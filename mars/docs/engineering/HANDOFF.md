@@ -111,54 +111,30 @@ wetness, shadows; `0c21dc1`, `83fda6f`).
 ## Tests & evaluations (per file counts, pass/fail, exact commands)
 
 **Engine suite.** `cd viewer && node --test engine/test/*.test.ts` (same as `npm run test:engine`).
-At `19aa5b6` it ran **122 tests: 120 pass, 1 fail, 1 skipped**, in 115 s wall time (not the ~10 min
-the brief expected).
+At `2ecff4b` (the deployed tree) it ran **127 tests: 126 pass, 0 fail, 1 skipped** (~3 min wall; the
+campus flagship test alone is ~2 min). Verified again by the deploy gate before release.
 
 | File (`engine/test/*.test.ts`) | n | Result | File | n | Result |
 | --- | ---: | --- | --- | ---: | --- |
-| `api` | 6 | pass | `core` | 6 | pass |
-| `build-bay` | 1 | pass | `env-sun` | 9 | pass |
-| `camera-geom` | 6 | pass | `history` | 3 | pass |
-| `camera-replay` | 3 | pass | `navigation` | 11 | pass |
-| `camera` | 6 | pass | **`progressive`** | 9 | **8 pass, 1 FAIL** |
-| `campus-extract` | 7 | 6 pass, 1 skip (`CAMPUS_FULL=1`) | `rehearsal` | 8 | pass |
-| `campus-flagship` | 1 | pass (114 s) | `sequence` | 9 | pass |
+| `api` | 6 | pass | `env-sun` | 9 | pass |
+| `build-bay` | 1 | pass | `history` | 3 | pass |
+| `camera-geom` | 6 | pass | `navigation` | 11 | pass |
+| `camera-replay` | 3 | pass | `progressive` | 9 | pass |
+| `camera` | 6 | pass | `rehearsal` | 8 | pass |
+| `campus-extract` | 7 | 6 pass, 1 skip (`CAMPUS_FULL=1`) | `review` | 5 | pass (C1–C3, H1–H2 regressions) |
+| `campus-flagship` | 1 | pass | `sequence` | 9 | pass |
 | `campus` | 9 | pass | `take` | 7 | pass |
 | `carry` | 10 | pass | `walk` | 7 | pass |
-| `construction` | 4 | pass | | | |
+| `construction` | 4 | pass | `core` | 6 | pass |
 
-The failure, verbatim:
-```
-✖ progressive floor: after 1 of 2 sheets only the installed sheet is walkable (2585.882333ms)
-  AssertionError [ERR_ASSERTION]: standing on the deck (y 1.9494500000000001)
-      at TestContext.<anonymous> (file:///…/viewer/engine/test/progressive.test.ts:113:10)
-```
-This is the "progressive deck-y regression" that `PROGRESS.md` (~11:30) lists as delegated. The suite
-is red until it lands.
+Earlier in the day `progressive floor` failed (walker at y 1.9494 instead of 1.9875). Root cause was
+the test fixture, not the engine: lying frames were placed with their base centre at y 0, i.e. sunk
+3.8 cm into the ground, which the old fixed-height beam placement masked. Fixtures now rest frames on
+the ground; two assertions were added (raised frames stand at y 0; feet exactly on the sheet top).
 
-**Spec §28 cases and the tests that cover them:**
-
-| Case | Test (file: title) |
-| --- | --- |
-| Wall | `navigation`: "wall: plans around the wall before contact"; `walk`: "walk around wall…" |
-| U-trap | `navigation`: "U-shaped trap…" |
-| Narrow passage | `walk`: "narrow passage: opposing walkers take turns…" |
-| Stair approach | `navigation`: "stairs: oblique approach…"; `walk`: "stairs: oblique start…" |
-| Multiple floors | `navigation`: "multi-level: deck → ground…" |
-| Long load around a corner | `carry`: 12 ft beam in the 2.5 m L passes; 19 ft upright is rejected at the corner |
-| Raise frame / premature release | `construction`: "supported bay: raise, hold, premature release refused…" |
-| Construction changes navigation | `navigation`: "construction changes navigation…"; `walk`: "construction mid-walk…"; `progressive`: "…forces a replan" |
-| Incomplete floor or stairs | `navigation`: "incomplete stairs…"; `progressive`: "progressive stairs…" |
-| Reservation conflict | `carry`: "…fails with reservation.conflict" |
-| Graceful cancellation | `carry`: three cancel cases; `construction`: "cancel mid-raise is refused" |
-| Camera collision and readability | `camera`: the collision, readability, glass and hysteresis tests |
-| Replay independence | `camera-replay`, `take`: "replay camera independence…", `api` |
-| Fork isolation, plan invalidation, replay isolation | `rehearsal`, `history`, `take`: "replay isolation…" |
-
-**Other suites** (none re-run for this handoff): `npm test` (`deploy/*.test.mjs`, 48/48 at audit
-time); `npm run test:simulation` (real MCP incl. `engine_*`, `fa20f9a`; needs `wrangler dev`);
-`npm run e2e` (studio 11/11, lab 13/13 per `PROGRESS.md`); `npm run typecheck`, `npm run lint`. All
-**(unverified now)**.
+**Other gates at release:** `npm test` 48/48 · `npx tsc --noEmit -p .` clean · Playwright
+`npm run e2e -- --workers=1` 26/26 (studio 11, lab 13, lab-build-bay 2) · `deploy/simulation-integration.mjs`
+PASS locally and against production (20 legacy + 9 `engine_*` tools).
 
 ## Concrete demonstrations that work (with numbers)
 
@@ -336,14 +312,16 @@ in `RELEASE_CHECKLIST.md`. Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
 
 ## Suggested next tranche (prioritised)
 
-1. **Green gate.** Fix the `progressive floor` deck-y regression. Put `test:engine`, `npm test`,
-   `typecheck`, `lint`, `e2e` and `test:simulation` in one gate script and record its output. Refresh
-   the stale numbers in `app/lab/README.md`, `TAKES_AND_PLANS.md` and `CAMERA.md`.
-2. **Planning cost.** Add a per-tick planning budget or queued replans. Replace the full `Spatial.sync`
-   rebuild with region-local grid/EDT updates. Profile the campus flagship to under 10 s of compute (or
-   chunk it for DO limits), and measure the ~3× replay regression before and after.
-3. **Visual proof of the flagship.** Render the campus take in the lab or studio, with a planned camera
-   track, video and committed baselines, all labelled hypothetical.
+1. **Gate script + doc refresh.** Put `test:engine`, `npm test`, `typecheck`, `lint`, `e2e` and
+   `test:simulation` in one gate script and record its output. Refresh stale numbers in
+   `app/lab/README.md`, `TAKES_AND_PLANS.md`, `CAMERA.md`, `CARRY.md`.
+2. **Planning cost, remaining part.** Base-obstacle rasters are cached now (campus flagship 56 s → 17 s
+   compute, identical hashes); still missing: a per-tick planning budget / queued replans for many
+   simultaneous walkers (200 ms spikes with 30), and region-local EDT updates instead of whole-grid.
+3. **Campus take in the studio.** The flagship already renders live in `/lab` on open ground; next is
+   the *campus* take (staging-east fork) rendered inside the 2026 studio scene with a planned camera
+   track and video, labelled hypothetical, plus the raise choreography fix (crew at the rising end)
+   and swept lift checks (lifts currently interpolate and can pass through beams).
 4. **People realism.** Carry, lift and hold poses (CCD hand IK, speed-matched walk), stair foot
    placement, multi-formation space reservation, and a deadlock detector that turns mutual waits into
    `blocked` plus a replan.
@@ -354,3 +332,41 @@ in `RELEASE_CHECKLIST.md`. Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
 7. **Reach.** Ladders and scaffold for full-height bays. Evidence-backed walkable decks and stairs in
    real 2026 buildings, as hand-authored links with provenance.
 8. **Milestone H** (inhabited scenes), then **mid-take resumability** (`ActionDef.snapshot/restore`).
+
+## Late-session addendum (lead, 2026-09-27 afternoon)
+
+Landed after the draft above was written; all commits are in the deployed tree `2ecff4b` unless noted.
+
+- **Independent review** (`docs/engineering/REVIEW.md`): 3 critical / 2 high / 6 medium / 9 low. The
+  criticals were real "impossible outcome, zero violations" cases, reproduced by scripts: carriers
+  teleporting to the heading-flipped pose on a mid-carry replan; holders able to walk away while the
+  frame stayed "held"; walkers passing through carried loads. All C/H findings are fixed with
+  regression tests (`engine/test/review.test.ts`) and three new invariants: `motion.teleport`
+  (0.6 m/tick — it immediately exposed two further walk_to teleports, also fixed), `support.holder-missing`,
+  `collision.human-load`. Failed/cancelled actions now cancel children, restore reserved phases, clear
+  tasks and release traffic entries; station reachability is checked at plan time. Medium/low findings
+  remain open (notably M2 cancel-on-stairs, M4 timeout leaves actions live, M5 DO rewrites whole history).
+- **Performance**: profiling showed the slowdown was `Spatial.sync` re-rasterising all 2,696 campus
+  obstacles on every construction change, not the people-avoidance replans. Cached base rasters:
+  campus flagship 56.4 s → 17.4 s compute; `routeAround` 2.3 s → 0.26 s; final-state and take hashes
+  bit-identical. Flagship after the review fixes: open ground 527.6 s simulated, campus 559.4 s,
+  take ≈ 452 KB, 0 violations, execute == rehearsal.
+- **Lab flagship**: `/lab` scenario "Build a rack bay" drives the real `SequenceRunner` per tick; its
+  final hash equals a Node `rehearse()` of the same plan. Baselines `e2e/baselines/build-bay-held-oblique.png`
+  and `build-bay-visitor-oblique.png` were inspected by the lead: frames held by two people each with
+  hands on the columns, beams at both heights between the columns, five joists, two sheets, ten-tread
+  stair to the deck edge, visitor on top. Honest weak spots: no lifting/leaning poses (only Idle/Walk
+  clips), raise crew stands at the base while the frame pivots up, lifts are not swept, the beam spins
+  180° in the air during `connect_beam` (one-line fix in `beam.ts`), a carrier can still bump a walker
+  who stopped beside the carry path (1 of 51 tried layouts).
+- **Production**: version `d33a4d6b-d4ae-4535-a818-0e5c329e9b4f` (built from `2ecff4b`), replacing
+  `de2dddaa-0fab-477c-8b8f-cb1c579efba5` (the previous `deployment.json` value `763de986…` was two
+  versions stale). `prepare.py` needed an `engine/` allowlist entry or `/engine/campus-2026.json`
+  would have 404'd. Live smoke: all routes 200, R2 model 200, MCP integration PASS (rehearse ≈ 0.85 s,
+  execute ≈ 0.74 s in the DO), headless production `/lab` flagship 43/43, 0 violations, screenshot
+  `viewer/e2e/artifacts/prod-smoke/build-bay-end-oblique.png` (inspected by the lead; identical state
+  to the local baseline). Rollback: see `RELEASE_CHECKLIST.md`.
+- **Process notes**: the network dropped repeatedly overnight; subagents stalled and were resumed
+  without losing committed work. `<usage-tool>` read a flat 11 % all night and did not track
+  this session. Git is local only (author genekogan); nothing was pushed — Gene adds the remote.
+
