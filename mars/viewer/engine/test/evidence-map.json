@@ -18,9 +18,10 @@
       "name": "U-shaped trap",
       "required": "Global planning escapes the shape; local steering alone does not oscillate indefinitely.",
       "tests": [
-        { "file": "navigation.test.ts", "title": "U-shaped trap: global route exits via the open side" }
+        { "file": "navigation.test.ts", "title": "U-shaped trap: global route exits via the open side" },
+        { "file": "gaps.test.ts", "title": "U-trap: a walker starting at the inner back wall" }
       ],
-      "approximate": "Planner-level only (findRoute). No runtime walk_to test starts inside the U, so local-steering oscillation there is not measured."
+      "approximate": "One synthetic U and one start/goal pair; oscillation is bounded by heading flips (≤ 6) and clearance is sampled per tick from the 0.1 m clearance grid (EDT), not continuously."
     },
     {
       "id": "narrow-passage",

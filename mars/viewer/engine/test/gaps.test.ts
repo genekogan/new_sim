@@ -1,5 +1,7 @@
 // Evidence gaps (EVIDENCE.md "approximate" notes turned into runtime tests):
-//   * two walkers pass side by side in a 2.0 m corridor (the 1.0 m gap still yields).
+//   * two walkers pass side by side in a 2.0 m corridor (the 1.0 m gap still yields);
+//   * a walker that starts inside the U-trap walks out and around without
+//     oscillating or grazing the U walls.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
@@ -8,6 +10,7 @@ import { Spatial } from '../spatial/service.ts';
 import { provingGround, PASS_W } from '../scenes/proving-ground.ts';
 import { emptyWorld, human, addAll } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
+import { clearanceAt } from '../spatial/grid.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
 
@@ -77,4 +80,39 @@ test('2.0 m corridor: both walkers keep moving while passing (no traffic.person 
   const b = rt.submit('walk_to', { actor: 'b', x: S[0], z: S[1] });
   assert.ok(rt.runUntilIdle(20 * 90));
   assert.deepEqual([a, b].map((r) => r.history.filter((h) => h.status === 'blocked').map((h) => h.code)), [[], []]);
+});
+
+// ---- U-trap: cup around (-15, 12), back wall inner face z = 14.85, opening toward −z ----
+
+test('U-trap: a walker starting at the inner back wall walks out and around to a goal behind the U; no oscillation, never within 0.28 m of the walls', () => {
+  const rt = setup(human('p1', -15, 14.4, { yaw: Math.PI / 2 }));
+  const sp = rt.services.spatial as Spatial;
+  sp.sync(rt.world);
+  const s = { flips: 0, last: rt.world.entities.p1.pose.yaw, prevTurn: 0, minClear: Infinity, at: [0, 0], minZ: Infinity };
+  rt.observers.push({
+    onTick: (r) => {
+      const e = r.world.entities.p1;
+      const d = e.pose.yaw - s.last;
+      const turn = Math.sign(Math.abs(d) > 1e-3 ? d : 0);
+      if (turn && s.prevTurn && turn !== s.prevTurn) s.flips++;
+      if (turn) s.prevTurn = turn;
+      s.last = e.pose.yaw;
+      sp.sync(r.world);
+      const p: [number, number] = [e.pose.p[0], e.pose.p[2]];
+      const c = clearanceAt(sp.level(0)!, p);
+      if (c < s.minClear) Object.assign(s, { minClear: c, at: p });
+      s.minZ = Math.min(s.minZ, p[1]);
+    },
+  });
+  assert.ok(clearanceAt(sp.level(0)!, [-15, 14.4]) >= HUMAN_RADIUS, 'start is standable');
+  const a = rt.submit('walk_to', { actor: 'p1', x: -15, z: 18 });
+  assert.equal(a.status, 'executing', a.diagnostic?.message);
+  assert.ok(rt.runUntilIdle(20 * 90));
+  assert.equal(a.status, 'completed', a.diagnostic?.message);
+  const p = rt.world.entities.p1.pose.p;
+  assert.ok(Math.hypot(p[0] + 15, p[2] - 18) < 0.05, `arrived at (${p[0].toFixed(2)}, ${p[2].toFixed(2)})`);
+  assert.ok(s.minZ < 9, `left the cup through its opening (min z ${s.minZ.toFixed(2)})`);
+  assert.ok(s.flips <= 6, `turn direction flips ${s.flips}`);
+  assert.ok(s.minClear >= HUMAN_RADIUS, `min clearance ${s.minClear.toFixed(3)} m at (${s.at.map((v) => v.toFixed(2)).join(', ')})`);
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
