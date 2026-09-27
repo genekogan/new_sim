@@ -74,6 +74,12 @@ across (turning on the way), straight down; paced at 1 m/s (≥ the verb's durat
 `lift.path-blocked` naming the obstacle of each variant. In the flagship both sheets are lifted over the side beams
 (s1 is staged east of the bay: the 12 ft end frames leave no path in from the south).
 
+**Crew accompanies the part** (`liftcrew.ts`, spec §7/§8; joist, plywood, tread, `connect_beam`): holders on the part's floor take hold beside hand points — new grip slots `lift-end-0/1` (ends, ±0.45 L), `lift-edge-0/1` (long-edge midpoints), `lift-corner-EK` (two corners of one short end); sheets try edges, then corners — picked so each can walk a straight line from pickup to seat, else one holder follows an end while the other waits at their station (`lift-station`; also deck workers taking a part from below: hand-up not modelled, not checked).
+Each tick a holder's target is its hand point + 0.35 m outward (else 0.35/0.6/0.85 m at ±45°/±90°, nearest free); it steps ≤ 0.9 m/s (sliding ±30°/60°), never onto clearance < 0.28 m or within 0.56 m of anyone, facing the hand point.
+The part is paced so no hand point outruns 0.9 m/s and waits while a holder would end > 0.9 m away; a holder stuck > 2 s → action `blocked`, `lift.crew-blocked` naming the obstacle/person (the crew keeps holding).
+Invariant `lift.hands-out-of-reach`: holder ≤ 1.0 m (ground) from its hand point, hand point (underside) ≤ 2.4 m above their floor; a lift-over apex > 2.4 m above the crew's lowest station floor is refused (`reach.too-high`).
+Flight carriers keep their own walk (slots `lift-edge-*`). Lifts take longer: full sequence 253.4 → 270.1 s simulated.
+
 ## Work access ("work from deck")
 A station must be on a level whose floor is ≤ 2.1 m (`STANDING_REACH`) below the part's top and not above it,
 within 0.8 m horizontally of its footprint, with clearance ≥ r + 0.03, not inside the part if it is a body-height
