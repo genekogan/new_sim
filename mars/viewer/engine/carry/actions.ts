@@ -66,8 +66,9 @@ const execsOf = (rt: Runtime): Map<string, Exec> => (rt.services.carryExecs ??= 
 
 /**
  * Read-only: the load discs of every load currently lifted by a live `carry` action (review C3).
- * With `braking`, a moving crew's load also contributes its discs where it would come to rest if it
- * braked now (marked `braking`), so a walker never steps where the load cannot stop short of it.
+ * With `braking`, a moving crew's load and carriers also contribute their discs where they would come
+ * to rest if the crew braked now (marked `braking`), so a walker never steps where the formation
+ * cannot stop short of it.
  * Walkers read this through `rt.services.loadDiscs` (registered on carry start: no walk.ts → carry
  * import cycle); the human-load invariant uses the current discs only.
  */
@@ -85,7 +86,9 @@ export function activeLoadDiscs(rt: Runtime, braking = false): LoadDisc[] {
     if (ex?.phase !== 'move' || ex.v < 0.02) continue;
     const U = ex.p.traj.u[ex.p.traj.u.length - 1], i0 = ex.i;
     const stop = (ex.v * ex.v) / (4 * ACCEL) + ex.v / 20; // braking distance at 2·ACCEL + one tick
-    for (const k of [0.5, 1]) for (const d of worldDiscs(f, poseAtU(ex, Math.min(U, ex.u + k * stop)))) if (d.d.part === 'load') out.push({ p: d.p, r: d.d.r, actionId, entity: e.id, crew, level, braking: true });
+    // carriers too: a walker must not stop where a carrier will be before the crew can halt (walkers
+    // only see the carriers' current bodies otherwise — the "walker beside the carry path" gap)
+    for (const k of [0.5, 1]) for (const d of worldDiscs(f, poseAtU(ex, Math.min(U, ex.u + k * stop)))) out.push({ p: d.p, r: d.d.r, actionId, entity: e.id, crew, level, braking: true });
     ex.i = i0; // poseAtU advances the segment cursor; restore it
   }
   return out;
@@ -117,6 +120,25 @@ function pathBystander(rt: Runtime, ex: Exec, u: number): string | null {
     if (spots.some((s) => Math.hypot(s[0] - x, s[1] - z) < 2 * 0.28 + 0.08)) return o.id;
   }
   return null;
+}
+
+/**
+ * True when a person standing at `q` is clear of the rest of this carry's route (every load disc and
+ * carrier spot from the current pose to the end, +0.15 m), or the carry has stopped moving. A walker
+ * blocked in the formation's way steps aside to such a spot and walks on once its goal passes it.
+ */
+function clearOfRoute(rt: Runtime, ex: Exec, q: Vec2): boolean {
+  if (!rt.isActive(ex.id) || ex.phase !== 'move') return true;
+  const { traj, f } = ex.p;
+  const U = traj.u[traj.u.length - 1];
+  const i0 = ex.i;
+  let clear = true;
+  for (let u = ex.u; clear; u = Math.min(U, u + 0.3)) {
+    for (const d of worldDiscs(f, poseAtU(ex, u))) if (Math.hypot(d.p[0] - q[0], d.p[1] - q[1]) < d.d.r + 0.28 + 0.15) { clear = false; break; }
+    if (u >= U) break;
+  }
+  ex.i = i0; // poseAtU advances the segment cursor; restore it
+  return clear;
 }
 
 /** A non-crew person standing within a body width of any station, or inside a laid footprint (+0.4 m). */
@@ -296,7 +318,8 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         ex.epoch = sp.epoch;
       }
       const U = p.traj.u[p.traj.u.length - 1];
-      // people in the formation's way: halt (never push through), ask idle bystanders to step aside
+      // people in the formation's way: halt (never push through), ask idle bystanders to step aside; a walker blocked
+      // in the way (its goal lies on the route) steps off the rest of the route and waits for the load to pass
       // sample the swept footprint from here to 1.2 m ahead (the first primitive may rotate in place)
       const ahead = [0, 0.3, 0.6, 0.9, 1.2].map((d) => pathBystander(rt, ex, Math.min(U, ex.u + d))).find((x) => x) ?? null;
       if (ahead) {
@@ -304,7 +327,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         ex.u = Math.min(U, ex.u + ex.v * dt);
         applyFormation(rt, ex, poseAtU(ex, ex.u));
         const c = poseAtU(ex, ex.u);
-        makeWay(rt, ahead, [c.x, c.z]);
+        makeWay(rt, ahead, [c.x, c.z], { by: `the crew carrying ${p.item}`, subjects: [p.item, ...p.crew], test: (q) => clearOfRoute(rt, ex, q) });
         // waited long enough: the people in the way are not going anywhere (another crew, a
         // boxed-in bystander) → replan the rest of the carry treating them as soft obstacles
         ex.waited = (ex.waited ?? 0) + 1;

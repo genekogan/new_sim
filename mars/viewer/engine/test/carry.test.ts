@@ -254,3 +254,41 @@ test('carry invariant: detects grip drift, a load inside a wall, and a wrong hol
   b.support = { kind: 'held', by: ['p1'] };
   assert.deepEqual(inv(rt).map((d) => d.code), ['carry.support']);
 });
+
+test('carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives', () => {
+  // A 2-person 12 ft beam carry on open ground (proving ground, (-7,-4) → (9,-4), carriers 0.4 m either
+  // side of the centreline). A walker w walks from 3–4 m away to a stop point beside or on the route,
+  // released at different times so it arrives before, during or just ahead of the formation. Before
+  // the fix: walkers stopped 0.46 m from a braking carrier (they saw only the carriers' current bodies),
+  // and a walker whose goal lay on the route deadlocked with the crew (each waiting for the other).
+  const layouts: { stop: Vec2; start: Vec2; delay: number }[] = [
+    { stop: [-4, -3.4], start: [-7, -0.4], delay: 120 }, // regressions found by the sweep
+    { stop: [1, -3.25], start: [-2, -0.25], delay: 240 },
+  ];
+  const lats = [-1.1, -0.9, -0.75, -0.6, 0.6, 0.75, 0.9, 1.1];
+  const xs = [-4, -2, 0, 2, 4];
+  let k = 0;
+  for (const x of xs) for (const lat of lats) {
+    const side = k % 2 ? 1 : -1;
+    layouts.push({ stop: [x, -4 + lat], start: [x + 3 * side, -4 + lat + 3 * Math.sign(lat)], delay: [60, 120, 180, 240][k % 4] });
+    k++;
+  }
+  assert.ok(layouts.length >= 40);
+  const bad: string[] = [];
+  for (const { stop, start, delay } of layouts) {
+    const base = provingGround();
+    const rt = setup(base, component('b1', 'beam-12ft', [-7, 0, -4], 0), human('p1', -9, -2), human('p2', -5, -6.5), human('w', start[0], start[1]));
+    const c = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b1', to: { x: 9, z: -4, yaw: 0 } });
+    assert.equal(c.status, 'executing', c.diagnostic?.message);
+    for (let t = 0; t < delay; t++) rt.step();
+    const w = rt.submit('walk_to', { actor: 'w', x: stop[0], z: stop[1] });
+    rt.runUntilIdle(20 * 150);
+    const tag = `stop (${stop}) from (${start}) at tick ${delay}`;
+    if (rt.violations.length) bad.push(`${tag}: ${rt.violations[0].message}`);
+    if ((c.status as string) !== 'completed') bad.push(`${tag}: carry ${c.status} ${c.diagnostic?.message ?? ''}`);
+    // w's own walk arrives at its stop point (an idle w may afterwards be asked to make way: also completed)
+    if (w.status !== 'completed' || w.outputs?.snapped !== 0) bad.push(`${tag}: walk ${w.status} ${w.diagnostic?.message ?? ''}`);
+    for (const r of rt.records.values()) if (r.verb === 'walk_to' && r.status !== 'completed') bad.push(`${tag}: ${r.id} ${r.status}`);
+  }
+  assert.deepEqual(bad, []);
+});

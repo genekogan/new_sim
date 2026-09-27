@@ -65,6 +65,12 @@ type Exec = {
   replanWait?: number;
   /** Set by a cancel during a stair traversal: finish the flight at the nearer landing, then stop (review M2). */
   cancelTo?: 'entry' | 'exit';
+  /**
+   * Stepping aside for a directed task this blocked walker stands in the way of (a carry formation,
+   * `makeWay` with `clearOf`): walk to `spot`, wait there until `clearOf(goal)` holds (the formation no
+   * longer needs the goal), then replan to the goal.
+   */
+  detour?: { spot: Vec2; level: number; by: string; clearOf: (q: Vec2) => boolean; stage: 'pending' | 'going' | 'waiting' };
 };
 
 export const walkSchema = z.strictObject({
@@ -77,6 +83,10 @@ export const walkSchema = z.strictObject({
 });
 
 const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
+/** Where the current route leads: the goal, or the step-aside spot while walking to it. */
+const targetOf = (ex: Exec) => (ex.detour?.stage === 'going' ? { level: ex.detour.level, p: ex.detour.spot } : ex.goal);
+/** Live walk_to execs by action id (so `makeWay` can ask a blocked walker to step aside). */
+const walkExecs = (rt: Runtime): Map<string, Exec> => (rt.services.walkExecs ??= new Map());
 export const traffic = (rt: Runtime): Map<string, { actors: Set<string>; entry: Vec2; dir: Vec2 }> =>
   (rt.services.traffic ??= new Map());
 
@@ -114,9 +124,14 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
       offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {}, peopleReplans: 0,
     };
     enterLeg(rt, ex);
+    walkExecs(rt).set(id, ex);
     return ex;
   },
-  step: stepWalk,
+  step(rt, ex, dt) {
+    const r = stepWalk(rt, ex, dt);
+    if (r.status === 'completed' || r.status === 'failed') walkExecs(rt).delete(ex.id);
+    return r;
+  },
   cancel(rt, ex) {
     // mid-flight on a stair: the body is between levels, so stopping here would leave it standing on
     // the flight. Defer: walk on to whichever landing is nearer along the path, then finish as cancelled.
@@ -126,6 +141,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
       return { ok: true, deferred: true };
     }
     releaseAll(rt, ex);
+    walkExecs(rt).delete(ex.id);
     const a = rt.world.entities[ex.actor];
     a.human!.activity = 'idle';
     a.human!.task = undefined;
@@ -156,6 +172,23 @@ function enterLeg(rt: Runtime, ex: Exec) {
     ex.climbT = 0;
     ex.phase = 'align';
   }
+}
+
+/** Every point of the route's first `upTo` metres (sampled every 0.3 m on walk legs) passes `ok`. */
+function routeHeadClear(route: Route, ok: (q: Vec2) => boolean, upTo: number): boolean {
+  let s = 0;
+  for (const leg of route.legs) {
+    if (leg.kind !== 'walk') return true;
+    for (let i = 1; i < leg.points.length; i++) {
+      const a = leg.points[i - 1], b = leg.points[i], len = dist2(a, b);
+      for (let t = 0; t <= len; t += 0.3) {
+        if (!ok(add2(a, scale2(sub2(b, a), len > 0 ? t / len : 0)))) return false;
+        if (s + t > upTo) return true;
+      }
+      s += len;
+    }
+  }
+  return true;
 }
 
 /** Intervals of the leg that pass through single-file components. */
@@ -244,6 +277,39 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     return { status: 'failed', diagnostic: { code: 'actor.holding', message: `${ex.actor} is holding ${a.human!.grip.entity} and cannot walk away until it is set down or stable`, subjects: [ex.actor, a.human!.grip.entity] } };
   }
   if (ex.cancelTo) return stepLinkCancel(rt, ex, a, ex.route.legs[ex.leg] as LinkLeg, dt);
+  if (ex.detour?.stage === 'pending') {
+    const r = planWalk(rt, a, { level: ex.detour.level, p: ex.detour.spot }, ex.profile);
+    if (r.ok) {
+      releaseAll(rt, ex);
+      ex.route = r.route;
+      ex.leg = 0;
+      ex.replans++;
+      ex.stuck = 0;
+      ex.v = 0;
+      ex.detour.stage = 'going';
+      enterLeg(rt, ex);
+      return { status: 'running', phase: 'step-aside' };
+    }
+    ex.detour = undefined;
+  }
+  if (ex.detour?.stage === 'waiting') {
+    // walk on once the goal and the first stretch of the way back to it are clear of the formation
+    const d = ex.detour;
+    const r = d.clearOf(ex.goal.p) ? planWalk(rt, a, ex.goal, ex.profile) : null;
+    if (r && !r.ok) return { status: 'failed', diagnostic: { ...r.diagnostic, code: 'route.invalidated', message: `${ex.actor} cannot walk on after stepping aside: ${r.diagnostic.message}` } };
+    if (!r || !routeHeadClear(r.route, d.clearOf, 4)) {
+      a.human!.activity = 'wait';
+      return { status: 'blocked', diagnostic: { code: 'traffic.stepped-aside', message: `${ex.actor} stepped aside for ${d.by} and waits for it to pass before walking on`, subjects: [ex.actor, d.by] } };
+    }
+    ex.detour = undefined;
+    releaseAll(rt, ex);
+    ex.route = r.route;
+    ex.leg = 0;
+    ex.replans++;
+    ex.stuck = 0;
+    enterLeg(rt, ex);
+    return { status: 'running', phase: 'replan' };
+  }
   // topology changed (construction)? replan only if the remaining corridor is no longer valid
   sp.sync(rt.world);
   let moved = false;
@@ -263,7 +329,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (takeReplan(rt, ex.replanWait >= REPLAN_MAX_WAIT || !prefixValid(rt, ex))) {
       ex.replanWait = undefined;
       releaseAll(rt, ex);
-      const r = planWalk(rt, a, ex.goal, ex.profile);
+      const r = planWalk(rt, a, targetOf(ex), ex.profile);
       if (!r.ok) return { status: 'failed', diagnostic: { ...r.diagnostic, code: 'route.invalidated', message: `route invalidated by construction: ${r.diagnostic.message}` } };
       ex.route = r.route;
       ex.leg = 0;
@@ -407,7 +473,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     // a carried load in the way counts as an obstacle too: route around where it is now
     const others = [...standingPeople(rt, a), ...loadDiscsFor(rt, a).map((d, i) => ({ id: `${d.entity}#${i}`, p: d.p }))];
     ex.plannedAround = Object.fromEntries(others.map((o) => [o.id, o.p]));
-    const rr = sp.routeAround(rt.world, ex.profile, { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] }, ex.goal, others);
+    const rr = sp.routeAround(rt.world, ex.profile, { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] }, targetOf(ex), others);
     if (rr.ok) {
       releaseAll(rt, ex);
       ex.route = rr.route;
@@ -439,6 +505,12 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
       ex.leg++;
       enterLeg(rt, ex);
       return { status: 'running', phase: ex.phase };
+    }
+    if (ex.detour?.stage === 'going') {
+      releaseAll(rt, ex);
+      ex.detour.stage = 'waiting';
+      a.human!.activity = 'wait';
+      return { status: 'running', phase: 'step-aside' };
     }
     if (ex.face !== undefined && Math.abs(angleDelta(a.pose.yaw, ex.face)) > 0.03) {
       a.pose.yaw = turnToward(a.pose.yaw, ex.face, ex.profile.turnRate * dt);
@@ -498,11 +570,24 @@ function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: 
 /**
  * Directed tasks outrank ambient idleness (spec §17): an idle person who is in
  * the way is asked to step to the nearest free spot clear of the requester's
- * destination. People with a task (holding, carrying, walking) are never moved.
+ * destination. People holding or carrying are never moved. A walker whose own
+ * walk_to is blocked (e.g. its goal lies in a carry formation's path, so each
+ * waits for the other) is moved only when the requester passes `clearOf`
+ * (true where the requester no longer needs the ground): it steps aside to a spot
+ * `clearOf` accepts, waits there until its goal is clear, then walks on.
  */
-export function makeWay(rt: Runtime, who: string, keepClear: Vec2) {
+export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { by: string; subjects: string[]; test: (q: Vec2) => boolean }) {
   const o = rt.world.entities[who];
-  if (!o?.human || o.human.task || o.human.grip) return;
+  if (!o?.human || o.human.grip) return;
+  let ex: Exec | undefined;
+  if (o.human.task) {
+    if (!clearOf) return;
+    const rec = rt.records.get(o.human.task);
+    ex = walkExecs(rt).get(o.human.task);
+    if (!ex || rec?.verb !== 'walk_to' || rec.status !== 'blocked' || ex.detour || ex.cancelTo || ex.route.legs[ex.leg]?.kind !== 'walk') return;
+    // only a mutual wait: the walker is blocked by the requester itself (its load or one of its crew)
+    if (!rec.diagnostic?.subjects?.some((s) => s !== who && clearOf.subjects.includes(s))) return;
+  }
   const sp = spatial(rt);
   const g = sp.level(o.human.level);
   if (!g) return;
@@ -512,16 +597,36 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2) {
   let best: Vec2 | null = null, bestScore = -Infinity;
   for (let k = 0; k < 12; k++) {
     const dir = rot2(base, (k * Math.PI) / 6);
-    for (const d of [1.2, 1.6, 2.2]) {
+    for (const d of ex ? [1.2, 1.6, 2.2, 3.0] : [1.2, 1.6, 2.2]) {
       const q = add2(from, scale2(dir, d));
       if (dist2(q, keepClear) < 1.0) continue;
       const c = clearanceAt(g, q);
       if (c < HUMAN_PROFILE.radius + 0.1 || occupant(rt, o, q, HUMAN_PROFILE.radius + 0.2)) continue;
+      if (ex && (!clearOf!.test(q) || !stepAwayClear(rt, o, from, q))) continue;
       const score = Math.min(c, 1.0) - 0.1 * d + 0.3 * (dir[0] * base[0] + dir[1] * base[1]);
       if (score > bestScore) { bestScore = score; best = q; }
     }
   }
-  if (best) rt.submit('walk_to', { actor: who, x: best[0], z: best[1] }, { id: `${who}:make-way:${rt.tick}` });
+  if (!best) return;
+  if (ex) ex.detour = { spot: best, level: o.human.level, by: clearOf!.by, clearOf: clearOf!.test, stage: 'pending' };
+  else rt.submit('walk_to', { actor: who, x: best[0], z: best[1] }, { id: `${who}:make-way:${rt.tick}` });
+}
+
+/** The straight way from `from` to `q` never brings `me` closer to a person or carried-load disc it is (or would be) touching. */
+function stepAwayClear(rt: Runtime, me: Entity, from: Vec2, q: Vec2): boolean {
+  const r = HUMAN_PROFILE.radius;
+  const discs = [
+    ...loadDiscsFor(rt, me).map((d) => ({ p: d.p, need: d.r + r + 0.05 })),
+    ...Object.values(rt.world.entities)
+      .filter((o) => o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level)
+      .map((o) => ({ p: [o.pose.p[0], o.pose.p[2]] as Vec2, need: 2 * r + 0.05 })),
+  ];
+  const len = dist2(from, q);
+  for (let t = 0.25; t <= len; t += 0.25) {
+    const p = add2(from, scale2(sub2(q, from), t / len));
+    for (const d of discs) if (dist2(p, d.p) < Math.min(d.need, dist2(from, d.p) - 1e-9)) return false;
+  }
+  return true;
 }
 
 function occupant(rt: Runtime, me: Entity, p: Vec2, r: number): string | null {
