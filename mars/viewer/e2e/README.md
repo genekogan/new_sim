@@ -89,6 +89,15 @@ and at most 1.5 % of pixels may differ. Baselines are captured at 1280×800 with
 deviceScaleFactor 1 and SwiftShader. Re-baseline after any intended visual
 change, and review the new PNGs before committing them.
 
+## Replay take (`studio-take.spec.ts`)
+
+Opens `/studio`, selects the flagship campus take from `public/engine/takes/manifest.json` (regenerate with
+`node deploy/record-campus-take.mjs`), scrubs to the manifest's four moments (first carry, both frames held, deck
+installed, visitor on the deck) with the engine camera on, then turns it off and frames a user camera. It asserts the
+sampled entity count and the final-state hash against the manifest, identical entity poses with either camera, the
+HYPOTHETICAL banner, and no console errors. Captures `studio-take-{carry,held,deck,visitor,user-camera}.png`; baselines
+`studio-take-held`, `studio-take-visitor`. `window.__marsStudio.take()` returns the replay readout (null when closed).
+
 ## Tests (`studio-years.spec.ts`)
 
 - For `/studio` and `/studio/2020` … `/studio/2025`: load, wait until ready,

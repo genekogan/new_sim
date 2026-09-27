@@ -15,6 +15,8 @@ object that points at a take by id, so re-shooting a take can never change it (S
 | `plan.ts` | `planCameraTrack(spec, sampler, scene, {duration, hz})` is the lookahead planner for known futures (takes). It returns `{samples, report}`. |
 | `track.ts` | `toCameraTrack(id, takeId, plan)` produces the `CameraTrack` stored in `take/types.ts` (`data` = `mars-camera-track/1`). `sampleTrack(data, t)` interpolates, and holds across cuts. |
 | `samplers.ts` | `walker(polyline, speed, t0, loop)` gives synthetic subject motion for tests and previews. |
+| `take-sampler.ts` | `takeSampler(take)`: a `Sampler` over a recorded Take (same poses as `sampleTake`, indexed and memoised per tick). Humans are standing subjects; components carry their catalog box corners + centre as points. |
+| `shotlist.ts` | `planShotList(windows, sampler, scene, opts)`: contiguous `[t0, t1)` shot windows, each planned by `planCameraTrack` on a time-shifted sampler, concatenated on one 1/hz grid with a cut at every boundary; merged report (per-shot findings prefixed with the shot label) plus `shots[]`. |
 
 **Sampler.** `sampler(t) → Record<id, SubjectPose>` with `SubjectPose = {p, yaw, height?, points?, weight?}`.
 The same code runs on a live runtime (entity poses) or a recorded take (its keyframes); the camera asks for nothing else.
@@ -148,4 +150,16 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 - **Candidates are local to the desired target.** There is no global search, cross-subject
   cutting or reverse-angle grammar yet. Viterbi does not enforce a hard minimum shot length
   (the cut cost does this in practice, and `temporal.cutsPer2s` reports it).
-- **Not yet available:** a take adapter (`sampler` from `take/replay.ts`), render-side blending, debug overlays.
+- **Not yet available:** render-side blending, debug overlays. Bystanders are not occluders: people and moving
+  parts are never in the occlusion set, so another person can stand between the camera and the subject.
+
+## Campus take + studio replay (2026-09-27)
+`node deploy/record-campus-take.mjs` rehearses the flagship on a fork of Mars 2026 (as `campus-flagship.test.ts`),
+plans a 10-shot list with `planShotList` + `takeSampler` against the ±40 m campus crop plus the finished bay as
+collision-only obstacles (`component: {collide, !occlude}`), and writes `public/engine/takes/flagship-campus-2026.json`
+(`mars-take-replay/1`: take + camera track + step timeline + moments; 1.41 MB, gzip 206 KB — take 501 KB, camera 904 KB,
+so no thinning was needed) and `manifest.json`. `--check` re-records and compares. Result: 6089 samples at 10 Hz, 12 cuts
+(9 shot boundaries + 3 in the raise orbit where a crew member walks out of frame), 0 invalid, 0 crossings, readability
+min 0.72 / mean 0.98, planned in ~2.3 s. The studio (`/studio`, 2026) replays it via "Replay take"
+(`app/engine-view/take-replay.ts`, `app/studio/take-{host,panel}`); the camera track only drives the view when "Engine
+camera" is on, and the take's poses at any t are identical either way (`e2e/studio-take.spec.ts`).
