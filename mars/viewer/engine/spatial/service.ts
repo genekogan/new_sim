@@ -9,6 +9,7 @@ import { def } from '../world/catalog.ts';
 import { buildGrids, gridsWithObstacles, StaticRaster, type GridSet } from './grid.ts';
 import { findRoute, type Place, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
+import type { Profiler } from '../runtime/profile.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
@@ -65,6 +66,8 @@ export class Spatial {
   scene!: SpatialScene;
   grids!: GridSet;
   epoch = 0;
+  /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
+  prof?: Profiler;
   private key = '';
   /** Rasters of the base obstacles (they lead every synced scene's obstacle list). */
   private raster: StaticRaster;
@@ -79,6 +82,15 @@ export class Spatial {
 
   /** Rebuild derived scene/grids iff navigation-relevant world content changed. */
   sync(world: WorldState): boolean {
+    const p = this.prof;
+    if (!p) return this.syncNow(world);
+    const t0 = p.now();
+    const rebuilt = this.syncNow(world);
+    p.add(rebuilt ? 'spatial.sync.rebuild' : 'spatial.sync', p.now() - t0);
+    return rebuilt;
+  }
+
+  private syncNow(world: WorldState): boolean {
     const relevant = Object.values(world.entities)
       .filter((e) => e.kind !== 'human' && e.phase && STATIC_PHASES.has(e.phase))
       .map((e) => [e.id, e.def, e.phase, e.pose, e.connections ?? [], e.support?.kind ?? '']);
@@ -110,6 +122,7 @@ export class Spatial {
   }
 
   route(world: WorldState, profile: AgentProfile, start: Place, goal: Place, opts?: Parameters<typeof findRoute>[5]): RouteResult {
+    if (this.prof) return this.prof.time('spatial.route', () => (this.sync(world), findRoute(this.grids, this.scene, profile, start, goal, opts)));
     this.sync(world);
     return findRoute(this.grids, this.scene, profile, start, goal, opts);
   }
@@ -125,6 +138,11 @@ export class Spatial {
    * incrementally from the synced grids and memoised per (epoch, ordered people, exact positions).
    */
   gridsAround(world: WorldState, people: { id: string; p: Vec2 }[]): { scene: SpatialScene; grids: GridSet } {
+    if (this.prof) return this.prof.time('spatial.gridsAround', () => this.gridsAroundNow(world, people));
+    return this.gridsAroundNow(world, people);
+  }
+
+  private gridsAroundNow(world: WorldState, people: { id: string; p: Vec2 }[]): { scene: SpatialScene; grids: GridSet } {
     this.sync(world);
     const key = `${this.epoch}|${people.map((q) => `${q.id}@${q.p[0]},${q.p[1]}`).join(';')}`;
     let hit = this.aroundCache.get(key);
@@ -144,8 +162,11 @@ export class Spatial {
 
   /** One-off route treating standing people as temporary obstacles (a walker blocked by someone not moving). */
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: { id: string; p: Vec2 }[]): RouteResult {
-    const { scene, grids } = this.gridsAround(world, people);
-    return findRoute(grids, scene, profile, start, goal);
+    const run = () => {
+      const { scene, grids } = this.gridsAround(world, people);
+      return findRoute(grids, scene, profile, start, goal);
+    };
+    return this.prof ? this.prof.time('spatial.routeAround', run) : run();
   }
 
   private narrowCache = new Map<string, Int32Array>();

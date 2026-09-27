@@ -5,6 +5,7 @@ import type { ActionDef, ActionRecord, ActionStatus, Diagnostic, Reservation } f
 import { TERMINAL } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
+import { Profiler } from './profile.ts';
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
 
@@ -35,6 +36,8 @@ export class Runtime {
   private owners = new Map<string, { action: string; mode: 'exclusive' | 'shared' }[]>();
   private nextId = 1;
   observers: RuntimeObserver[] = [];
+  /** Opt-in profiler (see `profile`); null when off. Measurement only, never read by the simulation. */
+  prof: Profiler | null = null;
 
   world: WorldState;
   registry: Map<string, ActionDef>;
@@ -54,6 +57,17 @@ export class Runtime {
     return this.world.tick * DT;
   }
 
+  /** `rt.profile = true` accumulates wall ms per `<verb>.plan` / `<verb>.step`, `invariants`, and (via
+   *  `services.spatial.prof`) per Spatial method. Turning it off drops the profiler. */
+  get profile() {
+    return this.prof !== null;
+  }
+  set profile(on: boolean) {
+    this.prof = on ? (this.prof ?? new Profiler()) : null;
+    const sp = this.services.spatial;
+    if (sp && typeof sp === 'object') sp.prof = this.prof ?? undefined;
+  }
+
   /** requested → validated → reserved → executing, or a diagnostic failure. */
   submit(verb: string, params: unknown, opts: { id?: string; parent?: string } = {}): ActionRecord {
     const id = opts.id ?? `a${this.nextId++}`;
@@ -69,7 +83,10 @@ export class Runtime {
         message: `invalid parameters for ${verb}: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
       });
     rec.params = parsed.data;
+    const prof = this.prof;
+    const t0 = prof ? prof.now() : 0;
     const plan = def.plan(this, parsed.data);
+    if (prof) prof.add(`${verb}.plan`, prof.now() - t0);
     if (!plan.ok) return this.fail(rec, plan.diagnostic);
     this.emit(rec, 'validated');
     const res = def.reservations(this.world, parsed.data);
@@ -119,7 +136,10 @@ export class Runtime {
     this.world.tick++;
     for (const l of [...this.live.values()]) {
       if (!this.live.has(l.rec.id)) continue; // finished earlier this tick (e.g. cancelled with its failed parent)
+      const prof = this.prof;
+      const t0 = prof ? prof.now() : 0;
       const r = l.def.step(this, l.exec, DT);
+      if (prof) prof.add(`${l.rec.verb}.step`, prof.now() - t0);
       if (r.status === 'running') {
         if (l.rec.status !== 'executing' || r.phase !== l.rec.phase) {
           l.rec.diagnostic = undefined;
@@ -136,11 +156,13 @@ export class Runtime {
         this.finish(l, 'failed', r.diagnostic);
       }
     }
+    const ti = this.prof ? this.prof.now() : 0;
     for (const inv of this.invariants)
       for (const d of inv(this)) {
         this.violations.push({ ...d, tick: this.tick });
         this.events.push({ tick: this.tick, type: 'violation', code: d.code, message: d.message, subjects: d.subjects });
       }
+    if (this.prof) this.prof.add('invariants', this.prof.now() - ti);
     for (const o of this.observers) o.onTick?.(this);
   }
 
