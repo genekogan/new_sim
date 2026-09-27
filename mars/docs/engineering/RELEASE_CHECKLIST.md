@@ -267,3 +267,59 @@ Rollback (from `viewer/`):
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 6f1200ce-ed10-467b-8d7f-a683f91292db \
   --name mars-campus-2026 -m "rollback: <reason>"
 ```
+
+## Production deploy 4 (2026-09-27)
+
+Deployed from committed tree `9561854` (clean `git status`). Contents: studio take replay
+(`/studio` "Replay take", with the engine-planned camera and scrubber), social vocabulary and the
+campfire-evening lab scene, the review fixes M3/M5/M6 and DO caps, deterministic head-on passing,
+the evidence report, and the gate.
+
+- **New version: `89e65c8c-5abb-4377-a693-3689de30d465`**. It replaces
+  `17f7c9aa-84d1-437d-b1d6-287c85e553fe`, which `wrangler deployments status` confirmed live at 100%
+  just before the deploy. `17f7c9aa…` is the new rollback target.
+- **Allowlist (`72bb2ad`):** `prepare.py` now stages `engine/takes/*.json` (manifest + flagship take)
+  via one line. Without it, `/engine/takes/*` would 404 and the studio picker would be empty. The take
+  is re-serialized by `scrub()` (1,424,001 → 1,615,368 B, content identical). The loader checks
+  the schema, the camera/take id and the final-state hash, not the byte size.
+- **Gate:** `viewer/.cloudflare/gate/2026-09-27T23-03-25-583Z/report.json`: `ok: true`, `gitHead`
+  `9561854`, `gitDirty: false`. Results: `npm test` 48/48; `test:engine` 177 pass / 1 skip; `tsc`
+  clean; e2e 28/28 in 306 s (studio 11, lab 13, lab-build-bay 2, lab-social 1, studio-take 1; no
+  baseline refresh); probe `finalStateHash` `79447f75…6129` at 11403 ticks. A first green run at
+  `72bb2ad` came before the evidence commit.
+- **Evidence (`9561854`):** `npm run evidence` gave 17/17 rows and 8/8 milestones PROVEN.
+- **Build:** `prepare.py` staged 306 files (789.9 MiB, 8 large objects). `CLOUDFLARE_RELEASE=1 npm run
+  build` exited 0 with only the known chunk-size warning. The route list includes `/lab` and `/lab/`.
+  `dist/client/engine/campus-2026.json` (1,081,647 B), `engine/takes/manifest.json` (926 B) and
+  `engine/takes/flagship-campus-2026.json` (1,615,368 B) are present. The dry run exited 0 (335 assets,
+  3399.28 KiB / 708.50 KiB gzip; bindings SIMULATIONS, MODELS, ASSETS). `upload.mjs` made 0 uploads
+  (8 × `Already uploaded`). The deploy uploaded 13 new asset files (301 already present); startup
+  77 ms.
+- **Live smoke:** `/`, `/studio`, `/lab` and `/simulation-guide` returned 200 text/html.
+  `/simulation-agent-guide.md` returned 200 (20,394 B). `/engine/campus-2026.json` returned 200 (parses).
+  `/engine/takes/manifest.json` and `/engine/takes/flagship-campus-2026.json` returned 200
+  application/json. `/nope` returned 404. `HEAD /browser/campus.glb` returned 200 model/gltf-binary
+  from R2.
+- **Integration:** `SIM_BASE=… node deploy/simulation-integration.mjs` printed both PASS lines, run on
+  its own. Engine timings: rehearse 797 ms wall, execute 566 ms, camera 1127 ms; take 45,386 B.
+- **Browser `/lab`:** headless Chromium (SwiftShader) on production `/lab?scenario=build-bay` ran
+  `runScenario` + `runToEnd`: tick 11403, done, 5/5 expectations (43/43 steps, 0 violations, visitor
+  on level 4), 0 console errors. Screenshot: `viewer/e2e/artifacts/prod-smoke-4/build-bay-end-oblique.png`.
+- **Cross-host determinism:** the production `stateHash()` is
+  `79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129`, the same value
+  `node deploy/determinism-probe.mjs` gives (11403 ticks). **They match.**
+- **Browser `/studio`:** selected take `c531eaf4…`, then scrubbed to "held" (t 227.6 s) with the engine
+  camera on (shot "orbit the raise"). 37/37 entities were drawn. The final-state hash equals both the
+  recorded and the manifest hash (`b159317e…0bda`). The HYPOTHETICAL banner is visible and there
+  were 0 console errors. Screenshot: `viewer/e2e/artifacts/prod-smoke-4/studio-take-held.png`. Reviewed:
+  it matches the `studio-take-held` baseline (bay among the trailers, crew holding both frames).
+  Note: `/studio` needs about 2+ minutes to become ready from this host because the 38.5 MB
+  `/browser/campus.glb` downloads at about 310 KB/s. A 180 s wait timed out once, and the rerun with a
+  600 s wait passed. This is a network cost, not a regression.
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 17f7c9aa-84d1-437d-b1d6-287c85e553fe \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```
