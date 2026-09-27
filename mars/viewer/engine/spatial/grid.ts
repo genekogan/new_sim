@@ -2,7 +2,7 @@
 // Deterministic, allocation-light and pure TS so it runs in the Durable
 // Object as well as the browser. Rebuilt (or patched) when construction
 // changes the scene.
-import { obbCorners, pointInObb, type OBB2, type Vec2 } from '../core/math.ts';
+import { obbCorners, obbOverlap, pointInObb, type OBB2, type Vec2 } from '../core/math.ts';
 import type { SpatialScene } from './types.ts';
 
 export type LevelGrid = {
@@ -39,15 +39,19 @@ export function buildGrids(scene: SpatialScene, cell = 0.1): GridSet {
       rasterObb(o.obb, minX, minZ, cell, nx, nz, (i) => {
         if (free[i]) blockers.set(i, o.id);
         free[i] = 0;
-      });
+      }, true);
     }
     levels.set(lv.id, { level: lv.id, y: lv.y, cell, nx, nz, x0: minX, z0: minZ, free, clearance: edt(free, nx, nz, cell), blockers });
   }
   return { cell, levels };
 }
 
-/** Visit every cell whose centre lies inside the OBB. */
-export function rasterObb(o: OBB2, x0: number, z0: number, cell: number, nx: number, nz: number, fn: (i: number) => void) {
+/**
+ * Visit cells covered by the OBB. `conservative` (obstacles): every cell the OBB
+ * touches, so thin panels are never lost between cell centres. Otherwise
+ * (floors): only cells whose centre lies inside, so floors never grow.
+ */
+export function rasterObb(o: OBB2, x0: number, z0: number, cell: number, nx: number, nz: number, fn: (i: number) => void, conservative = false) {
   const cs = obbCorners(o);
   let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
   for (const [x, z] of cs) { ax = Math.min(ax, x); az = Math.min(az, z); bx = Math.max(bx, x); bz = Math.max(bz, z); }
@@ -56,7 +60,7 @@ export function rasterObb(o: OBB2, x0: number, z0: number, cell: number, nx: num
   for (let j = j0; j <= j1; j++)
     for (let i = i0; i <= i1; i++) {
       const p: Vec2 = [x0 + (i + 0.5) * cell, z0 + (j + 0.5) * cell];
-      if (pointInObb(p, o, 1e-9)) fn(j * nx + i);
+      if (conservative ? obbOverlap(o, { c: p, half: [cell / 2 - 1e-9, cell / 2 - 1e-9], yaw: 0 }) : pointInObb(p, o, 1e-9)) fn(j * nx + i);
     }
 }
 

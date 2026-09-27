@@ -108,4 +108,41 @@ export class Spatial {
   level(id: number) {
     return this.grids.levels.get(id);
   }
+
+  private narrowCache = new Map<string, Int32Array>();
+  /**
+   * Connected components of "single-file" cells: standable for radius r but
+   * too tight for two agents to pass (clearance < 2r + margin). Each component
+   * is a traffic resource that opposing walkers must take turns through.
+   */
+  narrow(level: number, r: number, margin = 0.15): Int32Array {
+    const key = `${this.epoch}:${level}:${r}:${margin}`;
+    let lab = this.narrowCache.get(key);
+    if (lab) return lab;
+    if (this.narrowCache.size > 16) this.narrowCache.clear();
+    const g = this.grids.levels.get(level)!;
+    const n = g.nx * g.nz;
+    lab = new Int32Array(n).fill(-1);
+    const isNarrow = (c: number) => g.clearance[c] >= r && g.clearance[c] < 2 * r + margin;
+    let next = 0;
+    const stack: number[] = [];
+    for (let c = 0; c < n; c++) {
+      if (lab[c] !== -1 || !isNarrow(c)) continue;
+      lab[c] = next;
+      stack.push(c);
+      while (stack.length) {
+        const k = stack.pop()!;
+        const i = k % g.nx, j = (k - i) / g.nx;
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ni = i + di, nj = j + dj;
+          if (ni < 0 || nj < 0 || ni >= g.nx || nj >= g.nz) continue;
+          const m = nj * g.nx + ni;
+          if (lab[m] === -1 && isNarrow(m)) { lab[m] = next; stack.push(m); }
+        }
+      }
+      next++;
+    }
+    this.narrowCache.set(key, lab);
+    return lab;
+  }
 }
