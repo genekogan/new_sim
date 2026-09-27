@@ -189,6 +189,7 @@ produced that state. Fix: in the `climb` phase return `{ ok: true, deferred: tru
 and finish the traversal (or reverse it) before completing as cancelled.
 
 ### M3. Replanning around people is a no-op on decks or any level above y ≈ 1.6 m
+> **Fixed 2026-09-27.** `Spatial.gridsAround`/`routeAround` now place each person at their own foot height (`pose.p[1]`, or an explicit `y`): band [foot, foot + 1.8 m], rasterised only into levels whose floor lies in [foot − 0.3, foot + 1.8). Carried-load discs (`<entity>#i`) use the load's real height band. Pinned hashes unchanged (probe `d54eca7c…`, campus `f60e10b4…`). Test: `replan around people on the deck (review M3)` — a person pinned in a deck gap forces a replan through the other gap (route 5 m → 10 m, completes, 0 violations); a person on the ground below leaves deck routes unchanged, and vice versa.
 `spatial/service.ts:124, 133` gives the "person" obstacles fixed `y0: 0, y1: 1.8`.
 `buildGrids` skips them on any level whose `y + 0.22 ≥ 1.8`. On a deck, `routeAround`
 returns the same corridor. The walker burns `MAX_PEOPLE_REPLANS` and stays blocked. The

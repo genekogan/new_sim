@@ -8,6 +8,7 @@ import { Spatial } from '../spatial/service.ts';
 import { provingGround, DECK_Y } from '../scenes/proving-ground.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
+import { HUMAN_PROFILE } from '../spatial/types.ts';
 import type { ActionDef } from '../actions/types.ts';
 
 function setup(...people: ReturnType<typeof human>[]) {
@@ -156,4 +157,40 @@ test('cancel mid-climb (review M2): the walker finishes at the nearer landing on
     assert.ok(!codes.includes('collision.human-static') && !codes.includes('motion.teleport'), codes.join(', '));
     assert.deepEqual(rt.violations.map((v) => v.message), []);
   }
+});
+
+test('replan around people on the deck (review M3): obstacles sit at their own foot height', () => {
+  // routeAround: a person on the deck lengthens a deck route; one on the ground below does not
+  const base = provingGround();
+  const sp = new Spatial(base);
+  const w = addAll(emptyWorld('proving-ground', base), human('a', 7.2, 10, { level: 1, y: DECK_Y }), human('b', 10, 10, { level: 1, y: DECK_Y }), human('g', 10, 10));
+  const from = { level: 1, p: [7.2, 10] as [number, number] }, to = { level: 1, p: [12.8, 10] as [number, number] };
+  const len = (people: { id: string; p: [number, number] }[]) => {
+    const r = people.length ? sp.routeAround(w, HUMAN_PROFILE, from, to, people) : sp.route(w, HUMAN_PROFILE, from, to);
+    assert.ok(r.ok);
+    return r.route.length;
+  };
+  const plain = len([]);
+  assert.ok(len([{ id: 'b', p: [10, 10] }]) > plain + 0.2, 'deck person is an obstacle on the deck');
+  assert.equal(len([{ id: 'g', p: [10, 10] }]), plain, 'ground person under the deck does not affect deck routes');
+  // ground routes ignore the deck person
+  const g0 = { level: 0, p: [8, 10] as [number, number] }, g1 = { level: 0, p: [12, 10] as [number, number] };
+  const gPlain = sp.route(w, HUMAN_PROFILE, g0, g1), gAround = sp.routeAround(w, HUMAN_PROFILE, g0, g1, [{ id: 'b', p: [10, 10] }]);
+  assert.ok(gPlain.ok && gAround.ok);
+  assert.equal(gAround.route.length, gPlain.route.length, 'deck person does not block the ground under the deck');
+
+  // walk_to: a wall across the deck leaves two gaps; a person who cannot make way (has a task)
+  // stands in the direct gap. The walker replans on the deck through the other gap and arrives.
+  const walled = provingGround({ extra: [{ id: 'deck-wall', obb: { c: [10, 10], half: [0.1, 1.8], yaw: 0 }, y0: DECK_Y, y1: DECK_Y + 2.4, kind: 'solid', label: 'deck wall' }] });
+  const pinned = human('b', 10, 12.4, { level: 1, y: DECK_Y });
+  pinned.human!.task = 'holding-position';
+  const world = addAll(emptyWorld('proving-ground', walled), human('a', 7.5, 12.4, { level: 1, y: DECK_Y }), pinned, human('g', 10, 12.4));
+  const rt = new Runtime(world, new Map<string, ActionDef>([['walk_to', walkTo]]), { spatial: new Spatial(walled) }, DEFAULT_INVARIANTS);
+  const act = rt.submit('walk_to', { actor: 'a', x: 12.5, z: 12.4, level: 1 });
+  assert.ok(rt.runUntilIdle(20 * 120), `still ${act.status}: ${act.diagnostic?.message}`);
+  assert.equal(act.status, 'completed', act.diagnostic?.message);
+  assert.ok((act.outputs?.replans as number) >= 1, 'replanned around the deck person');
+  assert.ok((act.outputs?.length as number) > 5 + 2, `route grew (${act.outputs?.length})`);
+  assert.equal(rt.world.entities.a.human!.level, 1);
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
 });

@@ -15,6 +15,22 @@ import type { Profiler } from '../runtime/profile.ts';
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
 /** Bounded memo of people-augmented grids (each holds full-size rasters). */
 const AROUND_CACHE = 8;
+/** Height band a standing person blocks above their feet. */
+const PERSON_H = 1.8;
+
+/** A temporary obstacle for gridsAround/routeAround: a person id (height from the world, or `y`) or `<entity>#i` load disc. */
+export type AroundPerson = { id: string; p: Vec2; y?: number };
+
+function aroundObstacle(world: WorldState, q: AroundPerson): { o: Obstacle; foot?: number } {
+  const e = world.entities[q.id] ?? world.entities[q.id.split('#')[0]];
+  const obb = { c: q.p, half: [0.3, 0.3] as Vec2, yaw: 0 };
+  if (q.y === undefined && e && e.kind !== 'human') {
+    const f = entityFootprint(e);
+    return { o: { id: q.id, obb, y0: f.y0, y1: f.y1, kind: 'solid', label: `${e.label ?? e.id} (moving)` } };
+  }
+  const foot = q.y ?? e?.pose.p[1] ?? 0;
+  return { o: { id: q.id, obb, y0: foot, y1: foot + PERSON_H, kind: 'solid', label: `person ${q.id}` }, foot };
+}
 
 /** World-space box corners for an entity (handles yaw/pitch/roll). */
 export function entityCorners(e: Entity): [number, number, number][] {
@@ -139,34 +155,50 @@ export class Spatial {
   private aroundCache = new Map<string, { scene: SpatialScene; grids: GridSet }>();
   /**
    * Grids of the current scene with the given standing people added as soft obstacles (for
-   * replanning around them). Exact — identical to buildGrids of the augmented scene — but built
-   * incrementally from the synced grids and memoised per (epoch, ordered people, exact positions).
+   * replanning around them), built incrementally from the synced grids and memoised per
+   * (epoch, ordered people, exact positions and heights).
+   *
+   * A person occupies [foot, foot + 1.8 m] where foot = their pose y (or `q.y`), and is rasterised
+   * only into levels whose floor lies in [foot − 0.3, foot + 1.8) — the level they stand on, not a
+   * deck overhead or the ground under a deck (review M3). Anything else in `people` (e.g. carried-
+   * load discs `<entity>#i`) keeps its entity's real height band under the usual per-level rule.
    */
-  gridsAround(world: WorldState, people: { id: string; p: Vec2 }[]): { scene: SpatialScene; grids: GridSet } {
+  gridsAround(world: WorldState, people: AroundPerson[]): { scene: SpatialScene; grids: GridSet } {
     if (this.prof) return this.prof.time('spatial.gridsAround', () => this.gridsAroundNow(world, people));
     return this.gridsAroundNow(world, people);
   }
 
-  private gridsAroundNow(world: WorldState, people: { id: string; p: Vec2 }[]): { scene: SpatialScene; grids: GridSet } {
+  private gridsAroundNow(world: WorldState, people: AroundPerson[]): { scene: SpatialScene; grids: GridSet } {
     this.sync(world);
-    const key = `${this.epoch}|${people.map((q) => `${q.id}@${q.p[0]},${q.p[1]}`).join(';')}`;
+    const placed = people.map((q) => aroundObstacle(world, q));
+    const key = `${this.epoch}|${placed.map(({ o, foot }) => `${o.id}@${o.obb.c[0]},${o.obb.c[1]},${o.y0},${o.y1},${foot ?? ''}`).join(';')}`;
     let hit = this.aroundCache.get(key);
     if (hit) {
       this.aroundCache.delete(key);
       this.aroundCache.set(key, hit);
       return hit;
     }
+    const extra = placed.map((x) => x.o);
     // people as obstacles: 0.3 m half-width so corridors pass ≥ 0.58 m from them (the hard
-    // separation guard is 0.54 m); the route start snaps within 0.5 m if someone stands close
-    const extra: Obstacle[] = people.map((q) => ({ id: q.id, obb: { c: q.p, half: [0.3, 0.3], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid', label: `person ${q.id}` }));
-    hit = { scene: { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] }, grids: gridsWithObstacles(this.grids, extra) };
+    // separation guard is 0.54 m); the route start snaps within 0.5 m if someone stands close.
+    // Rasterise level by level so each person lands only on the levels at their own height.
+    const levels = new Map(this.grids.levels);
+    for (const [id, g] of this.grids.levels) {
+      const here: Obstacle[] = [];
+      for (const { o, foot } of placed) {
+        if (foot === undefined) here.push(o);
+        else if (g.y >= foot - 0.3 && g.y < foot + PERSON_H) here.push({ ...o, y0: g.y, y1: g.y + PERSON_H });
+      }
+      if (here.length) levels.set(id, gridsWithObstacles({ cell: this.grids.cell, levels: new Map([[id, g]]) }, here).levels.get(id)!);
+    }
+    hit = { scene: { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] }, grids: { cell: this.grids.cell, levels } };
     for (const k of this.aroundCache.keys()) if (this.aroundCache.size >= AROUND_CACHE || !k.startsWith(`${this.epoch}|`)) this.aroundCache.delete(k);
     this.aroundCache.set(key, hit);
     return hit;
   }
 
   /** One-off route treating standing people as temporary obstacles (a walker blocked by someone not moving). */
-  routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: { id: string; p: Vec2 }[]): RouteResult {
+  routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[]): RouteResult {
     const run = () => {
       const { scene, grids } = this.gridsAround(world, people);
       return findRoute(grids, scene, profile, start, goal, this.planner === 'exact' ? undefined : { planner: this.planner });
