@@ -34,7 +34,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     launchOptions: {
       // Software WebGL: identical pixels on any machine, no GPU needed.
-      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info'],
     },
   },
   webServer: [

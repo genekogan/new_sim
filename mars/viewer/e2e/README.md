@@ -127,4 +127,28 @@ when the context closes.
 
 ## Perf snapshot
 
-(filled in below from the latest run)
+`perf.json` records, per year, `window.__marsStudio.info()` (the three.js
+`renderer.info` for the last frame at the default camera) and the Chromium
+`performance.memory` heap. Chromium runs with `--enable-precise-memory-info`;
+without that flag the heap figures are coarse and stale. Run of 2026-09-27,
+1280×800, SwiftShader, M-series Mac:
+
+| route | load ms* | draw calls | triangles | geometries | textures | JS heap MB† |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| /studio (2026) | 8756 | 1083 | 957,420 | 1296 | 390 | 329 |
+| /studio/2020 | 7362 | 128 | 17,298 | 104 | 19 | 353 |
+| /studio/2021 | 5880 | 95 | 23,096 | 116 | 13 | 402 |
+| /studio/2022 | 5794 | 57 | 12,030 | 126 | 13 | 82 |
+| /studio/2023 | 5810 | 76 | 16,196 | 141 | 12 | 64 |
+| /studio/2024 | 5838 | 117 | 17,144 | 155 | 18 | 74 |
+| /studio/2025 | 5873 | 65 | 17,646 | 136 | 11 | 111 |
+
+\* From `goto` to `waitReady`. About 5 s of that is the fixed pixel-ratio
+budget window that `waitReady` waits for, so the model/scene load itself is
+roughly load − 5 s. The 70 MB 2026 GLB comes from the local disk.
+† Used heap at snapshot time, without a forced GC. All years are opened in one
+page, in order, so 2020 and 2021 still carry uncollected garbage from the 2026
+model. Compare trends between runs, not absolute values. The adaptive loop
+drops SwiftShader to `pixelRatio` 0.8 on every route, because software GL
+renders under 30 fps. On a real GPU, draw calls and triangles are the same but
+the pixel ratio stays higher.

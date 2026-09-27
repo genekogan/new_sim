@@ -77,6 +77,19 @@ export async function waitReady(page: Page, { frames = 3, settle = true, timeout
       { timeout },
     );
   }
+  // Photo-evidence thumbnails etc.: no pending requests, visible images decoded.
+  await page.waitForLoadState('networkidle', { timeout });
+  await page.waitForFunction(
+    () =>
+      [...document.images]
+        .filter((img) => {
+          const r = img.getBoundingClientRect();
+          return r.width > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+        })
+        .every((img) => img.complete),
+    null,
+    { timeout },
+  );
   await waitFrames(page, frames);
   await expect(page.getByRole('status').filter({ hasText: 'Loading' })).toHaveCount(0);
 }
