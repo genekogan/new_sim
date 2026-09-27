@@ -3,11 +3,18 @@
 // the tall blue two-column braced frame; beams are the orange horizontals.
 // Other values are industry-typical and marked provisional until checked
 // against photos or the 2026 component catalog.
-import { FT, IN, type Vec3 } from '../core/math.ts';
+import { dcos, dsin, FT, IN, type Vec3 } from '../core/math.ts';
 import type { Confidence } from './types.ts';
 
 export type GripSlot = { id: string; local: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
+
+/**
+ * Interaction slot on a fixture (spec §5 affordances, RESEARCH §8 Smart Objects): where a person's
+ * body stands/sits, in the fixture's local ground frame (x, z), and the local yaw they face.
+ * Runtime claims live in engine/social/slots.ts (`slot:<entity>#<id>` reservations).
+ */
+export type SlotDef = { id: string; kind: 'seat' | 'stand' | 'audience' | 'fire-circle'; local: [x: number, z: number]; yaw: number };
 
 export type Handling = {
   /** Crew sizes allowed to carry (spec §11). */
@@ -36,6 +43,8 @@ export type AssetDef = {
   sockets?: Socket[];
   /** Stair flight modules: number of treads (risers = treads + 1; the landing is the top step). */
   stair?: { treads: number };
+  /** Interaction slots (seats, fire-circle places); see SlotDef. */
+  slots?: SlotDef[];
   dims: { confidence: Confidence; note: string };
 };
 
@@ -168,6 +177,47 @@ function stairFlight(treads: number, rise: number): AssetDef {
   };
 }
 
+// Social fixtures (spec §17, SOCIAL.md). Seats face local +z (yaw π/2). Fixtures carry no `phase`
+// unless placed as an obstacle, so seats are walk-on points: there is no seat collision geometry yet.
+const FACE_Z = Math.PI / 2;
+const FIRE_RING = 1.6; // m from the fire centre to where people stand
+const SOCIAL_FIXTURES: AssetDef[] = [
+  {
+    id: 'bench-6ft',
+    label: '6 ft bench (3 seats)',
+    category: 'fixture',
+    size: [6 * FT, 0.45, 0.4],
+    massKg: 25,
+    color: '#8a6a45',
+    slots: [-1, 0, 1].map((k, i) => ({ id: `seat${i}`, kind: 'seat' as const, local: [k * 2 * FT, 0] as [number, number], yaw: FACE_Z })),
+    dims: provisional('generic site-built bench; seats every 2 ft'),
+  },
+  {
+    id: 'camp-chair',
+    label: 'folding camp chair',
+    category: 'fixture',
+    size: [0.55, 0.85, 0.55],
+    massKg: 4,
+    color: '#2f6f5f',
+    slots: [{ id: 'seat', kind: 'seat', local: [0, 0], yaw: FACE_Z }],
+    dims: provisional('generic folding camp chair'),
+  },
+  {
+    id: 'campfire',
+    label: 'campfire (stone ring)',
+    category: 'fixture',
+    size: [1.0, 0.35, 1.0],
+    massKg: 80,
+    color: '#7a3b1e',
+    // 8 places on a 1.6 m circle, each facing the fire
+    slots: Array.from({ length: 8 }, (_, k) => {
+      const a = (k * Math.PI) / 4;
+      return { id: `ring${k}`, kind: 'fire-circle' as const, local: [FIRE_RING * dcos(a), FIRE_RING * dsin(a)] as [number, number], yaw: a + Math.PI };
+    }),
+    dims: provisional('generic 1 m fire ring; people stand/sit 1.6 m from its centre'),
+  },
+];
+
 export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
   [
     ...[8, 9, 12, 16, 19].map(upright),
@@ -222,6 +272,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
       massKg: 70,
       dims: provisional('generic adult; collision radius 0.28 m'),
     } satisfies AssetDef,
+    ...SOCIAL_FIXTURES,
     {
       id: 'test-wall',
       label: 'proving-ground wall block',
