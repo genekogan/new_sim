@@ -6,7 +6,7 @@
 //   traffic   : single-file passages are exclusive resources per direction (yield, never oscillate)
 //   animation : consumers read pose + human.activity; they never write positions
 import { z } from 'zod';
-import { add2, angleDelta, clamp, dist2, heading, norm2, rot2, scale2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
+import { add2, angleDelta, clamp, dist2, heading, len2, norm2, rot2, scale2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
@@ -356,13 +356,15 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   }
   if (yieldTo && ex.v < 0.02)
     return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${ex.actor} is waiting for ${yieldTo} to clear a single-file passage`, subjects: [ex.actor, yieldTo] } };
-  if (personBlock && ex.v < 0.02)
+  if (personBlock && ex.v < 0.02) {
+    makeWay(rt, personBlock, pointAt(ex, ex.total));
     return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} is waiting for ${personBlock} to move out of the way`, subjects: [ex.actor, personBlock] } };
+  }
   if (arrived) {
     if (Math.abs(ex.offset) > 0.05) {
       const occ = occupant(rt, a, pointAt(ex, ex.total), ex.profile.radius);
       if (occ) {
-        ex.offset = ex.offset; // hold position beside the goal
+        makeWay(rt, occ, pointAt(ex, ex.total));
         return { status: 'blocked', diagnostic: { code: 'walk.goal-occupied', message: `${ex.actor} cannot step onto its destination: ${occ} is standing there`, subjects: [ex.actor, occ] } };
       }
       return { status: 'running', phase: 'settle' };
@@ -406,6 +408,35 @@ function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: 
     if (dTo < dFrom - 1e-9) return o.id;
   }
   return null;
+}
+
+/**
+ * Directed tasks outrank ambient idleness (spec §17): an idle person who is in
+ * the way is asked to step to the nearest free spot clear of the requester's
+ * destination. People with a task (holding, carrying, walking) are never moved.
+ */
+export function makeWay(rt: Runtime, who: string, keepClear: Vec2) {
+  const o = rt.world.entities[who];
+  if (!o?.human || o.human.task || o.human.grip) return;
+  const sp = spatial(rt);
+  const g = sp.level(o.human.level);
+  if (!g) return;
+  const from: Vec2 = [o.pose.p[0], o.pose.p[2]];
+  const away = norm2(sub2(from, keepClear));
+  const base = len2(away) > 0 ? away : [1, 0] as Vec2;
+  let best: Vec2 | null = null, bestScore = -Infinity;
+  for (let k = 0; k < 12; k++) {
+    const dir = rot2(base, (k * Math.PI) / 6);
+    for (const d of [1.2, 1.6, 2.2]) {
+      const q = add2(from, scale2(dir, d));
+      if (dist2(q, keepClear) < 1.0) continue;
+      const c = clearanceAt(g, q);
+      if (c < HUMAN_PROFILE.radius + 0.1 || occupant(rt, o, q, HUMAN_PROFILE.radius + 0.2)) continue;
+      const score = Math.min(c, 1.0) - 0.1 * d + 0.3 * (dir[0] * base[0] + dir[1] * base[1]);
+      if (score > bestScore) { bestScore = score; best = q; }
+    }
+  }
+  if (best) rt.submit('walk_to', { actor: who, x: best[0], z: best[1] }, { id: `${who}:make-way:${rt.tick}` });
 }
 
 function occupant(rt: Runtime, me: Entity, p: Vec2, r: number): string | null {

@@ -14,7 +14,7 @@ import { entityCorners } from '../spatial/service.ts';
 
 const RAISE_RATE = Math.PI / 2 / 5; // rad/s: ~5 s for a full raise
 
-type P = { crew: string[]; item: string };
+type P = { crew: string[]; item: string; stand_at?: { x: number; z: number } };
 type Exec = { p: P; id: string; phase: 'approach' | 'grip' | 'raise'; children?: Children; t: number; groundY: number; y0: number };
 
 const groundOf = (u: Entity) => Math.min(...entityCorners(u).map((c) => c[1]));
@@ -45,7 +45,12 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
   verb: 'raise_upright',
   description:
     'A crew walks to stations at the base of a lying upright, raises it about its base to standing, and keeps holding it. The crew stays committed until release_support succeeds.',
-  schema: z.strictObject({ crew: z.array(z.string().max(80)).min(1).max(4), item: z.string().max(80) }),
+  schema: z.strictObject({
+    crew: z.array(z.string().max(80)).min(1).max(4),
+    item: z.string().max(80),
+    /** Which end becomes the footing: the end nearest this point (frames are raised base-down at either end). */
+    stand_at: z.strictObject({ x: z.number(), z: z.number() }).optional(),
+  }),
   reservations: (_w, p) => [...p.crew.map((c) => ({ resource: `actor:${c}`, mode: 'exclusive' as const })), { resource: `entity:${p.item}`, mode: 'exclusive' }],
   plan(rt, p) {
     const u = rt.world.entities[p.item];
@@ -60,14 +65,14 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
       if (d) return { ok: false, diagnostic: d };
       if (rt.world.entities[c]?.kind !== 'human') return { ok: false, diagnostic: { code: 'entity.unknown', message: `no person "${c}"`, subjects: [c] } };
     }
-    const sweep = raiseSweep(rt, { ...u, pose: canonicalLying(u, groundOf(u)) }, Math.PI / 2, 0);
+    const sweep = raiseSweep(rt, { ...u, pose: canonicalLying(u, groundOf(u), p.stand_at && [p.stand_at.x, p.stand_at.z]) }, Math.PI / 2, 0);
     if (sweep) return { ok: false, diagnostic: sweep };
     return { ok: true, program: null };
   },
   start(rt, p, _prog, id) {
     const u = rt.world.entities[p.item];
     const groundY = groundOf(u);
-    u.pose = canonicalLying(u, groundY); // same physical placement, canonical encoding
+    u.pose = canonicalLying(u, groundY, p.stand_at && [p.stand_at.x, p.stand_at.z]); // same physical placement, canonical encoding
     u.phase = 'reserved';
     u.reservedBy = id;
     return { p, id, phase: 'approach', t: 0, groundY, y0: u.pose.p[1] };

@@ -25,8 +25,11 @@ export function isLying(u: Entity): boolean {
  * placement: height along world heading φ = yaw' + π/2, base centre at `base`,
  * resting on the ground (origin raised by half the column thickness).
  */
-export function canonicalLying(u: Entity, groundY: number): Pose {
-  const { base, top } = frameEnds(u);
+export function canonicalLying(u: Entity, groundY: number, standNear?: Vec2): Pose {
+  let { base, top } = frameEnds(u);
+  // Frames are top/bottom symmetric in this model; the crew raises whichever end is
+  // nearest the intended footing (choosing which end goes down is their call).
+  if (standNear && Math.hypot(top[0] - standNear[0], top[2] - standNear[1]) < Math.hypot(base[0] - standNear[0], base[2] - standNear[1])) [base, top] = [top, base];
   const phi = heading([top[0] - base[0], top[2] - base[2]]);
   const t = def(u.def).size[2];
   return { p: [base[0], groundY + t / 2, base[2]], yaw: phi - Math.PI / 2, pitch: Math.PI / 2 };
@@ -35,10 +38,10 @@ export function canonicalLying(u: Entity, groundY: number): Pose {
 /**
  * Carry target that lays an upright so its base lands at `standAt` and its
  * top points along heading `lieToward` (the frame will stand with its beam
- * normal along that heading). Carry lays the long axis along +yaw with the
- * base end at centre − dir·h/2.
+ * normal along that heading).
  */
 export function layTargetForStanding(defId: string, standAt: Vec2, lieToward: number) {
   const h = def(defId).size[1];
+  // carry treats a symmetric load as end-agnostic; raise_upright { stand_at } picks the footing end.
   return { x: standAt[0] + Math.cos(lieToward) * (h / 2), z: standAt[1] + Math.sin(lieToward) * (h / 2), yaw: lieToward };
 }
