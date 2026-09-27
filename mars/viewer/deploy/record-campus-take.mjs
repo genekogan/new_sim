@@ -35,7 +35,7 @@ const FILE = 'flagship-campus-2026.json';
 const URL_PATH = `/engine/takes/${FILE}`;
 const RULES = `mars-campus-flagship/1+${RULES_VERSION}`;
 const HZ = 10;
-// The studio's replay bar (app/studio/take-panel.tsx, .take-panel in studio.css: 36 px inset + ~94 px panel)
+// The studio's replay bar (app/studio/take-panel.tsx, .take-panel in studio.css: 36 px inset + ~90 px panel)
 // covers the bottom ~130 px of an 800 px viewport; subject framing keeps important points above it.
 // Coupling: restyling that bar means re-planning with a matching fraction (the track stores it as data.safeArea).
 const SAFE_BOTTOM = 0.17;
@@ -110,7 +110,9 @@ const shots = [
   { label: 'beams carried to the bay', t1: T('raiseA', 'start'),
     spec: { kind: 'frameGroup', subjects: ['p5', 'p6'], padding: 2.5, azimuth: NE, elevation: 24 * DEG } },
   { label: 'orbit the raise', t1: T('raiseB', 'end') + 2,
-    spec: { kind: 'orbit', center: bay, radius: 10, height: 4, period: 90, phase: NE, lookHeight: 1.5, subjects: ['p1', 'p2', 'p3', 'p4'] } },
+    // subjects: the upright being raised + its raise crew (a lying frame is sized by its extent now). p3/p4 fetch B
+    // from the pile 12 m west during this window, so requiring them would pull the orbit out until everyone is tiny.
+    spec: { kind: 'orbit', center: bay, radius: 10, height: 4, period: 90, phase: NE, lookHeight: 1.5, subjects: ['A', 'p1', 'p2'] } },
   { label: 'close-up: first beam seating, from outside the bay', t1: T('seat_b1', 'end'),
     spec: { kind: 'frameGroup', subjects: ['b1', 'p5', 'p6'], padding: 0.4, azimuth: outsideB1, elevation: 14 * DEG } },
   { label: 'beams, release and joist carries', t1: T('fix_j1', 'start'),
@@ -132,7 +134,8 @@ const cameraScene = { ...local, obstacles: [...local.obstacles, ...buildSolids] 
 // the finished bay may not be entered or crossed at any time; it never occludes (it is not there yet for most of the take)
 const policy = { ...DEFAULT_CAMERA_POLICY, component: { collide: true, occlude: false } };
 const t1 = performance.now();
-const cam = planShotList(shots, takeSampler(take), cameraScene, { hz: HZ, policy, safeArea: { bottom: SAFE_BOTTOM } });
+// cutCost 2.5 s: bystanders are occluders now, and a crew walking past for ~1 s is not worth a cut away and back
+const cam = planShotList(shots, takeSampler(take), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
 const tCam = performance.now() - t1;
 const track = toCameraTrack('', take.id, cam, 'planned-shot-list');
 track.id = `cam-${hashOf({ takeId: take.id, data: track.data }).slice(0, 16)}`;

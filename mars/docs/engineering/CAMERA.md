@@ -27,7 +27,7 @@ a standing human defaults to feet, torso, head and both hands.
 **Shots.** The shot kinds are:
 - `fixed {position, target}`
 - `follow {subject, offset, frame, lookHeight, damping}`
-- `orbit {center|subject, radius, height, period, phase}`
+- `orbit {center|subject, radius, height, period, phase, padding}`: pulls out along its ray until every subject point fits
 - `frameGroup {subjects, padding, azimuth, elevation}`: bounding box → sphere → fit distance for the fov and aspect
 - `path {keys:[{t, position, target}]}`: non-uniform Catmull-Rom (Hermite)
 - `reveal {subject|center, azimuth, from, to, t0, t1}`: smoothstep dolly and crane
@@ -50,10 +50,13 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 2. **Readability.** For each point of each subject:
    - the point is in the frustum (5 % safe margin), and
    - a ray cast against the occlusion set is clear (stopping 5 cm short, so a carried load
-     does not hide its own socket).
+     does not hide its own socket), and it misses every **bystander capsule** (r 0.28 m, h 1.8 m;
+     `kind: 'human'` poses that are neither a subject nor a subject's `crew`: a part's carriers or
+     its reserving action's workers, from `takeSampler`). People occlude sight only, never collide.
+   - it is above the `safeArea.bottom` UI band, if one is set.
 
-   Subject score = visible fraction × min(1, projected height / `minSize`) (default 8 % of
-   frame height). The aggregate is a weighted mean in 0–1. Reasons name concrete objects, e.g.
+   Subject score = visible fraction × min(1, projected extent / `minSize`) (default 8 % of frame
+   height). Extent = max(height, bbox diagonal of its points), so a lying 12 ft upright is 3.7 m. The aggregate is a weighted mean in 0–1. Reasons name concrete objects, e.g.
    `subject p2 76% occluded by 'U west wall'`, `subject p1 40% outside frame`, `too small (2.1% of frame height)`.
 3. **Temporal coherence.** Metrics are peak angular and linear velocity/acceleration (cuts
    excluded), key switches, A→B→A oscillations within 2 s, and the maximum number of cuts in
@@ -130,6 +133,7 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 | Hysteresis | Mirror-image alternates with a swaying subject: greedy without hysteresis flips 10× (9 oscillations); LiveSolver and the planner give 0 oscillations. |
 | Replay independence | Runtime walk hashes are identical with and without live camera solving. Two different planned tracks leave the world hash unchanged. |
 | Determinism | The plan hash is identical across runs, and the track round-trips through JSON. |
+| Framing (`camera-framing`) | A bystander in front lowers readability and the planner swings; behind the subject or as its carrier it does not. Orbiting a lying 3.66 m frame at 8 m keeps every corner in frame (≥ 0.8, never "too small"). A 0.17 safe area keeps a tight group's feet above the band. |
 | Perf | A 60 s track at 10 Hz with 3 subjects plans in about 60–80 ms (budget 1 s). |
 
 <sub>Perf row re-checked 2026-09-27: 69 ms, via `cd viewer && node --test --test-name-pattern="perf" engine/test/camera-replay.test.ts` (camera.test.ts has no perf test).</sub>
@@ -150,16 +154,21 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 - **Candidates are local to the desired target.** There is no global search, cross-subject
   cutting or reverse-angle grammar yet. Viterbi does not enforce a hard minimum shot length
   (the cut cost does this in practice, and `temporal.cutsPer2s` reports it).
-- **Not yet available:** render-side blending, debug overlays. Bystanders are not occluders: people and moving
-  parts are never in the occlusion set, so another person can stand between the camera and the subject.
+- **Not yet available:** render-side blending, debug overlays. Moving *parts* are still not occluders (people are).
+- **Safe area coupling.** `safeArea: { bottom }` tilts subject/region shots so the subject sits in the usable band and
+  scores points under the band as out of frame (fixed/path stay as authored). The campus take is planned with 0.17
+  for the studio replay bar (~130 px; in the e2e 1280×800 layout the canvas is 593 px tall, so it is really ~0.22, and
+  the top toolbars cover ~0.18 — not modelled); the track stores it as `data.safeArea`, and the studio applies stored
+  poses as-is, so restyling that bar means re-recording with a matching fraction.
 
 ## Campus take + studio replay (2026-09-27)
 `node deploy/record-campus-take.mjs` rehearses the flagship on a fork of Mars 2026 (as `campus-flagship.test.ts`),
 plans a 10-shot list with `planShotList` + `takeSampler` against the ±40 m campus crop plus the finished bay as
 collision-only obstacles (`component: {collide, !occlude}`), and writes `public/engine/takes/flagship-campus-2026.json`
-(`mars-take-replay/1`: take + camera track + step timeline + moments; 1.41 MB, gzip 206 KB — take 501 KB, camera 904 KB,
-so no thinning was needed) and `manifest.json`. `--check` re-records and compares. Result: 6089 samples at 10 Hz, 12 cuts
-(9 shot boundaries + 3 in the raise orbit where a crew member walks out of frame), 0 invalid, 0 crossings, readability
-min 0.72 / mean 0.98, planned in ~2.3 s. The studio (`/studio`, 2026) replays it via "Replay take"
+(`mars-take-replay/1`: take + camera track + step timeline + moments; 1.39 MB, gzip 235 KB — take 448 KB, camera 938 KB,
+so no thinning was needed) and `manifest.json`. `--check` re-records and compares. Result (people as occluders, safe
+area 0.17, `cutCost` 2.5 s, raise orbit on `A` + its crew; take `c531eaf4…`): 5976 samples at 10 Hz, 14 cuts (9 shot
+boundaries + 5 that dodge passing crews; raise orbit 3 → 2), 0 invalid, 0 crossings, readability min 0.67 / mean 0.97.
+The previous camera code on the same take (12 cuts) scores min 0.24, 84 samples < 0.6, under the new evaluator. The studio (`/studio`, 2026) replays it via "Replay take"
 (`app/engine-view/take-replay.ts`, `app/studio/take-{host,panel}`); the camera track only drives the view when "Engine
 camera" is on, and the take's poses at any t are identical either way (`e2e/studio-take.spec.ts`).
