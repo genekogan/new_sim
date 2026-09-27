@@ -6,7 +6,7 @@ import { hashOf } from '../core/hash.ts';
 import { rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
-import { buildGrids, gridsWithObstacles, type GridSet } from './grid.ts';
+import { buildGrids, gridsWithObstacles, StaticRaster, type GridSet } from './grid.ts';
 import { findRoute, type Place, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 
@@ -66,12 +66,15 @@ export class Spatial {
   grids!: GridSet;
   epoch = 0;
   private key = '';
+  /** Rasters of the base obstacles (they lead every synced scene's obstacle list). */
+  private raster: StaticRaster;
 
   constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string } = {}) {
     this.base = base;
     this.baseId = opts.baseId ?? hashOf(base);
     this.cell = opts.cell ?? 0.1;
     this.contributors = opts.contributors ?? [];
+    this.raster = new StaticRaster(base.obstacles, base.bounds, this.cell);
   }
 
   /** Rebuild derived scene/grids iff navigation-relevant world content changed. */
@@ -101,7 +104,7 @@ export class Spatial {
       if (r.links) links.push(...r.links);
     }
     this.scene = { bounds: this.base.bounds, levels, surfaces, obstacles, links };
-    this.grids = buildGrids(this.scene, this.cell);
+    this.grids = buildGrids(this.scene, this.cell, this.raster);
     this.epoch++;
     return true;
   }

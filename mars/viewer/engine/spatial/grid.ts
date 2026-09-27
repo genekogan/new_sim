@@ -26,15 +26,63 @@ export type GridSet = { cell: number; levels: Map<number, LevelGrid> };
 const BODY_HEIGHT = 1.8;
 const STEP = 0.22;
 
-export function buildGrids(scene: SpatialScene, cell = 0.1): GridSet {
+/**
+ * Memoised rasters of a fixed obstacle list (a static base scene, e.g. the 2.7k campus obstacles):
+ * per level height, the index of the first listed obstacle covering each cell (conservative
+ * raster, −1 none). buildGrids given this `prefix` skips re-rasterising those obstacles when they
+ * lead `scene.obstacles` — same free cells and blockers, since obstacles only clear cells and the
+ * first one to clear a floor cell names it.
+ */
+export class StaticRaster {
+  readonly obstacles: Obstacle[];
+  readonly bounds: [number, number, number, number];
+  readonly cell: number;
+  private byY = new Map<number, Int32Array>();
+
+  constructor(obstacles: Obstacle[], bounds: [number, number, number, number], cell: number) {
+    this.obstacles = obstacles.slice(); // snapshot: fits() compares element identity
+    this.bounds = bounds;
+    this.cell = cell;
+  }
+
+  /** Whether `scene` (at `cell`) starts with exactly these obstacles on the same raster. */
+  fits(scene: SpatialScene, cell: number): boolean {
+    if (cell !== this.cell || scene.obstacles.length < this.obstacles.length || scene.bounds.some((b, k) => b !== this.bounds[k])) return false;
+    for (let k = 0; k < this.obstacles.length; k++) if (scene.obstacles[k] !== this.obstacles[k]) return false;
+    return true;
+  }
+
+  firstCover(y: number): Int32Array {
+    let m = this.byY.get(y);
+    if (m) return m;
+    const [minX, minZ, maxX, maxZ] = this.bounds, cell = this.cell;
+    const nx = Math.ceil((maxX - minX) / cell), nz = Math.ceil((maxZ - minZ) / cell);
+    const cover = new Int32Array(nx * nz).fill(-1);
+    this.obstacles.forEach((o, k) => {
+      if (o.y1 <= y + STEP || o.y0 >= y + BODY_HEIGHT) return;
+      rasterObb(o.obb, minX, minZ, cell, nx, nz, (i) => { if (cover[i] < 0) cover[i] = k; }, true);
+    });
+    if (this.byY.size >= 8) this.byY.delete(this.byY.keys().next().value!);
+    this.byY.set(y, cover);
+    return cover;
+  }
+}
+
+export function buildGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaster): GridSet {
   const [minX, minZ, maxX, maxZ] = scene.bounds;
   const nx = Math.ceil((maxX - minX) / cell), nz = Math.ceil((maxZ - minZ) / cell);
   const levels = new Map<number, LevelGrid>();
+  const pre = prefix?.fits(scene, cell) ? prefix : undefined;
   for (const lv of scene.levels) {
     const free = new Uint8Array(nx * nz);
     const blockers = new Map<number, string>();
     for (const s of scene.surfaces) if (s.level === lv.id) rasterObb(s.obb, minX, minZ, cell, nx, nz, (i) => (free[i] = 1));
-    for (const o of scene.obstacles) {
+    if (pre) {
+      const cover = pre.firstCover(lv.y);
+      for (let i = 0; i < cover.length; i++) if (cover[i] >= 0 && free[i]) { blockers.set(i, pre.obstacles[cover[i]].id); free[i] = 0; }
+    }
+    for (let k = pre ? pre.obstacles.length : 0; k < scene.obstacles.length; k++) {
+      const o = scene.obstacles[k];
       if (o.y1 <= lv.y + STEP || o.y0 >= lv.y + BODY_HEIGHT) continue; // below step height or overhead
       rasterObb(o.obb, minX, minZ, cell, nx, nz, (i) => {
         if (free[i]) blockers.set(i, o.id);
