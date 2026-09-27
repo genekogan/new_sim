@@ -10,6 +10,11 @@
 //     y<year>/plan/<planHash>    StoredPlan  (immutable)
 //     y<year>/take/<takeId>      Take        (immutable, content-addressed)
 //     y<year>/cams/<takeId>      CameraTrack[] (rewritten on attach)
+//     y<year>/store-index        { plans, takes } ids oldest-first (creation order, for the caps)
+// Caps (review M5 low): at most MAX_PLANS plans and MAX_TAKES takes per (room, year). A store past a
+// cap evicts the oldest ones no checkpoint's `simulation-run` cause references (take + its camera
+// tracks, or plan); if every stored one is referenced the whole call is refused with
+// `room.storage-full` (nothing persisted, in-memory state reloaded) — continue in a new room.
 // Loaded lazily: the index on the first engine call, states/takes/plans/cameras on use.
 // An old-format history blob (states inline) is migrated on first load: each state
 // becomes its own blob and the index is rewritten without them (review M5).
@@ -22,15 +27,21 @@ import type { WorldState } from '../engine/world/types.ts';
 import type { CameraTrack, Take } from '../engine/take/types.ts';
 
 const CHUNK = 512 * 1024; // characters per row; DO SQLite caps a value at 2 MB
+export const MAX_PLANS = 64;
+export const MAX_TAKES = 32;
+
+type StoreIndex = { plans: string[]; takes: string[] }; // oldest first
 
 export type EngineCallMeta = { op: string; elapsedMs: number; loadMs?: number; stored: Record<string, number>; storage: Record<string, { count: number; bytes: number }> };
 
 export class EngineRoom {
   private storage: DurableObjectStorage;
   private controllers = new Map<number, EngineController>();
+  private limits: { plans: number; takes: number };
 
-  constructor(storage: DurableObjectStorage) {
+  constructor(storage: DurableObjectStorage, limits: { plans?: number; takes?: number } = {}) {
     this.storage = storage;
+    this.limits = { plans: limits.plans ?? MAX_PLANS, takes: limits.takes ?? MAX_TAKES };
     storage.sql.exec('CREATE TABLE IF NOT EXISTS engine_blobs (key TEXT NOT NULL, chunk INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (key, chunk))');
   }
 
@@ -113,6 +124,9 @@ export class EngineRoom {
     const changes = ctl.drainChanges();
     const stored: Record<string, number> = {};
     const p = `y${year}/`;
+    const meta = (): EngineCallMeta => ({ op, elapsedMs: Math.round(elapsedMs * 10) / 10, ...(loadMs !== undefined ? { loadMs: Math.round(loadMs * 10) / 10 } : {}), stored, storage: this.sizes(year) });
+    let full: OpResult | null = null;
+    let evictedTakes = false;
     try {
       this.storage.transactionSync(() => {
         const put = (key: string, value: unknown) => {
@@ -120,10 +134,34 @@ export class EngineRoom {
           this.write(key, text);
           stored[key] = text.length;
         };
+        const newPlans = changes.plans.filter((id) => !this.exists(`${p}plan/${id}`));
+        const newTakes = changes.takes.filter((id) => !this.exists(`${p}take/${id}`));
+        const index = this.storeIndex(year);
+        const evict = newPlans.length || newTakes.length ? this.evictions(year, ctl, index, newPlans, newTakes) : { plans: [], takes: [] };
+        if ('full' in evict) {
+          full = { ok: false, code: 'room.storage-full', message: evict.full };
+          return;
+        }
         if (changes.history || this.pending.get(year)!.size) this.flush(year, ctl.history, stored);
-        for (const id of changes.plans) if (!this.exists(`${p}plan/${id}`)) put(`${p}plan/${id}`, ctl.plans.get(id));
-        for (const id of changes.takes) if (!this.exists(`${p}take/${id}`)) put(`${p}take/${id}`, ctl.take(id));
-        for (const id of changes.cameras) put(`${p}cams/${id}`, ctl.cameras(id));
+        for (const id of newPlans) put(`${p}plan/${id}`, ctl.plans.get(id));
+        for (const id of newTakes) put(`${p}take/${id}`, ctl.take(id));
+        for (const id of changes.cameras) if (!evict.takes.includes(id)) put(`${p}cams/${id}`, ctl.cameras(id));
+        for (const id of evict.plans) {
+          this.remove(`${p}plan/${id}`);
+          ctl.plans.delete(id);
+        }
+        for (const id of evict.takes) {
+          this.remove(`${p}take/${id}`);
+          this.remove(`${p}cams/${id}`);
+          evictedTakes = true;
+        }
+        if (newPlans.length || newTakes.length) {
+          const next: StoreIndex = {
+            plans: [...index.plans.filter((id) => !evict.plans.includes(id)), ...newPlans],
+            takes: [...index.takes.filter((id) => !evict.takes.includes(id)), ...newTakes],
+          };
+          put(`${p}store-index`, next);
+        }
       });
     } catch (e) {
       // in-memory state may now be ahead of storage: drop it and reload lazily next call
@@ -131,7 +169,63 @@ export class EngineRoom {
       this.pending.delete(year);
       throw e;
     }
-    return { ...result, _meta: { op, elapsedMs: Math.round(elapsedMs * 10) / 10, ...(loadMs !== undefined ? { loadMs: Math.round(loadMs * 10) / 10 } : {}), stored, storage: this.sizes(year) } };
+    if (full) {
+      // refused: nothing was persisted, so the op's in-memory effects (a commit, a take) are dropped too
+      this.controllers.delete(year);
+      this.pending.delete(year);
+      return { ...(full as OpResult), _meta: meta() };
+    }
+    // the controller's take library has no delete: reload it lazily so an evicted take is gone in
+    // memory too (never reported as kept); unkept rehearsal takes are dropped with it, as on a restart
+    if (evictedTakes) {
+      this.controllers.delete(year);
+      this.pending.delete(year);
+    }
+    return { ...result, _meta: meta() };
+  }
+
+  /** Stored plan/take ids oldest-first; built once from row order for a room stored before the caps. */
+  private storeIndex(year: number): StoreIndex {
+    const p = `y${year}/`;
+    const saved = this.readJSON<StoreIndex>(`${p}store-index`);
+    if (saved) return saved;
+    // plan/take blobs are immutable, so the rowid of their first chunk is their creation order
+    const ids = (kind: string) =>
+      this.storage.sql
+        .exec<{ key: string }>('SELECT key, MIN(rowid) AS r FROM engine_blobs WHERE key LIKE ? GROUP BY key ORDER BY r', `${p}${kind}/%`)
+        .toArray()
+        .map((row) => row.key.slice(`${p}${kind}/`.length));
+    return { plans: ids('plan'), takes: ids('take') };
+  }
+
+  /**
+   * Which stored plans/takes to evict so that the new ones fit under the caps: oldest first, never one
+   * that a checkpoint's `simulation-run` cause references and never one stored by this call.
+   */
+  private evictions(year: number, ctl: EngineController, index: StoreIndex, newPlans: string[], newTakes: string[]): { plans: string[]; takes: string[] } | { full: string } {
+    const refTakes = new Set<string>(), refPlans = new Set<string>();
+    for (const cp of ctl.history.checkpoints.values())
+      if (cp.cause.kind === 'simulation-run') {
+        refTakes.add(cp.cause.take);
+        if (cp.cause.plan) refPlans.add(cp.cause.plan);
+      }
+    const pick = (kind: 'plan' | 'take', have: string[], added: string[], cap: number, ref: Set<string>): string[] | string => {
+      const over = have.length + added.length - cap;
+      if (over <= 0) return [];
+      const free = have.filter((id) => !ref.has(id));
+      if (free.length < over)
+        return `room y${year} already holds ${have.length} stored ${kind}s (cap ${cap}) and ${have.length - free.length} of them are referenced by checkpoints (simulation-run), so the new ${kind} cannot be stored; this call was not persisted — create a new room (studio leave/create) and fork your work there`;
+      return free.slice(0, over);
+    };
+    const plans = pick('plan', index.plans, newPlans, this.limits.plans, refPlans);
+    if (typeof plans === 'string') return { full: plans };
+    const takes = pick('take', index.takes, newTakes, this.limits.takes, refTakes);
+    if (typeof takes === 'string') return { full: takes };
+    return { plans, takes };
+  }
+
+  private remove(key: string) {
+    this.storage.sql.exec('DELETE FROM engine_blobs WHERE key=?', key);
   }
 
   /** Stored bytes per key class (for size measurements). */

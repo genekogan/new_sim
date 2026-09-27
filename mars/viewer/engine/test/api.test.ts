@@ -313,7 +313,8 @@ test('api: EngineRoom stores states as content-addressed blobs and migrates an o
   }
   for (const w of execWrites) {
     const ks = Object.keys(w).map((k) => k.split('/')[1]).sort();
-    assert.deepEqual(ks, ['history', 'state', 'take'], JSON.stringify(w));
+    assert.deepEqual(ks, ['history', 'state', 'store-index', 'take'], JSON.stringify(w));
+    assert.ok(w['y2026/store-index'] < 1024, 'plan/take creation-order index stays small');
     assert.ok(w['y2026/history'] < 4096, `index stays small (${w['y2026/history']} B)`);
   }
   const sizes = fresh2.sizes(2026);
@@ -323,4 +324,69 @@ test('api: EngineRoom stores states as content-addressed blobs and migrates an o
   const again = new EngineRoom(f.storage);
   const l3 = again.call(2026, 'log', { workspace: 'f3' }) as any;
   assert.equal(l3.checkpoints.length, 2);
+});
+
+test('api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)', async () => {
+  const { EngineRoom, MAX_TAKES, MAX_PLANS } = await import('../../simulation/engine-room.ts');
+  assert.deepEqual([MAX_PLANS, MAX_TAKES], [64, 32]);
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage);
+  const walk = (x: number) => ({ schema: 'mars-sequence/1', id: `walk-${x}`, params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x, z: -22 } }] });
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'w' }) as any).ok);
+  // 40 distinct stored takes: the first 3 executed (referenced by simulation-run checkpoints), 37 kept rehearsals
+  const order: string[] = [];
+  const referenced: string[] = [];
+  for (let k = 0; k < 40; k++) {
+    const b = room.call(2026, 'bind_plan', { template: walk(-4 - k * 0.25), bindings: { a: 'n1' }, workspace: 'w' }) as any;
+    assert.ok(b.ok, b.message);
+    const r = k < 3 ? (room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'w' }) as any) : (room.call(2026, 'rehearse', { plan_id: b.plan_id, keep: true }) as any);
+    assert.ok(r.ok, r.message);
+    const id = k < 3 ? r.take_id : r.take.take_id;
+    order.push(id);
+    if (k < 3) referenced.push(id);
+  }
+  assert.equal(new Set(order).size, 40);
+  const takes = s.keys().filter((k) => k.startsWith('y2026/take/')).map((k) => k.slice('y2026/take/'.length));
+  assert.equal(takes.length, 32);
+  for (const id of referenced) assert.ok(takes.includes(id), `referenced take ${id} survives`);
+  // evicted: the 8 oldest unreferenced (rehearsals 3..10)
+  assert.deepEqual(order.filter((id) => !takes.includes(id)), order.slice(3, 11));
+  const index = JSON.parse(s.blob('y2026/store-index'));
+  assert.deepEqual(index.takes, [...referenced, ...order.slice(11)], 'index keeps creation order');
+  assert.equal(index.plans.length, 40);
+  assert.equal((room.call(2026, 'get_take', { take_id: order[3] }) as any).code, 'take.unknown', 'evicted take is gone in memory too');
+  assert.ok((room.call(2026, 'get_take', { take_id: referenced[0] }) as any).ok);
+  // a restarted room sees the same caps and index
+  assert.equal(new EngineRoom(s.storage).sizes(2026).take.count, 32);
+
+  // every stored take referenced by history: the next store is refused and nothing is persisted
+  const f = sqliteStorage();
+  const small = new EngineRoom(f.storage, { takes: 2, plans: 3 });
+  small.call(2026, 'fork', { from: 'proving-ground', name: 'w' });
+  const heads: string[] = [];
+  for (let k = 0; k < 2; k++) {
+    const b = small.call(2026, 'bind_plan', { template: walk(-4 - k), bindings: { a: 'n1' }, workspace: 'w' }) as any;
+    const e = small.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'w' }) as any;
+    assert.ok(e.ok, e.message);
+    heads.push(e.checkpoint.id);
+  }
+  const b3 = small.call(2026, 'bind_plan', { template: walk(-7), bindings: { a: 'n1' }, workspace: 'w' }) as any;
+  assert.ok(b3.ok, 'third plan fits (cap 3)');
+  const keys = f.keys();
+  const e3 = small.call(2026, 'execute', { plan_id: b3.plan_id, workspace: 'w' }) as any;
+  assert.equal(e3.ok, false);
+  assert.equal(e3.code, 'room.storage-full');
+  assert.match(e3.message, /2 stored takes \(cap 2\) and 2 of them are referenced .* new room/);
+  assert.deepEqual(f.keys(), keys, 'nothing persisted');
+  assert.equal((small.call(2026, 'log', { workspace: 'w' }) as any).head, heads[1], 'the refused execute left no checkpoint in memory either');
+  // plans: the oldest unreferenced plan (the third, never executed) is evicted; referenced plans are kept
+  const b4 = small.call(2026, 'bind_plan', { template: walk(-8), bindings: { a: 'n1' }, workspace: 'w' }) as any;
+  assert.ok(b4.ok, b4.message);
+  const plans = f.keys().filter((k) => k.startsWith('y2026/plan/')).map((k) => k.slice('y2026/plan/'.length));
+  assert.equal(plans.length, 3);
+  assert.ok(!plans.includes(b3.plan_id) && plans.includes(b4.plan_id));
+  const b5 = small.call(2026, 'bind_plan', { template: walk(-9), bindings: { a: 'n1' }, workspace: 'w' }) as any;
+  assert.ok(b5.ok, b5.message);
+  const b6 = small.call(2026, 'bind_plan', { template: walk(-10), bindings: { a: 'n1' }, workspace: 'w' }) as any;
+  assert.ok(b6.ok, b6.message);
 });
