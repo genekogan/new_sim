@@ -161,6 +161,8 @@ Director workflow:
 8. **Camera tracks** — attach one or more shots per take; reshooting never re-simulates. Viewing never mutates the room: take fetches (MCP or REST) write nothing, and a camera track is stored beside its take without moving any head or changing any world state, so it never makes a plan stale. The view capability cannot open `/mcp` (403), so it cannot bind, execute, fork or attach cameras — only read takes over REST.
 9. **Fork again** — alternative futures branch from any checkpoint (`engine_fork {from, name, at}`); there is no merge.
 
+**Worked example.** A complete director session runs against the `carry-yard` seed: an impossible carry (`carry.no-route`, then `carry.target-blocked`), a revision that rehearses clean (0 violations), execute, take slice plus a `follow` camera track, a fork, and `plan.stale`. It is a runnable script (`deploy/director-demo.mjs` in the source tree), and the annotated transcript with timings is in `docs/engineering/DIRECTOR_DEMO.md`. Two details matter when copying it: template param kinds are `actor|actors|entity|entities|number|string|point|any`, and a failed rehearsal or a stale execute is an `isError` result whose JSON body still carries the report or diff.
+
 Limits: MCP bodies over 32 KiB are rejected (keep templates compact); mid-take states are not resumable (fork only at checkpoints); engine calls are not UUID-idempotent, but content addressing makes retries safe (re-binding returns the same `plan_id`; a repeated execute is refused as stale).
 
 ## Boundaries and browser requirements
