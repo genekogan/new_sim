@@ -23,6 +23,8 @@ import { keepCameraAboveGround } from './camera-ground';
 import { createEucFollowCamera } from './euc-follow-camera';
 import { createCampusLife } from './campus-life';
 import { SimulationPanel } from './simulation-panel';
+import { createTakeHost, type TakeHost } from './take-host';
+import { TakePanel } from './take-panel';
 import { createWeather } from './weather';
 import { DEFAULT_SCENE_DATE } from '../../engine/env/sun';
 import { createGallery } from './gallery';
@@ -102,6 +104,8 @@ type Api = {
   export: () => Promise<void>;
   add: (id: string) => Promise<void>;
   scope: (v: string) => void;
+  /** Replay-take host (2026 only). */
+  take: TakeHost | null;
 };
 const STOCK = [
   ['upright_frame_8ft_4ft', '8′ × 4′ upright'],
@@ -277,6 +281,8 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       lastClock = -1;
     setLiving(lifeEnabled);
     setCycle(cycleEnabled);
+    const takeHost = year === 2026 ? createTakeHost(scene, { hideAmbient: (v) => life?.setHidden(v), onError: setError, userFov: camera.fov }) : null;
+    orbit.addEventListener('start', () => { const r = takeHost?.replay(); if (r) r.engineCamera = false; }); // grabbing the view hands it to the user
     const transform = new TransformControls(camera, renderer.domElement);
     transform.setTranslationSnap(0.01);
     transform.setRotationSnap(THREE.MathUtils.degToRad(1));
@@ -793,6 +799,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       scope: (v) => {
         selectScope = v;
       },
+      take: takeHost,
       cut: (v) => {
         walker.stop();
         cutMode = v;
@@ -1096,8 +1103,10 @@ export default function Studio({ year = 2026 }: { year?: number }) {
           camera.lookAt(orbit.target);
         } else followRider = false;
       }
+      takeHost?.update(dt);
+      const takeCamera = !walker.active && !followRider && !!takeHost?.drive(camera, orbit.target);
       if (walker.active) walker.update(dt);
-      else if (!followRider) orbit.update();
+      else if (!followRider && !takeCamera) orbit.update();
       keepCameraAboveGround(camera, walker.active ? undefined : orbit.target);
       batches?.setExcluded(selection);
       batches?.setActive(true);
@@ -1131,6 +1140,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       // e2e/README.md and the sun/season/weather visual verification pass).
       atmosphere: (options: Parameters<Api['atmosphere']>[0]) =>
         api.current?.atmosphere(options),
+      take: () => takeHost?.info() ?? null,
     };
     (window as { __marsStudio?: typeof testHook }).__marsStudio = testHook;
     loop();
@@ -1147,6 +1157,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       resources.dispose();
       cancelAnimationFrame(frame);
       walker.dispose();
+      takeHost?.dispose();
       life?.dispose();
       gallery?.dispose();
       weather.dispose();
@@ -1623,6 +1634,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
               <button onClick={() => setError('')}>Dismiss</button>
             </div>
           )}
+          {year === 2026 && <TakePanel host={() => api.current?.take ?? null} />}
           <div className="stage-bottom">
             <span>
               {walking

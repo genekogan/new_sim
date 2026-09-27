@@ -865,3 +865,165 @@
 }
 
 .year-picker{display:flex;align-items:center;gap:8px;font-size:12px}.year-picker select{background:#303e31;color:#f3f0de;border:1px solid #68765c;border-radius:4px;padding:6px}
+/* Replay take (take-panel.tsx) */
+.take-panel {
+  position: absolute;
+  left: 18px;
+  bottom: 36px;
+  max-width: calc(100% - 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: #d2daca;
+  pointer-events: none;
+}
+.take-panel > * {
+  pointer-events: auto;
+}
+.take-panel.open {
+  right: 18px;
+  background: #1d2d25eb;
+  border: 1px solid #718466;
+  border-radius: 5px;
+  padding: 8px 10px;
+}
+.take-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.take-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  background: #223129ee;
+  padding: 6px 9px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.take-picker select {
+  max-width: 230px;
+}
+.take-panel.open .take-picker {
+  background: none;
+  padding: 0;
+}
+.take-banner {
+  background: #f0b44c;
+  color: #2b2208;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.take-diagnostics {
+  margin-left: auto;
+  min-width: 0;
+  font-size: 10px;
+}
+.take-diagnostics summary {
+  cursor: pointer;
+  white-space: nowrap;
+}
+.take-diagnostics ol {
+  margin: 6px 0 0;
+  padding-left: 0;
+  list-style: none;
+  max-height: 96px;
+  max-width: 460px;
+  overflow: auto;
+  color: #aabca4;
+}
+.take-diagnostics li.violation,
+.take-diagnostics li.failed {
+  color: #ffb4a0;
+}
+.take-diagnostics li b {
+  font-weight: 400;
+  color: #d6dfaf;
+  margin-right: 4px;
+}
+.take-transport button {
+  min-width: 54px;
+  font-size: 11px;
+  color: #27382c;
+  background: #eeefdb;
+  border: 1px solid #a2af92;
+  padding: 4px 9px;
+  border-radius: 3px;
+}
+.take-transport label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.take-time {
+  font-variant-numeric: tabular-nums;
+  color: #e6ecd8;
+  flex-shrink: 0;
+}
+.take-scrub {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+}
+.take-scrub input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: #c7d993;
+}
+.take-moments {
+  position: relative;
+  height: 8px;
+}
+.take-panel .take-moments button {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 0;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #2b2208;
+  background: #f0b44c;
+}
+.take-now {
+  justify-content: space-between;
+  color: #aabca4;
+  font-size: 10px;
+}
+.take-now span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.take-note,
+.take-loading {
+  font-size: 10px;
+  color: #8fa087;
+}
+@media (max-width: 750px) {
+  .take-panel {
+    left: 16px;
+    bottom: 32px;
+    max-width: calc(100% - 32px);
+  }
+  .take-panel.open {
+    right: 16px;
+  }
+  .take-row {
+    flex-wrap: wrap;
+  }
+  .take-note {
+    display: none;
+  }
+}

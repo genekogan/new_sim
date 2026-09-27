@@ -46,6 +46,7 @@ export function createCampusLife(
   let disposed = false,
     editing = false,
     enabled = true,
+    hidden = false,
     paths: CampusPaths,
     scenery: ReturnType<typeof createScenery>,
     dirty = true,
@@ -256,6 +257,14 @@ export function createCampusLife(
       editing = value;
       if (value) restore();
     },
+    /** Hide every ambient person (animated, static source and EUC riders), e.g. while a take replays. */
+    setHidden(value: boolean) {
+      hidden = value;
+      if (value) {
+        sources.forEach((s) => (s.visible = false));
+        group.visible = false;
+      } else if (!enabled || editing || !actors.length) restore();
+    },
     invalidate() {
       dirty = true;
     },
@@ -278,13 +287,14 @@ export function createCampusLife(
         remote
           ? (simTime(remote, remoteNow) - remote.motionEpoch) / 1000
           : time,
-        enabled && !editing,
+        enabled && !editing && !hidden,
         remote ? eucDistance(remote, remoteNow) : undefined,
         remote ?? undefined,
         remoteNow,
       );
-      const active = enabled && !editing;
+      const active = enabled && !editing && !hidden;
       group.visible = active;
+      if (hidden) sources.forEach((s) => (s.visible = false));
       if (!active) return;
       for (const a of actors) {
         a.source.visible = false;

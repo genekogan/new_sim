@@ -102,10 +102,10 @@ const shots = [
   { label: 'establishing wide from the north-east', t1: 10,
     spec: { kind: 'establishing', region: { min: [site.origin[0] - 13, site.origin[1] - 9], max: [site.origin[0] + 8, site.origin[1] + 8], y: site.groundY }, azimuth: NE, elevation: 28 * DEG } },
   { label: 'follow the first upright carry', t1: T('carryA', 'end'),
-    spec: { kind: 'follow', subject: 'p1', offset: [5.5, 3.2, -5.5], frame: 'world', lookHeight: 0.9, damping: 1.0, subjects: ['p1', 'p2', 'A'] } },
+    spec: { kind: 'follow', subject: 'p1', offset: [4, 4.2, 6], frame: 'world', lookHeight: 0.9, damping: 1.0, subjects: ['p1', 'p2', 'A'] } },
   { label: 'beams carried to the bay', t1: T('raiseA', 'start'),
     spec: { kind: 'frameGroup', subjects: ['p5', 'p6'], padding: 2.5, azimuth: NE, elevation: 24 * DEG } },
-  { label: 'orbit the raise', t1: T('raiseB', 'end'),
+  { label: 'orbit the raise', t1: T('raiseB', 'end') + 2,
     spec: { kind: 'orbit', center: bay, radius: 10, height: 4, period: 90, phase: NE, lookHeight: 1.5, subjects: ['p1', 'p2', 'p3', 'p4'] } },
   { label: 'close-up: first beam seating, from outside the bay', t1: T('seat_b1', 'end'),
     spec: { kind: 'frameGroup', subjects: ['b1', 'p5', 'p6'], padding: 0.4, azimuth: outsideB1, elevation: 14 * DEG } },
@@ -139,7 +139,7 @@ const moments = {
   carry: g(T('carryA', 'start') + (T('carryA', 'end') - T('carryA', 'start')) / 2),
   held: g(T('raiseB', 'end') + 1),
   deck: g(T('deck_s2', 'end') + 1.5),
-  visitor: g(duration),
+  visitor: Math.floor(duration * HZ) / HZ, // last grid point inside the take (the scrubber max is the duration)
 };
 const body = {
   schema: 'mars-take-replay/1',
