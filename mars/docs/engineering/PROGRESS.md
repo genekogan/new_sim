@@ -36,3 +36,9 @@ Budget: weekly usage meter (`<usage-tool>`) started at 11% used; hard stop ≈61
 1. Flagship on the real 2026 fork at `staging-east` (crop scene); record take + camera track; capture screenshots via lab/studio.
 2. Add `/lab` to Worker SPA routes; full e2e; production deploy with rollback note.
 3. Handoff report (HANDOFF.md).
+
+## ~11:30 — Campus flagship green; Gene back online; leadership mode
+- Flagship runs on the real 2026 campus fork (staging-east): 43 steps, 548 s sim, 0 violations, execute == rehearsal (engine/test/campus-flagship.test.ts).
+- Env track done: real NOAA sun, wetness, cloud-softened shadows; studio baselines refreshed.
+- Gene's instruction: Fable leads/evaluates, Opus subagents do narrow work. Delegated: (1) progressive deck-y regression + nav perf caching, (2) Lab build-bay scenario + captures, (3) HANDOFF.md draft.
+- Pending after (1): full-suite green → production deploy with rollback note.
