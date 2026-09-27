@@ -1,0 +1,324 @@
+/**
+ * Solar position for Bombay Beach, CA (spec §19; see docs/engineering/RESEARCH.md #12
+ * for the cited NOAA GML formulas this implements — the classic NOAA Solar Calculator
+ * spreadsheet method, Meeus/Spencer Fourier approximations, accurate to roughly
+ * 0.01-0.1 deg and sunrise/sunset within about a minute for |lat| <= 72).
+ *
+ * Pure TS: no three.js, no DOM, no Date.now(), no Math.random(). All calendar math
+ * (day-of-year, weekday, US DST since 2007) is done with plain integer arithmetic
+ * instead of the built-in Date object, so results are identical across Node, the
+ * browser and the Durable Object regardless of host timezone.
+ *
+ * Input is a *local* ISO datetime at the campus, e.g. "2026-03-15T16:00" or
+ * "2026-03-15T16:00:00" (matches `Environment.datetime` in world/types.ts — no
+ * trailing offset/Z; it is always interpreted as Bombay Beach local time).
+ */
+
+export const BOMBAY_BEACH = { lat: 33.3506, lon: -115.7295 };
+
+/** Default calendar date used by the studio when no date is supplied (spec §19
+ * asks for "a plausible season date"): mid-March, matching the sunrise/sunset
+ * reference case in RESEARCH.md #12. `world/factory.ts`'s emptyWorld() picks
+ * 2026-03-01 for the same reason, independently — both are early-season 2026
+ * defaults and do not need to match exactly. */
+export const DEFAULT_SCENE_DATE = '2026-03-15';
+
+/**
+ * North axis assumption. The audit (AUDIT.md §7) and engine conventions
+ * (ENGINE_GUIDE.md: "Metres, Y up, ground plane (x, z)") do not record which
+ * studio world axis is geographic north — the previous `daylightAt(hour)` sun
+ * was a fixed, uncalibrated sinusoid with no compass reference at all (see
+ * ambience-math.ts:4-17, unchanged by this work). No compass rose, site plan
+ * bearing or "true north" note was found anywhere in docs/ or the studio code.
+ *
+ * ASSUMPTION (stated loudly; adjust here if a real site bearing surfaces):
+ * world **-Z is geographic north**, **+X is east**, **+Z is south**, **-X is
+ * west** — azimuth (clockwise from north, standard compass convention) maps
+ * onto the ground plane the way it would on a north-up map viewed from above
+ * with Y up. `NORTH_AZIMUTH_OFFSET` (degrees, added to azimuth before
+ * projecting to x/z) exists to correct that mapping if the true campus
+ * bearing is ever established; 0 means "no correction applied yet".
+ */
+export const NORTH_AZIMUTH_OFFSET = 0;
+
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+// ---------------------------------------------------------------------------
+// Calendar math (no Date object; see file header).
+// ---------------------------------------------------------------------------
+
+function isLeapYear(y: number): boolean {
+  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+}
+
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** 1-based day-of-year for a civil date. */
+function dayOfYear(y: number, m: number, d: number): number {
+  let doy = d;
+  for (let i = 0; i < m - 1; i++)
+    doy += MONTH_DAYS[i] + (i === 1 && isLeapYear(y) ? 1 : 0);
+  return doy;
+}
+
+/** Julian Day Number for a proleptic-Gregorian civil date, referenced to noon UT
+ * (Fliegel & Van Flandern). Used only to derive day-of-week for the DST rule below;
+ * `julianDayNumber(2000,1,1) === 2451545`, a Saturday. */
+function julianDayNumber(y: number, m: number, d: number): number {
+  const a = Math.floor((14 - m) / 12);
+  const y2 = y + 4800 - a;
+  const m2 = m + 12 * a - 3;
+  return (
+    d +
+    Math.floor((153 * m2 + 2) / 5) +
+    365 * y2 +
+    Math.floor(y2 / 4) -
+    Math.floor(y2 / 100) +
+    Math.floor(y2 / 400) -
+    32045
+  );
+}
+
+/** 0 = Sunday .. 6 = Saturday. */
+function dayOfWeek(y: number, m: number, d: number): number {
+  return (((julianDayNumber(y, m, d) + 1) % 7) + 7) % 7;
+}
+
+/** Calendar day of the n-th occurrence of `weekday` (0=Sun..6=Sat) in a month. */
+function nthWeekdayOfMonth(y: number, m: number, weekday: number, n: number): number {
+  const firstDow = dayOfWeek(y, m, 1);
+  const firstOccurrence = 1 + ((weekday - firstDow + 7) % 7);
+  return firstOccurrence + (n - 1) * 7;
+}
+
+/**
+ * UTC offset (hours, negative west of Greenwich) for America/Los_Angeles at a given
+ * *local* wall-clock instant, using the US DST rule in force since 2007: starts the
+ * second Sunday of March at 02:00 local standard time, ends the first Sunday of
+ * November at 02:00 local daylight time. Not valid for years before 2007 (the US
+ * rule differed) — Mars College's 2020-2026 dates are all comfortably after that.
+ *
+ * The single ambiguous/skipped hour at each transition (02:00-02:59 does not exist
+ * in spring; 01:00-01:59 occurs twice in fall) is resolved by comparing only against
+ * the 02:00 boundary: hour < 2 on the transition day counts as still in the
+ * previous regime. This is a documented simplification of a genuinely ambiguous
+ * hour, not a source of meaningful lighting error.
+ */
+export function losAngelesUtcOffsetHours(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+): number {
+  const dstStartDay = nthWeekdayOfMonth(year, 3, 0, 2);
+  const dstEndDay = nthWeekdayOfMonth(year, 11, 0, 1);
+  const beforeSpringForward =
+    month < 3 || (month === 3 && (day < dstStartDay || (day === dstStartDay && hour < 2)));
+  const afterFallBack =
+    month > 11 || (month === 11 && (day > dstEndDay || (day === dstEndDay && hour >= 2)));
+  return beforeSpringForward || afterFallBack ? -8 : -7;
+}
+
+export type LocalDateTime = {
+  year: number;
+  month: number; // 1-12
+  day: number;
+  hour: number; // 0-23
+  minute: number;
+  second: number;
+};
+
+/** Parse "YYYY-MM-DDTHH:MM[:SS]" (or a date-only "YYYY-MM-DD") as a naive local
+ * datetime — no timezone is read from the string; it is always Bombay Beach local. */
+export function parseLocalDateTime(iso: string): LocalDateTime {
+  const [datePart, timePart] = iso.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hh = 0, mm = 0, ss = 0] = (timePart ?? '').split(':').map(Number);
+  return { year, month, day, hour: hh, minute: mm, second: ss };
+}
+
+/** Format a local calendar date + minutes-of-day as "YYYY-MM-DDTHH:MM:SS". Minutes
+ * outside [0, 1440) roll the calendar date forward/back (sunrise/noon/sunset never
+ * cross midnight at this latitude, but this keeps the function honest). */
+function formatLocalDateTime(year: number, month: number, day: number, minutesOfDay: number): string {
+  let dayShift = Math.floor(minutesOfDay / 1440);
+  let m = ((minutesOfDay % 1440) + 1440) % 1440;
+  let y = year, mo = month, d = day + dayShift;
+  while (d < 1) {
+    mo -= 1;
+    if (mo < 1) { mo = 12; y -= 1; }
+    d += MONTH_DAYS[mo - 1] + (mo === 2 && isLeapYear(y) ? 1 : 0);
+  }
+  for (;;) {
+    const lastDay = MONTH_DAYS[mo - 1] + (mo === 2 && isLeapYear(y) ? 1 : 0);
+    if (d <= lastDay) break;
+    d -= lastDay;
+    mo += 1;
+    if (mo > 12) { mo = 1; y += 1; }
+  }
+  const hh = Math.floor(m / 60), mm = Math.floor(m % 60), ss = Math.round((m % 1) * 60);
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${y}-${pad(mo)}-${pad(d)}T${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+}
+
+// ---------------------------------------------------------------------------
+// NOAA / Spencer solar ephemeris (day-angle gamma, equation of time, declination).
+// Same structure as the NOAA Solar Calculator spreadsheet: local calendar
+// date/time in, with the local UTC offset folded into `time_offset` — no
+// separate UTC date conversion is needed (RESEARCH.md #12).
+// ---------------------------------------------------------------------------
+
+type Ephemeris = { eqtimeMin: number; declRad: number };
+
+function ephemerisAt(year: number, month: number, day: number, hourDecimal: number): Ephemeris {
+  const doy = dayOfYear(year, month, day);
+  const daysInYear = isLeapYear(year) ? 366 : 365;
+  const gamma = ((2 * Math.PI) / daysInYear) * (doy - 1 + (hourDecimal - 12) / 24);
+  const g2 = 2 * gamma, g3 = 3 * gamma;
+  const eqtimeMin =
+    229.18 *
+    (0.000075 +
+      0.001868 * Math.cos(gamma) -
+      0.032077 * Math.sin(gamma) -
+      0.014615 * Math.cos(g2) -
+      0.040849 * Math.sin(g2));
+  const declRad =
+    0.006918 -
+    0.399912 * Math.cos(gamma) +
+    0.070257 * Math.sin(gamma) -
+    0.006758 * Math.cos(g2) +
+    0.000907 * Math.sin(g2) -
+    0.002697 * Math.cos(g3) +
+    0.00148 * Math.sin(g3);
+  return { eqtimeMin, declRad };
+}
+
+/** Atmospheric refraction correction (degrees) for a *true* (geometric) elevation,
+ * added to get the apparent elevation the eye/camera would see. Meeus's standard
+ * piecewise approximation (arcminutes-ish near the horizon, negligible above ~20deg). */
+function refractionCorrectionDeg(trueElevationDeg: number): number {
+  if (trueElevationDeg > 85) return 0;
+  const te = Math.tan(trueElevationDeg * DEG2RAD);
+  let arcsec: number;
+  if (trueElevationDeg > 5) {
+    arcsec = 58.1 / te - 0.07 / te ** 3 + 0.000086 / te ** 5;
+  } else if (trueElevationDeg > -0.575) {
+    arcsec =
+      1735 +
+      trueElevationDeg *
+        (-518.2 + trueElevationDeg * (103.4 + trueElevationDeg * (-12.79 + trueElevationDeg * 0.711)));
+  } else {
+    arcsec = -20.774 / te;
+  }
+  return arcsec / 3600;
+}
+
+export type SolarPosition = {
+  /** Apparent (refraction-corrected) elevation above the horizon, degrees. */
+  elevationDeg: number;
+  /** Geometric elevation, no refraction — for reference/debugging. */
+  trueElevationDeg: number;
+  /** Azimuth, degrees clockwise from north. */
+  azimuthDeg: number;
+  /** Unit vector from a ground point toward the sun, studio frame (x east, y up,
+   * z south under the NORTH_AZIMUTH_OFFSET=0 assumption — see the doc comment above). */
+  direction: [number, number, number];
+};
+
+/** Solar position at a local Bombay Beach datetime (spec §19, task 1). */
+export function solarPosition(
+  localIso: string,
+  lat = BOMBAY_BEACH.lat,
+  lon = BOMBAY_BEACH.lon,
+): SolarPosition {
+  const t = parseLocalDateTime(localIso);
+  const hourDecimal = t.hour + t.minute / 60 + t.second / 3600;
+  const tz = losAngelesUtcOffsetHours(t.year, t.month, t.day, t.hour);
+  const { eqtimeMin, declRad } = ephemerisAt(t.year, t.month, t.day, hourDecimal);
+  const timeOffsetMin = eqtimeMin + 4 * lon - 60 * tz;
+  const tstMin = hourDecimal * 60 + timeOffsetMin;
+  const haDeg = tstMin / 4 - 180;
+  const haRad = haDeg * DEG2RAD;
+  const latRad = lat * DEG2RAD;
+  const cosZen = clamp(
+    Math.sin(latRad) * Math.sin(declRad) + Math.cos(latRad) * Math.cos(declRad) * Math.cos(haRad),
+    -1,
+    1,
+  );
+  const zenithDeg = Math.acos(cosZen) * RAD2DEG;
+  const trueElevationDeg = 90 - zenithDeg;
+  const sinZen = Math.sqrt(Math.max(0, 1 - cosZen * cosZen));
+  let azimuthDeg: number;
+  if (sinZen < 1e-6) {
+    azimuthDeg = 180; // sun at/near the zenith or nadir: azimuth undefined, pick a stable value
+  } else {
+    // Standard NOAA form (solareqns.PDF): x = (sin(lat)cos(zen) - sin(decl)) /
+    // (cos(lat)sin(zen)); az = 180 +/- acos(x), sign by the hour-angle side.
+    // (RESEARCH.md's "cos(180-az) = -(...)" is the same identity with az on the
+    // other side of the equation; this is the form actually used by the NOAA
+    // spreadsheet and is the one verified against hand-computed spherical
+    // astronomy below in env-sun.test.ts.)
+    const x = clamp(
+      (Math.sin(latRad) * cosZen - Math.sin(declRad)) / (Math.cos(latRad) * sinZen),
+      -1,
+      1,
+    );
+    const acosDeg = Math.acos(x) * RAD2DEG;
+    azimuthDeg = haDeg > 0 ? 180 + acosDeg : 180 - acosDeg;
+  }
+  azimuthDeg = ((azimuthDeg % 360) + 360) % 360;
+  const elevationDeg = trueElevationDeg + refractionCorrectionDeg(trueElevationDeg);
+  return {
+    elevationDeg,
+    trueElevationDeg,
+    azimuthDeg,
+    direction: sunDirectionVector(elevationDeg, azimuthDeg),
+  };
+}
+
+export type SunTimes = {
+  sunriseLocal: string | null; // null = no sunrise this day (polar day/night; never happens at 33.35N)
+  sunsetLocal: string | null;
+  solarNoonLocal: string;
+};
+
+/** Sunrise, solar noon and sunset for a local calendar date (spec §19, task 1). */
+export function sunTimes(
+  localIso: string,
+  lat = BOMBAY_BEACH.lat,
+  lon = BOMBAY_BEACH.lon,
+): SunTimes {
+  const t = parseLocalDateTime(localIso);
+  const tz = losAngelesUtcOffsetHours(t.year, t.month, t.day, 12);
+  const { eqtimeMin, declRad } = ephemerisAt(t.year, t.month, t.day, 12);
+  const latRad = lat * DEG2RAD;
+  const solarNoonMin = 720 - 4 * lon - eqtimeMin + 60 * tz;
+  const cosHa0 =
+    Math.cos(90.833 * DEG2RAD) / (Math.cos(latRad) * Math.cos(declRad)) -
+    Math.tan(latRad) * Math.tan(declRad);
+  const solarNoonLocal = formatLocalDateTime(t.year, t.month, t.day, solarNoonMin);
+  if (cosHa0 < -1 || cosHa0 > 1) {
+    // |cosHa0| > 1: the sun never sets (>1 magnitude, polar day) or never rises
+    // (polar night) that day. Does not occur at 33.35N; guarded for completeness.
+    return { sunriseLocal: cosHa0 < -1 ? solarNoonLocal : null, sunsetLocal: cosHa0 < -1 ? solarNoonLocal : null, solarNoonLocal };
+  }
+  const ha0Deg = Math.acos(cosHa0) * RAD2DEG;
+  return {
+    sunriseLocal: formatLocalDateTime(t.year, t.month, t.day, solarNoonMin - 4 * ha0Deg),
+    sunsetLocal: formatLocalDateTime(t.year, t.month, t.day, solarNoonMin + 4 * ha0Deg),
+    solarNoonLocal,
+  };
+}
+
+/**
+ * Project elevation/azimuth to a unit direction vector in the studio's (x, y, z)
+ * frame — see NORTH_AZIMUTH_OFFSET above for the north-axis assumption this bakes in.
+ */
+export function sunDirectionVector(elevationDeg: number, azimuthDeg: number): [number, number, number] {
+  const azRad = (azimuthDeg + NORTH_AZIMUTH_OFFSET) * DEG2RAD;
+  const elRad = elevationDeg * DEG2RAD;
+  const cosEl = Math.cos(elRad);
+  return [Math.sin(azRad) * cosEl, Math.sin(elRad), -Math.cos(azRad) * cosEl];
+}
