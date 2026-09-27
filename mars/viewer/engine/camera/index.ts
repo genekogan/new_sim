@@ -5,3 +5,4 @@ export * from './quality.ts';
 export * from './solve.ts';
 export * from './plan.ts';
 export * from './track.ts';
+export * from './samplers.ts';

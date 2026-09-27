@@ -4,28 +4,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { provingGround } from '../scenes/proving-ground.ts';
 import type { Obstacle } from '../spatial/types.ts';
-import type { Vec2, Vec3 } from '../core/math.ts';
 import { hashOf } from '../core/hash.ts';
 import { CameraWorld } from '../camera/geom.ts';
 import { placement, sweepCrossing, temporal, type TrackSample } from '../camera/quality.ts';
-import { evaluateShot, type Sampler, type ShotSpec, type SubjectPose } from '../camera/shots.ts';
+import { evaluateShot, type Sampler, type ShotSpec } from '../camera/shots.ts';
 import { LiveSolver } from '../camera/solve.ts';
 import { planCameraTrack, type CameraPlan } from '../camera/plan.ts';
 import { sampleTrack, toCameraTrack, trackData } from '../camera/track.ts';
-
-/** Subject walking a polyline at `speed`, starting at t0; optional looping. */
-export function walker(pts: Vec2[], speed = 1.3, t0 = 0, loop = false): (t: number) => SubjectPose {
-  const seg = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
-  const total = seg.reduce((a, b) => a + b, 0);
-  return (t) => {
-    let s = Math.max(0, (t - t0) * speed);
-    s = loop ? s % total : Math.min(s, total - 1e-9);
-    let i = 0;
-    while (i < seg.length - 1 && s > seg[i]) { s -= seg[i]; i++; }
-    const a = pts[i], b = pts[i + 1], u = Math.min(1, s / seg[i]);
-    return { p: [a[0] + (b[0] - a[0]) * u, 0, a[1] + (b[1] - a[1]) * u], yaw: Math.atan2(b[1] - a[1], b[0] - a[0]) };
-  };
-}
+import { walker } from '../camera/samplers.ts';
 
 /** Independent verification of a plan (does not trust the report). */
 function verify(plan: CameraPlan, world: CameraWorld) {

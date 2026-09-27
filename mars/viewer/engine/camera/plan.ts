@@ -158,10 +158,21 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
       reason = `discontinuous move of '${a.key}'${h ? ` would cross ${solidName(h.solid)}` : ''}`;
     } else {
       const k1 = VARIANT_KEYS.indexOf(a.key);
-      for (let j = i; j <= Math.min(N - 1, i + L) && !reason; j++) {
-        const cj = table[j][k1];
-        if (!cj) reason = `'${a.key}' unavailable at t=${fmt(j * dt)} s`;
-        else if (bad[j][k1] > 0) reason = `${j === i ? 'at' : 'ahead:'} t=${fmt(j * dt)} s '${a.key}': ${describe(cj)}`;
+      const stay = table[i][k1];
+      if (stay && !continuous(a, stay)) {
+        const h = crossing(a, stay);
+        reason = `'${a.key}' cannot continue at t=${fmt(i * dt)} s: ${h ? `its move crosses ${solidName(h.solid)}` : 'discontinuous jump'}`;
+      }
+      // first future failure of the key we left: unavailable, invalid/unreadable, or a move crossing a solid
+      for (let j = i; j < N && !reason; j++) {
+        const cj = table[j][k1], prev = table[j - 1][k1];
+        const when = `${j === i ? 'at' : 'ahead:'} t=${fmt(j * dt)} s`;
+        if (!cj) reason = `${when} '${a.key}' unavailable`;
+        else if (bad[j][k1] > 0) reason = `${when} '${a.key}': ${describe(cj)}`;
+        else if (j > i && prev && !continuous(prev, cj)) {
+          const h = crossing(prev, cj);
+          reason = `${when} '${a.key}' ${h ? `would cross ${solidName(h.solid)}` : 'would jump'}`;
+        }
       }
       if (!reason) reason = `better framing with '${b.key}'`;
     }
