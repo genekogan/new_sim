@@ -1,41 +1,41 @@
 {
   "generatedBy": "viewer/deploy/evidence-report.mjs",
   "map": "viewer/engine/test/evidence-map.json",
-  "generatedAt": "2026-09-27T22:25:21.237Z",
+  "generatedAt": "2026-09-27T22:44:27.959Z",
   "git": {
-    "head": "f767540",
+    "head": "ec63cce",
     "dirtyEngineFiles": 0
   },
   "node": "v26.8.2",
   "suite": {
-    "files": 24,
-    "tests": 172,
-    "pass": 170,
+    "files": 25,
+    "tests": 178,
+    "pass": 177,
     "fail": 0,
-    "skip": 2,
+    "skip": 1,
     "fileErrors": 0,
-    "wallMs": 49559
+    "wallMs": 45605
   },
   "flagship": {
     "provingGround": {
-      "line": "flagship rehearsal: 43 steps, 576.1 s simulated, 9940 ms compute",
+      "line": "flagship rehearsal: 43 steps, 570.1 s simulated, 7271 ms compute",
       "steps": 43,
-      "simulatedS": 576.1,
-      "computeMs": 9940
+      "simulatedS": 570.1,
+      "computeMs": 7271
     },
     "campus": {
-      "line": "campus flagship: 43 steps, 608.8 s simulated, 26389 ms compute, take 512469 bytes",
+      "line": "campus flagship: 43 steps, 597.5 s simulated, 23117 ms compute, take 458610 bytes",
       "steps": 43,
-      "simulatedS": 608.8,
-      "computeMs": 26389,
-      "takeBytes": 512469
+      "simulatedS": 597.5,
+      "computeMs": 23117,
+      "takeBytes": 458610
     },
     "determinismProbe": {
       "scenario": "build-bay/open-ground",
       "status": "completed",
-      "ticks": 11522,
-      "finalStateHash": "d54eca7c402a4c3a92ff82ed2466fd2e354cd9ded9ee0f01fa1bed8fc7f0f610",
-      "takeId": "8f65762a1ec91b82ba4e93c0",
+      "ticks": 11403,
+      "finalStateHash": "79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129",
+      "takeId": "bf58b85269c981003ce6d9c6",
       "engineMath": "584b58ab6d111145",
       "hostMath": "a522a34bc9912127",
       "host": "node 26.8.2 (v8 14.6.202.34-node.28)"
@@ -74,7 +74,7 @@
           "title": "wall: plans around the wall before contact",
           "name": "wall: plans around the wall before contact",
           "result": "pass",
-          "durationMs": 36
+          "durationMs": 39
         },
         {
           "file": "navigation.test.ts",
@@ -88,7 +88,7 @@
           "title": "walk around wall: completes, no penetration, no teleport, little heading jitter",
           "name": "walk around wall: completes, no penetration, no teleport, little heading jitter",
           "result": "pass",
-          "durationMs": 95
+          "durationMs": 103
         }
       ]
     },
@@ -106,14 +106,14 @@
           "title": "U-shaped trap: global route exits via the open side",
           "name": "U-shaped trap: global route exits via the open side",
           "result": "pass",
-          "durationMs": 12
+          "durationMs": 6
         },
         {
           "file": "gaps.test.ts",
           "title": "U-trap: a walker starting at the inner back wall",
           "name": "U-trap: a walker starting at the inner back wall walks out and around to a goal behind the U; no oscillation, never within 0.28 m of the walls",
           "result": "pass",
-          "durationMs": 110
+          "durationMs": 78
         }
       ]
     },
@@ -121,10 +121,10 @@
       "id": "narrow-passage",
       "name": "Narrow passage / two agents",
       "status": "PROVEN",
-      "passed": 8,
-      "total": 8,
+      "passed": 9,
+      "total": 9,
       "required": "Agents pass if clearance allows; otherwise one yields/waits without jitter or repeated path flipping.",
-      "approximate": "In the 2.0 m corridor both pass without traffic.yield and finish < 1.4× solo, but the later-id walker still stops ~1.9 s to give way (traffic.person; todo test in gaps.test.ts). Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free.",
+      "approximate": "Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free.",
       "tests": [
         {
           "file": "navigation.test.ts",
@@ -138,49 +138,56 @@
           "title": "too-narrow passage for a wide profile is rejected / detoured, never squeezed",
           "name": "too-narrow passage for a wide profile is rejected / detoured, never squeezed",
           "result": "pass",
-          "durationMs": 6
+          "durationMs": 14
         },
         {
           "file": "walk.test.ts",
           "title": "narrow passage: opposing walkers take turns, no overlap, no oscillation",
           "name": "narrow passage: opposing walkers take turns, no overlap, no oscillation",
           "result": "pass",
-          "durationMs": 63
+          "durationMs": 62
         },
         {
           "file": "walk.test.ts",
           "title": "standing person on the route: brief pause at most",
           "name": "standing person on the route: brief pause at most, no turn/walk flicker, no overlap",
           "result": "pass",
-          "durationMs": 62
+          "durationMs": 50
         },
         {
           "file": "sequence.test.ts",
           "title": "runner: proving-ground walkers",
           "name": "runner: proving-ground walkers — passage yield + barrier-gated climb, no violations",
           "result": "pass",
-          "durationMs": 102
+          "durationMs": 79
         },
         {
           "file": "review.test.ts",
           "title": "C3: a walker crossing a carry waits for the load to pass",
           "name": "C3: a walker crossing a carry waits for the load to pass (traffic.load), never walks through it; overlap is a violation",
           "result": "pass",
-          "durationMs": 2020
+          "durationMs": 466
         },
         {
           "file": "gaps.test.ts",
           "title": "2.0 m corridor: two walkers head-on pass side by side without yielding",
           "name": "2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time",
           "result": "pass",
-          "durationMs": 332
+          "durationMs": 294
         },
         {
           "file": "gaps.test.ts",
           "title": "1.0 m gap (same scene): opposing walkers still take turns",
           "name": "1.0 m gap (same scene): opposing walkers still take turns (someone yields)",
           "result": "pass",
-          "durationMs": 64
+          "durationMs": 106
+        },
+        {
+          "file": "gaps.test.ts",
+          "title": "2.0 m corridor: both walkers keep moving while passing",
+          "name": "2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass",
+          "result": "pass",
+          "durationMs": 49
         }
       ]
     },
@@ -198,21 +205,21 @@
           "title": "stairs: oblique approach goes to the entry, faces up-stair, exits at landing",
           "name": "stairs: oblique approach goes to the entry, faces up-stair, exits at landing",
           "result": "pass",
-          "durationMs": 8
+          "durationMs": 13
         },
         {
           "file": "walk.test.ts",
           "title": "stairs: oblique start climbs real steps to the deck and ends on level 1",
           "name": "stairs: oblique start climbs real steps to the deck and ends on level 1",
           "result": "pass",
-          "durationMs": 103
+          "durationMs": 85
         },
         {
           "file": "walk.test.ts",
           "title": "cancel mid-climb (review M2)",
           "name": "cancel mid-climb (review M2): the walker finishes at the nearer landing on its level, cancelled, no violations",
           "result": "pass",
-          "durationMs": 86
+          "durationMs": 70
         }
       ]
     },
@@ -230,21 +237,21 @@
           "title": "multi-level: deck → ground directly below uses stairs, never drops through",
           "name": "multi-level: deck → ground directly below uses stairs, never drops through",
           "result": "pass",
-          "durationMs": 29
+          "durationMs": 17
         },
         {
           "file": "walk.test.ts",
           "title": "stairs: oblique start climbs real steps to the deck and ends on level 1",
           "name": "stairs: oblique start climbs real steps to the deck and ends on level 1",
           "result": "pass",
-          "durationMs": 103
+          "durationMs": 85
         },
         {
           "file": "walk.test.ts",
           "title": "replan around people on the deck (review M3)",
           "name": "replan around people on the deck (review M3): obstacles sit at their own foot height",
           "result": "pass",
-          "durationMs": 94
+          "durationMs": 91
         }
       ]
     },
@@ -262,35 +269,35 @@
           "title": "carry: 2 people carry a 12 ft beam around the L corner of the 2.5 m corridor",
           "name": "carry: 2 people carry a 12 ft beam around the L corner of the 2.5 m corridor",
           "result": "pass",
-          "durationMs": 287
+          "durationMs": 361
         },
         {
           "file": "carry.test.ts",
           "title": "carry: 19 ft upright with 4 people cannot use the 1.5 m corridor",
           "name": "carry: 19 ft upright with 4 people cannot use the 1.5 m corridor, though the 4 people can walk it",
           "result": "pass",
-          "durationMs": 331
+          "durationMs": 284
         },
         {
           "file": "carry.test.ts",
           "title": "carry: 19 ft upright goes straight down the 2.5 m corridor but cannot turn its corner",
           "name": "carry: 19 ft upright goes straight down the 2.5 m corridor but cannot turn its corner",
           "result": "pass",
-          "durationMs": 247
+          "durationMs": 281
         },
         {
           "file": "carry.test.ts",
           "title": "carry invariant: detects grip drift, a load inside a wall, and a wrong holder",
           "name": "carry invariant: detects grip drift, a load inside a wall, and a wrong holder",
           "result": "pass",
-          "durationMs": 34
+          "durationMs": 38
         },
         {
           "file": "review.test.ts",
           "title": "C1: a mid-carry replan never flips the formation",
           "name": "C1: a mid-carry replan never flips the formation (no carrier teleports); teleports are an invariant violation",
           "result": "pass",
-          "durationMs": 874
+          "durationMs": 845
         }
       ]
     },
@@ -308,63 +315,63 @@
           "title": "supported bay: raise, hold, premature release refused, beams, stable release",
           "name": "supported bay: raise, hold, premature release refused, beams, stable release",
           "result": "pass",
-          "durationMs": 2521
+          "durationMs": 2176
         },
         {
           "file": "construction.test.ts",
           "title": "raising arc blocked by an overhead obstacle is rejected and names it",
           "name": "raising arc blocked by an overhead obstacle is rejected and names it",
           "result": "pass",
-          "durationMs": 5
+          "durationMs": 7
         },
         {
           "file": "construction.test.ts",
           "title": "crew too small for a 19 ft upright",
           "name": "crew too small for a 19 ft upright; misaligned bay; unreachable seat height",
           "result": "pass",
-          "durationMs": 806
+          "durationMs": 605
         },
         {
           "file": "construction.test.ts",
           "title": "raise choreography (2 people)",
           "name": "raise choreography (2 people): lifter walks the frame up, hands ≤ 2.0 m and within reach, ≤ 0.6 m/s; footer braces the base",
           "result": "pass",
-          "durationMs": 666
+          "durationMs": 595
         },
         {
           "file": "construction.test.ts",
           "title": "raise choreography (4 people)",
           "name": "raise choreography (4 people): two lifters step around the footers to the stations behind the base",
           "result": "pass",
-          "durationMs": 649
+          "durationMs": 603
         },
         {
           "file": "construction.test.ts",
           "title": "raise choreography: an obstacle on the lifter",
           "name": "raise choreography: an obstacle on the lifter's walk is refused at plan time, or blocks mid-raise without clipping",
           "result": "pass",
-          "durationMs": 643
+          "durationMs": 626
         },
         {
           "file": "construction.test.ts",
           "title": "raise choreography (1 person, 8 ft frame)",
           "name": "raise choreography (1 person, 8 ft frame): the lifter walks it up and ends as the footer",
           "result": "pass",
-          "durationMs": 462
+          "durationMs": 460
         },
         {
           "file": "construction.test.ts",
           "title": "19 ft bay: 3 people raise each 19 ft frame",
           "name": "19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s), premature release refused, 12 ft beams at 0.5 m + 1.8 m, stable release",
           "result": "pass",
-          "durationMs": 2030
+          "durationMs": 1886
         },
         {
           "file": "review.test.ts",
           "title": "C2: people holding up a frame cannot be assigned to carry",
           "name": "C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation",
           "result": "pass",
-          "durationMs": 810
+          "durationMs": 705
         }
       ]
     },
@@ -382,42 +389,42 @@
           "title": "construction changes navigation: a new wall in the gap forces a detour",
           "name": "construction changes navigation: a new wall in the gap forces a detour",
           "result": "pass",
-          "durationMs": 57
+          "durationMs": 73
         },
         {
           "file": "walk.test.ts",
           "title": "construction mid-walk: new obstacle on the route triggers one replan",
           "name": "construction mid-walk: new obstacle on the route triggers one replan, no penetration",
           "result": "pass",
-          "durationMs": 111
+          "durationMs": 97
         },
         {
           "file": "progressive.test.ts",
           "title": "construction changes navigation: a stair flight set down across a walker",
           "name": "construction changes navigation: a stair flight set down across a walker's corridor forces a replan",
           "result": "pass",
-          "durationMs": 1962
+          "durationMs": 1793
         },
         {
           "file": "progressive.test.ts",
           "title": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable",
           "name": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable",
           "result": "pass",
-          "durationMs": 6066
+          "durationMs": 3910
         },
         {
           "file": "progressive.test.ts",
           "title": "full sequence: uprights → beams → release → joists → plywood → stairs → a person walks up",
           "name": "full sequence: uprights → beams → release → joists → plywood → stairs → a person walks up; zero violations",
           "result": "pass",
-          "durationMs": 2974
+          "durationMs": 3049
         },
         {
           "file": "planning.test.ts",
           "title": "replan budget: construction replans are staggered deterministically",
           "name": "replan budget: construction replans are staggered deterministically, walkers keep a clear prefix, all arrive",
           "result": "pass",
-          "durationMs": 857
+          "durationMs": 708
         }
       ]
     },
@@ -435,28 +442,28 @@
           "title": "incomplete stairs are not traversable and the failure names them",
           "name": "incomplete stairs are not traversable and the failure names them",
           "result": "pass",
-          "durationMs": 269
+          "durationMs": 331
         },
         {
           "file": "progressive.test.ts",
           "title": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable",
           "name": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable",
           "result": "pass",
-          "durationMs": 6066
+          "durationMs": 3910
         },
         {
           "file": "progressive.test.ts",
           "title": "progressive stairs: incomplete flight is not traversable and names what is missing",
           "name": "progressive stairs: incomplete flight is not traversable and names what is missing",
           "result": "pass",
-          "durationMs": 3372
+          "durationMs": 2897
         },
         {
           "file": "progressive.test.ts",
           "title": "a sheet whose support goes missing stops being floor and is flagged",
           "name": "a sheet whose support goes missing stops being floor and is flagged",
           "result": "pass",
-          "durationMs": 2917
+          "durationMs": 2910
         }
       ]
     },
@@ -481,28 +488,28 @@
           "title": "carry: a second carry using a busy person fails with reservation.conflict",
           "name": "carry: a second carry using a busy person fails with reservation.conflict",
           "result": "pass",
-          "durationMs": 445
+          "durationMs": 398
         },
         {
           "file": "review.test.ts",
           "title": "C2: people holding up a frame cannot be assigned to carry",
           "name": "C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation",
           "result": "pass",
-          "durationMs": 810
+          "durationMs": 705
         },
         {
           "file": "review.test.ts",
           "title": "H1: an unreachable hold station is refused at plan time",
           "name": "H1: an unreachable hold station is refused at plan time; a failed/cancelled action leaves no reservations, tasks, children or traffic behind",
           "result": "pass",
-          "durationMs": 142
+          "durationMs": 136
         },
         {
           "file": "social.test.ts",
           "title": "sit: two people cannot hold one camp-chair",
           "name": "sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it",
           "result": "pass",
-          "durationMs": 158
+          "durationMs": 108
         }
       ]
     },
@@ -520,49 +527,49 @@
           "title": "carry: cancel mid-move performs a controlled set-down where the ground is clear",
           "name": "carry: cancel mid-move performs a controlled set-down where the ground is clear",
           "result": "pass",
-          "durationMs": 66
+          "durationMs": 79
         },
         {
           "file": "carry.test.ts",
           "title": "carry: cancel over an obstruction is refused (carry.cancel-unsafe)",
           "name": "carry: cancel over an obstruction is refused (carry.cancel-unsafe) and the carry continues",
           "result": "pass",
-          "durationMs": 59
+          "durationMs": 53
         },
         {
           "file": "carry.test.ts",
           "title": "carry: cancel during gather releases the crew immediately",
           "name": "carry: cancel during gather releases the crew immediately; target on an obstruction is rejected",
           "result": "pass",
-          "durationMs": 26
+          "durationMs": 24
         },
         {
           "file": "construction.test.ts",
           "title": "cancel mid-raise is refused (would leave the frame unsupported)",
           "name": "cancel mid-raise is refused (would leave the frame unsupported)",
           "result": "pass",
-          "durationMs": 709
+          "durationMs": 582
         },
         {
           "file": "walk.test.ts",
           "title": "cancel mid-climb (review M2)",
           "name": "cancel mid-climb (review M2): the walker finishes at the nearer landing on its level, cancelled, no violations",
           "result": "pass",
-          "durationMs": 86
+          "durationMs": 70
         },
         {
           "file": "review.test.ts",
           "title": "H1: an unreachable hold station is refused at plan time",
           "name": "H1: an unreachable hold station is refused at plan time; a failed/cancelled action leaves no reservations, tasks, children or traffic behind",
           "result": "pass",
-          "durationMs": 142
+          "durationMs": 136
         },
         {
           "file": "sequence.test.ts",
           "title": "runner: timeout settles deferred cancels",
           "name": "runner: timeout settles deferred cancels, lists cut steps, reports refusals (review M4)",
           "result": "pass",
-          "durationMs": 182
+          "durationMs": 177
         }
       ]
     },
@@ -580,28 +587,28 @@
           "title": "camera collision: path keyed through the test wall is corrected",
           "name": "camera collision: path keyed through the test wall is corrected (no sample in solid, no swept crossing)",
           "result": "pass",
-          "durationMs": 37
+          "durationMs": 25
         },
         {
           "file": "camera.test.ts",
           "title": "camera collision: impossible clearance is reported as rejection",
           "name": "camera collision: impossible clearance is reported as rejection, not silently accepted",
           "result": "pass",
-          "durationMs": 15
+          "durationMs": 7
         },
         {
           "file": "camera.test.ts",
           "title": "camera glass: subject behind plexiglass stays readable",
           "name": "camera glass: subject behind plexiglass stays readable; the camera may not fly through it",
           "result": "pass",
-          "durationMs": 16
+          "durationMs": 21
         },
         {
           "file": "camera-replay.test.ts",
           "title": "camera collision: a wall too tall to clear forces a deliberate, explained cut",
           "name": "camera collision: a wall too tall to clear forces a deliberate, explained cut",
           "result": "pass",
-          "durationMs": 92
+          "durationMs": 108
         },
         {
           "file": "camera-geom.test.ts",
@@ -615,7 +622,7 @@
           "title": "camera geom: signed distance, placement validity, pushout",
           "name": "camera geom: signed distance, placement validity, pushout",
           "result": "pass",
-          "durationMs": 54
+          "durationMs": 0
         }
       ]
     },
@@ -633,21 +640,21 @@
           "title": "camera readability: subject walking behind U walls is reported",
           "name": "camera readability: subject walking behind U walls is reported; planner cuts to a readable alternate before occlusion",
           "result": "pass",
-          "durationMs": 105
+          "durationMs": 141
         },
         {
           "file": "camera.test.ts",
           "title": "camera temporal: hysteresis prevents oscillation between two equal alternatives",
           "name": "camera temporal: hysteresis prevents oscillation between two equal alternatives over 10 s",
           "result": "pass",
-          "durationMs": 5
+          "durationMs": 12
         },
         {
           "file": "camera-geom.test.ts",
           "title": "camera readability: occlusion fraction, frustum, size, named reasons",
           "name": "camera readability: occlusion fraction, frustum, size, named reasons",
           "result": "pass",
-          "durationMs": 7
+          "durationMs": 1
         },
         {
           "file": "camera-geom.test.ts",
@@ -672,28 +679,28 @@
           "title": "replay camera independence: camera tracks never change the take",
           "name": "replay camera independence: camera tracks never change the take, its hash or its final state",
           "result": "pass",
-          "durationMs": 258
+          "durationMs": 252
         },
         {
           "file": "camera-replay.test.ts",
           "title": "camera replay independence: live camera solving and different planned tracks never change the take",
           "name": "camera replay independence: live camera solving and different planned tracks never change the take",
           "result": "pass",
-          "durationMs": 322
+          "durationMs": 346
         },
         {
           "file": "camera-take.test.ts",
           "title": "planShotList: contiguous windows",
           "name": "planShotList: contiguous windows → one uniform track, a cut at every shot boundary, take untouched",
           "result": "pass",
-          "durationMs": 477
+          "durationMs": 554
         },
         {
           "file": "api.test.ts",
           "title": "api: take replay is independent of camera track attachment",
           "name": "api: take replay is independent of camera track attachment",
           "result": "pass",
-          "durationMs": 274
+          "durationMs": 282
         }
       ]
     },
@@ -718,21 +725,21 @@
           "title": "fork isolation: canonical refuses execution",
           "name": "fork isolation: canonical refuses execution; executing in one branch leaves parent and sibling unchanged",
           "result": "pass",
-          "durationMs": 182
+          "durationMs": 204
         },
         {
           "file": "rehearsal.test.ts",
           "title": "rehearsal is private: history, heads and checkpoints untouched",
           "name": "rehearsal is private: history, heads and checkpoints untouched",
           "result": "pass",
-          "durationMs": 131
+          "durationMs": 135
         },
         {
           "file": "campus.test.ts",
           "title": "canonical mars-2026 is protected; flagship work happens in a fork",
           "name": "canonical mars-2026 is protected; flagship work happens in a fork",
           "result": "pass",
-          "durationMs": 7
+          "durationMs": 4
         }
       ]
     },
@@ -750,35 +757,35 @@
           "title": "plan invalidation: moving an obstacle into the route after rehearsal makes execution stale",
           "name": "plan invalidation: moving an obstacle into the route after rehearsal makes execution stale",
           "result": "pass",
-          "durationMs": 166
+          "durationMs": 168
         },
         {
           "file": "rehearsal.test.ts",
           "title": "plan invalidation: env/weather, labels and provenance edits do NOT stale a plan",
           "name": "plan invalidation: env/weather, labels and provenance edits do NOT stale a plan",
           "result": "pass",
-          "durationMs": 144
+          "durationMs": 172
         },
         {
           "file": "rehearsal.test.ts",
           "title": "plan invalidation: inventory mode, RNG state and rules version are physical assumptions",
           "name": "plan invalidation: inventory mode, RNG state and rules version are physical assumptions",
           "result": "pass",
-          "durationMs": 2
+          "durationMs": 5
         },
         {
           "file": "rehearsal.test.ts",
           "title": "tampered plans and mismatched service scenes fail loudly",
           "name": "tampered plans and mismatched service scenes fail loudly",
           "result": "pass",
-          "durationMs": 1
+          "durationMs": 6
         },
         {
           "file": "api.test.ts",
           "title": "api: stale plans and protected canonical workspaces are refused",
           "name": "api: stale plans and protected canonical workspaces are refused with diagnostics",
           "result": "pass",
-          "durationMs": 205
+          "durationMs": 195
         }
       ]
     },
@@ -796,14 +803,14 @@
           "title": "replay isolation: sampling an old take never touches history, the live workspace or the take",
           "name": "replay isolation: sampling an old take never touches history, the live workspace or the take",
           "result": "pass",
-          "durationMs": 50
+          "durationMs": 47
         },
         {
           "file": "take.test.ts",
           "title": "tampered takes are rejected",
           "name": "tampered takes are rejected",
           "result": "pass",
-          "durationMs": 123
+          "durationMs": 112
         }
       ]
     }
@@ -851,7 +858,7 @@
           "title": "rng is seeded, resumable and uniform-ish",
           "name": "rng is seeded, resumable and uniform-ish",
           "result": "pass",
-          "durationMs": 15
+          "durationMs": 52
         },
         {
           "file": "core.test.ts",
@@ -865,42 +872,42 @@
           "title": "engine source never calls the host transcendentals",
           "name": "engine source never calls the host transcendentals (use core/math.ts d* versions)",
           "result": "pass",
-          "durationMs": 5
+          "durationMs": 14
         },
         {
           "file": "navigation.test.ts",
           "title": "deterministic: identical routes on repeat",
           "name": "deterministic: identical routes on repeat",
           "result": "pass",
-          "durationMs": 68
+          "durationMs": 113
         },
         {
           "file": "walk.test.ts",
           "title": "entity insertion order does not change behaviour (review M6)",
           "name": "entity insertion order does not change behaviour (review M6): same world, two orders, same final hash",
           "result": "pass",
-          "durationMs": 2953
+          "durationMs": 1328
         },
         {
           "file": "campus.test.ts",
           "title": "campus 2026 scene file loads with provenance on every obstacle",
           "name": "campus 2026 scene file loads with provenance on every obstacle",
           "result": "pass",
-          "durationMs": 2
+          "durationMs": 3
         },
         {
           "file": "campus.test.ts",
           "title": "Chiba interior is not walkable",
           "name": "Chiba interior is not walkable (unknown ≠ walkable)",
           "result": "pass",
-          "durationMs": 118
+          "durationMs": 96
         },
         {
           "file": "campus.test.ts",
           "title": "loading is deterministic",
           "name": "loading is deterministic",
           "result": "pass",
-          "durationMs": 275
+          "durationMs": 319
         },
         {
           "file": "campus-extract.test.ts",
@@ -925,63 +932,63 @@
           "title": "wall: plans around the wall before contact",
           "name": "wall: plans around the wall before contact",
           "result": "pass",
-          "durationMs": 36
+          "durationMs": 39
         },
         {
           "file": "navigation.test.ts",
           "title": "U-shaped trap: global route exits via the open side",
           "name": "U-shaped trap: global route exits via the open side",
           "result": "pass",
-          "durationMs": 12
+          "durationMs": 6
         },
         {
           "file": "navigation.test.ts",
           "title": "stairs: oblique approach goes to the entry",
           "name": "stairs: oblique approach goes to the entry, faces up-stair, exits at landing",
           "result": "pass",
-          "durationMs": 8
+          "durationMs": 13
         },
         {
           "file": "navigation.test.ts",
           "title": "multi-level: deck → ground directly below uses stairs",
           "name": "multi-level: deck → ground directly below uses stairs, never drops through",
           "result": "pass",
-          "durationMs": 29
+          "durationMs": 17
         },
         {
           "file": "walk.test.ts",
           "title": "walk around wall: completes, no penetration",
           "name": "walk around wall: completes, no penetration, no teleport, little heading jitter",
           "result": "pass",
-          "durationMs": 95
+          "durationMs": 103
         },
         {
           "file": "walk.test.ts",
           "title": "stairs: oblique start climbs real steps",
           "name": "stairs: oblique start climbs real steps to the deck and ends on level 1",
           "result": "pass",
-          "durationMs": 103
+          "durationMs": 85
         },
         {
           "file": "walk.test.ts",
           "title": "narrow passage: opposing walkers take turns",
           "name": "narrow passage: opposing walkers take turns, no overlap, no oscillation",
           "result": "pass",
-          "durationMs": 63
+          "durationMs": 62
         },
         {
           "file": "walk.test.ts",
           "title": "standing person on the route: brief pause at most",
           "name": "standing person on the route: brief pause at most, no turn/walk flicker, no overlap",
           "result": "pass",
-          "durationMs": 62
+          "durationMs": 50
         },
         {
           "file": "walk.test.ts",
           "title": "unreachable goal is rejected before any movement",
           "name": "unreachable goal is rejected before any movement",
           "result": "pass",
-          "durationMs": 157
+          "durationMs": 123
         },
         {
           "file": "review.test.ts",
@@ -995,14 +1002,14 @@
           "title": "planner equality: production findRoute === frozen reference",
           "name": "planner equality: production findRoute === frozen reference over test routes + 200 seeded proving-ground routes",
           "result": "pass",
-          "durationMs": 5994
+          "durationMs": 3937
         },
         {
           "file": "planning.test.ts",
           "title": "stress-30: exact planner keeps the pinned result",
           "name": "stress-30: exact planner keeps the pinned result; per-tick cost bounded; zero violations",
           "result": "pass",
-          "durationMs": 2596
+          "durationMs": 2075
         }
       ]
     },
@@ -1020,49 +1027,49 @@
           "title": "carry: 2 people carry a 12 ft beam around the L corner",
           "name": "carry: 2 people carry a 12 ft beam around the L corner of the 2.5 m corridor",
           "result": "pass",
-          "durationMs": 287
+          "durationMs": 361
         },
         {
           "file": "carry.test.ts",
           "title": "carry: 19 ft upright with 4 people cannot use the 1.5 m corridor",
           "name": "carry: 19 ft upright with 4 people cannot use the 1.5 m corridor, though the 4 people can walk it",
           "result": "pass",
-          "durationMs": 331
+          "durationMs": 284
         },
         {
           "file": "carry.test.ts",
           "title": "carry: 19 ft upright goes straight down the 2.5 m corridor",
           "name": "carry: 19 ft upright goes straight down the 2.5 m corridor but cannot turn its corner",
           "result": "pass",
-          "durationMs": 247
+          "durationMs": 281
         },
         {
           "file": "carry.test.ts",
           "title": "carry: crew too small / too large for the load is rejected",
           "name": "carry: crew too small / too large for the load is rejected with the reason",
           "result": "pass",
-          "durationMs": 3
+          "durationMs": 1
         },
         {
           "file": "carry.test.ts",
           "title": "carry: determinism",
           "name": "carry: determinism — same inputs give the same final state hash",
           "result": "pass",
-          "durationMs": 125
+          "durationMs": 115
         },
         {
           "file": "carry.test.ts",
           "title": "carry invariant: detects grip drift",
           "name": "carry invariant: detects grip drift, a load inside a wall, and a wrong holder",
           "result": "pass",
-          "durationMs": 34
+          "durationMs": 38
         },
         {
           "file": "review.test.ts",
           "title": "C1: a mid-carry replan never flips the formation",
           "name": "C1: a mid-carry replan never flips the formation (no carrier teleports); teleports are an invariant violation",
           "result": "pass",
-          "durationMs": 874
+          "durationMs": 845
         }
       ]
     },
@@ -1080,56 +1087,56 @@
           "title": "supported bay: raise, hold, premature release refused",
           "name": "supported bay: raise, hold, premature release refused, beams, stable release",
           "result": "pass",
-          "durationMs": 2521
+          "durationMs": 2176
         },
         {
           "file": "construction.test.ts",
           "title": "connect_beam lifts a symmetric beam without spinning it",
           "name": "connect_beam lifts a symmetric beam without spinning it end-for-end; ends map to a/b by geometry",
           "result": "pass",
-          "durationMs": 2747
+          "durationMs": 1333
         },
         {
           "file": "construction.test.ts",
           "title": "raising arc blocked by an overhead obstacle",
           "name": "raising arc blocked by an overhead obstacle is rejected and names it",
           "result": "pass",
-          "durationMs": 5
+          "durationMs": 7
         },
         {
           "file": "construction.test.ts",
           "title": "crew too small for a 19 ft upright",
           "name": "crew too small for a 19 ft upright; misaligned bay; unreachable seat height",
           "result": "pass",
-          "durationMs": 806
+          "durationMs": 605
         },
         {
           "file": "construction.test.ts",
           "title": "cancel mid-raise is refused",
           "name": "cancel mid-raise is refused (would leave the frame unsupported)",
           "result": "pass",
-          "durationMs": 709
+          "durationMs": 582
         },
         {
           "file": "construction.test.ts",
           "title": "raise choreography (2 people)",
           "name": "raise choreography (2 people): lifter walks the frame up, hands ≤ 2.0 m and within reach, ≤ 0.6 m/s; footer braces the base",
           "result": "pass",
-          "durationMs": 666
+          "durationMs": 595
         },
         {
           "file": "construction.test.ts",
           "title": "raise choreography (4 people)",
           "name": "raise choreography (4 people): two lifters step around the footers to the stations behind the base",
           "result": "pass",
-          "durationMs": 649
+          "durationMs": 603
         },
         {
           "file": "review.test.ts",
           "title": "C2: people holding up a frame cannot be assigned to carry",
           "name": "C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation",
           "result": "pass",
-          "durationMs": 810
+          "durationMs": 705
         }
       ]
     },
@@ -1147,63 +1154,63 @@
           "title": "progressive floor: after 1 of 2 sheets",
           "name": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable",
           "result": "pass",
-          "durationMs": 6066
+          "durationMs": 3910
         },
         {
           "file": "progressive.test.ts",
           "title": "progressive stairs: incomplete flight is not traversable",
           "name": "progressive stairs: incomplete flight is not traversable and names what is missing",
           "result": "pass",
-          "durationMs": 3372
+          "durationMs": 2897
         },
         {
           "file": "progressive.test.ts",
           "title": "plywood without joists is rejected",
           "name": "plywood without joists is rejected with a diagnostic",
           "result": "pass",
-          "durationMs": 1528
+          "durationMs": 1504
         },
         {
           "file": "progressive.test.ts",
           "title": "joist without beams is rejected",
           "name": "joist without beams is rejected; joist too long / out of reach rules",
           "result": "pass",
-          "durationMs": 1400
+          "durationMs": 1395
         },
         {
           "file": "progressive.test.ts",
           "title": "full sequence: uprights",
           "name": "full sequence: uprights → beams → release → joists → plywood → stairs → a person walks up; zero violations",
           "result": "pass",
-          "durationMs": 2974
+          "durationMs": 3049
         },
         {
           "file": "progressive.test.ts",
           "title": "work from deck: a joist above standing reach",
           "name": "work from deck: a joist above standing reach needs a supported deck below it",
           "result": "pass",
-          "durationMs": 4353
+          "durationMs": 4343
         },
         {
           "file": "progressive.test.ts",
           "title": "swept lift: a joist whose straight path is obstructed",
           "name": "swept lift: a joist whose straight path is obstructed is lifted over (up, across, down)",
           "result": "pass",
-          "durationMs": 1421
+          "durationMs": 1423
         },
         {
           "file": "progressive.test.ts",
           "title": "lift crew: a plywood lift-over keeps both holders",
           "name": "lift crew: a plywood lift-over keeps both holders beside their hand points every tick",
           "result": "pass",
-          "durationMs": 1800
+          "durationMs": 1818
         },
         {
           "file": "build-bay.test.ts",
           "title": "flagship: rehearse the full build from material piles, then execute it",
           "name": "flagship: rehearse the full build from material piles, then execute it",
           "result": "pass",
-          "durationMs": 16252
+          "durationMs": 13436
         }
       ]
     },
@@ -1221,56 +1228,56 @@
           "title": "rehearsal/live consistency",
           "name": "rehearsal/live consistency: same plan + same baseline → identical final state and take",
           "result": "pass",
-          "durationMs": 362
+          "durationMs": 331
         },
         {
           "file": "rehearsal.test.ts",
           "title": "rehearsal is private",
           "name": "rehearsal is private: history, heads and checkpoints untouched",
           "result": "pass",
-          "durationMs": 131
+          "durationMs": 135
         },
         {
           "file": "rehearsal.test.ts",
           "title": "plan invalidation: moving an obstacle into the route",
           "name": "plan invalidation: moving an obstacle into the route after rehearsal makes execution stale",
           "result": "pass",
-          "durationMs": 166
+          "durationMs": 168
         },
         {
           "file": "rehearsal.test.ts",
           "title": "failed official runs are not committed",
           "name": "failed official runs are not committed; the take is still recorded",
           "result": "pass",
-          "durationMs": 119
+          "durationMs": 76
         },
         {
           "file": "history.test.ts",
           "title": "official execution appends a simulation-run checkpoint",
           "name": "official execution appends a simulation-run checkpoint naming the take and plan",
           "result": "pass",
-          "durationMs": 247
+          "durationMs": 224
         },
         {
           "file": "api.test.ts",
           "title": "api: bind → rehearse → execute → get_take",
           "name": "api: bind → rehearse → execute → get_take (60 s, 3 walkers) — rehearsal and execution produce the same take",
           "result": "pass",
-          "durationMs": 692
+          "durationMs": 659
         },
         {
           "file": "build-bay.test.ts",
           "title": "flagship: rehearse the full build from material piles",
           "name": "flagship: rehearse the full build from material piles, then execute it",
           "result": "pass",
-          "durationMs": 16252
+          "durationMs": 13436
         },
         {
           "file": "campus-flagship.test.ts",
           "title": "flagship on Mars 2026: fork canonical",
           "name": "flagship on Mars 2026: fork canonical, build a rack bay at staging-east, canonical untouched",
           "result": "pass",
-          "durationMs": 49267
+          "durationMs": 45335
         }
       ]
     },
@@ -1288,56 +1295,56 @@
           "title": "take fidelity: sampling at every tick",
           "name": "take fidelity: sampling at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level",
           "result": "pass",
-          "durationMs": 213
+          "durationMs": 187
         },
         {
           "file": "take.test.ts",
           "title": "deterministic take bytes",
           "name": "deterministic take bytes: identical runs produce byte-identical takes",
           "result": "pass",
-          "durationMs": 390
+          "durationMs": 332
         },
         {
           "file": "take.test.ts",
           "title": "replay camera independence",
           "name": "replay camera independence: camera tracks never change the take, its hash or its final state",
           "result": "pass",
-          "durationMs": 258
+          "durationMs": 252
         },
         {
           "file": "take.test.ts",
           "title": "replay isolation",
           "name": "replay isolation: sampling an old take never touches history, the live workspace or the take",
           "result": "pass",
-          "durationMs": 50
+          "durationMs": 47
         },
         {
           "file": "camera-replay.test.ts",
           "title": "camera replay independence",
           "name": "camera replay independence: live camera solving and different planned tracks never change the take",
           "result": "pass",
-          "durationMs": 322
+          "durationMs": 346
         },
         {
           "file": "camera-take.test.ts",
           "title": "takeSampler: same entities and poses as sampleTake",
           "name": "takeSampler: same entities and poses as sampleTake at any time; components get box points",
           "result": "pass",
-          "durationMs": 407
+          "durationMs": 423
         },
         {
           "file": "camera.test.ts",
           "title": "camera determinism + CameraTrack payload round trip",
           "name": "camera determinism + CameraTrack payload round trip",
           "result": "pass",
-          "durationMs": 93
+          "durationMs": 41
         },
         {
           "file": "rehearsal.test.ts",
           "title": "fork isolation: canonical refuses execution",
           "name": "fork isolation: canonical refuses execution; executing in one branch leaves parent and sibling unchanged",
           "result": "pass",
-          "durationMs": 182
+          "durationMs": 204
         },
         {
           "file": "core.test.ts",
@@ -1369,56 +1376,56 @@
           "title": "catalog slots: campfire has 8 fire-circle places",
           "name": "catalog slots: campfire has 8 fire-circle places 1.6 m out facing the centre; bench 3 seats",
           "result": "pass",
-          "durationMs": 4
+          "durationMs": 6
         },
         {
           "file": "social.test.ts",
           "title": "sit: two people cannot hold one camp-chair",
           "name": "sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it",
           "result": "pass",
-          "durationMs": 158
+          "durationMs": 108
         },
         {
           "file": "social.test.ts",
           "title": "converse: 4 people form a circle",
           "name": "converse: 4 people form a circle, no overlaps, everyone faces the centre; cancel leaves them idle and unclaimed",
           "result": "pass",
-          "durationMs": 130
+          "durationMs": 118
         },
         {
           "file": "social.test.ts",
           "title": "converse refusals",
           "name": "converse refusals: a holder (actor.holding) and a circle that does not fit (converse.clearance)",
           "result": "pass",
-          "durationMs": 53
+          "durationMs": 43
         },
         {
           "file": "social.test.ts",
           "title": "campfire_circle with 10 people",
           "name": "campfire_circle with 10 people: 8 take fire-circle places, 2 fail slot.none-free naming the fire; no violations",
           "result": "pass",
-          "durationMs": 143
+          "durationMs": 149
         },
         {
           "file": "social.test.ts",
           "title": "gather onto a place region with an audience layout",
           "name": "gather onto a place region with an audience layout: rows face the focus, nearest-first assignment",
           "result": "pass",
-          "durationMs": 54
+          "durationMs": 51
         },
         {
           "file": "social.test.ts",
           "title": "ambient_wander: 6 people for 60 s",
           "name": "ambient_wander: 6 people for 60 s, every target inside the region, 0 violations; a directed task claims a person and ambient lets go",
           "result": "pass",
-          "durationMs": 208
+          "durationMs": 224
         },
         {
           "file": "social.test.ts",
           "title": "determinism: gather + converse + ambient twice",
           "name": "determinism: gather + converse + ambient twice → same state hash",
           "result": "pass",
-          "durationMs": 138
+          "durationMs": 116
         }
       ]
     }
@@ -1457,6 +1464,31 @@
     {
       "file": "api.test.ts",
       "name": "api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)",
+      "result": "pass"
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera readability: a bystander between camera and subject occludes; behind the subject or on the crew it does not",
+      "result": "pass"
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind",
+      "result": "pass"
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8",
+      "result": "pass"
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)",
+      "result": "pass"
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)",
       "result": "pass"
     },
     {
@@ -1530,6 +1562,11 @@
       "result": "pass"
     },
     {
+      "file": "carry.test.ts",
+      "name": "carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives",
+      "result": "pass"
+    },
+    {
       "file": "core.test.ts",
       "name": "reconstruction edits and simulation events are distinct causes",
       "result": "pass"
@@ -1593,11 +1630,6 @@
       "file": "env-sun.test.ts",
       "name": "smoothstep matches known fixed points",
       "result": "pass"
-    },
-    {
-      "file": "gaps.test.ts",
-      "name": "2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)",
-      "result": "todo"
     },
     {
       "file": "history.test.ts",
@@ -1706,54 +1738,57 @@
     }
   ],
   "sinceLastReport": {
-    "previousHead": "9ed068f",
-    "previousDate": "2026-09-27T22:13:05.109Z",
+    "previousHead": "f767540",
+    "previousDate": "2026-09-27T22:25:21.237Z",
     "added": [
-      "api.test.ts :: api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)",
-      "construction.test.ts :: 19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s), premature release refused, 12 ft beams at 0.5 m + 1.8 m, stable release",
-      "gaps.test.ts :: 1.0 m gap (same scene): opposing walkers still take turns (someone yields)",
-      "gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)",
-      "gaps.test.ts :: 2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time",
-      "gaps.test.ts :: U-trap: a walker starting at the inner back wall walks out and around to a goal behind the U; no oscillation, never within 0.28 m of the walls"
+      "camera-framing.test.ts :: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)",
+      "camera-framing.test.ts :: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind",
+      "camera-framing.test.ts :: camera readability: a bystander between camera and subject occludes; behind the subject or on the crew it does not",
+      "camera-framing.test.ts :: camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)",
+      "camera-framing.test.ts :: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8",
+      "carry.test.ts :: carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives",
+      "gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass"
     ],
-    "removed": []
+    "removed": [
+      "gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)"
+    ]
   },
   "allTests": [
     {
       "file": "api.test.ts",
       "name": "api: list_verbs exposes every registry verb with a valid JSON Schema generated from its zod schema",
       "result": "pass",
-      "durationMs": 41
+      "durationMs": 44
     },
     {
       "file": "api.test.ts",
       "name": "api: bind → rehearse → execute → get_take (60 s, 3 walkers) — rehearsal and execution produce the same take",
       "result": "pass",
-      "durationMs": 692
+      "durationMs": 659
     },
     {
       "file": "api.test.ts",
       "name": "api: stale plans and protected canonical workspaces are refused with diagnostics",
       "result": "pass",
-      "durationMs": 205
+      "durationMs": 195
     },
     {
       "file": "api.test.ts",
       "name": "api: take replay is independent of camera track attachment",
       "result": "pass",
-      "durationMs": 274
+      "durationMs": 282
     },
     {
       "file": "api.test.ts",
       "name": "api: query_world — filters, levels/links, route and carry previews use the verbs’ own planners",
       "result": "pass",
-      "durationMs": 220
+      "durationMs": 168
     },
     {
       "file": "api.test.ts",
       "name": "api: persisted state round-trips through JSON with lazy take/plan/camera loaders",
       "result": "pass",
-      "durationMs": 122
+      "durationMs": 116
     },
     {
       "file": "api.test.ts",
@@ -1765,25 +1800,55 @@
       "file": "api.test.ts",
       "name": "api: rehearse is read-only unless keep: true (review M5); unkept takes stay playable in memory",
       "result": "pass",
-      "durationMs": 300
+      "durationMs": 269
     },
     {
       "file": "api.test.ts",
       "name": "api: EngineRoom stores states as content-addressed blobs and migrates an old history blob (review M5)",
       "result": "pass",
-      "durationMs": 286
+      "durationMs": 268
     },
     {
       "file": "api.test.ts",
       "name": "api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)",
       "result": "pass",
-      "durationMs": 3214
+      "durationMs": 1474
     },
     {
       "file": "build-bay.test.ts",
       "name": "flagship: rehearse the full build from material piles, then execute it",
       "result": "pass",
-      "durationMs": 16252
+      "durationMs": 13436
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera readability: a bystander between camera and subject occludes; behind the subject or on the crew it does not",
+      "result": "pass",
+      "durationMs": 1
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind",
+      "result": "pass",
+      "durationMs": 121
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8",
+      "result": "pass",
+      "durationMs": 57
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)",
+      "result": "pass",
+      "durationMs": 0
+    },
+    {
+      "file": "camera-framing.test.ts",
+      "name": "camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)",
+      "result": "pass",
+      "durationMs": 34
     },
     {
       "file": "camera-geom.test.ts",
@@ -1795,7 +1860,7 @@
       "file": "camera-geom.test.ts",
       "name": "camera geom: signed distance, placement validity, pushout",
       "result": "pass",
-      "durationMs": 54
+      "durationMs": 0
     },
     {
       "file": "camera-geom.test.ts",
@@ -1807,7 +1872,7 @@
       "file": "camera-geom.test.ts",
       "name": "camera readability: occlusion fraction, frustum, size, named reasons",
       "result": "pass",
-      "durationMs": 7
+      "durationMs": 1
     },
     {
       "file": "camera-geom.test.ts",
@@ -1825,73 +1890,73 @@
       "file": "camera-replay.test.ts",
       "name": "camera collision: a wall too tall to clear forces a deliberate, explained cut",
       "result": "pass",
-      "durationMs": 92
+      "durationMs": 108
     },
     {
       "file": "camera-replay.test.ts",
       "name": "camera replay independence: live camera solving and different planned tracks never change the take",
       "result": "pass",
-      "durationMs": 322
+      "durationMs": 346
     },
     {
       "file": "camera-replay.test.ts",
       "name": "camera perf: plan a 60 s track at 10 Hz with 3 subjects in < 1 s",
       "result": "pass",
-      "durationMs": 206
+      "durationMs": 249
     },
     {
       "file": "camera-take.test.ts",
       "name": "takeSampler: same entities and poses as sampleTake at any time; components get box points",
       "result": "pass",
-      "durationMs": 407
+      "durationMs": 423
     },
     {
       "file": "camera-take.test.ts",
       "name": "planShotList: contiguous windows → one uniform track, a cut at every shot boundary, take untouched",
       "result": "pass",
-      "durationMs": 477
+      "durationMs": 554
     },
     {
       "file": "camera.test.ts",
       "name": "camera collision: path keyed through the test wall is corrected (no sample in solid, no swept crossing)",
       "result": "pass",
-      "durationMs": 37
+      "durationMs": 25
     },
     {
       "file": "camera.test.ts",
       "name": "camera collision: impossible clearance is reported as rejection, not silently accepted",
       "result": "pass",
-      "durationMs": 15
+      "durationMs": 7
     },
     {
       "file": "camera.test.ts",
       "name": "camera readability: subject walking behind U walls is reported; planner cuts to a readable alternate before occlusion",
       "result": "pass",
-      "durationMs": 105
+      "durationMs": 141
     },
     {
       "file": "camera.test.ts",
       "name": "camera glass: subject behind plexiglass stays readable; the camera may not fly through it",
       "result": "pass",
-      "durationMs": 16
+      "durationMs": 21
     },
     {
       "file": "camera.test.ts",
       "name": "camera temporal: hysteresis prevents oscillation between two equal alternatives over 10 s",
       "result": "pass",
-      "durationMs": 5
+      "durationMs": 12
     },
     {
       "file": "camera.test.ts",
       "name": "camera determinism + CameraTrack payload round trip",
       "result": "pass",
-      "durationMs": 93
+      "durationMs": 41
     },
     {
       "file": "campus-extract.test.ts",
       "name": "a 6 m post with vertices only at its ends is caught by band clipping",
       "result": "pass",
-      "durationMs": 4
+      "durationMs": 2
     },
     {
       "file": "campus-extract.test.ts",
@@ -1909,7 +1974,7 @@
       "file": "campus-extract.test.ts",
       "name": "roofs of buildings emit interior blockers from the ground to their underside",
       "result": "pass",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "file": "campus-extract.test.ts",
@@ -1933,181 +1998,187 @@
       "file": "campus-flagship.test.ts",
       "name": "flagship on Mars 2026: fork canonical, build a rack bay at staging-east, canonical untouched",
       "result": "pass",
-      "durationMs": 49267
+      "durationMs": 45335
     },
     {
       "file": "campus.test.ts",
       "name": "campus 2026 scene file loads with provenance on every obstacle",
       "result": "pass",
-      "durationMs": 2
+      "durationMs": 3
     },
     {
       "file": "campus.test.ts",
       "name": "no obstacle id is duplicated",
       "result": "pass",
-      "durationMs": 10
+      "durationMs": 2
     },
     {
       "file": "campus.test.ts",
       "name": "stored contentHash matches the data (extraction output is self-consistent)",
       "result": "pass",
-      "durationMs": 44
+      "durationMs": 81
     },
     {
       "file": "campus.test.ts",
       "name": "Chiba interior is not walkable (unknown ≠ walkable)",
       "result": "pass",
-      "durationMs": 118
+      "durationMs": 96
     },
     {
       "file": "campus.test.ts",
       "name": "staging-east is clear for a 4-person 19 ft upright carry at any heading",
       "result": "pass",
-      "durationMs": 441
+      "durationMs": 410
     },
     {
       "file": "campus.test.ts",
       "name": "flagship inventory lies inside its pile regions, on clear ground, not overlapping",
       "result": "pass",
-      "durationMs": 204
+      "durationMs": 220
     },
     {
       "file": "campus.test.ts",
       "name": "a walker can route from every pile to staging (±40 m crop)",
       "result": "pass",
-      "durationMs": 491
+      "durationMs": 484
     },
     {
       "file": "campus.test.ts",
       "name": "canonical mars-2026 is protected; flagship work happens in a fork",
       "result": "pass",
-      "durationMs": 7
+      "durationMs": 4
     },
     {
       "file": "campus.test.ts",
       "name": "loading is deterministic",
       "result": "pass",
-      "durationMs": 275
+      "durationMs": 319
     },
     {
       "file": "carry.test.ts",
       "name": "carry: 2 people carry a 12 ft beam around the L corner of the 2.5 m corridor",
       "result": "pass",
-      "durationMs": 287
+      "durationMs": 361
     },
     {
       "file": "carry.test.ts",
       "name": "carry: 19 ft upright with 4 people cannot use the 1.5 m corridor, though the 4 people can walk it",
       "result": "pass",
-      "durationMs": 331
+      "durationMs": 284
     },
     {
       "file": "carry.test.ts",
       "name": "carry: 19 ft upright goes straight down the 2.5 m corridor but cannot turn its corner",
       "result": "pass",
-      "durationMs": 247
+      "durationMs": 281
     },
     {
       "file": "carry.test.ts",
       "name": "carry: crew too small / too large for the load is rejected with the reason",
       "result": "pass",
-      "durationMs": 3
+      "durationMs": 1
     },
     {
       "file": "carry.test.ts",
       "name": "carry: a second carry using a busy person fails with reservation.conflict",
       "result": "pass",
-      "durationMs": 445
+      "durationMs": 398
     },
     {
       "file": "carry.test.ts",
       "name": "carry: cancel mid-move performs a controlled set-down where the ground is clear",
       "result": "pass",
-      "durationMs": 66
+      "durationMs": 79
     },
     {
       "file": "carry.test.ts",
       "name": "carry: cancel over an obstruction is refused (carry.cancel-unsafe) and the carry continues",
       "result": "pass",
-      "durationMs": 59
+      "durationMs": 53
     },
     {
       "file": "carry.test.ts",
       "name": "carry: cancel during gather releases the crew immediately; target on an obstruction is rejected",
       "result": "pass",
-      "durationMs": 26
+      "durationMs": 24
     },
     {
       "file": "carry.test.ts",
       "name": "carry: determinism — same inputs give the same final state hash",
       "result": "pass",
-      "durationMs": 125
+      "durationMs": 115
     },
     {
       "file": "carry.test.ts",
       "name": "carry invariant: detects grip drift, a load inside a wall, and a wrong holder",
       "result": "pass",
-      "durationMs": 34
+      "durationMs": 38
+    },
+    {
+      "file": "carry.test.ts",
+      "name": "carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives",
+      "result": "pass",
+      "durationMs": 8461
     },
     {
       "file": "construction.test.ts",
       "name": "supported bay: raise, hold, premature release refused, beams, stable release",
       "result": "pass",
-      "durationMs": 2521
+      "durationMs": 2176
     },
     {
       "file": "construction.test.ts",
       "name": "connect_beam lifts a symmetric beam without spinning it end-for-end; ends map to a/b by geometry",
       "result": "pass",
-      "durationMs": 2747
+      "durationMs": 1333
     },
     {
       "file": "construction.test.ts",
       "name": "raising arc blocked by an overhead obstacle is rejected and names it",
       "result": "pass",
-      "durationMs": 5
+      "durationMs": 7
     },
     {
       "file": "construction.test.ts",
       "name": "crew too small for a 19 ft upright; misaligned bay; unreachable seat height",
       "result": "pass",
-      "durationMs": 806
+      "durationMs": 605
     },
     {
       "file": "construction.test.ts",
       "name": "cancel mid-raise is refused (would leave the frame unsupported)",
       "result": "pass",
-      "durationMs": 709
+      "durationMs": 582
     },
     {
       "file": "construction.test.ts",
       "name": "raise choreography (2 people): lifter walks the frame up, hands ≤ 2.0 m and within reach, ≤ 0.6 m/s; footer braces the base",
       "result": "pass",
-      "durationMs": 666
+      "durationMs": 595
     },
     {
       "file": "construction.test.ts",
       "name": "raise choreography (4 people): two lifters step around the footers to the stations behind the base",
       "result": "pass",
-      "durationMs": 649
+      "durationMs": 603
     },
     {
       "file": "construction.test.ts",
       "name": "raise choreography: an obstacle on the lifter's walk is refused at plan time, or blocks mid-raise without clipping",
       "result": "pass",
-      "durationMs": 643
+      "durationMs": 626
     },
     {
       "file": "construction.test.ts",
       "name": "raise choreography (1 person, 8 ft frame): the lifter walks it up and ends as the footer",
       "result": "pass",
-      "durationMs": 462
+      "durationMs": 460
     },
     {
       "file": "construction.test.ts",
       "name": "19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s), premature release refused, 12 ft beams at 0.5 m + 1.8 m, stable release",
       "result": "pass",
-      "durationMs": 2030
+      "durationMs": 1886
     },
     {
       "file": "core.test.ts",
@@ -2125,7 +2196,7 @@
       "file": "core.test.ts",
       "name": "rng is seeded, resumable and uniform-ish",
       "result": "pass",
-      "durationMs": 15
+      "durationMs": 52
     },
     {
       "file": "core.test.ts",
@@ -2137,7 +2208,7 @@
       "file": "core.test.ts",
       "name": "reconstruction edits and simulation events are distinct causes",
       "result": "pass",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "file": "core.test.ts",
@@ -2149,7 +2220,7 @@
       "file": "core.test.ts",
       "name": "deterministic trig: <= 2 ulp of Math.* over 100k seeded inputs per function, incl. large arguments",
       "result": "pass",
-      "durationMs": 257
+      "durationMs": 280
     },
     {
       "file": "core.test.ts",
@@ -2173,13 +2244,13 @@
       "file": "core.test.ts",
       "name": "engine source never calls the host transcendentals (use core/math.ts d* versions)",
       "result": "pass",
-      "durationMs": 5
+      "durationMs": 14
     },
     {
       "file": "env-sun.test.ts",
       "name": "elevation at true solar noon matches the equinox/solstice references",
       "result": "pass",
-      "durationMs": 1
+      "durationMs": 59
     },
     {
       "file": "env-sun.test.ts",
@@ -2233,43 +2304,43 @@
       "file": "gaps.test.ts",
       "name": "2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time",
       "result": "pass",
-      "durationMs": 332
+      "durationMs": 294
     },
     {
       "file": "gaps.test.ts",
       "name": "1.0 m gap (same scene): opposing walkers still take turns (someone yields)",
       "result": "pass",
-      "durationMs": 64
+      "durationMs": 106
     },
     {
       "file": "gaps.test.ts",
-      "name": "2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)",
-      "result": "todo",
-      "durationMs": 77
+      "name": "2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass",
+      "result": "pass",
+      "durationMs": 49
     },
     {
       "file": "gaps.test.ts",
       "name": "U-trap: a walker starting at the inner back wall walks out and around to a goal behind the U; no oscillation, never within 0.28 m of the walls",
       "result": "pass",
-      "durationMs": 110
+      "durationMs": 78
     },
     {
       "file": "history.test.ts",
       "name": "physicalHash ignores env, clock, labels, tags and provenance",
       "result": "pass",
-      "durationMs": 7
+      "durationMs": 31
     },
     {
       "file": "history.test.ts",
       "name": "physicalHash tracks poses, phases, supports, activity, inventory and RNG",
       "result": "pass",
-      "durationMs": 3
+      "durationMs": 2
     },
     {
       "file": "history.test.ts",
       "name": "official execution appends a simulation-run checkpoint naming the take and plan",
       "result": "pass",
-      "durationMs": 247
+      "durationMs": 224
     },
     {
       "file": "history.test.ts",
@@ -2281,13 +2352,13 @@
       "file": "navigation.test.ts",
       "name": "wall: plans around the wall before contact",
       "result": "pass",
-      "durationMs": 36
+      "durationMs": 39
     },
     {
       "file": "navigation.test.ts",
       "name": "U-shaped trap: global route exits via the open side",
       "result": "pass",
-      "durationMs": 12
+      "durationMs": 6
     },
     {
       "file": "navigation.test.ts",
@@ -2299,31 +2370,31 @@
       "file": "navigation.test.ts",
       "name": "too-narrow passage for a wide profile is rejected / detoured, never squeezed",
       "result": "pass",
-      "durationMs": 6
+      "durationMs": 14
     },
     {
       "file": "navigation.test.ts",
       "name": "stairs: oblique approach goes to the entry, faces up-stair, exits at landing",
       "result": "pass",
-      "durationMs": 8
+      "durationMs": 13
     },
     {
       "file": "navigation.test.ts",
       "name": "multi-level: deck → ground directly below uses stairs, never drops through",
       "result": "pass",
-      "durationMs": 29
+      "durationMs": 17
     },
     {
       "file": "navigation.test.ts",
       "name": "incomplete stairs are not traversable and the failure names them",
       "result": "pass",
-      "durationMs": 269
+      "durationMs": 331
     },
     {
       "file": "navigation.test.ts",
       "name": "construction changes navigation: a new wall in the gap forces a detour",
       "result": "pass",
-      "durationMs": 57
+      "durationMs": 73
     },
     {
       "file": "navigation.test.ts",
@@ -2335,199 +2406,199 @@
       "file": "navigation.test.ts",
       "name": "deterministic: identical routes on repeat",
       "result": "pass",
-      "durationMs": 68
+      "durationMs": 113
     },
     {
       "file": "navigation.test.ts",
       "name": "perf: grid build + long route budget",
       "result": "pass",
-      "durationMs": 63
+      "durationMs": 69
     },
     {
       "file": "planning.test.ts",
       "name": "profiler: rt.profile = true records plan/step/spatial costs and never changes the run",
       "result": "pass",
-      "durationMs": 314
+      "durationMs": 283
     },
     {
       "file": "planning.test.ts",
       "name": "planner equality: production findRoute === frozen reference over test routes + 200 seeded proving-ground routes",
       "result": "pass",
-      "durationMs": 5994
+      "durationMs": 3937
     },
     {
       "file": "planning.test.ts",
       "name": "replan budget: construction replans are staggered deterministically, walkers keep a clear prefix, all arrive",
       "result": "pass",
-      "durationMs": 857
+      "durationMs": 708
     },
     {
       "file": "planning.test.ts",
       "name": "corridor planner (opt-in): failures identical to exact, successes clear and near-optimal",
       "result": "pass",
-      "durationMs": 629
+      "durationMs": 544
     },
     {
       "file": "planning.test.ts",
       "name": "stress-30: exact planner keeps the pinned result; per-tick cost bounded; zero violations",
       "result": "pass",
-      "durationMs": 2596
+      "durationMs": 2075
     },
     {
       "file": "progressive.test.ts",
       "name": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable",
       "result": "pass",
-      "durationMs": 6066
+      "durationMs": 3910
     },
     {
       "file": "progressive.test.ts",
       "name": "progressive stairs: incomplete flight is not traversable and names what is missing",
       "result": "pass",
-      "durationMs": 3372
+      "durationMs": 2897
     },
     {
       "file": "progressive.test.ts",
       "name": "construction changes navigation: a stair flight set down across a walker's corridor forces a replan",
       "result": "pass",
-      "durationMs": 1962
+      "durationMs": 1793
     },
     {
       "file": "progressive.test.ts",
       "name": "plywood without joists is rejected with a diagnostic",
       "result": "pass",
-      "durationMs": 1528
+      "durationMs": 1504
     },
     {
       "file": "progressive.test.ts",
       "name": "joist without beams is rejected; joist too long / out of reach rules",
       "result": "pass",
-      "durationMs": 1400
+      "durationMs": 1395
     },
     {
       "file": "progressive.test.ts",
       "name": "full sequence: uprights → beams → release → joists → plywood → stairs → a person walks up; zero violations",
       "result": "pass",
-      "durationMs": 2974
+      "durationMs": 3049
     },
     {
       "file": "progressive.test.ts",
       "name": "determinism: identical final state hash across runs",
       "result": "pass",
-      "durationMs": 5848
+      "durationMs": 5880
     },
     {
       "file": "progressive.test.ts",
       "name": "work from deck: a joist above standing reach needs a supported deck below it",
       "result": "pass",
-      "durationMs": 4353
+      "durationMs": 4343
     },
     {
       "file": "progressive.test.ts",
       "name": "a sheet whose support goes missing stops being floor and is flagged",
       "result": "pass",
-      "durationMs": 2917
+      "durationMs": 2910
     },
     {
       "file": "progressive.test.ts",
       "name": "swept lift: a joist whose straight path is obstructed is lifted over (up, across, down)",
       "result": "pass",
-      "durationMs": 1421
+      "durationMs": 1423
     },
     {
       "file": "progressive.test.ts",
       "name": "swept lift: blocked straight and lifted over is refused with lift.path-blocked naming both obstacles",
       "result": "pass",
-      "durationMs": 1422
+      "durationMs": 1413
     },
     {
       "file": "progressive.test.ts",
       "name": "lift crew: a joist lift keeps the holder beside its hand point (≤ 1.0 m, ≤ 2.4 m up) every tick",
       "result": "pass",
-      "durationMs": 1396
+      "durationMs": 1414
     },
     {
       "file": "progressive.test.ts",
       "name": "lift crew: a plywood lift-over keeps both holders beside their hand points every tick",
       "result": "pass",
-      "durationMs": 1800
+      "durationMs": 1818
     },
     {
       "file": "progressive.test.ts",
       "name": "lift crew: crates dropped on the holder's way block the lift (lift.crew-blocked, no clipping, part held)",
       "result": "pass",
-      "durationMs": 1479
+      "durationMs": 1499
     },
     {
       "file": "rehearsal.test.ts",
       "name": "rehearsal/live consistency: same plan + same baseline → identical final state and take",
       "result": "pass",
-      "durationMs": 362
+      "durationMs": 331
     },
     {
       "file": "rehearsal.test.ts",
       "name": "rehearsal is private: history, heads and checkpoints untouched",
       "result": "pass",
-      "durationMs": 131
+      "durationMs": 135
     },
     {
       "file": "rehearsal.test.ts",
       "name": "fork isolation: canonical refuses execution; executing in one branch leaves parent and sibling unchanged",
       "result": "pass",
-      "durationMs": 182
+      "durationMs": 204
     },
     {
       "file": "rehearsal.test.ts",
       "name": "plan invalidation: moving an obstacle into the route after rehearsal makes execution stale",
       "result": "pass",
-      "durationMs": 166
+      "durationMs": 168
     },
     {
       "file": "rehearsal.test.ts",
       "name": "plan invalidation: env/weather, labels and provenance edits do NOT stale a plan",
       "result": "pass",
-      "durationMs": 144
+      "durationMs": 172
     },
     {
       "file": "rehearsal.test.ts",
       "name": "plan invalidation: inventory mode, RNG state and rules version are physical assumptions",
       "result": "pass",
-      "durationMs": 2
+      "durationMs": 5
     },
     {
       "file": "rehearsal.test.ts",
       "name": "failed official runs are not committed; the take is still recorded",
       "result": "pass",
-      "durationMs": 119
+      "durationMs": 76
     },
     {
       "file": "rehearsal.test.ts",
       "name": "tampered plans and mismatched service scenes fail loudly",
       "result": "pass",
-      "durationMs": 1
+      "durationMs": 6
     },
     {
       "file": "review.test.ts",
       "name": "C1: a mid-carry replan never flips the formation (no carrier teleports); teleports are an invariant violation",
       "result": "pass",
-      "durationMs": 874
+      "durationMs": 845
     },
     {
       "file": "review.test.ts",
       "name": "C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation",
       "result": "pass",
-      "durationMs": 810
+      "durationMs": 705
     },
     {
       "file": "review.test.ts",
       "name": "H1: an unreachable hold station is refused at plan time; a failed/cancelled action leaves no reservations, tasks, children or traffic behind",
       "result": "pass",
-      "durationMs": 142
+      "durationMs": 136
     },
     {
       "file": "review.test.ts",
       "name": "C3: a walker crossing a carry waits for the load to pass (traffic.load), never walks through it; overlap is a violation",
       "result": "pass",
-      "durationMs": 2020
+      "durationMs": 466
     },
     {
       "file": "review.test.ts",
@@ -2551,49 +2622,49 @@
       "file": "sequence.test.ts",
       "name": "bind: invalid templates and bindings fail loudly with every problem listed",
       "result": "pass",
-      "durationMs": 5
+      "durationMs": 8
     },
     {
       "file": "sequence.test.ts",
       "name": "runner: barriers, when-started / when-completed chains",
       "result": "pass",
-      "durationMs": 81
+      "durationMs": 64
     },
     {
       "file": "sequence.test.ts",
       "name": "runner: `at` cues start on the exact tick; late cues are reported",
       "result": "pass",
-      "durationMs": 102
+      "durationMs": 51
     },
     {
       "file": "sequence.test.ts",
       "name": "runner: onFail abort cancels live steps and skips pending ones",
       "result": "pass",
-      "durationMs": 112
+      "durationMs": 145
     },
     {
       "file": "sequence.test.ts",
       "name": "runner: onFail continue keeps independent branches, skips dependents",
       "result": "pass",
-      "durationMs": 99
+      "durationMs": 92
     },
     {
       "file": "sequence.test.ts",
       "name": "runner: tick budget → timeout, live actions cancelled",
       "result": "pass",
-      "durationMs": 40
+      "durationMs": 47
     },
     {
       "file": "sequence.test.ts",
       "name": "runner: proving-ground walkers — passage yield + barrier-gated climb, no violations",
       "result": "pass",
-      "durationMs": 102
+      "durationMs": 79
     },
     {
       "file": "sequence.test.ts",
       "name": "runner: timeout settles deferred cancels, lists cut steps, reports refusals (review M4)",
       "result": "pass",
-      "durationMs": 182
+      "durationMs": 177
     },
     {
       "file": "social.test.ts",
@@ -2605,85 +2676,85 @@
       "file": "social.test.ts",
       "name": "catalog slots: campfire has 8 fire-circle places 1.6 m out facing the centre; bench 3 seats",
       "result": "pass",
-      "durationMs": 4
+      "durationMs": 6
     },
     {
       "file": "social.test.ts",
       "name": "sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it",
       "result": "pass",
-      "durationMs": 158
+      "durationMs": 108
     },
     {
       "file": "social.test.ts",
       "name": "converse: 4 people form a circle, no overlaps, everyone faces the centre; cancel leaves them idle and unclaimed",
       "result": "pass",
-      "durationMs": 130
+      "durationMs": 118
     },
     {
       "file": "social.test.ts",
       "name": "converse refusals: a holder (actor.holding) and a circle that does not fit (converse.clearance)",
       "result": "pass",
-      "durationMs": 53
+      "durationMs": 43
     },
     {
       "file": "social.test.ts",
       "name": "campfire_circle with 10 people: 8 take fire-circle places, 2 fail slot.none-free naming the fire; no violations",
       "result": "pass",
-      "durationMs": 143
+      "durationMs": 149
     },
     {
       "file": "social.test.ts",
       "name": "gather onto a place region with an audience layout: rows face the focus, nearest-first assignment",
       "result": "pass",
-      "durationMs": 54
+      "durationMs": 51
     },
     {
       "file": "social.test.ts",
       "name": "ambient_wander: 6 people for 60 s, every target inside the region, 0 violations; a directed task claims a person and ambient lets go",
       "result": "pass",
-      "durationMs": 208
+      "durationMs": 224
     },
     {
       "file": "social.test.ts",
       "name": "determinism: gather + converse + ambient twice → same state hash",
       "result": "pass",
-      "durationMs": 138
+      "durationMs": 116
     },
     {
       "file": "take.test.ts",
       "name": "take fidelity: sampling at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level",
       "result": "pass",
-      "durationMs": 213
+      "durationMs": 187
     },
     {
       "file": "take.test.ts",
       "name": "take payload: 3 walkers × 60 s stays compact (bytes measured)",
       "result": "pass",
-      "durationMs": 267
+      "durationMs": 251
     },
     {
       "file": "take.test.ts",
       "name": "deterministic take bytes: identical runs produce byte-identical takes",
       "result": "pass",
-      "durationMs": 390
+      "durationMs": 332
     },
     {
       "file": "take.test.ts",
       "name": "replay camera independence: camera tracks never change the take, its hash or its final state",
       "result": "pass",
-      "durationMs": 258
+      "durationMs": 252
     },
     {
       "file": "take.test.ts",
       "name": "replay isolation: sampling an old take never touches history, the live workspace or the take",
       "result": "pass",
-      "durationMs": 50
+      "durationMs": 47
     },
     {
       "file": "take.test.ts",
       "name": "tampered takes are rejected",
       "result": "pass",
-      "durationMs": 123
+      "durationMs": 112
     },
     {
       "file": "take.test.ts",
@@ -2695,61 +2766,61 @@
       "file": "walk.test.ts",
       "name": "walk around wall: completes, no penetration, no teleport, little heading jitter",
       "result": "pass",
-      "durationMs": 95
+      "durationMs": 103
     },
     {
       "file": "walk.test.ts",
       "name": "stairs: oblique start climbs real steps to the deck and ends on level 1",
       "result": "pass",
-      "durationMs": 103
+      "durationMs": 85
     },
     {
       "file": "walk.test.ts",
       "name": "narrow passage: opposing walkers take turns, no overlap, no oscillation",
       "result": "pass",
-      "durationMs": 63
+      "durationMs": 62
     },
     {
       "file": "walk.test.ts",
       "name": "construction mid-walk: new obstacle on the route triggers one replan, no penetration",
       "result": "pass",
-      "durationMs": 111
+      "durationMs": 97
     },
     {
       "file": "walk.test.ts",
       "name": "standing person on the route: brief pause at most, no turn/walk flicker, no overlap",
       "result": "pass",
-      "durationMs": 62
+      "durationMs": 50
     },
     {
       "file": "walk.test.ts",
       "name": "unreachable goal is rejected before any movement",
       "result": "pass",
-      "durationMs": 157
+      "durationMs": 123
     },
     {
       "file": "walk.test.ts",
       "name": "determinism: same inputs → same final state hash",
       "result": "pass",
-      "durationMs": 136
+      "durationMs": 107
     },
     {
       "file": "walk.test.ts",
       "name": "cancel mid-climb (review M2): the walker finishes at the nearer landing on its level, cancelled, no violations",
       "result": "pass",
-      "durationMs": 86
+      "durationMs": 70
     },
     {
       "file": "walk.test.ts",
       "name": "replan around people on the deck (review M3): obstacles sit at their own foot height",
       "result": "pass",
-      "durationMs": 94
+      "durationMs": 91
     },
     {
       "file": "walk.test.ts",
       "name": "entity insertion order does not change behaviour (review M6): same world, two orders, same final hash",
       "result": "pass",
-      "durationMs": 2953
+      "durationMs": 1328
     }
   ]
 }

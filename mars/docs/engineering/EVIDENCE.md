@@ -7,14 +7,14 @@ change the hand-curated map `viewer/engine/test/evidence-map.json` and regenerat
 
 | | |
 | --- | --- |
-| Git HEAD | `f767540` (engine tree clean) |
-| Generated | 2026-09-27T22:25:21.237Z · Node v26.8.2 |
-| Engine suite | 172 tests in 24 files: 170 pass, 0 fail, 2 skipped · 49.6 s wall |
+| Git HEAD | `ec63cce` (engine tree clean) |
+| Generated | 2026-09-27T22:44:27.959Z · Node v26.8.2 |
+| Engine suite | 178 tests in 25 files: 177 pass, 0 fail, 1 skipped · 45.6 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 576.1 s simulated, 9940 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 608.8 s simulated, 26389 ms compute, take 512469 B (`campus-flagship.test.ts`) |
-| Determinism probe | `build-bay/open-ground` completed, 11522 ticks · final state `d54eca7c402a4c3a92ff82ed2466fd2e354cd9ded9ee0f01fa1bed8fc7f0f610` · take `8f65762a1ec91b82ba4e93c0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
+| Flagship, proving ground | 43 steps, 570.1 s simulated, 7271 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 597.5 s simulated, 23117 ms compute, take 458610 B (`campus-flagship.test.ts`) |
+| Determinism probe | `build-bay/open-ground` completed, 11403 ticks · final state `79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129` · take `bf58b85269c981003ce6d9c6` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
 PROVEN means only that the listed tests pass; the approximation notes say what they do not show.
@@ -25,7 +25,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | --- | --- | ---: | --- |
 | Wall avoidance | PROVEN | 3/3 | No explicit wall-contact-duration metric: 'no sliding' is inferred from the clearance invariant (zero violations), path length and a heading-flip bound on one synthetic wall. |
 | U-shaped trap | PROVEN | 2/2 | One synthetic U and one start/goal pair; oscillation is bounded by heading flips (≤ 6) and clearance is sampled per tick from the 0.1 m clearance grid (EDT), not continuously. |
-| Narrow passage / two agents | PROVEN | 8/8 | In the 2.0 m corridor both pass without traffic.yield and finish < 1.4× solo, but the later-id walker still stops ~1.9 s to give way (traffic.person; todo test in gaps.test.ts). Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free. |
+| Narrow passage / two agents | PROVEN | 9/9 | Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free. |
 | Stair approach | PROVEN | 3/3 | Root-motion only: no foot IK, so rendered feet sink/hover by about 0.09 m on treads. Climb is a link traversal with an align phase; one straight flight on the proving ground, no landings or turns. |
 | Multiple floors | PROVEN | 3/3 | Two levels (ground + one deck) on the proving ground plus progressive decks. The 2026 campus has only ground level 0 walkable (interiors and upper floors are blocked by design). |
 | Long load around corner | PROVEN | 5/5 | Rigid formation, load held level, ground level only (no carrying on stairs or between levels), no re-grip. Collision is exact OBB vs prisms every tick; carriers have no carry/lift poses in the renderer. |
@@ -78,8 +78,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `review.test.ts` | C3: a walker crossing a carry waits for the load to pass (traffic.load), never walks through it; overlap is a violation |
 | pass | `gaps.test.ts` | 2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time |
 | pass | `gaps.test.ts` | 1.0 m gap (same scene): opposing walkers still take turns (someone yields) |
+| pass | `gaps.test.ts` | 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass |
 
-*Approximate:* In the 2.0 m corridor both pass without traffic.yield and finish < 1.4× solo, but the later-id walker still stops ~1.9 s to give way (traffic.person; todo test in gaps.test.ts). Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free.
+*Approximate:* Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free.
 
 ### Stair approach — PROVEN
 
@@ -436,18 +437,20 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `9ed068f` (2026-09-27T22:13:05.109Z): 6 added, 0 removed.
+Compared with the report at `f767540` (2026-09-27T22:25:21.237Z): 7 added, 1 removed.
 
-- added: api.test.ts :: api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)
-- added: construction.test.ts :: 19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s), premature release refused, 12 ft beams at 0.5 m + 1.8 m, stable release
-- added: gaps.test.ts :: 1.0 m gap (same scene): opposing walkers still take turns (someone yields)
-- added: gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)
-- added: gaps.test.ts :: 2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time
-- added: gaps.test.ts :: U-trap: a walker starting at the inner back wall walks out and around to a goal behind the U; no oscillation, never within 0.28 m of the walls
+- added: camera-framing.test.ts :: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)
+- added: camera-framing.test.ts :: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind
+- added: camera-framing.test.ts :: camera readability: a bystander between camera and subject occludes; behind the subject or on the crew it does not
+- added: camera-framing.test.ts :: camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)
+- added: camera-framing.test.ts :: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8
+- added: carry.test.ts :: carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives
+- added: gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass
+- removed: gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)
 
 ## Tests not cited by any row or milestone
 
-56 of 172 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+61 of 178 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -458,6 +461,11 @@ Compared with the report at `9ed068f` (2026-09-27T22:13:05.109Z): 6 added, 0 rem
 - `api.test.ts` pass: api: rehearse is read-only unless keep: true (review M5); unkept takes stay playable in memory
 - `api.test.ts` pass: api: EngineRoom stores states as content-addressed blobs and migrates an old history blob (review M5)
 - `api.test.ts` pass: api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)
+- `camera-framing.test.ts` pass: camera readability: a bystander between camera and subject occludes; behind the subject or on the crew it does not
+- `camera-framing.test.ts` pass: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind
+- `camera-framing.test.ts` pass: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8
+- `camera-framing.test.ts` pass: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)
+- `camera-framing.test.ts` pass: camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)
 - `camera-geom.test.ts` pass: camera geom: glass collides but does not occlude; policy is per kind
 - `camera-geom.test.ts` pass: camera shots: stateless evaluation (random access == sequential), Catmull-Rom through keys
 - `camera-replay.test.ts` pass: camera perf: plan a 60 s track at 10 Hz with 3 subjects in < 1 s
@@ -472,6 +480,7 @@ Compared with the report at `9ed068f` (2026-09-27T22:13:05.109Z): 6 added, 0 rem
 - `campus.test.ts` pass: staging-east is clear for a 4-person 19 ft upright carry at any heading
 - `campus.test.ts` pass: flagship inventory lies inside its pile regions, on clear ground, not overlapping
 - `campus.test.ts` pass: a walker can route from every pile to staging (±40 m crop)
+- `carry.test.ts` pass: carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives
 - `core.test.ts` pass: reconstruction edits and simulation events are distinct causes
 - `core.test.ts` pass: deterministic trig: <= 2 ulp of Math.* over 100k seeded inputs per function, incl. large arguments
 - `core.test.ts` pass: deterministic trig: edge cases (signed zeros, pi, tiny, huge, non-finite)
@@ -485,7 +494,6 @@ Compared with the report at `9ed068f` (2026-09-27T22:13:05.109Z): 6 added, 0 rem
 - `env-sun.test.ts` pass: sunDirectionVector is a unit vector consistent with solarPosition()
 - `env-sun.test.ts` pass: daylightFactors: night at large negative elevation, day at high elevation
 - `env-sun.test.ts` pass: smoothstep matches known fixed points
-- `gaps.test.ts` todo: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)
 - `history.test.ts` pass: physicalHash ignores env, clock, labels, tags and provenance
 - `history.test.ts` pass: physicalHash tracks poses, phases, supports, activity, inventory and RNG
 - `history.test.ts` pass: state store (review M5): index without states, lazy state reads, commits put only the new state, old blobs migrate
