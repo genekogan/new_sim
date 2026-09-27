@@ -32,9 +32,11 @@
         { "file": "walk.test.ts", "title": "narrow passage: opposing walkers take turns, no overlap, no oscillation" },
         { "file": "walk.test.ts", "title": "standing person on the route: brief pause at most" },
         { "file": "sequence.test.ts", "title": "runner: proving-ground walkers" },
-        { "file": "review.test.ts", "title": "C3: a walker crossing a carry waits for the load to pass" }
+        { "file": "review.test.ts", "title": "C3: a walker crossing a carry waits for the load to pass" },
+        { "file": "gaps.test.ts", "title": "2.0 m corridor: two walkers head-on pass side by side without yielding" },
+        { "file": "gaps.test.ts", "title": "1.0 m gap (same scene): opposing walkers still take turns" }
       ],
-      "approximate": "Only the too-narrow (take turns) case is run with two walkers; two agents passing side by side in a wide-enough gap is not tested. Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free."
+      "approximate": "In the 2.0 m corridor both pass without traffic.yield and finish < 1.4× solo, but the later-id walker still stops ~1.9 s to give way (traffic.person; todo test in gaps.test.ts). Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free."
     },
     {
       "id": "stair-approach",

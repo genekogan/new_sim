@@ -3,11 +3,15 @@
 //   wall      — single wall at x=-15, z∈[-19,-11]
 //   u-trap    — cup around (-15, 12) opening toward -z
 //   passage   — 1.0 m gap at x=15 in a wall along z=-15
+//   corridor  — opt-in ({ corridor: true }): 2.0 m-wide, 8 m-long corridor along z at x=22,
+//               z∈[17,25] where two walkers can pass (opt-in so pinned proving-ground hashes hold)
 //   deck      — 3 m high deck x∈[6,14], z∈[7,13] with complete stairs A (west, ascending +x)
 //               and incomplete stairs B (east, ascending -x)
 import type { Link, Obstacle, SpatialScene } from '../spatial/types.ts';
 
 export const DECK_Y = 3.0;
+/** Clear width of the passing corridor (x = 22, z ∈ [17, 25]). */
+export const PASS_W = 2.0;
 
 export function stairPath(from: [number, number, number], to: [number, number, number], steps: number): [number, number, number][] {
   const out: [number, number, number][] = [];
@@ -27,7 +31,7 @@ const wall = (id: string, cx: number, cz: number, hx: number, hz: number, y1 = 2
   label: label ?? id,
 });
 
-export function provingGround(opts: { stairsBUsable?: boolean; stairsAUsable?: boolean; extra?: Obstacle[] } = {}): SpatialScene {
+export function provingGround(opts: { stairsBUsable?: boolean; stairsAUsable?: boolean; corridor?: boolean; extra?: Obstacle[] } = {}): SpatialScene {
   const stairsA: Link = {
     id: 'stairs-a',
     kind: 'stairs',
@@ -67,6 +71,10 @@ export function provingGround(opts: { stairsBUsable?: boolean; stairsAUsable?: b
       wall('u-east', -12, 12, 0.15, 3, 2.4, 'U east wall'),
       wall('passage-w', 10, -15, 4.5, 0.15, 2.4, 'passage west wall'),
       wall('passage-e', 20, -15, 4.5, 0.15, 2.4, 'passage east wall'),
+      // 2.0 m clear between the inner faces (x = 21.0 and 23.0)
+      ...(opts.corridor
+        ? [wall('corridor-w', 22 - PASS_W / 2 - 0.15, 21, 0.15, 4, 2.4, 'corridor west wall'), wall('corridor-e', 22 + PASS_W / 2 + 0.15, 21, 0.15, 4, 2.4, 'corridor east wall')]
+        : []),
       // deck posts (ground level) and slab (overhead on ground, floor on deck)
       ...[[6.1, 7.1], [13.9, 7.1], [6.1, 12.9], [13.9, 12.9]].map(([x, z], i) => wall(`deck-post-${i}`, x, z, 0.1, 0.1, DECK_Y, 'deck post')),
       { id: 'deck-slab', obb: { c: [10, 10], half: [4, 3], yaw: 0 }, y0: DECK_Y - 0.25, y1: DECK_Y, kind: 'solid', label: 'deck slab' },
