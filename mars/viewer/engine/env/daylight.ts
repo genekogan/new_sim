@@ -11,6 +11,8 @@
  * — only the *timing/seasonality* of when those looks occur is now correct.
  */
 
+import { dsin } from '../core/math.ts';
+
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
@@ -38,7 +40,7 @@ export type DaylightFactors = {
 /** Daylight/night/warmth/blue-hour blend factors for a given apparent solar
  * elevation (degrees, refraction-corrected — see engine/env/sun.ts). */
 export function daylightFactors(elevationDeg: number): DaylightFactors {
-  const sinElevation = Math.sin(elevationDeg * (Math.PI / 180));
+  const sinElevation = dsin(elevationDeg * (Math.PI / 180));
   const daylight = smoothstep(sinElevation, -0.12, 0.22);
   const night = 1 - smoothstep(sinElevation, -0.2, 0.06);
   const warmth = 1 - smoothstep(sinElevation, 0.02, 0.55);

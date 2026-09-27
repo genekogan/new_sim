@@ -4,7 +4,7 @@
 //   readability        — the action's subject points are in frame, unoccluded
 //                        (occlusion set only; glass is see-through), large enough;
 //   temporal coherence — angular velocity/acceleration, oscillation between alternatives.
-import type { Vec3 } from '../core/math.ts';
+import { dacos, dtan, type Vec3 } from '../core/math.ts';
 import { CameraWorld, nearestSolid, raycast, solidName, type Solid } from './geom.ts';
 import { DEFAULT_ASPECT, subjectPoints, type CameraPose, type SubjectPose } from './shots.ts';
 
@@ -55,7 +55,7 @@ function basis(cam: CameraPose, aspect: number): Basis {
   const rl = Math.hypot(r[0], r[2]);
   r = rl > 1e-9 ? [r[0] / rl, 0, r[2] / rl] : [1, 0, 0];
   const u: Vec3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
-  const tv = Math.tan((cam.fov * DEG) / 2);
+  const tv = dtan((cam.fov * DEG) / 2);
   return { f, r, u, tv, th: tv * aspect };
 }
 
@@ -147,7 +147,7 @@ export function temporal(samples: TrackSample[], window = 2): Temporal {
     if (b.cut) { cutTimes.push(b.t); prevW = prevV = null; continue; }
     if (dt <= 0) continue;
     const da = viewDir(a), db = viewDir(b);
-    const w = Math.acos(Math.min(1, Math.max(-1, da[0] * db[0] + da[1] * db[1] + da[2] * db[2]))) / DEG / dt;
+    const w = dacos(Math.min(1, Math.max(-1, da[0] * db[0] + da[1] * db[1] + da[2] * db[2]))) / DEG / dt;
     const v = Math.hypot(b.position[0] - a.position[0], b.position[1] - a.position[1], b.position[2] - a.position[2]) / dt;
     maxAngVel = Math.max(maxAngVel, w); maxLinVel = Math.max(maxLinVel, v);
     if (prevW !== null && prevV !== null) { maxAngAcc = Math.max(maxAngAcc, Math.abs(w - prevW) / dt); maxLinAcc = Math.max(maxLinAcc, Math.abs(v - prevV) / dt); }

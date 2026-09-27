@@ -15,7 +15,7 @@
 //     around them to it (holdStations 2/3); the frame ends held by the whole crew.
 // A single person (8–9 ft frames) is the lifter and ends at the base as the footer.
 import { z } from 'zod';
-import { heading, obbOverlap, rot2, type Vec2, type Vec3 } from '../core/math.ts';
+import { dcos, dsin, heading, obbOverlap, rot2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
@@ -64,11 +64,11 @@ function geoOf(u: Entity, groundY: number): Geo {
 const yoOf = (g: Geo, th: number) => (g.y0 - g.groundY) * (th / (Math.PI / 2));
 /** Distance along the frame (from its base) where lifters hold it at pitch th. */
 function handS(g: Geo, th: number): number {
-  const c = Math.cos(th), room = LIFT_HAND - yoOf(g, th);
+  const c = dcos(th), room = LIFT_HAND - yoOf(g, th);
   return c * g.H <= room ? g.H : room / c;
 }
 /** Horizontal distance from the base line to the lifters' hands (monotone in th). */
-const reachR = (g: Geo, th: number) => handS(g, th) * Math.sin(th);
+const reachR = (g: Geo, th: number) => handS(g, th) * dsin(th);
 const local = (g: Geo, x: number, zl: number): Vec2 => {
   const w = rot2([x, zl], g.yaw);
   return [g.base[0] + w[0], g.base[1] + w[1]];
@@ -86,8 +86,8 @@ export function liftHandPoint(u: Entity, groundY: number, y0: number, side: -1 |
   const g: Geo = { ...geoOf(u, groundY), y0 };
   const th = u.pose.pitch ?? 0;
   const s = handS(g, th);
-  const q = local(g, (side * g.d) / 2, s * Math.sin(th));
-  return [q[0], groundY + yoOf(g, th) + s * Math.cos(th), q[1]];
+  const q = local(g, (side * g.d) / 2, s * dsin(th));
+  return [q[0], groundY + yoOf(g, th) + s * dcos(th), q[1]];
 }
 
 /** Pitch at which lifters leave the frame line for their base stations. */

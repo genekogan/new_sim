@@ -12,6 +12,7 @@ import { LiveSolver } from '../camera/solve.ts';
 import { planCameraTrack, type CameraPlan } from '../camera/plan.ts';
 import { sampleTrack, toCameraTrack, trackData } from '../camera/track.ts';
 import { walker } from '../camera/samplers.ts';
+import { dsin } from '../core/math.ts';
 
 /** Independent verification of a plan (does not trust the report). */
 function verify(plan: CameraPlan, world: CameraWorld) {
@@ -96,7 +97,7 @@ test('camera glass: subject behind plexiglass stays readable; the camera may not
 
 // Two mirror-image alternates (az±15) around a pillar; the subject sways so each is marginally better in turn.
 const pillar: Obstacle = { id: 'pillar', obb: { c: [0, -4], half: [0.4, 0.4], yaw: 0 }, y0: 0, y1: 3, kind: 'solid', label: 'pillar' };
-const sway: Sampler = (t) => ({ p1: { p: [0.5 * Math.sin(Math.PI * t), 0, 0], yaw: 0 } });
+const sway: Sampler = (t) => ({ p1: { p: [0.5 * dsin(Math.PI * t), 0, 0], yaw: 0 } });
 const blocked: ShotSpec = { kind: 'fixed', position: [0, 1.6, -8], target: [0, 1, 0], subjects: ['p1'] };
 const symmetric = { variants: ['az+15', 'az-15'], minSize: 0.26 };
 

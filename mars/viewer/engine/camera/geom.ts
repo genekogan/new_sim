@@ -3,7 +3,7 @@
 // scene or the world. Obstacles are split by per-kind policy into the
 // *collision* set (camera may not enter / cross) and the *occlusion* set
 // (blocks line of sight). Plexiglass ('glass') collides but does not occlude.
-import type { Vec3 } from '../core/math.ts';
+import { dcos, dsin, type Vec3 } from '../core/math.ts';
 import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 
 export type ObstacleKind = NonNullable<Obstacle['kind']>;
@@ -45,7 +45,7 @@ export class CameraWorld {
     this.cell = cell;
     this.solids = scene.obstacles.map((o) => {
       const pol = (o.kind && policy[o.kind]) || policy.default;
-      const c = Math.cos(o.obb.yaw), s = Math.sin(o.obb.yaw);
+      const c = dcos(o.obb.yaw), s = dsin(o.obb.yaw);
       const [hx, hz] = o.obb.half;
       const ex = Math.abs(c) * hx + Math.abs(s) * hz, ez = Math.abs(s) * hx + Math.abs(c) * hz;
       return {

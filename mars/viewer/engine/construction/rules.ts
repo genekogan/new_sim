@@ -10,7 +10,7 @@
 // self-supporting iff it has ≥ 2 standing uprights and every upright in it
 // has beams on BOTH columns at ≥ N distinct heights (N = 1 for frames ≤ 9 ft,
 // 2 for taller frames). Until then every upright must be held by ≥ holdCrew people.
-import { FT, rot2, type Vec2, type Vec3 } from '../core/math.ts';
+import { FT, datan2, rot2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
@@ -122,6 +122,6 @@ export function holdStations(u: Entity, n: number): { p: Vec2; yaw: number }[] {
     const p: Vec2 = [u.pose.p[0] + w[0], u.pose.p[2] + w[1]];
     // face the column
     const col = rot2([Math.sign(o[0]) * (d / 2), 0], u.pose.yaw);
-    return { p, yaw: Math.atan2(u.pose.p[2] + col[1] - p[1], u.pose.p[0] + col[0] - p[0]) };
+    return { p, yaw: datan2(u.pose.p[2] + col[1] - p[1], u.pose.p[0] + col[0] - p[0]) };
   });
 }

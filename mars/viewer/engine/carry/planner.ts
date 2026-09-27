@@ -5,7 +5,7 @@
 // (sweep.ts) for the whole formation: load cover discs + carrier bodies.
 // Output: a dense trajectory of formation poses, shortcut-smoothed only where
 // the smoothed motion passes the same swept checks. Deterministic.
-import { angleDelta, dist2, type Vec2 } from '../core/math.ts';
+import { angleDelta, datan2, dcos, dist2, dsin, type Vec2 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { nearestBlocker, type LevelGrid } from '../spatial/grid.ts';
 import type { Formation, SE2 } from './formation.ts';
@@ -38,7 +38,7 @@ type Prim = { m: (q: SE2) => Motion; cost: number; dk: number; reverse?: boolean
 
 function primitives(f: Formation): Prim[] {
   const R = turnRadius(f);
-  const fwd = (s: number) => (q: SE2): Motion => ({ kind: 'line', a: q, b: { x: q.x + s * Math.cos(q.th), z: q.z + s * Math.sin(q.th), th: q.th } });
+  const fwd = (s: number) => (q: SE2): Motion => ({ kind: 'line', a: q, b: { x: q.x + s * dcos(q.th), z: q.z + s * dsin(q.th), th: q.th } });
   const rot = (d: number) => (q: SE2): Motion => ({ kind: 'line', a: q, b: { x: q.x, z: q.z, th: q.th + d } });
   const arc = (d: number) => (q: SE2): Motion => ({ kind: 'arc', a: q, R, dth: d });
   const rotCost = 0.3 + 1.5 * (f.length / 2) * DTH;
@@ -57,7 +57,7 @@ function directOk(f: Formation, a: SE2, b: SE2, settle: boolean): boolean {
   const d = Math.hypot(b.x - a.x, b.z - a.z);
   const dth = Math.abs(angleDelta(a.th, b.th));
   if (d < 0.05) return settle ? dth <= 1.5 * DTH : true; // in-place rotation (swept-checked by caller)
-  const phi = Math.atan2(b.z - a.z, b.x - a.x);
+  const phi = datan2(b.z - a.z, b.x - a.x);
   const mid = a.th + angleDelta(a.th, b.th) / 2;
   const crab = Math.abs(angleDelta(mid, phi));
   const crabR = Math.min(crab, Math.PI - crab);
@@ -170,7 +170,7 @@ function smooth(g: LevelGrid, f: Formation, keys: SE2[], motions: Motion[]): Tra
     const sz = motionSize(m);
     length += sz.len;
     rotation += sz.rot;
-    if (m.kind === 'line' && sz.len > 1e-6 && Math.cos(Math.atan2(m.b.z - m.a.z, m.b.x - m.a.x) - m.a.th) < -0.5) reverse += sz.len;
+    if (m.kind === 'line' && sz.len > 1e-6 && dcos(datan2(m.b.z - m.a.z, m.b.x - m.a.x) - m.a.th) < -0.5) reverse += sz.len;
     for (const q of seg) {
       const p = poses[poses.length - 1];
       th = p.th + angleDelta(p.th, q.th); // keep headings continuous for interpolation
@@ -200,10 +200,10 @@ function failure(inp: PlanInput, field: Float32Array, fieldOk: boolean, Q: SE2[]
     let bestV = h(q.x, q.z);
     for (let a = 0; a < 32; a++) {
       const t = (a / 32) * 2 * Math.PI;
-      const v = h(q.x + Math.cos(t), q.z + Math.sin(t));
+      const v = h(q.x + dcos(t), q.z + dsin(t));
       if (v < bestV) { bestV = v; phi = t; }
     }
-  } else phi = Math.atan2(goals[0].z - q.z, goals[0].x - q.x);
+  } else phi = datan2(goals[0].z - q.z, goals[0].x - q.x);
   const along = Math.abs(angleDelta(q.th, phi)) <= Math.PI / 2 ? phi : phi + Math.PI;
   const qa: SE2 = { x: q.x, z: q.z, th: q.th + angleDelta(q.th, along) };
   const fwd = Math.abs(angleDelta(qa.th, phi)) < 1 ? 1.5 : -1.5;
@@ -211,7 +211,7 @@ function failure(inp: PlanInput, field: Float32Array, fieldOk: boolean, Q: SE2[]
   let hit: Hit | null = sweep(g, f, { kind: 'line', a: q, b: qa });
   if (!hit) {
     verb = 'cannot get past';
-    hit = sweep(g, f, { kind: 'line', a: qa, b: { x: qa.x + fwd * Math.cos(qa.th), z: qa.z + fwd * Math.sin(qa.th), th: qa.th } });
+    hit = sweep(g, f, { kind: 'line', a: qa, b: { x: qa.x + fwd * dcos(qa.th), z: qa.z + fwd * dsin(qa.th), th: qa.th } });
   }
   if (!hit)
     for (const pr of primitives(f)) {

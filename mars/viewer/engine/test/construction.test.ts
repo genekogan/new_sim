@@ -13,7 +13,7 @@ import { liftHandPoint, raiseRoles } from '../construction/raise.ts';
 import { entityCorners } from '../spatial/service.ts';
 import type { Entity } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
-import { angleDelta } from '../core/math.ts';
+import { angleDelta, dsin } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 
@@ -121,7 +121,7 @@ test('connect_beam lifts a symmetric beam without spinning it end-for-end; ends 
   assert.deepEqual(b1.connections!.map((c) => c.to), ['A', 'B']);
   // A sits at −z, B at +z; the beam's local +x (end-r) points along its yaw
   const endOf = (id: string) => b1.connections!.find((c) => c.to === id)!.socket;
-  const ux = Math.sin(b1.pose.yaw);
+  const ux = dsin(b1.pose.yaw);
   assert.equal(endOf('B'), ux > 0 ? 'end-r' : 'end-l');
   assert.equal(endOf('A'), ux > 0 ? 'end-l' : 'end-r');
   assert.equal(rt.world.entities.A.connections!.find((c) => c.to === 'b1')!.toSocket, endOf('A'));

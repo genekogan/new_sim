@@ -10,7 +10,7 @@
 //     next to another person, and with a walking route from where they are now.
 // Ladders / scaffold are not modelled: work more than 2.1 m above every
 // accessible floor is refused (`reach.too-high`).
-import { angleDelta, obbOverlap, rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { angleDelta, datan2, dcos, dsin, obbOverlap, rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
@@ -136,7 +136,7 @@ export function findStations(rt: Runtime, crew: string[], anchors: Vec2[], t: Wo
         floodMark(g, cell, r, bad.get(c.level)!);
         continue;
       }
-      pick = { actor, level: c.level, p: c.p, yaw: Math.atan2(anchor[1] - c.p[1], anchor[0] - c.p[0]) };
+      pick = { actor, level: c.level, p: c.p, yaw: datan2(anchor[1] - c.p[1], anchor[0] - c.p[0]) };
       break;
     }
     if (!pick)
@@ -175,7 +175,7 @@ export function smooth(t: number) {
 }
 
 export function lerpPose(a: Pose, b: Pose, s: number): Pose {
-  const dy = Math.atan2(Math.sin(b.yaw - a.yaw), Math.cos(b.yaw - a.yaw));
+  const dy = datan2(dsin(b.yaw - a.yaw), dcos(b.yaw - a.yaw));
   return {
     p: [a.p[0] + (b.p[0] - a.p[0]) * s, a.p[1] + (b.p[1] - a.p[1]) * s, a.p[2] + (b.p[2] - a.p[2]) * s],
     yaw: a.yaw + dy * s,

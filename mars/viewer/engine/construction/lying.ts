@@ -1,6 +1,6 @@
 // Geometry of a lying upright, independent of how its pose was encoded
 // (carry lays frames with roll −π/2; raise works in a canonical pitch-π/2 form).
-import { heading, type Vec2 } from '../core/math.ts';
+import { dcos, dsin, heading, type Vec2 } from '../core/math.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { entityCorners } from '../spatial/service.ts';
@@ -43,5 +43,5 @@ export function canonicalLying(u: Entity, groundY: number, standNear?: Vec2): Po
 export function layTargetForStanding(defId: string, standAt: Vec2, lieToward: number) {
   const h = def(defId).size[1];
   // carry treats a symmetric load as end-agnostic; raise_upright { stand_at } picks the footing end.
-  return { x: standAt[0] + Math.cos(lieToward) * (h / 2), z: standAt[1] + Math.sin(lieToward) * (h / 2), yaw: lieToward };
+  return { x: standAt[0] + dcos(lieToward) * (h / 2), z: standAt[1] + dsin(lieToward) * (h / 2), yaw: lieToward };
 }

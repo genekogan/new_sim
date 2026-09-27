@@ -3,7 +3,7 @@
 // clearance queries. Construction mutates entities; the next query sees the
 // new topology (spec §10 "construction must alter future navigation").
 import { hashOf } from '../core/hash.ts';
-import { rot2, type OBB2, type Vec2 } from '../core/math.ts';
+import { dcos, dsin, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { buildGrids, gridsWithObstacles, StaticRaster, type GridSet } from './grid.ts';
@@ -19,9 +19,9 @@ const AROUND_CACHE = 8;
 export function entityCorners(e: Entity): [number, number, number][] {
   const [sx, sy, sz] = def(e.def).size;
   const out: [number, number, number][] = [];
-  const cy = Math.cos(e.pose.yaw), syw = Math.sin(e.pose.yaw);
-  const cp = Math.cos(e.pose.pitch ?? 0), sp = Math.sin(e.pose.pitch ?? 0);
-  const cr = Math.cos(e.pose.roll ?? 0), sr = Math.sin(e.pose.roll ?? 0);
+  const cy = dcos(e.pose.yaw), syw = dsin(e.pose.yaw);
+  const cp = dcos(e.pose.pitch ?? 0), sp = dsin(e.pose.pitch ?? 0);
+  const cr = dcos(e.pose.roll ?? 0), sr = dsin(e.pose.roll ?? 0);
   // local box: x∈[-sx/2,sx/2], y∈[0,sy] (origin at base centre), z∈[-sz/2,sz/2]
   for (const x of [-sx / 2, sx / 2]) for (const y of [0, sy]) for (const z of [-sz / 2, sz / 2]) {
     // roll about Z

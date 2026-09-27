@@ -5,7 +5,7 @@
 // never drops a load: it becomes a controlled set-down (deferred cancel) at
 // the current pose if that spot is clear, otherwise it is refused.
 import { z } from 'zod';
-import { angleDelta, clamp, wrapAngle, type Vec2 } from '../core/math.ts';
+import { angleDelta, clamp, dcos, dsin, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { ActionDef, CancelResult, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
@@ -135,7 +135,7 @@ function bystanderAt(rt: Runtime, ex: Exec, spots: Vec2[], frame: ReturnType<typ
 }
 const sub2r = (q: Vec2, c: Vec2, th: number): Vec2 => {
   const dx = q[0] - c[0], dz = q[1] - c[1];
-  return [dx * Math.cos(-th) - dz * Math.sin(-th), dx * Math.sin(-th) + dz * Math.cos(-th)];
+  return [dx * dcos(-th) - dz * dsin(-th), dx * dsin(-th) + dz * dcos(-th)];
 };
 
 /**

@@ -6,7 +6,7 @@
 // Everything here is pure geometry derived from the asset catalog's handling
 // data, so planner, action, invariant and tests agree on where the load and
 // each carrier are for a given formation pose.
-import { dist2, rot2, type Vec2, type Vec3 } from '../core/math.ts';
+import { datan2, dcos, dist2, dsin, rot2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import { def, HUMAN_RADIUS, type AssetDef } from '../world/catalog.ts';
@@ -48,7 +48,7 @@ export const longAxis = (d: AssetDef) => (d.category === 'rack-upright' ? 1 : 0)
 
 /** Rotate a local vector by roll (about Z) then pitch (about X) — same order as `entityCorners`. */
 export function rotRP(v: Vec3, o: Orientation): Vec3 {
-  const cr = Math.cos(o.roll), sr = Math.sin(o.roll), cp = Math.cos(o.pitch), sp = Math.sin(o.pitch);
+  const cr = dcos(o.roll), sr = dsin(o.roll), cp = dcos(o.pitch), sp = dsin(o.pitch);
   const X = v[0] * cr - v[1] * sr, Y = v[0] * sr + v[1] * cr, Z = v[2];
   return [X, Y * cp - Z * sp, Y * sp + Z * cp];
 }
@@ -208,7 +208,7 @@ export function entityFrame(e: Entity): { q: SE2; halfW: number; bottom: number;
   const a0 = toWorld(e.pose, [0, 0, 0]);
   const unit: Vec3 = ax === 1 ? [0, 1, 0] : [1, 0, 0];
   const a1 = toWorld(e.pose, unit);
-  const th = Math.atan2(a1[2] - a0[2], a1[0] - a0[0]);
+  const th = datan2(a1[2] - a0[2], a1[0] - a0[0]);
   const pts: Vec3[] = [];
   for (const x of [-sx / 2, sx / 2]) for (const y of [0, sy]) for (const z of [-sz / 2, sz / 2]) pts.push(toWorld(e.pose, [x, y, z]));
   let cx = 0, cz = 0;
@@ -236,6 +236,6 @@ export function gripError(f: Formation, q: SE2, actual: Vec2[]): { max: number; 
 
 /** World-space disc centres at a formation pose. */
 export function worldDiscs(f: Formation, q: SE2): { p: Vec2; d: Disc }[] {
-  const c = Math.cos(q.th), s = Math.sin(q.th);
+  const c = dcos(q.th), s = dsin(q.th);
   return f.discs.map((d) => ({ p: [q.x + d.c[0] * c - d.c[1] * s, q.z + d.c[0] * s + d.c[1] * c] as Vec2, d }));
 }

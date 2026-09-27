@@ -8,6 +8,7 @@ import {
   BOMBAY_BEACH,
 } from '../env/sun.ts';
 import { daylightFactors, smoothstep } from '../env/daylight.ts';
+import { dacos, dcos, dsin, dtan } from '../core/math.ts';
 
 // Reference values are cited from docs/engineering/RESEARCH.md #12 ("Sun position
 // for Bombay Beach") and the task brief's own worked noon-elevation approximations
@@ -69,12 +70,12 @@ function cooperDayLengthMinutes(year: number, month: number, day: number, lat: n
   const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   let doy = day;
   for (let i = 0; i < month - 1; i++) doy += md[i] + (i === 1 && leap ? 1 : 0);
-  const declRad = ((23.45 * Math.sin(((360 / 365) * (284 + doy) * Math.PI) / 180)) * Math.PI) / 180;
+  const declRad = ((23.45 * dsin(((360 / 365) * (284 + doy) * Math.PI) / 180)) * Math.PI) / 180;
   const latRad = (lat * Math.PI) / 180;
   const cosH =
-    Math.cos((90.833 * Math.PI) / 180) / (Math.cos(latRad) * Math.cos(declRad)) -
-    Math.tan(latRad) * Math.tan(declRad);
-  const hourAngleDeg = (Math.acos(Math.max(-1, Math.min(1, cosH))) * 180) / Math.PI;
+    dcos((90.833 * Math.PI) / 180) / (dcos(latRad) * dcos(declRad)) -
+    dtan(latRad) * dtan(declRad);
+  const hourAngleDeg = (dacos(Math.max(-1, Math.min(1, cosH))) * 180) / Math.PI;
   return (2 * hourAngleDeg * 4); // 4 min per degree of hour angle, both sides of noon
 
 }

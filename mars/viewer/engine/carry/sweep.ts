@@ -3,7 +3,7 @@
 // bodies) must have clearance ≥ disc radius + margin at every sample, and
 // samples are spaced so no disc moves more than SAMPLE metres between them
 // (margin ≥ SAMPLE/2 then covers the motion between samples).
-import { angleDelta, type Vec2 } from '../core/math.ts';
+import { angleDelta, dcos, dsin, type Vec2 } from '../core/math.ts';
 import type { LevelGrid } from '../spatial/grid.ts';
 import type { Formation, SE2 } from './formation.ts';
 
@@ -26,8 +26,8 @@ export function motionAt(m: Motion, t: number): SE2 {
   const sg = m.dth >= 0 ? 1 : -1;
   const th = m.a.th + m.dth * t;
   return {
-    x: m.a.x + m.R * sg * (Math.sin(th) - Math.sin(m.a.th)),
-    z: m.a.z - m.R * sg * (Math.cos(th) - Math.cos(m.a.th)),
+    x: m.a.x + m.R * sg * (dsin(th) - dsin(m.a.th)),
+    z: m.a.z - m.R * sg * (dcos(th) - dcos(m.a.th)),
     th,
   };
 }
@@ -48,7 +48,7 @@ export function motionDisp(m: Motion, f: Formation): number {
 
 /** First disc (index) whose clearance is insufficient at pose q, or -1. */
 export function poseHit(g: LevelGrid, f: Formation, q: SE2, margin: number, out?: { p: Vec2 }): number {
-  const c = Math.cos(q.th), s = Math.sin(q.th);
+  const c = dcos(q.th), s = dsin(q.th);
   const { x0, z0, cell, nx, nz, clearance } = g;
   for (let k = 0; k < f.discs.length; k++) {
     const d = f.discs[k];

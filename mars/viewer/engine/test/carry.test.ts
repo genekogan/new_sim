@@ -15,7 +15,7 @@ import { carry } from '../carry/actions.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 import { carryCorridors } from '../carry/scenes.ts';
 import { entityFrame, formationFor, laidPose, REACH } from '../carry/formation.ts';
-import { obbOverlap, rot2, sub2, type OBB2, type Vec2 } from '../core/math.ts';
+import { dcos, dsin, obbOverlap, rot2, sub2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
 import type { SpatialScene } from '../spatial/types.ts';
@@ -84,7 +84,7 @@ test('carry: 2 people carry a 12 ft beam around the L corner of the 2.5 m corrid
   assert.deepEqual(b.support, { kind: 'ground' });
   const fp = entityFootprint(b).obb;
   assert.ok(Math.hypot(fp.c[0] - 18, fp.c[1] - 11) < 0.02, `set down at ${fp.c}`);
-  assert.ok(Math.abs(Math.sin(fp.yaw - Math.PI / 2)) < 0.02 || Math.abs(Math.cos(fp.yaw)) < 0.02);
+  assert.ok(Math.abs(dsin(fp.yaw - Math.PI / 2)) < 0.02 || Math.abs(dcos(fp.yaw)) < 0.02);
   for (const c of ['p1', 'p2']) {
     assert.equal(rt.world.entities[c].human!.activity, 'idle');
     assert.equal(rt.world.entities[c].human!.grip, undefined);

@@ -14,6 +14,8 @@
  * trailing offset/Z; it is always interpreted as Bombay Beach local time).
  */
 
+import { dacos, dcos, dsin, dtan } from '../core/math.ts';
+
 export const BOMBAY_BEACH = { lat: 33.3506, lon: -115.7295 };
 
 /** Default calendar date used by the studio when no date is supplied (spec §19
@@ -180,18 +182,18 @@ function ephemerisAt(year: number, month: number, day: number, hourDecimal: numb
   const eqtimeMin =
     229.18 *
     (0.000075 +
-      0.001868 * Math.cos(gamma) -
-      0.032077 * Math.sin(gamma) -
-      0.014615 * Math.cos(g2) -
-      0.040849 * Math.sin(g2));
+      0.001868 * dcos(gamma) -
+      0.032077 * dsin(gamma) -
+      0.014615 * dcos(g2) -
+      0.040849 * dsin(g2));
   const declRad =
     0.006918 -
-    0.399912 * Math.cos(gamma) +
-    0.070257 * Math.sin(gamma) -
-    0.006758 * Math.cos(g2) +
-    0.000907 * Math.sin(g2) -
-    0.002697 * Math.cos(g3) +
-    0.00148 * Math.sin(g3);
+    0.399912 * dcos(gamma) +
+    0.070257 * dsin(gamma) -
+    0.006758 * dcos(g2) +
+    0.000907 * dsin(g2) -
+    0.002697 * dcos(g3) +
+    0.00148 * dsin(g3);
   return { eqtimeMin, declRad };
 }
 
@@ -200,7 +202,7 @@ function ephemerisAt(year: number, month: number, day: number, hourDecimal: numb
  * piecewise approximation (arcminutes-ish near the horizon, negligible above ~20deg). */
 function refractionCorrectionDeg(trueElevationDeg: number): number {
   if (trueElevationDeg > 85) return 0;
-  const te = Math.tan(trueElevationDeg * DEG2RAD);
+  const te = dtan(trueElevationDeg * DEG2RAD);
   let arcsec: number;
   if (trueElevationDeg > 5) {
     arcsec = 58.1 / te - 0.07 / te ** 3 + 0.000086 / te ** 5;
@@ -243,11 +245,11 @@ export function solarPosition(
   const haRad = haDeg * DEG2RAD;
   const latRad = lat * DEG2RAD;
   const cosZen = clamp(
-    Math.sin(latRad) * Math.sin(declRad) + Math.cos(latRad) * Math.cos(declRad) * Math.cos(haRad),
+    dsin(latRad) * dsin(declRad) + dcos(latRad) * dcos(declRad) * dcos(haRad),
     -1,
     1,
   );
-  const zenithDeg = Math.acos(cosZen) * RAD2DEG;
+  const zenithDeg = dacos(cosZen) * RAD2DEG;
   const trueElevationDeg = 90 - zenithDeg;
   const sinZen = Math.sqrt(Math.max(0, 1 - cosZen * cosZen));
   let azimuthDeg: number;
@@ -261,11 +263,11 @@ export function solarPosition(
     // spreadsheet and is the one verified against hand-computed spherical
     // astronomy below in env-sun.test.ts.)
     const x = clamp(
-      (Math.sin(latRad) * cosZen - Math.sin(declRad)) / (Math.cos(latRad) * sinZen),
+      (dsin(latRad) * cosZen - dsin(declRad)) / (dcos(latRad) * sinZen),
       -1,
       1,
     );
-    const acosDeg = Math.acos(x) * RAD2DEG;
+    const acosDeg = dacos(x) * RAD2DEG;
     azimuthDeg = haDeg > 0 ? 180 + acosDeg : 180 - acosDeg;
   }
   azimuthDeg = ((azimuthDeg % 360) + 360) % 360;
@@ -296,15 +298,15 @@ export function sunTimes(
   const latRad = lat * DEG2RAD;
   const solarNoonMin = 720 - 4 * lon - eqtimeMin + 60 * tz;
   const cosHa0 =
-    Math.cos(90.833 * DEG2RAD) / (Math.cos(latRad) * Math.cos(declRad)) -
-    Math.tan(latRad) * Math.tan(declRad);
+    dcos(90.833 * DEG2RAD) / (dcos(latRad) * dcos(declRad)) -
+    dtan(latRad) * dtan(declRad);
   const solarNoonLocal = formatLocalDateTime(t.year, t.month, t.day, solarNoonMin);
   if (cosHa0 < -1 || cosHa0 > 1) {
     // |cosHa0| > 1: the sun never sets (>1 magnitude, polar day) or never rises
     // (polar night) that day. Does not occur at 33.35N; guarded for completeness.
     return { sunriseLocal: cosHa0 < -1 ? solarNoonLocal : null, sunsetLocal: cosHa0 < -1 ? solarNoonLocal : null, solarNoonLocal };
   }
-  const ha0Deg = Math.acos(cosHa0) * RAD2DEG;
+  const ha0Deg = dacos(cosHa0) * RAD2DEG;
   return {
     sunriseLocal: formatLocalDateTime(t.year, t.month, t.day, solarNoonMin - 4 * ha0Deg),
     sunsetLocal: formatLocalDateTime(t.year, t.month, t.day, solarNoonMin + 4 * ha0Deg),
@@ -319,6 +321,6 @@ export function sunTimes(
 export function sunDirectionVector(elevationDeg: number, azimuthDeg: number): [number, number, number] {
   const azRad = (azimuthDeg + NORTH_AZIMUTH_OFFSET) * DEG2RAD;
   const elRad = elevationDeg * DEG2RAD;
-  const cosEl = Math.cos(elRad);
-  return [Math.sin(azRad) * cosEl, Math.sin(elRad), -Math.cos(azRad) * cosEl];
+  const cosEl = dcos(elRad);
+  return [dsin(azRad) * cosEl, dsin(elRad), -dcos(azRad) * cosEl];
 }

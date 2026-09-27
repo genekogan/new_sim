@@ -2,7 +2,7 @@
 // and by tests: convex hull, minimum-area oriented rectangle, triangle
 // clipping to a vertical band, and deterministic point clustering.
 // No three.js — inputs are flat Float64 arrays of world-space positions.
-import type { OBB2, Vec2 } from '../core/math.ts';
+import { datan2, dcos, dsin, type OBB2, type Vec2 } from '../core/math.ts';
 
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 
@@ -47,11 +47,11 @@ export function minAreaRect(points: Vec2[], minHalf = 0.02): OBB2 {
   const cands: number[] = [0];
   for (let i = 0; i < hull.length; i++) {
     const p = hull[i], q = hull[(i + 1) % hull.length];
-    if (p[0] !== q[0] || p[1] !== q[1]) cands.push(Math.atan2(q[1] - p[1], q[0] - p[0]));
+    if (p[0] !== q[0] || p[1] !== q[1]) cands.push(datan2(q[1] - p[1], q[0] - p[0]));
   }
   for (let yaw of cands) {
     yaw = ((yaw % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2);
-    const c = Math.cos(yaw), s = Math.sin(yaw);
+    const c = dcos(yaw), s = dsin(yaw);
     let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
     for (const [x, z] of hull) {
       const u = x * c + z * s, v = -x * s + z * c; // rotate by -yaw

@@ -1,7 +1,7 @@
 // Pure extraction core: manifest components (world-space triangles + extras)
 // → obstacle prisms. The GLB loading lives in deploy/engine-scene.mjs; this
 // file is deterministic TS so tests can exercise it without the 70 MB model.
-import type { OBB2, Vec2 } from '../core/math.ts';
+import { dcos, dsin, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Confidence } from '../world/types.ts';
 import { clipHalfPlane, clipTrianglesToBandPolys, clusterPolygons, convexHull, minAreaRect, polygonArea } from './geom.ts';
 import type { ObstacleKind, ObstacleRow } from './types.ts';
@@ -56,7 +56,7 @@ export function fitPieces(polys: Vec2[][], depth = 0): OBB2[] {
   const hull = convexHull(points);
   const fill = hull.length >= 3 ? polygonArea(hull) / area : 1;
   if (depth >= 4 || area < 6 || fill >= 0.6) return [obb];
-  const ax: Vec2 = obb.half[0] >= obb.half[1] ? [Math.cos(obb.yaw), Math.sin(obb.yaw)] : [-Math.sin(obb.yaw), Math.cos(obb.yaw)];
+  const ax: Vec2 = obb.half[0] >= obb.half[1] ? [dcos(obb.yaw), dsin(obb.yaw)] : [-dsin(obb.yaw), dcos(obb.yaw)];
   const a = polys.map((p) => clipHalfPlane(p, obb.c, ax, true)).filter((p) => p.length);
   const b = polys.map((p) => clipHalfPlane(p, obb.c, ax)).filter((p) => p.length);
   if (!a.length || !b.length) return [obb];

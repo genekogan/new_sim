@@ -1,7 +1,7 @@
 // Plan-time validation for `carry` (spec §13 "validated"): crew/load checks,
 // pickup and set-down geometry, the whole-formation SE(2) route, and each
 // carrier's approach walk. Pure w.r.t. the world.
-import { dist2, obbOverlap, pointInObb, type Vec2 } from '../core/math.ts';
+import { dcos, dist2, dsin, obbOverlap, pointInObb, type Vec2 } from '../core/math.ts';
 import type { Diagnostic, PlanResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
@@ -74,7 +74,7 @@ export function laidIssue(sp: Spatial, f: Formation, q: SE2, level: number, leve
   }
   const floors = sp.scene.surfaces.filter((s) => s.level === level);
   const corners = [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([a, b]) => {
-    const c = Math.cos(fp.obb.yaw), s = Math.sin(fp.obb.yaw);
+    const c = dcos(fp.obb.yaw), s = dsin(fp.obb.yaw);
     const lx = a * fp.obb.half[0], lz = b * fp.obb.half[1];
     return [fp.obb.c[0] + lx * c - lz * s, fp.obb.c[1] + lx * s + lz * c] as Vec2;
   });

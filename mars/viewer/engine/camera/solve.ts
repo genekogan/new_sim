@@ -3,7 +3,7 @@
 // each (push-out), score readability / deviation, and pick with hysteresis.
 // Nothing here hides architecture: occluders are only ignored when the spec
 // explicitly asks for `cutaway`.
-import type { Vec3 } from '../core/math.ts';
+import { dacos, dasin, datan, datan2, dlog, dtan, type Vec3 } from '../core/math.ts';
 import { CameraWorld, pointInside, pushOut, raycast } from './geom.ts';
 import { dirFrom, type CameraPose, type SubjectPose } from './shots.ts';
 import { MIN_CLEARANCE, placement, readability, type Placement, type Readability } from './quality.ts';
@@ -55,7 +55,7 @@ const len = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
 function spherical(pose: CameraPose) {
   const d = sub(pose.position, pose.target);
   const dist = Math.max(1e-6, len(d));
-  return { dist, az: Math.atan2(d[2], d[0]), el: Math.asin(Math.max(-1, Math.min(1, d[1] / dist))) };
+  return { dist, az: datan2(d[2], d[0]), el: dasin(Math.max(-1, Math.min(1, d[1] / dist))) };
 }
 
 /** Normalised framing deviation between two poses sharing a target. */
@@ -63,7 +63,7 @@ export function deviation(desired: CameraPose, pose: CameraPose): number {
   const a = sub(desired.position, desired.target), b = sub(pose.position, pose.target);
   const la = len(a) || 1, lb = len(b) || 1;
   const cos = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (la * lb);
-  return Math.acos(Math.max(-1, Math.min(1, cos))) / Math.PI + 0.35 * Math.abs(Math.log(lb / la));
+  return dacos(Math.max(-1, Math.min(1, cos))) / Math.PI + 0.35 * Math.abs(dlog(lb / la));
 }
 
 /**
@@ -92,7 +92,7 @@ export function candidates(world: CameraWorld, desired: CameraPose, subjects: Re
       const u = d / dist;
       position = [T[0] + (desired.position[0] - T[0]) * u, T[1] + (desired.position[1] - T[1]) * u, T[2] + (desired.position[2] - T[2]) * u];
       // widen to keep roughly the same framing, capped
-      fov = Math.min(80, (2 * Math.atan(Math.tan((desired.fov * DEG) / 2) / u)) / DEG);
+      fov = Math.min(80, (2 * datan(dtan((desired.fov * DEG) / 2) / u)) / DEG);
     } else {
       const e = Math.min(80 * DEG, el + (v.del ?? 0) * DEG);
       const r = dist * (v.wide ?? 1);

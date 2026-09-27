@@ -1,7 +1,7 @@
 // Shot specs as data + a stateless evaluator. `evaluateShot(spec, sampler, t)`
 // depends only on (spec, sampler, t): it works identically against a live
 // runtime or a recorded take, and any t can be evaluated in any order.
-import type { Vec3 } from '../core/math.ts';
+import { datan, dcos, dexp, dsin, dtan, type Vec3 } from '../core/math.ts';
 
 /** What the camera needs to know about a subject at time t. */
 export type SubjectPose = {
@@ -43,15 +43,15 @@ const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 /** Unit direction from azimuth (heading in x/z, radians) and elevation (radians above horizon). */
 export function dirFrom(azimuth: number, elevation: number): Vec3 {
-  const ce = Math.cos(elevation);
-  return [ce * Math.cos(azimuth), Math.sin(elevation), ce * Math.sin(azimuth)];
+  const ce = dcos(elevation);
+  return [ce * dcos(azimuth), dsin(elevation), ce * dsin(azimuth)];
 }
 
 /** Default readability points for a standing human: feet, torso, head, both hands. */
 export function subjectPoints(s: SubjectPose): Vec3[] {
   if (s.points && s.points.length) return s.points;
   const h = s.height ?? 1.75;
-  const lx = -Math.sin(s.yaw) * 0.25, lz = Math.cos(s.yaw) * 0.25; // lateral (rot2([0,1], yaw))
+  const lx = -dsin(s.yaw) * 0.25, lz = dcos(s.yaw) * 0.25; // lateral (rot2([0,1], yaw))
   return [
     [s.p[0], s.p[1] + 0.15, s.p[2]],
     [s.p[0], s.p[1] + h * 0.6, s.p[2]],
@@ -82,8 +82,8 @@ export function shotSubjects(spec: ShotSpec): string[] {
 /** Distance at which a sphere of radius r fits the frustum (min of vertical/horizontal half-angles). */
 export function fitDistance(r: number, fovDeg: number, aspect = DEFAULT_ASPECT): number {
   const v = (fovDeg * DEG) / 2;
-  const h = Math.atan(Math.tan(v) * aspect);
-  return r / Math.sin(Math.min(v, h));
+  const h = datan(dtan(v) * aspect);
+  return r / dsin(Math.min(v, h));
 }
 
 /** Catmull-Rom (non-uniform times, Hermite form) through keyed positions. */
@@ -111,7 +111,7 @@ export function catmullRom(keys: Key[], t: number, field: 'position' | 'target')
 function followRaw(spec: Extract<ShotSpec, { kind: 'follow' }>, sampler: Sampler, t: number): { position: Vec3; target: Vec3 } {
   const s = subjectOf(sampler, spec.subject, t);
   const [ox, oy, oz] = spec.offset;
-  const off: Vec3 = spec.frame === 'world' ? [ox, oy, oz] : [ox * Math.cos(s.yaw) - oz * Math.sin(s.yaw), oy, ox * Math.sin(s.yaw) + oz * Math.cos(s.yaw)];
+  const off: Vec3 = spec.frame === 'world' ? [ox, oy, oz] : [ox * dcos(s.yaw) - oz * dsin(s.yaw), oy, ox * dsin(s.yaw) + oz * dcos(s.yaw)];
   const target: Vec3 = [s.p[0], s.p[1] + (spec.lookHeight ?? 1.3), s.p[2]];
   return { position: add(s.p, off), target };
 }
@@ -133,7 +133,7 @@ export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number): Camer
       let wsum = 0, pos: Vec3 = [0, 0, 0], tgt: Vec3 = [0, 0, 0];
       for (let k = 0; k <= steps; k++) {
         const tk = Math.max(0, t - k * h);
-        const w = Math.exp((-k * h) / tau);
+        const w = dexp((-k * h) / tau);
         const r = followRaw(spec, sampler, tk);
         pos = add(pos, scale(r.position, w)); tgt = add(tgt, scale(r.target, w)); wsum += w;
       }
@@ -144,7 +144,7 @@ export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number): Camer
       const c: Vec3 = spec.subject ? subjectOf(sampler, spec.subject, t).p : spec.center ?? [0, 0, 0];
       const a = (spec.phase ?? 0) + (2 * Math.PI * t) / spec.period;
       return {
-        position: [c[0] + spec.radius * Math.cos(a), c[1] + spec.height, c[2] + spec.radius * Math.sin(a)],
+        position: [c[0] + spec.radius * dcos(a), c[1] + spec.height, c[2] + spec.radius * dsin(a)],
         target: [c[0], c[1] + (spec.lookHeight ?? 1.2), c[2]],
         fov,
       };

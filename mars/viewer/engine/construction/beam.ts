@@ -1,6 +1,6 @@
 // connect_beam + release_support (spec §7, §12, §28 "Raise tall frame").
 import { z } from 'zod';
-import { angleDelta, dot2, rot2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
+import { angleDelta, datan2, dcos, dot2, dsin, rot2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
@@ -56,14 +56,14 @@ export function planBeam(rt: Runtime, p: CP): { ok: true; program: CProg } | { o
   const sgn = Math.sign(rel[1]) || 1;
   const face = (s: [number, number, number], outZ: number) => {
     const o = rot2([col * 0.25, outZ * 0.8], a.pose.yaw); // beyond the bay end, clear of the column holders
-    return { p: [s[0] + o[0], s[2] + o[1]] as Vec2, yaw: Math.atan2(-o[1], -o[0]) };
+    return { p: [s[0] + o[0], s[2] + o[1]] as Vec2, yaw: datan2(-o[1], -o[0]) };
   };
   // beam long axis (local x) along a's frame normal; the beam is end-for-end symmetric, so take the
   // yaw (mod π) nearest the staged yaw — it must not spin 180° mid-air — and map its ends to a/b by geometry
   const axis = a.pose.yaw + Math.PI / 2;
   const d = angleDelta(beam.pose.yaw, axis);
   const beamYaw = wrapAngle(Math.abs(d) > Math.PI / 2 ? axis + Math.PI : axis);
-  const endA = dot2([Math.cos(beamYaw), Math.sin(beamYaw)], [sa[0] - mid[0], sa[2] - mid[2]]) > 0 ? 'end-r' : 'end-l';
+  const endA = dot2([dcos(beamYaw), dsin(beamYaw)], [sa[0] - mid[0], sa[2] - mid[2]]) > 0 ? 'end-r' : 'end-l';
   // swept lift: the beam may touch the two uprights it hooks into; nothing else on the way up
   const lift = sweptLiftPath(rt, beam, beam.pose, { p: mid, yaw: beamYaw }, { ignore: [a.id, b.id], what: `${def(beam.def).label} ${beam.id}` });
   if (!lift.ok) return lift;
