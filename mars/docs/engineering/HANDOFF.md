@@ -330,6 +330,13 @@ d33a4d6b-d4ae-4535-a818-0e5c329e9b4f --name mars-campus-2026 -m "rollback: <reas
 2. **Planning cost, remaining part.** Base-obstacle rasters are cached now (campus flagship 56 s → 17 s
    compute, identical hashes); still missing: a per-tick planning budget / queued replans for many
    simultaneous walkers (200 ms spikes with 30), and region-local EDT updates instead of whole-grid.
+3a. **Crew accompanies lifted parts (deferred, spec §7/§8).** Construction lifts move a part from its
+   staging spot to its seat while the crew stands at fixed stations, so a plywood lift-over reads as a
+   floating sheet (`e2e/artifacts/raise-evidence/deck_s1-a-rising-oblique.png`). Plan: crew positions
+   derived from the part pose each tick (≤ 0.9 m/s, no clipping), a `lift.hands-out-of-reach`
+   invariant (holder ≤ 1.0 m from a hand point; hand points ≤ 2.4 m above the holder's floor), tests
+   for a joist lift and a plywood lift-over. Four delegated attempts stalled on the network with no
+   output on 2026-09-27; nothing of it is in the tree.
 3. **Campus take in the studio.** The flagship already renders live in `/lab` on open ground; next is
    the *campus* take (staging-east fork) rendered inside the 2026 studio scene with a planned camera
    track and video, labelled hypothetical. (The raise choreography fix and swept lift checks landed
