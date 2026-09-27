@@ -8,6 +8,8 @@ import type { Invariant, Runtime } from '../runtime/runtime.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { entityFrame, formationFor, gripError } from './formation.ts';
 import { poseHit } from './sweep.ts';
+import { activeLoadDiscs } from './actions.ts';
+import { HUMAN_RADIUS } from '../world/catalog.ts';
 
 export const GRIP_TOL = 0.05; // m
 const CLEAR_TOL = 0.03; // m, same tolerance as the human clearance invariant
@@ -53,4 +55,24 @@ export const carryIntegrity: Invariant = (rt: Runtime) => {
   return out;
 };
 
-export const CARRY_INVARIANTS = [carryIntegrity];
+/** No person outside the crew stands inside a carried load's disc cover (+ body radius) — review C3. */
+export const humanLoadClearance: Invariant = (rt: Runtime) => {
+  const out: Diagnostic[] = [];
+  const seen = new Set<string>();
+  const discs = activeLoadDiscs(rt);
+  if (!discs.length) return out;
+  for (const h of Object.values(rt.world.entities)) {
+    if (h.kind !== 'human' || !h.human) continue;
+    for (const d of discs) {
+      if (d.crew.includes(h.id) || h.human.level !== d.level || seen.has(`${h.id}|${d.entity}`)) continue;
+      const gap = Math.hypot(h.pose.p[0] - d.p[0], h.pose.p[2] - d.p[1]) - d.r;
+      if (gap < HUMAN_RADIUS - CLEAR_TOL) {
+        seen.add(`${h.id}|${d.entity}`);
+        out.push({ code: 'collision.human-load', message: `${h.id} overlaps the carried ${d.entity} (body centre ${gap.toFixed(2)} m from the load cover, needs ${HUMAN_RADIUS} m)`, subjects: [h.id, d.entity], at: h.pose.p });
+      }
+    }
+  }
+  return out;
+};
+
+export const CARRY_INVARIANTS = [carryIntegrity, humanLoadClearance];

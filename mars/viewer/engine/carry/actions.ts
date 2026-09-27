@@ -11,7 +11,7 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { makeWay, walkTo } from '../locomotion/walk.ts';
-import { carriedPose, carrierSpots, entityFrame, laidPose, worldDiscs, type SE2 } from './formation.ts';
+import { carriedPose, carrierSpots, entityFrame, formationFor, laidPose, worldDiscs, type SE2 } from './formation.ts';
 import { poseHit } from './sweep.ts';
 import { labelOf, laidIssue, planCarryAction, type CarryParams, type CarryProgram } from './validate.ts';
 import { planCarry } from './planner.ts';
@@ -59,6 +59,37 @@ const lerpPose = (a: Pose, b: Pose, t: number): Pose => ({
 });
 const crewOf = (rt: Runtime, ex: Exec): Entity[] => ex.p.crew.map((id) => rt.world.entities[id]);
 const itemOf = (rt: Runtime, ex: Exec) => rt.world.entities[ex.p.item];
+
+export type LoadDisc = { p: Vec2; r: number; actionId: string; entity: string; crew: string[]; level: number; braking?: boolean };
+
+const execsOf = (rt: Runtime): Map<string, Exec> => (rt.services.carryExecs ??= new Map());
+
+/**
+ * Read-only: the load discs of every load currently lifted by a live `carry` action (review C3).
+ * With `braking`, a moving crew's load also contributes its discs where it would come to rest if it
+ * braked now (marked `braking`), so a walker never steps where the load cannot stop short of it.
+ * Walkers read this through `rt.services.loadDiscs` (registered on carry start: no walk.ts → carry
+ * import cycle); the human-load invariant uses the current discs only.
+ */
+export function activeLoadDiscs(rt: Runtime, braking = false): LoadDisc[] {
+  const out: LoadDisc[] = [];
+  for (const e of Object.values(rt.world.entities)) {
+    if (e.kind !== 'component' || e.phase !== 'carried' || e.support?.kind !== 'held' || !e.support.by.length) continue;
+    const actionId = e.reservedBy;
+    if (!actionId || rt.records.get(actionId)?.verb !== 'carry' || !rt.isActive(actionId)) continue;
+    const crew = e.support.by;
+    const level = rt.world.entities[crew[0]]?.human?.level ?? 0;
+    const f = formationFor(e.def, crew.length);
+    for (const d of worldDiscs(f, entityFrame(e).q)) if (d.d.part === 'load') out.push({ p: d.p, r: d.d.r, actionId, entity: e.id, crew, level });
+    const ex = braking ? execsOf(rt).get(actionId) : undefined;
+    if (ex?.phase !== 'move' || ex.v < 0.02) continue;
+    const U = ex.p.traj.u[ex.p.traj.u.length - 1], i0 = ex.i;
+    const stop = (ex.v * ex.v) / (4 * ACCEL) + ex.v / 20; // braking distance at 2·ACCEL + one tick
+    for (const k of [0.5, 1]) for (const d of worldDiscs(f, poseAtU(ex, Math.min(U, ex.u + k * stop)))) if (d.d.part === 'load') out.push({ p: d.p, r: d.d.r, actionId, entity: e.id, crew, level, braking: true });
+    ex.i = i0; // poseAtU advances the segment cursor; restore it
+  }
+  return out;
+}
 
 /** Place load + carriers for formation pose q (the only way positions change while moving). */
 function applyFormation(rt: Runtime, ex: Exec, q: SE2) {
@@ -162,13 +193,16 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
   reservations: (_w, p) => [...p.crew.map((c) => ({ resource: `actor:${c}`, mode: 'exclusive' as const })), { resource: `entity:${p.item}`, mode: 'exclusive' }],
   plan: planCarryAction,
   start(rt, p, prog, id) {
+    rt.services.loadDiscs ??= () => activeLoadDiscs(rt, true);
     const walks = prog.crew.map((actor, i) => {
       const r = prog.gather[i];
       return r ? walkTo.start(rt, { actor, x: prog.approach[i][0], z: prog.approach[i][1] }, r, id) : null;
     });
     for (const c of prog.crew) rt.world.entities[c].human!.task = id;
     rt.world.entities[prog.item].reservedBy = id;
-    return { id, p: prog, phase: 'gather', walks, t: 0, u: 0, v: 0, i: 0, q: prog.pickup, cancelling: false, epoch: -1 };
+    const ex: Exec = { id, p: prog, phase: 'gather', walks, t: 0, u: 0, v: 0, i: 0, q: prog.pickup, cancelling: false, epoch: -1 };
+    execsOf(rt).set(id, ex);
+    return ex;
   },
   step(rt, ex, dt): StepResult {
     const p = ex.p;
@@ -178,7 +212,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         const w = ex.walks[i];
         if (!w) continue;
         const r = walkTo.step(rt, w, dt);
-        if (r.status === 'failed') return { status: 'failed', diagnostic: { ...r.diagnostic, code: 'carry.gather-failed', message: `${p.crew[i]} could not reach the ${p.f.name}: ${r.diagnostic.message}` } };
+        if (r.status === 'failed') return execsOf(rt).delete(ex.id), { status: 'failed', diagnostic: { ...r.diagnostic, code: 'carry.gather-failed', message: `${p.crew[i]} could not reach the ${p.f.name}: ${r.diagnostic.message}` } };
         if (r.status === 'completed') {
           ex.walks[i] = null;
           const h = rt.world.entities[p.crew[i]].human!;
@@ -196,7 +230,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         h.pose.yaw = wrapAngle(h.pose.yaw + clamp(d, -TURN_RATE * dt, TURN_RATE * dt));
       });
       if (ex.walks.some((w) => w) || !aligned) {
-        if (ex.t > GATHER_TIMEOUT_S) return { status: 'failed', diagnostic: { code: 'carry.gather-stuck', message: `the crew did not assemble around ${p.item} within ${GATHER_TIMEOUT_S} s`, subjects: [p.item, ...p.crew] } };
+        if (ex.t > GATHER_TIMEOUT_S) return execsOf(rt).delete(ex.id), { status: 'failed', diagnostic: { code: 'carry.gather-stuck', message: `the crew did not assemble around ${p.item} within ${GATHER_TIMEOUT_S} s`, subjects: [p.item, ...p.crew] } };
         return { status: 'running', phase: 'gather' };
       }
       // nobody may stand where the carriers step to grip the load (idle bystanders are asked to move)
@@ -313,6 +347,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
     ex.t += dt;
     if (ex.t < RELEASE_S) return { status: 'running', phase: 'release' };
     for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
+    execsOf(rt).delete(ex.id);
     const e = itemOf(rt, ex);
     return {
       status: 'completed',
@@ -329,6 +364,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       ex.walks.forEach((w) => w && walkTo.cancel(rt, w));
       for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
       itemOf(rt, ex).reservedBy = undefined;
+      execsOf(rt).delete(ex.id);
       return { ok: true };
     }
     if (ex.phase === 'lift') {

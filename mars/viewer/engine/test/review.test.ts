@@ -11,6 +11,7 @@ import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
 import { forgetMotion } from '../runtime/invariants.ts';
 import { planWalk, traffic, walkTo } from '../locomotion/walk.ts';
 import { holdStations } from '../construction/rules.ts';
+import { entityFrame, formationFor, worldDiscs } from '../carry/formation.ts';
 import { canonicalLying } from '../construction/lying.ts';
 import { z } from 'zod';
 import type { ActionDef } from '../actions/types.ts';
@@ -179,4 +180,39 @@ test('H1: an unreachable hold station is refused at plan time; a failed/cancelle
     assert.equal(rt2.submit('carry', { crew: ['p1', 'p2'], item: 'bx', to: { x: -5, z: 5, yaw: 0 } }).status, 'executing');
     assert.deepEqual(codes(rt2), []);
   }
+});
+
+test('C3: a walker crossing a carry waits for the load to pass (traffic.load), never walks through it; overlap is a violation', () => {
+  const f = formationFor('beam-12ft', 2);
+  let waited = 0;
+  for (const [startX, side] of [[3.0, 3], [2.0, 2], [4.0, 3], [2.0, 1.5]] as const) {
+    const rt = engine(open(20), component('b', 'beam-12ft', [0, 0, 0], 0, { phase: 'staged' }), human('p1', -1, 2), human('p2', 1, -2), human('p3', 6, side));
+    const c = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b', to: { x: 12, z: 0, yaw: 0 } });
+    let walk: ReturnType<Runtime['submit']> | null = null;
+    let worst = Infinity;
+    for (let t = 0; t < 4000 && (rt.isActive(c.id) || (walk && rt.isActive(walk.id))); t++) {
+      if (!walk && c.phase === 'move' && rt.world.entities.b.pose.p[0] > startX) walk = rt.submit('walk_to', { actor: 'p3', x: 6, z: -side });
+      rt.step();
+      const b = rt.world.entities.b;
+      if (b.phase !== 'carried') continue;
+      const p = rt.world.entities.p3.pose.p;
+      for (const d of worldDiscs(f, entityFrame(b).q)) if (d.d.part === 'load') worst = Math.min(worst, Math.hypot(d.p[0] - p[0], d.p[1] - p[2]) - d.d.r);
+    }
+    assert.equal(c.status, 'completed', `carry (walk starts at load x ${startX})`);
+    assert.equal(walk?.status, 'completed', `walk ${walk?.diagnostic?.code}`);
+    assert.ok(worst >= 0.28 - 0.03, `p3 body centre ${worst.toFixed(2)} m from the load cover (needs ≥ 0.25)`);
+    assert.deepEqual(codes(rt), []);
+    if (walk!.history.some((h) => h.code === 'traffic.load')) waited++;
+  }
+  assert.ok(waited >= 2, `walkers waited for the load (traffic.load) in ${waited} of 4 crossings`);
+  // the invariant: a person inside a carried load's cover is flagged
+  const rt = engine(open(20), component('b', 'beam-12ft', [0, 0, 0], 0, { phase: 'staged' }), human('p1', -1, 2), human('p2', 1, -2), human('p3', 6, 6));
+  const c = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b', to: { x: 12, z: 0, yaw: 0 } });
+  while (rt.isActive(c.id) && c.phase !== 'move') rt.step();
+  const q = entityFrame(rt.world.entities.b).q;
+  rt.world.entities.p3.pose.p = [q.x, 0, q.z];
+  forgetMotion(rt);
+  rt.step();
+  assert.ok(codes(rt).includes('collision.human-load'), JSON.stringify(codes(rt)));
+  assert.match(rt.violations.find((v) => v.code === 'collision.human-load')!.message, /p3 overlaps the carried b/);
 });

@@ -306,6 +306,8 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
       personBlock = enc.id;
     } else if (tight) vmax = Math.min(vmax, 0.45);
   }
+  // carried loads (review C3): never step into one (loadIntrusion below): wait for it to pass
+  let loadBlock: string | null = null;
   let phase = 'walk';
   // hysteresis: start turning in place above TURN_IN_PLACE, stop only once nearly aligned
   if (!arrived && !ex.turning && Math.abs(err) > TURN_IN_PLACE && ex.v < 0.3) ex.turning = true;
@@ -352,16 +354,26 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     ex.v = 0;
     p = cur;
     personBlock ??= intruded;
+  } else {
+    const intoLoad = loadIntrusion(rt, a, cur, p, r);
+    if (intoLoad) {
+      ex.s = prevS;
+      ex.offset = prevOffset;
+      ex.v = 0;
+      p = cur;
+      loadBlock ??= intoLoad;
+    }
   }
   a.pose.p = [p[0], g.y, p[1]];
-  a.human!.activity = ex.v > 0.05 ? 'walk' : yieldTo || personBlock ? 'wait' : 'idle';
+  a.human!.activity = ex.v > 0.05 ? 'walk' : yieldTo || personBlock || loadBlock ? 'wait' : 'idle';
 
   // stuck behind a person for too long → replan around them (they become temporary obstacles)
-  ex.stuck = ex.v < 0.02 && personBlock ? ex.stuck + 1 : 0;
+  ex.stuck = ex.v < 0.02 && (personBlock || loadBlock) ? ex.stuck + 1 : 0;
   if (ex.stuck > (enc.kind === 'static' ? STUCK_STATIC_TICKS : STUCK_TICKS) && !arrived && ex.peopleReplans < MAX_PEOPLE_REPLANS) {
     ex.stuck = 0;
     ex.peopleReplans++;
-    const others = standingPeople(rt, a);
+    // a carried load in the way counts as an obstacle too: route around where it is now
+    const others = [...standingPeople(rt, a), ...loadDiscsFor(rt, a).map((d, i) => ({ id: `${d.entity}#${i}`, p: d.p }))];
     ex.plannedAround = Object.fromEntries(others.map((o) => [o.id, o.p]));
     const rr = sp.routeAround(rt.world, ex.profile, { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] }, ex.goal, others);
     if (rr.ok) {
@@ -375,6 +387,8 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   }
   if (yieldTo && ex.v < 0.02)
     return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${ex.actor} is waiting for ${yieldTo} to clear a single-file passage`, subjects: [ex.actor, yieldTo] } };
+  if (loadBlock && ex.v < 0.02)
+    return { status: 'blocked', diagnostic: { code: 'traffic.load', message: `${ex.actor} waits for the carried ${loadBlock} to pass`, subjects: [ex.actor, loadBlock] } };
   if (personBlock && ex.v < 0.02) {
     makeWay(rt, personBlock, pointAt(ex, ex.total));
     return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} is waiting for ${personBlock} to move out of the way`, subjects: [ex.actor, personBlock] } };
@@ -415,6 +429,23 @@ function intrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): st
     if (dTo >= 2 * r - 0.02) continue;
     const dFrom = Math.hypot(o.pose.p[0] - from[0], o.pose.p[2] - from[1]);
     if (dTo < dFrom - 1e-9) return o.id;
+  }
+  return null;
+}
+
+/** Carried-load discs published by the carry action (`rt.services.loadDiscs`, see carry/actions.ts activeLoadDiscs). */
+type LoadDiscView = { p: Vec2; r: number; entity: string; crew: string[]; level: number };
+function loadDiscsFor(rt: Runtime, me: Entity): LoadDiscView[] {
+  const all = (rt.services.loadDiscs?.() ?? []) as LoadDiscView[];
+  return all.filter((d) => !d.crew.includes(me.id) && d.level === me.human!.level);
+}
+
+/** The carried load that moving from `from` to `to` would push this body into (and deeper). */
+function loadIntrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): string | null {
+  for (const d of loadDiscsFor(rt, me)) {
+    const dTo = dist2(to, d.p);
+    if (dTo >= d.r + r - 0.02) continue;
+    if (dTo < dist2(from, d.p) - 1e-9) return d.entity;
   }
   return null;
 }
