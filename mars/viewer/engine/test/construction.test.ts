@@ -8,7 +8,10 @@ import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { CONSTRUCTION_ACTIONS, uprightsSupported } from '../construction/index.ts';
-import { groupStability } from '../construction/rules.ts';
+import { groupStability, holdStations } from '../construction/rules.ts';
+import { liftHandPoint, raiseRoles } from '../construction/raise.ts';
+import { entityCorners } from '../spatial/service.ts';
+import type { Entity } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { angleDelta } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
@@ -160,4 +163,149 @@ test('cancel mid-raise is refused (would leave the frame unsupported)', () => {
   rt.runUntilIdle(2000, [r.id]);
   assert.equal(r.status, 'completed');
   assert.deepEqual(rt.violations, []);
+});
+
+// ---- raise choreography: footers brace the base, lifters walk the frame up ----
+
+/** Closest horizontal distance from p to a point of either column that is ≤ 2.0 m above the ground. */
+function reachToFrame(u: Entity, p: [number, number]): number {
+  const c = entityCorners(u);
+  const avg = (i: number, j: number) => [0, 1, 2].map((k) => (c[i][k] + c[j][k]) / 2);
+  let best = Infinity;
+  for (const xi of [0, 1]) {
+    const a = avg(xi * 4, xi * 4 + 1), b = avg(xi * 4 + 2, xi * 4 + 3);
+    for (let k = 0; k <= 400; k++) {
+      const q = a.map((v, i) => v + ((b[i] - v) * k) / 400);
+      if (q[1] > 2.0) continue;
+      best = Math.min(best, Math.hypot(q[0] - p[0], q[2] - p[1]));
+    }
+  }
+  return best;
+}
+
+/** Watch a raise: lifter hand/reach, lifter ground speed, slots seen. */
+function watchRaise(rt: Runtime, rec: { id: string; phase?: string }, item: string, lifters: string[]) {
+  const seen = { maxHandY: 0, maxHandDist: 0, maxReach: 0, maxSpeed: 0, slots: new Map<string, string[]>(), ticks: 0 };
+  const last = new Map<string, [number, number]>();
+  rt.observers.push({
+    onTick: (r) => {
+      if (!r.isActive(rec.id) || rec.phase === 'approach') return;
+      const u = r.world.entities[item];
+      for (const id of [...new Set([...lifters, ...(u.support?.kind === 'held' ? u.support.by : [])])]) {
+        const h = r.world.entities[id];
+        const slot = h.human!.grip?.slot;
+        const list = seen.slots.get(id) ?? [];
+        if (slot && list[list.length - 1] !== slot) list.push(slot);
+        seen.slots.set(id, list);
+      }
+      for (const id of lifters) {
+        const h = r.world.entities[id];
+        const p: [number, number] = [h.pose.p[0], h.pose.p[2]];
+        const q = last.get(id);
+        if (q) seen.maxSpeed = Math.max(seen.maxSpeed, Math.hypot(p[0] - q[0], p[1] - q[1]) * 20);
+        last.set(id, p);
+        if (h.human!.grip?.slot !== 'lift-far') continue;
+        seen.ticks++;
+        seen.maxReach = Math.max(seen.maxReach, reachToFrame(u, p));
+        // the engine's own hand point (on the lifter's column)
+        const side = raiseRoles((rt.records.get(rec.id)!.params as { crew: string[] }).crew).find((x) => x.actor === id)!.side;
+        const hand = liftHandPoint(u, 0, def(u.def).size[2] / 2, side);
+        seen.maxHandY = Math.max(seen.maxHandY, hand[1]);
+        seen.maxHandDist = Math.max(seen.maxHandDist, Math.hypot(hand[0] - p[0], hand[2] - p[1]));
+      }
+    },
+  });
+  return seen;
+}
+
+test('raise choreography (2 people): lifter walks the frame up, hands ≤ 2.0 m and within reach, ≤ 0.6 m/s; footer braces the base', () => {
+  const rt = setup();
+  const r = rt.submit('raise_upright', { crew: ['p1', 'p2'], item: 'A' });
+  assert.notEqual(r.status, 'failed', r.diagnostic?.message);
+  const seen = watchRaise(rt, r, 'A', ['p2']);
+  rt.runUntilIdle(20 * 120, [r.id]);
+  assert.equal(r.status, 'completed', r.diagnostic?.message);
+  assert.ok(seen.ticks > 40, `lifter walked the frame up over ${seen.ticks} ticks`);
+  assert.ok(seen.maxHandY <= 2.0 + 1e-9, `lifter hands at most ${seen.maxHandY.toFixed(3)} m up`);
+  assert.ok(seen.maxHandDist <= 0.9, `hands within ${seen.maxHandDist.toFixed(3)} m of the lifter`);
+  assert.ok(seen.maxReach <= 0.9, `frame (≤ 2.0 m up) within ${seen.maxReach.toFixed(3)} m of the lifter throughout`);
+  assert.ok(seen.maxSpeed <= 0.6 + 1e-6, `lifter ground speed ≤ 0.6 m/s (max ${seen.maxSpeed.toFixed(3)})`);
+  assert.deepEqual(seen.slots.get('p1'), ['foot-l', 'hold-0']);
+  assert.deepEqual(seen.slots.get('p2'), ['lift-far', 'hold-1']);
+  const A = rt.world.entities.A;
+  assert.equal(A.pose.pitch, 0);
+  assert.deepEqual(A.support, { kind: 'held', by: ['p1', 'p2'] });
+  const st = holdStations(A, 2);
+  for (const [i, id] of ['p1', 'p2'].entries()) {
+    const h = rt.world.entities[id];
+    assert.ok(Math.hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
+  }
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+test('raise choreography (4 people): two lifters step around the footers to the stations behind the base', () => {
+  const rt = setup();
+  const r = rt.submit('raise_upright', { crew: ['p1', 'p2', 'p3', 'p4'], item: 'A' });
+  assert.notEqual(r.status, 'failed', r.diagnostic?.message);
+  const seen = watchRaise(rt, r, 'A', ['p3', 'p4']);
+  rt.runUntilIdle(20 * 120, [r.id]);
+  assert.equal(r.status, 'completed', r.diagnostic?.message);
+  assert.ok(r.history.some((h) => h.phase === 'step'), 'lifters stepped to their base stations');
+  assert.ok(seen.maxHandY <= 2.0 + 1e-9 && seen.maxReach <= 0.9 && seen.maxSpeed <= 0.6 + 1e-6, JSON.stringify(seen));
+  const st = holdStations(rt.world.entities.A, 4);
+  for (const [i, id] of ['p1', 'p2', 'p3', 'p4'].entries()) {
+    const h = rt.world.entities[id];
+    assert.ok(Math.hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
+    assert.equal(h.human!.grip?.slot, `hold-${i}`);
+  }
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+test('raise choreography: an obstacle on the lifter\'s walk is refused at plan time, or blocks mid-raise without clipping', () => {
+  // A lies toward −z; the lifter (p2, crew[1]) walks along x = −(depth/2 + 0.42) from z = −H to the base
+  const lx = -(D12 / 2 + 0.42);
+  const crate: Obstacle = { id: 'crate', obb: { c: [lx, -1.5], half: [0.15, 0.15], yaw: 0 }, y0: 0, y1: 1.2, kind: 'solid', label: 'tool crate' };
+  const early = setup([crate]).submit('raise_upright', { crew: ['p1', 'p2'], item: 'A' });
+  assert.equal(early.status, 'failed');
+  assert.equal(early.diagnostic?.code, 'raise.station-blocked');
+  assert.match(early.diagnostic!.message, /p2 .*tool crate/);
+
+  // appears mid-raise (a wall block set down ahead of the lifter): the raise holds and reports blocked
+  const rt = setup();
+  const r = rt.submit('raise_upright', { crew: ['p1', 'p2'], item: 'A' });
+  while (rt.isActive(r.id) && !(r.phase === 'raise' && (rt.world.entities.A.pose.pitch ?? 0) < 1.0)) rt.step();
+  const p2 = rt.world.entities.p2;
+  rt.world.entities.wall = component('wall', 'test-wall', [lx - 0.3, 0, p2.pose.p[2] + 1.0], 0, { phase: 'staged' });
+  const pitch = rt.world.entities.A.pose.pitch!;
+  for (let i = 0; i < 60; i++) rt.step();
+  assert.equal(r.status, 'blocked');
+  assert.equal(r.diagnostic?.code, 'raise.station-blocked');
+  assert.match(r.diagnostic!.message, /p2 cannot walk A up.*proving-ground wall block/);
+  assert.ok(rt.world.entities.A.pose.pitch! < pitch && rt.world.entities.A.pose.pitch! > 0.3, 'frame held part-raised');
+  assert.deepEqual(rt.world.entities.A.support, { kind: 'held', by: ['p1', 'p2'] });
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), [], 'no clipping while blocked');
+  // cleared: the raise resumes and completes
+  delete rt.world.entities.wall;
+  rt.runUntilIdle(20 * 60, [r.id]);
+  assert.equal(r.status, 'completed', r.diagnostic?.message);
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+test('raise choreography (1 person, 8 ft frame): the lifter walks it up and ends as the footer', () => {
+  const rt = setup();
+  const T8 = def('upright-8ft').size[2] / 2;
+  rt.world.entities.E = component('E', 'upright-8ft', [6, 0, 0], 0, { phase: 'staged', pose: { p: [6, T8, 0], yaw: 0, pitch: LYING } });
+  const r = rt.submit('raise_upright', { crew: ['p1'], item: 'E' });
+  assert.notEqual(r.status, 'failed', r.diagnostic?.message);
+  const seen = watchRaise(rt, r, 'E', ['p1']);
+  rt.runUntilIdle(20 * 120, [r.id]);
+  assert.equal(r.status, 'completed', r.diagnostic?.message);
+  assert.ok(seen.ticks > 20 && seen.maxHandY <= 2.0 + 1e-9 && seen.maxReach <= 0.9 && seen.maxSpeed <= 0.6 + 1e-6, JSON.stringify({ ...seen, slots: [...seen.slots] }));
+  assert.deepEqual(seen.slots.get('p1'), ['lift-far', 'hold-0']);
+  const E = rt.world.entities.E, h = rt.world.entities.p1;
+  assert.equal(E.pose.pitch, 0);
+  assert.deepEqual(E.support, { kind: 'held', by: ['p1'] });
+  const st = holdStations(E, 1)[0];
+  assert.ok(Math.hypot(h.pose.p[0] - st.p[0], h.pose.p[2] - st.p[1]) < 1e-6, 'ends at the base station');
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
