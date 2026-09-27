@@ -7,13 +7,13 @@ change the hand-curated map `viewer/engine/test/evidence-map.json` and regenerat
 
 | | |
 | --- | --- |
-| Git HEAD | `9ed068f` (engine tree clean) |
-| Generated | 2026-09-27T22:13:05.109Z · Node v26.8.2 |
-| Engine suite | 166 tests in 23 files: 165 pass, 0 fail, 1 skipped · 48.4 s wall |
+| Git HEAD | `f767540` (engine tree clean) |
+| Generated | 2026-09-27T22:25:21.237Z · Node v26.8.2 |
+| Engine suite | 172 tests in 24 files: 170 pass, 0 fail, 2 skipped · 49.6 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 576.1 s simulated, 7941 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 608.8 s simulated, 24750 ms compute, take 512469 B (`campus-flagship.test.ts`) |
+| Flagship, proving ground | 43 steps, 576.1 s simulated, 9940 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 608.8 s simulated, 26389 ms compute, take 512469 B (`campus-flagship.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 11522 ticks · final state `d54eca7c402a4c3a92ff82ed2466fd2e354cd9ded9ee0f01fa1bed8fc7f0f610` · take `8f65762a1ec91b82ba4e93c0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
@@ -24,12 +24,12 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Row | Status | Tests passed | What remains approximate |
 | --- | --- | ---: | --- |
 | Wall avoidance | PROVEN | 3/3 | No explicit wall-contact-duration metric: 'no sliding' is inferred from the clearance invariant (zero violations), path length and a heading-flip bound on one synthetic wall. |
-| U-shaped trap | PROVEN | 1/1 | Planner-level only (findRoute). No runtime walk_to test starts inside the U, so local-steering oscillation there is not measured. |
-| Narrow passage / two agents | PROVEN | 6/6 | Only the too-narrow (take turns) case is run with two walkers; two agents passing side by side in a wide-enough gap is not tested. Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free. |
+| U-shaped trap | PROVEN | 2/2 | One synthetic U and one start/goal pair; oscillation is bounded by heading flips (≤ 6) and clearance is sampled per tick from the 0.1 m clearance grid (EDT), not continuously. |
+| Narrow passage / two agents | PROVEN | 8/8 | In the 2.0 m corridor both pass without traffic.yield and finish < 1.4× solo, but the later-id walker still stops ~1.9 s to give way (traffic.person; todo test in gaps.test.ts). Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free. |
 | Stair approach | PROVEN | 3/3 | Root-motion only: no foot IK, so rendered feet sink/hover by about 0.09 m on treads. Climb is a link traversal with an align phase; one straight flight on the proving ground, no landings or turns. |
 | Multiple floors | PROVEN | 3/3 | Two levels (ground + one deck) on the proving ground plus progressive decks. The 2026 campus has only ground level 0 walkable (interiors and upper floors are blocked by design). |
 | Long load around corner | PROVEN | 5/5 | Rigid formation, load held level, ground level only (no carrying on stairs or between levels), no re-grip. Collision is exact OBB vs prisms every tick; carriers have no carry/lift poses in the renderer. |
-| Raise tall frame | PROVEN | 8/8 | Successful raises use 12 ft (and 8 ft) frames; the 19 ft frame is exercised only on the rejection path. The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics. |
+| Raise tall frame | PROVEN | 9/9 | The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics. The 19 ft raise is proven on open ground only (no 19 ft raise beside other structures). |
 | Construction changes navigation | PROVEN | 6/6 | Every construction epoch rebuilds the affected grids (no incremental navmesh); proven on the proving ground and the progressive fixture, not on the full campus. |
 | Incomplete floor/stairs | PROVEN | 4/4 | Holds for engine-built decks/stairs only. The 2026 campus has no decks or stairs at all (upper floors are blocked, not modelled), so the rule is untested against historical geometry. |
 | Reservation conflict | PROVEN | 5/5 | Reservations are per actor/object/slot. There are no space-time reservations: simultaneous carries are not co-planned, so sequences must order them with `after` dependencies. |
@@ -60,8 +60,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Result | File | Test |
 | --- | --- | --- |
 | pass | `navigation.test.ts` | U-shaped trap: global route exits via the open side |
+| pass | `gaps.test.ts` | U-trap: a walker starting at the inner back wall walks out and around to a goal behind the U; no oscillation, never within 0.28 m of the walls |
 
-*Approximate:* Planner-level only (findRoute). No runtime walk_to test starts inside the U, so local-steering oscillation there is not measured.
+*Approximate:* One synthetic U and one start/goal pair; oscillation is bounded by heading flips (≤ 6) and clearance is sampled per tick from the 0.1 m clearance grid (EDT), not continuously.
 
 ### Narrow passage / two agents — PROVEN
 
@@ -75,8 +76,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `walk.test.ts` | standing person on the route: brief pause at most, no turn/walk flicker, no overlap |
 | pass | `sequence.test.ts` | runner: proving-ground walkers — passage yield + barrier-gated climb, no violations |
 | pass | `review.test.ts` | C3: a walker crossing a carry waits for the load to pass (traffic.load), never walks through it; overlap is a violation |
+| pass | `gaps.test.ts` | 2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time |
+| pass | `gaps.test.ts` | 1.0 m gap (same scene): opposing walkers still take turns (someone yields) |
 
-*Approximate:* Only the too-narrow (take turns) case is run with two walkers; two agents passing side by side in a wide-enough gap is not tested. Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free.
+*Approximate:* In the 2.0 m corridor both pass without traffic.yield and finish < 1.4× solo, but the later-id walker still stops ~1.9 s to give way (traffic.person; todo test in gaps.test.ts). Yielding is heuristic (traffic resources, right-of-way), not ORCA, and not proven deadlock-free.
 
 ### Stair approach — PROVEN
 
@@ -129,9 +132,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `construction.test.ts` | raise choreography (4 people): two lifters step around the footers to the stations behind the base |
 | pass | `construction.test.ts` | raise choreography: an obstacle on the lifter's walk is refused at plan time, or blocks mid-raise without clipping |
 | pass | `construction.test.ts` | raise choreography (1 person, 8 ft frame): the lifter walks it up and ends as the footer |
+| pass | `construction.test.ts` | 19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s), premature release refused, 12 ft beams at 0.5 m + 1.8 m, stable release |
 | pass | `review.test.ts` | C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation |
 
-*Approximate:* Successful raises use 12 ft (and 8 ft) frames; the 19 ft frame is exercised only on the rejection path. The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics.
+*Approximate:* The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics. The 19 ft raise is proven on open ground only (no 19 ft raise beside other structures).
 
 ### Construction changes navigation — PROVEN
 
@@ -432,11 +436,18 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-No previous `evidence.json`; this run is the baseline. Future runs list tests added or removed since it.
+Compared with the report at `9ed068f` (2026-09-27T22:13:05.109Z): 6 added, 0 removed.
+
+- added: api.test.ts :: api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)
+- added: construction.test.ts :: 19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s), premature release refused, 12 ft beams at 0.5 m + 1.8 m, stable release
+- added: gaps.test.ts :: 1.0 m gap (same scene): opposing walkers still take turns (someone yields)
+- added: gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)
+- added: gaps.test.ts :: 2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time
+- added: gaps.test.ts :: U-trap: a walker starting at the inner back wall walks out and around to a goal behind the U; no oscillation, never within 0.28 m of the walls
 
 ## Tests not cited by any row or milestone
 
-54 of 166 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+56 of 172 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -446,6 +457,7 @@ No previous `evidence.json`; this run is the baseline. Future runs list tests ad
 - `api.test.ts` pass: api: pathological inputs (5,000-deep nesting, 1 MB array) return input.invalid instead of throwing
 - `api.test.ts` pass: api: rehearse is read-only unless keep: true (review M5); unkept takes stay playable in memory
 - `api.test.ts` pass: api: EngineRoom stores states as content-addressed blobs and migrates an old history blob (review M5)
+- `api.test.ts` pass: api: EngineRoom caps stored plans/takes per room; referenced takes survive; all-referenced refuses (room.storage-full)
 - `camera-geom.test.ts` pass: camera geom: glass collides but does not occlude; policy is per kind
 - `camera-geom.test.ts` pass: camera shots: stateless evaluation (random access == sequential), Catmull-Rom through keys
 - `camera-replay.test.ts` pass: camera perf: plan a 60 s track at 10 Hz with 3 subjects in < 1 s
@@ -473,6 +485,7 @@ No previous `evidence.json`; this run is the baseline. Future runs list tests ad
 - `env-sun.test.ts` pass: sunDirectionVector is a unit vector consistent with solarPosition()
 - `env-sun.test.ts` pass: daylightFactors: night at large negative elevation, day at high elevation
 - `env-sun.test.ts` pass: smoothstep matches known fixed points
+- `gaps.test.ts` todo: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)
 - `history.test.ts` pass: physicalHash ignores env, clock, labels, tags and provenance
 - `history.test.ts` pass: physicalHash tracks poses, phases, supports, activity, inventory and RNG
 - `history.test.ts` pass: state store (review M5): index without states, lazy state reads, commits put only the new state, old blobs migrate
