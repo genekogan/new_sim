@@ -130,3 +130,30 @@ test('determinism: same inputs → same final state hash', () => {
   };
   assert.equal(run(), run());
 });
+
+test('cancel mid-climb (review M2): the walker finishes at the nearer landing on its level, cancelled, no violations', () => {
+  for (const [frac, level, y] of [[0.3, 0, 0], [0.7, 1, DECK_Y]] as const) {
+    const rt = setup(human('p1', 3.5, 12.5));
+    const a = rt.submit('walk_to', { actor: 'p1', x: 10, z: 10, level: 1 });
+    assert.equal(a.status, 'executing', a.diagnostic?.message);
+    let n = 0;
+    while (pos(rt, 'p1')[1] < frac * DECK_Y && n++ < 20 * 60) rt.step();
+    assert.equal(a.phase, 'climb');
+    const at = pos(rt, 'p1')[1];
+    const c = rt.cancel(a.id);
+    assert.equal(c.status, 'executing', 'cancel is deferred while on the flight');
+    assert.equal(c.phase, 'cancelling');
+    assert.ok(rt.runUntilIdle(20 * 60, [a.id]), 'deferred cancel finishes');
+    assert.equal(a.status, 'cancelled');
+    const h = rt.world.entities.p1.human!;
+    assert.equal(h.level, level, `cancelled at ${(at / DECK_Y).toFixed(2)} of the climb → ${level ? 'top' : 'bottom'} landing`);
+    assert.ok(Math.abs(pos(rt, 'p1')[1] - y) < 1e-6, `stands at landing height ${y}, got ${pos(rt, 'p1')[1]}`);
+    assert.equal(h.activity, 'idle');
+    assert.equal(h.task, undefined);
+    assert.equal([...((rt.services.traffic as Map<string, unknown>) ?? new Map()).keys()].filter((k) => k.startsWith('link:')).length, 0, 'stair released');
+    for (let i = 0; i < 20; i++) rt.step();
+    const codes = rt.violations.map((v) => v.code);
+    assert.ok(!codes.includes('collision.human-static') && !codes.includes('motion.teleport'), codes.join(', '));
+    assert.deepEqual(rt.violations.map((v) => v.message), []);
+  }
+});

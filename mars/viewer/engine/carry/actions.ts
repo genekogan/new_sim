@@ -206,6 +206,20 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
   },
   step(rt, ex, dt): StepResult {
     const p = ex.p;
+    if (ex.phase === 'gather' && ex.cancelling) {
+      // cancelled while a crew member was mid-stair: let their walks finish the flight (review M2)
+      for (let i = 0; i < ex.walks.length; i++) {
+        const w = ex.walks[i];
+        if (!w) continue;
+        const r = walkTo.step(rt, w, dt).status;
+        if (r === 'completed' || r === 'failed') ex.walks[i] = null;
+      }
+      if (ex.walks.some((w) => w)) return { status: 'running', phase: 'gather-cancel' };
+      for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
+      itemOf(rt, ex).reservedBy = undefined;
+      execsOf(rt).delete(ex.id);
+      return { status: 'completed', outputs: { cancelled: true } };
+    }
     if (ex.phase === 'gather') {
       ex.t += dt;
       for (let i = 0; i < ex.walks.length; i++) {
@@ -361,7 +375,16 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
   cancel(rt, ex): CancelResult {
     const p = ex.p;
     if (ex.phase === 'gather') {
-      ex.walks.forEach((w) => w && walkTo.cancel(rt, w));
+      // a walker mid-stair finishes the flight at the nearer landing first (walk_to deferred cancel, review M2)
+      ex.walks = ex.walks.map((w) => {
+        if (!w) return null;
+        const r = walkTo.cancel(rt, w);
+        return r.ok && r.deferred ? w : null;
+      });
+      if (ex.walks.some((w) => w)) {
+        ex.cancelling = true;
+        return { ok: true, deferred: true };
+      }
       for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
       itemOf(rt, ex).reservedBy = undefined;
       execsOf(rt).delete(ex.id);

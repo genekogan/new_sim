@@ -179,6 +179,8 @@ other host that trusts "call never throws for engine-level failures" crashes. Fi
 worker, and give `json` a depth-limited refinement plus string `.max()`.
 
 ### M2. Cancelling walk_to mid-stair leaves the person idle, floating on the stair
+> **Fixed 2026-09-27.** A cancel during the `climb` phase of a link leg is now deferred: the walker continues (or backs down) the flight at climbing speed to whichever landing is nearer along the path, waits for anyone in the way, then stands on that landing's level and completes as `cancelled` (stair resource released). carry's `gather` cancel also defers until any mid-stair crew walk finishes. Test: `cancel mid-climb (review M2): the walker finishes at the nearer landing on its level, cancelled, no violations`.
+
 `locomotion/walk.ts:112-118`. The cancel is accepted in any phase. During a link leg the
 pose is mid-flight (`:542`), `human.level` is still the entry level, and `activity`
 becomes `idle`. The person now stands in mid-air, or inside the flight body on the lower

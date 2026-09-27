@@ -12,7 +12,7 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { cellOf, clearanceAt, segmentClearance, type LevelGrid } from '../spatial/grid.ts';
-import type { Leg, Route, WalkLeg } from '../spatial/path.ts';
+import type { Leg, LinkLeg, Route, WalkLeg } from '../spatial/path.ts';
 import { HUMAN_PROFILE, type AgentProfile } from '../spatial/types.ts';
 
 const ACCEL = 1.2; // m/s²
@@ -58,6 +58,8 @@ type Exec = {
   /** Standing people the current route was planned around (ignored by local encounters while they stay put). */
   plannedAround: Record<string, Vec2>;
   peopleReplans: number;
+  /** Set by a cancel during a stair traversal: finish the flight at the nearer landing, then stop (review M2). */
+  cancelTo?: 'entry' | 'exit';
 };
 
 export const walkSchema = z.strictObject({
@@ -111,6 +113,13 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
   },
   step: stepWalk,
   cancel(rt, ex) {
+    // mid-flight on a stair: the body is between levels, so stopping here would leave it standing on
+    // the flight. Defer: walk on to whichever landing is nearer along the path, then finish as cancelled.
+    const leg = ex.route.legs[ex.leg];
+    if (leg?.kind === 'link' && ex.phase === 'climb' && ex.climbT > 1e-9) {
+      ex.cancelTo ??= ex.climbT >= linkGeometry(leg).total / 2 ? 'exit' : 'entry';
+      return { ok: true, deferred: true };
+    }
     releaseAll(rt, ex);
     const a = rt.world.entities[ex.actor];
     a.human!.activity = 'idle';
@@ -229,6 +238,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     releaseAll(rt, ex);
     return { status: 'failed', diagnostic: { code: 'actor.holding', message: `${ex.actor} is holding ${a.human!.grip.entity} and cannot walk away until it is set down or stable`, subjects: [ex.actor, a.human!.grip.entity] } };
   }
+  if (ex.cancelTo) return stepLinkCancel(rt, ex, a, ex.route.legs[ex.leg] as LinkLeg, dt);
   // topology changed (construction)? replan only if the remaining corridor is no longer valid
   sp.sync(rt.world);
   if (sp.epoch !== ex.epoch) {
@@ -570,18 +580,10 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     else t.actors.add(ex.actor);
     ex.held.add(res);
   }
-  // continuous traversal: from the standing entry point, along the steps, to the exit point (no end snaps)
-  const entry = leg.ascending ? link.from : link.to, exit0 = leg.ascending ? link.to : link.from;
-  const steps = leg.ascending ? link.path : [...link.path].reverse();
-  const path: [number, number, number][] = [[entry.p[0], entry.y, entry.p[1]], ...steps, [exit0.p[0], exit0.y, exit0.p[1]]];
-  const lens = path.slice(1).map((q, i) => Math.hypot(q[0] - path[i][0], q[1] - path[i][1], q[2] - path[i][2]));
-  const total = lens.reduce((s, x) => s + x, 0);
+  const geo = linkGeometry(leg);
+  const total = geo.total;
   ex.climbT = Math.min(total, ex.climbT + CLIMB_SPEED * dt);
-  let d = ex.climbT, i = 0;
-  while (i < lens.length - 1 && d > lens[i]) { d -= lens[i]; i++; }
-  const t = lens[i] ? clamp(d / lens[i], 0, 1) : 1;
-  const P = path[i], Q = path[i + 1] ?? path[i];
-  const next: [number, number, number] = [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t, P[2] + (Q[2] - P[2]) * t];
+  const next = pointOnLink(geo, ex.climbT);
   // someone standing on / at the end of the stair: wait rather than pass through them
   const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);
   if (blocker) {
@@ -606,6 +608,54 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     return { status: 'running', phase: ex.phase };
   }
   return { status: 'running', phase: 'climb' };
+}
+
+type LinkGeometry = { entry: LinkLeg['link']['from']; exit: LinkLeg['link']['from']; path: [number, number, number][]; lens: number[]; total: number };
+
+/** Continuous traversal path of a link leg: from the standing entry point, along the steps, to the exit point (no end snaps). */
+function linkGeometry(leg: LinkLeg): LinkGeometry {
+  const link = leg.link;
+  const entry = leg.ascending ? link.from : link.to, exit = leg.ascending ? link.to : link.from;
+  const steps = leg.ascending ? link.path : [...link.path].reverse();
+  const path: [number, number, number][] = [[entry.p[0], entry.y, entry.p[1]], ...steps, [exit.p[0], exit.y, exit.p[1]]];
+  const lens = path.slice(1).map((q, i) => Math.hypot(q[0] - path[i][0], q[1] - path[i][1], q[2] - path[i][2]));
+  return { entry, exit, path, lens, total: lens.reduce((s, x) => s + x, 0) };
+}
+
+function pointOnLink(g: LinkGeometry, at: number): [number, number, number] {
+  let d = at, i = 0;
+  while (i < g.lens.length - 1 && d > g.lens[i]) { d -= g.lens[i]; i++; }
+  const t = g.lens[i] ? clamp(d / g.lens[i], 0, 1) : 1;
+  const P = g.path[i], Q = g.path[i + 1] ?? g.path[i];
+  return [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t, P[2] + (Q[2] - P[2]) * t];
+}
+
+/**
+ * Deferred cancel on a stair (review M2): continue (or back down) the flight at climbing speed to the
+ * nearer landing, keep facing the stair, then stand there on that landing's level and complete (the
+ * runtime records the action as `cancelled`). Waits, rather than passes through, anyone in the way.
+ */
+function stepLinkCancel(rt: Runtime, ex: Exec, a: Entity, leg: LinkLeg, dt: number): StepResult {
+  const geo = linkGeometry(leg);
+  const forward = ex.cancelTo === 'exit';
+  const at = forward ? Math.min(geo.total, ex.climbT + CLIMB_SPEED * dt) : Math.max(0, ex.climbT - CLIMB_SPEED * dt);
+  const next = pointOnLink(geo, at);
+  const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);
+  if (blocker) {
+    a.human!.activity = 'climb-wait';
+    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} (cancelled) waits on ${leg.link.id} for ${blocker} to move before stepping off at the ${forward ? 'far' : 'near'} landing`, subjects: [ex.actor, blocker, leg.link.id] } };
+  }
+  ex.climbT = at;
+  a.pose.p = next;
+  a.human!.activity = leg.ascending === forward ? 'climb-up' : 'climb-down';
+  if (forward ? at < geo.total - 1e-9 : at > 1e-9) return { status: 'running', phase: 'cancel-climb' };
+  const end = forward ? geo.exit : geo.entry;
+  a.pose.p = [end.p[0], end.y, end.p[1]];
+  a.human!.level = end.level;
+  releaseAll(rt, ex);
+  a.human!.activity = 'idle';
+  a.human!.task = undefined;
+  return { status: 'completed', outputs: { cancelled: true, stoppedAt: forward ? 'exit' : 'entry', level: end.level, x: end.p[0], z: end.p[1], link: leg.link.id } };
 }
 
 function remainingValid(rt: Runtime, ex: Exec): boolean {
