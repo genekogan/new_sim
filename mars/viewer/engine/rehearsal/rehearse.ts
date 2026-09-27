@@ -68,8 +68,8 @@ export type ExecuteResult =
 export function runPlan(start: WorldState, startCheckpoint: string, plan: BoundPlan, cfg: EngineConfig, rulesVersion: string) {
   const world = structuredClone(start);
   const services = cfg.services(world);
-  const sp = services.spatial as { base?: unknown } | undefined;
-  if (sp && sp.base !== undefined && hashOf(sp.base) !== world.base.staticHash)
+  const sp = services.spatial as { base?: unknown; baseId?: string } | undefined;
+  if (sp && sp.base !== undefined && (sp.baseId ?? hashOf(sp.base)) !== world.base.staticHash)
     throw new HistoryError(
       'services.base-mismatch',
       `the spatial service's static scene does not match the world's base (${world.base.campus}, staticHash ${world.base.staticHash.slice(0, 12)})`,

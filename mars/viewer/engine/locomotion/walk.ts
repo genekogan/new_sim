@@ -22,7 +22,8 @@ const TURN_DONE = 0.25; // rad: turn-in-place ends once this aligned
 const PASS_OFFSET = 0.45; // m lateral offset when passing another walker
 const STATIC_OFFSET = 0.8; // m sidestep around a standing person
 const STUCK_TICKS = 80; // 4 s blocked by a moving person → replan around standing people
-const STUCK_STATIC_TICKS = 10; // 0.5 s blocked by someone standing still → replan around them
+const STUCK_STATIC_TICKS = 30; // 1.5 s blocked by someone standing still → replan around them
+const MAX_PEOPLE_REPLANS = 6; // after this, stay blocked (fail loudly via diagnostics) rather than churn grids
 const YIELD_OFFSET = 0.9; // m lateral offset while waiting for oncoming traffic
 const LOOK = 2.5; // m look-ahead for conflicts
 
@@ -55,6 +56,7 @@ type Exec = {
   turning: boolean;
   /** Standing people the current route was planned around (ignored by local encounters while they stay put). */
   plannedAround: Record<string, Vec2>;
+  peopleReplans: number;
 };
 
 export const walkSchema = z.strictObject({
@@ -101,7 +103,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     const ex: Exec = {
       id, actor: p.actor, goal: { level: p.level ?? a.human!.level, p: [p.x, p.z] }, face: p.face,
       speed: p.speed ?? HUMAN_PROFILE.speed, profile: HUMAN_PROFILE, route, leg: 0, segs: [], total: 0, s: 0, v: 0,
-      offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {},
+      offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {}, peopleReplans: 0,
     };
     enterLeg(rt, ex);
     return ex;
@@ -340,8 +342,9 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
 
   // stuck behind a person for too long → replan around them (they become temporary obstacles)
   ex.stuck = ex.v < 0.02 && personBlock ? ex.stuck + 1 : 0;
-  if (ex.stuck > (enc.kind === 'static' ? STUCK_STATIC_TICKS : STUCK_TICKS) && !arrived) {
+  if (ex.stuck > (enc.kind === 'static' ? STUCK_STATIC_TICKS : STUCK_TICKS) && !arrived && ex.peopleReplans < MAX_PEOPLE_REPLANS) {
     ex.stuck = 0;
+    ex.peopleReplans++;
     const others = standingPeople(rt, a);
     ex.plannedAround = Object.fromEntries(others.map((o) => [o.id, o.p]));
     const rr = sp.routeAround(rt.world, ex.profile, { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] }, ex.goal, others);
@@ -461,11 +464,12 @@ function standingPeople(rt: Runtime, me: Entity) {
     .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
 }
 
+/** A person whose walk is actually progressing. A blocked walker counts as standing (so others route around them). */
 function isActiveWalker(rt: Runtime, o: Entity) {
   const t = o.human?.task;
   if (!t) return false;
   const rec = rt.records.get(t);
-  return !!rec && rec.verb === 'walk_to' && rt.isActive(t);
+  return !!rec && rec.verb === 'walk_to' && rt.isActive(t) && rec.status !== 'blocked';
 }
 
 type Encounter = { kind: 'none' } | { kind: 'follow' | 'headon' | 'crossing' | 'static'; id: string; along: number; lateral: number };

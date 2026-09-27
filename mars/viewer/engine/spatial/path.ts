@@ -16,6 +16,7 @@ export type Route = { legs: Leg[]; length: number; expanded: number };
 export type RouteResult = { ok: true; route: Route } | { ok: false; diagnostic: Diagnostic };
 
 const SQ2 = Math.SQRT2;
+export const PLAN_MARGIN = 0.06; // m
 const COMFORT = 0.9; // m of clearance beyond which there is no wall penalty
 const WALL_PENALTY = 1.2;
 
@@ -36,7 +37,9 @@ export function findRoute(
   goal: Place,
   opts: { goalTolerance?: number; allowUnusableLinks?: boolean; maxExpand?: number } = {},
 ): RouteResult {
-  const r = profile.radius;
+  // plan with a margin above the body radius: corridor clearance is sampled at cell centres, and
+  // the walker's continuous position may sit up to half a cell off them
+  const r = profile.radius + PLAN_MARGIN;
   const lvIds = [...grids.levels.keys()].sort((a, b) => a - b);
   const idxOf = new Map(lvIds.map((l, i) => [l, i]));
   const g0 = grids.levels.get(lvIds[0])!;

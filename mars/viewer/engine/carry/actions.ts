@@ -40,6 +40,7 @@ type Exec = {
   cancelling: boolean;
   epoch: number;
   replans?: number;
+  waited?: number;
 };
 
 export const carrySchema = z.strictObject({
@@ -87,17 +88,17 @@ function pathBystander(rt: Runtime, ex: Exec, u: number): string | null {
   return null;
 }
 
-/** A non-crew person standing within a body width of any set-down station or the laid footprint. */
-function setdownBystander(rt: Runtime, ex: Exec): string | null {
+/** A non-crew person standing within a body width of any station, or inside a laid footprint (+0.4 m). */
+function bystanderAt(rt: Runtime, ex: Exec, spots: Vec2[], frame: ReturnType<typeof entityFrame> | null): string | null {
   const p = ex.p;
-  const spots = p.setdown;
-  const half = entityFrame({ ...itemOf(rt, ex), pose: p.laid });
   for (const o of Object.values(rt.world.entities)) {
     if (o.kind !== 'human' || p.crew.includes(o.id) || o.human?.level !== p.level) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
     if (spots.some((s) => Math.hypot(s[0] - q[0], s[1] - q[1]) < 2 * 0.28 + 0.12)) return o.id;
-    const l = sub2r(q, [half.q.x, half.q.z], half.q.th);
-    if (Math.abs(l[0]) < p.f.length / 2 + 0.4 && Math.abs(l[1]) < half.halfW + 0.4) return o.id;
+    if (frame) {
+      const l = sub2r(q, [frame.q.x, frame.q.z], frame.q.th);
+      if (Math.abs(l[0]) < p.f.length / 2 + 0.4 && Math.abs(l[1]) < frame.halfW + 0.4) return o.id;
+    }
   }
   return null;
 }
@@ -187,6 +188,12 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         if (ex.t > GATHER_TIMEOUT_S) return { status: 'failed', diagnostic: { code: 'carry.gather-stuck', message: `the crew did not assemble around ${p.item} within ${GATHER_TIMEOUT_S} s`, subjects: [p.item, ...p.crew] } };
         return { status: 'running', phase: 'gather' };
       }
+      // nobody may stand where the carriers step to grip the load (idle bystanders are asked to move)
+      const inWay = bystanderAt(rt, ex, carrierSpots(p.f, p.pickup), null);
+      if (inWay) {
+        makeWay(rt, inWay, [p.pickup.x, p.pickup.z]);
+        return { status: 'blocked', diagnostic: { code: 'carry.pickup-occupied', message: `the crew cannot take up ${p.item}: ${inWay} is standing at a grip position`, subjects: [p.item, inWay], at: [p.pickup.x, p.levelY, p.pickup.z] } };
+      }
       // lift: the load leaves the ground, held by exactly the crew
       const item = itemOf(rt, ex);
       item.phase = 'carried';
@@ -231,13 +238,34 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       }
       const U = p.traj.u[p.traj.u.length - 1];
       // people in the formation's way: halt (never push through), ask idle bystanders to step aside
-      const ahead = pathBystander(rt, ex, Math.min(U, ex.u + 1.2));
+      // sample the swept footprint from here to 1.2 m ahead (the first primitive may rotate in place)
+      const ahead = [0, 0.3, 0.6, 0.9, 1.2].map((d) => pathBystander(rt, ex, Math.min(U, ex.u + d))).find((x) => x) ?? null;
       if (ahead) {
         ex.v = Math.max(0, ex.v - 2 * ACCEL * dt);
         ex.u = Math.min(U, ex.u + ex.v * dt);
         applyFormation(rt, ex, poseAtU(ex, ex.u));
         const c = poseAtU(ex, ex.u);
         makeWay(rt, ahead, [c.x, c.z]);
+        // waited long enough: the people in the way are not going anywhere (another crew, a
+        // boxed-in bystander) → replan the rest of the carry treating them as soft obstacles
+        ex.waited = (ex.waited ?? 0) + 1;
+        if (ex.waited > 120 && ex.v < 0.02) {
+          ex.waited = 0;
+          const others = Object.values(rt.world.entities)
+            .filter((o) => o.kind === 'human' && !p.crew.includes(o.id) && o.human?.level === p.level)
+            .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
+          const aug = sp.gridsAround(rt.world, others);
+          const ga = aug.grids.levels.get(p.level);
+          const r = ga ? planCarry({ g: ga, f: p.f, starts: [c, { ...c, th: wrapAngle(c.th + Math.PI) }], goals: [p.target], labelOf: (id) => labelOf(sp, id), carrierNames: p.crew }) : null;
+          if (r?.ok) {
+            p.traj = r.traj;
+            ex.u = 0;
+            ex.i = 0;
+            ex.replans = (ex.replans ?? 0) + 1;
+            applyFormation(rt, ex, r.traj.poses[0]);
+            return { status: 'running', phase: 'replan' };
+          }
+        }
         if (ex.v < 0.02) return { status: 'blocked', diagnostic: { code: 'carry.path-occupied', message: `the crew carrying ${p.item} waits for ${ahead} to move out of its way`, subjects: [p.item, ahead], at: [c.x, p.levelY, c.z] } };
         return { status: 'running', phase: 'move' };
       }
@@ -249,7 +277,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         applyFormation(rt, ex, p.traj.poses[p.traj.poses.length - 1]);
         // the set-down stations must be free of other people: idle bystanders are asked to step
         // aside (directed work outranks idling); the crew holds the load meanwhile
-        const bystander = setdownBystander(rt, ex);
+        const bystander = bystanderAt(rt, ex, p.setdown, entityFrame({ ...itemOf(rt, ex), pose: p.laid }));
         if (bystander) {
           makeWay(rt, bystander, [p.target.x, p.target.z]);
           return { status: 'blocked', diagnostic: { code: 'carry.setdown-occupied', message: `the crew holds ${p.item} at its destination: ${bystander} is standing where it must be set down`, subjects: [p.item, bystander], at: [p.target.x, p.levelY, p.target.z] } };

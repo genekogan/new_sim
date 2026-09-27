@@ -1,7 +1,7 @@
 // End-of-tick invariants (spec §31). They never correct anything — they
 // record violations so rehearsal reports and tests can fail loudly.
 import type { Diagnostic } from '../actions/types.ts';
-import { clearanceAt } from '../spatial/grid.ts';
+import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import type { Spatial } from '../spatial/service.ts';
 import type { Invariant, Runtime } from './runtime.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
@@ -20,7 +20,7 @@ export const humanStaticClearance: Invariant = (rt: Runtime) => {
     if (c < HUMAN_RADIUS - TOL)
       out.push({
         code: 'collision.human-static',
-        message: `${e.id} body overlaps static geometry (clearance ${c.toFixed(2)} m < ${HUMAN_RADIUS} m)`,
+        message: `${e.id} body overlaps static geometry (clearance ${c.toFixed(2)} m < ${HUMAN_RADIUS} m) near ${nearestBlocker(g, [e.pose.p[0], e.pose.p[2]]) ?? 'the floor edge'} at (${e.pose.p[0].toFixed(2)}, ${e.pose.p[2].toFixed(2)}) level ${e.human.level} activity ${e.human.activity}`,
         subjects: [e.id],
         at: e.pose.p,
       });

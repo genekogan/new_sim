@@ -45,7 +45,8 @@ export function planBeam(rt: Runtime, p: CP): { ok: true; program: CProg } | { o
   const col = p.column === 'l' ? -1 : 1;
   const colB = (flip ? -col : col) as -1 | 1;
   const sa = seatPoint(a, col, h), sb = seatPoint(b, colB, h);
-  const mid: [number, number, number] = [(sa[0] + sb[0]) / 2, h - def(beam.def).size[1] / 2, (sa[2] + sb[2]) / 2];
+  // seat height is frame-relative; the beam's world height comes from the seat point (ground may not be y=0)
+  const mid: [number, number, number] = [(sa[0] + sb[0]) / 2, sa[1] - def(beam.def).size[1] / 2, (sa[2] + sb[2]) / 2];
   // staged at the bay: lying roughly under its final position (the carry action delivers it here)
   const bp = beam.pose.p;
   if (beam.support?.kind !== 'ground' || Math.hypot(bp[0] - mid[0], bp[2] - mid[2]) > 0.9)

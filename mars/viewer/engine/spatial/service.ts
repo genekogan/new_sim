@@ -55,6 +55,9 @@ export type Contributor = (world: WorldState, base: SpatialScene) => SceneContri
 
 export class Spatial {
   base: SpatialScene;
+  /** Identity of the static base this service represents (defaults to hashOf(base)). A crop of a
+   *  campus is a performance view of the same base and shares the campus content hash. */
+  baseId: string;
   cell: number;
   contributors: Contributor[];
   scene!: SpatialScene;
@@ -62,8 +65,9 @@ export class Spatial {
   epoch = 0;
   private key = '';
 
-  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[] } = {}) {
+  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string } = {}) {
     this.base = base;
+    this.baseId = opts.baseId ?? hashOf(base);
     this.cell = opts.cell ?? 0.1;
     this.contributors = opts.contributors ?? [];
   }
@@ -114,9 +118,19 @@ export class Spatial {
    * walker has been blocked by someone who is not moving). Builds throwaway grids;
    * rare by design.
    */
+  /** Grids of the current scene with the given people added as soft obstacles (for replanning around them). */
+  gridsAround(world: WorldState, people: { id: string; p: Vec2 }[]): { scene: SpatialScene; grids: GridSet } {
+    this.sync(world);
+    const extra: Obstacle[] = people.map((q) => ({ id: q.id, obb: { c: q.p, half: [0.3, 0.3], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid', label: `person ${q.id}` }));
+    const scene = { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] };
+    return { scene, grids: buildGrids(scene, this.cell) };
+  }
+
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: { id: string; p: Vec2 }[]): RouteResult {
     this.sync(world);
-    const extra: Obstacle[] = people.map((q) => ({ id: q.id, obb: { c: q.p, half: [0.28, 0.28], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid', label: `person ${q.id}` }));
+    // people as obstacles: 0.3 m half-width so corridors pass ≥ 0.58 m from them (the hard
+    // separation guard is 0.54 m); the route start snaps within 0.5 m if someone stands close
+    const extra: Obstacle[] = people.map((q) => ({ id: q.id, obb: { c: q.p, half: [0.3, 0.3], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid', label: `person ${q.id}` }));
     const scene = { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] };
     return findRoute(buildGrids(scene, this.cell), scene, profile, start, goal);
   }

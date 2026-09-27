@@ -76,19 +76,20 @@ export function buildBayTemplate(site: Site): SequenceTemplate {
   const tA = layTargetForStanding('upright-12ft', [0, 0], -Math.PI / 2), tB = layTargetForStanding('upright-12ft', [0, L9], Math.PI / 2); // tops point away from the bay
   // 1. uprights to their raise positions (bases where they will stand), beams to the bay
   step('carryA', 'carry', { crew: ['$crew[0]', '$crew[1]'], item: 'A', to: to(tA.x, tA.z, tA.yaw) }, [], 'carry upright A to its raise position');
-  step('carryB', 'carry', { crew: ['$crew[2]', '$crew[3]'], item: 'B', to: to(tB.x, tB.z, tB.yaw) }, [], 'carry upright B');
+  // B is brought in last: its lay position and the staged beams share the strip beside the bay
+  step('carryB', 'carry', { crew: ['$crew[2]', '$crew[3]'], item: 'B', to: to(tB.x, tB.z, tB.yaw) }, ['carry_b4'], 'carry upright B (after the beams are staged)');
   // beams are staged beside the bay, outside the band the lying frames sweep when raised
   // (a 9 ft beam is exactly the bay length, so it cannot lie *between* the two footings)
   const x = D12 / 2 + 0.2;
   const beamSpots: [string, number, number][] = [['b1', -x, 0], ['b2', x, 0], ['b3', -x - 0.4, 0], ['b4', x + 0.4, 0]];
-  let prev: string[] = [];
+  let prev: string[] = ['carryA'];
   for (const [b, bx] of beamSpots) {
     step(`carry_${b}`, 'carry', { crew: ['$crew[4]', '$crew[5]'], item: b, to: to(bx, L9 / 2, Math.PI / 2) }, prev, `carry beam ${b} to the bay`);
     prev = [`carry_${b}`];
   }
   // 2. raise + hold
   step('raiseA', 'raise_upright', { crew: ['$crew[0]', '$crew[1]'], item: 'A', stand_at: xz(to(0, 0, 0)) }, ['carryA', 'carry_b4'], 'raise and hold upright A (after the beams are staged beside the bay)');
-  step('raiseB', 'raise_upright', { crew: ['$crew[2]', '$crew[3]'], item: 'B', stand_at: xz(to(0, L9, 0)) }, ['carryB', 'carry_b4'], 'raise and hold upright B');
+  step('raiseB', 'raise_upright', { crew: ['$crew[2]', '$crew[3]'], item: 'B', stand_at: xz(to(0, L9, 0)) }, ['carryB'], 'raise and hold upright B');
   // 3. beams: lower level both columns, then upper level (12 ft frames need two)
   prev = ['raiseA', 'raiseB'];
   for (const [b, col, h] of [['b1', 'r', 0.5], ['b2', 'l', 0.5], ['b3', 'r', 1.8], ['b4', 'l', 1.8]] as const) {
