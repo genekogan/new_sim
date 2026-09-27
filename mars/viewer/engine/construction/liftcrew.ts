@@ -19,6 +19,7 @@ import { HUMAN_PROFILE } from '../spatial/types.ts';
 export const HAND_REACH = 1.0; // m: ground distance holder → hand point while held (invariant)
 export const LIFT_APEX_MAX = 2.4; // m: hand point above the holder's floor (invariant; lift-over apex rule)
 export const FOLLOW_OFFSET = 0.35; // m outward from the part footprint
+export const FOLLOW_FAR = [0.6, 0.85]; // m: fallback offsets when there is no room at FOLLOW_OFFSET (all < FOLLOW_KEEP)
 export const FOLLOW_SPEED = 0.9; // m/s
 export const FOLLOW_CLEARANCE = HUMAN_PROFILE.radius; // 0.28 m standing room
 export const FOLLOW_PERSONAL = 2 * HUMAN_PROFILE.radius; // 0.56 m to anyone else
@@ -30,17 +31,18 @@ export type Hand = { p: Vec3; out: Vec2 };
 
 /**
  * Hand point of grip `slot` on part `e` at pose `q`, with the outward direction:
- * `lift-end-0/1` = the ends (∓0.45·length on local x), `lift-edge-0/1` = the long-edge
- * midpoints (∓half-width on local z). Height = the part's underside. null = not a follow slot.
+ * `lift-end-0/1` = the ends (∓0.45·length on local x, out along x); `lift-edge-0/1` = the long-edge
+ * midpoints (∓half-width on local z, out along z); `lift-corner-EK` = near corner K (∓0.4·width) of
+ * end E (∓0.45·length), out along x. Height = the part's underside. null = not a follow slot.
  */
 export function handPoint(e: Entity, q: Pose, slot: string): Hand | null {
-  const m = /^lift-(end|edge)-([01])$/.exec(slot);
-  if (!m) return null;
-  const s = m[2] === '1' ? 1 : -1;
+  const m = /^lift-(end|edge|corner)-([01])([01])?$/.exec(slot);
+  if (!m || (m[1] === 'corner') !== !!m[3]) return null;
+  const sg = (c: string) => (c === '1' ? 1 : -1);
   const [lx, , lz] = def(e.def).size;
-  const end = m[1] === 'end';
-  const o = rot2(end ? [s * 0.45 * lx, 0] : [0, (s * lz) / 2], q.yaw);
-  return { p: [q.p[0] + o[0], q.p[1], q.p[2] + o[1]], out: rot2(end ? [s, 0] : [0, s], q.yaw) };
+  const loc: Vec2 = m[1] === 'edge' ? [0, (sg(m[2]) * lz) / 2] : [sg(m[2]) * 0.45 * lx, m[3] ? sg(m[3]) * 0.4 * lz : 0];
+  const o = rot2(loc, q.yaw);
+  return { p: [q.p[0] + o[0], q.p[1], q.p[2] + o[1]], out: rot2(m[1] === 'edge' ? [0, sg(m[2])] : [sg(m[2]), 0], q.yaw) };
 }
 
 /** Standing context of one holder: its level grid and everyone else on that level. */
@@ -64,12 +66,13 @@ export function standable(r: Room, p: Vec2, from?: Vec2): boolean {
 export function blockerAt(r: Room, p: Vec2): string {
   const o = crowd(r, p);
   if (o) return `${o.id} standing ${d2(o.p, p).toFixed(2)} m away`;
-  return clearanceAt(r.g, p) > 0 ? (nearestBlocker(r.g, p) ?? 'an obstacle') : 'the floor edge';
+  return nearestBlocker(r.g, p) ?? (clearanceAt(r.g, p) > 0 ? 'an obstacle' : 'the floor edge');
 }
 
 /**
  * Ground target beside hand point h: FOLLOW_OFFSET straight out if there is room, else
- * the free spot (out ±45°, ±90°, or 0.6 m straight out) nearest to `cur`; null if none.
+ * the free spot nearest to `cur` among 0.35 m at ±45° / ±90° and FOLLOW_FAR at 0° / ±45° / ±90°
+ * (someone standing by, a frame post); null if none.
  */
 export function followTarget(r: Room, h: Hand, cur: Vec2): Vec2 | null {
   const at = (d: number, a: number): Vec2 => {
@@ -78,10 +81,11 @@ export function followTarget(r: Room, h: Hand, cur: Vec2): Vec2 | null {
   };
   const first = at(FOLLOW_OFFSET, 0);
   if (standable(r, first)) return first;
-  const q = Math.PI / 4;
-  const alts = [at(FOLLOW_OFFSET, q), at(FOLLOW_OFFSET, -q), at(FOLLOW_OFFSET, 2 * q), at(FOLLOW_OFFSET, -2 * q), at(0.6, 0)].filter((p) => standable(r, p));
-  if (!alts.length) return null;
-  return alts.reduce((b, p) => (d2(p, cur) < d2(b, cur) - 1e-9 ? p : b));
+  const alts: Vec2[] = [];
+  for (const d of [FOLLOW_OFFSET, ...FOLLOW_FAR]) for (const a of [0, 1, -1, 2, -2]) if (d !== FOLLOW_OFFSET || a) alts.push(at(d, (a * Math.PI) / 4));
+  const free = alts.filter((p) => standable(r, p));
+  if (!free.length) return null;
+  return free.reduce((b, p) => (d2(p, cur) < d2(b, cur) - 1e-9 ? p : b));
 }
 
 /**
@@ -122,9 +126,12 @@ type Move = { actor: string; p: Vec2; yaw: number; level: number };
 /**
  * Where the crew takes hold: holders standing on the part's floor (or below) get a follow slot and
  * walk to the ground target beside its hand point; others keep their station (`lift-station`).
- * Sheets prefer the long-edge midpoints, falling back to the ends when an edge holder could not walk
- * a straight line from pickup to seat (e.g. the edge would be inside an enclosed bay); holders are
- * assigned to slots by least walking. At most two holders follow.
+ * Options, in order of preference (the first group with a feasible choice wins, least walking within
+ * it): both followers at a pair of hand points — sheets: long-edge midpoints, else the two corners
+ * of one short end; linear parts: the ends — then one follower at an end while the other waits at
+ * their station for the part to come to them. Feasible = every follower can stand beside its hand
+ * point at pickup and at the seat, with a straight walkable line between (so nobody would have to
+ * cross an enclosed bay). At most two holders follow.
  */
 export function pickupPlan(rt: Runtime, crew: string[], item: Entity, to: Pose, stations: { level: number; p: Vec2; yaw: number }[]): { moves: Move[]; slots: string[] } | Diagnostic {
   const sp = rt.services.spatial as Spatial;
@@ -134,28 +141,38 @@ export function pickupPlan(rt: Runtime, crew: string[], item: Entity, to: Pose, 
   const slots = crew.map(() => STATION_SLOT);
   const idx = crew.map((_, i) => i).filter((i) => floorOf(stations[i].level) <= item.pose.p[1] + 0.3).slice(0, 2);
   if (!idx.length) return { moves, slots };
-  const fams = def(item.def).category === 'plywood' ? ['edge', 'end'] : ['end'];
-  const opts = idx.length === 1 ? [['0'], ['1']] : [['0', '1'], ['1', '0']];
+  const ends = ['lift-end-0', 'lift-end-1'];
+  const pairs = (a: string, b: string) => [[a, b], [b, a]];
+  const groups: string[][][] = [];
+  if (idx.length === 2) {
+    if (def(item.def).category === 'plywood') groups.push([...pairs('lift-edge-0', 'lift-edge-1'), ...pairs('lift-corner-00', 'lift-corner-01'), ...pairs('lift-corner-10', 'lift-corner-11')]);
+    else groups.push(pairs(ends[0], ends[1]));
+  }
+  // one follower (slot per idx position; '' = stays at station)
+  groups.push(idx.flatMap((_, k) => ends.map((s) => idx.map((__, m) => (m === k ? s : '')))));
   type Pick = { ok: boolean; cost: number; sel: { i: number; slot: string; a: Vec2; h: Hand }[] };
-  let best: Pick | null = null;
-  for (const fam of fams) {
-    for (const opt of opts) {
-      const pick: Pick = { ok: true, cost: 0, sel: [] };
-      for (const [k, i] of idx.entries()) {
-        const slot = `lift-${fam}-${opt[k]}`;
-        const room = roomFor(rt, crew[i], crew);
-        const e = rt.world.entities[crew[i]];
-        const cur: Vec2 = [e.pose.p[0], e.pose.p[2]];
-        const h = handPoint(item, item.pose, slot)!;
-        const a = room && followTarget(room, h, cur);
-        if (!room || !a) { pick.cost = Infinity; pick.ok = false; break; }
-        const b = followTarget(room, handPoint(item, to, slot)!, a);
-        if (!b || segmentClearance(room.g, a, b) < FOLLOW_CLEARANCE) pick.ok = false;
-        pick.cost += d2(cur, a);
-        pick.sel.push({ i, slot, a, h });
-      }
-      if (pick.cost < Infinity && (!best || (pick.ok && !best.ok) || (pick.ok === best.ok && pick.cost < best.cost - 1e-9))) best = pick;
+  const evaluate = (opt: string[]): Pick => {
+    const pick: Pick = { ok: true, cost: 0, sel: [] };
+    for (const [k, i] of idx.entries()) {
+      const slot = opt[k];
+      if (!slot) continue;
+      const room = roomFor(rt, crew[i], crew);
+      const e = rt.world.entities[crew[i]];
+      const cur: Vec2 = [e.pose.p[0], e.pose.p[2]];
+      const h = handPoint(item, item.pose, slot)!;
+      const a = room && followTarget(room, h, cur);
+      if (!room || !a) return { ok: false, cost: Infinity, sel: [] };
+      const b = followTarget(room, handPoint(item, to, slot)!, a);
+      if (!b || segmentClearance(room.g, a, b) < FOLLOW_CLEARANCE) pick.ok = false;
+      pick.cost += d2(cur, a);
+      pick.sel.push({ i, slot, a, h });
     }
+    return pick;
+  };
+  let best: Pick | null = null;
+  for (const group of groups) {
+    for (const pick of group.map(evaluate))
+      if (pick.cost < Infinity && (!best || (pick.ok && !best.ok) || (pick.ok === best.ok && pick.cost < best.cost - 1e-9))) best = pick;
     if (best?.ok) break;
   }
   if (!best)

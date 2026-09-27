@@ -19,7 +19,7 @@ import { def } from '../world/catalog.ts';
 import { isBeam } from './rules.ts';
 import { beamProblems, isJoist, memberSeg, memberTop, supportProblems } from './deck.ts';
 import {
-  approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, levelFor, liftStep, releaseCrew, spatialOf, stagedCheck, lerpPose, sweptLiftPath, symmetricYaw,
+  approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, levelFor, liftStep, releaseCrew, spatialOf, stagedCheck, lerpPose, stationFloor, sweptLiftPath, symmetricYaw,
   type Fail, type LiftExec, type Station, type SweepOpts,
 } from './access.ts';
 
@@ -211,18 +211,19 @@ export const installStairFlight: ActionDef<SP, SProg, SExec> = {
   plan: planStairFlight,
   start(rt, p, prog, id) {
     rt.world.entities[p.stair].phase = 'reserved';
-    return { p, prog, id, crew: p.crew, item: p.stair, phase: 'approach', t: 0, from: rt.world.entities[p.stair].pose, to: prog.to, duration: prog.duration };
+    // carriers either side of the flight (offsets ∓z) hold its long-edge midpoints (liftcrew hand points)
+    return { p, prog, id, crew: p.crew, item: p.stair, phase: 'approach', t: 0, from: rt.world.entities[p.stair].pose, to: prog.to, duration: prog.duration, slots: ['lift-edge-0', 'lift-edge-1'] };
   },
   step(rt, ex, dt) {
     if (ex.phase === 'approach') {
-      const s = approach(rt, ex, ex.prog.stations, 'stair.station-unreachable');
+      const s = approach(rt, ex, ex.prog.stations, 'stair.station-unreachable', false);
       if (s === 'running') return { status: 'running', phase: 'approach' };
       if (s !== 'arrived') return { status: 'failed', diagnostic: s };
       const blocked = beginSweptLift(rt, ex, ex.prog.sweep, ex.duration);
       if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
     }
-    const done = liftStep(rt, ex, dt);
+    const done = liftStep(rt, ex, dt, false) === true;
     const q = rt.world.entities[ex.item].pose;
     for (const [i, c] of ex.crew.entries()) {
       const oo = rot2(ex.prog.offsets[i], q.yaw);
@@ -264,13 +265,13 @@ export function planTread(rt: Runtime, p: TP): { ok: true; program: TProg } | Fa
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 1, 2, 'installing a tread');
   if (cc) return cc;
-  // it seats into the flight (whose obstacle box is its whole envelope); nothing else on the way
-  const sweep: SweepOpts = { ignore: [st.id], what: `tread ${p.index} (${tr.id}) of ${st.id}` };
-  const path = sweptLiftPath(rt, tr, tr.pose, to, sweep);
-  if (!path.ok) return path;
   const obb: OBB2 = { c: [to.p[0], to.p[2]], half: [def(tr.def).size[0] / 2, def(tr.def).size[2] / 2], yaw: to.yaw };
   const st2 = findStations(rt, p.crew, [[to.p[0], to.p[2]]], { label: `tread ${p.index} of ${st.id}`, obb, y: yTop, y0: to.p[1] }, [stairObb(g)]);
   if (!st2.ok) return st2;
+  // it seats into the flight (whose obstacle box is its whole envelope); nothing else on the way
+  const sweep: SweepOpts = { ignore: [st.id], what: `tread ${p.index} (${tr.id}) of ${st.id}`, floor: stationFloor(rt, st2.stations) };
+  const path = sweptLiftPath(rt, tr, tr.pose, to, sweep);
+  if (!path.ok) return path;
   return { ok: true, program: { to, stations: st2.stations, sweep } };
 }
 
@@ -303,7 +304,8 @@ export const installTread: ActionDef<TP, TProg, TExec> = {
       if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
     }
-    if (!liftStep(rt, ex, dt)) return { status: 'running', phase: 'place' };
+    const ls = liftStep(rt, ex, dt);
+    if (ls !== true) return ls ? { status: 'blocked', diagnostic: ls } : { status: 'running', phase: 'place' };
     const w = rt.world;
     const tr = w.entities[ex.item], st = w.entities[ex.p.stair];
     tr.phase = 'installed';

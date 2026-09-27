@@ -22,7 +22,7 @@ import type { Entity, Pose, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { beamLinks, isBeam, isStanding, isSupported, isUpright, snapSeat } from './rules.ts';
 import {
-  approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, liftStep, releaseCrew, spatialOf, stagedCheck, sweptLiftPath, symmetricYaw,
+  approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, liftStep, releaseCrew, spatialOf, stagedCheck, stationFloor, sweptLiftPath, symmetricYaw,
   type Fail, type LiftExec, type Station, type SweepOpts,
 } from './access.ts';
 
@@ -125,14 +125,14 @@ export function planJoist(rt: Runtime, p: JP): { ok: true; program: JProg } | Fa
   const cc = crewCheck(rt, p.crew, 1, 2, `setting a ${def(j.def).label}`);
   if (cc) return cc;
   const to: Pose = { p: [c[0], y, c[1]], yaw: symmetricYaw(j.pose.yaw, a.pose.yaw) };
-  // it may touch the two beams it comes to rest on; nothing else on the way up
-  const sweep: SweepOpts = { ignore: [...beams], what: `joist ${j.id}` };
-  const path = sweptLiftPath(rt, j, j.pose, to, sweep);
-  if (!path.ok) return path;
   const u = rot2([len * 0.45, 0], a.pose.yaw);
   const anchors: Vec2[] = p.crew.length === 1 ? [c] : [[c[0] - u[0], c[1] - u[1]], [c[0] + u[0], c[1] + u[1]]];
   const st = findStations(rt, p.crew, anchors, { label: `joist ${j.id}`, obb: flatObb(to, j), y: y + size(j)[1], y0: y });
   if (!st.ok) return st;
+  // it may touch the two beams it comes to rest on; nothing else on the way up
+  const sweep: SweepOpts = { ignore: [...beams], what: `joist ${j.id}`, floor: stationFloor(rt, st.stations) };
+  const path = sweptLiftPath(rt, j, j.pose, to, sweep);
+  if (!path.ok) return path;
   return { ok: true, program: { to, beams, stations: st.stations, height: h, sweep } };
 }
 
@@ -168,7 +168,8 @@ export const installJoist: ActionDef<JP, JProg, JExec> = {
       if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
     }
-    if (!liftStep(rt, ex, dt)) return { status: 'running', phase: 'place' };
+    const ls = liftStep(rt, ex, dt);
+    if (ls !== true) return ls ? { status: 'blocked', diagnostic: ls } : { status: 'running', phase: 'place' };
     const j = rt.world.entities[ex.item];
     j.phase = 'installed';
     j.support = { kind: 'resting-on', on: ex.prog.beams[0] };
@@ -242,13 +243,13 @@ export function planPlywood(rt: Runtime, p: PP): { ok: true; program: PProg } | 
   const cc = crewCheck(rt, p.crew, 2, 2, `setting a ${def(sh.def).label}`);
   if (cc) return cc;
   const to: Pose = { p: [p.x, s.y, p.z], yaw: symmetricYaw(sh.pose.yaw, p.yaw) };
-  // it may touch the members it comes to rest on; nothing else on the way up
-  const sweep: SweepOpts = { ignore: [...s.supports], what: `plywood ${sh.id}` };
-  const path = sweptLiftPath(rt, sh, sh.pose, to, sweep);
-  if (!path.ok) return path;
   const e = rot2([size(sh)[0] * 0.45, 0], p.yaw);
   const st = findStations(rt, p.crew, [[p.x - e[0], p.z - e[1]], [p.x + e[0], p.z + e[1]]], { label: `plywood ${sh.id}`, obb, y: top, y0: s.y });
   if (!st.ok) return st;
+  // it may touch the members it comes to rest on; nothing else on the way up
+  const sweep: SweepOpts = { ignore: [...s.supports], what: `plywood ${sh.id}`, floor: stationFloor(rt, st.stations) };
+  const path = sweptLiftPath(rt, sh, sh.pose, to, sweep);
+  if (!path.ok) return path;
   return { ok: true, program: { to, supports: s.supports, stations: st.stations, sweep } };
 }
 
@@ -283,7 +284,8 @@ export const installPlywood: ActionDef<PP, PProg, PExec> = {
       if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
     }
-    if (!liftStep(rt, ex, dt)) return { status: 'running', phase: 'place' };
+    const ls = liftStep(rt, ex, dt);
+    if (ls !== true) return ls ? { status: 'blocked', diagnostic: ls } : { status: 'running', phase: 'place' };
     const sh = rt.world.entities[ex.item];
     sh.phase = 'installed';
     sh.support = { kind: 'resting-on', on: ex.prog.supports[0] };

@@ -19,7 +19,7 @@ import { SEQUENCE_SCHEMA, type SequenceTemplate, type StepSpec } from '../sequen
 import { walkTo } from '../locomotion/walk.ts';
 import { carry } from '../carry/actions.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
-import { CONSTRUCTION_ACTIONS, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
+import { CONSTRUCTION_ACTIONS, liftHandsInReach, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 
 export type Site = { origin: Vec2; yaw: number; groundY?: number };
@@ -151,5 +151,5 @@ export const buildBayBindings = { crew: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'], vi
 export function buildBayRegistry(): Map<string, ActionDef> {
   return new Map<string, ActionDef>([['walk_to', walkTo], ['carry', carry], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
 }
-export const BUILD_BAY_INVARIANTS = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported];
+export const BUILD_BAY_INVARIANTS = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach];
 export const BUILD_BAY_CONTRIBUTORS = [progressiveContributor];

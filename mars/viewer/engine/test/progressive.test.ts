@@ -8,7 +8,7 @@ import { DEFAULT_INVARIANTS, forgetMotion } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
-import { CONSTRUCTION_ACTIONS, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
+import { CONSTRUCTION_ACTIONS, liftHandsInReach, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { levelFor } from '../construction/access.ts';
 import { deckSurfaces } from '../construction/contributor.ts';
 import { seatPoint, snapSeat } from '../construction/rules.ts';
@@ -47,7 +47,7 @@ function setup(extra: Obstacle[] = []) {
     human('w', 6, 4),
   );
   const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
-  return new Runtime(w, reg, { spatial: new Spatial(base, { contributors: [progressiveContributor] }) }, [...DEFAULT_INVARIANTS, uprightsSupported, progressiveSupported]);
+  return new Runtime(w, reg, { spatial: new Spatial(base, { contributors: [progressiveContributor] }) }, [...DEFAULT_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach]);
 }
 
 const kids = (rt: Runtime, r: ActionRecord) => JSON.stringify([...rt.records.values()].filter((x) => x.parent === r.id).map((x) => [x.verb, x.status, x.diagnostic?.message]));

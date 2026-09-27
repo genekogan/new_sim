@@ -7,7 +7,7 @@ import type { ActionDef } from '../actions/types.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { carry } from '../carry/actions.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
-import { CONSTRUCTION_ACTIONS, RULES_VERSION as ASSEMBLY_RULES, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
+import { CONSTRUCTION_ACTIONS, liftHandsInReach, RULES_VERSION as ASSEMBLY_RULES, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import type { Invariant } from '../runtime/runtime.ts';
 import type { EngineConfig } from '../rehearsal/rehearse.ts';
@@ -19,7 +19,7 @@ import type { WorldState } from '../world/types.ts';
 export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}`;
 
 export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...CONSTRUCTION_ACTIONS];
-export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported];
+export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach];
 
 export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> {
   const m = new Map<string, ActionDef>();

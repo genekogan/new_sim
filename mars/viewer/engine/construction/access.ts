@@ -21,6 +21,7 @@ import { cellOf, clearanceAt, type LevelGrid } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { holdingDiagnostic, STANDING_REACH } from './rules.ts';
 import { childrenState, walkCrew, type Children } from './children.ts';
+import { CREW_BLOCK_TIMEOUT, FOLLOW_SPEED, followCrew, handPoint, LIFT_APEX_MAX, pickupPlan, STATION_SLOT, type Hand } from './liftcrew.ts';
 
 export const ARM_REACH = 0.8; // m, horizontal: station → nearest point of the component
 export const STAGE_RADIUS = 3.0; // m: components must be delivered (carried) this close before installing
@@ -168,7 +169,8 @@ function floodMark(g: LevelGrid, start: number, r: number, mark: Uint8Array) {
 
 // ---- shared execution: walk the crew to stations, then lift the part into place ----
 
-export type LiftExec = { id: string; crew: string[]; item: string; phase: 'approach' | 'place'; children?: Children; t: number; from: Pose; to: Pose; duration: number; path?: Pose[] };
+/** slots: grip slot per crew member (liftcrew.ts); stall: seconds the part has waited for its crew. */
+export type LiftExec = { id: string; crew: string[]; item: string; phase: 'approach' | 'place'; children?: Children; t: number; from: Pose; to: Pose; duration: number; path?: Pose[]; slots?: string[]; stall?: number };
 
 export function smooth(t: number) {
   return t * t * (3 - 2 * t);
@@ -184,10 +186,20 @@ export function lerpPose(a: Pose, b: Pose, s: number): Pose {
   };
 }
 
-/** 'arrived' when every crew member stands at their station; a diagnostic if a walk failed. */
-export function approach(rt: Runtime, ex: LiftExec, stations: Station[], code: string): 'running' | 'arrived' | Diagnostic {
+/**
+ * 'arrived' when every crew member stands where they take hold (liftcrew pickupPlan: beside the part's
+ * hand points, or at their station when `follow` is off / they work from a level above the part).
+ */
+export function approach(rt: Runtime, ex: LiftExec, stations: Station[], code: string, follow = true): 'running' | 'arrived' | Diagnostic {
   if (!ex.children) {
-    const r = walkCrew(rt, ex.id, stations.map((s) => ({ actor: s.actor, p: s.p, yaw: s.yaw, level: s.level })));
+    let moves = stations.map((s) => ({ actor: s.actor, p: s.p, yaw: s.yaw, level: s.level }));
+    if (follow) {
+      const pk = pickupPlan(rt, ex.crew, rt.world.entities[ex.item], ex.to, stations);
+      if ('code' in pk) return pk;
+      ex.slots = pk.slots;
+      moves = pk.moves;
+    }
+    const r = walkCrew(rt, ex.id, moves);
     if ('code' in r) return { ...r, code };
     ex.children = r;
   }
@@ -202,13 +214,45 @@ export function beginLift(rt: Runtime, ex: LiftExec) {
   item.phase = 'carried';
   item.support = { kind: 'held', by: [...ex.crew] };
   ex.from = { ...item.pose, p: [...item.pose.p] };
-  for (const c of ex.crew) Object.assign(rt.world.entities[c].human!, { activity: 'lift', grip: { entity: item.id, slot: c }, task: ex.id });
+  for (const [i, c] of ex.crew.entries())
+    Object.assign(rt.world.entities[c].human!, { activity: 'lift', grip: { entity: item.id, slot: ex.slots?.[i] ?? STATION_SLOT }, task: ex.id });
 }
 
-/** Advance the lift; true when the part has reached its final pose. */
-export function liftStep(rt: Runtime, ex: LiftExec, dt: number): boolean {
-  ex.t = Math.min(1, ex.t + dt / ex.duration);
-  rt.world.entities[ex.item].pose = pathPose(ex.path ?? [ex.from, ex.to], ex.t);
+/**
+ * Advance the lift one tick: true when the part is seated, false while it moves (or waits for its
+ * crew), a `lift.crew-blocked` diagnostic once a holder has been stuck > CREW_BLOCK_TIMEOUT. With
+ * `follow`, the part is paced so no hand point outruns FOLLOW_SPEED and holders walk beside it.
+ */
+export function liftStep(rt: Runtime, ex: LiftExec, dt: number, follow = true): boolean | Diagnostic {
+  const item = rt.world.entities[ex.item];
+  const path = ex.path ?? [ex.from, ex.to];
+  let t = Math.min(1, ex.t + dt / ex.duration);
+  let q = pathPose(path, t);
+  const slots = follow ? ex.crew.map((c) => rt.world.entities[c].human?.grip?.slot ?? '') : [];
+  const hands = (p: Pose) => slots.map((s) => handPoint(item, p, s)).filter((h): h is Hand => !!h);
+  const h0 = hands(item.pose);
+  if (h0.length) {
+    for (let k = 0; k < 6; k++) {
+      const dh = Math.max(0, ...hands(q).map((h, i) => Math.hypot(h.p[0] - h0[i].p[0], h.p[2] - h0[i].p[2])));
+      if (dh <= FOLLOW_SPEED * dt) break;
+      t = ex.t + (t - ex.t) * ((FOLLOW_SPEED * dt) / dh) * 0.95;
+      q = pathPose(path, t);
+    }
+    const f = followCrew(rt, item, ex.crew, q, dt);
+    if (!f.ok) {
+      ex.stall = (ex.stall ?? 0) + dt;
+      if (!f.stuck || ex.stall <= CREW_BLOCK_TIMEOUT) return false;
+      return {
+        code: 'lift.crew-blocked',
+        message: `${f.stuck.who} cannot keep hold of ${item.id} on its way into place: blocked by ${f.stuck.why} for over ${CREW_BLOCK_TIMEOUT} s; the crew holds it and waits`,
+        subjects: [item.id, f.stuck.who],
+        at: item.pose.p,
+      };
+    }
+    ex.stall = 0;
+  }
+  ex.t = t;
+  item.pose = q;
   return ex.t >= 1;
 }
 
@@ -226,7 +270,8 @@ const LIFT_SAMPLE_STEP = 0.03; // m: max displacement of any point of the part b
 export const LIFT_OVER = 0.3; // m of clearance above the seated part's top for a lift-over
 export const LIFT_PACE = 1.0; // m/s: pace of a multi-segment lift (the straight lift keeps its verb's duration)
 
-export type SweepOpts = { ignore: string[]; liftOver?: boolean; what?: string };
+/** floor: height of the floor the lifting crew stands on (lift-over apex rule; default: where the part lies). */
+export type SweepOpts = { ignore: string[]; liftOver?: boolean; what?: string; floor?: number };
 export type LiftPath = { poses: Pose[]; via: 'straight' | 'lift-over' };
 type Hit = { o: Obstacle; q: Pose };
 
@@ -312,6 +357,10 @@ export function sweptLiftPath(rt: Runtime, e: Entity, from: Pose, to: Pose, o: S
   let tail = '; a lift-over is not possible for this part';
   if (o.liftOver !== false) {
     const yL = Math.max(from.p[1], to.p[1] + def(e.def).size[1] + LIFT_OVER);
+    // hands carry the underside: its apex may be at most LIFT_APEX_MAX above the crew's floor
+    const floor = o.floor ?? from.p[1];
+    if (yL - floor > LIFT_APEX_MAX + 1e-9)
+      return fail('reach.too-high', `${what} would have to be lifted over at ${f2(yL)} m, ${f2(yL - floor)} m above the crew's floor (hand reach ${LIFT_APEX_MAX} m); ladders/scaffold are not modelled`, [e.id, h1.o.id], h1.q.p);
     const over: Pose[] = [from, { ...from, p: [from.p[0], yL, from.p[2]] }, { ...to, p: [to.p[0], yL, to.p[2]] }, to];
     const h2 = pathHit(sp, e, over, skip);
     if (!h2) return { ok: true, path: { poses: over, via: 'lift-over' } };
@@ -329,6 +378,12 @@ export function beginSweptLift(rt: Runtime, ex: LiftExec, o: SweepOpts, base: nu
   ex.path = r.path.poses;
   ex.duration = liftDuration(r.path, base);
   return null;
+}
+
+/** Lowest floor any of the stations stands on (the lift-over apex must be within everyone's reach). */
+export function stationFloor(rt: Runtime, st: Station[]): number {
+  const lv = spatialOf(rt).scene.levels;
+  return Math.min(...st.map((s) => lv.find((l) => l.id === s.level)?.y ?? 0));
 }
 
 export function releaseCrew(rt: Runtime, crew: string[]) {

@@ -7,7 +7,7 @@ import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
-import { CONSTRUCTION_ACTIONS, uprightsSupported } from '../construction/index.ts';
+import { CONSTRUCTION_ACTIONS, liftHandsInReach, uprightsSupported } from '../construction/index.ts';
 import { groupStability, holdStations } from '../construction/rules.ts';
 import { liftHandPoint, raiseRoles } from '../construction/raise.ts';
 import { entityCorners } from '../spatial/service.ts';
@@ -43,7 +43,7 @@ function setup(extra: Obstacle[] = []) {
     ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => human(id, -6 + i * 1.2, -6)),
   );
   const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
-  return new Runtime(w, reg, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS, uprightsSupported]);
+  return new Runtime(w, reg, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS, uprightsSupported, liftHandsInReach]);
 }
 
 function run(rt: Runtime, verb: string, params: unknown) {
