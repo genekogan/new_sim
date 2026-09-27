@@ -2,8 +2,7 @@
 
 This is pure, deterministic TypeScript with no three.js, DOM, wall-clock or randomness.
 Cameras **only read** the world and the spatial scene. A camera track is a separate
-object that points at a take by id, so re-shooting a take can never change it (SPEC §18,
-§21, §28). The research background is in `RESEARCH.md` §9.
+object that points at a take by id, so re-shooting a take can never change it (SPEC §18, §21, §28; `RESEARCH.md` §9).
 
 ## Model
 
@@ -18,12 +17,10 @@ object that points at a take by id, so re-shooting a take can never change it (S
 | `samplers.ts` | `walker(polyline, speed, t0, loop)` gives synthetic subject motion for tests and previews. |
 
 **Sampler.** `sampler(t) → Record<id, SubjectPose>` with `SubjectPose = {p, yaw, height?, points?, weight?}`.
-The same shot and planner code runs on a live runtime (read entity poses) or on a
-recorded take (sample its keyframes). The camera never asks the runtime for anything else.
+The same code runs on a live runtime (entity poses) or a recorded take (its keyframes); the camera asks for nothing else.
 
-**Subject points.** Readability uses the points that matter for the action. `points` may list
-the head, torso, hands, beam end or receiving socket. By default a standing human gets feet,
-torso, head and both hands.
+**Subject points.** Readability uses the action's points (`points`: head, torso, hands, beam end, receiving socket…);
+a standing human defaults to feet, torso, head and both hands.
 
 **Shots.** The shot kinds are:
 - `fixed {position, target}`
@@ -149,5 +146,4 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 - **Candidates are local to the desired target.** There is no global search, cross-subject
   cutting or reverse-angle grammar yet. Viterbi does not enforce a hard minimum shot length
   (the cut cost does this in practice, and `temporal.cutsPer2s` reports it).
-- **Not yet available:** a take adapter (`sampler` from `take/replay.ts`), rendering-side
-  damping/blending, and debug overlays (visibility rays, occluder highlights).
+- **Not yet available:** a take adapter (`sampler` from `take/replay.ts`), render-side blending, debug overlays.
