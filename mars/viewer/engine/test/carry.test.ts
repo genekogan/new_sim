@@ -14,7 +14,7 @@ import { walkTo } from '../locomotion/walk.ts';
 import { carry } from '../carry/actions.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 import { carryCorridors } from '../carry/scenes.ts';
-import { formationFor, laidPose, REACH } from '../carry/formation.ts';
+import { entityFrame, formationFor, laidPose, REACH } from '../carry/formation.ts';
 import { obbOverlap, rot2, sub2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
@@ -158,4 +158,99 @@ test('carry: a second carry using a busy person fails with reservation.conflict'
   assert.ok(rt.runUntilIdle(20 * 120));
   assert.equal(a.status, 'completed', a.diagnostic?.message);
   assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+/** Corridor A with a stack of 2x4s lying across the route: the carried beam passes over it, but cannot be laid on it. */
+function stackRun() {
+  const rt = setup(
+    carryCorridors(),
+    component('b1', 'beam-12ft', [4, 0, 4], 0),
+    component('stack', '2x4-8ft', [12, 0, 4], 0, { label: 'stack of 2x4s' }),
+    human('p1', 2, 6.5),
+    human('p2', 6, 1.5),
+  );
+  const a = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b1', to: { x: 18, z: 11, yaw: Math.PI / 2 } });
+  assert.equal(a.status, 'executing', a.diagnostic?.message);
+  return { rt, a };
+}
+const centre = (rt: Runtime) => entityFootprint(rt.world.entities.b1).obb.c;
+function stepUntil(rt: Runtime, pred: () => boolean, max = 20 * 120) {
+  for (let i = 0; i < max && !pred(); i++) rt.step();
+  assert.ok(pred(), 'condition reached');
+}
+
+test('carry: cancel mid-move performs a controlled set-down where the ground is clear', () => {
+  const { rt, a } = stackRun();
+  const s = audit(rt, 'b1', ['p1', 'p2']);
+  stepUntil(rt, () => a.phase === 'move' && centre(rt)[0] > 7.5);
+  const y0 = rt.world.entities.b1.pose.p[1];
+  assert.ok(y0 > 0.5, 'load is up in the air');
+  const r = rt.cancel(a.id);
+  assert.notEqual(r.status, 'cancelled', 'not dropped instantly: set-down takes time');
+  const heights: number[] = [];
+  rt.observers.push({ onTick: () => heights.push(rt.world.entities.b1.pose.p[1]) });
+  assert.ok(rt.runUntilIdle(20 * 10));
+  assert.equal(a.status, 'cancelled');
+  const b = rt.world.entities.b1;
+  assert.deepEqual(b.support, { kind: 'ground' });
+  assert.equal(b.phase, 'staged');
+  assert.ok(Math.abs(entityFrame(b).bottom) < 1e-6, 'resting on the ground');
+  for (let i = 1; i < heights.length; i++) assert.ok(heights[i - 1] - heights[i] < 0.06, 'lowered gradually, never dropped');
+  assert.ok(Math.abs(centre(rt)[0] - 7.5) < 0.2, 'set down where it was cancelled');
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+  assert.deepEqual(s.overlaps, []);
+  for (const c of ['p1', 'p2']) assert.equal(rt.world.entities[c].human!.grip, undefined);
+});
+
+test('carry: cancel over an obstruction is refused (carry.cancel-unsafe) and the carry continues', () => {
+  const { rt, a } = stackRun();
+  stepUntil(rt, () => a.phase === 'move' && centre(rt)[0] > 12);
+  const r = rt.cancel(a.id);
+  assert.equal(r.status, 'executing');
+  assert.equal(r.diagnostic?.code, 'carry.cancel-unsafe');
+  assert.match(r.diagnostic!.message, /stack of 2x4s/);
+  assert.equal(rt.world.entities.b1.phase, 'carried');
+  assert.ok(rt.runUntilIdle(20 * 120));
+  assert.equal(a.status, 'completed', a.diagnostic?.message);
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('carry: cancel during gather releases the crew immediately; target on an obstruction is rejected', () => {
+  const { rt, a } = stackRun();
+  rt.step();
+  rt.cancel(a.id);
+  assert.equal(a.status, 'cancelled');
+  assert.equal(rt.world.entities.b1.reservedBy, undefined);
+  assert.equal(rt.world.entities.p1.human!.task, undefined);
+  const b = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b1', to: { x: 12, z: 4, yaw: 0 } });
+  assert.equal(b.diagnostic?.code, 'carry.target-blocked');
+  assert.match(b.diagnostic!.message, /stack of 2x4s/);
+});
+
+test('carry: determinism — same inputs give the same final state hash', () => {
+  const run = () => {
+    const { rt, a } = cornerRun();
+    rt.runUntilIdle(20 * 180);
+    assert.equal(a.status, 'completed');
+    return rt.stateHash();
+  };
+  assert.equal(run(), run());
+});
+
+test('carry invariant: detects grip drift, a load inside a wall, and a wrong holder', () => {
+  const { rt, a } = cornerRun();
+  stepUntil(rt, () => a.phase === 'move' && centre(rt)[0] > 10);
+  assert.deepEqual(rt.violations, []);
+  const inv = CARRY_INVARIANTS[0];
+  const p1 = rt.world.entities.p1;
+  p1.pose.p[0] += 0.2;
+  assert.deepEqual(inv(rt).map((d) => d.code), ['carry.grip-drift']);
+  p1.pose.p[0] -= 0.2;
+  const b = rt.world.entities.b1;
+  const saved = structuredClone(b.pose);
+  b.pose.p[2] += 1.2; // shove the load sideways into the corridor wall
+  assert.ok(inv(rt).some((d) => d.code === 'carry.load-static'));
+  b.pose = saved;
+  b.support = { kind: 'held', by: ['p1'] };
+  assert.deepEqual(inv(rt).map((d) => d.code), ['carry.support']);
 });
