@@ -15,7 +15,8 @@ import type { Diagnostic } from '../actions/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 
-export const RULES_VERSION = 'mars-assembly/1';
+// 2: crews accompany lifted parts; swept lifts; raise choreography
+export const RULES_VERSION = 'mars-assembly/2';
 export const STANDING_REACH = 2.1; // m: highest beam seat a person on the ground can place
 export const LADDER_REACH = 3.6; // m: with a ladder at the station
 

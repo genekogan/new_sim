@@ -113,7 +113,8 @@ export const holdersPresent: Invariant = (rt: Runtime) => {
       else if (grip !== e.id) why = `${id} is not gripping it (grip ${grip ?? 'none'})`;
       else if (h.human.activity !== 'lift' && h.human.activity !== 'set-down') {
         // (during a lift / set-down transition the part follows a scripted path from its staging
-        // spot to its seat while the crew stands at stations — an approximation, review L6)
+        // spot to its seat and the crew walks with it, each holder beside its grip slot; reach
+        // during a lift is checked against the hand points by construction's liftHandsInReach)
         obb ??= entityFootprint(e).obb;
         const d = distToObb([h.pose.p[0], h.pose.p[2]], obb);
         if (d > HOLD_REACH) why = `${id} stands ${d.toFixed(2)} m from it (reach ${HOLD_REACH} m)`;

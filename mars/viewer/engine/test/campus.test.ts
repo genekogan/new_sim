@@ -15,6 +15,7 @@ import { cropScene, sceneFromFile } from '../campus/load.ts';
 import { blockersIn } from '../campus/regions.ts';
 import { CAMPUS_ID, FLAGSHIP_WORKSPACE, loadCampus2026, publishCampus2026 } from '../campus/world.ts';
 import type { Region } from '../world/types.ts';
+import { RULES_VERSION } from '../construction/rules.ts';
 
 const file = readCampus2026File();
 const campus = loadCampus2026(file);
@@ -137,7 +138,7 @@ test('a walker can route from every pile to staging (±40 m crop)', () => {
 });
 
 test('canonical mars-2026 is protected; flagship work happens in a fork', () => {
-  const h = new WorldHistory('mars-assembly/1');
+  const h = new WorldHistory(RULES_VERSION);
   const { canonical, flagship } = publishCampus2026(h, file);
   assert.equal(canonical.id, CAMPUS_ID);
   assert.ok(canonical.protected);
