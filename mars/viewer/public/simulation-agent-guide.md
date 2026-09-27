@@ -131,6 +131,38 @@ For clients without MCP, the same room supports authenticated REST:
 - REST responses: 401 missing capability, 403 invalid/view-only/origin mismatch, 405 wrong method, 413 body over 32 KiB, 400 invalid command. MCP command failures use `isError` with explanatory text.
 - Commands are serialized in a Durable Object. No last-writer version precondition: coordinate multiple directing agents at the application level.
 
+## Engine tools (preview, unstable)
+
+> **Preview.** Names, arguments and results may change without notice. The engine tools run the deterministic world engine (fixed 1/20 s tick, typed verbs, invariants, versioned history) inside the room's Durable Object. They do **not** yet drive the campus viewer: engine rooms start from two synthetic, protected scenes — `proving-ground` (walls, U-trap, 1 m passage, deck with complete/incomplete stairs; people `n1`, `s1`, `p1`) and `carry-yard` (L-corridors; beam `b1`, people `p1`, `p2`). Campus-year scenes come later. The 20 tools above are unchanged and independent.
+
+The nine `engine_*` tools are generated from the same operation registry the engine uses in-process, and MCP validates inputs with the same zod schemas. Every result is JSON with `ok`; failures set `isError` and carry `code`, `message` and machine-readable `diagnostics`/`diff` naming concrete objects. `_meta` reports in-DO milliseconds and stored bytes.
+
+| Tool | Purpose |
+|---|---|
+| `engine_list_verbs` | Verbs (`walk_to`, `carry`, `raise_upright`, `connect_beam`, `release_support`, `install_joist`, `install_plywood`, `install_stair_flight`, `install_tread`) with JSON Schemas; rules version; `mars-sequence/1` template JSON Schema. |
+| `engine_query_world` | `{}` lists workspaces. With `workspace`: entities (filter `ids`/`kind`/`label`/`region`), `include: regions/levels/links/stability`, `route {actor,x,z,level?}` preview, `carry {crew,item,to}` preview. Previews use the verbs' own planners and never mutate anything. |
+| `engine_bind_plan` | `{template, bindings, workspace}` → `plan_id` (content hash) bound to that workspace's current head, or every problem at once. |
+| `engine_rehearse` | `{plan_id}` → report (status, per-step diagnostics, violations by code, metrics), take summary, `stale` if execution would be refused now. Private: never moves any head. |
+| `engine_execute` | `{plan_id, workspace}` → new checkpoint + `take_id`. Refuses `workspace.protected` (fork first), `plan.stale` (with a physical diff such as `panel changed (pose)`) and `execution.failed` (take kept, nothing committed). |
+| `engine_fork` | `{from, name}` editable workspace from a workspace head or `at` checkpoint. |
+| `engine_log` | `{workspace}` checkpoints newest first with causes (`canonical-publish`, `simulation-run {take, plan}`, `fork`…). |
+| `engine_get_take` | `{take_id, from?, to?, entities?, include?}` compact slice: integer pose tracks `[tick, x_mm, y_mm, z_mm, yaw_mrad…]`, discrete changes, events; optional `final` state and `cameras`. |
+| `engine_attach_camera_track` | `{take_id, shot, hz?}` plans a collision-aware camera track (`fixed`, `follow`, `orbit`, `frameGroup`, `path`, `reveal`, `establishing`) with explained cuts, stored beside the take. The take and its hash never change. |
+
+Director workflow:
+
+1. **Query** — `engine_query_world {}` then `{workspace:"proving-ground", include:["levels","links"]}`; preview hard moves with `route`/`carry`.
+2. **Fork** — canonical workspaces are protected: `engine_fork {from:"proving-ground", name:"scene-1"}`.
+3. **Bind** — write a template: steps are registry verbs with typed params; `after: [ids]`, `when: {event, step}` and `at: seconds` cue timing; `$name`, `$name[0]` reference bindings. Example step: `{id:"cross", verb:"walk_to", params:{actor:"$a", x:15, z:-10.5}}`.
+4. **Rehearse** — read `report.status`, `report.steps[].diagnostic`, `report.violations.byCode` and metrics (duration, replans, blocked ticks).
+5. **Revise** — change the template/bindings (or the world) and rebind; plans are immutable, so a revision is a new `plan_id`.
+6. **Execute** — in your fork. The committed checkpoint's cause records `{take, plan}`. Re-executing the same plan is `plan.stale`: the world moved on, so bind again.
+7. **Take** — `engine_get_take` (or `GET /api/simulation/engine/take?id=…&from=…&to=…` with the view capability) to inspect or play back what happened. Rehearsal and execution of the same plan from the same baseline produce the same take id.
+8. **Camera tracks** — attach one or more shots per take; reshooting never re-simulates.
+9. **Fork again** — alternative futures branch from any checkpoint (`engine_fork {from, name, at}`); there is no merge.
+
+Limits: MCP bodies over 32 KiB are rejected (keep templates compact); mid-take states are not resumable (fork only at checkpoints); engine calls are not UUID-idempotent, but content addressing makes retries safe (re-binding returns the same `plan_id`; a repeated execute is refused as stale).
+
 ## Boundaries and browser requirements
 
 Modern WebGL2 browser and WebAssembly required. The browser campus transfer is about 38.5 MB with Brotli (70.8 MB decoded GLB); geometry is losslessly compressed and browser textures capped at 1024 px. Original full-texture GLB/Blender files remain downloadable. Edited browser exports use the browser textures. The renderer adapts pixel ratio downward under sustained load, suspends in hidden tabs, and handles WebGL context loss/restoration. Low-memory/mobile devices can still struggle with this large campus; no claim of universal mobile performance is made.
