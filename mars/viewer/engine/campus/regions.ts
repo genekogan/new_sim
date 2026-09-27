@@ -9,7 +9,13 @@ import { cropScene, sceneFromFile } from './load.ts';
 import type { CampusObstacle, CampusSceneFile } from './types.ts';
 
 export const STAGING = { w: 22, d: 16, margin: 1 }; // region 22×16 m (≥ 20×15 required), +1 m clear margin
-export const PILE = { w: 8, d: 5, margin: 0.5 };
+/** Pile footprints sized for items laid side by side on the ground with crew access gaps (see world.ts). */
+export const PILES: { id: string; label: string; w: number; d: number }[] = [
+  { id: 'pile-uprights', label: 'Upright pile (hypothetical)', w: 8, d: 9.5 },
+  { id: 'pile-beams', label: 'Beam pile (hypothetical)', w: 6, d: 7 },
+  { id: 'pile-timber', label: '2x4 + plywood pile (hypothetical)', w: 11, d: 7 },
+];
+const PILE_MARGIN = 0.5;
 const SEARCH_CELL = 0.25;
 
 const HYPOTHETICAL_NOTE = 'flagship scenario work area in a fork of 2026 — hypothetical, not historical';
@@ -101,13 +107,8 @@ export function buildRegions(file: FileNoRegions): Region[] {
   regions.push({ id: 'staging-east', label: 'Staging east of Chiba (hypothetical flagship build site)', kind: 'staging', polygon: rectPoly(staging[0], staging[1], STAGING.w, STAGING.d), provenance: hyp });
   // material piles: nearest clear 9×6 m spots around staging, ≥ 2 m apart from staging and each other
   const taken: OBB2[] = [{ c: staging, half: [sw / 2 + 2, sd / 2 + 2], yaw: 0 }];
-  const names = [
-    ['pile-uprights', 'Upright pile (hypothetical)'],
-    ['pile-beams', 'Beam pile (hypothetical)'],
-    ['pile-timber', '2x4 + plywood pile (hypothetical)'],
-  ];
-  const pw = PILE.w + 2 * PILE.margin, pd = PILE.d + 2 * PILE.margin;
-  for (const [id, label] of names) {
+  for (const { id, label, w, d } of PILES) {
+    const pw = w + 2 * PILE_MARGIN, pd = d + 2 * PILE_MARGIN;
     let spot: Vec2 | null = null, bd = Infinity;
     for (let cx = Math.floor(staging[0] - 30); cx <= staging[0] + 30; cx++)
       for (let cz = Math.floor(staging[1] - 30); cz <= staging[1] + 30; cz++) {
@@ -119,7 +120,7 @@ export function buildRegions(file: FileNoRegions): Region[] {
       }
     if (!spot) throw new Error(`buildRegions: no clear spot for ${id}`);
     taken.push({ c: spot, half: [pw / 2 + 1, pd / 2 + 1], yaw: 0 });
-    regions.push({ id, label, kind: 'material-pile', polygon: rectPoly(spot[0], spot[1], PILE.w, PILE.d), provenance: { ...hyp, note: 'flagship scenario inventory, not historical' } });
+    regions.push({ id, label, kind: 'material-pile', polygon: rectPoly(spot[0], spot[1], w, d), provenance: { ...hyp, note: 'flagship scenario inventory, not historical' } });
   }
   return regions;
 }

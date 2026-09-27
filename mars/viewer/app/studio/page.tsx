@@ -24,6 +24,7 @@ import { createEucFollowCamera } from './euc-follow-camera';
 import { createCampusLife } from './campus-life';
 import { SimulationPanel } from './simulation-panel';
 import { createWeather } from './weather';
+import { DEFAULT_SCENE_DATE } from '../../engine/env/sun';
 import { createGallery } from './gallery';
 import { add2026Details } from '../history/details-2026';
 import { createHistoricalScreens } from '../history/screens';
@@ -77,6 +78,9 @@ type Api = {
     living?: boolean;
     cycle?: boolean;
     hour?: number;
+    /** Calendar date ("YYYY-MM-DD") for the season-aware sun (spec §19); stays
+     * independent of `hour`/`cycle` and of simulation elapsed time. */
+    date?: string;
     fire?: string;
   }) => void;
   grid: (visible: boolean) => void;
@@ -267,6 +271,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       lifeEnabled = !reducedMotion,
       cycleEnabled = false,
       sceneHour = 16,
+      sceneDate = DEFAULT_SCENE_DATE,
       fireMode = 'auto',
       elapsed = 0,
       lastClock = -1;
@@ -737,6 +742,10 @@ export default function Studio({ year = 2026 }: { year?: number }) {
           environment.invalidate();
         }
         if (options.cycle !== undefined) cycleEnabled = options.cycle;
+        if (options.date !== undefined) {
+          sceneDate = options.date;
+          environment.invalidate();
+        }
         if (options.hour !== undefined) {
           sceneHour = options.hour;
           setHour(sceneHour);
@@ -1062,6 +1071,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
           simulationElapsed,
           lifeEnabled,
           remote?.state.weather,
+          sceneDate,
         );
         weather.update(simulationElapsed, camera, remote?.state.weather);
         gallery?.update(remote?.state ?? null, simulationElapsed, cutMode);
@@ -1117,6 +1127,10 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         orbit.target.fromArray(target);
         orbit.update();
       },
+      // e2e-only: set hour/date/weather without clicking through the UI (see
+      // e2e/README.md and the sun/season/weather visual verification pass).
+      atmosphere: (options: Parameters<Api['atmosphere']>[0]) =>
+        api.current?.atmosphere(options),
     };
     (window as { __marsStudio?: typeof testHook }).__marsStudio = testHook;
     loop();

@@ -2,7 +2,32 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { ThreeResources } from '../../lib/three-resources';
 import { clearWeather, type Weather } from '../../simulation/shared';
-import { daylightAt } from './ambience-math';
+import {
+  BOMBAY_BEACH,
+  DEFAULT_SCENE_DATE,
+  solarPosition,
+} from '../../engine/env/sun';
+import { daylightFactors } from '../../engine/env/daylight';
+
+/** Weather plus the optional `wet` surface-wetness field the new engine's
+ * `Environment.weather` shape carries (world/types.ts) — the live MCP/DO
+ * `Weather` type (simulation/shared.ts) does not yet expose it, so it is
+ * treated as an additive optional passthrough here, computed locally from
+ * rain when absent (see the wetness estimator in `update()`). */
+type WeatherWithWetness = Weather & { wet?: number };
+
+/** Local ISO datetime for solarPosition(): a calendar date (default
+ * DEFAULT_SCENE_DATE, spec §19 "a plausible season date") combined with the
+ * studio's hour-of-day, which stays independent of that date and of
+ * simulation elapsed time (spec §19). */
+function localDateTimeAt(date: string, hour: number): string {
+  const h = ((hour % 24) + 24) % 24;
+  const hh = Math.floor(h),
+    mm = Math.floor((h - hh) * 60),
+    ss = Math.round((((h - hh) * 60 - mm) * 60));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date}T${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+}
 
 /** Presentation environment; soil is a licensed material, not surveyed terrain. */
 export function createEnvironment(
@@ -52,7 +77,9 @@ export function createEnvironment(
   sun.shadow.autoUpdate = false;
   scene.add(sun);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  // Soft (blurred) PCF so cloud cover can widen shadow.radius below; the plain
+  // PCFShadowMap ignores that property entirely.
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const moon = new THREE.DirectionalLight(0x9bb7ff, 0.15);
   moon.position.set(40, 75, 20);
   scene.add(moon);
@@ -141,31 +168,65 @@ export function createEnvironment(
   const dayFog = new THREE.Color(0xc6d7dc),
     nightFog = new THREE.Color(0x101c31),
     sunsetFog = new THREE.Color(0xb1a093);
+  const blueHourColor = new THREE.Color(0x1a2540);
+  let wetness = 0;
+  let lastWetTime = -1;
   function update(
     hour: number,
     time: number,
     moving: boolean,
-    weather: Weather = clearWeather,
+    weather: WeatherWithWetness = clearWeather,
+    date: string = DEFAULT_SCENE_DATE,
   ) {
-    const state = daylightAt(hour);
-    uniforms.sunPosition.value.copy(state.direction).multiplyScalar(450000);
+    // Real NOAA solar position (engine/env/sun.ts), season-aware — see
+    // NORTH_AZIMUTH_OFFSET there for the stated world-north assumption. Date
+    // and hour are independent inputs, and both stay independent of
+    // simulation elapsed time `time` (spec §19).
+    const sun_ = solarPosition(localDateTimeAt(date, hour), BOMBAY_BEACH.lat, BOMBAY_BEACH.lon);
+    const direction = new THREE.Vector3(...sun_.direction);
+    const state = daylightFactors(sun_.elevationDeg);
+    uniforms.sunPosition.value.copy(direction).multiplyScalar(450000);
     uniforms.dayBlend.value = state.daylight;
     uniforms.time.value = time * (2 + weather.wind * 16);
     uniforms.cloudCoverage.value = 0.15 + weather.clouds * 0.8;
     uniforms.cloudDensity.value = 0.25 + weather.clouds * 0.65;
     uniforms.turbidity.value = 1.6 + weather.dust * 8;
-    soil.color.set(0xfff6e6).multiplyScalar(1 - weather.rain * 0.3);
-    soil.roughness = 1 - weather.rain * 0.45;
+    // Surface wetness: an exponential moving average of rain intensity (rises
+    // over ~10s, dries over ~90s) so puddles linger visually after rain stops,
+    // matching spec §19's "wet/muddy ground appearance". `weather.wet` (the
+    // Environment.weather.wet field in the new engine's world/types.ts) is used
+    // directly when present; otherwise it is estimated from `weather.rain`
+    // because the live studio's remote Weather (simulation/shared.ts) does not
+    // carry `wet` yet.
+    if (lastWetTime >= 0) {
+      const dt = Math.max(0, Math.min(5, time - lastWetTime));
+      const target = weather.wet ?? weather.rain;
+      const tau = target > wetness ? 10 : 90;
+      wetness += (target - wetness) * (1 - Math.exp(-dt / tau));
+    } else {
+      wetness = weather.wet ?? weather.rain;
+    }
+    lastWetTime = time;
+    soil.color.set(0xfff6e6).multiplyScalar(1 - weather.rain * 0.3 - wetness * 0.25);
+    soil.roughness = 1 - weather.rain * 0.45 - wetness * 0.35;
+    soil.metalness = wetness * 0.12; // faint puddle-ish sheen, not a literal water shader
     (scene.fog as THREE.Fog).near =
       180 - weather.dust * 160 - weather.rain * 70;
     (scene.fog as THREE.Fog).far =
       650 - weather.dust * 520 - weather.rain * 190;
-    sun.position.copy(state.direction).multiplyScalar(100);
-    sun.intensity = 2.8 * state.daylight * Math.max(0, state.direction.y) * 1.2;
+    sun.position.copy(direction).multiplyScalar(100);
+    sun.intensity = 2.8 * state.daylight * Math.max(0, direction.y) * 1.2;
+    // Cloud cover dims and diffuses the sun: less direct intensity, softer
+    // (wider) shadow penumbra, and more of the light effectively comes from
+    // the sky/hemisphere term below instead of the direct lamp.
     sun.intensity *= 1 - weather.clouds * 0.65;
+    sun.shadow.radius = 1.2 + weather.clouds * 7;
     sun.color.set(0xfff0d8).lerp(warmSun, state.warmth * 0.7);
-    hemi.intensity = 0.22 + 1.48 * state.daylight;
-    hemi.color.set(0x9bb7e8).lerp(blueSky, state.daylight);
+    hemi.intensity = 0.22 + 1.48 * state.daylight + weather.clouds * 0.35 * state.daylight;
+    hemi.color
+      .set(0x9bb7e8)
+      .lerp(blueSky, state.daylight)
+      .lerp(blueHourColor, state.blueHour * 0.5);
     moon.intensity = 0.22 * state.night;
     moonDisc.visible = state.night > 0.15;
     starMaterial.opacity = state.night * 0.85 * (1 - weather.clouds);
@@ -174,7 +235,8 @@ export function createEnvironment(
       .lerp(
         mixedFog.copy(dayFog).lerp(sunsetFog, state.warmth),
         state.daylight,
-      );
+      )
+      .lerp(blueHourColor, state.blueHour * 0.6);
     (scene.fog as THREE.Fog).color
       .lerp(new THREE.Color(0xa99678), weather.dust * 0.65)
       .lerp(new THREE.Color(0x8997a3), weather.rain * 0.35);

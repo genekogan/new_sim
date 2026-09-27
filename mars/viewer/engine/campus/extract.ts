@@ -93,7 +93,8 @@ export function extractObstacles(components: ComponentInput[], assemblyNames: Re
     const asmName = assemblyNames[c.assembly] ?? c.assembly;
     const label = L(`${name} · ${asmName}`);
     const push = (id: string, o: OBB2, y0: number, y1: number, k: ObstacleKind, lab: number, cf: Confidence) =>
-      rows.push([id, k, o.c[0], o.c[1], o.half[0], o.half[1], o.yaw, r3(y0), r3(y1), lab, cf, c.assembly, c.id]);
+      // zero-thickness horizontal sheets (table tops, flat panels) get a 2 cm slab so y1 > y0
+      rows.push([id, k, o.c[0], o.c[1], o.half[0], o.half[1], o.yaw, r3(y1 - y0 < 0.02 ? (y0 + y1) / 2 - 0.01 : y0), r3(y1 - y0 < 0.02 ? (y0 + y1) / 2 + 0.01 : y1), lab, cf, c.assembly, c.id]);
     const emit = (pts: Vec2[][], prefix: string, y0: number, y1: number, cell: number, k = kind, lab = label, cf = conf) => {
       const pieces = clusterPolygons(pts, cell).flatMap((cl) => fitPieces(cl));
       pieces.forEach((o, i) => push(i === 0 ? prefix : `${prefix}.${i}`, o, y0, y1, k, lab, cf));
