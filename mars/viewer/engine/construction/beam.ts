@@ -53,7 +53,7 @@ export function planBeam(rt: Runtime, p: CP): { ok: true; program: CProg } | { o
   // installers stand just outside the column and outside the bay, facing the seat
   const sgn = Math.sign(rel[1]) || 1;
   const face = (s: [number, number, number], outZ: number) => {
-    const o = rot2([col * 0.5, outZ * 0.35], a.pose.yaw);
+    const o = rot2([col * 0.25, outZ * 0.8], a.pose.yaw); // beyond the bay end, clear of the column holders
     return { p: [s[0] + o[0], s[2] + o[1]] as Vec2, yaw: Math.atan2(-o[1], -o[0]) };
   };
   const beamYaw = a.pose.yaw + Math.PI / 2; // beam long axis (local x) along a's frame normal

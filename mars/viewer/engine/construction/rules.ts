@@ -109,13 +109,14 @@ export function holdingDiagnostic(w: WorldState, actor: string): Diagnostic | nu
 }
 
 /**
- * Stations where people raise and then hold an upright. All are on the frame's
- * −z side (its base side while it lies toward +z), so they are standable
- * both before and after the raise.
+ * Stations where people raise and then hold an upright: first beside each
+ * column in the frame plane (outside any bay the beams will enclose), then on
+ * the frame's −z side (its base side while it lies toward +z).
  */
 export function holdStations(u: Entity, n: number): { p: Vec2; yaw: number }[] {
   const d = def(u.def).size[0];
-  const offs: Vec2[] = [[-(d / 2 + 0.42), -0.55], [d / 2 + 0.42, -0.55], [-0.2, -1.0], [0.2, -1.6]];
+  // beside each column in the frame plane (never inside the future bay), then behind the base
+  const offs: Vec2[] = [[-(d / 2 + 0.42), 0], [d / 2 + 0.42, 0], [-(d / 2 + 0.42), -0.7], [d / 2 + 0.42, -0.7]];
   return offs.slice(0, n).map((o) => {
     const w = rot2(o, u.pose.yaw);
     const p: Vec2 = [u.pose.p[0] + w[0], u.pose.p[2] + w[1]];

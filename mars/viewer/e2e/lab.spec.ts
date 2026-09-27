@@ -88,10 +88,9 @@ test('lab stairs: climber is on the steps, facing up-stair, rising continuously'
 
 // KNOWN ENGINE ISSUE (walk.ts stepLink): traversal starts at link.path[0] although the walker
 // stands at link.from.p, and ends by snapping to link.to.p — a 0.40–0.47 m horizontal teleport
-// in one tick at both ends of every stair. Marked test.fail so it turns red once fixed.
+// in one tick at both ends of every stair. Fixed in walk.ts stepLink (continuous entry→steps→exit path).
 for (const name of ['stairs', 'deck-to-ground']) {
-  test(`lab ${name}: no horizontal teleport at stair ends (known engine issue)`, async ({ page }) => {
-    test.fail();
+  test(`lab ${name}: no horizontal teleport at stair ends`, async ({ page }) => {
     await openLab(page);
     await run(page, name);
     let prev: number[] | null = null, worst = 0;

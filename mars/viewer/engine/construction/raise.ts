@@ -9,11 +9,15 @@ import { def } from '../world/catalog.ts';
 import { entityFootprint, type Spatial } from '../spatial/service.ts';
 import { holdingDiagnostic, holdStations, isUpright } from './rules.ts';
 import { childrenState, walkCrew, type Children } from './children.ts';
+import { canonicalLying, isLying } from './lying.ts';
+import { entityCorners } from '../spatial/service.ts';
 
 const RAISE_RATE = Math.PI / 2 / 5; // rad/s: ~5 s for a full raise
 
 type P = { crew: string[]; item: string };
-type Exec = { p: P; id: string; phase: 'approach' | 'grip' | 'raise'; children?: Children; t: number };
+type Exec = { p: P; id: string; phase: 'approach' | 'grip' | 'raise'; children?: Children; t: number; groundY: number; y0: number };
+
+const groundOf = (u: Entity) => Math.min(...entityCorners(u).map((c) => c[1]));
 
 /** Sample the raising arc and report the first static obstacle it would hit. */
 export function raiseSweep(rt: Runtime, u: Entity, from: number, to: number): Diagnostic | null {
@@ -49,22 +53,24 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
     const need = def(u.def).handling?.raiseCrew ?? 2;
     if (p.crew.length < need)
       return { ok: false, diagnostic: { code: 'raise.crew-too-small', message: `raising the ${def(u.def).label} ${u.id} needs at least ${need} people; ${p.crew.length} assigned`, subjects: [u.id, ...p.crew] } };
-    if (Math.abs((u.pose.pitch ?? 0) - Math.PI / 2) > 0.02 || u.support?.kind !== 'ground')
+    if (!isLying(u) || u.support?.kind !== 'ground')
       return { ok: false, diagnostic: { code: 'raise.not-lying', message: `${u.id} must be lying flat on the ground (base at its pivot) before it can be raised`, subjects: [u.id] } };
     for (const c of p.crew) {
       const d = holdingDiagnostic(rt.world, c);
       if (d) return { ok: false, diagnostic: d };
       if (rt.world.entities[c]?.kind !== 'human') return { ok: false, diagnostic: { code: 'entity.unknown', message: `no person "${c}"`, subjects: [c] } };
     }
-    const sweep = raiseSweep(rt, u, Math.PI / 2, 0);
+    const sweep = raiseSweep(rt, { ...u, pose: canonicalLying(u, groundOf(u)) }, Math.PI / 2, 0);
     if (sweep) return { ok: false, diagnostic: sweep };
     return { ok: true, program: null };
   },
   start(rt, p, _prog, id) {
     const u = rt.world.entities[p.item];
+    const groundY = groundOf(u);
+    u.pose = canonicalLying(u, groundY); // same physical placement, canonical encoding
     u.phase = 'reserved';
     u.reservedBy = id;
-    return { p, id, phase: 'approach', t: 0 };
+    return { p, id, phase: 'approach', t: 0, groundY, y0: u.pose.p[1] };
   },
   step(rt, ex, dt) {
     const w = rt.world;
@@ -98,6 +104,8 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
     // raise: rotate pitch toward 0 about the base line (origin at base centre)
     const next = Math.max(0, (u.pose.pitch ?? 0) - RAISE_RATE * dt);
     u.pose.pitch = next;
+    // the base settles from resting-on-its-face height to standing on the ground
+    u.pose.p[1] = ex.groundY + (ex.y0 - ex.groundY) * (next / (Math.PI / 2));
     if (next > 0) return { status: 'running', phase: 'raise' };
     u.phase = 'placed';
     u.reservedBy = undefined;

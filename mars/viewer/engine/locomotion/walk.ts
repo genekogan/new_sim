@@ -302,6 +302,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     vmax = 0;
     phase = 'turn';
   }
+  const prevS = ex.s, prevOffset = ex.offset;
   ex.v += clamp(vmax - ex.v, -ACCEL * 2 * dt, ACCEL * dt);
   if (ex.v < 0) ex.v = 0;
   ex.s = Math.min(ex.total, ex.s + ex.v * dt);
@@ -323,6 +324,17 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   }
   if (clearanceAt(g, p) < r) { p = base; off = 0; }
   ex.offset = off;
+  // hard separation guarantee (collision-enforcement layer, independent of the avoidance heuristics):
+  // never take a step that brings this body inside another person's space
+  const cur: Vec2 = [a.pose.p[0], a.pose.p[2]];
+  const intruded = intrusion(rt, a, cur, p, r);
+  if (intruded) {
+    ex.s = prevS;
+    ex.offset = prevOffset;
+    ex.v = 0;
+    p = cur;
+    personBlock ??= intruded;
+  }
   a.pose.p = [p[0], g.y, p[1]];
   a.human!.activity = ex.v > 0.05 ? 'walk' : yieldTo || personBlock ? 'wait' : 'idle';
 
@@ -370,6 +382,30 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     return { status: 'completed', outputs: { replans: ex.replans, length: ex.route.length } };
   }
   return { status: 'running', phase };
+}
+
+/** Id of a person that moving from `from` to `to` would intrude on (closer than 2r and getting closer). */
+function intrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): string | null {
+  for (const o of Object.values(rt.world.entities)) {
+    if (o.id === me.id || o.kind !== 'human' || o.human?.level !== me.human!.level) continue;
+    if (Math.abs(o.pose.p[1] - me.pose.p[1]) > 1.0) continue;
+    const dTo = Math.hypot(o.pose.p[0] - to[0], o.pose.p[2] - to[1]);
+    if (dTo >= 2 * r - 0.02) continue;
+    const dFrom = Math.hypot(o.pose.p[0] - from[0], o.pose.p[2] - from[1]);
+    if (dTo < dFrom - 1e-9) return o.id;
+  }
+  return null;
+}
+
+function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: number): string | null {
+  for (const o of Object.values(rt.world.entities)) {
+    if (o.id === me.id || o.kind !== 'human') continue;
+    const dTo = Math.hypot(o.pose.p[0] - to[0], (o.pose.p[1] - to[1]) * 0.5, o.pose.p[2] - to[2]);
+    if (dTo >= 2 * r - 0.02) continue;
+    const dFrom = Math.hypot(o.pose.p[0] - from[0], (o.pose.p[1] - from[1]) * 0.5, o.pose.p[2] - from[2]);
+    if (dTo < dFrom - 1e-9) return o.id;
+  }
+  return null;
 }
 
 function occupant(rt: Runtime, me: Entity, p: Vec2, r: number): string | null {
@@ -449,7 +485,10 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     else t.actors.add(ex.actor);
     ex.held.add(res);
   }
-  const path = leg.ascending ? link.path : [...link.path].reverse();
+  // continuous traversal: from the standing entry point, along the steps, to the exit point (no end snaps)
+  const entry = leg.ascending ? link.from : link.to, exit0 = leg.ascending ? link.to : link.from;
+  const steps = leg.ascending ? link.path : [...link.path].reverse();
+  const path: [number, number, number][] = [[entry.p[0], entry.y, entry.p[1]], ...steps, [exit0.p[0], exit0.y, exit0.p[1]]];
   const lens = path.slice(1).map((q, i) => Math.hypot(q[0] - path[i][0], q[1] - path[i][1], q[2] - path[i][2]));
   const total = lens.reduce((s, x) => s + x, 0);
   ex.climbT = Math.min(total, ex.climbT + CLIMB_SPEED * dt);
@@ -457,7 +496,15 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
   while (i < lens.length - 1 && d > lens[i]) { d -= lens[i]; i++; }
   const t = lens[i] ? clamp(d / lens[i], 0, 1) : 1;
   const P = path[i], Q = path[i + 1] ?? path[i];
-  a.pose.p = [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t, P[2] + (Q[2] - P[2]) * t];
+  const next: [number, number, number] = [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t, P[2] + (Q[2] - P[2]) * t];
+  // someone standing on / at the end of the stair: wait rather than pass through them
+  const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);
+  if (blocker) {
+    ex.climbT = Math.max(0, ex.climbT - CLIMB_SPEED * dt);
+    a.human!.activity = 'climb-wait'; // still on the stair: stair geometry, not the floor grid, applies
+    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} waits on ${link.id} for ${blocker} to move`, subjects: [ex.actor, blocker, link.id] } };
+  }
+  a.pose.p = next;
   a.pose.yaw = face;
   a.human!.activity = leg.ascending ? 'climb-up' : 'climb-down';
   if (ex.climbT >= total - 1e-9) {
