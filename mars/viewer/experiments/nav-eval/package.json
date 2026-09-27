@@ -1,0 +1,17 @@
+{
+  "name": "nav-eval",
+  "private": true,
+  "type": "module",
+  "description": "Sandbox: navigation + collision library evaluation (not part of the app build)",
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "@dimforge/rapier3d-deterministic-compat": "^0.21.0",
+    "@recast-navigation/core": "^0.43.1",
+    "@recast-navigation/generators": "^0.43.1",
+    "@recast-navigation/three": "^0.43.1",
+    "meshoptimizer": "^1.3.0",
+    "recast-navigation": "^0.43.1",
+    "three": "^0.185.1",
+    "three-mesh-bvh": "^0.9.15"
+  }
+}
