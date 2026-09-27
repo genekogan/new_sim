@@ -37,7 +37,20 @@ export type SequenceResult = {
   endTick: number;
   ticks: number;
   finalStateHash: string;
+  /** Steps the sequence cut short (timeout / abort): pending ones skipped, live ones cancelled (or refused). */
+  cut: string[];
+  /** No live actions and no `held` support without a gripping holder: the final state is a resting state. */
+  settled: boolean;
+  /** Why the final state is not settled (empty when settled). */
+  unsettled: string[];
+  /** Extra ticks stepped after a timeout to let deferred cancels (e.g. a controlled set-down) finish. */
+  settleTicks: number;
 };
+
+/** Sim-time budget after a timeout for deferred cancels to finish (review M4). */
+export const SETTLE_S = 20;
+/** While settling, refused cancels are retried this often (a carry may refuse until the ground is clear). */
+const RETRY_CANCEL_TICKS = 20;
 
 const DONE: ReadonlySet<StepStatus> = new Set(['completed', 'failed', 'skipped', 'cancelled']);
 
@@ -52,6 +65,12 @@ export class SequenceRunner {
   private violationStart: number;
   private aborted = false;
   private timedOut = false;
+  private cut: string[] = [];
+  /** Why each cut live step was stopped (applied when its deferred cancel finishes). */
+  private cutReason = new Map<string, Diagnostic>();
+  /** Cut steps whose cancel the action refused; retried while settling. */
+  private refused = new Set<string>();
+  private settleTicks = 0;
 
   constructor(rt: Runtime, steps: StepSpec[], opts: { actionPrefix?: string } = {}) {
     this.rt = rt;
@@ -105,9 +124,10 @@ export class SequenceRunner {
         continue;
       }
       r.endedTick = rec.endedTick;
-      r.diagnostic = rec.diagnostic;
+      r.diagnostic = rec.diagnostic ?? (rec.status === 'cancelled' ? this.cutReason.get(r.id) : undefined);
       r.outputs = rec.outputs;
       r.status = rec.status as StepStatus;
+      this.refused.delete(r.id);
       if (rec.status === 'failed') this.onFailure(s, r);
     }
   }
@@ -122,11 +142,64 @@ export class SequenceRunner {
       this.poll();
       this.advance();
     }
-    if (!this.done) this.timeout();
+    if (!this.done) {
+      this.timeout();
+      this.settle(Math.round(SETTLE_S / DT));
+    }
     return this.result();
   }
 
+  /**
+   * After a timeout: keep stepping (bounded) until every deferred cancel has finished, so the recorded
+   * final state is a resting state rather than mid-action. Refused cancels are retried periodically and
+   * stay recorded in `diagnostics` if they never succeed.
+   */
+  private settle(budget: number) {
+    let n = 0;
+    while (n < budget && this.liveActions().length) {
+      this.rt.step();
+      n++;
+      this.poll();
+      if (n % RETRY_CANCEL_TICKS === 0)
+        for (const r of this.reports) {
+          if (!this.refused.has(r.id) || (r.status !== 'executing' && r.status !== 'blocked')) continue;
+          const rec = this.rt.cancel(r.actionId!);
+          if (rec.status === 'cancelled') this.poll();
+          else if (this.deferredCancel(rec)) this.refused.delete(r.id);
+        }
+    }
+    this.settleTicks = n;
+    const why = this.unsettledReasons();
+    if (why.length)
+      this.diagnostics.push({
+        code: 'sequence.unsettled',
+        message: `final state is not settled after ${(n * DT).toFixed(1)} s of settling: ${why.join('; ')}`,
+        subjects: this.liveActions().map((r) => r.id),
+      });
+  }
+
+  private liveActions() {
+    return [...this.rt.records.values()].filter((r) => !TERMINAL.has(r.status));
+  }
+
+  private deferredCancel(rec: { phase?: string; history: { code?: string }[] }) {
+    return rec.phase === 'cancelling' && !rec.history[rec.history.length - 1]?.code;
+  }
+
+  private unsettledReasons(): string[] {
+    const out = this.liveActions().map((r) => `action ${r.id} (${r.verb}) is still ${r.status}${r.phase ? ` (${r.phase})` : ''}`);
+    const ents = this.rt.world.entities;
+    for (const id of Object.keys(ents).sort()) {
+      const e = ents[id];
+      if (e.support?.kind !== 'held') continue;
+      for (const h of e.support.by)
+        if (ents[h]?.human?.grip?.entity !== e.id) out.push(`${id} is marked held by ${h}, who is not gripping it`);
+    }
+    return out;
+  }
+
   result(): SequenceResult {
+    const unsettled = this.unsettledReasons();
     const status: SequenceStatus = this.timedOut
       ? 'timeout'
       : this.aborted
@@ -143,6 +216,10 @@ export class SequenceRunner {
       endTick: this.rt.tick,
       ticks: this.rt.tick - this.t0,
       finalStateHash: this.rt.stateHash(),
+      cut: [...this.cut],
+      settled: !unsettled.length,
+      unsettled,
+      settleTicks: this.settleTicks,
     };
   }
 
@@ -215,20 +292,30 @@ export class SequenceRunner {
     this.diagnostics.push({ code: 'sequence.timeout', message: `sequence did not finish within its tick budget (${this.rt.tick - this.t0} ticks)` });
   }
 
-  /** Skip pending steps and cancel live ones. A refused cancel (e.g. unsupported load) is recorded, never forced. */
+  /**
+   * Skip pending steps and cancel live ones. A deferred cancel (controlled stop) keeps the step live until
+   * it finishes as `cancelled`; a refused cancel (e.g. unsupported load) is recorded, never forced.
+   */
   private stopAll(code: string, message: string, cause?: string) {
     for (const r of this.reports) {
       if (r.status === 'pending') {
         r.status = 'skipped';
         r.endedTick = this.rt.tick;
         r.diagnostic = { code, message, subjects: cause ? [r.id, cause] : [r.id] };
+        this.cut.push(r.id);
       } else if (r.status === 'executing' || r.status === 'blocked') {
+        const reason = { code, message, subjects: cause ? [r.id, cause] : [r.id] };
+        if (!this.cut.includes(r.id)) this.cut.push(r.id);
+        this.cutReason.set(r.id, reason);
         const rec = this.rt.cancel(r.actionId!);
         if (rec.status === 'cancelled') {
           r.status = 'cancelled';
           r.endedTick = rec.endedTick;
-          r.diagnostic = { code, message, subjects: cause ? [r.id, cause] : [r.id] };
+          r.diagnostic = reason;
+        } else if (this.deferredCancel(rec)) {
+          // controlled stop in progress: poll() records the end
         } else {
+          this.refused.add(r.id);
           this.diagnostics.push({
             code: 'sequence.cancel-refused',
             message: `step "${r.id}" could not be cancelled: ${rec.diagnostic?.message ?? 'refused'}; it keeps running`,

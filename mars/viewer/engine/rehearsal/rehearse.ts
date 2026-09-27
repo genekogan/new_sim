@@ -43,6 +43,11 @@ export type RunReport = {
   violations: Violation[];
   metrics: RunMetrics;
   finalStateHash: string;
+  /** Steps cut short by a timeout / abort (see SequenceResult.cut). */
+  cut: string[];
+  /** No live actions and no held-without-holder supports at the end: safe to treat as a resting state. */
+  settled: boolean;
+  unsettled: string[];
 };
 
 export type EntityDiff = { id: string; fields: string[] };
@@ -94,6 +99,9 @@ export function runPlan(start: WorldState, startCheckpoint: string, plan: BoundP
     violations: res.violations,
     metrics: { duration: res.ticks * take.dt, ticks: res.ticks, replans, pathLength, blockedTicks, violations: res.violations.length },
     finalStateHash: take.finalStateHash,
+    cut: res.cut,
+    settled: res.settled,
+    unsettled: res.unsettled,
   };
   return { report, take, finalState: rt.world };
 }
@@ -195,7 +203,8 @@ export function execute(
   if (!chk.ok) return { ok: false, code: chk.code, message: chk.message, diff: chk.diff };
   const { report, take, finalState } = runPlan(history.read(chk.head.id), chk.head.id, plan, cfg, history.rulesVersion);
   opts.takes?.put(take);
-  if (!report.ok && !opts.commitOnFailure)
+  // an unsettled final state (live actions, loads held by nobody) is never committed as a resumable checkpoint (§22)
+  if (!report.ok && (!opts.commitOnFailure || !report.settled))
     return {
       ok: false,
       code: 'execution.failed',

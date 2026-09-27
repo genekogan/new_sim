@@ -196,6 +196,8 @@ carry bystander replan through `gridsAround` has the same bug. Fix: take the lev
 and use `y0 = lv.y, y1 = lv.y + 1.8` (or `human.pose.p[1]`).
 
 ### M4. A timeout returns while actions are still live; the recorded take and final state are mid-action
+> **Fixed 2026-09-27.** After a timeout `SequenceRunner` cancels every live step, then keeps stepping (bounded by `SETTLE_S` = 20 s sim) until deferred cancels finish, retrying refused cancels every second; only then is the final state/take recorded. Deferred cancels are no longer misreported as `sequence.cancel-refused`. `SequenceResult`/`RunReport` now carry `cut` (steps cut short), `settled`, `unsettled` (live actions, held-without-holder supports) and `settleTicks`; `execute(…, { commitOnFailure })` refuses to commit an unsettled state. Test: `runner: timeout settles deferred cancels, lists cut steps, reports refusals (review M4)`.
+
 `sequence/runner.ts:125`. After `timeout()`, deferred cancels (for example a carry's
 controlled set-down) keep running. `runPlan` (`rehearsal/rehearse.ts:79-98`) returns
 immediately and records a take whose `finalState` has a load held mid-transition and

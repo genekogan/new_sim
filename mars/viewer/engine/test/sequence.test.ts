@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import { Runtime, DT } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { bindTemplate, PlanError, substitute } from '../sequence/bind.ts';
-import { runSequence } from '../sequence/runner.ts';
+import { runSequence, SETTLE_S } from '../sequence/runner.ts';
+import type { ActionDef } from '../actions/types.ts';
+import { z } from 'zod';
+import { DECK_Y } from '../scenes/proving-ground.ts';
 import type { SequenceTemplate, StepSpec } from '../sequence/types.ts';
 import { config, crossBindings, crossTemplate, pgHistory, pgWorld, registry } from './sequence-fixtures.ts';
 
@@ -168,4 +171,51 @@ test('runner: proving-ground walkers — passage yield + barrier-gated climb, no
   assert.ok(s.north.blockedTicks + s.south.blockedTicks > 0, 'someone yielded at the passage');
   assert.equal(s.climb.submittedTick, Math.max(s.north.endedTick!, s.south.endedTick!));
   assert.equal(rt.world.entities.p1.human!.level, 1);
+});
+
+test('runner: timeout settles deferred cancels, lists cut steps, reports refusals (review M4)', () => {
+  // how many ticks until p1 is ~70% up the stair (then a timeout lands mid-flight)
+  const probe = runtime();
+  probe.submit('walk_to', { actor: 'p1', x: 10, z: 10, level: 1 });
+  let budget = 0;
+  while (probe.world.entities.p1.pose.p[1] < 0.7 * DECK_Y && budget < 20 * 60) probe.step(), budget++;
+  const rt = runtime();
+  const r = runSequence(rt, [
+    { id: 'climb', verb: 'walk_to', params: { actor: 'p1', x: 10, z: 10, level: 1 } },
+    { id: 'later', verb: 'wait_ticks', params: { n: 5 }, after: ['climb'] },
+  ], { maxTicks: budget });
+  assert.equal(r.status, 'timeout');
+  assert.deepEqual(r.cut.sort(), ['climb', 'later']);
+  const s = Object.fromEntries(r.steps.map((x) => [x.id, x]));
+  assert.equal(s.climb.status, 'cancelled', 'the deferred cancel finished inside the settle budget');
+  assert.equal(s.climb.diagnostic?.code, 'sequence.timeout');
+  assert.equal(s.later.status, 'skipped');
+  assert.ok(r.settleTicks > 0 && r.settleTicks < SETTLE_S / DT, `settled in ${r.settleTicks} ticks`);
+  assert.equal(r.settled, true, r.unsettled.join('; '));
+  assert.equal(r.ticks, budget + r.settleTicks, 'final state recorded after settling');
+  const p1 = rt.world.entities.p1;
+  assert.equal(p1.human!.level, 1, 'stepped off at the (nearer) top landing');
+  assert.equal(p1.human!.task, undefined);
+  assert.ok(![...rt.records.values()].some((x) => x.status === 'executing' || x.status === 'blocked'));
+  assert.deepEqual(r.violations, []);
+  assert.ok(!r.diagnostics.some((d) => d.code === 'sequence.cancel-refused'), 'a deferred cancel is not a refusal');
+
+  // an action that refuses every cancel: recorded, retried, and the result says the world is not settled
+  const stubborn: ActionDef<Record<string, never>, null, Record<string, never>> = {
+    verb: 'stubborn', description: 'test: never stops', schema: z.strictObject({}), reservations: () => [],
+    plan: () => ({ ok: true, program: null }), start: () => ({}), step: () => ({ status: 'running', phase: 'holding' }),
+    cancel: () => ({ ok: false, diagnostic: { code: 'test.refuse', message: 'will not stop here' } }),
+  };
+  const c = config();
+  c.registry.set('stubborn', stubborn as ActionDef);
+  const w = pgWorld();
+  const rt2 = new Runtime(w, c.registry, c.services(w), DEFAULT_INVARIANTS);
+  const r2 = runSequence(rt2, [{ id: 'hold', verb: 'stubborn', params: {} }], { maxTicks: 10 });
+  assert.equal(r2.status, 'timeout');
+  assert.deepEqual(r2.cut, ['hold']);
+  assert.equal(r2.settled, false);
+  assert.equal(r2.settleTicks, SETTLE_S / DT, 'bounded settle budget');
+  assert.match(r2.unsettled[0], /step:hold \(stubborn\) is still executing/);
+  assert.ok(r2.diagnostics.some((d) => d.code === 'sequence.cancel-refused' && /will not stop here/.test(d.message)));
+  assert.ok(r2.diagnostics.some((d) => d.code === 'sequence.unsettled'));
 });
