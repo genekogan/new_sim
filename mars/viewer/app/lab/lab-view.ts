@@ -11,12 +11,14 @@ import { LabSim } from './sim.ts';
 import { StaticScene } from './scene.ts';
 import { HumanViews } from '../engine-view/humans.ts';
 import { ComponentViews } from '../engine-view/components.ts';
+import { FixtureViews } from '../engine-view/fixtures.ts';
 import { loadTemplates } from '../engine-view/people.ts';
 import { GridOverlays } from './overlay-grids.ts';
 import { AgentOverlays } from './overlay-agents.ts';
 import { buildLinks, buildObstacles, buildRoutes, buildViolations } from './overlay-debug.ts';
+import { buildSlots } from './overlay-slots.ts';
 
-export const OVERLAYS = ['grid', 'routes', 'traffic', 'agents', 'obstacles', 'links', 'labels', 'violations'] as const;
+export const OVERLAYS = ['grid', 'routes', 'traffic', 'agents', 'obstacles', 'links', 'labels', 'violations', 'slots'] as const;
 export type OverlayName = (typeof OVERLAYS)[number];
 
 export class LabView {
@@ -28,6 +30,10 @@ export class LabView {
   private orbit: OrbitControls;
   private humans = new HumanViews();
   readonly components = new ComponentViews();
+  readonly fixtures = new FixtureViews();
+  private hemi = new THREE.HemisphereLight('#dfefff', '#8a7355', 1.3);
+  private sun = new THREE.DirectionalLight('#fff4e0', 2.4);
+  private slotTick = -1;
   private grids = new GridOverlays();
   private agents = new AgentOverlays();
   private groups: Record<OverlayName, THREE.Group>;
@@ -60,20 +66,21 @@ export class LabView {
     this.orbit.maxPolarAngle = Math.PI * 0.495;
     this.scene.background = new THREE.Color('#bcd3e4');
     this.scene.fog = new THREE.Fog('#bcd3e4', 70, 160);
-    this.scene.add(new THREE.HemisphereLight('#dfefff', '#8a7355', 1.3));
-    const sun = new THREE.DirectionalLight('#fff4e0', 2.4);
+    this.scene.add(this.hemi);
+    const sun = this.sun;
     sun.position.set(-20, 35, 15);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, far: 100 });
-    this.scene.add(sun, this.humans.group, this.components.group);
+    this.scene.add(sun, this.humans.group, this.components.group, this.fixtures.group);
     const mk = (n: string) => Object.assign(new THREE.Group(), { name: `overlay:${n}` });
-    this.groups = { grid: this.grids.heat, traffic: this.grids.traffic, agents: this.agents.discs, labels: this.agents.labels, routes: mk('routes'), obstacles: mk('obstacles'), links: mk('links'), violations: mk('violations') };
+    this.groups = { grid: this.grids.heat, traffic: this.grids.traffic, agents: this.agents.discs, labels: this.agents.labels, routes: mk('routes'), obstacles: mk('obstacles'), links: mk('links'), violations: mk('violations'), slots: mk('slots') };
     for (const g of Object.values(this.groups)) this.scene.add(g);
     this.sim.onReset = (rt) => this.reset(rt);
     this.sim.onTick = (rt) => {
       this.humans.onTick(rt.world);
       this.components.onTick(rt.world);
+      this.fixtures.onTick(rt.world);
     };
     loadTemplates(this.abort.signal, this.resources)
       .then((ts) => {
@@ -95,10 +102,27 @@ export class LabView {
     this.scene.add(this.statics.group);
     this.humans.reset(rt.world);
     this.components.reset(rt.world);
+    this.fixtures.reset(rt.world);
+    this.lighting(!!this.sim.scenario.evening);
+    this.slotTick = -1;
     this.agents.clear();
     this.epoch = -1;
     this.violationCount = -1;
     this.preset('oblique');
+  }
+
+  /** Day (default) or dusk: a low warm sun, dim blue sky, lit campfires. */
+  private lighting(evening: boolean) {
+    const sky = evening ? '#56607e' : '#bcd3e4';
+    (this.scene.background as THREE.Color).set(sky);
+    this.scene.fog!.color.set(sky);
+    this.hemi.color.set(evening ? '#8d9cc4' : '#dfefff');
+    this.hemi.groundColor.set(evening ? '#5a4632' : '#8a7355');
+    this.hemi.intensity = evening ? 1.05 : 1.3;
+    this.sun.color.set(evening ? '#ffab6e' : '#fff4e0');
+    this.sun.intensity = evening ? 1.6 : 2.4;
+    this.sun.position.set(-20, evening ? 18 : 35, 15);
+    this.fixtures.setDusk(evening);
   }
 
   /** Framing presets from the scenario focus: straight-down diagnostic or oblique. */
@@ -120,6 +144,7 @@ export class LabView {
     if (on) this.overlays.add(name);
     else this.overlays.delete(name);
     this.epoch = -1;
+    this.slotTick = -1;
   }
 
   private resize() {
@@ -145,6 +170,10 @@ export class LabView {
       if (on.has('obstacles')) buildObstacles(this.groups.obstacles, sp);
       if (on.has('links')) buildLinks(this.groups.links, sp);
     }
+    if (on.has('slots') && this.slotTick !== rt.tick) {
+      this.slotTick = rt.tick;
+      buildSlots(this.groups.slots, rt);
+    }
     if (on.has('violations') && rt.violations.length !== this.violationCount) {
       this.violationCount = rt.violations.length;
       buildViolations(this.groups.violations, rt.violations);
@@ -157,6 +186,7 @@ export class LabView {
   frame(dt: number) {
     const alpha = this.sim.advance(dt);
     this.components.render(alpha);
+    this.fixtures.render(this.sim.rt.time);
     this.humans.render(alpha, this.reach);
     this.syncOverlays();
     this.renderer.render(this.scene, this.camera);
@@ -187,6 +217,7 @@ export class LabView {
     this.agents.clear();
     this.statics?.dispose();
     this.components.dispose();
+    this.fixtures.dispose();
     this.resources.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

@@ -6,6 +6,7 @@ import { installHook, removeHook } from './hook.ts';
 import { SCENARIOS, dropPanel, PANEL_ID } from './scenarios.ts';
 import { LabPanel } from './panel.tsx';
 import { SequenceHud } from './sequence-hud.tsx';
+import { SocialHud } from './social-hud.tsx';
 import './lab.css';
 
 export default function Lab() {
@@ -50,14 +51,18 @@ export default function Lab() {
               first: {sim!.rt.violations[0].message}
             </div>
           )}
-          {failed.map((r) => (
-            <div key={r.id} className="lab-banner error" role="alert">
-              {r.id} {r.verb} FAILED · {r.diagnostic?.code}:{' '}
-              {r.diagnostic?.message}
-            </div>
-          ))}
+          {failed.map((r) => {
+            const expected = !!sim!.scenario.expectedFailure?.(sim!.rt, r.id);
+            return (
+              <div key={r.id} className={`lab-banner ${expected ? 'expected' : 'error'}`} role="alert">
+                {r.id} {r.verb} {expected ? 'EXPECTED CONFLICT (scripted, not a failure)' : 'FAILED'} · {r.diagnostic?.code}:{' '}
+                {r.diagnostic?.message}
+              </div>
+            );
+          })}
         </div>
         {sim && <SequenceHud sim={sim} />}
+        {sim && <SocialHud sim={sim} />}
         {done && !sim!.scenario.continuous && (
           <div
             className={`lab-verdict ${checks.every((c) => c.ok) ? 'ok' : 'bad'}`}

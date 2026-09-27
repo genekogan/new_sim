@@ -3,6 +3,8 @@ import type { LabView, OverlayName } from './lab-view.ts';
 import { SCENARIOS } from './scenarios.ts';
 import { sequenceRows } from './sequence-hud.tsx';
 import { entityCorners } from '../../engine/spatial/service.ts';
+import { slotStates } from './overlay-slots.ts';
+import { scriptOf } from './campfire-evening.ts';
 
 export type EngineHook = ReturnType<typeof installHook>;
 
@@ -73,6 +75,17 @@ export function installHook(view: LabView, notify: () => void) {
         .filter((e) => e.kind === 'component')
         .map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: JSON.parse(JSON.stringify(e.pose)), corners: entityCorners(e), rendered: view.components.bounds(e.id) })),
     stateHash: () => sim.rt.stateHash(),
+    /** Interaction slots (seats, fire places): claim holder, claimant, occupant, free/claimed/occupied. */
+    slots: () => slotStates(sim.rt).map((q) => ({ ...q, p: [+q.p[0].toFixed(4), +q.p[1].toFixed(4)], yaw: +q.yaw.toFixed(4) })),
+    /** Social presets: the fired script events (record ids/status/diagnostic) and the scripted diagnostics. */
+    social: () => {
+      const s = scriptOf(sim.rt);
+      if (!s) return null;
+      return {
+        fired: s.fired.map((f) => ({ id: f.id, label: f.label, tick: f.tick, cancelled: f.cancelled ?? null, recs: f.recs.map((r) => ({ id: r.id, verb: r.verb, status: r.status, phase: r.phase ?? null, code: r.diagnostic?.code ?? null, message: r.diagnostic?.message ?? null })) })),
+        notes: s.notes.slice(),
+      };
+    },
     pause(on = true) {
       sim.paused = on;
       notify();

@@ -249,3 +249,64 @@
   color: #ffc233;
   margin-left: 1px;
 }
+.lab-banner.expected {
+  background: #b87400ee;
+  color: #fff;
+  font-weight: normal;
+  font-size: 12px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-social {
+  font-size: 10px;
+  line-height: 1.35;
+  width: min(430px, calc(100% - 40px));
+  padding: 5px 8px;
+}
+.lab-social li,
+.lab-social-legend,
+.lab-social-notes {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-social-notes {
+  color: #ffc233;
+}
+.lab-social-legend {
+  color: #cfd8dc;
+  margin-bottom: 3px;
+}
+.lab-social-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lab-social-events li.on {
+  color: #9fe6ff;
+}
+.lab-social-events li.warn {
+  color: #ffc233;
+}
+.lab-social-events li.todo {
+  color: #ffffff66;
+}
+.lab-social-events li span {
+  opacity: 0.7;
+}
+.lab-social-slots {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  color: #cfd8dc;
+}
+.lab-social-slots i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 2px;
+  border-radius: 50%;
+}

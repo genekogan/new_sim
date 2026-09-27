@@ -14,6 +14,7 @@ const OVERLAY_LABEL: Record<OverlayName, string> = {
   links: 'Stair links',
   labels: 'Action phase labels',
   violations: 'Violation markers',
+  slots: 'Interaction slots (green free · amber claimed · orange occupied)',
 };
 
 type Props = {

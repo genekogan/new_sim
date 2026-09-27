@@ -12,6 +12,7 @@ import type { ActionDef } from '../../engine/actions/types.ts';
 import type { Entity } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
 import { buildBay } from './build-bay.ts';
+import { campfireEvening } from './campfire-evening.ts';
 
 export type Check = { ok: boolean; message: string };
 export type Scenario = {
@@ -34,6 +35,10 @@ export type Scenario = {
   focus: [number, number, number, number?];
   /** Tick ranges worth capturing mid-action (fractions of completion ticks). */
   capture?: number[];
+  /** Dusk lighting; fixtures such as a campfire glow (campfire-evening). */
+  evening?: boolean;
+  /** Failed actions the script provokes on purpose (shown as amber EXPECTED diagnostics, not red failures). */
+  expectedFailure?: (rt: Runtime, actionId: string) => boolean;
   expect: (rt: Runtime) => Check[];
 };
 
@@ -211,6 +216,7 @@ SCENARIOS.push(
   },
   stress(30),
   buildBay,
+  campfireEvening,
 );
 
 /**

@@ -5,7 +5,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import type { Runtime } from '../../engine/runtime/runtime.ts';
 import { HUMAN_RADIUS } from '../../engine/world/catalog.ts';
 
-const ACT_COLOR: Record<string, string> = { walk: '#3dd6ff', idle: '#e8e8e8', wait: '#ffc233', 'climb-up': '#8cff66', 'climb-down': '#8cff66' };
+const ACT_COLOR: Record<string, string> = { walk: '#3dd6ff', idle: '#e8e8e8', wait: '#ffc233', 'climb-up': '#8cff66', 'climb-down': '#8cff66', sit: '#ff7ac8', warm: '#ff9a3d', talk: '#c48cff', watch: '#fff27a' };
 
 type Marker = { disc: THREE.Mesh; arrow: THREE.ArrowHelper; label: CSS2DObject };
 
@@ -68,7 +68,10 @@ export class AgentOverlays {
       m.label.position.set(p.x, p.y + 2.05, p.z);
       if (showLabels) {
         const rec = e.human.task ? rt.records.get(e.human.task) : undefined;
-        const phase = rec ? `${rec.verb}${rec.phase ? `·${rec.phase}` : ''}${rec.status === 'blocked' ? ' BLOCKED' : ''}` : 'no task';
+        // social / crew children show their parents' verbs (nearest two): "gather › take_slot·occupied"
+        const up: string[] = [];
+        for (let p = rec?.parent ? rt.records.get(rec.parent) : undefined; p && up.length < 2; p = p.parent ? rt.records.get(p.parent) : undefined) up.unshift(p.verb);
+        const phase = rec ? `${up.map((v) => `${v} › `).join('')}${rec.verb}${rec.phase ? `·${rec.phase}` : ''}${rec.status === 'blocked' ? ' BLOCKED' : ''}` : 'no task';
         const text = `${id} · ${e.human.activity} · L${e.human.level}\n${phase}`;
         if (m.label.element.textContent !== text) m.label.element.textContent = text;
         m.label.element.classList.toggle('bad', bad || rec?.status === 'blocked');

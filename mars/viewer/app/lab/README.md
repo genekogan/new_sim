@@ -9,9 +9,12 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 ## Modules
 | file | role |
 | --- | --- |
-| `scenarios.ts` | presets, pure TS (node can run them): wall, u-trap, narrow-passage, stairs, deck-to-ground, incomplete-stairs, construction, trio, stress-30, build-bay |
+| `scenarios.ts` | presets, pure TS (node can run them): wall, u-trap, narrow-passage, stairs, deck-to-ground, incomplete-stairs, construction, trio, stress-30, build-bay, campfire-evening |
 | `build-bay.ts` | flagship "build a rack bay" preset: world/registry/invariants/contributors of `engine/scenarios/build-bay.ts` on the test's open ground, `bindTemplate` → `SequenceRunner` stepped live (`advance()` once, then per tick `rt.step()` → `poll()` → `advance()`, exactly `run()`'s loop) |
 | `../engine-view/components.ts` | one persistent object per world component, pose interpolated between ticks; Euler(pitch, −yaw, roll, 'YXZ') = engine `entityCorners` order; uprights as braced two-column frames, stair flights as two stringers (treads are their own entities), everything else a catalog-coloured box; `nearestPoint` for hand placement |
+| `campfire-evening.ts` | HYPOTHETICAL inhabited scene (milestone H, `engine/social`): campfire + 2 benches + 3 camp chairs south-west of the proving ground's test zones, 14 people, a timed script of direct submits (gather, converse, sit, ambient_wander; stand + take_slot at 40 s; last place at 42 s; full-circle `slot.none-free` + `reservation.conflict` at 50 s as EXPECTED diagnostics; bench at 51 s; `releaseForDirective` + `walk_to` at 54 s); runs 75 s, dusk lighting |
+| `social-hud.tsx`, `overlay-slots.ts` | social HUD (script status, slot occupancy, Idle-clip legend) and the **Interaction slots** overlay (green free · amber claimed · orange occupied, tick = heading) |
+| `../engine-view/fixtures.ts` | `kind: 'fixture'` meshes: bench, camp chair (seat faces local +z), campfire (stones, logs, flame; warm point light at dusk) |
 | `sequence-hud.tsx` | sequence HUD on the canvas (active steps + phase, BLOCKED waits with code/message, last diagnostics) and the panel's step-chip timeline |
 | `sim.ts` | `LabSim`: builds `Runtime` (Spatial + walk_to + `DEFAULT_INVARIANTS`), fixed-DT accumulator, step cost stats, event log, replan detection |
 | `scene.ts` | ground, walls/solids as boxes from the `SpatialScene`, stairs from `link.path` (missing treads left out), component boxes |
@@ -39,7 +42,7 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 `ready`, `frames`, `error`, `scenarios()`, `runScenario(name, {paused=true, speed})`, `step(n)`, `runToEnd(max)`,
 `pause(on)`, `setSpeed(x)`, `state()` (humans, checks, stats), `violations()`, `records()`, `log()`,
 `setOverlay(name, on)`, `overlays()`, `camera(pos, target)`, `cameraPreset('top'|'oblique')`, `info()`, `perf()`,
-`sequence()` (step rows + blocked/failed/violation log), `runUntilSteps(ids, status='completed', max)`, `components()`
+`sequence()` (step rows + blocked/failed/violation log), `slots()` (interaction slots with claim/occupant), `social()` (fired script events + expected diagnostics), `runUntilSteps(ids, status='completed', max)`, `components()`
 (pose, phase, support, engine corners, rendered bounds), `stateHash()`.
 
 `e2e/lab.spec.ts` covers:
@@ -50,6 +53,8 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 - Perf.
 
 Baselines: `lab-stairs-mid-oblique`, `lab-narrow-passage-mid-top-debug`.
+
+`e2e/lab-social.spec.ts` covers campfire-evening: all expectations, zero violations, the arrangement at 20 s and 60 s (fire circle on the 1.6 m ring facing the fire, sitters on claimed seats facing the seat heading, c1/c2 facing each other, no two people closer than 2r), the two EXPECTED conflict banners and no FAILED banner, deterministic replay. Captures `lab-social-t{20,60}-{oblique,top}[-debug].png` (debug = agents, labels, slots, routes) and close-ups `lab-social-t60-close-{pair,circle,chairs,chairs-top}.png`. Baselines: `lab-social-t20-oblique`, `lab-social-t60-top-debug`.
 
 `e2e/lab-build-bay.spec.ts` covers the flagship sequence: completes, zero violations, final state hash equal to the node
 rehearsal (`engine/rehearsal/rehearse.ts`) — so live stepping is the rehearsal — geometry sanity from engine corners
@@ -75,6 +80,7 @@ Captures (oblique + top): `build-bay-{carry,raise,held,beams,joists,deck,stair,v
 - Walk-clip ground speed at 1.75 m: woman 0.955 m/s, casual 1.19 m/s. Walk timeScale = ground speed / clip speed (minimum 0.35).
 
 ## Known limitations (honest)
+- **Social poses**: only Idle/Walk clips exist, so sit / warm / talk / watch are the standing Idle pose. Seated people stand at the seat point inside the chair / bench mesh (the engine has no approach point or sit transition, and seats are not obstacles, so a sitter walks onto the chair).
 - **Stairs**: the flat-ground Walk clip plays along the stair line. Feet sink or hover by up to half a riser (≈ 0.09 m) between treads. No foot IK.
 - **Stair ends (engine)**: there is a 0.40–0.47 m horizontal teleport at both ends of every traversal (see report).
 - **Turning in place** plays Idle (activity is `idle` during `turn`).
