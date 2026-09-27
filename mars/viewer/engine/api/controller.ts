@@ -1,0 +1,438 @@
+// Engine controller facade (spec §13, §15, §16, §24). One object that the
+// browser, Node tests/scripts and the Durable Object all drive with the SAME
+// typed operations; MCP tools are generated from `opSchemas` + `call`.
+// Deterministic: no wall clock, no Math.random; hosts timestamp metadata
+// outside engine state if they want to.
+import type { ActionDef, Diagnostic } from '../actions/types.ts';
+import { hashOf, stableStringify } from '../core/hash.ts';
+import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
+import { execute as executePlan, rehearse as rehearsePlan, type EngineConfig, type RunReport } from '../rehearsal/rehearse.ts';
+import { DT, Runtime, type Invariant } from '../runtime/runtime.ts';
+import { bindTemplate, PlanError } from '../sequence/bind.ts';
+import { PLAN_SCHEMA, SEQUENCE_SCHEMA, templateSchema, type BoundPlan, type SequenceTemplate } from '../sequence/types.ts';
+import { sampleTake, takeDuration } from '../take/replay.ts';
+import { TakeLibrary } from '../take/store.ts';
+import type { CameraTrack, ChangeEvent, PoseSample, Take } from '../take/types.ts';
+import type { Spatial } from '../spatial/service.ts';
+import type { Leg, Route } from '../spatial/path.ts';
+import type { SpatialScene } from '../spatial/types.ts';
+import type { Entity, WorldState } from '../world/types.ts';
+import { groupStability, isUpright } from '../construction/rules.ts';
+import { planCameraTrack } from '../camera/plan.ts';
+import { toCameraTrack } from '../camera/track.ts';
+import type { Sampler, ShotSpec, SubjectPose } from '../camera/shots.ts';
+import { createRegistry, describeVerbs, engineConfig, ENGINE_INVARIANTS, jsonSchemaOf } from './registry.ts';
+import { opSchemas, type OpInput, type OpName } from './schemas.ts';
+
+export type StoredPlan = { plan: BoundPlan; workspace: string };
+
+/** Optional lazy loaders (the DO keeps takes/plans/cameras in SQLite and loads them on demand). */
+export type ControllerStore = {
+  loadTake?(id: string): Take | undefined;
+  loadPlan?(id: string): StoredPlan | undefined;
+  loadCameras?(takeId: string): CameraTrack[] | undefined;
+};
+
+/** What an operation changed, for hosts that persist incrementally. */
+export type Changes = { history: boolean; takes: string[]; plans: string[]; cameras: string[] };
+
+export type ControllerOptions = {
+  history: WorldHistory;
+  /** Static scenes by world.base.campus (the services factory builds fresh Spatial state per run from these). */
+  scenes: Record<string, SpatialScene>;
+  registry?: Map<string, ActionDef>;
+  invariants?: Invariant[];
+  /** Override the services factory (default: Spatial over `scenes` + construction contributor). */
+  services?: EngineConfig['services'];
+  maxTicks?: number;
+  store?: ControllerStore;
+};
+
+export type OpResult = { ok: boolean; [k: string]: unknown };
+
+const r2 = (x: number) => Math.round(x * 100) / 100;
+const fail = (code: string, message: string, extra: Record<string, unknown> = {}): OpResult => ({ ok: false, code, message, ...extra });
+
+function compactEntity(e: Entity) {
+  const out: Record<string, unknown> = { id: e.id, def: e.def, kind: e.kind, pose: { p: e.pose.p.map(r2), yaw: r2(e.pose.yaw), ...(e.pose.pitch ? { pitch: r2(e.pose.pitch) } : {}), ...(e.pose.roll ? { roll: r2(e.pose.roll) } : {}) } };
+  if (e.label && e.label !== e.id) out.label = e.label;
+  if (e.phase) out.phase = e.phase;
+  if (e.support) out.support = e.support;
+  if (e.connections?.length) out.connections = e.connections;
+  if (e.human) out.human = e.human;
+  if (e.reservedBy) out.reservedBy = e.reservedBy;
+  if (e.provenance.origin !== 'test-fixture') out.provenance = e.provenance;
+  return out;
+}
+
+function summariseLegs(legs: Leg[]) {
+  return legs.map((l) =>
+    l.kind === 'walk' ? { kind: 'walk', level: l.level, points: l.points.map((p) => [r2(p[0]), r2(p[1])]), minClearance: r2(l.minClearance) } : { kind: 'link', link: l.link.id, ascending: l.ascending },
+  );
+}
+
+export function compactReport(r: RunReport) {
+  const byCode: Record<string, number> = {};
+  for (const v of r.violations) byCode[v.code] = (byCode[v.code] ?? 0) + 1;
+  return {
+    status: r.status,
+    ok: r.ok,
+    planHash: r.planHash,
+    baselineCheckpoint: r.baselineCheckpoint,
+    metrics: { ...r.metrics, duration: r2(r.metrics.duration), pathLength: r2(r.metrics.pathLength) },
+    finalStateHash: r.finalStateHash,
+    diagnostics: r.diagnostics,
+    violations: { count: r.violations.length, byCode, first: r.violations.slice(0, 20) },
+    steps: r.steps.map((s) => ({
+      id: s.id,
+      verb: s.verb,
+      status: s.status,
+      started: s.started,
+      submittedTick: s.submittedTick,
+      endedTick: s.endedTick,
+      blockedTicks: s.blockedTicks,
+      ...(s.cueLateTicks ? { cueLateTicks: s.cueLateTicks } : {}),
+      ...(s.diagnostic ? { diagnostic: s.diagnostic } : {}),
+      ...(s.outputs ? { outputs: s.outputs } : {}),
+    })),
+  };
+}
+
+export function takeSummary(t: Take) {
+  let samples = 0;
+  for (const s of Object.values(t.tracks)) samples += s.length;
+  return {
+    take_id: t.id,
+    duration: r2(takeDuration(t)),
+    ticks: t.ticks,
+    dt: t.dt,
+    entities: Object.keys(t.tracks).sort(),
+    samples,
+    events: t.events.length,
+    changes: t.changes.length,
+    bytes: stableStringify(t).length,
+    finalStateHash: t.finalStateHash,
+  };
+}
+
+/** Take-shaped slice [t0, t1] (ticks): sampleTake(slice, t) equals sampleTake(take, t) for t in range. */
+export function sliceTake(take: Take, t0: number, t1: number, entities?: string[]) {
+  const keep = entities ? new Set(entities) : null;
+  const tracks: Record<string, PoseSample[]> = {};
+  for (const id of Object.keys(take.tracks)) {
+    if (keep && !keep.has(id)) continue;
+    const s = take.tracks[id];
+    let a = 0, b = s.length - 1;
+    while (a < s.length - 1 && s[a + 1][0] <= t0) a++;
+    while (b > 0 && s[b - 1][0] >= t1) b--;
+    tracks[id] = s.slice(a, b + 1).map((x) => [...x]);
+  }
+  // fold discrete state up to t0 into synthetic changes at t0, then real changes in (t0, t1]
+  const folded = new Map<string, Map<string, unknown>>();
+  const changes: ChangeEvent[] = [];
+  for (const c of take.changes) {
+    if (keep && !keep.has(c[1])) continue;
+    if (c[0] <= t0) {
+      let m = folded.get(c[1]);
+      if (!m) folded.set(c[1], (m = new Map()));
+      m.set(c[2], c[3]);
+    } else if (c[0] <= t1) changes.push(structuredClone(c));
+  }
+  const head: ChangeEvent[] = [];
+  for (const [id, m] of folded) for (const [f, v] of m) head.push([t0, id, f, structuredClone(v)]);
+  return { tracks, changes: [...head, ...changes], events: take.events.filter((e) => e.t >= t0 && e.t <= t1).map((e) => structuredClone(e)) };
+}
+
+export class EngineController {
+  readonly history: WorldHistory;
+  readonly scenes: Record<string, SpatialScene>;
+  readonly registry: Map<string, ActionDef>;
+  readonly cfg: EngineConfig;
+  readonly takes = new TakeLibrary();
+  readonly plans = new Map<string, StoredPlan>();
+  private store: ControllerStore;
+  private camerasLoaded = new Set<string>();
+  private changes: Changes = { history: false, takes: [], plans: [], cameras: [] };
+
+  constructor(o: ControllerOptions) {
+    this.history = o.history;
+    this.scenes = o.scenes;
+    this.registry = o.registry ?? createRegistry();
+    const base = engineConfig(o.scenes, { registry: this.registry, invariants: o.invariants ?? ENGINE_INVARIANTS, maxTicks: o.maxTicks });
+    this.cfg = o.services ? { ...base, services: o.services } : base;
+    this.store = o.store ?? {};
+  }
+
+  /** Validate `input` with the op's zod schema and dispatch. Never throws for engine-level failures. */
+  call(name: string, input: unknown): OpResult {
+    if (!Object.hasOwn(opSchemas, name)) return fail('op.unknown', `no engine operation "${name}"`);
+    const parsed = opSchemas[name as OpName].safeParse(input ?? {});
+    if (!parsed.success) return fail('op.invalid-input', parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; '));
+    try {
+      switch (name as OpName) {
+        case 'list_verbs': return this.listVerbs();
+        case 'query_world': return this.queryWorld(parsed.data as OpInput<'query_world'>);
+        case 'bind_plan': return this.bindPlan(parsed.data as OpInput<'bind_plan'>);
+        case 'rehearse': return this.rehearse(parsed.data as OpInput<'rehearse'>);
+        case 'execute': return this.execute(parsed.data as OpInput<'execute'>);
+        case 'fork': return this.fork(parsed.data as OpInput<'fork'>);
+        case 'log': return this.log(parsed.data as OpInput<'log'>);
+        case 'get_take': return this.getTake(parsed.data as OpInput<'get_take'>);
+        case 'attach_camera_track': return this.attachCameraTrack(parsed.data as OpInput<'attach_camera_track'>);
+      }
+    } catch (e) {
+      if (e instanceof PlanError) return fail(e.code, e.message, { diagnostics: e.diagnostics });
+      if (e instanceof HistoryError) return fail(e.code, e.message);
+      return fail('engine.error', e instanceof Error ? e.message : String(e));
+    }
+    return fail('op.unknown', name);
+  }
+
+  /** Changes since the last drain (history rewritten? new takes / plans / camera sets). */
+  drainChanges(): Changes {
+    const c = this.changes;
+    this.changes = { history: false, takes: [], plans: [], cameras: [] };
+    return c;
+  }
+
+  // ---- read-only -------------------------------------------------------------------------------
+
+  listVerbs(): OpResult {
+    return {
+      ok: true,
+      rulesVersion: this.history.rulesVersion,
+      dt: DT,
+      templateSchema: SEQUENCE_SCHEMA,
+      planSchema: PLAN_SCHEMA,
+      verbs: describeVerbs(this.registry),
+      templateJsonSchema: jsonSchemaOf(templateSchema),
+    };
+  }
+
+  workspaces() {
+    return [...this.history.workspaces.values()].map((w) => ({ id: w.id, label: w.label, protected: w.protected, head: w.head, forkedFrom: w.forkedFrom, campus: this.history.read(w.head).base.campus }));
+  }
+
+  queryWorld(q: OpInput<'query_world'>): OpResult {
+    if (!q.workspace) return { ok: true, workspaces: this.workspaces() };
+    const world = this.history.read(q.workspace);
+    const ws = this.history.workspaces.get(q.workspace);
+    const cp = this.history.checkpoint(ws ? ws.head : q.workspace);
+    const needle = q.label?.toLowerCase();
+    const inRegion = (e: Entity) => !q.region || (e.pose.p[0] >= q.region.min[0] && e.pose.p[0] <= q.region.max[0] && e.pose.p[2] >= q.region.min[1] && e.pose.p[2] <= q.region.max[1]);
+    const all = Object.keys(world.entities).sort().map((id) => world.entities[id]);
+    const matched = all.filter((e) => (!q.ids || q.ids.includes(e.id)) && (!q.kind || e.kind === q.kind) && (!needle || [e.id, e.label ?? '', e.def].some((s) => s.toLowerCase().includes(needle))) && inRegion(e));
+    const limit = q.limit ?? 100;
+    const out: OpResult = {
+      ok: true,
+      workspace: q.workspace,
+      checkpoint: cp.id,
+      protected: ws?.protected ?? true,
+      campus: world.base.campus,
+      env: world.env,
+      entityCount: all.length,
+      matched: matched.length,
+      entities: matched.slice(0, limit).map(compactEntity),
+      ...(matched.length > limit ? { truncated: true } : {}),
+    };
+    const inc = new Set(q.include ?? []);
+    if (inc.has('regions')) out.regions = Object.values(world.regions);
+    if (inc.has('levels') || inc.has('links')) {
+      const sp = this.cfg.services(world).spatial as Spatial;
+      sp.sync(world);
+      if (inc.has('levels'))
+        out.levels = sp.scene.levels.map((l) => ({ ...l, surfaces: sp.scene.surfaces.filter((s) => s.level === l.id).map((s) => ({ id: s.id, label: s.label, y: s.y, obb: s.obb })) }));
+      if (inc.has('links'))
+        out.links = sp.scene.links.map((l) => ({ id: l.id, kind: l.kind, usable: l.usable, ...(l.reason ? { reason: l.reason } : {}), from: l.from, to: l.to, width: l.width }));
+    }
+    if (inc.has('stability')) {
+      const seen = new Set<string>();
+      const reports = [];
+      for (const e of all) {
+        if (!isUpright(e) || seen.has(e.id)) continue;
+        const r = groupStability(world, e);
+        for (const g of r.group) seen.add(g);
+        reports.push(r);
+      }
+      out.stability = reports;
+    }
+    if (q.route) out.route = this.preview(world, 'walk_to', q.route, (prog: Route) => ({ length: r2(prog.length), legs: summariseLegs(prog.legs) }));
+    if (q.carry)
+      out.carry = this.preview(world, 'carry', q.carry, (p: any) => {
+        const poses = p.traj.poses as { x: number; z: number; th: number }[];
+        const step = Math.max(1, Math.ceil(poses.length / 60));
+        return {
+          load: p.f?.defId,
+          crew: p.crew,
+          level: p.level,
+          length: r2(p.traj.length),
+          rotation: r2(p.traj.rotation),
+          reverse: r2(p.traj.reverse),
+          expanded: p.stats?.expanded,
+          keyposes: p.stats?.keyposes,
+          path: poses.filter((_, i) => i % step === 0 || i === poses.length - 1).map((s) => [r2(s.x), r2(s.z), r2(s.th)]),
+        };
+      });
+    return out;
+  }
+
+  /** Validate + plan one verb against a private copy of `world` with fresh services (the runtime's own plan()). */
+  private preview(world: WorldState, verb: string, params: unknown, summarise: (program: any) => unknown) {
+    const def = this.registry.get(verb);
+    if (!def) return { ok: false, diagnostic: { code: 'action.unknown-verb', message: `no verb ${verb}` } };
+    const parsed = def.schema.safeParse(params);
+    if (!parsed.success) return { ok: false, diagnostic: { code: 'action.invalid-params', message: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') } };
+    const w = structuredClone(world);
+    const rt = new Runtime(w, this.registry, this.cfg.services(w), []);
+    const r = def.plan(rt, parsed.data);
+    return r.ok ? { ok: true, ...(summarise(r.program) as object), ...(r.notes ? { notes: r.notes } : {}) } : { ok: false, diagnostic: r.diagnostic as Diagnostic };
+  }
+
+  log(q: OpInput<'log'>): OpResult {
+    if (!q.workspace) return { ok: true, workspaces: this.workspaces() };
+    const cps = this.history.log(q.workspace).slice(0, q.limit ?? 50);
+    return { ok: true, workspace: q.workspace, head: cps[0]?.id, checkpoints: cps.map(compactCheckpoint) };
+  }
+
+  getTake(q: OpInput<'get_take'>): OpResult {
+    const take = this.take(q.take_id);
+    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    const t0 = Math.max(0, Math.floor((q.from ?? 0) / take.dt + 1e-6));
+    const t1 = Math.min(take.ticks, q.to === undefined ? take.ticks : Math.ceil(q.to / take.dt - 1e-6));
+    if (t1 < t0) return fail('take.bad-range', `empty range: from ${q.from} s is after to ${q.to} s`);
+    const inc = new Set(q.include ?? ['events', 'changes']);
+    const s = sliceTake(take, t0, t1, q.entities);
+    const { tracks: _t, changes: _c, events: _e, finalState, ...header } = take;
+    return {
+      ok: true,
+      ...header,
+      duration: r2(takeDuration(take)),
+      range: { from: t0, to: t1 },
+      tracks: s.tracks,
+      changes: inc.has('changes') ? s.changes : undefined,
+      events: inc.has('events') ? s.events : undefined,
+      finalState: inc.has('final') ? structuredClone(finalState) : undefined,
+      cameras: inc.has('cameras') ? this.cameras(take.id) : this.cameras(take.id).map((c) => ({ id: c.id, kind: c.kind })),
+    };
+  }
+
+  // ---- plans, runs, workspaces ----------------------------------------------------------------
+
+  bindPlan(q: OpInput<'bind_plan'>): OpResult {
+    const plan = bindTemplate(q.template as SequenceTemplate, q.bindings, { history: this.history, baseline: q.workspace, registry: this.registry });
+    const ws = this.history.workspaces.has(q.workspace) ? q.workspace : '';
+    if (!this.plans.has(plan.planHash)) {
+      this.plans.set(plan.planHash, { plan, workspace: ws });
+      this.changes.plans.push(plan.planHash);
+    }
+    return { ok: true, plan_id: plan.planHash, baselineCheckpoint: plan.baselineCheckpoint, rulesVersion: plan.rulesVersion, workspace: ws || undefined, steps: plan.steps.map((s) => ({ id: s.id, verb: s.verb, params: s.params, after: s.after, when: s.when, at: s.at })) };
+  }
+
+  rehearse(q: OpInput<'rehearse'>): OpResult {
+    const sp = this.plan(q.plan_id);
+    if (!sp) return fail('plan.unknown', `no plan ${q.plan_id} (bind_plan first)`);
+    const ws = q.workspace ?? sp.workspace;
+    if (!ws) return fail('op.invalid-input', 'plan was bound to a checkpoint; pass `workspace` to rehearse against');
+    const r = rehearsePlan(this.history, ws, sp.plan, this.cfg);
+    this.putTake(r.take);
+    return { ok: r.report.ok, code: r.report.ok ? undefined : 'rehearsal.failed', report: compactReport(r.report), take: takeSummary(r.take), stale: r.stale };
+  }
+
+  execute(q: OpInput<'execute'>): OpResult {
+    const sp = this.plan(q.plan_id);
+    if (!sp) return fail('plan.unknown', `no plan ${q.plan_id} (bind_plan first)`);
+    const r = executePlan(this.history, q.workspace, sp.plan, this.cfg, { takes: this.takes, label: q.label });
+    if ('take' in r) this.noteTake(r.take.id);
+    if (r.ok) {
+      this.changes.history = true;
+      return { ok: true, workspace: q.workspace, checkpoint: compactCheckpoint(r.checkpoint), take_id: r.take.id, take: takeSummary(r.take), report: compactReport(r.report) };
+    }
+    if (r.code === 'execution.failed') return { ok: false, code: r.code, message: uniqueMessage(r.message), take_id: r.take.id, take: takeSummary(r.take), report: compactReport(r.report) };
+    return { ok: false, code: r.code, message: r.message, ...(r.diff ? { diff: r.diff } : {}) };
+  }
+
+  fork(q: OpInput<'fork'>): OpResult {
+    const w = this.history.fork(q.from, q.name, q.label ?? q.name, q.at);
+    this.changes.history = true;
+    return { ok: true, workspace: { ...w } };
+  }
+
+  attachCameraTrack(q: OpInput<'attach_camera_track'>): OpResult {
+    const take = this.take(q.take_id);
+    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    const scene = this.scenes[take.finalState.base.campus];
+    if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
+    const before = this.takes.takeHash(take.id);
+    const sampler: Sampler = (t) => {
+      const f = sampleTake(take, t);
+      const out: Record<string, SubjectPose> = {};
+      for (const [id, e] of Object.entries(f.entities)) out[id] = { p: e.p, yaw: e.yaw };
+      return out;
+    };
+    const plan = planCameraTrack(q.shot as ShotSpec, sampler, scene, { duration: takeDuration(take), hz: q.hz ?? 10 });
+    const trackId = q.track_id ?? `cam-${hashOf({ take: take.id, shot: q.shot, hz: q.hz ?? 10 }).slice(0, 12)}`;
+    this.cameras(take.id); // make sure existing tracks are loaded before we add one
+    this.takes.attachCamera(toCameraTrack(trackId, take.id, plan));
+    if (!this.changes.cameras.includes(take.id)) this.changes.cameras.push(take.id);
+    const r = plan.report;
+    return {
+      ok: !r.rejected,
+      code: r.rejected ? 'camera.rejected' : undefined,
+      track_id: trackId,
+      take_id: take.id,
+      takeHashUnchanged: this.takes.takeHash(take.id) === before,
+      report: { samples: r.samples, invalidSamples: r.invalidSamples, sweptCrossings: r.sweptCrossings, minReadability: r2(r.minReadability), readableFraction: r2(r.readableFraction), cuts: r.cuts, corrections: r.corrections.slice(0, 20), reasons: r.reasons.slice(0, 20) },
+    };
+  }
+
+  // ---- storage helpers --------------------------------------------------------------------------
+
+  take(id: string): Take | undefined {
+    if (this.takes.has(id)) return this.takes.get(id);
+    const t = this.store.loadTake?.(id);
+    if (!t) return undefined;
+    this.takes.put(t);
+    return this.takes.get(id);
+  }
+
+  plan(id: string): StoredPlan | undefined {
+    let p = this.plans.get(id);
+    if (!p) {
+      p = this.store.loadPlan?.(id);
+      if (p) this.plans.set(id, p);
+    }
+    return p;
+  }
+
+  cameras(takeId: string): CameraTrack[] {
+    if (!this.camerasLoaded.has(takeId)) {
+      this.camerasLoaded.add(takeId);
+      for (const c of this.store.loadCameras?.(takeId) ?? []) if (this.takes.has(c.takeId)) this.takes.attachCamera(c);
+    }
+    return this.takes.cameras(takeId);
+  }
+
+  private putTake(t: Take) {
+    this.takes.put(t);
+    this.noteTake(t.id);
+  }
+  private noteTake(id: string) {
+    if (!this.changes.takes.includes(id)) this.changes.takes.push(id);
+  }
+}
+
+/** Collapse repeated '; '-joined diagnostic messages and cap the length (tool output stays readable). */
+function uniqueMessage(m: string, max = 800) {
+  const [head, ...rest] = m.split(': ');
+  const parts = [...new Set(rest.join(': ').split('; '))];
+  const s = parts.length ? `${head}: ${parts.join('; ')}` : head;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+function compactCheckpoint(c: Checkpoint) {
+  return { id: c.id, parent: c.parent, cause: c.cause, label: c.label, stateHash: c.stateHash.slice(0, 16), physicalHash: c.physicalHash.slice(0, 16), rulesVersion: c.rulesVersion, seq: c.created };
+}
+
+export function createController(o: ControllerOptions): EngineController {
+  return new EngineController(o);
+}
