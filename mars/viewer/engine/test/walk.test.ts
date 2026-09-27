@@ -96,6 +96,18 @@ test('construction mid-walk: new obstacle on the route triggers one replan, no p
   assert.deepEqual(rt.violations, []);
 });
 
+test('standing person on the route: brief pause at most, no turn/walk flicker, no overlap', () => {
+  const rt = setup(human('w', -25, 20), human('idle', -20, 20));
+  const a = rt.submit('walk_to', { actor: 'w', x: -15, z: 20 });
+  assert.ok(rt.runUntilIdle(20 * 60));
+  assert.equal(a.status, 'completed', a.diagnostic?.message);
+  const blockedTicks = a.history.reduce((n, h, i, H) => (h.status === 'blocked' ? n + ((H[i + 1]?.tick ?? h.tick) - h.tick) : n), 0);
+  assert.ok(blockedTicks <= 20, `blocked for ${blockedTicks} ticks`);
+  const phaseFlips = a.history.filter((h) => h.phase === 'turn').length;
+  assert.ok(phaseFlips <= 3, `turn phases ${phaseFlips}`);
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
 test('unreachable goal is rejected before any movement', () => {
   const rt = setup(human('p1', 0, 0));
   rt.world.entities.p1.human!.level = 0;

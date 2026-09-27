@@ -73,5 +73,7 @@ export type ActionRecord = {
   history: { tick: number; status: ActionStatus; phase?: string; code?: string }[];
   requestedTick: number;
   endedTick?: number;
+  /** Parent action for hierarchical tasks (children may use the parent's reservations). */
+  parent?: string;
   outputs?: Record<string, unknown>;
 };

@@ -65,7 +65,8 @@ test('take fidelity: sampling at every tick reproduces true poses within 2 mm / 
 test('take payload: 3 walkers × 60 s stays compact (bytes measured)', () => {
   const { take, report } = recordMinute();
   assert.equal(report.status, 'completed');
-  assert.ok(takeDuration(take) >= 55 && takeDuration(take) <= 70, `duration ${takeDuration(take)}`);
+  // ~60 s of walking plus realistic yielding/sidestepping around people (walk.ts person encounters)
+  assert.ok(takeDuration(take) >= 55 && takeDuration(take) <= 90, `duration ${takeDuration(take)}`);
   const full = stableStringify(take);
   const { finalState: _f, ...body } = take;
   const sizes = {

@@ -62,7 +62,8 @@ const wrap = (a: number) => {
 
 /** Entity poses + discrete state at time t (seconds from take start). Entities not present at t are omitted. */
 export function sampleTake(take: Take, t: number): TakeFrame {
-  const tick = Math.min(Math.max(0, t / take.dt), take.ticks);
+  // round away float noise (162 * 0.05 / 0.05 = 161.99999…) so same-tick changes are included
+  const tick = Math.min(Math.max(0, Math.round((t / take.dt) * 1e6) / 1e6), take.ticks);
   const discrete = new Map<string, Record<string, unknown>>();
   for (const [ct, id, field, value] of take.changes) {
     if (ct > tick) break;

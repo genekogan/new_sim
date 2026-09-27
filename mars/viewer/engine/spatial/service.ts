@@ -11,7 +11,7 @@ import { findRoute, type Place, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
-const STATIC_PHASES = new Set(['stored', 'staged', 'placed', 'installed', 'raising']);
+const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
 
 /** World-space box corners for an entity (handles yaw/pitch/roll). */
 export function entityCorners(e: Entity): [number, number, number][] {
@@ -107,6 +107,18 @@ export class Spatial {
 
   level(id: number) {
     return this.grids.levels.get(id);
+  }
+
+  /**
+   * One-off route treating standing people as temporary obstacles (used when a
+   * walker has been blocked by someone who is not moving). Builds throwaway grids;
+   * rare by design.
+   */
+  routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: { id: string; p: Vec2 }[]): RouteResult {
+    this.sync(world);
+    const extra: Obstacle[] = people.map((q) => ({ id: q.id, obb: { c: q.p, half: [0.28, 0.28], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid', label: `person ${q.id}` }));
+    const scene = { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] };
+    return findRoute(buildGrids(scene, this.cell), scene, profile, start, goal);
   }
 
   private narrowCache = new Map<string, Int32Array>();

@@ -53,9 +53,9 @@ export class Runtime {
   }
 
   /** requested → validated → reserved → executing, or a diagnostic failure. */
-  submit(verb: string, params: unknown, opts: { id?: string } = {}): ActionRecord {
+  submit(verb: string, params: unknown, opts: { id?: string; parent?: string } = {}): ActionRecord {
     const id = opts.id ?? `a${this.nextId++}`;
-    const rec: ActionRecord = { id, verb, params, status: 'requested', history: [], requestedTick: this.tick };
+    const rec: ActionRecord = { id, verb, params, status: 'requested', history: [], requestedTick: this.tick, parent: opts.parent };
     this.records.set(id, rec);
     this.emit(rec, 'requested');
     const def = this.registry.get(verb);
@@ -71,7 +71,7 @@ export class Runtime {
     if (!plan.ok) return this.fail(rec, plan.diagnostic);
     this.emit(rec, 'validated');
     const res = def.reservations(this.world, parsed.data);
-    const conflict = this.reservationConflict(res);
+    const conflict = this.reservationConflict(res, opts.parent);
     if (conflict) return this.fail(rec, conflict);
     for (const r of res) {
       const list = this.owners.get(r.resource) ?? [];
@@ -158,9 +158,13 @@ export class Runtime {
     return hashOf(this.world);
   }
 
-  private reservationConflict(res: Reservation[]): Diagnostic | null {
+  /** Resources held by `parent` (or its ancestors) are delegable to child actions (hierarchical tasks). */
+  private reservationConflict(res: Reservation[], parent?: string): Diagnostic | null {
+    const ancestors = new Set<string>();
+    for (let p = parent; p; p = this.records.get(p)?.parent) ancestors.add(p);
     for (const r of res) {
       for (const o of this.owners.get(r.resource) ?? []) {
+        if (ancestors.has(o.action)) continue;
         if (r.mode === 'exclusive' || o.mode === 'exclusive') {
           const other = this.records.get(o.action)!;
           return {
