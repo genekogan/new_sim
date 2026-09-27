@@ -15,7 +15,7 @@ export function aluminet2021(k:Kit,g:T.Group,width:number,length:number){
  }
  geo.computeVertexNormals();
  const mesh=new T.Mesh(geo,new T.MeshStandardMaterial({color:'#b8bebc',metalness:.38,roughness:.75,alphaMap:weave,alphaTest:.4,side:T.DoubleSide}));
- mesh.castShadow=true;mesh.receiveShadow=true;k.tag(g,mesh,'draped silver aluminet',layers.roof);mesh.userData.walkNoCollision=true;
+ mesh.castShadow=true;mesh.receiveShadow=true;k.named(k.tag(g,mesh,'draped silver aluminet',layers.roof),'aluminet');mesh.userData.walkNoCollision=true;
  for(let z=-length/2;z<=length/2+.01;z+=length/6){
   for(const side of [-1,1])k.rod(g,'aluminet tie',[side*width/2,4.25,z],[side*(width/2+.3),4.65,z],.012,'#a1a39d',layers.roof);
  }
@@ -31,7 +31,7 @@ export function frontage2024(k:Kit,g:T.Group,w:number,d:number){
   k.box(front,'painted frontage side',[w/2-1.5,slant,.06],[side*(w/4+.75),slant/2,0],red,layers.wall);
   k.box(front,'upper orange mural',[3.65,2.05,.025],[side*3.48,slant-1.025,.045],orange,layers.wall);
  }
- k.box(front,'central flower mural',[3.25,2.0,.06],[0,slant-1,.04],k.photo('/history/2024/flower.webp'),layers.wall);
+ k.named(k.box(front,'central flower mural',[3.25,2.0,.06],[0,slant-1,.04],k.photo('/history/2024/flower.webp'),layers.wall),'flower-mural');
  // Photographic array silhouette: two broad upper rows, narrower lower rows,
  // a clear strip, and exposed red base. No PV on the right-hand wing.
  const canvas=document.createElement('canvas');canvas.width=128;canvas.height=64;
@@ -61,5 +61,5 @@ export function frontage2024(k:Kit,g:T.Group,w:number,d:number){
  k.box(front,'painted eye window insert',[1.36,.9,.03],[6.96,slant-2.87,.18],k.photo('/history/2024/eye.webp'),layers.wall);
  // Vertical entry beneath the stair landing (not painted over with an opaque wall).
  k.wall(g,.75,2.05,-.96,d/2+.10,1.27,'#d09c42');
- k.box(g,'Chiba entry sign',[2.8,.6,.06],[0,2.5,d/2+.13],k.photo('/history/2024/entry.webp'),layers.wall);
+ k.named(k.box(g,'Chiba entry sign',[2.8,.6,.06],[0,2.5,d/2+.13],k.photo('/history/2024/entry.webp'),layers.wall),'entry-sign');
 }

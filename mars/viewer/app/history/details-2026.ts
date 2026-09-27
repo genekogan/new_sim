@@ -19,5 +19,5 @@ export function add2026Details(root:T.Group){
  k.table(cafe,0,0,2.5,.65,.92);k.box(cafe,'coffee machine',[.38,.52,.36],[-.65,1.19,0],'#252d2e');k.box(cafe,'coffee machine metal front',[.31,.3,.018],[-.65,1.22,.19],k.mat('#a4adad',.6));k.box(cafe,'coffee grinder',[.18,.36,.22],[-.22,1.1,0],'#353c39');
  for(let i=0;i<6;i++)k.box(cafe,'café cup',[.085,.11,.085],[.2+i*.15,1,0],'#c9b999');
  const sign=document.createElement('canvas');sign.width=512;sign.height=128;const ctx=sign.getContext('2d')!;ctx.fillStyle='#9a724e';ctx.fillRect(0,0,512,128);ctx.font='bold 78px sans-serif';ctx.fillStyle='#ede7d5';ctx.fillText('MIMOS',35,92);const texture=new T.CanvasTexture(sign);texture.colorSpace=T.SRGBColorSpace;k.box(cafe,'MIMOS sign',[1.7,.43,.025],[0,2.05,-.29],new T.MeshStandardMaterial({map:texture}),layers.detail);
- const chiba=root.getObjectByName('Chiba')||root;chiba.add(...k.root.children);return [kitchen,cafe];
+ k.finalize();const chiba=root.getObjectByName('Chiba')||root;chiba.add(...k.root.children);return [kitchen,cafe];
 }

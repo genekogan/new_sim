@@ -2,14 +2,44 @@ import * as T from 'three';
 export const BAY = 3.6576;
 export const layers = {steel:'Rack steel', floor:'Timber, floors and stairs', roof:'Roofs and upper floors', wall:'Walls and screens', detail:'Interior details', context:'Site context'};
 type XYZ = [number,number,number];
+
+// ---- Stable component ids (docs/engineering/HISTORY_IDS.md) -------------------------
+// `${assembly}-${kind}-${hash}`: hash = FNV-1a of kind + placement relative to the owning
+// assembly group (position per 5 cm, rotation-matrix entries per ~1°). Independent of build
+// order; identical kind+placement pairs get `-2`, `-3`… in build order. `Kit.named` pins
+// an explicit `${assembly}-${name}` for pieces plans refer to.
+export const slug=(s:string)=>s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'component';
+// Off-centre rounding: authored values are round decimals, so float noise never lands
+// them on a quantisation boundary (which would make ids flicker between engines).
+const quant=(v:number,step:number)=>Math.floor(v/step+.5137)||0;
+const fnv1a=(s:string)=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}return (h>>>0).toString(16).padStart(8,'0');};
+const _inv=new T.Matrix4(),_m=new T.Matrix4(),_r=new T.Matrix4(),_p=new T.Vector3(),_q=new T.Quaternion(),_s=new T.Vector3();
+/** Quantised placement of `o` in `assembly`'s frame; matrixWorld must be current. */
+export function placementKey(assembly:T.Object3D,o:T.Object3D){
+ _m.multiplyMatrices(_inv.copy(assembly.matrixWorld).invert(),o.matrixWorld).decompose(_p,_q,_s);
+ const e=_r.makeRotationFromQuaternion(_q).elements;
+ return [_p.x,_p.y,_p.z].map(v=>quant(v,.05)).join(',')+'|'+[e[0],e[1],e[2],e[4],e[5],e[6]].map(v=>quant(v,.0175)).join(',');
+}
+export type IdEntry={o:T.Object3D;assembly:T.Object3D;assemblyId:string;kind:string};
+/** Assigns `component_id` to every entry (entries in build order); `taken` is per scene. */
+export function assignStableIds(entries:IdEntry[],taken=new Set<string>()){
+ for(const {o,assemblyId} of entries){const n=o.userData.named_id;if(!n)continue;const id=`${assemblyId}-${n}`;if(taken.has(id))throw Error(`Duplicate named component id: ${id}`);taken.add(id);o.userData.component_id=id;}
+ for(const {o,assembly,assemblyId,kind} of entries){if(o.userData.named_id)continue;
+  const base=`${assemblyId}-${slug(kind)}-${fnv1a(`${slug(kind)}|${placementKey(assembly,o)}`)}`;let id=base;for(let n=2;taken.has(id);n++)id=`${base}-${n}`;
+  taken.add(id);o.userData.component_id=id;}
+}
+const isAssembly=(o:T.Object3D)=>Boolean(o.userData.assembly_id&&!o.userData.layer&&!o.userData.component_id);
+export type KitHooks={/** Test hook: runs right after each assembly group is created. */assembly?:(k:Kit,g:T.Group)=>void};
+
 /** Per-scene reusable geometry/material definitions; every instance remains editable. */
 export class Kit {
  root = new T.Group();
  private geometries = new Map<string,T.BufferGeometry>();
  private materials = new Map<string,T.Material>();
- private serial = new Map<string,number>();
+ private tagged:{o:T.Object3D;g:T.Object3D}[]=[];
+ private hooks:KitHooks;
  year:number;
- constructor(year:number) {this.year=year;this.root.name=`Mars ${year} · photographic reconstruction`;}
+ constructor(year:number,hooks:KitHooks={}) {this.year=year;this.hooks=hooks;this.root.name=`Mars ${year} · photographic reconstruction`;}
  mat(color:string,metalness=0) {
   const key=color+metalness; let m=this.materials.get(key);
   if(!m){m=new T.MeshStandardMaterial({color,metalness,roughness:metalness?0.5:0.86});if(!metalness && ['#b89770','#b99b75','#b89a75','#aa8d64','#bfa17b','#ae9165'].includes(color)){const map=new T.TextureLoader().load('/modular/textures/kitchen-plywood-sample.jpg');map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;(m as T.MeshStandardMaterial).map=map;(m as T.MeshStandardMaterial).color.set('#ead8b7');}this.materials.set(key,m);}return m;
@@ -18,11 +48,23 @@ export class Kit {
   let m=this.materials.get(url);if(!m){const map=new T.TextureLoader().load(url);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;m=new T.MeshStandardMaterial({map,roughness:0.92,side:T.DoubleSide});this.materials.set(url,m);}return m;
  }
  assembly(id:string,name:string,p:XYZ=[0,0,0],rotation=0,source='Photographic fit; dimensions and hidden surfaces remain provisional') {
-  const g=new T.Group();g.name=name;g.position.set(...p);g.rotation.y=rotation;g.userData={assembly_id:id,source,year:this.year};this.root.add(g);return g;
+  const g=new T.Group();g.name=name;g.position.set(...p);g.rotation.y=rotation;g.userData={assembly_id:id,source,year:this.year};this.root.add(g);this.hooks.assembly?.(this,g);return g;
  }
  tag(g:T.Object3D,o:T.Object3D,name:string,layer:string,definition=name) {
-  const id=String(g.userData.assembly_id),n=(this.serial.get(id)||0)+1;this.serial.set(id,n);
-  o.name=name;o.userData={assembly_id:id,component_id:`${id}-${n}`,layer,kind:definition,definition_id:definition,source:g.userData.source};g.add(o);return o;
+  o.name=name;o.userData={assembly_id:String(g.userData.assembly_id),layer,kind:definition,definition_id:definition,source:g.userData.source};g.add(o);this.tagged.push({o,g});return o;
+ }
+ /** Pin an explicit, plan-addressable id: component_id becomes `${assembly}-${slug(id)}`. */
+ named<O extends T.Object3D>(o:O,id:string):O {o.userData.named_id=slug(id);return o;}
+ /** Assign stable component ids once the scene is fully built (placements are final). */
+ finalize(taken=new Set<string>()) {
+  this.root.updateMatrixWorld(true);const entries:IdEntry[]=[];
+  for(const {o,g} of this.tagged){
+   let attached=false;for(let p:T.Object3D|null=o;p;p=p.parent)if(p===this.root){attached=true;break;}
+   if(!attached)continue; // removed after tagging (e.g. 2025 roof decks)
+   let a:T.Object3D=g;while(!isAssembly(a)&&a.parent)a=a.parent;
+   entries.push({o,assembly:a,assemblyId:String(o.userData.assembly_id),kind:String(o.userData.kind)});
+  }
+  assignStableIds(entries,taken);return this.root;
  }
  box(g:T.Object3D,name:string,size:XYZ,p:XYZ,material:T.Material|string='#b89770',layer:string=layers.detail) {
   const key=size.join(',');let geo=this.geometries.get(key);if(!geo){geo=new T.BoxGeometry(...size);this.geometries.set(key,geo);}

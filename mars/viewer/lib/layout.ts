@@ -46,15 +46,62 @@ const layoutSchema = z
     edits: z.array(editSchema).max(20000),
   })
   .strict();
+/** Frozen legacy→stable id table (app/history/id-migration.json, HISTORY_IDS.md). */
+export type IdMigration = {
+  schema: 'mars-history-id-migration/1';
+  years: Record<string, Record<string, { start: number; ids: (string | null)[] }>>;
+};
+/** Stable id for a legacy build-order id `${assembly}-${serial}` in `year`, if known. */
+export function legacyId(table: IdMigration, year: number, id: string) {
+  const m = /^(.*)-(\d+)$/.exec(id),
+    run = m && table.years[String(year)]?.[m[1]];
+  if (!m || !run) return undefined;
+  const suffix = run.ids[Number(m[2]) - run.start];
+  return suffix ? `${m[1]}-${suffix}` : null;
+}
+/**
+ * Rewrites legacy historical ids in place. Ids already in the baseline are kept; a
+ * legacy-shaped id that cannot be mapped to a baseline component is dropped with a
+ * warning so old layouts still load. Anything else is left for validation to reject.
+ */
+export function migrateLayoutIds(
+  layout: { edits: Edit[] },
+  year: number,
+  baseline: Set<string>,
+  table: IdMigration,
+  warn: (message: string) => void = console.warn,
+) {
+  const mapped = (id: string) => {
+    if (baseline.has(id)) return id;
+    const next = legacyId(table, year, id);
+    if (next === undefined) return id;
+    if (next && baseline.has(next)) return next;
+    warn(`Layout: legacy Mars ${year} component id ${id} has no stable equivalent; edit dropped`);
+    return null;
+  };
+  layout.edits = layout.edits.flatMap((e) => {
+    if (e.added?.startsWith('copy:')) {
+      const source = mapped(e.added.slice(5));
+      return source ? [{ ...e, added: `copy:${source}` }] : [];
+    }
+    if (e.added) return [e];
+    const id = mapped(e.id);
+    return id ? [{ ...e, id }] : [];
+  });
+  return layout;
+}
 export function validateLayout(
   data: unknown,
   baseline: Set<string>,
   stock: Set<string>,
   year = 2026,
+  migration?: IdMigration,
+  warn?: (message: string) => void,
 ) {
   const layout = layoutSchema.parse(data),
     ids = new Set<string>();
   if ((layout.year ?? 2026) !== year) throw Error(`This layout belongs to Mars ${layout.year ?? 2026}, not ${year}`);
+  if (migration) migrateLayoutIds(layout, year, baseline, migration, warn);
   let additions = 0;
   for (const e of layout.edits) {
     if (ids.has(e.id)) throw Error(`Duplicate layout ID: ${e.id}`);

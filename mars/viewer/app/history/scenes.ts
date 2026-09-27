@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {Kit,BAY,layers} from './kit';
+import {Kit,BAY,layers,assignStableIds,type IdEntry,type KitHooks} from './kit';
 import {aluminet2021,frontage2024} from './photographic-corrections';
 import {createBrahman2020Scene} from '../studio-2020/scene';
 export const YEARS=[2020,2021,2022,2023,2024,2025,2026] as const;
@@ -54,7 +54,7 @@ function make2021(k:Kit){
  const lib=k.assembly('library','Library nook',[-offset,0,-6]);for(let i=0;i<4;i++){k.box(lib,'book shelf',[2.8,.05,.32],[0,.45+i*.43,-1]);for(let b=0;b<11;b++)k.box(lib,'book',[.07+(b%3)*.025,.22+(b%2)*.04,.2],[-1.25+b*.23,.6+i*.43,-1],['#b4af94','#806147','#4a6875','#ac6e57'][b%4]);}k.table(lib,0,1.3);
  k.stairs(g,2.8,6,2.22,-offset,d/2+3,14);
  // The enormous cutout MARS letters are an observed 2021 landmark.
- const c=document.createElement('canvas');c.width=1024;c.height=256;const ctx=c.getContext('2d')!;ctx.fillStyle='#ddd9c6';ctx.font='bold 245px sans-serif';ctx.textAlign='center';ctx.font='bold 220px sans-serif';ctx.fillText('MA',218,226);ctx.fillText('RS',806,226);const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;const mat=new T.MeshStandardMaterial({map:texture,transparent:true,alphaTest:.4,side:T.DoubleSide});const sign=new T.Mesh(new T.PlaneGeometry(w+.2,4.4),mat);sign.position.set(0,2.4,d/2+.55);sign.userData.walkNoCollision=true;k.tag(g,sign,'MARS cutout letters',layers.wall);sign.userData.walkNoCollision=true;
+ const c=document.createElement('canvas');c.width=1024;c.height=256;const ctx=c.getContext('2d')!;ctx.fillStyle='#ddd9c6';ctx.font='bold 245px sans-serif';ctx.textAlign='center';ctx.font='bold 220px sans-serif';ctx.fillText('MA',218,226);ctx.fillText('RS',806,226);const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;const mat=new T.MeshStandardMaterial({map:texture,transparent:true,alphaTest:.4,side:T.DoubleSide});const sign=new T.Mesh(new T.PlaneGeometry(w+.2,4.4),mat);sign.position.set(0,2.4,d/2+.55);sign.userData.walkNoCollision=true;k.named(k.tag(g,sign,'MARS cutout letters',layers.wall),'mars-letters');sign.userData.walkNoCollision=true;
  const utility=k.assembly('outdoor-kitchen','Outdoor utility kitchen',[11,0,0]);const uf=new T.Group();uf.userData={...utility.userData,layer:layers.steel};uf.rotation.y=Math.PI/2;utility.add(uf);k.frame(uf,4,1,2.4384,false,BAY);k.deck(utility,BAY,4*BAY,.2);k.kitchen(utility,BAY,10);
  const container=k.assembly('container','White utility container',[10,0,12],Math.PI/2);k.box(container,'shipping container',[6.06,2.59,2.44],[0,1.3,0],'#cac9bc',layers.context);
  ring(k,15,29,33,2,.65);
@@ -128,9 +128,11 @@ function make2025(k:Kit){
  const dorm=hall(k,'secondary-house','Secondary two-storey house',22,20,3,2);k.wall(dorm,3*BAY,2.3,0,BAY,1.36);k.wall(dorm,3*BAY,1.3,0,BAY,3.25,'#e1e0d8');k.deck(dorm,3*BAY,2*BAY,4.68,0,0,true);
  ring(k,18,36,30,20,.55);
 }
-function tag2020(root:T.Group){let count=0;for(const g of root.children){const id=g.userData.id==='portal'?'chiba':String(g.userData.id||`site-${count++}`);g.userData.assembly_id=id;g.traverse(o=>{if(o===g)return;if(o instanceof T.Mesh){const name=o.name.toLowerCase();o.userData={...o.userData,assembly_id:id,component_id:`${id}-${count++}`,kind:name||'component',definition_id:name||'component',layer:/beam|upright|brac/.test(name)?layers.steel:/roof|ceiling/.test(name)?layers.roof:/wall|scrim|curtain|climbing sheet/.test(name)?layers.wall:/floor|deck|stair/.test(name)?layers.floor:layers.detail};if(/scrub/.test(name))o.userData.kind='site_context';}});}}
-export function createHistoricalScene(year:number){
- if(year===2020){const {root}=createBrahman2020Scene();tag2020(root);const k=new Kit(year);k.visitors(7);root.add(...k.root.children);return root;}
- const k=new Kit(year);({2021:make2021,2022:make2022,2023:make2023,2024:make2024,2025:make2025} as Record<number,(k:Kit)=>void>)[year](k);k.visitors(year===2021?12:year===2022?16:22);return k.root;
+// 2020 comes from studio-2020/scene; ids use the same stable scheme as Kit (HISTORY_IDS.md).
+function tag2020(root:T.Group){root.updateMatrixWorld(true);const entries:IdEntry[]=[];root.children.forEach((g,i)=>{const id=g.userData.id==='portal'?'chiba':String(g.userData.id||`site-${i}`);g.userData.assembly_id=id;g.traverse(o=>{if(o===g)return;if(o instanceof T.Mesh){const name=o.name.toLowerCase();o.userData={...o.userData,assembly_id:id,kind:name||'component',definition_id:name||'component',layer:/beam|upright|brac/.test(name)?layers.steel:/roof|ceiling/.test(name)?layers.roof:/wall|scrim|curtain|climbing sheet/.test(name)?layers.wall:/floor|deck|stair/.test(name)?layers.floor:layers.detail};entries.push({o,assembly:g,assemblyId:id,kind:name||'component'});if(/scrub/.test(name))o.userData.kind='site_context';}});});assignStableIds(entries);}
+/** `hooks` exist for id-stability tests (deploy/history-ids.test.mjs); the app passes none. */
+export function createHistoricalScene(year:number,hooks:KitHooks={}){
+ if(year===2020){const {root}=createBrahman2020Scene();tag2020(root);const k=new Kit(year,hooks);k.visitors(7);root.add(...k.root.children);return root;}
+ const k=new Kit(year,hooks);({2021:make2021,2022:make2022,2023:make2023,2024:make2024,2025:make2025} as Record<number,(k:Kit)=>void>)[year](k);k.visitors(year===2021?12:year===2022?16:22);return k.finalize();
 }
 export function sceneManifest(root:T.Group,year:number){const instances:{id:string;assembly_id:string;layer:string;kind:string;definition_id:string}[]=[],assemblies:{id:string;name:string}[]=[],defs=new Set<string>();root.traverse(o=>{const u=o.userData;if(u.assembly_id&&!u.component_id&&!u.layer&&!assemblies.some(a=>a.id===u.assembly_id))assemblies.push({id:u.assembly_id,name:o.name.replaceAll('_',' ')});if(u.component_id){instances.push({id:u.component_id,assembly_id:u.assembly_id,layer:u.layer||layers.detail,kind:u.kind||'component',definition_id:u.definition_id||'component'});defs.add(u.definition_id||'component');}});return {instances,assemblies,definitions:[...defs],limitations:[historyNotes[year],'Rack bays set to nominal 12 ft. Photographic placement is approximate; this is not a measured inventory or survey.','Visitors and EUC riders are illustrative.']};}

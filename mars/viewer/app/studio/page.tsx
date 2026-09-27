@@ -9,7 +9,7 @@ import {
   disposeSkeletons,
 } from '../../lib/three-resources';
 import { createRenderBatches } from '../../lib/render-batches';
-import { validateLayout } from '../../lib/layout';
+import { validateLayout, type IdMigration } from '../../lib/layout';
 import {
   nestedTransforms,
   applyNestedTransforms,
@@ -903,11 +903,14 @@ export default function Studio({ year = 2026 }: { year?: number }) {
           throw Error(
             'Wait for the model to load and leave the room before importing',
           );
+        // Legacy build-order historical ids are migrated (docs/engineering/HISTORY_IDS.md).
+        const migration = (await import('../history/id-migration.json')).default as IdMigration;
         const d = validateLayout(
           data,
           new Set(baseline.keys()),
           new Set(STOCK.map((s) => s[0])),
           year,
+          migration,
         );
         // Validate and load every asset before touching the current layout.
         const prepared: THREE.Object3D[] = [];

@@ -32,10 +32,10 @@ line 19).
    generated offline (`simulation/catalog.json`). The browser rebuilds its own grid from
    live, possibly edited geometry (`campus-life.ts:82`). The EUC perimeter is also
    computed on both sides.
-6. **Historical component IDs are order-dependent serials** (`kit.ts:23-24`). Inserting
-   one component earlier in `scenes.ts` renumbers everything after it, which breaks saved
-   layouts and any future world-placement references. Only 2026 IDs, which come from
-   GLB extras, are stable.
+6. ~~**Historical component IDs are order-dependent serials** (`kit.ts:23-24`).~~ Fixed
+   2026-09-27, see `HISTORY_IDS.md`: ids are now `${assembly}-${kind}-${placement hash}`
+   (or an explicit `Kit.named` pin), and legacy serial ids in saved layouts migrate through
+   the frozen `app/history/id-migration.json`.
 7. **`app/studio/page.tsx` (1700 lines) is one 935-line `useEffect`** (206–1141). It
    bundles scene loading, editing, layout I/O, GLB export, the remote-snapshot adapter
    and the render loop. It can be separated along clear seams (§11.3).
@@ -178,8 +178,8 @@ historical years (landmarks `worker.ts:294-295`).
   - `assembly(id,name,p,rot,source)` (19–21) creates a Group with
     `userData {assembly_id, source, year}`.
   - `tag(g,o,name,layer,definition)` (22–25) assigns
-    `component_id = ${assembly_id}-${serial}`, `kind = definition_id = name`, `layer`
-    and `source`.
+    `kind = definition_id = name`, `layer` and `source`; `finalize()` then sets a
+    stable `component_id = ${assembly_id}-${kind}-${hash}` (HISTORY_IDS.md).
   - Primitives:
     - `box` (26)
     - `rod` (30)
@@ -671,9 +671,9 @@ The JSX (1157–1700) only talks to `api.current`, so the `Api` type (68–101) 
 a clean boundary.
 
 ### 11.4 Hazards
-- **Stable IDs:** kit serial IDs (`kit.ts:23-24`) and 2020 `tag2020` counters
-  (`scenes.ts:131`) are order-dependent. Freeze the current IDs as aliases before
-  changing any scene code, or saved layouts and checkpoints will silently retarget.
+- **Stable IDs:** fixed, see `HISTORY_IDS.md`. Kit and 2020 ids no longer depend on
+  build order; legacy serials were frozen as aliases in `app/history/id-migration.json`.
+  Moving or retyping a piece still changes its hashed id — pin plan targets with `Kit.named`.
 - **Protected baselines:** `history-geometry` tests and `historyNotes` encode the
   2021/2022/2024 corrections. The engine must load these scenes unmodified and fork from
   them (SPEC §21). Do not regenerate them through new kit code without equivalence tests.
