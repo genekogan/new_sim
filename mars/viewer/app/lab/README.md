@@ -56,7 +56,7 @@ rehearsal (`engine/rehearsal/rehearse.ts`) — so live stepping is the rehearsal
 (beams between the columns, joists on the upper beams, ply on the joists, stair top at deck height and at the deck edge,
 visitor on the ply) and rendered bounds within the engine boxes; every blocked step appears in the diagnostics log.
 Captures (oblique + top): `build-bay-{carry,raise,held,beams,joists,deck,stair,visitor}-*.png`, video
-`build-bay-raise-beams-2x.webm` (raise + beams at 2×). Baselines: `build-bay-held-oblique`, `build-bay-visitor-oblique`.
+`build-bay-raise-beams-2x.webm` (raise + beams at 2×). Baselines: `build-bay-raise-oblique` (A at about 45°: lifter walking the frame up, footer at the base), `build-bay-held-oblique`, `build-bay-visitor-oblique`.
 
 ## Performance (2026-09-27, M3 Max, headless Chromium + SwiftShader, 1280×800)
 `performance.now()` resolution in the page is 0.1 ms, so p50 values are quantised.

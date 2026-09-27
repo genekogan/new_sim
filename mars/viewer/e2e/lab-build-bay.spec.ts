@@ -15,8 +15,8 @@ import { rehearse } from '../engine/rehearsal/rehearse.ts';
 import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry, BUILD_BAY_INVARIANTS, BUILD_BAY_CONTRIBUTORS } from '../engine/scenarios/build-bay.ts';
 import { buildBayGround, BUILD_BAY_MOMENTS, BUILD_BAY_RULES, BUILD_BAY_SITE } from '../app/lab/build-bay.ts';
 
-/** Committed baselines (2 representative shots). */
-const BASELINES = new Set(['build-bay-held-oblique', 'build-bay-visitor-oblique']);
+/** Committed baselines (3 representative shots: mid-raise, both frames held, visitor on the deck). */
+const BASELINES = new Set(['build-bay-raise-oblique', 'build-bay-held-oblique', 'build-bay-visitor-oblique']);
 
 /** Close cameras on the bay (site origin = upright A's base, bay along +z to 2.74 m, stair on +x). */
 const CAM = {
