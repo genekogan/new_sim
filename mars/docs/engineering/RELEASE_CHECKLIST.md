@@ -155,3 +155,46 @@ Rollback (from `viewer/`):
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback de2dddaa-0fab-477c-8b8f-cb1c579efba5 \
   --name mars-campus-2026 -m "rollback: <reason>"
 ```
+
+## Production deploy 2 (2026-09-27)
+
+Deployed from committed tree `6593a06` (clean `git status`). Contents: review fixes
+(teleport/holder/load invariants), raise choreography, swept lifts, deterministic trig
+(`engine/core/math.ts`).
+
+- **New version: `6f1200ce-ed10-467b-8d7f-a683f91292db`** (created 18:49Z). It replaces
+  `d33a4d6b-d4ae-4535-a818-0e5c329e9b4f`, which `wrangler deployments status` confirmed live at
+  100% just before the deploy. `d33a4d6b…` is the new rollback target.
+- Gates: `npm test` 48/48; `npm run test:engine` 142 tests (141 pass, 0 fail, 1 skip);
+  `tsc --noEmit -p .` clean; `npm run e2e -- --workers=1` 26/26 in 5.1 min (no baseline refresh).
+- Build: `prepare.py` staged 304 files (788.4 MiB, 8 large objects). `CLOUDFLARE_RELEASE=1 npm run build`
+  exited 0 (only the known chunk-size warning). The route list includes `/lab` and `/lab/`, and
+  `dist/client/engine/campus-2026.json` is present (1,081,647 B). Dry run exited 0 (332 assets,
+  3325.93 KiB / 687.95 KiB gzip; bindings SIMULATIONS, MODELS, ASSETS). `upload.mjs` made 0 uploads
+  (8 × `Already uploaded`). The deploy uploaded 7 new asset files (305 already present); startup 85 ms.
+- Live smoke:
+  - `/`, `/studio`, `/lab` and `/simulation-guide` returned 200 text/html.
+  - `/simulation-agent-guide.md` returned 200 (19,520 B).
+  - `/engine/campus-2026.json` returned 200 application/json (1,081,647 B, parses).
+  - `HEAD /browser/campus.glb` returned 200 model/gltf-binary.
+- `SIM_BASE=… node deploy/simulation-integration.mjs` printed both PASS lines. Engine timings:
+  rehearse 1012 ms wall, execute 787 ms, camera 889 ms; take 44,806 B. The first attempt hit an MCP
+  `REQUEST_TIMEOUT`. It ran at the same time as the headless browser run below. Run alone, it passed.
+- Browser: a headless Chromium (SwiftShader) opened production `/lab?scenario=build-bay` and ran
+  `runScenario('build-bay')` + `runToEnd`.
+  - Result: tick 10918, done, all 5 expectations met (43/43 steps, 0 violations, visitor on level 4).
+  - 0 console errors.
+  - Screenshot: `viewer/e2e/artifacts/prod-smoke-2/build-bay-end-oblique.png` (gitignored).
+    The first attempt timed out on `page.goto` 'load' at 30 s while the integration run was also
+    going. The rerun used `domcontentloaded`; readiness is still gated on the hook.
+- **Cross-host determinism in production:** the live lab's `window.__marsEngine.stateHash()` =
+  `5c29efcf86065fa84f74f74dff1ae922d7ca1c2fa67962b4737d112c20391c96`. `node
+  deploy/determinism-probe.mjs` gives the same `finalStateHash` on node 26.8.2, also at 10918 ticks
+  (take `bf7c878a441a1667c2832d6d`). **They match.**
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback d33a4d6b-d4ae-4535-a818-0e5c329e9b4f \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```
