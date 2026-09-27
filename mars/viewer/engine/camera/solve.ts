@@ -18,6 +18,8 @@ export type SolveOpts = {
   aspect?: number;
   minSize?: number;
   cutaway?: boolean;
+  /** Restrict the alternate family to these keys (default: all VARIANTS). */
+  variants?: string[];
 };
 
 export type Candidate = {
@@ -70,6 +72,7 @@ export function candidates(world: CameraWorld, desired: CameraPose, subjects: Re
   const T = desired.target;
   const out: Candidate[] = [];
   for (const v of VARIANTS) {
+    if (opts.variants && v.key !== 'desired' && !opts.variants.includes(v.key)) continue; // desired is always evaluated
     let position: Vec3;
     let fov = desired.fov;
     if (v.key === 'desired') position = desired.position;
