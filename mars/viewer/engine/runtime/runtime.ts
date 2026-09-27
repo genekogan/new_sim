@@ -23,7 +23,7 @@ export type RuntimeEvent =
 /** Invariant checks run at the end of every tick; violations are recorded, never hidden. */
 export type Invariant = (rt: Runtime) => Diagnostic[];
 
-type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown };
+type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean };
 
 export class Runtime {
   readonly records = new Map<string, ActionRecord>();
@@ -96,6 +96,12 @@ export class Runtime {
       this.emit(rec, rec.status, r.diagnostic);
       return rec;
     }
+    if (r.deferred) {
+      // controlled stop in progress (e.g. set-down); the action finishes as 'cancelled'
+      l.cancelling = true;
+      this.emit(rec, rec.status, undefined, 'cancelling');
+      return rec;
+    }
     this.finish(l, 'cancelled');
     return rec;
   }
@@ -112,7 +118,7 @@ export class Runtime {
         }
       } else if (r.status === 'completed') {
         l.rec.outputs = r.outputs;
-        this.finish(l, 'completed');
+        this.finish(l, l.cancelling ? 'cancelled' : 'completed');
       } else if (r.status === 'blocked') {
         if (l.rec.status !== 'blocked' || l.rec.diagnostic?.code !== r.diagnostic.code) this.emit(l.rec, 'blocked', r.diagnostic);
         l.rec.diagnostic = r.diagnostic;

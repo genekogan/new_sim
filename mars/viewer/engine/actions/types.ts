@@ -37,7 +37,12 @@ export type StepResult =
 
 export type PlanResult<Program> = { ok: true; program: Program; notes?: string[] } | { ok: false; diagnostic: Diagnostic };
 
-export type CancelResult = { ok: true } | { ok: false; diagnostic: Diagnostic };
+/**
+ * `deferred`: the action accepted the cancel but needs more ticks to reach a
+ * safe stop (e.g. a controlled set-down); it keeps stepping and its eventual
+ * `completed` is recorded as `cancelled`.
+ */
+export type CancelResult = { ok: true; deferred?: boolean } | { ok: false; diagnostic: Diagnostic };
 
 export interface ActionDef<Params = any, Program = any, Exec = any> {
   verb: string;
