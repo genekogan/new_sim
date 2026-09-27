@@ -1,10 +1,8 @@
-// Static proving-ground geometry for the Engine Lab: ground, walls/solids as
-// boxes (from the engine SpatialScene), stairs built from link.path with
-// missing treads left out, and world components (e.g. an installed panel).
+// Static geometry for the Engine Lab: ground, walls/solids as boxes (from the
+// engine SpatialScene) and stairs built from link.path with missing treads left
+// out. World components (panels, rack parts) are drawn by components.ts.
 import * as THREE from 'three';
 import type { Link, Obstacle, SpatialScene } from '../../engine/spatial/types.ts';
-import type { Entity, WorldState } from '../../engine/world/types.ts';
-import { def } from '../../engine/world/catalog.ts';
 
 const MAT = {
   ground: new THREE.MeshStandardMaterial({ color: '#b9a383', roughness: 1 }),
@@ -13,7 +11,6 @@ const MAT = {
   post: new THREE.MeshStandardMaterial({ color: '#2f6fb3', roughness: 0.6, metalness: 0.2 }),
   tread: new THREE.MeshStandardMaterial({ color: '#a8835a', roughness: 0.85 }),
   stringer: new THREE.MeshStandardMaterial({ color: '#e07b2a', roughness: 0.6, metalness: 0.2 }),
-  component: new THREE.MeshStandardMaterial({ color: '#d8b98a', roughness: 0.8 }),
 };
 const unit = new THREE.BoxGeometry(1, 1, 1);
 
@@ -68,23 +65,8 @@ function obstacleMesh(o: Obstacle) {
   return m;
 }
 
-/** Box for a world component; engine yaw/pitch/roll = three Euler(pitch, -yaw, roll, 'YXZ'), origin at base centre. */
-export function componentMesh(e: Entity) {
-  const d = def(e.def);
-  const geo = new THREE.BoxGeometry(d.size[0], d.size[1], d.size[2]).translate(0, d.size[1] / 2, 0);
-  const mat = d.color ? new THREE.MeshStandardMaterial({ color: d.color, roughness: 0.8 }) : MAT.component;
-  const m = new THREE.Mesh(geo, mat);
-  m.name = e.id;
-  m.castShadow = m.receiveShadow = true;
-  m.position.fromArray(e.pose.p);
-  m.rotation.set(e.pose.pitch ?? 0, -e.pose.yaw, e.pose.roll ?? 0, 'YXZ');
-  return m;
-}
-
 export class StaticScene {
   readonly group = new THREE.Group();
-  private components = new THREE.Group();
-  private key = '';
 
   constructor(base: SpatialScene) {
     this.group.name = 'proving ground';
@@ -97,22 +79,9 @@ export class StaticScene {
     const bodies = new Set(base.links.map((l) => `${l.id}-body`));
     for (const o of base.obstacles) if (!bodies.has(o.id)) this.group.add(obstacleMesh(o));
     for (const l of base.links) if (l.kind === 'stairs') this.group.add(stairs(l));
-    this.group.add(this.components);
-  }
-
-  /** Mirror non-human world entities (construction appears/disappears). */
-  sync(world: WorldState) {
-    const es = Object.values(world.entities).filter((e) => e.kind === 'component');
-    const key = JSON.stringify(es.map((e) => [e.id, e.def, e.pose, e.phase]));
-    if (key === this.key) return;
-    this.key = key;
-    for (const c of this.components.children) (c as THREE.Mesh).geometry.dispose();
-    this.components.clear();
-    for (const e of es) this.components.add(componentMesh(e));
   }
 
   dispose() {
-    for (const c of this.components.children) (c as THREE.Mesh).geometry.dispose();
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh && o.geometry !== unit) o.geometry.dispose();
     });

@@ -1,5 +1,5 @@
 // Engine Lab scenarios: proving-ground regressions (engine/test/walk.test.ts)
-// as runnable presets. Pure TS (no three.js/DOM) so node can run them too.
+// and the flagship build sequence (build-bay.ts) as runnable presets. Pure TS (no three.js/DOM) so node can run them too.
 import { Runtime } from '../../engine/runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../../engine/runtime/invariants.ts';
 import { Spatial } from '../../engine/spatial/service.ts';
@@ -11,6 +11,7 @@ import { nextRandom, seedRng } from '../../engine/core/rng.ts';
 import type { ActionDef } from '../../engine/actions/types.ts';
 import type { Entity } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
+import { buildBay } from './build-bay.ts';
 
 export type Check = { ok: boolean; message: string };
 export type Scenario = {
@@ -24,6 +25,10 @@ export type Scenario = {
   tick?: (rt: Runtime) => void;
   /** Never completes on its own (stress). */
   continuous?: boolean;
+  /** Custom runtime (own registry/invariants/services), replacing the walk_to proving-ground default. */
+  build?: () => Runtime;
+  /** Custom completion test (e.g. a sequence), instead of "every action terminal". */
+  done?: (rt: Runtime) => boolean;
   maxTicks: number;
   /** Camera focus (x, z), framing radius and optional oblique azimuth (deg, 0 = camera on +x, 90 = on +z). */
   focus: [number, number, number, number?];
@@ -33,6 +38,7 @@ export type Scenario = {
 };
 
 export function buildRuntime(s: Scenario) {
+  if (s.build) return s.build();
   const base = s.scene();
   const w = addAll(emptyWorld('proving-ground', base), ...s.humans(base));
   const rt = new Runtime(w, new Map<string, ActionDef>([['walk_to', walkTo]]), { spatial: new Spatial(base) }, DEFAULT_INVARIANTS);
@@ -204,6 +210,7 @@ SCENARIOS.push(
     expect: (rt) => [allCompleted(rt), noViolations(rt)],
   },
   stress(30),
+  buildBay,
 );
 
 /**

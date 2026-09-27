@@ -2,6 +2,7 @@
 // expectations, perf and the action/diagnostic log.
 import { SCENARIOS, type Check } from './scenarios.ts';
 import { OVERLAYS, type LabView, type OverlayName } from './lab-view.ts';
+import { SequencePanel } from './sequence-hud.tsx';
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4, 8];
 const OVERLAY_LABEL: Record<OverlayName, string> = {
@@ -75,6 +76,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
           </li>
         ))}
       </ul>
+      <SequencePanel sim={sim} />
       <h2>
         Overlays <button onClick={() => onAll(true)}>all</button> <button onClick={() => onAll(false)}>none</button>
       </h2>

@@ -9,17 +9,23 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 ## Modules
 | file | role |
 | --- | --- |
-| `scenarios.ts` | presets, pure TS (node can run them): wall, u-trap, narrow-passage, stairs, deck-to-ground, incomplete-stairs, construction, trio, stress-30 |
+| `scenarios.ts` | presets, pure TS (node can run them): wall, u-trap, narrow-passage, stairs, deck-to-ground, incomplete-stairs, construction, trio, stress-30, build-bay |
+| `build-bay.ts` | flagship "build a rack bay" preset: world/registry/invariants/contributors of `engine/scenarios/build-bay.ts` on the test's open ground, `bindTemplate` → `SequenceRunner` stepped live (`advance()` once, then per tick `rt.step()` → `poll()` → `advance()`, exactly `run()`'s loop) |
+| `components.ts` | one persistent object per world component, pose interpolated between ticks; Euler(pitch, −yaw, roll, 'YXZ') = engine `entityCorners` order; uprights as braced two-column frames, stair flights as two stringers (treads are their own entities), everything else a catalog-coloured box; `nearestPoint` for hand placement |
+| `sequence-hud.tsx` | sequence HUD on the canvas (active steps + phase, BLOCKED waits with code/message, last diagnostics) and the panel's step-chip timeline |
 | `sim.ts` | `LabSim`: builds `Runtime` (Spatial + walk_to + `DEFAULT_INVARIANTS`), fixed-DT accumulator, step cost stats, event log, replan detection |
 | `scene.ts` | ground, walls/solids as boxes from the `SpatialScene`, stairs from `link.path` (missing treads left out), component boxes |
 | `people.ts` | template loading copied minimally from `studio/campus-life.ts` (scale 1.75 m, feet at y=0); Walk-clip ground speed measured from the stance foot |
-| `humans.ts` | engine pose → rig (`rotation.y = -yaw`). Clip weights/phase advance per tick; frames interpolate the last two ticks |
+| `humans.ts` | engine pose → rig (`rotation.y = -yaw`). Clip weights/phase advance per tick; frames interpolate the last two ticks. Walk whenever the person translates (walk, climb, carry on the move, gathering), Idle otherwise (support/hold, lift, set-down, waiting). People with a `grip` get two-bone arm IK onto the nearest point of the gripped part, only within reach (fades out beyond 1.1–1.8× arm length; no stretching) |
 | `overlay-*.ts` | clearance heatmap, traffic components, routes/corridors, discs/facing, obstacle prisms, stair links, labels, violation markers |
 | `lab-view.ts`, `page.tsx`, `panel.tsx`, `hook.ts` | renderer + loop, UI, `window.__marsEngine` |
 
 ## Use
 - **Scenario picker** reloads a fresh world. Transport: Play/Pause, Step (one tick), Reset, speed 0.25–8×.
   Simulation time is decoupled from fps (accumulator, ≤ 40 ticks per frame).
+- **Build a rack bay**: 43 steps, ≈ 524 s simulated, ≈ 10.5 k ticks. The panel shows every step as a chip (cyan running,
+  amber blocked, green done, ⏸ = was blocked at some point; hover for times and diagnostics); the canvas HUD lists running
+  steps with their phase and any `BLOCKED traffic.person / carry.setdown-occupied / carry.path-occupied …` wait.
 - **Construction**: the panel drops at tick 20. "Drop panel into the gap now" drops it earlier.
 - **Overlays** are all off by default. Colours:
   - Heatmap: red = blocked or clearance < r; amber = single-file band; green→clear = open.
@@ -32,7 +38,9 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 ## Test hook `window.__marsEngine`
 `ready`, `frames`, `error`, `scenarios()`, `runScenario(name, {paused=true, speed})`, `step(n)`, `runToEnd(max)`,
 `pause(on)`, `setSpeed(x)`, `state()` (humans, checks, stats), `violations()`, `records()`, `log()`,
-`setOverlay(name, on)`, `overlays()`, `camera(pos, target)`, `cameraPreset('top'|'oblique')`, `info()`, `perf()`.
+`setOverlay(name, on)`, `overlays()`, `camera(pos, target)`, `cameraPreset('top'|'oblique')`, `info()`, `perf()`,
+`sequence()` (step rows + blocked/failed/violation log), `runUntilSteps(ids, status='completed', max)`, `components()`
+(pose, phase, support, engine corners, rendered bounds), `stateHash()`.
 
 `e2e/lab.spec.ts` covers:
 - Each scenario: run to completion, check expectations, zero violations, a visible failure banner when a failure is expected, and an identical deterministic replay.
@@ -42,6 +50,13 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 - Perf.
 
 Baselines: `lab-stairs-mid-oblique`, `lab-narrow-passage-mid-top-debug`.
+
+`e2e/lab-build-bay.spec.ts` covers the flagship sequence: completes, zero violations, final state hash equal to the node
+rehearsal (`engine/rehearsal/rehearse.ts`) — so live stepping is the rehearsal — geometry sanity from engine corners
+(beams between the columns, joists on the upper beams, ply on the joists, stair top at deck height and at the deck edge,
+visitor on the ply) and rendered bounds within the engine boxes; every blocked step appears in the diagnostics log.
+Captures (oblique + top): `build-bay-{carry,raise,held,beams,joists,deck,stair,visitor}-*.png`, video
+`build-bay-raise-beams-2x.webm` (raise + beams at 2×). Baselines: `build-bay-held-oblique`, `build-bay-visitor-oblique`.
 
 ## Performance (2026-09-27, M3 Max, headless Chromium + SwiftShader, 1280×800)
 `performance.now()` resolution in the page is 0.1 ms, so p50 values are quantised.
@@ -63,3 +78,8 @@ Baselines: `lab-stairs-mid-oblique`, `lab-narrow-passage-mid-top-debug`.
 - **Turning in place** plays Idle (activity is `idle` during `turn`).
 - **Route overlay** reads Runtime's private `live` map (`sim.ts liveRoutes`). An engine inspect API should replace it.
 - **Construction** mutates the world between ticks (as `walk.test.ts` does), not through an install action.
+- **Build-bay people**: only Idle/Walk clips are used (Wave is unused); carry/hold/lift are Idle or Walk plus arm IK, so
+  bodies do not lean, crouch or lift. The IK picks the nearest point of the gripped part per arm, not the engine's grip slot.
+- **Raise (engine model)**: the raise crew stands at its final hold stations beside the frame's base for the whole raise;
+  nobody is at the rising end, so mid-raise their hands are (honestly) out of reach and the frame visibly rotates up on its own.
+- Lifts are interpolated (PROGRESSIVE.md), so a joist/sheet may pass through a beam while being lifted.

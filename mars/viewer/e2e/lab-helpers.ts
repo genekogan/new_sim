@@ -17,6 +17,20 @@ type Hook = {
   cameraPreset(kind: 'top' | 'oblique'): void;
   info(): { calls: number; triangles: number; geometries: number; textures: number; frames: number; humans: { id: string; template: string; speed: number; walkWeight: number; activity: string }[] };
   perf(): { ticks: number; meanMs: number; p50Ms: number; p95Ms: number; maxMs: number };
+  sequence(): { steps: SeqStep[] | null; diagnostics: { tick: number; level: string; text: string }[] };
+  runUntilSteps(ids: string[], status?: string, maxTicks?: number): LabState & { reached: boolean };
+  components(): LabComponent[];
+  stateHash(): string;
+};
+export type SeqStep = { id: string; verb: string; status: string; phase?: string; blockedTicks: number; code?: string; message?: string; start?: number; end?: number };
+export type LabComponent = {
+  id: string;
+  def: string;
+  phase?: string;
+  support?: string;
+  pose: { p: number[]; yaw: number; pitch?: number; roll?: number };
+  corners: number[][];
+  rendered: { min: number[]; max: number[] } | null;
 };
 export type LabState = {
   scenario: string;

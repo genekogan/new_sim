@@ -5,6 +5,7 @@ import { LabView, OVERLAYS, type OverlayName } from './lab-view.ts';
 import { installHook, removeHook } from './hook.ts';
 import { SCENARIOS, dropPanel, PANEL_ID } from './scenarios.ts';
 import { LabPanel } from './panel.tsx';
+import { SequenceHud } from './sequence-hud.tsx';
 import './lab.css';
 
 export default function Lab() {
@@ -56,6 +57,7 @@ export default function Lab() {
             </div>
           ))}
         </div>
+        {sim && <SequenceHud sim={sim} />}
         {done && !sim!.scenario.continuous && (
           <div
             className={`lab-verdict ${checks.every((c) => c.ok) ? 'ok' : 'bad'}`}
@@ -89,6 +91,7 @@ export default function Lab() {
             !view.sim.rt.world.entities[PANEL_ID]
               ? () => {
                   dropPanel(view.sim.rt);
+                  view.components.onTick(view.sim.rt.world);
                   refresh();
                 }
               : undefined

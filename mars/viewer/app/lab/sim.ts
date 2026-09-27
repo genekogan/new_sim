@@ -19,6 +19,8 @@ export class LabSim {
   scenario: Scenario = SCENARIOS[0];
   rt!: Runtime;
   log: LogLine[] = [];
+  /** Blocked waits, failures and violations only (kept longer than the log; sequence HUD). */
+  diagnostics: LogLine[] = [];
   paused = false;
   speed = 1;
   private acc = 0;
@@ -32,6 +34,7 @@ export class LabSim {
     this.scenario = s;
     this.rt = buildRuntime(s);
     this.log = [{ tick: 0, level: 'info', text: `scenario ${s.name}: ${s.description}` }];
+    this.diagnostics = [];
     this.costs = [];
     this.routes.clear();
     this.acc = 0;
@@ -52,13 +55,17 @@ export class LabSim {
   }
 
   private record(e: RuntimeEvent) {
+    let line: LogLine;
     if (e.type === 'action') {
       const level = e.status === 'failed' ? 'error' : e.status === 'blocked' ? 'warn' : 'info';
-      if (['requested', 'validated', 'reserved'].includes(e.status) && this.scenario.continuous) return;
-      this.log.push({ tick: e.tick, level, text: `${e.id} ${e.verb} → ${e.status}${e.phase ? ` [${e.phase}]` : ''}${e.code ? ` ${e.code}` : ''}${e.message ? `: ${e.message}` : ''}` });
-    } else if (e.type === 'violation') this.log.push({ tick: e.tick, level: 'error', text: `VIOLATION ${e.code}: ${e.message}` });
-    else this.log.push({ tick: e.tick, level: 'info', text: `mark ${e.name} ${e.data ? JSON.stringify(e.data) : ''}` });
+      if (['requested', 'validated', 'reserved'].includes(e.status) && (this.scenario.continuous || this.scenario.done)) return;
+      line = { tick: e.tick, level, text: `${e.id} ${e.verb} → ${e.status}${e.phase ? ` [${e.phase}]` : ''}${e.code ? ` ${e.code}` : ''}${e.message ? `: ${e.message}` : ''}` };
+    } else if (e.type === 'violation') line = { tick: e.tick, level: 'error', text: `VIOLATION ${e.code}: ${e.message}` };
+    else line = { tick: e.tick, level: 'info', text: `mark ${e.name} ${e.data ? JSON.stringify(e.data) : ''}` };
+    this.log.push(line);
+    if (line.level !== 'info') this.diagnostics.push(line);
     if (this.log.length > 600) this.log.splice(1, this.log.length - 500);
+    if (this.diagnostics.length > 400) this.diagnostics.splice(0, 100);
   }
 
   /** One authoritative tick + scenario script, timed. */
@@ -105,6 +112,7 @@ export class LabSim {
   }
 
   pending() {
+    if (this.scenario.done) return !this.scenario.done(this.rt);
     return [...this.rt.records.values()].some((r) => !TERMINAL.has(r.status));
   }
   overBudget() {

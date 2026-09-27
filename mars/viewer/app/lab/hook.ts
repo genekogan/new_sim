@@ -1,6 +1,8 @@
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
 import type { LabView, OverlayName } from './lab-view.ts';
 import { SCENARIOS } from './scenarios.ts';
+import { sequenceRows } from './sequence-hud.tsx';
+import { entityCorners } from '../../engine/spatial/service.ts';
 
 export type EngineHook = ReturnType<typeof installHook>;
 
@@ -53,6 +55,24 @@ export function installHook(view: LabView, notify: () => void) {
       notify();
       return state();
     },
+    /** Sequence presets: per-step status/phase/blocked diagnostics, plus the blocked/failed/violation log. */
+    sequence: () => ({ steps: sequenceRows(sim), diagnostics: sim.diagnostics.slice() }),
+    /** Fast-forward until every named sequence step has `status` (default completed), or done / maxTicks. */
+    runUntilSteps(ids: string[], status = 'completed', maxTicks = 20 * 600) {
+      const ok = () => {
+        const rows = sequenceRows(sim);
+        return !!rows && ids.every((id) => rows.find((r) => r.id === id)?.status === status);
+      };
+      for (let i = 0; i < maxTicks && !ok() && !sim.done(); i++) sim.step();
+      notify();
+      return { ...state(), reached: ok() };
+    },
+    /** Components with engine pose, phase, support and world-space box corners (engine entityCorners). */
+    components: () =>
+      Object.values(sim.rt.world.entities)
+        .filter((e) => e.kind === 'component')
+        .map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: JSON.parse(JSON.stringify(e.pose)), corners: entityCorners(e), rendered: view.components.bounds(e.id) })),
+    stateHash: () => sim.rt.stateHash(),
     pause(on = true) {
       sim.paused = on;
       notify();

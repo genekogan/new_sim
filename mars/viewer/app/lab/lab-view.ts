@@ -10,6 +10,7 @@ import { traffic } from '../../engine/locomotion/walk.ts';
 import { LabSim } from './sim.ts';
 import { StaticScene } from './scene.ts';
 import { HumanViews } from './humans.ts';
+import { ComponentViews } from './components.ts';
 import { loadTemplates } from './people.ts';
 import { GridOverlays } from './overlay-grids.ts';
 import { AgentOverlays } from './overlay-agents.ts';
@@ -26,6 +27,7 @@ export class LabView {
   private css = new CSS2DRenderer();
   private orbit: OrbitControls;
   private humans = new HumanViews();
+  readonly components = new ComponentViews();
   private grids = new GridOverlays();
   private agents = new AgentOverlays();
   private groups: Record<OverlayName, THREE.Group>;
@@ -37,6 +39,7 @@ export class LabView {
   private epoch = -1;
   private violationCount = -1;
   private routeTick = -1;
+  private reach = (id: string, from: THREE.Vector3, out: THREE.Vector3) => this.components.nearestPoint(id, from, out);
   overlays = new Set<OverlayName>();
   frames = 0;
   loaded = false;
@@ -63,12 +66,15 @@ export class LabView {
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, far: 100 });
-    this.scene.add(sun, this.humans.group);
+    this.scene.add(sun, this.humans.group, this.components.group);
     const mk = (n: string) => Object.assign(new THREE.Group(), { name: `overlay:${n}` });
     this.groups = { grid: this.grids.heat, traffic: this.grids.traffic, agents: this.agents.discs, labels: this.agents.labels, routes: mk('routes'), obstacles: mk('obstacles'), links: mk('links'), violations: mk('violations') };
     for (const g of Object.values(this.groups)) this.scene.add(g);
     this.sim.onReset = (rt) => this.reset(rt);
-    this.sim.onTick = (rt) => this.humans.onTick(rt.world);
+    this.sim.onTick = (rt) => {
+      this.humans.onTick(rt.world);
+      this.components.onTick(rt.world);
+    };
     loadTemplates(this.abort.signal, this.resources)
       .then((ts) => {
         this.humans.setTemplates(ts);
@@ -88,6 +94,7 @@ export class LabView {
     this.statics = new StaticScene(rt.services.spatial.base);
     this.scene.add(this.statics.group);
     this.humans.reset(rt.world);
+    this.components.reset(rt.world);
     this.agents.clear();
     this.epoch = -1;
     this.violationCount = -1;
@@ -149,8 +156,8 @@ export class LabView {
   /** Render one frame; `dt` real seconds since the previous frame (0 = no sim advance). */
   frame(dt: number) {
     const alpha = this.sim.advance(dt);
-    this.statics?.sync(this.sim.rt.world);
-    this.humans.render(alpha);
+    this.components.render(alpha);
+    this.humans.render(alpha, this.reach);
     this.syncOverlays();
     this.renderer.render(this.scene, this.camera);
     this.css.render(this.scene, this.camera);
@@ -179,6 +186,7 @@ export class LabView {
     this.humans.clear();
     this.agents.clear();
     this.statics?.dispose();
+    this.components.dispose();
     this.resources.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
