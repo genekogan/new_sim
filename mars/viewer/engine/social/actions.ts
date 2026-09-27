@@ -1,7 +1,9 @@
 // Social / inhabited-scene verbs (spec §17, milestone H). Each is a parent action that moves its
 // people with child walk_to actions (arriving with `face`), then holds them in an activity
 // ('sit', 'talk', 'warm', 'watch') until cancelled. People carry no loads here, so every social
-// action cancels immediately and leaves its people idle where they stand.
+// action cancels immediately and leaves its people idle where they stand — except a person seated
+// on a fixture (or sitting down), whose cancel is deferred by a 0.6 s 'stand-up' back to the
+// seat's approach point (seat fixtures are obstacles; see slots.ts seatApproach).
 //
 // Pre-emption (spec §17 "explicit director commands take precedence"): a social action owns its
 // people's `actor:<id>` reservations, so a directed task submitted for one of them fails with
@@ -18,7 +20,7 @@ import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { checkStations, childrenState, walkCrew, type Children } from '../construction/children.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
-import { assignNearest, isFree, slotById, whyTaken, slotResource, slotsOf, SLOT_CLEARANCE, type Slot, type SlotKind } from './slots.ts';
+import { assignNearest, isFree, needsApproach, seatApproach, slotById, whyTaken, slotResource, slotsOf, SLOT_CLEARANCE, type Slot, type SlotKind } from './slots.ts';
 import { ambientWander } from './ambient.ts';
 
 const id80 = z.string().min(1).max(80);
@@ -74,12 +76,38 @@ const FACE_DONE = 0.03;
 // ---------- take_slot / sit / stand ----------
 
 type SlotParams = { actor: string; slot?: string; owner?: string; activity?: (typeof ACTIVITIES)[number] };
-type SlotExec = { id: string; actor: string; slot: Slot; activity: string; phase: 'approach' | 'turn' | 'occupied'; child?: Children; error?: Diagnostic };
+/** A slot plus, for a fixture seat, the approach point chosen at claim time (slots.ts seatApproach). */
+type SlotProgram = { slot: Slot; approach?: Vec2 };
+type SlotPhase = 'approach' | 'turn' | 'sit-down' | 'occupied' | 'stand-up';
+type SlotExec = {
+  id: string; actor: string; slot: Slot; approach?: Vec2; activity: string; phase: SlotPhase; child?: Children; error?: Diagnostic;
+  /** sit-down / stand-up transition: start point, elapsed and total time. */
+  from?: Vec2; t: number; dur: number;
+};
+
+/** Seconds a sit-down or stand-up takes (approach point ↔ seat). */
+export const SIT_TRANSITION = 0.6;
+/** Activities of the seat transitions; the renderer maps them (SOCIAL.md). */
+export const SEAT_TRANSITIONS = ['sit-down', 'stand-up'] as const;
 
 /** Plan-time slot choice, read back by reservations() (same params object; Runtime.submit calls plan first). */
 const resolved = new WeakMap<object, Slot>();
 
-function slotAction(verb: string, description: string, kinds: SlotKind[] | null, schema: z.ZodType<SlotParams>): ActionDef<SlotParams, Slot, SlotExec> {
+const lerp2 = (a: Vec2, b: Vec2, k: number): Vec2 => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+const smooth = (k: number) => k * k * (3 - 2 * k);
+
+/** Advance a sit-down / stand-up transition toward `to`; true when it has arrived. */
+function transition(rt: Runtime, ex: SlotExec, to: Vec2, dt: number): boolean {
+  const a = rt.world.entities[ex.actor];
+  ex.t += dt;
+  const k = ex.dur > 0 ? Math.min(1, ex.t / ex.dur) : 1;
+  const q = k >= 1 - 1e-9 ? to : lerp2(ex.from!, to, smooth(k));
+  a.pose.p[0] = q[0];
+  a.pose.p[2] = q[1];
+  return k >= 1 - 1e-9;
+}
+
+function slotAction(verb: string, description: string, kinds: SlotKind[] | null, schema: z.ZodType<SlotParams>): ActionDef<SlotParams, SlotProgram, SlotExec> {
   return {
     verb,
     description,
@@ -113,17 +141,30 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
       }
       if (kinds && !kinds.includes(slot.kind))
         return { ok: false, diagnostic: { code: 'slot.wrong-kind', message: `${slot.id} is a ${slot.kind} slot; ${verb} needs ${kinds.join('/')}`, subjects: [p.actor, slot.id] } };
-      const d = checkStations(rt, [{ actor: p.actor, p: slot.p, level: slot.level }]);
-      if (d) return { ok: false, diagnostic: d };
+      let approach: Vec2 | undefined;
+      if (needsApproach(rt.world, slot)) {
+        const q = seatApproach(rt, slot);
+        if (!Array.isArray(q)) return { ok: false, diagnostic: { ...q, subjects: [p.actor, ...(q.subjects ?? [])] } };
+        approach = q;
+      }
+      const onSeat = dist2(pos2(a), slot.p) < 0.05 && a.human!.level === slot.level;
+      if (!onSeat) {
+        const d = checkStations(rt, [{ actor: p.actor, p: approach ?? slot.p, level: slot.level }]);
+        if (d) return { ok: false, diagnostic: d };
+      }
       resolved.set(p, slot);
-      return { ok: true, program: slot };
+      return { ok: true, program: { slot, approach } };
     },
-    start(rt, p, slot, id) {
+    start(rt, p, { slot, approach }, id) {
       const a = rt.world.entities[p.actor];
-      const ex: SlotExec = { id, actor: p.actor, slot, activity: p.activity ?? DEFAULT_ACTIVITY[slot.kind], phase: 'approach' };
-      if (dist2(pos2(a), slot.p) < 0.05 && a.human!.level === slot.level) ex.phase = 'turn';
+      // a fixture seat is always occupied sitting (and 'sit' is the seated invariant exemption)
+      const act = approach ? 'sit' : p.activity ?? DEFAULT_ACTIVITY[slot.kind];
+      const ex: SlotExec = { id, actor: p.actor, slot, approach, activity: act, phase: 'approach', t: 0, dur: 0 };
+      const here = pos2(a), level = a.human!.level === slot.level;
+      if (level && dist2(here, slot.p) < 0.05) { ex.phase = 'turn'; ex.approach = undefined; } // already on the seat
+      else if (level && dist2(here, approach ?? slot.p) < 0.05) ex.phase = 'turn';
       else {
-        const ch = walkCrew(rt, id, [{ actor: p.actor, p: slot.p, yaw: slot.yaw, level: slot.level }]);
+        const ch = walkCrew(rt, id, [{ actor: p.actor, p: approach ?? slot.p, yaw: slot.yaw, level: slot.level }]);
         if ('code' in ch) ex.error = ch;
         else ex.child = ch;
       }
@@ -133,10 +174,17 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
     step(rt, ex, dt): StepResult {
       if (ex.error) return { status: 'failed', diagnostic: ex.error };
       const a = rt.world.entities[ex.actor];
+      if (ex.phase === 'stand-up') {
+        a.human!.task = ex.id;
+        a.human!.activity = 'stand-up';
+        if (!transition(rt, ex, ex.approach!, dt)) return { status: 'running', phase: 'stand-up' };
+        idle(rt, [ex.actor], ex.id);
+        return { status: 'completed', outputs: { stoodAt: ex.approach } };
+      }
       if (ex.phase === 'approach') {
         const st = childrenState(ex.child!);
         if (st === 'running') return { status: 'running', phase: 'approach' };
-        if (st !== 'done') return { status: 'failed', diagnostic: { ...st, message: `${ex.actor} could not reach ${ex.slot.id}: ${st.message}` } };
+        if (st !== 'done') return { status: 'failed', diagnostic: { ...st, message: `${ex.actor} could not reach ${ex.approach ? `the approach point of ${ex.slot.id}` : ex.slot.id}: ${st.message}` } };
         ex.phase = 'turn';
       }
       if (ex.phase === 'turn') {
@@ -145,12 +193,30 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
           a.pose.yaw = turnToward(a.pose.yaw, ex.slot.yaw, HUMAN_PROFILE.turnRate * dt);
           return { status: 'running', phase: 'turn' };
         }
+        if (ex.approach) { ex.phase = 'sit-down'; ex.from = pos2(a); ex.t = 0; ex.dur = SIT_TRANSITION; }
+        else ex.phase = 'occupied';
+      }
+      if (ex.phase === 'sit-down') {
+        setActivity(rt, [ex.actor], ex.id, 'sit-down');
+        if (!transition(rt, ex, ex.slot.p, dt)) return { status: 'running', phase: 'sit-down' };
         ex.phase = 'occupied';
       }
       setActivity(rt, [ex.actor], ex.id, ex.activity);
       return { status: 'running', phase: 'occupied' };
     },
     cancel(rt, ex) {
+      if (ex.phase === 'stand-up') return { ok: true, deferred: true };
+      // seated (or sitting down): stand up back to the approach point first, over the share of
+      // SIT_TRANSITION the body has left to cover; the seat claim is held until they are off it
+      if (ex.approach && (ex.phase === 'sit-down' || ex.phase === 'occupied')) {
+        const here = pos2(rt.world.entities[ex.actor]);
+        const span = dist2(ex.slot.p, ex.approach);
+        const left = dist2(here, ex.approach);
+        if (left > 1e-6) {
+          ex.phase = 'stand-up'; ex.from = here; ex.t = 0; ex.dur = span > 1e-9 ? SIT_TRANSITION * Math.min(1, left / span) : 0;
+          return { ok: true, deferred: true };
+        }
+      }
       idle(rt, [ex.actor], ex.id);
       return { ok: true };
     },
@@ -176,7 +242,7 @@ const asSlot = (p: SitParams): SlotParams => {
 };
 const resolvedSit = new WeakMap<object, SlotParams>();
 
-export const sit: ActionDef<SitParams, Slot, SlotExec> = {
+export const sit: ActionDef<SitParams, SlotProgram, SlotExec> = {
   ...sitBase,
   verb: 'sit',
   description: 'Walk a person to a seat (explicit `slot` id, or the nearest free seat of `fixture`, e.g. a camp-chair or bench), turn to face the seat direction and sit until `stand { actor }` or cancel. Two people can never hold one seat (reservation.conflict / slot.none-free).',
@@ -189,7 +255,7 @@ export const sit: ActionDef<SitParams, Slot, SlotExec> = {
 type StandExec = { released: string };
 export const stand: ActionDef<{ actor: string }, string, StandExec> = {
   verb: 'stand',
-  description: 'End a person\'s sit / take_slot: they stand up where they are and become idle. Refused (social.in-group) for a member of a converse — cancel that action instead.',
+  description: `End a person's sit / take_slot. A seated person first stands up (activity 'stand-up', ${SIT_TRANSITION} s) back to the seat's approach point, keeping the seat claimed until they are off it; then they are idle. Completes when the released action has ended. Refused (social.in-group) for a member of a converse — cancel that action instead.`,
   schema: z.strictObject({ actor: id80 }),
   reservations: () => [],
   plan(rt, p) {
@@ -206,7 +272,7 @@ export const stand: ActionDef<{ actor: string }, string, StandExec> = {
     rt.cancel(holder);
     return { released: holder };
   },
-  step: (_rt, ex) => ({ status: 'completed', outputs: { released: ex.released } }),
+  step: (rt, ex) => (rt.isActive(ex.released) ? { status: 'running', phase: 'stand-up' } : { status: 'completed', outputs: { released: ex.released } }),
   cancel: () => ({ ok: true }),
 };
 

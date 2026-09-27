@@ -5,11 +5,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
-import { Spatial } from '../spatial/service.ts';
+import { entityFootprint, Spatial } from '../spatial/service.ts';
+import { cellOf, clearanceAt } from '../spatial/grid.ts';
+import { fireRingRadius, HUMAN_RADIUS } from '../world/catalog.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { emptyWorld, human, addAll, FIXTURE } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
-import { angleDelta, heading, type Vec2 } from '../core/math.ts';
+import { add2, angleDelta, heading, pointInObb, rot2, type Vec2 } from '../core/math.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
 import { SOCIAL_ACTIONS, releaseForDirective } from '../social/actions.ts';
@@ -69,26 +71,32 @@ test('sit: two people cannot hold one camp-chair (reservation.conflict names slo
   assert.equal(c.diagnostic?.code, 'slot.none-free');
   assert.ok(c.diagnostic!.subjects!.includes('chair'), c.diagnostic!.message);
   assert.ok(runWhile(rt, () => a.phase !== 'occupied', 20 * 30), a.diagnostic?.message);
+  assert.ok(a.history.some((h) => h.phase === 'sit-down'), 'sat down through the approach point');
+  rt.step();
   assert.equal(H(rt, 'p1').activity, 'sit');
   assert.ok(Math.hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) < 0.05);
   assert.ok(Math.abs(angleDelta(rt.world.entities.p1.pose.yaw, Math.PI / 2)) < 0.05, 'faces the seat direction');
-  // a directed task for a seated person is refused naming the social action (no automatic pre-emption)
+  // a directed task for a seated person is refused: walk_to's plan finds its start inside the chair
+  // (route.start-blocked naming it) before the runtime reaches the sit's actor reservation
   const w = rt.submit('walk_to', { actor: 'p1', x: -4, z: -5 });
-  assert.equal(w.diagnostic?.code, 'reservation.conflict');
-  assert.match(w.diagnostic!.message, /\(sit,/);
+  assert.equal(w.status, 'failed');
+  assert.match(w.diagnostic!.message, /chair|\(sit,/);
   const s = rt.submit('stand', { actor: 'p1' });
   assert.equal(s.status, 'executing', s.diagnostic?.message);
-  assert.equal(a.status, 'cancelled');
+  assert.equal(a.status, 'executing', 'stand-up is a deferred stop');
   rt.step();
+  assert.equal(H(rt, 'p1').activity, 'stand-up');
+  assert.ok(runWhile(rt, () => s.status === 'executing', 20 * 2), 'stand-up takes SIT_TRANSITION');
   assert.equal(s.status, 'completed');
+  assert.equal(a.status, 'cancelled');
   assert.equal(H(rt, 'p1').activity, 'idle');
-  const e = rt.submit('sit', { actor: 'p2', fixture: 'chair' });
-  assert.equal(e.diagnostic?.code, 'slot.none-free', 'p1 is still standing on the seat');
-  assert.match(e.diagnostic!.message, /occupied by p1/);
+  assert.ok(Math.hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) > 0.55, 'stood up onto the approach point, off the seat');
+  assert.ok(noClaims(rt, ['p1']));
   const off = rt.submit('walk_to', { actor: 'p1', x: -2, z: -6 });
   assert.ok(rt.runUntilIdle(20 * 20, [off.id]) && off.status === 'completed', off.diagnostic?.message);
   const d = rt.submit('sit', { actor: 'p2', fixture: 'chair' });
   assert.equal(d.status, 'executing', d.diagnostic?.message);
+  assert.ok(runWhile(rt, () => d.phase !== 'occupied', 20 * 30), d.diagnostic?.message);
   assert.deepEqual(msgs(rt), []);
 });
 
@@ -220,4 +228,94 @@ test('determinism: gather + converse + ambient twice → same state hash', () =>
     return rt.stateHash();
   };
   assert.equal(run(), run());
+});
+
+// ---------- seat fixtures are obstacles; seats are reached through approach points ----------
+
+const inFootprint = (rt: Runtime, id: string, p: Vec2) => pointInObb(p, entityFootprint(rt.world.entities[id]).obb);
+const SEATED = new Set(['sit', 'sit-down', 'stand-up']);
+
+test('seat fixtures and the campfire block walking: their grid cells are blocked (no phase needed); all 8 fire-circle places are standable', () => {
+  const rt = setup(fixture('chair', 'camp-chair', -8, -5), fixture('bench', 'bench-6ft', -5, -5, 0.4), fixture('fire', 'campfire', -5, 4));
+  const sp = rt.services.spatial as Spatial;
+  sp.sync(rt.world);
+  const g = sp.level(0)!;
+  for (const id of ['chair', 'bench', 'fire']) {
+    const f = entityFootprint(rt.world.entities[id]);
+    assert.ok(f.y1 - f.y0 > 0.22, `${id} is taller than the step height`);
+    for (const [u, v] of [[0, 0], [0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8], [0.8, 0.8], [-0.8, -0.8]]) {
+      const q = add2(f.obb.c, rot2([u * f.obb.half[0], v * f.obb.half[1]], f.obb.yaw));
+      const c = cellOf(g, q);
+      assert.equal(g.free[c], 0, `${id} cell at (${q[0].toFixed(2)}, ${q[1].toFixed(2)}) is blocked`);
+      assert.equal(g.blockers.get(c), id);
+    }
+  }
+  const ring = fixtureSlots(rt, rt.world.entities.fire);
+  assert.equal(ring.length, 8);
+  for (const s of ring) {
+    assert.ok(clearanceAt(g, s.p) >= HUMAN_RADIUS, `${s.id} has ${clearanceAt(g, s.p).toFixed(2)} m clearance`);
+    assert.ok(!inFootprint(rt, 'fire', s.p));
+  }
+  assert.ok(fireRingRadius(1, 1) >= Math.SQRT1_2 + HUMAN_RADIUS, 'FIRE_RING rule keeps a body radius clear of the ring corner');
+});
+
+test('sitters walk around other chairs/benches (never inside another fixture footprint), sit down from the approach point, stand up back onto it; 0 violations', () => {
+  const chairs = [-9, -8, -7, -6, -5].map((x, i) => fixture(`c${i}`, 'camp-chair', x, -5)); // a row: 0.45 m gaps, too tight to pass
+  const rt = setup(...chairs, fixture('bench', 'bench-6ft', -7, -2.5, Math.PI), human('s1', -7, -8), human('s2', -7, 0), human('s3', -3, -5.2));
+  const fixtures = [...chairs.map((c) => c.id), 'bench'];
+  const recs = [
+    rt.submit('sit', { actor: 's1', fixture: 'c2' }), // behind the row: must go round an end
+    rt.submit('sit', { actor: 's2', fixture: 'bench' }), // behind the bench: must go round it
+    rt.submit('sit', { actor: 's3', slot: 'c0#seat' }), // along the row to its far end
+  ];
+  for (const r of recs) assert.equal(r.status, 'executing', r.diagnostic?.message);
+  const seatOf = (r: ActionRecord) => (r.params as { fixture?: string; slot?: string }).fixture ?? (r.params as { slot: string }).slot.split('#')[0];
+  const check = () => {
+    for (const r of recs) {
+      const who = (r.params as { actor: string }).actor, p = p2(rt, who), act = H(rt, who).activity;
+      for (const f of fixtures) {
+        if (f === seatOf(r) && SEATED.has(act)) continue; // on (or moving onto / off) their own seat
+        assert.ok(!inFootprint(rt, f, p), `tick ${rt.tick}: ${who} (${act}) is inside ${f} at (${p[0].toFixed(2)}, ${p[1].toFixed(2)})`);
+      }
+    }
+  };
+  let n = 0;
+  while (recs.some((r) => r.phase !== 'occupied') && n++ < 20 * 60) { rt.step(); check(); }
+  assert.ok(recs.every((r) => r.phase === 'occupied' && r.status === 'executing'), recs.map((r) => `${r.id} ${r.status}/${r.phase} ${r.diagnostic?.message ?? ''}`).join('; '));
+  for (let i = 0; i < 20; i++) { rt.step(); check(); }
+  for (const r of recs) {
+    const who = (r.params as { actor: string }).actor;
+    assert.ok(r.history.some((h) => h.phase === 'sit-down'), `${who} sat down through the approach point`);
+    const slot = fixtureSlots(rt, rt.world.entities[seatOf(r)]).find((s) => s.claimedBy === r.id)!;
+    assert.ok(slot, `${who} holds a seat of ${seatOf(r)}`);
+    assert.ok(Math.hypot(p2(rt, who)[0] - slot.p[0], p2(rt, who)[1] - slot.p[1]) < 1e-6, `${who} is on ${slot.id}`);
+    assert.equal(H(rt, who).activity, 'sit');
+    assert.ok(Math.abs(angleDelta(rt.world.entities[who].pose.yaw, slot.yaw)) < 0.05);
+  }
+  assert.deepEqual(msgs(rt), [], 'seated people are exempt from collision.human-static on their own seat only by activity');
+  const stands = recs.map((r) => rt.submit('stand', { actor: (r.params as { actor: string }).actor }));
+  n = 0;
+  while (stands.some((s) => s.status === 'executing') && n++ < 20 * 2) { rt.step(); check(); }
+  for (const [i, s] of stands.entries()) {
+    const who = (recs[i].params as { actor: string }).actor;
+    assert.equal(s.status, 'completed');
+    assert.equal(H(rt, who).activity, 'idle');
+    for (const f of fixtures) assert.ok(!inFootprint(rt, f, p2(rt, who)), `${who} stood up off ${f}`);
+  }
+  assert.ok(noClaims(rt, ['s1', 's2', 's3']));
+  for (let i = 0; i < 5; i++) rt.step();
+  assert.deepEqual(msgs(rt), []);
+});
+
+test('a seat whose approach point is walled in front and behind is refused slot.unreachable naming the wall; nothing is reserved', () => {
+  // a chair in the proving ground's 1 m passage, facing along the wall: 0.225 m to each wall face
+  const rt = setup(fixture('gap', 'camp-chair', 15, -15, -Math.PI / 2), human('p1', 15, -12));
+  const a = rt.submit('sit', { actor: 'p1', fixture: 'gap' });
+  assert.equal(a.status, 'failed');
+  assert.equal(a.diagnostic?.code, 'slot.unreachable');
+  assert.ok(a.diagnostic!.subjects!.includes('passage-e') && a.diagnostic!.subjects!.includes('passage-w'), a.diagnostic!.message);
+  assert.match(a.diagnostic!.message, /gap#seat .*passage east wall.*passage west wall/);
+  assert.ok(noClaims(rt, ['p1']));
+  const b = rt.submit('take_slot', { actor: 'p1', slot: 'gap#seat' });
+  assert.equal(b.diagnostic?.code, 'slot.unreachable');
 });

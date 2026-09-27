@@ -45,6 +45,11 @@ export type AssetDef = {
   stair?: { treads: number };
   /** Interaction slots (seats, fire-circle places); see SlotDef. */
   slots?: SlotDef[];
+  /**
+   * Fixture that stands where it is placed: a static walking obstacle at its catalog box even
+   * without a construction `phase` (spatial/service.ts). A moving phase (`carried`) still lifts it out.
+   */
+  obstacle?: true;
   dims: { confidence: Confidence; note: string };
 };
 
@@ -177,10 +182,21 @@ function stairFlight(treads: number, rise: number): AssetDef {
   };
 }
 
-// Social fixtures (spec §17, SOCIAL.md). Seats face local +z (yaw π/2). Fixtures carry no `phase`
-// unless placed as an obstacle, so seats are walk-on points: there is no seat collision geometry yet.
+// Social fixtures (spec §17, SOCIAL.md). Seats face local +z (yaw π/2). All three are `obstacle`s:
+// their box blocks walking at ground level (every one is taller than the 0.22 m step), so people
+// reach a seat through its approach point (engine/social/slots.ts `seatApproach`), never across it.
 const FACE_Z = Math.PI / 2;
-const FIRE_RING = 1.6; // m from the fire centre to where people stand
+/** Body radius (m) the fire-circle rule keeps clear; equals HUMAN_RADIUS (declared below). */
+const BODY_R = 0.28;
+/**
+ * Fire-circle rule: a place stands at least FIRE_RING_GAP (a body radius + 0.3 m heat / step margin)
+ * beyond the fire ring's farthest corner, and never closer than 1.6 m to the centre. For the 1 m
+ * ring that is 1.6 m (0.89 m clear of the corner, so ≥ 0.28 m body clearance with grid slack).
+ */
+export const FIRE_RING_GAP = BODY_R + 0.3;
+export const fireRingRadius = (sx: number, sz: number) => Math.max(1.6, Math.hypot(sx, sz) / 2 + FIRE_RING_GAP);
+const FIRE_SIZE: Vec3 = [1.0, 0.35, 1.0];
+const FIRE_RING = fireRingRadius(FIRE_SIZE[0], FIRE_SIZE[2]); // m from the fire centre to where people stand
 const SOCIAL_FIXTURES: AssetDef[] = [
   {
     id: 'bench-6ft',
@@ -189,6 +205,7 @@ const SOCIAL_FIXTURES: AssetDef[] = [
     size: [6 * FT, 0.45, 0.4],
     massKg: 25,
     color: '#8a6a45',
+    obstacle: true,
     slots: [-1, 0, 1].map((k, i) => ({ id: `seat${i}`, kind: 'seat' as const, local: [k * 2 * FT, 0] as [number, number], yaw: FACE_Z })),
     dims: provisional('generic site-built bench; seats every 2 ft'),
   },
@@ -199,6 +216,7 @@ const SOCIAL_FIXTURES: AssetDef[] = [
     size: [0.55, 0.85, 0.55],
     massKg: 4,
     color: '#2f6f5f',
+    obstacle: true,
     slots: [{ id: 'seat', kind: 'seat', local: [0, 0], yaw: FACE_Z }],
     dims: provisional('generic folding camp chair'),
   },
@@ -206,10 +224,11 @@ const SOCIAL_FIXTURES: AssetDef[] = [
     id: 'campfire',
     label: 'campfire (stone ring)',
     category: 'fixture',
-    size: [1.0, 0.35, 1.0],
+    size: FIRE_SIZE,
     massKg: 80,
     color: '#7a3b1e',
-    // 8 places on a 1.6 m circle, each facing the fire
+    obstacle: true,
+    // 8 places on the FIRE_RING circle (1.6 m), each facing the fire
     slots: Array.from({ length: 8 }, (_, k) => {
       const a = (k * Math.PI) / 4;
       return { id: `ring${k}`, kind: 'fire-circle' as const, local: [FIRE_RING * dcos(a), FIRE_RING * dsin(a)] as [number, number], yaw: a + Math.PI };

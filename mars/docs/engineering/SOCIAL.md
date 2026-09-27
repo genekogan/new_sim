@@ -10,7 +10,9 @@ place a body occupies, facing `yaw`. Slots are **derived, never stored**:
 - **Fixtures** whose catalog def lists `slots` (`world/catalog.ts` `SlotDef`, local x/z + yaw):
   `bench-6ft` (3 seats, 2 ft apart), `camp-chair` (1 seat), `campfire` (8 fire-circle places on a
   1.6 m circle facing the fire). Seats face local +z. Ids are `<entity>#<slot>` (`chair#seat`,
-  `fire#ring3`).
+  `fire#ring3`). Fire-circle rule (`catalog.ts` `FIRE_RING_GAP`, `fireRingRadius`): a place stands
+  ≥ a body radius + 0.3 m beyond the fire ring's farthest corner and never closer than 1.6 m — for
+  the 1 m ring that is 1.6 m, ≥ 0.8 m grid clearance, so all 8 places are standable.
 - **Place regions** with an audience `layout: { focus, spacing?=0.9, rowGap?=1.0, kind? }`
   (`SocialRegion`, an extra JSON field on the region): rows perpendicular to centroid→focus,
   nearest row first, points kept only inside the polygon with body clearance; ids `r<i>c<j>` of
@@ -21,16 +23,50 @@ seat (spec §28 "Reservation conflict"); `claimedBy` is read back from `rt.holde
 *free* when unclaimed **and** nobody's body is on it (`occupantOf`). Assignment for groups is
 deterministic nearest-first (all actor×slot pairs sorted by distance, ties by list order).
 
+## Seat fixtures are obstacles; approach points
+All three social fixtures carry `obstacle: true` in the catalog, so `spatial/service.ts` makes them
+static obstacles at their catalog box **even without a construction `phase`** (a phase still wins:
+`carried` lifts one out). Every box is taller than the 0.22 m step (chair 0.85 m with its back,
+bench 0.45 m, fire ring 0.35 m), so their cells are blocked at ground level and walkers route round
+them.
+
+A fixture seat (`kind: 'seat'` owned by an entity) is therefore never walked onto. At claim time
+(`sit` / `take_slot` plan) `seatApproach` picks its **approach point** deterministically against the
+current grid: `APPROACH_GAPS` = 0.35 / 0.40 / 0.45 / 0.50 m beyond the fixture's edge along the
+seat's facing (front), the first with ≥ `APPROACH_CLEARANCE` (0.30 m) clearance; if all four are
+blocked, the same distances behind the fixture (mirrored). If both sides are blocked the verb is
+refused `slot.unreachable`, naming the seat, its fixture and the blocker of each side (e.g.
+`passage-e (passage east wall)`), before anything is reserved. The plan-time route check goes to the
+approach point.
+
+Execution: `walk_to` the approach point (arriving facing the seat yaw) → `turn` → **`sit-down`**
+(activity `sit-down`, `SIT_TRANSITION` = 0.6 s, smoothstep from the approach point onto the seat
+point) → `occupied` (activity `sit`; a fixture seat is always held sitting, whatever `activity`
+was asked). Cancelling (`stand`, gather cancel, `releaseForDirective`) a seated / sitting-down person
+is a **deferred** stop: **`stand-up`** (activity `stand-up`, 0.6 s, or the remaining share of it)
+back to the approach point, then idle; the action ends `cancelled` and the seat claim is held until
+the body is off the seat. `stand` completes when that stand-up has finished.
+
+Invariant exemption (`runtime/invariants.ts` `SEATED_ACTIVITIES`): like `climb-*`, a person whose
+activity is `sit`, `sit-down` or `stand-up` is exempt from `collision.human-static` — the seated
+body is inside its own chair's footprint by design. The exemption is by activity, so it relies on
+the social verbs only setting those activities on a seat or its approach line.
+
+**Renderer activity names**: `sit`, `sit-down`, `stand-up` (seat), `talk`, `warm`, `watch`,
+`listen`, `idle` (+ `walk` from `walk_to`). `sit-down` / `stand-up` last 0.6 s while the body
+point moves between the approach point and the seat.
+
 ## Verbs
 Every verb moves people with child `walk_to` actions (arriving with `face`) and then holds them
-in an activity until cancelled. No loads are involved, so every cancel is immediate: people stop
-where they are, `activity = 'idle'`, `task` cleared, all actor/slot claims released.
+in an activity until cancelled. No loads are involved, so every cancel is immediate — people stop
+where they are, `activity = 'idle'`, `task` cleared, all actor/slot claims released — except a
+seated person, who first stands up to the approach point (0.6 s deferred stop, above).
 
 | Verb | Params | Behaviour |
 | --- | --- | --- |
-| `sit` | `actor, slot \| fixture` | walk to the seat, turn to its yaw, `sit` until `stand`/cancel. Explicit `slot` taken → `reservation.conflict` naming the slot + holding action; `fixture` with no free seat → `slot.none-free` naming the fixture and who holds / stands on each seat |
+| `sit` | `actor, slot \| fixture` | walk to the seat's approach point, turn to its yaw, `sit-down`, `sit` until `stand`/cancel; `slot.unreachable` if no approach point. Explicit `slot` taken → `reservation.conflict` naming the slot + holding action; `fixture` with no free seat → `slot.none-free` naming the fixture and who holds / stands on each seat |
 | `take_slot` | `actor, slot \| owner, activity?` | same for any slot kind; activity defaults by kind (seat→sit, audience→watch, fire-circle→warm) |
-| `stand` | `actor` | cancels the actor's `sit`/`take_slot`; `social.in-group` for a converse member |
+| `stand` | `actor` | cancels the actor's `sit`/`take_slot` (seated: `stand-up` 0.6 s to the approach point, then idle; `stand` completes after it); `social.in-group` for a converse member |
 | `face` | `actor, target: {entity} \| {point}` | turn in place (turn rate 4 rad/s), idle |
 | `converse` | `actors[2..6], at?, duration?` | circle of radius clamp(0.4/sin(π/n), 0.6, 1.0) m around `at`, else the nearest fitting centre to the centroid (rings to 3 m); actors keep their angular order (no crossing paths); all face the centre, `talk`. Refuses `actor.holding`, `converse.levels`, `converse.clearance` (names the wall/person) |
 | `gather` | `actors, region \| fixture, activity?` | one child `take_slot` per assigned person; people left over get a child that fails `slot.none-free` naming the owner. Ends when all children end |
@@ -56,21 +92,30 @@ wanderers mid-walk show the `walk_to` whose parent is `ambient_wander`). The dir
 release them first: `releaseForDirective(rt, actor)` cancels the smallest social unit (their own
 `sit`/`take_slot`, their current ambient walk, or the whole `converse`/`face`) and never touches
 non-social holders — critical tasks (supporting an upright) are never abandoned for autonomy.
-`socialHolder(rt, actor)` reports which social action owns someone.
+`socialHolder(rt, actor)` reports which social action owns someone. A **seated** person is inside
+their chair, so a directed `walk_to` for them is refused even earlier, at plan time
+(`route.start-blocked … (blocked by chair)`); and releasing them is a 0.6 s `stand-up`, during which
+their `actor:` reservation is still held — submit the directed task once `stand` / the cancelled
+seat action has ended (a same-tick `stand` + `take_slot` fails `reservation.conflict`).
 
 ## Tests (`engine/test/social.test.ts`)
 Registry wiring; catalog slot geometry; two sitters on one camp-chair (conflict / none-free /
-stand); converse circle (spacing, facing < 0.2 rad, cancel → idle + no claims); converse
+stand-up to the approach point); seat fixtures + campfire block their grid cells without a phase and
+all 8 fire places are standable; 3 sitters round a row of 5 chairs and a bench (never inside another
+fixture's footprint on any tick, seated exactly on the slot, stand-up back off it, 0 violations); a
+chair walled in front and behind → `slot.unreachable` naming both walls; converse circle (spacing, facing < 0.2 rad, cancel → idle + no claims); converse
 refusals (holder, wall); campfire_circle with 10 → 8 warm on their claimed ring places, 2
 `slot.none-free`, cancel → no claims; audience-region gather; ambient 6 people × 60 s (targets in
 region, 0 violations, directed task takes one and ambient lets go); determinism hash.
 
 ## Missing / approximate
-- **Sit pose / animation is a renderer concern**: the engine only sets `activity` and yaw; the
-  body point is the seat point.
-- **No seat geometry collision**: seat fixtures carry no `phase`, so they are not obstacles; a
-  walker may path across a chair. A campfire placed with `phase: 'installed'` is an obstacle.
-- Seats are occupied at the seat point; there is no separate approach point / sit-down transition.
+- **Sit pose / animation is a renderer concern**: the engine sets `activity` (`sit-down` → `sit` →
+  `stand-up`), yaw, and moves the body point between the approach point and the seat point.
+- Fixture obstacles are their full catalog box (the chair's includes its back); a mirrored approach
+  (behind the fixture) means a chair's sitter steps over the back — only used when the front is
+  walled off. Approach points are not reserved: another person standing on one makes the sitter's
+  walk yield/replan, not fail at plan time.
+- The seated exemption is by activity (`SEATED_ACTIVITIES`), not per fixture.
 - No conversation turn-taking, gaze, gestures or group re-forming when a member leaves.
 - No automatic pre-emption or resumption; ambient never re-adopts a released person.
 - Regions are single-level; audience layouts do not use seats/benches inside the region.

@@ -9,13 +9,19 @@ import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core
 import type { WorldState } from '../world/types.ts';
 
 const TOL = 0.03;
+/**
+ * Activities exempt from `collision.human-static` besides climb-*: a person sitting on a seat
+ * fixture (engine/social) is inside that chair/bench's footprint by design, and moves between the
+ * seat's approach point and the seat during the 0.6 s sit-down / stand-up transitions.
+ */
+export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up']);
 
 export const humanStaticClearance: Invariant = (rt: Runtime) => {
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
   const out: Diagnostic[] = [];
   for (const e of Object.values(rt.world.entities)) {
-    if (e.kind !== 'human' || !e.human || e.human.activity.startsWith('climb')) continue;
+    if (e.kind !== 'human' || !e.human || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity)) continue;
     const g = sp.level(e.human.level);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);

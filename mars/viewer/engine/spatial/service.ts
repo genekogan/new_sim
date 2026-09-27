@@ -5,7 +5,7 @@
 import { hashOf } from '../core/hash.ts';
 import { dcos, dsin, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
-import { def } from '../world/catalog.ts';
+import { CATALOG, def } from '../world/catalog.ts';
 import { buildGrids, gridsWithObstacles, StaticRaster, type GridSet } from './grid.ts';
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
@@ -13,6 +13,8 @@ import type { Profiler } from '../runtime/profile.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
+/** Non-human entity that blocks walking where it stands: a static phase, or no phase and a catalog `obstacle` fixture (chair, bench, campfire). */
+const isStatic = (e: Entity) => e.kind !== 'human' && (e.phase ? STATIC_PHASES.has(e.phase) : CATALOG[e.def]?.obstacle === true);
 /** Bounded memo of people-augmented grids (each holds full-size rasters). */
 const AROUND_CACHE = 8;
 /** Height band a standing person blocks above their feet. */
@@ -111,7 +113,7 @@ export class Spatial {
 
   private syncNow(world: WorldState): boolean {
     const relevant = Object.values(world.entities)
-      .filter((e) => e.kind !== 'human' && e.phase && STATIC_PHASES.has(e.phase))
+      .filter(isStatic)
       .map((e) => [e.id, e.def, e.phase, e.pose, e.connections ?? [], e.support?.kind ?? '']);
     const key = hashOf(relevant);
     if (key === this.key && this.scene) return false;
@@ -121,7 +123,7 @@ export class Spatial {
     const links: Link[] = [...this.base.links];
     const levels = [...this.base.levels];
     for (const e of Object.values(world.entities)) {
-      if (e.kind === 'human' || !e.phase || !STATIC_PHASES.has(e.phase)) continue;
+      if (!isStatic(e)) continue;
       const f = entityFootprint(e);
       obstacles.push({ id: e.id, obb: f.obb, y0: f.y0, y1: f.y1, kind: 'component', label: e.label ?? def(e.def).label });
     }

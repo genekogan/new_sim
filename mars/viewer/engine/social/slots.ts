@@ -4,13 +4,13 @@
 // entities whose catalog def lists `slots`, and 'place' regions carrying an audience `layout` —
 // never stored. Claims are runtime reservations on `slot:<id>` (exclusive), so two actions can
 // never own one seat; `claimedBy` is read back from the runtime.
-import { add2, clamp, dist2, heading, rot2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
+import { add2, clamp, dcos, dist2, dsin, heading, rot2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Region, WorldState } from '../world/types.ts';
 import { CATALOG, HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
-import { clearanceAt } from '../spatial/grid.ts';
+import { cellOf, clearanceAt, type LevelGrid } from '../spatial/grid.ts';
 
 export type SlotKind = 'seat' | 'stand' | 'audience' | 'fire-circle';
 
@@ -188,4 +188,84 @@ export function assignNearest(w: WorldState, actors: string[], slots: Slot[]): {
   }
   out.sort((x, y) => actors.indexOf(x.actor) - actors.indexOf(y.actor));
   return { pairs: out, left: actors.filter((_, i) => !usedA.has(i)) };
+}
+
+// ---------- seat approach points ----------
+
+/**
+ * A seat fixture (chair, bench) is a static obstacle, so nobody walks onto it: the sitter walks to
+ * the seat's approach point, a standable spot APPROACH_GAPS beyond the fixture's edge along the
+ * seat's facing (its front), or — when every front candidate is blocked — the same distances
+ * behind it (mirrored). The sit-down / stand-up transition then moves the body between the
+ * approach point and the seat point. Candidates are tried in order, so the choice is deterministic
+ * for a given grid; it is made at claim (plan) time against the current grid.
+ */
+export const APPROACH_GAPS = [0.35, 0.4, 0.45, 0.5] as const;
+/** Clearance an approach point needs: the body radius plus 2 cm, so the walk goal never snaps. */
+export const APPROACH_CLEARANCE = HUMAN_RADIUS + 0.02;
+
+/** Distance from local point `s` (strictly inside the box) along unit `u` to the box edge. */
+function edgeDistance(s: Vec2, u: Vec2, half: Vec2): number {
+  let t = Infinity;
+  for (const k of [0, 1] as const) if (Math.abs(u[k]) > 1e-9) t = Math.min(t, ((u[k] > 0 ? half[k] : -half[k]) - s[k]) / u[k]);
+  return t;
+}
+
+/** Nearest blocker id around `p` other than `except` (the seat's own fixture). */
+function blockerNear(g: LevelGrid, p: Vec2, except: string, radius = 1.5): string | undefined {
+  const c = cellOf(g, p);
+  if (c < 0) return undefined;
+  const r = Math.ceil(radius / g.cell), ci = c % g.nx, cj = Math.floor(c / g.nx);
+  let best: string | undefined, bd = Infinity;
+  for (let j = Math.max(0, cj - r); j <= Math.min(g.nz - 1, cj + r); j++)
+    for (let i = Math.max(0, ci - r); i <= Math.min(g.nx - 1, ci + r); i++) {
+      const id = g.blockers.get(j * g.nx + i);
+      if (id && id !== except) { const d = (i - ci) ** 2 + (j - cj) ** 2; if (d < bd) { bd = d; best = id; } }
+    }
+  return best;
+}
+
+/** Whether a slot is sat on through an approach point (a `seat` of a fixture entity). */
+export const needsApproach = (w: WorldState, s: Slot) => s.kind === 'seat' && !!w.entities[s.owner];
+
+/**
+ * Approach point of a fixture seat (see APPROACH_GAPS), or `slot.unreachable` naming what blocks
+ * both the front and the back (e.g. "passage-e (passage east wall)").
+ */
+export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
+  const e = rt.world.entities[s.owner];
+  const d = CATALOG[e.def];
+  const sp = rt.services.spatial as Spatial | undefined;
+  sp?.sync(rt.world);
+  const g = sp?.level(s.level);
+  const c: Vec2 = [e.pose.p[0], e.pose.p[2]];
+  const local = rot2(sub2(s.p, c), -e.pose.yaw);
+  const half: Vec2 = [d.size[0] / 2, d.size[2] / 2];
+  const tried: { p: Vec2; cl: number }[] = [];
+  for (const side of [1, -1]) {
+    const yawL = s.yaw - e.pose.yaw + (side < 0 ? Math.PI : 0);
+    const u: Vec2 = [dcos(yawL), dsin(yawL)];
+    const edge = edgeDistance(local, u, half);
+    for (const gap of APPROACH_GAPS) {
+      const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
+      const cl = g ? clearanceAt(g, p) : Infinity;
+      if (cl >= APPROACH_CLEARANCE) return p;
+      tried.push({ p, cl });
+    }
+  }
+  const front = tried[0], back = tried[APPROACH_GAPS.length];
+  const blocker = (q: Vec2) => (g ? blockerNear(g, q, e.id) : undefined);
+  const name = (id: string | undefined) => {
+    if (!id) return 'the edge of walkable ground';
+    const label = sp!.scene.obstacles.find((o) => o.id === id)?.label;
+    return label && label !== id ? `${id} (${label})` : id;
+  };
+  const fmt = (q: Vec2) => `(${q[0].toFixed(2)}, ${q[1].toFixed(2)})`;
+  const bf = blocker(front.p), bb = blocker(back.p);
+  return {
+    code: 'slot.unreachable',
+    message: `${s.id} cannot be sat on: no standing room ${APPROACH_GAPS[0]}–${APPROACH_GAPS[APPROACH_GAPS.length - 1]} m in front of it (${fmt(front.p)}, ${front.cl.toFixed(2)} m clear, blocked by ${name(bf)}) or behind it (${fmt(back.p)}, ${back.cl.toFixed(2)} m clear, blocked by ${name(bb)}); a sitter needs ${APPROACH_CLEARANCE.toFixed(2)} m`,
+    subjects: [s.id, s.owner, ...new Set([bf, bb].filter((x): x is string => !!x))],
+    at: [front.p[0], 0, front.p[1]],
+  };
 }
