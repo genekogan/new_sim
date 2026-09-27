@@ -6,3 +6,5 @@ export * from './solve.ts';
 export * from './plan.ts';
 export * from './track.ts';
 export * from './samplers.ts';
+export * from './shotlist.ts';
+export * from './take-sampler.ts';
