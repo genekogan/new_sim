@@ -52,7 +52,7 @@ export class WorldHistory {
     const id = hashOf({ stateHash, parent, cause, rulesVersion: this.rulesVersion }).slice(0, 24);
     const existing = this.checkpoints.get(id);
     if (existing) return existing;
-    this.states.set(stateHash, frozen);
+    if (!this.states.has(stateHash)) this.states.set(stateHash, frozen); // first clone wins (review M6)
     const cp: Checkpoint = {
       id,
       stateHash,

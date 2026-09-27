@@ -12,7 +12,9 @@ the Cloudflare Durable Object. Spec: `SPEC.md`. Audit of the existing app:
 - **No three.js / DOM / Date.now / Math.random in engine core.** Use
   `core/math.ts`, `core/rng.ts` (seeded, state lives in `world.rng`).
 - **Determinism**: fixed tick `DT = 1/20 s` (`runtime/runtime.ts`); iterate maps
-  / records in insertion or sorted order; no wall-clock.
+  / records in insertion or sorted order; no wall-clock. `new Runtime()` rebuilds
+  `world.entities` in sorted-id order (`canonicalEntityOrder`), because `hashOf` ignores
+  key order; code that adds entities mid-run must call it again.
 - **Fail loudly**: actions return `Diagnostic { code, message, subjects, at }`
   naming concrete objects (e.g. "the 19 ft upright u3 intersects wall
   passage-e during the 90° turn at (14.8, -15.0)"). Never "succeed" by clipping,

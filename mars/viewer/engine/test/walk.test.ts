@@ -9,6 +9,9 @@ import { provingGround, DECK_Y } from '../scenes/proving-ground.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
+import { carry } from '../carry/actions.ts';
+import { CARRY_INVARIANTS } from '../carry/invariants.ts';
+import { carryCorridors } from '../carry/scenes.ts';
 import type { ActionDef } from '../actions/types.ts';
 
 function setup(...people: ReturnType<typeof human>[]) {
@@ -193,4 +196,28 @@ test('replan around people on the deck (review M3): obstacles sit at their own f
   assert.ok((act.outputs?.length as number) > 5 + 2, `route grew (${act.outputs?.length})`);
   assert.equal(rt.world.entities.a.human!.level, 1);
   assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('entity insertion order does not change behaviour (review M6): same world, two orders, same final hash', () => {
+  // A 2-person beam carry down corridor A past two bystanders standing abreast in its path, plus a
+  // walker coming the other way. Which bystander is asked to make way first is a "first match" over
+  // world.entities; before canonicalisation the reversed order left the carry blocked.
+  const REG = new Map<string, ActionDef>([['walk_to', walkTo], ['carry', carry]]);
+  const scenes: [string, number, number][][] = [[['x1', 12, 3.6], ['x2', 12, 4.5]], [['a9', 12, 4.6], ['z0', 12, 3.4], ['m5', 16, 4]]];
+  for (const people of scenes) {
+    const run = (reverse: boolean) => {
+      const base = carryCorridors();
+      const es = [component('b1', 'beam-12ft', [4, 0, 4], 0), human('p1', 2, 6.5), human('p2', 6, 1.5), ...people.map(([id, x, z]) => human(id, x, z))];
+      const rt = new Runtime(addAll(emptyWorld('carry-test', base), ...(reverse ? es.reverse() : es)), REG, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS]);
+      const ids = Object.keys(rt.world.entities);
+      assert.deepEqual(ids, [...ids].sort(), 'Runtime canonicalises entity order');
+      const c = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b1', to: { x: 18, z: 11, yaw: Math.PI / 2 } });
+      if (rt.world.entities.m5) rt.submit('walk_to', { actor: 'm5', x: 6, z: 6 });
+      rt.runUntilIdle(20 * 240);
+      assert.equal(c.status, 'completed', c.diagnostic?.message);
+      assert.deepEqual(rt.violations.map((v) => v.message), []);
+      return rt.stateHash();
+    };
+    assert.equal(run(false), run(true));
+  }
 });

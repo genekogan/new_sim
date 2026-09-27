@@ -44,6 +44,7 @@ export class Runtime {
   services: Record<string, any>;
   invariants: Invariant[];
   constructor(world: WorldState, registry: Map<string, ActionDef>, services: Record<string, any>, invariants: Invariant[] = []) {
+    canonicalEntityOrder(world);
     this.world = world;
     this.registry = registry;
     this.services = services;
@@ -276,3 +277,23 @@ export class Runtime {
     for (const o of this.observers) o.onEvent?.(this, e);
   }
 }
+
+/**
+ * Rebuild `world.entities` with keys in sorted id order (review M6). The state hash ignores key
+ * order, so every scan over `Object.values(world.entities)` — encounter/intrusion/bystander
+ * searches that act on the first match, invariants, the sequence runner — must see one canonical
+ * order, or two worlds with equal hashes could behave differently. Actions never add entities
+ * mid-run; anything that does must call this again.
+ */
+export function canonicalEntityOrder(world: WorldState): WorldState {
+  const ids = Object.keys(world.entities);
+  let sorted = true;
+  for (let i = 1; i < ids.length && sorted; i++) sorted = ids[i - 1] < ids[i];
+  if (!sorted) {
+    const out: WorldState['entities'] = {};
+    for (const id of ids.sort()) out[id] = world.entities[id];
+    world.entities = out;
+  }
+  return world;
+}
+

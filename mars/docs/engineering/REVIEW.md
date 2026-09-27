@@ -220,6 +220,7 @@ checkpoints and workspaces in the history blob. Flag `rehearse` `readOnly: false
 keep its take in memory with an LRU. Cap plan and take counts per room.
 
 ### M6. Behaviour depends on entity insertion order, which the state hash ignores
+> **Fixed 2026-09-27.** `new Runtime()` now canonicalises `world.entities` to sorted-id order (`canonicalEntityOrder` in `runtime/runtime.ts`; a no-op when already sorted). Every run goes through a Runtime and no action adds entities mid-run, so all 21 `Object.values(world.entities)` scans (encounter/intrusion/bystander first-match, invariants, sequence runner) see one order for a given state hash. `WorldHistory` keeps the first stored clone per state hash. Pinned hashes unchanged (probe `d54eca7c…`, campus `f60e10b4…`). Test: `entity insertion order does not change behaviour (review M6)` — a beam carry past two abreast bystanders (+ a counter-walker) built in forward and reversed order ends with identical hashes; before the fix the reversed order left the carry blocked.
 `hashOf` sorts keys, so two worlds with identical content and different
 `world.entities` insertion order hash identically. Yet 21 engine call sites iterate
 `Object.values(world.entities)` unsorted, and several return the *first* match. For
