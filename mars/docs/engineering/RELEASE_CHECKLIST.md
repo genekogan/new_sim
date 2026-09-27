@@ -23,6 +23,9 @@ order: `npm test`, `npm run test:engine`, `npx tsc --noEmit -p .`,
 - Before deploying, check that `ok: true`, that `gitHead` matches the commit you are deploying
   with `gitDirty: false`, and that `finalStateHash` matches the previous release unless the
   engine change was intended to move it. Record the report path under Results.
+- With each release, regenerate the milestone evidence report (`npm run evidence` from `viewer/`,
+  ~1 min) and commit `docs/engineering/EVIDENCE.md` + `evidence.json`; it exits non-zero if a test
+  cited in `viewer/engine/test/evidence-map.json` was renamed or removed. It is not part of the gate.
 
 ## Rollback target (record before deploying)
 

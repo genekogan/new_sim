@@ -17,6 +17,7 @@
     "gate": "node deploy/gate.mjs",
     "format": "oxfmt app simulation lib deploy vite.config.ts",
     "test:engine": "node --test engine/test/*.test.ts",
+    "evidence": "node deploy/evidence-report.mjs",
     "e2e": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright test -c e2e/playwright.config.ts",
     "e2e:update-baselines": "E2E_UPDATE_BASELINES=1 PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright test -c e2e/playwright.config.ts",
     "e2e:install": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright install chromium"
