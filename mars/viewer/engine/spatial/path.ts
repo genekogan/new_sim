@@ -168,7 +168,10 @@ export function findRoute(
       curLv = e.toLevel;
     } else pts.push(centreOf(g, id % N));
   }
-  pts.push(goal.p);
+  // a snapped goal (its own cell has no standing room) ends at the snapped standable cell centre, never
+  // at the raw goal (review H2); walk_to reports the snap distance
+  const end = gt === cellOf(gg, goal.p) ? goal.p : goalC;
+  if (dist2(end, pts[pts.length - 1]) > 1e-9 || pts.length === 1) pts.push(end);
   legs.push(walkLeg(grids.levels.get(curLv)!, pts, r, true));
   const length = legs.reduce((s, l) => s + (l.kind === 'walk' ? pathLen2(l.points) : pathLen(l.link.path)), 0);
   return { ok: true, route: { legs, length, expanded } };
@@ -176,7 +179,7 @@ export function findRoute(
 
 /** String-pull a cell path keeping every shortcut's clearance ≥ radius. Endpoints are preserved. */
 function walkLeg(g: LevelGrid, raw: Vec2[], r: number, _final = false): WalkLeg {
-  // drop the exact goal/start if they are not standable (snapped) — keep cell centres instead
+  // (a snapped goal already arrives here as its cell centre; see findRoute)
   const pts = raw.filter((p, i) => i === 0 || i === raw.length - 1 || dist2(p, raw[i - 1]) > 1e-9);
   const out: Vec2[] = [pts[0]];
   let a = 0;

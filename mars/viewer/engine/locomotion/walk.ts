@@ -415,7 +415,9 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     releaseAll(rt, ex);
     a.human!.activity = 'idle';
     a.human!.task = undefined;
-    return { status: 'completed', outputs: { replans: ex.replans, length: ex.route.length } };
+    // snapped: how far the standable arrival point lies from the requested goal (0 = exact; review H2)
+    const snapped = Math.round(dist2(pointAt(ex, ex.total), ex.goal.p) * 1000) / 1000;
+    return { status: 'completed', outputs: { replans: ex.replans, length: ex.route.length, snapped } };
   }
   return { status: 'running', phase };
 }

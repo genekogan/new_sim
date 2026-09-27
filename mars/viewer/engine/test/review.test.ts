@@ -17,6 +17,7 @@ import { z } from 'zod';
 import type { ActionDef } from '../actions/types.ts';
 import { progressiveContributor } from '../construction/index.ts';
 import { def } from '../world/catalog.ts';
+import { clearanceAt } from '../spatial/grid.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity } from '../world/types.ts';
 
@@ -215,4 +216,29 @@ test('C3: a walker crossing a carry waits for the load to pass (traffic.load), n
   rt.step();
   assert.ok(codes(rt).includes('collision.human-load'), JSON.stringify(codes(rt)));
   assert.match(rt.violations.find((v) => v.code === 'collision.human-load')!.message, /p3 overlaps the carried b/);
+});
+
+test('H2: a snapped walk_to goal ends at the snapped standable point, reports outputs.snapped, and fails beyond the tolerance', () => {
+  const wall = { id: 'wall-e', label: 'east wall', kind: 'wall' as const, y0: 0, y1: 2.4, obb: { c: [5, 0] as [number, number], half: [0.1, 6] as [number, number], yaw: 0 } };
+  const base = open(10, [wall]);
+  const sp = new Spatial(base);
+  const rt = new Runtime(addAll(emptyWorld('open', base), human('p1', 0, 0)), createRegistry(), { spatial: sp }, ENGINE_INVARIANTS);
+  const r = rt.submit('walk_to', { actor: 'p1', x: 4.75, z: 0 }); // body edge would be 0.15 m inside the wall face at 4.9
+  rt.runUntilIdle(2000, [r.id]);
+  assert.equal(r.status, 'completed');
+  const p = rt.world.entities.p1.pose.p;
+  assert.ok(clearanceAt(sp.level(0)!, [p[0], p[2]]) >= 0.28, `arrival clearance ${clearanceAt(sp.level(0)!, [p[0], p[2]]).toFixed(2)} m`);
+  const snapped = r.outputs?.snapped as number;
+  assert.ok(snapped > 0.05 && snapped <= 0.35, `snapped ${snapped}`);
+  assert.ok(Math.abs(Math.hypot(p[0] - 4.75, p[2]) - snapped) < 0.01, 'the body stands at the reported snapped point');
+  assert.deepEqual(codes(rt), [], 'no collision on arrival');
+  // an exactly standable goal is reached exactly
+  const ok = rt.submit('walk_to', { actor: 'p1', x: 2, z: 1 });
+  rt.runUntilIdle(2000, [ok.id]);
+  assert.equal(ok.outputs?.snapped, 0);
+  assert.deepEqual([rt.world.entities.p1.pose.p[0], rt.world.entities.p1.pose.p[2]], [2, 1]);
+  // beyond the snap tolerance: refused before any movement
+  const far = rt.submit('walk_to', { actor: 'p1', x: 5.0, z: 0 });
+  assert.equal(far.status, 'failed');
+  assert.equal(far.diagnostic?.code, 'route.goal-blocked');
 });
