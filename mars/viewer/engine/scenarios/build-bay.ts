@@ -112,9 +112,10 @@ export function buildBayTemplate(site: Site): SequenceTemplate {
     lastJ = [`carry_${j}`];
     prevJ = { 0: `carry_${j}` };
   }
-  // sheets must end within 3 m of their deck position (hand-up rule): s1 south of the bay now,
-  // s2 west of the bay once the joists have left the ground there
-  step('carry_s1', 'carry', { crew: ['$crew[2]', '$crew[3]'], item: 's1', to: to(-1.3, -1.6, 0) }, ['releaseA', 'releaseB']);
+  // sheets must end within 3 m of their deck position (hand-up rule) and beside the bay, where
+  // they can be lifted over the side beams onto the joists (swept-lift rule: never through the
+  // 12 ft end frames): s1 east of the bay now, s2 west of it once the joists have left the ground there
+  step('carry_s1', 'carry', { crew: ['$crew[2]', '$crew[3]'], item: 's1', to: to(2.6, PANELS[0][1], 0) }, ['releaseA', 'releaseB']);
   prev = Object.values(prevJ);
   for (const [j, a] of JOISTS) {
     step(`fix_${j}`, 'install_joist', { crew: ['$crew[4]'], joist: j, bay: { a: 'A', b: 'B' }, height: 1.8, at: a }, prev);

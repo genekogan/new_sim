@@ -14,7 +14,7 @@ import { deckSurfaces } from '../construction/contributor.ts';
 import { seatPoint, snapSeat } from '../construction/rules.ts';
 import { def } from '../world/catalog.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
-import type { SpatialScene } from '../spatial/types.ts';
+import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 
 const L9 = def('beam-9ft').size[0];
 const D12 = def('upright-12ft').size[0];
@@ -27,18 +27,18 @@ const PANELS: [string, number][] = [['s1', 0.15 + PANEL_Z / 2], ['s2', 0.15 + PA
 const STAIR = { x: 0.94 + def('stair-flight-10').size[0], z: 0.75, heading: Math.PI }; // foot east of the bay, top at the deck's east edge
 const DECK_LEVEL = levelFor(1.9875);
 
-function openGround(): SpatialScene {
+function openGround(extra: Obstacle[] = []): SpatialScene {
   return {
     bounds: [-15, -15, 15, 15],
     levels: [{ id: 0, y: 0, label: 'ground' }],
     surfaces: [{ id: 'ground', level: 0, y: 0, obb: { c: [0, 0], half: [15, 15], yaw: 0 } }],
-    obstacles: [],
+    obstacles: extra,
     links: [],
   };
 }
 
-function setup() {
-  const base = openGround();
+function setup(extra: Obstacle[] = []) {
+  const base = openGround(extra);
   const w = addAll(
     emptyWorld('open-ground', base),
     component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, REST_Y, 0], yaw: Math.PI, pitch: LYING } }),
@@ -298,4 +298,46 @@ test('a sheet whose support goes missing stops being floor and is flagged', () =
   const g = sp.level(DECK_LEVEL)!;
   const cell = Math.floor((0 - g.x0) / g.cell) + Math.floor((0.8 - g.z0) / g.cell) * g.nx;
   assert.equal(g.free[cell], 0, 'no floor where s1 was');
+});
+
+// ---- swept lifts (install_* / connect_beam never pass a part through anything) ----
+
+/** A crate on joist j1's straight path from its staging spot (−1.6, 1.37) to its seat (0, 0.2) at 1.88 m. */
+const CRATE: Obstacle = { id: 'crate', obb: { c: [-0.8, 0.785], half: [0.1, 0.1], yaw: 0 }, y0: 0.5, y1: 1.2, kind: 'solid', label: 'tool crate' };
+/** A canopy over the staging side, below the lift-over height (seat top + 0.3 m ≈ 2.27 m). */
+const CANOPY: Obstacle = { id: 'canopy', obb: { c: [-1.3, 1.35], half: [0.6, 0.85], yaw: 0 }, y0: 2.1, y1: 2.2, kind: 'solid', label: 'shade canopy' };
+
+test('swept lift: a joist whose straight path is obstructed is lifted over (up, across, down)', () => {
+  const rt = setup([CRATE]);
+  buildBay(rt);
+  stageParts(rt);
+  let maxY = 0, xAtLift = NaN;
+  rt.observers.push({ onTick: (r) => {
+    const j = r.world.entities.j1;
+    if (j.phase !== 'carried') return;
+    if (Number.isNaN(xAtLift) && j.pose.p[1] > 1.0) xAtLift = j.pose.p[0];
+    maxY = Math.max(maxY, j.pose.p[1]);
+  } });
+  must(rt, 'install_joist', { crew: ['p5'], joist: 'j1', bay: { a: 'A', b: 'B' }, height: 1.8, at: 0.2 });
+  const j1 = rt.world.entities.j1;
+  const seat = j1.pose.p[1];
+  assert.equal(j1.phase, 'installed');
+  assert.ok(maxY >= seat + def('2x4-6ft').size[1] + 0.3 - 1e-6, `lifted over at ${maxY.toFixed(2)} m (seat ${seat.toFixed(2)} m)`);
+  assert.ok(Math.abs(xAtLift - -1.6) < 1e-6, `rose straight up from where it lay (x ${xAtLift} at 1 m)`);
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+test('swept lift: blocked straight and lifted over is refused with lift.path-blocked naming both obstacles', () => {
+  const rt = setup([CRATE, CANOPY]);
+  buildBay(rt);
+  stageParts(rt);
+  const r = rt.submit('install_joist', { crew: ['p5'], joist: 'j1', bay: { a: 'A', b: 'B' }, height: 1.8, at: 0.2 });
+  assert.equal(r.status, 'failed');
+  assert.equal(r.diagnostic?.code, 'lift.path-blocked');
+  assert.match(r.diagnostic!.message, /joist j1 cannot be lifted into place: its straight path would pass through tool crate \(crate\).*lifting it over at 2\.2\d m is blocked too, by shade canopy \(canopy\)/);
+  assert.deepEqual(r.diagnostic!.subjects, ['j1', 'crate']);
+  assert.equal(rt.world.entities.j1.phase, 'staged');
+  // the unobstructed neighbour still goes in (its path clears both)
+  must(rt, 'install_joist', { crew: ['p5'], joist: 'j5', bay: { a: 'A', b: 'B' }, height: 1.8, at: 2.55 });
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });

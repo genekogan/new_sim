@@ -22,8 +22,8 @@ import type { Entity, Pose, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { beamLinks, isBeam, isStanding, isSupported, isUpright, snapSeat } from './rules.ts';
 import {
-  approach, beginLift, cancelLift, crewCheck, f2, fail, findStations, liftStep, releaseCrew, spatialOf, stagedCheck,
-  type Fail, type LiftExec, type Station,
+  approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, liftStep, releaseCrew, spatialOf, stagedCheck, sweptLiftPath, symmetricYaw,
+  type Fail, type LiftExec, type Station, type SweepOpts,
 } from './access.ts';
 
 export const JOIST_CANTILEVER_MAX = 12 * IN + 0.005;
@@ -86,7 +86,7 @@ export function supportProblems(w: WorldState, e: Entity, depth = 0): string[] {
 // ---------------------------------------------------------------- install_joist
 
 type JP = { crew: string[]; joist: string; bay: { a: string; b: string }; height: number; at: number };
-type JProg = { to: Pose; beams: [string, string]; stations: Station[]; height: number };
+type JProg = { to: Pose; beams: [string, string]; stations: Station[]; height: number; sweep: SweepOpts };
 
 export function planJoist(rt: Runtime, p: JP): { ok: true; program: JProg } | Fail {
   const w = rt.world;
@@ -124,12 +124,16 @@ export function planJoist(rt: Runtime, p: JP): { ok: true; program: JProg } | Fa
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 1, 2, `setting a ${def(j.def).label}`);
   if (cc) return cc;
-  const to: Pose = { p: [c[0], y, c[1]], yaw: a.pose.yaw };
+  const to: Pose = { p: [c[0], y, c[1]], yaw: symmetricYaw(j.pose.yaw, a.pose.yaw) };
+  // it may touch the two beams it comes to rest on; nothing else on the way up
+  const sweep: SweepOpts = { ignore: [...beams], what: `joist ${j.id}` };
+  const path = sweptLiftPath(rt, j, j.pose, to, sweep);
+  if (!path.ok) return path;
   const u = rot2([len * 0.45, 0], a.pose.yaw);
   const anchors: Vec2[] = p.crew.length === 1 ? [c] : [[c[0] - u[0], c[1] - u[1]], [c[0] + u[0], c[1] + u[1]]];
   const st = findStations(rt, p.crew, anchors, { label: `joist ${j.id}`, obb: flatObb(to, j), y: y + size(j)[1], y0: y });
   if (!st.ok) return st;
-  return { ok: true, program: { to, beams, stations: st.stations, height: h } };
+  return { ok: true, program: { to, beams, stations: st.stations, height: h, sweep } };
 }
 
 type JExec = LiftExec & { p: JP; prog: JProg };
@@ -160,8 +164,9 @@ export const installJoist: ActionDef<JP, JProg, JExec> = {
         const pr = beamProblems(rt.world, rt.world.entities[id]);
         if (pr.length) return { status: 'failed', diagnostic: { code: 'joist.beam-unsupported', message: `joist ${ex.item} cannot rest on ${id}: ${pr.join('; ')}`, subjects: [ex.item, id] } };
       }
+      const blocked = beginSweptLift(rt, ex, ex.prog.sweep, ex.duration);
+      if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
-      beginLift(rt, ex);
     }
     if (!liftStep(rt, ex, dt)) return { status: 'running', phase: 'place' };
     const j = rt.world.entities[ex.item];
@@ -181,7 +186,7 @@ export const installJoist: ActionDef<JP, JProg, JExec> = {
 // ---------------------------------------------------------------- install_plywood
 
 type PP = { crew: string[]; sheet: string; x: number; z: number; yaw: number; height?: number };
-type PProg = { to: Pose; supports: string[]; stations: Station[] };
+type PProg = { to: Pose; supports: string[]; stations: Station[]; sweep: SweepOpts };
 
 /** Support analysis for a sheet footprint (used by install and by tests/diagnostics). */
 export function sheetSupports(w: WorldState, sheet: Entity, obb: OBB2, height?: number): { ok: true; y: number; supports: string[] } | Fail {
@@ -236,11 +241,15 @@ export function planPlywood(rt: Runtime, p: PP): { ok: true; program: PProg } | 
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 2, 2, `setting a ${def(sh.def).label}`);
   if (cc) return cc;
-  const to: Pose = { p: [p.x, s.y, p.z], yaw: p.yaw };
+  const to: Pose = { p: [p.x, s.y, p.z], yaw: symmetricYaw(sh.pose.yaw, p.yaw) };
+  // it may touch the members it comes to rest on; nothing else on the way up
+  const sweep: SweepOpts = { ignore: [...s.supports], what: `plywood ${sh.id}` };
+  const path = sweptLiftPath(rt, sh, sh.pose, to, sweep);
+  if (!path.ok) return path;
   const e = rot2([size(sh)[0] * 0.45, 0], p.yaw);
   const st = findStations(rt, p.crew, [[p.x - e[0], p.z - e[1]], [p.x + e[0], p.z + e[1]]], { label: `plywood ${sh.id}`, obb, y: top, y0: s.y });
   if (!st.ok) return st;
-  return { ok: true, program: { to, supports: s.supports, stations: st.stations } };
+  return { ok: true, program: { to, supports: s.supports, stations: st.stations, sweep } };
 }
 
 type PExec = LiftExec & { p: PP; prog: PProg };
@@ -270,8 +279,9 @@ export const installPlywood: ActionDef<PP, PProg, PExec> = {
       const sh = rt.world.entities[ex.item];
       const again = sheetSupports(rt.world, sh, flatObb(ex.to, sh), ex.p.height);
       if (!again.ok) return { status: 'failed', diagnostic: again.diagnostic };
+      const blocked = beginSweptLift(rt, ex, ex.prog.sweep, ex.duration);
+      if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
-      beginLift(rt, ex);
     }
     if (!liftStep(rt, ex, dt)) return { status: 'running', phase: 'place' };
     const sh = rt.world.entities[ex.item];

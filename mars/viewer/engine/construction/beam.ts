@@ -3,14 +3,15 @@ import { z } from 'zod';
 import { angleDelta, dot2, rot2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
-import type { Entity } from '../world/types.ts';
+import type { Entity, Pose } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { groupStability, holdingDiagnostic, isBeam, isStanding, isSupported, isUpright, seatPoint, snapSeat, STANDING_REACH } from './rules.ts';
 import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
+import { liftDuration, pathPose, sweptLiftPath } from './access.ts';
 
 type CP = { crew: string[]; beam: string; a: string; b: string; column: 'l' | 'r'; height: number };
-type CProg = { colB: 'l' | 'r'; height: number; endA: 'end-l' | 'end-r'; target: { p: [number, number, number]; yaw: number }; stations: { p: Vec2; yaw: number }[] };
-type CExec = { p: CP; prog: CProg; id: string; phase: 'approach' | 'lift'; children?: Children; t: number; from: { p: [number, number, number]; yaw: number } };
+type CProg = { colB: 'l' | 'r'; height: number; endA: 'end-l' | 'end-r'; target: { p: [number, number, number]; yaw: number }; stations: { p: Vec2; yaw: number }[]; path: Pose[]; duration: number };
+type CExec = { p: CP; prog: CProg; id: string; phase: 'approach' | 'lift'; children?: Children; t: number; from: { p: [number, number, number]; yaw: number }; path?: Pose[]; duration?: number };
 
 const fail = (code: string, message: string, subjects: string[]): { ok: false; diagnostic: Diagnostic } => ({ ok: false, diagnostic: { code, message, subjects } });
 
@@ -63,7 +64,13 @@ export function planBeam(rt: Runtime, p: CP): { ok: true; program: CProg } | { o
   const d = angleDelta(beam.pose.yaw, axis);
   const beamYaw = wrapAngle(Math.abs(d) > Math.PI / 2 ? axis + Math.PI : axis);
   const endA = dot2([Math.cos(beamYaw), Math.sin(beamYaw)], [sa[0] - mid[0], sa[2] - mid[2]]) > 0 ? 'end-r' : 'end-l';
-  return { ok: true, program: { colB: colB < 0 ? 'l' : 'r', height: h, endA, target: { p: mid, yaw: beamYaw }, stations: [face(sa, -sgn), face(sb, sgn)] } };
+  // swept lift: the beam may touch the two uprights it hooks into; nothing else on the way up
+  const lift = sweptLiftPath(rt, beam, beam.pose, { p: mid, yaw: beamYaw }, { ignore: [a.id, b.id], what: `${def(beam.def).label} ${beam.id}` });
+  if (!lift.ok) return lift;
+  return {
+    ok: true,
+    program: { colB: colB < 0 ? 'l' : 'r', height: h, endA, target: { p: mid, yaw: beamYaw }, stations: [face(sa, -sgn), face(sb, sgn)], path: lift.path.poses, duration: liftDuration(lift.path, 2.5) },
+  };
 }
 
 export const connectBeam: ActionDef<CP, CProg, CExec> = {
@@ -104,15 +111,16 @@ export const connectBeam: ActionDef<CP, CProg, CExec> = {
       // re-check at the moment of lifting: uprights may have lost support meanwhile
       const again = planBeam(rt, ex.p);
       if (!again.ok) return { status: 'failed', diagnostic: again.diagnostic };
+      ex.path = again.program.path;
+      ex.duration = again.program.duration;
       ex.phase = 'lift';
       beam.support = { kind: 'held', by: [...ex.p.crew] };
       beam.phase = 'carried';
       for (const c of ex.p.crew) Object.assign(w.entities[c].human!, { activity: 'lift', grip: { entity: beam.id, slot: c } });
     }
-    ex.t = Math.min(1, ex.t + dt / 2.5);
-    const s = ex.t * ex.t * (3 - 2 * ex.t);
-    const T = ex.prog.target;
-    beam.pose = { p: [ex.from.p[0] + (T.p[0] - ex.from.p[0]) * s, ex.from.p[1] + (T.p[1] - ex.from.p[1]) * s, ex.from.p[2] + (T.p[2] - ex.from.p[2]) * s], yaw: ex.from.yaw + angleDelta(ex.from.yaw, T.yaw) * s };
+    ex.t = Math.min(1, ex.t + dt / (ex.duration ?? 2.5));
+    const q = pathPose(ex.path!, ex.t);
+    beam.pose = { p: q.p, yaw: q.yaw };
     if (ex.t < 1) return { status: 'running', phase: 'lift' };
     const key = `col${ex.p.column}@${ex.prog.height.toFixed(3)}`;
     const keyB = `col${ex.prog.colB}@${ex.prog.height.toFixed(3)}`;

@@ -10,11 +10,13 @@
 //     next to another person, and with a walking route from where they are now.
 // Ladders / scaffold are not modelled: work more than 2.1 m above every
 // accessible floor is refused (`reach.too-high`).
-import { rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { angleDelta, obbOverlap, rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
-import type { Spatial } from '../spatial/service.ts';
+import { entityFootprint, type Spatial } from '../spatial/service.ts';
+import type { Obstacle } from '../spatial/types.ts';
+import { def } from '../world/catalog.ts';
 import { cellOf, clearanceAt, type LevelGrid } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { holdingDiagnostic, STANDING_REACH } from './rules.ts';
@@ -166,7 +168,7 @@ function floodMark(g: LevelGrid, start: number, r: number, mark: Uint8Array) {
 
 // ---- shared execution: walk the crew to stations, then lift the part into place ----
 
-export type LiftExec = { id: string; crew: string[]; item: string; phase: 'approach' | 'place'; children?: Children; t: number; from: Pose; to: Pose; duration: number };
+export type LiftExec = { id: string; crew: string[]; item: string; phase: 'approach' | 'place'; children?: Children; t: number; from: Pose; to: Pose; duration: number; path?: Pose[] };
 
 export function smooth(t: number) {
   return t * t * (3 - 2 * t);
@@ -206,8 +208,127 @@ export function beginLift(rt: Runtime, ex: LiftExec) {
 /** Advance the lift; true when the part has reached its final pose. */
 export function liftStep(rt: Runtime, ex: LiftExec, dt: number): boolean {
   ex.t = Math.min(1, ex.t + dt / ex.duration);
-  rt.world.entities[ex.item].pose = lerpPose(ex.from, ex.to, smooth(ex.t));
+  rt.world.entities[ex.item].pose = pathPose(ex.path ?? [ex.from, ex.to], ex.t);
   return ex.t >= 1;
+}
+
+// ---- swept lifts: the part's box along its path must not pass through anything ----
+// A lift moves a part from where it lies to its seat. Plan time (and again at the
+// moment of lifting) samples the path and tests the part's box (entityCorners →
+// entityFootprint prism) against every scene obstacle — static geometry and
+// components — except the part itself, the parts it will rest on / seat into
+// (`ignore`), and anything it already touches where it lies. If the straight path
+// is blocked, try the standard "lift over": straight up until its underside is
+// LIFT_OVER above its seated top, across (turning on the way), then straight down.
+
+export const LIFT_SAMPLES = 24; // minimum samples per path segment
+const LIFT_SAMPLE_STEP = 0.03; // m: max displacement of any point of the part between samples
+export const LIFT_OVER = 0.3; // m of clearance above the seated part's top for a lift-over
+export const LIFT_PACE = 1.0; // m/s: pace of a multi-segment lift (the straight lift keeps its verb's duration)
+
+export type SweepOpts = { ignore: string[]; liftOver?: boolean; what?: string };
+export type LiftPath = { poses: Pose[]; via: 'straight' | 'lift-over' };
+type Hit = { o: Obstacle; q: Pose };
+
+const partExtent = (e: Entity) => Math.hypot(...def(e.def).size) / 2;
+
+/**
+ * Seated yaw for an end-for-end symmetric part (2x4, sheet, tread): of `yaw` and `yaw + π`, the one
+ * nearest the yaw it lies at, so it is not spun half a turn in the air.
+ */
+export function symmetricYaw(from: number, yaw: number): number {
+  return Math.abs(angleDelta(from, yaw)) > Math.PI / 2 ? yaw + Math.PI : yaw;
+}
+
+/** Pose at time fraction t along a waypoint path: segment times ∝ length, eased within each segment. */
+export function pathPose(ps: Pose[], t: number): Pose {
+  if (ps.length === 2) return lerpPose(ps[0], ps[1], smooth(t));
+  const lens = ps.slice(1).map((q, i) => Math.hypot(q.p[0] - ps[i].p[0], q.p[1] - ps[i].p[1], q.p[2] - ps[i].p[2]) + 1e-9);
+  const total = lens.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  for (let i = 0; i < lens.length; i++) {
+    const f = lens[i] / total;
+    if (t <= acc + f || i === lens.length - 1) return lerpPose(ps[i], ps[i + 1], smooth(Math.min(1, Math.max(0, (t - acc) / f))));
+    acc += f;
+  }
+  return ps[ps.length - 1];
+}
+
+export const pathLength = (ps: Pose[]) => ps.slice(1).reduce((a, q, i) => a + Math.hypot(q.p[0] - ps[i].p[0], q.p[1] - ps[i].p[1], q.p[2] - ps[i].p[2]), 0);
+
+/** Duration of a lift along `path`: the verb's own duration for a straight lift, paced for a lift-over. */
+export const liftDuration = (path: LiftPath, base: number) => (path.via === 'straight' ? base : Math.max(base, pathLength(path.poses) / LIFT_PACE));
+
+function segmentHit(sp: Spatial, e: Entity, a: Pose, b: Pose, skip: Set<string>): Hit | null {
+  const ext = partExtent(e);
+  const disp = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2])
+    + ext * (Math.abs(angleDelta(a.yaw, b.yaw)) + Math.abs((b.pitch ?? 0) - (a.pitch ?? 0)) + Math.abs((b.roll ?? 0) - (a.roll ?? 0)));
+  const n = Math.max(LIFT_SAMPLES, Math.ceil(disp / LIFT_SAMPLE_STEP));
+  // broad phase: obstacles near the segment's bounding box
+  const lo = [Math.min(a.p[0], b.p[0]) - ext, Math.min(a.p[1], b.p[1]) - ext, Math.min(a.p[2], b.p[2]) - ext];
+  const hi = [Math.max(a.p[0], b.p[0]) + ext, Math.max(a.p[1], b.p[1]) + ext, Math.max(a.p[2], b.p[2]) + ext];
+  const near = sp.scene.obstacles.filter((o) => {
+    if (o.id === e.id || skip.has(o.id) || o.y1 <= lo[1] || o.y0 >= hi[1]) return false;
+    const r = Math.hypot(o.obb.half[0], o.obb.half[1]);
+    return o.obb.c[0] + r >= lo[0] && o.obb.c[0] - r <= hi[0] && o.obb.c[1] + r >= lo[2] && o.obb.c[1] - r <= hi[2];
+  });
+  if (!near.length) return null;
+  for (let k = 1; k <= n; k++) {
+    const q = lerpPose(a, b, k / n);
+    const f = entityFootprint({ ...e, pose: q });
+    for (const o of near) {
+      if (o.y1 <= f.y0 + 0.005 || o.y0 >= f.y1 - 0.005) continue;
+      if (obbOverlap(f.obb, o.obb, -0.01)) return { o, q };
+    }
+  }
+  return null;
+}
+
+function pathHit(sp: Spatial, e: Entity, ps: Pose[], skip: Set<string>): Hit | null {
+  for (let i = 1; i < ps.length; i++) {
+    const h = segmentHit(sp, e, ps[i - 1], ps[i], skip);
+    if (h) return h;
+  }
+  return null;
+}
+
+/**
+ * Plan a collision-free lift of `e` from `from` to `to`: the straight path if clear, else a
+ * lift-over (when allowed). Fails with `lift.path-blocked` naming the obstacle.
+ */
+export function sweptLiftPath(rt: Runtime, e: Entity, from: Pose, to: Pose, o: SweepOpts): { ok: true; path: LiftPath } | Fail {
+  const sp = spatialOf(rt);
+  const skip = new Set(o.ignore);
+  // anything the part already touches where it lies (a pile, the floor slab) is not in its way
+  const f0 = entityFootprint({ ...e, pose: from });
+  for (const ob of sp.scene.obstacles)
+    if (ob.id !== e.id && !(ob.y1 <= f0.y0 + 0.005 || ob.y0 >= f0.y1 - 0.005) && obbOverlap(f0.obb, ob.obb, -0.01)) skip.add(ob.id);
+  const straight = [from, to];
+  const h1 = pathHit(sp, e, straight, skip);
+  if (!h1) return { ok: true, path: { poses: straight, via: 'straight' } };
+  const what = o.what ?? `${def(e.def).label} ${e.id}`;
+  const name = (h: Hit) => h.o.label && h.o.label !== h.o.id ? `${h.o.label} (${h.o.id})` : h.o.id;
+  const at = (h: Hit) => `(${f2(h.q.p[0])}, ${f2(h.q.p[1])}, ${f2(h.q.p[2])})`;
+  let tail = '; a lift-over is not possible for this part';
+  if (o.liftOver !== false) {
+    const yL = Math.max(from.p[1], to.p[1] + def(e.def).size[1] + LIFT_OVER);
+    const over: Pose[] = [from, { ...from, p: [from.p[0], yL, from.p[2]] }, { ...to, p: [to.p[0], yL, to.p[2]] }, to];
+    const h2 = pathHit(sp, e, over, skip);
+    if (!h2) return { ok: true, path: { poses: over, via: 'lift-over' } };
+    tail = `; lifting it over at ${f2(yL)} m is blocked too, by ${name(h2)} at ${at(h2)}`;
+  }
+  return fail('lift.path-blocked', `${what} cannot be lifted into place: its straight path would pass through ${name(h1)} at ${at(h1)}${tail}`, [e.id, h1.o.id], h1.q.p);
+}
+
+/** At the moment of lifting: re-plan the swept path against the current world and begin the lift along it. */
+export function beginSweptLift(rt: Runtime, ex: LiftExec, o: SweepOpts, base: number): Diagnostic | null {
+  const item = rt.world.entities[ex.item];
+  const r = sweptLiftPath(rt, item, item.pose, ex.to, o);
+  if (!r.ok) return r.diagnostic;
+  beginLift(rt, ex);
+  ex.path = r.path.poses;
+  ex.duration = liftDuration(r.path, base);
+  return null;
 }
 
 export function releaseCrew(rt: Runtime, crew: string[]) {

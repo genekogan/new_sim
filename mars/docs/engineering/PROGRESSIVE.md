@@ -50,8 +50,9 @@ whose footprints overlap it (optionally within 0.3 m of `height`):
 - Top edge hooks onto an installed, supported joist or beam within 0.15 m horizontally whose top is 0–0.25 m below
   the flight top (`stair.no-top-support`). The landing surface need **not** exist yet (the link stays unusable).
 - Installed box must not intersect obstacles (`stair.site-blocked`) or people (`stair.site-occupied`).
-- The crew stands either side of the staged flight and walks it ≤ 3 m into place; the slide and carriers are
-  sampled every 0.1 m (`stair.move-blocked`). Result: `support: connected` to the top member, `top` connection.
+- The crew stands either side of the staged flight and walks it ≤ 3 m into place; the flight body gets the shared
+  swept-lift check (no lift-over: it is walked, not hoisted; `lift.path-blocked`), the carriers are sampled every
+  0.1 m (`stair.move-blocked`). Result: `support: connected` to the top member, `top` connection.
 
 **install_tread** `{crew(1–2), stair, tread, index}` — `index` 1 = bottom; the flight must be installed; the tread
 must be missing (`tread.already-installed`); a person stands beside the flight within reach. Recorded as a
@@ -60,7 +61,18 @@ must be missing (`tread.already-installed`); a person stands beside the flight w
 **Common:** parts must be staged (lying on the ground, `stored|staged`) within 3 m of their target — the `carry`
 action delivers them (`*.not-staged`); crew not holding anything; preconditions re-checked when the crew arrives;
 approach → lift (joist 2 s, sheet 3 s, tread 1.5 s, flight ≥ 2 s) → installed. Cancel is refused mid-lift
-(`*.cancel-unsafe`), fine during approach.
+(`*.cancel-unsafe`), fine during approach. Symmetric lumber (2x4, sheet, tread) is seated at whichever of yaw /
+yaw + π is nearer its staged yaw, so it never spins half a turn in the air.
+
+**Swept lifts** (`access.ts sweptLiftPath`, also `connect_beam`): at plan time and again at the moment of lifting,
+the lift path is sampled (≥ 24 samples per segment, ≤ 3 cm displacement of any point between samples) and the part's
+box (`entityCorners` → footprint prism) is tested against every scene obstacle — static geometry and components —
+except the part itself, what it rests on / seats into (beam: its two uprights; joist: its two beams; sheet: its
+supports; tread: its flight; flight: its top member) and anything it already touches where it lies. If the straight
+path is blocked, the standard lift-over is tried: straight up until its underside is 0.3 m above its seated top,
+across (turning on the way), straight down; paced at 1 m/s (≥ the verb's duration), eased per segment. Both blocked →
+`lift.path-blocked` naming the obstacle of each variant. In the flagship both sheets are lifted over the side beams
+(s1 is staged east of the bay: the 12 ft end frames leave no path in from the south).
 
 ## Work access ("work from deck")
 A station must be on a level whose floor is ≤ 2.1 m (`STANDING_REACH`) below the part's top and not above it,

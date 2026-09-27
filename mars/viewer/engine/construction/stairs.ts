@@ -19,8 +19,8 @@ import { def } from '../world/catalog.ts';
 import { isBeam } from './rules.ts';
 import { beamProblems, isJoist, memberSeg, memberTop, supportProblems } from './deck.ts';
 import {
-  approach, beginLift, cancelLift, crewCheck, f2, fail, findStations, levelFor, liftStep, releaseCrew, spatialOf, stagedCheck, lerpPose,
-  type Fail, type LiftExec, type Station,
+  approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, levelFor, liftStep, releaseCrew, spatialOf, stagedCheck, lerpPose, sweptLiftPath, symmetricYaw,
+  type Fail, type LiftExec, type Station, type SweepOpts,
 } from './access.ts';
 
 export const TOP_SUPPORT_REACH = 0.15; // m: stringer hooks within this horizontal distance of the member
@@ -125,7 +125,7 @@ export function stairLink(w: WorldState, st: Entity, surfaces: Surface[]): Link 
 // ---------------------------------------------------------------- install_stair_flight
 
 type SP = { crew: string[]; stair: string; x: number; z: number; heading: number; level?: number };
-type SProg = { to: Pose; support: string; stations: Station[]; offsets: Vec2[]; duration: number };
+type SProg = { to: Pose; support: string; stations: Station[]; offsets: Vec2[]; duration: number; sweep: SweepOpts };
 
 function siteBlocker(rt: Runtime, id: string, obb: OBB2, y0: number, y1: number, ignore: string[]): string | null {
   const sp = spatialOf(rt);
@@ -170,16 +170,16 @@ export function planStairFlight(rt: Runtime, p: SP): { ok: true; program: SProg 
   const offsets: Vec2[] = [[0, -off], [0, off]];
   const from = st.pose;
   const dist = Math.hypot(to.p[0] - from.p[0], to.p[2] - from.p[2]);
+  // the flight body (shared swept-lift check; it may touch the member its top hooks onto). It is
+  // walked along the floor by its carriers, so it cannot be hoisted over an obstacle.
+  const sweep: SweepOpts = { ignore: [sup.id], liftOver: false, what: `stair flight ${st.id}` };
+  const path = sweptLiftPath(rt, st, from, to, sweep);
+  if (!path.ok) return path;
   const gr = sp.level(lv.id)!;
   const r = HUMAN_PROFILE.radius;
   const n = Math.max(2, Math.ceil(dist / 0.1));
   for (let k = 0; k <= n; k++) {
     const q = lerpPose(from, to, k / n);
-    const qg = stairGeom(st.def, q);
-    if (k > 0) {
-      const b = siteBlocker(rt, st.id, stairObb(qg), g.baseY + 0.1, g.topY - 0.02, [sup.id]);
-      if (b) return fail('stair.move-blocked', `${st.id} cannot be walked into place: it would hit ${b} at (${f2(qg.c[0])}, ${f2(qg.c[1])})`, [st.id]);
-    }
     for (const o of offsets) {
       const oo = rot2(o, q.yaw);
       const cp: Vec2 = [q.p[0] + oo[0], q.p[2] + oo[1]];
@@ -191,7 +191,7 @@ export function planStairFlight(rt: Runtime, p: SP): { ok: true; program: SProg 
     const oo = rot2(offsets[i], from.yaw);
     return { actor, level: lv.id, p: [from.p[0] + oo[0], from.p[2] + oo[1]], yaw: from.yaw };
   });
-  return { ok: true, program: { to, support: sup.id, stations, offsets, duration: Math.max(2, dist / 0.6) } };
+  return { ok: true, program: { to, support: sup.id, stations, offsets, duration: Math.max(2, dist / 0.6), sweep } };
 }
 
 type SExec = LiftExec & { p: SP; prog: SProg };
@@ -218,8 +218,9 @@ export const installStairFlight: ActionDef<SP, SProg, SExec> = {
       const s = approach(rt, ex, ex.prog.stations, 'stair.station-unreachable');
       if (s === 'running') return { status: 'running', phase: 'approach' };
       if (s !== 'arrived') return { status: 'failed', diagnostic: s };
+      const blocked = beginSweptLift(rt, ex, ex.prog.sweep, ex.duration);
+      if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
-      beginLift(rt, ex);
     }
     const done = liftStep(rt, ex, dt);
     const q = rt.world.entities[ex.item].pose;
@@ -246,7 +247,7 @@ export const installStairFlight: ActionDef<SP, SProg, SExec> = {
 // ---------------------------------------------------------------- install_tread
 
 type TP = { crew: string[]; stair: string; tread: string; index: number };
-type TProg = { to: Pose; stations: Station[] };
+type TProg = { to: Pose; stations: Station[]; sweep: SweepOpts };
 
 export function planTread(rt: Runtime, p: TP): { ok: true; program: TProg } | Fail {
   const w = rt.world;
@@ -258,15 +259,19 @@ export function planTread(rt: Runtime, p: TP): { ok: true; program: TProg } | Fa
   if (!missingTreads(w, st).includes(p.index)) return fail('tread.already-installed', `tread ${p.index} of ${st.id} is already installed`, [st.id]);
   const s = -g.run / 2 + (p.index - 0.5) * g.going;
   const yTop = g.baseY + p.index * g.riser;
-  const to: Pose = { p: [g.c[0] + g.dir[0] * s, yTop - def(tr.def).size[1], g.c[1] + g.dir[1] * s], yaw: g.yaw + Math.PI / 2 };
+  const to: Pose = { p: [g.c[0] + g.dir[0] * s, yTop - def(tr.def).size[1], g.c[1] + g.dir[1] * s], yaw: symmetricYaw(tr.pose.yaw, g.yaw + Math.PI / 2) };
   const staged = stagedCheck(tr, [to.p[0], to.p[2]], 'tread.not-staged');
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 1, 2, 'installing a tread');
   if (cc) return cc;
+  // it seats into the flight (whose obstacle box is its whole envelope); nothing else on the way
+  const sweep: SweepOpts = { ignore: [st.id], what: `tread ${p.index} (${tr.id}) of ${st.id}` };
+  const path = sweptLiftPath(rt, tr, tr.pose, to, sweep);
+  if (!path.ok) return path;
   const obb: OBB2 = { c: [to.p[0], to.p[2]], half: [def(tr.def).size[0] / 2, def(tr.def).size[2] / 2], yaw: to.yaw };
   const st2 = findStations(rt, p.crew, [[to.p[0], to.p[2]]], { label: `tread ${p.index} of ${st.id}`, obb, y: yTop, y0: to.p[1] }, [stairObb(g)]);
   if (!st2.ok) return st2;
-  return { ok: true, program: { to, stations: st2.stations } };
+  return { ok: true, program: { to, stations: st2.stations, sweep } };
 }
 
 type TExec = LiftExec & { p: TP; prog: TProg };
@@ -294,8 +299,9 @@ export const installTread: ActionDef<TP, TProg, TExec> = {
       const st = rt.world.entities[ex.p.stair];
       if (st.phase !== 'installed' || !missingTreads(rt.world, st).includes(ex.p.index))
         return { status: 'failed', diagnostic: { code: 'tread.stale', message: `tread ${ex.p.index} of ${st.id} can no longer be installed`, subjects: [st.id] } as Diagnostic };
+      const blocked = beginSweptLift(rt, ex, ex.prog.sweep, ex.duration);
+      if (blocked) return { status: 'failed', diagnostic: blocked };
       ex.phase = 'place';
-      beginLift(rt, ex);
     }
     if (!liftStep(rt, ex, dt)) return { status: 'running', phase: 'place' };
     const w = rt.world;

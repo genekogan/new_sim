@@ -221,8 +221,10 @@ writing). No camera track has been rendered to video.
 - **Replay slowed ~3× after people-avoidance** (lead-reported). Here the campus flagship rehearsal
   took 57 s of compute; the "before" figure is **(unverified)**.
 - **Other limits.** Loads stay level, with nothing carried on stairs or between levels. Formations are
-  rigid (no re-grip). A blocked mid-carry route holds unless the blocker is a bystander. Lifts and
-  raises are interpolated, not swept. The camera sees obstacle prisms only, not the render mesh. There
+  rigid (no re-grip). A blocked mid-carry route holds unless the blocker is a bystander. Raises follow a
+  lifter/footer choreography (lifters walk the frame up, hands ≤ 1.9 m, ≤ 0.6 m/s) and install lifts are
+  swept with a lift-over fallback (PROGRESSIVE.md "Swept lifts"); the arc itself is still sampled, not
+  continuous. The camera sees obstacle prisms only, not the render mesh. There
   are no dismantling verbs. The lab README still describes the stair-end teleport that `64eeba8` fixed.
 
 ## Deferred work
@@ -320,8 +322,8 @@ in `RELEASE_CHECKLIST.md`. Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
    simultaneous walkers (200 ms spikes with 30), and region-local EDT updates instead of whole-grid.
 3. **Campus take in the studio.** The flagship already renders live in `/lab` on open ground; next is
    the *campus* take (staging-east fork) rendered inside the 2026 studio scene with a planned camera
-   track and video, labelled hypothetical, plus the raise choreography fix (crew at the rising end)
-   and swept lift checks (lifts currently interpolate and can pass through beams).
+   track and video, labelled hypothetical. (The raise choreography fix and swept lift checks landed
+   2026-09-27; the lab baselines `build-bay-*.png` may need re-inspection.)
 4. **People realism.** Carry, lift and hold poses (CCD hand IK, speed-matched walk), stair foot
    placement, multi-formation space reservation, and a deadlock detector that turns mutual waits into
    `blocked` plus a replan.
