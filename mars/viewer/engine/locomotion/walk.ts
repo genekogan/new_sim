@@ -20,6 +20,7 @@ const CLIMB_SPEED = 0.45; // m/s along the stair path
 const TURN_IN_PLACE = 1.0; // rad heading error above which the walker stops and turns
 const TURN_DONE = 0.25; // rad: turn-in-place ends once this aligned
 const PASS_OFFSET = 0.45; // m lateral offset when passing another walker
+const PASS_SPEED = 0.7; // m/s cap while two walkers pass head-on with room for both (never a stop)
 const STATIC_OFFSET = 0.8; // m sidestep around a standing person
 const STUCK_TICKS = 80; // 4 s blocked by a moving person → replan around standing people
 const STUCK_STATIC_TICKS = 30; // 1.5 s blocked by someone standing still → replan around them
@@ -61,6 +62,12 @@ type Exec = {
   /** Standing people the current route was planned around (ignored by local encounters while they stay put). */
   plannedAround: Record<string, Vec2>;
   peopleReplans: number;
+  /**
+   * Head-on encounter decision, latched for the whole encounter (hysteresis): `room` = both walkers'
+   * passing spots have clearance, so both keep walking at PASS_SPEED on PASS_OFFSET (side +1 = right)
+   * instead of the later id stopping to give way. Cleared once that person is no longer a head-on walker ahead.
+   */
+  pass?: { id: string; side: 1 | -1; room: boolean };
   /** Ticks this walker has deferred a construction replan (planning budget); undefined = none pending. */
   replanWait?: number;
   /** Set by a cancel during a stair traversal: finish the flight at the nearer landing, then stop (review M2). */
@@ -366,13 +373,31 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   const arrived = ex.s >= ex.total - 1e-6;
   const enc: Encounter = arrived ? { kind: 'none' } : encounter(rt, ex, a, tan);
   if (enc.kind !== 'static') ex.side = 0;
+  // head-on with room for both: latch the decision per encounter (hysteresis); while the partner is
+  // still ahead, keep passing even after the offsets have opened the lateral gap past `encounter`'s band.
+  // The latch ends when the partner stops being a head-on walker (turns, stops, or is behind us).
+  if (arrived) ex.pass = undefined; // at the goal the body settles onto the corridor point
+  else if (ex.pass) {
+    const same = enc.kind !== 'none' && enc.id === ex.pass.id;
+    if (same ? enc.kind !== 'headon' : !stillPassing(rt, ex, a, tan, ex.pass.id)) ex.pass = undefined;
+  }
+  if (enc.kind === 'headon' && ex.pass?.id !== enc.id) {
+    // keep right, unless the oncoming walker is already clearly on our right (then both pass on the
+    // left: the test is symmetric, so both walkers pick the same way round)
+    const o = rt.world.entities[enc.id].pose.p;
+    const onRight = (o[0] - a.pose.p[0]) * tan[1] - (o[2] - a.pose.p[2]) * tan[0];
+    const side = onRight > 0.1 ? -1 : 1;
+    ex.pass = { id: enc.id, side, room: roomToPass(ex, g, tan, enc.along, side) };
+  }
+  const passing = !yieldTo && !!ex.pass?.room && ex.held.size === 0 && !holdsTraffic(rt, ex.pass.id) && (enc.kind === 'none' || enc.id === ex.pass.id);
   // lateral offset target (bounded by clearance below)
   let targetOffset = 0;
   let giveWay = false;
   if (yieldTo) targetOffset = -YIELD_OFFSET;
+  else if (passing) targetOffset = -ex.pass!.side * PASS_OFFSET;
   else if (enc.kind === 'headon' || enc.kind === 'crossing') {
     const iHold = ex.held.size > 0;
-    const oHolds = [...traffic(rt).values()].some((t) => t.actors.has(enc.id));
+    const oHolds = holdsTraffic(rt, enc.id);
     giveWay = (oHolds && !iHold) || (!iHold && !oHolds && enc.id < ex.actor);
     targetOffset = giveWay ? -YIELD_OFFSET : -PASS_OFFSET;
   } else if (enc.kind === 'static') {
@@ -391,6 +416,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     vmax = Math.min(vmax, Math.sqrt(2 * ACCEL * Math.max(0, narrow.s0 - (r + 1.0) - ex.s)));
   }
   let personBlock: string | null = null;
+  if (passing) vmax = Math.min(vmax, PASS_SPEED);
   if (enc.kind !== 'none') {
     const tight = enc.lateral < 2 * r + 0.04;
     if (enc.kind === 'follow') {
@@ -402,7 +428,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     } else if (tight && enc.along < 2 * r + 0.35) {
       vmax = 0;
       personBlock = enc.id;
-    } else if (tight) vmax = Math.min(vmax, 0.45);
+    } else if (tight) vmax = Math.min(vmax, passing ? 0.5 : 0.45); // a pass slows but keeps walking
   }
   // carried loads (review C3): never step into one (loadIntrusion below): wait for it to pass
   let loadBlock: string | null = null;
@@ -657,6 +683,34 @@ function isActiveWalker(rt: Runtime, o: Entity) {
   if (!t) return false;
   const rec = rt.records.get(t);
   return !!rec && rec.verb === 'walk_to' && rt.isActive(t) && rec.status !== 'blocked';
+}
+
+const holdsTraffic = (rt: Runtime, id: string) => [...traffic(rt).values()].some((t) => t.actors.has(id));
+
+/**
+ * Room for a head-on pass: my passing spot (corridor point + PASS_OFFSET to my `side`, +1 = right) and the
+ * oncoming walker's (the corridor point level with them, PASS_OFFSET to the other side) both keep a body
+ * radius (plus margin) of clearance, reachable straight from the corridor. In a 2.0 m corridor that holds
+ * (centre clearance ≈ 0.95 m ≥ r + PASS_OFFSET); in the 1.0 m gap it does not, so the give-way applies.
+ */
+function roomToPass(ex: Exec, g: LevelGrid, tan: Vec2, along: number, side: number): boolean {
+  const r = ex.profile.radius;
+  const n: Vec2 = rot2(tan, -Math.PI / 2); // offset −PASS_OFFSET maps to base + n·PASS_OFFSET
+  const ok = (base: Vec2, sgn: number) => {
+    const q = add2(base, scale2(n, sgn * PASS_OFFSET));
+    return clearanceAt(g, q) >= r + 0.04 && segmentClearance(g, base, q) >= r;
+  };
+  return ok(pointAt(ex, ex.s), side) && ok(pointAt(ex, Math.min(ex.total, ex.s + along)), -side);
+}
+
+/** The pass partner is still an active walker ahead of us, near enough to our line to matter. */
+function stillPassing(rt: Runtime, ex: Exec, a: Entity, tan: Vec2, id: string): boolean {
+  const o = rt.world.entities[id];
+  if (!o || o.human?.level !== a.human!.level || !isActiveWalker(rt, o)) return false;
+  const d = sub2([o.pose.p[0], o.pose.p[2]], [a.pose.p[0], a.pose.p[2]]);
+  const along = d[0] * tan[0] + d[1] * tan[1];
+  const lateral = Math.abs(d[0] * -tan[1] + d[1] * tan[0]);
+  return along > -ex.profile.radius && along < LOOK && lateral < 2 * PASS_OFFSET + 2 * ex.profile.radius;
 }
 
 type Encounter = { kind: 'none' } | { kind: 'follow' | 'headon' | 'crossing' | 'static'; id: string; along: number; lateral: number };

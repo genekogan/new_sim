@@ -201,7 +201,8 @@ writing). No camera track has been rendered to video.
   reservation, so a sequence has to order them with `after` dependencies (the `step(…, after)` calls
   in `build-bay.ts`).
 - **People-avoidance is heuristic.** Walkers use traffic resources, right-of-way, turn hysteresis and
-  hard separation. Formations halt for people in the way, ask idle bystanders to "make way", then
+  hard separation. Head-on walkers with room to pass both slow and keep to one side (latched per
+  encounter); only tight spots and single-file passages make one stop and give way. Formations halt for people in the way, ask idle bystanders to "make way", then
   replan treating them as soft obstacles (`carry/actions.ts` `pathBystander`/`makeWay`). This is not
   ORCA and not proven deadlock-free: a head-on wait-forever shows up only as a runner `timeout`
   (`TAKES_AND_PLANS.md` Known gaps).

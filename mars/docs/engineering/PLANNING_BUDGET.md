@@ -55,6 +55,12 @@ A walker whose remaining corridor was invalidated replans only within the tick's
 Probe / flagship build-bay `d54eca7c402a…0f610`; campus flagship `f60e10b461dd…4c182`; lab stress-30
 `a6e42f5c6bfb…0e26c` (now pinned in `planning.test.ts`); the other 8 lab scenarios are unchanged too.
 
+**Re-pinned 2026-09-27 (walk.ts head-on passing, not the budget):** head-on walkers with room to pass
+now both slow to 0.7 m/s on the 0.45 m offset instead of the later id stopping (`roomToPass`, latched
+per encounter). That shifts encounter timing: stress-30 `a6e42f5c…0e26c` → `e55d3ee17dd5…8e989`; probe /
+flagship build-bay `d54eca7c…0f610` (11522 ticks) → `79447f750779…96129` (11403 ticks, take
+`bf58b85269c981003ce6d9c6`); 0 violations. Campus flagship hash not re-measured here.
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

@@ -172,7 +172,10 @@ test('stress-30: exact planner keeps the pinned result; per-tick cost bounded; z
   stressRun('corridor'); // JIT warm-up (a long-lived lab/DO process is warm)
   const exact = stressRun('exact');
   assert.equal(exact.rt.violations.length, 0);
-  assert.equal(exact.rt.stateHash(), 'a6e42f5c6bfba73d76bc6080a4373236031f79bfee46533306d374333390e26c', 'stress-30 final state unchanged by the planning-budget work');
+  // Re-pinned (was a6e42f5c…e26c) when head-on walkers with room to pass stopped giving way: both now slow
+  // to PASS_SPEED on PASS_OFFSET instead of the later id standing still (walk.ts roomToPass), which changes
+  // the timing of every open-ground head-on encounter in the stress crowd.
+  assert.equal(exact.rt.stateHash(), 'e55d3ee17dd51e004fe851f06829016d6fdba09f0b8edf81cf1484165ba8e989', 'stress-30 final state unchanged by the planning-budget work');
   const corr = stressRun('corridor');
   assert.equal(corr.rt.violations.length, 0);
   console.log(`stress-30 max tick: exact ${exact.max.toFixed(1)} ms (mean ${exact.mean.toFixed(2)}), corridor ${corr.max.toFixed(1)} ms (mean ${corr.mean.toFixed(2)})`);

@@ -68,18 +68,31 @@ test('1.0 m gap (same scene): opposing walkers still take turns (someone yields)
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
 
-// Known limitation (walk.ts, owned by the locomotion track): on any head-on encounter where
-// neither walker holds a traffic resource, the walker with the later id gives way by stopping
-// (vmax = 0, `traffic.person`) and sidestepping, even with room for both to keep walking. In the
-// 2.0 m corridor 'b' stands still for ~1.9 s (ticks 101–138) and its status blips
-// blocked/executing for a few ticks as 'a' clears. This todo passes once give-way slows
-// instead of stopping when the offset clearance allows passing.
-test('2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)', { todo: 'walk.ts giveWay stops the later-id walker on every head-on encounter' }, () => {
+// Head-on with room to pass (walk.ts `roomToPass`, latched per encounter): neither walker stops to give
+// way — both slow to the passing speed on the right-hand PASS_OFFSET and keep walking. Before this, the
+// later id stood still for ~1.9 s (`traffic.person`) and blipped blocked/executing as 'a' cleared.
+test('2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass', () => {
   const rt = setup(human('a', S[0], S[1], { yaw: Math.PI / 2 }), human('b', N[0], N[1], { yaw: -Math.PI / 2 }));
+  const s = { d: Infinity, minV: Infinity, prev: null as null | number[][] };
+  rt.observers.push({
+    onTick: (r) => {
+      const pa = r.world.entities.a.pose.p, pb = r.world.entities.b.pose.p;
+      const d = Math.hypot(pa[0] - pb[0], pa[2] - pb[2]);
+      s.d = Math.min(s.d, d);
+      // speed of both walkers while they are within 2 m of each other (the pass itself)
+      if (s.prev && d < 2) for (const [i, p] of [pa, pb].entries()) s.minV = Math.min(s.minV, Math.hypot(p[0] - s.prev[i][0], p[2] - s.prev[i][2]) * 20);
+      s.prev = [[...pa], [...pb]];
+    },
+  });
   const a = rt.submit('walk_to', { actor: 'a', x: N[0], z: N[1] });
   const b = rt.submit('walk_to', { actor: 'b', x: S[0], z: S[1] });
   assert.ok(rt.runUntilIdle(20 * 90));
+  assert.equal(a.status, 'completed', a.diagnostic?.message);
+  assert.equal(b.status, 'completed', b.diagnostic?.message);
   assert.deepEqual([a, b].map((r) => r.history.filter((h) => h.status === 'blocked').map((h) => h.code)), [[], []]);
+  assert.ok(s.d >= 2 * HUMAN_RADIUS, `closest approach ${s.d.toFixed(3)} m`);
+  assert.ok(s.minV >= 0.5 - 1e-6, `slowest walker speed during the pass ${s.minV.toFixed(3)} m/s`);
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
 
 // ---- U-trap: cup around (-15, 12), back wall inner face z = 14.85, opening toward −z ----
