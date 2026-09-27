@@ -7,13 +7,13 @@ change the hand-curated map `viewer/engine/test/evidence-map.json` and regenerat
 
 | | |
 | --- | --- |
-| Git HEAD | `ec63cce` (engine tree clean) |
-| Generated | 2026-09-27T22:44:27.959Z · Node v26.8.2 |
-| Engine suite | 178 tests in 25 files: 177 pass, 0 fail, 1 skipped · 45.6 s wall |
+| Git HEAD | `72bb2ad` (engine tree clean) |
+| Generated | 2026-09-27T23:03:04.696Z · Node v26.8.2 |
+| Engine suite | 178 tests in 25 files: 177 pass, 0 fail, 1 skipped · 44.0 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 570.1 s simulated, 7271 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 597.5 s simulated, 23117 ms compute, take 458610 B (`campus-flagship.test.ts`) |
+| Flagship, proving ground | 43 steps, 570.1 s simulated, 6916 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 597.5 s simulated, 22528 ms compute, take 458610 B (`campus-flagship.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 11403 ticks · final state `79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129` · take `bf58b85269c981003ce6d9c6` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
@@ -437,16 +437,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `f767540` (2026-09-27T22:25:21.237Z): 7 added, 1 removed.
+Compared with the report at `ec63cce` (2026-09-27T22:44:27.959Z): 0 added, 0 removed.
 
-- added: camera-framing.test.ts :: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)
-- added: camera-framing.test.ts :: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind
-- added: camera-framing.test.ts :: camera readability: a bystander between camera and subject occludes; behind the subject or on the crew it does not
-- added: camera-framing.test.ts :: camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)
-- added: camera-framing.test.ts :: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8
-- added: carry.test.ts :: carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives
-- added: gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass
-- removed: gaps.test.ts :: 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop)
 
 ## Tests not cited by any row or milestone
 
