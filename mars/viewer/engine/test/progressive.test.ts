@@ -5,11 +5,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS, forgetMotion } from '../runtime/invariants.ts';
-import { Spatial } from '../spatial/service.ts';
+import { Spatial, type Contributor } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { CONSTRUCTION_ACTIONS, liftHandsInReach, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { levelFor } from '../construction/access.ts';
+import { handPoint, HAND_REACH, LIFT_APEX_MAX, FOLLOW_SPEED } from '../construction/liftcrew.ts';
 import { deckSurfaces } from '../construction/contributor.ts';
 import { seatPoint, snapSeat } from '../construction/rules.ts';
 import { def } from '../world/catalog.ts';
@@ -37,7 +38,7 @@ function openGround(extra: Obstacle[] = []): SpatialScene {
   };
 }
 
-function setup(extra: Obstacle[] = []) {
+function setup(extra: Obstacle[] = [], contributors: Contributor[] = []) {
   const base = openGround(extra);
   const w = addAll(
     emptyWorld('open-ground', base),
@@ -47,7 +48,7 @@ function setup(extra: Obstacle[] = []) {
     human('w', 6, 4),
   );
   const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
-  return new Runtime(w, reg, { spatial: new Spatial(base, { contributors: [progressiveContributor] }) }, [...DEFAULT_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach]);
+  return new Runtime(w, reg, { spatial: new Spatial(base, { contributors: [progressiveContributor, ...contributors] }) }, [...DEFAULT_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach]);
 }
 
 const kids = (rt: Runtime, r: ActionRecord) => JSON.stringify([...rt.records.values()].filter((x) => x.parent === r.id).map((x) => [x.verb, x.status, x.diagnostic?.message]));
@@ -339,5 +340,93 @@ test('swept lift: blocked straight and lifted over is refused with lift.path-blo
   assert.equal(rt.world.entities.j1.phase, 'staged');
   // the unobstructed neighbour still goes in (its path clears both)
   must(rt, 'install_joist', { crew: ['p5'], joist: 'j5', bay: { a: 'A', b: 'B' }, height: 1.8, at: 2.55 });
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+// ---- crew accompanies lifted parts (liftcrew.ts; spec §7/§8) ----
+
+/** Sample every tick while `item` is held by a lift: holder ↔ hand point distance and height, holder speed. */
+function watchHands(rt: Runtime, item: string) {
+  const s = { ticks: 0, maxD: 0, maxUp: -Infinity, maxSpeed: 0, walked: 0, maxY: 0, slots: new Set<string>() };
+  const last = new Map<string, [number, number]>();
+  rt.observers.push({ onTick: (r) => {
+    const e = r.world.entities[item];
+    if (e.phase !== 'carried' || e.support?.kind !== 'held') return;
+    s.ticks++;
+    s.maxY = Math.max(s.maxY, e.pose.p[1]);
+    for (const id of e.support.by) {
+      const h = r.world.entities[id];
+      const slot = h.human!.grip!.slot;
+      const hand = handPoint(e, e.pose, slot);
+      assert.ok(hand, `${id} holds ${item} by a follow slot (got ${slot})`);
+      s.slots.add(`${id}:${slot}`);
+      s.maxD = Math.max(s.maxD, Math.hypot(h.pose.p[0] - hand.p[0], h.pose.p[2] - hand.p[2]));
+      s.maxUp = Math.max(s.maxUp, hand.p[1] - h.pose.p[1]);
+      const p: [number, number] = [h.pose.p[0], h.pose.p[2]];
+      const q = last.get(id);
+      if (q) {
+        const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+        s.maxSpeed = Math.max(s.maxSpeed, d * 20);
+        s.walked += d;
+      }
+      last.set(id, p);
+    }
+  } });
+  return s;
+}
+
+function assertHands(s: ReturnType<typeof watchHands>, what: string, t0: number, rt: Runtime) {
+  const info = JSON.stringify({ ...s, slots: [...s.slots] });
+  console.log(`# ${what}: held ${(s.ticks / 20).toFixed(2)} s, action ${((rt.tick - t0) / 20).toFixed(1)} s simulated; hands ≤ ${s.maxD.toFixed(2)} m away, ≤ ${s.maxUp.toFixed(2)} m up; crew walked ${s.walked.toFixed(2)} m at ≤ ${s.maxSpeed.toFixed(2)} m/s`);
+  assert.ok(s.ticks > 20, info);
+  assert.ok(s.maxD <= HAND_REACH + 1e-9, `hand point out of reach: ${info}`);
+  assert.ok(s.maxUp <= LIFT_APEX_MAX + 1e-9, `hand point too high: ${info}`);
+  assert.ok(s.maxSpeed <= FOLLOW_SPEED + 1e-6, `crew too fast: ${info}`);
+  assert.ok(s.walked > 1.0, `the crew walks with the part: ${info}`);
+}
+
+test('lift crew: a joist lift keeps the holder beside its hand point (≤ 1.0 m, ≤ 2.4 m up) every tick', () => {
+  const rt = setup();
+  buildBay(rt);
+  stageParts(rt);
+  const s = watchHands(rt, 'j1');
+  const t0 = rt.tick;
+  must(rt, 'install_joist', { crew: ['p5'], joist: 'j1', bay: { a: 'A', b: 'B' }, height: 1.8, at: 0.2 });
+  assertHands(s, 'joist lift j1', t0, rt);
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+test('lift crew: a plywood lift-over keeps both holders beside their hand points every tick', () => {
+  const rt = setup();
+  buildBay(rt);
+  stageParts(rt);
+  joists(rt);
+  const s = watchHands(rt, 's1');
+  const t0 = rt.tick;
+  panel(rt, 0);
+  const seat = rt.world.entities.s1.pose.p[1];
+  assert.ok(s.maxY >= seat + def('plywood-4x6').size[1] + 0.3 - 1e-6, `lifted over (max ${s.maxY.toFixed(2)} m, seat ${seat.toFixed(2)} m)`);
+  assertHands(s, 'plywood lift-over s1', t0, rt);
+  assert.equal(s.slots.size, 2);
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+/** Crates set down on the holder's way the moment j1 leaves the ground (a gap at the joist too narrow to pass). */
+const CRATES: Obstacle[] = [
+  { id: 'crate', obb: { c: [-1.245, 1.85], half: [0.295, 0.25], yaw: 0 }, y0: 0, y1: 1.5, kind: 'solid', label: 'tool crate' },
+  { id: 'crate-w', obb: { c: [-2.03, 1.85], half: [0.37, 0.25], yaw: 0 }, y0: 0, y1: 1.5, kind: 'solid', label: 'tool crate' },
+];
+
+test('lift crew: crates dropped on the holder\'s way block the lift (lift.crew-blocked, no clipping, part held)', () => {
+  const late: Contributor = (w) => ({ obstacles: w.entities.j1?.phase === 'carried' ? CRATES : [] });
+  const rt = setup([CRATE], [late]);
+  buildBay(rt);
+  stageParts(rt);
+  const r = rt.submit('install_joist', { crew: ['p5'], joist: 'j1', bay: { a: 'A', b: 'B' }, height: 1.8, at: 0.2 });
+  rt.runUntilIdle(20 * 40, [r.id]);
+  assert.equal(r.status, 'blocked', `${r.status} ${r.diagnostic?.message}`);
+  assert.equal(r.diagnostic?.code, 'lift.crew-blocked');
+  assert.match(r.diagnostic!.message, /^p5 cannot keep hold of j1 .*blocked by crate/);
+  assert.equal(rt.world.entities.j1.support?.kind, 'held');
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
