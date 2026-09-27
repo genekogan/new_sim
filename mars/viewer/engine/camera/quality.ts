@@ -28,6 +28,48 @@ export function sweepCrossing(world: CameraWorld, a: Vec3, b: Vec3): Solid | nul
   return h ? h.solid : null;
 }
 
+/** People as soft occluders (readability only, never camera collision): vertical capsule at the sampled pose. */
+export const PERSON_RADIUS = 0.28; // m
+export const PERSON_HEIGHT = 1.8; // m, total capsule height from the feet
+
+/**
+ * Does segment a→b pass within `r` of the vertical capsule axis standing at `base`
+ * (axis from base.y + r to base.y + h − r)? Returns the segment parameter of the
+ * closest approach (used to order it against solid hits), or null.
+ */
+export function capsuleHit(a: Vec3, b: Vec3, base: Vec3, r = PERSON_RADIUS, h = PERSON_HEIGHT): number | null {
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+  // x/z broadphase: horizontal distance from the axis to the segment's footprint
+  const ex = base[0] - a[0], ez = base[2] - a[2];
+  const hh = dx * dx + dz * dz;
+  const s2 = hh > 1e-12 ? Math.min(1, Math.max(0, (ex * dx + ez * dz) / hh)) : 0;
+  if (Math.hypot(ex - dx * s2, ez - dz * s2) > r) return null;
+  // closest points between the segment and the vertical axis segment (Ericson §5.1.9)
+  const y0 = base[1] + r, L = Math.max(0, h - 2 * r);
+  const rx = a[0] - base[0], ry = a[1] - y0, rz = a[2] - base[2];
+  const A = dx * dx + dy * dy + dz * dz, E = L * L, F = ry * L;
+  const C = dx * rx + dy * ry + dz * rz, B = dy * L;
+  let s = 0, u = 0;
+  if (A <= 1e-12) { u = E > 1e-12 ? Math.min(1, Math.max(0, F / E)) : 0; }
+  else if (E <= 1e-12) { s = Math.min(1, Math.max(0, -C / A)); }
+  else {
+    const den = A * E - B * B;
+    s = den > 1e-12 ? Math.min(1, Math.max(0, (B * F - C * E) / den)) : 0;
+    u = (B * s + F) / E;
+    if (u < 0) { u = 0; s = Math.min(1, Math.max(0, -C / A)); }
+    else if (u > 1) { u = 1; s = Math.min(1, Math.max(0, (B - C) / A)); }
+  }
+  const px = a[0] + dx * s - base[0], py = a[1] + dy * s - (y0 + L * u), pz = a[2] + dz * s - base[2];
+  return px * px + py * py + pz * pz < r * r ? s : null;
+}
+
+/** Subject ids plus their crews (carriers of a carried part etc.): never occluders of this shot. */
+export function subjectGroup(subjects: Record<string, SubjectPose>, ids: string[]): Set<string> {
+  const g = new Set(ids);
+  for (const id of ids) for (const c of subjects[id]?.crew ?? []) g.add(c);
+  return g;
+}
+
 export type SubjectReadability = {
   id: string;
   score: number;
@@ -41,7 +83,7 @@ export type Readability = { score: number; subjects: SubjectReadability[]; reaso
 export type ReadOpts = {
   aspect?: number;
   minSize?: number; // min projected subject height, fraction of frame (default 0.08)
-  cutaway?: boolean; // inspection mode: ignore occluders entirely
+  cutaway?: boolean; // inspection mode: ignore occluders (solids and people) entirely
   near?: number;
 };
 
@@ -67,13 +109,17 @@ function toCam(cam: CameraPose, b: Basis, p: Vec3): Vec3 {
 
 /**
  * Readability of the named subjects from `cam`. Each subject's points are
- * ray-cast from the camera against the occlusion set; a point counts if it is
+ * ray-cast from the camera against the occlusion set and against every
+ * bystander's capsule (humans in `subjects` outside the subjects' group); a point counts if it is
  * inside the frustum (5 % safe margin) and unoccluded. Subject score =
  * visible fraction × min(1, size / minSize); aggregate = weighted mean.
  */
 export function readability(world: CameraWorld, cam: CameraPose, subjects: Record<string, SubjectPose>, ids: string[], opts: ReadOpts = {}): Readability {
   const aspect = opts.aspect ?? DEFAULT_ASPECT, minSize = opts.minSize ?? 0.08, near = opts.near ?? 0.1;
   const b = basis(cam, aspect);
+  // bystanders: humans that are neither a subject nor a subject's crew (sorted → deterministic naming)
+  const group = subjectGroup(subjects, ids);
+  const people = opts.cutaway ? [] : Object.keys(subjects).filter((k) => subjects[k].kind === 'human' && !group.has(k)).sort().map((k) => ({ id: k, p: subjects[k].p }));
   const out: SubjectReadability[] = [];
   const reasons: string[] = [];
   let wsum = 0, total = 0;
@@ -93,10 +139,15 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
       const u = Math.max(0, 1 - 0.05 / Math.max(dist, 1e-6));
       const end: Vec3 = [cam.position[0] + (p[0] - cam.position[0]) * u, cam.position[1] + (p[1] - cam.position[1]) * u, cam.position[2] + (p[2] - cam.position[2]) * u];
       const h = raycast(world, cam.position, end, 'occlude');
-      if (h) {
-        const e = occ.get(h.solid.o.id) ?? { label: h.solid.o.label ?? h.solid.o.id, n: 0 };
+      let hit: { t: number; id: string; label: string } | null = h ? { t: h.t, id: h.solid.o.id, label: h.solid.o.label ?? h.solid.o.id } : null;
+      for (const q of people) {
+        const t = capsuleHit(cam.position, end, q.p);
+        if (t !== null && (!hit || t < hit.t)) hit = { t, id: q.id, label: `person ${q.id}` };
+      }
+      if (hit) {
+        const e = occ.get(hit.id) ?? { label: hit.label, n: 0 };
         e.n++;
-        occ.set(h.solid.o.id, e);
+        occ.set(hit.id, e);
       } else if (framed) visible++;
     }
     // projected height of the subject (feet→head) as fraction of frame height

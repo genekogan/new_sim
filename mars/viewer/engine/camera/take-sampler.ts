@@ -1,9 +1,10 @@
 // Take adapter for the camera (CAMERA.md "take adapter"): a `Sampler` over a
 // recorded Take. Same poses as `sampleTake` (same bracketing + `interpSample`),
 // but indexed per entity so a planner can call it tens of thousands of times.
-// Humans are standing subjects (default readability points); components get
-// their catalog box corners + centre as points, so a carried beam or a seated
-// sheet is a subject the camera can frame and score.
+// Humans are standing subjects (default readability points, `kind: 'human'`, so
+// they occlude other subjects); components get their catalog box corners +
+// centre as points, so a carried beam or a seated sheet is a subject the camera
+// can frame and score. `crew` = humans gripping the part / sharing its action.
 import { POS_Q, ANG_Q, type PoseSample, type Take } from '../take/types.ts';
 import { interpSample } from '../take/replay.ts';
 import { entityCorners } from '../spatial/service.ts';
@@ -11,7 +12,7 @@ import type { Entity } from '../world/types.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { Sampler, SubjectPose } from './shots.ts';
 
-type Info = { kind: string; def?: string; present: [number, boolean][]; track: PoseSample[] };
+type Info = { kind: string; def?: string; present: [number, boolean][]; track: PoseSample[]; grip: [number, unknown][]; task: [number, unknown][]; reservedBy: [number, unknown][] };
 
 function bracket(s: PoseSample[], tick: number): [PoseSample, PoseSample] | null {
   if (!s.length || tick < s[0][0]) return null;
@@ -25,23 +26,29 @@ function bracket(s: PoseSample[], tick: number): [PoseSample, PoseSample] | null
   return [s[lo], s[hi]];
 }
 
-function presentAt(p: [number, boolean][], tick: number): boolean {
-  let v = false;
-  for (const [t, on] of p) {
+function valueAt<T>(p: [number, T][], tick: number, v: T): T {
+  for (const [t, x] of p) {
     if (t > tick) break;
-    v = on;
+    v = x;
   }
   return v;
 }
+const presentAt = (p: [number, boolean][], tick: number) => valueAt(p, tick, false);
+const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
 
 /** Subject poses for every entity present at time t (seconds from take start). Pure; memoised per tick. */
 export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler {
   const info = new Map<string, Info>();
   for (const id of Object.keys(take.tracks)) {
     const e = take.finalState.entities[id];
-    info.set(id, { kind: e?.kind ?? 'human', def: e?.def, present: [], track: take.tracks[id] });
+    info.set(id, { kind: e?.kind ?? 'human', def: e?.def, present: [], track: take.tracks[id], grip: [], task: [], reservedBy: [] });
   }
-  for (const [t, id, field, value] of take.changes) if (field === 'present') info.get(id)?.present.push([t, value === true]);
+  for (const [t, id, field, value] of take.changes) {
+    const e = info.get(id);
+    if (!e) continue;
+    if (field === 'present') e.present.push([t, value === true]);
+    else if (field === 'grip' || field === 'task' || field === 'reservedBy') e[field].push([t, value]);
+  }
   const cache = new Map<number, Record<string, SubjectPose>>();
   const limit = opts.cache ?? 4096;
   return (t) => {
@@ -49,6 +56,31 @@ export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler 
     const hit = cache.get(tick);
     if (hit) return hit;
     const out: Record<string, SubjectPose> = {};
+    // crews: humans gripping a part or sharing an action (task) belong to that subject for occlusion
+    const byTask = new Map<string, string[]>(), byGrip = new Map<string, string[]>();
+    const push = (m: Map<string, string[]>, k: string, id: string) => { const l = m.get(k); if (l) l.push(id); else m.set(k, [id]); };
+    for (const [id, e] of info) {
+      if (e.kind === 'component' || !presentAt(e.present, tick)) continue;
+      const task = str(valueAt(e.task, tick, null as unknown));
+      const grip = valueAt(e.grip, tick, null as unknown) as { entity?: string } | null;
+      if (task) push(byTask, task, id);
+      if (grip && typeof grip.entity === 'string') push(byGrip, grip.entity, id);
+    }
+    const crewOf = (id: string, e: Info): string[] | undefined => {
+      const c = new Set<string>();
+      if (e.kind === 'component') {
+        for (const h of byGrip.get(id) ?? []) c.add(h);
+        const r = str(valueAt(e.reservedBy, tick, null as unknown));
+        if (r) for (const h of byTask.get(r) ?? []) c.add(h);
+      } else {
+        const task = str(valueAt(e.task, tick, null as unknown));
+        const grip = valueAt(e.grip, tick, null as unknown) as { entity?: string } | null;
+        if (task) for (const h of byTask.get(task) ?? []) c.add(h);
+        if (grip && typeof grip.entity === 'string') for (const h of byGrip.get(grip.entity) ?? []) c.add(h);
+        c.delete(id);
+      }
+      return c.size ? [...c].sort() : undefined;
+    };
     for (const [id, e] of info) {
       if (!presentAt(e.present, tick)) continue;
       const br = bracket(e.track, tick);
@@ -56,8 +88,9 @@ export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler 
       const s = interpSample(br[0], br[1], tick);
       const p: Vec3 = [s[1] / POS_Q, s[2] / POS_Q, s[3] / POS_Q];
       const yaw = s[4] / ANG_Q;
+      const crew = crewOf(id, e);
       if (e.kind !== 'component' || !e.def) {
-        out[id] = { p, yaw };
+        out[id] = { p, yaw, kind: 'human', ...(crew ? { crew } : {}) };
         continue;
       }
       const ent = { def: e.def, pose: { p, yaw, pitch: (s[5] ?? 0) / ANG_Q, roll: (s[6] ?? 0) / ANG_Q } } as Entity;
@@ -65,7 +98,7 @@ export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler 
       const c: Vec3 = [0, 0, 0];
       let top = -Infinity;
       for (const q of cs) { c[0] += q[0] / 8; c[1] += q[1] / 8; c[2] += q[2] / 8; top = Math.max(top, q[1]); }
-      out[id] = { p, yaw, height: Math.max(0.5, top - p[1]), points: [c, ...cs] };
+      out[id] = { p, yaw, height: Math.max(0.5, top - p[1]), points: [c, ...cs], kind: 'component', ...(crew ? { crew } : {}) };
     }
     if (cache.size >= limit) cache.delete(cache.keys().next().value!);
     cache.set(tick, out);

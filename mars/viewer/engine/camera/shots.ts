@@ -12,6 +12,10 @@ export type SubjectPose = {
   points?: Vec3[];
   /** Relative importance in group scoring (default 1). */
   weight?: number;
+  /** 'human' subjects are soft occluders (capsule) for everyone else's readability. */
+  kind?: 'human' | 'component';
+  /** Ids that count as part of this subject for occlusion (a carried part's carriers, a human's co-workers). */
+  crew?: string[];
 };
 export type Sampler = (t: number) => Record<string, SubjectPose>;
 
