@@ -2,7 +2,7 @@
 // window.__marsEngine, assert expectations + zero violations, capture
 // top-down/oblique shots with overlays off and on. See app/lab/README.md.
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
-import { captureView, collectConsoleErrors, recordVideo } from './helpers';
+import { captureView, collectConsoleErrors, recordVideo, writeArtifact } from './helpers';
 import { labFrames, openLab, setOverlays, type LabState } from './lab-helpers';
 
 const SCENARIOS: { name: string; capture: number[] }[] = [
@@ -125,3 +125,43 @@ for (const name of ['narrow-passage', 'stairs']) {
     await context.close();
   });
 }
+
+// Perf: sim step cost (synchronous fast-forward) and real-time render stats, 3 vs 30 humans.
+test('lab perf: step cost + render stats for trio and stress-30', async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
+  const errors = collectConsoleErrors(page);
+  await openLab(page);
+  const out: Record<string, unknown> = {};
+  for (const name of ['trio', 'stress-30']) {
+    await run(page, name);
+    const end = await toEnd(page);
+    const sim = await page.evaluate(() => window.__marsEngine!.perf());
+    const violations = (await page.evaluate(() => window.__marsEngine!.violations())).length;
+    // real time: replay from the start at 1x for 6 s and count frames
+    await page.evaluate((n) => window.__marsEngine!.runScenario(n, { paused: false, speed: 1 }), name);
+    const f0 = await page.evaluate(() => ({ f: window.__marsEngine!.frames, t: performance.now(), tick: window.__marsEngine!.state().tick }));
+    await page.waitForTimeout(6000);
+    const f1 = await page.evaluate(() => ({ f: window.__marsEngine!.frames, t: performance.now(), tick: window.__marsEngine!.state().tick }));
+    const live = await page.evaluate(() => window.__marsEngine!.perf());
+    const info = await page.evaluate(() => window.__marsEngine!.info());
+    out[name] = {
+      humans: end.humans.length,
+      fastForward: { ticks: end.tick, ...sim },
+      realtime: { fps: +((f1.f - f0.f) / ((f1.t - f0.t) / 1000)).toFixed(1), simSecondsPerSecond: +(((f1.tick - f0.tick) / 20) / ((f1.t - f0.t) / 1000)).toFixed(2), step: live },
+      clips: [...new Map(info.humans.map((h) => [h.template, (h as { clipSpeed?: number }).clipSpeed])).entries()],
+      render: { calls: info.calls, triangles: info.triangles, geometries: info.geometries, textures: info.textures },
+      violations,
+    };
+    await page.evaluate(() => window.__marsEngine!.pause(true));
+    await page.evaluate(() => window.__marsEngine!.cameraPreset('oblique'));
+    await setOverlays(page, false);
+    await captureView(page, `lab-${name}-oblique`, { testInfo, compare: false });
+    await page.evaluate(() => window.__marsEngine!.cameraPreset('top'));
+    await setOverlays(page, true);
+    await captureView(page, `lab-${name}-top-debug`, { testInfo, compare: false });
+    await setOverlays(page, false);
+  }
+  writeArtifact('lab-perf.json', out);
+  console.log(JSON.stringify(out, null, 1));
+  expect(errors).toEqual([]);
+});

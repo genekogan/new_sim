@@ -112,6 +112,6 @@ export class HumanViews {
   }
 
   info() {
-    return [...this.views].map(([id, v]) => ({ id, template: v.rig.template.name, speed: +v.speed.toFixed(3), walkWeight: +v.cur.walkW.toFixed(2), activity: v.activity }));
+    return [...this.views].map(([id, v]) => ({ id, template: v.rig.template.name, clipSpeed: +v.rig.template.walkSpeed.toFixed(3), forward: v.rig.template.forward, speed: +v.speed.toFixed(3), walkWeight: +v.cur.walkW.toFixed(2), activity: v.activity }));
   }
 }
