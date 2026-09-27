@@ -11,10 +11,11 @@
     "preview": "vite preview",
     "start": "wrangler dev --config dist/server/cloudflare.json",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint app simulation lib deploy --ignore-pattern simulation/env.d.ts",
-    "test": "node --experimental-transform-types --test deploy/*.test.mjs",
+    "lint": "oxlint app simulation lib deploy engine --ignore-pattern simulation/env.d.ts",
+    "test": "node --test deploy/*.test.mjs",
     "test:simulation": "node deploy/simulation-integration.mjs",
-    "format": "oxfmt app simulation lib deploy vite.config.ts"
+    "format": "oxfmt app simulation lib deploy vite.config.ts",
+    "test:engine": "node --test engine/test/*.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

@@ -16,7 +16,10 @@ export class WalkingBody {
   velocity = 0;
   grounded = false;
 
-  constructor(readonly camera: THREE.PerspectiveCamera) {
+  readonly camera: THREE.PerspectiveCamera;
+
+  constructor(camera: THREE.PerspectiveCamera) {
+    this.camera = camera;
     this.ray.layers.enable(1);
   }
 

@@ -33,7 +33,8 @@
     "app/**/*.tsx",
     "simulation/**/*.ts",
     "lib/**/*.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "engine/**/*.ts"
   ],
   "exclude": [
     "node_modules"
