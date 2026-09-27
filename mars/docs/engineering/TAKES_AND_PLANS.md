@@ -95,6 +95,12 @@ state at all, so camera edits cannot invalidate a plan.
 - A relevant physical edit after rehearsal ⇒ `plan.stale`; env / label / provenance edits ⇒ still valid.
 - Sampling a take at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level.
 
+## Cross-host determinism
+
+Engine math uses `core/math.ts` `dsin/dcos/dtan/dasin/dacos/datan/datan2/dexp/dlog` (pure IEEE-754 arithmetic; host
+`Math.sin`… differ in the last bit between V8 builds; a `core.test.ts` source scan bans them). `node deploy/determinism-probe.mjs [--json]`
+prints the flagship build-bay/open-ground `finalStateHash`, take id and math fingerprints — run it on each host (browser, Node, DO) and diff.
+
 ## What is resumable — and what is not
 
 - **Resumable:** any *checkpoint* (a quiescent world state between runs). A plan bound to it can be
