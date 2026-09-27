@@ -20,6 +20,8 @@ const L9 = def('beam-9ft').size[0];
 const D12 = def('upright-12ft').size[0];
 const PANEL_Z = def('plywood-4x6').size[2];
 const LYING = Math.PI / 2;
+/** A lying frame rests on its face: origin (base centre) raised by half the column thickness (canonicalLying). */
+const REST_Y = def('upright-12ft').size[2] / 2;
 const JOISTS: [string, number][] = [['j1', 0.2], ['j2', 0.8], ['j3', 1.37], ['j4', 1.95], ['j5', 2.55]];
 const PANELS: [string, number][] = [['s1', 0.15 + PANEL_Z / 2], ['s2', 0.15 + PANEL_Z * 1.5]]; // z centres: s1 z∈[0.15,1.37], s2 z∈[1.37,2.59]
 const STAIR = { x: 0.94 + def('stair-flight-10').size[0], z: 0.75, heading: Math.PI }; // foot east of the bay, top at the deck's east edge
@@ -39,8 +41,8 @@ function setup() {
   const base = openGround();
   const w = addAll(
     emptyWorld('open-ground', base),
-    component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, 0, 0], yaw: Math.PI, pitch: LYING } }),
-    component('B', 'upright-12ft', [0, 0, L9], 0, { phase: 'staged', pose: { p: [0, 0, L9], yaw: 0, pitch: LYING } }),
+    component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, REST_Y, 0], yaw: Math.PI, pitch: LYING } }),
+    component('B', 'upright-12ft', [0, 0, L9], 0, { phase: 'staged', pose: { p: [0, REST_Y, L9], yaw: 0, pitch: LYING } }),
     ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => human(id, -6 + i * 1.2, -6)),
     human('w', 6, 4),
   );
@@ -61,6 +63,9 @@ function must(rt: Runtime, verb: string, params: unknown) {
 function buildBay(rt: Runtime, release = true) {
   must(rt, 'raise_upright', { crew: ['p1', 'p2'], item: 'A' });
   must(rt, 'raise_upright', { crew: ['p3', 'p4'], item: 'B' });
+  // raised frames stand on the ground (y 0): beam seats — and so every deck above — take their world
+  // height from the upright's base, so a frame sunk into the ground lowers the whole deck
+  for (const id of ['A', 'B']) assert.ok(Math.abs(rt.world.entities[id].pose.p[1]) < 1e-9, `${id} stands at y ${rt.world.entities[id].pose.p[1]}`);
   const x = D12 / 2;
   rt.world.entities.b1 = component('b1', 'beam-9ft', [-x, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
   rt.world.entities.b2 = component('b2', 'beam-9ft', [x, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
@@ -111,6 +116,8 @@ test('progressive floor: after 1 of 2 sheets only the installed sheet is walkabl
   const W = rt.world.entities.w;
   assert.equal(W.human!.level, DECK_LEVEL);
   assert.ok(Math.abs(W.pose.p[1] - 1.9875) < 0.01, `standing on the deck (y ${W.pose.p[1]})`);
+  const S1 = rt.world.entities.s1;
+  assert.ok(Math.abs(W.pose.p[1] - (S1.pose.p[1] + def(S1.def).size[1])) < 1e-9, 'feet on the sheet top');
   assert.ok(up.history.some((h) => h.phase === 'climb'), 'climbed the stairs');
   // over the missing sheet: no floor
   const miss = rt.submit('walk_to', { actor: 'w', x: 0, z: 2.0, level: DECK_LEVEL });

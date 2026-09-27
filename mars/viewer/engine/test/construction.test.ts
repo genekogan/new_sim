@@ -16,6 +16,8 @@ import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 const L9 = def('beam-9ft').size[0];
 const D12 = def('upright-12ft').size[0];
 const LYING = Math.PI / 2;
+/** A lying frame rests on its face: origin (base centre) raised by half the column thickness (canonicalLying). */
+const REST_Y = def('upright-12ft').size[2] / 2;
 
 function openGround(extra: Obstacle[] = []): SpatialScene {
   return {
@@ -32,8 +34,8 @@ function setup(extra: Obstacle[] = []) {
   const w = addAll(
     emptyWorld('open-ground', base),
     // A lies toward −z (yaw π), B lies toward +z (yaw 0); bases L9 apart so the bay is between them
-    component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, 0, 0], yaw: Math.PI, pitch: LYING } }),
-    component('B', 'upright-12ft', [0, 0, L9], 0, { phase: 'staged', pose: { p: [0, 0, L9], yaw: 0, pitch: LYING } }),
+    component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, REST_Y, 0], yaw: Math.PI, pitch: LYING } }),
+    component('B', 'upright-12ft', [0, 0, L9], 0, { phase: 'staged', pose: { p: [0, REST_Y, L9], yaw: 0, pitch: LYING } }),
     ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => human(id, -6 + i * 1.2, -6)),
   );
   const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
@@ -106,7 +108,7 @@ test('raising arc blocked by an overhead obstacle is rejected and names it', () 
 
 test('crew too small for a 19 ft upright; misaligned bay; unreachable seat height', () => {
   const rt = setup();
-  rt.world.entities.T = component('T', 'upright-19ft', [8, 0, 8], 0, { phase: 'staged', pose: { p: [8, 0, 8], yaw: 0, pitch: LYING } });
+  rt.world.entities.T = component('T', 'upright-19ft', [8, 0, 8], 0, { phase: 'staged', pose: { p: [8, def('upright-19ft').size[2] / 2, 8], yaw: 0, pitch: LYING } });
   const t = rt.submit('raise_upright', { crew: ['p1', 'p2'], item: 'T' });
   assert.equal(t.diagnostic?.code, 'raise.crew-too-small');
   assert.match(t.diagnostic!.message, /at least 3/);
