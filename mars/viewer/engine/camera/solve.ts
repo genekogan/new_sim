@@ -18,6 +18,10 @@ export type SolveOpts = {
   aspect?: number;
   minSize?: number;
   cutaway?: boolean;
+  /** Max decollision push-out (m); farther is treated as invalid, not teleported (default 1.5). */
+  maxPush?: number;
+  /** Weight of framing deviation vs readability (default 2). */
+  deviationWeight?: number;
   /** Restrict the alternate family to these keys (default: all VARIANTS). */
   variants?: string[];
 };
@@ -99,7 +103,8 @@ export function candidates(world: CameraWorld, desired: CameraPose, subjects: Re
     let pushed = false;
     if (!place.valid) {
       const po = pushOut(world, position, minClear + 0.02);
-      if (po.ok) {
+      const drift = Math.hypot(po.p[0] - position[0], po.p[1] - position[1], po.p[2] - position[2]);
+      if (po.ok && drift <= (opts.maxPush ?? 1.5)) {
         position = po.p;
         pushed = true;
         place = placement(world, position, minClear);
@@ -113,8 +118,8 @@ export function candidates(world: CameraWorld, desired: CameraPose, subjects: Re
 }
 
 /** Instantaneous cost (lower is better). Invalid placements are effectively forbidden. */
-export function candidateCost(c: Candidate, minReadability = 0.6): number {
-  return badness(c, minReadability) + 4 * (1 - c.read.score) + c.deviation;
+export function candidateCost(c: Candidate, minReadability = 0.6, deviationWeight = 2): number {
+  return badness(c, minReadability) + 4 * (1 - c.read.score) + deviationWeight * c.deviation;
 }
 /** Hard-problem part of the cost (used for lookahead): invalid or unreadable. */
 export function badness(c: Candidate, minReadability = 0.6): number {
@@ -146,12 +151,14 @@ export class LiveSolver {
     const hyst = this.opts.hysteresis ?? 0.35, hold = this.opts.minHold ?? 1.5;
     const all = candidates(this.world, desired, subjects, ids, this.opts);
     let best = all[0];
-    for (const c of all) if (candidateCost(c, minRead) < candidateCost(best, minRead)) best = c;
+    const w = this.opts.deviationWeight ?? 2;
+    const cost = (c: Candidate) => candidateCost(c, minRead, w);
+    for (const c of all) if (cost(c) < cost(best)) best = c;
     const cur = this.key ? all.find((c) => c.key === this.key) : undefined;
     let chosen = best;
     if (cur && cur.valid && cur.read.score >= minRead) {
       const held = t - this.since;
-      if (held < hold || candidateCost(cur, minRead) <= candidateCost(best, minRead) + hyst) chosen = cur;
+      if (held < hold || cost(cur) <= cost(best) + hyst) chosen = cur;
     }
     const switched = chosen.key !== this.key;
     if (switched) { this.key = chosen.key; this.since = t; }

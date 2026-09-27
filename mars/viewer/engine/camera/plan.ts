@@ -1,7 +1,7 @@
 // Lookahead camera planner for pre-known futures (takes). Samples the whole
 // shot at `hz`, builds the candidate table for every instant, and chooses a
 // key per sample by dynamic programming (Viterbi) over:
-//   per-sample cost  = deviation + 4·(1 − readability) + max badness in the
+//   per-sample cost  = 2·deviation + 4·(1 − readability) + max badness in the
 //                      next `lead` seconds (so alternates are taken BEFORE an
 //                      occlusion/collision window starts),
 //   transition cost  = 0 for a continuous move of the same key, 0.5 for a
@@ -20,7 +20,7 @@ export type PlanOpts = SolveOpts & {
   duration: number;
   hz?: number; // default 10
   lead?: number; // lookahead seconds (default 1.0)
-  cutCost?: number; // seconds-equivalent cost of a cut (default 2)
+  cutCost?: number; // seconds-equivalent cost of a cut (default 1.5)
   maxSpeed?: number; // m/s for continuous moves (default 6)
   maxTurn?: number; // deg/s for continuous moves (default 120)
   policy?: CameraPolicy;
@@ -65,7 +65,8 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
   const hz = opts.hz ?? 10, dt = 1 / hz;
   const N = Math.round(opts.duration * hz) + 1;
   const L = Math.round((opts.lead ?? 1.0) * hz);
-  const cutUnits = (opts.cutCost ?? 2) * hz;
+  const cutUnits = (opts.cutCost ?? 1.5) * hz;
+  const devW = opts.deviationWeight ?? 2;
   const maxStep = (opts.maxSpeed ?? 6) * dt, maxTurn = (opts.maxTurn ?? 120) * DEG * dt;
   const minRead = opts.minReadability ?? 0.6;
   const cutaway = !!(opts.cutaway ?? spec.cutaway);
@@ -96,7 +97,7 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
       if (!c) return INF;
       let ahead = 0;
       for (let j = i; j <= Math.min(N - 1, i + L); j++) ahead = Math.max(ahead, bad[j][k]);
-      return c.deviation + 4 * (1 - c.read.score) + ahead;
+      return devW * c.deviation + 4 * (1 - c.read.score) + ahead;
     }),
   );
 
