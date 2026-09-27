@@ -289,14 +289,17 @@ node deploy/simulation-integration.mjs                         # real MCP incl. 
 
 - **Production:** Worker `mars-campus-2026`, R2 bucket `mars-campus-2026-models`, at
   `https://mars-campus-2026.<workers-subdomain>.workers.dev` (`/studio`, `/mcp`, `/simulation-agent-guide.md`).
-- **Rollback target:** `d33a4d6b-d4ae-4535-a818-0e5c329e9b4f` (live before deploy 2, confirmed at
+- **Live:** `17f7c9aa-84d1-437d-b1d6-287c85e553fe` (deploy 3, from `3f5ece7`).
+- **Rollback target:** `6f1200ce-ed10-467b-8d7f-a683f91292db` (live before deploy 3, confirmed at
   100% with `wrangler deployments status`). `viewer/deploy/deployment.json` records it as
-  `rollback_version`; its `version` is the live `6f1200ce…`.
+  `rollback_version`; its `version` is the live `17f7c9aa…`.
+- **Release gate:** a deploy starts from a green `npm run gate` report (`ok: true`, `gitHead` = the
+  deployed commit, `gitDirty: false`). See `RELEASE_CHECKLIST.md`.
 - **Release steps** (`viewer/deploy/README.md`): `browser-model.py` → `compress-browser.mjs` →
   `prepare.py` → `CLOUDFLARE_RELEASE=1 npm run build` → `deploy/upload.mjs` →
   `wrangler deploy --config dist/server/cloudflare.json`; then `SITE_BASE=… ALL_ASSETS=1 node
   deploy/smoke.mjs` and `SIM_BASE=… node deploy/simulation-integration.mjs`.
-- **Shipped to production 2026-09-27** (deploy 1, then deploy 2; see below); before that, not live:
+- **Shipped to production 2026-09-27** (deploys 1, 2 and 3; see below); before that, not live:
   the engine, the `engine_*` tools,
   `/api/simulation/engine/take`, `/lab` (`5f02352`) and the NOAA sun.
 - **Review first:** an uncommitted line in `viewer/deploy/prepare.py` and in-progress lab edits (not
@@ -321,6 +324,18 @@ browser final-state hash equals the node hash** (`deploy/determinism-probe.mjs`)
 `5c29efcf…1c96`, so determinism holds across hosts in production. Details are in `RELEASE_CHECKLIST.md`.
 Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback
 d33a4d6b-d4ae-4535-a818-0e5c329e9b4f --name mars-campus-2026 -m "rollback: <reason>"`
+
+**Production deploy 3 (2026-09-27):** Worker version `17f7c9aa-84d1-437d-b1d6-287c85e553fe`, built
+from `3f5ece7`, replacing `6f1200ce-ed10-467b-8d7f-a683f91292db` (now the rollback target). It ships
+crews that accompany lifted parts, the `lift.hands-out-of-reach` invariant, rules `mars-assembly/2`
+(plans bound under `/1` now report stale) and the gate script. The gate was green
+(`.cloudflare/gate/2026-09-27T21-06-25-559Z`): 48 unit, engine 144 pass / 1 skip, tsc, e2e 26/26, probe
+hash `d54eca7c…f610`. One baseline was refreshed after visual review: `build-bay-visitor-oblique`, where
+crews end in different spots. Live smoke returned 200 on all routes and the R2 GLB, and integration
+PASSED. Headless production `/lab` build-bay: 43/43 steps, 0 violations, tick 11522. **The production
+hash equals the node probe hash** (`d54eca7c…f610`). Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
+./node_modules/.bin/wrangler rollback 6f1200ce-ed10-467b-8d7f-a683f91292db --name mars-campus-2026
+-m "rollback: <reason>"`
 
 ## Suggested next tranche (prioritised)
 

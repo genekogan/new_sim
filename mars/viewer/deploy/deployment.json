@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "6f1200ce-ed10-467b-8d7f-a683f91292db",
+  "version": "17f7c9aa-84d1-437d-b1d6-287c85e553fe",
   "published": "2026-09-05",
   "verification": "../.cloudflare/audit/http-smoke.json",
   "updated": "2026-09-27",
-  "feature": "review fixes (teleport/holder/load invariants), raise choreography, swept lifts, deterministic trig",
+  "feature": "crews accompany lifted parts, reach invariant, rules v2, gate script",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,6 +17,6 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "d33a4d6b-d4ae-4535-a818-0e5c329e9b4f",
+  "rollback_version": "6f1200ce-ed10-467b-8d7f-a683f91292db",
   "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab"
 }

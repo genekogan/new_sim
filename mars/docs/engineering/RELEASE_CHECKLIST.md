@@ -213,3 +213,54 @@ Rollback (from `viewer/`):
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback d33a4d6b-d4ae-4535-a818-0e5c329e9b4f \
   --name mars-campus-2026 -m "rollback: <reason>"
 ```
+
+## Production deploy 3 (2026-09-27)
+
+Deployed from committed tree `3f5ece7` (clean `git status`). Contents: crews accompany lifted parts
+(`engine/construction/liftcrew.ts`), the `lift.hands-out-of-reach` invariant, `RULES_VERSION`
+`mars-assembly/2` (`497e913`; plans bound under `/1` now report `plan.stale`), and the release gate
+script (`npm run gate`).
+
+- **New version: `17f7c9aa-84d1-437d-b1d6-287c85e553fe`** (created 21:13Z). It replaces
+  `6f1200ce-ed10-467b-8d7f-a683f91292db`, which `wrangler deployments status` confirmed live at 100%
+  just before the deploy. `6f1200ce…` is the new rollback target.
+- **Gate:** `viewer/.cloudflare/gate/2026-09-27T21-06-25-559Z/report.json`: `ok: true`, `gitHead`
+  `3f5ece7`, `gitDirty: false`. Results: `npm test` 48/48; `test:engine` 144 pass / 1 skip; `tsc`
+  clean; e2e 26/26 in 275 s; determinism probe completed, `finalStateHash` `d54eca7c…f610` at 11522
+  ticks. The hash moved from `5c29efcf…` on purpose: crews now walk during lifts, so the sequence runs
+  longer (10918 → 11522 ticks).
+- **Baseline refresh (`3f5ece7`):** the first gate run failed only on `build-bay-visitor-oblique.png`
+  (2.74 % of pixels differed, above the 1.5 % limit). The held and raise captures stayed within
+  tolerance. Visual review: the end state is unchanged (43/43 steps, 0 violations, deck complete,
+  visitor on the deck). The idle crew stands in different places. Engine positions put nobody inside
+  the stair or rack footprints; the nearest person is 0.30 m away. The baseline was refreshed with
+  `npm run e2e:update-baselines -- -g build-bay --workers=1`, which rewrote only that PNG, and the
+  gate was rerun green.
+- **Build:** `prepare.py` staged 304 files (788.4 MiB, 8 large objects). `CLOUDFLARE_RELEASE=1 npm run
+  build` exited 0 with only the known chunk-size warning. The route list includes `/lab` and `/lab/`,
+  and `dist/client/engine/campus-2026.json` is present (1,081,647 B). The dry run exited 0 (332 assets,
+  3336.26 KiB / 690.90 KiB gzip; bindings SIMULATIONS, MODELS, ASSETS). `upload.mjs` made 0 uploads
+  (8 × `Already uploaded`). The deploy uploaded 6 new asset files (306 already present); startup
+  85 ms.
+- **Live smoke:** `/`, `/studio`, `/studio/2024`, `/lab` and `/simulation-guide` returned 200
+  text/html. `/simulation-agent-guide.md` returned 200 (19,520 B). `/engine/campus-2026.json`
+  returned 200 application/json (1,081,647 B, parses). `/nope` returned 404. `HEAD /browser/campus.glb`
+  returned 200 model/gltf-binary from R2.
+- **Integration:** `SIM_BASE=… node deploy/simulation-integration.mjs` printed both PASS lines. Engine
+  timings: rehearse 1224 ms wall, execute 1081 ms, camera 775 ms; take 44,806 B. It ran on its own,
+  before the browser run.
+- **Browser:** headless Chromium (SwiftShader) on production `/lab?scenario=build-bay` ran
+  `runScenario` + `runToEnd`: tick 11522, done, 5/5 expectations (43/43 steps, 0 violations, visitor
+  on level 4), 0 console errors. Screenshot: `viewer/e2e/artifacts/prod-smoke-3/build-bay-end-oblique.png`
+  (gitignored). Reviewed: it matches the new baseline.
+- **Cross-host determinism:** the production `stateHash()` is
+  `d54eca7c402a4c3a92ff82ed2466fd2e354cd9ded9ee0f01fa1bed8fc7f0f610`, the same value
+  `node deploy/determinism-probe.mjs` gives (node 26.8.2, 11522 ticks, take `8f65762a1ec91b82ba4e93c0`).
+  **They match.**
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 6f1200ce-ed10-467b-8d7f-a683f91292db \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```
