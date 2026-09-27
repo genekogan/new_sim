@@ -56,6 +56,8 @@ const fail = (code: string, message: string, extra: Record<string, unknown> = {}
 /** Input bounds checked before zod sees the input (zod, stableStringify and structuredClone all recurse). */
 export const MAX_INPUT_DEPTH = 32;
 export const MAX_INPUT_BYTES = 256 * 1024;
+/** Unkept rehearsal takes held in memory per controller (oldest dropped first). */
+export const UNKEPT_TAKES = 8;
 
 /**
  * Iterative (stack-safe) pre-check of an op input: nesting depth and an estimate of its
@@ -187,6 +189,8 @@ export class EngineController {
   readonly plans = new Map<string, StoredPlan>();
   private store: ControllerStore;
   private camerasLoaded = new Set<string>();
+  /** Rehearsal takes not kept (`keep: false`): in memory only, newest UNKEPT_TAKES, never persisted. */
+  private unkept = new Map<string, Take>();
   private changes: Changes = { history: false, takes: [], plans: [], cameras: [] };
 
   constructor(o: ControllerOptions) {
@@ -376,15 +380,22 @@ export class EngineController {
     const ws = q.workspace ?? sp.workspace;
     if (!ws) return fail('op.invalid-input', 'plan was bound to a checkpoint; pass `workspace` to rehearse against');
     const r = rehearsePlan(this.history, ws, sp.plan, this.cfg);
-    this.putTake(r.take);
-    return { ok: r.report.ok, code: r.report.ok ? undefined : 'rehearsal.failed', report: compactReport(r.report), take: takeSummary(r.take), stale: r.stale };
+    // read-only by default: the take stays in memory (playable via get_take while it lasts) and is
+    // stored only on request — or later, by execute / attach_camera_track on the same take id
+    const kept = q.keep === true || this.takes.has(r.take.id);
+    if (q.keep === true) this.keepTake(r.take);
+    else if (!kept) this.holdUnkept(r.take);
+    return { ok: r.report.ok, code: r.report.ok ? undefined : 'rehearsal.failed', report: compactReport(r.report), take: { ...takeSummary(r.take), kept }, stale: r.stale };
   }
 
   execute(q: OpInput<'execute'>): OpResult {
     const sp = this.plan(q.plan_id);
     if (!sp) return fail('plan.unknown', `no plan ${q.plan_id} (bind_plan first)`);
     const r = executePlan(this.history, q.workspace, sp.plan, this.cfg, { takes: this.takes, label: q.label });
-    if ('take' in r) this.noteTake(r.take.id);
+    if ('take' in r) {
+      this.unkept.delete(r.take.id);
+      this.noteTake(r.take.id);
+    }
     if (r.ok) {
       this.changes.history = true;
       return { ok: true, workspace: q.workspace, checkpoint: compactCheckpoint(r.checkpoint), take_id: r.take.id, take: takeSummary(r.take), report: compactReport(r.report) };
@@ -404,6 +415,8 @@ export class EngineController {
     if (!take) return fail('take.unknown', `no take ${q.take_id}`);
     const scene = this.scenes[take.finalState.base.campus];
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
+    // a camera track is stored beside its take: an unkept rehearsal take is kept from now on
+    if (this.unkept.has(take.id)) this.keepTake(take);
     const before = this.takes.takeHash(take.id);
     const sampler: Sampler = (t) => {
       const f = sampleTake(take, t);
@@ -431,6 +444,8 @@ export class EngineController {
 
   take(id: string): Take | undefined {
     if (this.takes.has(id)) return this.takes.get(id);
+    const u = this.unkept.get(id);
+    if (u) return u;
     const t = this.store.loadTake?.(id);
     if (!t) return undefined;
     this.takes.put(t);
@@ -454,9 +469,16 @@ export class EngineController {
     return this.takes.cameras(takeId);
   }
 
-  private putTake(t: Take) {
+  /** Store a take in the library and mark it for persistence (drops any unkept copy). */
+  private keepTake(t: Take) {
+    this.unkept.delete(t.id);
     this.takes.put(t);
     this.noteTake(t.id);
+  }
+  private holdUnkept(t: Take) {
+    this.unkept.delete(t.id);
+    this.unkept.set(t.id, t);
+    for (const k of this.unkept.keys()) if (this.unkept.size > UNKEPT_TAKES) this.unkept.delete(k);
   }
   private noteTake(id: string) {
     if (!this.changes.takes.includes(id)) this.changes.takes.push(id);

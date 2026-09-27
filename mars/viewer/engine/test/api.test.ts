@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
+import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { createController, engineTools, ENGINE_SCENES, opSchemas, seedHistory, sliceTake, type EngineController, type StoredPlan } from '../api/index.ts';
 import { WorldHistory } from '../history/store.ts';
@@ -227,4 +228,99 @@ test('api: pathological inputs (5,000-deep nesting, 1 MB array) return input.inv
   assert.equal((c.call('query_world', deep) as any).code, 'input.invalid');
   // ordinary inputs are unaffected
   assert.ok(c.call('bind_plan', { template: crossTemplate, bindings: crossBindings, workspace: 'ws' }).ok);
+});
+
+/** DurableObjectStorage stand-in over node:sqlite, counting bytes/rows written. */
+function sqliteStorage() {
+  const db = new DatabaseSync(':memory:');
+  const io = { bytes: 0, rows: 0 };
+  const storage = {
+    sql: {
+      exec(q: string, ...args: (string | number)[]) {
+        if (/^INSERT/i.test(q)) { io.bytes += String(args[2]).length; io.rows++; }
+        const st = db.prepare(q);
+        const out = /^\s*SELECT/i.test(q) ? st.all(...args) : (st.run(...args), []);
+        return { toArray: () => out };
+      },
+    },
+    transactionSync<T>(fn: () => T): T {
+      db.exec('BEGIN');
+      try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; }
+    },
+  };
+  const keys = () => (db.prepare('SELECT DISTINCT key FROM engine_blobs ORDER BY key').all() as { key: string }[]).map((r) => r.key);
+  const blob = (key: string) => (db.prepare('SELECT data FROM engine_blobs WHERE key=? ORDER BY chunk').all(key) as { data: string }[]).map((r) => r.data).join('');
+  return { storage: storage as unknown as DurableObjectStorage, io, keys, blob, db };
+}
+
+test('api: rehearse is read-only unless keep: true (review M5); unkept takes stay playable in memory', () => {
+  const c = fresh();
+  c.drainChanges();
+  const plan = bind(c, crossTemplate, crossBindings);
+  c.drainChanges();
+  const reh = c.call('rehearse', { plan_id: plan }) as any;
+  assert.ok(reh.ok);
+  assert.equal(reh.take.kept, false);
+  assert.deepEqual(c.drainChanges(), { history: false, takes: [], plans: [], cameras: [] }, 'nothing to persist');
+  assert.ok((c.call('get_take', { take_id: reh.take.take_id }) as any).ok, 'unkept take is playable');
+  const kept = c.call('rehearse', { plan_id: plan, keep: true }) as any;
+  assert.equal(kept.take.kept, true);
+  assert.deepEqual(c.drainChanges().takes, [reh.take.take_id]);
+  // attaching a camera to an unkept take keeps it (the track is stored beside its take)
+  const plan2 = bind(c, minuteTemplate, minuteBindings);
+  const r2 = c.call('rehearse', { plan_id: plan2 }) as any;
+  c.drainChanges();
+  assert.ok((c.call('attach_camera_track', { take_id: r2.take.take_id, shot: { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] } }) as any).track_id);
+  const ch = c.drainChanges();
+  assert.deepEqual([ch.takes, ch.cameras], [[r2.take.take_id], [r2.take.take_id]]);
+});
+
+test('api: EngineRoom stores states as content-addressed blobs and migrates an old history blob (review M5)', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  // an old-format room: the whole WorldHistory (states inline) under y2026/history
+  const c = fresh();
+  const plan = bind(c, crossTemplate, crossBindings);
+  assert.ok(c.call('execute', { plan_id: plan, workspace: 'ws' }).ok);
+  const oldBlob = JSON.stringify(c.history.toJSON());
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage);
+  s.storage.sql.exec('INSERT INTO engine_blobs (key, chunk, data) VALUES (?, ?, ?)', 'y2026/history', 0, oldBlob);
+  const stateHashes = [...new Set([...c.history.checkpoints.values()].map((cp) => cp.stateHash))];
+  s.io.bytes = s.io.rows = 0;
+  const log = room.call(2026, 'log', { workspace: 'ws' }) as any;
+  assert.equal(log.head, c.history.head('ws').id, 'migrated history keeps its heads');
+  assert.deepEqual(s.keys().filter((k) => k.includes('/state/')).sort(), stateHashes.map((h) => `y2026/state/${h}`).sort());
+  const index = JSON.parse(s.blob('y2026/history'));
+  assert.equal(index.states, undefined, 'index rewritten without states');
+  const q = room.call(2026, 'query_world', { workspace: 'ws', ids: ['n1'] }) as any;
+  assert.deepEqual(q.entities[0].pose.p, c.history.read('ws').entities.n1.pose.p, 'states load on demand from their blobs');
+
+  // publish (seed) + 3 forks + 3 executes on a fresh room: every write is O(new state + index)
+  const f = sqliteStorage();
+  const fresh2 = new EngineRoom(f.storage);
+  const walk = (x: number) => ({ schema: 'mars-sequence/1', id: `walk-${x}`, params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x, z: -22 } }] });
+  fresh2.call(2026, 'query_world', {});
+  const seedBytes = f.io.bytes;
+  for (const k of [1, 2, 3]) fresh2.call(2026, 'fork', { from: 'proving-ground', name: `f${k}` });
+  const execWrites: Record<string, number>[] = [];
+  for (const k of [1, 2, 3]) {
+    const b = fresh2.call(2026, 'bind_plan', { template: walk(-5 - k), bindings: { a: 'n1' }, workspace: `f${k}` }) as any;
+    const r = fresh2.call(2026, 'rehearse', { plan_id: b.plan_id }) as any;
+    assert.deepEqual(r._meta.stored, {}, 'rehearse writes nothing');
+    const e = fresh2.call(2026, 'execute', { plan_id: b.plan_id, workspace: `f${k}` }) as any;
+    assert.ok(e.ok, e.message);
+    execWrites.push(e._meta.stored);
+  }
+  for (const w of execWrites) {
+    const ks = Object.keys(w).map((k) => k.split('/')[1]).sort();
+    assert.deepEqual(ks, ['history', 'state', 'take'], JSON.stringify(w));
+    assert.ok(w['y2026/history'] < 4096, `index stays small (${w['y2026/history']} B)`);
+  }
+  const sizes = fresh2.sizes(2026);
+  assert.equal(sizes.state.count, 2 + 3, 'two seed states + one per execute');
+  console.log(`  M5 engine room: seed ${seedBytes} B, total written ${f.io.bytes} B in ${f.io.rows} rows; stored ${JSON.stringify(sizes)}`);
+  // a restarted DO (new EngineRoom over the same storage) sees the same heads
+  const again = new EngineRoom(f.storage);
+  const l3 = again.call(2026, 'log', { workspace: 'f3' }) as any;
+  assert.equal(l3.checkpoints.length, 2);
 });

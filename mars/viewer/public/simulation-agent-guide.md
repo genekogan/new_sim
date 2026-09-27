@@ -142,7 +142,7 @@ The nine `engine_*` tools are generated from the same operation registry the eng
 | `engine_list_verbs` | Verbs (`walk_to`, `carry`, `raise_upright`, `connect_beam`, `release_support`, `install_joist`, `install_plywood`, `install_stair_flight`, `install_tread`) with JSON Schemas; rules version; `mars-sequence/1` template JSON Schema. |
 | `engine_query_world` | `{}` lists workspaces. With `workspace`: entities (filter `ids`/`kind`/`label`/`region`), `include: regions/levels/links/stability`, `route {actor,x,z,level?}` preview, `carry {crew,item,to}` preview. Previews use the verbs' own planners and never mutate anything. |
 | `engine_bind_plan` | `{template, bindings, workspace}` → `plan_id` (content hash) bound to that workspace's current head, or every problem at once. |
-| `engine_rehearse` | `{plan_id}` → report (status, per-step diagnostics, violations by code, metrics), take summary, `stale` if execution would be refused now. Private: never moves any head. |
+| `engine_rehearse` | `{plan_id, keep?}` → report (status, per-step diagnostics, violations by code, metrics), take summary, `stale` if execution would be refused now. Private: never moves any head. Read-only by default: the take is held in memory only (`take.kept: false`; playable via `engine_get_take` for the last few rehearsals, then evicted). Pass `keep: true` to store it durably; executing the same plan, or attaching a camera track to the take, also keeps it. |
 | `engine_execute` | `{plan_id, workspace}` → new checkpoint + `take_id`. Refuses `workspace.protected` (fork first), `plan.stale` (with a physical diff such as `panel changed (pose)`) and `execution.failed` (take kept, nothing committed). |
 | `engine_fork` | `{from, name}` editable workspace from a workspace head or `at` checkpoint. |
 | `engine_log` | `{workspace}` checkpoints newest first with causes (`canonical-publish`, `simulation-run {take, plan}`, `fork`…). |
@@ -157,7 +157,7 @@ Director workflow:
 4. **Rehearse** — read `report.status`, `report.steps[].diagnostic`, `report.violations.byCode` and metrics (duration, replans, blocked ticks).
 5. **Revise** — change the template/bindings (or the world) and rebind; plans are immutable, so a revision is a new `plan_id`.
 6. **Execute** — in your fork. The committed checkpoint's cause records `{take, plan}`. Re-executing the same plan is `plan.stale`: the world moved on, so bind again.
-7. **Take** — `engine_get_take` (or `GET /api/simulation/engine/take?id=…&from=…&to=…` with the view capability) to inspect or play back what happened. Rehearsal and execution of the same plan from the same baseline produce the same take id.
+7. **Take** — `engine_get_take` (or `GET /api/simulation/engine/take?id=…&from=…&to=…` with the view capability) to inspect or play back what happened. Rehearsal and execution of the same plan from the same baseline produce the same take id. Executed takes are always stored; a rehearsal take only with `keep: true` (otherwise it may be gone after a room restart or a few more rehearsals — rehearse again, it is deterministic).
 8. **Camera tracks** — attach one or more shots per take; reshooting never re-simulates.
 9. **Fork again** — alternative futures branch from any checkpoint (`engine_fork {from, name, at}`); there is no merge.
 

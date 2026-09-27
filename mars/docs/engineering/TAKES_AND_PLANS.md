@@ -69,6 +69,9 @@ static scene hash differs from `world.base.staticHash` (`services.base-mismatch`
 
 - `rehearse(history, ws, plan, cfg)` runs from the plan's own baseline checkpoint, never writes history, and
   returns `{ report, take, finalState, stale? }` (`stale` = what `execute` in `ws` would say right now).
+  The controller op `rehearse { plan_id, workspace?, keep? }` is read-only by default: the take is held in an
+  in-memory LRU (`UNKEPT_TAKES` = 8, playable via `get_take`) and reported as `take.kept: false`; `keep: true`
+  stores it (the only write). `execute` of the same plan or `attach_camera_track` on the take also keeps it.
   Report metrics: simulated duration, ticks, Σ `outputs.replans`, Σ `outputs.length` (path metres),
   blocked ticks, violations.
 - `execute(history, ws, plan, cfg, { takes?, commitOnFailure?, label? })`:

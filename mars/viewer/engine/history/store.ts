@@ -35,8 +35,26 @@ export class HistoryError extends Error {
   }
 }
 
+/**
+ * Where world states live when they are not all held in memory (the Durable Object keeps each one
+ * as its own content-addressed blob `state/<stateHash>`). `get` may return undefined for an unknown
+ * hash; `put` is only called for a state hash this history has not stored before.
+ */
+export type StateStore = { get(stateHash: string): WorldState | undefined; put(stateHash: string, state: WorldState): void; has?(stateHash: string): boolean };
+
+/** Serialised history. `states` is omitted by `toJSON({ states: false })` (states live in a StateStore). */
+export type HistoryJSON = {
+  rulesVersion: string;
+  seq: number;
+  states?: [string, WorldState][];
+  checkpoints: Checkpoint[];
+  workspaces: Workspace[];
+};
+
 export class WorldHistory {
+  /** State cache: every state when no store is attached, else the ones read or written so far. */
   private states = new Map<string, WorldState>();
+  private store: StateStore | null = null;
   readonly checkpoints = new Map<string, Checkpoint>();
   readonly workspaces = new Map<string, Workspace>();
   private seq = 0;
@@ -52,7 +70,11 @@ export class WorldHistory {
     const id = hashOf({ stateHash, parent, cause, rulesVersion: this.rulesVersion }).slice(0, 24);
     const existing = this.checkpoints.get(id);
     if (existing) return existing;
-    if (!this.states.has(stateHash)) this.states.set(stateHash, frozen); // first clone wins (review M6)
+    // first clone wins (review M6); with a store, only a state it does not hold yet is written
+    if (!this.states.has(stateHash) && !this.stored(stateHash)) {
+      this.store?.put(stateHash, frozen);
+      this.states.set(stateHash, frozen);
+    }
     const cp: Checkpoint = {
       id,
       stateHash,
@@ -103,7 +125,41 @@ export class WorldHistory {
   read(checkpointOrWorkspace: string): WorldState {
     const ws = this.workspaces.get(checkpointOrWorkspace);
     const cp = this.checkpoint(ws ? ws.head : checkpointOrWorkspace);
-    return structuredClone(this.states.get(cp.stateHash)!) as WorldState;
+    return structuredClone(this.state(cp.stateHash)) as WorldState;
+  }
+
+  /** The frozen state for a hash: from the cache, else loaded once from the attached store. */
+  private state(stateHash: string): WorldState {
+    let s = this.states.get(stateHash);
+    if (!s) {
+      const got = this.store?.get(stateHash);
+      if (!got) throw new HistoryError('missing-state', `world state ${stateHash.slice(0, 16)}… is not stored`);
+      s = deepFreeze(got);
+      this.states.set(stateHash, s);
+    }
+    return s;
+  }
+
+  /**
+   * Keep states in `store` instead of the serialised history: `read()` loads a state on demand and
+   * `commit()`/`publishCanonical()` put only the new one. States already in memory (a seeded or
+   * old-format history) are written through now, so `toJSON({ states: false })` is complete
+   * together with the store. Returns the number of states written.
+   */
+  attachStateStore(store: StateStore): number {
+    this.store = store;
+    let n = 0;
+    for (const [hash, s] of this.states)
+      if (!this.stored(hash)) {
+        store.put(hash, s);
+        n++;
+      }
+    return n;
+  }
+
+  private stored(stateHash: string): boolean {
+    const st = this.store;
+    return !!st && (st.has ? st.has(stateHash) : st.get(stateHash) !== undefined);
   }
 
   head(workspace: string) {
@@ -128,21 +184,25 @@ export class WorldHistory {
     return ws;
   }
 
-  /** Serialise the whole store (for Durable Object / file persistence). */
-  toJSON() {
+  /**
+   * Serialise the history (Durable Object / file persistence). `{ states: false }` writes only the
+   * checkpoint + workspace index — the states themselves are in the attached StateStore.
+   */
+  toJSON(o: { states?: boolean } = {}): HistoryJSON {
     return {
       rulesVersion: this.rulesVersion,
       seq: this.seq,
-      states: [...this.states.entries()],
+      ...(o.states === false ? {} : { states: [...this.states.entries()] }),
       checkpoints: [...this.checkpoints.values()],
       workspaces: [...this.workspaces.values()],
     };
   }
 
-  static fromJSON(j: ReturnType<WorldHistory['toJSON']>): WorldHistory {
+  /** Load either format: a full blob (with `states`) or an index whose states come from attachStateStore. */
+  static fromJSON(j: HistoryJSON): WorldHistory {
     const h = new WorldHistory(j.rulesVersion);
     h.seq = j.seq;
-    for (const [k, s] of j.states) h.states.set(k, deepFreeze(s));
+    for (const [k, s] of j.states ?? []) h.states.set(k, deepFreeze(s));
     for (const c of j.checkpoints) h.checkpoints.set(c.id, c);
     for (const w of j.workspaces) h.workspaces.set(w.id, { ...w });
     return h;

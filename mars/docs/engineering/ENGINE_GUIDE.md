@@ -42,7 +42,7 @@ the Cloudflare Durable Object. Spec: `SPEC.md`. Audit of the existing app:
 | `world/types.ts` | WorldState / Entity / Provenance / `physicalView()` (what plans depend on) |
 | `world/catalog.ts` | Mars asset defs: uprights 8/9/12/16/19 ft, beams 8/9/12 ft, 2x4, plywood; grips, sockets, handling |
 | `world/factory.ts` | `emptyWorld`, `human`, `component`, `addAll` |
-| `history/store.ts` | `WorldHistory`: content-addressed checkpoints, protected canonical workspaces, forks, causes |
+| `history/store.ts` | `WorldHistory`: content-addressed checkpoints, protected canonical workspaces, forks, causes; `attachStateStore` + `toJSON({ states: false })` keep states as separate blobs (the DO) |
 | `runtime/runtime.ts` | `Runtime`: submit → validated → reserved → executing; `step()`, `runUntilIdle()`, events, violations |
 | `runtime/profile.ts` | opt-in `rt.profile = true` wall-ms profiler (plan/step per verb, Spatial methods); `deploy/perf-stress.mjs` |
 | `runtime/invariants.ts` | end-of-tick checks (human/static clearance, human/human overlap, unsupported components) |

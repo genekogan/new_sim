@@ -53,7 +53,11 @@ export const opSchemas = {
     bindings: z.record(z.string(), z.unknown()),
     workspace: z.string().max(120).describe('workspace (its head) or checkpoint the plan is validated against'),
   }),
-  rehearse: z.strictObject({ plan_id: id, workspace: wsId.describe('staleness is reported against this workspace (default: the one bound)').optional() }),
+  rehearse: z.strictObject({
+    plan_id: id,
+    workspace: wsId.describe('staleness is reported against this workspace (default: the one bound)').optional(),
+    keep: z.boolean().describe('store the take durably (default false: held in memory only, playable via get_take until evicted)').optional(),
+  }),
   execute: z.strictObject({ plan_id: id, workspace: wsId, label: z.string().max(200).optional() }),
   fork: z.strictObject({ from: z.string().max(120), name: wsId, label: z.string().max(200).optional(), at: z.string().max(64).describe('checkpoint id (default: head of `from`)').optional() }),
   log: z.strictObject({ workspace: wsId.optional(), limit: z.number().int().min(1).max(500).optional() }),
@@ -87,7 +91,7 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
     description:
       'Bind a mars-sequence/1 template to concrete actors/entities and a baseline workspace. Validates the step graph and every step against the verb schemas; returns plan_id (content hash) or all diagnostics at once. Stores the plan; does not run anything.',
   },
-  rehearse: { readOnly: true, description: 'Run a bound plan privately from its baseline (never mutates any workspace). Returns report (status, per-step diagnostics, invariant violations, metrics), a take summary (take_id playable via get_take) and `stale` if executing now would be refused.' },
+  rehearse: { readOnly: true, description: 'Run a bound plan privately from its baseline (never mutates any workspace). Returns report (status, per-step diagnostics, invariant violations, metrics), a take summary (take_id playable via get_take; `kept` says whether it is stored) and `stale` if executing now would be refused. Stores nothing unless `keep: true` (then only the take); an unkept take lives in memory for the last few rehearsals — execute or attach a camera to keep it.' },
   execute: {
     readOnly: false,
     description:

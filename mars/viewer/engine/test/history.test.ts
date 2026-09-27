@@ -60,3 +60,56 @@ test('official execution appends a simulation-run checkpoint naming the take and
   assert.equal(hashOf(h2.read('ws')), ex.take.finalStateHash);
 });
 
+
+test('state store (review M5): index without states, lazy state reads, commits put only the new state, old blobs migrate', () => {
+  const h = pgHistory();
+  const w1 = h.read('ws');
+  w1.entities.n1.pose.p = [14, 0, -20];
+  h.commit('ws', w1, { kind: 'design-edit', note: 'move n1' });
+  const w2 = h.read('ws');
+  w2.entities.s1.pose.p = [14, 0, -10];
+  h.commit('ws', w2, { kind: 'design-edit', note: 'move s1' });
+  // an old-format blob (states inline) — what the Durable Object stored before
+  const old = JSON.parse(JSON.stringify(h.toJSON()));
+  assert.equal(old.states.length, 3);
+
+  const blobs = new Map<string, string>();
+  let gets = 0, puts = 0;
+  const store = {
+    has: (k: string) => blobs.has(k),
+    get: (k: string) => (gets++, blobs.has(k) ? JSON.parse(blobs.get(k)!) : undefined),
+    put: (k: string, s: unknown) => (puts++, void blobs.set(k, JSON.stringify(s))),
+  };
+  // migrate on first load: every inline state becomes its own blob; the index drops them
+  const migrated = WorldHistory.fromJSON(old);
+  assert.equal(migrated.attachStateStore(store), 3);
+  const index = JSON.parse(JSON.stringify(migrated.toJSON({ states: false })));
+  assert.equal(index.states, undefined);
+  assert.ok(JSON.stringify(index).length < JSON.stringify(old).length / 2, 'index is small');
+  assert.deepEqual([...blobs.keys()].sort(), old.states.map(([k]: [string]) => k).sort());
+
+  // reload from index + store: states load on demand (once), contents identical to the old blob
+  const h2 = WorldHistory.fromJSON(index);
+  h2.attachStateStore(store);
+  gets = 0;
+  for (const ws of ['pg', 'ws']) assert.equal(hashOf(h2.read(ws)), hashOf(h.read(ws)));
+  for (const cp of h.log('ws')) assert.equal(hashOf(h2.read(cp.id)), cp.stateHash);
+  assert.equal(gets, 3, 'each state fetched once');
+  h2.read('ws');
+  assert.equal(gets, 3, 'then served from the cache');
+
+  // a commit puts exactly the new state; re-committing a known state puts nothing
+  puts = 0;
+  const w3 = h2.read('ws');
+  w3.entities.p1.pose.p = [3, 0, 12];
+  const cp3 = h2.commit('ws', w3, { kind: 'design-edit', note: 'move p1' });
+  assert.equal(puts, 1);
+  assert.ok(blobs.has(cp3.stateHash));
+  h2.fork('pg', 'ws2', 'second');
+  h2.commit('ws2', h.read('ws'), { kind: 'design-edit', note: 'same as ws before p1' });
+  assert.equal(puts, 1, 'known state is not written again');
+  // the full format still round-trips (tests/files) and a missing state fails loudly
+  assert.equal(hashOf(WorldHistory.fromJSON(JSON.parse(JSON.stringify(h.toJSON()))).read('ws')), hashOf(h.read('ws')));
+  const bare = WorldHistory.fromJSON(index);
+  assert.throws(() => bare.read('ws'), /not stored/);
+});
