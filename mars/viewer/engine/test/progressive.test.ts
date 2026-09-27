@@ -1,0 +1,233 @@
+// Progressive construction (spec §7, §10, §12, §28 "Construction changes
+// navigation", "Incomplete floor/stairs"; milestone E): joists, plywood decks
+// and stairs are walkable only once actually built and supported.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Runtime } from '../runtime/runtime.ts';
+import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
+import { Spatial } from '../spatial/service.ts';
+import { emptyWorld, human, addAll, component } from '../world/factory.ts';
+import { walkTo } from '../locomotion/walk.ts';
+import { CONSTRUCTION_ACTIONS, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
+import { levelFor } from '../construction/access.ts';
+import { def } from '../world/catalog.ts';
+import type { ActionDef, ActionRecord } from '../actions/types.ts';
+import type { SpatialScene } from '../spatial/types.ts';
+
+const L9 = def('beam-9ft').size[0];
+const D12 = def('upright-12ft').size[0];
+const PANEL_Z = def('plywood-4x6').size[2];
+const LYING = Math.PI / 2;
+const JOISTS: [string, number][] = [['j1', 0.2], ['j2', 0.8], ['j3', 1.37], ['j4', 1.95], ['j5', 2.55]];
+const PANELS: [string, number][] = [['s1', 0.15 + PANEL_Z / 2], ['s2', 0.15 + PANEL_Z * 1.5]]; // z centres: s1 z∈[0.15,1.37], s2 z∈[1.37,2.59]
+const STAIR = { x: 0.94 + def('stair-flight-10').size[0], z: 0.75, heading: Math.PI }; // foot east of the bay, top at the deck's east edge
+const DECK_LEVEL = levelFor(1.9875);
+
+function openGround(): SpatialScene {
+  return {
+    bounds: [-15, -15, 15, 15],
+    levels: [{ id: 0, y: 0, label: 'ground' }],
+    surfaces: [{ id: 'ground', level: 0, y: 0, obb: { c: [0, 0], half: [15, 15], yaw: 0 } }],
+    obstacles: [],
+    links: [],
+  };
+}
+
+function setup() {
+  const base = openGround();
+  const w = addAll(
+    emptyWorld('open-ground', base),
+    component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, 0, 0], yaw: Math.PI, pitch: LYING } }),
+    component('B', 'upright-12ft', [0, 0, L9], 0, { phase: 'staged', pose: { p: [0, 0, L9], yaw: 0, pitch: LYING } }),
+    ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => human(id, -6 + i * 1.2, -6)),
+    human('w', 6, 4),
+  );
+  const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
+  return new Runtime(w, reg, { spatial: new Spatial(base, { contributors: [progressiveContributor] }) }, [...DEFAULT_INVARIANTS, uprightsSupported, progressiveSupported]);
+}
+
+const kids = (rt: Runtime, r: ActionRecord) => JSON.stringify([...rt.records.values()].filter((x) => x.parent === r.id).map((x) => [x.verb, x.status, x.diagnostic?.message]));
+
+function must(rt: Runtime, verb: string, params: unknown) {
+  const r = rt.submit(verb, params);
+  if (r.status !== 'failed') rt.runUntilIdle(20 * 180, [r.id]);
+  assert.equal(r.status, 'completed', `${verb} ${JSON.stringify(params)}: ${r.status} ${r.phase ?? ''} ${r.diagnostic?.code} ${r.diagnostic?.message} ${kids(rt, r)}`);
+  return r;
+}
+
+/** Raise A and B, seat beams at 0.5 m and 1.8 m on both columns, release (supported bay). */
+function buildBay(rt: Runtime, release = true) {
+  must(rt, 'raise_upright', { crew: ['p1', 'p2'], item: 'A' });
+  must(rt, 'raise_upright', { crew: ['p3', 'p4'], item: 'B' });
+  const x = D12 / 2;
+  rt.world.entities.b1 = component('b1', 'beam-9ft', [-x, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
+  rt.world.entities.b2 = component('b2', 'beam-9ft', [x, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
+  rt.world.entities.b3 = component('b3', 'beam-9ft', [-x + 0.25, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
+  rt.world.entities.b4 = component('b4', 'beam-9ft', [x - 0.25, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
+  for (const [beam, col, height] of [['b1', 'r', 0.5], ['b2', 'l', 0.5], ['b3', 'r', 1.8], ['b4', 'l', 1.8]] as const)
+    must(rt, 'connect_beam', { crew: ['p5', 'p6'], beam, a: 'A', b: 'B', column: col, height });
+  if (release) {
+    must(rt, 'release_support', { item: 'A' });
+    must(rt, 'release_support', { item: 'B' });
+  }
+}
+
+/** Components delivered to the work area (the carry action's job; placed directly here). */
+function stageParts(rt: Runtime) {
+  const E = rt.world.entities;
+  JOISTS.forEach(([id], k) => (E[id] = component(id, '2x4-6ft', [-1.6 - 0.12 * k, 0, 1.37], Math.PI / 2, { phase: 'staged' })));
+  PANELS.forEach(([id, z]) => (E[id] = component(id, 'plywood-4x6', [-2.7, 0, z], 0, { phase: 'staged' })));
+  E.st = component('st', 'stair-flight-10', [5.0, 0, 0.75], Math.PI, { phase: 'staged' });
+  for (let i = 1; i <= 10; i++) {
+    const s = -1.25 + (i - 0.5) * 0.25; // tread i along the flight (local), flight centre x = 2.19, heading −x
+    E[`t${i}`] = component(`t${i}`, 'stair-tread', [0.94 + 1.25 - s, 0, 2.4], Math.PI / 2, { phase: 'staged' });
+  }
+}
+
+const joists = (rt: Runtime, which = JOISTS) => { for (const [joist, at] of which) must(rt, 'install_joist', { crew: ['p5'], joist, bay: { a: 'A', b: 'B' }, height: 1.8, at }); };
+const panel = (rt: Runtime, i: 0 | 1, crew = ['p3', 'p4']) => must(rt, 'install_plywood', { crew, sheet: PANELS[i][0], x: 0, z: PANELS[i][1], yaw: 0 });
+/** Deck crews step back to the muster line so the stair site is clear (a stair on people is refused: stair.site-occupied). */
+function muster(rt: Runtime) {
+  ['p3', 'p4', 'p5'].forEach((id) => must(rt, 'walk_to', { actor: id, x: -6 + 1.2 * (Number(id[1]) - 1), z: -6, level: 0 }));
+}
+const stair = (rt: Runtime) => must(rt, 'install_stair_flight', { crew: ['p1', 'p2'], stair: 'st', ...STAIR });
+const treads = (rt: Runtime, ix: number[]) => { for (const i of ix) must(rt, 'install_tread', { crew: ['p6'], stair: 'st', tread: `t${i}`, index: i }); };
+const all10 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const stairLinkNow = (rt: Runtime) => { const sp = rt.services.spatial as Spatial; sp.sync(rt.world); return sp.scene.links.find((l) => l.id === 'st')!; };
+
+test('progressive floor: after 1 of 2 sheets only the installed sheet is walkable', () => {
+  const rt = setup();
+  buildBay(rt);
+  stageParts(rt);
+  joists(rt);
+  panel(rt, 0);
+  muster(rt);
+  stair(rt);
+  treads(rt, all10);
+  assert.equal(stairLinkNow(rt).usable, true, stairLinkNow(rt).reason);
+  const up = must(rt, 'walk_to', { actor: 'w', x: 0, z: 0.9, level: DECK_LEVEL });
+  const W = rt.world.entities.w;
+  assert.equal(W.human!.level, DECK_LEVEL);
+  assert.ok(Math.abs(W.pose.p[1] - 1.9875) < 0.01, `standing on the deck (y ${W.pose.p[1]})`);
+  assert.ok(up.history.some((h) => h.phase === 'climb'), 'climbed the stairs');
+  // over the missing sheet: no floor
+  const miss = rt.submit('walk_to', { actor: 'w', x: 0, z: 2.0, level: DECK_LEVEL });
+  assert.equal(miss.status, 'failed');
+  assert.equal(miss.diagnostic?.code, 'route.goal-blocked');
+  assert.match(miss.diagnostic!.message, /no floor/);
+  // the second sheet makes it reachable
+  panel(rt, 1);
+  must(rt, 'walk_to', { actor: 'w', x: 0, z: 2.0, level: DECK_LEVEL });
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('progressive stairs: incomplete flight is not traversable and names what is missing', () => {
+  const rt = setup();
+  buildBay(rt);
+  stageParts(rt);
+  joists(rt);
+  muster(rt);
+  stair(rt);
+  let link = stairLinkNow(rt);
+  assert.equal(link.usable, false);
+  assert.equal(link.reason, 'treads 1–10 missing; no landing at top');
+  treads(rt, [1, 2, 4, 5, 6, 8, 9, 10]);
+  assert.equal(stairLinkNow(rt).reason, 'treads 3, 7 missing; no landing at top');
+  panel(rt, 0);
+  link = stairLinkNow(rt);
+  assert.equal(link.reason, 'treads 3, 7 missing');
+  const r = rt.submit('walk_to', { actor: 'w', x: 0, z: 0.9, level: DECK_LEVEL });
+  assert.equal(r.diagnostic?.code, 'route.link-unusable');
+  assert.match(r.diagnostic!.message, /stairs st \(treads 3, 7 missing\)/);
+  treads(rt, [3, 7]);
+  assert.equal(stairLinkNow(rt).usable, true);
+  must(rt, 'walk_to', { actor: 'w', x: 0, z: 0.9, level: DECK_LEVEL });
+  // and back down
+  must(rt, 'walk_to', { actor: 'w', x: 6, z: 4, level: 0 });
+  assert.equal(rt.world.entities.w.human!.level, 0);
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('construction changes navigation: a stair flight set down across a walker\'s corridor forces a replan', () => {
+  const rt = setup();
+  buildBay(rt);
+  stageParts(rt);
+  joists(rt, JOISTS.slice(0, 3));
+  muster(rt);
+  const ins = rt.submit('install_stair_flight', { crew: ['p1', 'p2'], stair: 'st', ...STAIR });
+  assert.notEqual(ins.status, 'failed', ins.diagnostic?.message);
+  while (rt.isActive(ins.id) && ins.phase !== 'place') rt.step();
+  rt.world.entities.w.pose.p = [3.0, 0, 9];
+  const walk = rt.submit('walk_to', { actor: 'w', x: 3.0, z: -5 });
+  assert.notEqual(walk.status, 'failed', walk.diagnostic?.message);
+  rt.runUntilIdle(20 * 120, [ins.id, walk.id]);
+  assert.equal(ins.status, 'completed', ins.diagnostic?.message);
+  assert.equal(walk.status, 'completed', `${walk.diagnostic?.code} ${walk.diagnostic?.message}`);
+  assert.ok((walk.outputs?.replans as number) >= 1, `walker replanned (${JSON.stringify(walk.outputs)})`);
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('plywood without joists is rejected with a diagnostic', () => {
+  const rt = setup();
+  buildBay(rt);
+  stageParts(rt);
+  const onBeams = rt.submit('install_plywood', { crew: ['p3', 'p4'], sheet: 's1', x: 0, z: PANELS[0][1], yaw: 0 });
+  assert.equal(onBeams.diagnostic?.code, 'plywood.span');
+  assert.match(onBeams.diagnostic!.message, /1\.22 m between b\d and b\d.*install 2x4 joists first/);
+  joists(rt, JOISTS.slice(1, 2));
+  const one = rt.submit('install_plywood', { crew: ['p3', 'p4'], sheet: 's1', x: 0, z: PANELS[0][1], yaw: 0 });
+  assert.equal(one.diagnostic?.code, 'plywood.too-few-supports');
+  assert.match(one.diagnostic!.message, /rest on j2 \(1 joist\)/);
+  const air = rt.submit('install_plywood', { crew: ['p3', 'p4'], sheet: 's1', x: 0, z: -2, yaw: 0 });
+  assert.equal(air.diagnostic?.code, 'plywood.unsupported');
+  assert.equal(rt.world.entities.s1.phase, 'staged');
+});
+
+test('joist without beams is rejected; joist too long / out of reach rules', () => {
+  const rt = setup();
+  must(rt, 'raise_upright', { crew: ['p1', 'p2'], item: 'A' });
+  must(rt, 'raise_upright', { crew: ['p3', 'p4'], item: 'B' });
+  stageParts(rt);
+  const r = rt.submit('install_joist', { crew: ['p5'], joist: 'j1', bay: { a: 'A', b: 'B' }, height: 1.8, at: 0.5 });
+  assert.equal(r.diagnostic?.code, 'joist.no-beams');
+  assert.match(r.diagnostic!.message, /both columns of bay A–B at 1\.83 m .*found none/);
+  rt.world.entities.b3 = component('b3', 'beam-9ft', [-D12 / 2 + 0.25, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
+  must(rt, 'connect_beam', { crew: ['p5', 'p6'], beam: 'b3', a: 'A', b: 'B', column: 'r', height: 1.8 });
+  const half = rt.submit('install_joist', { crew: ['p5'], joist: 'j1', bay: { a: 'A', b: 'B' }, height: 1.8, at: 0.5 });
+  assert.equal(half.diagnostic?.code, 'joist.no-beams');
+  assert.match(half.diagnostic!.message, /found b3/);
+  rt.world.entities.long = component('long', '2x4-8ft', [-2, 0, 1], 0, { phase: 'staged' });
+  rt.world.entities.b4 = component('b4', 'beam-9ft', [D12 / 2 - 0.25, 0, L9 / 2], Math.PI / 2, { phase: 'staged' });
+  must(rt, 'connect_beam', { crew: ['p5', 'p6'], beam: 'b4', a: 'A', b: 'B', column: 'l', height: 1.8 });
+  assert.equal(rt.submit('install_joist', { crew: ['p5'], joist: 'long', bay: { a: 'A', b: 'B' }, height: 1.8, at: 0.5 }).diagnostic?.code, 'joist.overhang');
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+function fullSequence() {
+  const rt = setup();
+  buildBay(rt);
+  stageParts(rt);
+  joists(rt);
+  panel(rt, 0);
+  panel(rt, 1);
+  muster(rt);
+  stair(rt);
+  treads(rt, all10);
+  const up = must(rt, 'walk_to', { actor: 'w', x: 0, z: 2.2, level: DECK_LEVEL });
+  return { rt, up };
+}
+
+test('full sequence: uprights → beams → release → joists → plywood → stairs → a person walks up; zero violations', () => {
+  const { rt, up } = fullSequence();
+  const W = rt.world.entities.w;
+  assert.equal(W.human!.level, DECK_LEVEL);
+  assert.ok(up.history.some((h) => h.phase === 'climb'));
+  for (const id of ['j1', 's1', 's2', 'st', 't10']) assert.equal(rt.world.entities[id].phase, 'installed', id);
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+test('determinism: identical final state hash across runs', () => {
+  const a = fullSequence().rt.stateHash();
+  const b = fullSequence().rt.stateHash();
+  assert.equal(a, b);
+});

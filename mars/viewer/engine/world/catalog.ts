@@ -34,6 +34,8 @@ export type AssetDef = {
   color?: string;
   handling?: Handling;
   sockets?: Socket[];
+  /** Stair flight modules: number of treads (risers = treads + 1; the landing is the top step). */
+  stair?: { treads: number };
   dims: { confidence: Confidence; note: string };
 };
 
@@ -136,11 +138,67 @@ function timber(ft: number): AssetDef {
   };
 }
 
+/**
+ * Site-built stair flight module (progressive construction, PROGRESSIVE.md):
+ * two stringers + `treads` separately installed treads. Local x = run
+ * (ascending toward +x), y = rise, z = width. Sized for the low Mars platform
+ * deck (beam seat 6 ft + 2x4 joist + 3/4 in ply ≈ 1.99 m). Provisional.
+ */
+function stairFlight(treads: number, rise: number): AssetDef {
+  const going = 0.25, width = 0.9, run = treads * going;
+  return {
+    id: `stair-flight-${treads}`,
+    label: `${treads}-tread stair flight (2x12 stringers, ${rise.toFixed(2)} m rise)`,
+    category: 'stair',
+    size: [run, rise, width],
+    massKg: Math.round(run * 2 * 8),
+    color: '#b8905a',
+    stair: { treads },
+    handling: {
+      carryCrew: [2, 4],
+      carryPose: 'flat',
+      grips: { 2: [{ id: 'g0', local: [-run * 0.4, 0, 0] }, { id: 'g1', local: [run * 0.4, 0, 0] }] },
+      carryHeight: 0.8,
+    },
+    sockets: [
+      { id: 'bottom', kind: 'stair-bottom', local: [-run / 2, 0, 0] },
+      { id: 'top', kind: 'stair-top', local: [run / 2, rise, 0] },
+    ],
+    dims: { confidence: 'provisional', note: `going ${going} m, ${treads + 1} risers of ${(rise / (treads + 1)).toFixed(3)} m, 0.9 m clear width; Mars stairs are site-built — dimensions not yet checked against photos` },
+  };
+}
+
 export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
   [
     ...[8, 9, 12, 16, 19].map(upright),
     ...[8, 9, 12].map(beam),
-    ...[8, 12].map(timber),
+    ...[4, 6, 8, 12].map(timber),
+    {
+      id: 'plywood-4x6',
+      label: '4x6 ft plywood panel (3/4 in; a 4x8 sheet cut to 6 ft)',
+      category: 'plywood',
+      size: [6 * FT, 0.75 * IN, 4 * FT],
+      massKg: 20,
+      color: '#d8b98a',
+      handling: {
+        carryCrew: [1, 2],
+        carryPose: 'edge',
+        grips: { 1: [{ id: 'mid', local: [0, 0, 0] }], 2: [{ id: 'g0', local: [-0.7, 0, 0] }, { id: 'g1', local: [0.7, 0, 0] }] },
+        carryHeight: 0.75,
+      },
+      dims: { confidence: 'provisional', note: 'cut panel sized for a 6 ft deck over a 4 ft deep rack bay (1 ft joist cantilever each side); not yet checked against photos' },
+    } satisfies AssetDef,
+    stairFlight(10, 1.98),
+    {
+      id: 'stair-tread',
+      label: 'stair tread (2x10, 0.9 m)',
+      category: 'timber',
+      size: [0.9, 1.5 * IN, 9.25 * IN],
+      massKg: 4,
+      color: '#c9a36b',
+      handling: { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'mid', local: [0, 0, 0] }] }, carryHeight: 0.8 },
+      dims: { confidence: 'documented', note: 'nominal 2x10 = 1.5 x 9.25 in; 0.9 m length matches the stair flight width' },
+    } satisfies AssetDef,
     {
       id: 'plywood-4x8',
       label: '4x8 ft plywood sheet (3/4 in)',
