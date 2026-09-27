@@ -42,7 +42,7 @@ Roll back to **`de2dddaa-0fab-477c-8b8f-cb1c579efba5`**. After the new deploy, u
 ```sh
 # 0. Only if the browser model must be rebuilt (not needed this release; public/browser/campus.glb{,.br} exist, 2026-09-22)
 #    python3 deploy/browser-model.py && node deploy/compress-browser.mjs
-# 1. Stage the allowlisted public release (.cloudflare/public, .cloudflare/large, manifests)
+# 1. Stage the allowlisted public release (.cloudflare/public, .cloudflare/large, manifests) — engine/** and other asset dirs are glob rules; `npm test` (deploy/prepare-allowlist.test.mjs) fails if app/engine reference an unstaged asset URL
 python3 deploy/prepare.py
 # 2. Release build (vite with publicDir=.cloudflare/public, then deploy/configure.mjs → dist/server/)
 CLOUDFLARE_RELEASE=1 npm run build

@@ -19,7 +19,9 @@ Cloudflare Worker: `mars-campus-2026`. R2 bucket: `mars-campus-2026-models`.
 Use Wrangler's OAuth login when authentication expires. Never copy credentials
 into the project or read credential files directly.
 
-`prepare.py` writes an explicit allowlist to `.cloudflare/public` and separates
+`prepare.py` stages its allowlist (explicit `FILES` plus directory `GLOBS` such as
+`engine/**`; `python3 deploy/prepare.py --list` prints the resolved set) to `.cloudflare/public`
+and separates
 files exceeding 25 MiB into `.cloudflare/large`. It sanitizes public JSON source
 paths and adapts local-only report links/text in generated copies. Original
 deliverables and their provenance remain unchanged. The manifest records

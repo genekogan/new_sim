@@ -1,9 +1,11 @@
 """Stage an allowlisted public release; never change the source deliverables."""
 import hashlib
 import json
+import os
 import pathlib
 import re
 import shutil
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / '.cloudflare'
@@ -22,19 +24,25 @@ def scrub(value):
         return value.replace('http://localhost:4326/', '/')
     return value
 
-for directory in [PUBLIC, LARGE]:
-    if directory.exists():
-        shutil.rmtree(directory)
-    directory.mkdir(parents=True)
-
-allow = {
+# Release allowlist. Directory rules are globs relative to public/ (`**` = any depth,
+# `*` = within one path segment); a whole asset namespace that the app loads by
+# convention (engine/**) must be a glob, not a per-file list, so new files ship
+# without edits here. deploy/prepare-allowlist.test.mjs scans app/ and engine/ for
+# /engine|modular|browser|data|history|2020/ URL literals and fails if one is not
+# covered by `python3 deploy/prepare.py --list`.
+GLOBS = [
+    'engine/**',
+    'modular/references/**', 'modular/textures/**', 'modular/environment/**',
+    '2020/screens/*.webp',
+    'history/**/*.webp', 'history/**/*.json', 'history/**/*.html',
+]
+FILES = {
     '2020': ['evidence/site-march4.webp', 'evidence/forest-march9.webp',
         'evidence/portal-march17.webp', 'evidence/forest-march30.webp',
         'evidence/portal-depth-march9.webp', 'evidence/climbing-wall-2020.webp',
         'evidence/rv-ring-march9.webp', 'evidence/front-alignment-march17.webp',
         'evidence/side-stairs-march17.webp', 'evidence/portal-screens-2020.webp'],
     'browser': ['campus.glb', 'campus.glb.br'],
-    'engine': ['campus-2026.json'],
     'modular': ['README.html', 'components.json', 'references.json', 'rooms.json',
         'stock-library.json', 'appearance-credits.html', 'appearance-sources.json', 'silhouette-replacements.json', 'person_casual.glb', 'person_punk.glb', 'person_woman.glb', 'modeled-pieces.csv', 'camera-checks.json',
         'campus-components.glb', 'chiba-components.glb', 'chiba-photo-reference.glb',
@@ -48,42 +56,76 @@ allow = {
     'data': ['manifest.json', 'chiba.glb', 'campus.glb', 'chiba.blend', 'campus.blend',
         'report.html', 'campus-comparison.jpg', 'detail-comparison.jpg', 'raw-comparison.jpg']
 }
-for folder in ['references', 'textures', 'environment']:
-    allow['modular'] += [str(p.relative_to(ROOT / 'public/modular'))
-        for p in (ROOT / 'public/modular' / folder).rglob('*') if p.is_file()]
-allow['engine'] += [str(p.relative_to(ROOT / 'public/engine')) for p in (ROOT / 'public/engine/takes').glob('*.json')]
-allow['2020'] += [str(p.relative_to(ROOT / 'public/2020'))
-    for p in (ROOT / 'public/2020/screens').glob('*.webp')]
-allow['history'] = [str(p.relative_to(ROOT / 'public/history')) for p in (ROOT / 'public/history').rglob('*') if p.suffix in ['.webp','.json','.html']]
-manifest = json.loads((ROOT / 'public/data/manifest.json').read_text())
-allow['data'] += [v['image'].removeprefix('/data/') for m in manifest['models'] for v in m['views']]
+
+def glob_regex(pattern):
+    out = ''
+    i = 0
+    while i < len(pattern):
+        if pattern.startswith('**/', i):
+            out += '(?:.*/)?'; i += 3
+        elif pattern.startswith('**', i):
+            out += '.*'; i += 2
+        elif pattern[i] == '*':
+            out += '[^/]*'; i += 1
+        else:
+            out += re.escape(pattern[i]); i += 1
+    return re.compile(out + r'\Z')
+
+def resolve():
+    """Every public/ path (relative, posix) the release stages, sorted."""
+    paths = {f'{ns}/{name}' for ns, names in FILES.items() for name in names}
+    manifest = json.loads((ROOT / 'public/data/manifest.json').read_text())
+    paths |= {v['image'].removeprefix('/') for m in manifest['models'] for v in m['views']}
+    for pattern in GLOBS:
+        rule = glob_regex(pattern)
+        # walk only the glob's literal directory prefix; os.walk follows the
+        # public/modular and public/data symlinks (pathlib.rglob does not)
+        base = ROOT / 'public' / pattern.split('*', 1)[0].rsplit('/', 1)[0]
+        for folder, _, names in os.walk(base, followlinks=True):
+            for name in names:
+                rel = (pathlib.Path(folder) / name).relative_to(ROOT / 'public').as_posix()
+                if not name.startswith('.') and rule.match(rel):
+                    paths.add(rel)
+    missing = sorted(p for p in paths if not (ROOT / 'public' / p).is_file())
+    if missing:
+        raise SystemExit(f'allowlisted files missing from public/: {missing}')
+    return sorted(paths)
+
+if '--list' in sys.argv:
+    print(json.dumps({'globs': GLOBS, 'files': resolve()}))
+    raise SystemExit(0)
+
+for directory in [PUBLIC, LARGE]:
+    if directory.exists():
+        shutil.rmtree(directory)
+    directory.mkdir(parents=True)
 
 records = []
-for namespace, names in allow.items():
-    for name in sorted(set(names)):
-        source = ROOT / 'public' / namespace / name
-        payload = source.read_bytes()
-        if source.suffix == '.json':
-            payload = json.dumps(scrub(json.loads(payload)), ensure_ascii=False).encode()
-        elif source.suffix == '.html':
-            html = payload.decode().replace('http://localhost:4326/', '/')
-            html = html.replace('A private, local reconstruction', 'A reconstruction')
-            html = html.replace('each with its original path and SHA-256 provenance',
-                'each with its source filename and SHA-256 provenance')
-            html = re.sub(r'<p><a href="SOURCE_REVIEW.md">.*?</p>',
-                '<p>Full source manifests and original media are retained in the local archive.</p>', html)
-            html = re.sub(r'<h2>Reproducibility and local files</h2>.*?(?=<p>Method references:)',
-                '<h2>Reproducibility</h2><p>Reconstruction ran locally. This published release includes '
-                'selected models, textures, reference images and validation evidence. Original media, '
-                'intermediate reconstructions and full provenance remain in the local archive.</p>', html, flags=re.S)
-            html = re.sub(r'<tr>\s*<td>mars-2026-modular-cad.blend</td>.*?</tr>', '', html, flags=re.S)
-            payload = html.encode()
-        target = (LARGE if len(payload) > LIMIT else PUBLIC) / namespace / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(payload)
-        records.append({'path': f'/{namespace}/{name}', 'bytes': len(payload),
-            'sha256': hashlib.sha256(payload).hexdigest(),
-            'storage': 'r2' if len(payload) > LIMIT else 'static'})
+for rel in resolve():
+    namespace, name = rel.split('/', 1)
+    source = ROOT / 'public' / rel
+    payload = source.read_bytes()
+    if source.suffix == '.json':
+        payload = json.dumps(scrub(json.loads(payload)), ensure_ascii=False).encode()
+    elif source.suffix == '.html':
+        html = payload.decode().replace('http://localhost:4326/', '/')
+        html = html.replace('A private, local reconstruction', 'A reconstruction')
+        html = html.replace('each with its original path and SHA-256 provenance',
+            'each with its source filename and SHA-256 provenance')
+        html = re.sub(r'<p><a href="SOURCE_REVIEW.md">.*?</p>',
+            '<p>Full source manifests and original media are retained in the local archive.</p>', html)
+        html = re.sub(r'<h2>Reproducibility and local files</h2>.*?(?=<p>Method references:)',
+            '<h2>Reproducibility</h2><p>Reconstruction ran locally. This published release includes '
+            'selected models, textures, reference images and validation evidence. Original media, '
+            'intermediate reconstructions and full provenance remain in the local archive.</p>', html, flags=re.S)
+        html = re.sub(r'<tr>\s*<td>mars-2026-modular-cad.blend</td>.*?</tr>', '', html, flags=re.S)
+        payload = html.encode()
+    target = (LARGE if len(payload) > LIMIT else PUBLIC) / namespace / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    records.append({'path': f'/{namespace}/{name}', 'bytes': len(payload),
+        'sha256': hashlib.sha256(payload).hexdigest(),
+        'storage': 'r2' if len(payload) > LIMIT else 'static'})
 
 shutil.copy2(ROOT / 'public/favicon.svg', PUBLIC / 'favicon.svg')
 shutil.copy2(ROOT / 'public/simulation-agent-guide.md', PUBLIC / 'simulation-agent-guide.md')
