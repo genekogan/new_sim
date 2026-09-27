@@ -176,7 +176,9 @@ test('stress-30: exact planner keeps the pinned result; per-tick cost bounded; z
   const corr = stressRun('corridor');
   assert.equal(corr.rt.violations.length, 0);
   console.log(`stress-30 max tick: exact ${exact.max.toFixed(1)} ms (mean ${exact.mean.toFixed(2)}), corridor ${corr.max.toFixed(1)} ms (mean ${corr.mean.toFixed(2)})`);
-  assert.ok(exact.max <= 150, `exact max tick ${exact.max.toFixed(1)} ms`);
-  assert.ok(corr.max <= 60, `corridor max tick ${corr.max.toFixed(1)} ms`);
+  // wall-clock bounds are deliberately loose (≈2× the measured 85 / 44 ms) so a loaded machine
+  // does not turn the release gate red; the measured numbers live in docs/engineering/PLANNING_BUDGET.md
+  assert.ok(exact.max <= 250, `exact max tick ${exact.max.toFixed(1)} ms`);
+  assert.ok(corr.max <= 120, `corridor max tick ${corr.max.toFixed(1)} ms`);
   assert.ok(exact.mean <= 3 && corr.mean <= 3);
 });
