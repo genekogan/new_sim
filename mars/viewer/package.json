@@ -14,6 +14,7 @@
     "lint": "oxlint app simulation lib deploy engine --ignore-pattern simulation/env.d.ts",
     "test": "node --test deploy/*.test.mjs",
     "test:simulation": "node deploy/simulation-integration.mjs",
+    "gate": "node deploy/gate.mjs",
     "format": "oxfmt app simulation lib deploy vite.config.ts",
     "test:engine": "node --test engine/test/*.test.ts",
     "e2e": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright test -c e2e/playwright.config.ts",

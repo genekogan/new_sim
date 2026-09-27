@@ -9,6 +9,21 @@ dry run and a local smoke of the built worker. The production deploy is left for
 - Wrangler: 4.136.2 (repo-pinned). Auth uses the existing OAuth login; never read credential files.
 - Procedure source: `viewer/deploy/README.md`
 
+## Release gate (required before deploying)
+
+A deploy must start from a green `npm run gate` report (run from `viewer/`). The gate runs, in
+order: `npm test`, `npm run test:engine`, `npx tsc --noEmit -p .`,
+`npm run e2e -- --workers=1`, `node deploy/determinism-probe.mjs`, and
+`deploy/simulation-integration.mjs` too when `SIM_BASE` is set. It stops at the first failure
+(`npm run gate -- --continue` runs every step) and exits non-zero if any step fails.
+
+- Report: `viewer/.cloudflare/gate/<ISO timestamp>/report.json`, with one `<step>.log` per step
+  in the same folder (gitignored). Each step records pass/fail, duration and its parsed summary.
+  The top level records `ok`, `gitHead`/`gitDirty` and the probe's `finalStateHash`.
+- Before deploying, check that `ok: true`, that `gitHead` matches the commit you are deploying
+  with `gitDirty: false`, and that `finalStateHash` matches the previous release unless the
+  engine change was intended to move it. Record the report path under Results.
+
 ## Rollback target (record before deploying)
 
 | Source | Version id |
