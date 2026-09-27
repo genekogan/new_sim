@@ -70,3 +70,7 @@ Budget: weekly usage meter (`<usage-tool>`) started at 11% used; hard stop ≈61
 ## ~23:30 — Paused
 - "Crew accompanies lifted parts" (floating-sheet look during lift-over): attempted 4× by a subagent, each attempt stalled on the network before writing anything; nothing landed. DEFERRED — brief is in the next-tranche list (HANDOFF §Suggested next tranche, item 3) and in this entry: crew walks alongside the part (positions from the part pose each tick, ≤0.9 m/s, no clipping); `lift.hands-out-of-reach` invariant (holder within 1.0 m of a hand point, hand points ≤2.4 m above the holder's floor); tests for a joist lift and a plywood lift-over.
 - Spawning paused by the lead until the connection is steady; production is current (6f1200ce) and the tree is clean.
+
+## ~01:00 (09-28) — Gate script; retrying lifted-parts
+- `npm run gate` (deploy/gate.mjs, 5e077a5): test → test:engine → tsc → e2e → determinism probe (+ simulation-integration when SIM_BASE set); report under viewer/.cloudflare/gate/<ts>/. First real run green (48/48, 141/1 skip, clean, 26/26, hash 5c29efcf…). RELEASE_CHECKLIST now requires a green gate report with matching gitHead and gitDirty:false.
+- Network steady again; "crew accompanies lifted parts" retried with reduced scope (plan file committed first).
