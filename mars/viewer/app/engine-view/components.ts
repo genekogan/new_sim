@@ -117,7 +117,7 @@ export class ComponentViews {
     return g;
   }
 
-  reset(world: WorldState) {
+  reset(world: Pick<WorldState, 'entities'>) {
     this.clear();
     this.onTick(world);
   }
@@ -127,8 +127,8 @@ export class ComponentViews {
     this.views.clear();
   }
 
-  /** Call after every engine tick. */
-  onTick(world: WorldState) {
+  /** Call after every engine tick (or with a sampled take frame, then `render(1)`). */
+  onTick(world: Pick<WorldState, 'entities'>) {
     for (const e of Object.values(world.entities)) {
       if (e.kind !== 'component') continue;
       let v = this.views.get(e.id);

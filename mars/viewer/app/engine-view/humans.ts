@@ -10,6 +10,12 @@ import { createRig, type Rig, type Template } from './people.ts';
 type Snap = { p: [number, number, number]; yaw: number; walkW: number; walkT: number; idleT: number };
 type Arm = { upper: THREE.Object3D; lower: THREE.Object3D; hand: THREE.Object3D; side: number };
 type View = { rig: Rig; prev: Snap; cur: Snap; speed: number; activity: string; grip?: string; arms: Arm[] };
+/**
+ * One person in a random-access frame (take replay / scrubbing). `walk` is the Walk clip weight
+ * (0–1) and `walkDist` the metres walked along the track so far, so the Walk phase is a pure
+ * function of take time: clip seconds = metres / clip ground speed (feet speed-matched).
+ */
+export type SampledHuman = { id: string; p: [number, number, number]; yaw: number; walk: number; walkDist: number; activity?: string; grip?: string };
 /** Nearest point of a gripped entity to a world point (components.ts nearestPoint). */
 export type Reach = (entity: string, from: THREE.Vector3, out: THREE.Vector3) => boolean;
 
@@ -91,6 +97,45 @@ export class HumanViews {
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
+        this.group.remove(v.rig.holder);
+        this.views.delete(id);
+      }
+  }
+
+  /**
+   * Random-access pose for take replay: set every rig straight from a sampled frame (no tick
+   * history, so scrubbing backwards or jumping gives the same picture as playing through).
+   * Rigs for ids missing from `frame` are removed. Follow with `render(1, reach)`.
+   */
+  setFrame(frame: SampledHuman[], t: number) {
+    if (!this.templates.length) return;
+    const seen = new Set<string>();
+    for (const f of frame) {
+      seen.add(f.id);
+      let v = this.views.get(f.id);
+      if (!v) {
+        const rig = createRig(templateFor(f.id, this.templates));
+        rig.holder.name = f.id;
+        this.group.add(rig.holder);
+        const s: Snap = { p: [...f.p], yaw: f.yaw, walkW: 0, walkT: 0, idleT: 0 };
+        v = { rig, prev: s, cur: s, speed: 0, activity: f.activity ?? 'idle', arms: armsOf(rig) };
+        this.views.set(f.id, v);
+      }
+      const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
+      const snap: Snap = {
+        p: [...f.p],
+        yaw: f.yaw,
+        walkW: f.walk,
+        walkT: (f.walkDist / v.rig.template.walkSpeed) % walkDur,
+        idleT: (t + (f.id.length * 0.37) % 1) % idleDur,
+      };
+      v.prev = v.cur = snap;
+      v.activity = f.activity ?? 'idle';
+      v.grip = f.grip;
+    }
+    for (const [id, v] of this.views)
+      if (!seen.has(id)) {
+        v.rig.mixer.stopAllAction();
         this.group.remove(v.rig.holder);
         this.views.delete(id);
       }
