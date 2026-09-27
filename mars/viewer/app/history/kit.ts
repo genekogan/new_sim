@@ -8,7 +8,8 @@ export class Kit {
  private geometries = new Map<string,T.BufferGeometry>();
  private materials = new Map<string,T.Material>();
  private serial = new Map<string,number>();
- constructor(public year:number) {this.root.name=`Mars ${year} · photographic reconstruction`;}
+ year:number;
+ constructor(year:number) {this.year=year;this.root.name=`Mars ${year} · photographic reconstruction`;}
  mat(color:string,metalness=0) {
   const key=color+metalness; let m=this.materials.get(key);
   if(!m){m=new T.MeshStandardMaterial({color,metalness,roughness:metalness?0.5:0.86});if(!metalness && ['#b89770','#b99b75','#b89a75','#aa8d64','#bfa17b','#ae9165'].includes(color)){const map=new T.TextureLoader().load('/modular/textures/kitchen-plywood-sample.jpg');map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;(m as T.MeshStandardMaterial).map=map;(m as T.MeshStandardMaterial).color.set('#ead8b7');}this.materials.set(key,m);}return m;

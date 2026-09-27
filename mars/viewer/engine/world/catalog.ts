@@ -49,8 +49,11 @@ function uprightSockets(height: number, depth: number): Socket[] {
   return out;
 }
 
+// Library frames in the stock GLBs: upright_frame_{8ft_4ft,12ft_4ft,16ft_3ft,19ft_3ft} (AUDIT.md §2).
+const UPRIGHT_DEPTH_FT: Record<number, number> = { 8: 4, 9: 4, 12: 4, 16: 3, 19: 3 };
+
 function upright(ft: number): AssetDef {
-  const h = ft * FT, depth = 42 * IN, t = 3 * IN;
+  const h = ft * FT, depth = (UPRIGHT_DEPTH_FT[ft] ?? 4) * FT, t = 3 * IN;
   const tall = ft >= 12;
   return {
     id: `upright-${ft}ft`,
@@ -78,7 +81,12 @@ function upright(ft: number): AssetDef {
       carryHeight: 0.8,
     },
     sockets: uprightSockets(h, depth),
-    dims: { confidence: 'participant', note: `height ${ft} ft confirmed by Gene; 42 in depth and 3 in columns provisional` },
+    dims: {
+      confidence: ft === 9 ? 'provisional' : 'participant',
+      note: ft === 9
+        ? '9 ft named by Gene but no 9 ft frame exists in the model library; depth assumed 4 ft'
+        : `height ${ft} ft; depth ${UPRIGHT_DEPTH_FT[ft]} ft from the stock library frame; 3 in columns provisional`,
+    },
   };
 }
 
@@ -130,7 +138,7 @@ function timber(ft: number): AssetDef {
 
 export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
   [
-    ...[8, 9, 12, 19].map(upright),
+    ...[8, 9, 12, 16, 19].map(upright),
     ...[8, 9, 12].map(beam),
     ...[8, 12].map(timber),
     {
