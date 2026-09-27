@@ -112,5 +112,14 @@ export function physicalView(w: WorldState) {
     const { label: _l, tags: _t, provenance: _p, ...rest } = e;
     entities[id] = rest;
   }
-  return { base: w.base, entities, regions: Object.values(w.regions).map((r) => [r.id, r.kind, r.polygon, r.level ?? 0]) };
+  // inventory mode and RNG state change what a run produces (finite stock, seeded
+  // choices), so a plan rehearsed under one cannot be trusted under another.
+  // Deliberately excluded: tick (clock only), env (visual, §19), labels/tags/provenance.
+  return {
+    base: w.base,
+    entities,
+    regions: Object.values(w.regions).map((r) => [r.id, r.kind, r.polygon, r.level ?? 0]),
+    inventory: w.inventory,
+    rng: w.rng,
+  };
 }
