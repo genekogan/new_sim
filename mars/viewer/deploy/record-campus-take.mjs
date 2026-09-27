@@ -35,6 +35,10 @@ const FILE = 'flagship-campus-2026.json';
 const URL_PATH = `/engine/takes/${FILE}`;
 const RULES = `mars-campus-flagship/1+${RULES_VERSION}`;
 const HZ = 10;
+// The studio's replay bar (app/studio/take-panel.tsx, .take-panel in studio.css: 36 px inset + ~94 px panel)
+// covers the bottom ~130 px of an 800 px viewport; subject framing keeps important points above it.
+// Coupling: restyling that bar means re-planning with a matching fraction (the track stores it as data.safeArea).
+const SAFE_BOTTOM = 0.17;
 const LIMIT = 1.5 * 1024 * 1024;
 const LABEL = 'Flagship rack bay at staging-east (HYPOTHETICAL build scenario — not historical)';
 const check = process.argv.includes('--check');
@@ -128,7 +132,7 @@ const cameraScene = { ...local, obstacles: [...local.obstacles, ...buildSolids] 
 // the finished bay may not be entered or crossed at any time; it never occludes (it is not there yet for most of the take)
 const policy = { ...DEFAULT_CAMERA_POLICY, component: { collide: true, occlude: false } };
 const t1 = performance.now();
-const cam = planShotList(shots, takeSampler(take), cameraScene, { hz: HZ, policy });
+const cam = planShotList(shots, takeSampler(take), cameraScene, { hz: HZ, policy, safeArea: { bottom: SAFE_BOTTOM } });
 const tCam = performance.now() - t1;
 const track = toCameraTrack('', take.id, cam, 'planned-shot-list');
 track.id = `cam-${hashOf({ takeId: take.id, data: track.data }).slice(0, 16)}`;
@@ -181,6 +185,7 @@ const entry = {
     meanReadability: cam.report.meanReadability,
     readableFraction: cam.report.readableFraction,
     rejected: cam.report.rejected,
+    safeAreaBottom: SAFE_BOTTOM,
   },
   violations: take.events.filter((e) => e.type === 'violation').length,
   blockedWaits: take.events.filter((e) => e.type === 'action' && e.status === 'blocked').length,

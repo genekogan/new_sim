@@ -89,3 +89,29 @@ test('camera orbit/frameGroup: the framing radius includes component extents (or
   const rg = readability(w, group, sampler(0), ['F', 'p1']);
   assert.ok(rg.subjects.every((s) => s.inFrame === 1), rg.reasons.join(';'));
 });
+
+test('camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)', () => {
+  const w = open();
+  const sampler: Sampler = () => ({ s: person(0, 0) });
+  const spec: ShotSpec = { kind: 'frameGroup', subjects: ['s'], padding: 0.2, azimuth: -Math.PI / 2, elevation: 0.1 };
+  const safe = { safeBottom: 0.17 };
+  // default (no band): tight framing puts the feet in the bottom 17 % of the frame
+  const plain = planCameraTrack(spec, sampler, w, { duration: 1 });
+  assert.equal(plain.safeArea, undefined);
+  assert.deepEqual(planCameraTrack(spec, sampler, w, { duration: 1, safeArea: { bottom: 0 } }), plain, 'bottom 0 == default');
+  const covered = readability(w, plain.samples[0], sampler(0), ['s'], safe);
+  assert.ok(covered.subjects[0].inFrame < 1, 'feet hidden by the bar in the plain framing');
+  assert.match(covered.reasons.join(';'), /subject s \d+% outside frame/);
+  // with the safe area the planner frames above the band: everything visible, readability 1
+  const banded = planCameraTrack(spec, sampler, w, { duration: 1, safeArea: { bottom: 0.17 } });
+  assert.deepEqual(banded.safeArea, { bottom: 0.17 });
+  assert.equal(banded.report.minReadability, 1);
+  for (const s of banded.samples) assert.equal(readability(w, s, sampler(s.t), ['s'], safe).subjects[0].inFrame, 1);
+  // the same holds for an orbit (aim tilts down so the subject sits in the usable band)
+  const orbit: ShotSpec = { kind: 'orbit', subject: 's', radius: 2.2, height: 1.2, period: 8, lookHeight: 0.9, padding: 0, subjects: ['s'] };
+  const po0 = planCameraTrack(orbit, sampler, w, { duration: 8 });
+  assert.ok(po0.samples.some((s) => readability(w, s, sampler(s.t), ['s'], safe).subjects[0].inFrame < 1), 'plain orbit: feet under the bar');
+  const po = planCameraTrack(orbit, sampler, w, { duration: 8, safeArea: { bottom: 0.17 } });
+  for (const s of po.samples) assert.equal(readability(w, s, sampler(s.t), ['s'], safe).subjects[0].inFrame, 1, `orbit t=${s.t}`);
+  assert.throws(() => planCameraTrack(spec, sampler, w, { duration: 1, safeArea: { bottom: 0.6 } }), /safe-area bottom/);
+});

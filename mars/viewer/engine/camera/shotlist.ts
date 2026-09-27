@@ -70,5 +70,6 @@ export function planShotList(shots: ShotWindow[], sampler: Sampler, scene: Spati
     rejected: invalid > 0 || crossings > 0,
     cutaway,
   };
-  return { spec: shots[0].spec, hz, duration: (samples.length - 1) / hz, samples, report, shots: planned };
+  const safeBottom = opts.safeArea?.bottom ?? 0;
+  return { spec: shots[0].spec, hz, duration: (samples.length - 1) / hz, ...(safeBottom > 0 ? { safeArea: { bottom: safeBottom } } : {}), samples, report, shots: planned };
 }

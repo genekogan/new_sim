@@ -17,6 +17,8 @@ export type SolveOpts = {
   pullMargin?: number; // stop this far before the first hit (default 0.45 m)
   aspect?: number;
   minSize?: number;
+  /** UI covering the bottom of the viewport (fraction of frame height, e.g. the studio replay bar ≈ 0.17). Default 0. */
+  safeArea?: { bottom?: number };
   cutaway?: boolean;
   /** Max decollision push-out (m); farther is treated as invalid, not teleported (default 1.5). */
   maxPush?: number;
@@ -111,7 +113,7 @@ export function candidates(world: CameraWorld, desired: CameraPose, subjects: Re
       }
     }
     const pose: CameraPose = { position, target: T, fov };
-    const read = readability(world, pose, subjects, ids, { aspect: opts.aspect, minSize: opts.minSize, cutaway: opts.cutaway });
+    const read = readability(world, pose, subjects, ids, { aspect: opts.aspect, minSize: opts.minSize, safeBottom: opts.safeArea?.bottom, cutaway: opts.cutaway });
     out.push({ key: v.key, pose, place, valid: place.valid, pushed, read, deviation: v.key === 'desired' ? 0 : deviation(desired, pose) });
   }
   return out;

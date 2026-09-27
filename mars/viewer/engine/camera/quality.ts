@@ -83,6 +83,7 @@ export type Readability = { score: number; subjects: SubjectReadability[]; reaso
 export type ReadOpts = {
   aspect?: number;
   minSize?: number; // min projected subject extent, fraction of frame height (default 0.08)
+  safeBottom?: number; // fraction of frame height covered by UI at the bottom: points there are 'outside frame' (default 0)
   cutaway?: boolean; // inspection mode: ignore occluders (solids and people) entirely
   near?: number;
 };
@@ -111,11 +112,12 @@ function toCam(cam: CameraPose, b: Basis, p: Vec3): Vec3 {
  * Readability of the named subjects from `cam`. Each subject's points are
  * ray-cast from the camera against the occlusion set and against every
  * bystander's capsule (humans in `subjects` outside the subjects' group); a point counts if it is
- * inside the frustum (5 % safe margin) and unoccluded. Subject score =
+ * inside the frustum (5 % safe margin, above the `safeBottom` UI band) and unoccluded. Subject score =
  * visible fraction × min(1, size / minSize); aggregate = weighted mean.
  */
 export function readability(world: CameraWorld, cam: CameraPose, subjects: Record<string, SubjectPose>, ids: string[], opts: ReadOpts = {}): Readability {
   const aspect = opts.aspect ?? DEFAULT_ASPECT, minSize = opts.minSize ?? 0.08, near = opts.near ?? 0.1;
+  const yMin = 2 * (opts.safeBottom ?? 0) - 0.95; // lowest usable NDC y (5 % margin above the UI band)
   const b = basis(cam, aspect);
   // bystanders: humans that are neither a subject nor a subject's crew (sorted → deterministic naming)
   const group = subjectGroup(subjects, ids);
@@ -131,7 +133,7 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
     const occ = new Map<string, { label: string; n: number }>();
     for (const p of pts) {
       const c = toCam(cam, b, p);
-      const framed = c[2] > near && Math.abs(c[0]) <= c[2] * b.th * 0.95 && Math.abs(c[1]) <= c[2] * b.tv * 0.95;
+      const framed = c[2] > near && Math.abs(c[0]) <= c[2] * b.th * 0.95 && c[1] <= c[2] * b.tv * 0.95 && c[1] >= c[2] * b.tv * yMin;
       if (framed) inFrame++;
       if (opts.cutaway) { if (framed) visible++; continue; }
       const dist = Math.hypot(p[0] - cam.position[0], p[1] - cam.position[1], p[2] - cam.position[2]);

@@ -44,7 +44,8 @@ export type PlanReport = {
   rejected: boolean;
   cutaway: boolean;
 };
-export type CameraPlan = { spec: ShotSpec; hz: number; duration: number; samples: PlannedSample[]; report: PlanReport };
+/** `safeArea` (only when non-zero): the bottom UI band the plan was framed for — the replaying view must match it. */
+export type CameraPlan = { spec: ShotSpec; hz: number; duration: number; safeArea?: { bottom: number }; samples: PlannedSample[]; report: PlanReport };
 
 const INF = 1e12;
 const DEG = Math.PI / 180;
@@ -80,13 +81,13 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
   for (let i = 0; i < N; i++) {
     const t = i * dt;
     const subjects = sampler(t);
-    const pose = evaluateShot(spec, sampler, t);
+    const pose = evaluateShot(spec, sampler, t, { aspect: opts.aspect, safeBottom: opts.safeArea?.bottom });
     const row: (Candidate | null)[] = new Array(K).fill(null);
     for (const c of candidates(world, pose, subjects, ids, sopts)) row[VARIANT_KEYS.indexOf(c.key)] = c;
     table.push(row);
     const d = row[0]!;
     const place = d.pushed ? placement(world, pose.position, opts.minClear) : d.place;
-    const read = d.pushed ? readability(world, pose, subjects, ids, { aspect: opts.aspect, minSize: opts.minSize, cutaway }) : d.read;
+    const read = d.pushed ? readability(world, pose, subjects, ids, { aspect: opts.aspect, minSize: opts.minSize, safeBottom: opts.safeArea?.bottom, cutaway }) : d.read;
     desired.push({ pose, valid: place.valid, read: read.score, reasons: [...(place.reason ? [place.reason] : []), ...read.reasons] });
   }
 
@@ -215,10 +216,12 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
   if (sweptCrossings) reasons.push(`REJECTED: ${sweptCrossings} continuous moves cross solid geometry`);
   if (cutaway) reasons.push('cutaway: occluders ignored for readability (inspection mode)');
 
+  const safeBottom = opts.safeArea?.bottom ?? 0;
   return {
     spec,
     hz,
     duration: opts.duration,
+    ...(safeBottom > 0 ? { safeArea: { bottom: safeBottom } } : {}),
     samples,
     report: {
       samples: N,

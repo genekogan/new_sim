@@ -84,11 +84,36 @@ export function shotSubjects(spec: ShotSpec): string[] {
   }
 }
 
-/** Distance at which a sphere of radius r fits the frustum (min of vertical/horizontal half-angles). */
-export function fitDistance(r: number, fovDeg: number, aspect = DEFAULT_ASPECT): number {
-  const v = (fovDeg * DEG) / 2;
-  const h = datan(dtan(v) * aspect);
+/**
+ * Distance at which a sphere of radius r fits the frustum (min of vertical/horizontal half-angles).
+ * `safeBottom` (fraction of frame height hidden by UI at the bottom) shrinks the usable vertical half-angle.
+ */
+export function fitDistance(r: number, fovDeg: number, aspect = DEFAULT_ASPECT, safeBottom = 0): number {
+  const tv = dtan((fovDeg * DEG) / 2);
+  const v = datan(tv * (1 - safeBottom));
+  const h = datan(tv * aspect);
   return r / dsin(Math.min(v, h));
+}
+
+/** Framing context for subject/region shots: the viewport's aspect and the bottom band covered by UI. */
+export type FrameOpts = { aspect?: number; safeBottom?: number };
+
+/**
+ * Tilt the view down so the old target lands at the centre of the usable band
+ * (NDC y = safeBottom, the middle of [−1 + 2·safeBottom, 1]). Position is unchanged.
+ */
+export function aimForSafeArea(pose: CameraPose, safeBottom: number): CameraPose {
+  if (!(safeBottom > 0)) return pose;
+  const d: Vec3 = [pose.target[0] - pose.position[0], pose.target[1] - pose.position[1], pose.target[2] - pose.position[2]];
+  const l = Math.hypot(d[0], d[1], d[2]);
+  if (l < 1e-9) return pose;
+  const f: Vec3 = [d[0] / l, d[1] / l, d[2] / l];
+  const rl = Math.hypot(f[0], f[2]);
+  if (rl < 1e-9) return pose; // looking straight up/down: no defined screen-up
+  const r: Vec3 = [-f[2] / rl, 0, f[0] / rl];
+  const u: Vec3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  const k = safeBottom * dtan((pose.fov * DEG) / 2) * l;
+  return { ...pose, target: [pose.target[0] - u[0] * k, pose.target[1] - u[1] * k, pose.target[2] - u[2] * k] };
 }
 
 /** Catmull-Rom (non-uniform times, Hermite form) through keyed positions. */
@@ -126,7 +151,15 @@ function followRaw(spec: Extract<ShotSpec, { kind: 'follow' }>, sampler: Sampler
  * weighted average of the undamped pose over the past 3·damping seconds
  * (clamped at t = 0), so random access and replay give identical results.
  */
-export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number): CameraPose {
+export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number, frame: FrameOpts = {}): CameraPose {
+  const sb = frame.safeBottom ?? 0;
+  if (sb < 0 || sb >= 0.5) throw new Error(`camera: safe-area bottom ${sb} must be in [0, 0.5)`);
+  const pose = evaluateRaw(spec, sampler, t, frame.aspect, sb);
+  // authored poses (fixed, path) are kept as given; subject/region shots aim above the UI band
+  return spec.kind === 'fixed' || spec.kind === 'path' ? pose : aimForSafeArea(pose, sb);
+}
+
+function evaluateRaw(spec: ShotSpec, sampler: Sampler, t: number, frameAspect: number | undefined, sb: number): CameraPose {
   const fov = spec.fov ?? DEFAULT_FOV;
   switch (spec.kind) {
     case 'fixed':
@@ -156,7 +189,7 @@ export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number): Camer
       for (const id of shotSubjects(spec)) for (const q of all[id] ? subjectPoints(all[id]) : []) r = Math.max(r, Math.hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]));
       const d0 = Math.hypot(off[0], off[1], off[2]);
       if (r > 0 && d0 > 1e-9) {
-        const d = fitDistance(r + (spec.padding ?? 0.5), fov, spec.aspect);
+        const d = fitDistance(r + (spec.padding ?? 0.5), fov, spec.aspect ?? frameAspect, sb);
         if (d > d0) off = scale(off, d / d0);
       }
       return { position: add(target, off), target, fov };
@@ -173,7 +206,7 @@ export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number): Camer
       for (const p of pts) for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], p[j]); hi[j] = Math.max(hi[j], p[j]); }
       const centre = lerp3(lo, hi, 0.5);
       const r = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2 + (spec.padding ?? 0.5);
-      const d = fitDistance(r, fov, spec.aspect);
+      const d = fitDistance(r, fov, spec.aspect ?? frameAspect, sb);
       return { position: add(centre, scale(dirFrom(spec.azimuth, spec.elevation), d)), target: centre, fov };
     }
     case 'path':
@@ -191,7 +224,7 @@ export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number): Camer
       const y = spec.region.y ?? 0;
       const target: Vec3 = [(min[0] + max[0]) / 2, y, (min[1] + max[1]) / 2];
       const r = Math.hypot(max[0] - min[0], max[1] - min[1]) / 2;
-      const d = fitDistance(r, fov, spec.aspect);
+      const d = fitDistance(r, fov, spec.aspect ?? frameAspect, sb);
       return { position: add(target, scale(dirFrom(spec.azimuth ?? -Math.PI / 2, spec.elevation ?? 35 * DEG), d)), target, fov };
     }
   }
