@@ -259,7 +259,8 @@ visibility; stable IDs for the 2020–2025 kit scenes.
 - **Flagship compute:** 5.0 s on the proving ground vs 57 s on the campus crop, ≈ 11× for similar
   simulated time. Likely cause: grid rebuild plus A\* over 0.64 M-cell levels on every epoch
   **(inferred, unprofiled)**.
-- **Lab and render:** trio 0.02 ms per tick; stress-30 0.88 ms mean with 200+ ms spikes. About 22
+- **Lab and render:** trio 0.02 ms per tick; stress-30 0.88 ms mean with 200+ ms spikes (now ~122 ms cold / ~85 ms warm with
+  identical routes, ~45 ms with the opt-in corridor planner; `PLANNING_BUDGET.md`, `node deploy/perf-stress.mjs`). About 22
   draw calls per person in software GL; the 2026 studio draws 1083 calls, 957 k triangles (`e2e/README.md`).
 - **DO CPU and storage:** measured runs sit far below the 30 s DO limit, and the engine adds ~260 KB to
   the worker bundle. A campus-scale take like the 57 s flagship would exceed the limit and need

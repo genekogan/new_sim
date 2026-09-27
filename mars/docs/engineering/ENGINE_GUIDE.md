@@ -42,10 +42,11 @@ the Cloudflare Durable Object. Spec: `SPEC.md`. Audit of the existing app:
 | `world/factory.ts` | `emptyWorld`, `human`, `component`, `addAll` |
 | `history/store.ts` | `WorldHistory`: content-addressed checkpoints, protected canonical workspaces, forks, causes |
 | `runtime/runtime.ts` | `Runtime`: submit → validated → reserved → executing; `step()`, `runUntilIdle()`, events, violations |
+| `runtime/profile.ts` | opt-in `rt.profile = true` wall-ms profiler (plan/step per verb, Spatial methods); `deploy/perf-stress.mjs` |
 | `runtime/invariants.ts` | end-of-tick checks (human/static clearance, human/human overlap, unsupported components) |
 | `spatial/types.ts` | SpatialScene (levels, surfaces, obstacles, links), AgentProfile |
 | `spatial/grid.ts` | per-level rasters + exact EDT clearance; `segmentClearance`, `nearestBlocker` |
-| `spatial/path.ts` | multi-level A* with stair links, corridor string-pulling; diagnostics |
+| `spatial/path.ts` | multi-level A* with stair links, corridor string-pulling; diagnostics; opt-in `planner: 'corridor'` (`PLANNING_BUDGET.md`) |
 | `spatial/service.ts` | `Spatial`: base scene + world entities → grids (epoch bumps on construction); `narrow()` traffic components; contributors hook |
 | `locomotion/walk.ts` | `walk_to` action (corridor following, stairs, yielding, replans) |
 | `scenes/proving-ground.ts` | synthetic regression scene (wall, U-trap, 1 m passage, 3 m deck, complete + incomplete stairs) |
