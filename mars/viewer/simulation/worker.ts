@@ -12,6 +12,8 @@ import {
   type SimState,
 } from './shared';
 import { definitions } from './commands';
+import { EngineRoom } from './engine-room';
+import { registerEngineTools } from './engine-tools';
 
 const json = (data: unknown, status = 200) =>
   Response.json(data, {
@@ -43,6 +45,13 @@ export class MarsSimulation extends DurableObject<Env> {
       ctx.storage.sql.exec('ALTER TABLE commands ADD COLUMN fingerprint TEXT');
   }
   private cached: SimState | null = null;
+  private engineRoom: EngineRoom | null = null;
+  /** Engine controller ops (preview): same op registry as engine/api; state lives in engine_blobs. */
+  engineCall(op: string, args: unknown, year = 2026) {
+    this.selectYear(year);
+    this.engineRoom ??= new EngineRoom(this.ctx.storage);
+    return this.engineRoom.call(year, op, args);
+  }
   private year = 2026;
   private get model() { return modelForYear(this.year); }
   private selectYear(year: number) {
@@ -242,6 +251,22 @@ export async function handleSimulation(
         .parse(await request.json());
       return json(await stub.apply(input.name, input.args, input.id, year));
     }
+    if (url.pathname === '/api/simulation/engine/take') {
+      // Viewer-facing compact take fetch (read-only capabilities allowed).
+      if (request.method !== 'GET')
+        return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET' } });
+      const q = url.searchParams;
+      const num = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
+      // RPC typing can't express the open-ended JSON result; it is plain JSON (OpResult).
+      const r = (await stub.engineCall('get_take', {
+        take_id: q.get('id') ?? '',
+        from: num('from'),
+        to: num('to'),
+        ...(q.has('entities') ? { entities: q.get('entities')!.split(',') } : {}),
+        ...(q.has('include') ? { include: q.get('include')!.split(',') } : {}),
+      }, year)) as unknown as { ok: boolean; code?: string };
+      return json(r, r.ok ? 200 : r.code === 'take.unknown' ? 404 : 400);
+    }
     if (url.pathname === '/mcp') {
       if (!control)
         return json({ error: 'MCP requires the control capability' }, 403);
@@ -354,6 +379,7 @@ export async function handleSimulation(
                 }
               },
             );
+          registerEngineTools(server, async (op, args) => (await stub.engineCall(op, args, year)) as unknown as { ok: boolean });
           return server;
         },
         {
