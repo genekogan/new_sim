@@ -1092,6 +1092,8 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       batches?.setExcluded(selection);
       batches?.setActive(true);
       renderer.render(scene, camera);
+      // Test hook for viewer/e2e (see e2e/README.md): scene loaded + frames rendered since.
+      if (root) testHook.frames++;
       budgetFrames++;
       if (now - budgetStart > 5000) {
         if (budgetFrames < 150 && renderer.getPixelRatio() > 0.8) {
@@ -1105,9 +1107,22 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         budgetStart = now;
       }
     };
+    const testHook = {
+      year,
+      frames: 0,
+      get ready() { return testHook.frames >= 3; },
+      info: () => ({ ...renderer.info.render, ...renderer.info.memory, pixelRatio: renderer.getPixelRatio() }),
+      look: (position: number[], target: number[]) => {
+        camera.position.fromArray(position);
+        orbit.target.fromArray(target);
+        orbit.update();
+      },
+    };
+    (window as { __marsStudio?: typeof testHook }).__marsStudio = testHook;
     loop();
     return () => {
       disposed = true;
+      delete (window as { __marsStudio?: unknown }).__marsStudio;
       abort.abort();
       clearTimeout(statusTimer);
       if (preparedExportUrl) URL.revokeObjectURL(preparedExportUrl);

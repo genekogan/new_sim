@@ -15,7 +15,10 @@
     "test": "node --test deploy/*.test.mjs",
     "test:simulation": "node deploy/simulation-integration.mjs",
     "format": "oxfmt app simulation lib deploy vite.config.ts",
-    "test:engine": "node --test engine/test/*.test.ts"
+    "test:engine": "node --test engine/test/*.test.ts",
+    "e2e": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright test -c e2e/playwright.config.ts",
+    "e2e:update-baselines": "E2E_UPDATE_BASELINES=1 PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright test -c e2e/playwright.config.ts",
+    "e2e:install": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright install chromium"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
@@ -27,7 +30,9 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
+    "@playwright/test": "^1.63.0",
     "@types/node": "22.19.19",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/three": "^0.185.4",
@@ -36,6 +41,8 @@
     "meshoptimizer": "^1.1.1",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "typescript": "5.9.3",
     "vite": "8.3.0",
     "wrangler": "4.136.2"

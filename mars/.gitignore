@@ -22,3 +22,4 @@ viewer/public/browser/campus.glb.br
 *.log
 .DS_Store
 .env*
+viewer/e2e/artifacts/
