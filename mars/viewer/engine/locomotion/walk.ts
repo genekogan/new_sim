@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { add2, angleDelta, clamp, dist2, heading, len2, norm2, rot2, scale2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
-import type { Runtime } from '../runtime/runtime.ts';
+import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { cellOf, clearanceAt, segmentClearance, type LevelGrid } from '../spatial/grid.ts';
@@ -24,6 +24,9 @@ const STATIC_OFFSET = 0.8; // m sidestep around a standing person
 const STUCK_TICKS = 80; // 4 s blocked by a moving person → replan around standing people
 const STUCK_STATIC_TICKS = 30; // 1.5 s blocked by someone standing still → replan around them
 const MAX_PEOPLE_REPLANS = 6; // after this, stay blocked (fail loudly via diagnostics) rather than churn grids
+/** Construction replans per tick before walkers with a still-clear current segment wait their turn. */
+export const REPLANS_PER_TICK = 4;
+const REPLAN_MAX_WAIT = 10; // ticks a deferred walker may follow its old corridor before replanning regardless
 const YIELD_OFFSET = 0.9; // m lateral offset while waiting for oncoming traffic
 const LOOK = 2.5; // m look-ahead for conflicts
 const MAX_CORRECTION = 0.55; // m per tick (below MAX_STEP_PER_TICK): larger corrections are spread over several ticks
@@ -58,6 +61,8 @@ type Exec = {
   /** Standing people the current route was planned around (ignored by local encounters while they stay put). */
   plannedAround: Record<string, Vec2>;
   peopleReplans: number;
+  /** Ticks this walker has deferred a construction replan (planning budget); undefined = none pending. */
+  replanWait?: number;
   /** Set by a cancel during a stair traversal: finish the flight at the nearer landing, then stop (review M2). */
   cancelTo?: 'entry' | 'exit';
 };
@@ -241,9 +246,22 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   if (ex.cancelTo) return stepLinkCancel(rt, ex, a, ex.route.legs[ex.leg] as LinkLeg, dt);
   // topology changed (construction)? replan only if the remaining corridor is no longer valid
   sp.sync(rt.world);
+  let moved = false;
   if (sp.epoch !== ex.epoch) {
     ex.epoch = sp.epoch;
-    if (!remainingValid(rt, ex)) {
+    moved = true;
+    if (remainingValid(rt, ex)) {
+      ex.replanWait = undefined;
+      if (ex.route.legs[ex.leg].kind === 'walk') ex.narrows = findNarrows(rt, ex, ex.route.legs[ex.leg] as WalkLeg);
+    } else ex.replanWait ??= 0;
+  }
+  // construction replans are budgeted per tick (PLANNING_BUDGET.md): over budget, a walker whose
+  // next stretch of corridor is still clear keeps following it for up to REPLAN_MAX_WAIT ticks; one
+  // whose next stretch is blocked (or who has waited long enough) replans at once and still counts
+  // against the budget. Deterministic: live actions step in submission order.
+  if (ex.replanWait !== undefined) {
+    if (takeReplan(rt, ex.replanWait >= REPLAN_MAX_WAIT || !prefixValid(rt, ex))) {
+      ex.replanWait = undefined;
       releaseAll(rt, ex);
       const r = planWalk(rt, a, ex.goal, ex.profile);
       if (!r.ok) return { status: 'failed', diagnostic: { ...r.diagnostic, code: 'route.invalidated', message: `route invalidated by construction: ${r.diagnostic.message}` } };
@@ -251,7 +269,11 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
       ex.leg = 0;
       ex.replans++;
       enterLeg(rt, ex);
-    } else if (ex.route.legs[ex.leg].kind === 'walk') ex.narrows = findNarrows(rt, ex, ex.route.legs[ex.leg] as WalkLeg);
+    } else {
+      // following the old corridor meanwhile: key its single-file passages to the new epoch
+      if (moved && ex.route.legs[ex.leg].kind === 'walk') ex.narrows = findNarrows(rt, ex, ex.route.legs[ex.leg] as WalkLeg);
+      ex.replanWait++;
+    }
   }
   const leg = ex.route.legs[ex.leg];
   if (leg.kind === 'link') return stepLink(rt, ex, a, leg, dt);
@@ -656,6 +678,37 @@ function stepLinkCancel(rt: Runtime, ex: Exec, a: Entity, leg: LinkLeg, dt: numb
   a.human!.activity = 'idle';
   a.human!.task = undefined;
   return { status: 'completed', outputs: { cancelled: true, stoppedAt: forward ? 'exit' : 'entry', level: end.level, x: end.p[0], z: end.p[1], link: leg.link.id } };
+}
+
+/** Per-tick construction-replan budget (`services.planning.replansPerTick` overrides REPLANS_PER_TICK);
+ *  `services.replanBudget` also keeps totals (replans, deferred walker-ticks, peak replans in one tick). */
+export type ReplanBudget = { tick: number; used: number; peak: number; deferred: number; replans: number };
+function takeReplan(rt: Runtime, forced: boolean): boolean {
+  const b = (rt.services.replanBudget ??= { tick: -1, used: 0, peak: 0, deferred: 0, replans: 0 }) as ReplanBudget;
+  if (b.tick !== rt.tick) { b.tick = rt.tick; b.used = 0; }
+  const max = (rt.services.planning as { replansPerTick?: number } | undefined)?.replansPerTick ?? REPLANS_PER_TICK;
+  if (!forced && b.used >= max) {
+    b.deferred++;
+    return false;
+  }
+  b.used++;
+  b.replans++;
+  if (b.used > b.peak) b.peak = b.used;
+  return true;
+}
+
+/** Whether the walker can keep following its old corridor while it waits: the next stretch it could
+ *  cover in REPLAN_MAX_WAIT ticks (+0.5 m) is clear, or its current link is still usable. */
+function prefixValid(rt: Runtime, ex: Exec): boolean {
+  const sp = spatial(rt);
+  const leg = ex.route.legs[ex.leg];
+  if (leg.kind === 'link') return sp.scene.links.some((l) => l.id === leg.link.id && l.usable);
+  const g = sp.level(leg.level);
+  if (!g) return false;
+  const end = Math.min(ex.total, ex.s + ex.speed * REPLAN_MAX_WAIT * DT + 0.5);
+  const pts = [pointAt(ex, ex.s), ...ex.segs.filter((q) => q.s0 > ex.s && q.s0 < end).map((q) => q.a), pointAt(ex, end)];
+  for (let i = 1; i < pts.length; i++) if (segmentClearance(g, pts[i - 1], pts[i]) < ex.profile.radius) return false;
+  return true;
 }
 
 function remainingValid(rt: Runtime, ex: Exec): boolean {

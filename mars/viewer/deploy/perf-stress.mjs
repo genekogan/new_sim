@@ -4,12 +4,14 @@
 // stats, the top profiled costs, the violation count and the final state hash.
 //   node deploy/perf-stress.mjs                    # stress-30, 60 s simulated
 //   node deploy/perf-stress.mjs --n 30 --seconds 60 --json
+//   node deploy/perf-stress.mjs --planner corridor  # opt-in coarse-to-fine planner (routes may differ)
 import { fileURLToPath } from 'node:url';
 import { stress, buildRuntime } from '../app/lab/scenarios.ts';
 
-export function perfStress({ n = 30, seconds = 60, profile = true } = {}) {
+export function perfStress({ n = 30, seconds = 60, profile = true, planner = 'exact' } = {}) {
   const s = stress(n);
   const rt = buildRuntime(s);
+  rt.services.spatial.planner = planner;
   rt.profile = profile;
   s.start(rt);
   const ticks = Math.round(seconds * 20);
@@ -25,6 +27,7 @@ export function perfStress({ n = 30, seconds = 60, profile = true } = {}) {
   const worst = costs.map((c, i) => [i + 1, c]).sort((a, b) => b[1] - a[1]).slice(0, 5);
   return {
     scenario: s.name,
+    planner,
     ticks,
     meanMs: costs.reduce((a, b) => a + b, 0) / ticks,
     p95Ms: q(0.95),
@@ -43,11 +46,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const i = process.argv.indexOf(`--${k}`);
     return i > 0 ? Number(process.argv[i + 1]) : d;
   };
-  const r = perfStress({ n: arg('n', 30), seconds: arg('seconds', 60) });
+  const pi = process.argv.indexOf('--planner');
+  const r = perfStress({ n: arg('n', 30), seconds: arg('seconds', 60), planner: pi > 0 ? process.argv[pi + 1] : 'exact' });
   if (process.argv.includes('--json')) console.log(JSON.stringify(r));
   else {
     const f = (x) => `${x.toFixed(2)} ms`;
-    console.log(`${r.scenario}: ${r.ticks} ticks, ${r.actions} actions, ${r.violations} violations`);
+    console.log(`${r.scenario} (${r.planner} planner): ${r.ticks} ticks, ${r.actions} actions, ${r.violations} violations`);
     console.log(`tick  mean ${f(r.meanMs)}  p95 ${f(r.p95Ms)}  p99 ${f(r.p99Ms)}  max ${f(r.maxMs)}`);
     console.log(`worst ticks: ${r.worstTicks.map((w) => `#${w.tick} ${w.ms} ms`).join(', ')}`);
     console.log('top costs (inclusive; spatial.route includes spatial.sync):');

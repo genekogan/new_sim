@@ -7,7 +7,7 @@ import { dcos, dsin, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { buildGrids, gridsWithObstacles, StaticRaster, type GridSet } from './grid.ts';
-import { findRoute, type Place, type RouteResult } from './path.ts';
+import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 import type { Profiler } from '../runtime/profile.ts';
 
@@ -63,6 +63,8 @@ export class Spatial {
   baseId: string;
   cell: number;
   contributors: Contributor[];
+  /** Route planner for route()/routeAround() (path.ts RouteOpts.planner); 'exact' unless opted in. */
+  planner: 'exact' | 'corridor';
   scene!: SpatialScene;
   grids!: GridSet;
   epoch = 0;
@@ -72,11 +74,12 @@ export class Spatial {
   /** Rasters of the base obstacles (they lead every synced scene's obstacle list). */
   private raster: StaticRaster;
 
-  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string } = {}) {
+  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor' } = {}) {
     this.base = base;
     this.baseId = opts.baseId ?? hashOf(base);
     this.cell = opts.cell ?? 0.1;
     this.contributors = opts.contributors ?? [];
+    this.planner = opts.planner ?? 'exact';
     this.raster = new StaticRaster(base.obstacles, base.bounds, this.cell);
   }
 
@@ -117,14 +120,16 @@ export class Spatial {
     }
     this.scene = { bounds: this.base.bounds, levels, surfaces, obstacles, links };
     this.grids = buildGrids(this.scene, this.cell, this.raster);
+    if (this.planner === 'corridor') prepareCorridor(this.grids);
     this.epoch++;
     return true;
   }
 
-  route(world: WorldState, profile: AgentProfile, start: Place, goal: Place, opts?: Parameters<typeof findRoute>[5]): RouteResult {
-    if (this.prof) return this.prof.time('spatial.route', () => (this.sync(world), findRoute(this.grids, this.scene, profile, start, goal, opts)));
+  route(world: WorldState, profile: AgentProfile, start: Place, goal: Place, opts?: RouteOpts): RouteResult {
+    const o = this.planner === 'exact' ? opts : { planner: this.planner, ...opts };
+    if (this.prof) return this.prof.time('spatial.route', () => (this.sync(world), findRoute(this.grids, this.scene, profile, start, goal, o)));
     this.sync(world);
-    return findRoute(this.grids, this.scene, profile, start, goal, opts);
+    return findRoute(this.grids, this.scene, profile, start, goal, o);
   }
 
   level(id: number) {
@@ -164,7 +169,7 @@ export class Spatial {
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: { id: string; p: Vec2 }[]): RouteResult {
     const run = () => {
       const { scene, grids } = this.gridsAround(world, people);
-      return findRoute(grids, scene, profile, start, goal);
+      return findRoute(grids, scene, profile, start, goal, this.planner === 'exact' ? undefined : { planner: this.planner });
     };
     return this.prof ? this.prof.time('spatial.routeAround', run) : run();
   }

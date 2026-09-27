@@ -6,7 +6,7 @@ import { Runtime } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
-import { emptyWorld, human, addAll } from '../world/factory.ts';
+import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import type { ActionDef } from '../actions/types.ts';
 import { buildGrids, gridsWithObstacles, clearanceAt, type GridSet } from '../spatial/grid.ts';
@@ -14,6 +14,8 @@ import { findRoute, type Place } from '../spatial/path.ts';
 import { HUMAN_PROFILE, type AgentProfile, type SpatialScene } from '../spatial/types.ts';
 import { seedRng, nextRandom } from '../core/rng.ts';
 import { findRouteReference } from './path-reference.ts';
+import { stress, buildRuntime } from '../../app/lab/scenarios.ts';
+import { segmentClearance } from '../spatial/grid.ts';
 
 function setup(...people: ReturnType<typeof human>[]) {
   const base = provingGround();
@@ -93,4 +95,88 @@ test('planner equality: production findRoute === frozen reference over test rout
     if (got.ok) ok++;
   }
   assert.ok(ok > 150 && standable > 150, `${ok} ok routes, ${standable} standable pairs`);
+});
+
+/** 10 walkers heading north through the 1 m gap at (15, -15); at tick 10 a panel closes it (lab dropPanel). */
+function gapCrowd(replansPerTick?: number) {
+  const people = Array.from({ length: 10 }, (_, k) => human(`g${k}`, 9 + (k % 5) * 3, -27 + Math.floor(k / 5) * 2.5, { yaw: Math.PI / 2 }));
+  const rt = setup(...people);
+  if (replansPerTick !== undefined) rt.services.planning = { replansPerTick };
+  const ids = people.map((p, k) => rt.submit('walk_to', { actor: p.id, x: 9 + (k % 5) * 3, z: -6 }).id);
+  for (let t = 0; t < 20 * 150 && ids.some((i) => rt.isActive(i)); t++) {
+    rt.step();
+    if (rt.tick === 10) {
+      rt.world.entities.panel = component('panel', 'plywood-4x8', [15, 1.22, -15], Math.PI / 2, { phase: 'installed', pose: { p: [15, 1.22, -15], yaw: Math.PI / 2, roll: Math.PI / 2 } });
+    }
+  }
+  return { rt, ids };
+}
+
+test('replan budget: construction replans are staggered deterministically, walkers keep a clear prefix, all arrive', () => {
+  const unlimited = gapCrowd(Infinity), budget = gapCrowd(2), again = gapCrowd(2);
+  for (const { rt, ids } of [unlimited, budget]) {
+    assert.deepEqual(rt.violations, []);
+    for (const i of ids) assert.equal(rt.records.get(i)!.status, 'completed', `${i} ${rt.records.get(i)!.diagnostic?.message}`);
+  }
+  const bu = unlimited.rt.services.replanBudget, bb = budget.rt.services.replanBudget;
+  assert.ok(bu.peak >= 5, `unlimited: ${bu.peak} replans in one tick`);
+  assert.equal(bu.deferred, 0);
+  assert.ok(bb.deferred > 0, 'some walkers waited their turn');
+  assert.ok(bb.peak < bu.peak, `budgeted peak ${bb.peak} < unlimited ${bu.peak}`);
+  assert.equal(bb.replans, bu.replans, 'the same walkers replan, just later');
+  assert.ok(bb.deferred <= bb.replans * 10, 'nobody waits more than 10 ticks');
+  assert.equal(budget.rt.stateHash(), again.rt.stateHash(), 'deterministic');
+});
+
+test('corridor planner (opt-in): failures identical to exact, successes clear and near-optimal', () => {
+  const scene = provingGround();
+  const grids = buildGrids(scene, 0.1);
+  const st = seedRng('corridor-planner');
+  const rand = () => nextRandom(st);
+  const P = (level: number, x: number, z: number): Place => ({ level, p: [x, z] });
+  const pick = (): Place => (rand() < 0.2 ? P(1, 6.6 + rand() * 6.8, 7.4 + rand() * 5.2) : P(0, -29 + rand() * 58, -29 + rand() * 58));
+  let same = 0, ok = 0;
+  for (let k = 0; k < 120; k++) {
+    const a = pick(), b = pick();
+    const e = findRoute(grids, scene, HUMAN_PROFILE, a, b), c = findRoute(grids, scene, HUMAN_PROFILE, a, b, { planner: 'corridor' });
+    if (!e.ok) { assert.deepEqual(c, e); continue; }
+    assert.ok(c.ok);
+    ok++;
+    if (JSON.stringify(c.route.legs) === JSON.stringify(e.route.legs)) same++;
+    assert.ok(Math.abs(c.route.length - e.route.length) <= 0.05 * e.route.length + 0.2, `length ${c.route.length} vs ${e.route.length}`);
+    // every segment clear, except where the exact route is not either (a raw, snapped start)
+    const minClear = (legs: typeof e.route.legs) => Math.min(...legs.flatMap((l) => (l.kind === 'walk' ? l.points.slice(1).map((q, i) => segmentClearance(grids.levels.get(l.level)!, l.points[i], q)) : [])));
+    assert.ok(minClear(c.route.legs) >= Math.min(HUMAN_PROFILE.radius, minClear(e.route.legs)) - 1e-6, `clearance ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
+  }
+  assert.ok(ok > 100 && same / ok > 0.85, `${same}/${ok} identical`);
+});
+
+/** Lab stress-30 as the lab steps it (rt.step() + tick script), 60 s simulated. Bounds are loose for the
+ *  parallel test runner; standalone numbers are in PLANNING_BUDGET.md (deploy/perf-stress.mjs). */
+function stressRun(planner: 'exact' | 'corridor') {
+  const s = stress(30);
+  const rt = buildRuntime(s);
+  (rt.services.spatial as Spatial).planner = planner;
+  s.start(rt);
+  const costs: number[] = [];
+  for (let i = 0; i < 20 * 60; i++) {
+    const t0 = performance.now();
+    rt.step();
+    s.tick!(rt);
+    costs.push(performance.now() - t0);
+  }
+  return { rt, max: Math.max(...costs), mean: costs.reduce((x, y) => x + y, 0) / costs.length };
+}
+
+test('stress-30: exact planner keeps the pinned result; per-tick cost bounded; zero violations', () => {
+  stressRun('corridor'); // JIT warm-up (a long-lived lab/DO process is warm)
+  const exact = stressRun('exact');
+  assert.equal(exact.rt.violations.length, 0);
+  assert.equal(exact.rt.stateHash(), 'a6e42f5c6bfba73d76bc6080a4373236031f79bfee46533306d374333390e26c', 'stress-30 final state unchanged by the planning-budget work');
+  const corr = stressRun('corridor');
+  assert.equal(corr.rt.violations.length, 0);
+  console.log(`stress-30 max tick: exact ${exact.max.toFixed(1)} ms (mean ${exact.mean.toFixed(2)}), corridor ${corr.max.toFixed(1)} ms (mean ${corr.mean.toFixed(2)})`);
+  assert.ok(exact.max <= 150, `exact max tick ${exact.max.toFixed(1)} ms`);
+  assert.ok(corr.max <= 60, `corridor max tick ${corr.max.toFixed(1)} ms`);
+  assert.ok(exact.mean <= 3 && corr.mean <= 3);
 });

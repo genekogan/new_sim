@@ -29,14 +29,56 @@ export function linkApproach(link: Link, ascending: boolean, back = 0.7): { entr
   return { entry: link.to, approach: add2(link.to.p, [dir[0] * back, dir[1] * back]), exit: link.from };
 }
 
-export function findRoute(
-  grids: GridSet,
-  scene: SpatialScene,
-  profile: AgentProfile,
-  start: Place,
-  goal: Place,
-  opts: { goalTolerance?: number; allowUnusableLinks?: boolean; maxExpand?: number } = {},
-): RouteResult {
+export type RouteOpts = {
+  goalTolerance?: number;
+  allowUnusableLinks?: boolean;
+  maxExpand?: number;
+  /**
+   * 'exact' (default): full-grid A*. 'corridor': coarse-to-fine — A* on a 0.5 m max-clearance grid
+   * picks a corridor, then the same fine A* runs restricted to cells within CORRIDOR_HALO of it;
+   * any failure falls back to the exact search (so failures and their diagnostics are identical).
+   * Faster on long routes but NOT guaranteed to return the exact route (docs/engineering/PLANNING_BUDGET.md).
+   */
+  planner?: 'exact' | 'corridor';
+};
+
+/** Corridor planner: coarse cell size (m) and fine-search halo around the coarse path (m). */
+export const CORRIDOR_CELL = 0.5;
+export const CORRIDOR_HALO = 1.5;
+
+type Prep = { r: number; lvIds: number[]; idxOf: Map<number, number>; N: number; gs: LevelGrid; gg: LevelGrid; sLv: number; gLv: number; s: number; gt: number; edges: Map<number, LinkEdge[]> };
+type Found = { goalId: number; chain: number[]; viaLink: Map<number, LinkEdge>; expanded: number };
+
+export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts = {}): RouteResult {
+  const prep = prepare(grids, scene, profile, start, goal, opts);
+  if ('ok' in prep) return prep;
+  if (opts.planner === 'corridor') {
+    const r = corridorRoute(grids, scene, profile, start, goal, opts, prep);
+    if (r) return r;
+  }
+  const found = search(grids, prep, opts, null);
+  if (!found) {
+    const { r } = prep;
+    if (!opts.allowUnusableLinks && scene.links.some((l) => !l.usable)) {
+      const alt = findRoute(grids, scene, profile, start, goal, { ...opts, allowUnusableLinks: true, planner: 'exact' });
+      if (alt.ok) {
+        const needed = alt.route.legs.filter((l): l is LinkLeg => l.kind === 'link' && !l.link.usable).map((l) => l.link);
+        return fail(
+          'route.link-unusable',
+          `no usable route: it would require ${needed.map((l) => `${l.kind} ${l.id} (${l.reason ?? 'not usable'})`).join(', ')}`,
+          goal,
+          needed.map((l) => l.id),
+        );
+      }
+    }
+    return fail('route.unreachable', `no route from level ${start.level} (${fmt(start.p)}) to level ${goal.level} (${fmt(goal.p)}) for a ${r} m-radius agent`, goal);
+  }
+  if ('ok' in found) return found;
+  return assemble(grids, prep, start, goal, found, found.expanded);
+}
+
+/** Snap start/goal and build the contextual link edges; a failure is the final diagnostic. */
+function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts): Prep | RouteResult {
   // plan with a margin above the body radius: corridor clearance is sampled at cell centres, and
   // the walker's continuous position may sit up to half a cell off them
   const r = profile.radius + PLAN_MARGIN;
@@ -73,11 +115,19 @@ export function findRoute(
       edges.set(id, list);
     }
   }
+  return { r, lvIds, idxOf, N, gs, gg, sLv: idxOf.get(start.level)!, gLv: idxOf.get(goal.level)!, s, gt, edges };
+}
 
-  // Search state lives in reused, generation-stamped scratch (no per-call 10 MB allocation + fill):
-  // gScore/came of a cell are valid iff stamp === gen, closed iff shut === gen. The expansion order,
-  // relaxation arithmetic and heap order (key, then insertion) are exactly the reference A*'s, so
-  // routes are bit-identical (engine/test/planning.test.ts vs engine/test/path-reference.ts).
+/**
+ * The A* core. Search state lives in reused, generation-stamped scratch (no per-call 10 MB
+ * allocation + fill): gScore/came of a cell are valid iff stamp === gen, closed iff shut === gen.
+ * Unmasked, the expansion order, relaxation arithmetic and heap order (key, then insertion) are
+ * exactly the reference A*'s, so routes are bit-identical (engine/test/planning.test.ts vs
+ * engine/test/path-reference.ts). `mask` (cells with mask.stamp === mask.gen) restricts the search.
+ * Returns null when the goal is unreachable, a diagnostic when the expansion limit is hit.
+ */
+function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint32Array; gen: number } | null): Found | RouteResult | null {
+  const { r, lvIds, idxOf, N, gg, s, gt, edges, sLv, gLv } = prep;
   const total = lvIds.length * N;
   const S = scratchFor(total);
   const gen = S.gen;
@@ -86,7 +136,7 @@ export function findRoute(
   const heap = S.heap;
   heap.reset(pos);
   const Ls = lvIds.map((id) => grids.levels.get(id)!);
-  const startId = idxOf.get(start.level)! * N + s, goalId = idxOf.get(goal.level)! * N + gt;
+  const startId = sLv * N + s, goalId = gLv * N + gt;
   const goalC = centreOf(gg, gt);
   const gx0 = goalC[0], gz0 = goalC[1];
   // octile distance from a cell centre to the goal cell centre (same float ops as centreOf)
@@ -98,10 +148,11 @@ export function findRoute(
     const g = Ls[lv];
     return hAt(g, c % g.nx, Math.floor(c / g.nx));
   };
+  const ms = mask?.stamp, mg = mask?.gen ?? 0;
   stamp[startId] = gen;
   gScore[startId] = 0;
   came[startId] = -1;
-  heap.push(startId, h(idxOf.get(start.level)!, s), false);
+  heap.push(startId, h(sLv, s), false);
   let expanded = 0;
   const maxExpand = opts.maxExpand ?? 4_000_000;
   const hasEdges = edges.size > 0;
@@ -127,8 +178,9 @@ export function findRoute(
         const cn = cl[n];
         if (!(cn >= r)) continue;
         if (di && dj && (!(cl[cj * nx + ni] >= r) || !(cl[nj * nx + ci] >= r))) continue; // no corner cutting
-        const w = 1 + (cn < COMFORT ? (WALL_PENALTY * (COMFORT - cn)) / COMFORT : 0);
         const nid = base + n;
+        if (ms && ms[nid] !== mg) continue;
+        const w = 1 + (cn < COMFORT ? (WALL_PENALTY * (COMFORT - cn)) / COMFORT : 0);
         const t = gc + (di && dj ? diag : straight) * w;
         const fresh = stamp[nid] !== gen;
         if (fresh || t < gScore[nid]) {
@@ -144,6 +196,7 @@ export function findRoute(
     for (const e of edges.get(cur) ?? []) {
       const tl = idxOf.get(e.toLevel)!;
       const nid = tl * N + e.toCell;
+      if (ms && ms[nid] !== mg) continue;
       const t = gc + e.cost;
       const fresh = stamp[nid] !== gen;
       if (fresh || t < gScore[nid]) {
@@ -155,26 +208,18 @@ export function findRoute(
       }
     }
   }
-  if (shut[goalId] !== gen) {
-    if (!opts.allowUnusableLinks && scene.links.some((l) => !l.usable)) {
-      const alt = findRoute(grids, scene, profile, start, goal, { ...opts, allowUnusableLinks: true });
-      if (alt.ok) {
-        const needed = alt.route.legs.filter((l): l is LinkLeg => l.kind === 'link' && !l.link.usable).map((l) => l.link);
-        return fail(
-          'route.link-unusable',
-          `no usable route: it would require ${needed.map((l) => `${l.kind} ${l.id} (${l.reason ?? 'not usable'})`).join(', ')}`,
-          goal,
-          needed.map((l) => l.id),
-        );
-      }
-    }
-    return fail('route.unreachable', `no route from level ${start.level} (${fmt(start.p)}) to level ${goal.level} (${fmt(goal.p)}) for a ${r} m-radius agent`, goal);
-  }
-
-  // reconstruct into legs
+  if (shut[goalId] !== gen) return null;
   const chain: number[] = [];
   for (let id = goalId; id !== -1; id = came[id]) chain.push(id);
   chain.reverse();
+  return { goalId, chain, viaLink, expanded };
+}
+
+/** Cell chain → legs (string-pulled walk legs + link legs). */
+function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: Found, expanded: number): RouteResult {
+  const { r, lvIds, N, gg, gt } = prep;
+  const { chain, viaLink } = found;
+  const goalC = centreOf(gg, gt);
   const legs: Leg[] = [];
   let pts: Vec2[] = [start.p];
   let curLv = start.level;
@@ -198,6 +243,69 @@ export function findRoute(
   legs.push(walkLeg(grids.levels.get(curLv)!, pts, r, true));
   const length = legs.reduce((s, l) => s + (l.kind === 'walk' ? pathLen2(l.points) : pathLen(l.link.path)), 0);
   return { ok: true, route: { legs, length, expanded } };
+}
+
+/**
+ * Coarse-to-fine: A* over a max-clearance coarse grid (optimistic: a coarse cell is open if any of
+ * its fine cells is, so every fine route has a coarse image) between the fine start/goal cells,
+ * then the fine A* restricted to fine cells within CORRIDOR_HALO of that coarse path. null (→ the
+ * exact search) whenever either stage fails, so only successful routes can differ from 'exact'.
+ */
+function corridorRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts, prep: Prep): RouteResult | null {
+  const f = Math.max(2, Math.round(CORRIDOR_CELL / grids.cell));
+  const coarse = coarseGrids(grids, f);
+  const cPrep = prepare(coarse, scene, profile, { level: start.level, p: centreOf(prep.gs, prep.s) }, { level: goal.level, p: centreOf(prep.gg, prep.gt) }, { ...opts, goalTolerance: 0 });
+  if ('ok' in cPrep) return null;
+  const cFound = search(coarse, cPrep, opts, null);
+  if (!cFound || 'ok' in cFound) return null;
+  const { N, lvIds } = prep;
+  const S = scratchFor(lvIds.length * N);
+  if (!S.mask) S.mask = new Uint32Array(S.total);
+  if (S.maskGen >= 0xfffffffe) { S.maskGen = 0; S.mask.fill(0); }
+  const mgen = ++S.maskGen;
+  const k = Math.ceil(CORRIDOR_HALO / (f * grids.cell));
+  const Nc = cPrep.N;
+  for (const id of cFound.chain) {
+    const lv = Math.floor(id / Nc), c = id - lv * Nc;
+    const cg = coarse.levels.get(lvIds[lv])!, g = grids.levels.get(lvIds[lv])!;
+    const ci = c % cg.nx, cj = (c - ci) / cg.nx;
+    const i0 = Math.max(0, (ci - k) * f), i1 = Math.min(g.nx, (ci + k + 1) * f);
+    const j0 = Math.max(0, (cj - k) * f), j1 = Math.min(g.nz, (cj + k + 1) * f);
+    for (let j = j0; j < j1; j++) for (let i = i0, row = lv * N + j * g.nx; i < i1; i++) S.mask[row + i] = mgen;
+  }
+  const found = search(grids, prep, opts, { stamp: S.mask, gen: mgen });
+  if (!found || 'ok' in found) return null;
+  return assemble(grids, prep, start, goal, found, cFound.expanded + found.expanded);
+}
+
+/** Build (memoise) the corridor planner's coarse grids now, e.g. at grid-rebuild time instead of inside the first route. */
+export function prepareCorridor(grids: GridSet) {
+  coarseGrids(grids, Math.max(2, Math.round(CORRIDOR_CELL / grids.cell)));
+}
+
+/** Max-clearance coarsening (factor f) of every level, memoised per fine LevelGrid. */
+const coarseCache = new WeakMap<LevelGrid, Map<number, LevelGrid>>();
+function coarseGrids(grids: GridSet, f: number): GridSet {
+  const levels = new Map<number, LevelGrid>();
+  for (const [id, g] of grids.levels) {
+    let byF = coarseCache.get(g);
+    if (!byF) coarseCache.set(g, (byF = new Map()));
+    let cg = byF.get(f);
+    if (!cg) {
+      const nx = Math.ceil(g.nx / f), nz = Math.ceil(g.nz / f);
+      const clearance = new Float32Array(nx * nz), free = new Uint8Array(nx * nz);
+      for (let j = 0; j < g.nz; j++)
+        for (let i = 0, cj = ((j / f) | 0) * nx; i < g.nx; i++) {
+          const v = g.clearance[j * g.nx + i], c = cj + ((i / f) | 0);
+          if (v > clearance[c]) clearance[c] = v;
+          if (g.free[j * g.nx + i]) free[c] = 1;
+        }
+      cg = { level: g.level, y: g.y, cell: g.cell * f, nx, nz, x0: g.x0, z0: g.z0, free, clearance, blockers: new Map() };
+      byF.set(f, cg);
+    }
+    levels.set(id, cg);
+  }
+  return { cell: grids.cell * f, levels };
 }
 
 /** String-pull a cell path keeping every shortcut's clearance ≥ radius. Endpoints are preserved. */
@@ -317,19 +425,23 @@ class Heap {
   }
 }
 
-/** One reusable search workspace, sized to the last grid set searched (findRoute is not reentrant
- *  while searching; its only recursion runs after the outer search is finished with it). */
-type Scratch = { total: number; gen: number; gScore: Float64Array; came: Int32Array; pos: Int32Array; stamp: Uint32Array; shut: Uint32Array; heap: Heap };
-let scratch: Scratch | null = null;
+/** Reusable search workspaces keyed by search size (fine + coarse grids of the last scenes).
+ *  findRoute is not reentrant while searching; its only recursion runs after its search is done. */
+type Scratch = { total: number; gen: number; gScore: Float64Array; came: Int32Array; pos: Int32Array; stamp: Uint32Array; shut: Uint32Array; heap: Heap; mask?: Uint32Array; maskGen: number };
+const scratches = new Map<number, Scratch>();
+const SCRATCHES = 3;
 function scratchFor(total: number): Scratch {
-  if (!scratch || scratch.total !== total) {
-    scratch = { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: scratch?.heap ?? new Heap() };
+  let sc = scratches.get(total);
+  if (!sc) {
+    if (scratches.size >= SCRATCHES) scratches.delete(scratches.keys().next().value!);
+    sc = { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: new Heap(), maskGen: 0 };
+    scratches.set(total, sc);
   }
-  if (scratch.gen >= 0xfffffffe) {
-    scratch.gen = 0;
-    scratch.stamp.fill(0);
-    scratch.shut.fill(0);
+  if (sc.gen >= 0xfffffffe) {
+    sc.gen = 0;
+    sc.stamp.fill(0);
+    sc.shut.fill(0);
   }
-  scratch.gen++;
-  return scratch;
+  sc.gen++;
+  return sc;
 }
