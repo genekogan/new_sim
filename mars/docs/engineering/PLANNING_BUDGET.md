@@ -16,10 +16,7 @@ It is measurement only; a test checks that profiled and unprofiled runs hash equ
 | exact planner (cold / warm) | 0.67 / 0.60 ms | 122 / 80–91 ms | ~225 ms / 74 | 29 ms |
 | `planner: 'corridor'` (cold / warm) | 0.58 / 0.51 ms | 76 / 42–46 ms | 140 ms / 75 | 16 ms |
 
-400 seeded proving-ground routes (warm), mean / p95 / max:
-- reference: 7.7 / 31 / 53 ms
-- exact: 3.5 / 14 / 22 ms
-- corridor: 1.5 / 3.9 / 6.5 ms
+400 seeded proving-ground routes (warm), mean / p95 / max: reference 7.7 / 31 / 53 ms; exact 3.5 / 14 / 22 ms; corridor 1.5 / 3.9 / 6.5 ms.
 
 ## 1. Exact A\*, identical routes (default)
 `spatial/path.ts` keeps the reference expansion order, relaxation arithmetic and (key, insertion) pop order.
@@ -41,28 +38,23 @@ Enable with `findRoute(…, { planner: 'corridor' })` or `new Spatial(base, { pl
 - **Failures:** any failure falls back to exact, so failures and their diagnostics are identical.
 - **Successes:** 373/399 seeded routes identical. The rest differ by −1.6…+1.3 m (≤ 3.9 %):
   string-pulling a different raw path can come out shorter.
-- **Halo trade-off:** 0.5 m → 349/399 identical, 4.2×; 2.0 m → 379/399, 2.0×.
-
-It stays opt-in. The lab and every pinned scenario use `'exact'`.
+- **Halo trade-off:** 0.5 m → 349/399 identical, 4.2×; 2.0 m → 379/399, 2.0×. Opt-in only: the lab and every pinned scenario use `'exact'`.
 
 ## 3. Construction replans staggered (`locomotion/walk.ts`)
 A walker whose remaining corridor was invalidated replans only within the tick's budget:
 `REPLANS_PER_TICK = 4`, or `services.planning.replansPerTick`.
 - **Deferred:** it follows the old corridor while its next `speed × 10 ticks + 0.5 m` is clear, for up to 10 ticks.
 - **Forced:** if that stretch is blocked, or the 10 ticks are up, it replans at once and still counts.
-- **Deterministic:** actions step in submission order. `services.replanBudget` keeps replans / deferred / peak.
+- **Deterministic:** submission-order stepping. `services.replanBudget` keeps replans / deferred / peak.
 - **Test:** 10 walkers are heading for the 1 m gap when a panel closes it. The drop tick takes
   62 ms unlimited (6 replans + ~28 ms grid rebuild), 37 ms at budget 4 and 36 ms at budget 2.
   The same 6 walkers replan, with 0 violations.
 - **Existing scenarios** peak at 1 construction replan per tick, so the budget never binds there.
 
 ## Hashes: before = after, no changes
-- Determinism probe / flagship build-bay: `d54eca7c402a…0f610`
-- Campus flagship: `f60e10b461dd…4c182`
-- Lab stress-30: `a6e42f5c6bfb…0e26c` (now pinned in `planning.test.ts`); the other 8 lab scenarios are unchanged.
+Probe / flagship build-bay `d54eca7c402a…0f610`; campus flagship `f60e10b461dd…4c182`; lab stress-30
+`a6e42f5c6bfb…0e26c` (now pinned in `planning.test.ts`); the other 8 lab scenarios are unchanged too.
 
 ## Limits
-- The tick-5 spike is 30 synchronous plans, so exact stays at about 30 × route cost (80–120 ms).
-  Getting under 60 ms needs the corridor planner.
-- The stress test (warm, in the parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91)
-  and ≤ 60 ms corridor (measured 42–45).
+The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
+corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
