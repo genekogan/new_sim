@@ -390,3 +390,136 @@ test('api: EngineRoom caps stored plans/takes per room; referenced takes survive
   const b6 = small.call(2026, 'bind_plan', { template: walk(-10), bindings: { a: 'n1' }, workspace: 'w' }) as any;
   assert.ok(b6.ok, b6.message);
 });
+
+// ---- spec §28 isolation proofs through the room (EngineRoom over node:sqlite; the same code the DO runs).
+// deploy/simulation-integration.mjs repeats these three against a real `wrangler dev` room over MCP + REST.
+
+/** Every engine_blobs row, for byte-exact "nothing was written" checks. */
+const dumpRows = (db: DatabaseSync) => hashOf(db.prepare('SELECT key, chunk, data FROM engine_blobs ORDER BY key, chunk').all());
+const walkPlan = (id: string, x: number, z: number) => ({ schema: 'mars-sequence/1', id, params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x, z } }] });
+/** Every workspace head plus every entity pose in every workspace (compact, as the tools return them). */
+function roomSnapshot(room: { call(y: number, op: string, input: unknown): any }) {
+  const ws = room.call(2026, 'query_world', {}).workspaces as { id: string; head: string }[];
+  return {
+    heads: Object.fromEntries(ws.map((w) => [w.id, w.head])),
+    logs: Object.fromEntries(ws.map((w) => [w.id, room.call(2026, 'log', { workspace: w.id }).checkpoints.length])),
+    poses: Object.fromEntries(ws.map((w) => [w.id, room.call(2026, 'query_world', { workspace: w.id }).entities.map((e: any) => [e.id, e.pose, e.human?.activity ?? e.phase ?? null])])),
+  };
+}
+
+test('replay isolation (room): take fetches and camera tracks never change heads, logs, poses or stored bytes; rooms never see each other', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage);
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'replay' }) as any).ok);
+  const b = room.call(2026, 'bind_plan', { template: minuteTemplate, bindings: minuteBindings, workspace: 'replay' }) as any;
+  assert.ok((room.call(2026, 'rehearse', { plan_id: b.plan_id }) as any).ok);
+  const ex = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'replay' }) as any;
+  assert.ok(ex.ok, ex.message);
+  const snap = roomSnapshot(room);
+  assert.equal(snap.heads.replay, ex.checkpoint.id);
+  const rows = dumpRows(s.db);
+  // viewing: many slices, full take with final state and cameras (the /api/simulation/engine/take path is this op)
+  const seen: string[] = [];
+  for (const [from, to] of [[0, 1], [5, 5.05], [12.34, 20], [30, 31], [55, undefined], [0, undefined]] as [number, number | undefined][]) {
+    const r = room.call(2026, 'get_take', { take_id: ex.take_id, from, to, include: ['final', 'cameras', 'events', 'changes'] }) as any;
+    assert.ok(r.ok, r.message);
+    assert.deepEqual(r._meta.stored, {}, 'a take fetch stores nothing');
+    seen.push(r.finalStateHash);
+  }
+  assert.deepEqual(new Set(seen), new Set([ex.take.finalStateHash]));
+  assert.equal(dumpRows(s.db), rows, 'take fetches wrote no byte to storage');
+  assert.deepEqual(roomSnapshot(room), snap, 'heads, log lengths and every pose unchanged after viewing');
+  // a camera track is stored beside the take (cams/ only): no head, log, pose, state, plan or take row changes
+  const historyBlob = s.blob('y2026/history');
+  const keys = s.keys();
+  const cam = room.call(2026, 'attach_camera_track', { take_id: ex.take_id, shot: { kind: 'frameGroup', subjects: ['n1', 's1', 'p1'], azimuth: 3.14, elevation: 0.4 } }) as any;
+  assert.ok(cam.ok && cam.takeHashUnchanged, JSON.stringify(cam.report));
+  assert.deepEqual(Object.keys(cam._meta.stored), [`y2026/cams/${ex.take_id}`]);
+  assert.deepEqual(s.keys(), [...keys, `y2026/cams/${ex.take_id}`].sort());
+  assert.equal(s.blob('y2026/history'), historyBlob);
+  assert.deepEqual(roomSnapshot(room), snap, 'unchanged after attaching a camera track');
+  // a restarted room (DO eviction) replays the same take and sees the same heads
+  const again = new EngineRoom(s.storage);
+  assert.deepEqual(roomSnapshot(again), snap);
+  assert.equal((again.call(2026, 'get_take', { take_id: ex.take_id, include: ['cameras'] }) as any).cameras.length, 1);
+  // a second, independent room (another DO, another capability): none of room 1's plans or takes, and vice versa
+  const s2 = sqliteStorage();
+  const room2 = new EngineRoom(s2.storage);
+  assert.deepEqual((room2.call(2026, 'query_world', {}) as any).workspaces.map((w: any) => w.id).sort(), ['carry-yard', 'proving-ground']);
+  assert.equal((room2.call(2026, 'get_take', { take_id: ex.take_id }) as any).code, 'take.unknown');
+  assert.equal((room2.call(2026, 'rehearse', { plan_id: b.plan_id }) as any).code, 'plan.unknown');
+  assert.equal((room2.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'replay' }) as any).code, 'plan.unknown');
+  room2.call(2026, 'fork', { from: 'proving-ground', name: 'other' });
+  const b2 = room2.call(2026, 'bind_plan', { template: walkPlan('other-walk', -8, -22), bindings: { a: 'n1' }, workspace: 'other' }) as any;
+  const ex2 = room2.call(2026, 'execute', { plan_id: b2.plan_id, workspace: 'other' }) as any;
+  assert.ok(ex2.ok, ex2.message);
+  assert.equal((room.call(2026, 'get_take', { take_id: ex2.take_id }) as any).code, 'take.unknown');
+  assert.equal((room.call(2026, 'rehearse', { plan_id: b2.plan_id }) as any).code, 'plan.unknown');
+  assert.deepEqual(roomSnapshot(room), snap, "room 1 untouched by room 2's work");
+});
+
+test('fork isolation (room): a fork executes without touching canonical or a sibling fork; canonical execute refused', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage);
+  const canon0 = roomSnapshot(room);
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'w1' }) as any).ok);
+  const b = room.call(2026, 'bind_plan', { template: walkPlan('p1-walk', -5, 5), bindings: { a: 'p1' }, workspace: 'w1' }) as any;
+  const prot = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'proving-ground' }) as any;
+  assert.equal(prot.code, 'workspace.protected');
+  assert.match(prot.message, /fork/);
+  const ex = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'w1' }) as any;
+  assert.ok(ex.ok, ex.message);
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'w2' }) as any).ok);
+  const snap = roomSnapshot(room);
+  assert.equal(snap.heads['proving-ground'], canon0.heads['proving-ground'], 'canonical head unchanged');
+  assert.equal(snap.logs['proving-ground'], 1);
+  assert.deepEqual(snap.poses['proving-ground'], canon0.poses['proving-ground']);
+  assert.equal(snap.heads.w2, canon0.heads['proving-ground'], 'w2 forks the canonical head, not w1');
+  assert.deepEqual(snap.poses.w2, canon0.poses['proving-ground'], "w2's world lacks w1's walk");
+  const p1 = (ws: string) => snap.poses[ws].find((e: any) => e[0] === 'p1')[1].p;
+  assert.notDeepEqual(p1('w1'), p1('w2'));
+  const log = room.call(2026, 'log', { workspace: 'w1' }) as any;
+  assert.deepEqual(log.checkpoints[0].cause, { kind: 'simulation-run', take: ex.take_id, plan: b.plan_id });
+  assert.equal(log.checkpoints[1].cause.kind, 'canonical-publish');
+  // the plan's baseline is the canonical head, which w2 still sits on: it runs there independently
+  const ex2 = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'w2' }) as any;
+  assert.ok(ex2.ok, ex2.message);
+  assert.equal(ex2.take_id, ex.take_id, 'same plan, same baseline → same take in a sibling');
+  assert.equal(roomSnapshot(room).heads['proving-ground'], canon0.heads['proving-ground']);
+});
+
+test('plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan; camera tracks do not', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage);
+  room.call(2026, 'fork', { from: 'proving-ground', name: 'w1' });
+  // camera attachment alone never stales: rehearse, shoot the rehearsal take twice, execute
+  const c = room.call(2026, 'bind_plan', { template: walkPlan('p1-walk', -5, 5), bindings: { a: 'p1' }, workspace: 'w1' }) as any;
+  const rc = room.call(2026, 'rehearse', { plan_id: c.plan_id }) as any;
+  assert.ok(rc.ok);
+  for (const shot of [{ kind: 'follow', subject: 'p1', offset: [-6, 2.5, 0], frame: 'world' }, { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] }])
+    assert.ok((room.call(2026, 'attach_camera_track', { take_id: rc.take.take_id, shot }) as any).ok);
+  const rc2 = room.call(2026, 'rehearse', { plan_id: c.plan_id }) as any;
+  assert.equal(rc2.stale, undefined, 'not stale after camera tracks');
+  const exc = room.call(2026, 'execute', { plan_id: c.plan_id, workspace: 'w1' }) as any;
+  assert.ok(exc.ok, exc.message);
+  assert.equal(exc.take_id, rc.take.take_id);
+  // A: n1 north through the 1 m passage (rehearsed). B (bound at the same head): s1 steps into the passage.
+  const a = room.call(2026, 'bind_plan', { template: walkPlan('n1-north', 15, -12), bindings: { a: 'n1' }, workspace: 'w1' }) as any;
+  const ra = room.call(2026, 'rehearse', { plan_id: a.plan_id }) as any;
+  assert.ok(ra.ok, JSON.stringify(ra.report));
+  const bb = room.call(2026, 'bind_plan', { template: walkPlan('s1-into-passage', 15, -15), bindings: { a: 's1' }, workspace: 'w1' }) as any;
+  const exb = room.call(2026, 'execute', { plan_id: bb.plan_id, workspace: 'w1' }) as any;
+  assert.ok(exb.ok, exb.message);
+  const s1 = (room.call(2026, 'query_world', { workspace: 'w1', ids: ['s1'] }) as any).entities[0].pose.p;
+  assert.ok(Math.abs(s1[0] - 15) < 0.3 && Math.abs(s1[2] + 15) < 0.3, `s1 stands in the passage (${s1})`);
+  const head = (room.call(2026, 'log', { workspace: 'w1' }) as any).head;
+  const stale = room.call(2026, 'execute', { plan_id: a.plan_id, workspace: 'w1' }) as any;
+  assert.equal(stale.code, 'plan.stale');
+  assert.deepEqual(stale.diff.changed, [{ id: 's1', fields: ['pose'] }]);
+  assert.match(stale.message, /s1 changed \(pose\)/);
+  assert.equal((room.call(2026, 'log', { workspace: 'w1' }) as any).head, head, 'a stale plan never commits');
+  assert.equal((room.call(2026, 'rehearse', { plan_id: a.plan_id }) as any).stale.code, 'plan.stale', 'rehearsal flags it too');
+});

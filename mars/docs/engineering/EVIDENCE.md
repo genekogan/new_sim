@@ -7,17 +7,21 @@ change the hand-curated map `viewer/engine/test/evidence-map.json` and regenerat
 
 | | |
 | --- | --- |
-| Git HEAD | `72bb2ad` (engine tree clean) |
-| Generated | 2026-09-27T23:03:04.696Z · Node v26.8.2 |
-| Engine suite | 178 tests in 25 files: 177 pass, 0 fail, 1 skipped · 44.0 s wall |
-| §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
-| §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 570.1 s simulated, 6916 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 597.5 s simulated, 22528 ms compute, take 458610 B (`campus-flagship.test.ts`) |
+| Git HEAD | `c211ce6` (6 uncommitted file(s) under `viewer/engine` at run time) |
+| Generated | 2026-09-27T23:38:35.838Z · Node v26.8.2 |
+| Engine suite | 181 tests in 25 files: 179 pass, 1 fail, 1 skipped · 45.4 s wall |
+| §28 rows | 16 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 17) |
+| §30 milestones | 7 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 8) |
+| Flagship, proving ground | 43 steps, 570.1 s simulated, 7014 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 597.5 s simulated, 23004 ms compute, take 458610 B (`campus-flagship.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 11403 ticks · final state `79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129` · take `bf58b85269c981003ce6d9c6` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
 PROVEN means only that the listed tests pass; the approximation notes say what they do not show.
+
+## Problems in this run
+
+- Failing: `social.test.ts` — sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it — p1 cannot reach their station at (0.00, -5.00): destination (0.00, -5.00) on level 0 has no standing room for a 0.34 m-radius agent (blocked by chair)
 
 ## SPEC §28 behavioural regressions
 
@@ -32,14 +36,14 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Raise tall frame | PROVEN | 9/9 | The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics. The 19 ft raise is proven on open ground only (no 19 ft raise beside other structures). |
 | Construction changes navigation | PROVEN | 6/6 | Every construction epoch rebuilds the affected grids (no incremental navmesh); proven on the proving ground and the progressive fixture, not on the full campus. |
 | Incomplete floor/stairs | PROVEN | 4/4 | Holds for engine-built decks/stairs only. The 2026 campus has no decks or stairs at all (upper floors are blocked, not modelled), so the rule is untested against historical geometry. |
-| Reservation conflict | PROVEN | 5/5 | Reservations are per actor/object/slot. There are no space-time reservations: simultaneous carries are not co-planned, so sequences must order them with `after` dependencies. |
+| Reservation conflict | PARTIAL | 4/5 | Reservations are per actor/object/slot. There are no space-time reservations: simultaneous carries are not co-planned, so sequences must order them with `after` dependencies. |
 | Graceful cancellation | PROVEN | 7/7 | Covered for carry, raise and stairs (plus generic lifecycle cleanup). Mid-raise cancel is refused rather than modelled as a lower-back-down; install lifts (joist/plywood/beam) have no cancel test. |
 | Camera collision | PROVEN | 6/6 | The camera collides with obstacle prisms (OBBs fitted to geometry), not the render mesh; checked on 10 Hz samples plus swept segments, on the proving ground with synthetic subjects. |
 | Camera readability | PROVEN | 4/4 | Occlusion is ray-tested against obstacle prisms, not the render mesh (no GPU/pixel visibility check); subjects are synthetic walkers, and no camera track has been rendered to video and reviewed. |
 | Replay independence | PROVEN | 4/4 | Proven at the engine/API level (take hash and final state unchanged). The browser renderer's camera path is not part of this suite. |
-| Fork isolation | PROVEN | 4/4 | Forks start only from quiescent checkpoints (no mid-action resume); there is no branch merge. |
-| Plan invalidation | PROVEN | 5/5 | Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic. |
-| Replay isolation | PROVEN | 2/2 | Engine level only (history, workspace and frozen take unchanged; replay.ts imports no runtime/history). The Durable Object room path is not covered by this suite. |
+| Fork isolation | PROVEN | 5/5 | Forks start only from quiescent checkpoints (no mid-action resume); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run. |
+| Plan invalidation | PROVEN | 6/6 | Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic. There is no design-edit engine op, so through the room the obstacle (walker s1 stepping into the 1 m passage) is moved by a second executed plan, not by editing a design entity; deploy/simulation-integration.mjs repeats this over real MCP, not run by this report. |
+| Replay isolation | PROVEN | 3/3 | Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, which this report does not run. A camera track needs the control capability (MCP) and is stored beside the take. |
 
 ### Wall avoidance — PROVEN
 
@@ -166,7 +170,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 *Approximate:* Holds for engine-built decks/stairs only. The 2026 campus has no decks or stairs at all (upper floors are blocked, not modelled), so the rule is untested against historical geometry.
 
-### Reservation conflict — PROVEN
+### Reservation conflict — PARTIAL
 
 *Required:* One actor/object/seat/work position cannot be simultaneously owned by incompatible actions.
 
@@ -176,7 +180,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `carry.test.ts` | carry: a second carry using a busy person fails with reservation.conflict |
 | pass | `review.test.ts` | C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation |
 | pass | `review.test.ts` | H1: an unreachable hold station is refused at plan time; a failed/cancelled action leaves no reservations, tasks, children or traffic behind |
-| pass | `social.test.ts` | sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it |
+| **FAIL** | `social.test.ts` | sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it — p1 cannot reach their station at (0.00, -5.00): destination (0.00, -5.00) on level 0 has no standing room for a 0.34 m-radius agent (blocked by chair) |
 
 *Approximate:* Reservations are per actor/object/slot. There are no space-time reservations: simultaneous carries are not co-planned, so sequences must order them with `after` dependencies.
 
@@ -247,8 +251,11 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `rehearsal.test.ts` | fork isolation: canonical refuses execution; executing in one branch leaves parent and sibling unchanged |
 | pass | `rehearsal.test.ts` | rehearsal is private: history, heads and checkpoints untouched |
 | pass | `campus.test.ts` | canonical mars-2026 is protected; flagship work happens in a fork |
+| pass | `api.test.ts` | fork isolation (room): a fork executes without touching canonical or a sibling fork; canonical execute refused |
 
-*Approximate:* Forks start only from quiescent checkpoints (no mid-action resume); there is no branch merge.
+*Evidence outside this suite (not run here):* `viewer/deploy/simulation-integration.mjs`
+
+*Approximate:* Forks start only from quiescent checkpoints (no mid-action resume); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run.
 
 ### Plan invalidation — PROVEN
 
@@ -261,8 +268,11 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `rehearsal.test.ts` | plan invalidation: inventory mode, RNG state and rules version are physical assumptions |
 | pass | `rehearsal.test.ts` | tampered plans and mismatched service scenes fail loudly |
 | pass | `api.test.ts` | api: stale plans and protected canonical workspaces are refused with diagnostics |
+| pass | `api.test.ts` | plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan; camera tracks do not |
 
-*Approximate:* Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic.
+*Evidence outside this suite (not run here):* `viewer/deploy/simulation-integration.mjs`
+
+*Approximate:* Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic. There is no design-edit engine op, so through the room the obstacle (walker s1 stepping into the 1 m passage) is moved by a second executed plan, not by editing a design entity; deploy/simulation-integration.mjs repeats this over real MCP, not run by this report.
 
 ### Replay isolation — PROVEN
 
@@ -272,8 +282,11 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | --- | --- | --- |
 | pass | `take.test.ts` | replay isolation: sampling an old take never touches history, the live workspace or the take |
 | pass | `take.test.ts` | tampered takes are rejected |
+| pass | `api.test.ts` | replay isolation (room): take fetches and camera tracks never change heads, logs, poses or stored bytes; rooms never see each other |
 
-*Approximate:* Engine level only (history, workspace and frozen take unchanged; replay.ts imports no runtime/history). The Durable Object room path is not covered by this suite.
+*Evidence outside this suite (not run here):* `viewer/deploy/simulation-integration.mjs`
+
+*Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, which this report does not run. A camera track needs the control capability (MCP) and is stored beside the take.
 
 ## SPEC §30 milestones
 
@@ -286,7 +299,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | E. Progressive construction | PROVEN | 9/9 | One bay, not an extended multi-bay run. No forklift, ladders or scaffold (anything above 2.1 m from a floor fails reach.too-high). Deck/stair/tread dimensions and the plywood span rule are provisional. |
 | F. Rehearsal + official execution | PROVEN | 8/8 | The engine detects failures and staleness; fixing them is the external director's job (rebind), with no automatic repair loop in the suite. The campus flagship is hypothetical (design-edit inventory and crew), not a documented historical build. |
 | G. Replay + branching | PROVEN | 9/9 | Forks resume only from quiescent checkpoints (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video. |
-| H. Inhabited Mars scenes | PROVEN | 9/9 | Campfire, class/audience gather, conversation, sitting and ambient wandering only: no party, dance or riding verbs in the engine. No seat collision, turn-taking, gaze, gestures or automatic pre-emption (SOCIAL.md). |
+| H. Inhabited Mars scenes | PARTIAL | 8/9 | Campfire, class/audience gather, conversation, sitting and ambient wandering only: no party, dance or riding verbs in the engine. No seat collision, turn-taking, gaze, gestures or automatic pre-emption (SOCIAL.md). |
 
 ### A. Audited foundation — PROVEN
 
@@ -417,7 +430,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 *Approximate:* Forks resume only from quiescent checkpoints (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video.
 
-### H. Inhabited Mars scenes — PROVEN
+### H. Inhabited Mars scenes — PARTIAL
 
 *Required:* Compose campfire/class/party/dance/riding/social activities using the same action/interaction framework.
 
@@ -425,7 +438,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | --- | --- | --- |
 | pass | `social.test.ts` | social verbs are registered in the one engine registry |
 | pass | `social.test.ts` | catalog slots: campfire has 8 fire-circle places 1.6 m out facing the centre; bench 3 seats |
-| pass | `social.test.ts` | sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it |
+| **FAIL** | `social.test.ts` | sit: two people cannot hold one camp-chair (reservation.conflict names slot + sit; slot.none-free names the chair); stand frees it — p1 cannot reach their station at (0.00, -5.00): destination (0.00, -5.00) on level 0 has no standing room for a 0.34 m-radius agent (blocked by chair) |
 | pass | `social.test.ts` | converse: 4 people form a circle, no overlaps, everyone faces the centre; cancel leaves them idle and unclaimed |
 | pass | `social.test.ts` | converse refusals: a holder (actor.holding) and a circle that does not fit (converse.clearance) |
 | pass | `social.test.ts` | campfire_circle with 10 people: 8 take fire-circle places, 2 fail slot.none-free naming the fire; no violations |
@@ -437,12 +450,15 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `ec63cce` (2026-09-27T22:44:27.959Z): 0 added, 0 removed.
+Compared with the report at `72bb2ad` (2026-09-27T23:03:04.696Z): 3 added, 0 removed.
 
+- added: api.test.ts :: fork isolation (room): a fork executes without touching canonical or a sibling fork; canonical execute refused
+- added: api.test.ts :: plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan; camera tracks do not
+- added: api.test.ts :: replay isolation (room): take fetches and camera tracks never change heads, logs, poses or stored bytes; rooms never see each other
 
 ## Tests not cited by any row or milestone
 
-61 of 178 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+61 of 181 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 

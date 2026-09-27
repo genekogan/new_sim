@@ -192,9 +192,11 @@
         { "file": "core.test.ts", "title": "fork isolation: canonical protected; sibling branches independent" },
         { "file": "rehearsal.test.ts", "title": "fork isolation: canonical refuses execution" },
         { "file": "rehearsal.test.ts", "title": "rehearsal is private: history, heads and checkpoints untouched" },
-        { "file": "campus.test.ts", "title": "canonical mars-2026 is protected; flagship work happens in a fork" }
+        { "file": "campus.test.ts", "title": "canonical mars-2026 is protected; flagship work happens in a fork" },
+        { "file": "api.test.ts", "title": "fork isolation (room): a fork executes without touching canonical or a sibling fork" }
       ],
-      "approximate": "Forks start only from quiescent checkpoints (no mid-action resume); there is no branch merge."
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "Forks start only from quiescent checkpoints (no mid-action resume); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run."
     },
     {
       "id": "plan-invalidation",
@@ -205,9 +207,11 @@
         { "file": "rehearsal.test.ts", "title": "plan invalidation: env/weather, labels and provenance edits do NOT stale a plan" },
         { "file": "rehearsal.test.ts", "title": "plan invalidation: inventory mode, RNG state and rules version are physical assumptions" },
         { "file": "rehearsal.test.ts", "title": "tampered plans and mismatched service scenes fail loudly" },
-        { "file": "api.test.ts", "title": "api: stale plans and protected canonical workspaces are refused" }
+        { "file": "api.test.ts", "title": "api: stale plans and protected canonical workspaces are refused" },
+        { "file": "api.test.ts", "title": "plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan" }
       ],
-      "approximate": "Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic."
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic. There is no design-edit engine op, so through the room the obstacle (walker s1 stepping into the 1 m passage) is moved by a second executed plan, not by editing a design entity; deploy/simulation-integration.mjs repeats this over real MCP, not run by this report."
     },
     {
       "id": "replay-isolation",
@@ -215,9 +219,11 @@
       "required": "Viewing an old take cannot mutate a live simulation room.",
       "tests": [
         { "file": "take.test.ts", "title": "replay isolation: sampling an old take never touches history, the live workspace or the take" },
-        { "file": "take.test.ts", "title": "tampered takes are rejected" }
+        { "file": "take.test.ts", "title": "tampered takes are rejected" },
+        { "file": "api.test.ts", "title": "replay isolation (room): take fetches and camera tracks never change heads" }
       ],
-      "approximate": "Engine level only (history, workspace and frozen take unchanged; replay.ts imports no runtime/history). The Durable Object room path is not covered by this suite."
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, which this report does not run. A camera track needs the control capability (MCP) and is stored beside the take."
     }
   ],
   "milestones": [

@@ -263,6 +263,140 @@ const log = await ecall('engine_log', { workspace: 'itest' });
 assert.equal(log.body.head, ex.body.checkpoint.id);
 const ms = (r) => `${Math.round(r.body._wallMs)} ms wall / ${r.body._meta.elapsedMs} ms in-DO`;
 console.log(`ENGINE: rehearse 60 s plan ${ms(reh)}; execute ${ms(ex)}; camera ${ms(cam)}; take ${ex.body.take.bytes} B; stored ${JSON.stringify(ex.body._meta.stored)}; totals ${JSON.stringify(ex.body._meta.storage)}; slice ${JSON.stringify(slice).length} B`);
+// ---- spec §28 isolation through the real control plane (MCP + REST → Durable Object room) ----
+// Mirrors the node:sqlite EngineRoom tests "replay/fork isolation (room)", "plan invalidation (room)".
+const viewH = { Authorization: `Bearer ${room}.${view}` };
+const T = [];
+const ok = (label, r) => {
+  assert.equal(r.isError, false, `${label}: ${JSON.stringify(r.body).slice(0, 800)}`);
+  T.push(`${label} ${Math.round(r.body._wallMs)}/${r.body._meta?.elapsedMs ?? '-'}`);
+  return r.body;
+};
+const refused = (label, r, code) => {
+  assert.equal(r.isError, true, `${label} must be refused`);
+  assert.equal(r.body.code, code, `${label}: ${JSON.stringify(r.body).slice(0, 400)}`);
+  T.push(`${label} ${Math.round(r.body._wallMs)}/${r.body._meta?.elapsedMs ?? '-'}`);
+  return r.body;
+};
+const walkPlan = (id, x, z) => ({ schema: 'mars-sequence/1', id, params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x, z } }] });
+/** Every workspace head, log length and entity pose in the room (through the tools). */
+async function snapshot(c = ecall) {
+  const ws = (await c('engine_query_world', {})).body.workspaces;
+  const out = { heads: {}, logs: {}, poses: {} };
+  for (const w of ws) {
+    out.heads[w.id] = w.head;
+    out.logs[w.id] = (await c('engine_log', { workspace: w.id })).body.checkpoints.length;
+    out.poses[w.id] = (await c('engine_query_world', { workspace: w.id })).body.entities.map((e) => [e.id, e.pose, e.human?.activity ?? e.phase ?? null]);
+  }
+  return out;
+}
+const vtake = async (qs, h = viewH, method = 'GET') => {
+  const t0 = performance.now();
+  const r = await fetch(`${base}/api/simulation/engine/take?${qs}`, { method, headers: h });
+  return { status: r.status, body: r.status === 200 || r.status === 404 ? await r.json() : null, wall: performance.now() - t0 };
+};
+// 1. Replay isolation
+ok('fork', await ecall('engine_fork', { from: 'proving-ground', name: 'replay' }));
+// a renamed template is a distinct plan (and take): not the itest take, which already has a camera track
+const rb = ok('bind', await ecall('engine_bind_plan', { template: { ...minute, id: 'replay-walk' }, bindings: { a: 'n1', b: 's1', c: 'p1' }, workspace: 'replay' }));
+assert.notEqual(rb.plan_id, planId);
+ok('rehearse(keep)', await ecall('engine_rehearse', { plan_id: rb.plan_id, keep: true }));
+const rex = ok('execute', await ecall('engine_execute', { plan_id: rb.plan_id, workspace: 'replay' }));
+const snap = await snapshot();
+assert.equal(snap.heads.replay, rex.checkpoint.id);
+assert.notEqual(rex.take_id, ex.body.take_id);
+assert.equal((await vtake(`id=${rex.take_id}&include=cameras`)).body.cameras.length, 0);
+const storage0 = (await ecall('engine_log', { workspace: 'replay' })).body._meta.storage;
+const fetchMs = [];
+for (const [from, to] of [[0, 1], [5, 5.05], [12.34, 20], [30, 31], [55, undefined], [0, undefined]]) {
+  const r = await vtake(`id=${rex.take_id}&from=${from}${to === undefined ? '' : `&to=${to}`}&include=final,cameras,events,changes`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.finalStateHash, rex.take.finalStateHash);
+  assert.deepEqual(r.body._meta.stored, {}, 'a view take fetch stores nothing');
+  fetchMs.push(`${Math.round(r.wall)}/${r.body._meta.elapsedMs}`);
+}
+T.push(`view take fetch ×6 ${fetchMs.join(',')}`);
+assert.deepEqual((await ecall('engine_log', { workspace: 'replay' })).body._meta.storage, storage0, 'stored bytes unchanged by viewing');
+assert.deepEqual(await snapshot(), snap, 'heads, log lengths and every pose unchanged after view fetches');
+// view capability: no MCP (so no execute/fork/attach), no commands, no POST on the take endpoint
+const rpc = (method, params) => fetch(`${base}/mcp`, { method: 'POST', headers: { ...viewH, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+assert.equal((await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'view', version: '1' } })).status, 403);
+for (const [name, args] of [['engine_execute', { plan_id: rb.plan_id, workspace: 'replay' }], ['engine_fork', { from: 'replay', name: 'v' }], ['engine_attach_camera_track', { take_id: rex.take_id, shot: { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] } }]]) {
+  const r = await rpc('tools/call', { name, arguments: args });
+  assert.equal(r.status, 403);
+  assert.match((await r.json()).error, /control capability/);
+  assert.equal((await post(name, args, randomUUID(), viewH)).status, 403);
+}
+await assert.rejects(new Client({ name: 'view', version: '1' }).connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: viewH } })));
+assert.equal((await vtake(`id=${rex.take_id}`, viewH, 'POST')).status, 405);
+assert.deepEqual(await snapshot(), snap, 'refused view calls changed nothing');
+// the control-side camera track is stored beside the take: heads, logs, poses unchanged
+const rcam = ok('attach camera', await ecall('engine_attach_camera_track', { take_id: rex.take_id, shot: { kind: 'frameGroup', subjects: ['n1', 's1', 'p1'], azimuth: 3.14, elevation: 0.4 } }));
+assert.equal(rcam.takeHashUnchanged, true);
+assert.deepEqual(Object.keys(rcam._meta.stored), [`y2026/cams/${rex.take_id}`]);
+assert.deepEqual(await snapshot(), snap, 'unchanged after attaching a camera track');
+assert.equal((await vtake(`id=${rex.take_id}&from=3&to=4&include=cameras`)).body.cameras.length, 1);
+// two independent rooms (different capabilities) never see each other's plans or takes
+const key2 = randomBytes(32).toString('hex'), view2 = hash(key2), room2 = hash(view2);
+const client2 = new Client({ name: 'mars-verification-2', version: '1.0.0' });
+await client2.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${room2}.${key2}` } } }));
+const ecall2 = async (name, args) => {
+  const t0 = performance.now();
+  const r = await client2.callTool({ name, arguments: args });
+  const body = JSON.parse(r.content[0].text);
+  body._wallMs = performance.now() - t0;
+  return { isError: !!r.isError, body };
+};
+assert.deepEqual(ok('room2 query', await ecall2('engine_query_world', {})).workspaces.map((w) => w.id).sort(), ['carry-yard', 'proving-ground']);
+refused('room2 get R take', await ecall2('engine_get_take', { take_id: rex.take_id }), 'take.unknown');
+refused('room2 rehearse R plan', await ecall2('engine_rehearse', { plan_id: rb.plan_id }), 'plan.unknown');
+refused('room2 execute R plan', await ecall2('engine_execute', { plan_id: rb.plan_id, workspace: 'replay' }), 'plan.unknown');
+assert.equal((await vtake(`id=${rex.take_id}`, { Authorization: `Bearer ${room2}.${view2}` })).status, 404);
+assert.equal((await vtake(`id=${rex.take_id}`, { Authorization: `Bearer ${room}.${view2}` })).status, 403, 'a capability for another room is invalid here');
+ok('room2 fork', await ecall2('engine_fork', { from: 'proving-ground', name: 'other' }));
+const b2 = ok('room2 bind', await ecall2('engine_bind_plan', { template: walkPlan('other-walk', -8, -22), bindings: { a: 'n1' }, workspace: 'other' }));
+const ex2 = ok('room2 execute', await ecall2('engine_execute', { plan_id: b2.plan_id, workspace: 'other' }));
+assert.equal((await vtake(`id=${ex2.take_id}`)).status, 404, "room 2's take is invisible to room 1's view capability");
+refused('R get room2 take', await ecall('engine_get_take', { take_id: ex2.take_id }), 'take.unknown');
+refused('R rehearse room2 plan', await ecall('engine_rehearse', { plan_id: b2.plan_id }), 'plan.unknown');
+assert.deepEqual(await snapshot(), snap, "room 1 untouched by room 2's work");
+await client2.close();
+// 2. Fork isolation
+const canon0 = await snapshot();
+ok('fork w1', await ecall('engine_fork', { from: 'proving-ground', name: 'iso-w1' }));
+const fb = ok('bind w1', await ecall('engine_bind_plan', { template: walkPlan('p1-walk', -5, 5), bindings: { a: 'p1' }, workspace: 'iso-w1' }));
+assert.match(refused('execute canonical', await ecall('engine_execute', { plan_id: fb.plan_id, workspace: 'proving-ground' }), 'workspace.protected').message, /fork/);
+const fex = ok('execute w1', await ecall('engine_execute', { plan_id: fb.plan_id, workspace: 'iso-w1' }));
+ok('fork w2', await ecall('engine_fork', { from: 'proving-ground', name: 'iso-w2' }));
+const fs = await snapshot();
+assert.equal(fs.heads['proving-ground'], canon0.heads['proving-ground'], 'canonical head unchanged');
+assert.equal(fs.logs['proving-ground'], canon0.logs['proving-ground']);
+assert.deepEqual(fs.poses['proving-ground'], canon0.poses['proving-ground']);
+assert.equal(fs.heads['iso-w2'], canon0.heads['proving-ground'], 'w2 forks the canonical head');
+assert.deepEqual(fs.poses['iso-w2'], canon0.poses['proving-ground'], "w2's world lacks w1's walk");
+const p1At = (ws) => fs.poses[ws].find((e) => e[0] === 'p1')[1].p;
+assert.notDeepEqual(p1At('iso-w1'), p1At('iso-w2'));
+for (const ws of ['replay', 'itest']) assert.equal(fs.heads[ws], canon0.heads[ws], `sibling ${ws} untouched`);
+const flog = ok('log w1', await ecall('engine_log', { workspace: 'iso-w1' }));
+assert.deepEqual(flog.checkpoints[0].cause, { kind: 'simulation-run', take: fex.take_id, plan: fb.plan_id });
+// 3. Plan invalidation (there is no design-edit engine op: the obstacle is moved by a second executed plan)
+const pc = ok('bind cam-plan', await ecall('engine_bind_plan', { template: walkPlan('p1-back', 0, -5), bindings: { a: 'p1' }, workspace: 'iso-w1' }));
+const prc = ok('rehearse cam-plan', await ecall('engine_rehearse', { plan_id: pc.plan_id }));
+for (const shot of [{ kind: 'follow', subject: 'p1', offset: [-6, 2.5, 0], frame: 'world' }, { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] }])
+  ok('attach camera (rehearsal take)', await ecall('engine_attach_camera_track', { take_id: prc.take.take_id, shot }));
+assert.equal(ok('rehearse after cameras', await ecall('engine_rehearse', { plan_id: pc.plan_id })).stale, undefined, 'camera tracks never stale a plan');
+assert.equal(ok('execute cam-plan', await ecall('engine_execute', { plan_id: pc.plan_id, workspace: 'iso-w1' })).take_id, prc.take.take_id);
+const pa = ok('bind A', await ecall('engine_bind_plan', { template: walkPlan('n1-north', 15, -12), bindings: { a: 'n1' }, workspace: 'iso-w1' }));
+ok('rehearse A', await ecall('engine_rehearse', { plan_id: pa.plan_id }));
+const pbb = ok('bind B', await ecall('engine_bind_plan', { template: walkPlan('s1-into-passage', 15, -15), bindings: { a: 's1' }, workspace: 'iso-w1' }));
+ok('execute B', await ecall('engine_execute', { plan_id: pbb.plan_id, workspace: 'iso-w1' }));
+const headB = (await ecall('engine_log', { workspace: 'iso-w1' })).body.head;
+const st = refused('execute A (stale)', await ecall('engine_execute', { plan_id: pa.plan_id, workspace: 'iso-w1' }), 'plan.stale');
+assert.deepEqual(st.diff.changed, [{ id: 's1', fields: ['pose'] }]);
+assert.match(st.message, /s1 changed \(pose\)/);
+assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, headB, 'a stale plan never commits');
+console.log(`ENGINE ISOLATION (wall ms / in-DO ms): ${T.join('; ')}`);
+console.log('PASS: §28 replay isolation (view fetches + camera track leave heads/logs/poses/bytes unchanged; view capability refused MCP/commands; rooms isolated), fork isolation, plan invalidation (stale diff names s1; camera tracks do not stale) through the DO room.');
 await writeFile(
   '.cloudflare/simulation-test-room.json',
   JSON.stringify({ room, key, view, base }),
