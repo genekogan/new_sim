@@ -12,6 +12,7 @@ import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { carrierSpots, CARRIER_RADIUS, checkCrew, entityFrame, formationFor, laidPose, type Formation, type SE2 } from './formation.ts';
 import { poseHit } from './sweep.ts';
 import { planCarry, type Trajectory } from './planner.ts';
+import { holdingDiagnostic } from '../construction/rules.ts';
 
 export type CarryParams = { crew: string[]; item: string; to: { x: number; z: number; yaw: number; level?: number }; place?: 'lay' };
 
@@ -99,6 +100,8 @@ export function planCarryAction(rt: Runtime, p: CarryParams): PlanResult<CarryPr
     const e = w.entities[id];
     if (!e) return bad({ code: 'entity.unknown', message: `no crew member "${id}"`, subjects: [id] });
     if (e.kind !== 'human' || !e.human) return bad({ code: 'actor.not-human', message: `"${id}" is a ${e.kind}, not a person`, subjects: [id] });
+    const hd = holdingDiagnostic(w, id); // someone holding up a frame cannot walk off to carry (review C2)
+    if (hd) return bad(hd);
     people.push(e);
   }
   const crewDiag = checkCrew(item.def, p.crew.length, item.id);

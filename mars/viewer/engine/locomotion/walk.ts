@@ -223,6 +223,12 @@ function tryEnter(rt: Runtime, ex: Exec, n: Narrow): string | null {
 function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   const a = rt.world.entities[ex.actor];
   const sp = spatial(rt);
+  // a holder never walks off, whichever path started the walk (walk_to plan, or a parent action
+  // calling walkTo.start directly — review C2)
+  if (a.human!.grip) {
+    releaseAll(rt, ex);
+    return { status: 'failed', diagnostic: { code: 'actor.holding', message: `${ex.actor} is holding ${a.human!.grip.entity} and cannot walk away until it is set down or stable`, subjects: [ex.actor, a.human!.grip.entity] } };
+  }
   // topology changed (construction)? replan only if the remaining corridor is no longer valid
   sp.sync(rt.world);
   if (sp.epoch !== ex.epoch) {

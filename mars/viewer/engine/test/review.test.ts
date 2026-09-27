@@ -8,6 +8,10 @@ import { Runtime } from '../runtime/runtime.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
+import { forgetMotion } from '../runtime/invariants.ts';
+import { planWalk, walkTo } from '../locomotion/walk.ts';
+import { progressiveContributor } from '../construction/index.ts';
+import { def } from '../world/catalog.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity } from '../world/types.ts';
 
@@ -60,4 +64,51 @@ test('C1: a mid-carry replan never flips the formation (no carrier teleports); t
   rt2.step();
   assert.deepEqual(codes(rt2), ['motion.teleport']);
   assert.match(rt2.violations[0].message, /p1 moved 3\.00 m in one tick/);
+});
+
+const REST_Y12 = def('upright-12ft').size[2] / 2;
+function raisedFrame() {
+  const base = open(15);
+  const w = addAll(
+    emptyWorld('open', base),
+    component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, REST_Y12, 0], yaw: Math.PI, pitch: Math.PI / 2 } }),
+    component('bx', 'beam-9ft', [8, 0, -8], 0, { phase: 'staged' }),
+    human('p1', -6, -6), human('p2', -4.8, -6),
+  );
+  const rt = new Runtime(w, createRegistry(), { spatial: new Spatial(base, { contributors: [progressiveContributor] }) }, ENGINE_INVARIANTS);
+  const r1 = rt.submit('raise_upright', { crew: ['p1', 'p2'], item: 'A' });
+  rt.runUntilIdle(20 * 120, [r1.id]);
+  assert.equal(r1.status, 'completed');
+  return rt;
+}
+
+test('C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation', () => {
+  const rt = raisedFrame();
+  assert.deepEqual(rt.world.entities.A.support, { kind: 'held', by: ['p1', 'p2'] });
+  const c = rt.submit('carry', { crew: ['p1', 'p2'], item: 'bx', to: { x: 8, z: 8, yaw: 0 } });
+  assert.equal(c.status, 'failed');
+  assert.equal(c.diagnostic?.code, 'actor.holding');
+  assert.match(c.diagnostic!.message, /p1 is holding A/);
+  // the direct child-walk start path (walkTo.start, as carry's gather uses) fails on its first step
+  const route = planWalk(rt, rt.world.entities.p1, { level: 0, p: [5, 5] });
+  assert.ok(route.ok);
+  const ex = walkTo.start(rt, { actor: 'p1', x: 5, z: 5 }, route.ok ? route.route : (null as never), 'direct');
+  const st = walkTo.step(rt, ex, 1 / 20);
+  assert.equal(st.status, 'failed');
+  assert.equal(st.status === 'failed' && st.diagnostic.code, 'actor.holding');
+  rt.world.entities.p1.human!.task = undefined;
+  for (let i = 0; i < 20; i++) rt.step();
+  assert.deepEqual(codes(rt), [], 'the frame stays held by both holders');
+  assert.ok(Math.hypot(rt.world.entities.p1.pose.p[0], rt.world.entities.p1.pose.p[2]) < 2, 'p1 stayed at the frame');
+
+  // the invariant: a holder whose grip is gone, or who stands away from the frame, is flagged
+  rt.world.entities.p2.human!.grip = undefined;
+  rt.step();
+  assert.deepEqual(codes(rt), ['support.holder-missing']);
+  assert.match(rt.violations[0].message, /A is marked held by \[p1, p2\] but p2 is not gripping it/);
+  rt.world.entities.p2.human!.grip = { entity: 'A', slot: 'hold-1' };
+  rt.world.entities.p1.pose.p = [4, 0, 0];
+  forgetMotion(rt);
+  rt.step();
+  assert.match(rt.violations[rt.violations.length - 1].message, /but p1 stands [\d.]+ m from it \(reach 1.2 m\)/);
 });

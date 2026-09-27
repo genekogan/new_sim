@@ -2,10 +2,10 @@
 // record violations so rehearsal reports and tests can fail loudly.
 import type { Diagnostic } from '../actions/types.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
-import type { Spatial } from '../spatial/service.ts';
+import { entityFootprint, type Spatial } from '../spatial/service.ts';
 import type { Invariant, Runtime } from './runtime.ts';
 import { def, HUMAN_RADIUS } from '../world/catalog.ts';
-import { angleDelta, type Vec3 } from '../core/math.ts';
+import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { WorldState } from '../world/types.ts';
 
 const TOL = 0.03;
@@ -87,9 +87,47 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
   return out;
 };
 
+export const HOLD_REACH = 1.2; // m from the held entity's footprint
+
+const distToObb = (p: Vec2, o: OBB2) => {
+  const l = rot2(sub2(p, o.c), -o.yaw);
+  return Math.hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
+};
+
+/**
+ * Every entity with support { kind: 'held', by } is actually held (review C2): each holder exists,
+ * grips exactly that entity, and (outside lift / set-down transitions) stands within HOLD_REACH of
+ * its footprint.
+ */
+export const holdersPresent: Invariant = (rt: Runtime) => {
+  const out: Diagnostic[] = [];
+  const ents = rt.world.entities;
+  for (const e of Object.values(ents)) {
+    if (e.support?.kind !== 'held') continue;
+    let obb: OBB2 | null = null;
+    for (const id of e.support.by) {
+      const h = ents[id];
+      const grip = h?.human?.grip?.entity;
+      let why = '';
+      if (!h?.human) why = `holder ${id} is not a person in this world`;
+      else if (grip !== e.id) why = `${id} is not gripping it (grip ${grip ?? 'none'})`;
+      else if (h.human.activity !== 'lift' && h.human.activity !== 'set-down') {
+        // (during a lift / set-down transition the part follows a scripted path from its staging
+        // spot to its seat while the crew stands at stations — an approximation, review L6)
+        obb ??= entityFootprint(e).obb;
+        const d = distToObb([h.pose.p[0], h.pose.p[2]], obb);
+        if (d > HOLD_REACH) why = `${id} stands ${d.toFixed(2)} m from it (reach ${HOLD_REACH} m)`;
+      }
+      if (why)
+        out.push({ code: 'support.holder-missing', message: `${e.id} is marked held by [${e.support.by.join(', ')}] but ${why}`, subjects: [e.id, id], at: e.pose.p });
+    }
+  }
+  return out;
+};
+
 /** Scenario set-up moved entities by hand (not through an action): don't compare motion across this tick. */
 export function forgetMotion(rt: Runtime) {
   lastPoses.delete(rt);
 }
 
-export const DEFAULT_INVARIANTS = [humanStaticClearance, humanHumanSeparation, noUnsupported, maxStepPerTick];
+export const DEFAULT_INVARIANTS = [humanStaticClearance, humanHumanSeparation, noUnsupported, maxStepPerTick, holdersPresent];
