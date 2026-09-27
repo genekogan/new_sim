@@ -10,6 +10,8 @@ import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { CONSTRUCTION_ACTIONS, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { levelFor } from '../construction/access.ts';
+import { deckSurfaces } from '../construction/contributor.ts';
+import { seatPoint, snapSeat } from '../construction/rules.ts';
 import { def } from '../world/catalog.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
 import type { SpatialScene } from '../spatial/types.ts';
@@ -222,6 +224,7 @@ test('full sequence: uprights → beams → release → joists → plywood → s
   const W = rt.world.entities.w;
   assert.equal(W.human!.level, DECK_LEVEL);
   assert.ok(up.history.some((h) => h.phase === 'climb'));
+  console.log(`# full sequence: ${rt.tick} ticks = ${(rt.tick / 20).toFixed(1)} s simulated, ${rt.records.size} actions (incl. child walks)`);
   for (const id of ['j1', 's1', 's2', 'st', 't10']) assert.equal(rt.world.entities[id].phase, 'installed', id);
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
@@ -230,4 +233,61 @@ test('determinism: identical final state hash across runs', () => {
   const a = fullSequence().rt.stateHash();
   const b = fullSequence().rt.stateHash();
   assert.equal(a, b);
+});
+
+/** Test fixture: a second bay B–C with beams at 0.5 m and at a seat far above standing reach (placed as state, not simulated). */
+function fixtureUpperBay(rt: Runtime) {
+  const E = rt.world.entities;
+  E.C = component('C', 'upright-12ft', [0, 0, 2 * L9], 0, { phase: 'installed', support: { kind: 'connected', to: [] } });
+  const hi = snapSeat(E.B, 3.5)!, lo = snapSeat(E.B, 0.5)!;
+  for (const [id, col, h] of [['b5', 'l', hi], ['b6', 'r', hi], ['b7', 'l', lo], ['b8', 'r', lo]] as const) {
+    const c = col === 'l' ? -1 : 1;
+    const sa = seatPoint(E.B, c, h), sb = seatPoint(E.C, c, h);
+    const key = `col${col}@${h.toFixed(3)}`;
+    E[id] = component(id, 'beam-9ft', [(sa[0] + sb[0]) / 2, h - def('beam-9ft').size[1] / 2, (sa[2] + sb[2]) / 2], Math.PI / 2, {
+      phase: 'installed', support: { kind: 'connected', to: ['B', 'C'] },
+      connections: [{ socket: 'end-l', to: 'B', toSocket: key }, { socket: 'end-r', to: 'C', toSocket: key }],
+    });
+    (E.B.connections ??= []).push({ socket: key, to: id, toSocket: 'end-l' });
+    (E.C.connections ??= []).push({ socket: key, to: id, toSocket: 'end-r' });
+  }
+  E.C.support = { kind: 'connected', to: ['b5', 'b6', 'b7', 'b8'] };
+  E.jx = component('jx', '2x4-6ft', [1.8, 0, 3.0], Math.PI / 2, { phase: 'staged' });
+  return hi;
+}
+
+test('work from deck: a joist above standing reach needs a supported deck below it', () => {
+  // no deck yet: refused, naming the reach problem
+  const bare = setup();
+  buildBay(bare);
+  stageParts(bare);
+  const hi = fixtureUpperBay(bare);
+  const r = bare.submit('install_joist', { crew: ['p5'], joist: 'jx', bay: { a: 'B', b: 'C' }, height: hi, at: 0.2 });
+  assert.equal(r.diagnostic?.code, 'reach.too-high');
+  assert.match(r.diagnostic!.message, /level 0 at 0\.00 m\) is 3\.6\d m down \(standing reach 2\.1 m\)/);
+  // with the deck and stairs built, the person on the deck sets it
+  const { rt } = fullSequence();
+  fixtureUpperBay(rt);
+  const ok = must(rt, 'install_joist', { crew: ['w'], joist: 'jx', bay: { a: 'B', b: 'C' }, height: hi, at: 0.2 });
+  const walk = [...rt.records.values()].find((x) => x.parent === ok.id)!;
+  assert.equal((walk.params as { level: number }).level, DECK_LEVEL, 'station is on the deck');
+  assert.equal(rt.world.entities.w.human!.level, DECK_LEVEL);
+  assert.equal(rt.world.entities.jx.phase, 'installed');
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('a sheet whose support goes missing stops being floor and is flagged', () => {
+  const { rt } = fullSequence();
+  assert.deepEqual(deckSurfaces(rt.world).map((s) => s.id), ['deck:s1', 'deck:s2']);
+  assert.deepEqual(progressiveSupported(rt), []);
+  // (not a modelled action: the joist under s1 is knocked out as a state edit)
+  Object.assign(rt.world.entities.j2, { phase: 'staged', support: { kind: 'ground' }, connections: [] });
+  assert.deepEqual(deckSurfaces(rt.world).map((s) => s.id), ['deck:s2']);
+  const v = progressiveSupported(rt);
+  assert.ok(v.some((d) => d.code === 'support.deck-unsupported' && d.subjects?.[0] === 's1' && /j2 is not installed/.test(d.message)), JSON.stringify(v));
+  const sp = rt.services.spatial as Spatial;
+  sp.sync(rt.world);
+  const g = sp.level(DECK_LEVEL)!;
+  const cell = Math.floor((0 - g.x0) / g.cell) + Math.floor((0.8 - g.z0) / g.cell) * g.nx;
+  assert.equal(g.free[cell], 0, 'no floor where s1 was');
 });
