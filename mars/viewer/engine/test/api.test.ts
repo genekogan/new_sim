@@ -209,3 +209,22 @@ test('api: persisted state round-trips through JSON with lazy take/plan/camera l
   assert.equal(c2.call('execute', { plan_id: plan, workspace: 'ws' }).code, 'plan.stale', 'plan loaded lazily, still bound to its baseline');
   assert.deepEqual(sliceTake(c2.take(ex.take_id)!, 0, 10).tracks, sliceTake(c.take(ex.take_id)!, 0, 10).tracks);
 });
+
+test('api: pathological inputs (5,000-deep nesting, 1 MB array) return input.invalid instead of throwing', () => {
+  const c = fresh();
+  let deep: unknown = { leaf: 1 };
+  for (let i = 0; i < 5000; i++) deep = { n: deep };
+  let r: any;
+  assert.doesNotThrow(() => (r = c.call('bind_plan', { template: crossTemplate, bindings: deep, workspace: 'ws' })));
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'input.invalid');
+  assert.match(r.message, /nesting exceeds 32 levels/);
+  const big = new Array(1024 * 1024).fill(0);
+  assert.doesNotThrow(() => (r = c.call('bind_plan', { template: crossTemplate, bindings: { crew: big }, workspace: 'ws' })));
+  assert.equal(r.code, 'input.invalid');
+  assert.match(r.message, /exceeds 256 KiB/);
+  // deep nesting in any op, including ones whose schema would reject it anyway
+  assert.equal((c.call('query_world', deep) as any).code, 'input.invalid');
+  // ordinary inputs are unaffected
+  assert.ok(c.call('bind_plan', { template: crossTemplate, bindings: crossBindings, workspace: 'ws' }).ok);
+});

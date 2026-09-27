@@ -53,6 +53,41 @@ export type OpResult = { ok: boolean; [k: string]: unknown };
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const fail = (code: string, message: string, extra: Record<string, unknown> = {}): OpResult => ({ ok: false, code, message, ...extra });
 
+/** Input bounds checked before zod sees the input (zod, stableStringify and structuredClone all recurse). */
+export const MAX_INPUT_DEPTH = 32;
+export const MAX_INPUT_BYTES = 256 * 1024;
+
+/**
+ * Iterative (stack-safe) pre-check of an op input: nesting depth and an estimate of its
+ * JSON-serialized size, both bailing out at the first violation. Returns a diagnostic or null.
+ */
+export function checkInputBounds(input: unknown, maxDepth = MAX_INPUT_DEPTH, maxBytes = MAX_INPUT_BYTES): string | null {
+  const stack: [unknown, number, string][] = [[input, 0, '(root)']];
+  let bytes = 0;
+  while (stack.length) {
+    const [v, depth, path] = stack.pop()!;
+    if (v === null || typeof v !== 'object') {
+      bytes += typeof v === 'string' ? v.length + 2 : typeof v === 'number' ? String(v).length : typeof v === 'boolean' ? 5 : 4;
+    } else {
+      if (depth >= maxDepth) return `input nesting exceeds ${maxDepth} levels at ${path}`;
+      if (Array.isArray(v)) {
+        bytes += 2 + v.length;
+        if (bytes > maxBytes) break;
+        for (let i = v.length - 1; i >= 0; i--) stack.push([v[i], depth + 1, `${path}[${i}]`]);
+      } else {
+        const keys = Object.keys(v);
+        bytes += 2;
+        for (let i = keys.length - 1; i >= 0; i--) {
+          bytes += keys[i].length + 4;
+          stack.push([(v as Record<string, unknown>)[keys[i]], depth + 1, `${path}.${keys[i]}`]);
+        }
+      }
+    }
+    if (bytes > maxBytes) break;
+  }
+  return bytes > maxBytes ? `input exceeds ${Math.round(maxBytes / 1024)} KiB when serialized` : null;
+}
+
 function compactEntity(e: Entity) {
   const out: Record<string, unknown> = { id: e.id, def: e.def, kind: e.kind, pose: { p: e.pose.p.map(r2), yaw: r2(e.pose.yaw), ...(e.pose.pitch ? { pitch: r2(e.pose.pitch) } : {}), ...(e.pose.roll ? { roll: r2(e.pose.roll) } : {}) } };
   if (e.label && e.label !== e.id) out.label = e.label;
@@ -166,9 +201,16 @@ export class EngineController {
   /** Validate `input` with the op's zod schema and dispatch. Never throws for engine-level failures. */
   call(name: string, input: unknown): OpResult {
     if (!Object.hasOwn(opSchemas, name)) return fail('op.unknown', `no engine operation "${name}"`);
-    const parsed = opSchemas[name as OpName].safeParse(input ?? {});
-    if (!parsed.success) return fail('op.invalid-input', parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; '));
     try {
+      const bounds = checkInputBounds(input ?? {});
+      if (bounds) return fail('input.invalid', `${name}: ${bounds}`);
+      let parsed;
+      try {
+        parsed = opSchemas[name as OpName].safeParse(input ?? {});
+      } catch (e) {
+        return fail('input.invalid', `${name}: input could not be validated (${e instanceof Error ? e.message : String(e)})`);
+      }
+      if (!parsed.success) return fail('op.invalid-input', parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; '));
       switch (name as OpName) {
         case 'list_verbs': return this.listVerbs();
         case 'query_world': return this.queryWorld(parsed.data as OpInput<'query_world'>);

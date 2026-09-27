@@ -161,6 +161,8 @@ pts.push(g.clearance[cellOf(gg, goal.p)] >= r ? goal.p : centreOf(gg, gt));
 ## Medium
 
 ### M1. `controller.call` validates input outside its try/catch; deeply nested JSON throws instead of returning a result
+> **Fixed 2026-09-27.** Validation now runs inside the guarded region, behind an iterative `checkInputBounds` pre-check (nesting > 32 or serialized size > 256 KiB → `{ ok: false, code: 'input.invalid' }`); a throwing `safeParse` also maps to `input.invalid`. Test: `api: pathological inputs (5,000-deep nesting, 1 MB array) return input.invalid instead of throwing`.
+
 `api/controller.ts:169` (`safeParse` before `try` at `:171`). Nesting depth is only
 bounded by the stack: the recursive `json` schema is at `sequence/types.ts:59-61`,
 `bindings` is `z.unknown()`, and `stableStringify`/`structuredClone` are recursive too.
