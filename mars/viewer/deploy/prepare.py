@@ -51,6 +51,7 @@ allow = {
 for folder in ['references', 'textures', 'environment']:
     allow['modular'] += [str(p.relative_to(ROOT / 'public/modular'))
         for p in (ROOT / 'public/modular' / folder).rglob('*') if p.is_file()]
+allow['engine'] += [str(p.relative_to(ROOT / 'public/engine')) for p in (ROOT / 'public/engine/takes').glob('*.json')]
 allow['2020'] += [str(p.relative_to(ROOT / 'public/2020'))
     for p in (ROOT / 'public/2020/screens').glob('*.webp')]
 allow['history'] = [str(p.relative_to(ROOT / 'public/history')) for p in (ROOT / 'public/history').rglob('*') if p.suffix in ['.webp','.json','.html']]
