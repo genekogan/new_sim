@@ -25,8 +25,8 @@ export type Scenario = {
   /** Never completes on its own (stress). */
   continuous?: boolean;
   maxTicks: number;
-  /** Camera focus (x, z) and framing radius. */
-  focus: [number, number, number];
+  /** Camera focus (x, z), framing radius and optional oblique azimuth (deg, 0 = camera on +x, 90 = on +z). */
+  focus: [number, number, number, number?];
   /** Tick ranges worth capturing mid-action (fractions of completion ticks). */
   capture?: number[];
   expect: (rt: Runtime) => Check[];
@@ -82,7 +82,7 @@ export const SCENARIOS: Scenario[] = [
     humans: () => [human('p1', -18, -15, { yaw: 0 })],
     start: (rt) => void walk(rt, 'p1', -12, -15),
     maxTicks: 20 * 60,
-    focus: [-15, -15, 9],
+    focus: [-15, -15, 9, 70],
     capture: [0.5],
     expect: (rt) => [allCompleted(rt), noViolations(rt)],
   },
@@ -94,7 +94,7 @@ export const SCENARIOS: Scenario[] = [
     humans: () => [human('p1', -15, 12, { yaw: Math.PI / 2 })],
     start: (rt) => void walk(rt, 'p1', -15, 20),
     maxTicks: 20 * 60,
-    focus: [-15, 13, 10],
+    focus: [-15, 12, 10, -60],
     capture: [0.35],
     expect: (rt) => [allCompleted(rt), noViolations(rt)],
   },
@@ -109,7 +109,7 @@ export const SCENARIOS: Scenario[] = [
       walk(rt, 's1', 15, -19.5);
     },
     maxTicks: 20 * 90,
-    focus: [15, -15, 8],
+    focus: [15, -15, 8, 35],
     capture: [0.3, 0.6],
     expect: (rt) => {
       const yields = recs(rt).map((r) => r.history.filter((h) => h.status === 'blocked').length);
@@ -129,7 +129,7 @@ export const SCENARIOS: Scenario[] = [
     humans: () => [human('p1', 3.5, 12.5)],
     start: (rt) => void walk(rt, 'p1', 10, 10, 1),
     maxTicks: 20 * 120,
-    focus: [6, 10, 8],
+    focus: [5, 10, 7, 105],
     capture: [0.3, 0.55],
     expect: (rt) => [allCompleted(rt), noViolations(rt), onLevel(rt, 'p1', 1), usedPhase(rt, 'align'), usedPhase(rt, 'climb'),
       { ok: Math.abs(rt.world.entities.p1.pose.p[1] - DECK_Y) < 1e-6, message: 'p1 stands at deck height' }],
@@ -142,7 +142,7 @@ export const SCENARIOS: Scenario[] = [
     humans: () => [human('p1', 12, 11.5, { level: 1, y: DECK_Y, yaw: Math.PI })],
     start: (rt) => void walk(rt, 'p1', 10, 8.5, 0),
     maxTicks: 20 * 120,
-    focus: [8, 9, 9],
+    focus: [7, 9, 9, 115],
     capture: [0.3, 0.5],
     expect: (rt) => [allCompleted(rt), noViolations(rt), onLevel(rt, 'p1', 0), usedPhase(rt, 'climb')],
   },

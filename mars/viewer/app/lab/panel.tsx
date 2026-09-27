@@ -30,7 +30,6 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
   const s = sim.scenario;
   const st = sim.stats();
   const info = view.info();
-  const [x, z, r] = s.focus;
   return (
     <aside className="lab-panel">
       <h1>Engine Lab</h1>
@@ -87,8 +86,8 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         ))}
       </div>
       <div className="lab-row">
-        <button onClick={() => view.look([x, r * 2.6, z + 0.01], [x, 0, z])}>Top-down</button>
-        <button onClick={() => view.look([x + r * 0.9, r * 0.9, z + r * 1.1], [x, 0.8, z])}>Oblique</button>
+        <button onClick={() => view.preset('top')}>Top-down</button>
+        <button onClick={() => view.preset('oblique')}>Oblique</button>
       </div>
       <p className="lab-meta">
         step {st.meanMs.toFixed(3)} ms mean · p95 {st.p95Ms.toFixed(3)} · max {st.maxMs.toFixed(2)} · {info.calls} draws · {(info.triangles / 1000).toFixed(0)}k tris

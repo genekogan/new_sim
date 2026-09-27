@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { Runtime, Violation } from '../../engine/runtime/runtime.ts';
 import type { Spatial } from '../../engine/spatial/service.ts';
-import type { Route } from '../../engine/spatial/path.ts';
+import { liveRoutes } from './sim.ts';
 import { linkApproach } from '../../engine/spatial/path.ts';
 import { segmentClearance } from '../../engine/spatial/grid.ts';
 import { obbCorners } from '../../engine/core/math.ts';
@@ -21,13 +21,6 @@ export function clearGroup(g: THREE.Object3D) {
     }
   });
   g.clear();
-}
-
-/** Live walk_to routes. The Runtime keeps execution state private; this debug read is the only such access (see README). */
-export function liveRoutes(rt: Runtime): { id: string; actor: string; route: Route; leg: number }[] {
-  const live = (rt as unknown as { live: Map<string, { exec: { actor?: string; route?: Route; leg?: number } }> }).live;
-  if (!(live instanceof Map)) return [];
-  return [...live.entries()].filter(([, l]) => l.exec?.route).map(([id, l]) => ({ id, actor: l.exec.actor!, route: l.exec.route!, leg: l.exec.leg ?? 0 }));
 }
 
 /** Route polylines (cyan = current leg) and corridor ribbons whose half-width is each segment's clearance. */

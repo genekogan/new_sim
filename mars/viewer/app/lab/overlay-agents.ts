@@ -40,6 +40,7 @@ export class AgentOverlays {
     const el = document.createElement('div');
     el.className = 'lab-label';
     const label = new CSS2DObject(el);
+    label.center.set(0.5, 1.25); // sit above the anchor so top-down views still show the person
     m = { disc, arrow, label };
     this.discs.add(disc, arrow);
     this.labels.add(label);

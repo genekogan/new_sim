@@ -91,8 +91,15 @@ export class LabView {
     this.agents.clear();
     this.epoch = -1;
     this.violationCount = -1;
-    const [x, z, r] = this.sim.scenario.focus;
-    this.look([x + r * 0.9, r * 0.9, z + r * 1.1], [x, 0.8, z]);
+    this.preset('oblique');
+  }
+
+  /** Framing presets from the scenario focus: straight-down diagnostic or oblique. */
+  preset(kind: 'top' | 'oblique') {
+    const [x, z, r, az = 50] = this.sim.scenario.focus;
+    const a = (az * Math.PI) / 180;
+    if (kind === 'top') this.look([x, r * 2.6, z + 0.01], [x, 0, z]);
+    else this.look([x + Math.cos(a) * r * 1.4, r * 0.9, z + Math.sin(a) * r * 1.4], [x, 0.8, z]);
   }
 
   look(pos: number[], target: number[]) {

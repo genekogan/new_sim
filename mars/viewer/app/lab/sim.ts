@@ -3,7 +3,15 @@
 // human-readable action/diagnostic log.
 import { DT, type Runtime, type RuntimeEvent } from '../../engine/runtime/runtime.ts';
 import { TERMINAL } from '../../engine/actions/types.ts';
+import type { Route } from '../../engine/spatial/path.ts';
 import { buildRuntime, scenarioByName, SCENARIOS, type Check, type Scenario } from './scenarios.ts';
+
+/** Live walk_to routes. Runtime keeps execution state private; this read-only debug access is the only such use (README). */
+export function liveRoutes(rt: Runtime): { id: string; actor: string; route: Route; leg: number }[] {
+  const live = (rt as unknown as { live: Map<string, { exec: { actor?: string; route?: Route; leg?: number } }> }).live;
+  if (!(live instanceof Map)) return [];
+  return [...live.entries()].filter(([, l]) => l.exec?.route).map(([id, l]) => ({ id, actor: l.exec.actor!, route: l.exec.route!, leg: l.exec.leg ?? 0 }));
+}
 
 export type LogLine = { tick: number; level: 'info' | 'warn' | 'error'; text: string };
 
@@ -25,6 +33,7 @@ export class LabSim {
     this.rt = buildRuntime(s);
     this.log = [{ tick: 0, level: 'info', text: `scenario ${s.name}: ${s.description}` }];
     this.costs = [];
+    this.routes.clear();
     this.acc = 0;
     this.rt.observers.push({ onEvent: (_rt, e) => this.record(e) });
     this.onReset(this.rt);
@@ -60,7 +69,21 @@ export class LabSim {
     this.costs.push(performance.now() - t0);
     if (this.costs.length > 2000) this.costs.splice(0, 1000);
     this.harvest();
+    this.watchRoutes();
     this.onTick(this.rt);
+  }
+
+  private routes = new Map<string, Route>();
+  /** The runtime emits no event when walk_to replans; surface it by watching route identity. */
+  private watchRoutes() {
+    const seen = new Set<string>();
+    for (const { id, actor, route } of liveRoutes(this.rt)) {
+      seen.add(id);
+      const old = this.routes.get(id);
+      if (old && old !== route) this.log.push({ tick: this.rt.tick, level: 'warn', text: `${id} walk_to REPLANNED for ${actor}: route ${old.length.toFixed(1)} m → ${route.length.toFixed(1)} m (${route.legs.length} legs)` });
+      this.routes.set(id, route);
+    }
+    for (const id of this.routes.keys()) if (!seen.has(id)) this.routes.delete(id);
   }
 
   stepN(n: number) {

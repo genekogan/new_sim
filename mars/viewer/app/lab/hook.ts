@@ -75,9 +75,7 @@ export function installHook(view: LabView, notify: () => void) {
     },
     /** Framing presets for a scenario: top-down diagnostic and oblique. */
     cameraPreset(kind: 'top' | 'oblique') {
-      const [x, z, r] = sim.scenario.focus;
-      if (kind === 'top') view.look([x, r * 2.6, z + 0.01], [x, 0, z]);
-      else view.look([x + r * 0.9, r * 0.9, z + r * 1.1], [x, 0.8, z]);
+      view.preset(kind);
     },
     info: () => view.info(),
     perf: () => sim.stats(),
