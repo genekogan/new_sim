@@ -130,6 +130,8 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 | Determinism | The plan hash is identical across runs, and the track round-trips through JSON. |
 | Perf | A 60 s track at 10 Hz with 3 subjects plans in about 60–80 ms (budget 1 s). |
 
+<sub>Perf row re-checked 2026-09-27: 69 ms, via `cd viewer && node --test --test-name-pattern="perf" engine/test/camera-replay.test.ts` (camera.test.ts has no perf test).</sub>
+
 ## Limitations and next steps
 - **Visibility uses obstacle prisms only.** It is not the full-resolution render mesh: beams,
   roof overhangs, slanted parts and thin members are represented only as far as the

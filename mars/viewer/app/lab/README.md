@@ -63,8 +63,10 @@ Captures (oblique + top): `build-bay-{carry,raise,held,beams,joists,deck,stair,v
 
 | preset | humans | step mean | step p95 | step max | real-time fps | draw calls | triangles | violations |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| trio | 3 | 0.02 ms | 0.1 ms | 0.3 ms | 29 | 143 | 38k | 0 |
-| stress-30 (60 s) | 30 | 1.24 ms | 3.2 ms | 207 ms | 10 | 727 | 355k | 879 |
+| trio | 3 | 0.02 ms | 0.1 ms | 0.3 ms | 31 | 143 | 38k | 0 |
+| stress-30 (60 s) | 30 | 0.83 ms | 0.6 ms | 202 ms | 10 | 727 | 355k | 0 |
+
+<sub>Table from `viewer/e2e/artifacts/2026-09-27T17-05-55/lab-perf.json` (latest `npm run e2e -- --workers=1 -g "perf"` run, 2026-09-27 13:08).</sub>
 
 - In node, stress-30 averages 1.3 ms per tick.
 - The 200 ms spike is the tick where up to 30 walkers plan at once. Each A* on 600×600×2 cells costs 5–45 ms, and there is no planning budget per tick.

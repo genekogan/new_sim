@@ -108,15 +108,17 @@ state at all, so camera edits cannot invalidate a plan.
 - Mid-action resumability needs per-action exec serialisation (`ActionDef.snapshot/restore`) plus runtime
   owners/live maps and runner state — not implemented.
 
-## Payload sizes (3 walkers, 59.9 s, proving ground; `take.test.ts` prints them)
+## Payload sizes (3 walkers, 69.8 s, proving ground; `take.test.ts` prints them)
 
 | Part | Bytes (stable JSON) |
 | --- | --- |
-| tracks (612 samples vs 3 594 raw walker-ticks) | 15 547 |
-| events (action lifecycle incl. phase changes) | 6 914 |
-| changes | 1 727 |
-| finalState (4 entities) | 1 219 |
-| **total** | **25 856** (gzip 6 808) |
+| tracks (847 samples vs 4 188 raw walker-ticks) | 21 902 |
+| events (action lifecycle incl. phase changes) | 17 211 |
+| changes | 3 963 |
+| finalState (4 entities) | 1 275 |
+| **total** | **44 800** (gzip 9 127) |
+
+<sub>Measured 2026-09-27 with `cd viewer && node --test --test-name-pattern="payload" engine/test/take.test.ts`.</sub>
 
 `finalState` grows with the world (a full campus will dominate); if that matters, store it as a
 content-addressed state in the history store and keep only the hash in the take.

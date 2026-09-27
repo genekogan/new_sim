@@ -127,11 +127,13 @@ slot-derived spot (`carry.grip-drift`) and the load's disc cover clears static g
 ## Measured (M-series laptop, Node 22)
 | Case | Result |
 | --- | --- |
-| 12 ft beam, 2 people, 2.5 m L corridor (19.5 m, 90° turn) | planner 10 ms, 53 expansions; submit incl. approach walks 13–45 ms; 32.6 s simulated (gather 3.4, lift 1.2, move 26.5, set-down 1.2, release 0.4); 0 violations; exact SAT audit finds no wall overlap; reach error ≤ 0.05 m |
+| 12 ft beam, 2 people, 2.5 m L corridor (19.5 m, 90° turn) | planner 10 ms, 53 expansions; submit incl. approach walks 45–46 ms; 32.6 s simulated (gather 3.4, lift 1.2, move 26.5, set-down 1.2, release 0.4); 0 violations; exact SAT audit finds no wall overlap; reach error ≤ 0.05 m |
 | 19 ft upright, 4 people, 1.5 m corridor | rejected `carry.clearance` in ~60 ms (5.3 k poses); the 4 people walk the corridor individually |
 | 19 ft upright, 4 people, 2.5 m corridor | straight run accepted; around the corner rejected `carry.clearance` in ~65 ms |
 | 12 ft beam, 2 people, 1.5 m corridor | fits straight, cannot turn the corner (~110 ms) |
 | Determinism | identical final state hash across runs |
+
+<sub>Submit timing re-measured 2026-09-27 (two runs) with `cd viewer && node --test --test-name-pattern="12 ft beam around the L corner" engine/test/carry.test.ts` (prints `plan+validate`); other rows not re-measured.</sub>
 
 ## Known limitations
 - Loads stay level: no tilting/pitching a load to clear an obstacle or to
