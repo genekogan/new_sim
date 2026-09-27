@@ -1,6 +1,6 @@
 // connect_beam + release_support (spec §7, §12, §28 "Raise tall frame").
 import { z } from 'zod';
-import { angleDelta, rot2, sub2, type Vec2 } from '../core/math.ts';
+import { angleDelta, dot2, rot2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
@@ -9,7 +9,7 @@ import { groupStability, holdingDiagnostic, isBeam, isStanding, isSupported, isU
 import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 
 type CP = { crew: string[]; beam: string; a: string; b: string; column: 'l' | 'r'; height: number };
-type CProg = { colB: 'l' | 'r'; height: number; target: { p: [number, number, number]; yaw: number }; stations: { p: Vec2; yaw: number }[] };
+type CProg = { colB: 'l' | 'r'; height: number; endA: 'end-l' | 'end-r'; target: { p: [number, number, number]; yaw: number }; stations: { p: Vec2; yaw: number }[] };
 type CExec = { p: CP; prog: CProg; id: string; phase: 'approach' | 'lift'; children?: Children; t: number; from: { p: [number, number, number]; yaw: number } };
 
 const fail = (code: string, message: string, subjects: string[]): { ok: false; diagnostic: Diagnostic } => ({ ok: false, diagnostic: { code, message, subjects } });
@@ -57,8 +57,13 @@ export function planBeam(rt: Runtime, p: CP): { ok: true; program: CProg } | { o
     const o = rot2([col * 0.25, outZ * 0.8], a.pose.yaw); // beyond the bay end, clear of the column holders
     return { p: [s[0] + o[0], s[2] + o[1]] as Vec2, yaw: Math.atan2(-o[1], -o[0]) };
   };
-  const beamYaw = a.pose.yaw + Math.PI / 2; // beam long axis (local x) along a's frame normal
-  return { ok: true, program: { colB: colB < 0 ? 'l' : 'r', height: h, target: { p: mid, yaw: beamYaw }, stations: [face(sa, -sgn), face(sb, sgn)] } };
+  // beam long axis (local x) along a's frame normal; the beam is end-for-end symmetric, so take the
+  // yaw (mod π) nearest the staged yaw — it must not spin 180° mid-air — and map its ends to a/b by geometry
+  const axis = a.pose.yaw + Math.PI / 2;
+  const d = angleDelta(beam.pose.yaw, axis);
+  const beamYaw = wrapAngle(Math.abs(d) > Math.PI / 2 ? axis + Math.PI : axis);
+  const endA = dot2([Math.cos(beamYaw), Math.sin(beamYaw)], [sa[0] - mid[0], sa[2] - mid[2]]) > 0 ? 'end-r' : 'end-l';
+  return { ok: true, program: { colB: colB < 0 ? 'l' : 'r', height: h, endA, target: { p: mid, yaw: beamYaw }, stations: [face(sa, -sgn), face(sb, sgn)] } };
 }
 
 export const connectBeam: ActionDef<CP, CProg, CExec> = {
@@ -113,9 +118,10 @@ export const connectBeam: ActionDef<CP, CProg, CExec> = {
     const keyB = `col${ex.prog.colB}@${ex.prog.height.toFixed(3)}`;
     beam.phase = 'installed';
     beam.support = { kind: 'connected', to: [ex.p.a, ex.p.b] };
-    beam.connections = [{ socket: 'end-l', to: ex.p.a, toSocket: key }, { socket: 'end-r', to: ex.p.b, toSocket: keyB }];
-    (w.entities[ex.p.a].connections ??= []).push({ socket: key, to: beam.id, toSocket: 'end-l' });
-    (w.entities[ex.p.b].connections ??= []).push({ socket: keyB, to: beam.id, toSocket: 'end-r' });
+    const endA = ex.prog.endA, endB = endA === 'end-l' ? 'end-r' : 'end-l';
+    beam.connections = [{ socket: endA, to: ex.p.a, toSocket: key }, { socket: endB, to: ex.p.b, toSocket: keyB }];
+    (w.entities[ex.p.a].connections ??= []).push({ socket: key, to: beam.id, toSocket: endA });
+    (w.entities[ex.p.b].connections ??= []).push({ socket: keyB, to: beam.id, toSocket: endB });
     for (const c of ex.p.crew) Object.assign(w.entities[c].human!, { activity: 'idle', grip: undefined, task: undefined });
     return { status: 'completed', outputs: { stable: groupStability(w, w.entities[ex.p.a]).stable } };
   },

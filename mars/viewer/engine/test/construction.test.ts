@@ -10,6 +10,7 @@ import { walkTo } from '../locomotion/walk.ts';
 import { CONSTRUCTION_ACTIONS, uprightsSupported } from '../construction/index.ts';
 import { groupStability } from '../construction/rules.ts';
 import { def } from '../world/catalog.ts';
+import { angleDelta } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 
@@ -96,6 +97,32 @@ test('supported bay: raise, hold, premature release refused, beams, stable relea
   assert.equal(rt.world.entities.p1.human!.grip, undefined);
   assert.equal(run(rt, 'walk_to', { actor: 'p1', x: 5, z: -5 }).status, 'completed', 'released holders are free again');
   assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('connect_beam lifts a symmetric beam without spinning it end-for-end; ends map to a/b by geometry', () => {
+  const rt = setup();
+  assert.equal(run(rt, 'raise_upright', { crew: ['p1', 'p2'], item: 'A' }).status, 'completed');
+  assert.equal(run(rt, 'raise_upright', { crew: ['p3', 'p4'], item: 'B' }).status, 'completed');
+  stageBeams(rt);
+  // A has yaw π ⇒ its frame normal gives a nominal beam yaw of −π/2, exactly π from the staged yaw π/2
+  const yaws: number[] = [];
+  rt.observers.push({ onTick: (r) => { if (r.world.entities.b1.phase === 'carried') yaws.push(r.world.entities.b1.pose.yaw); } });
+  const r = run(rt, 'connect_beam', { crew: ['p5', 'p6'], beam: 'b1', a: 'A', b: 'B', column: 'r', height: 0.5 });
+  assert.equal(r.status, 'completed', r.diagnostic?.message);
+  assert.ok(yaws.length > 10, `lift observed over ${yaws.length} ticks`);
+  const all = [Math.PI / 2, ...yaws, rt.world.entities.b1.pose.yaw];
+  let total = 0;
+  for (let i = 1; i < all.length; i++) total += Math.abs(angleDelta(all[i - 1], all[i]));
+  assert.ok(total < Math.PI / 2, `beam yawed ${total.toFixed(3)} rad during the lift`);
+  const b1 = rt.world.entities.b1;
+  assert.deepEqual(b1.connections!.map((c) => c.to), ['A', 'B']);
+  // A sits at −z, B at +z; the beam's local +x (end-r) points along its yaw
+  const endOf = (id: string) => b1.connections!.find((c) => c.to === id)!.socket;
+  const ux = Math.sin(b1.pose.yaw);
+  assert.equal(endOf('B'), ux > 0 ? 'end-r' : 'end-l');
+  assert.equal(endOf('A'), ux > 0 ? 'end-l' : 'end-r');
+  assert.equal(rt.world.entities.A.connections!.find((c) => c.to === 'b1')!.toSocket, endOf('A'));
+  assert.equal(rt.world.entities.B.connections!.find((c) => c.to === 'b1')!.toSocket, endOf('B'));
 });
 
 test('raising arc blocked by an overhead obstacle is rejected and names it', () => {
