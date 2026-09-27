@@ -29,7 +29,8 @@ export type ShotSpec = Common & (
   | { kind: 'fixed'; position: Vec3; target: Vec3 }
   /** offset in the subject's frame (x forward, y up, z left-hand side per yaw convention) unless frame='world'. */
   | { kind: 'follow'; subject: string; offset: Vec3; frame?: 'subject' | 'world'; lookHeight?: number; damping?: number }
-  | { kind: 'orbit'; center?: Vec3; subject?: string; radius: number; height: number; period: number; phase?: number; lookHeight?: number }
+  /** radius/height are the minimum: the orbit pulls out along its own ray until every point of `subjects` fits (sphere about the target + padding). */
+  | { kind: 'orbit'; center?: Vec3; subject?: string; radius: number; height: number; period: number; phase?: number; lookHeight?: number; padding?: number; aspect?: number }
   | { kind: 'frameGroup'; subjects: string[]; padding?: number; azimuth: number; elevation: number; aspect?: number }
   | { kind: 'path'; keys: Key[] }
   | { kind: 'reveal'; subject?: string; center?: Vec3; azimuth: number; from: { distance: number; elevation: number }; to: { distance: number; elevation: number }; t0: number; t1: number; lookHeight?: number }
@@ -147,11 +148,18 @@ export function evaluateShot(spec: ShotSpec, sampler: Sampler, t: number): Camer
     case 'orbit': {
       const c: Vec3 = spec.subject ? subjectOf(sampler, spec.subject, t).p : spec.center ?? [0, 0, 0];
       const a = (spec.phase ?? 0) + (2 * Math.PI * t) / spec.period;
-      return {
-        position: [c[0] + spec.radius * dcos(a), c[1] + spec.height, c[2] + spec.radius * dsin(a)],
-        target: [c[0], c[1] + (spec.lookHeight ?? 1.2), c[2]],
-        fov,
-      };
+      const target: Vec3 = [c[0], c[1] + (spec.lookHeight ?? 1.2), c[2]];
+      let off: Vec3 = [spec.radius * dcos(a), spec.height - (spec.lookHeight ?? 1.2), spec.radius * dsin(a)];
+      // framing radius: every point of the shot's subjects (a lying frame's corners, a crew member at the edge)
+      const all = sampler(t);
+      let r = 0;
+      for (const id of shotSubjects(spec)) for (const q of all[id] ? subjectPoints(all[id]) : []) r = Math.max(r, Math.hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]));
+      const d0 = Math.hypot(off[0], off[1], off[2]);
+      if (r > 0 && d0 > 1e-9) {
+        const d = fitDistance(r + (spec.padding ?? 0.5), fov, spec.aspect);
+        if (d > d0) off = scale(off, d / d0);
+      }
+      return { position: add(target, off), target, fov };
     }
     case 'frameGroup': {
       const all = sampler(t);

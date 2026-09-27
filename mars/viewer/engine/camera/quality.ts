@@ -75,14 +75,14 @@ export type SubjectReadability = {
   score: number;
   visible: number; // fraction of points in frame and unoccluded
   inFrame: number; // fraction of points inside the frustum
-  size: number; // projected height as fraction of frame height
+  size: number; // projected world extent (height or bbox diagonal) as fraction of frame height
   occluders: { id: string; label: string; fraction: number }[];
 };
 export type Readability = { score: number; subjects: SubjectReadability[]; reasons: string[] };
 
 export type ReadOpts = {
   aspect?: number;
-  minSize?: number; // min projected subject height, fraction of frame (default 0.08)
+  minSize?: number; // min projected subject extent, fraction of frame height (default 0.08)
   cutaway?: boolean; // inspection mode: ignore occluders (solids and people) entirely
   near?: number;
 };
@@ -150,11 +150,19 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
         occ.set(hit.id, e);
       } else if (framed) visible++;
     }
-    // projected height of the subject (feet→head) as fraction of frame height
+    // projected size as fraction of frame height: the subject's world extent (max of its height and
+    // its points' bounding-box diagonal, so a lying 12 ft upright is 3.7 m, not a default human
+    // height) at the depth of its bounding-box centre (feet→head→points)
     const hgt = s.height ?? 1.75;
-    const cb = toCam(cam, b, s.p), ch = toCam(cam, b, [s.p[0], s.p[1] + hgt, s.p[2]]);
-    const depth = Math.max(near, (cb[2] + ch[2]) / 2);
-    const size = hgt / (2 * depth * b.tv);
+    const lo: Vec3 = [s.p[0], s.p[1], s.p[2]], hi: Vec3 = [s.p[0], s.p[1] + hgt, s.p[2]];
+    const plo: Vec3 = [Infinity, Infinity, Infinity], phi: Vec3 = [-Infinity, -Infinity, -Infinity];
+    for (const q of pts) for (let j = 0; j < 3; j++) {
+      plo[j] = Math.min(plo[j], q[j]); phi[j] = Math.max(phi[j], q[j]);
+      lo[j] = Math.min(lo[j], q[j]); hi[j] = Math.max(hi[j], q[j]);
+    }
+    const extent = Math.max(hgt, Math.hypot(phi[0] - plo[0], phi[1] - plo[1], phi[2] - plo[2]));
+    const depth = Math.max(near, toCam(cam, b, [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2])[2]);
+    const size = extent / (2 * depth * b.tv);
     const n = pts.length;
     const score = (visible / n) * Math.min(1, size / minSize);
     const occluders = [...occ.entries()].map(([oid, e]) => ({ id: oid, label: e.label, fraction: e.n / n })).sort((x, y) => y.fraction - x.fraction || (x.id < y.id ? -1 : 1));
