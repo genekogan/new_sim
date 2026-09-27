@@ -6,7 +6,7 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { groupStability, holdingDiagnostic, isBeam, isStanding, isSupported, isUpright, seatPoint, snapSeat, STANDING_REACH } from './rules.ts';
-import { childrenState, walkCrew, type Children } from './children.ts';
+import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 
 type CP = { crew: string[]; beam: string; a: string; b: string; column: 'l' | 'r'; height: number };
 type CProg = { colB: 'l' | 'r'; height: number; target: { p: [number, number, number]; yaw: number }; stations: { p: Vec2; yaw: number }[] };
@@ -73,7 +73,12 @@ export const connectBeam: ActionDef<CP, CProg, CExec> = {
     height: z.number().min(0.1).max(6),
   }),
   reservations: (_w, p) => [...p.crew.map((c) => ({ resource: `actor:${c}`, mode: 'exclusive' as const })), { resource: `entity:${p.beam}`, mode: 'exclusive' }],
-  plan: planBeam,
+  plan(rt, p) {
+    const r = planBeam(rt, p);
+    if (!r.ok) return r;
+    const unreachable = checkStations(rt, p.crew.map((c, i) => ({ actor: c, p: r.program.stations[i].p })));
+    return unreachable ? { ok: false, diagnostic: { ...unreachable, code: 'beam.station-unreachable' } } : r;
+  },
   start(rt, p, prog, id) {
     const beam = rt.world.entities[p.beam];
     beam.phase = 'reserved';

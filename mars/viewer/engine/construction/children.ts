@@ -3,6 +3,8 @@
 import type { ActionRecord, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Vec2 } from '../core/math.ts';
+import type { Spatial } from '../spatial/service.ts';
+import { HUMAN_PROFILE } from '../spatial/types.ts';
 
 export type Children = { recs: ActionRecord[] };
 
@@ -17,6 +19,23 @@ export function walkCrew(rt: Runtime, parent: string, moves: { actor: string; p:
     recs.push(r);
   }
   return { recs };
+}
+
+/**
+ * Plan-time check that every crew member has a route to their station (review H1), so an
+ * unreachable station is refused before anything is reserved, not discovered mid-action.
+ */
+export function checkStations(rt: Runtime, moves: { actor: string; p: Vec2; level?: number }[]): Diagnostic | null {
+  const sp = rt.services.spatial as Spatial;
+  sp.sync(rt.world);
+  for (const m of moves) {
+    const a = rt.world.entities[m.actor];
+    if (!a?.human) continue;
+    const r = sp.route(rt.world, HUMAN_PROFILE, { level: a.human.level, p: [a.pose.p[0], a.pose.p[2]] }, { level: m.level ?? a.human.level, p: m.p });
+    if (!r.ok)
+      return { ...r.diagnostic, subjects: [m.actor, ...(r.diagnostic.subjects ?? [])], message: `${m.actor} cannot reach their station at (${m.p[0].toFixed(2)}, ${m.p[1].toFixed(2)}): ${r.diagnostic.message}` };
+  }
+  return null;
 }
 
 /** 'done' when all children completed; a diagnostic if any failed. */

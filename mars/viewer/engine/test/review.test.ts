@@ -9,7 +9,11 @@ import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
 import { forgetMotion } from '../runtime/invariants.ts';
-import { planWalk, walkTo } from '../locomotion/walk.ts';
+import { planWalk, traffic, walkTo } from '../locomotion/walk.ts';
+import { holdStations } from '../construction/rules.ts';
+import { canonicalLying } from '../construction/lying.ts';
+import { z } from 'zod';
+import type { ActionDef } from '../actions/types.ts';
 import { progressiveContributor } from '../construction/index.ts';
 import { def } from '../world/catalog.ts';
 import type { SpatialScene } from '../spatial/types.ts';
@@ -111,4 +115,68 @@ test('C2: people holding up a frame cannot be assigned to carry (nor walk off by
   forgetMotion(rt);
   rt.step();
   assert.match(rt.violations[rt.violations.length - 1].message, /but p1 stands [\d.]+ m from it \(reach 1.2 m\)/);
+});
+
+test('H1: an unreachable hold station is refused at plan time; a failed/cancelled action leaves no reservations, tasks, children or traffic behind', () => {
+  // review proof p4: a post stands on hold station 2
+  const A0 = component('A', 'upright-12ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, REST_Y12, 0], yaw: Math.PI, pitch: Math.PI / 2 } });
+  const st = holdStations({ ...A0, pose: canonicalLying(A0, 0) }, 2);
+  const base = open(15, [{ id: 'post', label: 'post', kind: 'solid', y0: 0, y1: 2, obb: { c: st[1].p, half: [0.15, 0.15], yaw: 0 } }]);
+  const rt = new Runtime(addAll(emptyWorld('open', base), A0, human('p1', -6, -6), human('p2', -4.8, -6), human('p3', -3.6, -6)), createRegistry(), { spatial: new Spatial(base) }, ENGINE_INVARIANTS);
+  const r = rt.submit('raise_upright', { crew: ['p1', 'p2'], item: 'A' });
+  assert.equal(r.status, 'failed');
+  assert.equal(r.diagnostic?.code, 'raise.station-unreachable');
+  assert.match(r.diagnostic!.message, /p2 cannot reach their station/);
+  assert.equal(rt.world.entities.A.phase, 'staged');
+  assert.equal(rt.world.entities.A.reservedBy, undefined);
+  assert.equal([...rt.records.values()].filter((x) => x.parent === r.id).length, 0, 'no child walks were started');
+  const c = rt.submit('carry', { crew: ['p1', 'p3'], item: 'A', to: { x: 5, z: 5, yaw: 0 } });
+  assert.notEqual(c.diagnostic?.code, 'carry.item-unavailable', 'the frame is still available');
+
+  // generic runtime cleanup, exercised through a verb that reserves, delegates and then fails
+  const probe: ActionDef<{ fail: boolean }, null, { id: string; t: number; fail: boolean }> = {
+    verb: 'probe',
+    description: 'test verb',
+    schema: z.strictObject({ fail: z.boolean() }),
+    reservations: () => [{ resource: 'actor:p1', mode: 'exclusive' }, { resource: 'entity:bx', mode: 'exclusive' }],
+    plan: () => ({ ok: true, program: null }),
+    start(rt2, p, _prog, id) {
+      const bx = rt2.world.entities.bx;
+      bx.phase = 'reserved';
+      bx.reservedBy = id;
+      Object.assign(rt2.world.entities.p1.human!, { task: id, activity: 'walk' });
+      traffic(rt2).set('narrow:test', { actors: new Set(['p1']), entry: [0, 0], dir: [1, 0] });
+      rt2.submit('walk_to', { actor: 'p2', x: 8, z: 8 }, { parent: id });
+      return { id, t: 0, fail: p.fail };
+    },
+    step: (_rt, ex) => (++ex.t >= 3 && ex.fail ? { status: 'failed', diagnostic: { code: 'probe.failed', message: 'probe failed' } } : { status: 'running' }),
+    cancel: () => ({ ok: true }),
+  };
+  for (const mode of ['fail', 'cancel'] as const) {
+    const b = open(15);
+    const w = addAll(emptyWorld('open', b), component('bx', 'beam-9ft', [3, 0, 3], 0, { phase: 'stored' }), human('p1', -3, -3), human('p2', -1.8, -3));
+    const rt2 = new Runtime(w, createRegistry([probe]), { spatial: new Spatial(b) }, ENGINE_INVARIANTS);
+    const pr = rt2.submit('probe', { fail: mode === 'fail' });
+    assert.equal(pr.status, 'executing');
+    const child = [...rt2.records.values()].find((x) => x.parent === pr.id)!;
+    assert.equal(child.status, 'executing');
+    if (mode === 'cancel') { rt2.step(); rt2.cancel(pr.id); }
+    rt2.runUntilIdle(100, [pr.id]);
+    assert.equal(pr.status, mode === 'fail' ? 'failed' : 'cancelled');
+    assert.equal(child.status, 'cancelled', 'live child cancelled with its parent');
+    assert.equal(rt2.isActive(child.id), false);
+    const bx = rt2.world.entities.bx;
+    assert.equal(bx.phase, 'stored', 'never picked up: back to its prior phase');
+    assert.equal(bx.reservedBy, undefined);
+    for (const id of ['p1', 'p2']) {
+      assert.equal(rt2.world.entities[id].human!.task, undefined, `${id} task cleared`);
+      assert.equal(rt2.world.entities[id].human!.activity, 'idle');
+    }
+    assert.equal(traffic(rt2).size, 0, 'no ghost single-file entries');
+    const p2 = [...rt2.world.entities.p2.pose.p];
+    rt2.runUntilIdle(40);
+    assert.deepEqual(rt2.world.entities.p2.pose.p, p2, 'the orphaned walk no longer moves p2');
+    assert.equal(rt2.submit('carry', { crew: ['p1', 'p2'], item: 'bx', to: { x: -5, z: 5, yaw: 0 } }).status, 'executing');
+    assert.deepEqual(codes(rt2), []);
+  }
 });

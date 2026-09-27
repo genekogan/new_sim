@@ -23,7 +23,9 @@ export type RuntimeEvent =
 /** Invariant checks run at the end of every tick; violations are recorded, never hidden. */
 export type Invariant = (rt: Runtime) => Diagnostic[];
 
-type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean };
+/** `prior`: phase of each reserved entity before start(), restored if the action fails / is cancelled before using it. */
+type Phase = WorldState['entities'][string]['phase'];
+type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; prior: Map<string, Phase> };
 
 export class Runtime {
   readonly records = new Map<string, ActionRecord>();
@@ -79,8 +81,14 @@ export class Runtime {
       this.owners.set(r.resource, list);
     }
     this.emit(rec, 'reserved');
+    const prior = new Map<string, Phase>();
+    for (const r of res)
+      if (r.resource.startsWith('entity:')) {
+        const eid = r.resource.slice('entity:'.length);
+        if (this.world.entities[eid]) prior.set(eid, this.world.entities[eid].phase);
+      }
     const exec = def.start(this, parsed.data, plan.program, id);
-    this.live.set(id, { rec, def, exec, program: plan.program });
+    this.live.set(id, { rec, def, exec, program: plan.program, prior });
     this.emit(rec, 'executing');
     return rec;
   }
@@ -110,6 +118,7 @@ export class Runtime {
   step() {
     this.world.tick++;
     for (const l of [...this.live.values()]) {
+      if (!this.live.has(l.rec.id)) continue; // finished earlier this tick (e.g. cancelled with its failed parent)
       const r = l.def.step(this, l.exec, DT);
       if (r.status === 'running') {
         if (l.rec.status !== 'executing' || r.phase !== l.rec.phase) {
@@ -181,6 +190,7 @@ export class Runtime {
 
   private finish(l: Live, status: ActionStatus, d?: Diagnostic) {
     this.live.delete(l.rec.id);
+    if (status !== 'completed') this.cleanup(l);
     for (const [k, list] of this.owners) {
       const kept = list.filter((o) => o.action !== l.rec.id);
       if (kept.length) this.owners.set(k, kept);
@@ -188,6 +198,35 @@ export class Runtime {
     }
     l.rec.endedTick = this.tick;
     this.emit(l.rec, status, d);
+  }
+
+  /**
+   * A failed or cancelled action leaves no state behind (review H1): its live children are
+   * cancelled, entities it reserved but never picked up return to their prior phase, its actors'
+   * task is cleared, and their single-file traffic entries (walk.ts `services.traffic`) released.
+   */
+  private cleanup(l: Live) {
+    const id = l.rec.id;
+    for (const r of [...this.records.values()]) if (r.parent === id && this.live.has(r.id)) this.cancel(r.id);
+    const ents = this.world.entities;
+    for (const [eid, phase] of l.prior) {
+      const e = ents[eid];
+      if (!e) continue;
+      if (e.phase === 'reserved') e.phase = phase; // never picked up: back to what it was
+      if (e.reservedBy === id) e.reservedBy = undefined;
+    }
+    for (const e of Object.values(ents)) if (e.reservedBy === id && e.phase !== 'carried' && e.phase !== 'raising') e.reservedBy = undefined;
+    const traffic = this.services.traffic as Map<string, { actors: Set<string> }> | undefined;
+    for (const e of Object.values(ents)) {
+      if (!e.human || e.human.task !== id) continue;
+      e.human.task = undefined;
+      if (!e.human.grip) e.human.activity = 'idle';
+      if (traffic)
+        for (const [k, t] of [...traffic]) {
+          t.actors.delete(e.id);
+          if (!t.actors.size) traffic.delete(k);
+        }
+    }
   }
 
   private fail(rec: ActionRecord, d: Diagnostic) {

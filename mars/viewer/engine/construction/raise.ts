@@ -8,7 +8,7 @@ import type { Entity } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { entityFootprint, type Spatial } from '../spatial/service.ts';
 import { holdingDiagnostic, holdStations, isUpright } from './rules.ts';
-import { childrenState, walkCrew, type Children } from './children.ts';
+import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 import { canonicalLying, isLying } from './lying.ts';
 import { entityCorners } from '../spatial/service.ts';
 
@@ -65,8 +65,12 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
       if (d) return { ok: false, diagnostic: d };
       if (rt.world.entities[c]?.kind !== 'human') return { ok: false, diagnostic: { code: 'entity.unknown', message: `no person "${c}"`, subjects: [c] } };
     }
-    const sweep = raiseSweep(rt, { ...u, pose: canonicalLying(u, groundOf(u), p.stand_at && [p.stand_at.x, p.stand_at.z]) }, Math.PI / 2, 0);
+    const lying = { ...u, pose: canonicalLying(u, groundOf(u), p.stand_at && [p.stand_at.x, p.stand_at.z]) };
+    const sweep = raiseSweep(rt, lying, Math.PI / 2, 0);
     if (sweep) return { ok: false, diagnostic: sweep };
+    const st = holdStations(lying, p.crew.length);
+    const unreachable = checkStations(rt, p.crew.map((c, i) => ({ actor: c, p: st[i].p })));
+    if (unreachable) return { ok: false, diagnostic: { ...unreachable, code: 'raise.station-unreachable' } };
     return { ok: true, program: null };
   },
   start(rt, p, _prog, id) {
