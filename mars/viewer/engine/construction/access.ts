@@ -223,7 +223,7 @@ export function beginLift(rt: Runtime, ex: LiftExec) {
  * crew), a `lift.crew-blocked` diagnostic once a holder has been stuck > CREW_BLOCK_TIMEOUT. With
  * `follow`, the part is paced so no hand point outruns FOLLOW_SPEED and holders walk beside it.
  */
-export function liftStep(rt: Runtime, ex: LiftExec, dt: number, follow = true): boolean | Diagnostic {
+export function liftStep(rt: Runtime, ex: Pick<LiftExec, 'crew' | 'item' | 't' | 'from' | 'to' | 'duration' | 'path' | 'stall'>, dt: number, follow = true): boolean | Diagnostic {
   const item = rt.world.entities[ex.item];
   const path = ex.path ?? [ex.from, ex.to];
   let t = Math.min(1, ex.t + dt / ex.duration);
