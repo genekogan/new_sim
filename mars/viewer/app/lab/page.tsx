@@ -14,8 +14,11 @@ export default function Lab() {
 
   useEffect(() => {
     const v = new LabView(host.current!);
-    const initial = new URLSearchParams(location.search).get('scenario') ?? SCENARIOS[0].name;
-    v.sim.load(SCENARIOS.some((s) => s.name === initial) ? initial : SCENARIOS[0].name);
+    const initial =
+      new URLSearchParams(location.search).get('scenario') ?? SCENARIOS[0].name;
+    v.sim.load(
+      SCENARIOS.some((s) => s.name === initial) ? initial : SCENARIOS[0].name,
+    );
     installHook(v, refresh);
     v.start();
     setView(v);
@@ -29,26 +32,38 @@ export default function Lab() {
 
   const sim = view?.sim;
   const checks = sim ? sim.checks() : [];
-  const failed = sim ? [...sim.rt.records.values()].filter((r) => r.status === 'failed') : [];
+  const failed = sim
+    ? [...sim.rt.records.values()].filter((r) => r.status === 'failed')
+    : [];
   const violations = sim?.rt.violations.length ?? 0;
   const done = sim?.done() ?? false;
   return (
     <div className="lab">
-      <div className="lab-stage" ref={host}>
-        {view?.error && <div className="lab-banner error">{view.error}</div>}
-        {violations > 0 && (
-          <div className="lab-banner error" role="alert">
-            {violations} invariant violation{violations > 1 ? 's' : ''} — first: {sim!.rt.violations[0].message}
-          </div>
-        )}
-        {failed.map((r) => (
-          <div key={r.id} className="lab-banner error" role="alert">
-            {r.id} {r.verb} FAILED · {r.diagnostic?.code}: {r.diagnostic?.message}
-          </div>
-        ))}
+      <div className="lab-stage">
+        <div className="lab-canvas" ref={host} />
+        <div className="lab-banners">
+          {view?.error && <div className="lab-banner error">{view.error}</div>}
+          {violations > 0 && (
+            <div className="lab-banner error" role="alert">
+              {violations} invariant violation{violations > 1 ? 's' : ''} —
+              first: {sim!.rt.violations[0].message}
+            </div>
+          )}
+          {failed.map((r) => (
+            <div key={r.id} className="lab-banner error" role="alert">
+              {r.id} {r.verb} FAILED · {r.diagnostic?.code}:{' '}
+              {r.diagnostic?.message}
+            </div>
+          ))}
+        </div>
         {done && !sim!.scenario.continuous && (
-          <div className={`lab-verdict ${checks.every((c) => c.ok) ? 'ok' : 'bad'}`} data-testid="lab-verdict">
-            {checks.every((c) => c.ok) ? 'Scenario expectations met' : 'Scenario expectations NOT met'}
+          <div
+            className={`lab-verdict ${checks.every((c) => c.ok) ? 'ok' : 'bad'}`}
+            data-testid="lab-verdict"
+          >
+            {checks.every((c) => c.ok)
+              ? 'Scenario expectations met'
+              : 'Scenario expectations NOT met'}
           </div>
         )}
       </div>
@@ -70,7 +85,8 @@ export default function Lab() {
             refresh();
           }}
           onDrop={
-            view.sim.scenario.name === 'construction' && !view.sim.rt.world.entities[PANEL_ID]
+            view.sim.scenario.name === 'construction' &&
+            !view.sim.rt.world.entities[PANEL_ID]
               ? () => {
                   dropPanel(view.sim.rt);
                   refresh();

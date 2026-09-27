@@ -154,7 +154,7 @@ export const SCENARIOS: Scenario[] = [
     humans: () => [human('p1', 20, 11, { yaw: Math.PI })],
     start: (rt) => void walk(rt, 'p1', 10, 10, 1),
     maxTicks: 20,
-    focus: [12, 10, 10],
+    focus: [14, 10, 10, 60],
     expect: (rt) => {
       const r = recs(rt)[0];
       const p = rt.world.entities.p1.pose.p;

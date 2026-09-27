@@ -12,8 +12,20 @@
   overflow: hidden;
   min-width: 0;
 }
-.lab-stage canvas {
+.lab-canvas {
+  position: absolute;
+  inset: 0;
+}
+.lab-canvas canvas {
   display: block;
+}
+.lab-banners {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
 }
 .lab-css {
   position: absolute;

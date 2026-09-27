@@ -37,12 +37,16 @@ for (const s of SCENARIOS) {
   test(`lab ${s.name}: completes as expected, zero violations, captures`, async ({ page }, testInfo) => {
     const errors = collectConsoleErrors(page);
     await openLab(page);
+    await page.addStyleTag({ content: '.lab-perf { visibility: hidden }' }); // timing numbers vary per run
     // pass 1: how long does it take?
     await run(page, s.name);
     const end: LabState = await toEnd(page);
     expect(end.done, 'scenario finished within its tick budget').toBe(true);
     for (const c of end.checks) expect(c.ok, c.message).toBe(true);
     expect(await page.evaluate(() => window.__marsEngine!.violations())).toEqual([]);
+    // failures are shown loudly: one alert banner per failed action, naming the diagnostic code
+    const failed = (await page.evaluate(() => window.__marsEngine!.records())).filter((r) => r.status === 'failed');
+    for (const r of failed) await expect(page.getByRole('alert').filter({ hasText: r.diagnostic!.code })).toBeVisible();
     // pass 2 (deterministic replay): mid-action captures, then the end state
     await run(page, s.name);
     let at = 0;
