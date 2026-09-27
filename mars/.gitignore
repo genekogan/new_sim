@@ -1,0 +1,24 @@
+# Environments / deps
+.venv/
+viewer/node_modules/
+__pycache__/
+*.pyc
+# Proprietary SDK (not redistributable)
+vendor/
+# Build + deploy outputs (reproducible)
+viewer/dist/
+viewer/.wrangler/
+viewer/.cloudflare/
+viewer/tsconfig.tsbuildinfo
+viewer/.pw-browsers/
+viewer/test-results/
+viewer/.e2e/
+# Large model binaries (backed up in R2 by content hash; regenerate via deploy/browser-model.py)
+viewer/public/browser/campus.glb
+viewer/public/browser/campus.glb.br
+*.blend
+*.blend1
+# Logs
+*.log
+.DS_Store
+.env*

@@ -1,0 +1,10 @@
+import bpy,pathlib,json,math
+from mathutils import Vector
+b=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/research');p='~/Mars/code/godot-mars/Imported Models/Mars Aerial/Mars 2026 - Aerial Located.glb';bpy.ops.wm.read_factory_settings(use_empty=True);bpy.ops.import_scene.gltf(filepath=p);bpy.context.view_layer.update();meshes=[o for o in bpy.context.scene.objects if o.type=='MESH'];rows=[]
+for o in bpy.context.scene.objects:
+ coords=[child.matrix_world@Vector(c) for child in [o,*o.children_recursive] if child.type=='MESH' for c in child.bound_box]
+ if not coords:continue
+ lo=[min(c[i] for c in coords) for i in range(3)];hi=[max(c[i] for c in coords) for i in range(3)];rows.append({'name':o.name,'parent':o.parent.name if o.parent else None,'type':o.type,'bounds':[lo,hi],'children':len(o.children),'materials':[s.material.name if s.material else None for s in o.material_slots] if o.type=='MESH' else []})
+(b/'cad-objects.json').write_text(json.dumps(rows,indent=2));bpy.ops.file.pack_all();bpy.ops.wm.save_as_mainfile(filepath=str(b/'cad-reference.blend'))
+scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=8;scene.render.resolution_x=1800;scene.render.resolution_y=1300;scene.render.resolution_percentage=100;scene.world=bpy.data.worlds.new('World');scene.world.color=(.4,.4,.4);scene.view_settings.view_transform='Standard';light=bpy.data.lights.new('Sun','SUN');light.energy=2;obj=bpy.data.objects.new('Sun',light);scene.collection.objects.link(obj);obj.rotation_euler=(.4,-.5,-.3)
+coords=[o.matrix_world@Vector(c) for o in meshes for c in o.bound_box];lo=Vector([min(c[i] for c in coords) for i in range(3)]);hi=Vector([max(c[i] for c in coords) for i in range(3)]);print('ALL BOUNDS',list(lo),list(hi),flush=True);center=(lo+hi)/2;extent=max(hi-lo);camera=bpy.data.cameras.new('Review');cam=bpy.data.objects.new('Review',camera);scene.collection.objects.link(cam);scene.camera=cam;camera.type='ORTHO';camera.ortho_scale=extent;camera.clip_end=100000;cam.location=center+Vector((0,0,extent));cam.rotation_euler=(0,0,0);scene.render.filepath=str(b/'cad-top.png');bpy.ops.render.render(write_still=True)

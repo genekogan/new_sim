@@ -1,0 +1,20 @@
+{
+  "url": "https://mars-campus-2026.<workers-subdomain>.workers.dev",
+  "studio_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio",
+  "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
+  "worker": "mars-campus-2026",
+  "bucket": "mars-campus-2026-models",
+  "version": "763de986-3bdd-4947-a335-226f28a8ed79",
+  "published": "2026-09-05",
+  "verification": "../.cloudflare/audit/http-smoke.json",
+  "updated": "2026-09-26",
+  "feature": "Brahman 2020 side-bay stairs, photographed Portal screen content, no temporary blue tarps, and 2026-style walking/editing toolbar",
+  "evidence": "../../research/2020/EVIDENCE.md",
+  "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
+  "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
+  "audit": "../AUDIT-2026-09-22-CONTROL-PLANE.md",
+  "agent_guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-agent-guide.md",
+  "compression_verification": "../.cloudflare/compression-audit/live.json",
+  "model_transfer_bytes": 38494104,
+  "model_decoded_bytes": 70772556
+}

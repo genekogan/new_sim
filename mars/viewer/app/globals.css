@@ -1,0 +1,595 @@
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #e7ecee;
+  background: #171c20;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 0;
+  background: none;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #d3e697;
+  outline-offset: 4px;
+}
+button:hover {
+  color: #fff;
+  background: #ffffff0b;
+}
+main {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  height: 86px;
+  flex-shrink: 0;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #30383e;
+  background: #14191d;
+  gap: 25px;
+}
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.emblem {
+  font-size: 33px;
+  font-weight: 800;
+  letter-spacing: -3px;
+  border: 1px solid #56614c;
+  width: 54px;
+  height: 52px;
+  line-height: 41px;
+  text-align: center;
+  color: #d3e697;
+  position: relative;
+}
+.emblem span {
+  position: absolute;
+  bottom: 1px;
+  right: 6px;
+  font-size: 10px;
+  line-height: 10px;
+  letter-spacing: 0;
+  background: #14191d;
+  padding: 0 2px;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  margin: 0 0 7px;
+}
+.identity p {
+  margin: 0;
+  font-size: 10px;
+  color: #9faab1;
+  letter-spacing: 1.6px;
+}
+nav {
+  display: flex;
+  align-self: stretch;
+  gap: 5px;
+}
+nav button {
+  padding: 15px 21px;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+  text-align: left;
+  color: #9da7af;
+}
+nav button span {
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+  color: #76838c;
+}
+nav button.selected {
+  color: #e7efcf;
+  border-bottom-color: #d3e697;
+  background: #d3e60708;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.local {
+  font-size: 12px;
+  color: #99a6ad;
+  margin-right: 8px;
+}
+.local i {
+  display: inline-block;
+  background: #b5cf81;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin: 0 7px 2px 0;
+}
+.icon {
+  height: 36px;
+  width: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+}
+.workspace {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.viewport {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+.comparing .viewport {
+  width: 50%;
+}
+.reference {
+  width: 50%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  background: #111619;
+  border-left: 1px solid #424c52;
+  position: relative;
+  overflow: hidden;
+}
+.reference img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.reference figcaption {
+  position: absolute;
+  bottom: 21px;
+  left: 18px;
+  right: 18px;
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  color: #b7c0c5;
+  align-items: center;
+}
+.reference figcaption span {
+  margin-left: auto;
+}
+.view-label {
+  position: absolute;
+  top: 22px;
+  left: 28px;
+  font-size: 10px;
+  letter-spacing: 1.7px;
+  color: #99aab2;
+  pointer-events: none;
+}
+.view-label span {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #d8e0e4;
+  letter-spacing: 0;
+}
+.tools {
+  position: absolute;
+  left: 23px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border: 1px solid #414b51;
+  background: #181e22e8;
+  border-radius: 6px;
+  box-shadow: 0 5px 20px #0002;
+}
+.tools button {
+  width: 36px;
+  height: 37px;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  color: #b0bcc3;
+}
+.tools span {
+  height: 1px;
+  background: #3a4248;
+  margin: 4px;
+}
+.tools .active {
+  color: #d4e89a;
+}
+.render-modes {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: flex;
+  border: 1px solid #434c52;
+  background: #181e22db;
+  border-radius: 5px;
+  padding: 3px;
+}
+.render-modes button {
+  padding: 8px 11px;
+  font-size: 12px;
+  color: #a2afb7;
+  border-radius: 2px;
+}
+.render-modes .active {
+  background: #3a4449;
+  color: #e7edee;
+}
+.comparing .render-modes {
+  right: calc(50% + 18px);
+}
+.footnote {
+  position: absolute;
+  bottom: 21px;
+  left: 28px;
+  font-size: 11px;
+  color: #9aa7af;
+}
+.loading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 20px 24px;
+  background: #151a20e8;
+  border: 1px solid #414b53;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #536144;
+  border-top-color: #cddd9b;
+  border-radius: 50%;
+  animation: rotate 1.5s linear infinite;
+}
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.error {
+  color: #ffc8b6;
+}
+.close-compare {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #14191ce8;
+  border: 1px solid #414a51;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.filmstrip {
+  background: #14191d;
+  border-top: 1px solid #354047;
+  flex-shrink: 0;
+}
+.strip-title {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  color: #acb7bd;
+  font-size: 12px;
+}
+.strip-title button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+}
+.count {
+  color: #75828b;
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid #374048;
+  border-radius: 3px;
+}
+.hint {
+  color: #788892;
+  font-size: 11px;
+}
+.frames {
+  display: flex;
+  gap: 10px;
+  overflow: auto;
+  padding: 0 28px 17px;
+  scrollbar-width: thin;
+  scrollbar-color: #434f56 transparent;
+}
+.frames button {
+  flex: 0 0 148px;
+  position: relative;
+  border: 1px solid #303b42;
+  padding: 0;
+  text-align: left;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.frames button.chosen {
+  border-color: #cddc9c;
+}
+.frames img {
+  width: 148px;
+  height: 83px;
+  object-fit: cover;
+  display: block;
+  opacity: 0.78;
+}
+.frames button:hover img,
+.frames button.chosen img {
+  opacity: 1;
+}
+.frames button span {
+  display: block;
+  font-size: 11px;
+  padding: 7px 8px;
+  color: #bec7ca;
+  white-space: nowrap;
+}
+.frames em {
+  font-size: 8px;
+  background: #c5d794;
+  color: #20271a;
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  font-style: normal;
+  padding: 2px 4px;
+}
+.inspector {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 354px;
+  padding: 30px 26px;
+  background: #171e23f7;
+  border-left: 1px solid #475259;
+  overflow: auto;
+  box-shadow: -20px 0 60px #0003;
+}
+.dismiss {
+  position: absolute;
+  top: 18px;
+  right: 15px;
+}
+.eyebrow {
+  font-size: 10px !important;
+  letter-spacing: 1.5px;
+  color: #c8dba0 !important;
+  margin: 0 0 25px !important;
+}
+.inspector h2 {
+  font-size: 25px;
+  font-weight: 400;
+  margin: 0 0 15px;
+}
+.inspector p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #b4c0c6;
+}
+.inspector dl {
+  border-top: 1px solid #3b464d;
+  margin: 24px 0;
+}
+.inspector dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 25px;
+  padding: 11px 0;
+  border-bottom: 1px solid #333f45;
+  font-size: 12px;
+}
+.inspector dt {
+  color: #96a5ae;
+}
+.inspector dd {
+  margin: 0;
+  text-align: right;
+}
+.inspector h3 {
+  font-size: 14px;
+  font-weight: 500;
+}
+.inspector ul {
+  padding-left: 16px;
+  font-size: 12px;
+  color: #a9b7bf;
+  line-height: 1.65;
+}
+.inspector li {
+  margin: 9px 0;
+}
+.inspector a {
+  display: block;
+  font-size: 12px;
+  color: #d1dfab;
+  text-decoration: none;
+  margin-top: 18px;
+}
+.inspector a.download {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #596746;
+  padding: 12px 14px;
+  border-radius: 4px;
+  margin-top: 25px;
+}
+@media (max-width: 1000px) {
+  .local,
+  .hint {
+    display: none;
+  }
+  header {
+    padding: 0 18px;
+    gap: 12px;
+  }
+  nav button {
+    padding: 14px 10px;
+    font-size: 12px;
+  }
+  .identity p {
+    display: none;
+  }
+  .identity h1 {
+    font-size: 16px;
+    margin: 0;
+  }
+  .emblem {
+    width: 42px;
+    height: 42px;
+    font-size: 27px;
+    line-height: 35px;
+  }
+  .header-actions {
+    gap: 2px;
+  }
+}
+@media (max-width: 650px) {
+  header {
+    height: 114px;
+    flex-wrap: wrap;
+    gap: 0;
+    position: relative;
+    padding-top: 13px;
+  }
+  .identity {
+    gap: 10px;
+  }
+  .header-actions {
+    margin-left: auto;
+  }
+  nav {
+    width: 100%;
+    height: 50px;
+    justify-content: center;
+    order: 3;
+  }
+  nav button {
+    padding: 7px 12px;
+  }
+  nav button span {
+    display: inline;
+    margin-left: 7px;
+    font-size: 10px;
+  }
+  .view-label {
+    left: 15px;
+  }
+  .render-modes {
+    right: 12px;
+    top: 63px;
+  }
+  .comparing .render-modes {
+    left: 14px;
+    right: auto;
+    top: 60px;
+  }
+  .render-modes button {
+    padding: 6px 7px;
+    font-size: 10px;
+  }
+  .tools {
+    left: 12px;
+  }
+  .footnote {
+    font-size: 9px;
+    left: 15px;
+  }
+  .frames {
+    padding-left: 15px;
+  }
+  .strip-title {
+    padding: 0 15px;
+  }
+  .inspector {
+    width: min(354px, 100%);
+  }
+  .reference figcaption {
+    font-size: 9px;
+    left: 8px;
+    display: block;
+  }
+  .reference figcaption svg {
+    display: none;
+  }
+  .reference figcaption span {
+    display: block;
+    margin-top: 5px;
+  }
+  .close-compare {
+    font-size: 10px;
+    right: 8px;
+    padding: 6px;
+  }
+  .comparing .view-label {
+    font-size: 8px;
+  }
+}
+
+.comparing .viewport {
+  align-self: center;
+  height: auto;
+  aspect-ratio: 16/9;
+  max-height: 100%;
+}
+.viewport {
+  position: relative;
+  min-height: 0;
+}
+.viewport canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.comparing .viewport {
+  max-height: none;
+}
+@media (min-width: 651px) and (max-width: 1000px) {
+  .comparing .render-modes {
+    top: 68px;
+  }
+}
