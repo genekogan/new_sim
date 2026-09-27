@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "763de986-3bdd-4947-a335-226f28a8ed79",
+  "version": "d33a4d6b-d4ae-4535-a818-0e5c329e9b4f",
   "published": "2026-09-05",
   "verification": "../.cloudflare/audit/http-smoke.json",
-  "updated": "2026-09-26",
-  "feature": "Brahman 2020 side-bay stairs, photographed Portal screen content, no temporary blue tarps, and 2026-style walking/editing toolbar",
+  "updated": "2026-09-27",
+  "feature": "engine lab (/lab), engine_* MCP tools, campus scene, NOAA sun",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -16,5 +16,7 @@
   "agent_guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-agent-guide.md",
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
-  "model_decoded_bytes": 70772556
+  "model_decoded_bytes": 70772556,
+  "rollback_version": "de2dddaa-0fab-477c-8b8f-cb1c579efba5",
+  "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab"
 }

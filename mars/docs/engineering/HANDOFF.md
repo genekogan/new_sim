@@ -319,13 +319,20 @@ node deploy/simulation-integration.mjs                         # real MCP incl. 
   `prepare.py` → `CLOUDFLARE_RELEASE=1 npm run build` → `deploy/upload.mjs` →
   `wrangler deploy --config dist/server/cloudflare.json`; then `SITE_BASE=… ALL_ASSETS=1 node
   deploy/smoke.mjs` and `SIM_BASE=… node deploy/simulation-integration.mjs`.
-- **Not in production yet**, per `deployment.json`: the engine, the `engine_*` tools,
+- **Shipped to production 2026-09-27** (see below); before that, not live:
+  the engine, the `engine_*` tools,
   `/api/simulation/engine/take`, `/lab` (`5f02352`) and the NOAA sun.
 - **Review first:** an uncommitted line in `viewer/deploy/prepare.py` and in-progress lab edits (not
   part of this handoff). Git is local only; nothing is pushed without Gene.
 
-**TODO (lead): production deploy result — date, new Worker version id, smoke + integration results,
-rollback command: ______**
+**Production deploy (2026-09-27):** Worker version `d33a4d6b-d4ae-4535-a818-0e5c329e9b4f`, built
+from `2ecff4b`, replacing `de2dddaa-0fab-477c-8b8f-cb1c579efba5`. Gates were green: 48 unit, engine
+126 pass / 1 skip, tsc, e2e 26/26. Live smoke returned 200 on all routes, `/engine/campus-2026.json`
+and the R2 GLB. `simulation-integration.mjs` PASSED against production (20 legacy + 9 engine tools).
+A headless `/lab` build-bay run reached done: 43/43 steps, 0 violations, 0 console errors. Details are
+in `RELEASE_CHECKLIST.md`. Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
+./node_modules/.bin/wrangler rollback de2dddaa-0fab-477c-8b8f-cb1c579efba5 --name mars-campus-2026
+-m "rollback: <reason>"`
 
 ## Suggested next tranche (prioritised)
 

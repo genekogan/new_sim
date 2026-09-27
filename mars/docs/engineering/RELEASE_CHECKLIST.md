@@ -123,3 +123,35 @@ rehearse 269 ms, execute 230 ms, camera 245 ms; take 33,656 B.
 "standing on the deck (y 1.949…)" fails and the failure reproduces in isolation. The MCP
 integration run above still passed. Nothing in this commit touches engine code.
 Decide whether to fix it before deploying.
+
+## Production deploy (2026-09-27)
+
+Deployed from committed tree `2ecff4b` (code identical to `00337c6`; the extra commit is docs only).
+
+- **New version: `d33a4d6b-d4ae-4535-a818-0e5c329e9b4f`** (replaces `de2dddaa…`, which was confirmed
+  live at 100% via `wrangler deployments status` immediately before the deploy).
+- Gates: `npm test` 48/48; `npm run test:engine` 127 tests, 126 pass / 0 fail / 1 skip (the
+  `progressive floor` failure noted above is fixed); `tsc --noEmit -p .` clean; `npm run e2e --
+  --workers=1` 26/26 (studio + lab + lab-build-bay; no baseline refresh needed).
+- Build: `prepare.py` + `CLOUDFLARE_RELEASE=1 npm run build` exit 0; route list includes `/lab`,
+  `/lab/`; `dist/client/engine/campus-2026.json` present (1,081,647 B). Dry run exit 0 (331 assets,
+  3298.37 KiB / 679.69 KiB gzip). `upload.mjs`: 0 uploads, all 8 large objects `Already uploaded`.
+  Deploy uploaded 11 new asset files (300 already present); startup 88 ms.
+- Live smoke: `/`, `/studio`, `/studio/2024`, `/lab`, `/simulation-guide` 200 text/html;
+  `/simulation-agent-guide.md` 200 (19,520 B); `/engine/campus-2026.json` 200 application/json
+  (1,081,647 B, parses); `HEAD /browser/campus.glb` 200 model/gltf-binary from R2.
+- `SIM_BASE=… node deploy/simulation-integration.mjs`: both PASS lines (MCP handshake, 20 legacy +
+  9 engine tools, isolation, read-only, idempotency, …; auth/method/prototype/body limits). Engine
+  in DO: rehearse 849 ms wall, execute 738 ms, camera 731 ms; take 44,806 B.
+- Browser: the Playwright config has no base-URL override, so the specs were not run against
+  production. A headless script opened `/lab?scenario=build-bay`, ran `runScenario('build-bay')` +
+  `runToEnd`: tick 10553, done, all 5 expectations met (43/43 steps, zero violations, visitor on
+  deck), 0 console errors, state hash `b42df0ac…c635`. Screenshot:
+  `viewer/e2e/artifacts/prod-smoke/build-bay-end-oblique.png` (gitignored).
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback de2dddaa-0fab-477c-8b8f-cb1c579efba5 \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```
