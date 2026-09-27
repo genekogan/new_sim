@@ -107,6 +107,17 @@ const sub2r = (q: Vec2, c: Vec2, th: number): Vec2 => {
   return [dx * Math.cos(-th) - dz * Math.sin(-th), dx * Math.sin(-th) + dz * Math.cos(-th)];
 };
 
+/**
+ * Mid-carry replan starts: always the current pose; the heading-flipped pose only when it keeps
+ * every carrier within 0.3 m of where they stand (otherwise the crew would teleport — review C1).
+ */
+function replanStarts(rt: Runtime, ex: Exec, here: SE2): SE2[] {
+  const flip: SE2 = { ...here, th: wrapAngle(here.th + Math.PI) };
+  const spots = carrierSpots(ex.p.f, flip);
+  const near = crewOf(rt, ex).every((h, i) => Math.hypot(spots[i][0] - h.pose.p[0], spots[i][1] - h.pose.p[2]) <= 0.3);
+  return near ? [here, flip] : [here];
+}
+
 function poseAtU(ex: Exec, u: number): SE2 {
   const { poses, u: us } = ex.p.traj;
   while (ex.i < us.length - 2 && us[ex.i + 1] <= u) ex.i++;
@@ -221,7 +232,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         if (k >= 0) {
           // replan the rest of the carry from the current formation pose (construction changed the topology)
           const here = poseAtU(ex, ex.u);
-          const r = planCarry({ g, f: p.f, starts: [here, { ...here, th: wrapAngle(here.th + Math.PI) }], goals: [p.target], labelOf: (id) => labelOf(sp, id), carrierNames: p.crew });
+          const r = planCarry({ g, f: p.f, starts: replanStarts(rt, ex, here), goals: [p.target], labelOf: (id) => labelOf(sp, id), carrierNames: p.crew });
           if (r.ok) {
             p.traj = r.traj;
             ex.u = 0;
@@ -256,7 +267,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
             .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
           const aug = sp.gridsAround(rt.world, others);
           const ga = aug.grids.levels.get(p.level);
-          const r = ga ? planCarry({ g: ga, f: p.f, starts: [c, { ...c, th: wrapAngle(c.th + Math.PI) }], goals: [p.target], labelOf: (id) => labelOf(sp, id), carrierNames: p.crew }) : null;
+          const r = ga ? planCarry({ g: ga, f: p.f, starts: replanStarts(rt, ex, c), goals: [p.target], labelOf: (id) => labelOf(sp, id), carrierNames: p.crew }) : null;
           if (r?.ok) {
             p.traj = r.traj;
             ex.u = 0;

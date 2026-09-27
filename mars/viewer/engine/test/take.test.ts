@@ -81,7 +81,9 @@ test('take payload: 3 walkers × 60 s stays compact (bytes measured)', () => {
     ticks: take.ticks,
   };
   console.log('take payload (3 walkers, %ss):', takeDuration(take).toFixed(1), JSON.stringify(sizes));
-  assert.ok(sizes.total < 40_000, `take is ${sizes.total} bytes`);
+  // was 40 000 (≈33.6 KB): since review C1 a replan no longer teleports a walker out of a face-off
+  // with a make-way bystander, so the recorded minute holds a longer stand-off (≈44.8 KB, mostly events)
+  assert.ok(sizes.total < 50_000, `take is ${sizes.total} bytes`);
   assert.ok(sizes.samples < take.ticks * 3 * 0.35, `pose samples ${sizes.samples} vs ${take.ticks * 3} raw`);
   // a static entity costs a single sample
   assert.equal(take.tracks.panel.length, 1);

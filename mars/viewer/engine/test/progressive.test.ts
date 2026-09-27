@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
-import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
+import { DEFAULT_INVARIANTS, forgetMotion } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
@@ -167,6 +167,7 @@ test('construction changes navigation: a stair flight set down across a walker\'
   assert.notEqual(ins.status, 'failed', ins.diagnostic?.message);
   while (rt.isActive(ins.id) && ins.phase !== 'place') rt.step();
   rt.world.entities.w.pose.p = [3.0, 0, 9];
+  forgetMotion(rt); // scenario set-up teleport, not an engine motion
   const walk = rt.submit('walk_to', { actor: 'w', x: 3.0, z: -5 });
   assert.notEqual(walk.status, 'failed', walk.diagnostic?.message);
   rt.runUntilIdle(20 * 120, [ins.id, walk.id]);

@@ -26,6 +26,7 @@ const STUCK_STATIC_TICKS = 30; // 1.5 s blocked by someone standing still → re
 const MAX_PEOPLE_REPLANS = 6; // after this, stay blocked (fail loudly via diagnostics) rather than churn grids
 const YIELD_OFFSET = 0.9; // m lateral offset while waiting for oncoming traffic
 const LOOK = 2.5; // m look-ahead for conflicts
+const MAX_CORRECTION = 0.55; // m per tick (below MAX_STEP_PER_TICK): larger corrections are spread over several ticks
 
 export type WalkParams = { actor: string; x: number; z: number; level?: number; face?: number; speed?: number };
 
@@ -121,6 +122,9 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
 function enterLeg(rt: Runtime, ex: Exec) {
   const leg = ex.route.legs[ex.leg];
   ex.s = 0;
+  // every leg starts at the body's actual position (replans start from the offset pose), so any
+  // lateral passing offset of the previous corridor must not carry over (it would teleport the body)
+  ex.offset = 0;
   ex.segs = [];
   ex.narrows = [];
   if (leg.kind === 'walk') {
@@ -326,9 +330,15 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   }
   if (clearanceAt(g, p) < r) { p = base; off = 0; }
   ex.offset = off;
+  // motion limit: a large correction (falling back onto the corridor when construction removed the
+  // clearance at the offset spot) is spread over several ticks, never jumped (invariant motion.teleport)
+  const cur: Vec2 = [a.pose.p[0], a.pose.p[2]];
+  const maxStep = MAX_CORRECTION;
+  const jump = dist2(cur, p);
+  const lagging = jump > maxStep + 1e-9;
+  if (lagging) p = add2(cur, scale2(sub2(p, cur), maxStep / jump));
   // hard separation guarantee (collision-enforcement layer, independent of the avoidance heuristics):
   // never take a step that brings this body inside another person's space
-  const cur: Vec2 = [a.pose.p[0], a.pose.p[2]];
   const intruded = intrusion(rt, a, cur, p, r);
   if (intruded) {
     ex.s = prevS;
@@ -364,6 +374,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} is waiting for ${personBlock} to move out of the way`, subjects: [ex.actor, personBlock] } };
   }
   if (arrived) {
+    if (lagging) return { status: 'running', phase: 'settle' }; // the body is still closing on the corridor point
     if (Math.abs(ex.offset) > 0.05) {
       const occ = occupant(rt, a, pointAt(ex, ex.total), ex.profile.radius);
       if (occ) {
