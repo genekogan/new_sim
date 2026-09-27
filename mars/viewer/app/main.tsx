@@ -4,6 +4,7 @@ import './globals.css';
 const Studio = lazy(() => import('./studio/page'));
 const Reconstruction = lazy(() => import('./page'));
 const Guide = lazy(() => import('./simulation-guide/page'));
+const Lab = lazy(() => import('./lab/page'));
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { error: boolean }
@@ -38,6 +39,8 @@ createRoot(document.getElementById('root')!).render(
     >
       {route === '/studio' || /^\/studio\/202[0-6]$/.test(route) ? (
         <Studio year={route === '/studio' ? 2026 : Number(route.split('/')[2])} />
+      ) : route === '/lab' ? (
+        <Lab />
       ) : route === '/simulation-guide' ? (
         <Guide />
       ) : route === '/' ? (

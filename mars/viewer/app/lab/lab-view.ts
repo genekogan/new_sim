@@ -1,0 +1,180 @@
+// Engine Lab view: three.js renderer + orbit camera over a LabSim. The rAF
+// loop feeds real elapsed time into the sim accumulator (sim time decoupled
+// from fps) and renders interpolated state.
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { ThreeResources } from '../../lib/three-resources';
+import type { Spatial } from '../../engine/spatial/service.ts';
+import { traffic } from '../../engine/locomotion/walk.ts';
+import { LabSim } from './sim.ts';
+import { StaticScene } from './scene.ts';
+import { HumanViews } from './humans.ts';
+import { loadTemplates } from './people.ts';
+import { GridOverlays } from './overlay-grids.ts';
+import { AgentOverlays } from './overlay-agents.ts';
+import { buildLinks, buildObstacles, buildRoutes, buildViolations } from './overlay-debug.ts';
+
+export const OVERLAYS = ['grid', 'routes', 'traffic', 'agents', 'obstacles', 'links', 'labels', 'violations'] as const;
+export type OverlayName = (typeof OVERLAYS)[number];
+
+export class LabView {
+  readonly sim = new LabSim();
+  readonly renderer: THREE.WebGLRenderer;
+  readonly camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
+  readonly scene = new THREE.Scene();
+  private css = new CSS2DRenderer();
+  private orbit: OrbitControls;
+  private humans = new HumanViews();
+  private grids = new GridOverlays();
+  private agents = new AgentOverlays();
+  private groups: Record<OverlayName, THREE.Group>;
+  private statics?: StaticScene;
+  private resources = new ThreeResources();
+  private abort = new AbortController();
+  private raf = 0;
+  private last = 0;
+  private epoch = -1;
+  private violationCount = -1;
+  private routeTick = -1;
+  overlays = new Set<OverlayName>();
+  frames = 0;
+  loaded = false;
+  error = '';
+  onFrame: () => void = () => {};
+
+  constructor(private host: HTMLElement) {
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.95;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.host.appendChild(this.renderer.domElement);
+    this.host.appendChild(this.css.domElement);
+    this.css.domElement.className = 'lab-css';
+    this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
+    this.orbit.maxPolarAngle = Math.PI * 0.495;
+    this.scene.background = new THREE.Color('#bcd3e4');
+    this.scene.fog = new THREE.Fog('#bcd3e4', 70, 160);
+    this.scene.add(new THREE.HemisphereLight('#dfefff', '#8a7355', 1.3));
+    const sun = new THREE.DirectionalLight('#fff4e0', 2.4);
+    sun.position.set(-20, 35, 15);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, far: 100 });
+    this.scene.add(sun, this.humans.group);
+    const mk = (n: string) => Object.assign(new THREE.Group(), { name: `overlay:${n}` });
+    this.groups = { grid: this.grids.heat, traffic: this.grids.traffic, agents: this.agents.discs, labels: this.agents.labels, routes: mk('routes'), obstacles: mk('obstacles'), links: mk('links'), violations: mk('violations') };
+    for (const g of Object.values(this.groups)) this.scene.add(g);
+    this.sim.onReset = (rt) => this.reset(rt);
+    this.sim.onTick = (rt) => this.humans.onTick(rt.world);
+    loadTemplates(this.abort.signal, this.resources)
+      .then((ts) => {
+        this.humans.setTemplates(ts);
+        this.humans.reset(this.sim.rt.world);
+        this.loaded = true;
+      })
+      .catch((e) => {
+        if (!this.abort.signal.aborted) this.error = `Animated people could not load: ${e.message}`;
+      });
+    new ResizeObserver(() => this.resize()).observe(host);
+    this.resize();
+  }
+
+  private reset(rt: LabSim['rt']) {
+    this.statics?.dispose();
+    if (this.statics) this.scene.remove(this.statics.group);
+    this.statics = new StaticScene(rt.services.spatial.base);
+    this.scene.add(this.statics.group);
+    this.humans.reset(rt.world);
+    this.agents.clear();
+    this.epoch = -1;
+    this.violationCount = -1;
+    const [x, z, r] = this.sim.scenario.focus;
+    this.look([x + r * 0.9, r * 0.9, z + r * 1.1], [x, 0.8, z]);
+  }
+
+  look(pos: number[], target: number[]) {
+    this.camera.position.set(pos[0], pos[1], pos[2]);
+    this.orbit.target.set(target[0], target[1], target[2]);
+    this.orbit.update();
+  }
+
+  setOverlay(name: OverlayName, on: boolean) {
+    if (!OVERLAYS.includes(name)) throw Error(`unknown overlay "${name}" (have ${OVERLAYS.join(', ')})`);
+    if (on) this.overlays.add(name);
+    else this.overlays.delete(name);
+    this.epoch = -1;
+  }
+
+  private resize() {
+    const w = this.host.clientWidth || 1, h = this.host.clientHeight || 1;
+    this.renderer.setSize(w, h);
+    this.css.setSize(w, h);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  private syncOverlays() {
+    const rt = this.sim.rt, sp = rt.services.spatial as Spatial, on = this.overlays;
+    sp.sync(rt.world);
+    for (const n of OVERLAYS) this.groups[n].visible = on.has(n);
+    const held = new Set([...traffic(rt).keys()]);
+    if (on.has('grid') || on.has('traffic')) this.grids.sync(sp, held);
+    if (on.has('routes') && (this.routeTick !== rt.tick || this.epoch !== sp.epoch)) {
+      this.routeTick = rt.tick;
+      buildRoutes(this.groups.routes, rt);
+    }
+    if (this.epoch !== sp.epoch) {
+      this.epoch = sp.epoch;
+      if (on.has('obstacles')) buildObstacles(this.groups.obstacles, sp);
+      if (on.has('links')) buildLinks(this.groups.links, sp);
+    }
+    if (on.has('violations') && rt.violations.length !== this.violationCount) {
+      this.violationCount = rt.violations.length;
+      buildViolations(this.groups.violations, rt.violations);
+    }
+    const now = new Set(rt.violations.filter((v) => v.tick === rt.tick).flatMap((v) => v.subjects ?? []));
+    this.agents.update(rt, this.humans.positions(), now, on.has('agents'), on.has('labels'));
+  }
+
+  /** Render one frame; `dt` real seconds since the previous frame (0 = no sim advance). */
+  frame(dt: number) {
+    const alpha = this.sim.advance(dt);
+    this.statics?.sync(this.sim.rt.world);
+    this.humans.render(alpha);
+    this.syncOverlays();
+    this.renderer.render(this.scene, this.camera);
+    this.css.render(this.scene, this.camera);
+    this.frames++;
+    this.onFrame();
+  }
+
+  start() {
+    const loop = (t: number) => {
+      this.raf = requestAnimationFrame(loop);
+      const dt = this.last ? (t - this.last) / 1000 : 0;
+      this.last = t;
+      if (!document.hidden) this.frame(dt);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  info() {
+    const r = this.renderer.info;
+    return { calls: r.render.calls, triangles: r.render.triangles, geometries: r.memory.geometries, textures: r.memory.textures, frames: this.frames, humans: this.humans.info() };
+  }
+
+  dispose() {
+    cancelAnimationFrame(this.raf);
+    this.abort.abort();
+    this.humans.clear();
+    this.agents.clear();
+    this.statics?.dispose();
+    this.resources.dispose();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
+    this.css.domElement.remove();
+  }
+}
