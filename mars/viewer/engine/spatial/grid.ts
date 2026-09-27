@@ -3,7 +3,7 @@
 // Object as well as the browser. Rebuilt (or patched) when construction
 // changes the scene.
 import { obbCorners, obbOverlap, pointInObb, type OBB2, type Vec2 } from '../core/math.ts';
-import type { SpatialScene } from './types.ts';
+import type { Obstacle, SpatialScene } from './types.ts';
 
 export type LevelGrid = {
   level: number;
@@ -44,6 +44,31 @@ export function buildGrids(scene: SpatialScene, cell = 0.1): GridSet {
     levels.set(lv.id, { level: lv.id, y: lv.y, cell, nx, nz, x0: minX, z0: minZ, free, clearance: edt(free, nx, nz, cell), blockers });
   }
   return { cell, levels };
+}
+
+/**
+ * `base` (built by buildGrids from some scene) with `extra` obstacles appended to that scene.
+ * Bit-identical to rebuilding: obstacles only ever clear cells, so copy the base rasters, stamp
+ * the extras with the same rule and order, and rerun the exact EDT. Rasterising the base
+ * obstacles (thousands on the campus) dominates buildGrids; this skips it.
+ */
+export function gridsWithObstacles(base: GridSet, extra: Obstacle[]): GridSet {
+  const levels = new Map<number, LevelGrid>();
+  for (const [id, g] of base.levels) {
+    let free: Uint8Array | null = null;
+    let blockers = g.blockers;
+    for (const o of extra) {
+      if (o.y1 <= g.y + STEP || o.y0 >= g.y + BODY_HEIGHT) continue;
+      rasterObb(o.obb, g.x0, g.z0, g.cell, g.nx, g.nz, (i) => {
+        if (!(free ?? g.free)[i]) return;
+        if (!free) { free = g.free.slice(); blockers = new Map(g.blockers); }
+        blockers.set(i, o.id);
+        free[i] = 0;
+      }, true);
+    }
+    levels.set(id, free ? { ...g, free, blockers, clearance: edt(free, g.nx, g.nz, g.cell) } : g);
+  }
+  return { cell: base.cell, levels };
 }
 
 /**

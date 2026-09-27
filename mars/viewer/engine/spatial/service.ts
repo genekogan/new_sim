@@ -6,12 +6,14 @@ import { hashOf } from '../core/hash.ts';
 import { rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
-import { buildGrids, type GridSet } from './grid.ts';
+import { buildGrids, gridsWithObstacles, type GridSet } from './grid.ts';
 import { findRoute, type Place, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
+/** Bounded memo of people-augmented grids (each holds full-size rasters). */
+const AROUND_CACHE = 8;
 
 /** World-space box corners for an entity (handles yaw/pitch/roll). */
 export function entityCorners(e: Entity): [number, number, number][] {
@@ -113,26 +115,34 @@ export class Spatial {
     return this.grids.levels.get(id);
   }
 
+  private aroundCache = new Map<string, { scene: SpatialScene; grids: GridSet }>();
   /**
-   * One-off route treating standing people as temporary obstacles (used when a
-   * walker has been blocked by someone who is not moving). Builds throwaway grids;
-   * rare by design.
+   * Grids of the current scene with the given standing people added as soft obstacles (for
+   * replanning around them). Exact — identical to buildGrids of the augmented scene — but built
+   * incrementally from the synced grids and memoised per (epoch, ordered people, exact positions).
    */
-  /** Grids of the current scene with the given people added as soft obstacles (for replanning around them). */
   gridsAround(world: WorldState, people: { id: string; p: Vec2 }[]): { scene: SpatialScene; grids: GridSet } {
     this.sync(world);
-    const extra: Obstacle[] = people.map((q) => ({ id: q.id, obb: { c: q.p, half: [0.3, 0.3], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid', label: `person ${q.id}` }));
-    const scene = { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] };
-    return { scene, grids: buildGrids(scene, this.cell) };
-  }
-
-  routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: { id: string; p: Vec2 }[]): RouteResult {
-    this.sync(world);
+    const key = `${this.epoch}|${people.map((q) => `${q.id}@${q.p[0]},${q.p[1]}`).join(';')}`;
+    let hit = this.aroundCache.get(key);
+    if (hit) {
+      this.aroundCache.delete(key);
+      this.aroundCache.set(key, hit);
+      return hit;
+    }
     // people as obstacles: 0.3 m half-width so corridors pass ≥ 0.58 m from them (the hard
     // separation guard is 0.54 m); the route start snaps within 0.5 m if someone stands close
     const extra: Obstacle[] = people.map((q) => ({ id: q.id, obb: { c: q.p, half: [0.3, 0.3], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid', label: `person ${q.id}` }));
-    const scene = { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] };
-    return findRoute(buildGrids(scene, this.cell), scene, profile, start, goal);
+    hit = { scene: { ...this.scene, obstacles: [...this.scene.obstacles, ...extra] }, grids: gridsWithObstacles(this.grids, extra) };
+    for (const k of this.aroundCache.keys()) if (this.aroundCache.size >= AROUND_CACHE || !k.startsWith(`${this.epoch}|`)) this.aroundCache.delete(k);
+    this.aroundCache.set(key, hit);
+    return hit;
+  }
+
+  /** One-off route treating standing people as temporary obstacles (a walker blocked by someone not moving). */
+  routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: { id: string; p: Vec2 }[]): RouteResult {
+    const { scene, grids } = this.gridsAround(world, people);
+    return findRoute(grids, scene, profile, start, goal);
   }
 
   private narrowCache = new Map<string, Int32Array>();
