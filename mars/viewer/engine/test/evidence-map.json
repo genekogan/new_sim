@@ -83,9 +83,10 @@
         { "file": "construction.test.ts", "title": "raise choreography (4 people)" },
         { "file": "construction.test.ts", "title": "raise choreography: an obstacle on the lifter" },
         { "file": "construction.test.ts", "title": "raise choreography (1 person, 8 ft frame)" },
+        { "file": "construction.test.ts", "title": "19 ft bay: 3 people raise each 19 ft frame" },
         { "file": "review.test.ts", "title": "C2: people holding up a frame cannot be assigned to carry" }
       ],
-      "approximate": "Successful raises use 12 ft (and 8 ft) frames; the 19 ft frame is exercised only on the rejection path. The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics."
+      "approximate": "The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics. The 19 ft raise is proven on open ground only (no 19 ft raise beside other structures)."
     },
     {
       "id": "construction-changes-navigation",

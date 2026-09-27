@@ -309,3 +309,71 @@ test('raise choreography (1 person, 8 ft frame): the lifter walks it up and ends
   assert.ok(Math.hypot(h.pose.p[0] - st.p[0], h.pose.p[2] - st.p[1]) < 1e-6, 'ends at the base station');
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
+
+// ---- 19 ft frames (catalog: raiseCrew 3, holdCrew 2): a successful raise, not only the refusal ----
+
+test('19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s), premature release refused, 12 ft beams at 0.5 m + 1.8 m, stable release', () => {
+  const T19 = def('upright-19ft'), L12 = def('beam-12ft').size[0], D19 = T19.size[0], R19 = T19.size[2] / 2;
+  assert.equal(T19.handling?.raiseCrew, 3);
+  assert.equal(T19.handling?.holdCrew, 2);
+  const base = openGround();
+  const w = addAll(
+    emptyWorld('open-ground', base),
+    // A lies toward −z (yaw π), B toward +z (yaw 0); bases one 12 ft beam apart
+    component('A', 'upright-19ft', [0, 0, 0], Math.PI, { phase: 'staged', pose: { p: [0, R19, 0], yaw: Math.PI, pitch: LYING } }),
+    component('B', 'upright-19ft', [0, 0, L12], 0, { phase: 'staged', pose: { p: [0, R19, L12], yaw: 0, pitch: LYING } }),
+    ...['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'].map((id, i) => human(id, -6 + i * 1.2, -9)),
+  );
+  const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
+  const rt = new Runtime(w, reg, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS, uprightsSupported, liftHandsInReach]);
+
+  for (const [item, crew] of [['A', ['p1', 'p2', 'p3']], ['B', ['p4', 'p5', 'p6']]] as const) {
+    const r = rt.submit('raise_upright', { crew: [...crew], item });
+    assert.notEqual(r.status, 'failed', r.diagnostic?.message);
+    const lifters = raiseRoles([...crew]).filter((x) => x.lifter).map((x) => x.actor);
+    assert.deepEqual(lifters, crew.slice(1), 'one footer, two lifters');
+    const seen = watchRaise(rt, r, item, lifters);
+    rt.runUntilIdle(20 * 180, [r.id]);
+    assert.equal(r.status, 'completed', r.diagnostic?.message);
+    assert.ok(seen.ticks > 40, `lifters walked ${item} up over ${seen.ticks} ticks`);
+    assert.deepEqual(crew.map((id) => seen.slots.get(id)), [['foot-l', 'hold-0'], ['lift-far', 'hold-1'], ['lift-far', 'hold-2']]);
+    assert.ok(seen.maxHandY <= 1.9 + 1e-9, `lifter hands at most ${seen.maxHandY.toFixed(3)} m up`);
+    assert.ok(seen.maxHandDist <= 0.9 && seen.maxReach <= 0.9, `hands/frame within reach: ${seen.maxHandDist.toFixed(3)} / ${seen.maxReach.toFixed(3)} m`);
+    assert.ok(seen.maxSpeed <= 0.6 + 1e-6, `lifter ground speed ≤ 0.6 m/s (max ${seen.maxSpeed.toFixed(3)})`);
+    assert.ok(r.history.some((h) => h.phase === 'step'), 'the station-2 lifter stepped around the footer');
+    const u = rt.world.entities[item];
+    assert.equal(u.pose.pitch, 0);
+    assert.deepEqual(u.support, { kind: 'held', by: [...crew] });
+    const st = holdStations(u, 3);
+    for (const [i, id] of crew.entries()) {
+      const h = rt.world.entities[id];
+      assert.ok(Math.hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
+      assert.equal(h.human!.grip?.slot, `hold-${i}`);
+    }
+    const early = rt.submit('release_support', { item });
+    assert.equal(early.diagnostic?.code, 'support.release-premature');
+  }
+  // beams lie on the ground under their seats, along the bay
+  const x = D19 / 2;
+  rt.world.entities.b1 = component('b1', 'beam-12ft', [-x, 0, L12 / 2], Math.PI / 2, { phase: 'staged' });
+  rt.world.entities.b2 = component('b2', 'beam-12ft', [x, 0, L12 / 2], Math.PI / 2, { phase: 'staged' });
+  rt.world.entities.b3 = component('b3', 'beam-12ft', [-x + 0.25, 0, L12 / 2], Math.PI / 2, { phase: 'staged' });
+  rt.world.entities.b4 = component('b4', 'beam-12ft', [x - 0.25, 0, L12 / 2], Math.PI / 2, { phase: 'staged' });
+  const connect = (beam: string, column: 'l' | 'r', height: number) => {
+    const r = run(rt, 'connect_beam', { crew: ['p7', 'p8'], beam, a: 'A', b: 'B', column, height });
+    assert.equal(r.status, 'completed', `${beam}: ${r.status} ${r.phase} ${r.diagnostic?.message}`);
+  };
+  connect('b1', 'r', 0.5);
+  connect('b2', 'l', 0.5);
+  const mid = rt.submit('release_support', { item: 'A' });
+  assert.equal(mid.diagnostic?.code, 'support.release-premature', 'one beam level is not enough for 19 ft frames');
+  assert.match(mid.diagnostic!.message, /≥2 heights/);
+  connect('b3', 'r', 1.8);
+  connect('b4', 'l', 1.8);
+  assert.ok(groupStability(rt.world, rt.world.entities.A).stable, JSON.stringify(groupStability(rt.world, rt.world.entities.A).missing));
+  assert.equal(run(rt, 'release_support', { item: 'A' }).status, 'completed');
+  assert.equal(run(rt, 'release_support', { item: 'B' }).status, 'completed');
+  assert.equal(rt.world.entities.A.phase, 'installed');
+  assert.equal(rt.world.entities.B.phase, 'installed');
+  assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
