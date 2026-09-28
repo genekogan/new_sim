@@ -1107,3 +1107,4 @@ Then: gate → release 5; HANDOFF refresh.
 - **Weak spots:** the 2022 photo buildings are not named (which house is which decides X- vs Z-mirror; asked on the
   card). Q21 rests on one wet-day nadir whose north comes from the tire ring, not EXIF. The eye-level 2026 capture only
   identifies Chiba.
+- **W44 landed** `5eeedb7`, `047fc68` (≈190k tokens, 40 min; merged): cards Q20 (2022 mirrored — model vs DJI_0829 north-up, spin arrows), Q21 (2024 kitchen + trailer ring north or south of Chiba — vs DJI_20240122144543_0335_D), Q22 (2026 north ≈ 33° off — vs DJI_0005; option "each year's own north"), all "worth answering first" with outlined captures + drone stills; page 17 open / 3 answered; STUDIO_REPLAY moments, YEAR_BUILD camera table, CAMPUS_SCENE per-year north. Lead LOOKED at q20-2022-model-vs-drone: accepted. Note: Q21's answer also settles Q2 for 2024.
