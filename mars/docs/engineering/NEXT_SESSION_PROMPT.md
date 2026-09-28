@@ -23,7 +23,7 @@ small tool calls and early commits, and forbid host `Math.sin/cos/atan2…` in `
 
 **Ground truth at the checkpoint (verify, don't assume):**
 - Repo: local git only at `<mars-campus-repo>` (author genekogan; no remote yet —
-  Gene adds github.com/genekogan; never push without him). Tree clean at HEAD; ~165 commits.
+  Gene adds github.com/genekogan; never push without him). Tree clean at HEAD (~170 commits). Production = release 5 (`cebd5827…`, rollback `89e65c8c…`).
 - Gates: `cd viewer && npm run gate` (unit 56, engine ≈ 243 pass / 1 skip / 1 todo, tsc, Playwright e2e,
   determinism probe). `npm run evidence` regenerates EVIDENCE.md. `deploy/director-demo.mjs` and
   `deploy/simulation-integration.mjs` exercise the real MCP control plane against `wrangler dev`.
@@ -33,7 +33,16 @@ small tool calls and early commits, and forbid host `Math.sin/cos/atan2…` in `
 - Pinned hashes (determinism probe, stress-30, campus flagship) are listed in PLANNING_BUDGET.md /
   planning.test.ts; a behaviour change that moves them must say so and re-pin with a reason.
 
+**Gene's product feedback after release 5 — read `docs/engineering/OWNER_FEEDBACK_2026-09-28.md` first;
+it outranks the list below.** In short: (5) materials go up by hand-up between a ground crew and two
+receivers standing on the beams/uprights (builders climb and stand on the rack structure while staging —
+that is how Martian floors are made), or by forklift; nothing levitates; (3) walkers must notice an
+obstacle the tick it happens and never push into it for strides; (2) turns are gradual splined paths,
+not straight–pivot–straight; (4) real stair climbing with feet on the treads (leg IK); (1) an animated
+fire instead of the static cone. Items 2–4 move pinned hashes: do them early and re-pin once.
+
 **Known open items, in priority order (details in HANDOFF "Suggested next tranche"):**
+0. Then the grid-origin fix below, in the same re-pin.
 1. Grid cell centres depend on the grid origin, so the uncropped campus run is physically identical to
    the cropped one but not hash-identical (`engine/test/campus-full.test.ts` todo). Fix in
    `spatial/grid.ts` at the START of a session (it re-pins every hash), then regenerate takes.
