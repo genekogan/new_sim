@@ -161,6 +161,55 @@ The 2024 stepped panels and every year's roof arrays come from the same verbs.
 Where: catalog (`solar-panel-<size>`, `panel-rail`), `construction/solar.ts` (install verbs with
 support: rails on framing), piles in the year bill of materials, renderer.
 
+## 11. Autonomous, expressive camera direction (a full tranche)
+Today the camera planner takes a typed shot list (fixed/follow/orbit/frameGroup/path/reveal/establishing)
+and validates collision, occlusion and smoothness against prisms, people and take parts. Gene wants a
+layer above it that turns *directions* into excellent, self-correcting camera work, e.g.:
+- "do a pan across Chiba with the sunset in the background"
+- "do a 270° revolution around the main pallet racks over 2 minutes"
+- "go inside the kitchen and face the sink"
+- "look at this crowd of people having this activity"
+Target — three layers, all deterministic and testable:
+1. **Direction language → shot program.** A typed `CameraDirection` vocabulary the director (LLM) fills
+   in: subject(s) by name/region/activity ("the main pallet racks", "the crowd doing X" → the group
+   currently in that social action), motion verb (pan, tilt, dolly, orbit/revolve by angle, crane, push-in,
+   pull-out, fly-through, hold), duration/speed, framing (wide/medium/close, headroom, rule-of-thirds
+   target), context constraints ("with the sunset in the background" → azimuth/elevation window computed
+   from `env/sun.ts` for the take's date-time; "inside the kitchen" → region + interior camera mode;
+   "face the sink" → a named fixture/affordance as look-at). Resolve names through the semantic world
+   (regions, assemblies, catalog, social slots) and reject ambiguity with a structured question, not a
+   guess. Compile to a shot program: keyframed pose + look-at + lens over time.
+2. **Trajectory synthesis with calculation, not hand-placed keys.** Given the program, *compute* the
+   path: orbit radius from the subject's extent and lens; sunset-behind means the camera azimuth is
+   opposite the sun within a tolerance band and the elevation keeps the sun in frame without blowing out
+   the subject; interior moves are planned as paths through the walkable/flyable volume (a camera
+   navmesh: the level grids plus a "flight" layer above head height, rooms as regions, door openings as
+   links) so "go inside the kitchen" is a collision-free route through the door, not a straight line
+   through a wall; smoothness by C² splines with speed easing; the subject stays framed by continuous
+   look-at solving.
+3. **Self-correction against failure modes.** Before committing, simulate the whole shot against the take
+   and score every sample (existing readability/collision/coherence plus new checks): stuck between two
+   sheets of plywood or inside a rack bay (free-space radius below a minimum → re-route or lift), behind
+   a person's head (people occluders — already modelled — plus a "foreground blob" penalty), sun flare
+   directly on axis, subject leaving frame during an orbit because it moves (orbit centre follows the
+   subject's predicted path), horizon tilt, motion sickness (angular velocity/acceleration caps), and
+   cut points when a continuous shot cannot be made valid. Correction strategies are explicit and ranked
+   (raise, widen, swing, re-route, shorten, split into two shots, cut) and the chosen fix is recorded in
+   the track's report with the reason, so a director can read why a shot changed. Verify the final track
+   with the render-side raycast pass (CAMERA_VERIFY) and feed disagreements back as a regression.
+Proof: a test suite of direction sentences → expected shot programs (unit), synthesized tracks that are
+valid on the campus take and on year scenes (including an interior kitchen move through a door and a
+270° orbit of a rack bay with crew moving inside it), a "stuck between plywood" fixture that must be
+self-corrected, sunset-behind verified against the sun model, and the MCP tool `engine_direct_camera
+{ take, directions[] }` returning the track plus the corrections report. Studio: the direction text and
+the resulting shot list shown in the replay bar.
+Where: `engine/camera/direct.ts` (vocabulary + compiler), `engine/camera/synth.ts` (trajectory
+synthesis, camera navmesh/flight layer using `spatial/`), `engine/camera/solve.ts` (new failure modes +
+ranked corrections), `env/sun.ts` (sun-behind windows), `api/` (tool), studio replay UI. Keep the rule
+that cameras never mutate the world and never hide geometry except in an explicit cutaway mode.
+Size: a full tranche on its own; schedule after the hand-up/handling work and the first year replay,
+because the year replays are what it will be pointed at.
+
 ## 10. What "done" looks like for this thread
 The studio's year picker offers, for each year, **"Watch it being built"**: a take from empty desert +
 piles to the canonical campus, with the engine camera, at any speed, with the log of every refusal
@@ -172,5 +221,6 @@ tranche's headline.
 the crouch) — these are prerequisites for 7; then 7 (the headline: full-year construction replays, start
 with 2026 or the simplest year, skeleton stage first as its own demo), with 9 (solar) and 8 (paint) as
 verbs inside it; 3 and 2 (movement quality, spec §10) and 4 alongside because every construction take
-shows them; 1 (fire) last. Items 2–4 change pinned hashes; do them early in a
+shows them; 1 (fire) last. Item 11 (autonomous camera direction) is its own tranche once the first
+year replay exists to point it at. Items 2–4 change pinned hashes; do them early in a
 session and re-pin once, with the reason recorded in PLANNING_BUDGET.md.

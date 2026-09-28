@@ -56,7 +56,12 @@ raw material piles (strapped plywood/2x4/2x6 bundles, uprights, beams, solar pan
 doors/windows where the reconstruction has them, a wood-cutting station) to the canonical campus — skeleton
 first (racks, 2x4 framing, stair/ramp), then floors/ceilings/walls gradually and safely — ending EQUAL to the
 year's protected checkpoint, watchable in the studio as "Watch it being built" with the engine camera and the
-refusal log. Also: people can stand in front of a wall and paint it. Photos of the real skeleton stage and
+refusal log. Also: people can stand in front of a wall and paint it. A separate full tranche (feedback §11): autonomous, expressive camera direction — directions like
+"pan across Chiba with the sunset behind", "270° revolution around the main racks over 2 minutes", "go inside
+the kitchen and face the sink", "look at this crowd doing X" compile to shot programs, trajectories are
+*computed* (orbit radius from subject extent, sun-behind windows from the sun model, interior moves routed
+through doors on a camera navmesh), and every shot is simulated and self-corrected against failure modes
+(stuck between plywood, behind a head, flare, subject leaving frame) with the fix and reason recorded. Photos of the real skeleton stage and
 piles are in `docs/engineering/evidence/`. Items 2–4 move pinned hashes: do them early and re-pin once.
 
 **Known open items, in priority order (details in HANDOFF "Suggested next tranche"):**
