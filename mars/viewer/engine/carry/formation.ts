@@ -76,7 +76,7 @@ export function orientationFor(d: AssetDef, pose: 'flat' | 'edge'): Orientation 
   return yVertical ? { pitch: 0, roll: 0 } : { pitch: -Math.PI / 2, roll: 0 };
 }
 
-/** Human-legible short name: "19 ft upright", "12 ft beam", "8 ft 2x4", "4x8 plywood sheet". */
+/** Human-legible short name: "19 ft upright", "12 ft beam", "8 ft 2x4", "4x8 plywood sheet", "4x6 plywood sheet". */
 export function shortName(defId: string): string {
   let m = /^upright-(\d+)ft$/.exec(defId);
   if (m) return `${m[1]} ft upright`;
@@ -84,7 +84,8 @@ export function shortName(defId: string): string {
   if (m) return `${m[1]} ft beam`;
   m = /^2x4-(\d+)ft$/.exec(defId);
   if (m) return `${m[1]} ft 2x4`;
-  if (defId.startsWith('plywood')) return '4x8 plywood sheet';
+  m = /^plywood-(\d+x\d+)$/.exec(defId);
+  if (m) return `${m[1]} plywood sheet`;
   return def(defId).label;
 }
 

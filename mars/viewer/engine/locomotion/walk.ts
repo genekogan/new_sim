@@ -94,7 +94,8 @@ const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
 const targetOf = (ex: Exec) => (ex.detour?.stage === 'going' ? { level: ex.detour.level, p: ex.detour.spot } : ex.goal);
 /** Live walk_to execs by action id (so `makeWay` can ask a blocked walker to step aside). */
 const walkExecs = (rt: Runtime): Map<string, Exec> => (rt.services.walkExecs ??= new Map());
-export const traffic = (rt: Runtime): Map<string, { actors: Set<string>; entry: Vec2; dir: Vec2 }> =>
+/** Traffic resources. `exclusive` (a carrier with a load on a flight): nobody else may enter, whatever their direction. */
+export const traffic = (rt: Runtime): Map<string, { actors: Set<string>; entry: Vec2; dir: Vec2; exclusive?: boolean }> =>
   (rt.services.traffic ??= new Map());
 
 function actorOf(rt: Runtime, id: string): Entity | Diagnostic {
@@ -582,7 +583,8 @@ function loadIntrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number)
   return null;
 }
 
-function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: number): string | null {
+/** A person that moving from `from` to `to` on a flight would bring `me` within 2r of (and closer). Also used by the carry climb. */
+export function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: number): string | null {
   for (const o of Object.values(rt.world.entities)) {
     if (o.id === me.id || o.kind !== 'human') continue;
     const dTo = Math.hypot(o.pose.p[0] - to[0], (o.pose.p[1] - to[1]) * 0.5, o.pose.p[2] - to[2]);
@@ -753,7 +755,7 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     // occupy the stair as a single-file resource
     const res = `link:${link.id}`;
     const t = traffic(rt).get(res);
-    if (t && t.actors.size && !t.actors.has(ex.actor) && dist2(t.entry, leg.ascending ? link.from.p : link.to.p) > 0.5) {
+    if (t && t.actors.size && !t.actors.has(ex.actor) && (t.exclusive || dist2(t.entry, leg.ascending ? link.from.p : link.to.p) > 0.5)) {
       ex.phase = 'align';
       return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${ex.actor} waits for ${[...t.actors][0]} to finish using ${link.id}`, subjects: [ex.actor, link.id] } };
     }

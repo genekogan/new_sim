@@ -5,12 +5,14 @@
 // never drops a load: it becomes a controlled set-down (deferred cancel) at
 // the current pose if that spot is clear, otherwise it is refused.
 import { z } from 'zod';
-import { angleDelta, clamp, dcos, dsin, wrapAngle, type Vec2 } from '../core/math.ts';
+import { angleDelta, clamp, dcos, dsin, rot2, wrapAngle, type Vec2 } from '../core/math.ts';
 import type { ActionDef, CancelResult, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import type { Spatial } from '../spatial/service.ts';
-import { makeWay, walkTo } from '../locomotion/walk.ts';
+import { makeWay, stairBlocker, traffic, walkTo } from '../locomotion/walk.ts';
+import { CARRY_CLIMB_SPEED, climbPose, type ClimbPose } from './climb.ts';
+import { entityFootprint } from '../spatial/service.ts';
 import { carriedPose, carrierSpots, entityFrame, formationFor, laidPose, worldDiscs, type SE2 } from './formation.ts';
 import { poseHit } from './sweep.ts';
 import { labelOf, laidIssue, planCarryAction, type CarryParams, type CarryProgram } from './validate.ts';
@@ -29,7 +31,7 @@ type Transition = { from: Pose; to: Pose; fromSpots: Vec2[]; toSpots: Vec2[]; ya
 type Exec = {
   id: string;
   p: CarryProgram;
-  phase: 'gather' | 'lift' | 'move' | 'set-down' | 'release';
+  phase: 'gather' | 'lift' | 'move' | 'climb' | 'set-down' | 'release';
   walks: (WalkExec | null)[];
   t: number;
   u: number;
@@ -41,6 +43,10 @@ type Exec = {
   epoch: number;
   replans?: number;
   waited?: number;
+  /** Climb (between levels): traversal parameter, whether the flight's traffic resource is held, done. */
+  s?: number;
+  onStair?: boolean;
+  climbed?: boolean;
 };
 
 export const carrySchema = z.strictObject({
@@ -48,6 +54,7 @@ export const carrySchema = z.strictObject({
   item: z.string().max(80),
   to: z.strictObject({ x: z.number().min(-500).max(500), z: z.number().min(-500).max(500), yaw: z.number().min(-7).max(7), level: z.number().int().min(0).max(20).optional() }),
   place: z.literal('lay').optional(),
+  via: z.string().max(80).optional(),
 });
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -357,6 +364,13 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       applyFormation(rt, ex, poseAtU(ex, ex.u));
       if (ex.u >= U - 1e-9) {
         applyFormation(rt, ex, p.traj.poses[p.traj.poses.length - 1]);
+        if (p.climb && !ex.climbed) {
+          // lined up level before the flight: climb with the load (the carrier steps on as walkers do)
+          ex.phase = 'climb';
+          ex.s = p.climb.s0;
+          ex.v = 0;
+          return { status: 'running', phase: 'climb' };
+        }
         // the set-down stations must be free of other people: idle bystanders are asked to step
         // aside (directed work outranks idling); the crew holds the load meanwhile
         const bystander = bystanderAt(rt, ex, p.setdown, entityFrame({ ...itemOf(rt, ex), pose: p.laid }));
@@ -368,6 +382,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       }
       return { status: 'running', phase: ex.phase };
     }
+    if (ex.phase === 'climb') return stepClimb(rt, ex, dt);
     if (ex.phase === 'set-down') {
       if (stepTransition(rt, ex, dt, SETDOWN_S)) {
         const item = itemOf(rt, ex);
@@ -392,6 +407,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         replans: ex.replans ?? 0,
         cancelled: ex.cancelling, x: ex.q.x, z: ex.q.z, yaw: e.pose.yaw,
         length: p.traj.length, rotation: p.traj.rotation, reverse: p.traj.reverse, expanded: p.stats.expanded,
+        ...(p.climb ? { level: p.level, via: p.climb.link.id } : {}),
       },
     };
   },
@@ -419,6 +435,16 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       ex.cancelling = true;
       return { ok: true, deferred: true };
     }
+    if (ex.phase === 'climb')
+      return {
+        ok: false,
+        diagnostic: {
+          code: 'carry.cancel-unsafe',
+          message: `cannot set the ${p.f.name} ${p.item} down on ${p.climb!.link.id}: nobody sets a load down on a flight; the carrier keeps climbing — cancel again once it is off the stairs`,
+          subjects: [p.item, p.climb!.link.id],
+          at: itemOf(rt, ex).pose.p,
+        },
+      };
     if (ex.phase === 'move') {
       const sp = rt.services.spatial as Spatial;
       sp.sync(rt.world);
@@ -441,3 +467,103 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
     return { ok: true, deferred: true };
   },
 };
+
+/** A non-crew person the next climb step would bring the carrier's body or the load closer to than allowed. */
+function climbBlocker(rt: Runtime, ex: Exec, next: ClimbPose): string | null {
+  const p = ex.p;
+  const me = crewOf(rt, ex)[0];
+  const body = stairBlocker(rt, me, me.pose.p, next.carrier, 0.28);
+  if (body) return body;
+  const item = itemOf(rt, ex);
+  const nowDiscs = worldDiscs(p.f, entityFrame(item).q).filter((d) => d.d.part === 'load');
+  const nextDiscs = worldDiscs(p.f, next.q).filter((d) => d.d.part === 'load');
+  const span = entityFootprint({ ...item, pose: next.load });
+  for (const o of Object.values(rt.world.entities)) {
+    if (o.kind !== 'human' || !o.human || p.crew.includes(o.id)) continue;
+    const y = o.pose.p[1];
+    if (y > span.y1 + 0.05 || y + 1.8 < span.y0 - 0.05) continue;
+    const x = o.pose.p[0], z = o.pose.p[2];
+    for (let k = 0; k < nextDiscs.length; k++) {
+      const d = nextDiscs[k];
+      const dn = Math.hypot(d.p[0] - x, d.p[1] - z);
+      if (dn >= d.d.r + 0.28 + 0.05) continue;
+      const c = nowDiscs[k];
+      if (!c || dn < Math.hypot(c.p[0] - x, c.p[1] - z) - 1e-9) return o.id;
+    }
+  }
+  return null;
+}
+
+/** Release the flight's traffic resource (walkers left on it keep a shared, non-exclusive entry). */
+function leaveStair(rt: Runtime, ex: Exec) {
+  if (!ex.onStair) return;
+  const res = `link:${ex.p.climb!.link.id}`;
+  const t = traffic(rt).get(res);
+  t?.actors.delete(ex.p.crew[0]);
+  if (t && !t.actors.size) traffic(rt).delete(res);
+  else if (t) t.exclusive = false;
+  ex.onStair = false;
+}
+
+/**
+ * The climb (single carrier): advance along the flight at walk_to's climbing speed; the load pose is
+ * re-derived from the traversal every tick (tilted along the flight, level on the landings). The flight
+ * is held as an exclusive traffic resource (walkers wait at either end); anyone the carrier or the load
+ * would walk into makes the carrier wait (`climb-wait`), idle people are asked to step aside.
+ */
+function stepClimb(rt: Runtime, ex: Exec, dt: number): StepResult {
+  const p = ex.p, c = p.climb!;
+  const h = crewOf(rt, ex)[0];
+  const face = wrapAngle(c.face);
+  const climbAct = c.ascending ? 'climb-up' : 'climb-down';
+  if (!ex.onStair) {
+    const sp = rt.services.spatial as Spatial;
+    sp.sync(rt.world);
+    const live = sp.scene.links.find((l) => l.id === c.link.id);
+    if (!live?.usable) {
+      h.human!.activity = 'carry';
+      return { status: 'blocked', diagnostic: { code: 'route.link-unusable', message: `${p.crew[0]} holds the ${p.f.name} ${p.item} at the ${c.ascending ? 'foot' : 'top'} of ${c.link.id}: it is no longer usable (${live?.reason ?? 'removed'})`, subjects: [p.item, c.link.id] } };
+    }
+    const res = `link:${c.link.id}`;
+    const entry = c.ascending ? c.link.from.p : c.link.to.p;
+    const t = traffic(rt).get(res);
+    if (t && t.actors.size && Math.hypot(t.entry[0] - entry[0], t.entry[1] - entry[1]) > 0.5) {
+      h.human!.activity = 'carry';
+      return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${p.crew[0]} carrying ${p.item} waits for ${[...t.actors][0]} to finish using ${c.link.id}`, subjects: [p.crew[0], p.item, c.link.id] } };
+    }
+    if (t) { t.actors.add(p.crew[0]); t.exclusive = true; }
+    else traffic(rt).set(res, { actors: new Set([p.crew[0]]), entry, dir: rot2([1, 0], face), exclusive: true });
+    ex.onStair = true;
+  }
+  const s = Math.min(c.s1, ex.s! + CARRY_CLIMB_SPEED * dt);
+  const next = climbPose(p.f, c, s);
+  const who = climbBlocker(rt, ex, next);
+  if (who) {
+    h.human!.activity = 'climb-wait';
+    const end = climbPose(p.f, c, c.s1).carrier;
+    makeWay(rt, who, [end[0], end[2]]);
+    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${p.crew[0]} carrying ${p.item} waits on ${c.link.id} for ${who} to move`, subjects: [p.crew[0], who, p.item, c.link.id], at: next.carrier } };
+  }
+  ex.s = s;
+  itemOf(rt, ex).pose = next.load;
+  h.pose = { p: next.carrier, yaw: face };
+  h.human!.activity = climbAct;
+  ex.q = next.q;
+  if (s + c.along >= c.sExit - 1e-9) h.human!.level = c.toLevel;
+  if (s < c.s1 - 1e-9) return { status: 'running', phase: 'climb' };
+  // off the flight, level on the exit landing: continue as an ordinary formation on the exit level
+  leaveStair(rt, ex);
+  h.human!.level = c.toLevel;
+  p.traj = c.deck;
+  p.level = c.toLevel;
+  p.levelY = c.toY;
+  ex.u = 0;
+  ex.i = 0;
+  ex.v = 0;
+  ex.climbed = true;
+  ex.phase = 'move';
+  ex.epoch = -1; // re-check the exit-level leg against the current scene on the next tick
+  h.human!.activity = 'carry';
+  applyFormation(rt, ex, p.traj.poses[0]);
+  return { status: 'running', phase: 'move' };
+}

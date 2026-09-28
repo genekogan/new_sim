@@ -12,6 +12,7 @@ graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.te
 | `validate.ts` | Plan-time validation (`plan()`): crew, item state, pickup, target, route, approach walks |
 | `actions.ts` | The `carry` ActionDef: gather → lift → move → set-down → release; cancellation |
 | `invariants.ts` | `carryIntegrity` end-of-tick invariant (`CARRY_INVARIANTS`) |
+| `climb.ts` | Between levels: flight traversal geometry (tilted load, lateral offsets), step-profile clearance |
 | `scenes.ts` | Carry proving scene: yard + 2.5 m L corridor (A), yard + 1.5 m L corridor + far yard (B) |
 
 ## Formation model
@@ -91,7 +92,7 @@ graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.te
 - Reservations: `actor:<id>` exclusive per crew member, `entity:<item>` exclusive.
 - Validation (all before anything moves): known humans on one level; item is a
   component lying on the ground (`stored|staged`, support `ground`); crew rules;
-  same-level target (`carry.level-change` otherwise); pickup (carriers can stand
+  another-level target only for one carrier (see *Between levels*; `carry.level-change` for crews); pickup (carriers can stand
   beside the lying item and the lifted formation is clear: `carry.pickup-blocked`);
   target (`carry.target-blocked` for exact laid-footprint problems); the
   whole-formation route; approach walks on a grid where the lying item is an
@@ -112,6 +113,22 @@ graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.te
   clear, deferred controlled set-down there (record ends `cancelled`), else
   refused with `carry.cancel-unsafe` and the carry continues. Set-down/release →
   deferred (already stopping). Never drops or teleports a load.
+
+## Between levels (one carrier; `engine/test/carry-stairs.test.ts`)
+- `to.level` ≠ the crew's level, crew of 1: flight = `via` (a link id) or the one a person's route
+  takes (`route.link-unusable` names missing treads; > 1 flight → `carry.multi-flight`). Refused
+  `carry.stairs-too-narrow` (naming the stair) if width < max(cross-section) + 0.2 m, or < load +
+  REACH + body radius side by side (a 4x6 sheet on edge needs 1.42 m; stairs A are 1.0 m).
+- Plan: SE(2) leg to a level line-up before the first step → climb along the link centreline at
+  0.45 m/s (load ends carryHeight above C(s ± L/2): level on landings, tilted with the flight, e.g.
+  37° on stairs A; load + carrier span centred on the flight) → SE(2) leg on the upper grid →
+  set-down at that level's y (`staged`, support `ground`: `stagedCheck` passes; it checks distance only).
+- Checked per plan sample and per tick (`carryStairsClearance`): every box-edge point ≥ step height
+  under it − 0.02 m (`carry.stairs-clearance`); plan-time also other obstacles, incl. overhead ones.
+- On the flight: exclusive traffic resource (walkers wait, `traffic.yield`); anyone the carrier or load
+  would walk into → `climb-wait` / `traffic.person` (idle people asked to step aside); cancel refused.
+- Descending = reversed traversal. Not supported: crews on flights, ladders, turning flights, > 1
+  flight, loads whose carry pose has a pitch (plywood on edge), replanning mid-flight.
 
 ## Invariant `carryIntegrity`
 For every component in phase `carried`: support must be `held` by humans who
@@ -136,8 +153,8 @@ slot-derived spot (`carry.grip-drift`) and the load's disc cover clears static g
 <sub>Submit timing re-measured 2026-09-27 (two runs) with `cd viewer && node --test --test-name-pattern="12 ft beam around the L corner" engine/test/carry.test.ts` (prints `plan+validate`); other rows not re-measured.</sub>
 
 ## Known limitations
-- Loads stay level: no tilting/pitching a load to clear an obstacle or to
-  swing it over a rail; no carrying on stairs, ladders or between levels.
+- Loads stay level on floors (they tilt only along a flight, see *Between levels*): no tilting a
+  load to clear an obstacle or swing it over a rail; no crews on stairs, no ladders.
 - The formation is rigid: carriers never shift along the load, change sides,
   or re-grip mid-route; a 2-person crew cannot "pivot around the rear man".
 - Other people are not part of the plan: bystanders are not avoided or yielded

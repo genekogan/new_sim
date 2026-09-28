@@ -10,6 +10,7 @@ import { entityFrame, formationFor, gripError } from './formation.ts';
 import { poseHit } from './sweep.ts';
 import { activeLoadDiscs } from './actions.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
+import { linkUnder, stairClearance } from './climb.ts';
 
 export const GRIP_TOL = 0.05; // m
 const CLEAR_TOL = 0.03; // m, same tolerance as the human clearance invariant
@@ -75,4 +76,33 @@ export const humanLoadClearance: Invariant = (rt: Runtime) => {
   return out;
 };
 
-export const CARRY_INVARIANTS = [carryIntegrity, humanLoadClearance];
+/**
+ * A load carried on a flight (crew activity climb-*) stays above the flight's step profile: every
+ * sampled point of its box is at least the step height under it − 0.02 m (climb.ts stairClearance).
+ * The flight is found geometrically (nearest link centreline), not from the action.
+ */
+export const carryStairsClearance: Invariant = (rt: Runtime) => {
+  const out: Diagnostic[] = [];
+  const ents = rt.world.entities;
+  let sp: Spatial | null = null;
+  for (const e of Object.values(ents)) {
+    if (e.kind !== 'component' || e.phase !== 'carried' || e.support?.kind !== 'held' || !e.support.by.length) continue;
+    if (!e.support.by.every((c) => ents[c]?.human?.activity.startsWith('climb'))) continue;
+    if (!sp) { sp = rt.services.spatial as Spatial; sp.sync(rt.world); }
+    const f = formationFor(e.def, e.support.by.length);
+    const q = entityFrame(e).q;
+    const link = linkUnder(sp.scene.links, [q.x, q.z], f.length);
+    if (!link) continue;
+    const iss = stairClearance(link, e.def, e.pose);
+    if (iss)
+      out.push({
+        code: 'carry.stairs-clearance',
+        message: `carried ${e.id} (${f.name}) is ${iss.deficit.toFixed(3)} m below the ${iss.surface.toFixed(2)} m step surface of ${link.id} at (${iss.at[0].toFixed(2)}, ${iss.at[1].toFixed(2)}, ${iss.at[2].toFixed(2)})`,
+        subjects: [e.id, link.id],
+        at: iss.at,
+      });
+  }
+  return out;
+};
+
+export const CARRY_INVARIANTS = [carryIntegrity, humanLoadClearance, carryStairsClearance];
