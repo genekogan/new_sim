@@ -29,7 +29,7 @@ function wall(extra: Entity[] = [], bottom = 0) {
   return new Runtime(w, reg, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS]);
 }
 
-test('paint green: a person on the ground paints a standing 4x8 sheet — the reachable band 0.5–2.1 m reaches coverage 1.0, hands in the envelope every tick, progress in the take', () => {
+test('paint green: a person on the ground paints a standing 4x8 sheet — the reachable band 0.5–2.06 m reaches coverage 1.0, hands in the envelope every tick, progress in the take', () => {
   const rt = wall();
   const rec = new TakeRecorder(rt, { rulesVersion: 'test' });
   const r = rt.submit('paint', { actor: 'p1', panel: 'w1', color: '#e8c547' });
@@ -61,7 +61,7 @@ test('paint green: a person on the ground paints a standing 4x8 sheet — the re
     if (band.to <= REACH_LO + 1e-9 || band.from >= REACH_HI - 1e-9) assert.equal(band.coverage, 0, `band ${band.from}–${band.to} (out of reach) unpainted`);
   }
   assert.equal(p.bands.find((b) => b.from === 0.4)!.coverage, 0.5, 'half of the 0.4–0.6 band is within reach');
-  assert.equal(p.coverage, Math.round((1.6 / 2.4384) * 100) / 100);
+  assert.equal(p.coverage, Math.round(((REACH_HI - REACH_LO) / 2.4384) * 100) / 100); // 0.5–2.06 m of 2.44 m
   assert.equal(E.p1.human!.hands, undefined, 'hands cleared at the end');
   assert.deepEqual(rt.violations, [], JSON.stringify(rt.violations.slice(0, 3)));
   // the take has it: coverage changes over time, the final state carries the paint
@@ -80,7 +80,7 @@ test('paint refusals: a non-paintable beam, a band above reach from the ground, 
   assert.match(beam.diagnostic!.message, /8 ft .*bm has no paintable face/);
   const top = rt.submit('paint', { actor: 'p1', panel: 'w1', texture: 'flower-mural-2024', band: { from: 2.1, to: 2.4384 } });
   assert.equal(top.diagnostic?.code, 'paint.out-of-reach');
-  assert.match(top.diagnostic!.message, /p1 standing on the ground \(floor 0\.00 m\) reaches 0\.50–2\.10 m; the band 2\.10–2\.44 m of w1's front face \(2\.10–2\.44 m\) is above that — stand on a deck or beam/);
+  assert.match(top.diagnostic!.message, /p1 standing on the ground \(floor 0\.00 m\) reaches 0\.50–2\.06 m; the band 2\.10–2\.44 m of w1's front face \(2\.10–2\.44 m\) is above that — stand on a deck or beam/);
   const both = rt.submit('paint', { actor: 'p1', panel: 'w1', color: 'red', texture: 'x' });
   assert.equal(both.diagnostic?.code, 'paint.what');
   // a sheet whose bottom edge is 2.3 m up: nothing of it is within reach from the ground

@@ -26,11 +26,12 @@ import { checkStations, childrenState, walkCrew, type Children } from './childre
 import { f2, lerpPose, smooth, spatialOf, sweepPoses } from './access.ts';
 import { flatObb, isPlywood, memberTop } from './deck.ts';
 import { envelopeGap, nearestOnRect, setHands } from './handup.ts';
+import { BODY_MODEL } from '../body/model.ts';
 
 const DEG = Math.PI / 180;
 export const STAGE_NEAR = 1.0; // m: rails / equipment / a low panel are set in place from within this of their place
-export const REACH_UP = 2.1; // m above the floor: standing reach (above it: hand_up or the forklift)
-export const REACH_DOWN = 1.0; // m below the floor (a deck edge)
+export const REACH_UP = BODY_MODEL.overheadMax; // m above the floor: standing reach, 2.06 (above it: hand_up or the forklift)
+export const REACH_DOWN = BODY_MODEL.reachDownBelowFeet; // m below the floor (a deck edge)
 export const PLACE_SPEED = 0.3; // m/s moving a part into place by hand
 export const LIFT_CLEAR = 0.08; // m: a part is lifted this far above both its rest and its place while moved
 export const STAND_OFF = 0.45; // m from a part's edge to the station of the person placing it

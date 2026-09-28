@@ -137,14 +137,15 @@ test('solar green: rails fastened on a 2.4 m deck, a panel handed up onto them a
   // its low edge sits on the rails
   const low = E.pv1.pose.p[1] - (def(PANEL).size[2] / 2) * dsin((20 * Math.PI) / 180);
   assert.ok(Math.abs(low - top) < 1e-9, `low edge ${low} on the rails ${top}`);
-  // a battery set down on the ground and configured
-  const pe = rt.submit('place_equipment', { actor: 'p1', item: 'bat1', at: { x: 3.6, z: -1.3, yaw: 0.3 }, config: { label: 'bank A' } });
+  // a battery set down on the ground and configured (0.36 m from where it lies: one crouched person slides it
+  // within a 0.62 m arm — BODY_MODEL; it was 0.67 m under the old 0.75 m arm)
+  const pe = rt.submit('place_equipment', { actor: 'p1', item: 'bat1', at: { x: 3.3, z: -1.2, yaw: 0.3 }, config: { label: 'bank A' } });
   assert.notEqual(pe.status, 'failed', `${pe.diagnostic?.code} ${pe.diagnostic?.message}`);
   const w3 = watch(rt, pe.id);
   assert.equal(w3.r.status, 'completed', `${w3.r.diagnostic?.code} ${w3.r.diagnostic?.message}`);
   assert.deepEqual(E.bat1.equipment, { kind: 'battery', config: { capacityAh: 200, chemistry: 'LiFePO4', label: 'bank A', voltage: 12 } });
   assert.deepEqual(E.bat1.support, { kind: 'ground' });
-  assert.ok(Math.abs(E.bat1.pose.p[0] - 3.6) < 1e-9 && Math.abs(E.bat1.pose.yaw - 0.3) < 1e-9);
+  assert.ok(Math.abs(E.bat1.pose.p[0] - 3.3) < 1e-9 && Math.abs(E.bat1.pose.yaw - 0.3) < 1e-9);
   assert.equal(E.bat1.phase, 'placed');
   for (const p of ['p1', 'p2', 'p3', 'p4']) assert.equal(E[p].human!.hands, undefined, `${p} let go`);
   assert.deepEqual(rt.violations, [], JSON.stringify(rt.violations.slice(0, 3)));
@@ -189,7 +190,7 @@ test('solar refusal: a panel lying on the ground cannot be mounted on rails 2.48
   const r = rt.submit('install_panel', { crew: ['p3', 'p4'], panel: 'pv1', rails: ['r1', 'r2'], tilt: 20 });
   assert.equal(r.status, 'failed');
   assert.equal(r.diagnostic?.code, 'solar.panel-too-high');
-  assert.match(r.diagnostic!.message, /rails r1 \/ r2 are 2\.48 m above pv1 where it lies \(standing reach 2\.1 m\): hand it up/);
+  assert.match(r.diagnostic!.message, /rails r1 \/ r2 are 2\.48 m above pv1 where it lies \(standing reach 2\.06 m\): hand it up/);
 });
 
 test('fragile: two people carrying a solar panel up a 37° stair are refused with the tilt named; the invariant flags a tilted held panel', () => {

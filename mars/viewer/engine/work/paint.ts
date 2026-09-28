@@ -22,26 +22,24 @@ import type { Spatial } from '../spatial/service.ts';
 import { toWorld } from '../carry/formation.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
 import { checkStations, childrenState, walkCrew, type Children } from '../construction/children.ts';
+import { BODY_MODEL, postureGap } from '../body/model.ts';
 
-export const REACH_LO = 0.5; // m above the floor: lowest the brush reaches standing (lower: not modelled)
-export const REACH_HI = 2.1; // m above the floor: highest (above: stand on a deck / beam)
+export const REACH_LO = BODY_MODEL.lowReach; // m above the floor: lowest the brush reaches standing (lower: not modelled)
+export const REACH_HI = BODY_MODEL.overheadMax; // m above the floor: highest, 2.06 (above: stand on a deck / beam)
 export const PAINT_STAND = 0.4; // m from the face to the painter's feet
-export const COLUMN_MAX = 1.3; // m of face width painted from one spot
+export const COLUMN_MAX = 1.0; // m of face width painted from one spot (a 0.62 m arm reaches the column's top corners at 2.03 m from PAINT_STAND; 1.3 m did not)
 export const BAND_H = 0.2; // m: the face's rows / bands (from its bottom edge)
 export const SWEEP = 0.8; // m/s brush speed along a row (and down to the next row)
 export const BRUSH_OFF = 0.03; // m the brush hand stays off the surface
 export const STATION_TOL = 0.05; // m a painter may drift from their spot before `paint.moved`
-/** Painting posture: shoulder height range above the feet, horizontal lean, arm length (as handup.ts envelopes). */
-export const PAINT_POSTURE = { lo: 0.9, hi: 1.5, lean: 0.35, arm: 0.75 } as const;
+/** Painting posture: shoulder height range above the feet, horizontal lean, arm length (BODY_MODEL, as handup.ts envelopes). */
+export const PAINT_POSTURE = { ...BODY_MODEL.posture.painting, arm: BODY_MODEL.armLength } as const;
 const round2 = (x: number) => Math.round(x * 100) / 100;
 const f2 = (x: number) => x.toFixed(2);
 
 /** How far a hand is outside the painter's reach envelope (≤ 0 = inside). */
 export function paintEnvelopeGap(feet: Vec3, hand: Vec3): number {
-  const dh = Math.max(0, Math.sqrt((hand[0] - feet[0]) ** 2 + (hand[2] - feet[2]) ** 2) - PAINT_POSTURE.lean);
-  const rel = hand[1] - feet[1];
-  const dv = Math.max(0, PAINT_POSTURE.lo - rel, rel - PAINT_POSTURE.hi);
-  return Math.sqrt(dh * dh + dv * dv) - PAINT_POSTURE.arm;
+  return postureGap(BODY_MODEL.posture.painting, feet, hand);
 }
 
 // ---------------------------------------------------------------- face geometry
@@ -219,6 +217,7 @@ function stepPaint(rt: Runtime, ex: PaintExec, dt: number): StepResult {
       else {
         a.human!.grip = undefined;
         delete a.human!.hands;
+        if (a.human!.activity === 'paint') a.human!.activity = 'idle'; // sidestep to the next column: not painting
         const r = walkCrew(rt, ex.id, [{ actor: ex.p.actor, p: c.p, yaw: c.yaw, level: prog.level }]);
         if ('code' in r) return { status: 'failed', diagnostic: { ...r, code: 'paint.no-station' } };
         ex.walk = r;

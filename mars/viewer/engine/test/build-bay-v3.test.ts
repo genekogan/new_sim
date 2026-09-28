@@ -40,8 +40,9 @@ function stage(w: WorldState) {
 const HUMANS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'visitor', 'g1', 'g2', 'g3', 'w1', 'w2'];
 /** Pinned: final-state hash and length of the v3 rehearsal (open ground). Re-pinned (was 17288 ticks,
  *  584685f1…fd588): splined turns + immediate block reaction, 2026-09-28; re-pinned (was 16191 ticks, e121377d…24b9):
- *  kneel rule at the edge (W8 patch), 2026-09-28 (PLANNING_BUDGET.md); 0 violations, same outcome. */
-const PIN = { ticks: 16248, hash: '0870c58386ccaa9d1a4c38f0a7001db4cad71ad0a7f240f7f19ad63fcaef946a' };
+ *  kneel rule at the edge (W8 patch), 2026-09-28; re-pinned (was 16248 ticks, 0870c583…946a): body model
+ *  unification, 2026-09-28 (PLANNING_BUDGET.md); 0 violations, same outcome. */
+const PIN = { ticks: 16219, hash: '339cf310d7cc59f3bff7cb49d4bcf77829bb4b0198cc54a2ceec19ce9f36ad1e' };
 
 test('flagship v3: deck handed up (joists + s1 by hand to two on the beams, s2 off the forklift), 0 violations, rehearse = execute, pinned', () => {
   const h = new WorldHistory('mars-rules/flagship-v3-test');

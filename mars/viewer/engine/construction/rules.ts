@@ -17,11 +17,12 @@ import { FT, datan2, rot2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
+import { BODY_MODEL } from '../body/model.ts';
 
 // 2: crews accompany lifted parts; swept lifts; raise choreography
 // 3: hand_up (receivers kneel at the edge: hands ≤ 0.8 m from their feet), items / eating, solar, paint
 export const RULES_VERSION = 'mars-assembly/3';
-export const STANDING_REACH = 2.1; // m: highest beam seat a person on the ground can place
+export const STANDING_REACH = BODY_MODEL.overheadMax; // m: highest beam seat a person on the ground can place (2.06; body/model.ts)
 export const LADDER_REACH = 3.6; // m: with a ladder at the station
 
 export const isUpright = (e?: Entity) => !!e && def(e.def).category === 'rack-upright';

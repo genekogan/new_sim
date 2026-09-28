@@ -21,9 +21,10 @@ import { cellOf, clearanceAt, type LevelGrid } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { holdingDiagnostic, STANDING_REACH } from './rules.ts';
 import { childrenState, walkCrew, type Children } from './children.ts';
+import { BODY_MODEL } from '../body/model.ts';
 import { CREW_BLOCK_TIMEOUT, FOLLOW_SPEED, followCrew, handPoint, LIFT_APEX_MAX, pickupPlan, STATION_SLOT, type Hand } from './liftcrew.ts';
 
-export const ARM_REACH = 0.8; // m, horizontal: station → nearest point of the component
+export const ARM_REACH = BODY_MODEL.maxHorizontalFromFeet; // m, horizontal: station → nearest point of the component (0.8)
 export const STAGE_RADIUS = 3.0; // m: components must be delivered (carried) this close before installing
 export const LEVEL_STEP = 0.5; // m: deck level ids are round(y / LEVEL_STEP) — stable, height-derived
 export const levelFor = (y: number) => Math.round(y / LEVEL_STEP);

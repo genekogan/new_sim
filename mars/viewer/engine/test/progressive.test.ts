@@ -273,7 +273,7 @@ test('work from deck: a joist above standing reach needs a supported deck below 
   const hi = fixtureUpperBay(bare);
   const r = bare.submit('install_joist', { crew: ['p5'], joist: 'jx', bay: { a: 'B', b: 'C' }, height: hi, at: 0.2 });
   assert.equal(r.diagnostic?.code, 'reach.too-high');
-  assert.match(r.diagnostic!.message, /level 0 at 0\.00 m\) is 3\.6\d m down \(standing reach 2\.1 m\)/);
+  assert.match(r.diagnostic!.message, /level 0 at 0\.00 m\) is 3\.6\d m down \(standing reach 2\.06 m\)/);
   // with the deck and stairs built, the person on the deck sets it
   const { rt } = fullSequence();
   fixtureUpperBay(rt);

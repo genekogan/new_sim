@@ -15,9 +15,10 @@ import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 import { APPROACH_CLEARANCE, APPROACH_GAPS, blockerNear } from '../social/slots.ts';
 import { HANDS, type Hand } from './body.ts';
+import { BODY_MODEL } from '../body/model.ts';
 
 /** Farthest an item may be from the table edge in front of the person (m). */
-export const ITEM_REACH = 0.6;
+export const ITEM_REACH = BODY_MODEL.tableReach;
 /** Farthest an item may be from a standing person's body axis, horizontally (m): edge gap + ITEM_REACH. */
 export const BODY_REACH = APPROACH_GAPS[APPROACH_GAPS.length - 1] + ITEM_REACH;
 /** Ground items: standing points this far from the item (m), 8 directions. */

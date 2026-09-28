@@ -1,10 +1,11 @@
 // Body landmarks for hand points (ITEMS.md "Hand points"). A person's frame is their ground point
 // `pose.p` (body axis, level height), forward f = (cos yaw, sin yaw) and right r = (−sin yaw, cos yaw)
-// in (x, z); heights are above the ground point, lowered by `drop` while seated (SEAT_DROP: pelvis on a
-// ~0.45 m seat instead of ~0.95 m hips). The renderer's rig need not match these exactly: they are
-// the engine's reach model (chest, shoulders, mouth), not a skeleton.
+// in (x, z); heights are above the ground point, lowered by `drop` while seated (SEAT_DROP). The numbers
+// are engine/body/model.ts (BODY_MODEL, the one body model; BODY_MODEL.md) — this file only names the
+// landmarks the item verbs use.
 import { dcos, dsin, type Vec3 } from '../core/math.ts';
 import type { Entity } from '../world/types.ts';
+import { BODY_MODEL } from '../body/model.ts';
 
 export type Hand = 'left' | 'right';
 export const HANDS: readonly Hand[] = ['left', 'right'];
@@ -13,16 +14,16 @@ export const otherHand = (h: Hand): Hand => (h === 'left' ? 'right' : 'left');
 export const sideOf = (h: Hand) => (h === 'right' ? 1 : -1);
 
 export const BODY = {
-  chest: 1.3, // sternum height, standing
-  chestFwd: 0.08, // sternum ahead of the body axis
-  shoulder: 1.42,
-  shoulderHalf: 0.19, // shoulder joint off the body axis
-  mouth: 1.58,
-  mouthFwd: 0.15, // mouth point: 0.15 m in front of the head (the spoon hand's target)
-  armReach: 0.75, // shoulder → hand envelope
+  chest: BODY_MODEL.chestHeight, // sternum height, standing
+  chestFwd: BODY_MODEL.chestFwd, // sternum ahead of the body axis
+  shoulder: BODY_MODEL.shoulderHeight,
+  shoulderHalf: BODY_MODEL.shoulderHalf, // shoulder joint off the body axis
+  mouth: BODY_MODEL.mouthHeight,
+  mouthFwd: BODY_MODEL.mouthFwd, // mouth point in front of the head (the spoon hand's target)
+  armReach: BODY_MODEL.armLength, // shoulder → hand envelope
 } as const;
 /** Heights drop this much when seated on a chair / bench. */
-export const SEAT_DROP = 0.45;
+export const SEAT_DROP = BODY_MODEL.seatedDrop;
 
 export type BodyFrame = { o: Vec3; f: [number, number]; r: [number, number]; drop: number };
 
@@ -40,7 +41,7 @@ export const chestPoint = (b: BodyFrame) => at(b, BODY.chestFwd, 0, BODY.chest);
 export const shoulderPoint = (b: BodyFrame, h: Hand) => at(b, 0, sideOf(h) * BODY.shoulderHalf, BODY.shoulder);
 export const mouthPoint = (b: BodyFrame) => at(b, BODY.mouthFwd, 0, BODY.mouth);
 /** Empty hand hanging at the side. */
-export const restHand = (b: BodyFrame, h: Hand) => at(b, 0.02, sideOf(h) * 0.22, 0.8);
+export const restHand = (b: BodyFrame, h: Hand) => at(b, BODY_MODEL.restHand.fwd, sideOf(h) * BODY_MODEL.restHand.side, BODY_MODEL.restHand.up);
 /** Hand carrying a small item (walking, sitting): in front of the hip. */
 export const carryHand = (b: BodyFrame, h: Hand) => at(b, 0.28, sideOf(h) * 0.16, 1.0);
 

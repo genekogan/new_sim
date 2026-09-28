@@ -10,10 +10,11 @@ import type { Entity, Pose } from '../world/types.ts';
 import { angleDelta } from '../core/math.ts';
 import { ARM_REACH, distToObb, f2, fail, type Fail, type LiftExec } from './access.ts';
 import { flatObb } from './deck.ts';
+import { BODY_MODEL } from '../body/model.ts';
 
 export const ALOFT_POS_TOL = 0.02; // m: a part staged aloft must already lie at its install pose
-export const ALOFT_REACH_DOWN = 1.0; // m below a fastener's feet
-export const ALOFT_REACH_UP = 2.1; // m above a fastener's feet
+export const ALOFT_REACH_DOWN = BODY_MODEL.reachDownBelowFeet; // m below a fastener's feet
+export const ALOFT_REACH_UP = BODY_MODEL.overheadMax; // m above a fastener's feet (2.06)
 export const FASTEN_SLOT = 'fasten';
 
 /** Staged on the structure (by a hand-up), not lying on a floor. */

@@ -5,7 +5,7 @@
 //
 // Phases (published as human.activity every tick, with per-tick hand points, so a renderer can pose):
 //   givers    walk → crouch (0.6 s) → lift (0.6 s, stand with the load) → walk-load (to below the edge)
-//             → reach_up (arms overhead; the load's underside ≤ their floor + 2.1 m) [→ push it in over
+//             → reach_up (arms overhead; the load's underside ≤ their floor + 2.06 m, BODY_MODEL.overheadMax) [→ push it in over
 //             the edge while it is within their reach] → hold → let go once the receivers have it;
 //   receivers walk → climb-up (frame) → beam-walk to their station beside the load's path → wait
 //             → reach_down (bend at the hips; hands ≤ 1.0 m below their feet, ≤ 0.5 m from their edge)
@@ -34,16 +34,22 @@ import { flatObb, isJoist, isPlywood, memberTop, sheetSupports } from './deck.ts
 import { isBeam } from './rules.ts';
 import { beamWalkways, climbLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
 import { deckAt, deckOver } from './framemove.ts';
+import { BODY_MODEL, postureGap, type Posture } from '../body/model.ts';
 
 // ---- rules (metres, seconds) ----
-export const GIVE_MAX = 2.1; // givers' hands (the load's underside) never above their floor + this
-export const REACH_DOWN = 1.0; // receivers' hands at most this far below their feet
-export const EDGE_REACH = 0.5; // at the hand-off, a receiver's hands within this of the edge they stand on
-export const KNEEL_BACK = 0.3; // … and they kneel at that edge: hands ≤ EDGE_REACH + this horizontally from their feet
+// reach rules: engine/body/model.ts (BODY_MODEL.md)
+export const GIVE_MAX = BODY_MODEL.overheadMax; // givers' hands (the load's underside) never above their floor + this (2.06)
+export const REACH_DOWN = BODY_MODEL.reachDownBelowFeet; // receivers' hands at most this far below their feet
+export const EDGE_REACH = BODY_MODEL.edgeReach; // at the hand-off, a receiver's hands within this of the edge they stand on
+/** … and they kneel at that edge: hands ≤ EDGE_REACH + KNEEL_BACK (= maxHorizontalFromFeet, 0.8 m) horizontally from their feet. */
+export const KNEEL_BACK = BODY_MODEL.maxHorizontalFromFeet - BODY_MODEL.edgeReach;
 export const EDGE_GAP = 0.08; // a load raised outside the edge clears the edge beam's face by this
 export const SLIDE_CLEAR = 0.05; // the load is fed in this far above the members it will rest on
-export const CARRY_Y = 0.75; // underside while the givers walk with it
+export const CARRY_Y = BODY_MODEL.restHand.up; // underside while the givers walk with it: hands hanging (0.8 m; was 0.75)
 export const GIVER_OFF = 0.3; // givers stand this far beyond the load's outer end / edge
+/** A one-end (lever) giver stands beside the end instead, the load passing their hip: this far to its side
+ *  (body radius + 3 cm), level with the outer hand — so the inner hand is ≤ 0.47 m from the feet (a 0.62 m arm). */
+export const LEVER_SIDE = HUMAN_PROFILE.radius + 0.03;
 export const HAND_SPREAD = 0.15; // each hand this far either side of a grip point, along the gripped edge
 export const BODY_GAP = HUMAN_PROFILE.radius + 0.02; // a load in someone's body band stays this far from them
 export const RECEIVER_SEP = 0.6; // m between receivers
@@ -57,31 +63,27 @@ export const FREE_END_MAX = 1.5; // m: a load held by one end whose free end is 
 const isLong = (e: Entity) => def(e.def).category === 'timber' || def(e.def).category === 'rack-beam';
 
 // ---- body envelope: where hands can be for a posture (feet-relative shoulder cylinder + arm) ----
-export const ARM_LEN = 0.75; // shoulder → hand centre
+export const ARM_LEN = BODY_MODEL.armLength; // shoulder → hand centre
 export const ENVELOPE_TOL = 0.1; // per-tick tolerance (the test's "within 0.1 m of the envelope")
-/** Shoulder height range above the feet and how far the shoulders may lean out horizontally. */
-export type Posture = { lo: number; hi: number; lean: number };
+export type { Posture };
+const PZ = BODY_MODEL.posture;
 export const POSTURE: Record<string, Posture> = {
-  crouch: { lo: 0.55, hi: 1.45, lean: 0.35 },
-  lift: { lo: 0.55, hi: 1.45, lean: 0.35 },
-  'walk-load': { lo: 1.3, hi: 1.45, lean: 0.2 },
-  reach_up: { lo: 1.3, hi: 1.45, lean: 0.2 },
+  crouch: PZ.crouch,
+  lift: PZ.crouch,
+  'walk-load': PZ.upright,
+  reach_up: PZ.upright,
   // bending at the hips / kneeling at the edge and leaning out over it
-  reach_down: { lo: -0.15, hi: 1.45, lean: 0.45 },
-  take: { lo: -0.15, hi: 1.45, lean: 0.45 },
-  stand_with_load: { lo: -0.15, hi: 1.45, lean: 0.45 },
-  lay: { lo: -0.15, hi: 1.45, lean: 0.45 },
-  set_down: { lo: -0.15, hi: 1.45, lean: 0.45 },
+  reach_down: PZ.bentOver,
+  take: PZ.bentOver,
+  stand_with_load: PZ.bentOver,
+  lay: PZ.bentOver,
+  set_down: PZ.bentOver,
 };
 export const HANDUP_SLOT_PREFIX = 'handup-';
 
 /** How far a hand is outside the reach envelope of a person in `activity` standing at `feet` (≤ 0 = inside). */
 export function envelopeGap(activity: string, feet: Vec3, hand: Vec3): number {
-  const pz = POSTURE[activity] ?? POSTURE.reach_up;
-  const dh = Math.max(0, Math.hypot(hand[0] - feet[0], hand[2] - feet[2]) - pz.lean);
-  const rel = hand[1] - feet[1];
-  const dv = Math.max(0, pz.lo - rel, rel - pz.hi);
-  return Math.hypot(dh, dv) - ARM_LEN;
+  return postureGap(POSTURE[activity] ?? POSTURE.reach_up, feet, hand);
 }
 
 // ---- geometry ----
@@ -211,8 +213,12 @@ const dirW = (q: Pose, l: Vec2): Vec2 => rot2(l, q.yaw);
 /** Givers' feet for grip i at part pose q (standing GIVER_OFF beyond the grip, on floor y). */
 function giverFeet(prog: Pick<HandupProgram, 'giverGrips'>, i: number, q: Pose, y: number): Vec3 {
   const gg = prog.giverGrips[i];
-  const p = add2(world(q, gg.g), scale2(dirW(q, gg.out), GIVER_OFF));
+  const p = add2(world(q, gg.g), giverOffset(q, gg));
   return [p[0], y, p[1]];
+}
+/** World offset grip → giver's feet: GIVER_OFF beyond the grip, or (lever grip) LEVER_SIDE beside it. */
+function giverOffset(q: Pose, gg: { out: Vec2; lever?: true }): Vec2 {
+  return gg.lever ? scale2(dirW(q, [-gg.out[1], gg.out[0]]), LEVER_SIDE) : scale2(dirW(q, gg.out), GIVER_OFF);
 }
 function giverHands(e: Entity, prog: Pick<HandupProgram, 'giverGrips'>, i: number, q: Pose, feet: Vec3): [Vec3, Vec3] {
   const gg = prog.giverGrips[i];
@@ -395,7 +401,7 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
     // pickup: grip points at the lying pose (same local grips), givers GIVER_OFF beyond them
     const gl = localOut(rot2(nOut, -yawH), size(e)[0], size(e)[2], givers.length);
     for (const [i, g] of givers.entries()) {
-      const gp = world(lying, gl[i].g), op = add2(gp, scale2(dirW(lying, gl[i].out), GIVER_OFF));
+      const gp = world(lying, gl[i].g), op = add2(gp, giverOffset(lying, { ...gl[i], ...(giverGrips[i]?.lever ? { lever: true as const } : {}) }));
       pickup.push({ actor: g, p: op, yaw: datan2(gp[1] - op[1], gp[0] - op[0]) });
     }
     const pk = checkStations(rt, pickup.map((m) => ({ actor: m.actor, p: m.p, level: w.entities[m.actor].human!.level })));
@@ -413,18 +419,28 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
     giverSegs.push({ phase: 'reach_up', from: carried, to: raised, dur: segDur(e, carried, raised, SPEED.raise) });
     // givers must be able to stand where the grips put them, all along
     const g = spatialOf(rt).level(w.entities[givers[0]].human!.level);
-    const standable = (q: Pose) => {
+    /** null = the givers can stand and reach; else what stops them (room, or hands outside the body model's envelope). */
+    const unstandable = (q: Pose): { i: number; reach?: number } | null => {
       const fs = givers.map((_, i) => giverFeet({ giverGrips }, i, q, giverFloor));
-      if (fs.some((f) => !g || clearanceAt(g, [f[0], f[2]]) < HUMAN_PROFILE.radius - 0.03)) return false;
-      if (fs.length === 2 && dist2([fs[0][0], fs[0][2]], [fs[1][0], fs[1][2]]) < 2 * HUMAN_PROFILE.radius) return false;
-      return givers.every((_, i) => giverHands(e, { giverGrips }, i, q, fs[i]).every((hh) => envelopeGap('reach_up', fs[i], hh) <= 0));
+      const k = fs.findIndex((f) => !g || clearanceAt(g, [f[0], f[2]]) < HUMAN_PROFILE.radius - 0.03);
+      if (k >= 0) return { i: k };
+      if (fs.length === 2 && dist2([fs[0][0], fs[0][2]], [fs[1][0], fs[1][2]]) < 2 * HUMAN_PROFILE.radius) return { i: 1 };
+      for (const [i] of givers.entries()) {
+        const gap = Math.max(...giverHands(e, { giverGrips }, i, q, fs[i]).map((hh) => envelopeGap('reach_up', fs[i], hh)));
+        if (gap > 0) return { i, reach: gap };
+      }
+      return null;
     };
+    const standable = (q: Pose) => unstandable(q) === null;
     for (const seg of giverSegs.slice(2))
-      for (const q of samples(e, seg.from, seg.to))
-        if (!standable(q)) {
-          const f = giverFeet({ giverGrips }, 0, q, giverFloor);
-          return bad('handup.giver-blocked', `the givers cannot walk ${e.id} to the edge: no room to stand at (${f2(f[0])}, ${f2(f[2])}) while holding it (${seg.phase})`, [e.id, ...givers], f);
-        }
+      for (const q of samples(e, seg.from, seg.to)) {
+        const u = unstandable(q);
+        if (!u) continue;
+        const f = giverFeet({ giverGrips }, u.i, q, giverFloor);
+        if (u.reach !== undefined)
+          return bad('handup.giver-reach', `${givers[u.i]} cannot hold ${e.id} ${giverGrips[u.i].lever ? 'by its end ' : ''}at ${f2(q.p[1] - giverFloor)} m above their floor standing at (${f2(f[0])}, ${f2(f[2])}) (${seg.phase}): a hand would be ${f2(u.reach)} m beyond their reach (arm ${ARM_LEN} m)`, [e.id, givers[u.i]], f);
+        return bad('handup.giver-blocked', `the givers cannot walk ${e.id} to the edge: no room to stand at (${f2(f[0])}, ${f2(f[2])}) while holding it (${seg.phase})`, [e.id, ...givers], f);
+      }
     // how far they can push it in over the edge (only when it already clears the members)
     let sMax = 0;
     if (direct) for (let s = STEP; s <= sOut + 1e-9; s += STEP) { if (!standable(at_s(s, ySlide))) break; sMax = s; }

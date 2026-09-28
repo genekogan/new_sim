@@ -194,6 +194,17 @@ just north of s2, crew[5] at s1's north-west corner; crew[4] steps onto s2 once 
 | --- | --- | --- | --- |
 | build-bay v3 (`build-bay-v3.test.ts`) | `e121377dd6d7…a75924b9` | `0870c58386cc…caef946a` | 16191 → 16248 |
 
+**Re-pinned 2026-09-28 (body model unification, 2026-09-28 — not the budget; W10, `BODY_MODEL.md`):** hand-up,
+items, solar, aloft fastening, paint and station reach import one body model (`engine/body/model.ts`): arm 0.62 m (was
+0.75), shoulders ≤ 1.48 m (1.42 + 0.06 heels; was 1.45), overhead 2.06 m (was 2.1). Hand-up givers now carry a load at
+0.80 m (hands hanging; was 0.75) and a one-end (lever) giver stands beside the load's end instead of 0.3 m beyond it
+(the inner hand was 0.7 m out). 0 violations; same outcome (every joist / sheet handed and received by the same
+people, same step statuses, everyone ends idle off the structure). The meal pin did not move.
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| build-bay v3 (`build-bay-v3.test.ts`) | `0870c58386cc…caef946a` | `339cf310d7cc…9f36ad1e` | 16248 → 16219 |
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

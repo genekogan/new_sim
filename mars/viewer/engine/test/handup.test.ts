@@ -90,7 +90,7 @@ test('hand_up refuses a deck too high for a genuine hand-off (receivers at 3.25 
   const r = rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
   assert.equal(r.status, 'failed');
   assert.equal(r.diagnostic?.code, 'handup.too-high');
-  assert.match(r.diagnostic!.message, /givers can raise it to 2\.10 m .* reach 1\.13 m below their feet \(max 1 m\); use the forklift/);
+  assert.match(r.diagnostic!.message, /givers can raise it to 2\.06 m .* reach 1\.17 m below their feet \(max 1 m\); use the forklift/);
 });
 
 test('hand_up refuses receivers who are not on a walkable beam or deck, and a beam without its partner', () => {
