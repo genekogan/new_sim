@@ -1161,5 +1161,5 @@ Then: gate → release 5; HANDOFF refresh.
     upper deck reported, stringer lay-down. Shared files touched additively: `raise.ts`, `stance.ts`, `locomotion/walk.ts`.
   - **Pins:** no existing pin moved. East-house plans byte-identical after every change; suite bay-1 / bay-1 + strip green;
     perf-walk 5 × PIN-OK; `YEAR_BUILD_FULL=1` skeleton `d382e461…` @117 277 and A+B `ddb634d6…` @600 599: green on the final head (9 / 9, run in full), bit-identical.
-  - Suite 391 tests: 385 pass, 0 fail, 6 skipped. Questions for Gene: Q25–Q27 in QUESTIONS_FOR_GENE.md. Lead decision:
+  - Suite on the rebased head: 405 tests, 399 pass, 0 fail, 6 skipped (the `YEAR_BUILD_FULL=1` east-house proof ran on the same code before the last docs-only rebase). Questions for Gene: Q25–Q27 in QUESTIONS_FOR_GENE.md. Lead decision:
     move east-house onto yard v2 (re-pin `94db263e…` / `ddb634d6…` and W31's chapter takes) or keep v1.
