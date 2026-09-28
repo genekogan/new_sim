@@ -14,6 +14,18 @@ const DIRS: Record<string, string[]> = { pan: ['left', 'right'], tilt: ['up', 'd
 const SIDES = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
+/** Offer `json` as a file download (the browser cannot write public/engine/takes/). */
+function download(name: string, json: string) {
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 type Form = {
   kind: (typeof KINDS)[number]; ref: string; verb: (typeof VERBS)[number]; degrees: string; dir: string; duration: string;
   atNow: boolean; size: string; side: string; sunBehind: boolean; sunset: boolean; interior: string; lookAt: string;
@@ -48,6 +60,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
   const [json, setJson] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
   const box = useRef<HTMLDetailsElement>(null);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const directed = host.directed();
@@ -78,6 +91,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
     }
     setBusy(true);
     setError('');
+    setSaved('');
     try {
       host.playDirected(false);
       await host.direct(dirs);
@@ -123,9 +137,25 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
             {playing ? "Back to the take's camera" : 'Play directed track'}
           </button>
         )}
+        {res?.ok && directed?.track && (
+          <button onClick={() => {
+            try {
+              const s = host.saveDirected();
+              if (!s) return;
+              download(s.name, s.json);
+              setSaved(`Saved ${s.trackId} into ${s.name} (${s.cameras.length} extra camera${s.cameras.length === 1 ? '' : 's'}, ${(s.json.length / 1e6).toFixed(2)} MB) — downloaded: put it in public/engine/takes/ to ship it. Not posted to a room: no simulation op stores a computed track for a file take (STUDIO_REPLAY.md §3).`);
+              onChange();
+            } catch (e) {
+              setError(`Save track: ${(e as Error).message}`);
+            }
+          }}>
+            Save track
+          </button>
+        )}
         {directed && <span className="direct-meta">{directed.track ? `${directed.track.id} · ` : ''}{directed.ms} ms · scene {directed.scene}</span>}
       </div>
       {error && <p className="direct-error" role="alert">{error}</p>}
+      {saved && <p className="direct-saved" role="status" aria-label="Saved track">{saved}</p>}
       {res && !res.ok && (
         <div className="direct-refused" role="alert" aria-label="Direction refused">
           {res.diagnostics.map((d, i) => {

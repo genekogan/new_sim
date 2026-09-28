@@ -81,3 +81,70 @@ test('direct camera: form → shot list with a correction → play the directed 
   console.log(`studio-direct: ${text.replace(/\n+/g, ' | ')}\n  refused: ${refusal}`);
   expect(errors, 'console/page errors').toEqual([]);
 });
+
+// Take files carry extra camera tracks (CAMERA_DIRECT.md §8.2). "Save track" writes the directed track into the open
+// take's file (`withFileCamera`) and offers it as a download; served in place of the shipped file, the replay bar's
+// camera picker lists it beside the planned track, plays it like the planned one and verifyCamera takes it by id.
+test('save track: directed track → take file with `cameras` → picker lists and plays it → verify by file id', async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
+  type VHook = Hook & {
+    cameras: () => { id: string; kind: string; label: string; own: boolean; saved: boolean }[];
+    verifyCamera: (fromT?: number, toT?: number, hz?: number, o?: { track?: 'take' | 'directed' | { file: string } }) => Promise<{ track: string | null; samples: number; all: number[][] } | null>;
+  };
+  const errors = collectConsoleErrors(page);
+  const shipped = fs.readFileSync(path.resolve(import.meta.dirname, '../public', entry.file.replace(/^\//, '')), 'utf8');
+  await openStudio(page);
+  const picker = page.getByRole('combobox', { name: 'Replay take' });
+  await picker.selectOption(entry.id);
+  await page.waitForFunction(() => !!(window.__marsStudio as unknown as Hook).take(), null, { timeout: 60_000 });
+  const camera = page.getByRole('combobox', { name: 'Camera track' });
+  await expect(camera.locator('option')).toHaveCount(1); // the shipped file carries only its planned track
+  await expect(camera.locator('option').first()).toContainText(`planned · ${entry.cameraTrack}`);
+
+  await page.locator('.take-direct summary').click();
+  const direction = [{ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' }, at: 1, framing: { size: 'close', side: 'east' } }];
+  await page.getByRole('textbox', { name: 'Directions JSON' }).fill(JSON.stringify(direction));
+  await page.getByRole('button', { name: 'Compute camera' }).click();
+  await expect(page.getByRole('list', { name: 'Shot list' })).toBeVisible({ timeout: 60_000 });
+  const listed = await page.evaluate(() => (window.__marsStudio as unknown as VHook).cameras());
+  expect(listed.map((c) => [c.kind, c.saved])).toEqual([['planned-shot-list', true], ['directed', false]]);
+  const trackId = listed[1].id;
+  await expect(camera.locator('option')).toHaveCount(2);
+  await expect(camera.locator('option').nth(1)).toHaveText(new RegExp(`^directed · ${trackId} · \\d+ shots? · unsaved$`));
+  const inPage = (await page.evaluate(() => (window.__marsStudio as unknown as VHook).verifyCamera(1, 5, 2, { track: 'directed' })))!;
+
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save track' }).click()]);
+  expect(download.suggestedFilename()).toBe(path.basename(entry.file));
+  const out = path.join(import.meta.dirname, 'artifacts', process.env.E2E_RUN ?? 'manual', `saved-${path.basename(entry.file)}`);
+  await download.saveAs(out);
+  const saved = JSON.parse(fs.readFileSync(out, 'utf8'));
+  expect(Object.keys(saved.cameras), 'the file carries the directed track under its id').toEqual([trackId]);
+  expect(saved.cameras[trackId]).toMatchObject({ id: trackId, takeId: entry.id, kind: 'directed', data: { schema: 'mars-camera-track/1' } });
+  const { cameras: _c, ...rest } = saved;
+  expect(JSON.stringify(rest) === shipped, 'take, planned camera and everything else byte-identical to the shipped file').toBe(true);
+  await expect(page.getByRole('status', { name: 'Saved track' })).toContainText('Not posted to a room');
+  await expect(camera.locator('option').nth(1)).not.toContainText('unsaved');
+
+  // serve the saved file as the take and reopen: the picker reads the track from the file
+  await page.route(`**${entry.file}`, (r) => r.fulfill({ path: out, contentType: 'application/json' }));
+  await picker.selectOption('');
+  await picker.selectOption(entry.id);
+  await page.waitForFunction(() => !!(window.__marsStudio as unknown as Hook).take(), null, { timeout: 60_000 });
+  const reopened = await page.evaluate(() => (window.__marsStudio as unknown as VHook).cameras());
+  expect(reopened.map((c) => [c.id, c.saved])).toEqual([[entry.cameraTrack, true], [trackId, true]]);
+  await camera.selectOption(trackId);
+  const playing = (await info(page))!;
+  expect(playing.track).toEqual({ id: trackId, kind: 'directed', own: false });
+  expect(playing.t, 'a directed file track starts at its first shot').toBeCloseTo(saved.cameras[trackId].data.shots[0].t0, 5);
+  await scrub(page, 4);
+  await captureView(page, 'studio-direct-file-track', { testInfo, compare: false });
+  const fromFile = (await page.evaluate((id) => (window.__marsStudio as unknown as VHook).verifyCamera(1, 5, 2, { track: { file: id } }), trackId))!;
+  expect(fromFile.track).toBe(trackId);
+  expect(fromFile.samples).toBeGreaterThan(0);
+  expect(fromFile.all, 'the file track verifies exactly as the in-page directed track').toEqual(inPage.all);
+  await camera.selectOption(entry.cameraTrack);
+  expect((await info(page))!.track.own).toBe(true);
+
+  writeArtifact('studio-direct-save.json', { trackId, bytes: fs.statSync(out).size, shippedBytes: shipped.length, verify: { samples: fromFile.samples, all: fromFile.all } });
+  expect(errors, 'console/page errors').toEqual([]);
+});

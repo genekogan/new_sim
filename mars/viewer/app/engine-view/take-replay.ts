@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { hashOf } from '../../engine/core/hash.ts';
 import { ANG_Q, POS_Q, type CameraTrack, type PoseSample, type Take, type TakeEvent } from '../../engine/take/types.ts';
 import { interpSample, replayFinalState, sampleTake, takeDuration, type TakeFrame } from '../../engine/take/replay.ts';
-import { sampleTrack, trackData, type CameraTrackData } from '../../engine/camera/track.ts';
+import { fileCamera, fileCameras, sampleTrack, trackData, withFileCamera, type CameraTrackData, type TakeFileCameras } from '../../engine/camera/track.ts';
 import type { CameraPose } from '../../engine/camera/shots.ts';
 import type { Vec3 } from '../../engine/core/math.ts';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
@@ -58,6 +58,8 @@ export type TakeReplayFile = {
   moments: Record<string, number>;
   take: Take;
   camera: CameraTrack;
+  /** Extra camera tracks of this take (CAMERA_DIRECT.md §8.2: directed ones), keyed by id; absent when none. */
+  cameras?: TakeFileCameras;
 };
 /** A year-build ("Watch it being built") manifest entry: explicit `kind`, else the year-build rules version. */
 export const isYearBuild = (e: Pick<TakeManifestEntry, 'kind' | 'rulesVersion'>) => (e.kind ? e.kind === 'year-build' : /year-build/.test(e.rulesVersion ?? ''));
@@ -76,6 +78,7 @@ export async function loadTakeFile(url: string, signal?: AbortSignal): Promise<T
   const f = (await r.json()) as TakeReplayFile;
   if (f.schema !== 'mars-take-replay/1') throw new Error(`take ${url}: unexpected schema ${String(f.schema)}`);
   if (f.camera.takeId !== f.take.id) throw new Error(`camera track ${f.camera.id} belongs to take ${f.camera.takeId}, not ${f.take.id}`);
+  fileCameras(f); // throws on a malformed track or one of another take (the planned `camera` and every `cameras` entry)
   replayFinalState(f.take); // throws if the recorded final state no longer hashes to finalStateHash
   return f;
 }
@@ -122,6 +125,8 @@ export class TakePeople {
   private base: SpatialScene;
   private stairKey = '';
   frame: TakeFrame | null = null;
+  /** Wall ms of the last show()'s `sampleTake` (the rest of show() is posing the three.js views). */
+  sampleMs = 0;
 
   constructor(take: Take, opts: { scene?: SpatialScene } = {}) {
     this.take = take;
@@ -167,7 +172,9 @@ export class TakePeople {
 
   /** Pose everything at take time t (seconds). */
   show(t: number) {
+    const s0 = performance.now();
     const frame = (this.frame = sampleTake(this.take, t));
+    this.sampleMs = performance.now() - s0;
     const comps: Record<string, Entity> = {};
     const fixtures: Record<string, Entity> = {};
     const people: SampledHuman[] = [];
@@ -243,6 +250,14 @@ export class TakePeople {
 
 /** A camera track the replay can drive the view with: the take's own planned track or a directed one. */
 export type ActiveTrack = { id: string; kind: string; data: CameraTrackData };
+/** One entry of the replay bar's camera picker. `own`: the take's planned track; `saved`: carried by the take file. */
+export type CameraOption = { id: string; kind: string; label: string; own: boolean; saved: boolean };
+/** Picker text for a track: its kind (the planned shot list reads "planned"), id and shot count. */
+export function cameraLabel(t: ActiveTrack): string {
+  const shots = (t.data as CameraTrackData & { shots?: unknown[] }).shots?.length ?? 0;
+  const kind = t.kind === 'planned-shot-list' ? 'planned' : t.kind;
+  return `${kind} · ${t.id}${shots ? ` · ${shots} shot${shots === 1 ? '' : 's'}` : ''}`;
+}
 
 export class TakeReplay {
   readonly group = new THREE.Group();
@@ -311,7 +326,25 @@ export class TakeReplay {
 
   private apply() {
     this.dirty = false;
+    const t0 = performance.now();
     this.frame = this.people.show(this.t);
+    this.timing.push([performance.now() - t0, this.people.sampleMs]);
+    if (this.timing.length > 4000) this.timing.splice(0, 2000);
+  }
+  private timing: [number, number][] = [];
+
+  /**
+   * Wall ms per redraw since the last reset (at most the last 2000–4000): `pose` = the whole show() (sampleTake + posing
+   * people, parts and piles), `sample` = sampleTake alone. Rendering is not included (the studio's frame loop).
+   */
+  perf(reset = false) {
+    const stat = (xs: number[]) => {
+      const s = [...xs].sort((a, b) => a - b), r = (x: number) => Math.round(x * 100) / 100;
+      return s.length ? { mean: r(s.reduce((a, b) => a + b, 0) / s.length), p50: r(s[s.length >> 1]), p95: r(s[Math.floor(s.length * 0.95)]), max: r(s[s.length - 1]) } : null;
+    };
+    const out = { redraws: this.timing.length, pose: stat(this.timing.map((x) => x[0])), sample: stat(this.timing.map((x) => x[1])) };
+    if (reset) this.timing = [];
+    return out;
   }
 
   /** Pose readout of the people on screen (HumanViews.bones). */
@@ -330,6 +363,30 @@ export class TakeReplay {
   /** Drive the engine camera with another track of this take (a directed one), or back to the take's own (null). */
   setTrack(track: ActiveTrack | null) {
     this.active = track ?? this.own;
+  }
+
+  /** Every camera track the take file carries: the planned one first, then `cameras` in id order (`fileCameras`). */
+  fileTracks(): CameraOption[] {
+    return fileCameras(this.file).map((c) => {
+      const own = c.id === this.own.id;
+      return { id: c.id, kind: c.kind, label: cameraLabel(own ? this.own : { id: c.id, kind: c.kind, data: trackData(c) }), own, saved: true };
+    });
+  }
+  /** Drive the engine camera with one of the file's tracks by id (the planned one restores the take's own). */
+  useFileTrack(id: string): ActiveTrack {
+    if (id === this.own.id) return (this.active = this.own);
+    const c = fileCamera(this.file, id);
+    if (!c) throw new Error(`take ${this.take.id} has no camera track ${id}`);
+    return (this.active = { id: c.id, kind: c.kind, data: trackData(c) });
+  }
+  /**
+   * The take file with `track` added to its `cameras` map (`withFileCamera`: checked, the take and the planned camera
+   * untouched). The replay's own file carries it from now on, so the picker lists it as saved.
+   */
+  withTrack(track: ActiveTrack): TakeReplayFile {
+    const f = withFileCamera(this.file, { id: track.id, takeId: this.take.id, kind: track.kind, data: track.data });
+    this.file.cameras = f.cameras;
+    return f;
   }
 
   /** Engine camera at the current take time, in scene coordinates (the datum offset applied). */

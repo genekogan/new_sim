@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { ThreeResources, disposeSkeletons } from '../../lib/three-resources';
 import { loadTemplates, type Template } from '../engine-view/people.ts';
-import { loadTakeFile, TakeReplay, type TakeManifestEntry } from '../engine-view/take-replay.ts';
+import { cameraLabel, loadTakeFile, TakeReplay, type ActiveTrack, type CameraOption, type TakeManifestEntry } from '../engine-view/take-replay.ts';
 import type { TakeChecks } from './take-checks.ts';
 import type { Directed } from './direct-camera.ts';
 
@@ -106,6 +106,46 @@ export function createTakeHost(
       return d;
     },
     directed: () => directed,
+    /**
+     * The replay bar's camera picker: every track the take file carries (planned first, then `cameras` in id order)
+     * plus the directed track compiled on this page when it is not saved in the file yet.
+     */
+    cameras(): CameraOption[] {
+      if (!replay) return [];
+      const out = replay.fileTracks();
+      const d = directed?.track;
+      if (d && !out.some((c) => c.id === d.id)) out.push({ id: d.id, kind: d.kind, label: `${cameraLabel(d)} · unsaved`, own: false, saved: false });
+      return out;
+    },
+    /**
+     * Drive the engine camera with a track by id (see cameras()): the file's tracks through `fileCamera`, or the
+     * unsaved directed one. A directed track starts at its first shot, as "Play directed track" does.
+     */
+    useCamera(id: string) {
+      if (!replay) return;
+      const d = directed?.track;
+      let t: ActiveTrack;
+      if (d?.id === id && !replay.fileTracks().some((c) => c.id === id)) {
+        replay.setTrack(d);
+        t = d;
+      } else t = replay.useFileTrack(id);
+      replay.engineCamera = true;
+      const shots = (t.data as { shots?: { t0: number }[] }).shots;
+      if (t.kind === 'directed' && shots?.length) replay.seek(shots[0].t0);
+      changed();
+    },
+    /**
+     * "Save track": the open take's file with the directed track added to its `cameras` (`withFileCamera`), as JSON
+     * named like the file it came from, for the owner to put into public/engine/takes/ (the browser cannot write there).
+     * The open replay carries the track from now on (the picker lists it as saved).
+     */
+    saveDirected(): { name: string; json: string; trackId: string; cameras: string[] } | null {
+      const d = directed?.track;
+      if (!replay || !entry || !d) return null;
+      const f = replay.withTrack(d);
+      changed();
+      return { name: entry.file.split('/').pop() ?? `${replay.take.id}.json`, json: JSON.stringify(f), trackId: d.id, cameras: Object.keys(f.cameras ?? {}) };
+    },
     /** Drive the engine camera with the directed track (true) or the take's own (false). */
     playDirected(on: boolean) {
       if (!replay) return;
@@ -144,6 +184,8 @@ export function createTakeHost(
       return on;
     },
     info: () => (replay ? { ...replay.info(), hiddenAssembly: hidden, checks } : null),
+    /** Redraw timing of the open replay (TakeReplay.perf). */
+    perf: (reset = false) => replay?.perf(reset) ?? null,
     dispose() {
       close();
       abort.abort();

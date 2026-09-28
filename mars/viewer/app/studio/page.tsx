@@ -1184,8 +1184,9 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       take: () => takeHost?.info() ?? null,
       // Engine camera vs render mesh (docs/engineering/CAMERA_VERIFY.md); lazy, off the main chunk.
       // `track`: 'take' (the take's own camera, default), 'directed' (the last directed track of the open take) or
-      // 'year' (the last take-less track from directOnYear: verified with no replay, ambient people hidden)
-      verifyCamera: async (fromT?: number, toT?: number, hz?: number, o: { track?: 'take' | 'directed' | 'year' } = {}) => {
+      // 'year' (the last take-less track from directOnYear: verified with no replay, ambient people hidden), or
+      // { file: id } (a track the take file carries: the planned one or one of its `cameras`, via fileCamera)
+      verifyCamera: async (fromT?: number, toT?: number, hz?: number, o: { track?: 'take' | 'directed' | 'year' | { file: string } } = {}) => {
         const { verifyCamera } = await import('./camera-verify');
         if (o.track === 'year') {
           if (!yearTrack) return null;
@@ -1198,6 +1199,11 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         }
         const r = takeHost.replay();
         if (!r) return null;
+        if (typeof o.track === 'object') {
+          const { fileCamera, trackData } = await import('../../engine/camera/track.ts');
+          const c = fileCamera(r.file, o.track.file);
+          return c ? verifyCamera(scene, r, { fromT, toT, hz, track: trackData(c), trackId: c.id }) : null;
+        }
         const d = o.track === 'directed' ? takeHost.directed()?.track : undefined;
         if (o.track === 'directed' && !d) return null;
         return verifyCamera(scene, r, { fromT, toT, hz, ...(d ? { track: d.data, trackId: d.id } : {}) });
@@ -1208,6 +1214,10 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         return d && directedSummary(d);
       },
       playDirected: (on: boolean) => takeHost.playDirected(on),
+      // the replay bar's camera picker (planned + the file's `cameras` + an unsaved directed track) and redraw timing
+      cameras: () => takeHost.cameras(),
+      useCamera: (id: string) => takeHost.useCamera(id),
+      takePerf: (reset?: boolean) => takeHost.perf(reset),
       directOnYear: async (directions: unknown[], o: { datetime?: string; crop?: [number, number, number, number]; duration?: number } = {}) => {
         const { directOnYear } = await import('./direct-camera');
         const d = await directOnYear(year, directions, o);

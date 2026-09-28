@@ -1106,6 +1106,13 @@
 .direct-none {
   color: #8fa087;
 }
+.direct-saved {
+  color: #cfe3b0;
+  margin: 6px 0 0;
+}
+.take-camera-track select {
+  max-width: 230px;
+}
 .direct-error,
 .direct-refused {
   color: #ffb4a0;

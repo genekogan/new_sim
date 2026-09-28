@@ -21,9 +21,11 @@ const MOMENT_LABELS: Record<string, string> = {
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const shortLabel = (l: string) => l.replace(/\s*\((HYPOTHETICAL|historical)[^)]*\)\s*$/i, '');
 const ticksOf = (t: TakeManifestEntry) => t.ticks ?? Math.round(t.duration / 0.05);
-/** Picker text: label · year · ticks · hypothetical / historical. */
+/** Take length for the picker: "9 min", "34 min", "1 h 38 min". */
+const span = (s: number) => (s < 3600 ? `${Math.round(s / 60)} min` : `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`);
+/** Picker text: label · year · length · ticks · hypothetical / historical. */
 export const takeOptionText = (t: TakeManifestEntry) =>
-  `${shortLabel(t.label)} · ${t.year} · ${ticksOf(t).toLocaleString('en-US')} ticks · ${t.hypothetical ? 'hypothetical' : 'historical'}`;
+  `${shortLabel(t.label)} · ${t.year} · ${span(t.duration)} · ${ticksOf(t).toLocaleString('en-US')} ticks · ${t.hypothetical ? 'hypothetical' : 'historical'}`;
 
 const manifests = new Map<string, Promise<TakeManifest | null>>();
 /** Every manifest entry recorded for `year` (`takes` + `otherYears`), in manifest order. */
@@ -168,6 +170,16 @@ export function TakePanel({ host, year }: { host: () => TakeHost | null; year: n
             <label className="take-camera">
               <input type="checkbox" aria-label="Engine camera" checked={replay.engineCamera} onChange={(e) => { replay.engineCamera = e.target.checked; bump(); }} />
               Engine camera
+            </label>
+            <label className="take-camera-track">
+              Camera
+              <select aria-label="Camera track" value={track?.id ?? ''} onChange={(e) => { h!.useCamera(e.target.value); bump(); }}>
+                {h!.cameras().map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
           <div className="take-row take-now">
