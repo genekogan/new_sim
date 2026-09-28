@@ -192,14 +192,16 @@ type PaintExec = { id: string; p: PaintP; prog: PaintProgram; col: number; walk?
 
 function initPaint(e: Entity, prog: PaintProgram): number[] {
   const same = e.paint && e.paint.face === prog.face && e.paint.color === prog.paint.color && e.paint.texture === prog.paint.texture;
-  const area = prog.bands.map((b, i) => (same ? (e.paint!.bands[i]?.coverage ?? 0) * (b.to - b.from) * prog.F.width : 0));
+  const area = prog.bands.map((b, i) => (same ? (e.paint!.bands[i]?.coverage ?? 0) * (Math.min(b.to, prog.F.height) - b.from) * prog.F.width : 0));
   publish(e, prog, area);
   return area;
 }
 function publish(e: Entity, prog: PaintProgram, area: number[]) {
   const W = prog.F.width;
-  const total = prog.bands.reduce((s, b) => s + (b.to - b.from) * W, 0);
-  const bands = prog.bands.map((b, i) => ({ from: b.from, to: b.to, coverage: round2(Math.min(1, area[i] / ((b.to - b.from) * W))) }));
+  // band edges are rounded to the cm for display; areas use the face's true top (a 4x8 is 2.4384 m, not 2.44)
+  const bandArea = (b: { from: number; to: number }) => (Math.min(b.to, prog.F.height) - b.from) * W;
+  const total = prog.bands.reduce((s, b) => s + bandArea(b), 0);
+  const bands = prog.bands.map((b, i) => ({ from: b.from, to: b.to, coverage: round2(Math.min(1, area[i] / bandArea(b))) }));
   const st: PaintState = { face: prog.face, ...prog.paint, coverage: round2(Math.min(1, area.reduce((s, x) => s + x, 0) / total)), bands };
   e.paint = st;
 }

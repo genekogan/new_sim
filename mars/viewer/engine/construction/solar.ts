@@ -7,7 +7,7 @@
 //                                                   ground or a deck and configured (spec §19: identifiable and
 //                                                   configurable, no electrical simulation).
 // Nothing levitates: a rail / equipment item / low panel is set in place by hand from where it lies (within
-// STAGE_NEAR m, same floor — carry it there first); a panel whose rails are above standing reach (2.1 m
+// STAGE_NEAR m, same floor — carry it there first); a panel whose rails are above standing reach (2.06 m
 // over the crew's floor) must arrive by hand_up (receivers lay it on the rails: handup.ts rests loads on
 // installed rails) or off the forklift (hand_up via: 'forklift') — install_panel refuses otherwise.
 // Every phase publishes human.activity and human.hands (the shared hand-point schema).

@@ -52,8 +52,12 @@ support `none` → `carry.fragile-dropped`.
   on a deck or beam"). A painter on a beam paints from where they stand (no walking).
 - Refusals: `paint.not-paintable`, `paint.what` (both / neither of colour and texture), `paint.while-walking`,
   `paint.busy`, `paint.panel-moving`, `paint.no-station`; mid-run `paint.moved` if pushed off the spot.
-- Envelope: `BODY_MODEL.posture.painting` — shoulder 0.9–1.48 m above the feet, lean 0.35 m, arm 0.62 m
-  (`paintEnvelopeGap`; was 1.5 m / 0.75 m). All reach numbers: `engine/body/model.ts`, BODY_MODEL.md.
+- Envelope: `BODY_MODEL.posture.painting` — shoulder 0.82–1.45 m above the feet (1.34 + 5 cm shrug + 6 cm heels),
+  lean 0.35 m, arm 0.62 m (`paintEnvelopeGap`; was 0.9–1.48 m, before that 1.5 m / 0.75 m).
+- **A standing 4x8 is not fully paintable from the ground** (measured rig, 2026-09-28): the brush reaches
+  0.5–2.06 m, so the sheet's top 0.38 m (2.06–2.44 m) is refused with `paint.out-of-reach` ("…stand on a deck or
+  beam"); from a 0.6 m platform (a level) it is painted (`paint.test.ts` "paint top band"). Band coverage uses the
+  face's true top (a 4x8 is 2.4384 m; the last band is labelled 2.40–2.44). All reach numbers: `engine/body/model.ts`, BODY_MODEL.md.
 
 ### Renderer contract (per tick)
 - **Paint progress**: panel `paint = { face, color | texture, coverage, bands: [{from, to, coverage}] }`

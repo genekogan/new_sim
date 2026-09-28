@@ -205,6 +205,19 @@ people, same step statuses, everyone ends idle off the structure). The meal pin 
 | --- | --- | --- | --- |
 | build-bay v3 (`build-bay-v3.test.ts`) | `0870c58386cc…caef946a` | `339cf310d7cc…9f36ad1e` | 16248 → 16219 |
 
+**Re-pinned 2026-09-28 (body model = measured rig, 2026-09-28 — not the budget; W12, `BODY_MODEL.md`):** the engine
+body model is the measured rig: shoulders 1.34 m (were 1.42), half-width 0.15, reach-down 0.5 m below the feet (was
+1.0), posture bands recomputed from the rig (tops 1.45 m = shoulders + 5 cm shrug + 6 cm heels; kneeling shoulders
+≥ 0.07 m above the feet, lean 0.35), chest 1.22, rest hands 0.72 m up (hand-up givers carry at 0.72 m, was 0.80).
+Hand-up givers raise a load only as high as the `reach_up` envelope reaches at their grips (2.05 m from the ground).
+v3: 0 violations; same outcome — identical step statuses, per-person grip sets (entity | slot role), level changes and
+final phase / support / activity / level of every entity (scratch diff against `719ba10`); only the timing moved.
+The meal pin, the year-build first bay (`ad844b78…` @ 41019) and the campus pins did not move.
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| build-bay v3 (`build-bay-v3.test.ts`) | `339cf310d7cc…9f36ad1e` | `5f32379db672…715d0c73` | 16219 → 16237 |
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

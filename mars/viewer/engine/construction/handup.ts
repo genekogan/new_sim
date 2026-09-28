@@ -8,7 +8,7 @@
 //             → reach_up (arms overhead; the load's underside ≤ their floor + 2.06 m, BODY_MODEL.overheadMax) [→ push it in over
 //             the edge while it is within their reach] → hold → let go once the receivers have it;
 //   receivers walk → climb-up (frame) → beam-walk to their station beside the load's path → wait
-//             → reach_down (bend at the hips; hands ≤ 1.0 m below their feet, ≤ 0.5 m from their edge)
+//             → reach_down (bend at the hips; hands ≤ 0.5 m below their feet, ≤ 0.5 m from their edge)
 //             → take → stand_with_load (lift it to just above the members) → lay (feed it in hand over
 //             hand, never walking with it on a beam) → set_down: `staged` in place on the structure,
 //             ready for install_joist / install_plywood (aloft.ts: those then only fasten it).
@@ -34,7 +34,7 @@ import { flatObb, isJoist, isPlywood, memberTop, sheetSupports } from './deck.ts
 import { isBeam } from './rules.ts';
 import { beamWalkways, climbLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
 import { deckAt, deckOver } from './framemove.ts';
-import { BODY_MODEL, postureGap, restHands, type Posture } from '../body/model.ts';
+import { BODY_MODEL, postureGap, postureTop, restHands, type Posture } from '../body/model.ts';
 
 // ---- rules (metres, seconds) ----
 // reach rules: engine/body/model.ts (BODY_MODEL.md)
@@ -45,7 +45,7 @@ export const EDGE_REACH = BODY_MODEL.edgeReach; // at the hand-off, a receiver's
 export const KNEEL_BACK = BODY_MODEL.maxHorizontalFromFeet - BODY_MODEL.edgeReach;
 export const EDGE_GAP = 0.08; // a load raised outside the edge clears the edge beam's face by this
 export const SLIDE_CLEAR = 0.05; // the load is fed in this far above the members it will rest on
-export const CARRY_Y = BODY_MODEL.restHand.up; // underside while the givers walk with it: hands hanging (0.8 m; was 0.75)
+export const CARRY_Y = BODY_MODEL.restHand.up; // underside while the givers walk with it: hands hanging (0.72 m = shoulders 1.34 − arm 0.62; was 0.80, before that 0.75)
 export const GIVER_OFF = 0.3; // givers stand this far beyond the load's outer end / edge
 /** A one-end (lever) giver stands beside the end instead, the load passing their hip: this far to its side
  *  (body radius + 3 cm), level with the outer hand — so the inner hand is ≤ 0.47 m from the feet (a 0.62 m arm). */
@@ -350,7 +350,28 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
   const edgeY = edge.from.y;
   // ---- heights and the reach rule for a genuine hand-off
   const giverFloor = mode === 'hand' ? w.entities[givers[0]].pose.p[1] : 0;
-  const gMax = giverFloor + GIVE_MAX;
+  // the givers' grips (local to the part), and how high their hands go there: GIVE_MAX is a palm straight
+  // overhead; hands out at the grips (GIVER_OFF ahead, HAND_SPREAD apart) reach a little less (body model
+  // envelope, reach_up: ≈ 2.05 m with 1.34 m shoulders) — they raise it only that high
+  const q3 = (v: Vec2): Vec2 => [Number(v[0].toFixed(3)), Number(v[1].toFixed(3))];
+  const giverGrips: HandupProgram['giverGrips'] = mode === 'hand' ? localOut(rot2(nOut, -yawH), size(e)[0], size(e)[2], givers.length).map((g) => ({ ...g, g: q3(g.g) })) : [];
+  if (mode === 'hand' && givers.length === 1 && isLong(e)) {
+    const b = balance(e, giverGrips[0]);
+    if (b.lever) giverGrips[0].lever = true;
+    if (b.free > FREE_END_MAX + 1e-9)
+      return bad('handup.unbalanced', `${def(e.def).label} ${e.id} (${f2(size(e)[0])} m) cannot be handed up by ${givers[0]} alone holding it by one end: its free end would be ${f2(b.free)} m from the grip (max ${FREE_END_MAX} m); hand it up side-on or with two givers`, [e.id, givers[0]], e.pose.p);
+  }
+  let gMax = giverFloor + GIVE_MAX;
+  if (mode === 'hand') {
+    const q = at_s(0, gMax);
+    for (const [i] of givers.entries()) {
+      const f = giverFeet({ giverGrips }, i, q, giverFloor);
+      for (const hh of giverHands(e, { giverGrips }, i, q, f)) {
+        const top = postureTop(POSTURE.reach_up, dist2([hh[0], hh[2]], [f[0], f[2]]));
+        if (top > -Infinity) gMax = Math.min(gMax, giverFloor + top); // out of reach at any height: handup.giver-reach below
+      }
+    }
+  }
   const th = size(e)[1];
   let transfer: Pose, lift0: Pose; // lift0: the pose the receivers first take it at
   let direct = false;
@@ -359,7 +380,7 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
     const hT = direct ? ySlide : gMax;
     const handY = hT + th;
     if (edgeY - handY > REACH_DOWN + 1e-9)
-      return bad('handup.too-high', `${e.id} cannot be handed up to people on ${edge.members![0]} at ${f2(edgeY)} m: the givers can raise it to ${f2(hT)} m (their floor + ${GIVE_MAX} m), so the receivers would have to reach ${f2(edgeY - handY)} m below their feet (max ${REACH_DOWN} m); use the forklift (hand_up via: 'forklift')`, [e.id, edge.members![0], ...givers, ...p.receivers], [O[0], hT, O[1]]);
+      return bad('handup.too-high', `${e.id} cannot be handed up to people on ${edge.members![0]} at ${f2(edgeY)} m: the givers can raise it to ${f2(hT)} m (their floor + ${f2(hT - giverFloor)} m: hands out at the grips; ${GIVE_MAX} m straight overhead), so the receivers would have to reach ${f2(edgeY - handY)} m below their feet (max ${REACH_DOWN} m); use the forklift (hand_up via: 'forklift')`, [e.id, edge.members![0], ...givers, ...p.receivers], [O[0], hT, O[1]]);
     // raised straight up outside the edge, clear of whatever sticks out past the beam (joist cantilevers …)
     for (let extra = 0; ; extra += STEP) {
       const Ox = add2(obbF.c, scale2(nOut, sOut + extra));
@@ -382,14 +403,6 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
       return bad('handup.too-high', `${e.id} on the forks at ${f2(fp.p[1])} m is ${f2(edgeY - fp.p[1] - th)} m below the receivers' feet (max ${REACH_DOWN} m); raise the forks`, [e.id], fp.p);
   }
   // ---- the part's path
-  const q3 = (v: Vec2): Vec2 => [Number(v[0].toFixed(3)), Number(v[1].toFixed(3))];
-  const giverGrips: HandupProgram['giverGrips'] = mode === 'hand' ? localOut(rot2(nOut, -yawH), size(e)[0], size(e)[2], givers.length).map((g) => ({ ...g, g: q3(g.g) })) : [];
-  if (mode === 'hand' && givers.length === 1 && isLong(e)) {
-    const b = balance(e, giverGrips[0]);
-    if (b.lever) giverGrips[0].lever = true;
-    if (b.free > FREE_END_MAX + 1e-9)
-      return bad('handup.unbalanced', `${def(e.def).label} ${e.id} (${f2(size(e)[0])} m) cannot be handed up by ${givers[0]} alone holding it by one end: its free end would be ${f2(b.free)} m from the grip (max ${FREE_END_MAX} m); hand it up side-on or with two givers`, [e.id, givers[0]], e.pose.p);
-  }
   const giverSegs: Seg[] = [];
   const pickup: HandupProgram['pickup'] = [];
   const ignoreRest = [...rest.supports];
@@ -586,7 +599,7 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
     return bad('handup.receiver-reach', `${e.id} cannot be received over ${edge.members![0]}: at the hand-off the receivers' hands would be ${f2(miss.d)} m beyond the edge of ${where} they kneel at (max ${EDGE_REACH} m); bring it within ${EDGE_REACH} m of the edge`, [e.id, edge.members![0], ...p.receivers], [miss.c.feet[0], miss.c.feet[1], miss.c.feet[2]]);
   }
   if (!pick) {
-    const why = p.stations ? 'the given stations cannot reach it all the way in (hands within the reach envelope, ≤ 1.0 m below the feet, ≤ 0.5 m from their edge at the hand-off) without standing in its path' : `no ${n === 2 ? 'two places ≥ 0.6 m apart' : 'place'} on the beams at ${f2(edge.from.y)} m from which ${n === 2 ? 'both receivers' : 'a receiver'} can take it at the edge and feed it in without standing in its path`;
+    const why = p.stations ? `the given stations cannot reach it all the way in (hands within the reach envelope, ≤ ${REACH_DOWN} m below the feet, ≤ ${EDGE_REACH} m from their edge at the hand-off) without standing in its path` : `no ${n === 2 ? 'two places ≥ 0.6 m apart' : 'place'} on the beams at ${f2(edge.from.y)} m from which ${n === 2 ? 'both receivers' : 'a receiver'} can take it at the edge and feed it in without standing in its path`;
     return bad('handup.no-receiver-station', `${e.id} cannot be received over ${edge.members![0]}: ${why}`, [e.id, edge.members![0], ...p.receivers]);
   }
   // assign receivers (explicit: in order; else the nearer station to each, deterministic)

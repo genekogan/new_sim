@@ -3,8 +3,9 @@
 // hand-held items and eating (items/body.ts), solar (construction/solar.ts), fastening aloft
 // (construction/aloft.ts), paint (work/paint.ts) and station reach (construction/access.ts) import
 // these numbers; the renderer scales the rig's arm bones to `armLength` from `shoulderHeight` once per
-// template (W9) and a Playwright test pins measured rig reach to this model within 2 cm.
-// A real ~1.75 m adult. Heights are above the feet (the person's ground point, `pose.p`), horizontal
+// template (W9) and a Playwright test pins measured rig reach to this model within 2 cm. Since
+// 2026-09-28 ("Body model = the measured rig") the model IS the measured rig: a 1.75 m person with the
+// rigs' 1.34 m shoulders; test/body-model.test.ts checks it is internally consistent. Heights are above the feet (the person's ground point, `pose.p`), horizontal
 // distances from the body axis. Anything outside is refused by the engine, never interpolated.
 import { dcos, dsin, type Vec3 } from '../core/math.ts';
 import type { Entity } from '../world/types.ts';
@@ -12,49 +13,76 @@ import type { Entity } from '../world/types.ts';
 /** Shoulder-height band above the feet for a posture, and how far the shoulders may lean out horizontally. */
 export type Posture = { lo: number; hi: number; lean: number };
 
-const shoulderHeight = 1.42;
+// Measured rig (W9, e2e/poses.spec.ts "body model", POSES.md "Body model"; OWNER_DECISIONS 2026-09-28
+// "Body model = the measured rig"): the three Quaternius templates scaled to 1.75 m.
+const shoulderHeight = 1.34; // shoulder joints standing (the rigs' big heads: a real adult's are ≈ 1.42)
+const shrug = 0.05; // shoulder rise with a hand ≥ 0.5 m above it (clavicle, then the girdle)
 const heelRaise = 0.06;
 const armLength = 0.62;
+/** Every posture's shoulder band tops out here: shoulders + shrug + heels (1.45 m) — so an arm straight up
+ *  reaches 2.07 m ≥ overheadMax (the stated 2.06 cap binds, not the envelope). */
+const shoulderTop = shoulderHeight + shrug + heelRaise;
+/** Rig proportions the posture bands are derived from (POSES.md: measured once per rig, casual / punk). */
+const RIG = {
+  hip: 0.89, // hip joints standing
+  torso: 0.45, // hip joints → shoulder joints (1.34 − 0.89)
+  squatHip: 0.42, // deepest squat: hip joints above the floor (rig.ts)
+  squatBend: 80, // ° torso bend lifting from the knees (rig.ts bendMax.knees)
+  kneelHip: 0.46, // one-knee kneel: hip joints above the floor (casual / punk; woman 0.51)
+  kneelBend: 150, // ° torso bend kneeling over an edge (rig.ts bendMax.kneel)
+} as const;
 
 export const BODY_MODEL = {
   height: 1.75,
-  shoulderHeight, // shoulder joints, standing
-  shoulderHalf: 0.19, // each shoulder joint off the body axis
-  armLength, // shoulder joint → palm centre
+  shoulderHeight, // shoulder joints, standing (measured rig 1.340)
+  shoulderHalf: 0.15, // each shoulder joint off the body axis (measured 0.116–0.146)
+  armLength, // shoulder joint → palm centre (measured 0.620)
+  shrug,
   heelRaise, // up on the toes
-  /** Palm centre straight overhead, heels down (hands in front of the head, so < shoulder + arm). */
+  rig: RIG,
+  /** Palm centre straight overhead, heels down (measured 1.997: shoulders + shrug + 0.97 × arm, the elbow never locks). */
   overheadReach: 2.0,
-  /** overheadReach + heelRaise: the highest a hand (a load's underside) goes above the floor — the §5 "standing reach". */
+  /** overheadReach + heelRaise: the highest a hand (a load's underside) goes above the floor — the §5 "standing reach" (measured 2.057). */
   overheadMax: 2.0 + heelRaise,
   /** Lowest a standing painter's brush goes above the floor (lower bands are not modelled). */
   lowReach: 0.5,
-  /** Kneeling at a deck / beam edge: hands at most this far below the feet (owner feedback §6). */
-  reachDownBelowFeet: 1.0,
-  /** Horizontal: hands at most this far from the feet when working a part from a station (the kneel rule at a hand-off). */
+  /** Kneeling on one knee at a deck / beam edge, bent over it: hands at most this far below the feet.
+   *  Measured 0.35 (woman) – 0.54 m (casual, punk) with the hands reachDownOut ahead of the feet; the spec's
+   *  ≈ 1.0 m is superseded (OWNER_DECISIONS "Body model = the measured rig"): deeper hand-offs → the forklift. */
+  reachDownBelowFeet: 0.5,
+  reachDownOut: 0.45,
+  /** Horizontal: hands at most this far from the feet when working a part from a station — the kneel rule at a
+   *  hand-off. Physical basis: a kneeling body reaches 0.78 (woman) – 0.96 m (casual, punk) out at
+   *  kneelOutBelow below its feet (measured); 0.8 m is what every template reaches. */
   maxHorizontalFromFeet: 0.8,
+  kneelOutBelow: 0.1,
   /** At a hand-off, a receiver's hands at most this far beyond the edge they kneel at (owner feedback §6 ≈ 0.5 m). */
   edgeReach: 0.5,
   /** Hand-held items: hands this far beyond the edge of the table a person stands at (bending at the hips). */
   tableReach: 0.6,
-  /** Shoulder band + lean per posture family (the envelope: a shoulder cylinder above the feet + the arm). */
+  /** Shoulder band + lean per posture family (the envelope: a shoulder cylinder above the feet + the arm).
+   *  Tops: shoulderTop (1.45). Bottoms from the rig: the standing / painting knee-bend offsets below the
+   *  shoulders (0.12 / 0.52 m), the squat and the kneel from RIG hips + torso × cos(bend). */
   posture: {
-    /** standing / walking with a load / reaching up: shoulders ≤ shoulderHeight + heelRaise */
-    upright: { lo: 1.3, hi: shoulderHeight + heelRaise, lean: 0.2 },
-    /** crouching / squatting to grip or lift from the knees */
-    crouch: { lo: 0.55, hi: shoulderHeight + heelRaise, lean: 0.35 },
-    /** kneeling at an edge / bent over it at the hips: shoulders down to 0.15 m below the feet */
-    bentOver: { lo: -0.15, hi: shoulderHeight + heelRaise, lean: 0.45 },
-    /** painting a vertical face in front of them */
-    painting: { lo: 0.9, hi: shoulderHeight + heelRaise, lean: 0.35 },
+    /** standing / walking with a load / reaching up (knees soft: shoulders ≥ 1.22) */
+    upright: { lo: shoulderHeight - 0.12, hi: shoulderTop, lean: 0.2 },
+    /** crouching / squatting to grip or lift from the knees: squatHip 0.42 + 0.45 × cos 80° = 0.50 */
+    crouch: { lo: 0.5, hi: shoulderTop, lean: 0.35 },
+    /** kneeling at an edge, bent over it: kneelHip 0.46 + 0.45 × cos 150° = 0.07 (shoulders stay above the
+     *  deck); lean 0.35 — with the arm this reproduces the measured casual / punk reach (0.54 m down at
+     *  0.45 m out, 0.95 m out at 0.1 m below), so the reachDownBelowFeet / maxHorizontalFromFeet caps bind */
+    bentOver: { lo: 0.07, hi: shoulderTop, lean: 0.35 },
+    /** painting a vertical face in front of them (a half squat: shoulders ≥ 0.82) */
+    painting: { lo: shoulderHeight - 0.52, hi: shoulderTop, lean: 0.35 },
   } satisfies Record<string, Posture>,
   /** Seated on a chair / bench: landmark heights drop this much (pelvis on a ~0.45 m seat). */
   seatedDrop: 0.45,
-  chestHeight: 1.3, // sternum, standing
+  chestHeight: shoulderHeight - 0.12, // sternum, standing (1.22)
   chestFwd: 0.08, // sternum ahead of the body axis
-  mouthHeight: 1.58,
+  mouthHeight: 1.58, // the renderer's measured mouth point (humans.ts) at 1.75 m
   mouthFwd: 0.15, // the spoon hand's target, in front of the head
-  /** Empty hands hanging at the hips (shoulderHeight − armLength = 0.80 m): where a crouch / reach starts from. */
-  restHand: { up: 0.8, side: 0.22, fwd: 0.02 }, // up = shoulderHeight − armLength (written out: the float difference is 0.7999…)
+  /** Empty hands hanging at the hips (shoulderHeight − armLength = 0.72 m, just off the shoulders' line): where a crouch / reach starts from. */
+  restHand: { up: 0.72, side: 0.18, fwd: 0.02 }, // up = shoulderHeight − armLength (written out: the float difference is 0.7200…01)
   /** Hand carrying a small item (walking, sitting): in front of the hip. */
   carryHand: { up: 1.0, side: 0.16, fwd: 0.28 },
 } as const;
@@ -67,6 +95,14 @@ export function postureGap(pz: Posture, feet: readonly number[], hand: readonly 
   const rel = hand[1] - feet[1];
   const dv = Math.max(0, pz.lo - rel, rel - pz.hi);
   return Math.sqrt(dh * dh + dv * dv) - BODY_MODEL.armLength;
+}
+
+/** Highest a hand `r` m out horizontally from the feet reaches in posture `pz`, above the feet, floored to the mm
+ *  (so `postureGap` there is ≤ 0); −Infinity when r is beyond lean + arm. Straight up (r ≤ lean) it is hi + arm. */
+export function postureTop(pz: Posture, r: number): number {
+  const dh = Math.max(0, r - pz.lean);
+  if (dh > BODY_MODEL.armLength) return -Infinity;
+  return Math.floor((pz.hi + Math.sqrt(BODY_MODEL.armLength * BODY_MODEL.armLength - dh * dh)) * 1000) / 1000;
 }
 
 // ---- body frame and landmarks (world points) ----

@@ -72,7 +72,7 @@ Per tick, world frame (metres, Y up, same frame as `pose.p`):
   (`CATALOG[def].handling.grips[1][0].local`), or use `pose` directly (it is exactly hand − rot(grip, yaw),
   yaw = the holder's yaw). `resting-on` / `ground` → render at `pose`. `contents.fraction` → food level.
 - Body landmarks (`body/model.ts` via `items/body.ts`, forward f = (cos yaw, sin yaw), right r = (−sin yaw, cos yaw) in x,z;
-  heights above the ground point, −0.45 m seated): chest 1.30 m (+0.08 fwd), shoulders 1.42 m ±0.19 m,
+  heights above the ground point, −0.45 m seated): chest 1.22 m (+0.08 fwd), shoulders 1.34 m ±0.15 m (measured rig, 2026-09-28; were 1.30 / 1.42 ±0.19),
   mouth point 1.58 m +0.15 m fwd, carry point 1.00 m +0.28 fwd ±0.16, bowl hand = chest + 0.25 fwd − 0.10.
   Eat: spoon hand rim (bowl hand + 0.12 up, 0.07 to the spoon side) → dip (inside the bowl) → rim → mouth
   point → (pause) → rim. Measured in the meal: bowl hand ≤ 0.4 m from the chest and spoon hand ≤ 0.62 m (the

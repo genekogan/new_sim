@@ -5,7 +5,10 @@ Code: `viewer/engine/construction/{frame,framemove,handup,aloft}.ts`, additive h
 `handup.test.ts`, `build-bay-v3.test.ts`. Flagship: `engine/scenarios/build-bay-v3.ts`.
 **Mars assembly model v1, approximate**: rule-based plausibility, not ergonomics.
 Every reach number below comes from the one body model (`engine/body/model.ts`, `BODY_MODEL.md`, W10
-2026-09-28): arm 0.62 m, standing reach 2.06 m (the §5 "2.1 m" rule is 2.06 m), reach-down 1.0 m, kneel rule 0.8 m.
+2026-09-28): arm 0.62 m, standing reach 2.06 m (the §5 "2.1 m" rule is 2.06 m), reach-down 0.5 m, kneel rule 0.8 m. Since
+2026-09-28 ("Body model = the measured rig", W12) these are the measured rig's numbers: shoulders 1.34 m; the spec's
+≈ 1.0 m reach-down is **superseded** by 0.5 m (a kneeling body's shoulders stay above the deck: measured 0.35–0.54 m
+below the feet at 0.45 m out) — hand-offs needing more are refused (`handup.too-high`: use the forklift).
 
 ## The rack structure is climbable / walkable (frame.ts, "only what exists is usable")
 | Link | Exists when | Rules |
@@ -49,14 +52,17 @@ without turning. With the members' top ≤ givers' floor + 2.01 m (GIVE_MAX − 
 themselves ("direct"); else they hand it up below the beam and the receivers lift it the rest.
 
 ### Reach rules (engine rules; plan time and every tick)
-- givers' hands (the load's underside) ≤ their floor + **2.06 m** (`BODY_MODEL.overheadMax`; was 2.1);
-- receivers' hands ≥ their feet − **1.0 m**; at the hand-off within **0.5 m** horizontally beyond the
+- givers' hands (the load's underside) ≤ their floor + **2.06 m** (`BODY_MODEL.overheadMax`; was 2.1) — and no
+  higher than the `reach_up` envelope reaches at their grips: hands 0.3 m ahead and ±0.15 m apart top out at
+  **2.05 m** (`postureTop`), so that is the hand-off height from the ground (W12);
+- receivers' hands ≥ their feet − **0.5 m** (was 1.0; measured rig); at the hand-off within **0.5 m** horizontally beyond the
   edge they kneel at — a beam walkway's side (`offWalkway − width/2`) or, standing on a deck, the deck's
   outline (W8); refused with `handup.receiver-reach` naming the distance (e.g. "hands would be 0.70 m
   beyond the edge of beam b3 they kneel at (max 0.5 m)");
 - **kneel rule** (W8 patch, applied by W10 2026-09-28): at `reach_down` / `take` the receivers' hands are
   ≤ **0.8 m** horizontally from their feet (they kneel *at* the edge, not stand back and lean) — planned
-  (station choice) and per tick (`lift.hands-out-of-reach`, + 0.1 m);
+  (station choice) and per tick (`lift.hands-out-of-reach`, + 0.1 m). Physical basis (W12): a kneeling rig
+  reaches 0.78 (woman) – 0.96 m (casual, punk) out at 0.1 m below its feet; 0.8 m is what every template reaches;
 - long-load balance (W8): one giver handing up a `timber` / `rack-beam` end-first holds it with a
   two-handed **lever grip** (outer hand at the end, inner hand `LEVER` 0.4 m toward the middle; slot
   suffix `:lever`); a free end > **1.5 m** from the inner hand is `handup.unbalanced` (6 ft 2x4: 1.34 m ok;
@@ -64,8 +70,9 @@ themselves ("direct"); else they hand it up below the beam and the receivers lif
   (`LEVER_SIDE` = body radius + 3 cm, the load passing their hip), not 0.3 m beyond it — with a 0.62 m arm the
   inner hand 0.7 m out was unreachable;
 - every holder's hands inside a posture envelope (`BODY_MODEL.posture`): shoulder cylinder above the feet
-  (`crouch/lift` 0.55–1.48 m, `walk-load/reach_up` 1.3–1.48 m, receivers' `reach_down…set_down`
-  −0.15–1.48 m, i.e. kneeling / bent over the edge), horizontal lean 0.2–0.45 m, arm **0.62 m** (was 0.75);
+  (`crouch/lift` 0.50–1.45 m, `walk-load/reach_up` 1.22–1.45 m, receivers' `reach_down…set_down`
+  0.07–1.45 m, i.e. kneeling / bent over the edge, shoulders above the deck), horizontal lean 0.2–0.35 m, arm
+  **0.62 m** (bands from the measured rig, BODY_MODEL.md; were 0.55 / 1.3 / −0.15 – 1.48, lean ≤ 0.45);
   planning requires inside (`handup.giver-reach` names a giver's hand beyond reach), the invariant allows +0.1 m;
 - a load in a receiver's body band stays ≥ 0.30 m from them; receivers ≥ 0.6 m apart.
 
@@ -76,7 +83,7 @@ sheet), `handup.no-receiver-station`, `handup.path-blocked`, `handup.giver-block
 `handup.no-support`, `handup.cancel-unsafe` (in the air), `crew.size`.
 
 Invariant `lift.hands-out-of-reach` now covers both ends: holders with slot `handup-*` must publish
-both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.06 m, receivers ≥ feet − 1.0 m and (kneel rule)
+both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.06 m, receivers ≥ feet − 0.5 m and (kneel rule)
 ≤ 0.8 m horizontally from their feet at `reach_down` / `take`.
 
 ### Hand points for the renderer
@@ -109,8 +116,9 @@ the bay). 88 steps, 16219 ticks (811 s simulated), 0 violations, ~6 s wall, pinn
   construction.
 - Balance is checked for a single giver only (lever grip, free end ≤ 1.5 m); a single receiver feeding
   a joist in end-first is assumed to slide it over the edge beam (not checked), and sheets are not checked.
-- Reach-down: the 1.0 m cap is the owner's §6 figure, but the kneeling envelope (shoulders ≥ 0.15 m below
-  the feet + arm 0.62 m) binds at 0.77 m — see BODY_MODEL.md "Approximate".
+- Reach-down: 0.5 m below the feet (measured rig; the owner's §6 ≈ 1.0 m is superseded). The kneeling
+  envelope reaches 0.54 m at 0.45 m out, so the 0.5 m cap binds (`handup.too-high`), not station choice. Decks
+  whose receivers stand > 2.05 + 0.5 ≈ 2.55 m above the givers' floor (plus the load's thickness) need the forklift.
 - Fork height is not state after the load leaves the forks (the truck just parks); `forklift_back` is
   a straight creep.
 - Climb paths are three straight segments; climbing is ≤ 1 person per link but two links on one

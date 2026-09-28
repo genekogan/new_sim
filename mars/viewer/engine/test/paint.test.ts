@@ -1,7 +1,9 @@
 // paint (owner feedback 2026-09-28 §8, W8): a person paints a 4x8 sheet standing upright on the ground —
 // coverage of the reachable band reaches 1.0, hands inside the painting envelope every tick and
 // reproducible from the take's grip slot, progress stored in the take; refusals: a non-paintable
-// entity, a band out of reach, painting while walking.
+// entity, a band out of reach, painting while walking. Body model = the measured rig (2026-09-28): from the
+// ground the brush reaches 0.5–2.06 m, so the top 0.38 m of a standing 4x8 (2.06–2.44 m) is refused
+// (`paint.out-of-reach`) — painted by someone standing on a 0.6 m platform instead.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { component, human, emptyWorld, addAll } from '../world/factory.ts';
@@ -15,18 +17,29 @@ import { sampleTake } from '../take/replay.ts';
 import { openGround } from './frame-fixtures.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
+import type { SpatialScene } from '../spatial/types.ts';
 
 const DT = 1 / 20;
 
 /** A 4x8 sheet standing on its short edge (2.44 m tall, 1.22 m wide), its front face toward −x; painter p1 3 m away. */
-function wall(extra: Entity[] = [], bottom = 0) {
-  const base = openGround();
+function wall(extra: Entity[] = [], bottom = 0, base: SpatialScene = openGround()) {
   const sheet = component('w1', 'plywood-4x8', [0, bottom + 1.2192, 0], 0, { phase: 'placed' });
   sheet.pose.roll = Math.PI / 2;
   sheet.support = { kind: 'ground' };
-  const w = addAll(emptyWorld('open-ground', base), sheet, human('p1', -3, 0.5), component('bm', 'beam-8ft', [-2, 0, 3], 0, { phase: 'stored' }), ...extra);
+  const w = addAll(emptyWorld('open-ground', base), sheet, human('p1', -3, 0.5, platformLevel(base)), component('bm', 'beam-8ft', [-2, 0, 3], 0, { phase: 'stored' }), ...extra);
   const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...PAINT_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
   return new Runtime(w, reg, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS]);
+}
+
+/** A painter on the platform's level (y) when the scene has one. */
+function platformLevel(base: SpatialScene) {
+  const l = base.levels.find((v) => v.id === 1);
+  return l ? { level: 1, y: l.y } : {};
+}
+/** Open ground plus a 0.6 m platform (a painting stage) in front of the sheet's face, x −4…−0.1. */
+function withPlatform(): SpatialScene {
+  const g = openGround();
+  return { ...g, levels: [...g.levels, { id: 1, y: 0.6, label: 'platform' }], surfaces: [...g.surfaces, { id: 'platform', level: 1, y: 0.6, obb: { c: [-2.05, 0], half: [1.95, 2], yaw: 0 } }] };
 }
 
 test('paint green: a person on the ground paints a standing 4x8 sheet — the reachable band 0.5–2.06 m reaches coverage 1.0, hands in the envelope every tick, progress in the take', () => {
@@ -96,4 +109,31 @@ test('paint refusals: a non-paintable beam, a band above reach from the ground, 
   const mv = rt.submit('paint', { actor: 'p1', panel: 'w1', color: 'red' });
   assert.equal(mv.diagnostic?.code, 'paint.while-walking');
   assert.match(mv.diagnostic!.message, /p1 is walking .*nobody paints on the move/);
+});
+
+test('paint top band: the top 0.38 m of a standing 4x8 (2.06–2.44 m) is out of reach from the ground — refused, not hidden; from a 0.6 m platform it is painted', () => {
+  const rt = wall();
+  // exactly the top band above standing reach
+  const top = rt.submit('paint', { actor: 'p1', panel: 'w1', color: 'red', band: { from: 2.06, to: 2.4384 } });
+  assert.equal(top.diagnostic?.code, 'paint.out-of-reach');
+  assert.match(top.diagnostic!.message, /reaches 0\.50–2\.06 m; the band 2\.06–2\.44 m of w1's front face \(2\.06–2\.44 m\) is above that — stand on a deck or beam/);
+  // the whole face is not paintable from the ground (the default band stops at 2.06 m: green test above)
+  const all = rt.submit('paint', { actor: 'p1', panel: 'w1', color: 'red', band: { from: 0.5, to: 2.4384 } });
+  assert.equal(all.diagnostic?.code, 'paint.out-of-reach');
+  // standing on something: a painter on a 0.6 m platform reaches 1.10–2.66 m and paints the top band
+  const up = wall([], 0, withPlatform());
+  const r = up.submit('paint', { actor: 'p1', panel: 'w1', color: '#e8c547', band: { from: 2.06, to: 2.4384 } });
+  assert.notEqual(r.status, 'failed', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
+  const E = up.world.entities;
+  for (let i = 0; r.status !== 'completed' && r.status !== 'failed' && i < 20 * 120; i++) {
+    up.step();
+    const a = E.p1;
+    if (a.human!.activity !== 'paint') continue;
+    assert.equal(a.pose.p[1], 0.6, 'painting from the platform');
+    for (const p of [a.human!.hands!.left!, a.human!.hands!.right!]) assert.ok(paintEnvelopeGap(a.pose.p, p) <= 1e-9, `hand outside the envelope at tick ${up.tick}`);
+  }
+  assert.equal(r.status, 'completed', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
+  const bands = E.w1.paint!.bands;
+  for (const b of bands) if (b.from >= 2.2 - 1e-9) assert.equal(b.coverage, 1, `top band ${b.from}–${b.to} painted from the platform`);
+  assert.deepEqual(up.violations, [], JSON.stringify(up.violations.slice(0, 3)));
 });
