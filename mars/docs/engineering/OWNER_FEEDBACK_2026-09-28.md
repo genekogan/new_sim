@@ -274,6 +274,27 @@ to receive the beam from someone below, then set it against the upright — each
 W7 built (`hang_beam` via `stance` + relay); confirmed, no longer hypothetical as a method (the sequence remains
 hypothetical).
 
+## 15. North bearing, levitating tires, Chiba 2024 facade (Gene, 2026-09-29 afternoon)
+- **North (answers Q3):** the long axis of the 2020 tire ring runs NORTH–SOUTH. The ring (`app/studio-2020/scene.ts:328-332`, 66 tires
+  on cos(a)·47+4, sin(a)·32−8) has its long axis along world X; `engine/env/sun.ts` takes −Z as north (`NORTH_AZIMUTH_OFFSET = 0`),
+  so the true offset is ±90°. Determine the sign from evidence (the March 4 DJI_0079 aerial in `public/2020/evidence`: midday shadows
+  point north at Bombay Beach; clip timestamp + NOAA sun), not by guessing; if ambiguous, one binary question with a picture. Then set
+  the offset, prove construction pins don't move (env is outside `physicalView` — test it), re-plan directed camera tracks / sunset
+  fixtures, re-check the 2022/2024 lab shadow baselines, record in OWNER_DECISIONS, move Q3 to answered. Check 2021–2026 share the
+  axis convention (Kit scenes and the 2026 CAD): one offset for all years, or say which differ.
+- **Bug — tires levitate:** `tire()` (`scene.ts:92`) puts the torus at y = 0.12 (tube r 0.105 → underside +0.015); the boundary ring
+  must rest on the 2020 ground mesh (if the ground is at −0.16 they float 13 cm): y = ground_y + tube radius, boundary ring only;
+  verify the ballast tires on roofs/tarps (`scene.ts:200/227`) touch their surfaces. Renderer-only, no engine change, no pins.
+  Playwright capture at eye level of the ring edge (LOOK at it); check the same floating for ground props in 2021–2025 Kit scenes and
+  2026 (fire rings, chairs, tables, piles — Q4's 16 cm is the same issue).
+- **Chiba 2024 facade** (photos `evidence/2024-chiba-facade-front-vertical-inset-stairs-plexiglass.webp`,
+  `evidence/2024-chiba-solarium-interior-plexiglass-roof.jpg`): in the model the whole facade leans and the stairs lean with it. In
+  reality the rectangular insert around the stairs is VERTICAL and set back (concave/inset); the left and right flaps are angled and
+  their bottoms protrude forward past the insert; the stairs go straight up-down inside the insert. The windows on the right are real
+  plexiglass — the solarium should be visible just inside (second photo: 2x4 lattice roof with clear panels over the rack frames);
+  the side has a plexiglass wall with a door, not an empty opening. A reconstruction edit of the protected mars-2024 state with its own
+  cause (HISTORY_IDS), stable ids kept.
+
 ## Priority
 5 with 6 (they are one feature: the hand-up is the reach-up/reach-down motion pair, and pickups need
 the crouch) — these are prerequisites for 7; then 7 (the headline: full-year construction replays, start
