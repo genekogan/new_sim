@@ -132,3 +132,4 @@ Then: gate → release 5; HANDOFF refresh.
 - Subagent cost tally (tokens / wall): —
 ### Questions for Gene
 - (carried) 2022 SW-corner passage closed by west-house table; rv-8/9 (2023), rv-9/10 (2024) intrude into Chiba; 9 ft frame; north axis.
+- (00:35 EDT) Gene: no production deploys until he says so; focus on functionality + constraints. Lead = Fable 5.1 as PM, Opus 5.5 workers.
