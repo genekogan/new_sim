@@ -127,7 +127,7 @@ const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
  * What a `walk_to` step reads about everyone else, read once per step (PLANNING_BUDGET.md §6):
  * - the world's entities in world order: the people scans (encounter, look-ahead, intrusion, vehicles,
  *   stairs) ran `Object.values` 4–6× per walker per tick, and `world.entities` is a V8 dictionary-mode
- *   object, where each call sorts and copies (~2 µs for 30);
+ *   object, where each call sorts and copies (~2 µs for 30; `entityList` ~0.5 µs);
  * - the carried-load discs (`services.loadDiscs`, rebuilt from every carried component on each call),
  *   on first use.
  * A walker's step never adds, removes or replaces an entity (it moves its own pose, read live through
@@ -137,7 +137,15 @@ const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
 let stepScope: { entities: Entity[]; discs?: LoadDiscView[] } | null = null;
 /** Pure-performance switches (PLANNING_BUDGET.md §6). Each leaves every result bit-identical; tests turn them off to prove it. */
 export const WALK_PERF = { stepSnapshot: true };
-const entitiesOf = (rt: Runtime): Entity[] => stepScope?.entities ?? Object.values(rt.world.entities);
+const entitiesOf = (rt: Runtime): Entity[] => stepScope?.entities ?? entityList(rt);
+/** `Object.values(world.entities)`, same order (both follow OrdinaryOwnPropertyKeys), ~4× cheaper on a dictionary-mode map. */
+function entityList(rt: Runtime): Entity[] {
+  const ents = rt.world.entities;
+  const ids = Object.keys(ents);
+  const out = new Array<Entity>(ids.length);
+  for (let i = 0; i < ids.length; i++) out[i] = ents[ids[i]];
+  return out;
+}
 /** Where the current route leads: the goal, or the step-aside spot while walking to it. */
 const targetOf = (ex: Exec) => (ex.detour?.stage === 'going' ? { level: ex.detour.level, p: ex.detour.spot } : ex.goal);
 /** Live walk_to execs by action id (so `makeWay` can ask a blocked walker to step aside). */
@@ -187,7 +195,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     const h = rt.world.entities[ex.actor];
     const x0 = h.pose.p[0], z0 = h.pose.p[2];
     const outer = stepScope;
-    stepScope = WALK_PERF.stepSnapshot ? { entities: Object.values(rt.world.entities) } : null;
+    stepScope = WALK_PERF.stepSnapshot ? { entities: entityList(rt) } : null;
     let r: StepResult;
     try {
       r = stepWalk(rt, ex, dt);
