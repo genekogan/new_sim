@@ -40,6 +40,8 @@ export class CameraWorld {
   cell: number;
   minX: number; minZ: number; nx: number; nz: number;
   cells: number[][];
+  private stamp: Uint32Array;
+  private gen = 0;
 
   constructor(scene: SpatialScene, policy: CameraPolicy = DEFAULT_CAMERA_POLICY, cell = 4) {
     this.cell = cell;
@@ -65,6 +67,7 @@ export class CameraWorld {
       const [ia, ja, ib, jb] = this.range(q.minX, q.minZ, q.maxX, q.maxZ);
       for (let j = ja; j <= jb; j++) for (let k = ia; k <= ib; k++) this.cells[j * this.nx + k].push(i);
     });
+    this.stamp = new Uint32Array(this.solids.length);
   }
 
   private range(ax: number, az: number, bx: number, bz: number): [number, number, number, number] {
@@ -77,9 +80,11 @@ export class CameraWorld {
     const x0 = Math.min(ax, bx) - pad, x1 = Math.max(ax, bx) + pad, z0 = Math.min(az, bz) - pad, z1 = Math.max(az, bz) + pad;
     const [ia, ja, ib, jb] = this.range(x0, z0, x1, z1);
     if (ia === ib && ja === jb) return this.cells[ja * this.nx + ia];
-    const seen = new Set<number>();
-    for (let j = ja; j <= jb; j++) for (let k = ia; k <= ib; k++) for (const i of this.cells[j * this.nx + k]) seen.add(i);
-    return [...seen].sort((p, q) => p - q);
+    // dedupe with a generation stamp per solid (no Set per query: raycasts toward subject points cross cells every sample)
+    if (++this.gen === 0xffffffff) { this.stamp.fill(0); this.gen = 1; }
+    const g = this.gen, stamp = this.stamp, out: number[] = [];
+    for (let j = ja; j <= jb; j++) for (let k = ia; k <= ib; k++) for (const i of this.cells[j * this.nx + k]) if (stamp[i] !== g) { stamp[i] = g; out.push(i); }
+    return out.sort((p, q) => p - q);
   }
 }
 
