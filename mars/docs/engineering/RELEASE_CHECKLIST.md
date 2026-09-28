@@ -380,3 +380,67 @@ Rollback (from `viewer/`):
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 89e65c8c-5abb-4377-a693-3689de30d465 \
   --name mars-campus-2026 -m "rollback: <reason>"
 ```
+
+## Production deploy 6 (2026-09-28, bleeding edge)
+
+Gene authorised a production deploy of the bleeding edge ("pre-release, ok to break stuff"). Deployed by W34 from
+committed tree `27e04f6` in a detached worktree (clean; the `.pw-browsers` symlink excluded through a scoped
+`core.excludesFile`, no repo config change). Contents: the overnight tranche and checkpoint-1 work up to `27e04f6`:
+hand-up + forklift, one body model, splined walking with no jumps, stair IK, the 2022 year build (phases A + B), paint
+and solar, meals, fire, camera direction (`engine_direct_camera`), takes `mars-take/4`, studio "Watch it being built"
+for 2022, and the flagship v3 take. **Not included** (landed on `main` during the gate): `0cd2f19` W32 prone model =
+the measured rig (engine), `f350896` / `ce74ba0` W32 docs, `848b895` merge, `858946e` docs.
+
+- **New version: `07dce638-2950-444f-823f-0e19b8f62320`** (created 16:28:17Z). It replaces
+  `cebd5827-b08d-4224-a320-afba968a1352`, which `wrangler deployments status` confirmed live at 100% just before the
+  deploy. `cebd5827…` is the new rollback target.
+- **Gate:** `viewer/.cloudflare/gate/2026-09-28T16-12-39-722Z/report.json` in the W34 worktree (gitignored): `ok:
+  true`, `gitHead` `27e04f6`, `gitDirty: false`. Results: `npm test` 56/56; `test:engine` 370 pass / 0 fail / 3 skip
+  (373); `tsc` clean; e2e 64 passed / 1 skipped in 729 s (`--workers=1`, `E2E_VITE_PORT=5591`, no baseline refresh);
+  probe `finalStateHash` `b746b0947e65…62e7f0c3` (= the "no walker jumps" pin; it moved from `79447f75…` on purpose
+  overnight). Evidence was not regenerated in this release (W34's commit scope excludes `EVIDENCE.md`); the last run is
+  the W26 one at `1395dd4`.
+- **Build:** `prepare.py` staged 315 files (799.6 MiB, 8 large objects; `large-assets.json` byte-identical to release
+  5). `CLOUDFLARE_RELEASE=1 npm run build` exited 0 with only the known chunk-size warning. The route list includes
+  `/lab`, `/lab/`, `/studio`, `/simulation-guide`. `dist/client/engine/campus-2020…2026.json` and all five
+  `engine/takes/*` files are present. The dry run exited 0 (356 assets, 5527.78 KiB / 1033.32 KiB gzip; bindings
+  SIMULATIONS, MODELS, ASSETS). `upload.mjs` made 0 uploads (8 × `Already uploaded`). The deploy uploaded 26 new asset
+  files (309 already present); startup 134 ms.
+- **Live smoke:** `/`, `/studio`, `/studio/2022`, `/lab` and `/simulation-guide` returned 200 text/html.
+  `/simulation-agent-guide.md` returned 200 (28,275 B). `/engine/campus-2026.json` (1,081,647 B, parses) and
+  `/engine/campus-2022.json` (238,055 B) returned 200 application/json. `/engine/takes/manifest.json` (4,120 B; takes
+  `d2f16bd3`, `64c3331c`; otherYears `b7b882fd`, `69c41651`), `flagship-campus-2026.json` (1,812,545 B),
+  `build-bay-v3-campus-2026.json` (2,418,487 B), `year-build-2022-east-house-bay1.json` (1,543,958 B) and
+  `year-build-2022-east-house.json` (4,451,737 B) returned 200 application/json. `/nope` returned 404. `HEAD
+  /browser/campus.glb` returned 200 model/gltf-binary from R2. `SITE_BASE=… ALL_ASSETS=1 node deploy/smoke.mjs` exited
+  0 (19 routes 200, 315 assets, GLB range header verified, anonymous state denied).
+- **Integration: the committed script FAILS against production on a stale expectation.**
+  `deploy/simulation-integration.mjs:62` asserts the 13 engine tool names of release 5; production (correctly) also
+  lists `engine_direct_camera` (camera direction phase 1, `649bc72`), so the assert fails before any engine call. The
+  gate does not run this script (no `SIM_BASE`), which is why it was not caught. A scratch copy with only that list
+  extended (not committed) printed all three PASS lines (§28 replay/fork/plan invalidation; MCP handshake + 20 legacy +
+  engine tools incl. pause/resume/edit/list/delete and the 2022 year room; auth/method/prototype/body limits) in 30 s.
+  Engine timings: rehearse 611 ms wall, execute 449 ms, camera 922 ms; take 22,918 B. **Follow-up for the owner of
+  `deploy/`:** add `'engine_direct_camera'` to that list (and the "13 engine tools" PASS text).
+- **Director demo:** `node deploy/director-demo.mjs --base https://mars-campus-2026.<workers-subdomain>.workers.dev` exited 0:
+  all 9 steps asserted, including step 9 pause → fork → resume both branches; total 7.96 s.
+- **Browser `/lab`:** headless Chromium (SwiftShader) on production `/lab?scenario=build-bay` ran `runScenario` +
+  `runToEnd`: tick 10901, done, 5/5 expectations (43/43 steps, 0 violations, visitor on level 4), 0 console errors.
+  Screenshot: `viewer/e2e/artifacts/prod-smoke-6/build-bay-end.png` (reviewed: deck, stair, visitor on the deck).
+- **Cross-host determinism:** the production `stateHash()` is
+  `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3`, the same value the gate's
+  `deploy/determinism-probe.mjs` gives. **They match.**
+- **Browser `/studio`:** `/studio/2022` shows the **Watch it being built** picker with both 2022 year-build takes
+  ("first bay … 41,317 ticks", "the whole house … 117,277 ticks"). On `/studio`, the Replay take picker lists flagship
+  and flagship v3; flagship `d2f16bd3…` scrubbed to "held" (t 209.6 s), engine camera on (shot "orbit the raise"):
+  37/37 entities drawn, final-state hash = recorded = manifest (`c56ea8da…7157`), HYPOTHETICAL banner visible, 0 console
+  errors. Screenshots: `viewer/e2e/artifacts/prod-smoke-6/studio-take-held.png` (reviewed: crew holding both frames
+  among the trailers; "final state = recorded · last frame = final state (0.69 mm)"), `studio-2022-picker.png`.
+- Compression audit: not required (the browser model was not rebuilt; `large-assets.json` unchanged).
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback cebd5827-b08d-4224-a320-afba968a1352 \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```
