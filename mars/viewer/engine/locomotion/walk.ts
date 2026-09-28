@@ -175,6 +175,10 @@ function entityList(rt: Runtime): Entity[] {
 const targetOf = (ex: Exec) => (ex.detour?.stage === 'going' ? { level: ex.detour.level, p: ex.detour.spot } : ex.goal);
 /** Live walk_to execs by action id (so `makeWay` can ask a blocked walker to step aside). */
 const walkExecs = (rt: Runtime): Map<string, Exec> => (rt.services.walkExecs ??= new Map());
+/** W47: the last single-file yield of each walker (actor → whom it waited for, at which tick, since when); plain data. */
+const yieldsOf = (rt: Runtime): Record<string, { to: string; tick: number; since: number }> => (rt.services.walkYields ??= {});
+/** W47: ticks a mutual single-file wait must last before the waiter holding the passage lets it go (3 s). */
+const RELEASE_AFTER = 60;
 /** Traffic resources. `exclusive` (a carrier with a load on a flight): nobody else may enter, whatever their direction. */
 export const traffic = (rt: Runtime): Map<string, { actors: Set<string>; entry: Vec2; dir: Vec2; exclusive?: boolean }> =>
   (rt.services.traffic ??= new Map());
@@ -810,11 +814,19 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     ex.replanWait = REPLAN_MAX_WAIT;
     return { status: 'blocked', diagnostic: { code: 'walk.obstacle', message: `${ex.actor} stops short of ${geoBlock} on its corridor and replans`, subjects: [ex.actor, geoBlock] } };
   }
-  if (yieldTo && ex.v < 0.02)
+  if (yieldTo && ex.v < 0.02) {
+    const y0 = yieldsOf(rt)[ex.actor];
+    yieldsOf(rt)[ex.actor] = { to: yieldTo, tick: rt.tick, since: y0 && y0.to === yieldTo && rt.tick - y0.tick <= 1 ? y0.since : rt.tick };
     return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${ex.actor} is waiting for ${yieldTo} to clear a single-file passage`, subjects: [ex.actor, yieldTo] } };
+  }
   if (loadBlock && ex.v < 0.02)
     return { status: 'blocked', diagnostic: { code: 'traffic.load', message: `${ex.actor} waits for the carried ${loadBlock} to pass`, subjects: [ex.actor, loadBlock] } };
   if (personBlock && ex.v < 0.02) {
+    // W47: the W38 passage release below, for a person in my way (not only on my destination) who waits for me to clear a
+    // single-file passage I hold (west-house 2022, D1: m6 → its climb foot, m3 stopped on it yielding to m6 — deadlocked). Their yield is read from this tick or the last (walks inside a carry have no record of their own); only
+    // a wait that has lasted RELEASE_AFTER on both sides (a transient one resolves as before: every pin unchanged).
+    const y = yieldsOf(rt)[personBlock];
+    if (ex.held.size && y && y.to === ex.actor && rt.tick - y.tick <= 1 && rt.tick - y.since >= RELEASE_AFTER && (ex.still ?? 0) >= RELEASE_AFTER) releaseAll(rt, ex);
     makeWay(rt, personBlock, pointAt(ex, ex.total));
     return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} is waiting for ${personBlock} to move out of the way`, subjects: [ex.actor, personBlock] } };
   }

@@ -146,8 +146,12 @@ test('year build 2022 east-house, first bay + its first ground-floor deck strip 
 });
 
 /** Pinned: the whole east-house A+B (YEAR_BUILD_FULL=1). First pin 2026-09-29 (W27): green once set-part lift crews wait for
- *  bystanders (s1417-install-wall holds its panel 17 ticks while an idle m6 steps aside); 8.3 h simulated. */
-const PIN_FULL_AB = { ticks: 600599, hash: 'ddb634d6e73d99e679421ceecaaec20a0936643d25dc33845082dd6a4ecdf30a' };
+ *  bystanders (s1417-install-wall holds its panel 17 ticks while an idle m6 steps aside); 8.3 h simulated.
+ *  Re-pinned 2026-09-29 (W47, rule 15 "idle crew parked clear of the section's work", YEAR_BUILD.md checkpoint 1b): the stair
+ *  section's idle crew park clear of the stair zone and its carry corridors — ddb634d6… @ 600 599 → 2cd6af11… @ 600 204
+ *  (phase A and D0–D2 bit-identical; 0 violations, 66 + 145 parts as before). The shipped chapter set (take-chapters.test.ts,
+ *  record-campus-take.mjs) is the pre-W47 run and keeps ddb634d6… until the takes are re-recorded. */
+const PIN_FULL_AB = { ticks: 600204, hash: '2cd6af11d9465ecc0a2950d36bc2b70ff135d29df62082523ee6c846a8ccd9b3' };
 
 test('year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1)', { skip: process.env.YEAR_BUILD_FULL !== '1' }, () => {
   const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { phaseB: {} });

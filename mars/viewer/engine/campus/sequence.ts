@@ -333,6 +333,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
       engCol: (kg, col) => engCol(dir === 1 ? kg : K - 1 - kg, col), Y, sections: opts.phaseB.sections, count: () => S.length, lastSteps: () => [...new Set(last.values())].sort(),
       narrowMinusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomMinusU(nodes.find((x) => x.id === nd.node)!, scene); },
       groundFree: (o, minTop = 0.05) => !scene.obstacles.some((x) => x.y1 > minTop && x.y0 < 1.3 && obbOverlap(x.obb, o)),
+      standFree: (c, r) => !scene.obstacles.some((x) => x.y1 > 0.05 && x.y0 < 2.0 && obbOverlap(x.obb, { c, half: [r, r], yaw: 0 })),
       narrowPlusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomPlusU(nodes.find((x) => x.id === nd.node)!, scene); },
     });
     for (const x of resB.sequenced) done.set(x.node, x.steps);

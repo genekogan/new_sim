@@ -433,6 +433,15 @@ The new rules either apply only where the east-house run never gets (a neighbour
 taken stringer spot, a reversed build), or they wait / hold where the east-house run never had a bystander or a
 static near-miss.
 
+## 7. Year-build whole-house runs, checkpoint 1b (W47, 2026-09-29; rules, not the budget)
+Wall times on a shared machine (2–3 runs in parallel), `SequenceRunner` directly: chiba A+B 564 548 ticks in 539 s; east-house
+A+B 600 204 ticks in 619 s; kitchen stops at 320 812 ticks (251 s); west-house stops at 520 579 ticks (552 s). The walker
+change of W47 (`locomotion/walk.ts`: a mutual single-file wait is released once both sides have waited ≥ 3 s,
+`RELEASE_AFTER`) costs nothing measurable. It fires only in deadlocks, so every walker pin is unchanged (engine suite
+green; east-house phase A reaches D0 at the same tick and hash as before). One pin moved, for a rule in `campus/sequence-b.ts`:
+east-house A+B `ddb634d6…` @ 600 599 → `2cd6af11…` @ 600 204 (YEAR_BUILD.md "Checkpoint 1b", rule 15). New: chiba A+B
+`0ee1da11…` @ 564 548.
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
