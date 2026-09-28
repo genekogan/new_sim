@@ -686,3 +686,62 @@ test('api: a historical year room (2022) seeds protected canonical mars-2022; wa
   const reload = new EngineRoom(old.storage, {}, loadCampusFile);
   assert.equal((reload.call(2023, 'log', { workspace: 'mars-2023' }) as any).checkpoints.length, 1, 'persisted once');
 });
+
+test('api: list (plans/takes/workspaces/cameras ledger) and delete_workspace (refusals name what blocks it)', async () => {
+  const c = fresh();
+  const plan = bind(c, walkPlan('ledger-walk', -5, -20), { a: 'n1' });
+  const unkept = bind(c, walkPlan('ledger-peek', -5, -22), { a: 'n1' });
+  const ex = c.call('execute', { plan_id: plan, workspace: 'ws' }) as any;
+  assert.ok(ex.ok);
+  const peek = c.call('rehearse', { plan_id: unkept }) as any;
+  assert.ok(c.call('attach_camera_track', { take_id: ex.take_id, track_id: 'wide', shot: { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] } }).ok);
+  const l = c.call('list', { take_id: ex.take_id }) as any;
+  assert.ok(l.ok);
+  assert.deepEqual(l.plans.map((p: any) => [p.plan_id, p.order, p.template, p.workspace]), [[plan, 0, 'ledger-walk', 'ws'], [unkept, 1, 'ledger-peek', 'ws']]);
+  assert.deepEqual(l.plans[0].referencedByCheckpoint, [ex.checkpoint.id]);
+  assert.deepEqual(l.plans[1].referencedByCheckpoint, []);
+  assert.deepEqual(l.takes.map((t: any) => [t.take_id, t.kept, t.cameras]), [[ex.take_id, true, true], [peek.take.take_id, false, false]]);
+  assert.ok(l.takes[0].bytes > 1000);
+  assert.deepEqual(l.takes[0].referencedByCheckpoint, [ex.checkpoint.id]);
+  assert.deepEqual(l.cameras.map((x: any) => [x.id, x.shot]), [['wide', 'fixed']]);
+  assert.deepEqual(l.workspaces.find((w: any) => w.id === 'proving-ground').forks, ['ws']);
+  assert.deepEqual(Object.keys(c.call('list', { include: ['workspaces'] })).sort(), ['ok', 'workspaces']);
+  assert.equal(c.call('list', { take_id: 'nope' }).code, 'take.unknown');
+  // delete_workspace
+  assert.equal(c.call('delete_workspace', { workspace: 'proving-ground' }).code, 'workspace.protected');
+  assert.equal(c.call('delete_workspace', { workspace: 'ghost' }).code, 'unknown-workspace');
+  assert.ok(c.call('fork', { from: 'ws', name: 'ws-a' }).ok);
+  assert.ok(c.call('fork', { from: 'ws', name: 'ws-b' }).ok);
+  const hf = c.call('delete_workspace', { workspace: 'ws' }) as any;
+  assert.equal(hf.code, 'workspace.has-forks');
+  assert.deepEqual(hf.details.forks, ['ws-a', 'ws-b']);
+  assert.match(hf.message, /ws-a, ws-b/);
+  for (const w of ['ws-a', 'ws-b', 'ws']) assert.ok(c.call('delete_workspace', { workspace: w }).ok, w);
+  assert.deepEqual((c.call('query_world', {}) as any).workspaces.map((w: any) => w.id).sort(), ['carry-yard', 'proving-ground']);
+  assert.deepEqual((c.call('list', {}) as any).takes[0].referencedByCheckpoint, [], "a deleted workspace's runs are unreferenced");
+  assert.ok(c.call('fork', { from: 'proving-ground', name: 'again', at: ex.checkpoint.id }).ok, 'its checkpoints stay addressable');
+
+  // room: listing comes from the store index; deleting a workspace frees its take for eviction
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage, { takes: 2 });
+  const runIn = (ws: string, x: number) => {
+    assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: ws }) as any).ok);
+    const p = room.call(2026, 'bind_plan', { template: walkPlan(`${ws}-walk`, x, -20), bindings: { a: 'n1' }, workspace: ws }) as any;
+    const e = room.call(2026, 'execute', { plan_id: p.plan_id, workspace: ws }) as any;
+    assert.ok(e.ok, e.message);
+    return e.take_id as string;
+  };
+  const tA = runIn('ra', -5), tB = runIn('rb', -8);
+  const rl = room.call(2026, 'list', { include: ['takes'] }) as any;
+  assert.deepEqual(rl.takes.map((t: any) => [t.take_id, t.order, t.kept, t.referencedByCheckpoint.length > 0]), [[tA, 0, true, true], [tB, 1, true, true]]);
+  assert.ok(rl.takes.every((t: any) => t.bytes > 1000));
+  const extra = room.call(2026, 'bind_plan', { template: walkPlan('ra-more', -6, -24), bindings: { a: 'n1' }, workspace: 'ra' }) as any;
+  const full = room.call(2026, 'rehearse', { plan_id: extra.plan_id, keep: true }) as any;
+  assert.equal(full.code, 'room.storage-full');
+  assert.match(full.message, /engine_delete_workspace/);
+  assert.ok((room.call(2026, 'delete_workspace', { workspace: 'rb' }) as any).ok);
+  const kept = room.call(2026, 'rehearse', { plan_id: extra.plan_id, keep: true }) as any;
+  assert.ok(kept.ok, JSON.stringify(kept).slice(0, 300));
+  assert.deepEqual((room.call(2026, 'list', { include: ['takes'] }) as any).takes.map((t: any) => t.take_id), [tA, kept.take.take_id], "rb's take was evicted");
+});

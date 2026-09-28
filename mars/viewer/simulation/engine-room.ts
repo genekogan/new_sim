@@ -12,8 +12,8 @@
 //     y<year>/cams/<takeId>      CameraTrack[] (rewritten on attach)
 //     y<year>/store-index        { plans, takes } ids oldest-first (creation order, for the caps)
 // Caps (review M5 low): at most MAX_PLANS plans and MAX_TAKES takes per (room, year). A store past a
-// cap evicts the oldest ones no checkpoint's `simulation-run` cause references (take + its camera
-// tracks, or plan); if every stored one is referenced the whole call is refused with
+// cap evicts the oldest ones no live workspace's checkpoint `simulation-run` cause references (take +
+// its camera tracks, or plan; engine_delete_workspace frees a deleted workspace's runs); if every stored one is referenced the whole call is refused with
 // `room.storage-full` (nothing persisted, in-memory state reloaded) — continue in a new room.
 // Year rooms 2020–2025 also seed protected canonical `mars-<year>` from that year's generated
 // campus scene (the `campusFile` loader: bundled JSON in the Worker, loadCampusFile in Node); a
@@ -102,6 +102,19 @@ export class EngineRoom {
         loadTake: (id) => this.readJSON<Take>(`${p}take/${id}`),
         loadPlan: (id) => this.readJSON<StoredPlan>(`${p}plan/${id}`),
         loadCameras: (id) => this.readJSON<CameraTrack[]>(`${p}cams/${id}`),
+        listStored: () => {
+          const index = this.storeIndex(year);
+          const bytes = new Map(
+            this.storage.sql
+              .exec<{ key: string; bytes: number }>("SELECT key, SUM(LENGTH(data)) AS bytes FROM engine_blobs WHERE key LIKE ? OR key LIKE ? OR key LIKE ? GROUP BY key", `${p}plan/%`, `${p}take/%`, `${p}cams/%`)
+              .toArray()
+              .map((r) => [r.key, r.bytes]),
+          );
+          return {
+            plans: index.plans.map((id) => ({ id, bytes: bytes.get(`${p}plan/${id}`) ?? 0 })),
+            takes: index.takes.map((id) => ({ id, bytes: bytes.get(`${p}take/${id}`) ?? 0, cameras: bytes.has(`${p}cams/${id}`) })),
+          };
+        },
       },
     });
     this.controllers.set(year, ctl);
@@ -209,21 +222,18 @@ export class EngineRoom {
 
   /**
    * Which stored plans/takes to evict so that the new ones fit under the caps: oldest first, never one
-   * that a checkpoint's `simulation-run` cause references and never one stored by this call.
+   * that the `simulation-run` cause of a checkpoint reachable from a live workspace references (a
+   * deleted workspace frees its runs) and never one stored by this call.
    */
   private evictions(year: number, ctl: EngineController, index: StoreIndex, newPlans: string[], newTakes: string[]): { plans: string[]; takes: string[] } | { full: string } {
-    const refTakes = new Set<string>(), refPlans = new Set<string>();
-    for (const cp of ctl.history.checkpoints.values())
-      if (cp.cause.kind === 'simulation-run') {
-        refTakes.add(cp.cause.take);
-        if (cp.cause.plan) refPlans.add(cp.cause.plan);
-      }
+    const runs = ctl.referencedRuns();
+    const refTakes = new Set(runs.takes.keys()), refPlans = new Set(runs.plans.keys());
     const pick = (kind: 'plan' | 'take', have: string[], added: string[], cap: number, ref: Set<string>): string[] | string => {
       const over = have.length + added.length - cap;
       if (over <= 0) return [];
       const free = have.filter((id) => !ref.has(id));
       if (free.length < over)
-        return `room y${year} already holds ${have.length} stored ${kind}s (cap ${cap}) and ${have.length - free.length} of them are referenced by checkpoints (simulation-run), so the new ${kind} cannot be stored; this call was not persisted — create a new room (studio leave/create) and fork your work there`;
+        return `room y${year} already holds ${have.length} stored ${kind}s (cap ${cap}) and ${have.length - free.length} of them are referenced by checkpoints of live workspaces (simulation-run), so the new ${kind} cannot be stored; this call was not persisted — delete workspaces you no longer need (engine_delete_workspace; see engine_list), or create a new room (studio leave/create) and fork your work there`;
       return free.slice(0, over);
     };
     const plans = pick('plan', index.plans, newPlans, this.limits.plans, refPlans);

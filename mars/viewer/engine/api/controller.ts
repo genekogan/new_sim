@@ -32,6 +32,8 @@ export type ControllerStore = {
   loadTake?(id: string): Take | undefined;
   loadPlan?(id: string): StoredPlan | undefined;
   loadCameras?(takeId: string): CameraTrack[] | undefined;
+  /** Stored plan/take ids oldest first with their stored sizes (engine_list); default: the in-memory maps. */
+  listStored?(): { plans: { id: string; bytes: number }[]; takes: { id: string; bytes: number; cameras: boolean }[] };
 };
 
 /** What an operation changed, for hosts that persist incrementally. */
@@ -225,6 +227,8 @@ export class EngineController {
         case 'fork': return this.fork(parsed.data as OpInput<'fork'>);
         case 'edit_world': return this.editWorld(parsed.data as OpInput<'edit_world'>);
         case 'log': return this.log(parsed.data as OpInput<'log'>);
+        case 'list': return this.list(parsed.data as OpInput<'list'>);
+        case 'delete_workspace': return this.deleteWorkspace(parsed.data as OpInput<'delete_workspace'>);
         case 'get_take': return this.getTake(parsed.data as OpInput<'get_take'>);
         case 'attach_camera_track': return this.attachCameraTrack(parsed.data as OpInput<'attach_camera_track'>);
       }
@@ -259,6 +263,75 @@ export class EngineController {
 
   workspaces() {
     return [...this.history.workspaces.values()].map((w) => ({ id: w.id, label: w.label, protected: w.protected, head: w.head, forkedFrom: w.forkedFrom, campus: this.history.read(w.head).base.campus }));
+  }
+
+  /**
+   * Takes and plans named by a `simulation-run` cause on a checkpoint reachable from a live workspace
+   * head (id → those checkpoint ids). Unreferenced ones are what the room evicts first.
+   */
+  referencedRuns(): { takes: Map<string, string[]>; plans: Map<string, string[]> } {
+    const takes = new Map<string, string[]>(), plans = new Map<string, string[]>();
+    const seen = new Set<string>();
+    const add = (m: Map<string, string[]>, k: string, cp: string) => {
+      const l = m.get(k);
+      if (l) l.push(cp);
+      else m.set(k, [cp]);
+    };
+    for (const ws of this.history.workspaces.values())
+      for (let id: string | null = ws.head; id && !seen.has(id); id = this.history.checkpoint(id).parent) {
+        seen.add(id);
+        const c = this.history.checkpoint(id).cause;
+        if (c.kind !== 'simulation-run') continue;
+        add(takes, c.take, id);
+        if (c.plan) add(plans, c.plan, id);
+      }
+    return { takes, plans };
+  }
+
+  list(q: OpInput<'list'>): OpResult {
+    const inc = new Set(q.include ?? ['plans', 'takes', 'workspaces']);
+    const refs = this.referencedRuns();
+    const stored = this.store.listStored?.() ?? {
+      plans: [...this.plans.entries()].map(([id, p]) => ({ id, bytes: JSON.stringify(p).length })),
+      takes: (this.takes.toJSON().takes as Take[]).map((t) => ({ id: t.id, bytes: JSON.stringify(t).length, cameras: this.takes.cameras(t.id).length > 0 })),
+    };
+    const out: OpResult = { ok: true };
+    if (inc.has('plans'))
+      out.plans = stored.plans.map((s, order) => {
+        const p = this.plan(s.id);
+        return { plan_id: s.id, order, bytes: s.bytes, template: p?.plan.template.id, workspace: p?.workspace || undefined, baselineCheckpoint: p?.plan.baselineCheckpoint, rulesVersion: p?.plan.rulesVersion, referencedByCheckpoint: refs.plans.get(s.id) ?? [] };
+      });
+    if (inc.has('takes')) {
+      const kept = stored.takes.map((s, order) => ({ take_id: s.id, order, kept: true, bytes: s.bytes, cameras: s.cameras, referencedByCheckpoint: refs.takes.get(s.id) ?? [] }));
+      const known = new Set(kept.map((t) => t.take_id));
+      const unkept = [...this.unkept.values()].filter((t) => !known.has(t.id)).map((t, i) => ({ take_id: t.id, order: kept.length + i, kept: false, bytes: JSON.stringify(t).length, cameras: false, referencedByCheckpoint: refs.takes.get(t.id) ?? [] }));
+      out.takes = [...kept, ...unkept];
+    }
+    if (inc.has('workspaces')) {
+      const all = this.workspaces();
+      out.workspaces = all.map((w) => ({ ...w, forks: all.filter((o) => o.forkedFrom === w.id).map((o) => o.id) }));
+    }
+    if (q.take_id) {
+      if (!this.take(q.take_id)) return fail('take.unknown', `no take ${q.take_id}`);
+      out.take_id = q.take_id;
+      out.cameras = this.cameras(q.take_id).map((c) => {
+        const d = c.data as { spec?: { kind?: string; subject?: string }; hz?: number; duration?: number; samples?: unknown[] };
+        return { id: c.id, kind: c.kind, shot: d?.spec?.kind, subject: d?.spec?.subject, hz: d?.hz, duration: d?.duration };
+      });
+    }
+    return out;
+  }
+
+  deleteWorkspace(q: OpInput<'delete_workspace'>): OpResult {
+    const ws = this.history.workspaces.get(q.workspace);
+    if (!ws) return fail('unknown-workspace', `no workspace ${q.workspace}`);
+    if (ws.protected) return fail('workspace.protected', `workspace "${ws.label}" is a protected canonical state and cannot be deleted`);
+    const forks = [...this.history.workspaces.values()].filter((w) => w.forkedFrom === ws.id).map((w) => w.id).sort();
+    if (forks.length)
+      return fail('workspace.has-forks', `workspace ${ws.id} is the fork parent of ${forks.join(', ')}; delete ${forks.length > 1 ? 'those' : 'that'} first`, { details: { forks } });
+    this.history.workspaces.delete(ws.id);
+    this.changes.history = true;
+    return { ok: true, deleted: ws.id, head: ws.head, note: 'its checkpoints stay addressable by id (engine_fork `at`); plans/takes referenced only from it are now evictable' };
   }
 
   queryWorld(q: OpInput<'query_world'>): OpResult {

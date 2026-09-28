@@ -108,6 +108,11 @@ export const opSchemas = {
     label: z.string().max(200).optional(),
   }),
   log: z.strictObject({ workspace: wsId.optional(), limit: z.number().int().min(1).max(500).optional() }),
+  list: z.strictObject({
+    include: z.array(z.enum(['plans', 'takes', 'workspaces'])).max(3).describe('default: all three').optional(),
+    take_id: id.describe("also list this take's camera tracks").optional(),
+  }),
+  delete_workspace: z.strictObject({ workspace: wsId }),
   get_take: z.strictObject({
     take_id: id,
     from: z.number().min(0).describe('seconds from take start').optional(),
@@ -149,6 +154,15 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
     readOnly: false,
     description:
       "Design-edit an editable workspace (never a protected canonical one): spawn catalog items (only with inventory 'unlimited'; provenance design-edit/hypothetical), move idle people / loose components / fixtures to a pose or `lying` set-down (refused when the footprint would overlap static geometry, components or people, or leave the floor), remove stored/staged components (or anything a design edit spawned), add/replace regions. All-or-nothing; commits one checkpoint (cause design-edit + note) and returns the physical diff.",
+  },
+  list: {
+    readOnly: true,
+    description:
+      "Ledger of the room: stored plans (plan_id, template id, workspace, baseline), takes (take_id, kept, bytes, cameras) — both oldest first with `order` and `referencedByCheckpoint` (checkpoints of live workspaces whose simulation-run cause names them; unreferenced ones are evicted first past the room caps) — and workspaces (head, protected, forkedFrom, forks). With `take_id` also that take's camera tracks.",
+  },
+  delete_workspace: {
+    readOnly: false,
+    description: 'Delete an editable workspace (never a protected canonical one, never one another live workspace was forked from — delete those forks first). Its checkpoints stay addressable by id, but plans/takes referenced only from it become evictable.',
   },
   log: { readOnly: true, description: 'Checkpoint history of a workspace (newest first: id, parent, cause, label). Without `workspace` lists all workspaces.' },
   get_take: { readOnly: true, description: 'Compact slice of a take: header, quantised pose tracks [tick, x_mm, y_mm, z_mm, yaw_mrad…] within [from, to] (bracketing samples included for interpolation), discrete changes, events; optional final state and camera tracks.' },
