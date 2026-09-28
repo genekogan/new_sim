@@ -78,8 +78,8 @@ Captures (oblique + top): `build-bay-{carry,raise,held,beams,joists,deck,stair,v
 ## Year build: 2022 east-house skeleton from piles (`year-build-2022`, `year-build-2022-house`)
 HYPOTHETICAL order / piles / crew (YEAR_BUILD.md). The panel shows the sequence timeline (198 / 552 step chips), the canvas HUD the
 running steps and blocked waits, the preset HUD the refusal / blocked log by diagnostic code. Headless Chromium (SwiftShader, M-series,
-2026-09-28): fetch ~100 ms, setup ~0.6 s; first bay 41 019 ticks (34 simulated min) — stepping alone ≈ 10 s; the whole house (an
-option, not the default) 116 477 ticks in 33–37 s wall (≈ 170× real time). Live stepping ends on the node rehearsal's tick and state
+2026-09-28): fetch ~100 ms, setup ~0.6 s; first bay 41 182 ticks (34 simulated min; 41 019 before W15's walker re-pin) — stepping
+alone ≈ 10 s; the whole house (an option, not the default) 117 125 ticks (116 477 before W15) in 33–37 s wall (≈ 170× real time). Live stepping ends on the node rehearsal's tick and state
 hash (`e2e/year-build.spec.ts` rehearses the same setup in node and compares). The whole house also shows 77 red FAILED banners: ambient
 make-way walks the engine submits for a person already reserved by a waiting step (`reservation.conflict`) — engine noise, same outcome.
 `e2e/year-build.spec.ts`: completes, 0 violations, 24 / 24 at the canonical pose, soles on the bracing node / rungs, captures
