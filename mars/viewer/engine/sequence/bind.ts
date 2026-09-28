@@ -52,6 +52,41 @@ export function substitute(value: unknown, bindings: Record<string, unknown>, wh
 }
 
 /** Structural problems with a template's step graph (empty = valid). */
+/** Inline references inside free text: "$name", "$name[0]", "$name.x", … anywhere in the string; "$$" is a literal "$". */
+const INLINE_REF = /\$\$|\$([A-Za-z_]\w*)((?:\[\d+\]|\.[A-Za-z_]\w*)*)/g;
+
+/**
+ * A step label with its template references filled in from the plan's bindings, e.g. "$crew[2] climbs below" →
+ * "m3 climbs below" (W39). Labels are display text: `bindTemplate` keeps `BoundStep.label` as the template wrote it
+ * (a filled label would change `planHash`, and with it every recorded take's `planHash` / id), so readers that show a
+ * label (the take recorder's step timeline) fill it here. Unlike `substitute` the reference may sit anywhere in the text;
+ * a ".word" that is no field of the value ends the reference (so "$crew[2].done" is "m3.done"), while a reference to an
+ * unbound name or a missing index is left as written. A bound list is joined with ", "; an object is written as JSON.
+ */
+export function bindLabel(label: string, bindings: Record<string, unknown>): string {
+  return label.replace(INLINE_REF, (whole: string, name: string | undefined, chain: string) => {
+    if (whole === '$$') return '$';
+    if (!name || !Object.prototype.hasOwnProperty.call(bindings, name)) return whole;
+    let cur: unknown = bindings[name];
+    let used = `$${name}`;
+    for (const a of chain.matchAll(ACCESSOR)) {
+      const key: string | number = a[1] !== undefined ? Number(a[1]) : a[2];
+      const ok =
+        typeof key === 'number'
+          ? Array.isArray(cur) && key < cur.length
+          : cur !== null && typeof cur === 'object' && !Array.isArray(cur) && Object.prototype.hasOwnProperty.call(cur, key);
+      if (!ok) {
+        if (typeof key === 'number') return whole; // a bad index: the reference is wrong, show it as written
+        break; // a ".word" that is no field ends the reference (sentence text after it)
+      }
+      cur = (cur as Record<string | number, unknown>)[key];
+      used += a[0];
+    }
+    const text = typeof cur === 'string' ? cur : Array.isArray(cur) ? cur.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(', ') : typeof cur === 'number' || typeof cur === 'boolean' ? String(cur) : JSON.stringify(cur);
+    return text + whole.slice(used.length);
+  });
+}
+
 export function validateGraph(steps: StepSpec[]): Diagnostic[] {
   const out: Diagnostic[] = [];
   const ids = new Set<string>();
