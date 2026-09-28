@@ -48,9 +48,17 @@ skipped; pick the next item that doesn't need him. Never guess historical facts.
 **Ground truth at the checkpoint (verify, don't assume):**
 - Repo: local git only at `<mars-campus-repo>` (author genekogan; no remote yet —
   Gene adds github.com/genekogan; never push without him). Tree clean at HEAD (~170 commits). Production = release 5 (`cebd5827…`, rollback `89e65c8c…`).
-- Gates: `cd viewer && npm run gate` (unit 56, engine ≈ 243 pass / 1 skip / 1 todo, tsc, Playwright e2e,
-  determinism probe). `npm run evidence` regenerates EVIDENCE.md. `deploy/director-demo.mjs` and
+- Gates: `cd viewer && npm run gate` — last green 2026-09-28 (W17, `3d04649`): unit 56, engine 326 pass / 0 fail / 2 skip
+  of 328, tsc clean, Playwright 52 passed / 1 skipped, determinism probe `0147f8f12a99…` @10729. `npm run evidence` regenerates
+  EVIDENCE.md (17/17 rows, 21/22 capabilities — year build B has no test —, 8/8 milestones). A gate in a scratch worktree
+  needs `node_modules`, `.pw-browsers`, `public/browser/campus.glb` and `campus.glb.br` symlinked in. `deploy/director-demo.mjs` and
   `deploy/simulation-integration.mjs` exercise the real MCP control plane against `wrangler dev`.
+- Current pins (PLANNING_BUDGET.md re-pin tables, last: W15): probe `0147f8f1…` @10729; campus flagship crop = full `fee92ee0…`
+  @11316; stress-30 `1298e2e5…`; meal `035e8c39…` @626; v3 (open ground) `66800edc…` @16230; year build 2022 first bay
+  `695d2dcb…` @41182, whole house `35d12886…` @117125.
+- Takes (`public/engine/takes/`, `node deploy/record-campus-take.mjs --all [--check]`): flagship `969c8bf9…` (= `fee92ee0…`,
+  1.75 MB) in the studio picker; 2022 first-bay year build `9970e93e…` (= `695d2dcb…`, 2.88 MB) under `otherYears` until the
+  studio filters takes by year; v3 is not recordable on the campus yet (onto_s2_4 `beam.no-room`).
 - Production: https://mars-campus-2026.<workers-subdomain>.workers.dev — see `viewer/deploy/deployment.json` for the
   live version and rollback target; RELEASE_CHECKLIST.md has the exact deploy + rollback commands.
   Production deploys of gated work are allowed ("pre-release, ok to break stuff").

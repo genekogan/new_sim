@@ -516,3 +516,25 @@ current direction; receiver reach/lean; long-load balance; lab-social t60.
 
 **If resuming after a cut-off:** `git status` — any unstaged files belong to a worker that did not finish; check `git log` for
 its partial commits, read its area doc, and re-brief from PROGRESS.md's last entry. Pinned hashes in the tests are the truth.
+
+**Consolidation (W17, 2026-09-28 ~05:30 EDT, tree `cd69215` + W17 commits; numbers re-run, not copied).**
+- **Gate GREEN** at `3d04649` (worktree; `gitDirty: true` only from the untracked `viewer/.pw-browsers` symlink, as W14's; nothing
+  uncommitted under `viewer/`): unit 56/56 (0.4 s) · engine 326 pass / 0 fail / 2 skip of 328 (42.1 s) · tsc clean (4.6 s) ·
+  Playwright 52 passed / 1 skipped (524.1 s) · determinism probe `0147f8f12a99…fd30d5` @10729 (= the W15 pin). Report
+  `viewer/.cloudflare/gate/2026-09-28T09-15-51-095Z/report.json` (in the W17 worktree; gitignored).
+- **Takes regenerated** (`deploy/record-campus-take.mjs`, now `--scenario flagship | build-bay-v3 | year-build-2022`, `--all`,
+  `--check`). All are `mars-take/2` inside the unchanged `mars-take-replay/1` wrapper (the studio loader checks only the wrapper,
+  the camera/take id and the final hash — no schema bump needed):
+  - flagship on 2026 staging-east: take `969c8bf92d9c6ce1524dde9a`, `fee92ee0a94f…0c56` @11316 ticks (= pin), camera
+    `cam-fcbd4f960ecf1e79` (10 shots, 12 cuts, readability min 0.60), **1 746 020 B / 288 378 B gzip** (was `c531eaf4…` /
+    `b159317e…` @11950, 1 736 933 / 280 180). Its only new field in use is `speed` (no hand-up / items / climbing in it).
+  - 2022 east-house first bay (year build A): take `9970e93e96cefb6267cf0bba`, `695d2dcb001b…0a81` @41182 (= PIN_BAY1), camera
+    `cam-7c787f709540d87d` at 0.5 Hz (6 slow shots, readability min 0.42, mean 0.81), **2 881 438 B / ~482 KB gzip**. In the
+    manifest's `otherYears`, not `takes`: the 2026 studio replays every `takes` entry on the 2026 scene and does not filter by
+    `year` (the take is in 2022 coordinates on the Kit datum y = 0). `hands` changes are ~0.9 MB of its 2.4 MB take.
+  - flagship v3: **not recorded** — at staging-east its `onto_s2_4` beam_walk fails `beam.no-room` (clearance 0.25 < 0.28 m on
+    s2); on open ground it passes at the pinned origin but fails at most other sites (PROGRESS W17).
+- **Baselines refreshed (inspected):** `studio-take-held`, `studio-take-visitor` — the new take's moments (209.9 s, 565.8 s).
+- **Evidence** (`f4d6738`): §28 rows 17/17 PROVEN; capabilities 21 PROVEN / 0 PARTIAL / 1 UNPROVEN of 22 (new rows: hand-up,
+  rack access, items/eating, solar, paint, year build A, year build B = UNPROVEN (no engine test yet), movement, body model +
+  take fields, composite v2; campus-full is bit-identical now); milestones 8/8 PROVEN; 86 tests added since `6ad36f0`.

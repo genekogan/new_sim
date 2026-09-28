@@ -308,3 +308,37 @@ Then: gate → release 5; HANDOFF refresh.
   - CAMERA_VERIFY cannot run on directed tracks from node (browser + the take file's own `camera`); needs a
     `verifyCamera(…, { track })` option in `app/studio` — reported, not touched.
   - Tests: +8 (camera-correct), camera-synth / camera-direct updated for the two genuine issues.
+- **W17 consolidation** (worktree at `6ff7a67`, rebased onto `cd69215` after W16 landed; ≈ 0.3 M tokens, ~50 min):
+  - **Takes.** `record-campus-take.mjs` gains `--scenario flagship | build-bay-v3 | year-build-2022`, `--all`, per-scenario `--check`;
+    the flagship path is byte-identical to the old script (checked). Flagship re-recorded: `969c8bf9…` = `fee92ee0…` @11316
+    (1 746 020 B, gzip 288 378; was `c531eaf4…` / `b159317e…` @11950, 1 736 933 / 280 180). 2022 east-house first bay:
+    `9970e93e…` = PIN_BAY1 `695d2dcb…` @41182, 2 881 438 B (camera 0.5 Hz), listed under manifest `otherYears`. `mars-take/2`
+    loads through the unchanged `mars-take-replay/1` wrapper (no `take-host.ts` change needed); W16's camera tests read the new
+    flagship file and pass.
+  - **Gate** `.cloudflare/gate/2026-09-28T09-15-51-095Z` (worktree), GREEN at `3d04649`:
+
+    | stage | result | time |
+    | --- | --- | --- |
+    | unit (`npm test`) | 56 / 56 | 0.4 s |
+    | engine | 326 pass / 0 fail / 2 skip (328) | 42.1 s |
+    | tsc | clean | 4.6 s |
+    | e2e | 52 passed / 1 skipped | 524.1 s |
+    | determinism probe | `0147f8f12a99…` @10729 | 2.6 s |
+
+    First run (at `268b66d`, before the baseline refresh): unit failed only because the worktree lacked `campus.glb.br`
+    (setup, now symlinked), and `studio-take-held` differed 7.71 % from the old take's frame. Refreshed and inspected:
+    `studio-take-held` (209.9 s, both frames standing on their beam pairs, every column held, "seat b1 at 0.5 m"),
+    `studio-take-visitor` (565.8 s, the visitor on the finished deck, same follow framing).
+  - **Evidence** at `f4d6738`: rows 17/17, capabilities 21 PROVEN / 1 UNPROVEN (year build B: no engine test cites phase B yet),
+    milestones 8/8; ten new capability rows mapped with approximation notes; 86 tests added since `6ad36f0`, 3 renamed.
+  - **Findings for other owners (not patched):**
+    1. *v3 site sensitivity* (`scenarios/build-bay-v3.ts` / `beam_walk` in construction): `onto_s2_4` fails `beam.no-room`
+       ("no room to stand at … on deck s2, clearance 0.25 m < 0.28 m", tick 10443) at 11 of 17 site origins tried on open
+       ground (e.g. (0,5), (0,−9), (20,−9), (28,±…), every staging-east candidate), passing only at (0,0), (0,±1), (0,−0.5),
+       (0,−3), (1,0), (28,0); on the real campus at (28,0) the deck passes but `carry_spare` fails `carry.no-route`. The pinned
+       v3 run is a knife edge (~3 cm), so v3 cannot be recorded as a studio take. Probe script: scratchpad `v3probe.mjs`.
+    2. *Take size* (`take/recorder.ts`): `hands` changes are ~0.9 MB and `speed` ~0.35 MB of the 2.4 MB year-build take (per-tick
+       while hanging beams) — thinning like the pose tracks would keep long year takes small.
+    3. *Studio* (`app/studio/take-panel.tsx`, `page.tsx`): the picker lists every manifest take and the take host exists only
+       in 2026; to offer the 2022 take, filter by `entry.year === year`, create a host for every year, and account for the
+       year-build datum (y = 0 vs the published −0.16 m ground).
