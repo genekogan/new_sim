@@ -67,9 +67,10 @@ export interface ActionDef<Params = any, Program = any, Exec = any> {
    * needs `actor:<actor>` held by `holder` — this action (`self`, the nearest ancestor of `holder`
    * with the hook) or a descendant of it — asks here which action ids to cancel to free the actor;
    * the runtime cancels them with reason `pre-empted by <id>` and starts the directive once they
-   * have ended. Return [] to refuse (the directive then fails reservation.conflict as before).
+   * have ended. `by` is the directive's record. Return [] to refuse (the directive then fails
+   * reservation.conflict as before).
    */
-  yieldTo?(rt: Runtime, self: ActionRecord, holder: ActionRecord, actor: string): string[];
+  yieldTo?(rt: Runtime, self: ActionRecord, holder: ActionRecord, actor: string, by: ActionRecord): string[];
   /**
    * Resumable snapshots (runtime/snapshot.ts, spec §22). `true`: the exec is plain data (Maps, Sets,
    * aliasing and ActionRecord references are fine; closures and class instances are not) and resumes

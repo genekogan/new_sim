@@ -42,7 +42,7 @@ approach point.
 Execution: `walk_to` the approach point (arriving facing the seat yaw) → `turn` → **`sit-down`**
 (activity `sit-down`, `SIT_TRANSITION` = 0.6 s, smoothstep from the approach point onto the seat
 point) → `occupied` (activity `sit`; a fixture seat is always held sitting, whatever `activity`
-was asked). Cancelling (`stand`, gather cancel, `releaseForDirective`) a seated / sitting-down person
+was asked). Cancelling (`stand`, gather cancel, pre-emption by a directed task, `releaseForDirective`) a seated / sitting-down person
 is a **deferred** stop: **`stand-up`** (activity `stand-up`, 0.6 s, or the remaining share of it)
 back to the approach point, then idle; the action ends `cancelled` and the seat claim is held until
 the body is off the seat. `stand` completes when that stand-up has finished.
@@ -84,20 +84,45 @@ reserves them, they get a task or grip, or their ambient walk is cancelled by so
 `walk.ts` make-way nudges are transient and do not count. Cancel stops new walks; in-flight walks
 are cancelled by the runtime (people stop in place).
 
-## Pre-emption rule (spec §17)
-Explicit director commands outrank social life, but **there is no automatic pre-emption yet**.
-A social action owns its people's `actor:<id>` reservations, so a directed task (carry, raise,
-walk) submitted for one of them fails `reservation.conflict` whose message names the social
-action (`… reserved by action a7 (sit, executing)`; gather members show their `take_slot`,
-wanderers mid-walk show the `walk_to` whose parent is `ambient_wander`). The director must
-release them first: `releaseForDirective(rt, actor)` cancels the smallest social unit (their own
-`sit`/`take_slot`, their current ambient walk, or the whole `converse`/`face`) and never touches
-non-social holders — critical tasks (supporting an upright) are never abandoned for autonomy.
-`socialHolder(rt, actor)` reports which social action owns someone. A **seated** person is inside
-their chair, so a directed `walk_to` for them is refused even earlier, at plan time
-(`route.start-blocked … (blocked by chair)`); and releasing them is a 0.6 s `stand-up`, during which
-their `actor:` reservation is still held — submit the directed task once `stand` / the cancelled
-seat action has ended (a same-tick `stand` + `take_slot` fails `reservation.conflict`).
+## Pre-emption (spec §17): directed tasks release social holds automatically
+Explicit director commands outrank social life. A social action owns its people's `actor:<id>`
+reservations; every social verb declares a `yieldTo` hook (`actions/types.ts` `ActionDef.yieldTo`),
+and `Runtime.submit` uses it:
+
+- **Who pre-empts.** A *directed* submission — its verb and every ancestor lack `yieldTo` (walk_to from a
+  director / MCP / sequence step, carry, construction steps, `take_item`, `paint`, …) — whose `actor:`
+  claims are held under a social action. Its reservations are read **before** its plan (a seated person's
+  walk_to plan would otherwise fail `route.start-blocked` inside the chair), so a verb whose reservations
+  depend on its plan contributes only the ones its params name. If any of its conflicts is not an `actor:`
+  claim under a social action (a carry, a slot, an item), nothing is pre-empted and the ordinary
+  `reservation.conflict` stands — critical tasks are never abandoned for autonomy.
+- **What is released: the smallest social unit** — this person's own `sit` / `take_slot` (a `gather` /
+  `campfire_circle` keeps its other members), their current ambient walk (ambient then lets them go for
+  good), or the whole `converse` / `face` (a circle cannot re-form without a member: a converse of two
+  ends for both). Each is cancelled with diagnostic `social.pre-empted`, message
+  **`pre-empted by <id> (<verb>)`** (`details.reason` = `pre-empted by <id>`), on the record and on its
+  `cancelling` / `cancelled` take events.
+- **Timing.** A converse / face / standing slot / ambient walk releases at once, and the directive is
+  planned and started in the same `submit`. A seated person first stands up (0.6 s `stand-up` to the
+  approach point, the seat claimed until they are off it): the directive **waits** — status `requested`,
+  phase `pre-empting`, `rt.isActive` true, `runUntilIdle` waits for it — and is planned, reserved and
+  started at the end of the tick the hold ends (a plan failure then fails it with that diagnostic).
+  Cancelling a waiting directive ends it `cancelled` without starting it (the stand-up still finishes); a
+  waiting child whose parent has ended fails `action.parent-ended`; `rt.snapshot()` refuses
+  (`snapshot.pre-empting`) while one waits.
+- **Never social vs social.** A social verb (or a child of one) never pre-empts: `sit`, `take_slot`,
+  `face`, `converse`, `gather` for a held person still fail `reservation.conflict` naming the holder (a
+  converse that includes a seated person is refused even earlier, `route.start-blocked` from the chair).
+  Autonomous nudges are not directives either: a `walk.ts` make-way walk (`<who>:make-way:<tick>`) is
+  refused as before.
+- **Opt out:** `preempt: false` restores the plain refusal — as a boolean key in the directive's params
+  (stripped before validation, so it works for any verb, from MCP or a sequence step) or as
+  `rt.submit(verb, params, { preempt: false })`.
+
+`releaseForDirective(rt, actor, reason?)` does the same release by hand; `socialHolder(rt, actor)` reports
+which social action owns someone. **Hash safety:** nothing new runs unless a live action has `yieldTo`
+(fast path), and no pinned scenario submits a directive for a socially held person (perf-walk 5/5 and the
+year-build first bay unchanged).
 
 ## Tests (`engine/test/social.test.ts`)
 Registry wiring; catalog slot geometry; two sitters on one camp-chair (conflict / none-free /
@@ -107,7 +132,13 @@ fixture's footprint on any tick, seated exactly on the slot, stand-up back off i
 chair walled in front and behind → `slot.unreachable` naming both walls; converse circle (spacing, facing < 0.2 rad, cancel → idle + no claims); converse
 refusals (holder, wall); campfire_circle with 10 → 8 warm on their claimed ring places, 2
 `slot.none-free`, cancel → no claims; audience-region gather; ambient 6 people × 60 s (targets in
-region, 0 violations, directed task takes one and ambient lets go); determinism hash.
+region, 0 violations, directed task takes one and ambient lets go); determinism hash. Pre-emption:
+seated person + directed carry (stand-up 0.6 s, carry starts the tick the seat is released, sit
+`pre-empted by <carry>` in the events, carry completes, 0 violations, snapshot refused while waiting);
+cancelling a waiting directive; converse pair + one directed walk (both idle, reason on the converse);
+campfire gather of 4 + one directed (3 keep warming, gather runs on); social vs social stays
+`reservation.conflict`; `preempt: false` in params and as a submit option → refused; make-way nudge
+refused; determinism (hash + event log).
 
 ## Missing / approximate
 - **Sit pose / animation is a renderer concern**: the engine sets `activity` (`sit-down` → `sit` →
@@ -118,7 +149,12 @@ region, 0 violations, directed task takes one and ambient lets go); determinism 
   walk yield/replan, not fail at plan time.
 - The seated exemption is by activity (`SEATED_ACTIVITIES`), not per fixture.
 - No conversation turn-taking, gaze, gestures or group re-forming when a member leaves.
-- No automatic pre-emption or resumption; ambient never re-adopts a released person.
+- Pre-emption is automatic but there is no **resumption**: a pre-empted sitter / talker does not go back
+  to the seat or circle after the directed task; ambient never re-adopts a released person. A converse
+  loses all its members when one is pre-empted (no re-forming). An `eat` / `serve` overlay (ITEMS.md)
+  on a pre-empted sitter is not released by pre-emption (it holds hands, not the actor): it fails
+  `eat.not-still` as soon as the stand-up moves them, and a directive that needs free hands is then
+  refused at its plan (`actor.holding`) while they still hold the bowl.
 - Regions are single-level; audience layouts do not use seats/benches inside the region.
 - The engine view (`app/engine-view/humans.ts`) layers procedural poses on the Idle clip: `sit` /
   `sit-down` / `stand-up` lower the body onto the seat (leg IK, hands on thighs, 0.4 s blend) and

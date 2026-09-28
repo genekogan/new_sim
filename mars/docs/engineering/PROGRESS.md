@@ -518,3 +518,26 @@ Then: gate → release 5; HANDOFF refresh.
     (known since W14) show as "refused / failed" in the replay.
 - **W24 landed** `e607410`, `81ce842`, `0d0158e`, `9c2c012`, `133ee39` (≈250k tokens, 27 min): replay-bar Camera picker (planned + file `cameras` + unsaved directed), "Save track" → take file with `cameras` downloaded under the shipped name (no room op stores a computed track — controller has none); whole-skeleton "Watch it being built" plays at 64× ≈ 20 fps (frame 51 ms mean, `sampleTake` 0.24 ms — no cache needed; redraw 3 % of a frame), picker labels with duration/ticks, merged wait lines "(×n over d s, until m:ss)"; `studio-build.spec` runs per year-build take; `meal-legs-crossed` refreshed (same pose, moment 358 → 278 after W21; inspected); lab "Oblique yard". 27 specs pass. Lead LOOKED at studio-build-east-house-final: accepted — 12 frames, 66/66 ✓, piles emptied, next to the three finished houses. Weak: one stance reach-down palm 1.025 m off at 3.01 m (engine envelope vs body, W14 finding 2); 95 refused = makeWay conflicts (W14 finding 3); unfilled `$crew[0]` step labels in the whole-skeleton take (sequence/recorder side, W13).
 - 08:10 EDT: in flight W13 (phase B), W25 (pre-emption + vehicles). Third slot held for the final consolidation (gate + evidence + re-record with the sampler fix + HANDOFF/NEXT_SESSION_PROMPT) once W13 lands or by ~09:00 at the latest.
+- **W25 (engine, hash-identical: automatic pre-emption of social holds; vehicle–vehicle collision)** — commits
+  `17a1c9b` (pre-emption), `e95d607` (vehicles) + a final commit (make-way nudges exempt, SOCIAL.md / VEHICLES.md, this entry):
+  - **Pre-emption** (HANDOFF open item). `ActionDef.yieldTo` on every social verb; `Runtime.submit` reads a directive's
+    reservations before its plan and, when its only conflicts are `actor:` claims under social actions, cancels the
+    smallest unit (own seat / slot — a gather keeps the rest; the ambient walk; the whole converse / face) with
+    `social.pre-empted` "pre-empted by <id> (<verb>)" on the record + take events. A seated person's 0.6 s stand-up
+    parks the directive (`requested` / `pre-empting`) until the end of the tick the seat is free, then plan → reserve →
+    start. Social vs social stays `reservation.conflict`; make-way nudges are not directives; `preempt: false` (params
+    key or submit option) = the old refusal. `cancel(id, reason?)`; waiting directives in `isActive` / `runUntilIdle` /
+    parent cleanup; `snapshot()` refuses while one waits.
+  - **Vehicles** (`vehicles/traffic.ts`). Footprints (box + rider + tines + fork load); invariant
+    `collision.vehicle-vehicle`; lanes in `services.vehicleLanes`; right of way (smaller yields, then earlier ride, then
+    id); follower stops 1 m short of a vehicle on its path (`traffic.vehicle` naming it), yields 1 m clear of a
+    right-of-way lane or pulls over and resumes; plan round stationary ridden vehicles; plan-time
+    `vehicle.path-conflict` naming both. Engages only with ≥ 2 ridden vehicles.
+  - **Hash identity** (clean scratch worktree, before → after): perf-walk stress / probe / campus / meal / v3 all
+    PIN-OK (5c3a3355 / b746b094 / c56ea8da / 3c28879f / a2f782ad); year-build first bay 41317 ticks, 251a44c5…,
+    0 violations — at 9cb9138 (task 1) and at 3d530af (task 2), and again for the final commit.
+  - **Tests.** social 19 (7 new), forklift +6 traffic tests; engine 358 pass / 0 fail / 3 skip (361) on the final tree.
+  - **Open.** No resumption of a pre-empted sit / converse; a converse loses all members; a forklift stopped 1 m short
+    of a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) — it waits until the rider leaves;
+    forklift reach / side-shift / raise not checked against vehicles; 3-vehicle yield cycles undetected; `edit_world`
+    cannot move vehicles, so forced overlaps are world edits in tests.

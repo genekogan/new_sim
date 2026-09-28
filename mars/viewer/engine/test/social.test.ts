@@ -455,6 +455,19 @@ test('pre-emption: a social verb never pre-empts another (reservation.conflict u
   assert.deepEqual(msgs(rt), []);
 });
 
+test('pre-emption: an autonomous make-way nudge (walk.ts `<who>:make-way:<tick>`) is not a directive — refused as before, the conversation goes on', () => {
+  const rt = setup(human('a', -7, -6), human('b', -5, -6));
+  const cv = rt.submit('converse', { actors: ['a', 'b'] });
+  assert.ok(runWhile(rt, () => cv.phase !== 'talking', 20 * 20), cv.diagnostic?.message);
+  const nudge = rt.submit('walk_to', { actor: 'a', x: -7, z: -8 }, { id: `a:make-way:${rt.tick}` });
+  assert.equal(nudge.status, 'failed');
+  assert.equal(nudge.diagnostic?.code, 'reservation.conflict');
+  assert.equal(cv.status, 'executing');
+  rt.step();
+  assert.equal(H(rt, 'a').activity, 'talk');
+  assert.deepEqual(msgs(rt), []);
+});
+
 test('pre-emption determinism: seated carry + converse pre-emption twice → same state hash and event log', () => {
   const run = () => {
     const { rt, c } = runSeatedCarry();

@@ -103,7 +103,7 @@ export class Runtime {
         message: `invalid parameters for ${verb}: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
       });
     rec.params = parsed.data;
-    const holds = preempt ? this.preemptible(def, parsed.data, opts.parent) : null;
+    const holds = preempt ? this.preemptible(def, parsed.data, rec, opts.parent) : null;
     if (holds) {
       const reason: Diagnostic = { code: 'social.pre-empted', message: `pre-empted by ${id} (${verb})`, subjects: [id], details: { reason: `pre-empted by ${id}`, by: id } };
       for (const h of holds) this.cancel(h, reason);
@@ -313,7 +313,7 @@ export class Runtime {
    * reservation.conflict stands). Reservations are read before plan() here, so a verb whose
    * reservations depend on its plan contributes only the ones its params name.
    */
-  private preemptible(def: ActionDef, params: unknown, parent?: string): string[] | null {
+  private preemptible(def: ActionDef, params: unknown, by: ActionRecord, parent?: string): string[] | null {
     if (def.yieldTo) return null;
     let social = false;
     for (const l of this.live.values()) if (l.def.yieldTo) { social = true; break; }
@@ -334,7 +334,7 @@ export class Runtime {
       for (const o of this.owners.get(r.resource) ?? []) {
         if (ancestors.has(o.action) || (r.mode !== 'exclusive' && o.mode !== 'exclusive')) continue;
         if (!r.resource.startsWith('actor:')) return null;
-        const unit = this.yieldUnit(o.action, r.resource.slice('actor:'.length));
+        const unit = this.yieldUnit(o.action, r.resource.slice('actor:'.length), by);
         if (!unit) return null;
         for (const u of unit) if (!out.includes(u)) out.push(u);
       }
@@ -342,12 +342,12 @@ export class Runtime {
   }
 
   /** The nearest social action at or above `holderId` decides what to cancel to free `actor`. */
-  private yieldUnit(holderId: string, actor: string): string[] | null {
+  private yieldUnit(holderId: string, actor: string, by: ActionRecord): string[] | null {
     const holder = this.records.get(holderId)!;
     for (let r: ActionRecord | undefined = holder; r; r = r.parent ? this.records.get(r.parent) : undefined) {
       const l = this.live.get(r.id);
       if (!l?.def.yieldTo) continue;
-      const ids = l.def.yieldTo(this, r, holder, actor).filter((i) => this.live.has(i));
+      const ids = l.def.yieldTo(this, r, holder, actor, by).filter((i) => this.live.has(i));
       return ids.length ? ids : null;
     }
     return null;

@@ -224,7 +224,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
       idle(rt, [ex.actor], ex.id);
       return { ok: true };
     },
-    yieldTo: (_rt, self) => [self.id], // pre-emption: this person's own seat / slot (a gather keeps its other members)
+    yieldTo: (_rt, self, _h, _a, by) => (directive(by) ? [self.id] : []), // pre-emption: this person's own seat / slot (a gather keeps its other members)
   };
 }
 
@@ -330,7 +330,7 @@ export const face: ActionDef<FaceParams, number, FaceExec> = {
     idle(rt, [ex.actor], ex.id);
     return { ok: true };
   },
-  yieldTo: (_rt, self) => [self.id],
+  yieldTo: (_rt, self, _h, _a, by) => (directive(by) ? [self.id] : []),
 };
 
 // ---------- converse ----------
@@ -439,7 +439,7 @@ export const converse: ActionDef<ConverseParams, Circle, ConverseExec> = {
     return { ok: true };
   },
   // pre-emption: the circle cannot re-form without a member, so the whole conversation ends (reason on its record)
-  yieldTo: (_rt, self) => [self.id],
+  yieldTo: (_rt, self, _h, _a, by) => (directive(by) ? [self.id] : []),
 };
 
 // ---------- gather / campfire_circle ----------
@@ -502,7 +502,7 @@ export const gather: ActionDef<GatherParams, GatherProgram, GatherExec> = {
   start: (rt, _p, prog, id) => startGather(rt, prog, id),
   step: stepGather,
   cancel: () => ({ ok: true }), // the runtime cancels live children (take_slot → people idle in place)
-  yieldTo: (_rt, _self, holder) => [holder.id], // (members' take_slot children answer first: only that member leaves)
+  yieldTo: (_rt, _self, holder, _a, by) => (directive(by) ? [holder.id] : []), // (members' take_slot children answer first: only that member leaves)
 };
 
 export const campfireCircle: ActionDef<{ actors: string[]; fire: string }, GatherProgram, GatherExec> = {
@@ -520,10 +520,17 @@ export const campfireCircle: ActionDef<{ actors: string[]; fire: string }, Gathe
   start: (rt, _p, prog, id) => startGather(rt, prog, id),
   step: stepGather,
   cancel: () => ({ ok: true }),
-  yieldTo: (_rt, _self, holder) => [holder.id],
+  yieldTo: (_rt, _self, holder, _a, by) => (directive(by) ? [holder.id] : []),
 };
 
 // ---------- pre-emption helpers (director side) ----------
+
+/**
+ * Autonomous nudges are not directives: a walk.ts make-way walk (`<person>:make-way:<tick>`, the
+ * sequence runner's MAKE_WAY) never pre-empts a social hold — it is refused as before.
+ */
+const AUTONOMOUS = /:make-way:\d+$/;
+const directive = (by: ActionRecord) => !AUTONOMOUS.test(by.id);
 
 export const SOCIAL_VERBS: ReadonlySet<string> = new Set(['sit', 'take_slot', 'stand', 'face', 'converse', 'gather', 'campfire_circle', 'ambient_wander']);
 

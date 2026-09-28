@@ -69,13 +69,77 @@ All vehicles share these limits: lateral acceleration ≤ 2 m/s², no links, and
 ## Invariants (`VEHICLE_INVARIANTS`)
 `vehicle.rider-off` (the pairing is broken, or the rider is off the pose),
 `vehicle.static-clearance`, `route.vehicle-no-link`, `motion.teleport`, `vehicle.max-speed`,
-`vehicle.close-pass` (faster than 1 m/s within 0.6 m of body gap of a person).
+`vehicle.close-pass` (faster than 1 m/s within 0.6 m of body gap of a person),
+`collision.vehicle-vehicle` (below).
+
+## Vehicle–vehicle collision (`vehicles/traffic.ts`)
+Everything here engages only when a second **ridden** vehicle is on the level (parked vehicles are static
+obstacles in the grids, as before), so single-vehicle scenes run the old code path.
+
+- **Footprint.** The catalog box, the rider's body (0.56 m square, rider feet → +1.8 m), per-def parts
+  (`FOOTPRINT_PARTS`: the forklift's tines, 1.1 m × truck width ahead of the truck, just under a load on
+  the forks, else ≤ 0.45 m up) and any load on the forks at its own box and height — kept in the vehicle's
+  frame so it can be placed at any pose along a path. `reach` (farthest corner), `half` (lateral
+  half-width) and `front` (overhang) summarise it; a load wider than the truck widens its `half`.
+- **Invariant `collision.vehicle-vehicle`.** Every tick, every pair of vehicles (parked or ridden): any two
+  footprint boxes overlapping by more than 1 cm in plan where their height bands overlap by more than
+  1 cm. One violation per pair, naming both vehicles and the load / rider parts involved (`f1's ply1
+  overlaps e1 (euc)`); a load raised above a parked EUC's 0.55 m box does not fire.
+- **Lanes.** Each riding vehicle (ride_to, ride_loop, a forklift's drive) publishes every tick its path
+  ahead — 4 s at its current speed, plus its stopping distance and front overhang, at least 3 m beyond
+  its front — with its speed, footprint `half` / `reach` and the tick its ride started, in
+  `services.vehicleLanes` (plain data: snapshotted, never part of a state hash; dropped when the ride
+  ends). A lane older than one tick is ignored.
+- **Right of way.** The smaller vehicle yields (profile radius: EUC 0.35 < bicycle 0.40 < forklift 1.4);
+  between equals, the ride that started earlier keeps its way, then the lower vehicle id.
+- **Following (per tick).** Against every other ridden vehicle:
+  1. *Footprint on the path*: if the swept footprint (placed at each curve sample) would come within
+     0.25 m of its footprint and closer than now, stop 1.0 m short (`V_STOP_GAP`); stopped, it reports
+     `traffic.vehicle` — `op1 on f1 waits for r1 on e1 (euc), stopped in its lane at (x, z)` — and after
+     3 s plans round a vehicle that stands still (`MAX_REPLANS` 3; a forklift, 2.5 m turn radius and no
+     reversing, usually cannot swerve round something it stopped 1 m short of, so it waits).
+  2. *Yielding to a lane* (the other has the right of way): stop where the body would come within
+     1.0 m (`YIELD_GAP`) of its lane band (path ± `half`, plus its current footprint) —
+     `r1 on e1 gives way to op1 on f1 (forklift): waits 1 m clear of its lane at (x, z)`. Already
+     inside the band (head-on, or the lane arrived): carry on if the path leaves it within 3 m and stays
+     out, else brake and **pull over** to a spot on its own side ≥ 1.1 m clear of the band (candidates
+     straight out, then 1.5 / 3 m along the lane; clearance and a drivable curve required), then plan on
+     toward the remaining targets — the lane rule holds it at the lane's edge until the other has passed.
+     No spot: `… must give way to … but has no room to pull over`, retried every 0.5 s.
+  3. *Hard guard*: no step may close a footprint gap already under 2 cm.
+  Riders of other vehicles still count as people for slowing (`PASS_GAP` / close-pass), not for stopping or
+  `makeWay` (a mounted rider cannot step aside); the forklift's 1.5 m person rule skips them too. The
+  forklift's square-up and creep refuse a move that brings truck + load within 0.3 m of another ridden
+  vehicle (`traffic.vehicle`, blocked until it moves).
+- **Planning.** `ride_to`, `ride_loop` and forklift drives plan round ridden vehicles that are not riding a
+  lane (moving ones are yielded to, not avoided), and are refused **`vehicle.path-conflict`** — naming
+  both riders and vehicles — when, advancing both from now (discs of their `reach`, 0.1 s steps over
+  10 s; the other at its speed, or half its cruise if momentarily stopped), they would come within
+  `YIELD_GAP` and the one that must yield cannot: it starts inside the other's lane band with no
+  pull-over spot, or (when the planner has the right of way and stands in the other's lane) the other
+  cannot stop 1 m short of it within its braking distance and has no pull-over spot either.
+- **Tests** (`engine/test/forklift.test.ts`, "traffic: …"): head-on forklift vs EUC on one line (the EUC
+  pulls over, waits ≥ 1.0 m clear of the lane, both arrive, footprints ≥ 0.9 m apart, 0 violations); an
+  EUC parked by its rider in a forklift's line (the forklift waits ≥ 1 m short with the rider named, and
+  carries on once it rides off); two forklifts crossing (f2 waits with the reason named, f1 never
+  waits, ≥ 1 m apart, 0 violations); `vehicle.path-conflict` for an EUC boxed against a wall inside a
+  moving forklift's lane (and the same ride accepted once the forklift has passed); forced overlaps (a
+  parked EUC under a carried sheet → `f1's ply1 overlaps e1`, a raised sheet clear, truck on truck);
+  determinism (hash + event log).
+- **Approximations.** Lanes are a straight read of the planned curve (no prediction of a replan or of the
+  other's braking); yield zones use the yielder's `reach` disc, so a long vehicle (a bicycle, a loaded
+  forklift) keeps more than 1 m on its narrow side; the forklift's reach / side-shift / fork-raise
+  steps are not checked against other vehicles (only its square-up and creep), and the empty fork
+  height is assumed ≤ 0.45 m; cycles of three or more vehicles each yielding to the next are not
+  detected; a forced overlap can only be staged by editing world state directly — `edit_world` refuses
+  to move vehicles at all (`api/edit.ts`).
 
 ## Limits (not modelled yet)
 - Vehicles are discs (the bicycle's 1.75 m length is not swept); no lean, wheel or balance
   kinematics; no reversing or three-point turns (a standstill pivot instead).
-- No collisions or traffic rules between moving vehicles (each sees the other's rider as a
-  person); walkers see a rider as a 0.28 m person, not the 0.35–0.40 m disc.
+- Vehicle–vehicle traffic is the heuristic above (right of way, yielding, pull-over), not a
+  negotiated or proven-deadlock-free scheme; walkers still see a rider as a 0.28 m person, not the
+  vehicle's footprint.
 - No charging, battery or range model; overhead clearance uses the grids' 1.8 m body height.
 - The curve is G1 only (no clothoids); pure pursuit absorbs the curvature jump within 0.08 m.
 
@@ -129,4 +193,4 @@ Code: `viewer/engine/vehicles/forklift.ts` (verbs `forklift_pick`, `forklift_del
 - **Limits.** No tilt, no pallets or dunnage (forks slide under a flat sheet), no load-moment chart
   (capacity is flat 1000 kg), final alignment is a standstill pivot + side-shift (no three-point
   turns), the truck body is not swept against people other than the 1.5 m stop rule, and placements
-  must be square to a deck edge.
+  must be square to a deck edge. Other vehicles: see "Vehicle–vehicle collision" above.
