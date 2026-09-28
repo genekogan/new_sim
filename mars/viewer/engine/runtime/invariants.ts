@@ -21,7 +21,8 @@ export const humanStaticClearance: Invariant = (rt: Runtime) => {
   sp.sync(rt.world);
   const out: Diagnostic[] = [];
   for (const e of Object.values(rt.world.entities)) {
-    if (e.kind !== 'human' || !e.human || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity)) continue;
+    // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
+    if (e.kind !== 'human' || !e.human || e.human.on || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity)) continue;
     const g = sp.level(e.human.level);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);

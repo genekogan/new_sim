@@ -34,7 +34,15 @@ export type Handling = {
   hands?: 1 | 2;
   /** A small hand-held item (bowl, spoon, cup…): taken / put / eaten with by engine/items. */
   small?: true;
+  /**
+   * Small enough (≤ SMALL_LOAD_KG) to carry in one hand while climbing a frame or walking a beam
+   * (construction/frame.ts). Absent = not small.
+   */
+  smallLoad?: true;
 };
+
+/** Heaviest load that counts as "small" on the rack structure (climb / beam-walk): kg. */
+export const SMALL_LOAD_KG = 10;
 
 export type AssetDef = {
   id: string;
@@ -57,6 +65,8 @@ export type AssetDef = {
    * without a construction `phase` (spatial/service.ts). A moving phase (`carried`) still lifts it out.
    */
   obstacle?: true;
+  /** Rack beams: width of the top step flange a person can stand on (m); frame.ts beam walkways. */
+  walkway?: { flange: number };
   dims: { confidence: Confidence; note: string };
 };
 
@@ -136,6 +146,7 @@ function beam(ft: number): AssetDef {
       { id: 'end-l', kind: 'beam-end', local: [-l / 2, 0, 0] },
       { id: 'end-r', kind: 'beam-end', local: [l / 2, 0, 0] },
     ],
+    walkway: { flange: 0.1 }, // ≈ 4 in top step you can stand on: provisional
     dims: { confidence: 'participant', note: `length ${ft} ft from Gene's size list; 4x2 in section provisional` },
   };
 }
@@ -154,6 +165,7 @@ function timber(ft: number): AssetDef {
       carryPose: 'edge',
       grips: { 1: [{ id: 'mid', local: [0, 0, 0] }], 2: [{ id: 'g0', local: [-l * 0.4, 0, 0] }, { id: 'g1', local: [l * 0.4, 0, 0] }] },
       carryHeight: 0.9,
+      ...(l * 1.9 <= SMALL_LOAD_KG ? { smallLoad: true as const } : {}),
     },
     dims: { confidence: 'documented', note: 'nominal 2x4 = 1.5 x 3.5 in' },
   };
@@ -272,7 +284,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
       size: [0.9, 1.5 * IN, 9.25 * IN],
       massKg: 4,
       color: '#c9a36b',
-      handling: { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'mid', local: [0, 0, 0] }] }, carryHeight: 0.8 },
+      handling: { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'mid', local: [0, 0, 0] }] }, carryHeight: 0.8, smallLoad: true },
       dims: { confidence: 'documented', note: 'nominal 2x10 = 1.5 x 9.25 in; 0.9 m length matches the stair flight width' },
     } satisfies AssetDef,
     {

@@ -53,6 +53,8 @@ export type HumanState = {
   grip?: { entity: string; slot: string };
   riding?: string; // vehicle id while mounted (engine/vehicles)
   level: number; // walkable level index (0 = ground)
+  /** Id of the rack-structure link (construction/frame.ts: `beam:<id>` / `climb:<…>`) the person stands on, if any. */
+  on?: string;
   /**
    * Hand points (world frame, metres), published every tick by engine/items while the person holds a
    * small item or an items verb drives a hand (reach, serve, eat); a hand without a point is free /

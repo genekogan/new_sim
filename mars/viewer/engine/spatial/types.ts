@@ -16,7 +16,7 @@ export type Surface = { id: string; level: number; y: number; obb: OBB2; label?:
  */
 export type Link = {
   id: string;
-  kind: 'stairs' | 'ladder' | 'ramp';
+  kind: 'stairs' | 'ladder' | 'ramp' | 'climb' | 'beam';
   from: { level: number; p: Vec2; y: number };
   to: { level: number; p: Vec2; y: number };
   /** Usable width (m). */
@@ -28,6 +28,19 @@ export type Link = {
   usable: boolean;
   /** Why not usable (e.g. 'steps 6–9 not installed'). */
   reason?: string;
+  /**
+   * Rack-structure access (construction/frame.ts): `climb` = an installed upright's bracing used as a
+   * ladder, `beam` = a connected beam walked as a narrow walkway. Both are narrower than a person's
+   * routing disc (width < 2 × radius), so the generic route planner never uses them; only the frame
+   * verbs (climb_frame, beam_walk, hand_up) traverse them. Optional and additive.
+   */
+  maxSpeed?: number;
+  /** People allowed on it at once (a climb is single-occupant). */
+  occupancy?: number;
+  /** What may be carried on it: nothing, or only small loads (catalog `handling.smallLoad`). */
+  carry?: 'none' | 'small';
+  /** Entities that form it (the upright; the beam and its partner beam). */
+  members?: string[];
 };
 
 export type Level = { id: number; y: number; label: string };

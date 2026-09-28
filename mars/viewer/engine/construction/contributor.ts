@@ -18,6 +18,7 @@ import { def } from '../world/catalog.ts';
 import { levelFor } from './access.ts';
 import { flatObb, isJoist, isPlywood, memberTop, supportProblems } from './deck.ts';
 import { isStairFlight, stairLink } from './stairs.ts';
+import { frameLinks } from './frame.ts';
 
 const sorted = (w: WorldState) => Object.values(w.entities).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
@@ -38,6 +39,13 @@ export const progressiveContributor: Contributor = (world, base) => {
   for (const e of sorted(world)) if (isStairFlight(e) && e.phase === 'installed') links.push(stairLink(world, e, all));
   return { surfaces, links };
 };
+
+/**
+ * Rack-structure access (frame.ts): climb links up installed uprights and beam walkways on connected
+ * beam pairs. Kept separate from progressiveContributor so existing scenes (and their pinned hashes /
+ * routes) are unchanged; the links are narrower than a routing disc, so walk_to never uses them.
+ */
+export const frameAccessContributor: Contributor = (world) => ({ links: frameLinks(world) });
 
 const PROGRESSIVE = (e: Entity) => isJoist(e) || isPlywood(e) || isStairFlight(e) || e.def === 'stair-tread';
 
