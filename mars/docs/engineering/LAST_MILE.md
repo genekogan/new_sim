@@ -382,6 +382,8 @@ Priority keys from Gene's list (OWNER_DECISIONS, last entry) appear in brackets:
 
 Estimated fix work ≈ **400.5 worker-hours** (S = 1, M = 2.5, L = 5). Re-classifications cost only the one-sentence edit in their source doc, which is folded into LM-173/174/175.
 
+**At handoff (W56):** 13 fixed, 8 partial, 1 blocked, 36 re-classified in total; 167 fix rows remain. See "Status at handoff" at the end of this file.
+
 ### Items that move pins (batch them into one re-pin)
 
 **Certainly move pins** (49 rows) — batch into one re-pin window, each with a PLANNING_BUDGET reason:
@@ -666,3 +668,62 @@ other 2022 houses' `todo` tests) = **content** — they stay `todo` with the ref
 
 **Budget note:** ≈ 380 fix-hours after the strikes ≈ 115 M subagent tokens at the measured 300 k/worker-hour — beyond this week's
 quota; run in wave order so any stop point is a clean milestone.
+
+## Status at handoff (W56, 2026-09-29; covers §11 counts and §13 waves)
+
+Read from the row `notes` at main `1a0b458`. The consolidated gate is GREEN there in a single run (report
+`viewer/.cloudflare/gate/2026-09-28T23-33-14-786Z`): unit 77, engine 433 / 416 pass / 0 fail / 6 skip / 11 todo, tsc
+clean, e2e 78 passed / 7 skipped (861 s), probe `b746b094…` = pin. Wave 1 is partly landed (W54, W57, W58). Waves 2–4
+have not started.
+
+**Fixed (13 rows, each with a test or a hash-neutral proof):**
+- W58: LM-001 (auto rebind), LM-003 + LM-004 (region-scoped staleness), LM-005 (parked vehicles over `edit_world`),
+  LM-007 + LM-008 (`engine_parse_camera`, `sentences[]`, alias table), LM-013 (`engine_store_camera_track`), LM-016 (step
+  timeout, `cancel` / `mark`), LM-017 (`take.evicted`).
+- W57: LM-011 (integration + director demo call `engine_direct_camera`), LM-072 (`setpart.ts` dead store), LM-073
+  (`core/math.ts` literals), LM-150 (engine test lint).
+
+**Partial (8 rows), with the next step for each:**
+- **LM-010** (W58): op-level refusals are tested. Next: the NL refusal contract with fixtures (Codex, brief X3).
+- **LM-012** (W54): output-identical, D2 hold 7.3 s → 0.25–0.35 s. Next: CAMERA_DIRECT §9 (sampler-call-count test,
+  worker, faster sha256, subject-only centring); LM-067 navmesh cache.
+- **LM-014** (W58): the 20 legacy tools are classified, with one refusal envelope. Next: integration asserts
+  `legacy.command-failed`. Routing through one registry leaned on LM-202, which §13 rules out-of-scope, so the routing
+  half needs its own brief.
+- **LM-015** (W57): the integration list comes from the registry. Next: the gate auto-starts wrangler dev (a gate stage:
+  lead / Codex boundary); integration calls `engine_parse_camera`, `engine_store_camera_track` and the sentence step.
+- **LM-149** (W57): `engine/**` lint 69 → 1. What is left is Codex's `camera/parse.ts:148`.
+- **LM-151** (W57): deploy / simulation → 0 except Codex's `group-2026-frames*` (5). `app/**` 16 are left (lanes R/S).
+  In total, **lint 25 remain** (9 Codex + 16 app) and lint is not a gate step.
+- **LM-106** (W47 rule 15): stair-section crew parking. The corridor half is written and verified (east-house A+B
+  `2cd6af11…` @ 600 204), but held because it moves east-house's pin and chapter set. It is content-gated now (§13:
+  2022 houses = content).
+- **LM-107** (W47 rule 12): the D1 receiver spot is fixed, and chiba A+B is green and pinned `0ee1da11…` @ 564 548 on
+  the **pre-W51** scene. West-house is past D1 and red in S (`carry.gather-stuck`). Content-gated (HISTORICAL_CONTENT.md
+  §2).
+
+**Blocked (1 row):** LM-009 (fixture subject kind). The lead has to approve adding `'fixture'` to the frozen
+`cameraDirectionSchema` (CODEX.md §7).
+
+**Re-classified by the §13 rulings (on top of the 16 content + 12 out-of-scope in the inventory):**
+- Out-of-scope: LM-111, LM-114, LM-147, LM-166, LM-202, LM-204 (+6).
+- Content: LM-156 (+1). LM-184 was already content.
+- Not an item: LM-055 (documented behaviour; wording fix).
+- LM-117 party/dance stays **fix**.
+
+**Counts at handoff:**
+
+| | rows |
+| --- | --- |
+| inventory | 216 = 188 fix + 16 content + 12 out-of-scope |
+| re-classified | 17 content + 18 out-of-scope + 1 struck = 36 |
+| fix rows | 180 |
+| fixed | 13 |
+| partial | 8 |
+| blocked | 1 |
+| not started | 158 |
+| **remaining** | **167 fix rows** (hours not recomputed; §11's 400.5 h was the inventory estimate) |
+
+**Doc hygiene.** Rows LM-007…LM-017 appear twice in §1: lines 69–74 carry the status, and 75–89 are a merge duplicate.
+LM-012 appears three times, and the two later copies still say "in flight: W54". The first copy of each is the live
+one; the duplicates should be deleted (LM-173 doc hygiene).

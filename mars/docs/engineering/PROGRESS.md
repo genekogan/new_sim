@@ -1420,3 +1420,28 @@ Then: gate → release 5; HANDOFF refresh.
 - **W57 landed** 11 commits `67c4698`…(≈1 M tokens, 4 h; merged `ebc8cc3`, `sequence-b.ts` conflict resolved keeping W47's stringer ordering): lint 123 → 25 (engine 69 → 1, tests 22 → 3, deploy 14 → 5, simulation 2 → 0; the 25 = 9 Codex-owned + 16 `app/**` for lanes R/S); `core/order.ts` `defaultSortOrder` keeps every sort bit-identical; LM-072 `setpart.ts:241` `* 0` was a dead value (overwritten two lines later) — removed, hash-neutral; LM-073 fdlibm literals rewritten at double precision (`Object.is`-equal); LM-011: integration asserts the engine tool list from the registry, fails if any tool is never called, directs a real self-corrected orbit in the room; director demo step 5b; both PASS vs local wrangler dev. Pins unchanged incl. `YEAR_BUILD_FULL=1` 6/6 (pre-W51). Lead review: accepted.
 - Lead: consolidated head `1a0b458` — the W54 identity test's D2 chapter case now runs only while the take's recorded base equals the current scene (W51 re-seeded 2022; content parked) — engine 433 tests / 416 pass / 0 fail / 6 skip / 11 todo; tsc clean; 5 pins OK. Consolidated full gate running in `scratchpad/final-gate-wt` (`E2E_RUN=final-gate`); W56 writing HISTORICAL_CONTENT.md + banners + HANDOFF/NEXT_SESSION_PROMPT/LAST_MILE status.
 - **Consolidated gate GREEN at `1a0b458`** (single run, worktree `final-gate-wt`, report `.cloudflare/gate/2026-09-28T23-33-14-786Z`): unit pass 0.9 s · engine pass 42.6 s · tsc pass · e2e pass 860.7 s · determinism probe pass. Release 8 → W59.
+
+## 2026-09-29 — W56: handoff docs (HISTORICAL_CONTENT.md, "content is parked" banners, HANDOFF, NEXT_SESSION_PROMPT, LAST_MILE status)
+- New `docs/engineering/HISTORICAL_CONTENT.md` for the content agent. It covers, per year 2020–2026:
+  - scene source, contentHash, north (2022 −101, every other year the global −90), pins, and manifest takes;
+  - all 2022 takes and the chapter set `8ce33bee…` are stale against W51's scene; 11 2022 tests are `todo`, and five
+    e2e sites are `W51_FIXME`;
+  - the 2022 reconciliation status (a/c/e/f/i done; b/d Kit only, with the engine stair rule refusing the new stair
+    link and tilted modules read as flat 1.18 m panels; g/h/j not started) and the four houses' state;
+  - what each year needs from Gene (open Q20–Q32 by year), the exact re-run recipe, and the engine / content boundary.
+- "Content is parked" banners at the top of RECONCILIATION_2022.md (W51's, now pointing here), YEAR_BUILD.md and
+  NEXT_SESSION_PROMPT.md.
+- NEXT_SESSION_PROMPT is now a pointer: the engine agent uses HANDOFF_PROMPT_ENGINE.md and the content agent uses
+  HISTORICAL_CONTENT.md. The usage rules are kept.
+- HANDOFF.md has a new top section, "Handoff 2026-09-29 — engine tranche": the lanes since release 7 with commit ids,
+  head `1a0b458`, and the consolidated gate table from `report.json`. "Known shortcomings" is now only a LAST_MILE
+  pointer.
+- LAST_MILE.md: "Status at handoff" at the end, plus a one-line pointer in §11. Counts: 13 fixed, 8 partial,
+  1 blocked, 36 re-classified, 167 fix rows remaining.
+- Found while reading, not fixed (docs-only worker):
+  - `year-build-houses.test.ts`: chiba's full A+B test is not `todo` and still asserts `0ee1da11…`, which was pinned
+    on the pre-W51 scene. It is likely red under `YEAR_BUILD_FULL=1` (not run). Its `FULL_RED` doc comment says
+    "chiba and west-house green … pinned", but only chiba is.
+  - PLANNING_BUDGET.md has no W51 entry for the 2022 pins that are now `todo`.
+  - LAST_MILE §1 rows LM-007…LM-017 are duplicated at lines 75–89, and two LM-012 copies still say "in flight".
+  - The consolidated gate's `report.json` records `gitDirty: true`.

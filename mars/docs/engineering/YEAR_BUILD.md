@@ -1,5 +1,11 @@
 # Year build — phase A: the skeleton stage from material piles (owner feedback §7)
 
+> **Content is parked (Gene, 2026-09-29 evening; OWNER_DECISIONS.md).** Historical content is Gene's separate job: no
+> further reconstruction workers are scheduled and nothing is re-pinned or re-recorded for content. After W51's 2022 re-seed every
+> 2022 year-build pin below is `todo` with its old hash kept in the test (the runs were made on the pre-W51 scene); the
+> mechanics described here are still the engine's.
+> Per-year state, what each year needs from Gene and the exact re-run recipe: **`HISTORICAL_CONTENT.md`**.
+
 2026-09-28 (W7). **HYPOTHETICAL**: the construction *order*, the piles and the crew are a plausible
 Mars-style build generated from the canonical scene and the engine's rules, not a documented history.
 The acceptance target is the year's protected checkpoint (`mars-<year>`): every part the generator

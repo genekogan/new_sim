@@ -1,8 +1,71 @@
 # Handoff: Mars Studio simulation engine, tranche of 2026-09-27
 
-> **Current state (2026-09-29): read "Codex split and checkpoint 1" at the very bottom, then "End of night" above it**:
-> what landed overnight, the gate, takes, pins, decisions you may veto, and open items. Questions for Gene are parked
-> in `QUESTIONS_FOR_GENE.md`. The sections below are the 2026-09-27 report and the later addenda, kept as history.
+> **Current state (2026-09-29): read "Handoff 2026-09-29 — engine tranche" directly below.** The sections after it are
+> the 2026-09-27 report and later addenda, kept as history ("Codex split and checkpoint 1" and "End of night" at the
+> bottom are the previous checkpoints).
+
+## Handoff 2026-09-29 — engine tranche
+
+**Who takes what.**
+- The engine / simulation / controller / app agent starts from **`HANDOFF_PROMPT_ENGINE.md`**, and its work list is
+  **`LAST_MILE.md`** (ordered by §13; "Status at handoff" at the end).
+- Historical content is Gene's separate job. Its agent starts from **`HISTORICAL_CONTENT.md`**.
+- Nothing is re-pinned or re-recorded for content (OWNER_DECISIONS, 2026-09-29 evening).
+
+**Head:** `1a0b458` on `main` (the camera-direct identity fix after the W47 / W51 / W57 merges).
+
+**Consolidated gate:** GREEN at `1a0b458` in a single run (report `viewer/.cloudflare/gate/2026-09-28T23-33-14-786Z`,
+from `report.json`; `gitDirty: true` in that worktree).
+
+| step | result |
+| --- | --- |
+| unit | 77 / 77 |
+| engine | 433 tests: 416 pass / 0 fail / 6 skip / **11 todo** |
+| tsc | clean |
+| e2e | 78 passed / 7 skipped (861 s, `--workers=1`) |
+| determinism probe | `b746b094…` (= pin) |
+
+- The 11 `todo` are the 2022 content pins that W51's re-seed moved (`W51_TODO`; HISTORICAL_CONTENT.md §1.1).
+- The e2e skips include the five `W51_FIXME` sites.
+- Lint is not a gate step: **25 remain** (9 Codex-owned + 16 in `app/**`).
+- `simulation-integration` / director demo were run by W57 against a local wrangler dev (PASS). The gate runs them
+  only with `SIM_BASE`.
+
+**Release:** production is release 7 (`f709304d…`, from `d91057b`) until W59's release 8 from `1a0b458` lands. See
+"Deployment status" and `viewer/deploy/deployment.json`.
+
+**What landed since release 7 (`d91057b`), by lane** (commit ids from PROGRESS / `git log`):
+- **W38** houses (checkpoint 1): chiba / kitchen / west-house through A+B on one template, 11 provisional rules, tranche
+  pins. Commits `ede0be0`…`e237c55`.
+- **W45** Codex merge: all four `codex/*` branches accepted (lint tooling, NL camera parser, 2026 frame grouping, fire
+  v2 / render polish). Main fast-forwarded to `7a00405` (merge `a7b0da2`).
+- **W46** prop datum: props seated on their surfaces in 2020/21/23/24/25, with 2022 held. Commits `8c5b8df`,
+  `ad4a988`; merge `a379ee3`.
+- **W47** checkpoint 1b: chiba A+B green and pinned `0ee1da11…` @ 564 548 on the pre-W51 scene; west-house / kitchen
+  `todo` with named refusals. Commits `eb14de2`, `ff47a24`; merge `531834e`.
+- **W48** set player: shot hold at 64×, leg phase across seams, Direct camera on a chapter, sentence box. Commits
+  `40002d0`, `1c090b7`; merge `db5075b`.
+- **W49** Gene's answers into QUESTIONS_FOR_GENE, and the RECONCILIATION_2022 plan. Commits `b772682`, `e62f904`;
+  merge `401662c`.
+- **W50** renderer follow-ups (C-channel rails, tilt risers, green posts). Commits `4999421`, `cb671fa`, `8ef5e39`;
+  merge `8cd45ef`.
+- **W51** 2022 reconciliation re-seed (names, pinwheel, parallel stairs, south 45° solar, trailer train), 2023/24
+  trailers out of Chiba, per-year north (2022 = −101). Commits `d2aafe3`, `54315f3`; merge `2a99adb`.
+- **W54** `directCamera` perf, output-identical (D2 hold 7.3 s → 0.25–0.35 s). Commits `7e4fe7c`…`800ad5c`.
+- **W57** lint 123 → 25 (hash-identical), LM-011 integration + director demo call `engine_direct_camera`, LM-072 /
+  LM-073. Commits `67c4698`…`cb0e2cc`, `16d7308`; merge `ebc8cc3`.
+- **W58** controller lane A: region-scoped staleness, `rebind:'auto'`, `engine_parse_camera` + `sentences[]`,
+  `engine_store_camera_track`, step timeout / cancel / mark, `take.evicted`, legacy tools classified. Commits
+  `ecce5f4`, `7618cd1`, `c79f999`, `1b3b0b1`, `e712963`; merge `20c83de`.
+- Also after release 7:
+  - W39 step labels + chapter cameras (merge `6ad0079`);
+  - W41 `/questions/` page (`1876875`, merge `3dd160e`);
+  - W42 north −90 (merge `50e805d`);
+  - W43 Chiba 2024 front (`9f70386`, `24f1e84`, merge `a944649`);
+  - W44 axis question cards (merge `22e7f5f`);
+  - `1a0b458` (camera-direct identity: the 2022 chapter case runs only while the take's base is current).
+
+**Known shortcomings:** see "Known shortcomings" below. It is now only a pointer to LAST_MILE.md.
 
 This is the end-of-tranche report that SPEC.md §30 and §33 ask for. The engine suite was re-run for
 this handoff at HEAD `19aa5b6` on 2026-09-27 (M3 Max, Node 26). Other numbers cite a file, test or
@@ -210,41 +273,21 @@ writing). No camera track has been rendered to video.
 
 ## Known shortcomings
 
-- **Poses are procedural layers on Idle/Walk, not clips.** `app/engine-view/humans.ts`: `sit`
-  lowers the body onto the seat with leg IK (0.4 s blend, no real sit-down motion); gripping people
-  get arm IK plus a ≤ 13° lean and shoulder shrug (carriers keep elbows bent) — no crouch or lift;
-  `warm` holds hands out; `talk`/`watch` are plain Idle. No foot IK when walking: on stairs feet sink
-  or hover by about 0.09 m. Turning in place plays Idle (`app/lab/README.md`).
-- **Formations don't avoid each other.** Simultaneous carries are not co-planned and have no space
-  reservation, so a sequence has to order them with `after` dependencies (the `step(…, after)` calls
-  in `build-bay.ts`).
-- **People-avoidance is heuristic.** Walkers use traffic resources, right-of-way, turn hysteresis and
-  hard separation. Head-on walkers with room to pass both slow and keep to one side (latched per
-  encounter); only tight spots and single-file passages make one stop and give way. Formations halt for people in the way, ask idle bystanders to "make way", then
-  replan treating them as soft obstacles (`carry/actions.ts` `pathBystander`/`makeWay`). This is not
-  ORCA and not proven deadlock-free: a head-on wait-forever shows up only as a runner `timeout`
-  (`TAKES_AND_PLANS.md` Known gaps).
-- **Campus interiors and upper floors are non-walkable by design.** Only ground level 0 of 2026 is
-  walkable. There are 152 `interior:` blockers and no decks, stairs or doors (`CAMPUS_SCENE.md`).
-- **No ladders or scaffold.** Anything more than 2.1 m above the nearest floor fails with
-  `reach.too-high`, so only low platforms can be built (`PROGRESSIVE.md`).
-- **9 ft frame unverified** (`QUESTIONS_FOR_GENE.md` Q5). Gene named 8/9/12/19 ft, but the library has no 9 ft frame.
-  `world/catalog.ts:88–89` marks it `provisional` with an assumed 4 ft depth. The flagship uses
-  `beam-9ft`.
-- **North-axis assumption.** World −Z is taken as geographic north, with `NORTH_AZIMUTH_OFFSET = 0`
-  (`engine/env/sun.ts:27–42`). No site bearing was found, so the sun and shadows may be rotated.
-- **Mid-action resumability is not supported.** Only quiescent checkpoints resume. `sampleTake(t)`
-  returns a visual frame only (`TAKES_AND_PLANS.md`).
-- **Planning cost spikes with many simultaneous walkers.** Stress-30 has a ~200 ms tick when 30
-  walkers plan at once: 5–45 ms per A\* and no per-tick budget. A construction replan costs ≈ 31 ms.
-- **Replay slowed ~3× after people-avoidance** (lead-reported). Here the campus flagship rehearsal
-  took 57 s of compute; the "before" figure is **(unverified)**.
-- **Other limits.** Loads stay level, with nothing carried on stairs or between levels. Formations are
-  rigid (no re-grip). A blocked mid-carry route holds unless the blocker is a bystander. Raises follow a
-  lifter/footer choreography (lifters walk the frame up, hands ≤ 1.9 m, ≤ 0.6 m/s) and install lifts are
-  swept with a lift-over fallback (PROGRESSIVE.md "Swept lifts"); the arc itself is still sampled, not
-  continuous. The camera sees obstacle prisms only, not the render mesh. There
-  are no dismantling verbs. The lab README still describes the stair-end teleport that `64eeba8` fixed.
+Every known shortcoming is a row in **`LAST_MILE.md`**, each with its source, category, effort, pin impact and "fixed
+means" test.
+
+- **At inventory (W55):** 216 rows = **188 fix / 16 content / 12 out-of-scope**.
+- **Fixed since** (with tests or hash-neutral proofs):
+  - W58: LM-001, LM-003, LM-004, LM-005, LM-007, LM-008, LM-013, LM-016, LM-017;
+  - W57: LM-011, LM-072, LM-073, LM-150.
+- **Partial:**
+  - W54: LM-012;
+  - W58: LM-010, LM-014;
+  - W57: LM-015, LM-149, LM-151;
+  - W47: LM-106, LM-107.
+- **Blocked:** LM-009.
+- **At handoff:** 13 fixed, 8 partial, 1 blocked, 36 re-classified (17 content, 18 out-of-scope, 1 struck), 167 fix
+  rows remaining (LAST_MILE.md "Status at handoff").
 
 ## Deferred work
 

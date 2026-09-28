@@ -2,6 +2,7 @@
 
 > **Content is parked (Gene, 2026-09-29 evening; OWNER_DECISIONS.md).** Historical content is Gene's separate job: no
 > further reconstruction workers are scheduled (W52 / W53 cancelled) and nothing is re-pinned or re-recorded for content.
+> Per-year state, what each year needs from Gene and the exact re-run recipe: **`HISTORICAL_CONTENT.md`**.
 > W51 landed §a, §b-Kit, §c, §d-Kit, §e, §f and §i as **one re-seed per year** (`mars-2022` 8b88e6f0… → f8090a99…,
 > `mars-2023` 8e401abb… → 883e6371…, `mars-2024` 832e8d9a… → bd2e0c79…; HISTORY_IDS.md "Reconstruction edits"). The
 > 2022 year-build pins are `todo` ("2022 reconciliation W51; re-pin by W52") with their old hashes kept in the tests.
