@@ -84,7 +84,11 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
   const table: (Candidate | null)[][] = [];
   const desired: Desired[] = [];
   const scored = new SubjectTrackBuilder();
+  // a fixed shot with no subject ids is the same pose against the same static world at every sample: one candidate row
+  // and one desired analysis serve every sample (W54: a 45 min lead-in hold is 27 k identical rows)
+  const constant = spec.kind === 'fixed' && !ids.length;
   for (let i = 0; i < N; i++) {
+    if (constant && i) { scored.push(ids, {}); table.push(table[0]); desired.push(desired[0]); continue; }
     const t = i * dt;
     // no subject ids (a lead-in hold, a fixed / path shot about static geometry): readability and the candidates do not
     // read the subject poses, so the take is not sampled (W54: a 45 min lead-in hold sampled 220 entities × 27 k ticks)
@@ -111,7 +115,13 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
     }),
   );
 
-  const crossing = (a: Candidate, b: Candidate) => raycast(world, a.pose.position, b.pose.position, 'collide');
+  const crossings = new Map<Candidate, ReturnType<typeof raycast>>(); // a → a (a constant row) is asked once per sample
+  const crossing = (a: Candidate, b: Candidate) => {
+    if (a !== b) return raycast(world, a.pose.position, b.pose.position, 'collide');
+    let h = crossings.get(a);
+    if (h === undefined) crossings.set(a, (h = raycast(world, a.pose.position, a.pose.position, 'collide')));
+    return h;
+  };
   const continuous = (a: Candidate, b: Candidate) => {
     const d = hypot(b.pose.position[0] - a.pose.position[0], b.pose.position[1] - a.pose.position[1], b.pose.position[2] - a.pose.position[2]);
     if (d > maxStep || viewAngle(a.pose, b.pose) > maxTurn || Math.abs(b.pose.fov - a.pose.fov) > 30 * dt) return false;
