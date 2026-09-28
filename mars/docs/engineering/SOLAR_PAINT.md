@@ -71,7 +71,10 @@ support `none` → `carry.fragile-dropped`.
 
 ## Approximate / not modelled
 - Tilt legs / rear risers of a tilted mount are implied (both rails sit on the deck; the panel's low edge
-  on them); the tilt direction is always +pitch / +roll (no azimuth choice).
+  on them); the tilt direction is always +pitch / +roll (no azimuth choice). The renderer draws them
+  (`components.ts` `panel()` → `solarTiltLegs()`): two plumb risers under the high edge, as tall as
+  span × sin(tilt), only for a module in phase `installed` with a non-zero pitch/roll (never while carried or
+  tilting); not engine entities, no BOM line. `panel-rail` draws as a C-channel (`solarRailMesh()`).
 - Rails / equipment / low panels are set in place from ≤ 1 m (longer moves are `carry`); rails on a deck
   are assumed screwed to the sheets; roof decks with slope are not modelled.
 - Painting: flat upright faces only, a single rectangular face per call, no drips / layers / drying; the

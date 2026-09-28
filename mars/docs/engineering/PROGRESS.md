@@ -1313,3 +1313,19 @@ Then: gate → release 5; HANDOFF refresh.
   - No Camera picker for sets.
   - The parser gets no world vocabulary; names are checked by the compiler.
 - **W48 landed** `40002d0`, `1c090b7` (≈250k tokens, 41 min; merged): shot hold ≥ 1.5 s on screen (deterministic chain from the anchor; 64×/60 s: 89 shots @0.67 s → 41 @1.50 s; toggle), walked metres carried across chapter seams (`take-walk.ts`; leg-phase jump 0.45 → 0 at A→D0 and D0→D1), Direct camera on the chapter on screen (label + Save into that chapter's file), "Say it" sentence box on Codex's `parse.ts` (Gene's four: three compile, "this crowd…" refused `camera.parse.deictic` with a question). 15/15 studio specs. Lead review: accepted. Weak: locked-off holds can lose their people; walk weight steps at a seam; `directCamera` on a chapter take freezes the page ≈ 6 s (to profile); single takes get no hold.
+
+- **W50 render follow-ups** (branch `w50-render-followups`, worktree `scratchpad/w50-wt`, port 5681): the two Codex
+  hand-offs. `components.ts` `build()` routes `panel-rail` → `solarRailMesh()` (C-channel); `panel()` takes the entity
+  and adds `solarTiltLegs()` only for an installed module with non-zero pitch/roll (two plumb risers under the high
+  edge, span × sin(tilt); view rebuilds on that mount key), carried/flat panels get none; upright comment fixed.
+  `kit.ts` rack posts import `RACK_FRAME_GREEN` (palette.ts) instead of `#293c45`. Baselines (all inspected): new
+  `render-polish-tilt-legs`, refreshed `render-polish-mounted-panel` + 9 post-recolour views (studio-2021-default /
+  -classroom-eye / -corridor-aluminet, studio-2022/2023/2024/2025-default, studio-2024-solarium-door,
+  lab-year-2022-top-prisms; each under the 0.2 pixelmatch threshold, 0.2–1.1 % raw, every changed pixel greener).
+  Specs: render-polish, solar-paint, lab-years, studio-years 29/29; year-build, studio-build, build-bay, poses 41 pass +
+  1 skip (studio-build "chapter set at 64×" failed once under the parallel load, passed 3/3 alone). Open: the
+  pre-existing Codex drift in poses/build-bay/solar-paint/year-build baselines (the same 0.03–1.24 % its REPORT lists)
+  is still unrefreshed; `scenes.ts:113` still draws the 2021 central upright `#293c45` (W47/W46 area); the Lab
+  `solar-paint` pv2 is rolled 20° with its x ∥ the rails and its origin unlifted, so its low edge sinks 0.34 m into
+  the ground (the engine's `tiltedPose` would pitch it and lift it span/2·sin); `app/lab/solar-paint.ts` header and
+  description still say textures are hashed stripes.
