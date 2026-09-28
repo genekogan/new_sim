@@ -31,10 +31,9 @@ import { fileURLToPath } from 'node:url';
 import { hashOf } from '../engine/core/hash.ts';
 import { WorldHistory } from '../engine/history/store.ts';
 import { Spatial, entityFootprint } from '../engine/spatial/service.ts';
-import { bindTemplate } from '../engine/sequence/bind.ts';
+import { bindLabel, bindTemplate } from '../engine/sequence/bind.ts';
 import { rehearse } from '../engine/rehearsal/rehearse.ts';
 import { blockedWaits, expandEvents, replayFinalState, sampleTake, takeDuration } from '../engine/take/replay.ts';
-import { datan2, dcos, dsin } from '../engine/core/math.ts';
 import { TakeLibrary } from '../engine/take/store.ts';
 import { readCampus2026File } from '../engine/campus/node.ts';
 import { loadCampusFile } from '../engine/campus/history-node.ts';
@@ -44,6 +43,8 @@ import { CAMPUS_ID, loadCampus2026 } from '../engine/campus/world.ts';
 import { RULES_VERSION } from '../engine/construction/rules.ts';
 import { DEFAULT_CAMERA_POLICY } from '../engine/camera/geom.ts';
 import { planShotList } from '../engine/camera/shotlist.ts';
+import { chapterShots, shotActivityReport, shotRater } from '../engine/camera/chapter-shots.ts';
+import { CameraWorld } from '../engine/camera/geom.ts';
 import { takeSampler } from '../engine/camera/take-sampler.ts';
 import { fileCameras, toCameraTrack } from '../engine/camera/track.ts';
 import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry, BUILD_BAY_INVARIANTS, BUILD_BAY_CONTRIBUTORS } from '../engine/scenarios/build-bay.ts';
@@ -76,8 +77,9 @@ function timeline(take, plan) {
     if (['completed', 'failed', 'cancelled'].includes(e.status)) { s.end = e.t * take.dt; s.status = e.status; }
   }
   for (const s of byId.values()) steps.push(s);
+  // labels are template text ("$crew[2] climbs below"): fill the references from the plan's bindings (W39)
   const labels = Object.fromEntries(plan.steps.map((s) => [s.id, s.label]));
-  for (const s of steps) if (labels[s.id]) s.label = labels[s.id];
+  for (const s of steps) if (labels[s.id]) s.label = bindLabel(labels[s.id], plan.bindings ?? {});
   const T = (id, k) => {
     const s = byId.get(id);
     if (!s || s[k] === null) throw new Error(`step ${id} has no ${k} time`);
@@ -356,70 +358,35 @@ SCENARIOS['year-build-2022-ab'] = {
 // (`--scenario year-build-2022-ab-chapters`), ≈ 30 min: two 13-min rehearsals (the takes and the exact re-run for the cameras).
 // The skeleton chapter is not the whole-skeleton take above: the A+B yard has ten more piles (the phase-B stock), so that
 // take's final state is not where D0 starts.
-const YARD_VERBS = new Set(['take_from_bundle', 'carry', 'cut', 'stack_offcut', 'walk_to']);
 /**
- * Per-section shot list: an establishing wide, then one frameGroup per stretch of work at the house (steps other than the
- * yard verbs), cut at those steps' starts (≥ minWin, ≤ maxWin s). A stretch frames the people who do that work AND stay at
- * the house (within its footprint + `near` m for ≥ `stay` of the stretch, sampled every 10 s) — a giver who spends most
- * of it fetching from the yard would stretch the frame until nobody is readable — from outside the house on their side
- * (alternately ±30°), low for people on the ground (10°: under the decks a steep camera sees plywood), higher on the decks.
- * A stretch with nobody working at the house frames whoever stays longest in one place; the chapter ends on a wide.
+ * Per-chapter shot list and moments (W39): engine/camera/chapter-shots.ts `chapterShots`, driven by the take — an activity
+ * grid (who works, where) and the step timeline (each step's actors from its bound params). Shots cut at telling events
+ * (raises, hand-ups, pass-ups, cuts at the station, the first tread / wall / rail), frame the working people only (a shot
+ * cuts 12 s after all of them went idle while someone else works), end on a wide from the yard side every 5 min, and each
+ * takes the first candidate angle `shotRater` finds readable over the whole shot (split in two where none is). Moments:
+ * the first of each telling event ("first raise", "first relay", "first cut", …) and `done`. CAMERA.md "Chapter shot lists".
  */
-function workShots(ctx, { what, minWin = 90, maxWin = 300, padding = 1.8, open = 15, close = 20, near = 2.5, stay = 0.7 }) {
-  const { site, initial, plan, duration, crew, steps, take } = ctx;
-  const params = new Map(plan.steps.map((s) => [s.id, JSON.stringify(s.params ?? {})]));
-  const actors = (id) => crew.filter((c) => params.get(id)?.includes(`"${c}"`));
-  const done = steps.filter((s) => s.start !== null && s.end !== null);
-  const work = done.filter((s) => !YARD_VERBS.has(s.verb));
-  const end = duration - close;
-  const starts = [...new Set(work.map((s) => s.start))].filter((t) => t > open + minWin / 2 && t < end - minWin / 2).sort((a, b) => a - b);
-  const cuts = [open];
-  for (const t of starts) if (t - cuts[cuts.length - 1] >= minWin) cuts.push(t);
-  cuts.push(end);
-  const wins = [];
-  for (let i = 0; i + 1 < cuts.length; i++) {
-    const a = cuts[i], b = cuts[i + 1], k = Math.ceil((b - a) / maxWin);
-    for (let j = 0; j < k; j++) wins.push([a + ((b - a) * j) / k, a + ((b - a) * (j + 1)) / k]);
-  }
-  const c = [site.origin[0], site.groundY, site.origin[1]];
-  const half = site.half ?? [6, 6], yaw = site.yaw ?? 0;
-  const r = Math.hypot(...half);
-  const box = boundsOf(initial, 2);
-  const cy = dcos(yaw), sy = dsin(yaw);
-  const inHouse = (p) => { const dx = p[0] - c[0], dz = p[2] - c[2]; const u = dx * cy + dz * sy, v = -dx * sy + dz * cy; return Math.abs(u) <= half[0] + near && Math.abs(v) <= half[1] + near; };
-  const shots = [{ label: `establishing: ${what}`, t1: open, spec: { kind: 'establishing', region: { ...box, y: site.groundY }, azimuth: SE, elevation: 32 * DEG } }];
-  for (const [i, [a, b]] of wins.entries()) {
-    const ts = [];
-    for (let t = a; t < b; t += 10) ts.push(t);
-    const frames = ts.map((t) => sampleTake(take, t).entities);
-    const atHouse = (p) => frames.filter((f) => f[p] && inHouse(f[p].p)).length / frames.length;
-    const workers = new Set(work.filter((s) => Math.min(b, s.end) > Math.max(a, s.start)).flatMap((s) => actors(s.id)));
-    let subjects = crew.filter((p) => workers.has(p) && atHouse(p) >= stay);
-    let where = '';
-    if (!subjects.length) subjects = crew.filter((p) => atHouse(p) >= stay), where = 'at the house, ';
-    if (!subjects.length) {
-      // nobody at the house: the one who moves least (a cutter at the station, a stack), framed where they are
-      const still = crew.map((p) => { const ps = frames.map((f) => f[p]?.p).filter(Boolean); const m = ps.length ? Math.max(...ps.map((q) => Math.hypot(q[0] - ps[0][0], q[2] - ps[0][2]))) : Infinity; return [p, m]; }).sort((x, y) => x[1] - y[1]);
-      subjects = [still[0][0]];
-      where = 'yard, ';
-    }
-    const f = frames[Math.floor(frames.length / 2)];
-    const ps = subjects.map((s) => f[s]?.p).filter(Boolean);
-    const m = [ps.reduce((x, p) => x + p[0], 0) / ps.length, ps.reduce((x, p) => x + p[1], 0) / ps.length, ps.reduce((x, p) => x + p[2], 0) / ps.length];
-    const d = [m[0] - c[0], m[2] - c[2]];
-    const az = (Math.hypot(d[0], d[1]) > 0.5 ? datan2(d[1], d[0]) : NE) + (i % 2 ? 30 : -30) * DEG;
-    const elevation = (m[1] < 1 ? 10 : m[1] < 3.5 ? 22 : 30) * DEG;
-    shots.push({ label: `${what}: ${where}${subjects.join(' ')}`, t1: b, spec: { kind: 'frameGroup', subjects, padding, azimuth: az, elevation } });
-  }
-  shots.push({ label: `${what}: done`, t1: duration, spec: { kind: 'establishing', region: { min: [site.origin[0] - r - 2, site.origin[1] - r - 2], max: [site.origin[0] + r + 2, site.origin[1] + r + 2], y: site.groundY }, azimuth: NE, elevation: 30 * DEG } });
-  return shots;
-}
-/** Chapter moments: the first work step at the house, the middle of the chapter, the end. */
-const workMoments = ({ steps, g, duration }) => {
-  const w = steps.filter((s) => s.start !== null && !YARD_VERBS.has(s.verb)).sort((a, b) => a.start - b.start)[0];
-  return { ...(w ? { work: g(w.start + 1) } : {}), middle: g(duration / 2), done: Math.floor(duration / 2) * 2 };
+const chapterSpec = (label, note, what) => {
+  const planOf = (ctx) => (ctx.chapterPlan ??= chapterShots({
+    take: ctx.take, steps: ctx.steps, planSteps: ctx.plan.steps, crew: ctx.crew, site: ctx.site, what, hz: ctx.hz,
+    yard: { ...boundsOf(ctx.initial, 2), y: ctx.site.groundY }, yardCentre: yardCentreOf(ctx.take, ctx.site.origin), rate: ctx.rate,
+  }));
+  return {
+    label, note,
+    shots: (ctx) => {
+      const cp = planOf(ctx);
+      const r = shotActivityReport(cp.shots.map((x, i, all) => ({ ...x, t0: i ? all[i - 1].t1 : 0 })), cp.grid);
+      console.log(`shots        ${cp.shots.length}: ${r.wides} yard wides (longest gap ${r.maxWideGap} s), frameGroup mean ${r.meanShot} s / max ${r.maxShot} s, idle framing > 20 s: ${r.idleStretches} (longest ${r.maxIdleRun} s); ends ${JSON.stringify(cp.ends)}`);
+      return cp.shots;
+    },
+    moments: (ctx) => planOf(ctx).moments,
+  };
 };
-const chapterSpec = (label, note, what, opts = {}) => ({ label, note, shots: (ctx) => workShots(ctx, { what, ...opts }), moments: workMoments });
+/** The yard's centre (x, z): the mean of the take's fixtures (piles, cutting station, scrap pile), else `fallback`. */
+function yardCentreOf(take, fallback) {
+  const fx = Object.values(take.entities0 ?? {}).filter((e) => e.kind === 'fixture');
+  return fx.length ? [fx.reduce((a, e) => a + e.pose.p[0], 0) / fx.length, fx.reduce((a, e) => a + e.pose.p[2], 0) / fx.length] : fallback;
+}
 SCENARIOS['year-build-2022-ab-chapters'] = {
   ...SCENARIOS['year-build-2022'],
   chapters: true,
@@ -556,23 +523,26 @@ function packageTake(name, S, run, take, tSim, extra = {}) {
   const initial = Object.keys(take.tracks).map((id) => ({ id, pose: { p: [take.tracks[id][0][1] / 1000, take.tracks[id][0][2] / 1000, take.tracks[id][0][3] / 1000] } }));
 
   // 3. camera: shot list planned against the scene (+ the finished build, collision-only)
-  const ctx = { site, final, initial, plan, T, g, duration, crew: run.crew, steps, take };
-  const shots = S.shots(ctx).map((s, i, all) => ({ ...s, t0: i ? g(all[i - 1].t1) : 0, t1: g(s.t1) }));
   const cameraScene = { ...scene, obstacles: [...scene.obstacles, ...buildSolids(final)] };
   // the finished build may not be entered or crossed at any time; as a prism it never occludes (it is not there yet for
   // most of the take). Sight occlusion by parts comes per tick from takeSampler (kind-aware boxes: posts, stringers, slabs).
   const policy = { ...DEFAULT_CAMERA_POLICY, component: { collide: true, occlude: false } };
+  const world = new CameraWorld(cameraScene, policy); // what planShotList builds from (cameraScene, policy)
   // the camera is planned from an exact re-run (tracks at 1 mm / 1 mrad; the same motion — checked), not from the
   // shipped take's TRACK_TOL tracks: thinning must not move a planned camera (the whole-house take's shot list took other
   // corrections on 99 of 2933 samples when planned from the thinned tracks). The track belongs to the shipped take id.
   const exact = run.exact ? run.exact() : take;
   if (exact.ticks !== take.ticks || exact.finalStateHash !== take.finalStateHash) throw new Error(`${name}: the exact re-run differs from the take (${exact.ticks} / ${exact.finalStateHash})`);
-  const t1 = performance.now();
-  // cutCost 2.5 s: bystanders are occluders now, and a crew walking past for ~1 s is not worth a cut away and back
   // kind-aware sampler for every take (W23: piles / the cutting station are boxes from entities0, a removed entity leaves
   // at its removal tick). The year-build cameras were re-planned with it in W26 (lead decision, PROGRESS "W23 landed");
   // `legacyKinds` (every entity absent from finalState sampled as a person) is no longer used by the recorder.
-  const cam = planShotList(shots, takeSampler(exact), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
+  const sampler = takeSampler(exact);
+  const t1 = performance.now();
+  // `rate`: a shot list may rate candidate shots against the same world and sampler (chapter shots: engine/camera/chapter-shots.ts)
+  const ctx = { site, final, initial, plan, T, g, duration, crew: run.crew, steps, take, hz: HZ, rate: shotRater(world, sampler, { hz: HZ, safeBottom: SAFE_BOTTOM }) };
+  const shots = S.shots(ctx).map((s, i, all) => ({ ...s, t0: i ? g(all[i - 1].t1) : 0, t1: g(s.t1) }));
+  // cutCost 2.5 s: bystanders are occluders now, and a crew walking past for ~1 s is not worth a cut away and back
+  const cam = planShotList(shots, sampler, world, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
   const tCam = performance.now() - t1;
   const track = toCameraTrack('', take.id, cam, 'planned-shot-list');
   track.id = `cam-${hashOf({ takeId: take.id, data: track.data }).slice(0, 16)}`;
