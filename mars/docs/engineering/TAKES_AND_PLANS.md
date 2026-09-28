@@ -106,16 +106,49 @@ prints the flagship build-bay/open-ground `finalStateHash`, take id and math fin
 
 ## What is resumable — and what is not
 
-- **Resumable:** any *checkpoint* (a quiescent world state between runs). A plan bound to it can be
-  rehearsed or executed any number of times; any workspace can fork from any checkpoint.
-- **Not resumable: mid-action state.** A Runtime's live action exec state (routes, corridor progress,
-  traffic holds, reservations, sequence-runner progress) is in memory only and is not serialised. You cannot
-  fork or resume *during* a take. `sampleTake(take, t)` is a **visual** frame, not a resumable state —
-  never present it as one. `take.finalState` is resumable only because runs end with every action terminal.
-- Aborted/timed-out runs end with cancelled actions (cancellation policy applied), so their final states are
-  quiescent too; they are not committed by default.
-- Mid-action resumability needs per-action exec serialisation (`ActionDef.snapshot/restore`) plus runtime
-  owners/live maps and runner state — not implemented.
+- **Quiescent checkpoints:** any checkpoint between runs. A plan bound to it can be rehearsed or executed any
+  number of times; any workspace can fork from any checkpoint. `take.finalState` is one because runs end with
+  every action terminal (aborted/timed-out runs end with cancelled actions, so theirs are quiescent too; not
+  committed by default).
+- **Mid-action pause checkpoints (spec §22), for a defined subset.** `rt.snapshot()` returns a
+  `RuntimeSnapshot` (`runtime/snapshot.ts`, plain JSON): world, every `ActionRecord`, each live action's
+  `exec` + `program`, reservations (`owners`), per-action prior phases, plain-data services (`traffic` holds,
+  `walkExecs`, `replanBudget`, `carryExecs` when empty), the Spatial navigation `epoch`, `nextId`, violations and
+  the event cursor. RNG state is in `world.rng`. `Runtime.restore(snap, registry, services, invariants)` rebuilds a
+  runtime that steps tick-for-tick identically (same `stateHash` every tick, same event stream from the cursor).
+  - Encoding (`runtime/codec.ts`) is a graph codec: objects reached twice stay one object after restore (a
+    parent's exec holding its child `ActionRecord`s; a walk exec held by the live map and `services.walkExecs`),
+    Maps/Sets/undefined/NaN/±Infinity/-0 survive. Every snapshot is proven by a JSON round trip (`hashOf` equal).
+    Functions (closures) and class instances are refused naming the path.
+  - `snapshot()` syncs the Spatial first (idempotent on the same world, so behaviour-neutral: the paused
+    original still matches an unpaused run). `restore()` needs **the runtime's own services** — a fresh
+    `Spatial` for the same base scene; a Spatial shared between diverging runtimes would share its epoch.
+  - **Resumable (tested in `resume.test.ts`):** `walk_to` in every phase incl. stair `align`/`climb` and
+    single-file traffic holds; `take_slot`, `sit`, `stand`, `face`, `converse`, `gather`, `campfire_circle`;
+    sequences — `SequenceRunner.serialize()` / `SequenceRunner.restore(rt, state)` carry pending/started steps,
+    cues, cut/refused sets (pair with an `rt.snapshot()` at the same tick; `runner.tick()` steps one tick).
+  - **Refused loudly** (`snapshot.non-resumable`, naming each action and why; `NON_RESUMABLE` in snapshot.ts):
+    `carry` — its exec drives in-process walk sub-execs (not child actions) registered in `services.walkExecs`,
+    publishes load discs through a services closure (`loadDiscs`), and holds planner trajectories + formation
+    transitions whose tick-exact restoration is unverified; construction lifts (`raise_upright`,
+    `connect_beam`, `install_*`, `release_support`) — they hold loads and drive crew sub-walks + lift
+    trajectories; vehicles (`mount`, `dismount`, `ride_to`, `ride_loop`) — controller state and the vehicle
+    invariant's per-runtime memory are not serialised; `ambient_wander` and any other verb — not yet verified.
+    A `walk_to` stepping aside for a carry (`detour.clearOf` closure) is refused by the codec.
+  - `snapshot({ allowDrop: true })` leaves refused actions out (`snap.dropped`); `restore()` finishes each as
+    `cancelled` with `snapshot.dropped` through the runtime's normal cleanup. Refused anyway
+    (`snapshot.drop-unsafe`) while the action holds a load (carried/raising entity or a gripping actor).
+  - New verbs opt in with `ActionDef.resumable = true` (plain exec) or `serializeExec`/`restoreExec`, plus a test.
+- **History:** `history.commit(ws, snap, { kind: 'pause', note })` stores the world as the checkpoint state and
+  the snapshot as a content-addressed blob (`checkpoint.resume`, persisted in `toJSON().resumes`);
+  `read(id, { resume: true })` returns `{ world, snapshot }` (`snapshot: null` for ordinary checkpoints) and
+  `resumable(id)` tells them apart. `fork(ws, …)` at a pause checkpoint yields a workspace whose head resumes.
+- **Limitations:** the restored runtime's `events` start empty (compare from `snap.eventCursor`); observers and
+  the profiler are not carried; `maxStepPerTick` has no previous-pose baseline on the first tick after a restore
+  (a teleport in exactly that tick would go unflagged); a restored `SequenceRunner.run(maxTicks)` budget counts
+  from the resume. `sampleTake(take, t)` is still a **visual** frame, never a resumable state.
+- Sizes (JSON, printed by `resume.test.ts`): walk_to mid-climb, 2 people: 3.5 kB; converse gathering (4 people
+  + 4 child walks) + face: 9.7 kB; sequence between steps: 1.8 kB (records grow with the take's action count).
 
 ## Payload sizes (3 walkers, 69.8 s, proving ground; `take.test.ts` prints them)
 
