@@ -48,3 +48,5 @@
 - (same) **Checkpoint 1** = 2022 complete: phase B landed and pinned, 2x4 framing verbs, all four houses, studio "Watch it being
   built · 2022". No deploy until Gene says so. The 2026 frame grouping is Codex's; Claude takes the integration half once its JSON
   is on a `codex/*` branch.
+- (2026-09-29 ~12:00 EDT, Gene) **Deploy bleeding edge to production** (the public Worker link) now, then continue autonomously; Codex
+  starts its tranche in parallel. Release protocol unchanged: full gate GREEN at the deployed head, rollback version recorded.
