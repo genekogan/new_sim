@@ -7,7 +7,7 @@
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { DT, type Runtime, type RuntimeObserver } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
-import { ANG_Q, POS_Q, TAKE_SCHEMA, type ChangeEvent, type PoseSample, type Take, type TakeEvent } from './types.ts';
+import { ANG_Q, POS_Q, SPEED_Q, TAKE_SCHEMA, type ChangeEvent, type PoseSample, type Take, type TakeEvent, type TakeHands } from './types.ts';
 import { interpSample } from './replay.ts';
 
 export type RecorderOptions = {
@@ -18,6 +18,18 @@ export type RecorderOptions = {
   /** Simplification tolerance in quanta (mm / mrad). 0 keeps every changed sample. */
   tol?: number;
 };
+
+type TrackState = { committed: PoseSample; pending: PoseSample[]; out: PoseSample[] };
+
+const q = (x: number, k: number) => Math.round(x * k) || 0;
+const mm = (v: readonly number[]) => [q(v[0], POS_Q), q(v[1], POS_Q), q(v[2], POS_Q)];
+
+/** Hand points quantised like pose tracks: integer millimetres, `{ left?: [x, y, z], right?: [x, y, z] }` (TakeHands). */
+function takeHands(e: Entity): TakeHands | undefined {
+  const h = e.human?.hands;
+  if (!h || (!h.left && !h.right)) return undefined;
+  return { ...(h.left ? { left: mm(h.left) } : {}), ...(h.right ? { right: mm(h.right) } : {}) } as TakeHands;
+}
 
 const FIELDS: [string, (e: Entity) => unknown][] = [
   ['activity', (e) => e.human?.activity],
@@ -30,11 +42,13 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['connections', (e) => e.connections],
   ['equipment', (e) => e.equipment], // construction/solar.ts place_equipment (kind + config)
   ['paint', (e) => e.paint], // work/paint.ts: colour / texture, coverage (0.01 steps), per band
+  // mars-take/2 (BODY_MODEL.md "take fields"): what a replay needs to pose people exactly as the engine did
+  ['hands', takeHands], // human.hands, integer mm (hand-up, items, eating, paint)
+  ['baseActivity', (e) => e.human?.baseActivity], // the activity an overlay (eat) is layered on: 'sit' = seated
+  ['on', (e) => e.human?.on], // the rack link (beam:… / climb:…) someone stands on
+  ['speed', (e) => (e.human?.speed === undefined ? undefined : q(e.human.speed, SPEED_Q))], // integer cm/s (walk_to)
+  ['contents', (e) => e.contents], // bowl / pot / cup fill (items)
 ];
-
-type TrackState = { committed: PoseSample; pending: PoseSample[]; out: PoseSample[] };
-
-const q = (x: number, k: number) => Math.round(x * k) || 0;
 
 export function quantize(e: Entity, t: number): PoseSample {
   const s = [t, q(e.pose.p[0], POS_Q), q(e.pose.p[1], POS_Q), q(e.pose.p[2], POS_Q), q(e.pose.yaw, ANG_Q)];

@@ -5,12 +5,20 @@
 // of the take body, so attaching/editing them can never change the take hash.
 import type { WorldState } from '../world/types.ts';
 
-export const TAKE_SCHEMA = 'mars-take/1';
+/** /2 (2026-09-28, W10): changes also carry hands (integer mm), baseActivity, on, speed (integer cm/s), contents. */
+export const TAKE_SCHEMA = 'mars-take/2';
 
 /** Quantised pose sample: [tick, x mm, y mm, z mm, yaw mrad] or + [pitch mrad, roll mrad] when non-zero. */
 export type PoseSample = number[];
 
-/** Discrete state change: [tick, entityId, field, value]. Fields: present, activity, level, task, grip, phase, support, reservedBy, connections. */
+/** A `hands` change value: the engine's human.hands in integer millimetres (a missing hand is free / at rest). */
+export type TakeHands = { left?: [number, number, number]; right?: [number, number, number] };
+
+/**
+ * Discrete state change: [tick, entityId, field, value]. Fields: present, activity, level, task, grip, phase,
+ * support, reservedBy, connections, equipment, paint; since mars-take/2 also hands (TakeHands, mm), baseActivity,
+ * on, speed (cm/s), contents. A null value = the field was cleared.
+ */
 export type ChangeEvent = [number, string, string, unknown];
 
 /** Runtime event with tick relative to the take start (action lifecycle, violation, mark). */
@@ -45,3 +53,4 @@ export type CameraTrack = { id: string; takeId: string; kind: string; data: unkn
 
 export const POS_Q = 1000; // samples are integer millimetres
 export const ANG_Q = 1000; // and integer milliradians
+export const SPEED_Q = 100; // a `speed` change is integer cm/s (mm/s changed almost every walking tick: +128 KB on v3)

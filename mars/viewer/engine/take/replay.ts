@@ -4,7 +4,7 @@
 import { hashOf } from '../core/hash.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { WorldState } from '../world/types.ts';
-import { ANG_Q, POS_Q, type PoseSample, type Take, type TakeEvent } from './types.ts';
+import { ANG_Q, POS_Q, SPEED_Q, type PoseSample, type Take, type TakeEvent } from './types.ts';
 
 export type SampledEntity = {
   p: Vec3;
@@ -14,9 +14,16 @@ export type SampledEntity = {
   activity?: string;
   level?: number;
   phase?: string;
-  /** Other discrete fields (task, grip, support, reservedBy, connections) as last recorded. */
+  /** Hand points (metres, world) as the engine published them on the last tick ≤ t (mars-take/2; absent = hands free). */
+  hands?: { left?: Vec3; right?: Vec3 };
+  /** Ground speed (m/s, to 1 cm/s) published by walk_to on the last tick ≤ t (mars-take/2). */
+  speed?: number;
+  /** Other discrete fields (task, grip, support, reservedBy, connections, equipment, paint, baseActivity, on,
+   *  contents) as last recorded. */
   state: Record<string, unknown>;
 };
+
+const fromMm = (v: number[] | undefined): Vec3 | undefined => (v ? [v[0] / POS_Q, v[1] / POS_Q, v[2] / POS_Q] : undefined);
 export type TakeFrame = { t: number; tick: number; entities: Record<string, SampledEntity> };
 
 const TWO_PI_Q = Math.round(2 * Math.PI * ANG_Q);
@@ -78,7 +85,7 @@ export function sampleTake(take: Take, t: number): TakeFrame {
     const br = bracket(take.tracks[id], tick);
     if (!br) continue;
     const s = interpSample(br[0], br[1], tick);
-    const { present: _p, activity, level, phase, ...rest } = st;
+    const { present: _p, activity, level, phase, hands, speed, ...rest } = st;
     const e: SampledEntity = {
       p: [s[1] / POS_Q, s[2] / POS_Q, s[3] / POS_Q],
       yaw: wrap(s[4] / ANG_Q),
@@ -89,6 +96,11 @@ export function sampleTake(take: Take, t: number): TakeFrame {
     if (typeof activity === 'string') e.activity = activity;
     if (typeof level === 'number') e.level = level;
     if (typeof phase === 'string') e.phase = phase;
+    if (hands && typeof hands === 'object') {
+      const h = hands as { left?: number[]; right?: number[] };
+      e.hands = { ...(h.left ? { left: fromMm(h.left) } : {}), ...(h.right ? { right: fromMm(h.right) } : {}) };
+    }
+    if (typeof speed === 'number') e.speed = speed / SPEED_Q;
     entities[id] = e;
   }
   return { t, tick, entities };

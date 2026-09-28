@@ -13,7 +13,7 @@ import { rehearse, execute } from '../rehearsal/rehearse.ts';
 import { TakeRecorder, takeIdOf } from '../take/recorder.ts';
 import { replayFinalState, sampleTake, takeDuration, takeEvents } from '../take/replay.ts';
 import { TakeLibrary } from '../take/store.ts';
-import type { Take } from '../take/types.ts';
+import { TAKE_SCHEMA, type Take } from '../take/types.ts';
 import { config, crossBindings, crossTemplate, minuteBindings, minuteTemplate, pgHistory, pgWorld, registry, RULES } from './sequence-fixtures.ts';
 
 function recordMinute() {
@@ -157,7 +157,7 @@ test('tampered takes are rejected', () => {
 
 test('sampleTake: ends hold, shortest-arc yaw, entities appear/disappear', () => {
   const take: Take = {
-    schema: 'mars-take/1', id: 'x', baselineStateHash: 'h', rulesVersion: RULES, dt: 0.05, startTick: 0, ticks: 20, keyframeEvery: 20,
+    schema: TAKE_SCHEMA, id: 'x', baselineStateHash: 'h', rulesVersion: RULES, dt: 0.05, startTick: 0, ticks: 20, keyframeEvery: 20,
     tracks: { a: [[0, 0, 0, 0, 3100], [10, 1000, 0, 0, -3100]], b: [[5, 0, 0, 0, 0]] },
     changes: [[0, 'a', 'present', true], [0, 'a', 'activity', 'walk'], [10, 'a', 'activity', 'idle'], [5, 'b', 'present', true], [15, 'b', 'present', false]],
     events: [], finalStateHash: '', finalState: null as any,
