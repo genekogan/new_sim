@@ -628,3 +628,30 @@ A reader enumerated every requirement ("must", "should", table rows, milestones)
 - Not test-provable (process/docs): SP:70, 92, 96-98, 256, 278, 325, 358-359, 375-383. Their evidence is ENGINEERING,
   RESEARCH, LIB_EVAL, AUDIT and PROGRESS.
 
+
+## 13. Lead ordering and rulings (Fable, 2026-09-29 22:10 EDT)
+
+**Rulings on §9:** LM-117 party/dance = **fix** (SPEC §30 H requires it; not a new feature). LM-111 turned sheet, LM-114 re-grip/pivot,
+LM-166 lab vehicle presets, LM-147 studio load time = **out-of-scope (product polish, no SPEC clause)**. LM-055 emergency stop = not an
+item (documented behaviour; MOVEMENT.md wording corrected by V). LM-196/197/199/200 = out-of-scope as proposed. LM-202 editor
+unification, LM-204 API visual capture, LM-216 cherry-pick = **out-of-scope (new features)**. LM-007 = the parser becomes its own op
+(`engine_parse_camera`) plus an optional `sentences[]` on `engine_direct_camera` (SPEC:146 keeps NL out of verbs). LM-156/184 (the three
+other 2022 houses' `todo` tests) = **content** — they stay `todo` with the refusal named (HISTORICAL_CONTENT.md).
+
+**Waves (2–3 workers; every branch fully gated before merge; pin-movers batched into one re-pin window per wave):**
+1. **Wave 1 — foundations:** T4 lint engine/** → 0 (hash-identical; `setpart.ts:241` erasing-op investigated — if it moves a pin,
+   report for the wave-2 window) + LM-011 integration/director cover every tool; lane A controller (LM-003/004 region staleness,
+   LM-001 auto replan/rebind, LM-013 directed-track op, LM-005 vehicles over edit_world, LM-007/008/009 parser op + aliases, LM-014
+   legacy tools behind one path, LM-016/017/018/019); lane V evidence refresh (map + regenerate) once A lands; J camera (combined
+   corrections, scene occlusion) after W54.
+2. **Wave 2 — engine pin window:** B walk (look-ahead on the shared budget, encounters), K7 all movers publish speed, F body variants +
+   release blend, D mid-raise cancel + install-lift cancel tests, E stand-on-top-beams + bracing holds, G solar side stations, H
+   pre-empt resume + deadlock detector + party/dance, C space-time reservations or proven ordering + crews on stairs, I forklift
+   swerve/reverse + 3-vehicle cycles, K core/math precision → ONE re-pin with reason, takes re-recorded once.
+3. **Wave 3 — renderer + studio:** R talk/watch, carry/lift/hold gaps, beam-flange feet, item–item collision + lap support, prone
+   phaseK exactness; S studio/scenes/lab fixes.
+4. **Wave 4 — close:** V final evidence (every row PROVEN, notes shrunk), HANDOFF "Known shortcomings" = re-classified only,
+   lint into the gate, release.
+
+**Budget note:** ≈ 380 fix-hours after the strikes ≈ 115 M subagent tokens at the measured 300 k/worker-hour — beyond this week's
+quota; run in wave order so any stop point is a clean milestone.
