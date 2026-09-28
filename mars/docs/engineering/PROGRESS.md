@@ -1207,3 +1207,52 @@ Then: gate → release 5; HANDOFF refresh.
   the café counter photo is squashed 19 % vertically.
 - **W46 landed** `8c5b8df`, `ad4a988` (≈300k tokens, 80 min; merged): `Kit.surface()` (highest structure face under a prop's footprint, else ground −0.16) seats legs/feet/crates/fridge/counter/trailers/RVs/toilets/bins in 2020/21/23/24/25; finding: W42's ray started below the deck top — Kit props were SUNK (legs −0.15, fridge −0.23), only trailers/RVs/toilets/west-house table floated; 2020 RV wheels also turned to roll along the body; 243 id aliases (no nulls); `history-geometry` "no prop floats / no structure in the core" per year; **2022 held** (`SEAT_HELD_YEARS`) — a nudged bench foot moved the first-bay pin (251a44c5 → ca200e08), so seating 2022 = a year-build re-pin + take re-record → folded into W47's joint re-pin; 2024 studio baselines re-captured with north −90 + the new front (inspected). 397 / 394 / 0 fail; npm test 67/67; studio-years 18/18, lab-years 7/7. Lead review: accepted. Open: tabletops/seats keep y = 0-authored heights (0.53–0.66 m above decks — Q4); fridge overlaps the counter end; 2026 details unseated.
 - 18:05 EDT: W48 spawned (studio set player: shot hold at high speed, leg-phase continuity across seams, Direct camera per chapter). In flight: W45 (Codex merge gate), W47 (checkpoint 1b), W48.
+- **W45 Codex merge** (branch `w45-codex-merge`, worktree `scratchpad/w45-wt`, ports 5651/5653): all four `codex/*` branches
+  **accepted**, merged `--no-ff` in order tooling → camera-nl-parse → 2026-frame-grouping → fire-v2-render-polish (Codex
+  commits untouched). No conflicts; every diff stays inside the CODEX.md §6 Codex-owned paths (`components.ts` = the
+  `rendererColor()` lookup in `build()` + one-line `panel()` / `equipment()` delegations; `package.json` = one
+  devDependency). No pin moved at any step: perf-walk 5/5 PIN-OK after each merge and on the final head; year-build
+  pins green in the suite.
+  - **tooling** (`9a4be6c`): `oxlint-tsgolint` 7.0.2003 devDependency, so type-aware lint runs again. Test-only overrides
+    in `.oxlintrc.json`. `engine/test/source-scan.test.ts` replaces the `core.test.ts` scan: a tokenizer that strips
+    comments/strings/regex, keeps `${…}`, and bans host transcendentals plus `**`/`**=` in production `engine/**`. Its
+    allowlist holds the 14 exact existing `**` lines and only shrinks; it still passes after main's W38/W46 engine code.
+    **Lint is red: 114 errors** (engine 89, app 14, deploy 9, simulation 2; re-run on the merge = 114). So **no gate stage
+    was added** (`gate.mjs` untouched, correct per the brief). Real findings for the lead: 26 `no-unused-vars` (3 are
+    the old scan's imports in `core.test.ts`), 10 production `no-explicit-any`, 3 `restrict-template-expressions`, and
+    `construction/setpart.ts:241` `erasing-op` (check it; changing it may move a pin). The full list is in the REPORT.
+    Note: main's `node_modules` lacks `oxlint-tsgolint` until the lead runs `npm ci`.
+  - **camera-nl-parse** (`a61bed6`): pure `engine/camera/parse.ts` (`parseSentence` / `parseSentences` → frozen
+    `cameraDirectionSchema`; imports only `direct.ts`). 55 success sentences incl. the 4 owner sentences; 21 structured
+    refusals (`camera.parse.{deictic,missing,conflict,unknown-verb,ambiguous,invalid}`) with question / candidates / span.
+    Not wired: needs the Claude-owned export from `camera/index.ts`, plus a Studio Direct-camera panel / api call with a
+    `ParseVocab` from `SemanticWorld`. No fixture subject kind in the schema (lookAt only).
+  - **2026-frame-grouping** (`8567ded`): `deploy/group-2026-frames.mjs` (+6 tests, `--check` byte-identical on the merge)
+    → `docs/engineering/data/campus-2026-frames.{json,svg}` + `-unclassified.md`. 667 rack_member → **81 frames, 12 beams,
+    92 unclassified** (panel-not-beam 65, beam-end-miss 12 at 0.21 m vs 0.12 m tol, coincident-post 8, no-scene-prism 7).
+    All frames `catalogDef: null` (post depth ≈1.02 m ≠ 0.914 stock; heights 4.292/4.877/5.971). No 9 ft beam / 2.743 m
+    post, so it does not settle Q5. Lab year-2026 spec passes. Not wired into `campus/assembly.ts`.
+  - **fire-v2-render-polish** (`965bed9`): crossed seeded flame ribbons + smoke in the same draw budget (431/429/466 =
+    pre-v2 reference); image paint from `public/history` (flower mural etc., unknown name warns once); solar module /
+    rail / tilt-riser builders; equipment meshes; engine uprights green `#2c4629` (photo median). fire.spec +
+    render-polish.spec green.
+  - **Baselines refreshed** (`eacf928`, each Read old/new/diff, and each compared with a pre-fire full-e2e run on
+    `8567ded`). These 9 had zero pre-fire drift and changed only by frame green or firelight: `poses-climb-frame`,
+    `poses-handup-joist`, `prone-push-up`, `prone-reach`, `prone-standing`, `studio-take-held`, `studio-take-visitor`
+    (green uprights); `lab-social-t20-oblique` (warmer fire glow on a person edge). `poses-raise-footer` was the one
+    failure (1.52%): green frame (1.19% vs pre-fire) on top of main's pre-existing drift (tick 2932→2946, one background
+    walker; 0.335% before the merge). It was refreshed on that basis.
+    **Not refreshed** (under threshold): `solar-paint-mid-paint` 0.66% and `solar-paint-mounted-equipment` 0.58% change
+    geometry and texture (image paint, cell grid, equipment), not just colour; `poses-handup` 1.24% and
+    `poses-beam-walk` 0.79% mix green with drift that predates the merge (1.06% / 0.72% pre-fire). Also below threshold
+    and predating this merge (identical pre-fire): build-bay ×3, lab-narrow-passage, lab-social-t65, lab-stairs,
+    meal-spoon, year-build-skeleton/handup-248.
+  - **Gate:** `eacf928` GATE GREEN (test 65, engine 394/0/3 skip, tsc clean, e2e 73 + 2 skip, probe b746b094). Main then
+    moved (W38/W43/W44/W46), so main was merged in (`a7b0da2`, no conflicts), then perf-walk 5/5 PIN-OK and
+    **GATE GREEN** (test 73, engine 403/0/6 skip, tsc clean, e2e 79 + 2 skip, probe b746b094; report
+    `.cloudflare/gate/2026-09-28T20-12-22-345Z`). The gate's `gitDirty: true` comes only from the untracked
+    `viewer/.pw-browsers` symlink. Main's new studio baselines show no fire/green drift (all <0.1%).
+  - **Lead follow-ups (Claude-owned):** `components.ts` `build()`: route `panel-rail` to `solarRailMesh()`; pass installed
+    state/pose to `panel()` and add `solarTiltLegs()` only for installed tilted modules; `app/history/kit.ts:84` posts
+    `#293c45` vs engine green; `components.ts` upright comment still says blue; `app/lab/solar-paint.ts` text says
+    hashed stripes; RELEASE_CHECKLIST once lint is gated; `npm ci` for `oxlint-tsgolint`.
