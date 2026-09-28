@@ -11,14 +11,29 @@
 import * as THREE from 'three';
 import { isVisible } from '../../lib/three-resources';
 import { takeSampler } from '../../engine/camera/take-sampler.ts';
-import { DEFAULT_ASPECT, shotSubjects, subjectPoints, type ShotSpec, type SubjectPose } from '../../engine/camera/shots.ts';
+import { DEFAULT_ASPECT, shotSubjects, subjectPoints, type Sampler, type ShotSpec, type SubjectPose } from '../../engine/camera/shots.ts';
 import { CameraWorld } from '../../engine/camera/geom.ts';
 import { readability, subjectGroup } from '../../engine/camera/quality.ts';
+import { subjectReader, type CameraTrackData, type SubjectTrack } from '../../engine/camera/track.ts';
 import type { Vec3 } from '../../engine/core/math.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
 import type { TakeReplay } from '../engine-view/take-replay.ts';
 
-export type VerifyOpts = { fromT?: number; toT?: number; hz?: number; minSize?: number; tolerance?: number };
+export type VerifyOpts = {
+  fromT?: number; toT?: number; hz?: number; minSize?: number; tolerance?: number;
+  /**
+   * Verify this track instead of the replay's own camera: a directed track of the open take (`engine_direct_camera`,
+   * app/studio/direct-camera.ts), or — with `replay` null — a take-less track (the Chiba sunset pan, the 2024 kitchen
+   * move). Subject points: the take sampler (as the planner had them), and for ids it does not know (the
+   * synthesiser's `focus:<i>` points of static subjects) the points recorded in the track's `data.subjects`.
+   */
+  track?: CameraTrackData;
+  trackId?: string;
+  /** Subject sampler (take coordinates) when there is no replay; default: nobody. */
+  sampler?: Sampler;
+  /** Take → scene offset in y (default: the replay's `offsetY`, else 0). */
+  offsetY?: number;
+};
 type Occ = { label: string; subject: string; points: number; crew: boolean };
 export type VerifySample = {
   t: number;
@@ -209,32 +224,52 @@ const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
 const v2 = (v: Vec3): Vec3 => [r4(v[0]), r4(v[1]), r4(v[2])];
 
 /**
- * Run the verification over the replay's camera track. Seeks the replay (paused) to each
- * sampled time, casts rays, then restores the previous time. Yields to the page every few
- * samples so rendering and tests stay responsive.
+ * Run the verification over a camera track: the replay's own by default, or `opts.track`. Seeks the replay
+ * (paused) to each sampled time, casts rays, then restores the previous time. Yields to the page every few
+ * samples so rendering and tests stay responsive. Rays are cast in scene coordinates (take + offsetY); framing,
+ * size and the planner comparison are in take coordinates (a translation changes neither).
  */
-export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay, opts: VerifyOpts = {}) {
+export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay | null, opts: VerifyOpts = {}) {
   const started = performance.now();
-  const data = replay.track as typeof replay.track & { shots?: { label: string; t0: number; t1: number; spec: ShotSpec }[] };
+  const track = opts.track ?? replay?.track;
+  if (!track) throw new Error('verifyCamera: no track (open a take or pass { track })');
+  const data = track as CameraTrackData & { shots?: { label: string; t0: number; t1: number; spec: ShotSpec }[]; subjects?: SubjectTrack };
   const trackHz = data.hz, hz = opts.hz ?? 2, tol = opts.tolerance ?? 0.1, minSize = opts.minSize ?? 0.08, near = 0.1;
-  const fromT = opts.fromT ?? 0, toT = opts.toT ?? replay.duration;
+  const fromT = opts.fromT ?? 0, toT = opts.toT ?? replay?.duration ?? data.duration;
   const stride = Math.max(1, Math.round(trackHz / hz));
-  const picked = data.samples.filter((s, i) => i % stride === 0 && s.t >= fromT - 1e-9 && s.t <= toT + 1e-9);
+  const picked = data.samples.map((s, i) => ({ s, i })).filter(({ s, i }) => i % stride === 0 && s.t >= fromT - 1e-9 && s.t <= toT + 1e-9);
   const shots = data.shots ?? [{ label: 'track', t0: 0, t1: Infinity, spec: data.spec }];
   const shotAt = (t: number) => shots.find((s) => t >= s.t0 && t < s.t1) ?? shots.at(-1)!;
   const safeBottom = data.safeArea?.bottom ?? 0;
   const yMin = 2 * safeBottom - 0.95;
-  const entityIds = new Set(Object.keys(replay.take.finalState.entities));
-  const kindOf = (id: string) => replay.take.finalState.entities[id]?.kind ?? 'human';
-  const sampler = takeSampler(replay.take);
+  const entities = replay?.take.finalState.entities ?? {};
+  const entityIds = new Set(Object.keys(entities));
+  const kindOf = (id: string) => entities[id]?.kind ?? 'human';
+  const base: Sampler = replay ? takeSampler(replay.take) : (opts.sampler ?? (() => ({})));
+  // focus points the synthesiser injected for static subjects are not in the take: read them from the track
+  const recorded = data.subjects ? subjectReader(data.subjects) : null;
+  const sampleAt = (t: number, i: number): Record<string, SubjectPose> => {
+    const now = base(t);
+    if (!recorded) return now;
+    let out: Record<string, SubjectPose> | null = null;
+    for (const [id, pts] of Object.entries(recorded(i).points)) {
+      if (now[id] || !pts.length) continue;
+      out ??= { ...now };
+      out[id] = { p: pts[0], yaw: 0, points: pts, kind: 'component' };
+    }
+    return out ?? now;
+  };
+  const dy = opts.offsetY ?? replay?.offsetY ?? 0;
+  const lift = (p: Vec3): Vec3 => (dy ? [p[0], p[1] + dy, p[2]] : p);
 
   // region the rays can reach: every sampled camera position and subject point (+ margin)
   const region = new THREE.Box3();
-  for (const s of picked) {
-    region.expandByPoint(new THREE.Vector3(...s.position));
+  for (const { s, i } of picked) {
+    region.expandByPoint(new THREE.Vector3(...lift(s.position)));
+    const now = sampleAt(s.t, i);
     for (const id of shotSubjects(shotAt(s.t).spec)) {
-      const subj = sampler(s.t)[id];
-      if (subj) for (const p of subjectPoints(subj)) region.expandByPoint(new THREE.Vector3(...p));
+      const subj = now[id];
+      if (subj) for (const p of subjectPoints(subj)) region.expandByPoint(new THREE.Vector3(...lift(p)));
     }
   }
   region.expandByScalar(2);
@@ -244,8 +279,8 @@ export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay, opts:
   const statics: THREE.Mesh[] = [], extras: THREE.Object3D[] = [];
   scene.updateMatrixWorld(true);
   scene.traverse((o) => {
-    if (o === replay.group || !(o as THREE.Mesh).isMesh) return;
-    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p === replay.group || SKIP_GROUPS.has(p.name)) return;
+    if (o === replay?.group || !(o as THREE.Mesh).isMesh) return;
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p === replay?.group || SKIP_GROUPS.has(p.name)) return;
     const m = o as THREE.Mesh;
     if (!opaque(m, skipped)) return;
     if ((m as THREE.SkinnedMesh).isSkinnedMesh || (m as THREE.InstancedMesh).isInstancedMesh) extras.push(m);
@@ -262,12 +297,12 @@ export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay, opts:
   const noPrismWorld = new CameraWorld({ obstacles: [], bounds: [region.min.x, region.min.z, region.max.x, region.max.z] } as unknown as SpatialScene);
   const raycaster = new THREE.Raycaster();
   const origin = new THREE.Vector3(), dir = new THREE.Vector3();
-  const prevT = replay.t, prevPlaying = replay.playing;
-  replay.playing = false;
+  const prevT = replay?.t ?? 0, prevPlaying = replay?.playing ?? false;
+  if (replay) replay.playing = false;
 
   // owner entity id of a take mesh (ComponentViews names parts by id, HumanViews names rig holders by id)
   const ownerOf = (o: THREE.Object3D): string | null => {
-    for (let p: THREE.Object3D | null = o; p && p !== replay.group; p = p.parent) if (p.name && entityIds.has(p.name)) return p.name;
+    for (let p: THREE.Object3D | null = o; p && p !== replay?.group; p = p.parent) if (p.name && entityIds.has(p.name)) return p.name;
     return null;
   };
 
@@ -275,15 +310,18 @@ export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay, opts:
   const occTotals = new Map<string, { points: number; samples: Set<number> }>();
   let frameMismatch = 0, rays = 0;
   for (let n = 0; n < picked.length; n++) {
-    const s = picked[n];
-    replay.seek(s.t);
-    replay.update(0);
-    replay.group.updateMatrixWorld(true);
+    const { s, i: si } = picked[n];
     const dyn: THREE.Object3D[] = [...extras];
-    replay.group.traverse((o) => { if ((o as THREE.Mesh).isMesh && isVisible(o)) dyn.push(o); });
+    if (replay) {
+      replay.seek(s.t);
+      replay.update(0);
+      replay.group.updateMatrixWorld(true);
+      replay.group.traverse((o) => { if ((o as THREE.Mesh).isMesh && isVisible(o)) dyn.push(o); });
+    }
     const shot = shotAt(s.t);
     const ids = shotSubjects(shot.spec);
-    const subjects = sampler(s.t);
+    const subjects = sampleAt(s.t, si);
+    const camPos = lift(s.position);
     const group = subjectGroup(subjects, ids);
     const fr = framer(s.position, s.target, s.fov, DEFAULT_ASPECT);
     let wsum = 0, total = 0, totalCrew = 0, cutawayCheck = 0;
@@ -304,8 +342,8 @@ export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay, opts:
         if (len <= 0) { vis++; visCrew++; continue; }
         const d: Vec3 = [(p[0] - s.position[0]) / dist, (p[1] - s.position[1]) / dist, (p[2] - s.position[2]) / dist];
         rays++;
-        const st = grid.cast(s.position, d, len);
-        origin.fromArray(s.position); dir.fromArray(d);
+        const st = grid.cast(camPos, d, len);
+        origin.fromArray(camPos); dir.fromArray(d);
         raycaster.set(origin, dir);
         raycaster.near = 0;
         raycaster.far = st ? st.s : len;
@@ -351,9 +389,11 @@ export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay, opts:
     });
     if (n % 8 === 7) await new Promise((r) => setTimeout(r, 0));
   }
-  replay.seek(prevT);
-  replay.playing = prevPlaying;
-  replay.update(0);
+  if (replay) {
+    replay.seek(prevT);
+    replay.playing = prevPlaying;
+    replay.update(0);
+  }
 
   const mean = (f: (x: VerifySample) => number) => r4(out.reduce((a, x) => a + f(x), 0) / Math.max(1, out.length));
   const diff = (x: VerifySample) => x.planner - x.real;
@@ -368,8 +408,9 @@ export async function verifyCamera(scene: THREE.Scene, replay: TakeReplay, opts:
   }
   return {
     schema: 'mars-camera-verify/1',
-    take: replay.take.id,
-    track: replay.file.camera.id,
+    take: replay?.take.id ?? null,
+    track: opts.trackId ?? (opts.track ? null : replay?.trackInfo().id ?? null),
+    offsetY: dy,
     hz, fromT, toT, tolerance: tol,
     samples: out.length,
     meanPlanner: mean((x) => x.planner),

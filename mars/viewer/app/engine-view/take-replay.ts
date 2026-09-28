@@ -16,6 +16,7 @@ import { def } from '../../engine/world/catalog.ts';
 import { progressiveContributor } from '../../engine/construction/contributor.ts';
 import { isPlywood } from '../../engine/construction/deck.ts';
 import { ComponentViews } from './components.ts';
+import { FixtureViews } from './fixtures.ts';
 import { HumanViews, type Hands, type SampledHuman } from './humans.ts';
 import type { Template } from './people.ts';
 
@@ -34,18 +35,32 @@ export type TakeManifestEntry = {
   violations: number;
   blockedWaits: number;
   bytes: number;
+  /** Optional in older manifests. */
+  ticks?: number;
+  rulesVersion?: string;
+  takeSchema?: string;
+  /** 'year-build' marks a "Watch it being built" take; absent → inferred from `rulesVersion` (STUDIO_REPLAY.md). */
+  kind?: string;
 };
-export type TakeManifest = { schema: 'mars-take-manifest/1'; takes: TakeManifestEntry[] };
+/** `takes`: recorded on the 2026 scene; `otherYears`: recorded in another year's frame. The studio lists both, filtered by `year`. */
+export type TakeManifest = { schema: 'mars-take-manifest/1'; takes: TakeManifestEntry[]; otherYears?: TakeManifestEntry[] };
+/** Build site of a take; `groundY` is the take's ground datum (the year-build fork: the Kit datum 0). */
+export type TakeSite = { origin: [number, number]; yaw: number; groundY: number };
 export type TakeReplayFile = {
   schema: 'mars-take-replay/1';
   label: string;
   hypothetical: boolean;
   note: string;
+  /** Campus id of the year the take was recorded in (`mars-2026`, `mars-2022`, …). */
+  campus?: string;
+  site?: TakeSite;
   steps: TakeStep[];
   moments: Record<string, number>;
   take: Take;
   camera: CameraTrack;
 };
+/** A year-build ("Watch it being built") manifest entry: explicit `kind`, else the year-build rules version. */
+export const isYearBuild = (e: Pick<TakeManifestEntry, 'kind' | 'rulesVersion'>) => (e.kind ? e.kind === 'year-build' : /year-build/.test(e.rulesVersion ?? ''));
 export const TAKE_MANIFEST_URL = '/engine/takes/manifest.json';
 
 /** A take-log line for the diagnostics readout (failures, blocked waits, violations). */
@@ -61,9 +76,25 @@ export async function loadTakeFile(url: string, signal?: AbortSignal): Promise<T
   return f;
 }
 
+/**
+ * A render copy of a take shifted by `dy` metres in y (tracks, recorded hand points, final poses). Only for drawing:
+ * its hashes no longer match, so hashing, sampling for the camera and the canonical check use the original.
+ */
+export function shiftTake(take: Take, dy: number): Take {
+  if (!dy) return take;
+  const q = Math.round(dy * POS_Q);
+  const up = (p: number[] | undefined) => (p ? [p[0], p[1] + q, p[2]] : p); // recorded hand points are integer mm
+  const tracks = Object.fromEntries(Object.entries(take.tracks).map(([id, s]) => [id, s.map((x) => { const y = [...x] as PoseSample; y[2] += q; return y; })]));
+  const changes = take.changes.map((c) => {
+    if (c[2] !== 'hands' || !c[3]) return c;
+    const h = c[3] as { left?: number[]; right?: number[] };
+    return [c[0], c[1], c[2], { ...(h.left ? { left: up(h.left) } : {}), ...(h.right ? { right: up(h.right) } : {}) }] as typeof c;
+  });
+  const entities = Object.fromEntries(Object.entries(take.finalState.entities).map(([id, e]) => [id, { ...e, pose: { ...e.pose, p: [e.pose.p[0], e.pose.p[1] + dy, e.pose.p[2]] as Vec3 } }]));
+  return { ...take, tracks, changes, finalState: { ...take.finalState, entities } };
+}
+
 type Walk = { ticks: number[]; cum: number[]; track: PoseSample[] };
-/** One person's recorded hand points: the take's `hands` change events, in tick order. */
-type HandTrack = { ticks: number[]; hands: (Hands | null)[] };
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const EMPTY_SCENE: SpatialScene = { bounds: [0, 0, 0, 0], levels: [], surfaces: [], obstacles: [], links: [] };
 
@@ -72,7 +103,7 @@ const EMPTY_SCENE: SpatialScene = { bounds: [0, 0, 0, 0], levels: [], surfaces: 
  * studio (TakeReplay) and the lab's replay check. The same pose path as the live lab (humans.ts
  * setFrame → render, components attachHeld): when the take carries the engine's `hands`,
  * `baseActivity` and `on` fields (HumanState; TakeRecorder FIELDS), arms go to the recorded hand points
- * (interpolated between consecutive ticks), eat / serve sit on their base, postures are solved from the
+ * (`sampleTake`: metres, interpolated between mars-take/3 keyframes; a /2 take holds each tick's value), eat / serve sit on their base, postures are solved from the
  * hands, items `in-hand` (support from the frame, not the final state) ride the rendered palms; people
  * on a usable stairs link walk it tread by tread — links from the base scene (optional) plus the
  * construction contributor over the frame's components (installed flights with all treads).
@@ -81,9 +112,9 @@ export class TakePeople {
   readonly group = new THREE.Group();
   readonly take: Take;
   private comps = new ComponentViews();
+  private fixtures = new FixtureViews();
   private humans = new HumanViews();
   private walks = new Map<string, Walk>();
-  private handTracks = new Map<string, HandTrack>();
   private base: SpatialScene;
   private stairKey = '';
   frame: TakeFrame | null = null;
@@ -91,19 +122,12 @@ export class TakePeople {
   constructor(take: Take, opts: { scene?: SpatialScene } = {}) {
     this.take = take;
     this.base = opts.scene ?? EMPTY_SCENE;
-    this.group.add(this.comps.group, this.humans.group);
+    this.group.add(this.comps.group, this.fixtures.group, this.humans.group);
     for (const [id, s] of Object.entries(take.tracks)) {
       if (take.finalState.entities[id]?.kind !== 'human') continue;
       const cum = [0];
       for (let i = 1; i < s.length; i++) cum.push(cum[i - 1] + Math.hypot(s[i][1] - s[i - 1][1], s[i][3] - s[i - 1][3]) / POS_Q);
       this.walks.set(id, { ticks: s.map((x) => x[0]), cum, track: s });
-    }
-    for (const [tick, id, field, value] of take.changes) {
-      if (field !== 'hands') continue;
-      let h = this.handTracks.get(id);
-      if (!h) this.handTracks.set(id, (h = { ticks: [], hands: [] }));
-      h.ticks.push(tick);
-      h.hands.push((value as Hands | null) ?? null);
     }
     this.humans.setStairs(this.base.links);
   }
@@ -127,23 +151,6 @@ export class TakePeople {
     return w.cum[lo] + Math.hypot(p[1] - s[lo][1], p[3] - s[lo][3]) / POS_Q;
   }
 
-  /** Recorded hand points at (fractional) `tick`: the last change, blended into the next one when that is the next tick (a hand moving every tick). */
-  private handsAt(id: string, tick: number): Hands | undefined {
-    const h = this.handTracks.get(id);
-    if (!h || tick < h.ticks[0]) return undefined;
-    let lo = 0, hi = h.ticks.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (h.ticks[mid] <= tick) lo = mid;
-      else hi = mid - 1;
-    }
-    const a = h.hands[lo] ?? undefined, b = h.hands[lo + 1] ?? undefined;
-    const f = tick - h.ticks[lo];
-    if (!a || !b || f <= 0 || h.ticks[lo + 1] - h.ticks[lo] !== 1) return a;
-    const one = (p?: Vec3, q?: Vec3): Vec3 | undefined => (p && q ? [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f] : p);
-    return { ...(a.left ? { left: one(a.left, b.left) } : {}), ...(a.right ? { right: one(a.right, b.right) } : {}) };
-  }
-
   /** Stair links for this frame's components (only when stair-relevant state changed). */
   private stairs(comps: Record<string, Entity>) {
     const rel = Object.values(comps).filter((e) => e.def === 'stair-tread' || def(e.def).category === 'stair' || isPlywood(e));
@@ -158,6 +165,7 @@ export class TakePeople {
   show(t: number) {
     const frame = (this.frame = sampleTake(this.take, t));
     const comps: Record<string, Entity> = {};
+    const fixtures: Record<string, Entity> = {};
     const people: SampledHuman[] = [];
     const dt = this.take.dt, span = 0.15 / dt; // ±0.15 s speed window
     for (const [id, e] of Object.entries(frame.entities)) {
@@ -169,17 +177,25 @@ export class TakePeople {
         comps[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(e.phase ? { phase: e.phase as Entity['phase'] } : {}), ...('support' in st ? { support: st.support ?? undefined } : {}), ...('connections' in st ? { connections: st.connections ?? undefined } : {}), ...(st.contents ? { contents: st.contents } : {}) };
         continue;
       }
+      if (src.kind === 'fixture') {
+        // piles / bundles, the cutting station, benches, campfires: pose + contents as of t (a pile shrinks)
+        fixtures[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(st.contents ? { contents: st.contents } : {}) };
+        continue;
+      }
+      if (src.kind !== 'human') continue;
       const w = this.walks.get(id);
       const dist = w ? this.walked(w, frame.tick) : 0;
       const speed = w ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
       const g = st.grip;
-      people.push({ id, p: e.p, yaw: e.yaw, walk: climbing ? 1 : clamp01((speed - 0.06) / 0.25), walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: this.handsAt(id, frame.tick), baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined });
+      people.push({ id, p: e.p, yaw: e.yaw, walk: climbing ? 1 : clamp01((speed - 0.06) / 0.25), walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });
     this.comps.render(1);
-    this.humans.setFrame(people, t, comps);
+    this.fixtures.onTick({ entities: fixtures });
+    this.fixtures.render(t);
+    this.humans.setFrame(people, t, { ...comps, ...fixtures }); // seats / fires come from the fixtures
     this.humans.render(1, (id, from, out) => this.comps.nearestPoint(id, from, out));
     this.comps.attachHeld(this.humans);
     return frame;
@@ -204,23 +220,39 @@ export class TakePeople {
   humanCount() {
     return this.humans.group.children.length;
   }
+  /** Components and fixtures drawn. */
   componentCount() {
-    return this.comps.group.children.length;
+    return this.comps.group.children.length + this.fixtures.group.children.length;
+  }
+  /** Bundles / stacks drawn with their piece counts (readout). */
+  stacks() {
+    return this.fixtures.stacks();
   }
 
   dispose() {
     this.humans.clear();
     this.comps.dispose();
+    this.fixtures.dispose();
     this.group.removeFromParent();
   }
 }
+
+/** A camera track the replay can drive the view with: the take's own planned track or a directed one. */
+export type ActiveTrack = { id: string; kind: string; data: CameraTrackData };
 
 export class TakeReplay {
   readonly group = new THREE.Group();
   readonly file: TakeReplayFile;
   readonly take: Take;
-  readonly track: CameraTrackData;
   readonly duration: number;
+  /**
+   * Render datum: take coordinates + (0, offsetY, 0) = scene coordinates. The drawn people / parts (a shifted render
+   * copy of the take) and the engine camera are both shifted, so the take stays self-consistent (STUDIO_REPLAY.md: year-build takes are at the Kit datum y = 0, the
+   * studio draws the ground at the year file's `groundY`).
+   */
+  readonly offsetY: number;
+  private own: ActiveTrack;
+  private active: ActiveTrack;
   t = 0;
   playing = false;
   speed = 1;
@@ -231,13 +263,16 @@ export class TakeReplay {
   private dirty = true;
 
   /** `scene`: the take's base SpatialScene when the host has it (its stairs links get the stair gait). */
-  constructor(file: TakeReplayFile, opts: { scene?: SpatialScene } = {}) {
+  constructor(file: TakeReplayFile, opts: { scene?: SpatialScene; offsetY?: number } = {}) {
     this.file = file;
     this.take = file.take;
-    this.track = trackData(file.camera);
+    this.own = this.active = { id: file.camera.id, kind: file.camera.kind, data: trackData(file.camera) };
     this.duration = takeDuration(file.take);
+    this.offsetY = opts.offsetY ?? 0;
     this.group.name = 'Take replay · HYPOTHETICAL build scenario (not historical)';
-    this.people = new TakePeople(file.take, opts);
+    // the render copy is shifted in data (not by moving the group): the arm / leg solvers mix bone world positions with
+    // the engine's target points, so the people must be posed in scene coordinates
+    this.people = new TakePeople(shiftTake(file.take, this.offsetY), opts);
     this.group.add(this.people.group);
     const stepLabel = new Map(file.steps.map((s) => [`step:${s.id}`, s.label ?? s.id]));
     this.log = this.take.events.flatMap((e: TakeEvent): LogLine[] => {
@@ -280,9 +315,33 @@ export class TakeReplay {
     return this.people.bones(id);
   }
 
-  /** Planned engine camera at the current take time. */
+  /** Track driving the engine camera (take coordinates). */
+  get track(): CameraTrackData {
+    return this.active.data;
+  }
+  /** Id / kind of the active track (the take's own `planned-shot-list`, or a `directed` one). */
+  trackInfo(): { id: string; kind: string; own: boolean } {
+    return { id: this.active.id, kind: this.active.kind, own: this.active === this.own };
+  }
+  /** Drive the engine camera with another track of this take (a directed one), or back to the take's own (null). */
+  setTrack(track: ActiveTrack | null) {
+    this.active = track ?? this.own;
+  }
+
+  /** Engine camera at the current take time, in scene coordinates (the datum offset applied). */
   cameraPose(): CameraPose {
-    return sampleTrack(this.track, this.t);
+    const p = sampleTrack(this.track, this.t);
+    if (!this.offsetY) return p;
+    return { ...p, position: [p.position[0], p.position[1] + this.offsetY, p.position[2]], target: [p.target[0], p.target[1] + this.offsetY, p.target[2]] };
+  }
+
+  /** Rendered palm of a person's hand in scene coordinates (posed on the last update). */
+  palmOf(id: string, hand: 'left' | 'right', out: THREE.Vector3) {
+    return this.people.palmOf(id, hand, out);
+  }
+  /** The recorded `hands` of a person at the current time (take coordinates: add offsetY for the scene). */
+  recordedHands(id: string): Hands | null {
+    return sampleTake(this.take, this.t).entities[id]?.hands ?? null;
   }
 
   /** Current shot label from the planned shot list (if the track carries one). */
@@ -309,7 +368,7 @@ export class TakeReplay {
 
   /** Test / readout view: what is on screen right now, independent of the camera. */
   info() {
-    const f = this.frame ?? sampleTake(this.take, this.t);
+    const f = !this.offsetY && this.frame ? this.frame : sampleTake(this.take, this.t); // take coordinates
     const poses = Object.fromEntries(Object.entries(f.entities).map(([id, e]) => [id, [Math.round(e.p[0] * 1000), Math.round(e.p[1] * 1000), Math.round(e.p[2] * 1000), Math.round(e.yaw * ANG_Q)]]));
     return {
       id: this.take.id,
@@ -324,6 +383,10 @@ export class TakeReplay {
       recordedFinalStateHash: this.take.finalStateHash,
       poseHash: hashOf(poses),
       shot: this.shotLabel(),
+      track: this.trackInfo(),
+      /** Sampled now but not drawable: removed before the end (no final-state record → no def; e.g. an emptied pile). */
+      undrawable: Object.keys(f.entities).filter((id) => !this.take.finalState.entities[id]),
+      offsetY: this.offsetY,
     };
   }
 

@@ -118,11 +118,11 @@ test('meal: captures (sit, spoon at the mouth, legs crossed)', async ({ page }, 
 type ReplayOut = { tick: number; bones: Bones; held: { id: string; by: string; hand: string; rendered: number[] | null; palm: number[] | null }[]; flights: string[] };
 
 // Take replay consumption (POSES.md "Take replay"): the meal replayed from a lab-recorded take plus the
-// hands / baseActivity fixture (recordWithFixture) through TakePeople — the studio replay's path — at
-// every 20th tick: every arm the live lab drives to an engine hand point is driven to the same point in
-// the replay (hands source, target within 1 mm), the replay reaches at least as many of them within
+// recorder's own hands / baseActivity / on (mars-take/3: hands thinned to keyframes within 5.5 mm, interpolated by
+// sampleTake) through TakePeople — the studio replay's path — at every 20th tick: every arm the live lab drives to an
+// engine hand point is driven to the same point in the replay (hands source, target within 6 mm), the replay reaches at least as many of them within
 // 0.1 m (less 2 %), eaters keep their seated base, and held items ride the replayed palms.
-test('meal: take replay with hands / baseActivity (fixture) poses as in the lab', async ({ page }) => {
+test('meal: take replay with the recorded hands / baseActivity poses as in the lab', async ({ page }) => {
   test.setTimeout(420_000);
   await openLab(page, 'meal');
   await page.evaluate(() => window.__marsEngine!.runScenario('meal', { paused: true }));
@@ -144,7 +144,7 @@ test('meal: take replay with hands / baseActivity (fixture) poses as in the lab'
         points++;
         if (a.err! <= 0.1) liveOk++;
         const ra = rb.arms[i];
-        if (ra.source !== 'hands' || !ra.target || dist(ra.target, a.target) > 0.001) wrong.push(`${t} ${id} ${a.side}: replay ${ra.source} ${JSON.stringify(ra.target)} vs ${JSON.stringify(a.target)}`);
+        if (ra.source !== 'hands' || !ra.target || dist(ra.target, a.target) > 0.006) wrong.push(`${t} ${id} ${a.side}: replay ${ra.source} ${JSON.stringify(ra.target)} vs ${JSON.stringify(a.target)}`);
         else if (ra.err! <= 0.1) replayOk++;
       });
     }
@@ -155,7 +155,7 @@ test('meal: take replay with hands / baseActivity (fixture) poses as in the lab'
       if (d > grip + 0.02) items.push(`${t} ${it.id} ${d.toFixed(3)} m from ${it.by}'s ${it.hand} palm`);
     }
   }
-  console.log(`[meal replay] ${Object.keys(live).length} frames, fixture events ${extra.length}, hand points ${points}: live reached ${liveOk}, replay reached ${replayOk}; wrong ${wrong.length}, base mismatches ${bases.length}, items off the palm ${items.length}`);
+  console.log(`[meal replay] ${Object.keys(live).length} frames, hand points ${points}: live reached ${liveOk}, replay reached ${replayOk}; wrong ${wrong.length}, base mismatches ${bases.length}, items off the palm ${items.length}`);
   if (wrong.length) console.log(`[meal replay] ${wrong.slice(0, 5).join(' | ')}`);
   if (bases.length) console.log(`[meal replay] ${bases.slice(0, 5).join(' | ')}`);
   expect(points).toBeGreaterThan(50);

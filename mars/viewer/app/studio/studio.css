@@ -1011,6 +1011,121 @@
   font-size: 10px;
   color: #8fa087;
 }
+/* Watch it being built · live log · final-state check · Direct camera (take-panel.tsx, direct-panel.tsx) */
+.build-picker select {
+  max-width: 260px;
+}
+.take-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  font-size: 10px;
+  color: #aabca4;
+}
+.take-log li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.take-log li.failed,
+.take-log li.violation {
+  color: #ffb4a0;
+}
+.take-log li b,
+.direct-shots b {
+  font-weight: 400;
+  color: #d6dfaf;
+  margin-right: 4px;
+}
+.take-checks {
+  flex-wrap: wrap;
+  font-size: 10px;
+  gap: 4px 14px;
+}
+.take-checks .ok {
+  color: #bfe39a;
+}
+.take-checks .bad {
+  color: #ffb4a0;
+}
+.take-direct {
+  font-size: 10px;
+}
+.take-direct summary {
+  cursor: pointer;
+  color: #e6ecd8;
+}
+.direct-form,
+.direct-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 6px;
+}
+.direct-form label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.direct-form input:not([type='checkbox']),
+.direct-form select,
+.take-direct textarea {
+  background: #16241d;
+  color: #eef2e2;
+  border: 1px solid #56684f;
+  border-radius: 3px;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+.direct-form input[type='number'] {
+  width: 56px;
+}
+.take-direct textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 54px;
+  margin-top: 6px;
+  font-family: ui-monospace, monospace;
+}
+.direct-form button,
+.direct-actions button {
+  font-size: 10px;
+  color: #27382c;
+  background: #eeefdb;
+  border: 1px solid #a2af92;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+.direct-meta,
+.direct-notes,
+.direct-none {
+  color: #8fa087;
+}
+.direct-error,
+.direct-refused {
+  color: #ffb4a0;
+  margin: 6px 0 0;
+}
+.direct-refused p {
+  margin: 2px 0;
+}
+.direct-shots {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  max-height: 150px;
+  overflow: auto;
+  color: #d2daca;
+}
+.direct-corrections {
+  margin: 2px 0;
+  padding-left: 12px;
+  color: #f0d49a;
+}
 @media (max-width: 750px) {
   .take-panel {
     left: 16px;

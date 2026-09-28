@@ -24,7 +24,7 @@ import { createEucFollowCamera } from './euc-follow-camera';
 import { createCampusLife } from './campus-life';
 import { SimulationPanel } from './simulation-panel';
 import { createTakeHost, type TakeHost } from './take-host';
-import { TakePanel } from './take-panel';
+import { BuildPicker, TakePanel } from './take-panel';
 import { createWeather } from './weather';
 import { DEFAULT_SCENE_DATE } from '../../engine/env/sun';
 import { createGallery } from './gallery';
@@ -121,6 +121,25 @@ const STOCK = [
   ['person_punk', 'Person · punk'],
   ['person_woman', 'Person · casual woman'],
 ];
+/** JSON-safe readout of a directed compile (test hook): shots with their corrections, or the refusal. */
+function directedSummary(d: import('./direct-camera').Directed) {
+  const r = d.result;
+  return {
+    ok: r.ok,
+    trackId: d.track?.id ?? null,
+    ms: d.ms,
+    scene: d.scene,
+    samples: r.ok ? r.plan.samples.length : 0,
+    rejected: r.ok ? r.report.rejected : null,
+    shots: (r.ok ? r.report.shots : r.shots).map((s) => ({
+      label: s.label, verb: s.verb, t0: s.t0, t1: s.t1, subject: s.subject.label, planner: s.planner ?? null,
+      simulation: s.simulation ? { valid: s.simulation.valid, failingSamples: s.simulation.failingSamples } : null,
+      corrections: s.corrections.map((c) => ({ failure: c.failure, strategy: c.strategy, samples: c.samples, params: c.params, reason: c.reason, tried: c.tried.map((x) => `${x.strategy}: ${x.outcome}`) })),
+    })),
+    diagnostics: r.ok ? [] : r.diagnostics.map((x) => ({ code: x.code, message: x.message })),
+  };
+}
+
 function download(data: Blob, name: string) {
   const url = URL.createObjectURL(data),
     a = document.createElement('a');
@@ -281,7 +300,25 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       lastClock = -1;
     setLiving(lifeEnabled);
     setCycle(cycleEnabled);
-    const takeHost = year === 2026 ? createTakeHost(scene, { hideAmbient: (v) => life?.setHidden(v), onError: setError, userFov: camera.fov }) : null;
+    // every year: the manifest lists takes per year (2026 flagship, year-build takes "Watch it being built")
+    const takeHost = createTakeHost(scene, {
+      year,
+      hideAmbient: (v) => life?.setHidden(v),
+      // a year-build take rebuilds a building of the year scene: hide its assembly group(s) while the take is open
+      hideAssembly: (id, hide) => {
+        let n = 0;
+        root?.traverse((o) => {
+          if (o.userData.assembly_id === id && !o.userData.component_id && o.parent?.userData.assembly_id !== id) {
+            o.visible = !hide;
+            n++;
+          }
+        });
+        if (n) batches?.invalidate();
+        return n > 0;
+      },
+      onError: setError,
+      userFov: camera.fov,
+    });
     orbit.addEventListener('start', () => { const r = takeHost?.replay(); if (r) r.engineCamera = false; }); // grabbing the view hands it to the user
     const transform = new TransformControls(camera, renderer.domElement);
     transform.setTranslationSnap(0.01);
@@ -1129,6 +1166,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         budgetStart = now;
       }
     };
+    let yearTrack: import('../engine-view/take-replay').ActiveTrack | null = null;
     const testHook = {
       year,
       frames: 0,
@@ -1145,9 +1183,59 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         api.current?.atmosphere(options),
       take: () => takeHost?.info() ?? null,
       // Engine camera vs render mesh (docs/engineering/CAMERA_VERIFY.md); lazy, off the main chunk.
-      verifyCamera: async (fromT?: number, toT?: number, hz?: number) => {
-        const r = takeHost?.replay();
-        return r ? (await import('./camera-verify')).verifyCamera(scene, r, { fromT, toT, hz }) : null;
+      // `track`: 'take' (the take's own camera, default), 'directed' (the last directed track of the open take) or
+      // 'year' (the last take-less track from directOnYear: verified with no replay, ambient people hidden)
+      verifyCamera: async (fromT?: number, toT?: number, hz?: number, o: { track?: 'take' | 'directed' | 'year' } = {}) => {
+        const { verifyCamera } = await import('./camera-verify');
+        if (o.track === 'year') {
+          if (!yearTrack) return null;
+          life?.setHidden(true);
+          try {
+            return await verifyCamera(scene, null, { fromT, toT, hz, track: yearTrack.data, trackId: yearTrack.id });
+          } finally {
+            life?.setHidden(!!takeHost.replay());
+          }
+        }
+        const r = takeHost.replay();
+        if (!r) return null;
+        const d = o.track === 'directed' ? takeHost.directed()?.track : undefined;
+        if (o.track === 'directed' && !d) return null;
+        return verifyCamera(scene, r, { fromT, toT, hz, ...(d ? { track: d.data, trackId: d.id } : {}) });
+      },
+      // camera direction (direct-camera.ts): against the open take, or the year's campus with nobody in it
+      direct: async (directions: unknown[], o: { correct?: boolean; datetime?: string } = {}) => {
+        const d = await takeHost.direct(directions, o);
+        return d && directedSummary(d);
+      },
+      playDirected: (on: boolean) => takeHost.playDirected(on),
+      directOnYear: async (directions: unknown[], o: { datetime?: string; crop?: [number, number, number, number]; duration?: number } = {}) => {
+        const { directOnYear } = await import('./direct-camera');
+        const d = await directOnYear(year, directions, o);
+        yearTrack = d.track ?? null;
+        return directedSummary(d);
+      },
+      // visible skinned people by outermost named ancestor (the take's crew vs ambient / Kit visitors)
+      visiblePeople: () => {
+        const out: Record<string, number> = {};
+        scene.traverse((o) => {
+          if (!(o as THREE.Mesh).isMesh) return;
+          let top: THREE.Object3D = o, vis = true, person = (o as THREE.SkinnedMesh).isSkinnedMesh;
+          for (let p: THREE.Object3D | null = o; p && p !== scene; p = p.parent) {
+            if (!p.visible) vis = false;
+            if (p.userData.kind === 'context_person') person = true;
+            top = p;
+          }
+          if (vis && person) out[top.name || top.type] = (out[top.name || top.type] ?? 0) + 1;
+        });
+        return out;
+      },
+      // rendered palm (scene) vs the recorded hand point (take + offsetY) of a person at the current take time
+      palm: (id: string, hand: 'left' | 'right') => {
+        const r = takeHost.replay();
+        if (!r) return null;
+        const v = new THREE.Vector3();
+        const rec = r.recordedHands(id)?.[hand];
+        return { palm: r.palmOf(id, hand, v) ? v.toArray() : null, recorded: rec ? [rec[0], rec[1] + r.offsetY, rec[2]] : null, activity: r.info().entities };
       },
     };
     (window as { __marsStudio?: typeof testHook }).__marsStudio = testHook;
@@ -1223,6 +1311,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         </a>
         <div className="studio-tabs">
           <label className="year-picker">Year <select aria-label="Campus year" value={year} onChange={e => { location.href = Number(e.target.value) === 2026 ? '/studio' : `/studio/${e.target.value}`; }}>{YEARS.map(y => <option key={y} value={y}>{y}{y === 2020 ? ' · Brahman' : ''}</option>)}</select></label>
+          <BuildPicker host={() => api.current?.take ?? null} year={year} />
           <button onClick={() => api.current?.view('chiba')}>{year === 2020 ? 'Portal' : 'Chiba'}</button>
           <button onClick={() => api.current?.view('campus')}>
             Whole campus
@@ -1642,7 +1731,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
               <button onClick={() => setError('')}>Dismiss</button>
             </div>
           )}
-          {year === 2026 && <TakePanel host={() => api.current?.take ?? null} />}
+          <TakePanel host={() => api.current?.take ?? null} year={year} />
           <div className="stage-bottom">
             <span>
               {walking
