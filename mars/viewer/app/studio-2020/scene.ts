@@ -58,11 +58,14 @@ function rack(g: THREE.Object3D, bays: number, depthRows: number, height: number
 function panel(g: THREE.Object3D, name: string, w: number, h: number, x: number, z: number, y = h / 2, material = plywood) {
   return box(g, name, [w, h, 0.055], [x, y, z], material);
 }
+/** A road wheel rolling along the vehicle's x: the tire ring in the group's x–y plane, the hub's axle along z (W46:
+ *  both were turned 90° about y, so the tires stood across the direction of travel). */
 function wheel(g: THREE.Object3D, x: number, y: number, z: number, radius: number) {
   const t = new THREE.Mesh(new THREE.TorusGeometry(radius, radius * 0.24, 6, 14), rubber);
-  t.rotation.y = Math.PI / 2; t.position.set(x, y, z); t.castShadow = true; g.add(t);
+  t.name = 'RV tire'; t.position.set(x, y, z); t.castShadow = true; g.add(t);
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.31, radius * 0.31, 0.08, 10), steel);
-  hub.rotation.z = Math.PI / 2; hub.position.set(x, y, z); g.add(hub);
+  hub.name = 'RV wheel hub'; hub.rotation.x = Math.PI / 2; hub.position.set(x, y, z); g.add(hub);
+  return t;
 }
 function canvasTexture(draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void, w = 512, h = 512) {
   const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
@@ -230,10 +233,12 @@ function makeCanopy(root: THREE.Object3D) {
     box(g, 'inner canopy post', [0.075, 2.9, 0.075], [near + 0.1, 1.48, z], steel);
     box(g, 'outer canopy post', [0.06, 1.1, 0.06], [far - 0.08, 0.57, z], steel);
   }
-  box(g, 'workshop plywood platform', [5.8, 0.08, 5.8], [-0.43, 0.1, 0], plywoodDark);
+  const platform = box(g, 'workshop plywood platform', [5.8, 0.08, 5.8], [-0.43, 0.1, 0], plywoodDark);
+  // the workshop furniture stands on the platform's top face (W46: legs started 7–10 cm inside it, bins hovered 1.5 cm)
+  const floor = platform.position.y + 0.08 / 2;
   panel(g, 'rear workshop plywood wall', 5.8, 2.38, -0.43, back + 0.09, 1.28);
-  box(g, 'worktable', [2.0, 0.08, 0.85], [-0.8, 0.78, 0.9], plywood);
-  for (const x of [-1.6, 0]) for (const z of [0.58, 1.22]) box(g, 'table leg', [0.08, 0.72, 0.08], [x, 0.4, z], plywoodDark);
+  const worktop = box(g, 'worktable', [2.0, 0.08, 0.85], [-0.8, 0.78, 0.9], plywood), under = worktop.position.y - 0.08 / 2;
+  for (const x of [-1.6, 0]) for (const z of [0.58, 1.22]) box(g, 'table leg', [0.08, under - floor, 0.08], [x, (under + floor) / 2, z], plywoodDark);
   // ballast tires down the sloping tarp's back edge, lying on (and tilted with) the tarp surface
   const tarpAt = (x: number, z: number) => tarpY((x - near) / (far - near), (z - back) / (front - back));
   for (let i = 0; i < 8; i++) {
@@ -242,10 +247,10 @@ function makeCanopy(root: THREE.Object3D) {
     tire(g, new THREE.Vector3(x, tarpAt(x, z), z), 0.2, normal);
   }
   // Ground photos IMG_3864 and 9-2 show an open workshop/cooking counter.
-  box(g, 'rear work counter', [4.8, 0.06, 0.66], [-.45, .91, back+.58], plywood);
-  for(const x of [-2.5,-.5,1.5])box(g, 'counter leg', [.07,.82,.07],[x,.48,back+.58],steel);
+  const counterUnder = box(g, 'rear work counter', [4.8, 0.06, 0.66], [-.45, .91, back+.58], plywood).position.y - 0.06 / 2;
+  for(const x of [-2.5,-.5,1.5])box(g, 'counter leg', [.07,counterUnder-floor,.07],[x,(counterUnder+floor)/2,back+.58],steel);
   box(g, 'flat cooking griddle', [1.1,.09,.54],[-1.8,.99,back+.58],black);
-  for(let i=0;i<6;i++)box(g,'workshop storage bin',[.36,.25,.43],[-2.4+i*.65,.28,back+.58],i%2?white:plywoodDark);
+  for(let i=0;i<6;i++)box(g,'workshop storage bin',[.36,.25,.43],[-2.4+i*.65,floor+.25/2,back+.58],i%2?white:plywoodDark);
   for(let i=0;i<5;i++)box(g,'counter supply bottle',[.09,.24,.09],[.2+i*.2,1.06,back+.58],i%2?white:glass);
   return g;
 }
@@ -305,11 +310,18 @@ function makeRV(root: THREE.Object3D, id: string, position: [number, number, num
   g.rotation.y = rotation;
   const body = variant === 2 ? black : variant === 1 ? white : new THREE.MeshStandardMaterial({ color: 0xd8d6c9 });
   box(g, 'vehicle shell', [length, 2.38, 2.25], [0, 1.43, 0], body);
+  const tires: THREE.Mesh[] = [];
   box(g, 'front windscreen', [0.08, 0.82, 1.72], [length / 2 + 0.05, 1.9, 0], glass);
   for (const side of [-1, 1]) {
     for (let i = 0; i < 3; i++) box(g, 'RV window', [0.7, 0.45, 0.015], [-length * 0.26 + i * length * 0.22, 1.9, side * 1.14], glass, false);
-    wheel(g, -length * 0.31, 0.4, side * 1.17, 0.39); wheel(g, length * 0.29, 0.4, side * 1.17, 0.39);
+    tires.push(wheel(g, -length * 0.31, 0.4, side * 1.17, 0.39), wheel(g, length * 0.29, 0.4, side * 1.17, 0.39));
   }
+  // stand on the studio ground: the lowest tire vertex (in the group's frame; the group only turns about y) on GROUND
+  g.updateMatrixWorld(true);
+  const toGroup = new THREE.Matrix4().copy(g.matrixWorld).invert(), v = new THREE.Vector3();
+  let low = Infinity;
+  for (const t of tires) { const p = t.geometry.attributes.position; for (let i = 0; i < p.count; i++) low = Math.min(low, v.fromBufferAttribute(p, i).applyMatrix4(t.matrixWorld).applyMatrix4(toGroup).y); }
+  g.position.y = GROUND - low;
   return g;
 }
 function makeMCDA(root: THREE.Object3D) {
@@ -349,7 +361,8 @@ function makeBoundary(root: THREE.Object3D) {
   for (let i = 0; i < 4; i++) {
     const booth = group(g, 'toilet-' + i, 'Blue portable toilet', [37 + i * 1.12, 0, -35], 'high', 'March 4 DJI_0079 aerial');
     const blue = new THREE.MeshStandardMaterial({ color: 0x35738d, roughness: 0.92 });
-    box(booth, 'portable toilet body', [0.95, 2.1, 1.0], [0, 1.08, 0], blue);
+    const body = box(booth, 'portable toilet body', [0.95, 2.1, 1.0], [0, 1.08, 0], blue);
+    booth.position.y = GROUND - (body.position.y - 2.1 / 2); // the booth's base on the studio ground (W46; was 19 cm up)
     box(booth, 'portable toilet roof', [1.06, 0.12, 1.08], [0, 2.2, 0], blue);
     box(booth, 'door', [0.72, 1.73, 0.025], [0, 1.0, 0.51], steel);
   }

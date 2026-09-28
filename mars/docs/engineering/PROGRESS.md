@@ -1080,3 +1080,130 @@ Then: gate → release 5; HANDOFF refresh.
 - **W42 landed** `ece387d`, `a109499` (≈450k tokens incl. a subagent, 110 min; merged `50e805d`): `NORTH_AZIMUTH_OFFSET = −90` (world −X north) from DJI_0079 EXIF 2020-03-04 10:10:34 PST, yaw +99.4°, sun az 143° / el 43° → shadows NW behind-left of an east-facing camera, holds ±1 h; import-graph test proves only `camera/`/`api/` see `env/sun.ts`; 5 pins + year-build pins unchanged; camera fixtures derive bearings from the constant (no tolerance loosened); 19 studio baselines refreshed (shadows rotated, inspected). **Years don't share the frame:** 2026 CAD ≈ −57° (33° still off), 2025 −Z (±20°), 2024 Chiba fits −Z but kitchen + RV ring on the wrong side, **2022 mirrored** (pinwheel turns the other way), 2021/2023 unverified. Tires: ring floated 17.5 cm (6-sided tube) → seated on ground/tarp/roof (73 ids aliased in `id-migration.json`, campus-2020.json regenerated); eye-level baseline `studio-2020-ring-edge` inspected. Props survey: 2020 RVs/toilets/workshop table + Kit tables (+0.26: 0.16 datum + legs at y 0.1), benches, crates, fridge, cafe counter, trailer wheels still float — Q4 + a Kit bug. Q3 → answered (A3). Lead review: accepted. Follow-ups: per-year bearing + the 2022 mirror / 2024 side as reconstruction edits → cards for Gene (W44); Kit prop datum fixes after W43 releases scenes.ts.
 - W44 spawned (docs): Q20 (2022 mirror), Q21 (2024 kitchen/RV side), Q22 (2026 bearing) cards with annotated captures; STUDIO_REPLAY moments, YEAR_BUILD camera table, CAMPUS_SCENE north note.
 - 16:10 EDT: all four `codex/*` branches carry REPORT files (+2 commits each). W45 spawned (merge worker): tooling → camera-nl-parse → 2026-frame-grouping → fire-v2-render-polish, each re-gated on `w45-codex-merge` (engine, tsc, unit, 5 pins, own specs; lint only if green; fire baseline drift inspected), then a full gate; lead fast-forwards. In flight: W38, W43, W44, W45.
+
+## 2026-09-28 — W44: site-axis cards for Gene (Q20–Q22) + doc touch-ups
+- **Three `first` cards** (QUESTIONS_FOR_GENE.md, new section "Site axis per year", orders 5–7), from W42's A3 table:
+  - **Q20 2022 mirrored:** "The model's four 2022 houses spin one way (counter-clockwise from above); the drone photo
+    shows them spinning the other way. Which is right — or is the model's map flipped left-to-right?"
+  - **Q21 2024 side:** "In 2024, did the kitchen and the ring of trailers sit north of Chiba, as the drone photo shows,
+    or south of it, as the model has them?" (answering "photo" also settles Q2 for 2024).
+  - **Q22 2026 north:** "Your 2020 answer set one north for every year, but the 2026 model is turned about 33° from what
+    the 2026 drone photos show. Should 2026 use the drones' north?" (+ "each year's own north" option).
+- **Pictures:** 6 new outlined + labelled lab captures (`e2e/questions-captures.spec.ts`, additive shots
+  `q20-2022-{top,eye}`, `q21-2024-{top,eye}`, `q22-2026-{top,eye}`) and 3 side-by-sides drawn by the new
+  `questions/tools/axis.py`: model top-down next to the drone still turned north-up from its logged heading, a north
+  arrow on each side — `q20-2022-model-vs-drone.jpg` (DJI_0829 rotated −110.2°; spin arrows: model counter-clockwise,
+  photo clockwise), `q21-2024-model-vs-drone.jpg` (DJI_20240122144543_0335_D, north-up by the tire ring; Chiba /
+  kitchen / trailer ring labelled on both), `q22-2026-model-vs-drone.jpg` (grey = north the engine uses now, −X; red =
+  drone north, −X turned 33° toward −Z; DJI_0005 rotated +91.7°). Stills copied from W42's scratch into
+  `questions/photos/` (`2022-DJI_0829`, `2024-DJI_20240122144543_0335_D`, `2026-DJI_0005`). All captures looked at;
+  the rotated DJI_0829 matches W42's north-up frame (afternoon shadows NE). Page regenerated: 17 open + 3 answered,
+  72 KB; `questions-html.test.mjs` 3/3.
+- **Docs:** STUDIO_REPLAY "Chapter sets" moments = first of each event + `done` (real keys from the manifest);
+  YEAR_BUILD "A+B as chapter takes" table → W39's cuts / min / mean readability / idle stretches 0 and the re-recorded
+  bytes (set 17 023 471 raw / 2 668 326 gzip), W31 camera bullet marked replaced; CAMPUS_SCENE "North = −z" → A3's
+  per-year table (−90 constant, 2026 ≈ −57°, caveat that −z is ~57° off); CAMERA.md already points at
+  `chapter-shots.ts` (no change).
+- **Weak spots:** the 2022 photo buildings are not named (which house is which decides X- vs Z-mirror; asked on the
+  card). Q21 rests on one wet-day nadir whose north comes from the tire ring, not EXIF. The eye-level 2026 capture only
+  identifies Chiba.
+- **W44 landed** `5eeedb7`, `047fc68` (≈190k tokens, 40 min; merged): cards Q20 (2022 mirrored — model vs DJI_0829 north-up, spin arrows), Q21 (2024 kitchen + trailer ring north or south of Chiba — vs DJI_20240122144543_0335_D), Q22 (2026 north ≈ 33° off — vs DJI_0005; option "each year's own north"), all "worth answering first" with outlined captures + drone stills; page 17 open / 3 answered; STUDIO_REPLAY moments, YEAR_BUILD camera table, CAMPUS_SCENE per-year north. Lead LOOKED at q20-2022-model-vs-drone: accepted. Note: Q21's answer also settles Q2 for 2024.
+## 2026-09-29 — W43: Chiba 2024 front as photographed (reconstruction edit of `mars-2024`)
+
+- **Scene** (`app/history/photographic-corrections.ts frontage2024`, `scenes.ts make2024`):
+  - a VERTICAL inset (2.5 bays) at the frame front, 2.65 m behind the flap bottoms;
+  - two straight stair flights (run 2.6, rise 2.08, 12 risers; the old shear matrix is gone) to a 3.46 × 1.45 m
+    landing at the upper-floor level above a sliding double door (yellow leaf kept, orange leaf added);
+  - flaps keep the 29.7° lean, with triangular cheeks against the inset and a left upper step under the top PV rows;
+  - right flap = 4 rows of `plexiglass` panes (new renderer-only material) on a 2x4 lattice, with the painted eye pane
+    and no opaque backing, so the solarium shows through;
+  - the solarium's end: a plexiglass wall on 2x4 studs with a 1.21 × 2.0 m door standing open. This is the **first
+    door object**: pinned `chiba-solarium-door`, kind `plexiglass door` → engine `glass`, `userData.door` = the
+    opening.
+  Measurements and pixel reasoning: CAMPUS_SCENE.md "Chiba 2024 front".
+- **Re-seed** (new HISTORY_IDS.md "Reconstruction edits" procedure): `campus-2024.json` c542f3fe… → d197e6ae…
+  - 1446 of 1606 Kit ids kept (all non-Chiba, PV, left strip, yellow leaf, frame, decks, upper stair); 160 Chiba
+    pieces replaced or added; the pins survive;
+  - migration table: 76 aliases, 84 nulls (the removed right-hand salvaged windows);
+  - `campus-history.test.ts` (+4 tests): pre-edit canonical → fork → `reconstruction-edit` checkpoint = the new
+    canonical (same physicalHash); the 2024 year room seeds protected `mars-2024`; walker 5.5 m and eye-level camera
+    navmesh 5.0 m through the door (closed-door counterfactual: no route); the hall interior still 100 % blocked;
+  - `history-geometry.test.mjs`: a new photographed-front test (vertical inset, level treads, flaps proud, an exact
+    open doorway).
+- **Captures** (looked at):
+  - studio 2024 default / plan / frontage re-baselined, plus new `front-eye` (the photo's framing), `solarium`
+    (through the right panes) and `solarium-door`;
+  - lab `year-2024-top-prisms` refreshed (4 walkers, zero violations).
+  Still differs from the photo: width (Q20: the photo's door/landing scale suggests ~7 bays), the older PV row layout,
+  flat plexiglass (no glare), an upright in the front doorway, a plywood floor where the interior photo shows sand, and
+  no furniture.
+- **Questions:** Q20 (6 vs 7 bays), Q21 (end-wall door position / swing); the page is regenerated (17 open cards).
+- **Gates:** `npm test` 60/60, `test:engine` 384 pass / 0 fail, `tsc` clean, `--check` 6/6 deterministic,
+  studio-years 14/14, lab-years year-2024 pass.
+- **Not changed, flag for the lead:** CAMERA_DIRECT.md §7 still says "No door objects in any scene". The 2024 solarium
+  door is now one (tagged as above; the navmesh sees it as a gap, so no rule changed).
+- **W43 landed** `9f70386`, `24f1e84` (≈270k tokens, 55 min; merged): Chiba 2024 front rebuilt from Gene's photos in `photographic-corrections.ts` (`frontage2024`): vertical inset 2.5 bays wide in the frame-front plane, flaps leaning out with bottoms 2.65 m proud + cheeks, straight 12-riser flights to a 3.46 × 1.45 m landing at 2.49 m, sliding double door, right-flap stepped plexiglass (20 panes, 2x4 lattice) with the eye pane, plexiglass end wall on studs with `chiba-solarium-door` open 90° — the first door object in any year scene (walker 5.5 m and camera navmesh 5.0 m through it); new renderer material `plexiglass` (engine kind `glass`: collides, doesn't block view); 1446/1606 ids kept, 76 successors + 84 nulls in `id-migration.json`; `campus-2024.json` re-seeded (`reconstruction-edit` with both photos as evidence, protected); HISTORY_IDS gained a "Reconstruction edits" procedure; history-ids/geometry tests extended. 387 / 384 / 0 fail; studio-years 14/14; lab 2024 0 violations. Lead LOOKED at front-eye + solarium: accepted (matches the photo's structure; still differs: width 6 vs 7 bays → Q23, solar rows 4+4+2+2 vs 6+6+4+4, flat plexiglass, an upright in the front doorway, plywood deck where the photo shows sand). Q24 = end-wall door position/swing. Merge note: the three 2024 studio baselines conflicted with W42's north refresh — W43's taken, to be re-captured (W46). CAMERA_DIRECT §7 door line updated by the lead.
+- W46 spawned (Kit/renderer): prop datum fixes (tables +0.26, benches, crates, fridge, cafe counter, 2020 RVs/toilets/workshop table, trailer wheels) with id migration; re-capture the 2024 studio baselines with north −90 + the new front.
+- **W38 (2026-09-28, the other three 2022 houses, checkpoint 1; branch `w38-houses`, rebased on `b4b5284`).**
+  `yearBuildHouseSetup(2022, house, file, { tranche? })` runs chiba, kitchen, west-house (and east-house, report only)
+  through the same generator A+B, crew of six. The four houses are checked to be one template (12 × `upright-16ft-kit`
+  4 × 3, 54 × `beam-12ft` at 0.22 / 2.48 / 4.757, same footprint); the phase-B split rules apply unchanged. Differences:
+  kitchen's roof deck covers bay 0 only and it has no solar; chiba has two screens + bezels and a 2.30 m wall; kitchen /
+  west-house have 0.90 / 1.00 m walls (all unplaced with reasons; geometry in YEAR_BUILD.md).
+  - **Default suite: each house's first bay + first ground-floor strip is green and pinned**: chiba `940e9f64…` @60 997,
+    kitchen `4862adfc…` @55 293, west-house `b4c42210…` @54 322 (0 violations, 24 + 3 parts at pose, max 0.49 mm).
+  - **Full A+B: not green yet** (0 violations up to the refusal, `todo` behind `YEAR_BUILD_FULL=1`): chiba and west-house stop
+    in D1 (`s0770-walk-to`, a first-floor receiver spot beside frame 9172e067 has no standing room); kitchen stops in S
+    (`stringer.site-occupied`, idle crew parked on the stair site). Each got through the skeleton (66 / 66) and D0.
+  - **11 provisional rules** (YEAR_BUILD.md "Rules added or changed"): yard v2 (neighbours' work zones; opt-in, east-house
+    pins keep v1), yard work area on the ground, beam staging end, lay-out room / build direction (kitchen reverses),
+    raise / hang_beam walk-in bystanders, walker static guard and passage release, narrow +u side (one giver), unreachable
+    upper deck reported, stringer lay-down. Shared files touched additively: `raise.ts`, `stance.ts`, `locomotion/walk.ts`.
+  - **Pins:** no existing pin moved. East-house plans byte-identical after every change; suite bay-1 / bay-1 + strip green;
+    perf-walk 5 × PIN-OK; `YEAR_BUILD_FULL=1` skeleton `d382e461…` @117 277 and A+B `ddb634d6…` @600 599: green on the final head (9 / 9, run in full), bit-identical.
+  - Suite on the rebased head: 405 tests, 399 pass, 0 fail, 6 skipped (the `YEAR_BUILD_FULL=1` east-house proof ran on the same code before the last docs-only rebase). Questions for Gene: Q25–Q27 in QUESTIONS_FOR_GENE.md. Lead decision:
+    move east-house onto yard v2 (re-pin `94db263e…` / `ddb634d6…` and W31's chapter takes) or keep v1.
+- **W38 landed** `ede0be0`…`e237c55` (≈475k tokens, 3 h incl. a stall; ff): chiba / kitchen / west-house through A+B — one template confirmed (12 × 16 ft frames, 54 beams at 0.220/2.480/4.757); per-house yards (v2: avoid other houses' work zones, 0 refused); tranches green + pinned (chiba 940e9f64 @60997, kitchen 4862adfc @55293, west b4c42210 @54322; 24 + 3 parts ≤ 0.49 mm); full runs stop at one refusal each with 0 violations before it (chiba/west D1 receiver spot beside frame 9172e067 — mirrored houses; kitchen `stringer.site-occupied` — idle crew parked on the stair site); 11 provisional rules (yard v2, beam staging end, build direction, raise/walk-in bystanders, walker static guard + passage-release deadlock fix, narrow +u side, unreachable upper deck reported, stringer lay-down); east-house pins bit-identical (9/9 full set); Q25–Q27 (chiba screens + 2.30 m wall, kitchen roof deck, low walls). 405 / 399 / 0 fail / 6 skip. Lead review: accepted. **Lead decision:** east-house stays on yard v1 until all four full runs are green, then one joint re-pin. Checkpoint 1b → W47.
+- W47 spawned (campus): the three refusals → green full A+B runs for chiba/kitchen/west-house, pins, yard v2 joint re-pin incl. east-house, chapter takes per house (W31 chapters + W39 cameras), manifest entries.
+- **W46 prop datum** (branch `w46-prop-datum`, `8c5b8df`): props seated on the surface under them (§15), computed, not
+  hard-coded — `Kit.surface()` = the highest upward structure face (floor/steel/roof layers: deck sheets, beams,
+  crossbars; never other furniture) under the prop's footprint, else the studio ground (`GROUND` −0.16 = every year
+  file's `groundY`; the studio draws the soil there in every year). Legs/feet run from it to their unchanged tops;
+  rigid props rest on it; trailers/RVs/toilets stand on the ground. **Re-measured** (ray from 0.5 m above the prop's
+  bottom, structure only): W42's "+0.26 tables / +0.38 crates" were rays from inside the ground-floor deck (top
+  0.2525) — most Kit props were **sunk**, not floating.
+
+  | Scene | Prop | Before (gap to its surface) | After | Ids aliased |
+  | --- | --- | --- | --- | --- |
+  | 2020 | RV tires (6 RVs × 4) | +0.089 over ground; wheels turned 90° (rolling sideways) | 0.000, rolling along the body | 48 (tire + hub) |
+  | 2020 | portable toilets (4) | +0.190 over ground | 0.000 | 12 (body, roof, door) |
+  | 2020 | workshop table legs (4) / counter legs (3) | −0.100 / −0.070 (inside the platform) | 0.000 on the platform top | 4 / 0 (same 5 cm bucket) |
+  | 2020 | workshop storage bins (6) | +0.015 over the platform | 0.000 | 6 |
+  | 2021/23/24/25 | table legs (classroom, library, kitchens, cafe, chiba, lounge) | −0.13 … −0.18 (inside the deck) | 0.000 (edge legs on a beam that stands 2.75 cm proud of the deck) | 24+4+12 / 28 / 28 / 20 |
+  | 2021 | classroom bench feet (12) | from 0.05, i.e. −0.20 inside the deck | 0.000, floor to seat underside | 12 |
+  | 2021/23/24/25 | stored food crates (12 per kitchen) | −0.01 … −0.06 (deck / proud beam) | 0.000 | 2 / 8 / 8 / 8 |
+  | 2021/23/24/25 | white refrigerator (+ seam, handles) | −0.21 / −0.23 | 0.000 (one corner on a beam) | 4 each year |
+  | 2023/24/25 | café painted counter | −0.15 | 0.000, spans floor → counter top 0.9 | 1 each |
+  | 2021/23/24/25 | trailer wheels (all rings) | +0.160 over ground | 0.000 | 0 (assembly moved) |
+  | 2022 | all of the above | unchanged (held) | unchanged | 0 |
+
+  243 legacy entries re-pointed at successors in `id-migration.json` (2020 70, 2021 58, 2023 41, 2024 41, 2025 33; no
+  nulls; live/null totals 7,858 / 93 unchanged); campus-2020/21/23/24/25.json regenerated, `--check` deterministic for
+  all six. **2022 held** (`SEAT_HELD_YEARS`): its furniture is inside the year-build static scene (the east-house fork
+  keeps every other obstacle within 35 m) — nudging one 2022 bench-foot obstacle moved the first-bay pin
+  251a44c5 → ca200e08. Seat 2022 together with the next year-build re-pin (re-record the 2022 takes; lead decision).
+  2026 details held too (CAD room floors are not visible to the Kit). Pins: perf-walk 5/5 PIN-OK, year-build first
+  bay + whole skeleton (`YEAR_BUILD_FULL=1`) + A+B chapter pin green, `campus-2022.json` byte-identical.
+  Tests: `history-geometry` per-year "every prop stands on its surface" (lowest vertex ≤ 1 cm from the highest
+  support under any bottom vertex, nothing poking > 1 cm into the footprint core; bites: with seating off, 2021/23/24/25
+  fail) + RV wheel axis; npm test 67/67, engine 397/394/0 fail/3 skip, tsc clean. Baselines (looked at each):
+  2020 default/plan/ring-edge (only "76 definitions" + RV edge), 2021/2023/2025 default/plan + 2021 corridor (trailers
+  16 cm lower), 2024 default/plan/frontage/front-eye/solarium/solarium-door re-captured with north −90 (shadows swing to
+  the front/left; solarium end now in shade), lab-year 2021/2024 top-prisms (north lighting, trailer shadows shorter);
+  new eye-level `studio-2020-rv-eye` (round wheels on the soil), `studio-2021-classroom-eye`, `studio-2024-kitchen-eye`
+  (crates on the deck). Weak spots: deck-standing tops keep their y = 0 authored heights, so tables/counters are 0.53–0.66 m
+  and benches 0.19 m above the deck; the fridge footprint still overlaps the counter end; 2020 counter legs pass through
+  two storage bins; 2023 rv-8/9 and 2024 rv-9/10 stand inside Chiba (ring through the hall; asserted in the test);
+  the café counter photo is squashed 19 % vertically.
+- **W46 landed** `8c5b8df`, `ad4a988` (≈300k tokens, 80 min; merged): `Kit.surface()` (highest structure face under a prop's footprint, else ground −0.16) seats legs/feet/crates/fridge/counter/trailers/RVs/toilets/bins in 2020/21/23/24/25; finding: W42's ray started below the deck top — Kit props were SUNK (legs −0.15, fridge −0.23), only trailers/RVs/toilets/west-house table floated; 2020 RV wheels also turned to roll along the body; 243 id aliases (no nulls); `history-geometry` "no prop floats / no structure in the core" per year; **2022 held** (`SEAT_HELD_YEARS`) — a nudged bench foot moved the first-bay pin (251a44c5 → ca200e08), so seating 2022 = a year-build re-pin + take re-record → folded into W47's joint re-pin; 2024 studio baselines re-captured with north −90 + the new front (inspected). 397 / 394 / 0 fail; npm test 67/67; studio-years 18/18, lab-years 7/7. Lead review: accepted. Open: tabletops/seats keep y = 0-authored heights (0.53–0.66 m above decks — Q4); fridge overlaps the counter end; 2026 details unseated.
+- 18:05 EDT: W48 spawned (studio set player: shot hold at high speed, leg-phase continuity across seams, Direct camera per chapter). In flight: W45 (Codex merge gate), W47 (checkpoint 1b), W48.

@@ -23,7 +23,8 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status: **14 open blocks** (Q1, Q2, Q4–Q14 and Q19; two pairs were duplicates and are merged) and **3 answered** (A3 north, §13 reach-down, §14 top beams).
+Status: **20 open blocks** (Q1, Q2, Q4–Q14, Q19, W44's site-axis Q20–Q22 and W38's year-build Q25–Q27; two pairs were duplicates and are merged) and **3 answered** (A3 north, §13 reach-down, §14 top beams).
+Status: **17 open blocks** (Q1–Q14, Q19, Q20 and Q21; 16 + 3 questions, two pairs were duplicates and are merged) and **2 answered**.
 
 **Gene's page.** `questions/index.html` shows every open block as a card Gene can read and answer (plain question,
 pictures, options, export button); it is served at `/questions/` after a deploy. It is generated from this file:
@@ -194,6 +195,17 @@ They now rest on the ground and on their surfaces. Everything else waits for thi
 | 2021–2025 | trailer wheels `rv-N-trailer-wheel-*` | +0.16 (datum only) | `kit.ts` rv() |
 | 2026 studio | campfire ring (`scenery.ts`): rocks embedded 0–4 cm, lowest log +0.05 (thick end) | ≈ on the ground | studio ambience (datum −0.16, correct) |
 
+**W46 (props seated, 2026-09-29): which floats were the datum and which were Kit bugs.** Re-measured from above (structure
+only), the table above mixes two things. **Kit bugs, fixed:** most Kit furniture stands on the ground-floor deck (top
+0.2525), and its legs, feet, crates, fridge and café counter started *inside* that deck (legs at 0.1, feet at 0.05, fridge
+at 0.02) — the "+0.26 / +0.38" figures were rays from inside the deck down to the ground; the 2020 worktable legs started
+inside their platform; the 2020 RV wheels were also turned 90°. These now stand on the deck, platform or beam under
+them. **Datum floats, fixed only for props:** trailers (+0.16), 2020 RVs (+0.089), toilets (+0.19) and the 2022
+west-house table (+0.26, held with all of 2022 for the year-build pins) stood on the Kit's y = 0 over the −0.16 ground;
+the props now stand on −0.16, like W42's tires. **Still open here:** the racks, decks and every other structure stay on
+the Kit datum (y = 0, 16 cm over the drawn ground), and furniture tops keep heights authored for y = 0, so tables sit
+0.53–0.66 m and benches 0.19 m above the deck. Answering Q4 moves the structure; the props will follow their surfaces.
+
 The lab (engine datum y = 0, ground at 0) and the year walk-about (ground at the file's `groundY`) draw props on their own
 ground, with no offset. Answering "ground at −0.16" would move every Kit row above by −0.16 in one place (the Kit's
 datum). The intrinsic lifts (tables +0.10, crates +0.22, benches +0.05) are separate Kit fixes.
@@ -201,6 +213,119 @@ datum). The intrinsic lifts (tables +0.10, crates +0.22, benches +0.05) are sepa
 **What the answer changes.** One datum for build takes and the studio. The studio's 16 cm offset disappears.
 Re-basing moves every year-build pin once (first bay, whole skeleton, A+B `ddb634d6…`), and the takes are
 re-recorded.
+
+Gene:
+
+---
+
+## Site axis per year (A3 follow-ups, W44)
+
+W42 checked every year's scene against drone stills with a logged camera heading (A3's table). Two years show
+layouts that no rotation can fix (2022 mirrored, 2024 kitchen / trailer ring on the other side of Chiba), and
+2026 needs its own bearing. The pictures put the model's top-down capture (screen up = world −Z) next to the
+still turned north-up. They are drawn by `questions/tools/axis.py` from the captures `q20/q21/q22-*-top.jpg`
+(`e2e/questions-captures.spec.ts`) and the stills copied into `questions/photos/`.
+
+### Q20. 2022: is the model's layout a mirror image of the real one?
+
+```question
+id: Q20
+urgency: first
+order: 5
+plain: The model's four 2022 houses spin one way (counter-clockwise from above); the drone photo shows them spinning the other way. Which is right — or is the model's map flipped left-to-right?
+terms:
+  - north-up | A photo turned so that north points to the top of the page.
+context: In the model each house sticks out past the end of the next one like the blades of a pinwheel, and seen from above that pinwheel turns counter-clockwise. In the 2022 drone photo (turned north-up from the heading the drone logged) the same four houses overlap the other way round, so it turns clockwise: that is a mirror image, which no turning of the map can fix.
+changes: If the photo is right, the 2022 layout is redrawn as its mirror image and the 2022 building replay is recorded again on it; if the model is right, nothing changes.
+options:
+  - The photo is right: flip the model (if you can, say below which house is which in the photo)
+  - The model is right: the houses really turned counter-clockwise
+  - Not sure
+images:
+  - questions/q20-2022-model-vs-drone.jpg | Left: the model from above, north (as its house names have it) up; it turns counter-clockwise. Right: drone photo DJI_0829, 2022, turned north-up; the same four houses turn clockwise.
+  - questions/q20-2022-eye.jpg | The model's 2022 courtyard from the south-east, with the four houses named.
+  - questions/photos/2022-DJI_0829.jpg | The drone photo as taken (the top of the frame faces east-south-east).
+```
+
+**What the engine sees.** `app/history/scenes.ts` draws the 2022 Kit with Chiba north (z −10.9 … −6.2, offset
+toward −X), the east house at +X (offset toward −Z), the kitchen south (offset toward +X) and the west house at −X
+(offset toward +Z): a counter-clockwise pinwheel seen from +Y. DJI_0829 (FlightYaw 110.2°, pitch −86.4°, rotated
+north-up by −110.2°; the afternoon shadows fall north-east, as they must in February) shows the four buildings
+overlapping clockwise. Handedness is rotation-invariant, so no `NORTH_AZIMUTH_OFFSET` fixes it (A3; W42).
+
+**What the answer changes.** A reconstruction edit: the 2022 scene is mirrored in `scenes.ts` (either
+X → −X or Z → −Z; which one depends on which photo building is which), `mars-2022` is re-seeded with a
+`reconstruction-edit` cause and every moved id is aliased in `id-migration.json` (HISTORY_IDS.md). The east-house
+year build (first bay, whole skeleton, A+B `ddb634d6…`) and its 7 chapter takes are re-planned and re-recorded, so
+their pins move once. Q1 (the south-west corner table) is re-read on the mirrored plan. If the model is right,
+nothing changes and A3's 2022 row becomes "mirror checked: model right".
+
+Gene:
+
+### Q21. 2024: were the kitchen and the trailer ring north or south of Chiba?
+
+```question
+id: Q21
+urgency: first
+order: 6
+plain: In 2024, did the kitchen and the ring of trailers sit north of Chiba, as the drone photo shows, or south of it, as the model has them?
+terms:
+  - north-up | A photo turned so that north points to the top of the page.
+context: The model's 2024 drawing puts Chiba at the north end, with the ring of trailers and the kitchen spread out to its south. The one straight-down drone photo from that winter, turned north-up by the old tire ring (which runs north–south on the west side of the site), shows Chiba at the south end with the ring and the kitchen to its north.
+changes: If the photo is right, the kitchen and all the trailers move to Chiba's other side (Chiba itself stays), which also clears the two trailers now standing under Chiba's roof; if the model is right, nothing changes.
+options:
+  - The photo is right: kitchen and trailers were north of Chiba (move them)
+  - The model is right: they were south of Chiba
+  - Not sure
+images:
+  - questions/q21-2024-model-vs-drone.jpg | Left: the model from above, north up: Chiba (blue) at the top, the trailer ring (red) and the kitchen (orange) below it. Right: the drone photo of 22 January 2024, north-up: Chiba at the bottom, the kitchen and the ring above it.
+  - questions/q21-2024-eye.jpg | The model's 2024 camp seen from the west: Chiba on the left (north), the kitchen on the right (south), the trailers between them.
+```
+
+**What the engine sees.** The 2024 Kit puts Chiba at z −5.5 … 9.2, the kitchen at z 35 … 47 and the 18 trailers
+(`rv-1` … `rv-18`) on a circle between them, all on Chiba's +Z side. DJI_20240122144543_0335_D (nadir, north-up by
+the 2020 tire ring on the west edge) has the big building with the solarium (Chiba, W42's `d2024_chiba` crop) at
+the south and the long kitchen with the solar panels at the north, the ring between. Chiba alone fits −Z = north
+(A3, "medium-high").
+
+**What the answer changes.** A reconstruction edit in `scenes.ts`: the kitchen, kitchen-interior, cafe and the
+trailer circle mirror across Chiba (z → −z about Chiba's centre, or the circle is re-centred north of it);
+`mars-2024` re-seeded, ids aliased. It also answers Q2 for 2024: rv-9 / rv-10 no longer stand under the roof.
+Coordinate with W43's 2024 Chiba facade edit (same file). If the model is right, nothing changes.
+
+Gene:
+
+### Q22. Which way is north in 2026 (and in each year)?
+
+```question
+id: Q22
+urgency: first
+order: 7
+plain: Your 2020 answer set one north for every year, but the 2026 model is turned about 33° from what the 2026 drone photos show. Should 2026 use the drones' north?
+terms:
+  - north-up | A photo turned so that north points to the top of the page.
+context: The tire ring running north–south fixed north exactly for 2020, and the model now uses that one north for every year. The 2026 model was drawn separately, and next to two 2026 drone photos turned north-up it sits about 33° off (Chiba's long side, the container row and the trailer arc all agree), so the 2026 sun, shadows and sunset shots are off by that much.
+changes: The sun, the shadows and the sunset camera shots for that year turn; nothing is rebuilt.
+options:
+  - Use the drones' north for 2026 (turn only the sun and shadows for that year)
+  - Use each year's own north wherever a drone photo shows it
+  - Keep one north for all years
+  - Not sure
+images:
+  - questions/q22-2026-model-vs-drone.jpg | Left: the 2026 model from above. Grey: north as the model uses it now. Red: north from the drone photos, about 33° round. Right: drone photo DJI_0005, 2026, turned north-up: turn the left picture until the red arrow points up and the two match.
+  - questions/q3-2026-cad-vs-drone-north-up.jpg | The earlier comparison: the model's 2026 plan and two drone photos (DJI_0098, DJI_0005), each turned north-up.
+  - questions/q22-2026-eye.jpg | The model's Chiba, 2026, at eye height; its shadows and the sunset shots around it are what would turn.
+```
+
+**What the engine sees.** One global `NORTH_AZIMUTH_OFFSET = −90` (`engine/env/sun.ts`, world −X north), exact for
+2020 (DJI_0079). For the 2026 CAD, DJI_0005 (FlightYaw −91.7°, near-nadir, 2026-03-19 14:31, rotated north-up by
++91.7°) and DJI_0098 (nadir) put north at −X turned ~33° toward −Z (offset ≈ −57° ± 8°; A3 table). 2025 fits 0°
+(±20°); 2021 and 2023 are unverified.
+
+**What the answer changes.** A per-year bearing (e.g. `northOffset(year)` beside the constant). Only `camera/` and
+`api/` read `env/sun.ts`, and `physicalView()` excludes env, so no construction pin moves; the sun, shadows,
+studio lighting and "sunset behind" camera windows for that year rotate, and directed tracks for that year
+re-plan. CAMPUS_SCENE.md's "North" note follows the answer.
 
 Gene:
 
@@ -565,6 +690,143 @@ photo (`evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg`) 
 **What the answer changes.** if 2022 had framing, the replays would sequence `install_top_plate`/`install_rafter` before the roof
 deck and the protected `mars-2022` state would need a reconstruction-edit adding the members (roof deck rises ≈ 13 cm). If not,
 nothing changes — the framing verbs wait for 2026.
+Gene:
+
+---
+
+## Chiba 2024 front (W43 reconstruction edit, 2026-09-29)
+
+### Q23. 2024: was Chiba six bays wide (about 22 m), or seven (about 25.6 m)?
+
+```question
+id: Q23
+urgency: fidelity
+order: 7
+plain: In 2024, was Chiba's front six rack bays wide (about 22 m, as the model has it) or seven bays (about 25.6 m)?
+terms:
+  - bay | one 12 ft (3.66 m) span of rack beams; the model's Chiba 2024 is 6 bays wide and 3 deep
+context: We rebuilt the 2024 front from your photo (vertical inset around the stairs, flaps leaning back on both sides), keeping the model's 6-bay width. But if the doors in the photo are ordinary 2 m doors and the landing sits at the upper floor, the whole front measures about 25–27 m wide, which is closer to 7 bays.
+changes: If seven bays, Chiba 2024 grows by one bay (the flaps and the solarium get wider) in another reconstruction edit of the protected 2024 state; if six, nothing changes.
+options:
+  - Six bays (about 22 m), as modelled
+  - Seven bays (about 25.6 m)
+  - Something else (say below)
+images:
+  - questions/photos/2024-chiba-front.jpg | Real photo, 2024: the front with the inset, the stairs, solar on the left and plexiglass on the right.
+  - questions/q23-2024-front-eye.jpg | The model after the edit, from eye height on the door axis (6 bays wide).
+```
+
+(Parked; non-blocking. Added by W43.)
+
+**What the engine sees.** `app/history/photographic-corrections.ts frontage2024` keeps the hall at 6 × 3 bays (21.95 m × 10.97 m).
+Measured in the 1000 × 497 px photo: the facade spans x ≈ 25–978 px at the ground (953 px), so at the flap bottoms 6 bays gives
+≈ 43.4 px/m. The door leaves are 70 px tall and the landing (the upper-floor level, 2.46–2.55 m in the model) is 88 px above
+the ground, which gives ≈ 35–36 px/m at the inset. The flaps' outer edges converge by about 10 % from bottom to top, so the
+camera is roughly 25 m away and the inset should read only about 10 % smaller than the flap bottoms (≈ 39 px/m), not 18 %.
+With 6 bays the door would be about 1.8 m tall and the landing 2.2 m; with 7 bays they would be 2.1 m and 2.6 m. The lens and
+the crop are unknown, so this does not settle it. **Default:** keep 6 bays.
+**What the answer changes.** A 7-bay answer widens the hall frame, the decks and both flaps by one bay (a new
+`reconstruction-edit` of `mars-2024`, HISTORY_IDS.md). Every Chiba 2024 hashed id then changes, and the pins stay.
+Gene:
+
+### Q24. 2024: where was the solarium's side door, and which way did it open?
+
+```question
+id: Q24
+urgency: none
+order: 8
+plain: The right-hand end of the 2024 solarium was a clear plastic wall with a door. Where in that wall was the door, and did it swing out, swing in, or slide?
+terms:
+  - solarium | the glazed lean-to under Chiba's right-hand front flap (your second 2024 photo)
+context: Neither photo shows that end wall. The model puts a 1.2 m wide door next to the building (the only place a 2 m door fits under the sloping flap), standing open outwards, so people and the camera can go through it.
+changes: The door moves, or is shown closed or sliding. Walking and camera routes into the solarium follow the door.
+options:
+  - Next to the building, swinging out (as modelled)
+  - Next to the building, swinging in
+  - A sliding door
+  - Somewhere else (say below)
+images:
+  - questions/q24-2024-solarium-door.jpg | The model: the plexiglass end wall on 2x4 studs, with the door standing open (right).
+  - questions/photos/2024-chiba-solarium-interior.jpg | Real photo, 2024: inside the solarium, with the 2x4 lattice roof, clear panels and rack frames.
+```
+
+(Parked; non-blocking. Added by W43.)
+
+**What the engine sees.** The end wall is at x = +w/2 under the right flap (`frontage2024`). The door opening is at
+dz 0.145–1.355 m in front of the frame and 0.22–2.22 m high, where the flap underside is still above 2.3 m. The leaf is the
+pinned `chiba-solarium-door` (kind `plexiglass door` → engine `glass`), standing open 90° outwards, with `userData.door`
+describing the opening. **Default:** as modelled.
+**What the answer changes.** Only the door pieces move (new hashed ids for the jambs and header; the leaf keeps its pinned id).
+A closed door would need a camera/walk rule for door objects (CAMERA_DIRECT.md: today openings are gaps).
+Gene:
+
+---
+
+## Year build checkpoint 1: the other three 2022 houses (W38)
+
+### Q25. 2022 Chiba: what were the two screens, and the 2.30 m wall on the same line as its 2.23 m wall?
+
+```question
+id: Q25
+urgency: none
+plain: In 2022, what were the two screens inside Chiba, and was there really a second, taller plywood wall along the same side?
+context: The model shows two framed screens inside Chiba (about 1.75 × 0.96 m and 3.45 × 1.95 m) and a 2.30 m plywood wall drawn on the same line as its 2.23 m wall. The replay builds walls only from plywood panels of the known heights, so it leaves these out and says why.
+changes: Screens would become placed items like furniture; a real second wall layer would get panels cut to 2.30 m and be built.
+options:
+  - Projection / display screens; one plywood wall on that side
+  - Screens, and a second (taller) layer on that wall
+  - Something else (say below)
+images:
+  - none | Two framed screens inside Chiba and a 2.30 m plywood wall drawn over its 2.23 m wall (YEAR_BUILD.md "Checkpoint 1").
+```
+
+(W38.) **What the engine sees.** Chiba 2022 has 2 screens + 2 bezels (1.750 × 0.962 m at 1.14–2.10 m; 3.450 × 1.950 m at
+0.68–2.63 m) and a 10.972 × 2.300 m plywood wall at y 0.23–2.53 on the same beam line as its 10.972 × 2.230 m wall. None has a
+material rule; the A+B plan leaves them unplaced with that reason. **What the answer changes.** Screens → placed items; a second
+layer → a 2.30 m panel def, and chiba's A+B plan and pins move.
+Gene:
+
+### Q26. 2022 kitchen: how did people get onto the roof deck over the far bay?
+
+```question
+id: Q26
+urgency: none
+plain: In 2022, the kitchen's top deck covered only the bay farthest from its stair. How did people get up there to lay it?
+context: The replay's builders reach the upper decks by climbing the frames at the stair end and walking along the beams. The kitchen's top deck is 7 m from the stair end, so the replay leaves it out and says why.
+changes: If they climbed the far end (or used a ladder), the replay builds that top deck too.
+options:
+  - Climbed the frames at the far end
+  - A ladder
+  - Walked across the beams from the stair end
+  - Don't know
+images:
+  - none | The kitchen's top deck covers bay 0 only (3 strips), 7 m from its stair end.
+```
+
+(W38.) **What the engine sees.** Kitchen 2022's 4.757 m deck covers bay 0 only (3 strips). The D1 / D2 crews climb only the
+stair-end frames and walk one beam's walkway, so the level is reported unplaced. **What the answer changes.** A D2 start from
+either end; kitchen gains 3 strips; its A+B plan and pins move.
+Gene:
+
+### Q27. 2022 kitchen and west house: what were the low walls (0.90 m and 1.00 m)?
+
+```question
+id: Q27
+urgency: none
+plain: In 2022, the kitchen had a waist-high plywood wall (0.9 m) and the west house a 1 m one. Were these counter fronts or railings, and how were they made?
+context: The replay cuts plywood wall panels only to the full wall heights (2.23 and 2.20 m), so it leaves these two low walls out and says why.
+changes: A half-height panel rule would build them.
+options:
+  - Counter / bench fronts, plywood on a 2x4 frame
+  - Railings with plywood
+  - Something else (say below)
+images:
+  - none | A 0.90 m plywood wall in the kitchen (y 0.30–1.20) and a 1.00 m one in the west house (y 0.30–1.30).
+```
+
+(W38.) **What the engine sees.** Kitchen: 3.658 × 0.900 m at (1.17, 6.31), y 0.30–1.20; west-house: 3.658 × 1.000 m at (−6.31,
+1.17), y 0.30–1.30. No panel def of those heights: unplaced with the reason. **What the answer changes.** A half-height panel
+rule; both houses' A+B plans and pins move.
 Gene:
 
 ---

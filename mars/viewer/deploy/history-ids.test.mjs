@@ -24,7 +24,7 @@ test('history ids: every year rebuilds with identical, unique, semantic ids',()=
   const a=current(year),b=idsOf(build2(year));
   assert.deepEqual(b,a,`${year} ids differ between builds`);
   assert.equal(new Set(a).size,a.length,`${year} has duplicate ids`);
-  for(const id of a)assert.match(id,/^(person-\d+|[a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign))$/,`${year}: ${id}`);
+  for(const id of a)assert.match(id,/^(person-\d+|[a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign|solarium-door))$/,`${year}: ${id}`);
  }
 });
 test('history ids: inserting a component early in 2021 leaves every original id intact',()=>{
@@ -42,15 +42,19 @@ test('history ids: inserting a component early in 2021 leaves every original id 
 });
 test('history ids: explicit names pin plan-addressable pieces',()=>{
  assert.ok(current(2021).includes('chiba-mars-letters'));assert.ok(current(2021).includes('chiba-aluminet'));
- assert.ok(current(2024).includes('chiba-flower-mural'));assert.ok(current(2024).includes('chiba-entry-sign'));
+ assert.ok(current(2024).includes('chiba-flower-mural'));assert.ok(current(2024).includes('chiba-entry-sign'));assert.ok(current(2024).includes('chiba-solarium-door'));
 });
 test('history ids: frozen migration table maps every legacy id to a live component',()=>{
- assert.equal(table.schema,'mars-history-id-migration/1');let entries=0;
+ assert.equal(table.schema,'mars-history-id-migration/1');let entries=0,removed=0;
  for(const year of YEARS){const live=new Set(current(year));
-  for(const [asm,run] of Object.entries(table.years[year]??{}))run.ids.forEach((s,i)=>{if(s===null)return;entries++;
+  for(const [asm,run] of Object.entries(table.years[year]??{}))run.ids.forEach((s,i)=>{if(s===null){removed++;return;}entries++;
    assert.ok(live.has(`${asm}-${s}`),`${year} ${asm}-${run.start+i} → ${asm}-${s} no longer exists; add an alias instead of regenerating`);});
  }
- assert.equal(entries,7942);
+ // 7,942 live legacy entries until 2026-09-29; the Chiba 2024 reconstruction edit removed the right-flap salvaged
+ // windows (84 entries: backing, glazing, frames → null = removed; HISTORY_IDS.md). 9 older nulls predate it.
+ // W46 (props seated on their surfaces, 2026-09-29) re-pointed 243 entries at successors, removing none: 2020 70
+ // (toilets 12, RV wheels 48, workshop legs + bins 10), 2021 58, 2023 41, 2024 41, 2025 33; 2022 and 2026 held.
+ assert.equal(entries,7942-84);assert.equal(removed,9+84);
  assert.equal(legacyId(table,2021,'person-3'),undefined);
 });
 test('layouts: legacy ids migrate, unmappable legacy ids warn and drop, stable ids pass',()=>{

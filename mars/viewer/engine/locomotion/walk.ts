@@ -39,6 +39,7 @@ const FACE_LOOK = 0.3; // m: heading aims along the chord to the path point this
 /** Ground speed (m/s) below which a walker is not shown walking: activity 'walk' needs ≥ WALK_MIN. */
 export const WALK_MIN = 0.08;
 const LOOK_TIME = 1.5; // s of look-ahead along the corridor for standing people, loads, geometry
+const STATIC_TOL = 0.03; // m: the static-clearance invariant's tolerance (runtime/invariants.ts)
 const STOP_GAP = 0.02; // m kept before the exact contact point of a hazard when stopping for it
 const VEHICLE_GAP = 1.5; // m body gap to a vehicle being driven within which a walker slows (look-ahead included)
 const VEHICLE_WALK = 0.5; // m/s walking speed near a vehicle that is being driven
@@ -720,6 +721,22 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     else if (stoppedFor.kind === 'load') loadBlock ??= stoppedFor.id;
     else geoBlock = stoppedFor.id;
   }
+  // hard static layer (W38): never step to where the body would overlap static geometry by the invariant's measure
+  // (runtime/invariants.ts humanStaticClearance: clearance < r − 3 cm) unless it already stands worse. A route planned
+  // from a start inside the radius runs its first leg straight to the nearest standable cell (spatial/path.ts snap), and
+  // past a column corner that leg can cut into a beam end (chiba 2022, planned round people). The walker holds and
+  // replans instead (as for a stale corridor). A step it takes here would be a collision.human-static violation.
+  if (p !== cur) {
+    const cn = clearanceAt(g, p);
+    if (cn < r - STATIC_TOL && cn < clearanceAt(g, cur) - 1e-9) {
+      geoBlock ??= nearestBlocker(g, p) ?? 'geometry';
+      ex.s = prevS;
+      ex.offset = bodyOff;
+      ex.v = 0;
+      p = cur;
+      lagging = false;
+    }
+  }
   a.pose.p = [p[0], g.y, p[1]];
   // animation signal: 'walk' only while the body actually covers ground (the renderer's Walk clip);
   // a stopped walker waits (named reason) or stands idle — it never walks on the spot
@@ -806,6 +823,10 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (Math.abs(ex.offset) > 0.05) {
       const occ = occupant(rt, a, pointAt(ex, ex.total), ex.profile.radius);
       if (occ) {
+        // W38: the person on my destination waits for me to clear a single-file passage my destination lies in — I hold it
+        // while I wait for them (chiba 2022, D1: m3 / m6 deadlocked for 16 h): let the passage go so they walk on through
+        const ot = rt.world.entities[occ].human?.task, orec = ot ? rt.records.get(ot) : undefined;
+        if (ex.held.size && orec?.status === 'blocked' && orec.diagnostic?.code === 'traffic.yield' && orec.diagnostic.subjects?.includes(ex.actor)) releaseAll(rt, ex);
         makeWay(rt, occ, pointAt(ex, ex.total));
         return { status: 'blocked', diagnostic: { code: 'walk.goal-occupied', message: `${ex.actor} cannot step onto its destination: ${occ} is standing there`, subjects: [ex.actor, occ] } };
       }

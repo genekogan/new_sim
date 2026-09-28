@@ -11,7 +11,7 @@ import { wrapAngle } from '../core/math.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 import { carry } from '../carry/actions.ts';
 import { assemblyGraph, type AssemblyGraph } from '../campus/assembly.ts';
-import { buildingFootprint } from '../campus/bom.ts';
+import { buildingFootprint, otherWorkZones } from '../campus/bom.ts';
 import { publishCampusYear, type CampusYearFile } from '../campus/history.ts';
 import { yearBuildPlan, yearBuildScene, type YearBuildPlan } from '../campus/sequence.ts';
 import type { CampusScene } from '../campus/types.ts';
@@ -70,13 +70,13 @@ export type YearBuildSetup = {
 };
 
 /** Publish `mars-<year>` (protected), fork it, commit the piles + crew, bind the skeleton template. */
-export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB) => boolean } } = {}): YearBuildSetup {
+export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB, i: number, all: PartB[], dir: 1 | -1) => boolean }; avoidNeighbours?: boolean } = {}): YearBuildSetup {
   const history = new WorldHistory(YEAR_BUILD_RULES);
   const { canonical, base } = publishCampusYear(history, year, file);
   const graph = assemblyGraph(year, base);
   const fp = buildingFootprint(graph.nodes.filter((n) => n.assembly === assembly));
   const scene = yearBuildScene(base, assembly, fp.c, opts.radius ?? 35);
-  const build = yearBuildPlan(graph, scene, assembly, { bays: opts.bays, ...(opts.phaseB ? { phaseB: opts.phaseB } : {}) });
+  const build = yearBuildPlan(graph, scene, assembly, { bays: opts.bays, ...(opts.phaseB ? { phaseB: opts.phaseB } : {}), ...(opts.avoidNeighbours ? { avoid: otherWorkZones(graph, assembly).map((z) => z.zone) } : {}) });
   const workspace = `mars-${year}-build-${assembly}`;
   history.fork(canonical.id, workspace, `Mars ${year}: ${assembly} skeleton from the piles (hypothetical)`);
   const w = history.read(workspace);
@@ -95,6 +95,32 @@ export function yearBuildSetup(year: number, assembly: string, file: CampusYearF
     services: () => ({ spatial: new Spatial(scene, { baseId: staticHash, ...(contributors ? { contributors } : {}) }) }), maxTicks: 20 * 60 * 60 * (opts.phaseB ? 16 : 4),
   };
   return { history, canonical: canonical.id, workspace, graph, scene, build, plan, cfg };
+}
+
+// ---- W38: every 2022 rack house through the same rules ----
+/** The four rack houses of Mars 2022: one template (12 frames of 16 ft × 3 ft in 4 lines × 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m). */
+export const HOUSES_2022 = ['chiba', 'east-house', 'kitchen', 'west-house'] as const;
+/**
+ * Phase-B tranche filter: the first ground-floor deck strip over the first bay built — the lowest level's lowest strip
+ * (next to geometric frame line 0 in every 2022 house), or its highest when the skeleton is built from the other end
+ * (`dir` −1, sequence.ts lay-out room rule).
+ */
+export function firstGroundStrip(p: PartB, _i: number, all: PartB[], dir: 1 | -1 = 1): boolean {
+  if (p.kind !== 'deck') return false;
+  const decks = all.filter((x) => x.kind === 'deck');
+  const lv = Math.min(...decks.map((x) => Number(x.meta.level)));
+  const vs = decks.filter((x) => Number(x.meta.level) === lv).map((x) => Number(x.meta.strip));
+  const s0 = dir === 1 ? Math.min(...vs) : Math.max(...vs);
+  return Number(p.meta.level) === lv && Number(p.meta.strip) === s0;
+}
+/**
+ * One house's A+B build (W38), the same rules for every house: crew of six, the yard clear of the house's own work zone,
+ * of every scene obstacle (the neighbouring houses stand) AND of the other rack houses' work zones (`avoidNeighbours`:
+ * PROVISIONAL yard rule v2 — east-house's pinned runs keep the v1 yard, see YEAR_BUILD.md). `tranche`: the default-suite
+ * slice — the first bay (frame lines 0–1) + the first ground-floor deck strip (3 pieces cut, notched, pushed in).
+ */
+export function yearBuildHouseSetup(year: number, house: string, file: CampusYearFile, opts: { tranche?: boolean } = {}): YearBuildSetup {
+  return yearBuildSetup(year, house, file, opts.tranche ? { bays: 1, phaseB: { sections: ['D0'], only: firstGroundStrip }, avoidNeighbours: true } : { phaseB: {}, avoidNeighbours: true });
 }
 
 /**

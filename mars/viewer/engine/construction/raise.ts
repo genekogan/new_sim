@@ -26,6 +26,7 @@ import { holdingDiagnostic, holdStations, isUpright } from './rules.ts';
 import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 import { canonicalLying, isLying } from './lying.ts';
 import { entityCorners } from '../spatial/service.ts';
+import { makeWay } from '../locomotion/walk.ts';
 
 const RAISE_RATE = Math.PI / 2 / 5; // rad/s: upper bound (~5 s for a full raise)
 export const LIFT_HAND = 1.9; // m above the ground: where lifters hold the frame (≤ 2.0 m overhead reach)
@@ -144,6 +145,47 @@ function standBlocked(rt: Runtime, u: Entity, actor: string, p: Vec2, need: numb
     subjects: [u.id, actor, ...(o ? [o.id] : [])],
     at: [p[0], u.pose.p[1], p[1]],
   };
+}
+
+// W38 (PROVISIONAL, as W27's set-part rule and the carry verb's): the raise crew never walks through a bystander.
+const BYSTANDER_GAP = 2 * HUMAN_RADIUS + 0.08;
+const d2 = (a: Vec2, b: Vec2) => hypot(a[0] - b[0], a[1] - b[1]);
+/** A person outside the crew whom a lifter's next position comes within BYSTANDER_GAP of (and closer than now); same level, ≤ 1 m in height. */
+function raiseBystander(rt: Runtime, ex: Exec, moves: [string, Vec2, number][]): { who: string; at: Vec2 } | null {
+  const w = rt.world;
+  const crew = new Set(ex.p.crew);
+  const others = Object.values(w.entities).filter((o) => o.kind === 'human' && o.human && !crew.has(o.id)).sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const [a, q] of moves) {
+    const h = w.entities[a];
+    const now: Vec2 = [h.pose.p[0], h.pose.p[2]];
+    for (const o of others) {
+      if (o.human!.level !== h.human!.level || Math.abs(o.pose.p[1] - h.pose.p[1]) > 1.0) continue;
+      const op: Vec2 = [o.pose.p[0], o.pose.p[2]];
+      const d = d2(q, op);
+      if (d < BYSTANDER_GAP && d < d2(now, op) - 1e-9) return { who: o.id, at: q };
+    }
+  }
+  return null;
+}
+/** True when a person standing at q is clear of every lifter's remaining path (makeWay's clearOf test). */
+function clearOfRaise(rt: Runtime, ex: Exec, q: Vec2): boolean {
+  if (!rt.isActive(ex.id)) return true;
+  const th = rt.world.entities[ex.p.item].pose.pitch ?? 0;
+  for (const r of ex.roles) {
+    if (!r.lifter) continue;
+    const pts: Vec2[] = [];
+    for (let k = 0; k <= 16; k++) pts.push(lifterAt(ex.geo, r.side, th * (1 - k / 16)));
+    if (r.steps) { const ps = stepPath(ex.geo, r, ex.thT), L = pathLen(ps); for (let d = 0; d <= L; d += 0.1) pts.push(along(ps, d)); }
+    if (pts.some((p) => d2(p, q) < BYSTANDER_GAP + 0.1)) return false;
+  }
+  return true;
+}
+/** Hold the frame and ask the bystander to step aside (null = nobody in the way). */
+function raiseWait(rt: Runtime, ex: Exec, u: Entity, moves: [string, Vec2, number][]): { status: 'blocked'; diagnostic: Diagnostic } | null {
+  const by = raiseBystander(rt, ex, moves);
+  if (!by) return null;
+  makeWay(rt, by.who, by.at, { by: `the crew raising ${u.id}`, subjects: [u.id, ...ex.p.crew], test: (q) => clearOfRaise(rt, ex, q) });
+  return { status: 'blocked', diagnostic: { code: 'raise.path-occupied', message: `the crew raising ${u.id} holds it and waits for ${by.who} to move out of its way (${ex.phase})`, subjects: [u.id, by.who, ...ex.p.crew], at: [by.at[0], u.pose.p[1], by.at[1]] } };
 }
 
 /** Plan-time: sample every lifter position of the choreography against static geometry. */
@@ -293,6 +335,8 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
         if (b) return { status: 'blocked', diagnostic: b };
         moves.push([r.actor, q, faceCol(g, q, r.side, 0)]);
       }
+      const wait = raiseWait(rt, ex, u, moves);
+      if (wait) return wait;
       for (const [a, q, yaw] of moves) put(a, q, yaw);
       st.d = nd;
       if (!done) return { status: 'running', phase: 'step' };
@@ -310,6 +354,8 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
       if (b) return { status: 'blocked', diagnostic: b };
       moves.push([r.actor, q, faceCol(g, q, r.side, reachR(g, next))]);
     }
+    const wait = raiseWait(rt, ex, u, moves);
+    if (wait) return wait;
     for (const [a, q, yaw] of moves) put(a, q, yaw);
     u.pose.pitch = next;
     // the base settles from resting-on-its-face height to standing on the ground

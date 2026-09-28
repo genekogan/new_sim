@@ -80,8 +80,10 @@ built" as one item, with its `ticks` and `duration`. Keep the chapter entries ou
    chapter k's final frame, so the swap is seamless. Check `chapter.startHash === previous.take.finalStateHash` before
    the swap and show a continuity error instead if it fails.
 3. The set's scrubber runs over `[0, duration)`. Map a set time T to the chapter k with `from ≤ T/dt < to` and the local
-   time `T − from·dt`. Moments are per chapter (`work`, `middle`, `done`: take seconds within the chapter). Offset them by
-   `from·dt`.
+   time `T − from·dt`. Moments are per chapter, take seconds within the chapter: the first of each event (`first raise`,
+   `first beam`, `first hand-up`, `first relay`, `first cut`, `first pass-up`, `first stringer`, `first tread`, `first post`,
+   `first wall`, `first rail`, `first panel`, and `up the frame` early in D1 / D2 / W / P) + `done` (W39,
+   `engine/camera/chapter-shots.ts`; was `work`, `middle`, `done`). Offset them by `from·dt`.
 4. Final checks: the last chapter's hash check covers the whole set (`finalStateHash` of the set = of the last chapter).
    The canonical check (year-build) runs on the last chapter's replayed last frame. Earlier chapters can run it on their
    own last frame; parts not yet built there are "outside this take".

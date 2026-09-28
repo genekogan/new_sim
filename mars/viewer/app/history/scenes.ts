@@ -8,7 +8,7 @@ export const historyNotes:Record<number,string>={
  2021:'Two separate parallel buildings, an equally wide bare-ground corridor and draped silver aluminet. February flythrough and ground views; hidden room boundaries remain estimated.',
  2022:'Four buildings rotated around a square courtyard, with four open corner passages. Drone orbit, overhead and March rooftop views; dimensions remain a photographic fit.',
  2023:'Broad rooftop Chiba, inclined solar frontage and a separate kitchen across the trailer circle. Ground views and drone footage; concealed interiors are provisional.',
- 2024:'Red Chiba façade, central stairs, stepped left solar panels, right-hand glazing and a separate kitchen. March façade photos plus January aerials; trailer locations may have changed.',
+ 2024:'Red Chiba façade: vertical inset with straight central stairs and the door landing, leaning flaps with stepped solar panels (left) and a plexiglass solarium (right), a plexiglass end wall with a door, and a separate kitchen. March façade photos, the 2024 front and solarium photos, January aerials; trailer locations may have changed.',
  2025:'Compact Chiba with long central steps, painted side walls and a separate kitchen / lounge. January aerials and February–March ground views.',
  2026:'Existing modular reconstruction and drone alignment, supplemented by kitchen, café and classroom photographs. Some dimensions and hidden interiors remain provisional.'};
 function hall(k:Kit,id:string,name:string,x:number,z:number,nx:number,nz:number,h=4.8768,openAisle=false,depth=nz*BAY){const g=k.assembly(id,name,[x,0,z]);k.frame(g,nx,nz,h,true,depth);k.deck(g,nx*BAY,depth,.22);
@@ -29,7 +29,7 @@ function kitchenBuilding(k:Kit,x:number,z:number,year:number){
  // Three bays: enclosed workspaces either side of an open central lounge.
  k.wall(g,w,2.25,0,-d/2,1.36);for(const side of [-1,1]){k.wall(g,d,2.25,side*w/2,0,1.36,'#b99b75',Math.PI/2);k.wall(g,BAY,1.03,side*BAY,d/2,.75);k.wall(g,BAY,.4,side*BAY,d/2,2.25);k.wall(g,BAY,.6,side*BAY,d/2,3.05);}
  const interior=k.assembly('kitchen-interior','Kitchen · sink, pantry and appliances',[-BAY,0,0]);g.add(interior);k.kitchen(interior,BAY,2*BAY,year);
- const cafe=k.assembly('cafe','Café / lounge',[BAY,0,0]);g.add(cafe);k.table(cafe,0,1,2.6,.65,.92);k.screen(cafe,0,1.8,-2.9,1.15);k.box(cafe,'café painted counter',[2.8,.8,.08],[0,.5,1.4],k.photo('/history/2023/cafe-front.webp'));k.wall(cafe,2.8,1.4,0,-3,1.35,k.photo('/history/2023/swirls.webp'));
+ const cafe=k.assembly('cafe','Café / lounge',[BAY,0,0]);g.add(cafe);k.table(cafe,0,1,2.6,.65,.92);k.screen(cafe,0,1.8,-2.9,1.15);{const floor=k.seat?k.surface(cafe,Kit.footprint(0,1.4,2.8,.08),.9):.1;k.box(cafe,'café painted counter',[2.8,.9-floor,.08],[0,(.9+floor)/2,1.4],k.photo('/history/2023/cafe-front.webp'));/* floor to counter top (.9) */}k.wall(cafe,2.8,1.4,0,-3,1.35,k.photo('/history/2023/swirls.webp'));
  k.solar(g,BAY,3.6,BAY,2.9,-.3,.15);
  // Raised central rooftop canopy, present in the later kitchen aerials.
  k.box(g,'central rooftop canopy',[BAY,.07,BAY],[0,4.45,-BAY/2],'#b89b73',layers.roof);k.stairs(g,2.7,4,2.22,0,5.7,12);
@@ -37,7 +37,7 @@ function kitchenBuilding(k:Kit,x:number,z:number,year:number){
 }
 function classroom(k:Kit,g:T.Group,w:number,d:number){
  k.wall(g,w,2.3,0,-d/2,1.38,'#d0ccc0');k.screen(g,0,1.62,-d/2+.08,1.8);
- for(let z=-d/2+1.7;z<d/2-1;z+=2){k.table(g,-w/4,z,2,.7);k.table(g,w/4,z,2,.7);for(const x of [-w/4,w/4]){k.box(g,'classroom bench',[1.8,.075,.35],[x,.48,z+.75],'#aa8b63');for(const dx of [-.7,.7])k.box(g,'bench foot',[.065,.4,.25],[x+dx,.25,z+.75],'#685744');}}
+ for(let z=-d/2+1.7;z<d/2-1;z+=2){k.table(g,-w/4,z,2,.7);k.table(g,w/4,z,2,.7);for(const x of [-w/4,w/4]){k.box(g,'classroom bench',[1.8,.075,.35],[x,.48,z+.75],'#aa8b63');for(const dx of [-.7,.7]){const floor=k.seat?k.surface(g,Kit.footprint(x+dx,z+.75,.065,.25),.4425):0,[h,cy]=k.seat?[.4425-floor,(.4425+floor)/2]:[.4,.25];k.box(g,'bench foot',[.065,h,.25],[x+dx,cy,z+.75],'#685744');}}} // feet: floor to seat underside (held years: as before W46)
 }
 function make2021(k:Kit){
  const d=6*BAY,wingDepth=4.572,offset=wingDepth,w=3*wingDepth,g=k.assembly('chiba','Main hall · MARS');
@@ -96,15 +96,9 @@ function make2024(k:Kit){
  const w=6*BAY,d=3*BAY,g=hall(k,'chiba','Chiba · painted frontage, solar and glazing',0,0,6,3,4.8768,true);
  k.deck(g,w,d,4.86,0,0,true);roofRails(k,g,w,d,4.7);
  k.wall(g,w,2.25,0,-d/2,1.37);k.wall(g,d,2.3,-w/2,0,1.38,'#b32629',Math.PI/2);k.wall(g,d,2.3,w/2,0,1.38,k.photo('/history/2022/arches.webp'),Math.PI/2);
- // March frontage photos: left stepped PV, right salvaged glazing; exposed mural between.
+ // March frontage photos + Gene's 2026-09-29 front / solarium photos: vertical inset with straight
+ // stairs and the door landing, leaning flaps (PV left, plexiglass solarium right), plexiglass end wall + door.
  frontage2024(k,g,w,d);
- k.deck(g,3.2,3.0,2.55,0,d/2+1.2);
- for(const side of [-1,1]){
-  const stairSupport=new T.Group();stairSupport.userData={...g.userData,layer:layers.floor};stairSupport.matrixAutoUpdate=false;stairSupport.matrix.set(1,0,0,0, 0,1,0,0, 0,-2.65/4.64,1,d/2+3.2, 0,0,0,1);g.add(stairSupport);
-  const stair=new T.Group();stair.userData={...g.userData,layer:layers.floor};stair.position.x=side*3.6;stair.rotation.y=side*Math.PI/2;stairSupport.add(stair);
-  k.stairs(stair,1.35,4,2.3,0,0,12);
-  stair.traverse(o=>{if(o instanceof T.Mesh)o.material=k.mat('#a93829');});
- }
  const upperStair=new T.Group();upperStair.userData={...g.userData,layer:layers.floor};upperStair.position.y=2.3;g.add(upperStair);k.stairs(upperStair,2.7,3.6,2.1,0,d/2-1.7,10);
 
  auditorium(k,g,d);
