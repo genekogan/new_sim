@@ -32,6 +32,7 @@ export type Support =
   | { kind: 'held'; by: string[] }
   | { kind: 'connected'; to: string[] }
   | { kind: 'forks'; vehicle: string }
+  | { kind: 'ridden-by'; by: string } // a vehicle under its rider (engine/vehicles)
   | { kind: 'none' };
 
 export type Connection = { socket: string; to: string; toSocket: string };
@@ -49,6 +50,7 @@ export type HumanState = {
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };
+  riding?: string; // vehicle id while mounted (engine/vehicles)
   level: number; // walkable level index (0 = ground)
 };
 

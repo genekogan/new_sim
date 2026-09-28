@@ -291,6 +291,10 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
       massKg: 70,
       dims: provisional('generic adult; collision radius 0.28 m'),
     } satisfies AssetDef,
+    // Rideable vehicles (engine/vehicles): local x = direction of travel. `obstacle`: parked, a vehicle
+    // blocks walking at its box; while ridden its phase is `carried`, which lifts it out (spatial/service.ts).
+    { id: 'euc', label: 'electric unicycle (EUC)', category: 'vehicle', size: [0.5, 0.55, 0.22], massKg: 25, color: '#222222', obstacle: true, dims: provisional('generic 18 in EUC; riding disc radius 0.35 m (vehicles/profiles.ts)') } satisfies AssetDef,
+    { id: 'bicycle', label: 'bicycle', category: 'vehicle', size: [1.75, 1.05, 0.6], massKg: 14, color: '#3a6ea5', obstacle: true, dims: provisional('generic adult bicycle; riding disc radius 0.4 m (vehicles/profiles.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
     {
       id: 'test-wall',
