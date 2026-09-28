@@ -111,7 +111,8 @@ export const holdItems: ActionDef<{ actor: string }, null, HoldExec> = {
     else if (want < ex.k) ex.k = Math.max(0, ex.k - dt / SIT_TRANSITION);
     const b = bodyFrame(a, smooth(ex.k) * SEAT_DROP);
     const held = heldBy(rt.world, ex.actor);
-    for (const h of HANDS) {
+    // a construction grip (carry / lift / hand_up) owns human.hands while it lasts: leave them alone
+    for (const h of a.human.grip ? [] : HANDS) {
       if (driven(rt, ex.actor, h)) continue;
       const it = held.find((x) => x.hand === h);
       if (it) {

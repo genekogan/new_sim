@@ -48,7 +48,7 @@ back to the approach point, then idle; the action ends `cancelled` and the seat 
 the body is off the seat. `stand` completes when that stand-up has finished.
 
 Invariant exemption (`runtime/invariants.ts` `SEATED_ACTIVITIES`): like `climb-*`, a person whose
-activity is `sit`, `sit-down` or `stand-up` is exempt from `collision.human-static` — the seated
+activity is `sit`, `sit-down` or `stand-up` (or the item overlays `eat` / `serve`, ITEMS.md) is exempt from `collision.human-static` — the seated
 body is inside its own chair's footprint by design. The exemption is by activity, so it relies on
 the social verbs only setting those activities on a seat or its approach line.
 
@@ -72,6 +72,7 @@ seated person, who first stands up to the approach point (0.6 s deferred stop, a
 | `gather` | `actors, region \| fixture, activity?` | one child `take_slot` per assigned person; people left over get a child that fails `slot.none-free` naming the owner. Ends when all children end |
 | `campfire_circle` | `actors, fire` | gather on the fire's fire-circle slots, activity `warm`; `campfire.not-a-fire` otherwise |
 | `ambient_wander` | `actors, region, seed?, duration?` | background strolls (below) |
+| `eat` (ITEMS.md) | `actor, bowl, spoon, cycles?` | overlay — no `actor:` claim, so it runs inside `sit` / `take_slot` / `gather` / `converse`: activity `eat`, `human.baseActivity` = the group's activity (`sit`, `talk`, …), 2.4 s spoon cycles with per-tick `human.hands` until the bowl is empty; `eat.not-still` while walking / transitioning. `take_item` / `put_item` / `serve` are in ITEMS.md |
 
 ## Ambient autonomy
 `ambient_wander` **reserves nothing**. Each tick, in list order, an idle unclaimed person whose
