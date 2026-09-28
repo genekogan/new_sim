@@ -469,7 +469,9 @@ simulation / corrections, report) with the golden recorded from the pre-W54 code
 the JSON for a byte diff. `record-campus-take.mjs --all --full --check` and `--scenario year-build-2022-ab-chapters
 --check`: OK (take id, final state, camera track and bytes match).
 
-Left (not needed for the targets):
+Next steps (not needed for the targets; LAST_MILE LM-012 / LM-067):
+- A timing test that cannot flake: assert the D2 case's sampler-call count (2 424 after W54, 29 713 before) and that
+  the lead-in hold makes no sampler calls, instead of a wall-clock bound.
 - D2's remaining ≈ 280 ms is half `trackHash`: `core/hash.ts` sha256 (pure JS, DataView reads) + `stableStringify`
   over 27 k samples. A faster identical sha256 (word reads without DataView, no destructuring per block) is a
   `core/` change, not camera's.
