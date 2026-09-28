@@ -104,7 +104,8 @@ Solar placing (`partHands`), items and paint are unchanged (items already blend 
 ## Takes (mars-take/2)
 `take/recorder.ts` FIELDS also record `hands` (integer mm, `{ left?, right? }`), `baseActivity`, `on`, `speed`
 (integer cm/s, `SPEED_Q`) and `contents`; `sampleTake` decodes `hands` / `speed` to metres into
-`SampledEntity.hands` / `.speed` (last value ≤ t, no interpolation between ticks); `baseActivity`, `on`,
+`SampledEntity.hands` / `.speed` (since mars-take/3 thinned keyframes, interpolated: within 5.5 mm / 1.5 cm/s of the
+engine at every tick, releases exact — TAKES_AND_PLANS.md "Thinned fields"); `baseActivity`, `on`,
 `contents` are in `.state`. Hand points in crouch / reach_down are therefore only in the take — `handupHands`
 rebuilds the grip, not the approach. `replayFinalState` is unchanged (the recorded final state, hash-verified).
 `test/take-fields.test.ts`: the meal and a hand-up take match the live world tick for tick.

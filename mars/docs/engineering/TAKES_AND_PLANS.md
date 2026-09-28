@@ -49,14 +49,72 @@ keyframeEvery, tracks, changes, events, finalStateHash, finalState }`.
   sample is forced at least every `keyframeEvery` (20) ticks. Before motion resumes after a hold, the hold
   point is committed, so interpolation never smears a pause.
 - `changes`: `[tick, entity, field, value]` for `present`, `activity`, `level`, `task`, `grip`, `phase`,
-  `support`, `reservedBy`, `connections` (initial values at tick 0; entities may appear/disappear).
+  `support`, `reservedBy`, `connections`, `equipment`, `paint`, and since mars-take/2 `hands` (integer mm),
+  `baseActivity`, `on`, `speed` (integer cm/s), `contents` (initial values at tick 0; entities may appear/disappear).
+  Every field is a step (last value ≤ t) except the mars-take/3 thinned fields `hands` / `speed` (below).
 - `events`: runtime action lifecycle (message kept only for failed/blocked), violations, marks, relative ticks.
 - `finalState`: the full successor state, so replay never needs the planner or runtime.
+
+## Thinned fields (mars-take/3)
+
+`hands` and `speed` changed on almost every tick someone reached or walked (the 2022 whole-house take: 51,768 `hands`
+changes = 3.8 MB, 43,580 `speed` changes = 1.1 MB of 8.3 MB). Since **mars-take/3** (`TAKE_SCHEMA`, W20) their changes
+are **keyframes**, simplified like pose tracks. `INTERP_FIELDS` (`take/types.ts`) holds the tolerances.
+
+| Field | Tolerance | Guarantee: `sampleTake` vs the live world at every tick |
+| --- | --- | --- |
+| `hands` | 5 mm per hand point (Euclidean) | ≤ 5.5 mm (tolerance + ½ mm quantisation) |
+| `speed` | 1 cm/s | ≤ 1.5 cm/s |
+
+Rules (`thinChanges` in `take/recorder.ts`, run by `TakeRecorder.finish()`; `RecorderOptions.fieldTol` overrides,
+0 = exact at every tick):
+- **Semantics.** Between two consecutive keyframes of one entity and field that are both non-null and **of the same
+  shape** (the same hands present), the value is linear in the tick (`interpChange` in `take/replay.ts`, also at
+  fractional ticks). Otherwise the earlier keyframe holds until the next one. After the last keyframe it holds.
+- **Exact events.** A release (`null`: hands free, not walking) and a shape change (a hand appears or goes) are
+  keyframes at exactly their tick and are never interpolated across.
+- **Holds.** The recorded step signal is simplified per run of one shape. A hold contributes its first and its last
+  tick (a line against a constant misses most at the ends), so a pause is never smeared into the motion that follows.
+  The same idea as the pose tracks' hold commit.
+- **Simplifier.** Greedy, as the pose tracks: a point is dropped when the line between the kept neighbours reproduces
+  it, and every point dropped before it, within the tolerance, evaluated with the same arithmetic `sampleTake` uses.
+  At most 256 points are pending per keyframe pair.
+- **What is untouched.** Every other field, `tracks`, `events` and `finalState`. `replayFinalState` and every pinned
+  final-state hash are bit-identical (the final state is not a track). The take `id` changes because `changes` and
+  `schema` do; `takeIdOf` itself is unchanged. The camera planner (`camera/take-sampler.ts`) reads only
+  `present` / `grip` / `task` / `reservedBy` and tracks, so a re-planned camera track has identical `data`. Its id
+  (`cam-` + hash of `{ takeId, data }`) changes only through the take id.
+- **Consumers.** `sampleTake` indexes `changes` once per take (a WeakMap on the frozen `changes` array) and
+  binary-searches each entity's fields. Before, it scanned all changes on every call. `sliceTake` (`get_take`
+  ranges) keeps the bracketing keyframes of thinned fields: the last one ≤ t0 at its own tick and the first one
+  after t1. So a slice still samples like the whole take. A mars-take/2 reader (step semantics) still loads a /3
+  take, but it holds each keyframe instead of interpolating.
+
+Measured 2026-09-28 (W20) by recording each take with the /2 recorder and applying `thinChanges`. Each run was
+checked at every tick against the /2 step signal: worst hand 4.93 mm, worst speed 1.00 cm/s, every release exact.
+
+| Take | ticks | total /2 → /3 (raw) | gzip | `hands` /2 → /3 | `speed` /2 → /3 | tracks | events |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| flagship (build bay, campus) | 11,316 | 539 → 468 KB | 117 → 105 KB | — (none) | 114 → 43 KB (4,705 → 1,776) | 277 KB | 86 KB |
+| 2022 east-house, first bay | 41,182 | 2.51 → 1.35 MB | 421 → 261 KB | 956 → 30 KB (12,864 → 456) | 362 → 135 KB (15,033 → 5,577) | 695 KB | 319 KB |
+| 2022 east-house, whole house | 117,125 | 8.32 → 3.94 MB | 1.35 → 0.76 MB | 3.83 MB → 100 KB (51,768 → 1,494) | 1.06 MB → 414 KB (43,580 → 16,895) | 2.04 MB | 0.90 MB |
+
+(Take JSON only. The studio file adds the camera track, 1.2 MB for the 10 Hz flagship.) `speed` keeps more:
+walk_to's speed has real steps (a replan, a yield, 45 → 101 cm/s in one tick), and each step costs its hold's end
+keyframe. The acceleration ramps (6 cm/s per tick) reduce to two keyframes.
+
+`sampleTake` at every tick of the whole take: flagship 1.3 s → 0.60 s (112 → 53 µs/tick); first bay ≈ 14.8 s →
+2.3 s (358 → 57 µs/tick); whole house ≈ 114 s → 14.3 s (972 → 122 µs/tick). The old figures are extrapolated from
+every 20th–1000th tick. The new cost scales with entities, not with take length.
+
+What now dominates a long take: `tracks` (2.0 MB whole house) and `events` (0.9 MB, the action lifecycle incl. phase
+changes). A 2020–2026 set of whole-year takes at ≈ 4 MB each is feasible. The next lever would be the events
+(phase-change lifecycle lines) or a coarser pose tolerance for people standing still. Neither is done.
 
 ## Replay (`take/replay.ts`)
 
 `sampleTake(take, t)` → poses + discrete state at time t (clamped to the take; before an entity's first
-sample it is absent). `replayFinalState(take)` returns a copy of the recorded final state and throws if it
+sample it is absent; `hands` / `speed` interpolated between their keyframes, in metres / m/s). `replayFinalState(take)` returns a copy of the recorded final state and throws if it
 no longer hashes to `finalStateHash`. `takeEvents(take, t0, t1)`. The module imports only `core/` and
 `take/types` — no runtime, registry, planner, spatial or history (a test enforces this).
 
@@ -96,7 +154,8 @@ state at all, so camera edits cannot invalidate a plan.
 - Rehearsal and replay never mutate history, workspace heads or the take (takes in `TakeLibrary` are frozen).
 - Executing in a fork leaves canonical and sibling workspaces untouched; canonical refuses execution.
 - A relevant physical edit after rehearsal ⇒ `plan.stale`; env / label / provenance edits ⇒ still valid.
-- Sampling a take at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level.
+- Sampling a take at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level; hands within
+  5.5 mm, speed within 1.5 cm/s, releases exact (`take-fields.test.ts`).
 
 ## Cross-host determinism
 
