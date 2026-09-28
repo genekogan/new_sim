@@ -10,6 +10,9 @@
 // self-supporting iff it has ≥ 2 standing uprights and every upright in it
 // has beams on BOTH columns at ≥ N distinct heights (N = 1 for frames ≤ 9 ft,
 // 2 for taller frames). Until then every upright must be held by ≥ holdCrew people.
+// (v1.1, year builds) Other uprights of the group that are still held by ≥ holdCrew
+// people are exempt from the height count (their holders carry them); the upright
+// being judged never is.
 import { FT, datan2, rot2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
@@ -80,6 +83,9 @@ export function groupStability(w: WorldState, u: Entity): StabilityReport {
   if (group.length < 2) missing.push(`${u.id} is not joined by beams to another upright`);
   for (const g of group) {
     if (!isStanding(g)) { missing.push(`${g.id} is not standing`); continue; }
+    // an upright still held by enough people is carried by them, not by its beams: a new frame hung on a
+    // stable run (year builds, campus/sequence.ts) does not un-stabilise the frames already released
+    if (g.id !== u.id && g.support?.kind === 'held' && g.support.by.length >= (def(g.def).handling?.holdCrew ?? 1)) continue;
     const n = requiredLevels(g);
     const links = beamLinks(w, g);
     for (const col of [-1, 1] as const) {
