@@ -44,8 +44,10 @@ function entities(): Entity[] {
     human('g5', -26.5, -18.5), human('g6', -24.6, -17.4),
     // the conversation pair
     human('c1', -15.0, -29.2), human('c2', -16.4, -29.4),
-    // the two sitters (near the chairs)
-    human('s1', -17.6, -17.5), human('s2', -20.2, -16.7),
+    // the two sitters, just outside the chair arc in the gaps between chair1/chair2 and chair2/chair3:
+    // chairs are obstacles and are sat on from their approach point on the fire side, so each steps
+    // through a gap to the front (from further back, the detour through the gathering crowd took ~20 s)
+    human('s1', -19.3, -19.15), human('s2', -20.75, -18.4),
     // ambient wanderers
     human('a1', -18.8, -15.4), human('a2', -16.8, -16.2),
     // latecomers: x1 takes the last fire place, x2 finds the circle full
@@ -53,9 +55,13 @@ function entities(): Entity[] {
   ];
 }
 
-export type ScriptEvent = { at: number; id: string; label: string; run: (rt: Runtime, s: Script) => ActionRecord[] };
+/**
+ * A scripted submit at `at` seconds; with `after`, it also waits (from `at` on) until that earlier
+ * event's first record has reached `status` — chained on the record, not on a guessed tick.
+ */
+export type ScriptEvent = { at: number; id: string; label: string; after?: { event: string; status: ActionRecord['status'] }; run: (rt: Runtime, s: Script) => ActionRecord[] };
 export type Fired = { id: string; label: string; tick: number; recs: ActionRecord[]; cancelled?: string[] };
-export type Script = { fired: Fired[]; next: number; notes: { tick: number; level: 'warn' | 'error'; text: string }[] };
+export type Script = { fired: Fired[]; notes: { tick: number; level: 'warn' | 'error'; text: string }[] };
 const scripts = new WeakMap<Runtime, Script>();
 export const scriptOf = (rt: Runtime) => scripts.get(rt);
 const rec = (s: Script, id: string) => s.fired.find((f) => f.id === id);
@@ -67,11 +73,15 @@ export const EVENTS: ScriptEvent[] = [
   { at: 0, id: 'sit-s1', label: 'sit s1 → chair1', run: (rt) => [rt.submit('sit', { actor: 's1', fixture: 'chair1' })] },
   { at: 0, id: 'sit-s2', label: 'sit s2 → chair2', run: (rt) => [rt.submit('sit', { actor: 's2', fixture: 'chair2' })] },
   { at: 0, id: 'ambient', label: 'ambient_wander a1 + a2', run: (rt) => [rt.submit('ambient_wander', { actors: ['a1', 'a2'], region: 'sw-lawn', seed: 3 })] },
+  // s1 is seated inside chair1: `stand` is a 0.6 s stand-up back to the chair's approach point, and
+  // s1 stays reserved by the sit until it ends — so the take_slot waits for the stand to complete
+  { at: 40, id: 'stand', label: 's1 stands up from chair1', run: (rt) => [rt.submit('stand', { actor: 's1' })] },
   {
     at: 40,
     id: 'join',
-    label: 's1 stands, take_slot → fire',
-    run: (rt) => [rt.submit('stand', { actor: 's1' }), rt.submit('take_slot', { actor: 's1', owner: 'fire' })],
+    label: 's1 take_slot → fire (after the stand completes)',
+    after: { event: 'stand', status: 'completed' },
+    run: (rt) => [rt.submit('take_slot', { actor: 's1', owner: 'fire' })],
   },
   { at: 42, id: 'x1', label: 'x1 take_slot → fire (last place)', run: (rt) => [rt.submit('take_slot', { actor: 'x1', owner: 'fire' })] },
   {
@@ -83,7 +93,9 @@ export const EVENTS: ScriptEvent[] = [
       return [rt.submit('take_slot', { actor: 'x2', owner: 'fire' }), rt.submit('take_slot', { actor: 'x2', slot: held?.id ?? 'fire#ring0' })];
     },
   },
-  { at: 51, id: 'bench', label: 'x2 sits on bench1 instead', run: (rt) => [rt.submit('sit', { actor: 'x2', fixture: 'bench1' })] },
+  // chained on the refusal, not a later tick: the bench's approach point + 0.6 s sit-down make the
+  // walk ~1 s longer than stepping straight onto the seat used to be
+  { at: 50, id: 'bench', label: 'x2 sits on bench1 instead (after the refusal)', after: { event: 'full', status: 'failed' }, run: (rt) => [rt.submit('sit', { actor: 'x2', fixture: 'bench1' })] },
   {
     at: 54,
     id: 'pull',
@@ -97,9 +109,11 @@ export const EVENTS: ScriptEvent[] = [
   },
 ];
 
+/** Fire every due event, in script order: its time has come and its `after` record status is reached. */
 function fire(rt: Runtime, s: Script) {
-  while (s.next < EVENTS.length && rt.tick >= Math.round(EVENTS[s.next].at * 20)) {
-    const e = EVENTS[s.next++];
+  for (const e of EVENTS) {
+    if (rec(s, e.id) || rt.tick < Math.round(e.at * 20)) continue;
+    if (e.after && rec(s, e.after.event)?.recs[0]?.status !== e.after.status) continue;
     const recs = e.run(rt, s);
     s.fired.push({ id: e.id, label: e.label, tick: rt.tick, recs });
     for (const r of recs)
@@ -116,7 +130,7 @@ export function campfireRuntime(): Runtime {
   w.regions['sw-lawn'] = { id: 'sw-lawn', label: 'south-west lawn', kind: 'place', polygon: WANDER, provenance: FIXTURE };
   const reg = new Map<string, ActionDef>([[walkTo.verb, walkTo], ...SOCIAL_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
   const rt = new Runtime(w, reg, { spatial: new Spatial(base) }, DEFAULT_INVARIANTS);
-  scripts.set(rt, { fired: [], next: 0, notes: [] });
+  scripts.set(rt, { fired: [], notes: [] });
   return rt;
 }
 
@@ -158,13 +172,14 @@ export function campfireChecks(rt: Runtime): Check[] {
   const sit2 = rec(s, 'sit-s2')?.recs[0];
   const seat2 = fixtureSlots(rt, rt.world.entities.chair2)[0];
   const on2 = onSlot(rt, 's2', seat2);
-  out.push({ ok: sit2?.status === 'executing' && act(rt, 's2') === 'sit' && on2.ok, message: `s2 sits on chair2 facing the fire (${on2.why})` });
+  out.push({ ok: sit2?.status === 'executing' && reached(sit2, 'sit-down') && act(rt, 's2') === 'sit' && on2.ok, message: `s2 sat down on chair2 from its approach point, facing the fire (${on2.why})` });
   const sit1 = rec(s, 'sit-s1')?.recs[0];
-  const [stand, join] = rec(s, 'join')?.recs ?? [];
+  const stand = rec(s, 'stand')?.recs[0];
+  const join = rec(s, 'join')?.recs[0];
   const onJ = onSlot(rt, 's1', join && heldBy(join.id));
   out.push({
     ok: reached(sit1, 'occupied') && sit1?.status === 'cancelled' && stand?.status === 'completed' && join?.status === 'executing' && act(rt, 's1') === 'warm' && onJ.ok,
-    message: `${pend('join')}s1 sat, stood at 40 s (stand ${stand?.status}) and joined the circle with take_slot (${join?.status}/${join?.phase}; ${onJ.why})`,
+    message: `${pend('join')}s1 sat, stood up at 40 s (stand ${stand?.status}${stand && join ? `, ${((join.requestedTick - stand.requestedTick) / 20).toFixed(2)} s stand-up` : ''}) and then joined the circle with take_slot (${join?.status}/${join?.phase}; ${onJ.why})`,
   });
   const x1 = rec(s, 'x1')?.recs[0];
   const full = ring.every((q) => q.claimedBy);
@@ -176,7 +191,8 @@ export function campfireChecks(rt: Runtime): Check[] {
   });
   const bench = rec(s, 'bench')?.recs[0];
   const onB = onSlot(rt, 'x2', bench && fixtureSlots(rt, rt.world.entities.bench1).find((q) => q.claimedBy === bench.id));
-  out.push({ ok: bench?.status === 'executing' && act(rt, 'x2') === 'sit' && onB.ok, message: `${pend('bench')}x2 then sits on bench1 (blocked-then-completed; ${onB.why})` });
+  // only possible once s1's join has filled the circle at ~40.6 s (x2's 'full' pair above is then slot.none-free + reservation.conflict)
+  out.push({ ok: bench?.status === 'executing' && reached(bench, 'sit-down') && act(rt, 'x2') === 'sit' && onB.ok, message: `${pend('bench')}x2 then sits down on bench1 from its approach point (${onB.why})` });
   const rel = rec(s, 'pull-release');
   const pull = rec(s, 'pull')?.recs[0];
   const g1k = gk.find((k) => (k.params as { actor: string }).actor === 'g1');
@@ -206,7 +222,7 @@ export const campfireEvening: Scenario = {
   name: 'campfire-evening',
   title: 'Campfire evening (HYPOTHETICAL, illustrative)',
   description:
-    'HYPOTHETICAL / illustrative inhabited scene (milestone H, engine/social): 1 campfire, 2 benches, 3 camp chairs on open ground. 6 people gather round the fire, 2 converse a few metres away, 2 sit on chairs, 2 wander a lawn. At 40 s s1 stands and joins the circle; x1 takes the last place; at 50 s x2 finds the circle full (slot.none-free + reservation.conflict, expected) and sits on a bench; at 54 s the director pulls g1 away (releaseForDirective + walk_to) and the circle keeps its other places.',
+    'HYPOTHETICAL / illustrative inhabited scene (milestone H, engine/social): 1 campfire, 2 benches, 3 camp chairs on open ground. 6 people gather round the fire, 2 converse a few metres away, 2 sit on chairs, 2 wander a lawn. At 40 s s1 stands up from the chair (0.6 s, back to its approach point) and, once that stand has completed, joins the circle; x1 takes the last place; at 50 s x2 finds the circle full (slot.none-free + reservation.conflict, expected) and then sits on a bench (0.6 s sit-down from its approach point); at 54 s the director pulls g1 away (releaseForDirective + walk_to) and the circle keeps its other places.',
   scene: () => provingGround(),
   humans: () => [],
   build: campfireRuntime,
