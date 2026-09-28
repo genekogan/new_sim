@@ -9,6 +9,15 @@ import { CATALOG } from '../../engine/world/catalog.ts';
 
 type View = { obj: THREE.Object3D; key: string; flame?: THREE.Mesh; light?: THREE.PointLight };
 
+/** Top of the camp chair's fabric seat (m), as built by `chair()`. */
+const CHAIR_SEAT = 0.44;
+/** Height of the sitting surface of a seat fixture as drawn here (humans.ts lowers sitters onto it). */
+export function seatHeight(def: string): number | undefined {
+  if (def === 'camp-chair') return CHAIR_SEAT;
+  if (def === 'bench-6ft') return CATALOG[def]?.size[1]; // plank top = box height
+  return undefined;
+}
+
 export class FixtureViews {
   readonly group = new THREE.Group();
   private views = new Map<string, View>();
@@ -56,7 +65,7 @@ export class FixtureViews {
   private chair(sx: number, sy: number, sz: number, color: string) {
     const g = new THREE.Group();
     const leg = '#3a3f44';
-    g.add(this.box(color, 0, 0.4, 0.02, sx - 0.06, 0.04, sz - 0.1));
+    g.add(this.box(color, 0, CHAIR_SEAT - 0.04, 0.02, sx - 0.06, 0.04, sz - 0.1));
     const back = this.box(color, 0, 0, 0, sx - 0.06, sy - 0.44, 0.03);
     back.position.set(0, 0.42, -sz / 2 + 0.05);
     back.rotation.x = -0.18; // leaning back

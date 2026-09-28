@@ -24,7 +24,7 @@ export function SocialHud({ sim }: { sim: LabSim }) {
         {sim.rt.violations.length ? ` · ${sim.rt.violations.length} VIOLATIONS` : ' · 0 violations'}
       </div>
       <div className="lab-social-legend">
-        sit/warm/talk/watch use the <b>Idle</b> clip (standing) — only Idle + Walk exist
+        only <b>Idle</b> + Walk clips exist: sit = Idle + procedural seated pose, warm = Idle + hands out, talk/watch = Idle
       </div>
       <ol className="lab-social-events">
         {EVENTS.map((e) => {

@@ -194,9 +194,11 @@ writing). No camera track has been rendered to video.
 
 ## Known shortcomings
 
-- **No foot IK and no carry, lift or hold poses.** Carriers play Walk or Idle beside the load. On
-  stairs, feet sink or hover by about 0.09 m. Turning in place plays Idle (`app/lab/README.md`).
-  `RESEARCH.md` §11 (IK) is not implemented.
+- **Poses are procedural layers on Idle/Walk, not clips.** `app/engine-view/humans.ts`: `sit`
+  lowers the body onto the seat with leg IK (0.4 s blend, no real sit-down motion); gripping people
+  get arm IK plus a ≤ 13° lean and shoulder shrug (carriers keep elbows bent) — no crouch or lift;
+  `warm` holds hands out; `talk`/`watch` are plain Idle. No foot IK when walking: on stairs feet sink
+  or hover by about 0.09 m. Turning in place plays Idle (`app/lab/README.md`).
 - **Formations don't avoid each other.** Simultaneous carries are not co-planned and have no space
   reservation, so a sequence has to order them with `after` dependencies (the `step(…, after)` calls
   in `build-bay.ts`).
