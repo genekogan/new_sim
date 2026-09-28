@@ -7,7 +7,7 @@
 // Only small loads (≤ 10 kg, catalog handling.smallLoad) may be held on either; a sheet goes up by
 // hand_up (handup.ts) instead. Mars assembly model v1, approximate.
 import { z } from 'zod';
-import { datan2, dist2, pointInObb, type Vec2, type Vec3, hypot } from '../core/math.ts';
+import { datan2, dcos, dist2, dsin, pointInObb, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Link, Surface } from '../spatial/types.ts';
@@ -173,7 +173,7 @@ export const climbFrame: ActionDef<CP, CProg, CExec> = {
 // ---------------------------------------------------------------- beam_walk
 
 type BP = { actor: string; x: number; z: number; speed?: number };
-type BProg = { walkway: Link; q: Vec2; deck: Surface | null; speed: number };
+type BProg = { walkway: Link; q: Vec2; deck: Surface | null; speed: number; to: Vec2 };
 type BExec = { p: BP; prog: BProg; id: string; beam: Track; off?: Track };
 
 /** A deck surface at the walkway's level (± STEP_UP_MAX) containing p with room to stand; null = none. */
@@ -185,6 +185,37 @@ export function deckAt(rt: Runtime, l: Link, p: Vec2): Surface | Diagnostic | nu
   const c = g ? clearanceAt(g, p) : 0;
   if (c < HUMAN_PROFILE.radius) return { code: 'beam.no-room', message: `no room to stand at (${f2(p[0])}, ${f2(p[1])}) on ${s.label ?? s.id} (clearance ${f2(c)} m < ${HUMAN_PROFILE.radius} m)`, subjects: [s.id] };
   return s;
+}
+
+/**
+ * How far round a step-off target whose own cell reads no room the landing spot is searched (m): one and a half grid
+ * cells. The grid's clearance is a cell-centre value on the global 0.1 m lattice, so the same spot (e.g. 0.35 m from a
+ * deck's edge) reads 0.25–0.35 m depending on where the site sits on the lattice; stepping off lands on the nearest spot
+ * with room instead — rings of 0.05 m, 16 fixed directions, the most room on the first ring that has any (ties: the
+ * lower direction index). A target truly too near an edge (further than this from any spot with room) is still refused.
+ */
+export const STEP_OFF_SEARCH = 0.15;
+const RING_DIRS: Vec2[] = Array.from({ length: 16 }, (_, k) => [dcos((k * Math.PI) / 8), dsin((k * Math.PI) / 8)] as Vec2);
+/** Where a person stepping off the walkway toward deck point p lands: p itself when it has room, else the nearest spot searched round it on a deck of the same level; null = no deck there. */
+export function stepOffSpot(rt: Runtime, l: Link, p: Vec2): { spot: Vec2; deck: Surface } | Diagnostic | null {
+  const d = deckAt(rt, l, p);
+  if (!d) return null;
+  if (!('code' in d)) return { spot: p, deck: d };
+  const sp = spatialOf(rt);
+  const s = sp.scene.surfaces.find((x) => x.level > 0 && Math.abs(x.y - l.from.y) <= STEP_UP_MAX && pointInObb(p, x.obb))!;
+  const g = sp.level(s.level);
+  if (!g) return d;
+  for (let k = 1; k * 0.05 <= STEP_OFF_SEARCH + 1e-9; k++) {
+    let best: Vec2 | null = null, bc = -Infinity;
+    for (const u of RING_DIRS) {
+      const c: Vec2 = [p[0] + u[0] * k * 0.05, p[1] + u[1] * k * 0.05];
+      if (!sp.scene.surfaces.some((x) => x.level === s.level && pointInObb(c, x.obb))) continue;
+      const cl = clearanceAt(g, c);
+      if (cl >= HUMAN_PROFILE.radius && cl > bc + 1e-9) { best = c; bc = cl; }
+    }
+    if (best) return { spot: best, deck: s };
+  }
+  return { ...d, message: `${d.message}; no spot with room within ${STEP_OFF_SEARCH} m of it` };
 }
 
 /** A deck surface over walkway point q within a person's height (people cannot stand on a beam under a deck). */
@@ -219,15 +250,16 @@ export function planBeamWalk(rt: Runtime, p: BP): { ok: true; program: BProg } |
   const big = bigLoad(rt.world, a.id);
   if (big)
     return bad('beam.no-carry', `${a.id} cannot walk beam ${beam} carrying ${big.id} (${def(big.def).label}, ${def(big.def).massKg} kg): nothing but small loads (≤ 10 kg) is carried on a beam; hand it up (hand_up)`, [a.id, big.id, beam], a.pose.p);
-  const target: Vec2 = [p.x, p.z];
+  let target: Vec2 = [p.x, p.z];
   let deck: Surface | null = null;
   const off = offWalkway(l, target);
   if (off > l.width / 2 + 0.02) {
-    const d = deckAt(rt, l, target);
+    const d = stepOffSpot(rt, l, target);
     if (d && 'code' in d) return { ok: false, diagnostic: d };
     if (!d || off > STEP_OFF_MAX)
       return bad('beam.off-walkway', `(${f2(p.x)}, ${f2(p.z)}) is ${f2(off)} m off beam ${beam}'s walkway and not on a deck within a step of it (≤ ${STEP_OFF_MAX} m, ±${STEP_UP_MAX} m)`, [a.id, beam], [p.x, l.from.y, p.z]);
-    deck = d;
+    deck = d.deck;
+    target = d.spot;
   }
   let q = onWalkway(l, target).q;
   if (deck) {
@@ -248,7 +280,7 @@ export function planBeamWalk(rt: Runtime, p: BP): { ok: true; program: BProg } |
     return bad('beam.under-deck', `${a.id} cannot walk beam ${beam} under ${under.deck.label ?? under.deck.id} (at (${f2(under.q[0])}, ${f2(under.q[1])})): nobody stands on a beam beneath a deck; walk on the deck`, [a.id, beam, under.deck.id.replace(/^deck:/, '')], [under.q[0], l.from.y, under.q[1]]);
   const who = beamBlocker(rt, l, a.id, s0, s1);
   if (who) return bad('beam.occupied', `${who.id} stands on beam ${beam} in ${a.id}'s way; people cannot pass on a beam`, [a.id, who.id, beam], who.pose.p);
-  return { ok: true, program: { walkway: l, q, deck, speed } };
+  return { ok: true, program: { walkway: l, q, deck, speed, to: target } };
 }
 
 export const beamWalk: ActionDef<BP, BProg, BExec> = {
@@ -262,7 +294,7 @@ export const beamWalk: ActionDef<BP, BProg, BExec> = {
     const a = rt.world.entities[p.actor];
     const y = prog.walkway.from.y;
     const ex: BExec = { p, prog, id, beam: track([[...a.pose.p] as Vec3, [prog.q[0], y, prog.q[1]]]) };
-    if (prog.deck) ex.off = track([[prog.q[0], y, prog.q[1]], [p.x, prog.deck.y, p.z]]);
+    if (prog.deck) ex.off = track([[prog.q[0], y, prog.q[1]], [prog.to[0], prog.deck.y, prog.to[1]]]);
     return ex;
   },
   step(rt, ex, dt) {

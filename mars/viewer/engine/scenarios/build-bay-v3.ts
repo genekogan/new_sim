@@ -70,7 +70,10 @@ export const V3_LAYOUT = {
   stair: { x: 5.0, z: 0.75 }, // as v1
   tread: { dx: 0.5, z: -1.9 }, // treads south-east of the bay (v1: dx 0, z 3.3 — where the 12 ft beams are staged now)
   spare: { x: -6.0, z: 6.5 }, // v2's spare tread (v2: z 5.2)
-  spareDeck: { x: -0.15, z: 1.2 }, // laid where s1 meets s2 (the carry formation is 1.5 m wide; s2 alone is 1.22 m)
+  // laid across s1 on the axis of s2, its carrier (0.47 m beside it) standing on s2: every load disc ≥ 0.27 m from a deck
+  // edge, so it fits wherever the site falls on the 0.1 m grid lattice (was (−0.15, 1.2): an end disc 0.17 m from the
+  // s1/s2 corner, r 0.163 m — failed at 7 of 17 open-ground origins, W27)
+  spareDeck: { x: 0, z: 1.0 },
   visit: { x: 0, z: 2.4 }, // the visitor walks onto s2
   // receivers' places for the sheets (site-local); b3 is the west upper beam, b4 the east one
   s1Receivers: [{ x: -COL, z: 1.65 }, { x: COL, z: 1.65 }], // on b3 / b4, north of s1

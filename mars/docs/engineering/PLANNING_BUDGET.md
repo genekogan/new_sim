@@ -367,6 +367,31 @@ Takes re-recorded at these pins afterwards: the 2022 first bay and whole skeleto
 the kind-aware sampler in W26) and the flagship (W23, `d2f16bd3…`); `record-campus-take.mjs --all --full --check` is OK for
 all three (W26).
 
+**Re-pinned 2026-09-29 (v3 step-off spot searched (origin-independent), 2026-09-29 — not the budget; W27).** v3 failed
+at some site origins because the grid's clearance is a cell-centre value on the global 0.1 m lattice: the same site-local
+spot reads differently depending on where the site falls on the lattice. At staging-east (28, −9) and on open ground at the
+same origin, crew[4]'s step-off target on s2 (−0.2, 2.8) is truly 0.35 m from s2's north edge but reads 0.25 m < 0.28 m.
+`beam_walk` refused it with `beam.no-room` (framemove.ts `deckAt`: the landing spot needs grid clearance ≥ the body
+radius). Separately, `carry_spare` aborted at 7 of 17 open-ground origins: the spare tread's end load disc (r 0.163 m)
+sat 0.171 m from the s1/s2 corner. Fixes:
+- `beam_walk` now lands on the nearest spot with room within `STEP_OFF_SEARCH` = 0.15 m (1.5 cells). The search uses
+  rings of 0.05 m in 16 fixed directions and takes the most room on the first ring that has any. A target truly at an
+  edge is still refused. `deckAt` itself is unchanged; handup.ts uses it.
+- v3's spare tread now lies at (0, 1.0), across s1 on s2's axis, with its carrier on s2. Every load disc is ≥ 0.27 m from
+  a deck edge.
+
+Verified: v3 completes with 0 violations at 17 of 17 open-ground origins (it was 10 of 17) and at staging-east (17 034
+ticks; it was `beam.no-room`). At the origin, the discrete outcome is identical to HEAD `49bd10f`: step statuses,
+component phase and support, each person's final level, activity, task and grip, grip sets and level changes. The pinned
+open-ground target has room, so the step-off search never runs there. The pin moves only because the tread's spot moved.
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| build-bay v3 (`build-bay-v3.test.ts`) | `a2f782ad96a0…36e38` | `39a0fb3f4d24…7c2ba` | 16401 → 16374 |
+
+No other pin moves. The engine suite is otherwise unchanged. New regression tests: v3 at (28, −9, −0.16) and
+(0.07, 0.03), and a `beam_walk` step-off unit test (lands within 0.15 m; still refused at 0.12 m from an edge).
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
