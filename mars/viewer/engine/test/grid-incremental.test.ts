@@ -229,7 +229,7 @@ test('Spatial.sync patches === full rebuild at every construction step: build-ba
     for (let i = 0; i < 200; i++) { rt.step(); s.tick?.(rt); }
   });
   assert.ok(n > 100, `${n} rebuilds checked`);
-  assert.equal(hash, 'c2c84663c9935244fd1a7533a40c6dda82ca705f84a6c4c36c0d9f881e367a41', 'determinism probe hash unchanged');
+  assert.equal(hash, '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b', 'determinism probe hash unchanged');
 });
 
 test('Spatial.sync patches === full rebuild at every construction step: campus flagship (staging-east crop)', () => {
@@ -250,7 +250,7 @@ test('Spatial.sync patches === full rebuild at every construction step: campus f
     const plan = bindTemplate(buildBayTemplate(site), buildBayBindings, { history: h, baseline: 'build', registry: buildBayRegistry() });
     const reh = rehearse(h, 'build', plan, cfg);
     assert.equal(reh.report.status, 'completed');
-    assert.equal(reh.take.finalStateHash, '42dec8e8f37152e61463e97fe1ef10c4dee4b6d38bb523d24b24c5144a5dde61', 'campus flagship hash unchanged');
+    assert.equal(reh.take.finalStateHash, 'ecb424c74d8797c5940ea5d2b3332c37e5efe4be4a1251d9ebd4b259f9dcbb3a', 'campus flagship hash unchanged');
   });
   assert.ok(n > 300, `${n} rebuilds checked`);
 });
@@ -303,7 +303,7 @@ test('Spatial.gridsFor === buildGrids for every carry plan (gather routes, tall 
     h.fork('canon', 'ws', 'ws');
     const plan = bindTemplate(buildBayTemplate(BUILD_BAY_SITE), buildBayBindings, { history: h, baseline: 'ws', registry: buildBayRegistry() });
     const r = rehearse(h, 'ws', plan, { registry: buildBayRegistry(), invariants: BUILD_BAY_INVARIANTS, services: () => ({ spatial: new Spatial(buildBayGround(), { contributors: BUILD_BAY_CONTRIBUTORS }) }) });
-    assert.equal(r.take.finalStateHash, 'c2c84663c9935244fd1a7533a40c6dda82ca705f84a6c4c36c0d9f881e367a41', 'determinism probe hash unchanged');
+    assert.equal(r.take.finalStateHash, '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b', 'determinism probe hash unchanged');
   });
   console.log(`  gridsFor: ${res.calls} calls, ${res.patched} patched`);
   // gather routes as planned on the former whole-grid buildGrids (measured before the switch). Re-pinned

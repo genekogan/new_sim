@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { hashOf } from '../core/hash.ts';
 import { obbOverlap, type Vec2 } from '../core/math.ts';
 import { WorldHistory, HistoryError } from '../history/store.ts';
-import { buildGrids, clearanceAt, cellOf } from '../spatial/grid.ts';
+import { buildGrids, clearanceAt, cellOf, centreOf } from '../spatial/grid.ts';
 import { Spatial, entityFootprint } from '../spatial/service.ts';
 import { HUMAN_PROFILE, type SpatialScene } from '../spatial/types.ts';
 import { formationFor } from '../carry/formation.ts';
@@ -73,7 +73,7 @@ test('Chiba interior is not walkable (unknown ≠ walkable)', () => {
   };
   let n = 0, blocked = 0;
   for (let c = 0; c < g.nx * g.nz; c++) {
-    const p: Vec2 = [g.x0 + ((c % g.nx) + 0.5) * g.cell, g.z0 + (Math.floor(c / g.nx) + 0.5) * g.cell];
+    const p: Vec2 = centreOf(g, c); // the lattice centre (grid.ts), never hand-computed from x0/z0
     if (!inside(p)) continue;
     n++;
     if (!g.free[c]) blocked++;

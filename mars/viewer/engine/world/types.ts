@@ -63,6 +63,12 @@ export type HumanState = {
   hands?: { left?: Vec3; right?: Vec3 };
   /** While an overlay activity (`eat`) runs: the activity it is layered on ('sit' = seated, 'talk', 'idle'…). */
   baseActivity?: string;
+  /**
+   * Ground speed (m/s, horizontal, rounded to mm/s) over the last tick, published by walk_to while it
+   * owns the person (absent otherwise). Renderers key the Walk clip on it: activity 'walk' is set only
+   * when speed ≥ 0.08 (locomotion/walk.ts WALK_MIN), a blocked walker is 'wait' with speed 0.
+   */
+  speed?: number;
 };
 
 export type Entity = {

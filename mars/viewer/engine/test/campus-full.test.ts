@@ -25,7 +25,7 @@ import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry,
 
 const RULES = 'mars-rules/flagship-campus-test';
 /** campus-flagship (staging-east crop) final state; also pinned in grid-incremental.test.ts. */
-const CROPPED_HASH = '42dec8e8f37152e61463e97fe1ef10c4dee4b6d38bb523d24b24c5144a5dde61';
+const CROPPED_HASH = 'ecb424c74d8797c5940ea5d2b3332c37e5efe4be4a1251d9ebd4b259f9dcbb3a';
 
 function setup() {
   const file = readCampus2026File();

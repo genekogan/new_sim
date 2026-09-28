@@ -38,8 +38,9 @@ function stage(w: WorldState) {
   return w;
 }
 const HUMANS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'visitor', 'g1', 'g2', 'g3', 'w1', 'w2'];
-/** Pinned: final-state hash and length of the v3 rehearsal (open ground). */
-const PIN = { ticks: 17288, hash: '584685f13886b4c2683a015e6a96c9eeb4f0a324e45142a3d7aef8edd37fd588' };
+/** Pinned: final-state hash and length of the v3 rehearsal (open ground). Re-pinned (was 17288 ticks,
+ *  584685f1…fd588): splined turns + immediate block reaction, 2026-09-28 (PLANNING_BUDGET.md); same outcome. */
+const PIN = { ticks: 16191, hash: 'e121377dd6d763a749ec18641d2c8c78fe34493a27eb1cdeafc49128a75924b9' };
 
 test('flagship v3: deck handed up (joists + s1 by hand to two on the beams, s2 off the forklift), 0 violations, rehearse = execute, pinned', () => {
   const h = new WorldHistory('mars-rules/flagship-v3-test');

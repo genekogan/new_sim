@@ -10,7 +10,7 @@ import path from 'node:path';
 import { hashOf } from '../core/hash.ts';
 import type { Vec2 } from '../core/math.ts';
 import { WorldHistory, HistoryError } from '../history/store.ts';
-import { buildGrids, clearanceAt, segmentClearance } from '../spatial/grid.ts';
+import { buildGrids, centreOf, clearanceAt, segmentClearance } from '../spatial/grid.ts';
 import { findRoute, type WalkLeg } from '../spatial/path.ts';
 import { HUMAN_PROFILE, type SpatialScene } from '../spatial/types.ts';
 import { HISTORY_YEARS, campusYearId, forkCampusYear, loadCampusYear, publishCampusYear, type CampusYear } from '../campus/history.ts';
@@ -160,7 +160,7 @@ test('building interiors are not walkable (ground-floor decks block)', () => {
     };
     let n = 0, blocked = 0;
     for (let c = 0; c < g.nx * g.nz; c++) {
-      if (!inside([g.x0 + ((c % g.nx) + 0.5) * g.cell, g.z0 + (Math.floor(c / g.nx) + 0.5) * g.cell])) continue;
+      if (!inside(centreOf(g, c))) continue; // the lattice centre (grid.ts), never hand-computed from x0/z0
       n++;
       if (!g.free[c]) blocked++;
     }
