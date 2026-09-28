@@ -8,15 +8,15 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `1d0965e` (4 uncommitted file(s) under `viewer/engine` at run time) |
-| Generated | 2026-09-28T02:05:25.798Z · Node v26.8.2 |
-| Engine suite | 242 tests in 33 files: 240 pass, 0 fail, 2 skipped · 40.6 s wall |
+| Git HEAD | `6ad36f0` (engine tree clean) |
+| Generated | 2026-09-28T02:26:31.956Z · Node v26.8.2 |
+| Engine suite | 245 tests in 34 files: 243 pass, 0 fail, 2 skipped · 39.7 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 11 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 12) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 570.1 s simulated, 4658 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 597.5 s simulated, 7386 ms compute, take 458610 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 599.3 s simulated, 14674 ms compute (cropped 7363 ms in the same test) · final `3a01328f…` ≠ cropped `b159317e…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 570.1 s simulated, 4410 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 597.5 s simulated, 6943 ms compute, take 458610 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 599.3 s simulated, 14184 ms compute (cropped 6868 ms in the same test) · final `3a01328f…` ≠ cropped `b159317e…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 11403 ticks · final state `79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129` · take `bf58b85269c981003ce6d9c6` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
@@ -656,15 +656,15 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `73dd2dd` (2026-09-28T02:04:22.947Z): 3 added, 0 removed.
+Compared with the report at `1d0965e` (2026-09-28T02:05:25.798Z): 3 added, 0 removed.
 
-- added: api.test.ts :: pause/resume (room): execute pauseAt mid-walk → resume ends in the unpaused final state; snapshots are state blobs; survives a room restart
-- added: api.test.ts :: pause/resume (room): fork at a pause, resume both with different commands → distinct states; the pause checkpoint stays resumable
-- added: api.test.ts :: pause/resume: pauseAt during a carry is refused naming the carry (allowDrop only before the lift); resume on a resting head is resume.not-resumable
+- added: build-bay-v2.test.ts :: flagship v2 layout: the forklift cannot stage s2 on the half-built deck (so it stages it beside the bay)
+- added: build-bay-v2.test.ts :: flagship v2 on Mars 2026: fork canonical, build at staging-east, canonical untouched
+- added: build-bay-v2.test.ts :: flagship v2: forklift sheet, stairs carry, campfire ending — rehearse, execute, canonical untouched
 
 ## Tests not cited by any row or milestone
 
-62 of 242 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+65 of 245 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -678,6 +678,9 @@ Compared with the report at `73dd2dd` (2026-09-28T02:04:22.947Z): 3 added, 0 rem
 - `api.test.ts` pass: pause/resume (room): execute pauseAt mid-walk → resume ends in the unpaused final state; snapshots are state blobs; survives a room restart
 - `api.test.ts` pass: pause/resume (room): fork at a pause, resume both with different commands → distinct states; the pause checkpoint stays resumable
 - `api.test.ts` pass: pause/resume: pauseAt during a carry is refused naming the carry (allowDrop only before the lift); resume on a resting head is resume.not-resumable
+- `build-bay-v2.test.ts` pass: flagship v2: forklift sheet, stairs carry, campfire ending — rehearse, execute, canonical untouched
+- `build-bay-v2.test.ts` pass: flagship v2 layout: the forklift cannot stage s2 on the half-built deck (so it stages it beside the bay)
+- `build-bay-v2.test.ts` pass: flagship v2 on Mars 2026: fork canonical, build at staging-east, canonical untouched
 - `camera-framing.test.ts` pass: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind
 - `camera-framing.test.ts` pass: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8
 - `camera-framing.test.ts` pass: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)
