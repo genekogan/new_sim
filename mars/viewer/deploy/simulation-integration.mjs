@@ -403,6 +403,62 @@ const st = refused('execute A (stale)', await ecall('engine_execute', { plan_id:
 assert.deepEqual(st.diff.changed, [{ id: 's1', fields: ['pose'] }]);
 assert.match(st.message, /s1 changed \(pose\)/);
 assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, headB, 'a stale plan never commits');
+// ---- design edits, ledger, workspace deletion (engine_edit_world / engine_list / engine_delete_workspace) ----
+{
+  refused('edit canonical', await ecall('engine_edit_world', { workspace: 'carry-yard', note: 'x', edits: [{ op: 'remove', id: 'b1' }] }), 'workspace.protected');
+  ok('fork finite', await ecall('engine_fork', { from: 'carry-yard', name: 'ed-fin' }));
+  refused('spawn (finite inventory)', await ecall('engine_edit_world', { workspace: 'ed-fin', note: 'x', edits: [{ op: 'spawn', id: 'u1', def: 'upright-19ft', lying: { x: 4, z: 22, yaw: 0 } }] }), 'edit.inventory-finite');
+  const fk = ok('fork unlimited', await ecall('engine_fork', { from: 'carry-yard', name: 'ed', inventory: 'unlimited' }));
+  assert.equal(fk.inventory, 'unlimited');
+  const head0 = (await ecall('engine_log', { workspace: 'ed' })).body.head;
+  const early = ok('bind before edit', await ecall('engine_bind_plan', { template: walkPlan('ed-walk', 3, 3), bindings: { a: 'p1' }, workspace: 'ed' }));
+  const wall = refused('spawn into a wall', await ecall('engine_edit_world', { workspace: 'ed', note: 'x', edits: [{ op: 'spawn', id: 'u1', def: 'upright-19ft', lying: { x: 4, z: 20, yaw: Math.PI / 2 } }] }), 'edit.blocked');
+  assert.match(wall.message, /yard B south wall/);
+  refused('spawn onto a person (atomic)', await ecall('engine_edit_world', { workspace: 'ed', note: 'x', edits: [{ op: 'spawn', id: 'q1', def: 'human', pose: { p: [1.5, 0, 19.5], yaw: 0 } }, { op: 'spawn', id: 'q2', def: 'human', pose: { p: [1.6, 0, 19.5], yaw: 0 } }] }), 'edit.blocked');
+  refused('remove a scene person', await ecall('engine_edit_world', { workspace: 'ed', note: 'x', edits: [{ op: 'remove', id: 'p1' }] }), 'edit.immovable');
+  const bad = await ecall('engine_edit_world', { workspace: 'ed', note: 'x', edits: [{ op: 'teleport', id: 'p1' }] });
+  refused('malformed edit (zod)', bad, 'op.invalid-input');
+  assert.ok(bad.body.details.issues.length > 0);
+  assert.equal((await ecall('engine_log', { workspace: 'ed' })).body.head, head0, 'refused edits commit nothing');
+  const crew = [[1.5, 19.5], [6.5, 19.5], [1.5, 24.5], [6.5, 24.5]];
+  const ed = ok('edit: 19 ft upright + crew of 4 in yard B', await ecall('engine_edit_world', {
+    workspace: 'ed', note: '19 ft upright in yard B with a crew of four',
+    edits: [{ op: 'spawn', id: 'u1', def: 'upright-19ft', lying: { x: 4, z: 22, yaw: 0 } }, ...crew.map(([x, z], i) => ({ op: 'spawn', id: `q${i + 1}`, def: 'human', pose: { p: [x, 0, z], yaw: 0 } })), { op: 'region', id: 'yb-staging', kind: 'staging', polygon: [[0, 18], [8, 18], [8, 26], [0, 26]] }],
+  }));
+  assert.deepEqual(ed.checkpoint.cause, { kind: 'design-edit', note: '19 ft upright in yard B with a crew of four' });
+  assert.deepEqual(ed.diff.added, ['q1', 'q2', 'q3', 'q4', 'u1']);
+  assert.deepEqual(ed.diff.regions, ['yb-staging']);
+  const u1 = (await ecall('engine_query_world', { workspace: 'ed', ids: ['u1'] })).body.entities[0];
+  assert.equal(u1.provenance.origin, 'design-edit');
+  assert.equal(refused('execute plan bound before the edit', await ecall('engine_execute', { plan_id: early.plan_id, workspace: 'ed' }), 'plan.stale').diff.added.length, 5);
+  const up = ok('bind upright carry', await ecall('engine_bind_plan', { template: { schema: 'mars-sequence/1', id: 'upright-delivery', params: { crew: { kind: 'actors' }, item: { kind: 'entity' } }, steps: [{ id: 'deliver', verb: 'carry', params: { crew: '$crew', item: '$item', to: { x: 18, z: 36, yaw: Math.PI / 2 } } }] }, bindings: { crew: ['q1', 'q2', 'q3', 'q4'], item: 'u1' }, workspace: 'ed' }));
+  const cl = refused('rehearse 19 ft upright through the 1.5 m corridor', await ecall('engine_rehearse', { plan_id: up.plan_id }), 'rehearsal.failed');
+  assert.equal(cl.report.steps[0].diagnostic.code, 'carry.clearance');
+  assert.match(cl.message, /carry\.clearance/);
+  const mv = ok('edit: move + remove', await ecall('engine_edit_world', { workspace: 'ed', note: 'tidy', edits: [{ op: 'move', id: 'b1', lying: { x: 4, z: 5, yaw: 0 } }, { op: 'remove', id: 'q4' }] }));
+  assert.deepEqual([mv.diff.changed.map((c) => c.id), mv.diff.removed], [['b1'], ['q4']]);
+  // ledger
+  const led = ok('list', await ecall('engine_list', {}));
+  assert.ok(led.plans.some((p) => p.plan_id === up.plan_id && p.template === 'upright-delivery' && p.referencedByCheckpoint.length === 0));
+  const executed = led.takes.find((t) => t.take_id === ex.body.take_id);
+  assert.ok(executed && executed.kept && executed.bytes > 1000 && executed.cameras && executed.referencedByCheckpoint.length === 1, JSON.stringify(executed));
+  assert.deepEqual(led.takes.map((t) => t.order), led.takes.map((_, i) => i));
+  assert.deepEqual(led.workspaces.find((w) => w.id === 'carry-yard').forks.sort(), ['ed', 'ed-fin']);
+  const lc = ok('list cameras', await ecall('engine_list', { include: ['takes'], take_id: ex.body.take_id }));
+  assert.equal(lc.cameras.length, 1);
+  refused('list unknown take', await ecall('engine_list', { take_id: 'nope' }), 'take.unknown');
+  // deletion
+  refused('delete canonical', await ecall('engine_delete_workspace', { workspace: 'carry-yard' }), 'workspace.protected');
+  ok('fork child', await ecall('engine_fork', { from: 'ed', name: 'ed-child' }));
+  const hf = refused('delete fork parent', await ecall('engine_delete_workspace', { workspace: 'ed' }), 'workspace.has-forks');
+  assert.deepEqual(hf.details.forks, ['ed-child']);
+  for (const w of ['ed-child', 'ed', 'ed-fin']) ok(`delete ${w}`, await ecall('engine_delete_workspace', { workspace: w }));
+  refused('delete twice', await ecall('engine_delete_workspace', { workspace: 'ed' }), 'unknown-workspace');
+  assert.ok(!(await ecall('engine_query_world', {})).body.workspaces.some((w) => w.id.startsWith('ed')));
+  // get_take: seconds in, seconds out
+  const gt = ok('get_take seconds', await ecall('engine_get_take', { take_id: ex.body.take_id, from: 10, to: 20, entities: ['n1'] }));
+  assert.deepEqual(gt.range, { from: 10, to: 20, fromTick: 200, toTick: 400 });
+}
 // ---- historical year room (2022): canonical mars-2022 seeded from public/engine/campus-2022.json ----
 {
   const c22 = new Client({ name: 'mars-verification-2022', version: '1.0.0' });
@@ -442,7 +498,7 @@ await writeFile(
 );
 await client.close();
 console.log(
-  'PASS: MCP handshake + 20 legacy tools + 9 engine tools (bind/rehearse/execute/take/camera); room isolation, read-only access, invalid camera, idempotency, walking, activities, pause and persisted state.',
+  'PASS: MCP handshake + 20 legacy tools + 12 engine tools (bind/rehearse/execute/take/camera/edit/list/delete, one refusal envelope); room isolation, read-only access, invalid camera, idempotency, walking, activities, pause and persisted state; 2022 year room.',
 );
 
 assert.equal(

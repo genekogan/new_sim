@@ -1,7 +1,8 @@
 // Director demo (spec §15/§16 north-star): an external agent directs the engine
-// through the real MCP endpoint — discover, bind an impossible plan, read the
-// diagnostic, revise, rehearse clean, execute, shoot a camera track, fork an
-// alternative future, and hit plan staleness. Prints an annotated transcript
+// through the real MCP endpoint — discover, design-edit the world (spawn a 19 ft
+// upright + crew), bind an impossible plan, read the diagnostic, revise, rehearse
+// clean, execute, shoot a camera track, fork an alternative future, hit plan
+// staleness, then read the ledger and clean up. Prints an annotated transcript
 // with per-call and per-step timings. Reference write-up: docs/engineering/DIRECTOR_DEMO.md.
 //
 //   node deploy/director-demo.mjs                  # starts + stops its own `wrangler dev` on :8907
@@ -85,8 +86,7 @@ async function call(tool, args, { expectError = false } = {}) {
   const r = await client.callTool({ name: tool, arguments: args });
   const wall = performance.now() - t0;
   const text = r.content[0].text;
-  let body;
-  try { body = JSON.parse(text); } catch { body = { ok: false, code: 'mcp.input', message: text }; }
+  const body = JSON.parse(text); // every engine result — refusals and input-validation failures included — is JSON
   body._isError = !!r.isError;
   const doMs = body._meta?.elapsedMs;
   timings.push({ step, tool, wall, doMs });
@@ -97,8 +97,9 @@ async function call(tool, args, { expectError = false } = {}) {
 
 // ---------- the scene ----------
 // carry-yard seed: yard A (x,z ∈ [0,8]) holds the 12 ft beam b1 and crew p1, p2. Its only exit is the
-// 2.5 m corridor A (east along z≈4, north at x≈18 to a dead end at z=14). Yard B2 (x∈[14,22], z∈[32,40])
-// is reached only through the 1.5 m corridor B from yard B — a separate compound.
+// 2.5 m corridor A (east along z≈4, north at x≈18 to a dead end at z=14). Yard B (x∈[0,8], z∈[18,26]) is a
+// separate compound whose only exit is the 1.5 m corridor B into yard B2 (x∈[14,22], z∈[32,40]; campfire
+// + benches). Regions: yard-a, yard-b, yard-b2.
 const delivery = (to, id = 'beam-delivery') => ({
   schema: 'mars-sequence/1', id,
   params: { crew: { kind: 'actors' }, beam: { kind: 'entity' } },
@@ -135,30 +136,47 @@ try {
   for (const w of spaces.workspaces) show(`workspace ${w.id}`, `${w.protected ? 'protected' : 'editable'}, head ${w.head}`);
   const world = await call('engine_query_world', { workspace: 'carry-yard', include: ['regions', 'levels', 'links'] });
   for (const e of world.entities)
-    show(`${e.kind} ${e.id}`, `${e.def} at ${pose(e)}${e.phase ? `, phase ${e.phase}` : `, ${e.human.activity}`}`);
-  show('regions / levels / links', `${world.regions.length} / ${world.levels.length} / ${world.links.length}`);
-  note('components: one 12 ft beam; no regions are defined in the synthetic yard (campus scenes will have them)');
-  const scene = await call('engine_fork', { from: 'carry-yard', name: 'scene-1', label: 'beam delivery' });
-  show('fork', `${scene.workspace.id} ← ${scene.workspace.forkedFrom} at ${scene.workspace.head}`);
-  const baseline = scene.workspace.head;
+    show(`${e.kind} ${e.id}`, `${e.def} at ${pose(e)}${e.phase ? `, phase ${e.phase}` : e.human ? `, ${e.human.activity}` : ''}`);
+  show('regions / levels / links', `${world.regions.map((r) => r.id).join(', ')} / ${world.levels.length} / ${world.links.length}`);
+  note('one 12 ft beam in yard A; a campfire and two benches in yard B2 (targets for the social verbs)');
+  const badFork = await call('engine_fork', { from: 'carry-yard', name: 'scene 1' }, { expectError: true });
+  assert.equal(badFork.code, 'op.invalid-input');
+  show('refused', `${badFork.code}: "${badFork.message}" details.issues ${JSON.stringify(badFork.details.issues)}`);
+  note('input validation failures come back in the same JSON envelope as every other refusal');
+  const scene = await call('engine_fork', { from: 'carry-yard', name: 'scene-1', label: 'beam delivery', inventory: 'unlimited' });
+  show('fork', `${scene.workspace.id} ← ${scene.workspace.forkedFrom}, inventory ${scene.inventory}, head ${scene.workspace.head}`);
+  note("inventory 'unlimited' lets engine_edit_world spawn from the catalog (it is itself a design-edit checkpoint)");
 
   // 2 ────────────────────────────────────────────────────────────────
-  section('2. Bind a deliberately impossible plan, rehearse, read the diagnostic');
-  note('ask: carry the beam into yard B2, at the far end of the 1.5 m corridor B');
-  const bad = await call('engine_bind_plan', { template: delivery({ x: 18, z: 36, yaw: Math.PI / 2 }), bindings: { crew: ['p1', 'p2'], beam: 'b1' }, workspace: 'scene-1' });
+  section('2. Design-edit, bind an impossible plan, read the diagnostic');
+  note('ask: a crew of four carries a 19 ft upright from yard B into yard B2, through the 1.5 m corridor B');
+  const upright = { op: 'spawn', id: 'u1', def: 'upright-19ft', lying: { x: 4, z: 22, yaw: 0 } };
+  const crewSpots = [[1.5, 19.5], [6.5, 19.5], [1.5, 24.5], [6.5, 24.5]];
+  const crew = crewSpots.map(([x, z], i) => ({ op: 'spawn', id: `q${i + 1}`, def: 'human', pose: { p: [x, 0, z], yaw: 0 } }));
+  const wallEdit = await call('engine_edit_world', { workspace: 'scene-1', note: 'upright across yard B', edits: [{ ...upright, lying: { x: 4, z: 20, yaw: Math.PI / 2 } }] }, { expectError: true });
+  assert.equal(wallEdit.code, 'edit.blocked');
+  show('refused', `${wallEdit.code}: "${wallEdit.message}" subjects ${wallEdit.details.subjects.join(', ')}`);
+  note('a 5.8 m upright laid north–south at z=20 would stick through the yard B south wall; nothing committed');
+  const edit = await call('engine_edit_world', { workspace: 'scene-1', note: '19 ft upright + a crew of four in yard B (hypothetical)', edits: [upright, ...crew] });
+  for (const a of edit.applied) show('applied', a);
+  show('checkpoint', `${edit.checkpoint.id} (parent ${edit.parent}), cause ${JSON.stringify(edit.checkpoint.cause)}`);
+  show('diff', edit.summary);
+  assert.deepEqual(edit.diff.added, ['q1', 'q2', 'q3', 'q4', 'u1']);
+  const baseline = edit.checkpoint.id;
+  const bad = await call('engine_bind_plan', { template: delivery({ x: 18, z: 36, yaw: Math.PI / 2 }, 'upright-delivery'), bindings: { crew: ['q1', 'q2', 'q3', 'q4'], beam: 'u1' }, workspace: 'scene-1' });
   show('plan', `${bad.plan_id} bound to ${bad.baselineCheckpoint}`);
   note('binding only checks the template against the registry schemas; feasibility is the rehearsal\'s job');
   const r1 = await call('engine_rehearse', { plan_id: bad.plan_id }, { expectError: true });
   assert.equal(r1.code, 'rehearsal.failed');
-  assert.equal(r1.report.steps[0].diagnostic.code, 'carry.no-route');
+  assert.equal(r1.report.steps[0].diagnostic.code, 'carry.clearance');
   show('status', `${r1.code} / report.status ${r1.report.status}, ticks ${r1.report.metrics.ticks}`);
   const d1 = r1.report.steps[0].diagnostic;
   show('step deliver', `${d1.code} — subjects ${d1.subjects.join(', ')}`);
   say(`     "${d1.message}"`);
   show('details', { stuck: d1.details.stuck, blocker: d1.details.blocker, part: d1.details.part });
-  note('yard A only opens onto corridor A: the carry planner searched every pose and names where the load jams');
+  note('each of the four could walk to yard B2 alone; the 5.8 m load cannot make the turn out of yard B');
 
-  note('revision 1: stay in corridor A, set the beam down across the dead end (yaw 0)');
+  note('revision 1 (other yard): set the 12 ft beam down across corridor A\'s dead end (yaw 0)');
   const bad2 = await call('engine_bind_plan', { template: delivery({ x: 18, z: 12.5, yaw: 0 }), bindings: { crew: ['p1', 'p2'], beam: 'b1' }, workspace: 'scene-1' });
   const r1b = await call('engine_rehearse', { plan_id: bad2.plan_id }, { expectError: true });
   const d1b = r1b.report.steps[0].diagnostic;
@@ -248,6 +266,24 @@ try {
   const rebound = await call('engine_bind_plan', { template: walk('p1-inspect', 6, 6), bindings: { a: 'p1' }, workspace: 'scene-1-alt' });
   const exRe = await call('engine_execute', { plan_id: rebound.plan_id, workspace: 'scene-1-alt' });
   show('re-bound + executed', `${rebound.plan_id} → checkpoint ${exRe.checkpoint.id}`);
+
+  // 8 ────────────────────────────────────────────────────────────────
+  section('8. Read the ledger, clean up');
+  const led = await call('engine_list', { take_id: ex.take_id });
+  for (const p of led.plans) show(`plan ${p.order}`, `${p.plan_id} ${p.template} (${p.workspace ?? '-'}), ${p.bytes} B, referenced by ${p.referencedByCheckpoint.join(', ') || '—'}`);
+  for (const t of led.takes) show(`take ${t.order}`, `${t.take_id} kept ${t.kept}, ${t.bytes} B, cameras ${t.cameras}, referenced by ${t.referencedByCheckpoint.join(', ') || '—'}`);
+  show('cameras on the delivery take', led.cameras.map((c) => `${c.id} (${c.shot} of ${c.subject}, ${c.hz} Hz, ${c.duration} s)`).join(', '));
+  for (const w of led.workspaces) show(`workspace ${w.id}`, `${w.protected ? 'protected' : 'editable'}, head ${w.head}${w.forks.length ? `, forks ${w.forks.join(', ')}` : ''}`);
+  assert.ok(led.takes.find((t) => t.take_id === ex.take_id).referencedByCheckpoint.includes(ex.checkpoint.id));
+  const delParent = await call('engine_delete_workspace', { workspace: 'scene-1' }, { expectError: true });
+  assert.equal(delParent.code, 'workspace.has-forks');
+  show('refused', `${delParent.code}: "${delParent.message}"`);
+  const delAlt = await call('engine_delete_workspace', { workspace: 'scene-1-alt' });
+  show('deleted', `${delAlt.deleted} (head ${delAlt.head}) — ${delAlt.note}`);
+  const led2 = await call('engine_list', { include: ['takes'] });
+  const freed = led2.takes.filter((t) => t.referencedByCheckpoint.length === 0).map((t) => t.take_id);
+  show('now unreferenced (evictable)', freed.join(', '));
+  assert.ok(freed.includes(exAlt.take_id));
   await client.close();
 } finally {
   stopServer();
