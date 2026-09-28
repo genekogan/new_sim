@@ -1144,6 +1144,11 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       atmosphere: (options: Parameters<Api['atmosphere']>[0]) =>
         api.current?.atmosphere(options),
       take: () => takeHost?.info() ?? null,
+      // Engine camera vs render mesh (docs/engineering/CAMERA_VERIFY.md); lazy, off the main chunk.
+      verifyCamera: async (fromT?: number, toT?: number, hz?: number) => {
+        const r = takeHost?.replay();
+        return r ? (await import('./camera-verify')).verifyCamera(scene, r, { fromT, toT, hz }) : null;
+      },
     };
     (window as { __marsStudio?: typeof testHook }).__marsStudio = testHook;
     loop();

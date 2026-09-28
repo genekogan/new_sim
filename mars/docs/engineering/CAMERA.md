@@ -172,3 +172,11 @@ boundaries + 5 that dodge passing crews; raise orbit 3 → 2), 0 invalid, 0 cros
 The previous camera code on the same take (12 cuts) scores min 0.24, 84 samples < 0.6, under the new evaluator. The studio (`/studio`, 2026) replays it via "Replay take"
 (`app/engine-view/take-replay.ts`, `app/studio/take-{host,panel}`); the camera track only drives the view when "Engine
 camera" is on, and the take's poses at any t are identical either way (`e2e/studio-take.spec.ts`).
+
+## Verified against the render mesh (2026-09-27, `CAMERA_VERIFY.md`)
+`window.__marsStudio.verifyCamera(fromT, toT, hz)` (`app/studio/camera-verify.ts`; e2e `camera-verify.spec.ts`)
+ray-casts each planned pose's subject points against the rendered GLB, take parts and skinned people. Flagship take @
+2 Hz: meanPlanner 0.973 vs meanReal 0.942, 0 samples hidden by the real mesh (planner ≥ 0.8, real ≤ 0.3), 9
+over-conservative (bystander capsules). The gaps are take parts (not occluders here) and crew bodies (exempt), worst on
+"wide on the deck" (475–478 s: p3/p4 under the seated sheets, upright A's posts). Static campus never disagrees on
+this take. Next: per-tick part occluders (uprights as posts only), crew exemption only near contact, slimmer capsules.
