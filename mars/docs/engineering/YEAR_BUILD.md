@@ -187,10 +187,132 @@ would make it the suite's longest file (the suite is ~57 s wall with the tranche
 - The build ground is the Kit datum (y = 0), 0.16 m above the studio ground of the published year scenes.
 - The crew is generic; no fatigue, no breaks, nobody else on site.
 
-## Phase B needs
+## Phase B needs (as W7 left them)
 Deck sheets (plywood strips on beams: the Kit's 15 ft strips → sheets + cuts; joists the Kit does not draw),
 the stair / ramp (a site-built flight of the Kit's width, stringers, treads), plywood walls and screens
 (install verb with support rules), roofs / ceilings, doors, windows, railings, solar panels on roofs (W8's
 verbs, own piles), paint (W8), fixtures placed as items; `cut` in the flow (the BOM's cut list); the other
 three 2022 houses and the other years (2021, 2023–25 map; 2020 needs non-catalog rack parts); a director-run
 take per year with camera tracks and the studio "Watch it being built" picker.
+
+# Phase B — floors, stair, walls, solar (W13, 2026-09-28)
+
+**HYPOTHETICAL** order, piles, crew and choreography; every material rule below is **PROVISIONAL** (the Kit
+draws decks, stairs, walls and solar as boxes, several through each other). The acceptance target stays the
+protected `mars-2022` checkpoint, through each rule's stated physical placement.
+
+## Code map (phase B)
+| File | Role |
+| --- | --- |
+| `engine/world/catalog-phase-b.ts` | notched 4x6 / 4x3 deck pieces, wall panels 4 ft × 2.23 / 2.20 m + a ripped 3 ft panel, Kit stair lumber (2x12 stringer cut to 4.059 m, 2x10 + 2x8 tread boards, 2x4 posts / handrails), the Kit 2022 solar module `solar-panel-107x163` (1.625 × 0.045 × 1.072 m), bundles, a scrap pile; `NOTCH`, `CUT_TO_ORDER`, `kitStringerGeometry` (registered through catalog-stock.ts; catalog.ts unchanged) |
+| `engine/campus/parts-b.ts` | the material rules: Kit feature node → engine parts with target poses, Kit refs with the stated offsets, `unplaced` with reasons, the Kit stair descriptor |
+| `engine/campus/bom.ts` | `billOfMaterialsB` (one stock piece per part + the cut list), `morePiles` (phase-B bundles placed after the unchanged phase-A yard), extra plots (scrap pile) |
+| `engine/campus/sequence-b.ts` | the phase-B generator (sections D0, D1, D2, S, W, P, END) appended to the phase-A template |
+| `engine/construction/passup.ts` | `pass_up`: a sheet / rail / panel to a given level, optional relay kneeling on a deck, receivers walking alongside on a deck, fastening |
+| `engine/construction/setpart.ts` | the set-part engine + `install_stringer`, `install_stair_part`; the Kit stair link + contributor; `kitPartHandsInReach`, `kitPartsSupported` |
+| `engine/construction/wall.ts` | `install_wall` (fastening lines, reach per band) |
+| `engine/construction/moves-b.ts` | `climb_stair` / `leave_stair`, `step_onto_beam`, `stack_offcut`; `stairWorkOk` |
+| `engine/construction/{rules,deck,access,cut,contributor,frame}.ts` | additive: Kit beam-deck span rule, notch exemption in sweeps, rips + notch time, standing plywood is not a deck, `stairwork:` skipped by `frameAccessOk` |
+| `engine/scenarios/year-build.ts` | `yearBuildSetup(…, { phaseB })`, `yearBuildRegistryB`, `yearBuildBInvariants` (cached support-chain invariants), `cachedContributor`, `compareB`, `kitOffsets` |
+| `engine/test/year-build-b.test.ts` | plan / BOM / unplaced / determinism, report-only for the other 2022 houses, the full A+B run (YEAR_BUILD_FULL=1) |
+
+## Phase B material rules (all provisional)
+- **Deck strips** (Kit `plywood deck sheet`, 4 ft × 15 ft across a whole house): 3/4 in plywood straight on the rack
+  beams (**rules.ts `beamDeckRule`**: sheets bearing only on beams of reconstruction frames may span ≤ 4 ft; the Kit has
+  no joists; deck.ts's 24 in rule stays for everything else). 8 + 7 ft is impossible with beams every 3 ft (one piece
+  would cantilever 0.61 m, deck.ts allows 12 in), so the strip is **6 + 6 + 3 ft jointed on beams** (4x8 → 4x6 + 4x2
+  offcut; 4x8 → 4x3 + 4x5 offcut), split from the side with room. Strips whose long edge lies on a frame line are
+  drawn by the Kit through the frame: those pieces are **notched** at the station (30 s jigsaw) and access.ts lets a
+  notched part share ≤ 2 in of its edges with a reconstruction frame. Offset: the sheet rests ON the beams — its top
+  +5.7 cm above the Kit's (the Kit centres its sheets on the beam centreline, 3.8 cm below the beams' top).
+- **Plywood walls**: 4 ft panels stood up and cut to the Kit height (2.23 / 2.20 m); a 15 ft wall closes with a panel
+  ripped to 3 ft (**cut.ts rips**). Placed against the outer face of the beam line / frame plane the Kit centres the
+  wall on (offset 3.5 cm beam line, 4.8 cm frame plane). **`install_wall`** fastening rule: screwed to the members
+  right behind it (≤ 1.2 cm) — beams (a line each), frames (column + bracing), deck edges; needs a line in its bottom
+  and its top third, each reached by a crew member (−0.5…2.06 m from their feet, ≤ 0.8 m out); the ground walls' top
+  line (the 2.48 m beam) is screwed from the first-floor deck; the upper wall is raised to two kneeling on that deck.
+- **Kit stair** (2022 rack-house template only: 8 treads, 4.452 m wide, going 0.457, rise 0.2775): six **2x12
+  stringers** (14 ft cut to 4.059 m, two inside each end-frame row) whose foot is on the ground and whose top end is
+  bolted to the end frame (rule `stringerRule`); each Kit tread = **2x10 front + 2x8 back** (0.419 m, centred; two 2x10
+  would overlap the next tread in plan) bearing on ≥ 2 stringers (`treadRule`; the sawtooth cuts are not modelled);
+  the top tread's back board notched; **posts** = 2x4 cut to 0.85 m bolted to the tread ends 1.9 cm outboard of the
+  Kit's (`postRule`); **handrails** = 2x4 on edge on ≥ 2 post tops (`handrailRule`). The walking link is usable once
+  every stringer and tread is in and the landing deck exists.
+- **Solar**: the Kit 2022 module is 1.625 × 1.072 m (the 1.59 × 0.43 box is its tilted envelope): new
+  `solar-panel-107x163` (in catalog-phase-b.ts; W8's catalog-solar.ts is W12's) tilted 13.75° about its short edge,
+  on a **pair of panel rails** on the roof deck under it (rails shared by two neighbouring panels). Offset: +3.2 cm
+  above the Kit (it draws the module's low edge into its deck, with no rails).
+
+## Unplaced by rule (with the reasons)
+- 2 **rail posts** the Kit draws inside the end frame (its column is the post there);
+- 1 **riser** that is a 6.5 cm sliver; 2 full **risers**: a riser stands in the slot between two treads 1.9–2.5 m up
+  and the set-part crews bring boards in only from the front (through the tread below); a lengthwise insertion from
+  the stair's side is not modelled;
+- **every other solar panel** (and its cell overlay): W8's `install_panel` stands its crew beyond both ends of the
+  tilt axis — inside the neighbouring panels' places (0.99 m from the centre vs a 1.10 m pitch); once a neighbour is
+  tilted there is no station, so in a contiguous row only alternate panels can be mounted. Needs side stations in
+  `install_panel` (solar.ts, W12's).
+
+## Verbs added (phase B)
+- `pass_up {part, to:{x,z,yaw,height}, edge, out, givers, relay?, relayAt?, receivers, receiverAt?, follow?, give?, push?, side?, fasten?}`
+  — hand_up's choreography to a *given* level (hand_up rests a part on the highest members under it, i.e. the roof
+  beams once the skeleton stands): givers raise it outside the edge (or push it in low over a 0.22 m beam), an optional
+  relay kneeling at a deck edge takes it and stands up with it, receivers (on walkways, or kneeling on a deck and
+  walking alongside it) lift it over the members and feed it in; plywood is screwed down in the same action (receivers
+  + a second person, or the receiver alone — provisional). Hand points use hand_up's slots, so `liftHandsInReach`
+  checks every tick. Refusals: `passup.*` (not-staged, no-rest, occupied, too-high "add a relay", giver/relay/receiver
+  reach, body-gap, path-blocked, fasten-reach, follow-on-beam …).
+- `install_stringer`, `install_stair_part`, `install_wall` (setpart.ts engine): explicit holders with local grips and
+  stations, optional hand-off to a deck crew, tip-up for standing sheets, per-role support rules, fasteners in reach;
+  invariants `kitPartHandsInReach`, `kitPartsSupported`.
+- `climb_stair` / `leave_stair` (builders on the treads already built; `stairWorkOk`), `step_onto_beam` (deck → walkway,
+  to climb down), `stack_offcut` (offcuts onto the scrap pile by the station).
+
+## Generator order (sequence-b.ts) and what the ordering rules produced
+Sections, each gated on everyone's last step of the one before (the Mars order): **D0** ground-floor deck (pieces pushed
+in over the 0.22 m edge beams, taken by two in the aisles) → **D1** first-floor deck from the stair end (first strip by
+four who climbed the end frame onto the beams; later strips received by people kneeling on the strip laid before;
+middle pieces fed in by a receiver walking alongside) → **D2** roof deck through a relay kneeling at the first-floor
+deck edge → **S** the stair → **W** walls → **P** solar → **END**.
+**Stair vs upper decks:** the ordering rules put the stair *after* both upper decks: the stair's walking link needs
+its landing (a first-floor strip), and nothing in D1/D2 needs the stair — **the deck crews climb the end frames
+(bracing as a ladder) and come down the same way** (step_onto_beam → climb_frame down). The stair's top treads are
+set by a builder standing on the treads below (climb_stair). Walls and solar use the finished stair to reach the
+first-floor deck.
+
+## Numbers (2022 east-house, W21 walker)
+Plan A+B: **1552 steps** (552 A + 1000 B): take 145, carry 370, cut 136, stack_offcut 89, pass_up 90, walk_to 57+,
+climb_frame 22, beam_walk 15, step_onto_beam 8, install_stringer 6, install_stair_part 24, climb/leave_stair 2/2,
+install_wall 25, install_rail 6, install_panel 3. Stock: 106 × 4x8 (81 deck pieces + 25 wall panels), 136 cuts.
+Sections run one after the other from snapshots (each 0 violations): A 117 277 ticks; D0 94 646; D1 96 662; D2
+102 287; S 84 136; W 68 331; P+END 15 635 → ≈ 579 000 ticks ≈ 8 h simulated.
+Default suite: first bay + its first ground-floor deck strip (3 pieces cut, notched, offcuts stacked, pushed in):
+221 steps, 53 604 ticks, 0 violations, ~14 s wall, pinned `94db263e…`.
+Full A+B end to end (YEAR_BUILD_FULL=1): see PROGRESS (W13) for the latest result.
+Matched by kind (sequenced Kit components): frames 12, beams 54, deck strips 27 (81 pieces), walls 4 (25 panels),
+stair 16 of 21 (6 stringers + 16 tread boards for 8 treads, 6 posts, 2 handrails), solar 6 of 20 (3 panels + cells).
+Unplaced 19, each with its reason: 2 rail posts inside the end frame, 3 risers (a 6.5 cm sliver; two in slots between
+treads no verb can reach), 14 solar parts (7 panels + their cells: 4 span a frame line whose columns stand 5 cm above
+the roof deck; the rest lose install_panel's end stations to a tilted neighbour or the deck's end).
+
+## Report only (yearBuildPlan with phaseB, no run)
+| year | houses | sequenced (A + B) | unplaced | why (main) |
+| --- | --- | --- | --- | --- |
+| 2022 | chiba, east-house, kitchen, west-house | 48 frames, 216 beams, 102 deck strips, 12 walls, 64 stair parts, 18 solar | fixtures 100, solar 42, stair 20, walls 7, roof 10, door 1 | fixtures / roofs / doors have no rule; wall heights ≠ 2.23 / 2.20 m, screens; the same stair / solar limits |
+| 2021 | chiba, outdoor-kitchen | 52 frames, 248 beams | decks 23, solar 32, stair 28, roof 15, walls 3, fixtures 79, door 1 | deck strips not jointable on beams at whole feet / beams not across; stairs of 12 treads; no catalog panel of those module sizes |
+| 2023 | chiba, kitchen | 60 frames, 300 beams | decks 78, solar 140, stair 88, walls 20, roof 19, fixtures 15 | as 2021 (other deck layouts, 12–41-tread stairs, other modules) |
+| 2024 | chiba, kitchen | 62 frames, 306 beams | decks 73, windows 91, stair 127, walls 25, solar 36, roof 17, fixtures 15 | + windows (no rule) |
+| 2025 | chiba, kitchen, secondary-house | 60 frames, 270 beams, 3 walls | decks 66, stair 66, walls 15, roof 11, solar 12, 2 frames | as above |
+| 2020 | chiba | 6 frames | decks 18, walls 76, stair 24, fixtures 183 | the Portal / Forest racks are not catalog frames (phase A) |
+The phase-B rules are generic in form (strips jointed on beams, walls by height, Kit modules by size) but their
+parameters fit the 2022 rack-house template only; other years need more sheet splits, wall heights, stair templates
+and module sizes.
+
+## What phase C needs
+- the full A+B end-to-end pin; a director-run take per house / year (mars-take/4) with camera tracks and the studio
+  "Watch it being built" for phase B; the other three 2022 houses run (they plan with the same rules);
+- install_panel side stations (solar.ts) — 7 of 10 modules wait on it; a lengthwise insertion for risers; a post rule
+  at the end frame; notching / seating decks below the column tops (or a Kit decision) for the panels over frame lines;
+- rules for other years: deck layouts that are not whole-foot on beams, wall heights, stair templates (12–41 treads),
+  more solar module sizes, roofs, doors, windows, fixtures as placed items;
+- performance: phase-B sections run ~1–4 s wall per simulated minute (support-chain checks are cached by supportKey).

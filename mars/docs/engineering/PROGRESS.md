@@ -579,3 +579,37 @@ Then: gate → release 5; HANDOFF refresh.
   - Cost: ≈ 0.35 M tokens, ≈ 1 h 10 min.
 - **W26 landed** `9f3cf9c`…`09ddb71` (≈350k tokens, 70 min): year-build takes re-recorded without `legacyKinds` (bay-1 `b7b882fd…`, house `69c41651…`; camera ids as W23 predicted); gate GREEN at `1395dd4` (unit 56/56 — `npm test` had been 55/56 since W19 over a doc-comment false positive in the allowlist test; engine 358/0/3 of 361; tsc; e2e 61 pass / 1 skip in 644 s; probe b746b094 @10901 = pin), report `.cloudflare/gate/2026-09-28T12-53-41-373Z`; three pose baselines refreshed (same moments 117 ticks later under W21; inspected); evidence 17/17 §28, 27 PROVEN / 1 PARTIAL (year build B, 3/4 — cites W13's committed tests) / 0 UNPROVEN, 8/8 milestones; HANDOFF "End of night" section (by feedback item, gate/take/pin tables, 6 vetoable decisions, 11 questions for Gene, 15 open items, cost tally), NEXT_SESSION_PROMPT refreshed. Lead review: accepted.
 - Overnight tally (lead): 25 workers finished (W1–W12, W14–W26), ≈ 9.0 M subagent tokens, ≈ 1 530 worker-minutes over 8 h; W13 (phase B) still running at ≈ 1 M tokens. Usage stayed ≤ 35 % of any 5-h window.
+
+## 2026-09-28 ~09:20 EDT — W13: year build phase B (2022 east-house: decks, stair, walls, solar)
+- **Commits:** 77e9d28 (catalog-phase-b + provisional rules), 58ebcee (material rules parts-b, pass_up, set_part verbs,
+  install_wall), 76db6c3 / d44c601 / 124a185 / f58e527 / 45318ed / c11c12c / 294926e / 403b9cd / bb41ab3 / c3405da
+  (generator sections D0, D1, D2, S, W, P; section barriers; tranche test + pins), + docs. Details: YEAR_BUILD.md "Phase B".
+- **Plan:** 1552 steps (552 A + 1000 B), 106 × 4x8, 136 cuts, 89 offcuts stacked. Sequenced: 12 frames, 54 beams,
+  27 deck strips (81 pieces), 4 walls (25 panels), 16 / 21 stair parts, 6 / 20 solar parts. Unplaced 19 with reasons.
+- **Runs:** every section clean (0 violations) run from the previous section's snapshot under W21's walker (A 117 277,
+  D0 94 646, D1 96 662, D2 102 287, S 84 136, W 68 331, P+END 15 635 ticks ≈ 8 h simulated). Default-suite tranche
+  (bay 1 + first ground-floor strip): 53 604 ticks, 0 violations, 14 s, pinned 94db263e. The full end-to-end run
+  (YEAR_BUILD_FULL=1, ~13 min wall) completed every step but with 37 ticks of one overlap (m2 carrying a wall panel
+  past m6, parked outside +x during the walls section); a fix (m6 waits on the deck during walls) is uncommitted
+  pending a green full run.
+- **The lead's `beam_walk` 0.45 m off a walkway:** sections overlapped in the end-to-end run (a solar-crew member free
+  early climbed toward a roof deck not yet laid, so the step-off target was not a deck). Fixed by section barriers
+  (c3405da). v3's `onto_s2_4` `beam.no-room` at staging-east is a different rule (deckAt clearance on s2 < 0.28 m at
+  the step-off spot) — not touched.
+- **Provisional rules added:** plywood straight on reconstruction-frame beams at ≤ 4 ft (rules.ts beamDeckRule);
+  notched parts may share 2 in of their edges with a reconstruction frame (access.ts); cut.ts rips plywood ≥ 0.3 m
+  wide and adds 30 s per notch; stringer / tread / riser / post / handrail / wall fastening rules (setpart.ts,
+  wall.ts); receivers may screw a sheet down alone (pass_up); the Kit stair link; standing plywood is not a deck.
+- **Files outside my list I needed:** frame.ts (frameAccessOk skips `stairwork:`), contributor.ts (standing sheets are
+  not decks) — both additive. W12's handup.ts / solar.ts untouched: install_panel needs side stations (7 of 10 modules).
+
+### Questions for Gene (W13, year build phase B)
+1. Decks: do Mars decks sit ON the beams (the engine: top 5.7 cm above the Kit's), in a step-beam ledge, or on 2x4
+   joists? The Kit draws its sheets centred on the beam centreline, through the frame planes.
+2. How were the 15 ft deck strips made from 4x8s — 6 + 6 + 3 jointed on beams (engine), or 8 + 7 with blocking?
+3. Wall panels: outside the beam line (engine, 3.5 cm off the Kit) or inside? How were they fastened at the aisles?
+4. The rack-house stair: stringers (how many, what lumber), tread boards, where its foot stands (the Kit draws its
+   first step 0.55 m above the ground datum and its top posts inside the end frame).
+5. Solar: rails or a frame under the modules? The Kit's modules sit over the frame columns that stand above the roof
+   deck, in a contiguous row — how were they mounted (side access)?
+6. Were the upper decks passed up through a relay on the first-floor deck, or by forklift / ladder?
