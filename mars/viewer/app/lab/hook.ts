@@ -13,11 +13,14 @@ import { TakeRecorder } from '../../engine/take/recorder.ts';
 import type { ChangeEvent, Take } from '../../engine/take/types.ts';
 import { blockedLog, yearBuildOf } from './year-build.ts';
 import { compareToCanonical } from '../../engine/scenarios/year-build.ts';
+import { Highlights, type HighlightOpts } from './highlight.ts';
 
 export type EngineHook = ReturnType<typeof installHook>;
 
 export function installHook(view: LabView, notify: () => void) {
   const sim = view.sim;
+  const marks = new Highlights(); // question captures: outlines + labels by id (highlight.ts)
+  view.scene.add(marks.group);
   // take-replay check (recordTake / humanFields / replayTake)
   let rec: TakeRecorder | null = null, take: Take | null = null, replay: TakePeople | null = null;
   const dropReplay = () => {
@@ -57,6 +60,7 @@ export function installHook(view: LabView, notify: () => void) {
     runScenario(name: string, opts: { paused?: boolean; speed?: number } = {}) {
       const go = () => {
         dropReplay();
+        marks.clear();
         rec = null;
         take = null;
         sim.paused = opts.paused ?? true;
@@ -261,6 +265,13 @@ export function installHook(view: LabView, notify: () => void) {
     endReplay: () => dropReplay(),
     /** The body model: the renderer's copy (app/engine-view/rig.ts) and the engine's (engine/body/model.ts). */
     bodyModel: () => JSON.parse(JSON.stringify({ renderer: BODY_MODEL, engine: ENGINE_BODY_MODEL })),
+    /**
+     * Question captures (docs/engineering/questions/): outline entities / scene obstacles / region footprints by id
+     * (`x` exact, `x*` prefix) on top of everything and label each with a word + arrow. Adds to earlier highlights;
+     * `runScenario` and `clearHighlights()` drop them. Returns the ids found / missing and the union box; throws if none match.
+     */
+    highlight: (ids: string | string[], label?: string, opts?: HighlightOpts) => marks.add(sim.rt, Array.isArray(ids) ? ids : [ids], label, opts),
+    clearHighlights: () => marks.clear(),
     /** Stair flights the renderer uses (tread centres along the axis and tread-top heights). */
     stairs: () => view.humans.stairs(),
   };

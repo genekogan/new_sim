@@ -23,13 +23,51 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status: **14 open blocks** (16 questions; two pairs were duplicates and are merged) and **2 answered**.
+Status: **15 open blocks** (Q1–Q14 and Q19; 16 + 1 questions, two pairs were duplicates and are merged) and **2 answered**.
+
+**Gene's page.** `questions/index.html` shows every open block as a card Gene can read and answer (plain question,
+pictures, options, export button); it is served at `/questions/` after a deploy. It is generated from this file:
+`cd viewer && node deploy/questions-html.mjs`. The generator reads the fenced ` ```question ` block under each
+heading and fails if a field is missing. Fields (the engineer's text below each block stays the record):
+
+| field | content |
+| --- | --- |
+| `id` | Q-number (A-number when answered) |
+| `urgency` | `first` (worth answering first), `fidelity` (improves fidelity) or `none` (blocks nothing) |
+| `order` | optional number: position within its urgency group (lower first) |
+| `status` | optional; `answered` moves the card to the record at the end (no controls) |
+| `plain` | one-line question in plain English, no engine vocabulary |
+| `terms` | optional list `word \| one-sentence definition` (hover titles + footnotes on the card) |
+| `context` | two sentences: why the model thinks this, and what it affects for Gene |
+| `changes` | one line: what changes if he answers, in plain words |
+| `options` | list of concrete answers (radio buttons; "don't know / skip" is added) |
+| `images` | list `questions/<file> \| caption`: a labelled capture (`e2e/questions-captures.spec.ts`), photos in `questions/photos/`, diagrams in `questions/diagrams/`; `none \| description` when it cannot be illustrated |
+
+The answer on the card's record comes from the block's `Gene:` line.
 
 ---
 
 ## Layout of the year scenes
 
 ### Q1. 2022: is the south-west corner passage really closed by the west-house table?
+
+```question
+id: Q1
+urgency: first
+order: 3
+plain: In 2022, could you walk out of the courtyard at its south-west corner (between the west house and the kitchen), or did a table block the gap?
+context: The model's 2022 drawing has a table standing in that gap, tucked under the kitchen stair, so people in the replay cannot leave the courtyard at that corner (the other three corners are open). We ask because it decides whether that corner is a way in and out when you walk the 2022 scene.
+changes: If it was open, the table moves and people can walk through that corner; if a table really stood there, nothing changes.
+options:
+  - Open: people walked through there (move the table)
+  - Blocked: a table or something similar really stood in the gap
+  - Open, but something else stood near there (describe below)
+images:
+  - questions/q01-2022-eye.jpg | The model, 2022, at eye height from outside the corner: the red outline is the table, under the kitchen stair.
+  - questions/q01-2022-top.jpg | The model from above: the red box is the table in the gap between the west house and the kitchen.
+  - questions/photos/2022-aerial-03.jpg | Real drone photo, 2022, almost straight down: the four buildings round the courtyard and their corner gaps.
+  - questions/photos/2022-courtyard-orbit.jpg | Real drone photo, 2022, from another side.
+```
 
 **What the engine sees.** The 2022 Kit scene has four corner passages out of the courtyard. NE, SE and NW are
 open. At the SW corner, between the west house and Chiba, a table stands in the gap: the long purple prism left
@@ -48,6 +86,26 @@ Gene:
 
 ### Q2. 2023 and 2024: do trailers rv-8/9 (2023) and rv-9/10 (2024) really stand inside Chiba's footprint?
 
+```question
+id: Q2
+urgency: first
+order: 2
+plain: In 2023 and 2024 the model has two trailers parked inside Chiba, under its roof (red outlines). Was that real?
+context: The model puts the trailers on a neat circle, and that circle clips the back of Chiba, so two trailers each year end up under its roof. In the photos below the trailers ring the open ground outside Chiba; if none stood inside, they move out and the inside of Chiba becomes open floor you can walk through.
+changes: Two trailers per year move out of Chiba and Chiba's floor opens up for walking; nothing else moves.
+options:
+  - No: no trailers under Chiba (move them out)
+  - Yes: trailers really were parked under Chiba's roof
+  - Only in one of the two years (say which below)
+images:
+  - questions/q02-2023-eye.jpg | The model, 2023, from the front of Chiba: the red boxes are the two trailers hidden under the roof; blue is Chiba.
+  - questions/q02-2023-top.jpg | The model, 2023, from above: two trailers (red) inside Chiba's outline (blue); the rest of the circle is outside.
+  - questions/photos/2023-aerial-09.jpg | Real drone photo, 2023: Chiba on the left, the trailers around the open ground.
+  - questions/q02-2024-eye.jpg | The model, 2024, from the front of Chiba: again two trailers (red) under the roof.
+  - questions/q02-2024-top.jpg | The model, 2024, from above.
+  - questions/photos/2024-aerial-20.jpg | Real drone photo, 2024: Chiba is the white building on the right.
+```
+
 **What the engine sees.** In both years, two trailers of the trailer circle sit under Chiba's roof, inside
 its footprint. These are the tilted orange-brown boxes inside the pink roof area at the top of each picture.
 
@@ -62,6 +120,25 @@ Gene:
 
 ### Q3. North axis: which way is north on site?
 
+```question
+id: Q3
+urgency: first
+order: 1
+plain: On this map of 2022, is north really straight up, with the east house on the right and the kitchen at the bottom?
+context: Nobody recorded the site's compass bearing, so the model assumed the top of its map is north (the house names agree with that, if "east" and "west" were real directions). Every sunset, every shadow and every "sun behind the building" camera shot is placed from that guess.
+changes: The sun, the shadows and the sunset camera shots turn to the right direction; nothing is rebuilt.
+options:
+  - Yes: up is north (keep it)
+  - North is to the right (toward the east house)
+  - North is to the left (toward the west house)
+  - North is down (toward the kitchen)
+  - Somewhere in between (write an angle or a landmark below, e.g. "the Salton Sea was toward the kitchen")
+images:
+  - questions/q03-2022-top-compass.jpg | The model's 2022 map. Red: where the model thinks north is. Orange: where that puts the February sunset.
+  - questions/photos/2022-aerial-03.jpg | Real drone photo, 2022, looking almost straight down. The long shadows mean early morning or late afternoon; if you remember which, they give the bearing.
+  - questions/photos/2022-aerial-10.jpg | Real rooftop panorama, 2022, at sunset: which building was the sun going down behind?
+```
+
 **What the engine sees.** World −Z is taken as geographic north (`NORTH_AZIMUTH_OFFSET = 0`,
 `engine/env/sun.ts`). No site bearing was found. The NOAA sun, the shadows and the camera's "sunset behind"
 windows all follow from this.
@@ -75,6 +152,22 @@ move, because the environment is outside `physicalView()` (inferred, not yet tes
 Gene:
 
 ### Q4. Ground datum: is the ground at y = 0 or at −0.16 m?
+
+```question
+id: Q4
+urgency: none
+order: 1
+plain: Did the rack posts stand directly on the sand?
+context: Two parts of the model disagree by 16 cm about where the ground is, so in the studio the rebuilt racks sit 16 cm lower than the original drawing. We need one ground level; it only matters beyond housekeeping if the posts stood on blocks or pads.
+changes: Everything shifts by 16 cm once and the saved build replays are re-recorded; you would not notice it by eye.
+options:
+  - Posts stood directly on the sand
+  - Posts stood on blocks or pads (how high? below)
+  - Don't mind: pick one
+images:
+  - questions/diagrams/q04-ground-options.svg | Diagram, not a 3D render: a 16 cm difference does not show clearly in a 3D view.
+  - questions/photos/2026-skeleton-2x4-frame.jpg | Real photo, 2026 (a later year): rack posts at ground level.
+```
 
 **What the engine sees.** The Kit stands every piece on y = 0. The published year scenes and the studio put the
 ground at −0.16 m (`GROUND_Y`, `engine/campus/extract.ts`), so rack posts start 16 cm above the drawn ground.
@@ -94,6 +187,24 @@ Gene:
 
 ### Q5. The "9 ft" part: is it a frame (upright) or a beam, and what are its dimensions?
 
+```question
+id: Q5
+urgency: none
+order: 3
+plain: Your list of rack sizes included a 9 ft piece. Was it a frame or a beam, and what size was it?
+terms:
+  - frame | The ladder-like end of a rack: two posts joined by diagonal braces.
+  - beam | The horizontal orange bar that hangs between two frames.
+context: The model has frames of 8, 12, 16 and 19 ft and beams of 12 ft, but nothing 9 ft, so it carries a placeholder 9 ft frame, guessed at 4 ft deep. Nothing in any scene uses it yet, so this only tidies the parts list.
+changes: One placeholder part is removed or completed; no scene changes.
+options:
+  - A beam
+  - A frame (how deep? below)
+  - Don't remember
+images:
+  - none | Cannot be illustrated: no 9 ft part appears in any scene or photo we have. Picture a rack frame (two posts joined by diagonal braces, like a ladder) only 9 ft tall; or a single orange beam 9 ft long, the kind that hangs between two frames.
+```
+
 **What the engine sees.** Gene's size list was 8 / 9 / 12 / 19 ft. The model library has 8, 12, 16 and 19 ft
 frames and 12 ft beams, and nothing that is 9 ft. `world/catalog.ts` carries `upright-9ft` marked `provisional`,
 with an assumed 4 ft depth. The flagship builds with `beam-9ft`. No image: nothing 9 ft exists in any scene
@@ -106,6 +217,21 @@ The provisional flag goes either way.
 Gene:
 
 ### Q6. Beam heights: keep the Kit's 0.22 / 2.48 / 4.757 m, or snap to the real hole pitch?
+
+```question
+id: Q6
+urgency: none
+order: 2
+plain: The model hangs the beams at 22 cm, 2.48 m and 4.76 m, as measured from photos. Keep those heights, or move each beam to the nearest real hole in the posts (at most 2.5 cm away)?
+context: The heights were estimated from photos, while the real posts have holes every 2 inches, so each real beam sat in one of those holes. The lowest height (22 cm) is also lower than the first hole could plausibly be.
+changes: Beams move by up to 2.5 cm and the saved build replays are re-recorded once; invisible by eye.
+options:
+  - Keep the heights as they are
+  - Snap to the real holes
+  - The lowest beam was higher (give the height below)
+images:
+  - questions/q06-2022-beams-eye.jpg | The model, 2022 east house: the three beam heights on one frame.
+```
 
 **What the engine sees.** The Kit hangs beams at 0.22, 2.48 and h − 0.12 m (4.757 m on a 16 ft frame). These
 come from photo estimates, and 0.22 m is below any plausible first hole. The engine reproduces them exactly with
@@ -123,6 +249,22 @@ Gene:
 
 ### Q7. Stock on site: how many pieces per bundle, and how were uprights and beams stacked?
 
+```question
+id: Q7
+urgency: fidelity
+order: 8
+plain: When the materials were on site, how were they piled: how many plywood sheets per stack, and were the rack frames and beams stacked flat or bundled?
+context: The replay's material yard is a guess made to look like the photos: plywood in strapped stacks of about 24 sheets, frames lying flat, beams in strapped bundles, and a cutting table. The size of the yard sets how many trips the crew makes and how long a build takes.
+changes: The yard's size, the number of trips and the length of the build replay; the finished houses do not change.
+options:
+  - Looks about right
+  - Different (describe below: sheets per stack, how frames and beams were stacked)
+images:
+  - questions/q07-yard.jpg | The replay's 2022 yard at the start. Colours match the labels; outlines show through other objects.
+  - questions/photos/2026-material-piles.jpg | Real photo, 2026: plywood, 2x4, 2x6 and timbers in piles.
+  - questions/photos/2026-material-piles-loader.jpg | Real photo, 2026: the piles with a loader.
+```
+
 **What the engine sees.** The pile yard is chosen to look like the evidence photos. None of it is documented:
 - plywood in strapped stacks of about 24 sheets;
 - lumber in strapped units;
@@ -139,6 +281,24 @@ Year-build pins move.
 Gene:
 
 ### Q8. Plywood span: may a sheet lie directly on a beam pair up to 4 ft apart, or only up to 24 in?
+
+```question
+id: Q8
+urgency: fidelity
+order: 1
+plain: Could a plywood sheet lie straight across beams 4 ft apart with nothing under the middle, or did it need support about every 2 ft?
+context: Standard 3/4 in plywood is rated for 2 ft between supports, so the model refuses to lay plywood across a 4 ft gap and puts joists in first. Your earlier brief said 4 ft was fine; if so, floors can be built without joists.
+terms:
+  - joist | A smaller board (here a 2x4) laid across the main beams to hold up the plywood.
+changes: One rule: if 4 ft was fine, floors without joists are allowed in the build replay. Goes with the floors question.
+options:
+  - 4 ft was fine: plywood straight on the beams
+  - It needed support about every 2 ft
+  - It depends (explain below)
+images:
+  - questions/diagrams/q08-span-options.svg | Diagram, not a 3D render: the two options side by side.
+  - questions/q09-2022-deck-eye.jpg | The model, 2022: a floor strip (red) spanning between two beams (blue) with nothing underneath.
+```
 
 **What the engine sees.** The brief said 4 ft. The engine says ≤ 24 in centre gap, because 3/4 in ply is rated
 24 in o.c. Every Mars frame is 3–4 ft deep, so the 4 ft rule would make joists optional on every bay. The
@@ -164,6 +324,27 @@ re-pin A+B. The pictures show the Kit's drawing of 2022, which is what the engin
 
 ### Q9. Decks: 4 ft × 15 ft strips on the beams, a step-beam ledge, or 4x8 sheets on 2x4 joists?
 
+```question
+id: Q9
+urgency: first
+order: 4
+plain: How were the floors built: plywood strips laid on top of the beams, sheets set into a ledge on the beams, or 4x8 sheets on joists?
+terms:
+  - joist | A smaller board (here a 2x4) laid across the main beams to hold up the plywood.
+context: The model's 2022 drawing shows each floor as long 4 ft × 15 ft plywood strips resting on the beams with nothing in between, and the build replay copies that. We are about to add wooden 2x4 framing to the replay, so this answer decides whether floors get joists.
+changes: How every floor is built in the build replay and how many pieces it needs; the finished houses look almost the same.
+options:
+  - A. Strips on top of the beams (as the model does now)
+  - B. Sheets set into a ledge on the beams
+  - C. 4x8 sheets on 2x4 joists
+  - A mix (say where below)
+images:
+  - questions/q09-2022-deck-eye.jpg | The model, 2022 east house: one floor strip (red) resting on two beams (blue).
+  - questions/diagrams/q09-deck-options.svg | Diagram, not a 3D render: the three options seen end-on. They could not be staged in the lab, which only has the model's current version.
+  - questions/photos/2022-exterior-24.jpg | Real photo, 2022: look at the ceiling. Are those wooden boards between the orange beams joists?
+  - questions/photos/2022-interior-01.jpg | Real photo, 2022: the underside of a floor, orange beams and plywood.
+```
+
 (Merges HANDOFF Q10 and W13 Q1.)
 
 **What the engine sees.** The Kit draws each deck as 4 ft × 15 ft plywood strips laid at beam height,
@@ -178,6 +359,22 @@ Gene:
 
 ### Q10. How was a 15 ft deck strip made from 4x8 sheets?
 
+```question
+id: Q10
+urgency: fidelity
+order: 2
+plain: A floor strip is 15 ft long but plywood comes in 8 ft sheets. How was a strip pieced together?
+context: The model cuts each strip from 6 ft + 6 ft + 3 ft pieces, joined where they sit on beams. That sets how many cuts and pieces the build replay needs (81 pieces for 27 strips).
+changes: Only the cutting and the piece count in the build replay.
+options:
+  - 6 ft + 6 ft + 3 ft (as the model does now)
+  - 8 ft + 7 ft, with a block under the joint
+  - Something else (describe below)
+images:
+  - questions/diagrams/q10-strip-options.svg | Diagram, not a 3D render: one 15 ft strip seen from above.
+  - questions/q09-2022-deck-eye.jpg | The model, 2022: one 15 ft floor strip (red) between two beams (blue).
+```
+
 (W13 Q2.)
 
 **What the engine sees.** Each strip is made as 6 + 6 + 3 ft pieces, jointed on beams (`cut` at the cutting
@@ -189,6 +386,24 @@ in `parts-b.ts`.
 Gene:
 
 ### Q11. Wall panels: outside or inside the beam line, and how were they fastened at the aisles?
+
+```question
+id: Q11
+urgency: fidelity
+order: 5
+plain: Were the plywood walls fixed on the outside of the rack beams or on the inside, and what were they fixed to where a walkway runs through?
+context: The model hangs the wall panels just outside the beams, and the 2022 murals are painted on those panels. Where a walkway opens the rack, a panel has no beam behind it, so the replay needs to know what it was fixed to.
+changes: Where the wall panels sit (a few centimetres) and where the builders stand to fix them; the murals stay.
+options:
+  - Outside the beams (as the model does now)
+  - Inside the beams
+  - Mixed (describe below, with how they were fixed at the walkways)
+images:
+  - questions/q11-2022-wall-eye.jpg | The model, 2022 east house: wall panels (red) and the beam line (blue).
+  - questions/diagrams/q11-wall-options.svg | Diagram, not a 3D render: the few centimetres involved do not show in 3D.
+  - questions/photos/2022-exterior-10.jpg | Real photo, 2022: plywood wall panels going up on a rack house.
+  - questions/photos/2022-exterior-20.jpg | Real photo, 2022: a mural wall.
+```
 
 (W13 Q3.)
 
@@ -202,6 +417,27 @@ stations. At the aisles, the fastening rule decides what a panel bears on.
 Gene:
 
 ### Q12. The rack-house stair: width, stringers, treads, and where its foot stands
+
+```question
+id: Q12
+urgency: fidelity
+order: 3
+plain: What was the stair up to the east house's first floor like: how wide, how many stringers under the steps, and where did its bottom step land?
+terms:
+  - stringer | The sloped board along the side (or middle) of a stair that the steps rest on.
+context: The model's drawing has an 8-step stair 4.45 m wide with no stringers, and its first step floats 55 cm above the ground. The replay builds it with 6 stringers and cannot place 5 parts (2 rail posts that would stand inside the rack and 3 step fronts).
+changes: The stair's parts and where its foot stands in the build replay; the 5 unplaced parts get placed or dropped.
+options:
+  - Two stringers (one each side)
+  - Four or more stringers
+  - It was a ramp, not a stair
+  - Not sure about stringers (answer the width and the bottom step below)
+images:
+  - questions/q12-2022-stair-eye.jpg | The model, 2022 east house stair from the courtyard: 8 steps (red); the orange step floats 55 cm up.
+  - questions/diagrams/q12-stair-options.svg | Diagram, not a 3D render: the options seen from the front.
+  - questions/photos/2022-exterior-09.jpg | Real photo, 2022: a rack house with a stair at its right end.
+  - questions/photos/2026-skeleton-2x4-frame.jpg | Real photo, 2026 (a later year): the long stair on the right.
+```
 
 (Merges HANDOFF Q9 and W13 Q4.)
 
@@ -218,6 +454,23 @@ Gene:
 
 ### Q13. Solar: rails or a frame under the modules, and how were they mounted?
 
+```question
+id: Q13
+urgency: fidelity
+order: 4
+plain: What held up the solar panels on the roof: two rails, or a frame of wood or metal? And which side did people work from to install them?
+context: The model shows the panels in one continuous row over posts rising above the roof, and the replay mounts them on two rails. With no gap between panels there is nowhere to stand beside them, so 14 of the 20 solar parts cannot be placed yet.
+changes: What sits under the panels and where the installers stand; it decides whether the 14 unplaced parts get placed.
+options:
+  - Two rails (as the model does now)
+  - A frame of wood or metal under them
+  - Something else (describe below)
+images:
+  - questions/q13-2022-solar-eye.jpg | The model, 2022 east house: the row of solar panels (red) above the roof.
+  - questions/diagrams/q13-solar-options.svg | Diagram, not a 3D render: the two options seen from the side.
+  - questions/photos/2022-exterior-20.jpg | Real photo, 2022: the solar row above a mural wall.
+```
+
 (W13 Q5.)
 
 **What the engine sees.** The Kit's modules sit over the frame columns that stand above the roof deck, in one
@@ -233,6 +486,23 @@ Gene:
 
 ### Q14. Upper decks: passed up by a relay on the first-floor deck, or by forklift / ladder?
 
+```question
+id: Q14
+urgency: fidelity
+order: 7
+plain: How did plywood and beams get up to the upper floors: handed up by people standing on the lower floor, or with a forklift or a ladder?
+context: In the replay, people stand on the first floor and pass material up hand to hand, and top beams go up with people climbing the rack's braces (you confirmed that part). If a forklift or ladder did the lifting, the replay's crew and steps for the upper floors change.
+changes: Only the upper-floor steps of the build replay: who stands where and how long it takes.
+options:
+  - Hand to hand, people on the lower floor (as now)
+  - Forklift or telehandler
+  - Ladder
+  - A mix (describe below)
+images:
+  - questions/q14-relay.jpg | The build replay, 2022: a top beam (red) handed up by people standing on the frame's braces.
+  - questions/photos/2026-material-piles-loader.jpg | Real photo, 2026: a loader on site.
+```
+
 (W13 Q6.)
 
 **What the engine sees.** Upper-deck material goes up by `pass_up`, a relay through people standing on the
@@ -245,11 +515,49 @@ stations, and the A+B pin.
 
 Gene:
 
+### Q19. Did the 2022 roofs have 2x4 framing under the plywood?
+
+```question
+id: Q19
+urgency: fidelity
+order: 6
+plain: In 2022, did the roofs have 2x4 framing under the plywood (as in the 2026 photo), or did the plywood lie straight on the top beams?
+context: The model's 2022 houses have no roof framing: every roof sheet lies straight on the top beams. The 2026 photo shows 2x4 framing going on before the plywood, so we want to know whether 2022 was built the same way.
+changes: If yes, the 2022 roofs gain framing, sit about 13 cm higher, and the replay builds the framing first; if no, nothing changes.
+options:
+  - No framing in 2022: plywood straight on the beams
+  - Yes, 2x4 framing as in 2026
+  - Only on some buildings (say which below)
+images:
+  - questions/q19-2022-roof-eye.jpg | The model, 2022 east house: roof sheets (red) lying straight on the top beam (blue).
+  - questions/diagrams/q19-roof-options.svg | Diagram, not a 3D render: the two options seen end-on.
+  - questions/photos/2026-skeleton-2x4-frame.jpg | Real photo, 2026: 2x4 framing on the racks before the plywood.
+```
+
+(Parked; non-blocking. Added after W33.)
+
+**What the engine sees.** the 2022 Kit scenes have no top plates, rafters or ceiling joists; every roof sheet lies straight on the
+rack's top beams (0.22 / 2.48 / 4.757 m). The only "roof" features are the kitchen's 8 rail posts + 2 railings. The 2026 skeleton
+photo (`evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg`) shows 2x4 top framing before plywood.
+**What the answer changes.** if 2022 had framing, the replays would sequence `install_top_plate`/`install_rafter` before the roof
+deck and the protected `mars-2022` state would need a reconstruction-edit adding the members (roof deck rises ≈ 13 cm). If not,
+nothing changes — the framing verbs wait for 2026.
+Gene:
+
 ---
 
 ## Answered (kept for the record; not open)
 
 ### A1. How were the top beams (~4.76 m) hung? (HANDOFF Q7, W7)
+
+```question
+id: A1
+urgency: none
+status: answered
+plain: How were the long top beams (about 4.76 m up) hung?
+context: Answered: two people climb the frame's braces and each holds one end of the beam while setting it.
+changes: Already in the build replay.
+```
 
 **Gene (2026-09-29):** two people climb the upright on its cross braces, and each holds one side of the beam
 while setting it. The `hang_beam` / stance mechanism is the real method (OWNER_DECISIONS.md;
@@ -257,15 +565,16 @@ OWNER_FEEDBACK §14).
 
 ### A2. Reach-down: accept 0.5 m, or model a lying-down receiver? (HANDOFF Q11, 03:50 EDT)
 
+```question
+id: A2
+urgency: none
+status: answered
+plain: When someone on a floor takes a load from below, may they only kneel (reach down 0.5 m), or also lie on their stomach at the edge?
+context: Answered: kneeling stays the default, and lying on the stomach at the edge was added as a further posture.
+changes: Already in the build replay.
+```
+
 **Gene (2026-09-29):** the 0.5 m kneel rule stays the default. Add a prone receiver (lying on the stomach at
 the deck edge, then rising to knees and feet holding the load) as a further posture (OWNER_FEEDBACK §13).
 W28 and W29 landed it.
 
-## Q19 — Did the 2022 roofs have 2x4 framing under the plywood? (parked; non-blocking)
-**What the engine sees:** the 2022 Kit scenes have no top plates, rafters or ceiling joists; every roof sheet lies straight on the
-rack's top beams (0.22 / 2.48 / 4.757 m). The only "roof" features are the kitchen's 8 rail posts + 2 railings. The 2026 skeleton
-photo (`evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg`) shows 2x4 top framing before plywood.
-**What the answer changes:** if 2022 had framing, the replays would sequence `install_top_plate`/`install_rafter` before the roof
-deck and the protected `mars-2022` state would need a reconstruction-edit adding the members (roof deck rises ≈ 13 cm). If not,
-nothing changes — the framing verbs wait for 2026.
-Gene:

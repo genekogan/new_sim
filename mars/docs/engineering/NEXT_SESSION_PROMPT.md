@@ -37,7 +37,10 @@ and `<usage-tool>` does not track this session, so budget by your own accounting
 historical truth) is appended to `docs/engineering/QUESTIONS_FOR_GENE.md` as a block: what the engine sees,
 a picture, what the answer changes, and an empty `Gene:` line. Then skip it and pick the next item that doesn't
 need him. Those questions are parked and non-blocking: do not re-surface them in handoffs or reports. Never
-guess historical facts.
+guess historical facts. Any new question for Gene goes into QUESTIONS_FOR_GENE.md WITH a capture and the
+plain-English fields (the ` ```question ` block: id, urgency, plain, context, changes, options, images; captures via
+`e2e/questions-captures.spec.ts` + the lab hook `highlight(ids, label)`), then `node deploy/questions-html.mjs`
+regenerates the page (`questions/index.html`, served at `/questions/`; `npm test` fails if it is stale).
 
 **Read in this order before doing anything:**
 1. `docs/engineering/HANDOFF.md` — state of the system, evidence, releases, known shortcomings, next tranche.
