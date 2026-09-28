@@ -771,7 +771,8 @@ Then: gate → release 5; HANDOFF refresh.
   no-receiver-station, 0.74 too-high. Per tick: exact reach + body clear at every take tick, proneYaw / phaseK schema.
   Suite 375 / 372 / 3 skip, 0 fail; tsc clean.
 - **Pins unchanged:** `deploy/perf-walk.mjs` stress / probe / campus / meal / v3 all PIN-OK (v3 `39a0fb3f…` @16374);
-  year-build first bay (phase A `251a44c5…` @41317) and first bay + deck strip (`94db263e…` @53604) green in the suite.
+  full `YEAR_BUILD_FULL=1` set 8/8: phase A first bay `251a44c5…` @41317, whole skeleton `d382e461…` @117277, first bay +
+  deck strip `94db263e…` @53604, A+B `ddb634d6…` @600599 — all unchanged.
 - **For others:** the recorder needs `proneYaw` / `phaseK` in FIELDS (W31's area) for takes; W29's lab preset
   `app/lab/prone.ts` mirrors the old 2.9 m / all-6-ft fixture — it now refuses (too-high) and must move to 2.75 m with 4 ft
   deck joists; POSES.md still quotes the engine's 0.94.
