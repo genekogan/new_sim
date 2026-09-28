@@ -188,3 +188,16 @@ Then: gate → release 5; HANDOFF refresh.
 - `upright-16ft-kit` seats sit exactly at the Kit's photo-estimated beam heights (0.22 / 2.48 / 4.757 m), not on a real hole pitch (2 in). Real pitch would move beams by up to ±2.5 cm vs the reconstruction. Keep the Kit heights, or snap to the pitch?
 - **W12 landed** `6cc13b3` (≈210k tokens, 30 min): `body/model.ts` = measured rig (shoulders 1.34, half 0.15, arm 0.62, overhead 2.00/2.06, reach-down 0.5 @ 0.45 out, kneel reach-out 0.8; `shrug` 0.05, `rig` hips/torso/squat/kneel numbers, bands derived, `postureTop`), `body-model.test.ts` (measurement match + internal consistency); givers raise only to `postureTop` at their grips (2.05 m); 2.6 m seat now `handup.too-high` (limit ≈ 2.57 m above the givers' floor); paint top band 2.06–2.44 refused from the ground, painted from a 0.6 m platform (+ fixed a coverage rounding bug). v3 re-pinned 339cf310→5f32379d @16237 ("body model = measured rig"); meal / year-build pins unmoved (whole house re-run: 116477 ticks, 66/66). 303 / 301 / 2 skip. Lead review: accepted. Open: woman template reaches 0.35 m down (< 0.5 cap) → per-person body variant in the engine later; giver hands at 0 mm slack on the envelope by design (fragile to any rounding change); renderer not re-run against chest 1.22 / rest-hands 0.72 → W14.
 - W14 spawned (renderer): e2e catch-up on HEAD, render solar/rails/equipment/paint progress/bundles/cutting station, climb + beam-walk poses, lab preset "2022 east-house skeleton from piles".
+- **W11 landed** `719ba10`, `ccd6839`, `fad3ccc`, `dfcaa93` (+ docs; PLANNING_BUDGET.md §6): walker perf, **every pin bit-identical**
+  (stress-30, probe, campus crop, meal and v3 hashes equal to a HEAD-minus-W11 tree in 3/3 alternating runs; stress corridor
+  `0754e1eb…` too). Changes: one entity snapshot + one load-disc read per `walk_to` step (the V8 dictionary-mode `world.entities`
+  made each `Object.values` ~2 µs); `routeAround` proves unreachable goals with a reverse flood beside the A\*; skips the
+  unusable-link explanation the walker never reads; `narrow()` 7× cheaper and reused per clearance array.
+  Stress-30 warm mean tick 0.69–0.71 → 0.48–0.50 ms (CPU −29 %); failing people-replan 88–94 → 9 ms; corridor max tick
+  88 → 53 ms; campus flagship compute −13 %, probe −5 %, v3 −4 %. Not met: exact max tick ≤ 60 ms (tick 5 = 27 exact A\*,
+  ~95 ms; only the corridor planner or spread submits get there, and both move hashes). Test `walk-perf.test.ts`, bench
+  `deploy/perf-walk.mjs`.
+  Finding for the lead: `walk.ts`'s fewer-obstacles fallback fires only when a failed `routeAround` names one of its obstacle
+  ids in `diagnostic.subjects`. `findRoute` only ever puts link ids there, so the fallback never runs; MOVEMENT.md says it
+  does. Fixing it moves hashes (a behaviour change, for the W9 "waits 3.5 s" follow-up). Also: `walk.ts` still uses host
+  `Math.hypot` (intrusion / encounter / occupant / stairBlocker); swapping it for `dist2` may move hashes by ulps.

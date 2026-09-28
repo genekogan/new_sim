@@ -156,6 +156,9 @@ stress-30 (lab stepping, 60 s, loaded machine):
 `walk_to.step` total is about 2× (the look-ahead and the more frequent 0.5 s decisions). Flagship
 rehearsals take +10–25 % compute, measured on a loaded host.
 
+W11 (`PLANNING_BUDGET.md` §6, all hashes identical) brought stress-30 back to a 0.48–0.50 ms mean tick and failing
+people-replans from ~90 ms to ~9 ms. The +10–25 % rehearsal figure did not reproduce there.
+
 ## 6. What is approximate
 
 - **Look-ahead offset.** The sidestep offset the look-ahead predicts is a straight-line

@@ -129,6 +129,81 @@ change already printed `b159317e…`, the manifest hash in `RELEASE_CHECKLIST.md
 Rebuild counts are unchanged (378 per run), and so are the hashes: probe `79447f750779…96129`, stress-30 `e55d3ee17dd5…8e989`,
 campus flagship `b159317e2937…c0bda`. Grid rebuilds (~0.2 s probe, ~0.9–1.0 s flagship) are now the largest sync cost.
 
+## 6. Walker per-tick cost after splined turns (W11, 2026-09-28; pure performance, every hash identical)
+W4's splined turns + block reaction (`MOVEMENT.md`) roughly doubled `walk_to.step`. Four changes, each behind an off
+switch that `engine/test/walk-perf.test.ts` flips to prove it changes nothing:
+- **One entity snapshot per `walk_to` step** (`walk.ts` `stepScope`, `WALK_PERF.stepSnapshot`). The people scans
+  (encounter, look-ahead, intrusion, driven vehicles, stairs, occupant, sidestep) each called `Object.values(world.entities)`,
+  4–6× per walker per tick. `world.entities` is a V8 dictionary-mode object (any map with more than a dozen keys added one by one),
+  where each call sorts and copies: ~2.1 µs for 30 entities. Now it is read once per step via `Object.keys` + index
+  (`entityList`, same `OrdinaryOwnPropertyKeys` order, ~0.5 µs). The carried-load discs (`services.loadDiscs`, rebuilt from
+  every carried component per call, 2–4× per step) are read once per step on first use. A walker's step never adds, removes
+  or replaces an entity and never moves a load (poses are read live through the same objects), so every scan sees exactly
+  what it saw before. Outside a step (carry's `makeWay`, `stairBlocker` from the carry climb): fresh reads.
+- **Failing people-replans prove unreachability early** (`path.ts` `RouteOpts.proveUnreachable`, set by
+  `Spatial.routeAround`; `Spatial.proveUnreachable`). A reverse flood from the goal runs alongside the A\*, one cell per
+  expansion, over exactly the A\*'s moves backwards: 8 neighbours, no corner cutting, link edges reversed. The A\* only
+  ever expands the start and passable cells. So if the flood runs out without meeting the start, the A\* would exhaust
+  the start's side and return `null`, and the search returns that `null` at once. That is the same diagnostic. It applies
+  only when the grid has ≤ `maxExpand` cells, so `route.search-limit` cannot be the answer. The A\* itself is untouched.
+  The stress-30 case: a walker on the ground whose deck goal is cut off (people at stairs-a's foot, stairs-b unfinished).
+  The deck pocket (3,957 cells) runs out after 1 ms, where the start's side (~720k cells) took ~65 ms.
+- **The unusable-link explanation only when read** (`RouteOpts.explainUnusable`, `WALK_PERF.lazyLinkDiagnostics`). After a
+  failure, `findRoute` runs a second, successful exact search with unusable links allowed, only to name the unfinished
+  stairs (`route.link-unusable`). That search took 15–20 ms. The walker is the only `routeAround` caller, and it reads a
+  failure only for `subjects` among its obstacle ids (the fewer-obstacles fallback). So it asks for the explanation only if
+  an unusable link has such an id. The fallback's second call, of which only `.ok` is read, never asks. Decisions are
+  identical; the discarded message says `route.unreachable` instead of naming the stairs. Other `findRoute` callers are unchanged.
+- **`narrow()` labels** (`service.ts` `narrowComponents`). The single-file component labelling that `findNarrows` needs on
+  every construction epoch was a full-grid flood with an array literal per popped cell. Now it is a typed-array flood with
+  the same predicate and the same row-major first-cell numbering (the flood order cannot change the labels). It is also
+  reused while a level keeps its clearance array: `updateGrids` keeps the array when no cell flips, and clearance arrays are
+  never written after they are built. The traffic resource names (`narrow:<epoch>:<level>:<n>`), which also reach
+  `app/lab/overlay-grids.ts` and runtime snapshots, are unchanged.
+
+**Proof.** `walk-perf.test.ts` checks the following:
+- `proveUnreachable` routes deep-equal the frozen reference A\* (`path-reference.ts`) over 63 cases: goal / start / both
+  walled in by rings of people, the cut-off deck, random people. 20+ of them fail with `route.unreachable` or
+  `route.link-unusable`. The corridor planner is identical with and without the proof, and a small `maxExpand` still
+  gives `route.search-limit`.
+- `explainUnusable` = all equals the reference. `explainUnusable` = none changes only link-unusable → unreachable.
+- `narrowComponents` equals the frozen old `narrow()` on 4 radii / margins, 12 seeded obstacle scenes, and every
+  `narrow()` call of the build-bay probe (pinned hash).
+- Stress-30 with every switch off equals on: exact (the pin) and corridor (its tick-1126 failing replan). Same for the meal.
+
+`deploy/perf-walk.mjs` runs the five pinned scenarios and asserts their hashes. Every
+number below was measured against a tree of the same HEAD with these four commits reverted, alternating, on a loaded host
+(load average 15–30); stress-30 is warm (median of 6 in-process runs after one cold run):
+
+| scenario (hash, before = after) | before | after |
+| --- | ---: | ---: |
+| stress-30 exact `093779fd18f0…` — tick mean / max / CPU per 60 s run | 0.69–0.71 ms / 99 ms / 945–961 ms | **0.48–0.50 ms** / 94–99 ms / 665–680 ms |
+| stress-30 corridor `0754e1ebe936…` — tick mean / max | 0.71–0.73 ms / 88 ms (tick 1126) | **0.43–0.44 ms / 53 ms** (tick 5) |
+| failing people-replan (stress-30 corridor, tick 1126, `routeAround`) | 88–94 ms | **8.5–9.5 ms** |
+| stress-30 `walk_to.step` total (profiled) | 0.56–0.57 s | 0.31–0.33 s |
+| build-bay probe = flagship rehearsal `93fa2a0a7900…` — compute / walk_to.step | 2.94–2.97 s / 0.11 s | 2.72–2.85 s / 0.07 s |
+| campus flagship crop `ecb424c74d87…` — compute / walk_to.step | 5.44–5.55 s / 0.18–0.19 s | **4.76–4.81 s** / 0.10 s |
+| meal `9dae86bfd31e…` — compute | 0.06–0.07 s | 0.06–0.07 s |
+| build-bay v3 `5f32379db672…` — compute / walk_to.step | 5.86–5.99 s / 0.28 s | 5.62–5.68 s / 0.15 s |
+
+(`narrow()` on campus + v3: 701 → 105 ms. `walk_to.step` counts top-level walks only; carry's crew walks run inside `carry.step`.)
+
+**W4's "+10–25 % flagship compute" did not reproduce.** At `9e1c2f4^` vs `9e1c2f4` the probe ran 3.18–3.38 s vs 3.05–3.07 s,
+and the campus crop 5.94–6.26 s vs 5.86–6.06 s, per tick about equal. Those figures were probably host load. Walker code is now ~5 %
+of the probe rehearsal; the rest is invariants, the take recorder, carry planning and sequence submits.
+
+**Not done, and why.**
+- **Max tick ≤ 60 ms with the exact planner.** Tick 5 is 27 synchronous exact A\* plans (399k expansions, 82–95 ms warm;
+  95 % in the search loop and heap). Exact routes pin the pop sequence. An inner-loop rewrite (orthogonal passability reused
+  for corner tests, per-level heuristic tables) and an int32 tie-break array gained 0–5 %, inside noise, so they were not kept.
+  The remaining options all move hashes. One is the corridor planner (max 53 ms here; 373/399 routes identical, the rest ±4 %
+  in length, so every walk timing moves). The other is spreading submit-time planning over ticks (moves every start).
+- **Look-ahead cache / arc memo.** After the snapshot, `hazardAhead` is ~0.03 ms per tick (stress-30) and `smoothPolyline`
+  < 5 ms per rehearsal. An exact cache would need every input (s, v, offset, target offset, each candidate's pose, epoch) as
+  its key, and they change every tick for a walker. Not worth the risk.
+- **`segmentClearance` redundancy.** On the per-tick path it runs only in `place()`, and with a zero offset q = base there.
+  The 17-offset scans (`sidestepTarget`, `roomToPass`) run once per encounter, not per tick.
+
 ## Hashes: before = after, no changes
 Probe / flagship build-bay `d54eca7c402a…0f610`; campus flagship `f60e10b461dd…4c182`; lab stress-30
 `a6e42f5c6bfb…0e26c` (now pinned in `planning.test.ts`); the other 8 lab scenarios are unchanged too.
@@ -220,4 +295,4 @@ The meal pin, the year-build first bay (`ad844b78…` @ 41019) and the campus pi
 
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
-corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
+corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
