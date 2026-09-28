@@ -1,9 +1,9 @@
 // Paint progress on a paintable face (engine/work/paint.ts, SOLAR_PAINT.md "Renderer contract"): the
 // entity's `paint = { face, color | texture, coverage, bands: [{ from, to, coverage }] }` drawn as one
-// colour quad per band on that face, 3 mm off it, as wide as the band's coverage (from the face's left
+// colour or image quad per band on that face, 3 mm off it, as wide as the band's coverage (from the face's left
 // edge as seen by a painter facing it: coverage is an area fraction, not a mask, and the brush works
-// row by row across the face). A `texture` is not a texture yet: it draws as a colour hashed from its
-// name with a dark stripe along the middle of each band, so a textured face is visibly not a plain coat.
+// row by row across the face). Known texture names use existing history images; unknown names retain a
+// stable hashed colour and dark stripe so no scene silently pretends an unavailable image was applied.
 // The face frame comes from the engine (`faceOf` at the entity's tick pose) and is rebuilt in the
 // object's local frame, so the overlay rides the part's interpolated render pose.
 import * as THREE from 'three';
@@ -12,6 +12,40 @@ import { faceOf } from '../../engine/work/paint.ts';
 
 const OFF = 0.003; // m off the face
 const STRIPE = 0.02; // m: texture stripe height
+export const PAINT_TEXTURES: Readonly<Record<string, string>> = Object.freeze({
+  'flower-mural': '/history/2024/flower.webp',
+  'flower-mural-2024': '/history/2024/flower.webp',
+  'flower-mural-2025': '/history/2025/flower.webp',
+  'red-wall-2024': '/history/2024/red-wall.webp',
+  'orange-wall-2024': '/history/2024/orange-wall.webp',
+  'eye-2024': '/history/2024/eye.webp',
+  'arches-2022': '/history/2022/arches.webp',
+  'arches-upper-2022': '/history/2022/arches-upper.webp',
+  'swirls-2023': '/history/2023/swirls.webp',
+  'cafe-front-2023': '/history/2023/cafe-front.webp',
+});
+const loaded = new Map<string, THREE.Texture>();
+const warned = new Set<string>();
+export function paintTexturePath(name: string): string | null {
+  const path = PAINT_TEXTURES[name];
+  if (!path) {
+    if (!warned.has(name)) { warned.add(name); console.warn(`[paint] unknown texture "${name}"; using hashed colour and stripe`); }
+    return null;
+  }
+  return path;
+}
+function imageFor(name: string): THREE.Texture | null {
+  const path = paintTexturePath(name);
+  if (!path) return null;
+  let image = loaded.get(path);
+  if (!image) {
+    image = new THREE.TextureLoader().load(path);
+    image.colorSpace = THREE.SRGBColorSpace;
+    image.anisotropy = 4;
+    loaded.set(path, image);
+  }
+  return image;
+}
 
 /** Colour of a paint state: its CSS colour, else a stable colour hashed from the texture name. */
 export function paintColor(p: Pick<PaintState, 'color' | 'texture'>): THREE.Color {
@@ -55,13 +89,14 @@ export class PaintOverlay {
     const toLocal = (w: number[]) => new THREE.Vector3(w[0], w[1], w[2]).applyMatrix4(inv);
     const nrm = new THREE.Vector3(...F.N).multiplyScalar(OFF);
     const at = (u: number, h: number) => toLocal([F.B[0] + F.U[0] * u + F.V[0] * h + nrm.x, F.B[1] + F.U[1] * u + F.V[1] * h + nrm.y, F.B[2] + F.U[2] * u + F.V[2] * h + nrm.z]);
-    const color = paintColor(p);
-    this.mat = new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    if (p.texture) this.stripe = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.35), roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const image = p.texture ? imageFor(p.texture) : null;
+    const color = image ? new THREE.Color('#ffffff') : paintColor(p);
+    this.mat = new THREE.MeshStandardMaterial({ color, map: image, roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    if (p.texture && !image) this.stripe = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.35), roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
     const bands = p.bands.map((b) => {
       const top = Math.min(b.to, F.height), w = F.width * Math.max(0, Math.min(1, b.coverage));
       if (w > 1e-4 && top > b.from) {
-        this.group.add(this.quad(at(0, b.from), at(w, b.from), at(w, top), at(0, top), this.mat!));
+        this.group.add(this.quad(at(0, b.from), at(w, b.from), at(w, top), at(0, top), this.mat!, b.coverage, b.from / F.height, top / F.height));
         if (this.stripe) {
           const m = (b.from + top) / 2;
           this.group.add(this.quad(at(0, m - STRIPE / 2), at(w, m - STRIPE / 2), at(w, m + STRIPE / 2), at(0, m + STRIPE / 2), this.stripe));
@@ -72,8 +107,9 @@ export class PaintOverlay {
     this.state = { face: p.face, color: `#${color.getHexString()}`, texture: p.texture ?? null, bands };
   }
 
-  private quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, m: THREE.Material) {
+  private quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, m: THREE.Material, u = 1, v0 = 0, v1 = 1) {
     const g = new THREE.BufferGeometry().setFromPoints([a, b, c, a, c, d]);
+    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, v0, u, v0, u, v1, 0, v0, u, v1, 0, v1], 2));
     g.computeVertexNormals();
     const q = new THREE.Mesh(g, m);
     q.receiveShadow = true;

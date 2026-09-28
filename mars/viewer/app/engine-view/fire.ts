@@ -1,5 +1,5 @@
 // Animated campfire shared by the Engine Lab fixtures (fixtures.ts) and the studio ambience fire
-// (studio/scenery.ts): a glowing coal bed, camera-facing flame tongues shaded by scrolling value
+// (studio/scenery.ts): a glowing coal bed, crossed flame tongues shaded by scrolling value
 // noise (one draw), rising embers and thin smoke (GPU-animated points, one draw each), and a warm
 // point light whose intensity and position flicker. Everything is a pure function of (seed, t):
 // the seed comes from the entity id (`seedOf`), t is sim/take seconds — no Math.random / Date.now,
@@ -34,19 +34,18 @@ float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
 float fbm(vec2 p){ return 0.5 * vn(p) + 0.3 * vn(p * 2.03 + 7.1) + 0.2 * vn(p * 4.01 + 3.7); }`;
 
 const FLAME_VS = /* glsl */ `${NOISE}
-uniform float uTime, uStrength; attribute vec2 corner; attribute vec4 tongue;
+uniform float uTime, uStrength; attribute vec2 corner; attribute vec4 tongue; attribute float angle;
 varying vec2 vUv; varying float vSeed, vHeat;
 void main(){
   vUv = corner + vec2(0.5, 0.0); vSeed = tongue.z; vHeat = tongue.w;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vec3 up = (modelViewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz; float s = length(up); up /= s;
-  // cylindrical billboard (true vertical, facing the camera); from overhead it becomes a short screen-up blob
-  float side = smoothstep(0.15, 0.6, length(up.xy));
-  vec3 V = normalize(mix(vec3(0.0, 1.0, 0.0), up, side)), R = normalize(cross(V, vec3(0.0, 0.0, 1.0)));
-  mv.xyz += up * s * tongue.y * 0.5 * (1.0 - side); // overhead: lift the blob above the logs
+  // The two oblique planes of each tongue keep visible area from directly above.
+  // Their sideways directions differ by 90 degrees, avoiding a camera-facing disc.
+  vec3 R = vec3(cos(angle), 0.20, sin(angle));
+  vec3 V = vec3(-sin(angle) * 0.42, 1.0, cos(angle) * 0.42);
   float breathe = 0.8 + 0.4 * vn(vec2(uTime * 3.3 + tongue.z * 17.0, tongue.z));
-  mv.xyz += R * corner.x * tongue.x * s + V * corner.y * tongue.y * s * breathe * mix(0.45, 1.0, side) * (0.5 + 0.5 * uStrength);
-  gl_Position = projectionMatrix * mv;
+  vec3 p = position + R * corner.x * tongue.x + V * corner.y * tongue.y * breathe * (0.5 + 0.5 * uStrength);
+  p.xz += vec2(sin(uTime * 4.7 + tongue.z * 31.0), cos(uTime * 3.9 + tongue.z * 29.0)) * tongue.x * corner.y * 0.18;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
 const FLAME_FS = /* glsl */ `${NOISE}
 uniform float uTime, uStrength; varying vec2 vUv; varying float vSeed, vHeat;
@@ -61,7 +60,7 @@ void main(){
   float a = body * top * smoothstep(0.0, 0.1, y) * (0.55 + 0.6 * n);
   float heat = a * (0.55 + 0.45 * vHeat) * (1.15 - 0.6 * y);
   vec3 c = mix(vec3(0.85, 0.16, 0.02), vec3(1.0, 0.5, 0.08), smoothstep(0.05, 0.4, heat));
-  c = mix(c, vec3(1.0, 0.9, 0.62), smoothstep(0.45, 0.85, heat));
+  c = mix(c, vec3(1.0, 0.73, 0.30), smoothstep(0.45, 0.85, heat));
   gl_FragColor = vec4(c, clamp(a, 0.0, 1.0) * uStrength);
 }`;
 const BED_FS = /* glsl */ `${NOISE}
@@ -90,8 +89,8 @@ const EMBER_FS = /* glsl */ `varying float vAge, vTw; uniform float uStrength;
 void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.3, 1.0, r)) * (1.0 - vAge) * vTw * uStrength;
   gl_FragColor = vec4(mix(vec3(1.0, 0.8, 0.35), vec3(1.0, 0.25, 0.05), vAge), a); }`;
 const SMOKE_FS = /* glsl */ `varying float vAge, vTw; uniform float uStrength;
-void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.0, 1.0, r)) * sin(3.14159 * vAge) * 0.17 * uStrength;
-  gl_FragColor = vec4(vec3(0.42, 0.4, 0.39), a); }`;
+void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.10, 1.0, r)) * sin(3.14159 * vAge) * 0.27 * uStrength;
+  gl_FragColor = vec4(vec3(0.55, 0.52, 0.48), a); }`;
 
 export type FireLight = { color?: THREE.ColorRepresentation; intensity: number; distance: number; decay: number; y: number };
 export type Fire = {
@@ -121,27 +120,35 @@ export function createFire(seed: number, radius: number, lightOpts: FireLight): 
     return m;
   };
 
-  // flame tongues: [count, width, height, heat] per layer (outer red → yellow-white core)
-  const pos: number[] = [], corner: number[] = [], tongue: number[] = [], index: number[] = [];
+  // Crossed oblique ribbons: both planes share the same seeded tongue and one draw call.
+  const pos: number[] = [], corner: number[] = [], tongue: number[] = [], angle: number[] = [], index: number[] = [];
   for (const [count, w, h, heat] of [[4, 1.1, 2.4, 0], [3, 0.85, 2.6, 0.5], [2, 0.6, 1.8, 1]]) {
     for (let k = 0; k < count; k++) {
-      const a = rnd() * Math.PI * 2, r = radius * (0.35 - 0.12 * heat) * Math.sqrt(rnd()), base = pos.length / 3;
-      for (const [cx, cy] of [[-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]]) {
-        pos.push(Math.cos(a) * r, 0.04, Math.sin(a) * r);
-        corner.push(cx, cy);
-        tongue.push(radius * w * (0.85 + 0.3 * rnd()), radius * h * (0.85 + 0.3 * rnd()), rnd(), heat);
+      const a = rnd() * Math.PI * 2, r = radius * (0.35 - 0.12 * heat) * Math.sqrt(rnd());
+      const width = radius * w * (0.85 + 0.3 * rnd()), height = radius * h * (0.85 + 0.3 * rnd()), noise = rnd();
+      for (const turn of [0, Math.PI / 2]) {
+        const base = pos.length / 3;
+        for (const [cx, cy] of [[-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]]) {
+          pos.push(Math.cos(a) * r, 0.04, Math.sin(a) * r);
+          corner.push(cx, cy);
+          tongue.push(width, height, noise, heat);
+          angle.push(a + turn);
+        }
+        index.push(base, base + 1, base + 2, base, base + 2, base + 3);
       }
-      index.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
   }
   const fg = new THREE.BufferGeometry();
   fg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   fg.setAttribute('corner', new THREE.Float32BufferAttribute(corner, 2));
   fg.setAttribute('tongue', new THREE.Float32BufferAttribute(tongue, 4));
+  fg.setAttribute('angle', new THREE.Float32BufferAttribute(angle, 1));
   fg.setIndex(index);
   fg.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, radius * 1.2, 0), radius * 2.6);
   geos.push(fg);
-  const flame = new THREE.Mesh(fg, shader(FLAME_VS, FLAME_FS, {}));
+  const flameMat = shader(FLAME_VS, FLAME_FS, {}, THREE.NormalBlending);
+  flameMat.side = THREE.DoubleSide;
+  const flame = new THREE.Mesh(fg, flameMat);
   flame.name = 'flame';
   flame.renderOrder = 2;
 
@@ -171,9 +178,10 @@ export function createFire(seed: number, radius: number, lightOpts: FireLight): 
   const tmp = new THREE.Vector2();
   const embers = points(28, radius * 0.3, 0.6, { uSize: { value: 0.022 }, uGrow: { value: 0 }, uRise: { value: radius * 5.5 }, uRate: { value: 0.45 }, uSpread: { value: radius * 0.35 }, uMax: { value: 10 } }, EMBER_FS);
   embers.name = 'embers';
-  const smoke = points(12, radius * 2.2, 0.3, { uSize: { value: radius * 0.8 }, uGrow: { value: 2 }, uRise: { value: radius * 7 }, uRate: { value: 0.09 }, uSpread: { value: radius * 0.9 }, uMax: { value: 400 } }, SMOKE_FS, THREE.NormalBlending);
+  const smoke = points(24, radius * 1.8, 0.3, { uSize: { value: radius * 1.1 }, uGrow: { value: 2.3 }, uRise: { value: radius * 8 }, uRate: { value: 0.12 }, uSpread: { value: radius * 1.1 }, uMax: { value: 400 } }, SMOKE_FS, THREE.NormalBlending);
   smoke.name = 'smoke';
-  smoke.renderOrder = 3;
+  // Composite the translucent column behind the flames; overhead smoke otherwise hides every tongue.
+  smoke.renderOrder = 1;
 
   const light = new THREE.PointLight(lightOpts.color ?? '#ff9a4a', 0, lightOpts.distance, lightOpts.decay);
   light.position.y = lightOpts.y;
