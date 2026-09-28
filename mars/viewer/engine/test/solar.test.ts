@@ -113,7 +113,7 @@ test('solar green: rails fastened on a 2.4 m deck, a panel handed up onto them a
     assert.ok(Math.abs(E[r].pose.p[1] - deckY) < 1e-9 && Math.abs(E[r].pose.p[2] - ZC) < 1e-9);
   }
   // the panel goes up by hand: two on the ground raise it at the east edge, the two on the deck lay it on the rails
-  const hu = rt.submit('hand_up', { part: 'pv1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to: { x: 0, z: ZC, yaw: Math.PI / 2 }, edge: 'b3', stations: [{ x: 0.2, z: ZC + 1.35 }, { x: 0.2, z: ZC - 1.35 }] });
+  const hu = rt.submit('hand_up', { part: 'pv1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to: { x: 0, z: ZC, yaw: Math.PI / 2 }, edge: 'b3', stations: [{ x: 0.2, z: ZC + 1.18 }, { x: 0.2, z: ZC - 1.18 }] });
   assert.notEqual(hu.status, 'failed', `${hu.diagnostic?.code} ${hu.diagnostic?.message}`);
   const w1 = watch(rt, hu.id);
   assert.equal(w1.r.status, 'completed', `${w1.r.diagnostic?.code} ${w1.r.diagnostic?.message}`);
