@@ -28,8 +28,9 @@ export type EntityKind = 'human' | 'component' | 'vehicle' | 'fixture' | 'marker
 /** How an entity is currently held up. `none` is only legal transiently and is a violation at tick end. */
 export type Support =
   | { kind: 'ground' }
-  | { kind: 'resting-on'; on: string }
+  | { kind: 'resting-on'; on: string; slot?: string } // slot: a table surfaceSlot id, or 'lap' (engine/items)
   | { kind: 'held'; by: string[] }
+  | { kind: 'in-hand'; by: string; hand: 'left' | 'right' } // a small item in one person's hand (engine/items)
   | { kind: 'connected'; to: string[] }
   | { kind: 'forks'; vehicle: string }
   | { kind: 'ridden-by'; by: string } // a vehicle under its rider (engine/vehicles)
@@ -52,6 +53,14 @@ export type HumanState = {
   grip?: { entity: string; slot: string };
   riding?: string; // vehicle id while mounted (engine/vehicles)
   level: number; // walkable level index (0 = ground)
+  /**
+   * Hand points (world frame, metres), published every tick by engine/items while the person holds a
+   * small item or an items verb drives a hand (reach, serve, eat); a hand without a point is free /
+   * at rest. Absent when neither hand is published. ITEMS.md "Hand points".
+   */
+  hands?: { left?: Vec3; right?: Vec3 };
+  /** While an overlay activity (`eat`) runs: the activity it is layered on ('sit' = seated, 'talk', 'idle'…). */
+  baseActivity?: string;
 };
 
 export type Entity = {
@@ -71,6 +80,8 @@ export type Entity = {
   human?: HumanState;
   /** Owning action while reserved/held. */
   reservedBy?: string;
+  /** Containers (bowl, pot…; catalog-items.ts CONTAINERS): what food is in it and how full (0..1). */
+  contents?: { food: string; fraction: number };
 };
 
 export type Region = {

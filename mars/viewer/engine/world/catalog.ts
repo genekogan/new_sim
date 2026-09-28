@@ -5,6 +5,7 @@
 // against photos or the 2026 component catalog.
 import { dcos, dsin, FT, IN, type Vec3 } from '../core/math.ts';
 import type { Confidence } from './types.ts';
+import { ITEM_ASSETS, type SurfaceSlotDef } from './catalog-items.ts';
 
 export type GripSlot = { id: string; local: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
@@ -29,12 +30,16 @@ export type Handling = {
   holdCrew?: number;
   /** Hand height while carrying (m). */
   carryHeight: number;
+  /** Small hand-held items (catalog-items.ts, engine/items): carried in this many hands (1). */
+  hands?: 1 | 2;
+  /** A small hand-held item (bowl, spoon, cup…): taken / put / eaten with by engine/items. */
+  small?: true;
 };
 
 export type AssetDef = {
   id: string;
   label: string;
-  category: 'rack-upright' | 'rack-beam' | 'timber' | 'plywood' | 'stair' | 'human' | 'vehicle' | 'fixture' | 'test-block';
+  category: 'rack-upright' | 'rack-beam' | 'timber' | 'plywood' | 'stair' | 'human' | 'vehicle' | 'fixture' | 'item' | 'test-block';
   /** Local axis-aligned box: x = width/length, y = height, z = depth/thickness (m). */
   size: Vec3;
   massKg: number;
@@ -45,6 +50,8 @@ export type AssetDef = {
   stair?: { treads: number };
   /** Interaction slots (seats, fire-circle places); see SlotDef. */
   slots?: SlotDef[];
+  /** Places on the fixture's top where items rest (tables; catalog-items.ts). */
+  surfaceSlots?: SurfaceSlotDef[];
   /**
    * Fixture that stands where it is placed: a static walking obstacle at its catalog box even
    * without a construction `phase` (spatial/service.ts). A moving phase (`carried`) still lifts it out.
@@ -298,6 +305,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     // Forklift (engine/vehicles/forklift.ts): x = 2.6 m length (forks at +x), y = 2.2 m lowered mast, z = 1.2 m width.
     { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
+    ...ITEM_ASSETS,
     {
       id: 'test-wall',
       label: 'proving-ground wall block',
