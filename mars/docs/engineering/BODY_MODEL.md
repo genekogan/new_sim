@@ -48,8 +48,8 @@ means inside. It is convex, so a straight hand path between two inside points st
 | `items/body.ts` | thin layer: re-exports the body frame / landmarks (`bodyFrame`, `at`, `shoulderPoint`, `chestPoint`, `mouthPoint`, `restHand`, `carryHand`); `BODY` / `SEAT_DROP` are named views of the model; keeps only the eat-cycle landmarks (bowl / rim / dip) |
 | `items/model.ts` | `ITEM_REACH` = tableReach |
 
-Not yet on the model (outside this track): `construction/stance.ts` (`GIVE_MAX`, `STANCE_UP` 2.1, `STANCE_ARM` 0.9,
-`GROUND_ARM` 0.8 — the year-build hang, W7's in-flight work) and `construction/liftcrew.ts` (`HAND_REACH` 1.0 m
+Outside this track: `construction/stance.ts` (the year-build hang; W7 is moving its `GIVE_MAX` / `GROUND_ARM` onto the
+model in flight — `STANCE_UP` 2.1, `STANCE_ARM` 0.9 remain its own) and `construction/liftcrew.ts` (`HAND_REACH` 1.0 m
 ground distance, `LIFT_APEX_MAX` 2.4 m for the lift-over apex: crews raising uprights, a different rule).
 
 ## Reach rules in one table
