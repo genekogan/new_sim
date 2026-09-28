@@ -1350,3 +1350,10 @@ Then: gate → release 5; HANDOFF refresh.
 
 ## 2026-09-29 ~22:40 EDT — Handoff procedure (Gene: transfer to Codex in ~1 h)
 - All running workers (W47, W51, W54, W57, W58) told to land at their next green checkpoint with an explicit "Next step" per unfinished item, full gate, then stop; no new workers. Then: docs refresh (HISTORICAL_CONTENT.md + banners, HANDOFF, NEXT_SESSION_PROMPT, LAST_MILE statuses) and the handoff prompt `docs/engineering/HANDOFF_PROMPT_ENGINE.md` for the next agent (engine / simulation / controller / app only; historical content is a separate agent's job).
+- **W54 (engine camera perf, output-identical)** on `w54-direct-perf`: `directCamera` on the W48 D2 hold 7.3 s → 0.25–0.35 s
+  warm in node (studio saw 5.6 s), flagship 270° bay orbit 0.32–0.40 → 0.16–0.21 s. Cause: the 2728.8 s lead-in hold
+  sampled all 220 entities × 27 288 ticks for readability that never reads them. `plan.ts` skips the sampler for
+  subject-less windows and reuses one candidate row for a subject-less `fixed` window; `geom.ts` candidates dedupe by
+  generation stamp. New `camera-direct-identity.test.ts` (17 CAMERA_DIRECT fixtures + the D2 hold, sha256 of the full
+  result JSON vs the pre-W54 golden): identical; `--all --full --check` and chapters `--check` OK. Phase table + what
+  is left: CAMERA_DIRECT.md §9.

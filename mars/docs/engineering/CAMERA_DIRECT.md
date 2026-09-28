@@ -424,3 +424,57 @@ the controller's take store, or the one the studio's Direct-camera panel compile
   file track needs one more choice (e.g. `{ track: { file: id } }`) resolved through `fileCamera`. Tested in
   `camera-take-file.test.ts` (a directed carry-crew orbit added to the flagship file, JSON round trip, poses equal,
   take hash unchanged, foreign / clashing / malformed tracks refused).
+
+## 9. Performance (W54, 2026-09-28) — output-identical
+
+`directCamera` on a chapter take froze the studio for ≈ 5.6 s (W48: a medium 20 s hold on m1 at 2728.8 s into D2,
+5 367 s, 220 entities). The cause was not the shot: the program's **lead-in hold** (0 → 2728.8 s, a `fixed` window with
+no subjects) was planned sample by sample, and each of its 27 288 samples called the take sampler, which builds every
+entity's pose, corners and part occluders for that tick — ≈ 3.6 s of sampling plus GC, for readability scores that
+never read them (no subject ids → score 1, no reasons).
+
+Changes (camera only; the directed tracks, reports and every planned camera are byte-identical):
+- `plan.ts`: a window with no subject ids does not sample the take (`readability` over no ids ignores `subjects`;
+  the candidates reach them only through it). A `fixed` window with no ids computes its candidate row and desired
+  analysis once and reuses them for every sample (same pose, same static world); the a → a continuity raycast is
+  memoised.
+- `geom.ts` `CameraWorld.candidates`: multi-cell queries dedupe with a per-solid generation stamp instead of a `Set`
+  + spread + sort per raycast (same indices, same order).
+
+Measured in node (`performance.now()` around `directCamera` with a fresh `takeSampler` per call, as the studio calls
+it; phases = inclusive CPU-profile time per warm call, 100 µs sampling; GC is attributed outside the call tree):
+
+| phase (ms per call) | D2 hold, before | D2 hold, after | flagship 270° bay orbit, before | after |
+| --- | ---: | ---: | ---: | ---: |
+| **wall, warm** | **7 260–7 830** | **250–350** | **320–400** | **160–215** |
+| plan (`planShotList`) | 4 133 | 48 | 140 | 50 |
+| take sampling (sampler calls) | 3 633 (29 713) | 64 (2 424) | 100 (6 177) | 41 (4 090) |
+| · occluder assembly (`partOccluders`) | 1 148 | 23 | 35 | 12 |
+| · corners (`entityCorners`) | 615 | 11 | 15 | 7 |
+| readability scoring | 360 | 17 | 91 | 63 |
+| synthesize + correct (`correctShot`) | 74 | 82 | 103 | 95 |
+| · simulate + score (`scoreShot`) | 11 | 13 | 83 | 76 |
+| navmesh build | 0 | 0 | 0 | 0 |
+| `trackHash` (sha256 of `plan.samples`) | ≈ 125 | 131 | ≈ 15 | 14 |
+| garbage collector | 4 827 | 53 | 99 | 26 |
+
+Targets (D2 ≤ 0.5 s, flagship orbit ≤ 0.3 s, warm) are met. Neither case builds a navmesh (holds and orbits have no
+route); corrections here are at most one re-synthesis (`correctShot` ≈ 80–95 ms including the simulation).
+
+Identity proof: `engine/test/camera-direct-identity.test.ts` runs 17 cases — the flagship bay orbit (phase 1, phase 2,
+the W48 medium sentence), the carryA orbit and hold, the Chiba sunset pan, the 2024 kitchen fly-through (phase 1 + 2),
+plywood squeeze, behind a head, group outgrows the frame, walking-crew orbit, flare, the three navmesh rooms and the
+W48 D2 hold — and compares sha256 of each full result's `JSON.stringify` (plan with every sample, shots with keys /
+simulation / corrections, report) with the golden recorded from the pre-W54 code. `CAMERA_IDENTITY_DUMP=<dir>` writes
+the JSON for a byte diff. `record-campus-take.mjs --all --full --check` and `--scenario year-build-2022-ab-chapters
+--check`: OK (take id, final state, camera track and bytes match).
+
+Left (not needed for the targets):
+- D2's remaining ≈ 280 ms is half `trackHash`: `core/hash.ts` sha256 (pure JS, DataView reads) + `stableStringify`
+  over 27 k samples. A faster identical sha256 (word reads without DataView, no destructuring per block) is a
+  `core/` change, not camera's.
+- `centreAt` averages a dynamic subject over ±1 s (9 sampler calls per key): ≈ 60 ms on D2 because each tick samples
+  all 220 entities. A per-id sampling path would need the crew / contact logic split out of the tick sampler.
+- The navmesh is still rebuilt per `directCamera` call (fly-throughs only, 100–250 ms): a cache keyed by (scene,
+  bounds, radius) across calls would help repeated fly-through edits; it is identical by construction but holds memory.
+- The studio still runs `directCamera` on the main thread; a worker would remove the remaining freeze entirely.
