@@ -6,7 +6,7 @@
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
-import { execute as executePlan, rehearse as rehearsePlan, type EngineConfig, type RunReport } from '../rehearsal/rehearse.ts';
+import { describeDiff, execute as executePlan, physicalDiff, rehearse as rehearsePlan, type EngineConfig, type RunReport } from '../rehearsal/rehearse.ts';
 import { DT, Runtime, type Invariant } from '../runtime/runtime.ts';
 import { bindTemplate, PlanError } from '../sequence/bind.ts';
 import { PLAN_SCHEMA, SEQUENCE_SCHEMA, templateSchema, type BoundPlan, type SequenceTemplate } from '../sequence/types.ts';
@@ -23,6 +23,7 @@ import { toCameraTrack } from '../camera/track.ts';
 import type { Sampler, ShotSpec, SubjectPose } from '../camera/shots.ts';
 import { createRegistry, describeVerbs, engineConfig, ENGINE_INVARIANTS, jsonSchemaOf } from './registry.ts';
 import { opSchemas, type OpInput, type OpName } from './schemas.ts';
+import { applyEdits } from './edit.ts';
 
 export type StoredPlan = { plan: BoundPlan; workspace: string };
 
@@ -222,6 +223,7 @@ export class EngineController {
         case 'rehearse': return this.rehearse(parsed.data as OpInput<'rehearse'>);
         case 'execute': return this.execute(parsed.data as OpInput<'execute'>);
         case 'fork': return this.fork(parsed.data as OpInput<'fork'>);
+        case 'edit_world': return this.editWorld(parsed.data as OpInput<'edit_world'>);
         case 'log': return this.log(parsed.data as OpInput<'log'>);
         case 'get_take': return this.getTake(parsed.data as OpInput<'get_take'>);
         case 'attach_camera_track': return this.attachCameraTrack(parsed.data as OpInput<'attach_camera_track'>);
@@ -407,7 +409,29 @@ export class EngineController {
   fork(q: OpInput<'fork'>): OpResult {
     const w = this.history.fork(q.from, q.name, q.label ?? q.name, q.at);
     this.changes.history = true;
-    return { ok: true, workspace: { ...w } };
+    if (q.inventory) {
+      const world = this.history.read(q.name);
+      if (world.inventory !== q.inventory) {
+        world.inventory = q.inventory;
+        this.history.commit(q.name, world, { kind: 'design-edit', note: `inventory: ${q.inventory}` }, `inventory ${q.inventory}`);
+      }
+    }
+    return { ok: true, workspace: { ...w }, inventory: this.history.read(q.name).inventory };
+  }
+
+  /** Design edits on an editable workspace: all-or-nothing, one `design-edit` checkpoint, returns the physical diff. */
+  editWorld(q: OpInput<'edit_world'>): OpResult {
+    const ws = this.history.workspaces.get(q.workspace);
+    if (!ws) return fail('unknown-workspace', `no workspace ${q.workspace}`);
+    if (ws.protected) return fail('workspace.protected', `workspace "${ws.label}" is a protected canonical state; fork it (engine_fork) before editing`);
+    const before = this.history.read(q.workspace);
+    const r = applyEdits(before, q.edits, (w) => this.cfg.services(w).spatial as Spatial, q.note);
+    if (!r.ok) return r;
+    const parent = ws.head;
+    const cp = this.history.commit(q.workspace, r.world, { kind: 'design-edit', note: q.note }, q.label);
+    this.changes.history = true;
+    const diff = physicalDiff(before, r.world);
+    return { ok: true, workspace: q.workspace, checkpoint: compactCheckpoint(cp), parent, applied: r.applied, diff, summary: describeDiff(diff) };
   }
 
   attachCameraTrack(q: OpInput<'attach_camera_track'>): OpResult {

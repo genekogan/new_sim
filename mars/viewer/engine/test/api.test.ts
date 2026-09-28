@@ -523,3 +523,94 @@ test('plan invalidation (room): another run moving a walker onto the route stale
   assert.equal((room.call(2026, 'log', { workspace: 'w1' }) as any).head, head, 'a stale plan never commits');
   assert.equal((room.call(2026, 'rehearse', { plan_id: a.plan_id }) as any).stale.code, 'plan.stale', 'rehearsal flags it too');
 });
+
+test('api: edit_world — design edits spawn/move/remove/region, all-or-nothing, one design-edit checkpoint, refusals name the blocker', () => {
+  const c = createController({ history: seedHistory(), scenes: ENGINE_SCENES });
+  const edit = (workspace: string, edits: unknown[], note = 'test edit') => c.call('edit_world', { workspace, edits, note }) as any;
+  // protected canonical, finite inventory
+  assert.equal(edit('carry-yard', [{ op: 'remove', id: 'b1' }]).code, 'workspace.protected');
+  assert.equal(edit('nope', [{ op: 'remove', id: 'b1' }]).code, 'unknown-workspace');
+  assert.ok(c.call('fork', { from: 'carry-yard', name: 'fin' }).ok);
+  const fin = edit('fin', [{ op: 'spawn', id: 'u1', def: 'upright-19ft', lying: { x: 4, z: 22, yaw: 0 } }]);
+  assert.equal(fin.code, 'edit.inventory-finite');
+  assert.match(fin.message, /inventory: 'unlimited'/);
+  assert.equal(fin.details.index, 0);
+  // fork with unlimited inventory: a design-edit checkpoint on the new workspace only
+  const f = c.call('fork', { from: 'carry-yard', name: 'yard', inventory: 'unlimited' }) as any;
+  assert.equal(f.inventory, 'unlimited');
+  assert.deepEqual(c.history.log('yard').map((cp) => cp.cause.kind), ['design-edit', 'canonical-publish']);
+  assert.equal(c.history.read('carry-yard').inventory, 'finite');
+  const early = bind(c, { schema: 'mars-sequence/1', id: 'w', params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x: 3, z: 3 } }] }, { a: 'p1' }, 'yard');
+  const head0 = c.history.head('yard').id;
+  // 19 ft upright in yard B with a crew of four (two moved, two spawned)
+  const r = edit('yard', [
+    { op: 'spawn', id: 'u1', def: 'upright-19ft', lying: { x: 4, z: 22, yaw: 0 } },
+    { op: 'move', id: 'p1', pose: { p: [1.5, 0, 19.5], yaw: 0 } },
+    { op: 'move', id: 'p2', pose: { p: [6.5, 0, 19.5], yaw: 0 } },
+    { op: 'spawn', id: 'q3', def: 'human', pose: { p: [1.5, 0, 24.5], yaw: 0 } },
+    { op: 'spawn', id: 'q4', def: 'human', pose: { p: [6.5, 0, 24.5], yaw: 0 } },
+    { op: 'region', id: 'yb', kind: 'staging', polygon: [[0, 18], [8, 18], [8, 26], [0, 26]] },
+  ], 'upright + crew in yard B');
+  assert.ok(r.ok, JSON.stringify(r));
+  assert.equal(r.parent, head0);
+  assert.deepEqual(r.checkpoint.cause, { kind: 'design-edit', note: 'upright + crew in yard B' });
+  assert.deepEqual(r.diff.added, ['q3', 'q4', 'u1']);
+  assert.deepEqual(r.diff.changed, [{ id: 'p1', fields: ['pose'] }, { id: 'p2', fields: ['pose'] }]);
+  assert.deepEqual(r.diff.regions, ['yb']);
+  assert.equal(r.applied.length, 6);
+  const w = c.history.read('yard');
+  assert.equal(w.entities.u1.phase, 'staged');
+  assert.deepEqual(w.entities.u1.provenance, { origin: 'design-edit', confidence: 'hypothetical', note: 'upright + crew in yard B' });
+  assert.equal(w.entities.q3.kind, 'human');
+  assert.deepEqual(Object.keys(w.entities), Object.keys(w.entities).sort(), 'canonical entity order');
+  // the spawned load is really there: the canonical 19 ft upright vs the 1.5 m corridor B
+  const pv = c.call('query_world', { workspace: 'yard', carry: { crew: ['p1', 'p2', 'q3', 'q4'], item: 'u1', to: { x: 18, z: 36, yaw: Math.PI / 2 } } }) as any;
+  assert.equal(pv.carry.diagnostic.code, 'carry.clearance');
+  assert.match(pv.carry.diagnostic.message, /19 ft upright/);
+  // a plan bound before the edit is stale, and the diff names the edit
+  const st = c.call('execute', { plan_id: early, workspace: 'yard' }) as any;
+  assert.equal(st.code, 'plan.stale');
+  assert.deepEqual(st.diff.added, ['q3', 'q4', 'u1']);
+  // refusals: wall, person, floor, float, immovable, id taken, unknown def; nothing commits
+  const head1 = c.history.head('yard').id;
+  const refuse = (edits: unknown[], code: string, re?: RegExp) => {
+    const x = edit('yard', edits);
+    assert.equal(x.ok, false);
+    assert.equal(x.code, code, JSON.stringify(x));
+    if (re) assert.match(x.message, re);
+    assert.equal(c.history.head('yard').id, head1, `${code}: nothing committed`);
+    return x;
+  };
+  const wall = refuse([{ op: 'move', id: 'b1', lying: { x: 8, z: 4, yaw: Math.PI / 2 } }], 'edit.blocked', /yard A east wall/);
+  assert.deepEqual(wall.details.subjects, ['b1', 'ya-e1']);
+  refuse([{ op: 'move', id: 'b1', lying: { x: 4, z: 22, yaw: 0.2 } }], 'edit.blocked', /overlap '.*upright.*'/);
+  refuse([{ op: 'spawn', id: 'q5', def: 'human', pose: { p: [1.6, 0, 24.5], yaw: 0 } }], 'edit.blocked', /overlap q3/);
+  refuse([{ op: 'spawn', id: 'box', def: 'plywood-4x8', lying: { x: 1.5, z: 24.5, yaw: 0 } }], 'edit.blocked', /q3/);
+  refuse([{ op: 'spawn', id: 'q5', def: 'human', pose: { p: [12, 0, 12], yaw: 0 } }], 'edit.off-floor');
+  refuse([{ op: 'spawn', id: 'box', def: 'plywood-4x8', pose: { p: [4, 1.5, 6], yaw: 0 } }], 'edit.unsupported');
+  refuse([{ op: 'spawn', id: 'u1', def: 'upright-8ft', lying: { x: 4, z: 6, yaw: 0 } }], 'edit.id-taken');
+  refuse([{ op: 'spawn', id: 'v1', def: 'forklift', lying: { x: 4, z: 6, yaw: 0 } }], 'edit.unknown-def');
+  refuse([{ op: 'spawn', id: 'v1', def: 'test-wall', pose: { p: [4, 0, 6], yaw: 0 } }], 'edit.not-spawnable');
+  refuse([{ op: 'spawn', id: 'f1', def: 'campfire', lying: { x: 4, z: 6, yaw: 0 } }], 'edit.invalid', /lying/);
+  refuse([{ op: 'move', id: 'b1' }], 'edit.invalid', /exactly one of pose, lying/);
+  refuse([{ op: 'move', id: 'ghost', lying: { x: 4, z: 6, yaw: 0 } }], 'entity.unknown');
+  refuse([{ op: 'remove', id: 'p1' }], 'edit.immovable', /design edit spawned/);
+  // atomic: a valid first edit followed by a refused one leaves the head where it was
+  const atomic = refuse([{ op: 'move', id: 'b1', lying: { x: 4, z: 5, yaw: 0 } }, { op: 'move', id: 'b1', lying: { x: 8, z: 4, yaw: Math.PI / 2 } }], 'edit.blocked');
+  assert.equal(atomic.details.index, 1);
+  // remove: a staged component, and a person a design edit spawned
+  const rm = edit('yard', [{ op: 'remove', id: 'b1' }, { op: 'remove', id: 'q4' }]);
+  assert.ok(rm.ok, JSON.stringify(rm));
+  assert.deepEqual(rm.diff.removed, ['b1', 'q4']);
+  // a busy/installed item cannot be moved: install the panel on the proving ground first
+  assert.ok(c.call('fork', { from: 'proving-ground', name: 'pg', inventory: 'unlimited' }).ok);
+  const fire = edit('pg', [{ op: 'spawn', id: 'fire2', def: 'campfire', pose: { p: [-20, 0, 0], yaw: 0 } }, { op: 'move', id: 'fire2', pose: { p: [-21, 0, 0], yaw: 0.3 } }]);
+  assert.ok(fire.ok, JSON.stringify(fire));
+  assert.equal(c.history.read('pg').entities.fire2.kind, 'fixture');
+  const pgw = c.history.read('pg');
+  pgw.entities.panel.phase = 'installed';
+  c.history.commit('pg', pgw, { kind: 'design-edit', note: 'panel installed' });
+  const inst = edit('pg', [{ op: 'move', id: 'panel', lying: { x: -25, z: 20, yaw: 0 } }]);
+  assert.equal(inst.code, 'edit.immovable');
+  assert.match(inst.message, /installed/);
+});

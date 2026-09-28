@@ -9,6 +9,41 @@ const wsId = z.string().regex(/^[A-Za-z0-9][\w.-]{0,63}$/, 'workspace ids: lette
 const coord = z.number().min(-500).max(500);
 const vec3 = z.tuple([coord, z.number().min(-50).max(300), coord]);
 const vec2 = z.tuple([coord, coord]);
+const angle = z.number().min(-7).max(7);
+const levelId = z.number().int().min(0).max(20);
+const newId = z.string().regex(/^[A-Za-z][\w.-]{0,63}$/, 'entity/region ids: a letter, then letters, digits, _ . - (≤ 64)');
+
+const poseSchema = z.strictObject({ p: vec3, yaw: angle, pitch: angle.optional(), roll: angle.optional() }).describe('explicit pose: base-centre p [x, y, z] (m), yaw/pitch/roll (rad)');
+const lyingSchema = z
+  .strictObject({ x: coord, z: coord, yaw: angle })
+  .describe('lay a carriable component flat on the level floor exactly as the carry verb sets loads down: box centre (x, z), long axis along yaw');
+/** One design edit (spec §21 "design-edit"): validated in order against the progressively edited world; all-or-nothing. */
+export const worldEditSchema = z.discriminatedUnion('op', [
+  z.strictObject({
+    op: z.literal('spawn'),
+    id: newId,
+    def: id.describe("catalog def id: upright-8ft…19ft, beam-8ft…12ft, 2x4-4ft…12ft, plywood-4x6/4x8, stair-flight-10, stair-tread, bench-6ft, camp-chair, campfire, human"),
+    pose: poseSchema.optional(),
+    lying: lyingSchema.optional(),
+    level: levelId.describe('walkable level (default 0)').optional(),
+    phase: z.enum(['stored', 'staged']).describe("components only (default 'staged' when lying, else 'stored')").optional(),
+    label: z.string().max(80).optional(),
+  }),
+  z.strictObject({ op: z.literal('move'), id, pose: poseSchema.optional(), lying: lyingSchema.optional(), level: levelId.describe('default: the level it is on').optional() }),
+  z.strictObject({ op: z.literal('remove'), id }),
+  z.strictObject({
+    op: z.literal('region'),
+    id: newId,
+    kind: z.enum(['place', 'staging', 'material-pile', 'work-area', 'walkable', 'no-go']),
+    polygon: z.array(vec2).min(3).max(64).describe('ground polygon [x, z], counter-clockwise'),
+    label: z.string().max(80).optional(),
+    level: levelId.optional(),
+    layout: z
+      .strictObject({ focus: vec2, spacing: z.number().min(0.7).max(3).optional(), rowGap: z.number().min(0.7).max(3).optional(), kind: z.enum(['audience', 'stand', 'seat']).optional() })
+      .describe("'place' regions: audience slots facing focus (gather/take_slot targets)")
+      .optional(),
+  }),
+]);
 
 const shotCommon = { fov: z.number().min(5).max(120).optional(), cutaway: z.boolean().optional(), subjects: z.array(id).max(16).optional() };
 export const shotSpecSchema = z.discriminatedUnion('kind', [
@@ -59,7 +94,19 @@ export const opSchemas = {
     keep: z.boolean().describe('store the take durably (default false: held in memory only, playable via get_take until evicted)').optional(),
   }),
   execute: z.strictObject({ plan_id: id, workspace: wsId, label: z.string().max(200).optional() }),
-  fork: z.strictObject({ from: z.string().max(120), name: wsId, label: z.string().max(200).optional(), at: z.string().max(64).describe('checkpoint id (default: head of `from`)').optional() }),
+  fork: z.strictObject({
+    from: z.string().max(120),
+    name: wsId,
+    label: z.string().max(200).optional(),
+    at: z.string().max(64).describe('checkpoint id (default: head of `from`)').optional(),
+    inventory: z.enum(['finite', 'unlimited']).describe("'unlimited' lets engine_edit_world spawn from the catalog (commits a design-edit checkpoint on the new workspace)").optional(),
+  }),
+  edit_world: z.strictObject({
+    workspace: wsId,
+    edits: z.array(worldEditSchema).min(1).max(32),
+    note: z.string().min(1).max(200).describe('why (recorded in the design-edit cause)'),
+    label: z.string().max(200).optional(),
+  }),
   log: z.strictObject({ workspace: wsId.optional(), limit: z.number().int().min(1).max(500).optional() }),
   get_take: z.strictObject({
     take_id: id,
@@ -97,7 +144,12 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
     description:
       'Officially run a bound plan in an editable workspace and commit the successor checkpoint (cause simulation-run). Refuses protected canonical workspaces (fork first), stale plans (physical change since binding — returns a diff) and runs with violations (take still stored).',
   },
-  fork: { readOnly: false, description: 'Create an editable workspace from another workspace head or a checkpoint. Canonical workspaces are protected: fork before executing.' },
+  fork: { readOnly: false, description: "Create an editable workspace from another workspace head or a checkpoint. Canonical workspaces are protected: fork before executing or editing. `inventory: 'unlimited'` lets engine_edit_world spawn catalog items there." },
+  edit_world: {
+    readOnly: false,
+    description:
+      "Design-edit an editable workspace (never a protected canonical one): spawn catalog items (only with inventory 'unlimited'; provenance design-edit/hypothetical), move idle people / loose components / fixtures to a pose or `lying` set-down (refused when the footprint would overlap static geometry, components or people, or leave the floor), remove stored/staged components (or anything a design edit spawned), add/replace regions. All-or-nothing; commits one checkpoint (cause design-edit + note) and returns the physical diff.",
+  },
   log: { readOnly: true, description: 'Checkpoint history of a workspace (newest first: id, parent, cause, label). Without `workspace` lists all workspaces.' },
   get_take: { readOnly: true, description: 'Compact slice of a take: header, quantised pose tracks [tick, x_mm, y_mm, z_mm, yaw_mrad…] within [from, to] (bracketing samples included for interpolation), discrete changes, events; optional final state and camera tracks.' },
   attach_camera_track: { readOnly: false, description: 'Plan a camera track (shot spec → collision-aware, readability-scored samples with explained cuts) against a recorded take and store it beside the take. Never changes the take or its hash.' },

@@ -60,7 +60,7 @@ const legacy = list.tools.filter((t) => !t.name.startsWith('engine_'));
 assert.equal(legacy.length, 20);
 const engineToolNames = list.tools.filter((t) => t.name.startsWith('engine_')).map((t) => t.name).sort();
 assert.deepEqual(engineToolNames, [
-  'engine_attach_camera_track', 'engine_bind_plan', 'engine_execute', 'engine_fork', 'engine_get_take',
+  'engine_attach_camera_track', 'engine_bind_plan', 'engine_edit_world', 'engine_execute', 'engine_fork', 'engine_get_take',
   'engine_list_verbs', 'engine_log', 'engine_query_world', 'engine_rehearse',
 ]);
 const call = async (name, args) => {
