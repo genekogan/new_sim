@@ -58,7 +58,9 @@ test('watch it being built: year picker → piles to standing structure, log, fi
   await openStudio(page, e.year);
   const picker = page.getByRole('combobox', { name: 'Watch it being built' });
   await expect(picker).toBeVisible();
-  await expect(picker.locator('option', { hasText: `${e.year} · ` })).toHaveCount(1);
+  // one option per year-build take of that year (2022: the first bay and, since W22, the whole skeleton)
+  const ofYear = [...manifest.takes, ...(manifest.otherYears ?? [])].filter((x) => isYearBuild(x) && x.year === e.year).length;
+  await expect(picker.locator('option', { hasText: `${e.year} · ` })).toHaveCount(ofYear);
   await picker.selectOption(e.id);
   await page.waitForFunction(() => !!(window.__marsStudio as unknown as Hook).take(), null, { timeout: 90_000 });
   await expect(page.getByRole('note').filter({ hasText: 'HYPOTHETICAL build scenario — not historical' })).toBeVisible();
@@ -84,12 +86,15 @@ test('watch it being built: year picker → piles to standing structure, log, fi
   expect(played.speed).toBe(64);
 
   const report: Record<string, unknown> = { take: e.id, played: played.t };
-  const moments: [string, number][] = [['yard', 0.5], ['skeleton', Math.round(e.duration / 2)], ['final', e.duration]];
+  // 'final': the last point on the scrubber's 0.1 s grid (a take of an odd tick count ends between two grid points)
+  const moments: [string, number][] = [['yard', 0.5], ['skeleton', Math.round(e.duration / 2)], ['final', Math.floor(e.duration * 10 + 1e-6) / 10]];
   for (const [name, t] of moments) {
     await scrub(page, t);
     const i = (await info(page))!;
-    // entities removed before the end (an emptied pile) have no final-state record, so the take cannot say what they are
-    expect(i.rendered.components + i.rendered.humans, `${name}: every drawable sampled entity is drawn (undrawable: ${i.undrawable.join(', ')})`).toBeGreaterThanOrEqual(i.entities - i.undrawable.length);
+    // mars-take/4: entities removed before the end (the emptied pile-upright-16ft-kit-1, gone at 1479 s) are drawn from the
+    // take's entities0, so every sampled entity is drawable
+    expect(i.undrawable, `${name}: nothing sampled is undrawable`).toEqual([]);
+    expect(i.rendered.components + i.rendered.humans, `${name}: every sampled entity is drawn`).toBeGreaterThanOrEqual(i.entities);
     const log = await page.getByRole('log', { name: 'Take log' }).innerText();
     console.log(name, JSON.stringify(await page.evaluate(() => (window.__marsStudio as unknown as { visiblePeople: () => unknown }).visiblePeople())));
     report[name] = { t: i.t, shot: i.shot, entities: i.entities, rendered: i.rendered, undrawable: i.undrawable, log };

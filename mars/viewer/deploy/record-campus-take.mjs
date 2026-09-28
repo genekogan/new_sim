@@ -5,7 +5,7 @@
 //   node deploy/record-campus-take.mjs --scenario build-bay-v3        # flagship v3 on the same campus site
 //   node deploy/record-campus-take.mjs --scenario year-build-2022     # 2022 east-house, first bay (year scene)
 //   node deploy/record-campus-take.mjs --all                          # every scenario, in manifest order
-//   node deploy/record-campus-take.mjs --scenario year-build-2022-house  # 2022 east-house, whole house A+B (opt-in)
+//   node deploy/record-campus-take.mjs --scenario year-build-2022-house  # 2022 east-house, whole skeleton (opt-in)
 //   ... --all --full                                                  # --all plus the opt-in whole-house take(s)
 //   ... --check                                                       # re-record and compare with the manifest (no writes)
 // Writes public/engine/takes/<file> and merges the scenario's entry into public/engine/takes/manifest.json.
@@ -126,13 +126,14 @@ const SCENARIOS = {
       h.commit('build', w, { kind: 'design-edit', note: 'flagship piles + crew at staging-east (hypothetical)' });
       const registry = buildBayRegistry();
       const plan = bindTemplate(buildBayTemplate(site), buildBayBindings, { history: h, baseline: 'build', registry });
-      const reh = rehearse(h, 'build', plan, {
+      const cfg = {
         registry,
         invariants: BUILD_BAY_INVARIANTS,
         services: () => ({ spatial: new Spatial(local, { contributors: BUILD_BAY_CONTRIBUTORS, baseId: file.contentHash }) }),
-      });
+      };
+      const reh = rehearse(h, 'build', plan, cfg);
       mustBeClean(reh, 'flagship');
-      return { reh, plan, site, scene: local, campus: CAMPUS_ID };
+      return { reh, exact: () => rehearse(h, 'build', plan, { ...cfg, trackTol: 1 }).take, plan, site, scene: local, campus: CAMPUS_ID };
     },
     shots({ site, final, T, duration }) {
       const bay = [site.origin[0], site.groundY, (final.entities.A.pose.p[2] + final.entities.B.pose.p[2]) / 2];
@@ -190,13 +191,14 @@ const SCENARIOS = {
       h.commit('build', w, { kind: 'design-edit', note: 'flagship v3 piles, forklift, campfire + people at staging-east (hypothetical)' });
       const registry = buildBayV3Registry();
       const plan = bindTemplate(buildBayV3Template(site), buildBayV3Bindings, { history: h, baseline: 'build', registry });
-      const reh = rehearse(h, 'build', plan, {
+      const cfg = {
         registry,
         invariants: BUILD_BAY_V3_INVARIANTS,
         services: () => ({ spatial: new Spatial(local, { contributors: BUILD_BAY_V3_CONTRIBUTORS, baseId: file.contentHash }) }),
-      });
+      };
+      const reh = rehearse(h, 'build', plan, cfg);
       mustBeClean(reh, 'flagship v3');
-      return { reh, plan, site, scene: local, campus: CAMPUS_ID };
+      return { reh, exact: () => rehearse(h, 'build', plan, { ...cfg, trackTol: 1 }).take, plan, site, scene: local, campus: CAMPUS_ID };
     },
     shots({ site, final, initial, T, duration }) {
       const bay = [site.origin[0], site.groundY, (final.entities.A.pose.p[2] + final.entities.B.pose.p[2]) / 2];
@@ -242,14 +244,14 @@ const SCENARIOS = {
     // these slow orbits / wides (<= 4° of orbit per sample), wrong for follows. The take itself is ~2.4 MB, ~0.9 MB of
     // it mars-take/2 `hands` changes (hand points while hanging beams: a recorder thinning question, not the camera's)
     hz: 0.5,
-    pin: { ticks: 41182, finalStateHash: '695d2dcb001bb3cce944158075a8bb2e689b94525ee38b523fd1283a32080a81' },
+    pin: { ticks: 41317, finalStateHash: '251a44c5422990d351698865a9ab4fa53db784cf85004d71275a79eea314c96f' }, // year-build.test.ts PIN_BAY1
     run() {
       const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays: 1 });
       const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
       mustBeClean(reh, 'year build 2022 bay 1');
       const fp = buildingFootprint(s.graph.nodes.filter((n) => n.assembly === 'east-house'));
       const site = { origin: fp.c, yaw: fp.yaw ?? 0, groundY: s.build.groundY, half: fp.half };
-      return { reh, plan: s.plan, site, scene: s.scene, campus: 'mars-2022', crew: s.build.bindings.crew };
+      return { reh, exact: () => rehearse(s.history, s.workspace, s.plan, { ...s.cfg, trackTol: 1 }).take, plan: s.plan, site, scene: s.scene, campus: 'mars-2022', crew: s.build.bindings.crew };
     },
     shots({ site, initial, plan, T, duration, crew }) {
       const c = [site.origin[0], site.groundY, site.origin[1]];
@@ -287,27 +289,28 @@ const SCENARIOS = {
   },
 };
 
-// The whole 2022 east-house, phase A + B (skeleton, decks, stair, walls, solar; year-build-b.test.ts, YEAR_BUILD_FULL):
-// opt-in (`--full` or `--scenario year-build-2022-house`) — a ~2 h rehearsal, unpinned until year-build-b pins it.
+// The whole 2022 east-house skeleton, phase A (12 frames + 54 beams; year-build.test.ts PIN_FULL, YEAR_BUILD_FULL): opt-in
+// (`--full` or `--scenario year-build-2022-house`), ≈ 1 min of rehearsal. Phase A + B is not recorded: unpinned, and at
+// 2026-09-28 it aborted on a beam_walk (and its take, ≈ 8 MB, is over this 6 MB budget).
 SCENARIOS['year-build-2022-house'] = {
   ...SCENARIOS['year-build-2022'],
   file: 'year-build-2022-east-house.json',
   optIn: true,
-  label: '2022 east-house, the whole house from the piles (HYPOTHETICAL build scenario — not historical)',
-  note: 'Year build phases A + B (YEAR_BUILD.md): a fork of protected mars-2022, the east-house removed and rebuilt from a hypothetical pile yard by a generic crew — skeleton, decks, stair, walls, solar — every sequenced part checked against the checkpoint pose. Coordinates are the 2022 year frame with ground at the Kit datum y = 0. Order, piles and crew are hypothetical.',
+  label: '2022 east-house skeleton, the whole house, from the piles (HYPOTHETICAL build scenario — not historical)',
+  note: 'Year build phase A (YEAR_BUILD.md): a fork of protected mars-2022, the east-house removed and its whole skeleton (12 frames, 54 beams) rebuilt from a hypothetical pile yard by a generic crew of six, every part checked against the checkpoint pose. Coordinates are the 2022 year frame with ground at the Kit datum y = 0. Order, piles and crew are hypothetical.',
   limit: 6 * MB,
-  pin: undefined,
+  pin: { ticks: 117277, finalStateHash: 'd382e4614e8ae157ad971ab7a4cb2b922c4737197006b39b4a209dc0db040617' }, // year-build.test.ts PIN_FULL
   run() {
-    const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { phaseB: {} });
+    const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022));
     const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
-    mustBeClean(reh, 'year build 2022 east-house A+B');
+    mustBeClean(reh, 'year build 2022 east-house skeleton');
     const fp = buildingFootprint(s.graph.nodes.filter((n) => n.assembly === 'east-house'));
     const site = { origin: fp.c, yaw: fp.yaw ?? 0, groundY: s.build.groundY, half: fp.half };
-    return { reh, plan: s.plan, site, scene: s.scene, campus: 'mars-2022', crew: s.build.bindings.crew };
+    return { reh, exact: () => rehearse(s.history, s.workspace, s.plan, { ...s.cfg, trackTol: 1 }).take, plan: s.plan, site, scene: s.scene, campus: 'mars-2022', crew: s.build.bindings.crew };
   },
   shots(ctx) {
     const l = SCENARIOS['year-build-2022'].shots(ctx);
-    l[l.length - 1] = { ...l[l.length - 1], label: 'the east-house standing' };
+    l[l.length - 1] = { ...l[l.length - 1], label: 'the east-house skeleton standing' };
     return l;
   },
 };
@@ -353,9 +356,14 @@ function record(name) {
   // the finished build may not be entered or crossed at any time; as a prism it never occludes (it is not there yet for
   // most of the take). Sight occlusion by parts comes per tick from takeSampler (kind-aware boxes: posts, stringers, slabs).
   const policy = { ...DEFAULT_CAMERA_POLICY, component: { collide: true, occlude: false } };
+  // the camera is planned from an exact re-run (tracks at 1 mm / 1 mrad; the same motion — checked), not from the
+  // shipped take's TRACK_TOL tracks: thinning must not move a planned camera (the whole-house take's shot list took other
+  // corrections on 99 of 2933 samples when planned from the thinned tracks). The track belongs to the shipped take id.
+  const exact = run.exact ? run.exact() : take;
+  if (exact.ticks !== take.ticks || exact.finalStateHash !== take.finalStateHash) throw new Error(`${name}: the exact re-run differs from the take (${exact.ticks} / ${exact.finalStateHash})`);
   const t1 = performance.now();
   // cutCost 2.5 s: bystanders are occluders now, and a crew walking past for ~1 s is not worth a cut away and back
-  const cam = planShotList(shots, takeSampler(take), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
+  const cam = planShotList(shots, takeSampler(exact), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
   const tCam = performance.now() - t1;
   const track = toCameraTrack('', take.id, cam, 'planned-shot-list');
   track.id = `cam-${hashOf({ takeId: take.id, data: track.data }).slice(0, 16)}`;

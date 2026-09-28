@@ -22,6 +22,9 @@ export type EngineConfig = {
   services: (world: WorldState) => Record<string, any>;
   maxTicks?: number;
   keyframeEvery?: number;
+  /** Pose-track tolerance of the run's TakeRecorder (default TRACK_TOL). `deploy/record-campus-take.mjs` plans the camera
+   *  from a second, exact run (`trackTol: 1`), so thinning never moves a planned camera (TAKES_AND_PLANS.md). */
+  trackTol?: number | { pos: number; ang: number };
 };
 
 export type RunMetrics = {
@@ -85,7 +88,7 @@ export function runServices(world: WorldState, cfg: EngineConfig): Record<string
 export function runPlan(start: WorldState, startCheckpoint: string, plan: BoundPlan, cfg: EngineConfig, rulesVersion: string) {
   const world = structuredClone(start);
   const rt = new Runtime(world, cfg.registry, runServices(world, cfg), cfg.invariants);
-  const rec = new TakeRecorder(rt, { planHash: plan.planHash, baselineCheckpoint: startCheckpoint, rulesVersion, keyframeEvery: cfg.keyframeEvery });
+  const rec = new TakeRecorder(rt, { planHash: plan.planHash, baselineCheckpoint: startCheckpoint, rulesVersion, keyframeEvery: cfg.keyframeEvery, ...(cfg.trackTol !== undefined ? { tol: cfg.trackTol } : {}) });
   const res = new SequenceRunner(rt, plan.steps).run(cfg.maxTicks);
   const take = rec.finish();
   return { report: runReport(res, take, plan.planHash, startCheckpoint), take, finalState: rt.world };
