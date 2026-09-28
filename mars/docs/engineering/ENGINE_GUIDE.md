@@ -4,6 +4,7 @@ The engine is a small, Mars-specific, deterministic world runtime in pure
 TypeScript (`viewer/engine/`). It runs unchanged in Node tests, the browser and
 the Cloudflare Durable Object. Spec: `SPEC.md`. Audit of the existing app:
 `AUDIT.md`. Owner decisions: `OWNER_DECISIONS.md`. Progress: `PROGRESS.md`.
+External contributors (Codex): `CODEX.md` (ownership map, worktree recipe, gates, merge protocol).
 
 ## Hard rules
 - **Node strip-types compatible TS**: no parameter properties, no `enum`, no

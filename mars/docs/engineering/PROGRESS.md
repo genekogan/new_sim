@@ -745,3 +745,53 @@ Then: gate → release 5; HANDOFF refresh.
   handup.test.ts fixtures.
 - **W30 landed** `166b0d4`, `32a85ec`, `c5afddd` (≈180k tokens, 45 min; merged from `w30-kneel-sweep`): the hand-off corridor search now sweeps the kneeling receivers' rise against everything (load goes straight up outside the joist ends, then in); `handup.rise-blocked` for kneelers naming the member (+ forklift variant "present it clear of it"); `finishPlan` sweeps take/rise/feed-in; tests sweep every held tick (2.4 m green test 0 intersections, was 4 ticks through j1; +2 regressions). v3 pin unchanged (39a0fb3f @16374 — v3's loads are raised to slide height by the givers); `perf-walk.mjs` v3 pin was stale, fixed; full year-build set 8/8 green (A+B ddb634d6 @600599). 373 / 370 / 3 skip. Lead review: accepted.
 - W32 spawned (engine handup/body): prone model = measured rig (W29's numbers), lying heading, beyond-lip check, `phaseK`.
+
+## 2026-09-29 — W33: Codex split docs (CODEX.md, four briefs, QUESTIONS_FOR_GENE.md)
+- **A.1 verified:** `YEAR_BUILD.md` last touched by `279d405` (W27), `97957ca` (W13) is an ancestor, and the tree was clean for it.
+  Not edited.
+- **`CODEX.md`** (new): the external contributor contract.
+  - Worktree recipe `git worktree add <wt> -b codex/<topic> main` with the four exact symlinks (`public/browser/` must be
+    `mkdir`-ed first; `.pw-browsers` shows as untracked, never add it; never `npm install` through the shared `node_modules`).
+  - **Own ports / dirs:** `E2E_VITE_PORT=5491` (Claude's default 5391), a manual Vite at 5493, `E2E_RUN=codex-<topic>-<n>`
+    → `e2e/artifacts/<run>/`. `test-results/` and `.cloudflare/gate/` are per worktree. `E2E_SIMULATION` stays off
+    (inspector 9337 is hard-coded).
+  - Hard rules, including the source scan `core.test.ts:292-313` (catches `hypot` / `pow`, not `**`).
+  - Gates: test:engine + tsc + Playwright per spec, **not** `npm run gate`. Rebase onto main + test:engine before every report.
+  - Pin rule: STOP, REVERT, REPORT. Commits: `Co-Authored-By: Codex <noreply@openai.com>`.
+  - The **final ownership map** (Gene's correction: take and `app/history/scenes.ts` are Claude-owned).
+  - `cameraDirectionSchema` (`direct.ts:62`) frozen, with a change log.
+  - REPORTs go to `briefs/<brief>.REPORT.md`, never PROGRESS / HANDOFF. Merge / reject protocol; ETAs.
+- **`briefs/`**, four briefs (the year-scene-doors brief was dropped per Gene's correction):
+  - `codex-2026-frame-grouping.md`: offline tool `deploy/group-2026-frames.mjs` → `data/campus-2026-frames.json` + an
+    unclassified report + an SVG. 660 rack_member components / 907 rows, 89 beam_candidates; the lab has no scene hook,
+    so the in-scene overlay is Claude's integration half.
+  - `codex-camera-nl-parse.md`: `parseSentence` / `parseSentences`. **Not `parseDirection`**, which `direct.ts:404`
+    already exports.
+  - `codex-fire-v2-and-render-polish.md`: new `solar-mesh.ts` / `equipment-mesh.ts` / `palette.ts` plus one-line
+    delegations in `components.ts`. Frame blue comes from the Claude-owned `catalog.ts:109`, so the recolour is
+    renderer-side. The 2024 mural is `public/history/2024/flower.webp`. Codex refreshes only `fire-*` /
+    `render-polish-*` baselines.
+  - `codex-tooling.md`: lint fails with "Failed to find tsgolint executable" (reproduced at `be0f66a`;
+    `node_modules/@oxlint-tsgolint/` is empty). The lint stage goes into the gate only when green. Findings are triaged,
+    not fixed, in Claude-owned source. The new `source-scan.test.ts` covers `**` with an allowlist of today's 14 sites
+    (13 files). Nothing in `engine/take/**`.
+- **`QUESTIONS_FOR_GENE.md`**: 18 collected questions (HANDOFF's 11, W13's 6, and PROGRESSIVE's plywood span rule),
+  shown as **14 open blocks** (two duplicate pairs merged: stair, decks) and **2 answered** (top beams §14, reach-down
+  §13), each with the engine's view, what the answer changes, and a `Gene:` line.
+  - **New images** (`questions/`, lab captures at `be0f66a` from the W33 worktree, Vite on 5433):
+    `yb2022-pile-yard`, `yb2022-top-beam-relay` (s0047 at tick 11912), `yb2022-frame-feet`, `kit2022-east-house-{a,b}`
+    (the year-2022 walkabout; the lab's year-build preset is phase A only, so the Kit's decks / stair / walls / solar come
+    from the walkabout). `lab-year-2023-top-prisms` was copied from the gitignored review capture
+    `e2e/artifacts/2026-09-28T04-18-51/`.
+  - Existing baselines embedded: `lab-year-2022/2024-top-prisms`, `year-build-skeleton`, `solar-paint-mounted-equipment`.
+- **HANDOFF / NEXT_SESSION_PROMPT / ENGINE_GUIDE:**
+  - HANDOFF: the questions were removed (End-of-night list, checkpoint addendum, tranche item 6, top blockquote) and
+    replaced by pointers. New closing section "Codex split and checkpoint 1": map, merge rule, ETA table (≈ 18–30 Codex
+    h in total, estimates), and the checkpoint-1 wording.
+  - NEXT_SESSION_PROMPT: the questions rule now appends to QUESTIONS_FOR_GENE; item 0 is a pointer; Codex paragraph +
+    map + ETAs; no Claude briefs into Codex paths.
+  - ENGINE_GUIDE: one pointer line.
+- **For the lead:** OWNER_DECISIONS' 09:45 entry still names `app/history/scenes.ts` and take thinning as Codex-owned; the
+  corrected map says Claude. Amend it (W33 does not own it). No engine / app / spec file touched; the capture script was
+  not committed.
+- Cost: ≈ 0.37 M tokens (incl. a 95k Explore subagent), ≈ 45 min wall.

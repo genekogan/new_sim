@@ -1,8 +1,8 @@
 # Handoff: Mars Studio simulation engine, tranche of 2026-09-27
 
-> **Current state (morning of 2026-09-28): read "End of night" at the bottom first** — what landed overnight, the gate,
-> takes, pins, decisions you may veto, questions for Gene, open items. The sections below are the 2026-09-27 report and
-> the later addenda, kept as history.
+> **Current state (2026-09-29): read "Codex split and checkpoint 1" at the very bottom, then "End of night" above it**:
+> what landed overnight, the gate, takes, pins, decisions you may veto, and open items. Questions for Gene are parked
+> in `QUESTIONS_FOR_GENE.md`. The sections below are the 2026-09-27 report and the later addenda, kept as history.
 
 This is the end-of-tranche report that SPEC.md §30 and §33 ask for. The engine suite was re-run for
 this handoff at HEAD `19aa5b6` on 2026-09-27 (M3 Max, Node 26). Other numbers cite a file, test or
@@ -228,7 +228,7 @@ writing). No camera track has been rendered to video.
   walkable. There are 152 `interior:` blockers and no decks, stairs or doors (`CAMPUS_SCENE.md`).
 - **No ladders or scaffold.** Anything more than 2.1 m above the nearest floor fails with
   `reach.too-high`, so only low platforms can be built (`PROGRESSIVE.md`).
-- **9 ft frame unverified.** Gene named 8/9/12/19 ft, but the library has no 9 ft frame.
+- **9 ft frame unverified** (`QUESTIONS_FOR_GENE.md` Q5). Gene named 8/9/12/19 ft, but the library has no 9 ft frame.
   `world/catalog.ts:88–89` marks it `provisional` with an assumed 4 ft depth. The flagship uses
   `beam-9ft`.
 - **North-axis assumption.** World −Z is taken as geographic north, with `NORTH_AZIMUTH_OFFSET = 0`
@@ -417,8 +417,7 @@ entities, banner visible, 0 errors. Rollback, from `viewer/`: `WRANGLER_WRITE_LO
    `blocked` plus a replan.
 5. **Integration.** Engine takes drive `/studio` people; campus-year scenes in DO engine rooms; a
    production deploy of the engine tools, with rollback.
-6. **Owner confirmations.** The site north bearing (`NORTH_AZIMUTH_OFFSET`), whether the 9 ft part
-   exists and what it is, the plywood span rule, and stair/plywood dimensions against photos.
+6. **Owner confirmations.** Parked in `QUESTIONS_FOR_GENE.md`.
 7. **Reach.** Ladders and scaffold for full-height bays. Evidence-backed walkable decks and stairs in
    real 2026 buildings, as hand-authored links with provenance.
 8. **Milestone H** (inhabited scenes), then **mid-take resumability** (`ActionDef.snapshot/restore`).
@@ -481,14 +480,13 @@ carried up the stair, campfire ending: 66 steps, 0 violations, open ground 677 s
 the uncropped campus run (physically identical, hash differs — grid cell centres depend on the grid origin; fix in
 `spatial/grid.ts` first thing next session, it re-pins every hash).
 
-**Reconstruction questions surfaced by the year walkabout (for Gene, not guessed):** the 2022 south-west corner
-passage is closed by the west-house table in the Kit scene (NE/SE/NW are open); trailers `rv-8/9` (2023) and
-`rv-9/10` (2024) intrude into Chiba's footprint under the roof.
+**Reconstruction questions surfaced by the year walkabout:** parked in `QUESTIONS_FOR_GENE.md` (Q1, Q2).
 
 **Open (see NEXT_SESSION_PROMPT.md for priority):** grid-origin hash; renderer reach gaps (footers, far arm, no foot
 IK, talk/watch Idle); crews on stairs; ~~vehicle–vehicle collision~~ (closed overnight, W25: `vehicles/traffic.ts`);
 ~~social pre-emption is manual (`releaseForDirective`)~~ (closed overnight, W25: automatic, SOCIAL.md); static geometry not editable over MCP; region layout edits don't stale plans; 9 ft frame
-and north axis unverified; `npm run lint` broken locally (missing oxlint-tsgolint) and not in the gate.
+and north axis unverified (`QUESTIONS_FOR_GENE.md` Q5, Q3); `npm run lint` broken locally (missing oxlint-tsgolint) and not in the gate
+(now `briefs/codex-tooling.md`).
 
 **Releases today:** 4 gated production deploys before this checkpoint (see RELEASE_CHECKLIST.md records); the fifth
 (this checkpoint) is recorded in the Deployment status section above if it completed.
@@ -569,20 +567,9 @@ grid lattice (W1), splines (W4), walker fallback (W15), no jumps (W21) moved eve
 5. **Year-build camera sampler** (PROGRESS W23): piles sampled as boxes, re-recorded tonight (above).
 6. **No production deploy** tonight (your instruction, 00:35): production is still release 5 (`cebd5827…`).
 
-### Questions for Gene (collected from PROGRESS.md; the engine does not guess these)
+### Questions for Gene
 
-1. 2022: the south-west corner passage is closed by the west-house table in the Kit scene — real?
-2. Trailers `rv-8/9` (2023) and `rv-9/10` (2024) intrude into Chiba's footprint — real, or scene error?
-3. The 9 ft frame is not in the model library (`catalog.ts` marks it provisional, 4 ft depth assumed).
-4. North axis: world −Z is taken as north (`NORTH_AZIMUTH_OFFSET = 0`); sunsets / shadows may be rotated.
-5. Ground datum: the Kit stands parts on y = 0, the published year scenes on −0.16 m — which is right for the build takes?
-6. Beam heights: the Kit's 0.22 / 2.48 / 4.757 m are on no real hole pitch — keep them or snap to the 2 in pitch (±2.5 cm)?
-7. How were the top beams (~4.76 m) hung — climbing the bracing (as modelled), ladders, a lift, the forklift, or bays assembled
-   lying down and raised?
-8. Stock on site: sheets per plywood bundle, pieces per lumber unit, how uprights / beams were stacked.
-9. The 2022 stair: the Kit draws a 4.45 m-wide 8-tread stair with no stringers — what was built (width, stringers, ramp)?
-10. Decks: the Kit draws 4 ft × 15 ft strips at beam height with no joists — or 4x8 sheets on 2x4 joists?
-11. Reach-down: accept 0.5 m (decision 2 above) or model a lying-down receiver (≈ 1.0 m)?
+Parked in `QUESTIONS_FOR_GENE.md` (non-blocking, with pictures; not re-surfaced in handoffs).
 
 ### Known shortcomings and open items (deduplicated, highest first)
 
@@ -616,7 +603,7 @@ grid lattice (W1), splines (W4), walker fallback (W15), no jumps (W21) moved eve
 14. **Engine hygiene:** host `**` on 14 non-test engine lines is not scanned; W7 follow-ups (climb paths not body-checked, beam
     walk-in checks static geometry only, bundle keeps its full box until empty, `contents.count` untyped, BOM solar ids vs W8's).
 15. **Carried from before tonight:** crews (multi-carrier) on stairs; static geometry not editable over MCP; region layout edits
-    don't stale plans; talk / watch are Idle; `npm run lint` broken locally; scanned Martians (consent), electrical model.
+    don't stale plans; talk / watch are Idle; `npm run lint` broken locally (Codex: `briefs/codex-tooling.md`); scanned Martians (consent), electrical model.
 
 Closed tonight (were open at the checkpoint): grid-origin hash dependence (W1); lab-social t60 (W9/W15); foot IK on stairs (W6);
 **automatic pre-emption of social holds (W25)**; **vehicle–vehicle collision (W25)**; take size (W20/W22); emptied piles undrawable
@@ -646,3 +633,57 @@ solar sequenced from piles with `cut`, `pass_up`, `install_wall`, stringer/tread
 tranche pinned `94db263e…` @53604; **the end-to-end A+B run is not green** (37 ticks `collision.human-human`, a wall carrier vs a parked crew
 member) and has no pin/take yet — first item for the next session. Report-only plans exist for all six years (YEAR_BUILD.md). Final head
 `97957ca`: tsc clean, engine 358/0/3 of 361 (lead-verified); full gate last GREEN at `1395dd4`, W13's later commits are engine + docs.
+
+## Codex split and checkpoint 1 (2026-09-29, W33 for the lead)
+
+**External Codex contributor (Gene, 09:45 EDT).** Bounded areas move to Codex, an external contributor and not a
+Claude subagent. Codex works on `codex/<topic>` branches in its own worktree, with its own Vite / Playwright port
+(5491 / 5493) and `E2E_RUN` dirs. It gates with `npm run test:engine`, `npx tsc --noEmit -p .` and Playwright
+per spec (not `npm run gate`), rebases onto `main` before every report, and reports only to
+`docs/engineering/briefs/<brief>.REPORT.md`.
+- **The lead** re-gates in a worktree (test:engine + tsc + the brief's specs; the full gate before a release),
+  then fast-forwards or cherry-picks. It accepts firelit / colour drift in other baselines at merge after looking
+  at them.
+- **A change that moves a pin** is rejected, with the reason appended to the REPORT.
+- **Codex commits** end with `Co-Authored-By: Codex <noreply@openai.com>`.
+
+Contract: `CODEX.md`.
+
+**Ownership map (final).**
+- **Codex-owned:**
+  - `engine/camera/parse.ts` (+ `engine/test/camera-parse*.test.ts`);
+  - `app/engine-view/fire.ts` + `e2e/fire.spec.ts` (+ `fire-*` baselines);
+  - render-polish files: `app/engine-view/paint.ts`, new `solar-mesh.ts` / `equipment-mesh.ts` / `palette.ts`,
+    one-line delegations in `components.ts` `panel()` / `equipment()` / the colour lookup, and new
+    `e2e/render-polish.spec.ts` (+ `render-polish-*` baselines);
+  - `docs/engineering/data/**` + `deploy/group-2026-frames.{mjs,test.mjs}`;
+  - lint / gate tooling (`.oxlintrc.json`, the package.json `lint` script + devDeps + lockfile, the `gate.mjs`
+    lint stage, new `engine/test/source-scan.test.ts`);
+  - its REPORT files.
+- **Claude-owned:** everything else, explicitly:
+  - locomotion, construction, campus (incl. `assembly.ts`), spatial, body;
+  - **take (`engine/take/**`)**, year-build sequencing, studio replay, **`app/history/scenes.ts`** (and all
+    `app/history/**`);
+  - the camera modules other than `parse.ts`, the catalog, the lab, all other specs and docs.
+- Claude workers are never briefed into Codex areas, and nobody touches `codex/*` except to merge.
+- **Note for the lead:** OWNER_DECISIONS.md's 09:45 entry still lists `app/history/scenes.ts` and take thinning as
+  Codex-owned. Gene's correction moved both to Claude, and the year-scene doors brief was dropped. OWNER_DECISIONS
+  is the lead's to amend.
+
+**Codex blocks** (`briefs/`; ETAs are W33's estimates of Codex hours, uncalibrated):
+
+| Brief | Block | ETA (estimate) |
+| --- | --- | --- |
+| `codex-2026-frame-grouping.md` | 2026 CAD `rack_member` + beams → catalog frames / beams with seat heights → `docs/engineering/data/campus-2026-frames.json` + unclassified report + SVG overlay. Claude then takes the `assembly.ts` integration half (block F). | 6–10 h |
+| `codex-camera-nl-parse.md` | `engine/camera/parse.ts`: sentence → `CameraDirection` (schema frozen), structured refusals, Gene's four sentences. | 4–6 h |
+| `codex-fire-v2-and-render-polish.md` | Fire from above / smoke / core; paint textures incl. the 2024 flower mural; solar and equipment meshes; green frames. | 6–10 h |
+| `codex-tooling.md` | `npm run lint` repaired (oxlint-tsgolint) and gated only once green; the source scan extended to `**` with an allowlist of today's 14 sites. | 2–4 h |
+
+The total is ≈ 18–30 Codex hours, and the four briefs are independent, so they can run in parallel.
+
+**Checkpoint 1** = **2022 complete: phase B landed and pinned, 2x4 framing verbs, all four houses, studio "Watch it
+being built · 2022"**. All of this is Claude-owned. Phase B for the east-house is green and pinned (`ddb634d6…`,
+W27). Open: its take (over budget), 2x4 framing, the other three houses and the studio chapter (W31 in flight).
+
+**Questions for Gene:** parked in `QUESTIONS_FOR_GENE.md` (14 open, 2 answered, with pictures). They are not
+re-surfaced here.

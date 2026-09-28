@@ -10,7 +10,8 @@ ended at a clean checkpoint on 2026-09-28. You are running OVERNIGHT and unatten
 asleep and cannot answer questions or report usage numbers until morning. Work as the lead: you evaluate
 and collate; delegate narrow, well-bounded tasks to Opus 5.5 subagents. Every subagent brief must name
 the files it owns and the files other agents own, require small tool calls and early commits, and forbid
-host `Math.sin/cos/atan2…` in `viewer/engine/**`.
+host `Math.sin/cos/atan2…` in `viewer/engine/**`. Never brief a Claude worker into a Codex-owned path
+(`docs/engineering/CODEX.md` §6), and never touch a `codex/*` branch except to merge it.
 
 **Self-manage usage so you are never cut off by the 5-hour limit.** Nobody will report numbers to you
 and `<usage-tool>` does not track this session, so budget by your own accounting:
@@ -32,13 +33,16 @@ and `<usage-tool>` does not track this session, so budget by your own accounting
 - In the morning Gene may raise the parallelism (he will say so and report numbers); until he does,
   the overnight rule stands.
 
-**Overnight decision rule:** anything that needs Gene (the reconstruction questions below, a product
-choice, a doubt about historical truth) is written to PROGRESS.md under "Questions for Gene" and
-skipped; pick the next item that doesn't need him. Never guess historical facts.
+**Decision rule:** anything that needs Gene (a reconstruction question, a product choice, a doubt about
+historical truth) is appended to `docs/engineering/QUESTIONS_FOR_GENE.md` as a block: what the engine sees,
+a picture, what the answer changes, and an empty `Gene:` line. Then skip it and pick the next item that doesn't
+need him. Those questions are parked and non-blocking: do not re-surface them in handoffs or reports. Never
+guess historical facts.
 
 **Read in this order before doing anything:**
 1. `docs/engineering/HANDOFF.md` — state of the system, evidence, releases, known shortcomings, next tranche.
-2. `docs/engineering/ENGINE_GUIDE.md` — hard rules for engine code (strip-types TS, zod only, DT = 1/20 s,
+2. `docs/engineering/CODEX.md`: the external Codex split, the ownership map and the merge protocol.
+   `docs/engineering/ENGINE_GUIDE.md`: hard rules for engine code (strip-types TS, zod only, DT = 1/20 s,
    deterministic trig from `core/math.ts`, fail loudly, canonical entity order) and the commit protocol.
 3. `docs/engineering/PROGRESS.md` (last three entries), `EVIDENCE.md` (what is proven vs approximate),
    `REVIEW.md` (open low findings), `OWNER_DECISIONS.md`.
@@ -90,9 +94,8 @@ through doors on a camera navmesh), and every shot is simulated and self-correct
 piles are in `docs/engineering/evidence/`. Items 2–4 move pinned hashes: do them early and re-pin once.
 
 **Known open items, in priority order (details and the full list in HANDOFF "End of night"):**
-0. Questions for Gene (HANDOFF "Questions for Gene", 11 items: 2022 SW passage, rv intrusions into Chiba, 9 ft frame, north axis,
-   ground datum, Kit beam heights, how top beams were hung, stock per bundle, the 2022 stair, deck strips vs sheets on joists,
-   reach-down 0.5 m) — ask them first in the morning; never guess.
+0. Questions for Gene are parked in `QUESTIONS_FOR_GENE.md` (non-blocking; Gene answers from the pictures). Do not ask
+   them again. When a `Gene:` line gets filled in, turn it into an OWNER_DECISIONS entry and a brief.
 1. Year build phase B (W13): commit a test that executes the stair / wall / solar sections, pin the whole east-house A+B run, record it
    as a take (≈ 8 MB last time — thin further), then the other 2022 houses and the other years (2020 / 2025 racks don't map yet).
 2. Flagship v3 `onto_s2_4` `beam_walk` `beam.no-room` (0.25 < 0.28 m; passes by ≈ 3 cm only at the pinned origin) — fix, then record v3.
@@ -103,9 +106,36 @@ piles are in `docs/engineering/evidence/`. Items 2–4 move pinned hashes: do th
    build) / 92.5 % (v3).
 6. Engine: resumption after pre-emption; forklift waits forever behind a parked rider; vehicle reach / side-shift vs vehicles; walker
    look-ahead at 0.9 m/s lateral; crews (multi-carrier) on stairs; static geometry not editable via MCP; region layout edits don't stale
-   plans; host `**` unscanned (14 lines); stress-30 tick-5 spike ≈ 90 ms.
-7. Renderer honesty gaps: talk / watch are Idle; no carry-pose clips; fire smoke / billboards; paint textures; frames blue not green.
+   plans; host `**` unscanned (14 lines; the scan is Codex's `briefs/codex-tooling.md`, the 14 rewrites are Claude's); stress-30 tick-5 spike ≈ 90 ms.
+7. Renderer honesty gaps: talk / watch are Idle; no carry-pose clips (Claude). Fire smoke / billboards, paint textures,
+   frames blue not green: **Codex** (`briefs/codex-fire-v2-and-render-polish.md`).
 8. Spec items not started: scanned real Martians (needs consent); electrical model (deferred by spec).
+
+**Codex split (Gene, 2026-09-29).** An external Codex contributor owns four bounded blocks on `codex/<topic>`
+branches (`docs/engineering/briefs/`). Its reports arrive as `briefs/<brief>.REPORT.md`. The lead re-gates each
+branch in a worktree (test:engine + tsc + the brief's specs; the full gate before a release), then fast-forwards
+or cherry-picks. A pin-moving change is rejected, with the reason appended to its REPORT.
+
+Ownership map (final):
+- **Codex-owned:**
+  - `engine/camera/parse.ts` (+ its tests);
+  - `app/engine-view/fire.ts` + `e2e/fire.spec.ts`;
+  - the render-polish files the brief names: `paint.ts`, new `solar-mesh.ts` / `equipment-mesh.ts` / `palette.ts`,
+    one-line delegations in `components.ts`, and `e2e/render-polish.spec.ts`;
+  - `docs/engineering/data/**` (+ `deploy/group-2026-frames.*`);
+  - lint / gate tooling.
+- **Claude-owned:** everything else, incl. locomotion, construction, campus, spatial, body, take (`engine/take/**`),
+  year-build sequencing, studio replay, and `app/history/scenes.ts`.
+
+The blocks, with W33's ETA estimates in Codex hours (uncalibrated):
+- 2026 frame grouping, 6–10 h. Claude then integrates it into `engine/campus/assembly.ts`.
+- Camera NL parse, 4–6 h.
+- Fire v2 + render polish, 6–10 h.
+- Tooling (lint gated once green; source scan covers `**`), 2–4 h.
+
+**Checkpoint 1 = 2022 complete:** phase B landed and pinned, 2x4 framing verbs, all four houses, and the studio's
+"Watch it being built · 2022". This is all Claude work. Merge the Codex branches as their REPORTs arrive, but do
+not let them block it.
 
 **Method that worked:** every capability ships with tests including deliberately invalid cases and, for
 anything visual, Playwright captures that you LOOK at yourself (Read the PNGs) before accepting. Keep
