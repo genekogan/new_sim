@@ -29,7 +29,7 @@
 // from the floor / stance, relay when the gap is too big), crew sizes (catalog carry / raise crews),
 // material availability (one piece per take, the take-out spot cleared by its carry before the next).
 // No cutting is needed for the skeleton (frames and beams are used as stocked); cuts belong to phase B.
-import { datan2, obbOverlap, rot2, type Vec2 } from '../core/math.ts';
+import { datan2, obbOverlap, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, Provenance } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { human } from '../world/factory.ts';
@@ -104,7 +104,7 @@ type Frame = { node: AsmNode; k: number; r: number; c: Vec2 };
 
 /** Generate the skeleton-stage plan for one building of a year. */
 /** `bays`: build only the first N bays (frame lines 0…N) — a tranche; the rest is reported as outside it. */
-export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB) => boolean } } = {}): YearBuildPlan {
+export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB, i: number, all: PartB[]) => boolean }; avoid?: OBB2[] } = {}): YearBuildPlan {
   const crew = opts.crew ?? ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'];
   if (crew.length !== 6) throw new Error('yearBuildPlan: phase A uses a crew of six');
   const nodes = g.nodes.filter((n) => n.assembly === assembly);
@@ -119,7 +119,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   const bomA = billOfMaterials(g, [assembly]);
   const bom = partsB ? billOfMaterialsB(g, [assembly], partsB) : bomA;
   const piles = stockPiles(bomA);
-  const yard = placePiles(piles, nodes, scene.obstacles, 0, partsB ? { extra: [{ id: 'scrap-pile', def: 'scrap-pile' }], more: morePiles(bom, piles), phaseB: true } : {});
+  const yard = placePiles(piles, nodes, scene.obstacles, 0, { ...(partsB ? { extra: [{ id: 'scrap-pile', def: 'scrap-pile' }], more: morePiles(bom, piles), phaseB: true } : {}), ...(opts.avoid?.length ? { avoid: opts.avoid } : {}) });
   for (const r of yard.refused) unplaced.push({ node: r.id, kind: 'pile', reason: r.reason });
   // ---- grid of frame lines × rows
   const Y = frameNodes[0].box.yaw;
@@ -229,9 +229,15 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     // aisle between rows); hang_beam's lifters walk it in along the axis
     const cv = rot2([b.col === 'l' ? -1 : 1, 0], Y);
     const mid: Vec2 = [(b.node.box.c[0]), (b.node.box.c[2])];
-    const back = dot(mid, n) - (lineCoord(frames, 0) - (def(b.node.def!).size[0] / 2 + AISLE_END));
-    const x = r3(mid[0] + cv[0] * LOAD_OUT - n[0] * back), z = r3(mid[1] + cv[1] * LOAD_OUT - n[1] * back);
-    const c = step('carry', { crew: G.map(C), item: b.node.id, to: { x, z, yaw: r3(b.node.box.yaw) } }, G, [t.step], `carry beam ${b.node.id} to the line-0 end of its stage axis`);
+    // W38 (PROVISIONAL, staging-end rule): the line-0 end unless its staging plot is taken (a neighbouring house there),
+    // then the far end beyond the last frame line — hang_beam walks it in from either end along the open aisle
+    const L = def(b.node.def!).size[0];
+    const at = (s: number) => { const back = dot(mid, n) - s; return { x: r3(mid[0] + cv[0] * LOAD_OUT - n[0] * back), z: r3(mid[1] + cv[1] * LOAD_OUT - n[1] * back) }; };
+    const ends = [{ ...at(lineCoord(frames, 0) - (L / 2 + AISLE_END)), end: 'line-0' }, { ...at(lineCoord(frames, K - 1) + (L / 2 + AISLE_END)), end: `far (line ${K - 1})` }];
+    const free = ends.find((e) => stagePlotFree(e, b.node.box.yaw, L, scene));
+    if (!free) { unplaced.push({ node: b.node.id, kind: 'beam', reason: `no room to stage it at either end of its aisle: ${ends.map((e) => `${e.end} end (${e.x}, ${e.z}) blocked by ${stagePlotBlocker(e, b.node.box.yaw, L, scene)}`).join('; ')}` }); return null; }
+    const { x, z } = free;
+    const c = step('carry', { crew: G.map(C), item: b.node.id, to: { x, z, yaw: r3(b.node.box.yaw) } }, G, [t.step], `carry beam ${b.node.id} to the ${free.end} end of its stage axis`);
     spotClear.set(t.pile, c);
     mark(b.node.id, 'beam', t.step, c);
     return { stage: c };
@@ -341,6 +347,19 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   };
   return { version: partsB ? YEAR_BUILD_B_VERSION : YEAR_BUILD_VERSION, year: g.year, assembly, template, bindings: { crew }, entities, targets, sequenced: seq, unplaced, bom, yard, groundY: 0, ...(partsB ? { partsB, phaseAStepCount, doneB: resB?.done ?? [], sectionStarts: resB?.sectionStarts ?? [] } : {}) };
 }
+
+/**
+ * W38: a beam staged lying at (x, z) with its carry / lift crew round it — the beam's box + 0.6 m at each end (a lifter
+ * 0.35 m beyond the end + body radius) and 0.7 m each side (the straddling carriers) — clear of every static obstacle
+ * 0.05–2.0 m tall of the build scene (neighbouring houses, vehicles)?
+ */
+const STAGE_END = 0.6, STAGE_SIDE = 0.7;
+function stagePlot(p: { x: number; z: number }, yaw: number, L: number) { return { c: [p.x, p.z] as Vec2, half: [L / 2 + STAGE_END, def('beam-12ft').size[2] / 2 + STAGE_SIDE] as Vec2, yaw }; }
+function stagePlotBlocker(p: { x: number; z: number }, yaw: number, L: number, scene: CampusScene): string | null {
+  const plot = stagePlot(p, yaw, L);
+  return scene.obstacles.find((o) => o.y1 > 0.05 && o.y0 < 2.0 && obbOverlap(o.obb, plot))?.id ?? null;
+}
+const stagePlotFree = (p: { x: number; z: number }, yaw: number, L: number, scene: CampusScene) => stagePlotBlocker(p, yaw, L, scene) === null;
 
 function lineCoord(frames: Frame[], k: number): number {
   const f = frames.find((x) => x.k === k)!;

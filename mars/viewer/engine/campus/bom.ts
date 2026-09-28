@@ -164,6 +164,20 @@ export function buildingFootprint(nodes: AsmNode[]): OBB2 {
   return { c: [r3(o[0] + c[0]), r3(o[1] + c[1])], half: [r3((x1 - x0) / 2), r3((z1 - z0) / 2)], yaw };
 }
 
+/** A building's work zone: its footprint + room to lay frames out and raise them (WORK_MARGIN). */
+export function workZoneOf(fp: OBB2): OBB2 {
+  return { c: fp.c, half: [fp.half[0] + WORK_MARGIN.sides, fp.half[1] + WORK_MARGIN.ends], yaw: fp.yaw };
+}
+
+/**
+ * W38: the work zones of every OTHER rack building of the year (assemblies with classified frames), sorted by name —
+ * the ground a neighbouring house's own build lays its frames out on; a yard avoids it (placePiles `avoid`).
+ */
+export function otherWorkZones(g: AssemblyGraph, assembly: string): { assembly: string; zone: OBB2 }[] {
+  const names = [...new Set(g.nodes.filter((n) => n.kind === 'upright' && n.assembly !== assembly).map((n) => n.assembly))].sort();
+  return names.map((a) => ({ assembly: a, zone: workZoneOf(buildingFootprint(g.nodes.filter((n) => n.assembly === a))) }));
+}
+
 /**
  * Place piles (largest first) and the cutting station on free ground beside the building, as one
  * yard on one side of its work zone. `obstacles` = the build scene's obstacles (the building itself
@@ -171,10 +185,10 @@ export function buildingFootprint(nodes: AsmNode[]): OBB2 {
  * (≤ `radius` m from the building) is searched nearest-to-that-side's-anchor first (ties by x, z);
  * the side where everything fits with the least total distance to the building wins (ties: side order).
  */
-export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean; extra?: { id: string; def: string }[]; more?: PileSpec[]; phaseB?: boolean } = {}): Yard {
+export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean; extra?: { id: string; def: string }[]; more?: PileSpec[]; phaseB?: boolean; avoid?: OBB2[] } = {}): Yard {
   const fp = buildingFootprint(nodes);
   // frames stand in lines along the frames' normal (local z): the ends are where frames are laid out
-  const workZone: OBB2 = { c: fp.c, half: [fp.half[0] + WORK_MARGIN.sides, fp.half[1] + WORK_MARGIN.ends], yaw: fp.yaw };
+  const workZone = workZoneOf(fp);
   const R = opts.radius ?? 30;
   const near = obstacles.filter((o) => o.y1 > groundY + 0.22 && o.y0 < groundY + 1.8 && dist(o.obb.c, fp.c) < R + 20 + Math.max(o.obb.half[0], o.obb.half[1]));
   const lattice: Vec2[] = [];
@@ -188,20 +202,20 @@ export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: Campu
     const a = rot2([sd[0] * (workZone.half[0] + 4), sd[1] * (workZone.half[1] + 4)], fp.yaw);
     const anchor: Vec2 = [fp.c[0] + a[0], fp.c[1] + a[1]];
     const cands = lattice.map((p) => ({ p, d: dist(p, anchor) })).sort((x, y) => x.d - y.d || x.p[0] - y.p[0] || x.p[1] - y.p[1]).map((x) => x.p);
-    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false, opts.extra ?? [], opts.more ?? [], opts.phaseB ?? false);
+    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false, opts.extra ?? [], opts.more ?? [], opts.phaseB ?? false, opts.avoid ?? []);
     const cost = yard.refused.length * 1e6 + yard.piles.reduce((s, p) => s + dist([p.x, p.z], fp.c), 0) + (yard.station ? dist([yard.station.x, yard.station.z], fp.c) : 0);
     if (cost < bestCost - 1e-9) { best = yard; bestCost = cost; }
   }
   return best!;
 }
 
-function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean, extra: { id: string; def: string }[] = [], more: PileSpec[] = [], phaseB = false): Yard {
+function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean, extra: { id: string; def: string }[] = [], more: PileSpec[] = [], phaseB = false, avoid: OBB2[] = []): Yard {
   const placed: OBB2[] = [];
   const out: PilePlacement[] = [];
   const refused: Yard['refused'] = [];
   // the pile's long axis along the building's long axis (frame normal, local z of the frames' yaw)
   const yaw = fp.yaw + Math.PI / 2;
-  const fits = (plot: OBB2) => !obbOverlap(plot, workZone) && !placed.some((q) => obbOverlap(q, plot)) && !near.some((o) => obbOverlap(o.obb, plot));
+  const fits = (plot: OBB2) => !obbOverlap(plot, workZone) && !avoid.some((z) => obbOverlap(z, plot)) && !placed.some((q) => obbOverlap(q, plot)) && !near.some((o) => obbOverlap(o.obb, plot));
   const order = [...piles].sort((a, b) => def(b.def).size[0] * def(b.def).size[2] - def(a.def).size[0] * def(a.def).size[2] || (a.id < b.id ? -1 : 1));
   const placePile = (pile: PileSpec) => {
     const d = def(pile.def), pc = def(pile.piece);
