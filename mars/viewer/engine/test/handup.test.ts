@@ -5,9 +5,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { component } from '../world/factory.ts';
 import { def } from '../world/catalog.ts';
-import { ENVELOPE_TOL, envelopeGap, GIVE_MAX, handsOf, handupHands, REACH_DOWN } from '../construction/handup.ts';
+import { ENVELOPE_TOL, envelopeGap, GIVE_MAX, handsOf, REACH_DOWN } from '../construction/handup.ts';
 import { deckSurfaces } from '../construction/contributor.ts';
 import { bay, run } from './frame-fixtures.ts';
+import { HAND_STEP_MAX, HandupHandsCheck } from './hands-check.ts';
+import { restHands } from '../body/model.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import { human } from '../world/factory.ts';
 import { forklift, FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
@@ -29,9 +31,11 @@ function watch(rt: Runtime, id: string, max = 20 * 400) {
   const r = rt.records.get(id)!;
   let ticks = 0, worst = -Infinity, holders = new Set<string>();
   const roles = new Map<string, string>();
+  const hc = new HandupHandsCheck();
   while (r.status !== 'completed' && r.status !== 'failed' && ticks < max) {
     rt.step();
     ticks++;
+    hc.check(rt); // at the grip = rebuildable from the slot; crouch / reach_down on their way from the hips; hands.teleport
     for (const h of Object.values(rt.world.entities)) {
       const slot = h.human?.grip?.slot;
       if (!slot?.startsWith('handup-')) continue;
@@ -39,9 +43,6 @@ function watch(rt: Runtime, id: string, max = 20 * 400) {
       roles.set(h.id, slot);
       const hs = handsOf(h);
       assert.ok(hs, `${h.id} publishes no hand points at tick ${rt.tick}`);
-      // a renderer rebuilds them from the take alone (part pose + holder pose + grip slot)
-      const part = rt.world.entities[h.human!.grip!.entity];
-      assert.deepEqual(handupHands(part, part.pose, h, slot), hs, `${h.id} hands not reproducible from ${slot}`);
       for (const p of hs!) {
         const g = envelopeGap(h.human!.activity, h.pose.p, p);
         worst = Math.max(worst, g);
@@ -51,7 +52,7 @@ function watch(rt: Runtime, id: string, max = 20 * 400) {
       }
     }
   }
-  return { r, ticks, worst, holders, roles };
+  return { r, ticks, worst, holders, roles, hc };
 }
 
 test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two givers, two receivers on the beams), 0 violations, hands in reach every tick', () => {
@@ -61,11 +62,26 @@ test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two give
   const r = rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
   assert.notEqual(r.status, 'failed', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
   const acts = new Map<string, Set<string>>();
+  // §6: hands travel — the first tick of a crouch / reach_down has them just below the hips, not on the part
+  const firstApproach = new Map<string, number>();
   const orig = rt.step.bind(rt);
-  rt.step = () => { orig(); for (const id of ['p1', 'p2', 'p3', 'p4']) (acts.get(id) ?? acts.set(id, new Set()).get(id)!).add(E[id].human!.activity); };
+  rt.step = () => {
+    orig();
+    for (const id of ['p1', 'p2', 'p3', 'p4']) {
+      const a = E[id].human!.activity;
+      (acts.get(id) ?? acts.set(id, new Set()).get(id)!).add(a);
+      if ((a === 'crouch' || a === 'reach_down') && !firstApproach.has(`${id}:${a}`)) {
+        const hs = handsOf(E[id])!, rest = restHands(E[id]);
+        firstApproach.set(`${id}:${a}`, Math.max(...[0, 1].map((i) => Math.sqrt((hs[i][0] - rest[i][0]) ** 2 + (hs[i][1] - rest[i][1]) ** 2 + (hs[i][2] - rest[i][2]) ** 2))));
+      }
+    }
+  };
   const w = watch(rt, r.id);
   rt.step = orig;
   assert.equal(w.r.status, 'completed', `${w.r.diagnostic?.code} ${w.r.diagnostic?.message}`);
+  assert.deepEqual([...firstApproach.keys()].sort(), ['p1:crouch', 'p2:crouch', 'p3:reach_down', 'p4:reach_down']);
+  for (const [k, d] of firstApproach) assert.ok(d < 0.05, `${k}: hands ${d.toFixed(3)} m from the hips on the first tick`);
+  assert.ok(w.hc.approachTicks >= 4 * 12 && w.hc.worstStep <= HAND_STEP_MAX, `approach ticks ${w.hc.approachTicks}, worst hand step ${w.hc.worstStep.toFixed(3)} m/tick`);
   assert.deepEqual([...w.holders].sort(), ['p1', 'p2', 'p3', 'p4'], 'all four held it');
   assert.deepEqual(rt.violations, [], JSON.stringify(rt.violations.slice(0, 3)));
   const s1 = E.s1;

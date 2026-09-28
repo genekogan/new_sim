@@ -6,6 +6,8 @@
 // template (W9) and a Playwright test pins measured rig reach to this model within 2 cm.
 // A real ~1.75 m adult. Heights are above the feet (the person's ground point, `pose.p`), horizontal
 // distances from the body axis. Anything outside is refused by the engine, never interpolated.
+import { dcos, dsin, type Vec3 } from '../core/math.ts';
+import type { Entity } from '../world/types.ts';
 
 /** Shoulder-height band above the feet for a posture, and how far the shoulders may lean out horizontally. */
 export type Posture = { lo: number; hi: number; lean: number };
@@ -51,10 +53,10 @@ export const BODY_MODEL = {
   chestFwd: 0.08, // sternum ahead of the body axis
   mouthHeight: 1.58,
   mouthFwd: 0.15, // the spoon hand's target, in front of the head
-  /** Empty hands hanging at the side (height above the feet, off the axis). */
-  restHand: { up: 0.8, side: 0.22, fwd: 0.02 },
-  /** Hands at the hips in front of the thighs: where a crouch starts from (before they travel to the grip). */
-  hipHand: { up: 0.95, side: 0.2, fwd: 0.12 },
+  /** Empty hands hanging at the hips (shoulderHeight − armLength = 0.80 m): where a crouch / reach starts from. */
+  restHand: { up: 0.8, side: 0.22, fwd: 0.02 }, // up = shoulderHeight − armLength (written out: the float difference is 0.7999…)
+  /** Hand carrying a small item (walking, sitting): in front of the hip. */
+  carryHand: { up: 1.0, side: 0.16, fwd: 0.28 },
 } as const;
 
 /** How far a hand is outside the envelope of `pz` for a person standing at `feet` (≤ 0 = inside): the
@@ -66,3 +68,35 @@ export function postureGap(pz: Posture, feet: readonly number[], hand: readonly 
   const dv = Math.max(0, pz.lo - rel, rel - pz.hi);
   return Math.sqrt(dh * dh + dv * dv) - BODY_MODEL.armLength;
 }
+
+// ---- body frame and landmarks (world points) ----
+// A person's frame is their ground point `pose.p` (body axis, level height), forward f = (cos yaw, sin yaw)
+// and right r = (−sin yaw, cos yaw) in (x, z); heights are above the ground point, lowered by `drop` while seated.
+export type Hand = 'left' | 'right';
+export const HANDS: readonly Hand[] = ['left', 'right'];
+export const otherHand = (h: Hand): Hand => (h === 'left' ? 'right' : 'left');
+/** +1 right, −1 left (along r). */
+export const sideOf = (h: Hand) => (h === 'right' ? 1 : -1);
+
+export type BodyFrame = { o: Vec3; f: [number, number]; r: [number, number]; drop: number };
+
+export function bodyFrame(e: Entity, drop = 0): BodyFrame {
+  const c = dcos(e.pose.yaw), s = dsin(e.pose.yaw);
+  return { o: e.pose.p, f: [c, s], r: [-s, c], drop };
+}
+
+/** World point `fwd` ahead, `right` to the right and `up` above the ground point (seated drop applied). */
+export function at(b: BodyFrame, fwd: number, right: number, up: number): Vec3 {
+  return [b.o[0] + b.f[0] * fwd + b.r[0] * right, b.o[1] + up - b.drop, b.o[2] + b.f[1] * fwd + b.r[1] * right];
+}
+
+const M = BODY_MODEL;
+export const chestPoint = (b: BodyFrame) => at(b, M.chestFwd, 0, M.chestHeight);
+export const shoulderPoint = (b: BodyFrame, h: Hand) => at(b, 0, sideOf(h) * M.shoulderHalf, M.shoulderHeight);
+export const mouthPoint = (b: BodyFrame) => at(b, M.mouthFwd, 0, M.mouthHeight);
+/** Empty hand hanging at the side. */
+export const restHand = (b: BodyFrame, h: Hand) => at(b, M.restHand.fwd, sideOf(h) * M.restHand.side, M.restHand.up);
+/** Hand carrying a small item (walking, sitting): in front of the hip. */
+export const carryHand = (b: BodyFrame, h: Hand) => at(b, M.carryHand.fwd, sideOf(h) * M.carryHand.side, M.carryHand.up);
+/** Both empty hands [left, right] hanging at the hips of person `e` (where the renderer puts hands no engine point drives). */
+export const restHands = (e: Entity): [Vec3, Vec3] => { const b = bodyFrame(e); return [restHand(b, 'left'), restHand(b, 'right')]; };

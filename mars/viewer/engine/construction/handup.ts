@@ -34,7 +34,7 @@ import { flatObb, isJoist, isPlywood, memberTop, sheetSupports } from './deck.ts
 import { isBeam } from './rules.ts';
 import { beamWalkways, climbLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
 import { deckAt, deckOver } from './framemove.ts';
-import { BODY_MODEL, postureGap, type Posture } from '../body/model.ts';
+import { BODY_MODEL, postureGap, restHands, type Posture } from '../body/model.ts';
 
 // ---- rules (metres, seconds) ----
 // reach rules: engine/body/model.ts (BODY_MODEL.md)
@@ -671,12 +671,27 @@ type Exec = {
   givingDone: boolean; receiversReady: boolean;
 };
 
+const phaseK = (s: Seg, t: number) => (s.dur > 0 ? Math.min(1, t / s.dur) : 1);
 function poseAt(s: Seg, t: number): Pose {
   const k = s.dur > 0 ? Math.min(1, t / s.dur) : 1;
   return lerpPose(s.from, s.to, s.phase === 'lift' || s.phase === 'set_down' || s.phase === 'reach_up' || s.phase === 'stand_with_load' ? smooth(k) : k);
 }
 
-function holdGivers(rt: Runtime, ex: Exec, activity: string, q: Pose, feetFromPose: boolean) {
+/**
+ * Hands on their way to a grip (crouch: from hanging at the hips down to where they grip the part lying on the
+ * ground; reach_down: from the hips down / out over the edge to the load): smoothstep from the rest hands to the
+ * grip over the phase, k = phase fraction. Undefined k = at the grip. Lift / reach_up / stand_with_load need no
+ * blend: the hands are on the part, which itself moves smoothly (poseAt). The segment rest → grip stays inside
+ * the body envelope (a convex set) when both ends are.
+ */
+function approach(h: Entity, grip: [Vec3, Vec3], k: number | undefined): [Vec3, Vec3] {
+  if (k === undefined || k >= 1) return grip;
+  const r = restHands(h), s = smooth(k);
+  const mix = (a: Vec3, b: Vec3): Vec3 => [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
+  return [mix(r[0], grip[0]), mix(r[1], grip[1])];
+}
+
+function holdGivers(rt: Runtime, ex: Exec, activity: string, q: Pose, feetFromPose: boolean, k?: number) {
   const e = rt.world.entities[ex.p.part];
   for (const [i, g] of (ex.p.givers ?? []).entries()) {
     const h = rt.world.entities[g];
@@ -689,10 +704,10 @@ function holdGivers(rt: Runtime, ex: Exec, activity: string, q: Pose, feetFromPo
     const c: Vec2 = [(hands[0][0] + hands[1][0]) / 2, (hands[0][2] + hands[1][2]) / 2];
     h.pose.yaw = datan2(c[1] - h.pose.p[2], c[0] - h.pose.p[0]);
     Object.assign(h.human!, { activity, task: ex.id, grip: { entity: e.id, slot } });
-    setHands(h, hands);
+    setHands(h, approach(h, hands, k));
   }
 }
-function holdReceivers(rt: Runtime, ex: Exec, activity: string, q: Pose) {
+function holdReceivers(rt: Runtime, ex: Exec, activity: string, q: Pose, k?: number) {
   const e = rt.world.entities[ex.p.part];
   for (const [i, st] of ex.prog.stations.entries()) {
     const h = rt.world.entities[st.actor];
@@ -701,7 +716,7 @@ function holdReceivers(rt: Runtime, ex: Exec, activity: string, q: Pose) {
     const c: Vec2 = [(hands[0][0] + hands[1][0]) / 2, (hands[0][2] + hands[1][2]) / 2];
     h.pose.yaw = datan2(c[1] - h.pose.p[2], c[0] - h.pose.p[0]);
     Object.assign(h.human!, { activity, task: ex.id, grip: { entity: e.id, slot } });
-    setHands(h, hands);
+    setHands(h, approach(h, hands, k));
   }
 }
 function release(rt: Runtime, who: string[]) {
@@ -777,7 +792,7 @@ function stepHandup(rt: Runtime, ex: Exec, dt: number): StepResult {
         e.support = { kind: 'held', by: [...givers] };
       }
       if (seg.phase !== 'crouch') e.pose = q;
-      holdGivers(rt, ex, seg.phase === 'push' ? 'reach_up' : seg.phase, e.pose, seg.phase === 'walk-load' || seg.phase === 'push');
+      holdGivers(rt, ex, seg.phase === 'push' ? 'reach_up' : seg.phase, e.pose, seg.phase === 'walk-load' || seg.phase === 'push', seg.phase === 'crouch' ? phaseK(seg, ex.gt) : undefined);
       if (ex.gt >= seg.dur - 1e-9) { ex.gi++; ex.gt = 0; }
       return { status: 'running', phase: seg.phase };
     }
@@ -795,7 +810,7 @@ function stepHandup(rt: Runtime, ex: Exec, dt: number): StepResult {
     e.support = { kind: 'held', by: prog.stations.map((s) => s.actor) };
   }
   if (seg.phase !== 'reach_down' && seg.phase !== 'take') e.pose = poseAt(seg, ex.rt);
-  holdReceivers(rt, ex, seg.phase, e.pose);
+  holdReceivers(rt, ex, seg.phase, e.pose, seg.phase === 'reach_down' ? phaseK(seg, ex.rt) : undefined);
   if (prog.mode === 'hand' && ex.ri < 2) holdGivers(rt, ex, 'reach_up', e.pose, false);
   if (ex.rt < seg.dur - 1e-9) return { status: 'running', phase: seg.phase };
   // segment done

@@ -7,9 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { component, human } from '../world/factory.ts';
 import { def } from '../world/catalog.ts';
-import { balance, EDGE_REACH, ENVELOPE_TOL, envelopeGap, FREE_END_MAX, handsOf, handupHands, LEVER } from '../construction/handup.ts';
+import { balance, EDGE_REACH, ENVELOPE_TOL, envelopeGap, FREE_END_MAX, handsOf, LEVER } from '../construction/handup.ts';
 import { beamWalkways } from '../construction/frame.ts';
 import { bay, openGround, run } from './frame-fixtures.ts';
+import { HandupHandsCheck } from './hands-check.ts';
 import { forklift, FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
 import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
@@ -36,15 +37,15 @@ function watch(rt: Runtime, id: string, max = 20 * 400) {
   const r = rt.records.get(id)!;
   const slots = new Set<string>();
   let ticks = 0;
+  const hc = new HandupHandsCheck();
   while (r.status !== 'completed' && r.status !== 'failed' && ticks++ < max) {
     rt.step();
+    hc.check(rt);
     for (const h of Object.values(rt.world.entities)) {
       const slot = h.human?.grip?.slot;
       if (!slot?.startsWith('handup-')) continue;
       slots.add(slot);
       const hs = handsOf(h)!;
-      const part = rt.world.entities[h.human!.grip!.entity];
-      assert.deepEqual(handupHands(part, part.pose, h, slot), hs, `${h.id} hands not reproducible from ${slot}`);
       for (const p of hs) assert.ok(envelopeGap(h.human!.activity, h.pose.p, p) <= ENVELOPE_TOL, `${h.id} (${h.human!.activity}) hand outside the envelope at tick ${rt.tick}`);
     }
   }
@@ -75,7 +76,8 @@ test('hand_up balance: a joist handed up end-first by one giver uses a two-hande
   const orig = rt.step.bind(rt);
   rt.step = () => {
     orig();
-    const hs = E.p1.human?.grip?.slot?.endsWith(':lever') ? handsOf(E.p1) : undefined;
+    // (while crouching the hands are still on their way from the hips to the grip)
+    const hs = E.p1.human?.grip?.slot?.endsWith(':lever') && E.p1.human.activity !== 'crouch' ? handsOf(E.p1) : undefined;
     if (hs) {
       lever = true;
       assert.ok(Math.abs(Math.sqrt((hs[0][0] - hs[1][0]) ** 2 + (hs[0][2] - hs[1][2]) ** 2) - LEVER) < 1e-6, 'the two hands LEVER apart along the joist');

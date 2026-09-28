@@ -9,12 +9,13 @@ import { def } from '../world/catalog.ts';
 import { dsin } from '../core/math.ts';
 import { PANEL_MAX_TILT } from '../world/catalog-solar.ts';
 import { SOLAR_ACTIONS, partHands } from '../construction/solar.ts';
-import { envelopeGap, ENVELOPE_TOL, handsOf, handupHands } from '../construction/handup.ts';
+import { envelopeGap, ENVELOPE_TOL, handsOf } from '../construction/handup.ts';
 import { deckSurfaces } from '../construction/contributor.ts';
 import { levelFor } from '../construction/access.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 import { fragileLoadsOk, tiltOf } from '../carry/fragile.ts';
 import { bay, run } from './frame-fixtures.ts';
+import { HandupHandsCheck } from './hands-check.ts';
 import { Runtime } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
@@ -79,15 +80,16 @@ function roofBay(extra: Entity[] = []) {
 function watch(rt: Runtime, id: string, max = 20 * 400) {
   const r = rt.records.get(id)!;
   let ticks = 0, worst = -Infinity;
+  const hc = new HandupHandsCheck();
   while (r.status !== 'completed' && r.status !== 'failed' && ticks++ < max) {
     rt.step();
+    hc.check(rt); // hand-up holders (reproducible at the grip, continuous on the way to it)
     for (const h of Object.values(rt.world.entities)) {
       const hs = handsOf(h);
       const slot = h.human?.grip?.slot;
       if (!hs || !slot) continue;
       const part = rt.world.entities[h.human!.grip!.entity];
       if (slot === 'place' || slot === 'mount') assert.deepEqual(partHands(part, part.pose, h.pose.p), hs, `${h.id} hands reproducible from the pose`);
-      else if (slot.startsWith('handup-')) assert.deepEqual(handupHands(part, part.pose, h, slot), hs);
       const act = slot.startsWith('handup-') ? h.human!.activity : 'crouch';
       for (const p of hs) {
         const g = envelopeGap(act, h.pose.p, p);
