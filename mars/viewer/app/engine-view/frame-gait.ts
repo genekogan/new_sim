@@ -183,7 +183,8 @@ export function stanceFacing(s: Stance, body: V2, hands: V3[]): number | null {
 export function framePose(ctx: FrameCtx, p: V3, yaw: number, hands: V3[] = []): FramePose {
   if (ctx.kind === 'beam') {
     const f = rot([1, 0], yaw), r: V2 = [-f[1], f[0]];
-    const out = (s: number): V3 => [p[0] + r[0] * s * 0.62 + f[0] * 0.08, p[1] + 1.12, p[2] + r[1] * s * 0.62 + f[1] * 0.08];
+    // arms a little out and down (hands ~0.35 m below the shoulders, 0.45 m out from the body axis)
+    const out = (s: number): V3 => [p[0] + r[0] * s * 0.45 + f[0] * 0.1, p[1] + 0.98, p[2] + r[1] * s * 0.45 + f[1] * 0.1];
     return { kind: 'beam', facing: null, feet: null, hands: [out(-1), out(1)], u: 0, exit: 0, weight: 1 };
   }
   if (ctx.kind === 'stance') return stancePose(ctx, stanceFacing(ctx, [p[0], p[2]], hands));

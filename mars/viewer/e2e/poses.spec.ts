@@ -166,6 +166,64 @@ test('raise: footer holds the column base low', async ({ page }, testInfo) => {
   await captureView(page, 'poses-raise-footer', { testInfo });
 });
 
+// Rack structure (POSES.md "Rack structure"): in hand-up v3 the receivers climb a frame on its W2 `climb:`
+// link (ladder cycle: facing the frame, planted feet on their rungs, hands on the hold line) and walk beam b3
+// (arms out for balance, short steps). Checked on every tick of the first climb and beam walk; captured.
+test('hand-up: climbing a frame (ladder cycle) and walking a beam (arms out)', async ({ page }, testInfo) => {
+  test.setTimeout(300_000);
+  await openLab(page, 'hand-up');
+  await page.addStyleTag({ content: '.lab-perf, .lab-hud { visibility: hidden }' });
+  await page.evaluate(() => window.__marsEngine!.runScenario('hand-up', { paused: true }));
+  type FB = { activity: string; soles: number[]; arms: Arm[]; frame: { kind: string; u: number; weight: number; feet: { p: number[]; planted: boolean }[] | null } | null };
+  const bones = () => page.evaluate(() => (window.__marsEngine! as unknown as { bones(): Record<string, FB> }).bones());
+  expect(await stepUntil(page, `(h) => h.state().humans.some((q) => q.activity === 'climb-up' && q.p[1] > 0.9)`, 20 * 900)).toBe(true);
+  let b = await bones();
+  const [cid] = Object.entries(b).find(([, x]) => x.activity === 'climb-up')!;
+  // every tick of the rest of this climb: planted soles on their rungs, holds reached, nothing stretched
+  let ticks = 0, planted = 0, off: string[] = [], holds = 0, reached = 0;
+  for (; ticks < 400; ticks++) {
+    const x = b[cid];
+    if (x.activity !== 'climb-up') break;
+    if (x.frame?.kind === 'ladder' && x.frame.weight >= 1 && x.frame.feet) {
+      x.frame.feet.forEach((f, k) => {
+        if (!f.planted) return;
+        planted++;
+        if (Math.abs(x.soles[k] - f.p[1]) > 0.03) off.push(`${ticks} sole ${x.soles[k]} rung ${f.p[1]}`);
+      });
+      for (const a of x.arms) if (a.source === 'frame') { holds++; if (a.err! <= 0.1) reached++; }
+    }
+    for (const a of x.arms) expect(Math.hypot(a.shoulder[0] - a.palm[0], a.shoulder[1] - a.palm[1], a.shoulder[2] - a.palm[2])).toBeLessThanOrEqual(a.len + 0.005);
+    if (ticks === 6) {
+      const st = await page.evaluate(() => window.__marsEngine!.state());
+      const q = st.humans.find((h) => h.id === cid)!;
+      await page.evaluate(([p, y]) => window.__marsEngine!.camera([p[0] + Math.cos(y + 2.0) * 3.2, p[1] + 1.6, p[2] + Math.sin(y + 2.0) * 3.2], [p[0], p[1] + 0.9, p[2]]), [q.p, q.yaw] as const);
+      await labFrames(page, 4);
+      await captureView(page, 'poses-climb-frame', { testInfo });
+    }
+    await page.evaluate(() => window.__marsEngine!.step(1));
+    b = await bones();
+  }
+  console.log(`[poses] climb ${cid}: ${ticks} ticks, planted soles ${planted} (off ${off.length}), frame holds reached ${reached}/${holds}`);
+  expect(off, 'planted feet on their rungs').toEqual([]);
+  expect(planted).toBeGreaterThan(20);
+  expect(reached / Math.max(1, holds)).toBeGreaterThanOrEqual(0.95);
+  // a beam walker: both arms out for balance (renderer holds, reached), short steps (half Walk weight)
+  expect(await stepUntil(page, `(h) => h.state().humans.some((q) => q.activity === 'beam-walk')`, 20 * 900)).toBe(true);
+  await page.evaluate(() => window.__marsEngine!.step(6));
+  b = await bones();
+  const walker = Object.entries(b).find(([, x]) => x.activity === 'beam-walk');
+  if (walker) {
+    const [wid, x] = walker;
+    console.log(`[poses] beam-walk ${wid}: arms ${x.arms.map((a) => `${a.source} err ${a.err}`).join(' / ')}`);
+    expect(x.arms.every((a) => a.source === 'frame' && a.err! <= 0.1), 'arms out on the beam').toBe(true);
+    const st = await page.evaluate(() => window.__marsEngine!.state());
+    const q = st.humans.find((h) => h.id === wid)!;
+    await page.evaluate(([p, y]) => window.__marsEngine!.camera([p[0] + Math.cos(y) * 3.6 + Math.cos(y + 1.57) * 1.2, p[1] + 0.9, p[2] + Math.sin(y) * 3.6 + Math.sin(y + 1.57) * 1.2], [p[0], p[1] + 1.0, p[2]]), [q.p, q.yaw] as const);
+    await labFrames(page, 4);
+    await captureView(page, 'poses-beam-walk', { testInfo });
+  }
+});
+
 type Probe = { template: string; body: Record<string, number>; arms: Arm[]; pose: { drop: number; bend: number; rise: number; kneel: number } };
 type BodyRow = { id: string; template: string; shoulderH: number; shoulderHalf: number; armLen: number; overhead: number; heels: number; down: number; downPose: Probe['pose'] | null; out: number; stretched: number };
 

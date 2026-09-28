@@ -12,12 +12,16 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 | `scenarios.ts` | presets, pure TS (node can run them): wall, u-trap, narrow-passage, stairs, deck-to-ground, incomplete-stairs, construction, trio, stress-30, build-bay, campfire-evening, year-2020 … year-2026 |
 | `build-bay.ts` | flagship "build a rack bay" preset: world/registry/invariants/contributors of `engine/scenarios/build-bay.ts` on the test's open ground, `bindTemplate` → `SequenceRunner` stepped live (`advance()` once, then per tick `rt.step()` → `poll()` → `advance()`, exactly `run()`'s loop) |
 | `hand-up.ts`, `meal.ts` | presets `hand-up` (flagship v3, `engine/scenarios/build-bay-v3.ts`: joists and s1 handed up to people on the beams, s2 off the forks; same SequenceRunner loop as build-bay, `bindRunner`) and `meal` (`engine/scenarios/meal.ts`: take bowl + spoon, serve, sit round the fire, eat until empty; runMeal's loop body per tick). Hook `bones(id?)` (feet/soles, stair gait, posture, arms vs targets), `stairs()`, `heldItems()`; specs `e2e/stairs.spec.ts`, `poses.spec.ts`, `meal.spec.ts` (POSES.md) |
-| `../engine-view/components.ts` | one persistent object per world component, pose interpolated between ticks; Euler(pitch, −yaw, roll, 'YXZ') = engine `entityCorners` order; uprights as braced two-column frames, stair flights as two stringers (treads are their own entities), everything else a catalog-coloured box; `nearestPoint` for hand placement |
+| `../engine-view/components.ts` | one persistent object per world component, pose interpolated between ticks; Euler(pitch, −yaw, roll, 'YXZ') = engine `entityCorners` order; uprights as braced two-column frames (Kit frames with the Kit's bracing: the stance nodes), stair flights as two stringers (treads are their own entities), solar panels as dark glass in an aluminium frame with a cell grid (tilt = engine pose), metallic rails, battery / charge controller / inverter with a label plate (kind + configuration), everything else a catalog-coloured box; `nearestPoint` for hand placement |
+| `../engine-view/paint.ts` | paint progress: one colour quad per band of `entity.paint` on its face, as wide as the band's coverage; a `texture` draws as a hashed colour with a stripe (no textures yet) |
+| `../engine-view/frame-gait.ts` | pure: climbing a frame (ladder cycle), standing on its bracing (soles on the node, turn toward a held load), balance on a beam (POSES.md "Rack structure") |
+| `year-build.ts` | presets `year-build-2022` (first bay) and `year-build-2022-house` (whole house): `engine/scenarios/year-build.ts` setup (publish `mars-2022`, fork, piles + crew, bind) on a fetched `campus-2022.json`, SequenceRunner stepped live (= the node rehearsal, tick and hash); HUD: fetch / setup ms, steps, unplaced, the refusal / blocked log by code |
+| `solar-paint.ts` | preset `solar-paint`: two painters (colour, texture), a fragile panel carried flat, a panel mounted at 20° on rails, labelled equipment, every bundle / stack kind at a few counts, the cutting station |
 | `campfire-evening.ts` | HYPOTHETICAL inhabited scene (milestone H, `engine/social`): campfire + 2 benches + 3 camp chairs south-west of the proving ground's test zones, 14 people, a timed script of direct submits (gather, converse, sit, ambient_wander; stand + take_slot at 40 s; last place at 42 s; full-circle `slot.none-free` + `reservation.conflict` at 50 s as EXPECTED diagnostics; bench at 51 s; `releaseForDirective` + `walk_to` at 54 s); runs 75 s, dusk lighting |
 | `year-walkabout.ts` | year walkabouts (pure TS): fetch `public/engine/campus-<year>.json` in `prepare()` (2026: `campus-2026.json` cropped ±60 m around staging-east), build `Spatial` + 0.1 m grids in the browser (timed for the HUD), four walkers at region-hull-derived spots (snapped to ≥ 0.6 m clearance) with `walk_to` targets across the campus and optional `via` passage checks |
 | `year-walkabout-view.ts` | the studio's real geometry as backdrop (`createHistoricalScene(year)` from `app/history/scenes.ts`, dynamically imported so the studio modules stay out of the lab's dev-server reload graph for other presets; 2026 = `browser/campus.glb` minus people/reference ground) and the **Engine obstacle prisms** overlay (ground-band blockers as one instanced translucent draw + outlines, depthTest off so footprints under roofs show) |
 | `social-hud.tsx`, `overlay-slots.ts` | social HUD (script status, slot occupancy, Idle-clip legend) and the **Interaction slots** overlay (green free · amber claimed · orange occupied, tick = heading) |
-| `../engine-view/fixtures.ts`, `../engine-view/fire.ts` | `kind: 'fixture'` meshes: bench, camp chair (seat faces local +z), campfire (stones, logs + the shared animated fire: noise-shaded flame tongues, coal bed, embers, thin smoke, flickering warm point light at dusk; a pure function of entity-id seed + sim time, also used by the studio ambience fire) |
+| `../engine-view/fixtures.ts`, `../engine-view/fire.ts` | `kind: 'fixture'` meshes: bundles / stacks (dunnage, straps, pieces drawn to `contents.count`: the stack shrinks as pieces are taken), the cutting station (bench, in/out tables, chop saw, fence), bench, camp chair (seat faces local +z), campfire (stones, logs + the shared animated fire: noise-shaded flame tongues, coal bed, embers, thin smoke, flickering warm point light at dusk; a pure function of entity-id seed + sim time, also used by the studio ambience fire) |
 | `sequence-hud.tsx` | sequence HUD on the canvas (active steps + phase, BLOCKED waits with code/message, last diagnostics) and the panel's step-chip timeline |
 | `sim.ts` | `LabSim`: builds `Runtime` (Spatial + walk_to + `DEFAULT_INVARIANTS`), fixed-DT accumulator, step cost stats, event log, replan detection |
 | `scene.ts` | ground, walls/solids as boxes from the `SpatialScene`, stairs from `link.path` (missing treads left out), component boxes |
@@ -46,7 +50,10 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 `pause(on)`, `setSpeed(x)`, `state()` (humans, checks, stats), `violations()`, `records()`, `log()`,
 `setOverlay(name, on)`, `overlays()`, `camera(pos, target)`, `cameraPreset('top'|'oblique')`, `info()`, `perf()`,
 `backdropReady` (year backdrop geometry + photos loaded), `scenarioHud()` (panel HUD lines), `sequence()` (step rows + blocked/failed/violation log), `slots()` (interaction slots with claim/occupant), `social()` (fired script events + expected diagnostics), `runUntilSteps(ids, status='completed', max)`, `components()`
-(pose, phase, support, engine corners, rendered bounds), `stateHash()`.
+(pose, phase, support, engine corners, rendered bounds), `stateHash()`, `stacks()` (bundles as drawn: count, stack top), `paints()`
+(paint overlays: per band the engine coverage and the drawn width), `yearBuild()` (year-build presets: steps with beam / height /
+relay, piles, canonical comparison, unplaced by reason, setup ms, blocked / refusal log). Note `step(n)` ticks on past `done`;
+`runToEnd()` / `runUntilSteps()` stop there.
 
 `e2e/lab.spec.ts` covers:
 - Each scenario: run to completion, check expectations, zero violations, a visible failure banner when a failure is expected, and an identical deterministic replay.
@@ -67,6 +74,19 @@ rehearsal (`engine/rehearsal/rehearse.ts`) — so live stepping is the rehearsal
 visitor on the ply) and rendered bounds within the engine boxes; every blocked step appears in the diagnostics log.
 Captures (oblique + top): `build-bay-{carry,raise,held,beams,joists,deck,stair,visitor}-*.png`, video
 `build-bay-raise-beams-2x.webm` (raise + beams at 2×). Baselines: `build-bay-raise-oblique` (A at about 45°: lifter walking the frame up, footer at the base), `build-bay-held-oblique`, `build-bay-visitor-oblique`.
+
+## Year build: 2022 east-house skeleton from piles (`year-build-2022`, `year-build-2022-house`)
+HYPOTHETICAL order / piles / crew (YEAR_BUILD.md). The panel shows the sequence timeline (198 / 552 step chips), the canvas HUD the
+running steps and blocked waits, the preset HUD the refusal / blocked log by diagnostic code. Headless Chromium (SwiftShader, M-series,
+2026-09-28): fetch ~100 ms, setup ~0.6 s; first bay 41 019 ticks (34 simulated min) — stepping alone ≈ 10 s; the whole house (an
+option, not the default) 116 477 ticks in 33–37 s wall (≈ 170× real time). Live stepping ends on the node rehearsal's tick and state
+hash (`e2e/year-build.spec.ts` rehearses the same setup in node and compares). The whole house also shows 77 red FAILED banners: ambient
+make-way walks the engine submits for a person already reserved by a waiting step (`reservation.conflict`) — engine noise, same outcome.
+`e2e/year-build.spec.ts`: completes, 0 violations, 24 / 24 at the canonical pose, soles on the bracing node / rungs, captures
+`year-build-{t0-yard,t0-top,raise,climb,handup-248,relay-give,relay-476,skeleton,skeleton-eye}` (+ `year-build-house-{oblique,eye,eye-far,eye-end}`
+with `YEAR_BUILD_FULL=1`). Baselines: `year-build-handup-248`, `year-build-skeleton`.
+`e2e/solar-paint.spec.ts` (`solar-paint`): drawn band width = engine coverage every tick, the fragile panel ≤ 30° while held (0.00°),
+part-used stacks lower than full ones; baselines `solar-paint-mid-paint`, `solar-paint-mounted-equipment`.
 
 ## Year walkabouts (`year-2020` … `year-2026`)
 Checks the generated engine scenes (`docs/engineering/CAMPUS_SCENE.md`) against the studio's rendering of the same year.
@@ -127,7 +147,7 @@ Findings in the engine data (not fixed here; the scene files belong to `deploy/h
 
 ## Known limitations (honest)
 - **Social poses**: only Idle/Walk clips exist. `sit` is a procedural pose (lowered body, leg IK, hands on thighs, about half the people with legs crossed); the sit-down is a 0.4 s blend (a crouch into the seat), not a clip. `warm` only adds hands held out; `talk` / `watch` / `listen` are the plain Idle pose (no gestures, no head look-at). Seated torsos are upright and do not touch the chair back; there is no body-vs-chair collision, so thighs can clip an armrest.
-- **Stairs**: tread-by-tread foot IK on `stairs` links (POSES.md; feet within 0.0 cm of the tread tops at every plant in `stairs.spec.ts`). Frame climbing (`climb` links) plays Idle while the body rises; beam walking plays the flat Walk clip.
+- **Stairs**: tread-by-tread foot IK on `stairs` links (POSES.md; feet within 0.0 cm of the tread tops at every plant in `stairs.spec.ts`). Frame climbing (`climb:` links, frame stances) is a two-hand two-foot ladder cycle facing the frame, people on the bracing stand on its node, beam walking has arms out and short steps (POSES.md "Rack structure").
 - **Stair ends (engine)**: fixed — traversal is continuous entry → steps → exit; `motion.teleport` (0.6 m/tick) guards it.
 - **Turning in place** plays Idle (activity is `idle` during `turn`).
 - **Route overlay** reads Runtime's private `live` map (`sim.ts liveRoutes`). An engine inspect API should replace it.

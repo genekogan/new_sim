@@ -1,13 +1,14 @@
-# Renderer poses: stairs, handling, eating (owner feedback §3 renderer half, §4, §6, §12)
+# Renderer poses: stairs, handling, eating, the rack structure (owner feedback §3 renderer half, §4, §5, §6, §7, §12)
 
 Code: `viewer/app/engine-view/` — `humans.ts` (per-person tick snapshots, layer order, arms), `rig.ts`
-(bone chains, two-bone IK, palm), `stair-gait.ts` (pure: tread-by-tread foot placement), `posture.ts`
+(bone chains, two-bone IK, palm), `stair-gait.ts` (pure: tread-by-tread foot placement), `frame-gait.ts`
+(pure: climbing a frame, standing on its bracing, balance on a beam), `posture.ts`
 (pure: crouch / hip-bend / heel-raise / kneel solver), `items.ts` + `components.ts` (item meshes, in-hand
 attachment, food level), `fixtures.ts` (one line: the 6 ft table mesh), `take-replay.ts` (`TakePeople`:
-the take-replay half, shared by the studio and the lab check). Lab presets `meal`, `hand-up`, `body`
-(`app/lab/meal.ts`, `hand-up.ts`, `body.ts`); hook `__marsEngine.bones(id?)`, `stairs()`, `heldItems()`,
+the take-replay half, shared by the studio and the lab check). Lab presets `meal`, `hand-up`, `body`,
+`year-build-2022` (`app/lab/meal.ts`, `hand-up.ts`, `body.ts`, `year-build.ts`); hook `__marsEngine.bones(id?)`, `stairs()`, `heldItems()`,
 `probe()`, `bodyModel()`, `recordTake()` / `humanFields()` / `replayTake()`.
-Specs: `e2e/stairs.spec.ts`, `e2e/poses.spec.ts`, `e2e/meal.spec.ts` (+ `e2e/take-fixture.ts`).
+Specs: `e2e/stairs.spec.ts`, `e2e/poses.spec.ts`, `e2e/meal.spec.ts` (+ `e2e/take-fixture.ts`), `e2e/year-build.spec.ts`.
 
 Renderers only read the world. Everything below is a deterministic function of the engine's tick
 history and the entity id (template, legs-crossed variant, warm-hands spread, which knee kneels);
@@ -73,11 +74,14 @@ Left / right are taken from where the bones are, not from their names.
      `imul(hash(id), 2654435761)`): right knee over the left, right ankle beside the left shin,
      faded in over the last 40 % of the sit-down.
    - **stairs** (the body is on a usable `stairs` link, `stair-gait.ts`): see below.
+   - **frame** (climbing a frame, on a frame stance: `frame-gait.ts`, "Rack structure" below): feet on rungs /
+     the bracing node, pelvis over the body point lowered until both legs reach (and by the posture's drop).
    - **posture** (`posture.ts`): see below.
 3. **Torso bend** (posture): pitched forward at Hips / Abdomen / Torso by 60 / 20 / 20 %.
 4. **Arms**: engine hand points (`human.hands`) → else the grip slot of `human.grip` (lift-far / hold-N
    column line ≤ 1.9 m, foot-l/r column base, liftcrew `lift-*` handPoint, `lift-station` none) → else
-   seated hands on the thighs / warm hands to the fire. A shoulder shrug toward the target (up to 5 cm
+   seated hands on the thighs / warm hands to the fire / **frame holds** (climbing, on the bracing) and the
+   balance pose on a beam (renderer-chosen, source `frame` in `bones()`). A shoulder shrug toward the target (up to 5 cm
    overhead, 2.5 cm down; Body model). Free arms on a torso bent > ~30° hang with gravity instead of
    keeping the clip's arm (which would point backwards). **Closed hand**: every arm in contact with its
    point (≥ 0.3, fully by 0.8) curls its fingers — each finger chain turns about the axis it already
@@ -142,6 +146,50 @@ change. `bones()` reports per arm: shoulder, palm, arm length, target, contact, 
   161 → 176 / 176, lay 1592 / 1592, set_down 198 / 198. Still missed: reach_up points above the 2.06 m
   the body reaches (up to ~1 m out), reach_down deeper than a kneeling body reaches (Body model,
   "Open"), the 0.6 s crouch while the body is still going down. `poses.spec.ts` floor: 88 %.
+- hand-up v3 on W12's landmarks (`36aa230`, re-pinned 16237 ticks, 5554 points): **91.8 %** (5101); with W14's
+  25° walking bend **92.5 %** (5137): crouch 201 / 216, lift 216 / 216, walk-load 478 → 514 / 514, reach_up
+  1811 / 2202, reach_down 253 / 264, take 176 / 176, stand_with_load 176 / 176, lay 1592 / 1592, set_down 198 / 198;
+  0 rig-reachable misses. (`[body] ENGINE MISMATCH reachDownBelowFeet` still printed: the woman template reaches
+  0.35 m below its feet at 0.45 m out, the engine allows 0.5 — Body model, "Open".)
+- year build 2022 east-house, first bay (every 3rd tick of 41 019; 9668 points): **76.5 %** (62.6 % before the
+  stance turn and the 25° walking bend); 0 rig-reachable misses. By activity: crouch 138 / 288, lift 643 / 956,
+  walk-load 3438 / 4116, hook 333 / 444, reach_up 2588 / 3464, take 256 / 400. What is missed is engine geometry
+  the body cannot follow: in `hang_beam` both lifters face the direction they walk the beam in, so the rear one
+  carries, lowers and slides it with the hands 0.35–0.65 m **behind** the back (`walk-load`, `lift`, `hook` at the
+  0.22 m seat); installers on the bracing hold a beam 0.73–0.79 m to the side of the body point, above the
+  shoulders on the way to the 4.76 m seat (no side lean in the rig); the 0.6 s crouch still going down.
+
+## Rack structure: climbing, frame stances, beams (§5, §7; HANDUP.md, YEAR_BUILD.md)
+`frame-gait.ts` (pure) gives, per person and frame, a context from `human.on` + activity (`frameCtx`) and a pose
+for the interpolated body point (`framePose`); `humans.ts` applies it (`frameLegs`, arm holds, facing).
+- **Climbing** (`climb-up` / `climb-down`, on a W2 `climb:<upright>:<l|r>@<seat>` link or a year-build frame
+  stance `stance:…`): the climber **faces the frame** — the hold line is the frame-plane point in front of the
+  climb axis, clamped between the columns, so a stance climber (who goes up just outside the column) holds the
+  column and a W2 climber (inward of the column, off the face) holds the bracing in front. The engine keeps the
+  stance / link heading as the body's yaw; the rendered facing is the renderer's reading of "climbing the frame"
+  (blended in over the first 0.2 m of height). A diagonal **two-hand, two-foot ladder cycle**: rungs at 0.25 m
+  (the Kit frame's lowest bracing node) then every 0.35 m (half the Kit's 0.7 m node pitch), clamped to the top;
+  each foot is planted for most of a two-rung cycle and moves up two rungs in the rest (the stair gait's timing,
+  left foot on odd rungs); each hand is 1.2 m above the rung of the opposite foot, half a rung ahead of it. A
+  pure function of the body height: climbing down is the same motion reversed, the cadence locked to the rung
+  pitch at the engine's 0.35 m/s. On the top segment (round the column onto the face / the beam end) the feet
+  finish onto the top rung and blend to the stance (or to the clip's legs at a beam end). The pelvis is lowered
+  until both legs reach their feet (the feet are on the frame ~0.3–0.45 m ahead of the body point).
+- **Frame stance** (`stance:…`, activity `stance` / `take` / `reach_up` / `hook`): both soles on the bracing
+  node in the frame plane (the body point is 0.36 m off it: a ladder stance), feet side by side across the
+  rendered facing; free hands on the column (1.3 m above the feet) and the bracing in front (1.1 m, toward the
+  middle of the frame). Holding a load (`hang_beam` hand points: a beam passing 0.3 m + the 0.457 m stage axis
+  beside a body that faces its frame) the person **turns on the rod toward the load**, up to 100° (feet stay on
+  the node; the posture is solved in the turned frame — crouch / bend allowed, no kneel, no heel rise).
+- **Beam** (`beam-walk`): arms a little out and down for balance (hands 0.45 m out, ~0.35 m below the
+  shoulders), short steps (Walk weight halved, cadence ×1.8 — half-length strides at the engine's speed).
+- **Kit frames** are drawn with the Kit's bracing (`components.ts`: one rod per 0.7 m from column −x at
+  0.25 + 0.7k to column +x 0.66 m higher), so stance feet land on drawn rod ends; climbing rungs at 0.35 m
+  are not IK'd to the rods (every other one is near a node).
+**Measured** (`e2e/year-build.spec.ts`, first bay, every 3rd tick of 41 019; `poses.spec.ts` v3 climb):
+stance soles on their node 44 516 / 44 516 (≤ 3 cm), planted climbing feet on their rung 3 808 / 3 808, frame
+holds reached 99.95 % (47 257 / 47 280; the rest ≤ 1.07 arm lengths during the climb's top blend), v3 W2 climb
+85 / 85 planted feet on rungs and 140 / 140 holds, beam-walk arms on their balance points; no arm longer than its bones.
 
 ## Items and eating (§12)
 Item meshes (`items.ts`): bowl / cup / plate / pot as lathe-turned open vessels (pot with side
@@ -188,9 +236,12 @@ construction stairs, found by the contributor); campus stairs in a take would ne
 - Reach-down is shallower than the engine allows (Body model, "Open"); those receivers' arms hang.
 - No body-vs-object collision: a squatting foot can overlap a part lying on the ground, the crossed
   knee can touch the bowl, thighs can clip chair arms.
-- Stair gait only on `stairs` links, not on `climb` (frame climbing plays Idle while the body rises) or
-  `beam` links (beam walking plays the flat Walk clip). A person standing still mid-flight (climb-wait)
-  can keep a foot mid-swing.
+- Stair gait only on `stairs` links; frame climbing is the ladder cycle (rungs at a 0.35 m pitch, not IK'd to the
+  drawn bracing rods), beam walking the Walk clip at half weight (no foot placement on the 0.1 m flange). A person
+  standing still mid-flight (climb-wait) can keep a foot mid-swing.
+- The climbing facing and the stance turn toward a load are the renderer's (the engine keeps the link / stance
+  heading); no side lean or torso twist, so hands far to the side or behind the body still hang (see the year
+  build numbers above).
 - The posture blend lags the engine's hand points by up to 0.4 s (crouch misses).
 - Take replay: food level follows `contents` only if the take records it (the recorder does not: the
   final state's fill is shown); seats at a default height; the kneeling side and legs-crossed variant
