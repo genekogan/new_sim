@@ -52,6 +52,8 @@ test('history ids: frozen migration table maps every legacy id to a live compone
  }
  // 7,942 live legacy entries until 2026-09-29; the Chiba 2024 reconstruction edit removed the right-flap salvaged
  // windows (84 entries: backing, glazing, frames → null = removed; HISTORY_IDS.md). 9 older nulls predate it.
+ // W46 (props seated on their surfaces, 2026-09-29) re-pointed 243 entries at successors, removing none: 2020 70
+ // (toilets 12, RV wheels 48, workshop legs + bins 10), 2021 58, 2023 41, 2024 41, 2025 33; 2022 and 2026 held.
  assert.equal(entries,7942-84);assert.equal(removed,9+84);
  assert.equal(legacyId(table,2021,'person-3'),undefined);
 });

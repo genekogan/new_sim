@@ -45,6 +45,12 @@ const CORRECTIONS: { year: number; name: string; position: number[]; target: num
   { year: 2024, name: 'solarium', position: [7.2, 2.9, 9.6], target: [9.0, 1.1, 5.0] },
   // The solarium's end: plexiglass wall on 2x4 studs with its door standing open (the first door object).
   { year: 2024, name: 'solarium-door', position: [16.5, 1.8, 10.5], target: [10.9, 1.5, 6.0] },
+  // Props on their surfaces (§15, W46), eye level: an RV side-on (wheels roll along it, tires on the −0.16 ground) …
+  { year: 2020, name: 'rv-eye', position: [-6.2, 1.4, -47.2], target: [-8.4, 0.4, -55] },
+  // … classroom tables and benches standing on the ground-floor deck (legs/feet no longer start inside it) …
+  { year: 2021, name: 'classroom-eye', position: [4.6, 1.3, 8.5], target: [4.6, 0.3, 2] },
+  // … and the kitchen: counters, crates and fridge on the deck, trailers behind on the ground.
+  { year: 2024, name: 'kitchen-eye', position: [0.2, 1.1, 42], target: [3.7, 0.3, 44.5] },
 ];
 
 for (const c of CORRECTIONS) {
