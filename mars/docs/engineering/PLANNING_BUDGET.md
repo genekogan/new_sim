@@ -293,6 +293,44 @@ The meal pin, the year-build first bay (`ad844b78…` @ 41019) and the campus pi
 | --- | --- | --- | --- |
 | build-bay v3 (`build-bay-v3.test.ts`) | `339cf310d7cc…9f36ad1e` | `5f32379db672…715d0c73` | 16219 → 16237 |
 
+**Re-pinned 2026-09-28 (walker fallback + hypot + encounters on the smoothed path, 2026-09-28 — not the budget; W15,
+`MOVEMENT.md` §2).** The walker changes:
+- the decision clock survives creeping;
+- a failed people-replan names who is behind it (`RouteOpts.nameObstacles`), and the fallback is a squeezed replan;
+- a crowded start snaps up to 1 m;
+- a walker at the end of its route counts as standing;
+- the static sidestep never flips while its person is alongside;
+- follow / head-on / crossing use the smoothed path ahead.
+
+`core/math.ts` `dist2` / `len2` and every former host `Math.hypot` in `engine/**` are now √ of a sum of squares
+(`hypot`); the source scan bans `Math.hypot`. Every pin moves once. Verified against HEAD (`b7dd62e`, re-checked on
+`87ed562`) with a scratch outcome diff: each run ends with 0 violations and the same discrete outcome. That is the same
+step statuses, every component in the same phase / support, and every person on the same level with the same final
+activity. v3 also keeps the same per-person grip sets and level changes. The meal keeps the same records per verb and
+status (4 people sit, bowls and pot empty); only its action ids shift with submission order. Only durations move:
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| probe / flagship build-bay | `93fa2a0a7900…ac67b` | `0147f8f12a99…fd30d5` | 10693 → 10729 |
+| campus flagship (staging-east crop) = full uncropped | `ecb424c74d87…cbb3a` | `fee92ee0a94f…40c56` (crop == full still asserted) | 11227 → 11316 |
+| lab stress-30 (60 s) | `093779fd18f0…fcac55` | `1298e2e57b62…5ee6b` | fixed 1200 |
+| meal (`meal.test.ts`) | `9dae86bfd31e…a70f87` | `035e8c3949b7…baba5` | 631 → 626 |
+| build-bay v3 (`build-bay-v3.test.ts`) | `5f32379db672…715d0c73` | `66800edc569a…ccaa2af8d5` | 16237 → 16230 |
+| year-build first bay (`year-build.test.ts`) | `ad844b78da3f…248121` | `695d2dcb001b…080a81` (24/24 at the canonical pose, max 0.57 mm / 0°) | 41019 → 41182 |
+| year-build whole house (`YEAR_BUILD_FULL=1`) | `14d5c7687782…30c89a` | `35d128861c53…86e11da` (66/66, max 0.57 mm / 0°) | 116477 → 117125 |
+| carry gather routes (`G`, `grid-incremental.test.ts`) | `ea04513b…539ab` | `9ba1037c…0133f`: same cells and vertices, one leg length 1 ulp apart | — |
+| build-bay v2 (not hash-pinned; outcome checked) | `a463bfe2ef12…` | `7d9b34cde6e4…` | 12802 → 12812 |
+
+`walk-perf.test.ts` still holds unchanged in substance:
+- every W11 switch off === on (stress-30 exact and corridor, the meal, the probe);
+- `proveUnreachable` routes === the frozen reference A\* (`path-reference.ts` takes the same `hypot`);
+- `narrow()` === the frozen reference.
+
+Only its pinned hash strings were updated. `deploy/perf-walk.mjs` asserts the new pins (PIN-OK ×5). One run on a shared
+host gave stress-30 a 0.35 ms mean and 29 ms max tick, against W11's 0.48 ms / 94 ms. Plausibly `Math.sqrt` is cheaper
+than V8's `Math.hypot`, but that is not a controlled measurement. New cost: a failing people-replan whose failure names
+a person pays for one squeezed search (~ the same as the first, with `proveUnreachable`).
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

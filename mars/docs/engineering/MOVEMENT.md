@@ -80,23 +80,72 @@ The first hit is refined by bisection (< 2 mm). The walker brakes to stop **2 cm
 | give way / yield | head-on without room (`traffic.person`); single-file passage held by someone else (`traffic.yield`); stepped aside for a formation (`traffic.stepped-aside`) | `wait` (or `walk` while stepping sideways) | blocked |
 | decision | `DECIDE_TICKS` = 10 ticks (0.5 s) after stopping, if no blocker has moved 0.1 m since: `routeAround` all standing people + loads + the blockers | — | running `replan` |
 
-Rules around the decision:
+Rules around the decision (W15, 2026-09-28, where noted):
+- **Stationary vs moving blocker.** A blocker standing still (idle, warm, seated, working, a blocked
+  walker, or a walker at the end of its route turning to face: speed 0) is routed around within
+  `DECIDE_TICKS` of the walker stopping. A blocker that is itself walking keeps moving, so the clock never
+  reaches 10 ticks: the walker waits, follows or gives way with the blocker's name. It routes round a
+  moving blocker only after 4 s (`STUCK_TICKS`), the safeguard against someone jittering in place.
+  Tests: `movement.test.ts` (stationary blocker, moving blocker).
+- **One blocked stretch, one clock (W15).** The stretch, and its decision clock, ends only when the walker
+  is under way again: faster than 0.15 m/s (`CREEP_SPEED`) or 0.2 m further along the corridor
+  (`BLOCK_PROGRESS`). Before W15, one tick of creeping (0.06 m/s, 3 mm) between two blocked ticks reset the
+  clock. In the lab campfire, x1 crept round g3 at the separation limit for 79 ticks this way before
+  anything decided.
 - **Back-off.** If a replan did not free the walker, the next attempt waits 1, 2, 4, 8, 16 s (at most
-  6 attempts, `MAX_PEOPLE_REPLANS`). A blocker that keeps moving is waited for, with its name, up
-  to 4 s before routing round it anyway.
-- **Fewer obstacles.** If routing round everyone fails because the walker is walled in by people who
-  are not blocking it (a fire ring filling up), it routes round only the people who blocked it.
-  This fallback runs only when the failure names such a person: a structural failure, such as an
-  unfinished stair, never pays for a second search.
+  6 attempts, `MAX_PEOPLE_REPLANS`).
+- **Squeeze (W15; replaces "fewer obstacles").** `routeAround` names the people and loads behind a failure
+  in `diagnostic.subjects` (`RouteOpts.nameObstacles`, `spatial/path.ts`):
+  - the people who crowd the start or goal within the snap distance;
+  - the people who separate the region the search exhausted from other free space (walled in);
+  - the people at the approach of a stair that would connect that region.
+
+  If the failure names a person, the walker routes round the same people again, each planned as an
+  octagon of inradius 0.22 m instead of a 0.3 m square (`SQUEEZE_HALF`):
+  - with the 0.1 m raster, a person then blocks planning to 0.61–0.78 m from their centre instead of
+    0.60–0.875 m, still outside the 0.54 m separation;
+  - a diagonal gap between two people needs ≈ 1.56 m instead of 1.75 m.
+
+  A structural failure (geometry, an unfinished stair) names nobody and is never searched twice.
+  Before W15, `findRoute` only ever put link ids in `subjects`, so the old fallback (route round only the
+  people who blocked this stretch) never ran. Where it would have run, it walked the walker into the
+  people it left out: a campfire_circle walker routed round f5 alone went into f7. Test: `movement.test.ts`
+  (squeezed people-replan), `navigation.test.ts` (naming).
+- **Crowded start (W15).** `routeAround` lets the start snap up to 1 m (`RouteOpts.startTolerance`; default
+  0.5), so a walker standing in a gap between people plans from the nearest standable spot and steps out
+  first. The nearest cell is the same whatever the tolerance whenever one lies within 0.5 m.
 - **Idle people** in the way are also asked to make way (`makeWay`), as before.
 - **Geometry.** A `walk.obstacle` block forces a construction replan on the next tick.
+- **Who counts as walking (W15).** `isActiveWalker` is false for a walk that is blocked, and now also for one
+  at the end of its last leg (settling onto its goal, turning to face). Such a person is a standing obstacle
+  for the look-ahead, sidesteps and people-replans, and a 'static' encounter. Before, their yaw, rotating
+  in place, read as oncoming or crossing traffic, so walkers took a head-on passing offset into them.
 
 **Sidesteps round standing people.** The lateral target is the offset (±0.8 m, 0.1 m steps) with the
 most room at the encounter point: min(grid clearance − r, distance to every standing person −
 0.54 m). So a walker threads the middle of a 1.22 m gap between two people instead of stepping
 toward one of them. The sidestep is latched until the person is behind the walker, is released at
 the goal, and is reset by a new corridor. If the hard layer cancels a step only because of its
-lateral part, the forward part is kept and the offset holds.
+lateral part, the forward part is kept and the offset holds. A new standing person met while the side is
+latched may change the target but never flips the side while the latched person is still alongside (W15).
+Two people flanking the way (a slot between neighbours in a ring) used to flip it every tick as each became
+the nearer encounter; the walker jittered ±0.05 m and stopped on alternate ticks.
+
+**Walker-walker encounters on the smoothed path (W15).** follow / head-on / crossing are measured against
+the line the walker will actually walk: the smoothed path over the next 2.5 m (`LOOK`), sampled every
+0.1 m, shifted by its current lateral offset and anchored at its body. A person's `along` is the arc length
+to the nearest sample (plus the projection there), `lateral` is their distance from the path, and the kind
+compares the other walker's heading with the path tangent where they meet. That heading is the chord of the
+other walker's own smoothed path over its next ~1 s (`ENC_TIME`), or its yaw if it has no path. On a
+straight path this is exactly the old measure. The head-on side choice (`onRight`), `roomToPass` (local
+normals at both passing spots) and the pass latch (`stillPassing`) use the same geometry.
+`encounterOf(rt, walkId)` exposes it for tests.
+- A walker coming back along the path just past a bend is head-on, though it is outside the old
+  straight-tangent band.
+- A person dead ahead of the current tangent, where the path has already turned away, is no encounter.
+
+Tests (`movement.test.ts`): head-on in the 1 m passage on curved approaches, crossing at a block corner (6
+staggers; they meet at 0.71–1.06 m, pushes 0, stalls 0), and the two cases above.
 
 **Vehicles.** A walker whose position or next 1.5 s of path comes within 1.5 m of a vehicle being
 driven slows to 0.5 m/s (a speed cap only: never a stop, so no standoff with the truck, which stops
@@ -168,12 +217,17 @@ people-replans from ~90 ms to ~9 ms. The +10–25 % rehearsal figure did not rep
   geometrically. The sharp fallback happens only for very short legs, near-reversals, and
   half-cell clearance quantisation. The adversarial test therefore shows the clearance check
   rejecting the wide arcs, not a full fallback.
-- **Walker-walker encounters.** These are still the old follow / head-on / crossing rules on the
-  current tangent, not the smoothed path ahead.
+- **Walker-walker encounters.** They use the smoothed path ahead (W15). The other walker's heading is a 1 s
+  chord of its path, not a prediction of where it will be when they meet: there is still no time-to-collision
+  model. Head-on round a tight corner is decided by the single-file traffic rule, not by the encounter: a
+  path hugging a wall runs through single-file cells.
 - **Emergency stop.** Stopping at once when something appears inside ~0.8 m at walking speed is
   abrupt (velocity to 0 in one tick; position is continuous). It is what the spec asks for; a
   one-step physical stop is not modelled.
 - **Vehicles.** A vehicle counts as "being driven" when its rider's action is active and not
   blocked. There is no velocity model.
-- **Crowd jams.** When a walker is walled in by a crowd that never moves, it still waits with a
-  named reason after the backed-off attempts. It never squeezes below the 0.54 m separation.
+- **Crowd jams.** When a walker is walled in by a crowd that never moves, and even the squeezed plan finds no
+  gap, it waits with a named reason after the backed-off attempts. It never goes below the 0.54 m separation.
+  With 0.1 m cells, a gap of 1.08–1.5 m between two people (enough for a body, e.g. neighbours on an
+  8-place fire ring 1.22 m apart) cannot be planned through at some angles. The look-ahead and sidestep can
+  still walk it, but a replan cannot.

@@ -203,3 +203,33 @@ Then: gate → release 5; HANDOFF refresh.
   `Math.hypot` (intrusion / encounter / occupant / stairBlocker); swapping it for `dist2` may move hashes by ulps.
 - **W11 landed** `719ba10`, `ccd6839`, `fad3ccc`, `dfcaa93`, `67a9a00` (≈330k tokens, 45 min): one entity snapshot per walk step (Object.keys+index), `proveUnreachable` reverse flood (failing people-replan 90 → 9 ms), typed-array `narrow()`, `explainUnusable` skip; stress-30 mean 0.70 → 0.49 ms, campus crop compute 5.5 → 4.8 s; all five pins bit-identical (3/3 alternating runs), `walk-perf.test.ts` + `deploy/perf-walk.mjs`. Not met hash-identically: exact max tick (tick 5 = 27 synchronous A* ≈ 90 ms; corridor planner or spread submit-time planning would fix it but move hashes). W4's "+10–25 % compute" did not reproduce (host load). Lead review: accepted. Findings → W15: the fewer-obstacles fallback never fires (`findRoute` puts only link ids in `subjects`), explaining W9's 3.5 s wait; `walk.ts` uses host `Math.hypot` (source-scan test doesn't cover hypot).
 - W15 spawned (engine walk.ts behaviour, one re-pin): fallback fix, `Math.hypot` → `dist`/`dist2` + scan covers hypot, walker-vs-walker on the smoothed path, stationary-blocker decision ≤ 0.5 s.
+- **W15 landed** (engine walker behaviour, one re-pin; MOVEMENT.md §2, PLANNING_BUDGET.md §6 "walker fallback + hypot + encounters on the smoothed path"):
+  - **§3 ≤ 0.5 s decisions.** The lab-social x1 wait was not the missing fallback: its walk_to crept 3 mm on alternate ticks
+    between two ring neighbours. The static sidestep flipped side every tick (g3 +0.8 / g2 −0.2), and every creeping tick
+    reset the decision clock. It decided after 79 ticks (1030 → 1109) and was warm at 63.3 s.
+    - Now a blocked stretch ends only at > 0.15 m/s or 0.2 m of progress.
+    - The sidestep never flips while its person is alongside.
+    - x1 walks steadily, stops once behind g2 (tick 1053), replans 9 ticks later and is warm at 58.2 s (tick 1163).
+  - **Fallback made real.** `findRoute` names the people / loads behind a failure (`RouteOpts.nameObstacles`, additive,
+    `b7dd62e`): crowding start / goal, walling in the exhausted region, at a needed stair's approach; structural failures
+    name nobody. The old "route round only the blockers" walked walkers into the others once it could fire (campfire_circle
+    f8 → f7). It is replaced by a squeezed replan: everyone as 0.22 m octagons, never planned inside the 0.54 m separation.
+    `routeAround` lets a crowded start snap up to 1 m.
+  - **Arrived walkers count as standing.** A walker at the end of its route, turning to face, used to be classed as
+    oncoming / crossing by its rotating yaw.
+  - **Encounters on the smoothed path.** follow / head-on / crossing use the path ahead (2.5 m, 0.1 m samples, at the current
+    offset) and the other walker's 1 s path chord; the result equals the old measure on straight paths. `encounterOf` test hook.
+  - **hypot.** `core/math.ts` `hypot` (√ of a sum of squares); `dist2` / `len2` and all 149 former host `Math.hypot` calls in 55
+    `engine/**` files (core/math.ts and tests included) use it. The core.test source scan now bans `Math.hypot` (pow / exp / log were already
+    banned).
+  - **Tests.** 8 new (movement: stationary blocker ×3 activities, moving blocker, campfire x1, squeezed replan, curved-passage
+    head-on, corner crossing, encounters-follow-the-path; navigation: naming).
+  - **Re-pinned once**, 0 violations and the same discrete outcome everywhere:
+    - probe 10693 → 10729, campus 11227 → 11316, meal 631 → 626, v3 16237 → 16230;
+    - year-build 41019 → 41182 and whole house 116477 → 117125 (66/66);
+    - stress-30, and G by 1 ulp.
+  - **Open.**
+    - `**` (host pow) remains in 14 non-test engine lines, not scanned: grid / path / vehicles / social nearest-cell squares, take
+      metrics, camera quality, solar, stance, invariants, fragile, sun, hash (2 ** 32, exact).
+    - 1.08–1.5 m gaps between people are walkable but not plannable at 0.1 m cells.
+    - Head-on round a tight corner is decided by the single-file traffic rule, not by the encounter.
