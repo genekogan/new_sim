@@ -88,7 +88,7 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
     const subjects = sampler(t);
     scored.push(ids, Object.fromEntries(ids.map((id) => [id, subjects[id] ? subjectPoints(subjects[id]) : undefined])));
     const pose = evaluateShot(spec, sampler, t, { aspect: opts.aspect, safeBottom: opts.safeArea?.bottom });
-    const row: (Candidate | null)[] = new Array(K).fill(null);
+    const row: (Candidate | null)[] = Array.from({ length: K }, () => null);
     for (const c of candidates(world, pose, subjects, ids, sopts)) row[VARIANT_KEYS.indexOf(c.key)] = c;
     table.push(row);
     const d = row[0]!;
@@ -117,9 +117,9 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
 
   // 3. Viterbi (ties → lower key index = VARIANTS priority)
   const D: number[][] = [cost[0].slice()];
-  const back: number[][] = [new Array(K).fill(-1)];
+  const back: number[][] = [Array.from({ length: K }, () => -1)];
   for (let i = 1; i < N; i++) {
-    const di = new Array(K).fill(INF), bi = new Array(K).fill(-1);
+    const di = Array.from({ length: K }, () => INF), bi = Array.from({ length: K }, () => -1);
     for (let k2 = 0; k2 < K; k2++) {
       const c2 = table[i][k2];
       if (!c2) continue;
@@ -135,7 +135,7 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
     }
     D.push(di); back.push(bi);
   }
-  const keys = new Array(N).fill(0);
+  const keys = Array.from({ length: N }, () => 0);
   for (let k = 1; k < K; k++) if (D[N - 1][k] < D[N - 1][keys[N - 1]]) keys[N - 1] = k;
   for (let i = N - 1; i > 0; i--) keys[i - 1] = Math.max(0, back[i][keys[i]]);
 

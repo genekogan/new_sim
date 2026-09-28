@@ -154,7 +154,8 @@ function centreAt(s: ResolvedSubject, sampler: Sampler, t: number, t0: number, t
 const hfovOf = (fov: number, aspect: number) => 2 * datan(dtan((fov * DEG) / 2) * aspect);
 
 function reframe(pose: CameraPose, top: Vec3 | null, d: CameraDirection, aspect: number, safeBottom: number): CameraPose {
-  let { position, target } = pose;
+  const { position } = pose;
+  let { target } = pose;
   const f = d.framing ?? {};
   const v = sub(target, position);
   const dist = len(v);
@@ -881,7 +882,7 @@ function synthFly(intent: ShotIntent, ctx0: SynthContext, prev: PrevPose | undef
   const vcap = Math.min(speedCap, d.speed ?? (d.duration === undefined ? DEFAULT_SPEEDS.fly : speedCap));
   const wcap = 0.85 * MOTION_CAPS.viewOmegaDeg * DEG, acap = 0.85 * MOTION_CAPS.accel;
   const n = dense.length;
-  const vmax = new Array(n).fill(vcap);
+  const vmax = Array.from({ length: n }, () => vcap);
   // signed view rotation per metre (rotation vector κ, rad/m), smoothed over ±0.5 m; ω = |κ|·v and
   // dω/dt ≈ κ'·v² + κ·a, so v ≤ ω_cap/|κ| and v ≤ √(½·α_cap/|κ'|)
   const kap: Vec3[] = dense.map(() => [0, 0, 0]);

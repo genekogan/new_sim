@@ -292,7 +292,7 @@ export function chapterShots(o: ChapterShotOpts): ChapterShotPlan {
     // off the line, then other heights (people under a deck read only from low down: 10° and 5° before steeper
     // angles); the same people as the last shot start wider off the line (no jump cut)
     const cands: ShotSpec[] = [];
-    for (const el of [...new Set([el0, 10, 5, 22, el0 + 15])])
+    for (const el of new Set([el0, 10, 5, 22, el0 + 15]))
       for (const off of again ? [65, -65, 30, -30, 0, 105, -105, 145, -145, 180] : [30, -30, 0, 65, -65, 105, -105, 145, -145, 180])
         cands.push({ kind: 'frameGroup', subjects, padding, azimuth: base + side * off * DEG, elevation: el * DEG });
     let spec = cands[0], best = 1;

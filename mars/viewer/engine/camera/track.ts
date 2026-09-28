@@ -52,7 +52,7 @@ function checkTrack(file: TakeFileWithCameras, track: unknown, key: string): Cam
 export function withFileCamera<F extends TakeFileWithCameras>(file: F, track: CameraTrack): F {
   checkTrack(file, track, track.id);
   if (track.id === file.camera.id) throw new Error(`camera track ${track.id} is the file's planned camera`);
-  const all: TakeFileCameras = { ...(file.cameras ?? {}), [track.id]: structuredClone(track) };
+  const all: TakeFileCameras = { ...file.cameras, [track.id]: structuredClone(track) };
   return { ...file, cameras: Object.fromEntries(Object.keys(all).sort().map((k) => [k, all[k]])) };
 }
 
