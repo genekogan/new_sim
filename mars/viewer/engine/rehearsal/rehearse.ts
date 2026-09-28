@@ -139,8 +139,8 @@ export function physicalDiff(a: WorldState, b: WorldState): PhysicalDiff {
     const fields = [...new Set([...Object.keys(ea[id]), ...Object.keys(eb[id])])].sort().filter((k) => stableStringify(ea[id][k]) !== stableStringify(eb[id][k]));
     if (fields.length) out.changed.push({ id, fields });
   }
-  const ra = new Map(pa.regions.map((r) => [String(r[0]), stableStringify(r)]));
-  const rb = new Map(pb.regions.map((r) => [String(r[0]), stableStringify(r)]));
+  const ra = new Map(pa.regions.map((r) => [r[0] as string, stableStringify(r)]));
+  const rb = new Map(pb.regions.map((r) => [r[0] as string, stableStringify(r)]));
   for (const id of [...new Set([...ra.keys(), ...rb.keys()])].sort()) if (ra.get(id) !== rb.get(id)) out.regions.push(id);
   for (const k of Object.keys(pa).sort())
     if (!['base', 'entities', 'regions'].includes(k) && stableStringify(pa[k]) !== stableStringify(pb[k])) out.other.push(k);
