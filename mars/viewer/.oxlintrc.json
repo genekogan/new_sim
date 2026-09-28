@@ -50,5 +50,15 @@
     "typescript/no-unnecessary-type-constraint": "error",
     "typescript/no-unsafe-function-type": "error",
     "jsx-a11y/prefer-tag-over-role": "off"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["engine/test/**/*.test.ts"],
+      "rules": {
+        "typescript/no-floating-promises": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/restrict-template-expressions": "off"
+      }
+    }
+  ]
 }

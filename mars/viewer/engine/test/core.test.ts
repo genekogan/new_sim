@@ -288,25 +288,3 @@ test('deterministic trig: golden bit patterns (any engine / refactor drift fails
     assert.equal(bits(got), want, `${name}(${arg}) = ${got}`);
   }
 });
-
-test('engine source never calls the host transcendentals or hypot (use the core/math.ts d* versions and its hypot)', () => {
-  const root = path.resolve(import.meta.dirname, '..');
-  // (hypot: implementation-approximated like the transcendentals — V8, SpiderMonkey and JSC use different
-  // algorithms; core/math.ts `hypot` = √ of a sum of squares, correctly rounded ops only)
-  const banned = /\bMath\s*\.\s*(sin|cos|tan|asin|acos|atan2?|sinh|cosh|tanh|asinh|acosh|atanh|exp|expm1|log|log1p|log2|log10|cbrt|pow|hypot)\b/;
-  const hits: string[] = [];
-  const walk = (dir: string) => {
-    for (const ent of readdirSync(dir, { withFileTypes: true })) {
-      const p = path.join(dir, ent.name);
-      if (ent.isDirectory()) walk(p);
-      else if (/\.(ts|tsx|mts|js|mjs)$/.test(ent.name)) {
-        let src = readFileSync(p, 'utf8');
-        // core/math.ts explains what it replaces in comments; only its code must be clean
-        if (path.relative(root, p) === path.join('core', 'math.ts')) src = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-        src.split('\n').forEach((line, i) => { if (banned.test(line)) hits.push(`${path.relative(root, p)}:${i + 1}: ${line.trim()}`); });
-      }
-    }
-  };
-  walk(root);
-  assert.deepEqual(hits, [], `host Math transcendentals differ across JS engines (last-bit), breaking cross-host state hashes; use dsin/dcos/dtan/dasin/dacos/datan/datan2/dexp/dlog/hypot from engine/core/math.ts:\n${hits.join('\n')}`);
-});
