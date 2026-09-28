@@ -948,3 +948,4 @@ Then: gate → release 5; HANDOFF refresh.
   - One person per frame face per height band (0.31 m apart otherwise).
   - No runtime make-way for the givers.
   - Sloped framing only plan-tested.
+- 13:55 EDT lead: merged head `c27c2d4` (W31 + W35 + W36 on main) — tsc clean, engine 383 / 380 / 0 fail / 3 skip on a clean run (one wall-clock flake under worker load on the first run, not reproduced). In flight: W37 (studio chapter-set playback), W38 (chiba/kitchen/west-house A+B). Next: per-house chapter takes → gate → release 7 (checkpoint 1).
