@@ -264,7 +264,10 @@ protected `mars-2022` checkpoint, through each rule's stated physical placement.
   reach, body-gap, path-blocked, fasten-reach, follow-on-beam …).
 - `install_stringer`, `install_stair_part`, `install_wall` (setpart.ts engine): explicit holders with local grips and
   stations, optional hand-off to a deck crew, tip-up for standing sheets, per-role support rules, fasteners in reach;
-  invariants `kitPartHandsInReach`, `kitPartsSupported`.
+  invariants `kitPartHandsInReach`, `kitPartsSupported`. **Bystanders (W27):** while the lift crew moves the part
+  (tip-up, walk-in, set), anyone else whom a lifter's feet would come within 2r + 0.08 m of (and closer than now), in the
+  next 1.2 m of foot travel, stops the crew: it holds the part (`setpart.path-occupied`, blocked) and an idle person is
+  asked to step aside (`makeWay`, as the carry verb does). Before, set-part checked feet only against the static grid.
 - `climb_stair` / `leave_stair` (builders on the treads already built; `stairWorkOk`), `step_onto_beam` (deck → walkway,
   to climb down), `stack_offcut` (offcuts onto the scrap pile by the station).
 
@@ -288,7 +291,14 @@ Sections run one after the other from snapshots (each 0 violations): A 117 277 t
 102 287; S 84 136; W 68 331; P+END 15 635 → ≈ 579 000 ticks ≈ 8 h simulated.
 Default suite: first bay + its first ground-floor deck strip (3 pieces cut, notched, offcuts stacked, pushed in):
 221 steps, 53 604 ticks, 0 violations, ~14 s wall, pinned `94db263e…`.
-Full A+B end to end (YEAR_BUILD_FULL=1): see PROGRESS (W13) for the latest result.
+**Full A+B end to end (YEAR_BUILD_FULL=1, W27): 1552 steps, 600 599 ticks ≈ 8.3 h simulated, 0 violations, settled,
+pinned `ddb634d6…` (~13 min wall); matched at 1 cm / 1°: phase A 66 parts, phase B 145 (81 deck pieces, 25 wall
+panels, 6 stringers, 16 tread boards, 6 posts, 2 handrails, 6 rails, 3 panels; max 0.25 mm); unplaced 19 (solar 14, stair 5).** W13's run had 37 ticks of `collision.human-human` in the walls section. m2,
+lifting wall panel p5 of wall 113aa87d in (`s1417-install-wall`: tip-up, then walk-in), passed 0.48 m from m6, who was
+idle outside the +x side since the stair section. The carry that brought the panel had checked its set-down spots. The
+set-part walk-in checked the lift crew's feet only against the static grid, so people were not obstacles. With the
+bystander rule above, that step waits 17 ticks while m6 steps aside; it is the only wait in the whole house. Every other
+step status matches the unguarded run.
 Matched by kind (sequenced Kit components): frames 12, beams 54, deck strips 27 (81 pieces), walls 4 (25 panels),
 stair 16 of 21 (6 stringers + 16 tread boards for 8 treads, 6 posts, 2 handrails), solar 6 of 20 (3 panels + cells).
 Unplaced 19, each with its reason: 2 rail posts inside the end frame, 3 risers (a 6.5 cm sliver; two in slots between
@@ -309,8 +319,9 @@ parameters fit the 2022 rack-house template only; other years need more sheet sp
 and module sizes.
 
 ## What phase C needs
-- the full A+B end-to-end pin; a director-run take per house / year (mars-take/4) with camera tracks and the studio
-  "Watch it being built" for phase B; the other three 2022 houses run (they plan with the same rules);
+- a director-run take per house / year (mars-take/4) with camera tracks (the east-house A+B: see PROGRESS W27 for its
+  take / size); the other three 2022 houses run (they plan with the same rules); idle crew parked against each section's
+  carry paths (today they are moved by make-way when a carry or set-part needs the ground);
 - install_panel side stations (solar.ts) — 7 of 10 modules wait on it; a lengthwise insertion for risers; a post rule
   at the end frame; notching / seating decks below the column tops (or a Kit decision) for the panels over frame lines;
 - rules for other years: deck layouts that are not whole-foot on beams, wall heights, stair templates (12–41 treads),

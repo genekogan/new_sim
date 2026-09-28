@@ -18,6 +18,14 @@ import { buildingFootprint } from '../campus/bom.ts';
 import { yearBuildPlan, yearBuildScene } from '../campus/sequence.ts';
 import { WorldHistory } from '../history/store.ts';
 import { kitStringerGeometry } from '../world/catalog-phase-b.ts';
+import { Runtime } from '../runtime/runtime.ts';
+import { humanHumanSeparation, humanStaticClearance } from '../runtime/invariants.ts';
+import { Spatial } from '../spatial/service.ts';
+import { emptyWorld, human, component } from '../world/factory.ts';
+import { walkTo } from '../locomotion/walk.ts';
+import { setPartVerb } from '../construction/setpart.ts';
+import { openGround } from './frame-fixtures.ts';
+import type { ActionDef } from '../actions/types.ts';
 
 const kinds = (xs: { kind: string }[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x.kind] = (m[x.kind] ?? 0) + 1), m), {});
 
@@ -72,6 +80,41 @@ test('year build 2022, report only: the other three rack houses plan through the
   console.log(`[year-build B 2022 report-only] ${JSON.stringify(out)}`);
 });
 
+// W27: the A+B run's walls section had m2, lifting a wall panel in (install_wall's tip-up / walk-in), pass 0.48 m from an
+// idle m6 — the set-part engine checked the lift crew's feet against the static grid only. Now the crew holds the part
+// and waits for anyone its feet would come within 2r + 0.08 m of (as the carry verb does); an idle person makes way.
+test('set-part lift crews never walk through a bystander: the crew holds the part (setpart.path-occupied) and an idle person in the way is asked to step aside; 0 violations', () => {
+  const verb = setPartVerb('install_test', 'test sheet', () => ({ kind: 'resting-on', supports: ['ground'] }), (d) => d === 'plywood-4x8', 'test-only set-part verb');
+  const lift = [{ actor: 'a', grip: [0, 0.01, -0.55] as [number, number, number], stand: [0, 0, -0.4] as [number, number, number] }, { actor: 'b', grip: [0, 0.01, 0.55] as [number, number, number], stand: [0, 0, 0.4] as [number, number, number] }];
+  const runWith = (c: [number, number]) => {
+    const w = emptyWorld('open', openGround());
+    const sh = component('sh', 'plywood-4x8', [0, 0, 0], 0, { phase: 'staged' });
+    sh.support = { kind: 'ground' };
+    w.entities.sh = sh;
+    w.entities.a = human('a', 0, -1.3);
+    w.entities.b = human('b', 0, 1.3);
+    w.entities.c = human('c', c[0], c[1]); // idle, on b's way (b walks along z ≈ 0.96 from x 0 to 3)
+    const rt = new Runtime(w, new Map<string, ActionDef>([[walkTo.verb, walkTo as ActionDef], [verb.verb, verb as ActionDef]]), { spatial: new Spatial(openGround()) }, [humanHumanSeparation, humanStaticClearance]);
+    const r = rt.submit('install_test', { part: 'sh', to: { x: 3, y: 0, z: 0, yaw: 0 }, from: { x: 0, y: 0.75, z: 0 }, lift, fasten: ['a'] });
+    const waits = new Set<string>();
+    for (let t = 0; t < 20 * 120 && rt.isActive(r.id); t++) { rt.step(); if (r.status === 'blocked') waits.add(r.diagnostic!.code); }
+    return { rt, r, waits };
+  };
+  const inWay = runWith([1.5, 1.0]);
+  assert.equal(inWay.r.status, 'completed');
+  assert.deepEqual(inWay.rt.violations, [], JSON.stringify(inWay.rt.violations.slice(0, 2)));
+  assert.deepEqual([...inWay.waits], ['setpart.path-occupied']);
+  assert.ok([...inWay.rt.records.keys()].some((k) => k.startsWith('c:make-way:')), 'c was asked to make way');
+  assert.equal(inWay.rt.world.entities.sh.phase, 'installed');
+  assert.ok(Math.abs(inWay.rt.world.entities.sh.pose.p[0] - 3) < 1e-9);
+  // nobody near the way: no wait, nobody moved
+  const clear = runWith([5, 5]);
+  assert.equal(clear.r.status, 'completed');
+  assert.deepEqual(clear.rt.violations, []);
+  assert.deepEqual([...clear.waits], []);
+  assert.deepEqual(clear.rt.world.entities.c.pose.p, [5, 0, 5]);
+});
+
 /** Pinned: the first-bay tranche + its first ground-floor deck strip (default suite). */
 const PIN_BAY1_DECK = { ticks: 53604, hash: '94db263edb961cb21d491445e7d9401be0f3a7609a287680ed1052a6b67d73cb' };
 
@@ -101,8 +144,9 @@ test('year build 2022 east-house, first bay + its first ground-floor deck strip 
   }
 });
 
-/** Pinned: the whole east-house A+B (YEAR_BUILD_FULL=1). */
-const PIN_FULL_AB = { ticks: 0, hash: '' };
+/** Pinned: the whole east-house A+B (YEAR_BUILD_FULL=1). First pin 2026-09-29 (W27): green once set-part lift crews wait for
+ *  bystanders (s1417-install-wall holds its panel 17 ticks while an idle m6 steps aside); 8.3 h simulated. */
+const PIN_FULL_AB = { ticks: 600599, hash: 'ddb634d6e73d99e679421ceecaaec20a0936643d25dc33845082dd6a4ecdf30a' };
 
 test('year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1)', { skip: process.env.YEAR_BUILD_FULL !== '1' }, () => {
   const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { phaseB: {} });

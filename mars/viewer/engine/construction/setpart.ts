@@ -34,6 +34,7 @@ import { crewCheck, f2, fail, lerpPose, smooth, spatialOf, sweepPoses, type Fail
 import { isKitUpright, isStanding, isSupported } from './rules.ts';
 import { envelopeGap, GIVE_MAX, REACH_DOWN, setHands, T } from './handup.ts';
 import { BODY_MODEL, restHands } from '../body/model.ts';
+import { makeWay } from '../locomotion/walk.ts';
 import { flatObb, isPlywood } from './deck.ts';
 import { deckSurfaces } from './contributor.ts';
 import type { Contributor } from '../spatial/service.ts';
@@ -390,6 +391,58 @@ function release(rt: Runtime, ids: string[]) {
   }
 }
 const ease = (s: Seg) => s.phase === 'lift' || s.phase === 'set' || s.phase === 'reach_up';
+const segPose = (seg: Seg, k: number): Pose => (seg.phase === 'crouch' || seg.phase === 'reach_down' || seg.phase === 'take' ? seg.from : lerpPose(seg.from, seg.to, ease(seg) ? smooth(k) : k));
+
+/** Where lift-crew member i stands holding the part at pose q (as `hold` places them). */
+function liftFeet(rt: Runtime, ex: Exec, i: number, q: Pose): Vec2 {
+  const l = ex.p.lift[i];
+  if (l.stand) { const s = localToWorld(q, [l.grip[0] + l.stand[0], l.grip[1] + l.stand[1], l.grip[2] + l.stand[2]]); return [s[0], s[2]]; }
+  const g = localToWorld(q, l.grip);
+  return [g[0] + ex.prog.delta[i][0], g[2] + ex.prog.delta[i][1]];
+}
+/** Separation the lift crew keeps from anyone else (the human-human invariant is 2r − 0.08; + 0.08 margin, as carry). */
+const BYSTANDER_GAP = 2 * HUMAN_PROFILE.radius + 0.08;
+const BYSTANDER_AHEAD = 1.2; // m of foot travel looked ahead
+/**
+ * A person not taking part in this set-part whom the lift crew's feet would come within BYSTANDER_GAP of (and closer than
+ * now) during the rest of the current segment, up to BYSTANDER_AHEAD of foot travel: the crew never walks through anyone
+ * (the carry verb's rule, carry/actions.ts pathBystander). Same level, within 1 m in height (the invariant's test).
+ */
+function liftBystander(rt: Runtime, ex: Exec, seg: Seg, k: number): { who: string; at: Vec2 } | null {
+  const w = rt.world;
+  const everyone = new Set(everyoneIds(ex.p));
+  const lifters = ex.p.lift.map((l) => w.entities[l.actor]);
+  const others = Object.values(w.entities).filter((o) => o.kind === 'human' && o.human && !everyone.has(o.id)).sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (!others.length) return null;
+  const q0 = segPose(seg, k);
+  const now = lifters.map((_, i) => liftFeet(rt, ex, i, q0));
+  const N = 12;
+  for (let m = 1; m <= N; m++) {
+    const kk = k + ((1 - k) * m) / N;
+    const q = segPose(seg, kk);
+    for (const [i, h] of lifters.entries()) {
+      const f = liftFeet(rt, ex, i, q);
+      if (dist2(f, now[i]) > BYSTANDER_AHEAD) continue;
+      for (const o of others) {
+        if (o.human!.level !== h.human!.level || Math.abs(o.pose.p[1] - h.pose.p[1]) > 1.0) continue;
+        const op: Vec2 = [o.pose.p[0], o.pose.p[2]];
+        const d = dist2(f, op);
+        if (d < BYSTANDER_GAP && d < dist2(now[i], op) - 1e-9) return { who: o.id, at: f };
+      }
+    }
+  }
+  return null;
+}
+/** True when a person standing at q is clear of the lift crew's feet for the rest of the program (makeWay's clearOf). */
+function clearOfLift(rt: Runtime, ex: Exec, q: Vec2): boolean {
+  if (!rt.isActive(ex.id)) return true;
+  for (let s = Math.max(0, ex.si); s < ex.prog.segs.length; s++) {
+    const seg = ex.prog.segs[s];
+    if (seg.who !== 'lift' || !seg.follow) continue;
+    for (let m = 0; m <= 8; m++) for (let i = 0; i < ex.p.lift.length; i++) if (dist2(liftFeet(rt, ex, i, segPose(seg, m / 8)), q) < BYSTANDER_GAP + 0.1) return false;
+  }
+  return true;
+}
 
 export function stepSetPart(rt: Runtime, ex: Exec, dt: number): StepResult {
   const w = rt.world;
@@ -411,9 +464,19 @@ export function stepSetPart(rt: Runtime, ex: Exec, dt: number): StepResult {
   }
   if (ex.si < prog.segs.length) {
     const seg = prog.segs[ex.si];
+    if (seg.who === 'lift' && seg.follow) {
+      // someone in the lift crew's way: hold the part and wait; an idle bystander is asked to step aside
+      const k0 = seg.dur > 0 ? Math.min(1, ex.t / seg.dur) : 1;
+      const by = liftBystander(rt, ex, seg, k0);
+      if (by) {
+        const crew = ex.p.lift.map((l) => l.actor);
+        makeWay(rt, by.who, by.at, { by: `the crew setting ${e.id}`, subjects: [e.id, ...crew], test: (q) => clearOfLift(rt, ex, q) });
+        return { status: 'blocked', diagnostic: { code: 'setpart.path-occupied', message: `the crew setting ${e.id} holds it and waits for ${by.who} to move out of its way (${seg.phase})`, subjects: [e.id, by.who, ...crew], at: [by.at[0], e.pose.p[1], by.at[1]] } };
+      }
+    }
     ex.t += dt;
     const k = seg.dur > 0 ? Math.min(1, ex.t / seg.dur) : 1;
-    const q = seg.phase === 'crouch' || seg.phase === 'reach_down' || seg.phase === 'take' ? seg.from : lerpPose(seg.from, seg.to, ease(seg) ? smooth(k) : k);
+    const q = segPose(seg, k);
     if (seg.phase === 'lift' && e.phase !== 'carried') {
       e.phase = 'carried';
       e.support = { kind: 'held', by: ex.p.lift.map((l) => l.actor) };
