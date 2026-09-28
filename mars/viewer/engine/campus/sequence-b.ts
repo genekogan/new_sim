@@ -29,7 +29,7 @@ import type { PartB, PartsB, UnplacedB } from './parts-b.ts';
 import type { Yard } from './bom.ts';
 
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
-const BEAM_HALF = 0.0254, PLY_T = 0.01905;
+const BEAM_HALF = 0.0254, PLY_T = 0.01905, SHEET_HALF = 0.6096;
 export const SECTIONS = ['D0', 'D1', 'D2', 'S', 'W', 'P', 'END'] as const;
 export type Section = (typeof SECTIONS)[number];
 
@@ -55,6 +55,8 @@ export type PhaseBCtx = {
   narrowMinusU: (v: number) => boolean;
   /** The same beyond the +u end (W38): a strip's middle piece then goes in from the −u side, when that side is open. */
   narrowPlusU?: (v: number) => boolean;
+  /** W38: is this ground plot clear of the build scene's obstacles reaching 0.5–1.3 m (tables, walls)? */
+  groundFree?: (o: { c: Vec2; half: Vec2; yaw: number }) => boolean;
   /** Crew positions at the start of phase B when run from a snapshot (sections only). */
 };
 export type PhaseBResult = { sequenced: { node: string; kind: string; steps: string[] }[]; unplaced: UnplacedB[]; done: string[]; sectionStarts: { section: Section; at: number }[] };
@@ -169,6 +171,11 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     return s0 > 0 && (p.meta.piece as number) < (p.meta.of as number) && ctx.narrowPlusU?.(vc(p)) && !ctx.narrowMinusU(vc(p)) ? -1 : s0;
   };
   const uc = (p: PartB) => Lc([p.pose.p[0], p.pose.p[2]])[0];
+  // W38 (PROVISIONAL): over a narrow +u side a piece one person can handle (≤ 12 kg, the carry rule above) has ONE giver,
+  // standing at its outer end on the strip's centre line (two would stand beside a neighbour's stair: chiba / west-house);
+  // a heavier one is held by its sides
+  const oneGiver = (p: PartB) => def(p.def).massKg <= 12;
+  const narrowGivers = (p: PartB, narrowP: boolean) => (narrowP && oneGiver(p) ? [C(G[0])] : G.map(C));
   const vc = (p: PartB) => Lc([p.pose.p[0], p.pose.p[2]])[1];
   const levelId = (y: number) => Math.round(y / 0.5);
   // the order within a strip: the middle piece before the outer piece on its side (it is fed over that side's area)
@@ -209,7 +216,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         const who2 = f2nd.actor === C(G[0]) ? [] : [recv === a0 ? a1 : a0];
         const pu = step('pass_up', {
           part: p.id, to: { x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(p.y) }, edge: r3(side < 0 ? -edge : edge), out: { x: W(side, 0)[0], z: W(side, 0)[1] },
-          givers: G.map(C), receivers: [C(recv)], receiverAt: [{ x: qa[0], z: qa[1], level: 0 }], give: r3(p.y + 0.05), push: true, fasten: [f2nd], ...(narrowP ? { side: true } : {}),
+          givers: narrowGivers(p, narrowP), receivers: [C(recv)], receiverAt: [{ x: qa[0], z: qa[1], level: 0 }], give: r3(p.y + 0.05), push: true, fasten: [f2nd], ...(narrowP && !oneGiver(p) ? { side: true } : {}),
         }, [...G, recv, ...who2], [f], `push ${p.id} in over the edge beam; ${C(recv)} takes it in the aisle; screwed down`);
         mark(p, pu);
       }
@@ -379,9 +386,9 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       if (cfg.relay !== null) { const uq = side < 0 ? uMin + 0.31 : uMax - 0.31; const q = W(uq, safeV(vc(p), uq)); relayAt = [{ x: q[0], z: q[1], level: levelId(cfg.relayY!) }]; }
       const pu = step('pass_up', {
         part: p.id, to: { x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(yTop) }, edge: r3(side < 0 ? -edge : edge), out: { x: outV[0], z: outV[1] },
-        givers: G.map(C), ...(cfg.relay !== null ? { relay: [C(cfg.relay)], relayAt } : {}), receivers: [C(recv)], ...(recvAt ? { receiverAt: [recvAt], ...(follow ? { follow: true } : {}) } : {}),
+        givers: narrowGivers(p, narrowP), ...(cfg.relay !== null ? { relay: [C(cfg.relay)], relayAt } : {}), receivers: [C(recv)], ...(recvAt ? { receiverAt: [recvAt], ...(follow ? { follow: true } : {}) } : {}),
         // screwed down where it lies: by the receiver and a second person, or by the receiver alone when nobody else reaches it
-        fasten: fz !== null ? [{ actor: C(fz), ...(fzAt ? { at: fzAt } : {}) }] : [], ...(narrowP ? { side: true } : {}),
+        fasten: fz !== null ? [{ actor: C(fz), ...(fzAt ? { at: fzAt } : {}) }] : [], ...(narrowP && !oneGiver(p) ? { side: true } : {}),
       }, [...G, recv, ...(fz !== null ? [fz] : []), ...(cfg.relay !== null ? [cfg.relay] : [])], [f, ...pre], `pass ${p.id} up${cfg.relay !== null ? ' through the relay' : ''} to ${yTop.toFixed(2)} m; screwed down${fz !== null ? '' : ' by the receiver alone'}`);
       mark(p, pu);
       all.push(pu);
@@ -453,13 +460,20 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     for (const it of pending) skip(it.p, 'placed but nobody could reach it to fasten');
     return { seat, deckLv, last: all.slice(-1), down: stayed };
   };
-  if (secs.has('D1') && levels.length > 1) {
+  // W38 (PROVISIONAL): the D1 / D2 crews go up the stair-end frames (line K−1) and move along the beam walkways of that
+  // bay; a level whose strips do not reach the stair-end bay (kitchen 2022: a 3-strip roof deck over bay 0, 7 m away) is
+  // not reachable that way — every piece of it is reported unplaced (starting a level from the other end is not modelled)
+  const reachable = (lv: number) => Math.max(...stripsOf(lv)) + SHEET_HALF >= lineV(K - 2) - 1e-6;
+  const unreachable = (lv: number) => { for (const p of decks.filter((x) => x.meta.level === lv)) unplaced.push({ node: p.nodes[0], kind: 'feature:deck-sheet', reason: `this deck level's strips cover only frame lines up to v ${r3(Math.max(...stripsOf(lv)) + SHEET_HALF)} m, short of the stair-end bay (from ${r3(lineV(K - 2))} m): the upper-deck crews climb only the stair-end frames and walk one beam's walkway, so nobody reaches it (a level laid from the other end is not modelled)` }); };
+  if (secs.has('D1') && levels.length > 1 && !reachable(levels[1])) unreachable(levels[1]);
+  if (secs.has('D2') && levels.length > 2 && !reachable(levels[2])) unreachable(levels[2]);
+  if (secs.has('D1') && levels.length > 1 && reachable(levels[1])) {
     begin('D1');
     const r = upperDeck({ lv: levels[1], relay: null, up: [2, 3, 4, 5] });
     if (r) climbDown(KE, r.seat, r.down, r.down.map((m) => uWalk[[2, 3, 4, 5].indexOf(m)]), r.last);
   }
   const relayY = levels.length > 1 ? piecesOf(levels[1], stripsOf(levels[1])[0])[0].y + PLY_T : 0;
-  if (secs.has('D2') && levels.length > 2) {
+  if (secs.has('D2') && levels.length > 2 && reachable(levels[2]) && reachable(levels[1])) {
     begin('D2');
     // the relay kneels on the first-floor deck (up the end frame and off its beam); the roof crew climbs to the roof beams
     const s1 = seatOf(levels[1]);
@@ -496,7 +510,21 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const a = localToWorld(p.pose, g1), b = localToWorld(p.pose, g2);
       const off = rot2([0, 1], 0); void off;
       const sc = sOf(p.pose.p[0], p.pose.p[2]);
-      const lie = S(sc - 1.6, lat); // along its own line, mostly under the stair site (only 1.5 m of ground lies beyond its foot here)
+      // along its own line, mostly under the stair site, 1.6 m back (only 1.5 m of ground lies beyond its foot here); W38
+      // (PROVISIONAL): less where the ground beyond the foot is taken (kitchen 2022: west-house's table 1.5 m out), down to
+      // where its top end would pass its installed top end; none clear → unplaced with the reason
+      // and, where even that is taken, shifted up to 0.4 m inward (toward the stair's centre line: ground still free, the
+      // stringers go in from the +lat side first) — the lift crew carries it the rest of the way sideways
+      const inward = lat < lat0 ? 1 : -1;
+      const back = (() => {
+        for (let d = 0; d <= 4; d++) for (let k = 16; k >= 4; k--) {
+          const x = k / 10, dl = inward * d / 10;
+          if (ctx.groundFree?.({ c: S(sc - x, lat + dl), half: [L / 2, 0.15], yaw: yawDir }) ?? true) return { x, dl }; // the stringer's own lying footprint
+        }
+        return null;
+      })();
+      if (back === null) { unplaced.push({ node: p.nodes[0], kind: 'feature:stair-part', reason: `no clear ground to lay stringer ${p.id} near its line before it is set (the ground beyond the stair foot is taken)` }); continue; }
+      const lie = S(sc - back.x, lat + back.dl);
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(yawDir) }, G);
       if (!f) continue;
       const at = (q: number[]) => { const o = [q[0] + axis[0] * nextFree, q[2] + axis[1] * nextFree]; return { x: r3(o[0]), z: r3(o[1]) }; };

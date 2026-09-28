@@ -372,6 +372,7 @@ type BE = {
 };
 export const WALK_IN = 0.6; // m/s: lifters walking a beam in along an aisle, in single file
 export const WALK_IN_MAX = 25; // m along the aisle axis
+const WALK_AHEAD = 1.2, WALK_GAP = 2 * HUMAN_RADIUS + 0.08; // W38: bystanders on the walk-in
 
 /** Beam pose: centre height `yc`, lateral offset `off` from the seat line, `s` along it from the bay (m). */
 function beamPose(g: Geo, yc: number, off: number, s = 0): Pose {
@@ -606,6 +607,29 @@ export const hangBeam: ActionDef<BP, Geo, BE> = {
         if (move(Math.abs(ex.s) > 1e-9 ? g.walkY : g.groundY + 1.0, 1.0 / LIFT_S)) { setHolders(ex.holders, Math.abs(ex.s) > 1e-9 ? 'walk-load' : 'reach_up'); next(afterLift()); }
         return { status: 'running', phase: 'lift' };
       case 'walk': {
+        // W38 (PROVISIONAL, as set-part W27 / raise W38): nobody is walked through — within the next WALK_AHEAD m of the
+        // lifters' way, a person outside the crew nearer than 2r + 0.08 m (and nearer than now): the lifters hold the beam
+        // and an idle person is asked to step aside (kitchen 2022: m2 walking a beam in passed 0.35 m from an idle m3)
+        {
+          const st0 = g.mode === 'ground' ? g.hookSt : g.giveSt;
+          const crew = new Set([...p.installers, ...(p.givers ?? []), ...(p.relay ?? [])]);
+          const others = Object.values(w.entities).filter((o) => o.kind === 'human' && o.human && !crew.has(o.id) && o.human.level === 0 && !o.human.on).sort((x, y) => (x.id < y.id ? -1 : 1));
+          const sg = Math.sign(-ex.s);
+          const ahead = Math.min(Math.abs(ex.s), WALK_AHEAD);
+          for (const [i, x] of ex.holders.entries()) {
+            const now: Vec2 = [st0[i][0] + g.axis[0] * (ex.s - g.s0), st0[i][1] + g.axis[1] * (ex.s - g.s0)];
+            for (let k = 1; k <= 6; k++) {
+              const s1 = ex.s + sg * ahead * k / 6;
+              const q: Vec2 = [st0[i][0] + g.axis[0] * (s1 - g.s0), st0[i][1] + g.axis[1] * (s1 - g.s0)];
+              const o = others.find((y) => dist(xz(y), q) < WALK_GAP && dist(xz(y), q) < dist(xz(y), now) - 1e-9);
+              if (o) {
+                const way = (z: Vec2) => { for (let m = 0; m <= 12; m++) { const s2 = ex.s + (0 - ex.s) * m / 12; for (const t of st0) if (dist([t[0] + g.axis[0] * (s2 - g.s0), t[1] + g.axis[1] * (s2 - g.s0)], z) < WALK_GAP + 0.1) return false; } return true; };
+                makeWay(rt, o.id, q, { by: `the crew walking ${beam.id} in`, subjects: [beam.id, ...crew], test: way });
+                return { status: 'blocked', diagnostic: { code: 'hang.path-occupied', message: `${x.id} holds ${beam.id} and waits for ${o.id} to move out of the aisle`, subjects: [beam.id, o.id, x.id], at: [q[0], g.groundY, q[1]] } };
+              }
+            }
+          }
+        }
         // the lifters carry it in single file along the aisle axis, their bodies moving with their grips
         const d = Math.min(Math.abs(ex.s), WALK_IN * dt) * Math.sign(-ex.s);
         ex.s += d;

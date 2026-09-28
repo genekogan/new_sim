@@ -147,7 +147,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   const grid = new Map(frames.map((f) => [`${f.k},${f.r}`, f]));
   const frameById = new Map(frames.map((f) => [f.node.id, f]));
   // beams by bay (k, r), column side (canonical l / r of frame (k, r)), seat
-  type Bm = { node: AsmNode; k: number; r: number; col: 'l' | 'r'; seat: number };
+  type Bm = { node: AsmNode; k: number; r: number; col: 'l' | 'r'; seat: number; colG: 'l' | 'r' };
   const beams: Bm[] = [];
   for (const b of nodes.filter((x) => x.kind === 'beam')) {
     const es = g.edges.filter((e) => e.from === b.id && e.rel === 'connects-to');
@@ -158,7 +158,9 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     }
     const lo = fs[0].k < fs[1].k ? 0 : 1;
     const col = es[lo].socket!.startsWith('coll') ? 'l' : 'r';
-    beams.push({ node: b, k: fs[lo].k, r: fs[0].r, col, seat: b.seat! });
+    // W38: the column in the canonical yaw of the GEOMETRICALLY lower frame (phase B's frame of reference; = col unless reversed)
+    const colG = es[1 - lo].socket!.startsWith('coll') ? 'l' : 'r';
+    beams.push({ node: b, k: fs[lo].k, r: fs[0].r, col, seat: b.seat!, colG: dir === 1 ? col : colG });
   }
   // engine yaw of each frame after its raise: lying heading φ − π/2 (line 0 lies toward −n, later lines toward +n)
   const phiOf = (k: number) => datan2(k === 0 && line0Out ? -n[1] : n[1], k === 0 && line0Out ? -n[0] : n[0]);
@@ -327,9 +329,10 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     resB = phaseB({
       assembly, parts: partsB, step, C, yard, scrap: scrap ? { id: scrap.id, x: scrap.x, z: scrap.z, yaw: scrap.yaw } : null, left, spotClear,
       // phase B works on the finished skeleton in geometric line order (k along +n0), whatever the build direction
-      frames: frames.map((f) => ({ id: f.node.id, k: dir === 1 ? f.k : K - 1 - f.k, r: f.r, c: f.c, def: f.node.def! })), beams: beams.map((b) => ({ id: b.node.id, k: dir === 1 ? b.k : K - 2 - b.k, r: b.r, col: b.col, seat: b.seat })),
-      engCol, Y, sections: opts.phaseB.sections, count: () => S.length, lastSteps: () => [...new Set(last.values())].sort(),
+      frames: frames.map((f) => ({ id: f.node.id, k: dir === 1 ? f.k : K - 1 - f.k, r: f.r, c: f.c, def: f.node.def! })), beams: beams.map((b) => ({ id: b.node.id, k: dir === 1 ? b.k : K - 2 - b.k, r: b.r, col: b.colG, seat: b.seat })),
+      engCol: (kg, col) => engCol(dir === 1 ? kg : K - 1 - kg, col), Y, sections: opts.phaseB.sections, count: () => S.length, lastSteps: () => [...new Set(last.values())].sort(),
       narrowMinusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomMinusU(nodes.find((x) => x.id === nd.node)!, scene); },
+      groundFree: (o) => !scene.obstacles.some((x) => x.y1 > 0.5 && x.y0 < 1.3 && obbOverlap(x.obb, o)), // tables, walls (not low beams a load clears)
       narrowPlusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomPlusU(nodes.find((x) => x.id === nd.node)!, scene); },
     });
     for (const x of resB.sequenced) done.set(x.node, x.steps);

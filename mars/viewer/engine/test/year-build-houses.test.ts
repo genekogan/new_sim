@@ -22,7 +22,7 @@ const FILE = loadCampusFile(2022);
 const PLANS: Record<string, { steps: number; far: number; sequenced: Record<string, number>; unplaced: Record<string, number> }> = {
   chiba: { steps: 1462, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 2, upright: 12 }, unplaced: { 'feature:fixture': 16, 'feature:solar': 14, 'feature:stair-part': 5, 'feature:wall': 5 } },
   'east-house': { steps: 1552, far: 0, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 4, upright: 12 }, unplaced: { 'feature:solar': 14, 'feature:stair-part': 5 } },
-  kitchen: { steps: 1325, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 21, 'feature:stair-part': 16, 'feature:wall': 3, upright: 12 }, unplaced: { 'feature:door': 1, 'feature:fixture': 79, 'feature:roof': 10, 'feature:stair-part': 5, 'feature:wall': 1 } },
+  kitchen: { steps: 1240, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 18, 'feature:stair-part': 16, 'feature:wall': 3, upright: 12 }, unplaced: { 'feature:deck-sheet': 3, 'feature:door': 1, 'feature:fixture': 79, 'feature:roof': 10, 'feature:stair-part': 5, 'feature:wall': 1 } },
   'west-house': { steps: 1480, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 3, upright: 12 }, unplaced: { 'feature:fixture': 5, 'feature:solar': 14, 'feature:stair-part': 5, 'feature:wall': 1 } },
 };
 
@@ -81,6 +81,8 @@ test('year build 2022, all four houses A+B: plans through the same rules — cou
   const c = yearBuildHouseSetup(2022, 'chiba', FILE).build.unplaced.filter((u) => u.kind === 'feature:wall');
   assert.equal(c.filter((u) => /"screen( bezel)?" has no material rule/.test(u.reason)).length, 4);
   assert.equal(c.filter((u) => /wall height 2\.300 m/.test(u.reason)).length, 1);
+  // kitchen's roof deck (3 strips over bay 0) is out of the upper-deck crews' reach from the stair end: reported, not faked
+  assert.equal(yearBuildHouseSetup(2022, 'kitchen', FILE).build.unplaced.filter((u) => u.kind === 'feature:deck-sheet' && /short of the stair-end bay/.test(u.reason)).length, 3);
   // deterministic: same plan hash from a fresh setup
   assert.equal(yearBuildHouseSetup(2022, 'kitchen', FILE).plan.planHash, yearBuildHouseSetup(2022, 'kitchen', FILE).plan.planHash);
   // east-house's pinned A+B (year-build-b.test.ts) keeps the v1 yard: two of its piles lie in a neighbour's work zone
