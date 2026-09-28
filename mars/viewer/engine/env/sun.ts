@@ -145,8 +145,8 @@ export function parseLocalDateTime(iso: string): LocalDateTime {
  * outside [0, 1440) roll the calendar date forward/back (sunrise/noon/sunset never
  * cross midnight at this latitude, but this keeps the function honest). */
 function formatLocalDateTime(year: number, month: number, day: number, minutesOfDay: number): string {
-  let dayShift = Math.floor(minutesOfDay / 1440);
-  let m = ((minutesOfDay % 1440) + 1440) % 1440;
+  const dayShift = Math.floor(minutesOfDay / 1440);
+  const m = ((minutesOfDay % 1440) + 1440) % 1440;
   let y = year, mo = month, d = day + dayShift;
   while (d < 1) {
     mo -= 1;

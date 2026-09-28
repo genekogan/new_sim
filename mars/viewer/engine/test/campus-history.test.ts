@@ -222,7 +222,7 @@ test('Chiba 2024 edit: untouched pieces keep their ids; replaced pieces are gone
   assert.ok(Math.abs(x - (W2 + 0.045)) < 0.01 && z1 - z0 > 1.15, `door opening ${z0.toFixed(2)}–${z1.toFixed(2)} at x ${x}`);
   // nothing stands in the opening between the floor and the header (a real gap, for walkers and the camera)
   const inGap = (o: (typeof door)[number]) => o.y0 < 2.1 && o.y1 > 0.3 && Math.abs(o.obb.c[0] - x) < 0.15 + hypot(o.obb.half[0], o.obb.half[1]) && o.obb.c[1] + hypot(o.obb.half[0], o.obb.half[1]) > z0 + 0.05 && o.obb.c[1] - hypot(o.obb.half[0], o.obb.half[1]) < z1 - 0.05;
-  const blockers = Y(2024).base.obstacles.filter((o) => inGap(o) && !/^chiba-solarium-door-jamb/.test(o.id)).filter((o) => {
+  const blockers = Y(2024).base.obstacles.filter((o) => inGap(o) && !o.id.startsWith('chiba-solarium-door-jamb')).filter((o) => {
     const scene = { ...asScene(2024), obstacles: [o] } as SpatialScene;
     const g = buildGrids(scene, 0.05).levels.get(0)!;
     return [0.2, 0.4, 0.6, 0.8].some((f) => !g.free[g.nx * Math.round((z0 + f * (z1 - z0) - g.z0) / g.cell) + Math.round((x - g.x0) / g.cell)]);
