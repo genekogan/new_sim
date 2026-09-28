@@ -5,6 +5,8 @@
 //   node deploy/record-campus-take.mjs --scenario build-bay-v3        # flagship v3 on the same campus site
 //   node deploy/record-campus-take.mjs --scenario year-build-2022     # 2022 east-house, first bay (year scene)
 //   node deploy/record-campus-take.mjs --all                          # every scenario, in manifest order
+//   node deploy/record-campus-take.mjs --scenario year-build-2022-house  # 2022 east-house, whole house A+B (opt-in)
+//   ... --all --full                                                  # --all plus the opt-in whole-house take(s)
 //   ... --check                                                       # re-record and compare with the manifest (no writes)
 // Writes public/engine/takes/<file> and merges the scenario's entry into public/engine/takes/manifest.json.
 // `takes` lists what the 2026 studio can replay (flagship first: the studio e2e uses takes[0]); takes recorded
@@ -28,7 +30,7 @@ import { WorldHistory } from '../engine/history/store.ts';
 import { Spatial, entityFootprint } from '../engine/spatial/service.ts';
 import { bindTemplate } from '../engine/sequence/bind.ts';
 import { rehearse } from '../engine/rehearsal/rehearse.ts';
-import { replayFinalState, takeDuration } from '../engine/take/replay.ts';
+import { blockedWaits, expandEvents, replayFinalState, takeDuration } from '../engine/take/replay.ts';
 import { TakeLibrary } from '../engine/take/store.ts';
 import { readCampus2026File } from '../engine/campus/node.ts';
 import { loadCampusFile } from '../engine/campus/history-node.ts';
@@ -60,7 +62,7 @@ const check = process.argv.includes('--check');
 function timeline(take, plan) {
   const steps = [];
   const byId = new Map();
-  for (const e of take.events) {
+  for (const e of expandEvents(take.events)) { // mars-take/4 folds same-tick lifecycles: expand them back
     if (e.type !== 'action' || !e.id.startsWith('step:')) continue;
     const id = e.id.slice(5);
     let s = byId.get(id);
@@ -231,6 +233,7 @@ const SCENARIOS = {
   'year-build-2022': {
     file: 'year-build-2022-east-house-bay1.json',
     list: 'otherYears',
+    kind: 'year-build',
     year: 2022,
     label: '2022 east-house skeleton, first bay, from the piles (HYPOTHETICAL build scenario — not historical)',
     note: 'Year build phase A (YEAR_BUILD.md): a fork of protected mars-2022, the east-house removed and rebuilt from a hypothetical pile yard by a generic crew of six; first bay = the suite tranche (6 frames, 18 beams), every part checked against the checkpoint pose. Coordinates are the 2022 year frame with ground at the Kit datum y = 0 (the year files draw ground at -0.16 m). Order, piles and crew are hypothetical.',
@@ -281,6 +284,31 @@ const SCENARIOS = {
         bay: Math.floor(duration / 2) * 2,
       };
     },
+  },
+};
+
+// The whole 2022 east-house, phase A + B (skeleton, decks, stair, walls, solar; year-build-b.test.ts, YEAR_BUILD_FULL):
+// opt-in (`--full` or `--scenario year-build-2022-house`) — a ~2 h rehearsal, unpinned until year-build-b pins it.
+SCENARIOS['year-build-2022-house'] = {
+  ...SCENARIOS['year-build-2022'],
+  file: 'year-build-2022-east-house.json',
+  optIn: true,
+  label: '2022 east-house, the whole house from the piles (HYPOTHETICAL build scenario — not historical)',
+  note: 'Year build phases A + B (YEAR_BUILD.md): a fork of protected mars-2022, the east-house removed and rebuilt from a hypothetical pile yard by a generic crew — skeleton, decks, stair, walls, solar — every sequenced part checked against the checkpoint pose. Coordinates are the 2022 year frame with ground at the Kit datum y = 0. Order, piles and crew are hypothetical.',
+  limit: 6 * MB,
+  pin: undefined,
+  run() {
+    const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { phaseB: {} });
+    const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
+    mustBeClean(reh, 'year build 2022 east-house A+B');
+    const fp = buildingFootprint(s.graph.nodes.filter((n) => n.assembly === 'east-house'));
+    const site = { origin: fp.c, yaw: fp.yaw ?? 0, groundY: s.build.groundY, half: fp.half };
+    return { reh, plan: s.plan, site, scene: s.scene, campus: 'mars-2022', crew: s.build.bindings.crew };
+  },
+  shots(ctx) {
+    const l = SCENARIOS['year-build-2022'].shots(ctx);
+    l[l.length - 1] = { ...l[l.length - 1], label: 'the east-house standing' };
+    return l;
   },
 };
 
@@ -365,6 +393,7 @@ function record(name) {
     planHash: take.planHash,
     rulesVersion: take.rulesVersion,
     takeSchema: take.schema,
+    ...(S.kind ? { kind: S.kind } : {}),
     cameraTrack: track.id,
     camera: {
       shots: shots.length,
@@ -380,10 +409,11 @@ function record(name) {
       safeAreaBottom: SAFE_BOTTOM,
     },
     violations: take.events.filter((e) => e.type === 'violation').length,
-    blockedWaits: take.events.filter((e) => e.type === 'action' && e.status === 'blocked').length,
+    blockedWaits: blockedWaits(take.events), // merged repeated waits (mars-take/4) count n times
     moments,
     bytes,
     gzipBytes: gz,
+    takeBytes: Buffer.byteLength(JSON.stringify(take)),
     thinned: false,
   };
 
@@ -394,7 +424,8 @@ function record(name) {
   console.log(`simulated    ${duration.toFixed(1)} s (${take.ticks} ticks), ${entities} entities, ${steps.length} steps, rehearsal ${(tSim / 1000).toFixed(1)} s`);
   console.log(`camera       ${track.id}: ${shots.length} shots, ${cam.report.samples} samples @ ${HZ} Hz, ${cam.report.cuts.length} cuts, readability min ${cam.report.minReadability.toFixed(2)} mean ${cam.report.meanReadability.toFixed(2)} readable ${(cam.report.readableFraction * 100).toFixed(1)}%, invalid ${cam.report.invalidSamples}, crossings ${cam.report.sweptCrossings}${cam.report.rejected ? ' REJECTED' : ''}, planned in ${(tCam / 1000).toFixed(1)} s`);
   for (const s of cam.shots) console.log(`  ${s.t0.toFixed(1).padStart(7)}–${s.t1.toFixed(1).padEnd(7)} ${s.label}: min read ${s.report.minReadability.toFixed(2)}, ${s.report.cuts.length} cuts, ${s.report.corrections.length} corrections${s.report.reasons[0] ? ` — ${s.report.reasons[0]}` : ''}`);
-  console.log(`payload      ${bytes} B = ${kb(bytes)} (gzip ${kb(gz)}): take ${kb(Buffer.byteLength(JSON.stringify(take)))}, camera ${kb(Buffer.byteLength(JSON.stringify(track)))}`);
+  const part = (k) => kb(Buffer.byteLength(JSON.stringify(take[k] ?? null)));
+  console.log(`payload      ${bytes} B = ${kb(bytes)} (gzip ${kb(gz)}): take ${kb(Buffer.byteLength(JSON.stringify(take)))} (gzip ${kb(gzipSync(JSON.stringify(take), { level: 9 }).length)}; tracks ${part('tracks')}, changes ${part('changes')}, events ${part('events')}, finalState ${part('finalState')}, entities0 ${part('entities0')}), camera ${kb(Buffer.byteLength(JSON.stringify(track)))}`);
   console.log(`moments      ${JSON.stringify(moments)}`);
   if (bytes > S.limit) throw new Error(`${name}: take payload ${bytes} bytes > ${S.limit / MB} MB: thin replay samples / camera rate before shipping`);
   if (cam.report.rejected) throw new Error('camera plan rejected (invalid samples or swept crossings): ' + cam.report.reasons.filter((r) => /REJECTED/.test(r)).join('; '));
@@ -402,7 +433,8 @@ function record(name) {
 }
 
 const ORDER = Object.keys(SCENARIOS);
-const names = process.argv.includes('--all') ? ORDER : [argOf('--scenario') ?? 'flagship'];
+const full = process.argv.includes('--full');
+const names = process.argv.includes('--all') ? ORDER.filter((n) => full || !SCENARIOS[n].optIn) : [argOf('--scenario') ?? 'flagship'];
 // each scenario fails loudly on its own; --all still records (and writes) the ones that complete, then exits non-zero
 const failed = [];
 const results = names.flatMap((n) => {

@@ -13,7 +13,7 @@ import { rehearse, execute } from '../rehearsal/rehearse.ts';
 import { TakeRecorder, takeIdOf } from '../take/recorder.ts';
 import { replayFinalState, sampleTake, takeDuration, takeEvents } from '../take/replay.ts';
 import { TakeLibrary } from '../take/store.ts';
-import { TAKE_SCHEMA, type Take } from '../take/types.ts';
+import { ANG_Q, POS_Q, TAKE_SCHEMA, TRACK_TOL, type Take } from '../take/types.ts';
 import { config, crossBindings, crossTemplate, minuteBindings, minuteTemplate, pgHistory, pgWorld, registry, RULES } from './sequence-fixtures.ts';
 
 function recordMinute() {
@@ -22,7 +22,7 @@ function recordMinute() {
   return { h, plan, ...rehearse(h, 'ws', plan, config()) };
 }
 
-test('take fidelity: sampling at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level', () => {
+test('take fidelity: sampling at every tick reproduces true poses within TRACK_TOL + ½ quantum (4.5 mm / 8.5 mrad, mars-take/4) and exact activity/level', () => {
   const h = pgHistory();
   const plan = bindTemplate(crossTemplate, crossBindings, { history: h, baseline: 'ws', registry: registry() });
   const c = config();
@@ -53,8 +53,8 @@ test('take fidelity: sampling at every tick reproduces true poses within 2 mm / 
       assert.equal(g.level, e.level);
     }
   }
-  assert.ok(worst <= 0.002, `max position error ${worst}`);
-  assert.ok(worstAng <= 0.002, `max yaw error ${worstAng}`);
+  assert.ok(worst <= (TRACK_TOL.pos + 0.5) / POS_Q + 1e-9, `max position error ${worst}`);
+  assert.ok(worstAng <= (TRACK_TOL.ang + 0.5) / ANG_Q + 1e-9, `max yaw error ${worstAng}`);
   // the recorder is detached after finish
   assert.ok(!rt.observers.includes(rec));
   // runtime events are carried with relative ticks

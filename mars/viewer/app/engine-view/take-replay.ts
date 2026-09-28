@@ -63,8 +63,12 @@ export type TakeReplayFile = {
 export const isYearBuild = (e: Pick<TakeManifestEntry, 'kind' | 'rulesVersion'>) => (e.kind ? e.kind === 'year-build' : /year-build/.test(e.rulesVersion ?? ''));
 export const TAKE_MANIFEST_URL = '/engine/takes/manifest.json';
 
-/** A take-log line for the diagnostics readout (failures, blocked waits, violations). */
-export type LogLine = { t: number; kind: 'violation' | 'failed' | 'blocked'; text: string };
+/** A take-log line for the diagnostics readout (failures, blocked waits, violations). `n`: repeated waits merged into
+ *  the line (mars-take/4 events), counted in the totals. */
+export type LogLine = { t: number; kind: 'violation' | 'failed' | 'blocked'; text: string; n?: number };
+
+/** The entity record the replay draws `id` from: the final state, else (mars-take/4) as first recorded (removed before the end). */
+const recordOf = (take: Take, id: string) => take.finalState.entities[id] ?? take.entities0?.[id];
 
 export async function loadTakeFile(url: string, signal?: AbortSignal): Promise<TakeReplayFile> {
   const r = await fetch(url, { signal });
@@ -124,7 +128,7 @@ export class TakePeople {
     this.base = opts.scene ?? EMPTY_SCENE;
     this.group.add(this.comps.group, this.fixtures.group, this.humans.group);
     for (const [id, s] of Object.entries(take.tracks)) {
-      if (take.finalState.entities[id]?.kind !== 'human') continue;
+      if (recordOf(take, id)?.kind !== 'human') continue;
       const cum = [0];
       for (let i = 1; i < s.length; i++) cum.push(cum[i - 1] + Math.hypot(s[i][1] - s[i - 1][1], s[i][3] - s[i - 1][3]) / POS_Q);
       this.walks.set(id, { ticks: s.map((x) => x[0]), cum, track: s });
@@ -169,7 +173,7 @@ export class TakePeople {
     const people: SampledHuman[] = [];
     const dt = this.take.dt, span = 0.15 / dt; // ±0.15 s speed window
     for (const [id, e] of Object.entries(frame.entities)) {
-      const src = this.take.finalState.entities[id];
+      const src = recordOf(this.take, id) as Entity | undefined; // pose / phase / contents below come from the frame
       if (!src) continue;
       const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; on?: string };
       if (src.kind === 'component') {
@@ -281,7 +285,7 @@ export class TakeReplay {
       if (e.type !== 'action') return [];
       const who = stepLabel.get(e.id) ?? e.id;
       if (e.status === 'failed') return [{ t, kind: 'failed', text: `${who} failed${e.code ? ` (${e.code})` : ''}${e.message ? `: ${e.message}` : ''}` }];
-      if (e.status === 'blocked') return [{ t, kind: 'blocked', text: `${who} waiting: ${e.code ?? 'blocked'}${e.message ? ` — ${e.message}` : ''}` }];
+      if (e.status === 'blocked') return [{ t, kind: 'blocked', text: `${who} waiting: ${e.code ?? 'blocked'}${e.message ? ` — ${e.message}` : ''}${e.n ? ` (×${e.n} until ${(e.until! * this.take.dt).toFixed(1)} s)` : ''}`, ...(e.n ? { n: e.n } : {}) }];
       return [];
     });
   }
@@ -362,7 +366,7 @@ export class TakeReplay {
       lines: upTo,
       violations: this.log.filter((l) => l.kind === 'violation').length,
       failed: this.log.filter((l) => l.kind === 'failed').length,
-      blocked: this.log.filter((l) => l.kind === 'blocked').length,
+      blocked: this.log.reduce((k, l) => k + (l.kind === 'blocked' ? (l.n ?? 1) : 0), 0),
     };
   }
 
@@ -384,8 +388,8 @@ export class TakeReplay {
       poseHash: hashOf(poses),
       shot: this.shotLabel(),
       track: this.trackInfo(),
-      /** Sampled now but not drawable: removed before the end (no final-state record → no def; e.g. an emptied pile). */
-      undrawable: Object.keys(f.entities).filter((id) => !this.take.finalState.entities[id]),
+      /** Sampled now but not drawable: no final-state record and no `entities0` (a pre-mars-take/4 take's emptied pile). */
+      undrawable: Object.keys(f.entities).filter((id) => !recordOf(this.take, id)),
       offsetY: this.offsetY,
     };
   }

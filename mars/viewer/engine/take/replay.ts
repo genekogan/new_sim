@@ -4,7 +4,7 @@
 import { hashOf } from '../core/hash.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { WorldState } from '../world/types.ts';
-import { ANG_Q, INTERP_FIELDS, POS_Q, SPEED_Q, type ChangeEvent, type PoseSample, type Take, type TakeEvent } from './types.ts';
+import { ANG_Q, INTERP_FIELDS, LIFECYCLE, POS_Q, SPEED_Q, type ChangeEvent, type PoseSample, type Take, type TakeEvent } from './types.ts';
 
 export type SampledEntity = {
   p: Vec3;
@@ -171,9 +171,29 @@ export function sampleTake(take: Take, t: number): TakeFrame {
 
 export const takeDuration = (take: Take) => take.ticks * take.dt;
 
-/** Runtime events with t0 ≤ time < t1 (seconds). */
+/**
+ * The event stream with mars-take/4 lifecycle runs (`from`) expanded back into one event per status, exactly as the
+ * runtime emitted them. Merged blocked waits (`n`, `until`) stay merged: one event per repeated wait. Pre-/4 events pass
+ * through unchanged. Fresh copies.
+ */
+export function expandEvents(events: TakeEvent[]): TakeEvent[] {
+  const out: TakeEvent[] = [];
+  for (const e of events) {
+    if (e.type !== 'action' || e.from === undefined) { out.push(structuredClone(e)); continue; }
+    const a = LIFECYCLE.indexOf(e.from as (typeof LIFECYCLE)[number]), b = LIFECYCLE.indexOf(e.status as (typeof LIFECYCLE)[number]);
+    for (let k = a; k >= 0 && k < b; k++) out.push({ t: e.t, type: 'action', id: e.id, verb: e.verb, status: LIFECYCLE[k] });
+    const { from: _f, ...last } = structuredClone(e);
+    out.push(last);
+  }
+  return out;
+}
+
+/** Blocked waits in an event stream, counting each merged wait (`n`) — the raw stream's number of `blocked` events. */
+export const blockedWaits = (events: TakeEvent[]) => events.reduce((k, e) => k + (e.type === 'action' && e.status === 'blocked' ? (e.n ?? 1) : 0), 0);
+
+/** Runtime events with t0 ≤ time < t1 (seconds), lifecycle runs expanded (`expandEvents`). */
 export function takeEvents(take: Take, t0 = 0, t1 = Infinity): TakeEvent[] {
-  return take.events.filter((e) => e.t * take.dt >= t0 && e.t * take.dt < t1).map((e) => structuredClone(e));
+  return expandEvents(take.events.filter((e) => e.t * take.dt >= t0 && e.t * take.dt < t1));
 }
 
 /** The recorded successor state (a fresh copy). Verifies it against the recorded hash. */
