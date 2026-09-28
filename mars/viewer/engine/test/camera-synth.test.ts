@@ -23,10 +23,12 @@ function ok(r: DirectResult): Extract<DirectResult, { ok: true }> {
 }
 const inWindow = (plan: Extract<DirectResult, { ok: true }>['plan'], t0: number, t1: number) => plan.samples.filter((s) => s.t >= t0 - 1e-6 && s.t <= t1 + 1e-6);
 
-test('(a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — planner validators pass', () => {
+test('(a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — through phase 2, planner validators pass', () => {
   const { take, input } = flagship();
   const at = onGrid(stepTimes(take).get('seat_b1')!.start); // beams, joists, deck: the crew works in and around the bay
-  const r = ok(directCamera([{ subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120, at, framing: { size: 'wide' } }], input));
+  // the computed orbit is simulated against the take and self-corrected (phase 2): the raw orbit's two samples with the
+  // uprights hidden by p1 / p2 (readability 0.56) are corrected by one recorded raise — see camera-correct.test.ts
+  const r = ok(directCamera([{ subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120, at, framing: { size: 'wide' } }], { ...input, correct: true }));
   const shot = r.shots[0];
   assert.equal(shot.t0, at);
   assert.equal(shot.t1, onGrid(at + 120));
@@ -37,6 +39,9 @@ test('(a) flagship: 270° orbit of the rack bay over 120 s with the crew moving 
   assert.equal(r.plan.report.sweptCrossings, 0);
   assert.equal(r.plan.report.rejected, false);
   assert.ok(rep.planner!.minReadability >= 0.6, `min readability ${rep.planner!.minReadability} (planner threshold 0.6)`);
+  assert.ok(rep.simulation!.valid, 'phase 2: valid on every sample');
+  assert.deepEqual(rep.corrections.map((c) => [c.failure, c.strategy, c.params]), [['occluded', 'raise', { heightOffset: 2.5 }]], 'the recorded correction');
+  assert.match(rep.corrections[0].reason, /person p2.*person p1/);
   assert.ok(rep.planner!.readableFraction >= 0.95, `readable fraction ${rep.planner!.readableFraction}`);
   assert.equal(rep.validation.invalidSamples, 0);
   const win = inWindow(r.plan, at, at + 120);

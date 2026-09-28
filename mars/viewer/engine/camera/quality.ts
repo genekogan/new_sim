@@ -88,6 +88,7 @@ export type ReadOpts = {
   minSize?: number; // min projected subject extent, fraction of frame height (default 0.08)
   safeBottom?: number; // fraction of frame height covered by UI at the bottom: points there are 'outside frame' (default 0)
   cutaway?: boolean; // inspection mode: ignore occluders (solids and people) entirely
+  ignore?: readonly string[]; // sampler ids whose capsules / part boxes do not occlude (phase 2: co-subjects); default none
   near?: number;
 };
 
@@ -127,7 +128,8 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
   const b = basis(cam, aspect);
   // occluders (sorted → deterministic naming): every human's capsule, every part's boxes
   const group = subjectGroup(subjects, ids);
-  const keys = opts.cutaway ? [] : Object.keys(subjects).sort();
+  const skip = opts.ignore?.length ? new Set(opts.ignore) : null;
+  const keys = opts.cutaway ? [] : Object.keys(subjects).sort().filter((k) => !skip?.has(k));
   const people = keys.filter((k) => subjects[k].kind === 'human').map((k) => ({ id: k, p: subjects[k].p, contacts: group.has(k) ? subjects[k].contacts ?? [] : null }));
   const parts = keys.flatMap((k) => (subjects[k].occluders ?? []).map((b) => ({ id: k, b })));
   const cr2 = CONTACT_RADIUS * CONTACT_RADIUS;

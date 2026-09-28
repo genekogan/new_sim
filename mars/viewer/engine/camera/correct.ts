@@ -26,11 +26,11 @@ export const LADDERS = {
 } as const;
 /** Failure kinds each strategy can address (a strategy is tried when it addresses at least one failure present). */
 export const ADDRESSES: Record<CorrectionStrategy, readonly FailureKind[]> = {
-  raise: ['collision', 'squeeze', 'foreground'],
-  widen: ['collision', 'squeeze', 'foreground', 'frame', 'horizon', 'motion'],
-  swing: ['collision', 'squeeze', 'foreground', 'flare'],
+  raise: ['collision', 'squeeze', 'foreground', 'occluded'],
+  widen: ['collision', 'squeeze', 'foreground', 'frame', 'occluded', 'horizon', 'motion'],
+  swing: ['collision', 'squeeze', 'foreground', 'flare', 'occluded'],
   reroute: ['collision', 'squeeze'],
-  shorten: ['collision', 'squeeze', 'foreground', 'flare', 'frame', 'horizon'],
+  shorten: ['collision', 'squeeze', 'foreground', 'flare', 'frame', 'occluded', 'horizon'],
   split: FAILURE_ORDER,
   cut: FAILURE_ORDER,
 };
@@ -202,7 +202,7 @@ export function correctShot(intent: ShotIntent, ctx: SynthContext, prev: PrevPos
     const attempts: { magnitude?: number; result: string }[] = [];
     const resynth = (over: SynthOverrides, magnitude?: number): { shot: SynthShot; sc: ShotScore } | null => {
       const mag = magnitude ?? (Object.values(over).find((v) => typeof v === 'number') as number | undefined);
-      const r = deps.synthesize(intent, ctx, prev, over);
+      const r = deps.synthesize(intent, ctx, prev, { ...(shot0.searchedHeading !== undefined ? { heading: shot0.searchedHeading } : {}), ...over });
       if (!r.ok) { attempts.push({ magnitude: mag, result: `refused: ${r.diagnostic.code}` }); return null; }
       const sc = simulate(r.shot, intent, ctx, deps);
       attempts.push({ magnitude: mag, result: resultText(sc) });

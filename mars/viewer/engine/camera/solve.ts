@@ -10,6 +10,8 @@ import { MIN_CLEARANCE, PERSON_HEIGHT, PERSON_RADIUS, placement, readability, ty
 import { segmentBox, type OccBox } from './occluders.ts';
 
 const DEG = Math.PI / 180;
+/** The id a shot's static focus points are scored under in phase 2's readability (the planner injects `focus:<i>`). */
+const FOCUS_ID = 'focus:sim';
 
 export type SolveOpts = {
   minClear?: number; // m (default 0.3)
@@ -193,25 +195,30 @@ export const FAILURE_LIMITS = {
   flareDeg: 6,
   /** At least this fraction of the subject's points must stay inside the frame (5 % margin, UI band) on every sample. */
   frameMin: 0.75,
+  /** The planner's readability threshold (`PlanOpts.minReadability` default): a sample whose subject readability — the
+   * planner's own `readability()`, the take's people and parts at that tick as occluders — is below it, still below it
+   * with the subjects' own bodies / parts ignored as occluders, while the same view without occluders (cutaway) is not,
+   * is occluded: something that is not the subject hides it. */
+  minReadability: 0.6,
   /** A look-at camera's roll is undefined near vertical: |pitch| above this loses the horizon (deg). */
   maxPitchDeg: 75,
   /** Explicit roll (a key's `roll`, rad) beyond this tilts the horizon (deg). */
   maxRollDeg: 1,
   /** Shortest failing run that counts (samples): a person brushing past for one frame is not a failure. */
-  minRun: { collision: 1, squeeze: 1, foreground: 3, flare: 1, frame: 3, horizon: 1, motion: 1 },
+  minRun: { collision: 1, squeeze: 1, foreground: 3, flare: 1, frame: 3, occluded: 1, horizon: 1, motion: 1 },
   /** A squeeze must be sustained — this much camera travel (m) or this long (s) — so passing a door's jambs is not one. */
   squeezeTravel: 0.3,
   squeezeHold: 0.5,
 } as const;
 
 /** Failure kinds in report / correction order (the first failure of the first kind drives the ranked corrections). */
-export const FAILURE_ORDER = ['collision', 'squeeze', 'foreground', 'flare', 'frame', 'horizon', 'motion'] as const;
+export const FAILURE_ORDER = ['collision', 'squeeze', 'foreground', 'flare', 'frame', 'occluded', 'horizon', 'motion'] as const;
 export type FailureKind = (typeof FAILURE_ORDER)[number];
 /** Penalty per failing sample (the scalar score is only for ranking / before-after reporting; validity = no failure). */
-export const FAILURE_WEIGHT: Record<FailureKind, number> = { collision: 100, squeeze: 10, foreground: 5, flare: 5, frame: 5, horizon: 3, motion: 3 };
+export const FAILURE_WEIGHT: Record<FailureKind, number> = { collision: 100, squeeze: 10, foreground: 5, flare: 5, frame: 5, occluded: 5, horizon: 3, motion: 3 };
 
 /** What `ShotFailure.worst` measures per kind. */
-const WORST_UNIT: Record<FailureKind, string> = { collision: ' samples', squeeze: ' m free', foreground: ' of the subject covered', flare: '° off axis', frame: ' of the points framed', horizon: '° pitch', motion: '°/s' };
+const WORST_UNIT: Record<FailureKind, string> = { collision: ' samples', squeeze: ' m free', foreground: ' of the subject covered', flare: '° off axis', frame: ' of the points framed', occluded: ' readability', horizon: '° pitch', motion: '°/s' };
 
 export type MotionCapsIn = { viewOmegaDeg: number; viewAlphaDeg: number; speed: number; accel: number };
 
@@ -237,6 +244,9 @@ export type ShotSim = {
   caps: MotionCapsIn;
   /** Frame check on (default). A fly-through looks along its route, not at the subject: off. */
   frame?: boolean;
+  /** Occlusion check (the planner's readability of `subjects` + `focus`); default = `frame` (a fly-through's subject
+   * may be behind a wall before it arrives: the planner reports that, phase 2 does not fail it). */
+  occlusion?: boolean;
 };
 
 export type SampleScore = {
@@ -252,6 +262,10 @@ export type SampleScore = {
   foreground?: { id: string; cover: number; distance: number };
   sunOffAxisDeg: number | null;
   framed: number;
+  /** The planner's readability of the subject at this sample (1 when the occlusion check is off or nothing is scored). */
+  readability: number;
+  /** Occluders (sampler ids / solid ids) of an occluded sample. */
+  occludedBy?: string[];
   pitchDeg: number;
   omegaDeg: number;
   alphaDeg: number;
@@ -268,7 +282,7 @@ export type ShotScore = {
   failingSamples: number;
   penalty: number;
   /** Worst value of each measured quantity over the shot (for the report). */
-  worst: { minFreeWidth: number; minPartClearance: number; maxForegroundCover: number; minSunOffAxisDeg: number | null; minFramed: number; maxAbsPitchDeg: number; maxOmegaDeg: number; maxAlphaDeg: number; maxSpeed: number; maxAccel: number };
+  worst: { minFreeWidth: number; minPartClearance: number; maxForegroundCover: number; minSunOffAxisDeg: number | null; minFramed: number; minReadability: number; maxAbsPitchDeg: number; maxOmegaDeg: number; maxAlphaDeg: number; maxSpeed: number; maxAccel: number };
 };
 
 const HDIRS: Vec3[] = [[1, 0, 0], [Math.SQRT1_2, 0, Math.SQRT1_2], [0, 0, 1], [-Math.SQRT1_2, 0, Math.SQRT1_2]];
@@ -375,6 +389,7 @@ export function scoreShot(sim: ShotSim): ShotScore {
   const samples: SampleScore[] = [];
   let prevW: number | null = null, prevV: number | null = null;
   const subjectSet = new Set(sim.subjects);
+  const readIds = [...sim.subjects, ...(sim.focus ? [FOCUS_ID] : [])];
   for (let i = 0; i < sim.keys.length; i++) {
     const k = sim.keys[i];
     const t = sim.t0 + k.t;
@@ -419,6 +434,26 @@ export function scoreShot(sim: ShotSim): ShotScore {
     for (const c of cs) if (c[2] > near && Math.abs(c[0]) <= c[2] * b.th * 0.95 && c[1] <= c[2] * b.tv * 0.95 && c[1] >= c[2] * b.tv * yMin) framedN++;
     const framed = cs.length ? framedN / cs.length : 1;
     if (sim.frame !== false && cs.length && framed < L.frameMin) fail('frame', `${Math.round((1 - framed) * 100)}% of the subject's points outside the frame`);
+    // occluded: the planner's own readability of the scored subjects (people and parts at this tick occlude), below its
+    // threshold where the same view without occluders is not (framing / size are other failures)
+    let read = 1, occludedBy: string[] | undefined;
+    if ((sim.occlusion ?? sim.frame !== false) && readIds.length) {
+      const cam = { position: p, target: k.target, fov: sim.fov };
+      const subj = sim.focus?.[i] ? { ...now, [FOCUS_ID]: { p: sim.focus[i][0], yaw: 0, points: sim.focus[i], kind: 'component' as const } } : now;
+      const ids2 = sim.focus?.[i] ? readIds : readIds.filter((x) => x !== FOCUS_ID);
+      const ro = { aspect: sim.aspect, safeBottom: sim.safeBottom };
+      const rd = readability(sim.world, cam, subj, ids2, ro);
+      read = r2(rd.score);
+      // a subject hidden by another subject (a crew member in front of another) is the group's own composition, not an
+      // obstruction: it fails only if what is not the subject is enough to push it under the threshold
+      const own = rd.score < L.minReadability ? readability(sim.world, cam, subj, ids2, { ...ro, ignore: ids2 }).score : 1;
+      const clear = own < L.minReadability ? readability(sim.world, cam, subj, ids2, { ...ro, cutaway: true }).score : 0;
+      if (own < L.minReadability && clear >= L.minReadability) {
+        const occ = rd.subjects.flatMap((q) => q.occluders.map((o) => `${q.id === FOCUS_ID ? 'the subject' : q.id} ${Math.round(o.fraction * 100)}% by '${o.label}'`));
+        occludedBy = [...new Set(rd.subjects.flatMap((q) => q.occluders.map((o) => o.id)))].sort();
+        fail('occluded', `readability ${r2(rd.score)} < ${L.minReadability} (${occ.join(', ')}); ${r2(clear)} without occluders`);
+      }
+    }
     // foreground blob: a person (not the subject) within 1.5 m of the camera over the subject's frame region
     let fg: SampleScore['foreground'];
     const front = cs.filter((c) => c[2] > near);
@@ -481,7 +516,7 @@ export function scoreShot(sim: ShotSim): ShotScore {
     const cap = sim.caps;
     if (w > cap.viewOmegaDeg + 0.5 || a > cap.viewAlphaDeg + 1 || v > cap.speed + 0.05 || acc > cap.accel + 0.1) fail('motion', `view ${r2(w)}°/s, ${r2(a)}°/s², camera ${r2(v)} m/s, ${r2(acc)} m/s² (caps ${cap.viewOmegaDeg}°/s, ${cap.viewAlphaDeg}°/s², ${cap.speed} m/s, ${cap.accel} m/s²)`);
     const fw = Math.min(fs.width, fs.vertical);
-    samples.push({ t: q6(t), position: p, freeWidth: fw === Infinity ? Infinity : r2(fw), ...(fs.by.length && fw < Infinity ? { squeezedBy: fs.by } : {}), ...(fs.slot && fails.includes('squeeze') ? { slot: fs.slot } : {}), partClearance: partClear === Infinity ? Infinity : r2(partClear), ...(fg ? { foreground: fg } : {}), sunOffAxisDeg: sunOff, framed: r2(framed), pitchDeg, omegaDeg: r2(w), alphaDeg: r2(a), speed: r2(v), accel: r2(acc), fails, why });
+    samples.push({ t: q6(t), position: p, freeWidth: fw === Infinity ? Infinity : r2(fw), ...(fs.by.length && fw < Infinity ? { squeezedBy: fs.by } : {}), ...(fs.slot && fails.includes('squeeze') ? { slot: fs.slot } : {}), partClearance: partClear === Infinity ? Infinity : r2(partClear), ...(fg ? { foreground: fg } : {}), sunOffAxisDeg: sunOff, framed: r2(framed), readability: read, ...(occludedBy ? { occludedBy } : {}), pitchDeg, omegaDeg: r2(w), alphaDeg: r2(a), speed: r2(v), accel: r2(acc), fails, why });
   }
   // failing runs per kind (runs shorter than minRun are transients)
   const failures: ShotFailure[] = [];
@@ -501,8 +536,8 @@ export function scoreShot(sim: ShotSim): ShotScore {
       if (counts) {
         const run = samples.slice(i, j + 1);
         const minW = Math.min(...run.map((s) => s.freeWidth));
-        const worst = kind === 'squeeze' ? (Number.isFinite(minW) ? minW : Math.min(...run.map((s) => s.partClearance))) : kind === 'foreground' ? Math.max(...run.map((s) => s.foreground?.cover ?? 0)) : kind === 'flare' ? Math.min(...run.map((s) => s.sunOffAxisDeg ?? 90)) : kind === 'frame' ? Math.min(...run.map((s) => s.framed)) : kind === 'horizon' ? Math.max(...run.map((s) => Math.abs(s.pitchDeg))) : kind === 'motion' ? Math.max(...run.map((s) => s.omegaDeg)) : run.length;
-        const who = [...new Set(run.flatMap((s) => (kind === 'foreground' && s.foreground ? [s.foreground.id] : kind === 'squeeze' && s.squeezedBy ? s.squeezedBy : [])))].sort();
+        const worst = kind === 'squeeze' ? (Number.isFinite(minW) ? minW : Math.min(...run.map((s) => s.partClearance))) : kind === 'foreground' ? Math.max(...run.map((s) => s.foreground?.cover ?? 0)) : kind === 'flare' ? Math.min(...run.map((s) => s.sunOffAxisDeg ?? 90)) : kind === 'frame' ? Math.min(...run.map((s) => s.framed)) : kind === 'occluded' ? Math.min(...run.map((s) => s.readability)) : kind === 'horizon' ? Math.max(...run.map((s) => Math.abs(s.pitchDeg))) : kind === 'motion' ? Math.max(...run.map((s) => s.omegaDeg)) : run.length;
+        const who = [...new Set(run.flatMap((s) => (kind === 'foreground' && s.foreground ? [s.foreground.id] : kind === 'squeeze' && s.squeezedBy ? s.squeezedBy : kind === 'occluded' && s.occludedBy ? s.occludedBy : [])))].sort();
         failures.push({ kind, i0: i, i1: j, t0: samples[i].t, t1: samples[j].t, samples: j - i + 1, worst: r2(worst), detail: `t=${samples[i].t}–${samples[j].t} s: ${run[0].why[kind]}${j > i ? `; worst ${r2(worst)}${WORST_UNIT[kind]}` : ''}`, subjects: who });
         for (let q = i; q <= j; q++) failing.add(q);
       }
@@ -525,6 +560,7 @@ export function scoreShot(sim: ShotSim): ShotScore {
       maxForegroundCover: fin(samples.map((s) => s.foreground?.cover ?? 0), Math.max, 0),
       minSunOffAxisDeg: offs.length ? r2(Math.min(...offs)) : null,
       minFramed: fin(samples.map((s) => s.framed), Math.min, 1),
+      minReadability: fin(samples.map((s) => s.readability), Math.min, 1),
       maxAbsPitchDeg: fin(samples.map((s) => Math.abs(s.pitchDeg)), Math.max, 0),
       maxOmegaDeg: fin(samples.map((s) => s.omegaDeg), Math.max, 0),
       maxAlphaDeg: fin(samples.map((s) => s.alphaDeg), Math.max, 0),

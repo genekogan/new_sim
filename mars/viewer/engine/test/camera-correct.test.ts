@@ -96,7 +96,8 @@ test('fixture "stuck between plywood": a dolly through two standing sheets 0.8 m
   assert.ok(c.strategy === 'raise' || c.strategy === 'reroute');
   assert.equal(c.strategy, 'raise');
   assert.equal(c.params.heightOffset, 1, '+0.5 m still between the 2.44 m sheets; +1 m clears them by ≥ 0.3 m');
-  assert.deepEqual(c.attempts.map((x) => [x.magnitude, x.result]), [[0.5, 'squeeze ×9'], [1, 'valid']]);
+  // +0.5 m is still between the sheets, which also hide the subject there (the planner's readability: occluded)
+  assert.deepEqual(c.attempts.map((x) => [x.magnitude, x.result]), [[0.5, 'squeeze ×9, occluded ×9'], [1, 'valid']]);
   assert.match(c.reason, /free width 0\.8 m between 'part s\d' and 'part s\d' \(< 1\.2 m\)/);
   assert.deepEqual(c.tried, [], 'raise is the first strategy');
   assert.equal(c.samples.count, 9);
@@ -219,13 +220,31 @@ test('fixture "impossible": a fly-through into a sealed room is refused with eve
   assert.ok([...tried[0].attempts!, ...tried[3].attempts!].every((a) => /^refused: camera\.nav\.unreachable$/.test(a.result)));
 });
 
-test('phase-1 flagship shots: the bay orbit (structure growing during it) and the carry-crew orbit are valid as computed — corrections []', () => {
+test('phase-1 flagship shots through phase 2: the bay orbit (structure growing during it) is corrected for two crew members hiding the uprights (raise), the carry-crew orbit is valid as computed', () => {
   const { take, input } = flagship();
   const at = onGrid(stepTimes(take).get('seat_b1')!.start);
-  const r = ok(directCamera([{ subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120, at, framing: { size: 'wide' } }], input));
+  const bayDir = { subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120, at, framing: { size: 'wide' } };
+  const r = ok(directCamera([bayDir], { ...input, correct: true }));
   const rep = r.report.shots[0];
-  assert.deepEqual(rep.corrections, []);
+  // at the W21 walker motion (take d2f16bd3…): 50.6 s into the orbit the camera passes due west of the bay while p2
+  // stands at upright A's foot and p1 walks across the line to B — the planner's readability 0.56 < 0.6 on 2 samples
+  assert.equal(rep.corrections.length, 1, JSON.stringify(rep.corrections));
+  const c = rep.corrections[0];
+  assert.equal(c.failure, 'occluded');
+  assert.equal(c.strategy, 'raise');
+  assert.equal(c.params.heightOffset, 2.5);
+  assert.deepEqual(c.samples, { count: 2, t0: 259.2, t1: 259.3 });
+  assert.match(c.reason, /readability 0\.56 < 0\.6 \(A 44% by 'person p2', B 44% by 'person p1'\)/);
+  assert.deepEqual(c.attempts.map((x) => x.result), ['occluded ×2', 'occluded ×2', 'occluded ×1', 'valid'], 'looking down more steeply clears their heads only from +2.5 m');
+  assert.deepEqual(c.tried, [], 'raise is the first strategy');
+  assert.ok('valid' in c.after && c.after.valid && c.after.failingSamples === 0);
+  // one knob: the corrected orbit is the computed one 2.5 m higher (same centre, radius, start heading)
+  const raw = ok(directCamera([bayDir], { ...input, correct: false })).report.shots[0];
+  for (const k of ['centre', 'orbitRadius', 'distance', 'startHeadingDeg', 'degrees']) assert.deepEqual(rep.params[k], raw.params[k], k);
+  assert.ok(Math.abs((rep.params.orbitHeight as number) - (raw.params.orbitHeight as number) - 2.5) < 0.011);
+  assert.ok(raw.planner!.minReadability < 0.6 && rep.planner!.minReadability >= 0.6, `planner min readability ${raw.planner!.minReadability} → ${rep.planner!.minReadability}`);
   assert.ok(rep.simulation!.valid && rep.simulation!.samples === 1201, JSON.stringify(rep.simulation));
+  assert.equal(rep.simulation!.worst.minReadability, rep.planner!.minReadability, 'phase 2 scores readability as the planner does');
   assert.equal(rep.simulation!.worst.minFramed, 1, 'every in-place member framed on every sample, including the ones placed during the orbit');
   // the structure grows during the orbit: members arrive inside its final box (the frame check follows them)
   const bay = new SemanticWorld(input.scene, take.finalState, input.facts).assemblies.find((a) => a.id === rep.subject.id)!; // the resolved rack bay (ids may change when the take is regenerated)

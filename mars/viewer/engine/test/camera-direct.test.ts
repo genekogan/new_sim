@@ -204,13 +204,17 @@ test('api: engine_direct_camera plans + stores a directed track beside the take;
   assert.equal(orbit.subject.id, 'n1');
   assert.ok(orbit.params.orbitRadius > 1);
   // phase 2 found a genuine issue: the computed orbit of n1 passes through the passage west wall (phase 1 left it to
-  // the planner, which cut away from it); the self-correction raises it 1 m and records why
+  // the planner, which cut away from it). Raising it 1 m clears the wall but then looks at n1 through it (occluded:
+  // 80 % hidden for ~1 s) — no raise or widen is clean; swinging the start bearing −90° is, and is recorded with why
   assert.equal(orbit.corrections.length, 1);
   const fix = orbit.corrections[0];
   assert.equal(fix.failure, 'collision');
-  assert.equal(fix.strategy, 'raise');
-  assert.equal(fix.params.heightOffset, 1);
+  assert.equal(fix.strategy, 'swing');
+  assert.equal(fix.params.bearingOffsetDeg, -90);
   assert.match(fix.reason, /passage west wall/);
+  assert.deepEqual(fix.tried.map((x: any) => [x.strategy, x.outcome]), [['raise', 'failed'], ['widen', 'failed']]);
+  assert.match(fix.tried[0].attempts[1].result, /^occluded ×\d+/, 'raise +1 m: no collision, but n1 behind the wall');
+  assert.ok(orbit.planner.minReadability >= 0.6);
   assert.equal(fix.after.failingSamples, 0);
   assert.ok(orbit.simulation.valid);
   assert.equal(orbit.validation.invalidSamples, 0);

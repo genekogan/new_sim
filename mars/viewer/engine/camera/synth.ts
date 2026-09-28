@@ -72,9 +72,11 @@ export type { DirectCorrection, ShotSimulation } from './correct.ts';
 /**
  * Knobs the phase-2 corrector (correct.ts) turns on a re-synthesis (all neutral by default): raise → heightOffset (m),
  * widen → distanceScale, swing → bearingOffset (rad), re-route → navRadius (camera radius of the navmesh, m) + avoid
- * (extra collision prisms, e.g. the take's parts), shorten → duration (s).
+ * (extra collision prisms, e.g. the take's parts), shorten → duration (s). `heading` (rad) = the start heading the first
+ * synthesis searched (`SynthShot.searchedHeading`): every correction re-uses it, so a raise or a widen changes only its own
+ * knob and a swing is an offset from the computed bearing (a re-search could pick another heading from the changed pose).
  */
-export type SynthOverrides = { bearingOffset?: number; heightOffset?: number; distanceScale?: number; duration?: number; via?: Vec3[]; navRadius?: number; avoid?: Obstacle[] };
+export type SynthOverrides = { bearingOffset?: number; heightOffset?: number; distanceScale?: number; duration?: number; via?: Vec3[]; navRadius?: number; avoid?: Obstacle[]; heading?: number };
 export type SynthValidation = { samples: number; invalidSamples: number; sweptCrossings: number; minClearance: number; firstProblem?: string };
 export type SynthShot = {
   index: number;
@@ -88,6 +90,8 @@ export type SynthShot = {
   /** Sampler ids scored for readability (a `focus:<i>` id is injected for static geometry). */
   subjects: string[];
   focus?: { id: string; points: Vec3[][] };
+  /** The start heading (rad, subject → camera) found by the heading search, before any `bearingOffset`; absent when forced. */
+  searchedHeading?: number;
   params: Record<string, unknown>;
   notes: string[];
   validation: SynthValidation;
@@ -467,6 +471,7 @@ function forcedHeading(intent: ShotIntent, over: SynthOverrides): number | null 
 function pickHeading(ctx: SynthContext, intent: ShotIntent, over: SynthOverrides, prev: PrevPose | undefined, centre: Vec3, poses: (h: number) => CameraPose[], scoreIds: string[], focus: Vec3[]): { heading: number; searched: boolean } {
   const forced = forcedHeading(intent, over);
   if (forced !== null) return { heading: forced, searched: false };
+  if (over.heading !== undefined) return { heading: over.heading + (over.bearingOffset ?? 0), searched: true };
   const cands: number[] = [];
   if (prev) cands.push(datan2(prev.position[2] - centre[2], prev.position[0] - centre[0]));
   for (let k = 0; k < 16; k++) cands.push(wrap((k * TAU) / 16));
@@ -538,6 +543,7 @@ export function synthesizeShot(intent: ShotIntent, ctx: SynthContext, prev?: Pre
   const minY = ctx.groundY + 0.6;
   let keys: Key[] = [];
   let focus: Vec3[][] | undefined;
+  let searchedHeading: number | undefined;
   let scoreIds = [...s.ids];
 
   const build = (N: number, T: number, poseAt: (u: number, t: number) => CameraPose, topAt?: (t: number) => Vec3 | null): Key[] => {
@@ -572,6 +578,7 @@ export function synthesizeShot(intent: ShotIntent, ctx: SynthContext, prev?: Pre
       const posAt = (h: number, c: Vec3): Vec3 => [c[0] + hr * dcos(h), c[1] + rise, c[2] + hr * dsin(h)];
       const arc = (h: number) => Array.from({ length: Math.ceil(deg / 10) + 1 }, (_, k) => ({ position: posAt(h + (sign * deg * DEG * k) / Math.ceil(deg / 10), c0), target: c0, fov }));
       const pick = pickHeading(ctx, intent, over, prev, c0, arc, scoreIds, s.dynamic ? [] : geo0.points.slice(0, 8));
+      if (pick.searched) searchedHeading = pick.heading - (over.bearingOffset ?? 0);
       const h0 = pick.heading;
       keys = build(tl.N, tl.T, (u, t) => { const c = centreAt(s, ctx.sampler, t, t0, t1) ?? c0; return { position: posAt(h0 + sign * deg * DEG * ease(u), c), target: c, fov }; });
       Object.assign(params, { orbitRadius: r2(hr), orbitHeight: r2(c0[1] + rise), distance: r2(dist), boundingRadius: r2(R), elevationDeg: degs(fr.elevation), degrees: deg, direction: sign > 0 ? 'cw' : 'ccw', startHeadingDeg: degs(h0), startCompassDeg: compassOf(hdir(h0)), headingSearched: pick.searched, centre: s.dynamic ? 'group centroid averaged ±1 s (follows the group)' : r3v(c0) });
@@ -607,6 +614,7 @@ export function synthesizeShot(intent: ShotIntent, ctx: SynthContext, prev?: Pre
       };
       const withH = (h: number) => (u: number, c: Vec3): CameraPose => { const o = off(h, u); return { position: [c[0] + o[0], c[1] + o[1] + (over.heightOffset ?? 0), c[2] + o[2]], target: c, fov }; };
       const pick = pickHeading(ctx, intent, over, prev, c0, (h) => [0, 0.5, 1].map((u) => withH(h)(u, c0)), scoreIds, s.dynamic ? [] : geo0.points.slice(0, 8));
+      if (pick.searched) searchedHeading = pick.heading - (over.bearingOffset ?? 0);
       const pose = withH(pick.heading);
       keys = build(tl.N, tl.T, (u, t) => pose(u, centreAt(s, ctx.sampler, t, t0, t1) ?? c0), (t) => { const g = geometry(s, ctx.sampler, t); return g ? [g.centre[0], g.max[1], g.centre[2]] : null; });
       Object.assign(params, { headingDeg: degs(pick.heading), compassDeg: compassOf(hdir(pick.heading)), headingSearched: pick.searched, boundingRadius: r2(R), elevationDeg: degs(el) });
@@ -629,6 +637,7 @@ export function synthesizeShot(intent: ShotIntent, ctx: SynthContext, prev?: Pre
       const distFor = (h: number) => { const { w, dep } = lateral(h); const across = verb === 'tilt' ? (2 * w) / fr.fill / (2 * dtan(hfov / 2)) : H / fr.fill / (2 * dtan(vfov / 2)); return (dep + Math.max(1.5, across)) * (over.distanceScale ?? 1); };
       const eye = ctx.groundY + 1.7;
       const pick = pickHeading(ctx, intent, over, prev, c, (h) => { const dd = distFor(h); const p: Vec3 = [c[0] + dd * dcos(h), Math.max(eye, c[1]), c[2] + dd * dsin(h)]; return [{ position: p, target: c, fov }]; }, [], s.dynamic ? [] : geo0.points.slice(0, 8));
+      if (pick.searched) searchedHeading = pick.heading - (over.bearingOffset ?? 0);
       const h = pick.heading;
       const { r, w } = lateral(h);
       let dist = distFor(h);
@@ -750,6 +759,7 @@ export function synthesizeShot(intent: ShotIntent, ctx: SynthContext, prev?: Pre
     shot: {
       index: intent.index, label: intent.label, verb: intent.verb, t0, t1: q6(t0 + T), fov, keys, subjects,
       ...(focus ? { focus: { id: focusId, points: focus } } : {}),
+      ...(searchedHeading !== undefined ? { searchedHeading } : {}),
       params: { duration: r2(T), fov, framing: fr.size, ...params }, notes, validation: validateKeys(ctx.world, keys), corrections: [],
     },
   };
