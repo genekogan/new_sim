@@ -29,6 +29,7 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['reservedBy', (e) => e.reservedBy],
   ['connections', (e) => e.connections],
   ['equipment', (e) => e.equipment], // construction/solar.ts place_equipment (kind + config)
+  ['paint', (e) => e.paint], // work/paint.ts: colour / texture, coverage (0.01 steps), per band
 ];
 
 type TrackState = { committed: PoseSample; pending: PoseSample[]; out: PoseSample[] };
