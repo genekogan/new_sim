@@ -410,17 +410,19 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
       if (!prone || prone.y - handY > REACH_DOWN_PRONE + 1e-9)
         return bad('handup.too-high', `${e.id} cannot be handed up to people on ${edge.members![0]} at ${f2(edgeY)} m: the givers can raise it to ${f2(hT)} m (their floor + ${f2(hT - giverFloor)} m: hands out at the grips; ${GIVE_MAX} m straight overhead), so the receivers would have to reach ${f2(edgeY - handY)} m below their feet (${reachList(prone, handY, edge)}); use the forklift (hand_up via: 'forklift')`, [e.id, edge.members![0], ...givers, ...p.receivers], [O[0], hT, O[1]]);
     }
-    // raised straight up outside the edge, clear of whatever sticks out past the beam (joist cantilevers …); for prone
-    // receivers the load then rises in one hand up past the deck edge to slide height, so that corridor must be clear too
+    // raised straight up outside the edge, clear of whatever sticks out past the beam (joist cantilevers …); unless the
+    // givers raise it to slide height themselves, the receivers (kneeling or prone) then lift it straight up from the
+    // hand-off to slide height, so that corridor must be clear too — of everything, the members it will rest on
+    // included (their ends stick out past the edge beam; W30: the kneeling rise used to ignore them)
     for (let extra = 0; ; extra += STEP) {
       const Ox = add2(obbF.c, scale2(nOut, sOut + extra));
       const hit = sweepPoses(rt, e, [pose(Ox, giverFloor + CARRY_Y, yawH), pose(Ox, hT, yawH)], []);
-      const hitR = !hit && prone ? sweepPoses(rt, e, [pose(Ox, hT, yawH), pose(Ox, ySlide, yawH)], []) : null;
+      const hitR = !hit && !direct ? sweepPoses(rt, e, [pose(Ox, hT, yawH), pose(Ox, ySlide, yawH)], []) : null;
       if (!hit && !hitR) { sOut += extra; break; }
       if (hitR) riseHit = hitR;
       if (extra >= 1.0 - 1e-9) {
         if (hit) return bad('handup.path-blocked', `${e.id} cannot be raised beside ${edge.members![0]}: ${hit.o.label ?? hit.o.id} is in the way up to 1 m out from the edge`, [e.id, hit.o.id], hit.q.p);
-        return riseBlocked(e, edge, hitR!, p.receivers, 'up to 1 m out from the edge');
+        return riseBlocked(e, edge, hitR!, p.receivers, 'up to 1 m out from the edge', !prone);
       }
     }
     O = add2(obbF.c, scale2(nOut, sOut));
@@ -437,10 +439,11 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
       prone = proneDeck(rt, edge);
       if (!prone || prone.y - (fp.p[1] + th) > REACH_DOWN_PRONE + 1e-9)
         return bad('handup.too-high', `${e.id} on the forks at ${f2(fp.p[1])} m is ${f2(edgeY - fp.p[1] - th)} m below the receivers' feet (${reachList(prone, fp.p[1] + th, edge)}); raise the forks`, [e.id], fp.p);
-      // the forks cannot move it out: its rise past the deck edge must be clear where it is
-      const hitR = sweepPoses(rt, e, [transfer, { ...transfer, p: [transfer.p[0], Math.max(ySlide, transfer.p[1]), transfer.p[2]] }], [vehicle!]);
-      if (hitR) return riseBlocked(e, edge, hitR, p.receivers, 'where the forks hold it (present it clear of it)');
     }
+    // the forks cannot move it out: its rise (prone: past the deck edge; kneeling: past the edge beam and the ends of
+    // the members it will rest on) must be clear where it is
+    const hitR = sweepPoses(rt, e, [transfer, { ...transfer, p: [transfer.p[0], Math.max(ySlide, transfer.p[1] + FORK_LIFT_OFF), transfer.p[2]] }], [vehicle!]);
+    if (hitR) return riseBlocked(e, edge, hitR, p.receivers, 'where the forks hold it (present it clear of it)', !prone);
   }
   // ---- the part's path
   const giverSegs: Seg[] = [];
@@ -501,6 +504,9 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
     const r = prone
       ? chooseProneStations(rt, e, p, edge, nOut, { at_s, sOut, ySlide, direct, sMax, rest, final, fixed: transfer }, riseHit, [])
       : chooseStations(rt, e, p, edge, { at_s, sOut, ySlide, direct, sMax, rest, final, ...(direct ? {} : { fixed: transfer }) });
+    // kneeling: something sticking out past the edge pushed the rise corridor out of their reach: name it
+    if ('ok' in r && !prone && riseHit && (r.diagnostic.code === 'handup.receiver-reach' || r.diagnostic.code === 'handup.no-receiver-station'))
+      return riseBlocked(e, edge, riseHit, p.receivers, `close to the edge, and clear of it nobody kneeling on the beams reaches it (${r.diagnostic.message.replace(/^.*?: /, '')})`, true);
     if ('ok' in r) return r as Fail;
     sT = r.sT;
     transfer = at_s(sT, direct ? ySlide : transfer.p[1]);
@@ -677,9 +683,12 @@ function reachList(prone: ProneDeck | null, handY: number, edge: Link): string {
   return `receivers reach down standing to ${f2(STAND_REACH)} m above their feet, kneeling ≤ ${REACH_DOWN} m below them, ${pr}`;
 }
 
-function riseBlocked(e: Entity, edge: Link, hit: Hit, receivers: string[], where: string): Fail {
+/** `handup.rise-blocked`: the load's way up beside the edge (prone: past the deck edge; kneeling: past the edge beam and
+ *  whatever rests on it, e.g. joist ends) is in the way of `hit` wherever the receivers could still reach it. */
+function riseBlocked(e: Entity, edge: Link, hit: Hit, receivers: string[], where: string, kneel = false): Fail {
   const name = hit.o.label && hit.o.label !== hit.o.id ? `${hit.o.label} (${hit.o.id})` : hit.o.id;
-  return bad('handup.rise-blocked', `${e.id} cannot rise past the deck edge over ${edge.members![0]} in the hands of a receiver lying there: ${name} is in the way of its rise at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])}) ${where}`, [e.id, hit.o.id, edge.members![0], ...receivers], hit.q.p);
+  const past = kneel ? `the edge beam ${edge.members![0]} in the hands of receivers kneeling at it` : `the deck edge over ${edge.members![0]} in the hands of a receiver lying there`;
+  return bad('handup.rise-blocked', `${e.id} cannot rise past ${past}: ${name} is in the way of its rise at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])}) ${where}`, [e.id, hit.o.id, edge.members![0], ...receivers], hit.q.p);
 }
 
 /** Distance from q (inside o) along unit n to o's outline. */
@@ -902,9 +911,12 @@ function finishPlan(rt: Runtime, e: Entity, p: HP, mode: 'hand' | 'forklift', ya
     { phase: 'lay', from: up, to: slid, dur: segDur(e, up, slid, SPEED.slide) },
     { phase: 'set_down', from: slid, to: final, dur: T.setDown },
   ];
-  // sweeps of the receivers' part (the members it comes to rest on may be touched at the very end)
-  const ignore = [...rest.supports, ...(vehicle ? [vehicle] : [])];
-  const hit = sweepPoses(rt, e, [transfer, up, slid], ignore) ?? sweepPoses(rt, e, [slid, final], ignore);
+  // sweeps of the receivers' part: the take, the rise and the feed-in clear everything (the members it will rest on
+  // included: it passes their ends; W30), only the set-down may touch those members
+  const vIgnore = vehicle ? [vehicle] : [];
+  const rise = sweepPoses(rt, e, [off, up], vIgnore);
+  if (rise) return riseBlocked(e, edge, rise, stations.map((s) => s.actor), mode === 'forklift' ? 'where the forks hold it (present it clear of it)' : 'beside the edge where they take it', !mid);
+  const hit = sweepPoses(rt, e, [transfer, off], vIgnore) ?? sweepPoses(rt, e, [up, slid], vIgnore) ?? sweepPoses(rt, e, [slid, final], [...rest.supports, ...vIgnore]);
   if (hit) return bad('handup.path-blocked', `${e.id} cannot be fed in from the edge: it would hit ${hit.o.label ?? hit.o.id} at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])})`, [e.id, hit.o.id], hit.q.p);
   // route checks for receivers walking to a climb foot (plan-time, review H1)
   for (const [i, ch] of chains.entries()) {
