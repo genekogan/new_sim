@@ -363,10 +363,10 @@ function record(name) {
   if (exact.ticks !== take.ticks || exact.finalStateHash !== take.finalStateHash) throw new Error(`${name}: the exact re-run differs from the take (${exact.ticks} / ${exact.finalStateHash})`);
   const t1 = performance.now();
   // cutCost 2.5 s: bystanders are occluders now, and a crew walking past for ~1 s is not worth a cut away and back
-  // legacyKinds: the shipped year-build cameras were planned with every pile sampled as a person (W23: takeSampler now
-  // classifies piles as boxes from entities0; bay-1's camera would change cam-305a0efe… → cam-7492f43a…). Kept until the
-  // lead accepts that delta and re-records them; the flagship has no piles (identical either way).
-  const cam = planShotList(shots, takeSampler(exact, { legacyKinds: S.kind === 'year-build' }), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
+  // kind-aware sampler for every take (W23: piles / the cutting station are boxes from entities0, a removed entity leaves
+  // at its removal tick). The year-build cameras were re-planned with it in W26 (lead decision, PROGRESS "W23 landed");
+  // `legacyKinds` (every entity absent from finalState sampled as a person) is no longer used by the recorder.
+  const cam = planShotList(shots, takeSampler(exact), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
   const tCam = performance.now() - t1;
   const track = toCameraTrack('', take.id, cam, 'planned-shot-list');
   track.id = `cam-${hashOf({ takeId: take.id, data: track.data }).slice(0, 16)}`;
