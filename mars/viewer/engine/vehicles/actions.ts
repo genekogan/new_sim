@@ -605,7 +605,7 @@ function stepRideCore(rt: Runtime, ex: RideExec, dt: number): StepResult {
   }
   // pure pursuit, curvature clamped to the speed-dependent turn radius
   const L = dist2(la, cur);
-  let kappa = L > 1e-6 ? (2 * dsin(err)) / L : 0;
+  const kappa = L > 1e-6 ? (2 * dsin(err)) / L : 0;
   const move = (speed: number): { p: Vec2; yaw: number; k: number } => {
     const kmax = 1 / turnRadiusAt(pr, speed);
     const k = clamp(kappa, -kmax, kmax);

@@ -253,7 +253,7 @@ test('a snapshot during a carry is refused naming the action; allowDrop refuses 
 });
 
 test('an exec holding a closure is refused naming the path; a def may opt in with resumable: true', () => {
-  const closureVerb: ActionDef = {
+  const closureVerb: ActionDef<unknown, unknown, { left: number; test: (q: number) => boolean }> = {
     verb: 'closure_test', description: 'test', schema: z.strictObject({}), resumable: true,
     reservations: () => [], plan: () => ({ ok: true, program: null }),
     start: () => ({ left: 3, test: (q: number) => q > 0 }),

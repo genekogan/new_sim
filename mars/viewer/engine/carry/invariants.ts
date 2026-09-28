@@ -39,7 +39,7 @@ export const carryIntegrity: Invariant = (rt: Runtime) => {
     const q = entityFrame(e).q;
     // carriers in slot order of their grips
     const slotIdx = crew.map((c) => f.carriers.findIndex((k) => k.slot === ents[c].human!.grip!.slot));
-    const actual: Vec2[] = new Array(crew.length);
+    const actual = Array.from<Vec2>({ length: crew.length });
     crew.forEach((c, j) => (actual[slotIdx[j]] = [ents[c].pose.p[0], ents[c].pose.p[2]]));
     const ge = gripError(f, q, actual);
     if (ge.max > GRIP_TOL) {

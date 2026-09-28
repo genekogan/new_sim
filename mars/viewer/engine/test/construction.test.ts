@@ -191,7 +191,7 @@ function watchRaise(rt: Runtime, rec: { id: string; phase?: string }, item: stri
     onTick: (r) => {
       if (!r.isActive(rec.id) || rec.phase === 'approach') return;
       const u = r.world.entities[item];
-      for (const id of [...new Set([...lifters, ...(u.support?.kind === 'held' ? u.support.by : [])])]) {
+      for (const id of new Set([...lifters, ...(u.support?.kind === 'held' ? u.support.by : [])])) {
         const h = r.world.entities[id];
         const slot = h.human!.grip?.slot;
         const list = seen.slots.get(id) ?? [];

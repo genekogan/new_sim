@@ -34,7 +34,8 @@ const SWEPT = new Set(['reach_down', 'take', 'stand_with_load', 'lay']);
  *  hold (reach_down … lay) overlaps nothing — deck edge, beams, joist ends, walls — except the forks it sits on. */
 function watch(rt: Runtime, id: string, max = 20 * 400) {
   const r = rt.records.get(id)!;
-  let ticks = 0, worst = -Infinity, holders = new Set<string>(), swept = 0;
+  let ticks = 0, worst = -Infinity, swept = 0;
+  const holders = new Set<string>();
   const roles = new Map<string, string>();
   const hc = new HandupHandsCheck();
   while (r.status !== 'completed' && r.status !== 'failed' && ticks < max) {

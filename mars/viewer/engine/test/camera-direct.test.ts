@@ -12,6 +12,7 @@ import { datan, dtan } from '../core/math.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { beforeSunset, campus2024, campus2026, flagship, onGrid, stepTimes, withTime } from './camera-direct-fixtures.ts';
+import { defaultSortOrder } from '../core/order.ts';
 
 const DEG = Math.PI / 180;
 const wrapDiff = (a: number, b: number) => Math.abs(((a - b + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
@@ -127,7 +128,7 @@ test('sentence: "look at this crowd of people having this activity" → the grou
   for (let t = 0; t < input.duration && !two; t += 1) {
     const by = new Map<string, Set<string>>();
     for (const f of Object.values(input.facts!(t))) if (f.task?.startsWith('step:') && f.activity) (by.get(f.activity) ?? by.set(f.activity, new Set()).get(f.activity)!).add(f.task);
-    for (const [act, tasks] of [...by.entries()].sort()) if (tasks.size > 1) { two = { t, act, tasks: [...tasks].sort() }; break; }
+    for (const [act, tasks] of [...by.entries()].sort(defaultSortOrder)) if (tasks.size > 1) { two = { t, act, tasks: [...tasks].sort() }; break; }
   }
   assert.ok(two, 'the flagship has overlapping crews');
   const amb = compile({ subject: { kind: 'group', ref: two.act }, motion: { verb: 'hold' } }, ctx, two.t);

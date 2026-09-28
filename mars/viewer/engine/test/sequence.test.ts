@@ -178,7 +178,10 @@ test('runner: timeout settles deferred cancels, lists cut steps, reports refusal
   const probe = runtime();
   probe.submit('walk_to', { actor: 'p1', x: 10, z: 10, level: 1 });
   let budget = 0;
-  while (probe.world.entities.p1.pose.p[1] < 0.7 * DECK_Y && budget < 20 * 60) probe.step(), budget++;
+  while (probe.world.entities.p1.pose.p[1] < 0.7 * DECK_Y && budget < 20 * 60) {
+    probe.step();
+    budget++;
+  }
   const rt = runtime();
   const r = runSequence(rt, [
     { id: 'climb', verb: 'walk_to', params: { actor: 'p1', x: 10, z: 10, level: 1 } },

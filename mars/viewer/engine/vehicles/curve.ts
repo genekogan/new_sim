@@ -55,7 +55,7 @@ export function vehicleGrids(sp: Spatial, world: WorldState, pr: VehicleProfile,
     const kerbs = kerbsFor(sp.scene, pr, floor);
     hit = { grids: kerbs.length ? gridsWithObstacles(base.grids, kerbs) : base.grids, kerbs: kerbs.map((o) => o.id) };
     if (!around?.length) {
-      for (const k of [...m.keys()]) if (!k.startsWith(`${sp.epoch}|`)) m.delete(k);
+      for (const k of Array.from(m.keys())) if (!k.startsWith(`${sp.epoch}|`)) m.delete(k);
       m.set(key, hit);
     }
   }
@@ -219,7 +219,7 @@ export function smooth(g: LevelGrid, pr: VehicleProfile, who: string, level: num
   const cands: Node[][] = [[point(S)]];
   for (let i = 1; i < n - 1; i++) cands.push(candidates(i));
   cands.push([point(E)]);
-  const choice = new Array<number>(n).fill(0);
+  const choice = Array.from({ length: n }, () => 0);
   const nodeAt = (i: number) => cands[i][choice[i]];
   let fault: { at: Vec2; clearance: number; corner: number } | null = null;
   /**
@@ -261,7 +261,7 @@ export function smooth(g: LevelGrid, pr: VehicleProfile, who: string, level: num
     }
     return { bad: fault };
   };
-  const entries: (Vec2 | null)[] = new Array(n).fill(null);
+  const entries: (Vec2 | null)[] = Array.from({ length: n }, () => null);
   const tryAt = (i: number): boolean => {
     for (let k = 0; k < cands[i].length; k++) {
       choice[i] = k;

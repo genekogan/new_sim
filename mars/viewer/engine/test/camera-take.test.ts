@@ -56,7 +56,7 @@ test('planShotList: contiguous windows → one uniform track, a cut at every sho
   const boundary = Math.round(mid * 10);
   assert.equal(plan.samples[boundary].cut, true, 'second shot starts with a cut');
   assert.ok(plan.report.cuts.some((c) => c.reason === 'shot list: group' && Math.abs(c.t - mid) < 1e-6), 'boundary cut reported');
-  assert.deepEqual(plan.report.cuts.map((c) => c.t), [...plan.report.cuts.map((c) => c.t)].sort((a, b) => a - b), 'cuts in time order');
+  assert.deepEqual(plan.report.cuts.map((c) => c.t), plan.report.cuts.map((c) => c.t).sort((a, b) => a - b), 'cuts in time order');
   assert.equal(plan.shots.length, 2);
   assert.equal(plan.report.invalidSamples, 0);
   const track = toCameraTrack('cam', take.id, plan);

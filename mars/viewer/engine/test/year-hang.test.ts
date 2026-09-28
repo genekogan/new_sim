@@ -21,7 +21,7 @@ import type { Entity } from '../world/types.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 
 const U = 'upright-16ft-kit';
-const H = def(U).size[1], D = def(U).size[0], L = def('beam-12ft').size[0];
+const H = def(U).size[1], L = def('beam-12ft').size[0];
 const ground = (): SpatialScene => ({ bounds: [-15, -15, 15, 15], levels: [{ id: 0, y: 0, label: 'ground' }], surfaces: [{ id: 'ground', level: 0, y: 0, obb: { c: [0, 0], half: [15, 15], yaw: 0 } }], obstacles: [], links: [] });
 const registry = () => new Map<string, ActionDef>([['walk_to', walkTo], ['carry', carry], ...[...CONSTRUCTION_ACTIONS, ...STANCE_ACTIONS].map((a) => [a.verb, a] as [string, ActionDef])]);
 const INV = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, liftHandsInReach, stanceAccessOk, hangHandsInReach];

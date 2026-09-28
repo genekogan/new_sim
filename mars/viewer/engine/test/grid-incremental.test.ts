@@ -189,6 +189,7 @@ test('BlockerMap behaves as a Map<number, string> (get / has / set / delete / si
  */
 function checkingSyncs(fn: () => void): number {
   const proto = Spatial.prototype;
+  // oxlint-disable-next-line typescript/unbound-method -- saved to restore after the probe; re-invoked with orig.call(this, …)
   const orig = proto.sync;
   const rasters = new WeakMap<Spatial, StaticRaster>();
   let n = 0;
@@ -262,6 +263,7 @@ test('Spatial.sync patches === full rebuild at every construction step: campus f
 /** Runs `fn` with every Spatial.gridsFor result compared with a from-scratch buildGrids of its scene. */
 function checkingGridsFor(fn: () => void): { calls: number; patched: number } {
   const proto = Spatial.prototype;
+  // oxlint-disable-next-line typescript/unbound-method -- saved to restore after the probe; re-invoked with orig.call(this, …)
   const orig = proto.gridsFor;
   const out = { calls: 0, patched: 0 };
   proto.gridsFor = function (this: Spatial, scene: SpatialScene) {

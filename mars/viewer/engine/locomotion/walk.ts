@@ -167,7 +167,7 @@ const entitiesOf = (rt: Runtime): Entity[] => stepScope?.entities ?? entityList(
 function entityList(rt: Runtime): Entity[] {
   const ents = rt.world.entities;
   const ids = Object.keys(ents);
-  const out = new Array<Entity>(ids.length);
+  const out = Array.from<Entity>({ length: ids.length });
   for (let i = 0; i < ids.length; i++) out[i] = ents[ids[i]];
   return out;
 }
@@ -1203,7 +1203,7 @@ function trackAhead(ex: Exec, a: Entity): Track {
   };
   const p0 = at(ex.s).p;
   const n = Math.round(LOOK / ENC_STEP);
-  const q: Vec2[] = new Array(n + 1), t: Vec2[] = new Array(n + 1);
+  const q = Array.from<Vec2>({ length: n + 1 }), t = Array.from<Vec2>({ length: n + 1 });
   for (let k = 0; k <= n; k++) {
     const x = at(ex.s + k * ENC_STEP);
     q[k] = add2(me, sub2(x.p, p0));

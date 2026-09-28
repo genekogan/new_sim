@@ -2,7 +2,6 @@
 // tests or a forked room), official execution (Durable Object) and local
 // previews — there is no second "fast path" implementation (spec §16).
 import type { ActionDef, ActionRecord, ActionStatus, Diagnostic, Reservation } from '../actions/types.ts';
-import { TERMINAL } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { Profiler } from './profile.ts';
@@ -24,6 +23,12 @@ export type RuntimeEvent =
 
 /** Invariant checks run at the end of every tick; violations are recorded, never hidden. */
 export type Invariant = (rt: Runtime) => Diagnostic[];
+/** The room's service bag: `spatial` plus per-module slots each owner installs and reads back with its own type
+ *  (walk.ts walkExecs/traffic/replanBudget, carry loadDiscs/carryExecs, vehicles vehicleLanes, …). Deliberately the one
+ *  untyped seam: app/lab code reads `services.spatial` directly while bare-verb tests pass `{}`, so a typed-slot
+ *  interface needs those callers changed too (LAST_MILE LM-149 note). */
+// oxlint-disable-next-line typescript/no-explicit-any -- heterogeneous per-module slots, see above
+export type RuntimeServices = Record<string, any>;
 
 /** `prior`: phase of each reserved entity before start(), restored if the action fails / is cancelled before using it. */
 type Phase = WorldState['entities'][string]['phase'];
@@ -46,9 +51,9 @@ export class Runtime {
 
   world: WorldState;
   registry: Map<string, ActionDef>;
-  services: Record<string, any>;
+  services: RuntimeServices;
   invariants: Invariant[];
-  constructor(world: WorldState, registry: Map<string, ActionDef>, services: Record<string, any>, invariants: Invariant[] = []) {
+  constructor(world: WorldState, registry: Map<string, ActionDef>, services: RuntimeServices, invariants: Invariant[] = []) {
     canonicalEntityOrder(world);
     this.world = world;
     this.registry = registry;
@@ -187,7 +192,7 @@ export class Runtime {
   /** Advance one fixed tick: step live actions in submission order, then check invariants. */
   step() {
     this.world.tick++;
-    for (const l of [...this.live.values()]) {
+    for (const l of Array.from(this.live.values())) {
       if (!this.live.has(l.rec.id)) continue; // finished earlier this tick (e.g. cancelled with its failed parent)
       const prof = this.prof;
       const t0 = prof ? prof.now() : 0;
@@ -259,7 +264,7 @@ export class Runtime {
 
   /** Rebuild a runtime from a snapshot; stepping it matches stepping the paused original tick for tick.
    *  `services` must be this runtime's own (a fresh Spatial for the same base scene). */
-  static restore(snap: RuntimeSnapshot, registry: Map<string, ActionDef>, services: Record<string, any>, invariants: Invariant[] = []): Runtime {
+  static restore(snap: RuntimeSnapshot, registry: Map<string, ActionDef>, services: RuntimeServices, invariants: Invariant[] = []): Runtime {
     const g = decodeSnapshot(snap);
     const rt = new Runtime(g.world, registry, services, invariants);
     applySnapshot(rt, rt.internals(), snap, g);
@@ -267,15 +272,18 @@ export class Runtime {
   }
 
   private internals(): RuntimeInternals {
-    const self = this;
+    const getNextId = () => this.nextId;
+    const setNextId = (n: number) => {
+      this.nextId = n;
+    };
     return {
       live: this.live,
       owners: this.owners,
       get nextId() {
-        return self.nextId;
+        return getNextId();
       },
       set nextId(n: number) {
-        self.nextId = n;
+        setNextId(n);
       },
       forceFinish: (l, status, d) => {
         l.rec.diagnostic = d;
@@ -355,7 +363,7 @@ export class Runtime {
 
   /** End of tick: start (plan → reserve → start) every waiting directive whose pre-empted holds have ended, in submission order. */
   private admitWaiting() {
-    for (const w of [...this.waiting.values()]) {
+    for (const w of Array.from(this.waiting.values())) {
       if (w.holds.some((h) => this.live.has(h))) continue;
       this.waiting.delete(w.rec.id);
       w.rec.phase = undefined;
@@ -387,7 +395,7 @@ export class Runtime {
    */
   private cleanup(l: Live) {
     const id = l.rec.id;
-    for (const r of [...this.records.values()]) if (r.parent === id && (this.live.has(r.id) || this.waiting.has(r.id))) this.cancel(r.id);
+    for (const r of Array.from(this.records.values())) if (r.parent === id && (this.live.has(r.id) || this.waiting.has(r.id))) this.cancel(r.id);
     const ents = this.world.entities;
     for (const [eid, phase] of l.prior) {
       const e = ents[eid];
@@ -403,7 +411,7 @@ export class Runtime {
       if (!e.human.grip) e.human.activity = 'idle';
       delete e.human.speed; // walk_to's published ground speed ends with the task (MOVEMENT.md §3)
       if (traffic)
-        for (const [k, t] of [...traffic]) {
+        for (const [k, t] of Array.from(traffic)) {
           t.actors.delete(e.id);
           if (!t.actors.size) traffic.delete(k);
         }

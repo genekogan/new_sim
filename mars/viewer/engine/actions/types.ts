@@ -44,7 +44,7 @@ export type PlanResult<Program> = { ok: true; program: Program; notes?: string[]
  */
 export type CancelResult = { ok: true; deferred?: boolean } | { ok: false; diagnostic: Diagnostic };
 
-export interface ActionDef<Params = any, Program = any, Exec = any> {
+export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> {
   verb: string;
   description: string;
   schema: z.ZodType<Params>;

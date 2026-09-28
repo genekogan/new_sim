@@ -185,7 +185,6 @@ export function buildBayV3Template(site: Site): SequenceTemplate {
   }, ['carry_s1', joistsDone], 's1 handed up: two lift it overhead at the east edge, two on the beams take it');
   step('deck_s1', 'install_plywood', { crew: ['$crew[4]', '$crew[5]'], sheet: 's1', ...xzYaw(s1to) }, ['up_s1'], 'crew[4] and crew[5] fasten s1');
   // 4. (c) s2 by forklift over the east beam, received by the two standing on s1
-  const t = to(L.truck.x, L.truck.z, L.truck.yaw);
   const side = to(L.truck.x, L.truck.z - 1.0);
   step('fk_walk', 'walk_to', { actor: '$crew[1]', x: side.x, z: side.z, level: 0 }, [`up_${V3_JOISTS[V3_JOISTS.length - 1][0]}`], 'crew[1] walks to the parked forklift');
   step('fk_mount', 'mount', { actor: '$crew[1]', vehicle: 'fk' }, ['fk_walk']);
