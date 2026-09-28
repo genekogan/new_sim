@@ -431,10 +431,11 @@ export class HumanViews {
           if (k > 0) t.addScaledVector(_fwd, 0.05 * k).addScaledVector(UP, -0.07 * k);
         }
       }
-      reachTo(v, targets, pz.rise > 0);
+      const k = reachTo(v, targets, pz.rise > 0);
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0) handOnThigh(v, i, sitW);
       });
+      if (sitW <= 0) dangle(v, pz.bend, k);
     } else if (gripping) {
       source = 'grip';
       const grip = v.grip!, slot = v.gripSlot ?? '', floor = h.position.y;
@@ -448,8 +449,10 @@ export class HumanViews {
         const t = V();
         if (find(_s, t)) targets[i] = t;
       });
-      reachTo(v, targets, pz.rise > 0, v.activity === 'carry' ? 0.88 : 0.97, find);
+      const k = reachTo(v, targets, pz.rise > 0, v.activity === 'carry' ? 0.88 : 0.97, find);
+      if (sitW <= 0) dangle(v, pz.bend, k);
     } else if (sitW > 0) v.arms.forEach((_, i) => handOnThigh(v, i, sitW));
+    else dangle(v, pz.bend, []);
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
     v.diag = diagOf(v, gait?.g ?? null, gait?.f.id ?? '', pz, targets, source);
   }
@@ -713,6 +716,7 @@ function handOnThigh(v: View, i: number, w: number) {
  */
 function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, maxExt = 0.97, refind?: (from: THREE.Vector3, out: THREE.Vector3) => boolean) {
   v.reachRatio = v.arms.map(() => null);
+  const contacts = v.arms.map(() => 0);
   v.arms.forEach((arm, i) => {
     const t = targets[i];
     if (!t) return;
@@ -729,7 +733,27 @@ function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, 
       if (refind) refind(_s, t);
       k = contact(_s.distanceTo(t), len);
     }
+    contacts[i] = k;
     armTo(arm, t, k, maxExt, v.rig.holder);
+  });
+  return contacts;
+}
+
+/**
+ * On a bent body a free arm (no target, or its target out of reach) hangs with gravity — straight
+ * down from the shoulder, a little forward — instead of keeping the clip's arm pose, which would
+ * point backwards on a torso pitched 80°. Only arms with no contact at all, from ~30° of bend.
+ */
+function dangle(v: View, bend: number, contacts: number[]) {
+  const b = smooth((bend - 0.5) / 0.6); // from ~30° of bend, fully by ~63°
+  if (b <= 0) return;
+  v.arms.forEach((arm, i) => {
+    if ((contacts[i] ?? 0) > 0) return; // touching (even partly): the reach IK owns the arm
+    const w = b;
+    const len = armLen(arm);
+    arm.upper.getWorldPosition(_s);
+    const goal = _s.clone().addScaledVector(UP, -0.9 * len).addScaledVector(_fwd, 0.08 * len);
+    armTo(arm, goal, w, 0.95, v.rig.holder, _tmp.copy(_fwd).multiplyScalar(-0.3).addScaledVector(UP, -0.2).clone());
   });
 }
 
