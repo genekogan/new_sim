@@ -11,7 +11,7 @@ import { SOCIAL_ACTIONS } from '../social/actions.ts';
 import { ITEM_ACTIONS } from '../items/actions.ts';
 import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
 import { FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
-import { CONSTRUCTION_ACTIONS, frameAccessOk, liftHandsInReach, RULES_VERSION as ASSEMBLY_RULES, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
+import { CONSTRUCTION_ACTIONS, frameAccessContributor, frameAccessOk, liftHandsInReach, RULES_VERSION as ASSEMBLY_RULES, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import type { Invariant } from '../runtime/runtime.ts';
 import type { EngineConfig } from '../rehearsal/rehearse.ts';
@@ -34,22 +34,27 @@ export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> 
   return m;
 }
 
-/** Scenes by `world.base.campus`; every run gets fresh Spatial state for the world's own base. */
-export function servicesFor(scenes: Record<string, SpatialScene>) {
+/**
+ * Scenes by `world.base.campus`; every run gets fresh Spatial state for the world's own base. The rack
+ * structure's climb links and beam walkways (construction/frame.ts) are part of the scene by default
+ * (`frameAccess: false` opts out); they are narrower than a routing disc, so walk_to never uses them.
+ */
+export function servicesFor(scenes: Record<string, SpatialScene>, opts: { frameAccess?: boolean } = {}) {
+  const contributors = opts.frameAccess === false ? [progressiveContributor] : [progressiveContributor, frameAccessContributor];
   return (world: WorldState) => {
     const scene = scenes[world.base.campus];
     if (!scene) throw new Error(`no spatial scene registered for campus "${world.base.campus}"`);
     // campus scenes (mars-<year>) are identified by their file's content hash (world.base.staticHash)
     const baseId = (scene as SpatialScene & { meta?: { contentHash?: string } }).meta?.contentHash;
-    return { spatial: new Spatial(scene, { contributors: [progressiveContributor], ...(baseId ? { baseId } : {}) }) };
+    return { spatial: new Spatial(scene, { contributors, ...(baseId ? { baseId } : {}) }) };
   };
 }
 
-export function engineConfig(scenes: Record<string, SpatialScene>, opts: { registry?: Map<string, ActionDef>; invariants?: Invariant[]; maxTicks?: number } = {}): EngineConfig {
+export function engineConfig(scenes: Record<string, SpatialScene>, opts: { registry?: Map<string, ActionDef>; invariants?: Invariant[]; maxTicks?: number; frameAccess?: boolean } = {}): EngineConfig {
   return {
     registry: opts.registry ?? createRegistry(),
     invariants: opts.invariants ?? ENGINE_INVARIANTS,
-    services: servicesFor(scenes),
+    services: servicesFor(scenes, { frameAccess: opts.frameAccess }),
     maxTicks: opts.maxTicks,
   };
 }

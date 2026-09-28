@@ -49,6 +49,10 @@ export const T = { crouch: 0.6, lift: 0.6, reachDown: 0.6, take: 0.4, stand: 0.4
 export const SPEED = { carry: 0.6, raise: 0.5, slide: 0.4 } as const;
 export const FORK_LIFT_OFF = 0.03; // receivers lift the load this far off the forks before feeding it in
 export const STEP = 0.05; // m: sampling of every planned motion
+// long-load balance (owner feedback §5/§6 follow-up): one person holding a board / beam by one end
+export const LEVER = 0.4; // m between the two hands of a one-end grip (outer hand at the end, inner hand toward the middle)
+export const FREE_END_MAX = 1.5; // m: a load held by one end whose free end is farther than this from the grip is refused
+const isLong = (e: Entity) => def(e.def).category === 'timber' || def(e.def).category === 'rack-beam';
 
 // ---- body envelope: where hands can be for a posture (feet-relative shoulder cylinder + arm) ----
 export const ARM_LEN = 0.75; // shoulder → hand centre
@@ -98,7 +102,14 @@ const distRect = (o: OBB2, p: Vec2) => dist2(nearestOnRect(o, p).q, p);
 
 /** Two hands either side of grip point g along tangent t (kept on the part), ordered [left, right] for someone at `from`. */
 function handPair(o: OBB2, g: Vec2, t: Vec2, y: number, from: Vec2): [Vec3, Vec3] {
-  const a = clampInRect(o, add2(g, scale2(t, HAND_SPREAD))), b = clampInRect(o, sub2(g, scale2(t, HAND_SPREAD)));
+  return orderLR(clampInRect(o, add2(g, scale2(t, HAND_SPREAD))), clampInRect(o, sub2(g, scale2(t, HAND_SPREAD))), g, y, from);
+}
+/** One-end (lever) grip: one hand at grip point g, the other LEVER farther along `inward` (toward the middle). */
+function leverPair(o: OBB2, g: Vec2, inward: Vec2, y: number, from: Vec2): [Vec3, Vec3] {
+  const a = clampInRect(o, g), b = clampInRect(o, add2(g, scale2(inward, LEVER)));
+  return orderLR(a, b, scale2(add2(a, b), 0.5), y, from);
+}
+function orderLR(a: Vec2, b: Vec2, g: Vec2, y: number, from: Vec2): [Vec3, Vec3] {
   const f = sub2(g, from);
   const left: Vec2 = [f[1], -f[0]]; // left of the facing direction (Y up)
   const [l, r] = dot2(sub2(a, b), left) >= 0 ? [a, b] : [b, a];
@@ -165,7 +176,7 @@ export type HandupProgram = {
   edge: string; // walkway link id
   nOut: Vec2;
   /** Local grip points (part frame, x/z) and the local outward direction for each giver. */
-  giverGrips: { g: Vec2; out: Vec2; tan: Vec2 }[];
+  giverGrips: { g: Vec2; out: Vec2; tan: Vec2; lever?: true }[];
   pickup: { actor: string; p: Vec2; yaw: number }[];
   giverSegs: Seg[]; // crouch, lift, walk-load, reach_up, [push]
   receiverSegs: Seg[]; // reach_down, take, stand_with_load, lay, set_down
@@ -203,6 +214,7 @@ function giverFeet(prog: Pick<HandupProgram, 'giverGrips'>, i: number, q: Pose, 
 }
 function giverHands(e: Entity, prog: Pick<HandupProgram, 'giverGrips'>, i: number, q: Pose, feet: Vec3): [Vec3, Vec3] {
   const gg = prog.giverGrips[i];
+  if (gg.lever) return leverPair(flatObb(q, e), world(q, gg.g), dirW(q, scale2(gg.out, -1)), q.p[1], [feet[0], feet[2]]);
   return handPair(flatObb(q, e), world(q, gg.g), dirW(q, gg.tan), q.p[1], [feet[0], feet[2]]);
 }
 function receiverHands(e: Entity, q: Pose, feet: Vec3): [Vec3, Vec3] {
@@ -216,7 +228,8 @@ function receiverHands(e: Entity, q: Pose, feet: Vec3): [Vec3, Vec3] {
  * part's local frame (x, z; on its underside) and the local axis the two hands spread along.
  * Receivers: `handup-take-<i>` = the part's top face, at its point nearest the receiver.
  */
-export function giverSlot(i: number, g: { g: Vec2; tan: Vec2 }): string {
+export function giverSlot(i: number, g: { g: Vec2; tan: Vec2; out?: Vec2; lever?: true }): string {
+  if (g.lever) return `${HANDUP_SLOT_PREFIX}give-${i}:${g.g[0].toFixed(3)}:${g.g[1].toFixed(3)}:${Math.abs(g.out![0]) > 0.5 ? 'x' : 'z'}:lever`;
   return `${HANDUP_SLOT_PREFIX}give-${i}:${g.g[0].toFixed(3)}:${g.g[1].toFixed(3)}:${Math.abs(g.tan[0]) > 0.5 ? 'x' : 'z'}`;
 }
 
@@ -228,9 +241,14 @@ export function giverSlot(i: number, g: { g: Vec2; tan: Vec2 }): string {
 export function handupHands(part: Entity, q: Pose, holder: Entity, slot: string): [Vec3, Vec3] | null {
   const feet = holder.pose.p;
   if (/^handup-take-\d+$/.test(slot)) return receiverHands(part, q, feet);
-  const m = /^handup-give-\d+:(-?[\d.]+):(-?[\d.]+):([xz])$/.exec(slot);
+  const m = /^handup-give-\d+:(-?[\d.]+):(-?[\d.]+):([xz])(:lever)?$/.exec(slot);
   if (!m) return null;
   const g: Vec2 = [Number(m[1]), Number(m[2])];
+  if (m[4]) {
+    // lever grip along axis m[3]: the second hand LEVER toward the part's middle
+    const inward: Vec2 = m[3] === 'x' ? [g[0] > 0 ? -1 : 1, 0] : [0, g[1] > 0 ? -1 : 1];
+    return leverPair(flatObb(q, part), world(q, g), dirW(q, inward), q.p[1], [feet[0], feet[2]]);
+  }
   const tan: Vec2 = m[3] === 'x' ? [1, 0] : [0, 1];
   return handPair(flatObb(q, part), world(q, g), dirW(q, tan), q.p[1], [feet[0], feet[2]]);
 }
@@ -248,7 +266,7 @@ const segDur = (e: Entity, a: Pose, b: Pose, speed: number) => {
   return Math.max(0.2, d / speed);
 };
 
-type Cand = { feet: Vec3; walkway: string | null; deck: number | null; first: number; edge: boolean; key: number };
+type Cand = { feet: Vec3; walkway: string | null; deck: number | null; deckObb?: OBB2; first: number; edge: boolean; key: number; miss?: number };
 
 export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgram } | Fail {
   const w = rt.world;
@@ -357,7 +375,13 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
   }
   // ---- the part's path
   const q3 = (v: Vec2): Vec2 => [Number(v[0].toFixed(3)), Number(v[1].toFixed(3))];
-  const giverGrips = mode === 'hand' ? localOut(rot2(nOut, -yawH), size(e)[0], size(e)[2], givers.length).map((g) => ({ ...g, g: q3(g.g) })) : [];
+  const giverGrips: HandupProgram['giverGrips'] = mode === 'hand' ? localOut(rot2(nOut, -yawH), size(e)[0], size(e)[2], givers.length).map((g) => ({ ...g, g: q3(g.g) })) : [];
+  if (mode === 'hand' && givers.length === 1 && isLong(e)) {
+    const b = balance(e, giverGrips[0]);
+    if (b.lever) giverGrips[0].lever = true;
+    if (b.free > FREE_END_MAX + 1e-9)
+      return bad('handup.unbalanced', `${def(e.def).label} ${e.id} (${f2(size(e)[0])} m) cannot be handed up by ${givers[0]} alone holding it by one end: its free end would be ${f2(b.free)} m from the grip (max ${FREE_END_MAX} m); hand it up side-on or with two givers`, [e.id, givers[0]], e.pose.p);
+  }
   const giverSegs: Seg[] = [];
   const pickup: HandupProgram['pickup'] = [];
   const ignoreRest = [...rest.supports];
@@ -419,12 +443,35 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
   return finishPlan(rt, e, p, mode, yawH, rest, edge, nOut, giverGrips, pickup, giverSegs, r.stations, lift0, transfer, final, ySlide, vehicle);
 }
 
+/**
+ * Balance of a long load held by one person at local grip g (the load's length is its local x): an end
+ * grip (g beyond the middle along x) is a two-handed lever grip, and its free end is measured from the
+ * inner hand; hands either side of the middle hold it balanced (free 0).
+ */
+export function balance(e: Entity, g: { g: Vec2; out: Vec2 }): { lever: boolean; free: number } {
+  const lx = size(e)[0];
+  if (Math.abs(g.out[0]) > 0.5) {
+    const inner = Math.abs(g.g[0]) - LEVER; // |x| of the inner hand (toward the middle)
+    return { lever: true, free: lx / 2 + inner };
+  }
+  const off = Math.abs(g.g[0]); // hands at g ± HAND_SPREAD along x: the middle between them = balanced
+  return { lever: false, free: off <= HAND_SPREAD ? 0 : lx / 2 + off - HAND_SPREAD };
+}
+
 /** Unit horizontal normal of walkway l pointing away from point c (the part's final centre). */
 function outward(l: Link, c: Vec2): Vec2 {
   const d = sub2(l.to.p, l.from.p);
   const len = Math.hypot(d[0], d[1]) || 1;
   const n: Vec2 = [-d[1] / len, d[0] / len];
   return dot2(sub2(c, l.from.p), n) > 0 ? [-n[0], -n[1]] : n;
+}
+
+/** How far hand h is horizontally beyond the edge a receiver at candidate c kneels at (≤ 0: over it). */
+function edgeOut(all: Link[], c: Cand, h: Vec3): number {
+  const q: Vec2 = [h[0], h[2]];
+  if (c.walkway) { const l = all.find((x) => x.id === c.walkway)!; return offWalkway(l, q) - l.width / 2; }
+  if (c.deckObb) return dist2(nearestOnRect(c.deckObb, q).q, q);
+  return 0;
 }
 
 type Geo = { at_s: (s: number, y: number) => Pose; sOut: number; ySlide: number; direct: boolean; sMax: number; rest: Rest; final: Pose; fixed?: Pose };
@@ -442,7 +489,7 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
   const all = beamWalkways(w).filter((l) => Math.abs(l.from.y - edge.from.y) <= 0.02);
   // candidate feet: explicit, or every STEP along the walkways at the edge's level
   const cands: Cand[] = [];
-  const push = (feet: Vec3, walkway: string | null, deck: number | null, edgeOf: boolean, key: number) => cands.push({ feet, walkway, deck, first: Infinity, edge: edgeOf, key });
+  const push = (feet: Vec3, walkway: string | null, deck: number | null, edgeOf: boolean, key: number, deckObb?: OBB2) => cands.push({ feet, walkway, deck, ...(deckObb ? { deckObb } : {}), first: Infinity, edge: edgeOf, key });
   if (p.stations) {
     if (p.stations.length !== p.receivers.length) return bad('handup.stations', `give one station per receiver (${p.receivers.length})`, p.receivers);
     for (const [i, s] of p.stations.entries()) {
@@ -451,7 +498,7 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
       if (l && deckOver(rt, l, q)) return bad('handup.receiver-not-aloft', `receiver station (${f2(s.x)}, ${f2(s.z)}) on ${l.id} is under a deck; stand on the deck instead`, [p.receivers[i]], [s.x, l.from.y, s.z]);
       if (l) { push([q[0], l.from.y, q[1]], l.id, null, l.id === edge.id, i); continue; }
       const d = deckAt(rt, edge, q);
-      if (d && !('code' in d)) { push([q[0], d.y, q[1]], null, d.level, false, i); continue; }
+      if (d && !('code' in d)) { push([q[0], d.y, q[1]], null, d.level, false, i, d.obb); continue; }
       return bad('handup.receiver-not-aloft', `receiver station (${f2(s.x)}, ${f2(s.z)}) is not on a walkable beam or a deck at ${f2(edge.from.y)} m${d && 'code' in d ? `: ${d.message}` : ''}`, [p.receivers[i]], [s.x, edge.from.y, s.z]);
     }
   } else {
@@ -474,17 +521,16 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
     return distRect(flatObb(q, e), [c.feet[0], c.feet[2]]) >= BODY_GAP;
   };
   const reachOk = (c: Cand, q: Pose, act: string) => receiverHands(e, q, c.feet).every((h) => envelopeGap(act, c.feet, h) <= 0 && h[1] >= c.feet[1] - REACH_DOWN - 1e-9);
-  const edgeOk = (c: Cand, q: Pose) => {
-    const hs = receiverHands(e, q, c.feet);
-    if (c.walkway) { const l = all.find((x) => x.id === c.walkway)!; return hs.every((h) => offWalkway(l, [h[0], h[2]]) <= EDGE_REACH + l.width / 2); }
-    return true;
-  };
+  // at the hand-off the load is within EDGE_REACH of the edge they kneel at (beam side face / deck outline)
+  const outOf = (c: Cand, q: Pose) => Math.max(...receiverHands(e, q, c.feet).map((h) => edgeOut(all, c, h)));
+  const edgeOk = (c: Cand, q: Pose) => outOf(c, q) <= EDGE_REACH + 1e-9;
   // the part's whole path from the first moment it is in the air beside the edge
   const before = g.fixed ? [g.fixed] : trs.map((t) => t.q);
   for (const c of cands) {
     if (!before.every((q) => bodyOk(c, q))) continue;
     for (const t of trs) {
-      if (!reachOk(c, t.q, 'reach_down') || !edgeOk(c, t.q)) continue;
+      if (!reachOk(c, t.q, 'reach_down')) continue;
+      if (!edgeOk(c, t.q)) { const d = outOf(c, t.q); c.miss = Math.min(c.miss ?? Infinity, d); continue; } // refused only by the edge rule
       const path = receiverPath(e, g, t.q);
       let ok = true;
       for (let i = 1; i < path.length && ok; i++)
@@ -512,6 +558,14 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
         if (!best || s < best.s - 1e-9 || (Math.abs(s - best.s) < 1e-9 && k < best.k - 1e-9)) best = { c: [a, b], s, k };
       }
     pick = best ? best.c : null;
+  }
+  // the nearest hand-off refused only by the edge rule: an explicit station that failed, else (no station works) the best one
+  const missed = p.stations ? cands.find((c) => c.first === Infinity && c.miss !== undefined && cands.every((o) => o.first < Infinity || o.miss !== undefined))
+    : good.length ? undefined : [...cands].filter((c) => c.miss !== undefined).sort((a, b) => a.miss! - b.miss! || a.key - b.key)[0];
+  const miss = missed ? { c: missed, d: missed.miss! } : null;
+  if (!pick && miss) {
+    const where = miss.c.walkway ? `beam ${miss.c.walkway.slice(5)}` : `the deck (level ${miss.c.deck})`;
+    return bad('handup.receiver-reach', `${e.id} cannot be received over ${edge.members![0]}: at the hand-off the receivers' hands would be ${f2(miss.d)} m beyond the edge of ${where} they kneel at (max ${EDGE_REACH} m); bring it within ${EDGE_REACH} m of the edge`, [e.id, edge.members![0], ...p.receivers], [miss.c.feet[0], miss.c.feet[1], miss.c.feet[2]]);
   }
   if (!pick) {
     const why = p.stations ? 'the given stations cannot reach it all the way in (hands within the reach envelope, ≤ 1.0 m below the feet, ≤ 0.5 m from their edge at the hand-off) without standing in its path' : `no ${n === 2 ? 'two places ≥ 0.6 m apart' : 'place'} on the beams at ${f2(edge.from.y)} m from which ${n === 2 ? 'both receivers' : 'a receiver'} can take it at the edge and feed it in without standing in its path`;

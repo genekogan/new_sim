@@ -47,15 +47,21 @@ themselves ("direct"); else they hand it up below the beam and the receivers lif
 
 ### Reach rules (engine rules; plan time and every tick)
 - givers' hands (the load's underside) ≤ their floor + **2.1 m**;
-- receivers' hands ≥ their feet − **1.0 m**; at the hand-off within **0.5 m** of the walkway they
-  stand on;
+- receivers' hands ≥ their feet − **1.0 m**; at the hand-off within **0.5 m** horizontally beyond the
+  edge they kneel at — a beam walkway's side (`offWalkway − width/2`) or, standing on a deck, the deck's
+  outline (W8); refused with `handup.receiver-reach` naming the distance (e.g. "hands would be 0.70 m
+  beyond the edge of beam b3 they kneel at (max 0.5 m)");
+- long-load balance (W8): one giver handing up a `timber` / `rack-beam` end-first holds it with a
+  two-handed **lever grip** (outer hand at the end, inner hand `LEVER` 0.4 m toward the middle; slot
+  suffix `:lever`); a free end > **1.5 m** from the inner hand is `handup.unbalanced` (6 ft 2x4: 1.34 m ok;
+  8 ft: 1.92 m refused — hand it up side-on or with two givers);
 - every holder's hands inside a posture envelope: shoulder cylinder above the feet
   (`crouch/lift` 0.55–1.45 m, `walk-load/reach_up` 1.3–1.45 m, receivers' `reach_down…set_down`
   −0.15–1.45 m, i.e. kneeling / bent over the edge), horizontal lean 0.2–0.45 m, arm 0.75 m;
   planning requires inside, the invariant allows +0.1 m;
 - a load in a receiver's body band stays ≥ 0.30 m from them; receivers ≥ 0.6 m apart.
 
-Refusals: `handup.too-high` ("…use the forklift" / "raise the forks"), `handup.no-walkway`,
+Refusals: `handup.receiver-reach`, `handup.unbalanced`, `handup.too-high` ("…use the forklift" / "raise the forks"), `handup.no-walkway`,
 `handup.receiver-not-aloft`, `handup.giver-aloft` (a giver on a beam: nobody walks a beam with a
 sheet), `handup.no-receiver-station`, `handup.path-blocked`, `handup.giver-blocked`,
 `handup.not-staged`, `handup.not-on-forks`, `handup.forklift-orientation`, `handup.occupied`,
@@ -70,7 +76,8 @@ both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.1 m, receivers 
 - From a take (which records poses + `grip`, not `hands`): `handupHands(part, part.pose, holder, slot)`
   (construction/handup.ts) rebuilds them exactly. Slots: givers `handup-give-<i>:<lx>:<lz>:<x|z>` =
   grip point in the part's local frame on its underside + the local axis the hands spread along
-  (±0.15 m); receivers `handup-take-<i>` = the part's top face at its point nearest them. Fastening
+  (±0.15 m), or with suffix `:lever` a one-end grip (one hand at the grip point, the other 0.4 m along
+  the axis toward the middle); receivers `handup-take-<i>` = the part's top face at its point nearest them. Fastening
   (install_* aloft) uses slot `fasten` (no hand points: nearest point of the part).
 
 ## Flagship v3
@@ -85,10 +92,15 @@ at the walk.ts of `e09a961` (a walk.ts change re-pins it; with W4's in-flight sp
   a sheet is never turned over the bay, so the forks can only deliver sheets parallel to the edge.
 - The body envelope is a cylinder + arm-length test, not IK; bodies vs parts only through the 0.30 m
   body-gap rule for receivers; givers stand 0.3 m beyond the grip by construction.
-- A long load held by its near end (end-first joists and sheets) is not checked for balance / torque.
+- Balance is checked for a single giver only (lever grip, free end ≤ 1.5 m); a single receiver feeding
+  a joist in end-first is assumed to slide it over the edge beam (not checked), and sheets are not checked.
+- The receivers' edge rule does not yet require the body at the edge: a receiver may stand back on a deck
+  and lean (envelope lean 0.45 m + arm 0.75 m). The stricter "kneel at the edge" rule (hands ≤ 0.8 m
+  horizontally from the feet) is ready but moves v3's pin (s2's deck receivers stand ≈ 1 m back) — see
+  PROGRESS W8.
 - Fork height is not state after the load leaves the forks (the truck just parks); `forklift_back` is
   a straight creep.
 - Climb paths are three straight segments; climbing is ≤ 1 person per link but two links on one
   column face are not mutually exclusive; a person on a beam may stand next to a column / on a joist.
-- Frame links are not in the API spatial scene (`frameAccessContributor` is opt-in); `hand_up` computes
-  them from the world, so it works everywhere.
+- Frame links are in the API spatial scene by default (`servicesFor(scenes, { frameAccess })`, W8;
+  `frameAccess: false` opts out); `hand_up` computes them from the world, so it works everywhere.

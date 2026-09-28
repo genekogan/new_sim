@@ -49,8 +49,10 @@ export type ControllerOptions = {
   scenes: Record<string, SpatialScene>;
   registry?: Map<string, ActionDef>;
   invariants?: Invariant[];
-  /** Override the services factory (default: Spatial over `scenes` + construction contributor). */
+  /** Override the services factory (default: Spatial over `scenes` + construction contributors). */
   services?: EngineConfig['services'];
+  /** Rack climb links / beam walkways in the spatial scene (default true; registry.ts servicesFor). */
+  frameAccess?: boolean;
   maxTicks?: number;
   store?: ControllerStore;
 };
@@ -206,7 +208,7 @@ export class EngineController {
     this.history = o.history;
     this.scenes = o.scenes;
     this.registry = o.registry ?? createRegistry();
-    const base = engineConfig(o.scenes, { registry: this.registry, invariants: o.invariants ?? ENGINE_INVARIANTS, maxTicks: o.maxTicks });
+    const base = engineConfig(o.scenes, { registry: this.registry, invariants: o.invariants ?? ENGINE_INVARIANTS, maxTicks: o.maxTicks, frameAccess: o.frameAccess });
     this.cfg = o.services ? { ...base, services: o.services } : base;
     this.store = o.store ?? {};
   }
