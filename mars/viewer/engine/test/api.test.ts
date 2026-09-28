@@ -1225,3 +1225,81 @@ test('direct_camera (LM-007): `sentences` are parsed then compiled in one call �
   assert.equal(c.call('direct_camera', { take_id: take.id }).code, 'op.invalid-input');
   assert.equal(c.call('direct_camera', { take_id: take.id, sentences: [sentence], directions: parsed }).code, 'op.invalid-input');
 });
+
+test('get_take (LM-017): a take evicted after its workspace was deleted is take.evicted naming the checkpoint; a never-stored one stays take.unknown', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage, { takes: 1, plans: 8 });
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'w1' }) as any).ok);
+  const a = room.call(2026, 'bind_plan', { template: walkPlan('a', -5, 5), bindings: { a: 'p1' }, workspace: 'w1' }) as any;
+  const ea = room.call(2026, 'execute', { plan_id: a.plan_id, workspace: 'w1' }) as any;
+  assert.ok(ea.ok, ea.message);
+  assert.ok((room.call(2026, 'delete_workspace', { workspace: 'w1' }) as any).ok);
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'w2' }) as any).ok);
+  const b = room.call(2026, 'bind_plan', { template: walkPlan('b', -4, 5), bindings: { a: 'p1' }, workspace: 'w2' }) as any;
+  const eb = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'w2' }) as any;
+  assert.ok(eb.ok, eb.message);
+  assert.ok(!s.keys().includes(`y2026/take/${ea.take_id}`), 'take A was evicted (cap 1, unreferenced)');
+  const g = room.call(2026, 'get_take', { take_id: ea.take_id }) as any;
+  assert.equal(g.code, 'take.evicted');
+  assert.deepEqual(g.details.checkpoints, [ea.checkpoint.id]);
+  assert.match(g.message, /no live workspace reaches it .* engine_fork at the checkpoint's parent/);
+  assert.equal((room.call(2026, 'attach_camera_track', { take_id: ea.take_id, shot: { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] } }) as any).code, 'take.evicted');
+  assert.equal((room.call(2026, 'get_take', { take_id: 'never-stored' }) as any).code, 'take.unknown');
+  assert.ok((room.call(2026, 'get_take', { take_id: eb.take_id }) as any).ok);
+});
+
+test('sequence built-ins over the op API (LM-016): list_verbs describes mark/cancel; a plan cancels a walk at 2 s and marks the take', () => {
+  const c = fresh();
+  const lv = c.call('list_verbs', {}) as any;
+  assert.deepEqual(lv.sequenceVerbs.map((v: any) => v.verb), ['mark', 'cancel']);
+  assert.ok(lv.templateJsonSchema.properties.steps.items.properties.timeout, 'step timeout is in the template schema');
+  const tpl = {
+    schema: 'mars-sequence/1', id: 'cut-walk', params: { a: { kind: 'actor' } },
+    steps: [
+      { id: 'w', verb: 'walk_to', params: { actor: '$a', x: -20, z: 5 }, timeout: 60 },
+      { id: 'stop', verb: 'cancel', params: { step: 'w' }, at: 2 },
+      { id: 'm', verb: 'mark', params: { name: 'walk-cut' }, after: ['stop'] },
+    ],
+  };
+  const r = c.call('rehearse', { plan_id: bind(c, tpl, { a: 'p1' }) }) as any;
+  assert.ok(r.ok, r.message);
+  assert.equal(r.report.status, 'completed');
+  const s = Object.fromEntries(r.report.steps.map((x: any) => [x.id, x]));
+  assert.equal(s.w.status, 'cancelled');
+  assert.equal(s.w.diagnostic.code, 'sequence.step-cancelled');
+  assert.equal(s.m.status, 'completed');
+  const ev = (c.call('get_take', { take_id: r.take.take_id }) as any).events.filter((e: any) => e.type === 'mark');
+  assert.deepEqual(ev.map((e: any) => e.name), ['walk-cut']);
+  assert.equal(c.call('bind_plan', { template: { ...tpl, steps: [{ id: 'x', verb: 'cancel', params: { step: 'nope' } }] }, bindings: { a: 'p1' }, workspace: 'ws' }).code, 'plan.invalid');
+});
+
+test('one control path (LM-014): every legacy tool is classified — an engine equivalent that exists, or viewer-only with a reason — and fails in one envelope', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { LEGACY_TOOLS, legacyDescription, legacyRefusal } = await import('../../simulation/legacy.ts');
+  const { createRegistry } = await import('../api/registry.ts');
+  const { SEQUENCE_VERBS } = await import('../sequence/runner.ts');
+  const src = (f: string) => readFileSync(new URL(`../../simulation/${f}`, import.meta.url), 'utf8');
+  const commands = [...src('commands.ts').matchAll(/^  ([a-z_]+): \{$/gm)].map((m) => m[1]);
+  assert.equal(commands.length, 18, 'commands.ts defines 18 legacy command tools');
+  const legacy = [...commands, 'get_state', 'get_capabilities'].sort();
+  assert.deepEqual(Object.keys(LEGACY_TOOLS).sort(), legacy, 'exactly the 20 legacy tools are classified');
+  const tools = new Set(engineTools().map((t) => t.name));
+  const verbs = new Set([...createRegistry().keys(), ...Object.keys(SEQUENCE_VERBS)]);
+  for (const [name, r] of Object.entries(LEGACY_TOOLS)) {
+    assert.ok(r.reason.length > 20, `${name}: a reason`);
+    if (r.scope === 'engine-equivalent') assert.ok(r.engine.length > 0, `${name}: names its engine path`);
+    for (const e of r.engine) assert.ok(e.startsWith('verb:') ? verbs.has(e.slice(5)) : tools.has(e), `${name}: engine equivalent ${e} exists`);
+    assert.match(legacyDescription(name, 'x'), /^\[legacy viewer control/);
+  }
+  assert.ok(Object.values(LEGACY_TOOLS).filter((r) => r.scope === 'engine-equivalent').length >= 8);
+  const env = legacyRefusal('move_person', new Error('no route'));
+  assert.deepEqual(env, { ok: false, code: 'legacy.command-failed', message: 'move_person: no route', legacy: true, tool: 'move_person', engine: ['engine_bind_plan', 'engine_execute', 'verb:walk_to'] });
+  // the worker registers every legacy tool with the classified description and answers failures with the envelope
+  const worker = src('worker.ts');
+  assert.match(worker, /legacyDescription\(name, def\.description\)/);
+  assert.match(worker, /legacyDescription\(\s*'get_state'/);
+  assert.match(worker, /legacyDescription\(\s*'get_capabilities'/);
+  assert.match(worker, /JSON\.stringify\(legacyRefusal\(name, e\)\)/);
+  assert.doesNotMatch(worker, /'Command failed'/);
+});

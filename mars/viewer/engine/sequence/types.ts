@@ -31,6 +31,11 @@ export type StepSpec = {
   at?: number;
   onFail?: 'abort' | 'continue';
   label?: string;
+  /**
+   * Seconds after submission: a step still live then is cancelled with `sequence.step-timeout` (a controlled
+   * stop, like a sequence timeout) and counts as a failure for `onFail` (LAST_MILE LM-016). Absent = no limit.
+   */
+  timeout?: number;
 };
 
 export type SequenceTemplate = {
@@ -71,6 +76,7 @@ export const stepSchema = z.strictObject({
   at: z.number().min(0).max(24 * 3600).optional(),
   onFail: z.enum(['abort', 'continue']).optional(),
   label: z.string().max(200).optional(),
+  timeout: z.number().positive().max(24 * 3600).describe('seconds after the step starts; still live then → cancelled with sequence.step-timeout, handled by onFail').optional(),
 });
 
 export const templateSchema = z.strictObject({

@@ -232,6 +232,14 @@ export class WorldHistory {
     return out;
   }
 
+  /** Checkpoints (any workspace, live or deleted) whose simulation-run / pause cause names `take`, oldest first (LM-017). */
+  checkpointsNamingTake(take: string): string[] {
+    return [...this.checkpoints.values()]
+      .filter((c) => (c.cause.kind === 'simulation-run' || c.cause.kind === 'pause') && c.cause.take === take)
+      .sort((a, b) => a.created - b.created)
+      .map((c) => c.id);
+  }
+
   checkpoint(id: string): Checkpoint {
     const cp = this.checkpoints.get(id);
     if (!cp) throw new HistoryError('unknown-checkpoint', `no checkpoint ${id}`);

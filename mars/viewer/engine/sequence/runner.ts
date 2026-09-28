@@ -2,6 +2,7 @@
 // Deterministic: ready steps are submitted in declaration order, re-scanned to
 // a fixed point before every tick (so `when: started` chains start on the same
 // tick), and the runtime is advanced only through Runtime.step().
+import { z } from 'zod';
 import type { ActionStatus, Diagnostic } from '../actions/types.ts';
 import { TERMINAL } from '../actions/types.ts';
 import { DT, type Runtime, type Violation } from '../runtime/runtime.ts';
@@ -75,6 +76,22 @@ export type RunnerState = {
 };
 
 const DONE: ReadonlySet<StepStatus> = new Set(['completed', 'failed', 'skipped', 'cancelled']);
+
+/**
+ * Sequence verbs the runner handles itself (LAST_MILE LM-016); they are not registry actions, reserve nothing and
+ * complete on the tick they start (so `after`, `when` and `at` apply to them like to any step).
+ */
+export const SEQUENCE_VERBS: Record<string, { description: string; schema: z.ZodType }> = {
+  mark: {
+    description: 'Put a named mark event into the run (and its take) on the tick this step starts; completes at once.',
+    schema: z.strictObject({ name: z.string().min(1).max(80), data: z.record(z.string(), z.unknown()).optional() }),
+  },
+  cancel: {
+    description:
+      "Stop another step of this plan: a live one is cancelled (its action's controlled stop) and ends 'cancelled', a pending one is skipped — both with sequence.step-cancelled, which is not a failure (no onFail abort); a finished one is left alone. Completes at once.",
+    schema: z.strictObject({ step: z.string().min(1).max(64) }),
+  },
+};
 const MAKE_WAY = /:make-way:\d+$/;
 
 export class SequenceRunner {
@@ -151,7 +168,70 @@ export class SequenceRunner {
   tick() {
     this.rt.step();
     this.poll();
+    if (this.hasTimeouts) this.checkTimeouts();
     this.advance();
+  }
+
+  private get hasTimeouts() {
+    return this.steps.some((s) => s.timeout !== undefined);
+  }
+
+  /** LM-016: cancel steps live past their `timeout` (a controlled stop), then apply their onFail policy. */
+  private checkTimeouts() {
+    if (this.aborted || this.timedOut) return;
+    for (let i = 0; i < this.steps.length && !this.aborted; i++) {
+      const s = this.steps[i], r = this.reports[i];
+      if (s.timeout === undefined || (r.status !== 'executing' && r.status !== 'blocked') || this.cutReason.has(r.id)) continue;
+      if (this.rt.tick - r.submittedTick! < Math.round(s.timeout / DT)) continue;
+      const reason: Diagnostic = { code: 'sequence.step-timeout', message: `step "${s.id}" (${s.verb}) did not finish within its ${s.timeout} s timeout`, subjects: [s.id] };
+      this.stopStep(r, reason);
+      this.diagnostics.push(reason);
+      if ((s.onFail ?? 'abort') === 'abort') this.abort(`step "${s.id}" (${s.verb}) timed out after ${s.timeout} s`, s.id);
+    }
+  }
+
+  /** Cancel one live step's action with `reason` (recorded when a deferred cancel finishes); a refused cancel is recorded. */
+  private stopStep(r: StepReport, reason: Diagnostic) {
+    this.cutReason.set(r.id, reason);
+    const rec = this.rt.cancel(r.actionId!, reason);
+    if (rec.status === 'cancelled') {
+      r.status = 'cancelled';
+      r.endedTick = rec.endedTick;
+      r.diagnostic = reason;
+    } else if (!this.deferredCancel(rec)) {
+      this.refused.add(r.id);
+      this.diagnostics.push({ code: 'sequence.cancel-refused', message: `step "${r.id}" could not be cancelled: ${rec.diagnostic?.message ?? 'refused'}; it keeps running`, subjects: [r.id] });
+    }
+  }
+
+  /** A runner built-in (`mark`, `cancel`): runs and completes on this tick. */
+  private builtin(s: StepSpec, r: StepReport) {
+    r.submittedTick = this.rt.tick;
+    r.started = true;
+    if (r.cueTick !== undefined) r.cueLateTicks = this.rt.tick - r.cueTick;
+    const p = s.params as { name?: string; data?: unknown; step?: string };
+    if (s.verb === 'mark') {
+      this.rt.mark(p.name!, p.data ?? { step: s.id });
+      r.outputs = { mark: p.name };
+    } else {
+      const t = this.byId.get(p.step!);
+      const reason: Diagnostic = { code: 'sequence.step-cancelled', message: `step "${p.step}" cancelled by step "${s.id}"`, subjects: [p.step!, s.id] };
+      if (!t || t.id === s.id) {
+        r.status = 'failed';
+        r.endedTick = this.rt.tick;
+        r.diagnostic = { code: 'sequence.unknown-step', message: `step "${s.id}": cancel names ${t ? 'itself' : `unknown step "${p.step}"`}`, subjects: [s.id] };
+        this.onFailure(s, r);
+        return;
+      }
+      if (t.status === 'pending') {
+        t.status = 'skipped';
+        t.endedTick = this.rt.tick;
+        t.diagnostic = reason;
+      } else if ((t.status === 'executing' || t.status === 'blocked') && !this.cutReason.has(t.id)) this.stopStep(t, reason);
+      r.outputs = { cancelled: t.id, was: t.status };
+    }
+    r.status = 'completed';
+    r.endedTick = this.rt.tick;
   }
 
   get done(): boolean {
@@ -270,8 +350,8 @@ export class SequenceRunner {
       ? 'timeout'
       : this.aborted
         ? 'aborted'
-        : this.reports.every((r) => r.status === 'completed')
-          ? 'completed'
+        : this.reports.every((r) => r.status === 'completed' || ((r.status === 'cancelled' || r.status === 'skipped') && r.diagnostic?.code === 'sequence.step-cancelled'))
+          ? 'completed' // a step the plan's own `cancel` stopped ran as directed (LM-016)
           : 'partial';
     return {
       status,
@@ -333,6 +413,7 @@ export class SequenceRunner {
   }
 
   private submit(s: StepSpec, r: StepReport) {
+    if (Object.hasOwn(SEQUENCE_VERBS, s.verb) && !this.rt.registry.has(s.verb)) return this.builtin(s, r);
     const rec = this.rt.submit(s.verb, s.params, { id: `${this.prefix}${s.id}` });
     r.actionId = rec.id;
     r.submittedTick = this.rt.tick;

@@ -18,6 +18,7 @@ import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import type { Invariant } from '../runtime/runtime.ts';
 import type { EngineConfig } from '../rehearsal/rehearse.ts';
 import { Spatial } from '../spatial/service.ts';
+import { SEQUENCE_VERBS } from '../sequence/runner.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 
@@ -31,6 +32,7 @@ export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> 
   const m = new Map<string, ActionDef>();
   for (const a of [...ENGINE_ACTIONS, ...extra]) {
     if (m.has(a.verb)) throw new Error(`duplicate verb ${a.verb}`);
+    if (Object.hasOwn(SEQUENCE_VERBS, a.verb)) throw new Error(`verb ${a.verb} is a sequence built-in (sequence/runner.ts SEQUENCE_VERBS)`);
     m.set(a.verb, a);
   }
   return m;
@@ -70,4 +72,9 @@ export function jsonSchemaOf(schema: z.ZodType): Record<string, unknown> {
 
 export function describeVerbs(registry: Map<string, ActionDef>): VerbInfo[] {
   return [...registry.values()].map((d) => ({ verb: d.verb, description: d.description, inputSchema: jsonSchemaOf(d.schema) }));
+}
+
+/** The runner's own step verbs (`mark`, `cancel`; LM-016), described like registry verbs. */
+export function describeSequenceVerbs(): VerbInfo[] {
+  return Object.entries(SEQUENCE_VERBS).map(([verb, d]) => ({ verb, description: `[sequence built-in] ${d.description}`, inputSchema: jsonSchemaOf(d.schema) }));
 }

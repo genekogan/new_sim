@@ -30,7 +30,7 @@ import { takeSampler } from '../camera/take-sampler.ts';
 import { SemanticWorld, takeFacts, worldFacts } from '../camera/direct.ts';
 import { activitiesOf, cameraVocab, parseCameraSentences, type ParsedSentence, type SentenceRefusal } from './camera-vocab.ts';
 import { directCamera } from '../camera/synth.ts';
-import { createRegistry, describeVerbs, engineConfig, ENGINE_INVARIANTS, jsonSchemaOf } from './registry.ts';
+import { createRegistry, describeSequenceVerbs, describeVerbs, engineConfig, ENGINE_INVARIANTS, jsonSchemaOf } from './registry.ts';
 import { opSchemas, type OpInput, type OpName } from './schemas.ts';
 import { applyEdits } from './edit.ts';
 import { appendCommands, describePoint, drive, isPauseSnapshot, liveActions, PAUSE_FORMAT, reached, stepProgress, type PauseContext, type PausePoint, type PauseSnapshot } from './pause.ts';
@@ -297,6 +297,7 @@ export class EngineController {
       templateSchema: SEQUENCE_SCHEMA,
       planSchema: PLAN_SCHEMA,
       verbs: describeVerbs(this.registry),
+      sequenceVerbs: describeSequenceVerbs(),
       templateJsonSchema: jsonSchemaOf(templateSchema),
     };
   }
@@ -360,7 +361,7 @@ export class EngineController {
       out.workspaces = all.map((w) => ({ ...w, forks: all.filter((o) => o.forkedFrom === w.id).map((o) => o.id) }));
     }
     if (q.take_id) {
-      if (!this.take(q.take_id)) return fail('take.unknown', `no take ${q.take_id}`);
+      if (!this.take(q.take_id)) return this.noTake(q.take_id);
       out.take_id = q.take_id;
       out.cameras = this.cameras(q.take_id).map((c) => {
         const d = c.data as { spec?: { kind?: string; subject?: string }; hz?: number; duration?: number; samples?: unknown[] };
@@ -465,7 +466,7 @@ export class EngineController {
 
   getTake(q: OpInput<'get_take'>): OpResult {
     const take = this.take(q.take_id);
-    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    if (!take) return this.noTake(q.take_id);
     const t0 = Math.max(0, Math.floor((q.from ?? 0) / take.dt + 1e-6));
     const t1 = Math.min(take.ticks, q.to === undefined ? take.ticks : Math.ceil(q.to / take.dt - 1e-6));
     if (t1 < t0) return fail('take.bad-range', `empty range: from ${q.from} s is after to ${q.to} s`);
@@ -771,7 +772,7 @@ export class EngineController {
 
   attachCameraTrack(q: OpInput<'attach_camera_track'>): OpResult {
     const take = this.take(q.take_id);
-    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    if (!take) return this.noTake(q.take_id);
     const scene = this.scenes[take.finalState.base.campus];
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
     // a camera track is stored beside its take: an unkept rehearsal take is kept from now on
@@ -805,7 +806,7 @@ export class EngineController {
     let world: WorldState, take: Take | undefined;
     if (q.take_id) {
       take = this.take(q.take_id);
-      if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+      if (!take) return this.noTake(q.take_id);
       world = take.finalState;
     } else world = this.history.read(q.workspace!);
     const scene = this.scenes[world.base.campus];
@@ -824,7 +825,7 @@ export class EngineController {
   /** LM-013: store a compiled camera track (a directed one from the studio) beside its take. */
   storeCameraTrack(q: OpInput<'store_camera_track'>): OpResult {
     const take = this.take(q.take_id);
-    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    if (!take) return this.noTake(q.take_id);
     const track = q.track as CameraTrack;
     if (track.takeId !== take.id) return fail('camera.track-take-mismatch', `camera track ${track.id} belongs to take ${track.takeId}, not ${take.id}; store it beside its own take`, { details: { track: track.id, takeId: track.takeId } });
     try {
@@ -855,7 +856,7 @@ export class EngineController {
   /** OWNER_FEEDBACK §11: directions → computed, validated camera track stored beside the take (camera/direct.ts, synth.ts). */
   directCameraOp(q: OpInput<'direct_camera'>): OpResult {
     const take = this.take(q.take_id);
-    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    if (!take) return this.noTake(q.take_id);
     const scene = this.scenes[take.finalState.base.campus];
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
     if ((q.directions ? 1 : 0) + (q.sentences ? 1 : 0) !== 1) return fail('op.invalid-input', 'direct_camera: give exactly one of `directions`, `sentences`');
@@ -896,6 +897,20 @@ export class EngineController {
   }
 
   // ---- storage helpers --------------------------------------------------------------------------
+
+  /**
+   * A take that is not here: `take.evicted` when a checkpoint still names it (its workspace was deleted and the
+   * room evicted the take past its cap — LM-017), else `take.unknown`.
+   */
+  noTake(id: string): OpResult {
+    const cps = this.history.checkpointsNamingTake(id);
+    if (!cps.length) return fail('take.unknown', `no take ${id}`);
+    return fail(
+      'take.evicted',
+      `take ${id} is no longer stored: checkpoint${cps.length > 1 ? 's' : ''} ${cps.join(', ')} still name${cps.length > 1 ? '' : 's'} it, but no live workspace reaches ${cps.length > 1 ? 'them' : 'it'} (deleted workspace), so the room evicted the take past its cap. Re-record it: engine_fork at the checkpoint's parent and engine_execute the plan again`,
+      { details: { take_id: id, checkpoints: cps } },
+    );
+  }
 
   take(id: string): Take | undefined {
     if (this.takes.has(id)) return this.takes.get(id);

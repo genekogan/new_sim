@@ -219,3 +219,71 @@ test('runner: timeout settles deferred cancels, lists cut steps, reports refusal
   assert.ok(r2.diagnostics.some((d) => d.code === 'sequence.cancel-refused' && /will not stop here/.test(d.message)));
   assert.ok(r2.diagnostics.some((d) => d.code === 'sequence.unsettled'));
 });
+
+// ---- LM-016: step timeout, cancel / mark steps (W58) ------------------------------------------------
+
+test('runner (LM-016): a step timeout cancels the live step with a named reason and applies onFail', () => {
+  const rt = runtime();
+  const t0 = rt.tick;
+  const r = runSequence(rt, [
+    { id: 'long', verb: 'wait_ticks', params: { n: 200 }, timeout: 2 },
+    { id: 'after', verb: 'wait_ticks', params: { n: 5 }, after: ['long'] },
+    { id: 'side', verb: 'wait_ticks', params: { n: 100 } },
+  ]);
+  assert.equal(r.status, 'aborted', 'default onFail abort');
+  const s = Object.fromEntries(r.steps.map((x) => [x.id, x]));
+  assert.equal(s.long.status, 'cancelled');
+  assert.equal(s.long.endedTick, t0 + Math.round(2 / DT));
+  assert.equal(s.long.diagnostic?.code, 'sequence.step-timeout');
+  assert.match(s.long.diagnostic!.message, /did not finish within its 2 s timeout/);
+  assert.equal(s.side.status, 'cancelled', 'abort stops the other live step');
+  assert.equal(s.after.status, 'skipped');
+  assert.ok(r.diagnostics.some((d) => d.code === 'sequence.step-timeout'));
+  // onFail continue: only the dependents are skipped
+  const r2 = runSequence(runtime(), [
+    { id: 'long', verb: 'wait_ticks', params: { n: 200 }, timeout: 1, onFail: 'continue' },
+    { id: 'after', verb: 'wait_ticks', params: { n: 5 }, after: ['long'] },
+    { id: 'side', verb: 'wait_ticks', params: { n: 60 } },
+  ]);
+  const s2 = Object.fromEntries(r2.steps.map((x) => [x.id, x]));
+  assert.equal(r2.status, 'partial');
+  assert.deepEqual([s2.long.status, s2.after.status, s2.side.status], ['cancelled', 'skipped', 'completed']);
+  // a step that finishes in time is untouched
+  const r3 = runSequence(runtime(), [{ id: 'quick', verb: 'wait_ticks', params: { n: 10 }, timeout: 5 }]);
+  assert.equal(r3.status, 'completed');
+});
+
+test('runner (LM-016): cancel stops a live step (not a failure), skips a pending one; mark puts an event in the run; `at` applies', () => {
+  const rt = runtime();
+  const t0 = rt.tick;
+  const r = runSequence(rt, [
+    { id: 'wander', verb: 'wait_ticks', params: { n: 1000 } },
+    { id: 'stop', verb: 'cancel', params: { step: 'wander' }, at: 1.5 },
+    { id: 'never', verb: 'wait_ticks', params: { n: 5 }, at: 100 },
+    { id: 'skipit', verb: 'cancel', params: { step: 'never' }, after: ['stop'] },
+    { id: 'm', verb: 'mark', params: { name: 'lights-down', data: { cue: 3 } }, when: { event: 'completed', step: 'stop' } },
+  ]);
+  const s = Object.fromEntries(r.steps.map((x) => [x.id, x]));
+  assert.equal(s.stop.status, 'completed');
+  assert.equal(s.stop.submittedTick, t0 + Math.round(1.5 / DT));
+  assert.equal(s.wander.status, 'cancelled');
+  assert.equal(s.wander.diagnostic?.code, 'sequence.step-cancelled');
+  assert.equal(s.never.status, 'skipped');
+  assert.equal(s.never.diagnostic?.code, 'sequence.step-cancelled');
+  assert.deepEqual(s.stop.outputs, { cancelled: 'wander', was: 'cancelled' });
+  assert.equal(r.status, 'completed', 'steps the plan cancels ran as directed: no abort, not partial');
+  assert.equal(r.endTick, t0 + Math.round(1.5 / DT), 'nothing left to run');
+  const marks = rt.events.filter((e) => e.type === 'mark');
+  assert.deepEqual(marks.map((e: any) => [e.name, e.data, e.tick]), [['lights-down', { cue: 3 }, t0 + Math.round(1.5 / DT)]]);
+});
+
+test('bind (LM-016): cancel/mark are validated like verbs — unknown / self targets and bad params are refused; timeout in the schema', () => {
+  const h = pgHistory();
+  const ctx = { history: h, baseline: 'ws', registry: registry() };
+  const ok = bindTemplate(tpl([{ id: 'a', verb: 'wait_ticks', params: { n: 5 }, timeout: 3 }, { id: 'c', verb: 'cancel', params: { step: 'a' } }, { id: 'm', verb: 'mark', params: { name: 'x' } }]), {}, ctx);
+  assert.equal(ok.steps[0].timeout, 3);
+  assert.deepEqual(codes(() => bindTemplate(tpl([{ id: 'c', verb: 'cancel', params: { step: 'ghost' } }]), {}, ctx)), ['sequence.unknown-step']);
+  assert.deepEqual(codes(() => bindTemplate(tpl([{ id: 'c', verb: 'cancel', params: { step: 'c' } }]), {}, ctx)), ['sequence.unknown-step']);
+  assert.deepEqual(codes(() => bindTemplate(tpl([{ id: 'm', verb: 'mark', params: {} }]), {}, ctx)), ['action.invalid-params']);
+  assert.deepEqual(codes(() => bindTemplate(tpl([{ id: 'a', verb: 'wait_ticks', params: { n: 5 }, timeout: -1 }]), {}, ctx)), ['sequence.invalid-template']);
+});
