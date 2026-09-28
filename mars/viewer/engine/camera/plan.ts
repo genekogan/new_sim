@@ -12,7 +12,7 @@
 import { dacos, q6, type Vec3, hypot } from '../core/math.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import { CameraWorld, raycast, solidName, type CameraPolicy } from './geom.ts';
-import { evaluateShot, shotSubjects, subjectPoints, type CameraPose, type Sampler, type ShotSpec } from './shots.ts';
+import { evaluateShot, shotSubjects, subjectPoints, type CameraPose, type Sampler, type ShotSpec, type SubjectPose } from './shots.ts';
 import { SubjectTrackBuilder, type SubjectTrack } from './track.ts';
 import { badness, candidates, VARIANT_KEYS, type Candidate, type SolveOpts } from './solve.ts';
 import { placement, readability, temporal, type Temporal } from './quality.ts';
@@ -52,6 +52,7 @@ export type PlanReport = {
 export type CameraPlan = { spec: ShotSpec; hz: number; duration: number; safeArea?: { bottom: number }; samples: PlannedSample[]; subjects: SubjectTrack; report: PlanReport };
 
 const INF = 1e12;
+const NO_SUBJECTS: Record<string, SubjectPose> = Object.freeze({}) as Record<string, SubjectPose>;
 const DEG = Math.PI / 180;
 const fmt = (t: number) => t.toFixed(1);
 const q3 = (v: Vec3): Vec3 => [q6(v[0]), q6(v[1]), q6(v[2])];
@@ -85,7 +86,9 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
   const scored = new SubjectTrackBuilder();
   for (let i = 0; i < N; i++) {
     const t = i * dt;
-    const subjects = sampler(t);
+    // no subject ids (a lead-in hold, a fixed / path shot about static geometry): readability and the candidates do not
+    // read the subject poses, so the take is not sampled (W54: a 45 min lead-in hold sampled 220 entities × 27 k ticks)
+    const subjects = ids.length ? sampler(t) : NO_SUBJECTS;
     scored.push(ids, Object.fromEntries(ids.map((id) => [id, subjects[id] ? subjectPoints(subjects[id]) : undefined])));
     const pose = evaluateShot(spec, sampler, t, { aspect: opts.aspect, safeBottom: opts.safeArea?.bottom });
     const row: (Candidate | null)[] = new Array(K).fill(null);
