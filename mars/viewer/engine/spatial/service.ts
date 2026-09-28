@@ -15,6 +15,37 @@ import type { Profiler } from '../runtime/profile.ts';
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
 /** Non-human entity that blocks walking where it stands: a static phase, or no phase and a catalog `obstacle` fixture (chair, bench, campfire). */
 const isStatic = (e: Entity) => e.kind !== 'human' && (e.phase ? STATIC_PHASES.has(e.phase) : CATALOG[e.def]?.obstacle === true);
+/**
+ * What sync's change test reads of one static entity: id, def, phase, pose (p, yaw, pitch, roll),
+ * connections (socket / to / toSocket, flattened) and support kind — exactly the fields the old
+ * `hashOf([id, def, phase, pose, connections ?? [], support?.kind ?? ''])` key hashed. Numbers are
+ * compared with ===, which agrees with that key's JSON text (-0 = 0; undefined ≠ 0 for pitch/roll).
+ * Actions mutate `pose.p` and push onto `connections` in place, so values are copied, not referenced.
+ */
+type NavSnap = { id: string; def: string; phase: string | undefined; x: number; y: number; z: number; yaw: number; pitch: number | undefined; roll: number | undefined; conn: string[]; support: string };
+
+function navSnap(e: Entity, s?: NavSnap): NavSnap {
+  const conn: string[] = [];
+  if (e.connections) for (const c of e.connections) conn.push(c.socket, c.to, c.toSocket);
+  const p = e.pose.p, support = e.support?.kind ?? '';
+  if (!s) return { id: e.id, def: e.def, phase: e.phase, x: p[0], y: p[1], z: p[2], yaw: e.pose.yaw, pitch: e.pose.pitch, roll: e.pose.roll, conn, support };
+  s.id = e.id; s.def = e.def; s.phase = e.phase; s.x = p[0]; s.y = p[1]; s.z = p[2];
+  s.yaw = e.pose.yaw; s.pitch = e.pose.pitch; s.roll = e.pose.roll; s.conn = conn; s.support = support;
+  return s;
+}
+
+function sameNav(s: NavSnap, e: Entity): boolean {
+  const p = e.pose.p, pose = e.pose;
+  if (s.id !== e.id || s.def !== e.def || s.phase !== e.phase || s.x !== p[0] || s.y !== p[1] || s.z !== p[2] || s.yaw !== pose.yaw || s.pitch !== pose.pitch || s.roll !== pose.roll || s.support !== (e.support?.kind ?? '')) return false;
+  const cs = e.connections, conn = s.conn;
+  if ((cs ? cs.length * 3 : 0) !== conn.length) return false;
+  if (cs) for (let i = 0, k = 0; i < cs.length; i++, k += 3) {
+    const c = cs[i];
+    if (c.socket !== conn[k] || c.to !== conn[k + 1] || c.toSocket !== conn[k + 2]) return false;
+  }
+  return true;
+}
+
 /** Bounded memo of people-augmented grids (each holds full-size rasters). */
 const AROUND_CACHE = 8;
 /** Height band a standing person blocks above their feet. */
@@ -90,7 +121,8 @@ export class Spatial {
   epoch = 0;
   /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
   prof?: Profiler;
-  private key = '';
+  /** Navigation-relevant snapshot of the static entities (in world order) at the last rebuild. */
+  private snaps: NavSnap[] = [];
   /** Rasters of the base obstacles (they lead every synced scene's obstacle list). */
   private raster: StaticRaster;
 
@@ -115,12 +147,7 @@ export class Spatial {
   }
 
   private syncNow(world: WorldState): boolean {
-    const relevant = Object.values(world.entities)
-      .filter(isStatic)
-      .map((e) => [e.id, e.def, e.phase, e.pose, e.connections ?? [], e.support?.kind ?? '']);
-    const key = hashOf(relevant);
-    if (key === this.key && this.scene) return false;
-    this.key = key;
+    if (!this.navChanged(world) && this.scene) return false;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
     const links: Link[] = [...this.base.links];
@@ -147,6 +174,26 @@ export class Spatial {
     if (this.planner === 'corridor') prepareCorridor(this.grids);
     this.epoch++;
     return true;
+  }
+
+  /**
+   * Whether any navigation-relevant field of the static entities (or their set / order) differs from
+   * the last call; refreshes the snapshots. Allocation-free when nothing changed (~35k calls a run),
+   * and changes exactly when the former sha256 key over the same fields would (planning.test.ts).
+   */
+  private navChanged(world: WorldState): boolean {
+    const snaps = this.snaps;
+    let n = 0, changed = false;
+    for (const id in world.entities) {
+      const e = world.entities[id];
+      if (!isStatic(e)) continue;
+      const s = snaps[n];
+      if (!s) { snaps.push(navSnap(e)); changed = true; }
+      else if (!sameNav(s, e)) { navSnap(e, s); changed = true; }
+      n++;
+    }
+    if (snaps.length !== n) { snaps.length = n; changed = true; }
+    return changed;
   }
 
   route(world: WorldState, profile: AgentProfile, start: Place, goal: Place, opts?: RouteOpts): RouteResult {

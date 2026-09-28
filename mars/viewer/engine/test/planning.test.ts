@@ -16,6 +16,9 @@ import { seedRng, nextRandom } from '../core/rng.ts';
 import { findRouteReference } from './path-reference.ts';
 import { stress, buildRuntime } from '../../app/lab/scenarios.ts';
 import { segmentClearance } from '../spatial/grid.ts';
+import { hashOf } from '../core/hash.ts';
+import { CATALOG } from '../world/catalog.ts';
+import type { Entity, WorldState } from '../world/types.ts';
 
 function setup(...people: ReturnType<typeof human>[]) {
   const base = provingGround();
@@ -184,4 +187,120 @@ test('stress-30: exact planner keeps the pinned result; per-tick cost bounded; z
   assert.ok(exact.max <= 250, `exact max tick ${exact.max.toFixed(1)} ms`);
   assert.ok(corr.max <= 120, `corridor max tick ${corr.max.toFixed(1)} ms`);
   assert.ok(exact.mean <= 3 && corr.mean <= 3);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Spatial.sync change test (PLANNING_BUDGET.md §5): per-entity snapshots instead of a sha256 key
+
+/** The former sync key, verbatim: sha256 over the navigation-relevant fields of the static entities. */
+const STATIC_PHASES_REF = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
+function referenceNavKey(w: WorldState): string {
+  const isStatic = (e: Entity) => e.kind !== 'human' && (e.phase ? STATIC_PHASES_REF.has(e.phase) : CATALOG[e.def]?.obstacle === true);
+  return hashOf(Object.values(w.entities).filter(isStatic).map((e) => [e.id, e.def, e.phase, e.pose, e.connections ?? [], e.support?.kind ?? '']));
+}
+
+function navWorld() {
+  const base = provingGround();
+  const w = addAll(emptyWorld('proving-ground', base),
+    component('u1', 'upright-8ft', [2, 0, 2]), component('u2', 'upright-12ft', [4, 0, 2], 0.3),
+    component('b1', 'beam-8ft', [3, 0, 5], 0, { connections: [{ socket: 'end-l', to: 'u1', toSocket: 'top' }] }),
+    { ...component('chair', 'camp-chair', [6, 0, 6]), phase: undefined, support: undefined },
+    human('h1', 8, 8, { label: 'Ann' }));
+  return { w, sp: new Spatial(base) };
+}
+
+test('Spatial.sync rebuilds on every navigation-relevant edit and on nothing else', () => {
+  const { w, sp } = navWorld();
+  assert.equal(sp.sync(w), true, 'first sync builds');
+  assert.equal(sp.sync(w), false);
+  const E = w.entities;
+  const relevant: [string, () => void][] = [
+    ['pose.p[0] in place', () => { E.u1.pose.p[0] += 0.001; }],
+    ['pose.p[1] in place', () => { E.u1.pose.p[1] = 1e-9; }],
+    ['pose.p[2] in place', () => { E.u2.pose.p[2] -= 1e-12; }],
+    ['pose.p replaced', () => { E.u2.pose.p = [E.u2.pose.p[0] + 1, E.u2.pose.p[1], E.u2.pose.p[2]]; }],
+    ['yaw', () => { E.u2.pose.yaw += 1e-6; }],
+    ['pitch set', () => { E.b1.pose.pitch = 0; }],
+    ['pitch cleared', () => { E.b1.pose.pitch = undefined; }],
+    ['roll', () => { E.b1.pose.roll = 0.2; }],
+    ['phase (static → static)', () => { E.u1.phase = 'placed'; }],
+    ['phase (leaves the static set)', () => { E.u1.phase = 'carried'; }],
+    ['phase (back)', () => { E.u1.phase = 'installed'; }],
+    ['def', () => { E.u2.def = 'upright-16ft'; }],
+    ['support kind', () => { E.u2.support = { kind: 'held', by: ['h1'] }; }],
+    ['connections push', () => { E.u1.connections = []; E.u1.connections.push({ socket: 'top', to: 'b1', toSocket: 'end-l' }); }],
+    ['connection field in place', () => { E.b1.connections![0].toSocket = 'mid'; }],
+    ['connection removed', () => { E.b1.connections!.pop(); }],
+    ['entity added', () => { E.u3 = component('u3', 'upright-9ft', [9, 0, 2]); }],
+    ['entity removed', () => { delete E.u3; }],
+    ['entity re-inserted (world order changes)', () => { const u = E.u1; delete E.u1; E.u1 = u; }],
+    ['fixture moves', () => { E.chair.pose.p[0] = 6.5; }],
+    ['identical twin added next to it', () => { const c = E.chair; delete E.chair; E.chair = c; E.twin = { ...structuredClone(c), id: 'twin' }; }],
+    ['twins swap order (only the ids differ per slot)', () => { const c = E.chair, t = E.twin; delete E.chair; delete E.twin; E.twin = t; E.chair = c; }],
+    ['human turns into a component', () => { E.h1 = { ...E.h1, kind: 'component', def: 'upright-8ft', phase: 'stored', human: undefined }; }],
+    ['and back', () => { E.h1 = human('h1', 8, 8, { label: 'Ann' }); }],
+  ];
+  for (const [what, edit] of relevant) {
+    const before = referenceNavKey(w);
+    edit();
+    assert.notEqual(referenceNavKey(w), before, `${what}: the reference key changes`);
+    assert.equal(sp.sync(w), true, `${what}: sync rebuilds`);
+    assert.equal(sp.sync(w), false, `${what}: then settles`);
+  }
+  const irrelevant: [string, () => void][] = [
+    ['label', () => { E.u1.label = 'the left upright'; }],
+    ['provenance', () => { E.u1.provenance = { ...E.u1.provenance, note: 'changed' } as Entity['provenance']; }],
+    ['assembly', () => { E.u2.assembly = 'bay-1'; }],
+    ['support detail (not its kind)', () => { E.u2.support = { kind: 'held', by: ['h1', 'h2'] }; }],
+    ['connections [] ↔ undefined', () => { E.b1.connections = E.b1.connections!.length ? E.b1.connections : undefined; E.u2.connections = []; }],
+    ['connections replaced by an equal copy', () => { E.u1.connections = E.u1.connections!.map((c) => ({ ...c })); }],
+    ['-0 for 0', () => { E.u1.pose.p[1] = E.u1.pose.p[1] === 0 ? -0 : E.u1.pose.p[1]; }],
+    ['entity replaced by a deep clone', () => { E.u2 = structuredClone(E.u2); }],
+    ['human walks and changes activity', () => { E.h1.pose.p[0] += 1; E.h1.human!.activity = 'walk'; }],
+    ['carried component moves', () => { E.u1.phase = 'carried'; sp.sync(w); E.u1.pose.p[0] += 2; }],
+  ];
+  for (const [what, edit] of irrelevant) {
+    const before = referenceNavKey(w);
+    edit();
+    const after = referenceNavKey(w);
+    if (what === 'carried component moves') { assert.equal(sp.sync(w), false, what); continue; }
+    assert.equal(after, before, `${what}: the reference key is unchanged`);
+    assert.equal(sp.sync(w), false, `${what}: no rebuild`);
+  }
+});
+
+test('Spatial.sync change test === former sha256 key over 1,500 seeded random edits', () => {
+  const { w, sp } = navWorld();
+  const rand = seedRng('nav-key');
+  const r = () => nextRandom(rand);
+  const pick = <T>(xs: T[]): T => xs[Math.floor(r() * xs.length)];
+  const phases = ['stored', 'reserved', 'carried', 'staged', 'raising', 'placed', 'installed', undefined] as const;
+  const defs = ['upright-8ft', 'beam-8ft', 'camp-chair', 'bench-6ft', 'plywood-4x8'];
+  sp.sync(w);
+  let key = referenceNavKey(w), rebuilds = 0;
+  for (let i = 0; i < 1500; i++) {
+    const ids = Object.keys(w.entities);
+    const e = w.entities[pick(ids)];
+    const k = Math.floor(r() * 14);
+    if (k === 0) e.pose.p[Math.floor(r() * 3)] += r() < 0.5 ? 0 : (r() - 0.5) * 0.01;
+    else if (k === 1) e.pose.yaw = r() < 0.5 ? e.pose.yaw : r() * 6;
+    else if (k === 2) e.pose.pitch = pick([undefined, 0, 0.1]);
+    else if (k === 3) e.phase = pick([...phases]);
+    else if (k === 4 && e.kind !== 'human') e.def = pick(defs);
+    else if (k === 5) e.support = pick([undefined, { kind: 'ground' }, { kind: 'resting-on', on: pick(ids) }, { kind: 'held', by: [pick(ids)] }]);
+    else if (k === 6) (e.connections ??= []).push({ socket: pick(['a', 'b']), to: pick(ids), toSocket: 'x' });
+    else if (k === 7 && e.connections?.length) pick(e.connections).to = pick(ids);
+    else if (k === 8) e.connections = r() < 0.5 ? undefined : e.connections?.slice();
+    else if (k === 9) w.entities[`n${i}`] = component(`n${i}`, pick(defs), [r() * 10, 0, r() * 10], 0, { phase: pick([...phases]) });
+    else if (k === 10 && ids.length > 3) delete w.entities[e.id];
+    else if (k === 11) { delete w.entities[e.id]; w.entities[e.id] = e; }
+    else if (k === 12) e.label = `l${i}`;
+    else if (k === 13) w.entities[e.id] = structuredClone(e);
+    const next = referenceNavKey(w);
+    const rebuilt = sp.sync(w);
+    assert.equal(rebuilt, next !== key, `edit ${i} (kind ${k} on ${e.id}): sync ${rebuilt ? 'rebuilt' : 'skipped'} but the reference key ${next !== key ? 'changed' : 'did not'}`);
+    if (rebuilt) rebuilds++;
+    key = next;
+  }
+  assert.ok(rebuilds > 400 && rebuilds < 1400, `${rebuilds} rebuilds (both outcomes exercised)`);
 });
