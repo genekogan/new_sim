@@ -26,3 +26,8 @@
   (shoulder height, arm length 0.62 m, overhead reach ≈ 2.0 m, reach-down, lean limits) is the source of truth; the rig's arm
   bones are scaled to it once per template; hand-up/items/paint constants import it; a Playwright test pins measured rig reach
   to the model within 2 cm. Anything the model cannot reach is refused by the engine, never interpolated (feedback §5/§6).
+- (2026-09-28 04:20 EDT, lead, overnight — Gene may veto) **Body model = the measured rig.** Renderer measurement (W9, three templates
+  scaled to 1.75 m): shoulders 1.34 m, arm 0.62 m, overhead 2.00 m (2.06 on heels), kneeling reach-down at a deck edge ≈ 0.35–0.54 m
+  below the feet at 0.45 m out. The engine model adopts these (shoulders 1.34, half-width 0.15, reach-down 0.5 m below the feet);
+  the spec's "≈ 1.0 m reach-down" is therefore replaced by 0.5 m — hand-offs needing more are refused ("use the forklift").
+  Supersedes the reach-down question in PROGRESS.md unless Gene wants a lying-down receiver posture instead.
