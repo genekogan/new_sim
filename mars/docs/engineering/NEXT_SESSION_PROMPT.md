@@ -12,6 +12,17 @@ well-bounded tasks to Opus 5.5 subagents (Gene's preference; typically 3, up to 
 accelerate). Every subagent brief must name the files it owns and the files other agents own, require
 small tool calls and early commits, and forbid host `Math.sin/cos/atan2…` in `viewer/engine/**`.
 
+**Manage your own parallelism against the 5-hour usage window.** Ask Gene for the current 5-hour and
+weekly percentages at the start and roughly every hour (he reports them; you cannot read them). Budget
+the window explicitly: decide how much of the 5-hour allowance this session may spend, divide by the
+hours left, and size the number of concurrent Opus subagents to that rate (one Opus task of this kind
+has cost roughly 150–300k subagent tokens; six in parallel exhausted a 5-hour window in about two
+hours on 2026-09-28). Scale up when the rate is under budget, down when over. Stop spawning when the
+window has ~30 minutes left and land what is running: every agent commits at its next green point, you
+regenerate EVIDENCE.md, append PROGRESS.md, and update this file and HANDOFF.md so the following
+session can resume from a clean tree — exactly the checkpoint pattern used on 2026-09-28. Never let a
+5-hour cut-off catch agents mid-write.
+
 **Read in this order before doing anything:**
 1. `docs/engineering/HANDOFF.md` — state of the system, evidence, releases, known shortcomings, next tranche.
 2. `docs/engineering/ENGINE_GUIDE.md` — hard rules for engine code (strip-types TS, zod only, DT = 1/20 s,
