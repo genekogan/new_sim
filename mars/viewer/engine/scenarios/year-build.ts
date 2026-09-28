@@ -27,6 +27,7 @@ import { MOVES_B, stairWorkOk } from '../construction/moves-b.ts';
 import { SOLAR_ACTIONS } from '../construction/solar.ts';
 import { progressiveContributor, progressiveSupported } from '../construction/contributor.ts';
 import type { Section } from '../campus/sequence-b.ts';
+import type { PartB } from '../campus/parts-b.ts';
 import { entityCorners, type Contributor, type SceneContribution } from '../spatial/service.ts';
 import type { Entity } from '../world/types.ts';
 import { walkTo } from '../locomotion/walk.ts';
@@ -69,7 +70,7 @@ export type YearBuildSetup = {
 };
 
 /** Publish `mars-<year>` (protected), fork it, commit the piles + crew, bind the skeleton template. */
-export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[] } } = {}): YearBuildSetup {
+export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB) => boolean } } = {}): YearBuildSetup {
   const history = new WorldHistory(YEAR_BUILD_RULES);
   const { canonical, base } = publishCampusYear(history, year, file);
   const graph = assemblyGraph(year, base);

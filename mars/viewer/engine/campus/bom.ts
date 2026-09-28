@@ -171,7 +171,7 @@ export function buildingFootprint(nodes: AsmNode[]): OBB2 {
  * (≤ `radius` m from the building) is searched nearest-to-that-side's-anchor first (ties by x, z);
  * the side where everything fits with the least total distance to the building wins (ties: side order).
  */
-export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean; extra?: { id: string; def: string }[]; more?: PileSpec[] } = {}): Yard {
+export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean; extra?: { id: string; def: string }[]; more?: PileSpec[]; phaseB?: boolean } = {}): Yard {
   const fp = buildingFootprint(nodes);
   // frames stand in lines along the frames' normal (local z): the ends are where frames are laid out
   const workZone: OBB2 = { c: fp.c, half: [fp.half[0] + WORK_MARGIN.sides, fp.half[1] + WORK_MARGIN.ends], yaw: fp.yaw };
@@ -188,14 +188,14 @@ export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: Campu
     const a = rot2([sd[0] * (workZone.half[0] + 4), sd[1] * (workZone.half[1] + 4)], fp.yaw);
     const anchor: Vec2 = [fp.c[0] + a[0], fp.c[1] + a[1]];
     const cands = lattice.map((p) => ({ p, d: dist(p, anchor) })).sort((x, y) => x.d - y.d || x.p[0] - y.p[0] || x.p[1] - y.p[1]).map((x) => x.p);
-    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false, opts.extra ?? [], opts.more ?? []);
+    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false, opts.extra ?? [], opts.more ?? [], opts.phaseB ?? false);
     const cost = yard.refused.length * 1e6 + yard.piles.reduce((s, p) => s + dist([p.x, p.z], fp.c), 0) + (yard.station ? dist([yard.station.x, yard.station.z], fp.c) : 0);
     if (cost < bestCost - 1e-9) { best = yard; bestCost = cost; }
   }
   return best!;
 }
 
-function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean, extra: { id: string; def: string }[] = [], more: PileSpec[] = []): Yard {
+function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean, extra: { id: string; def: string }[] = [], more: PileSpec[] = [], phaseB = false): Yard {
   const placed: OBB2[] = [];
   const out: PilePlacement[] = [];
   const refused: Yard['refused'] = [];
@@ -218,14 +218,20 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
     out.push({ ...pile, x: r3(c[0]), z: r3(c[1]), yaw, out: { x: r3(c[0] + o[0]), z: r3(c[1] + o[1]), yaw } });
   };
   for (const pile of order) placePile(pile);
+  // phase B (cuts): the cutting station's plot includes its out-feed (up to ~4.6 m behind the bench: two pieces 0.8 m
+  // apart); the phase-A yard (no cuts) keeps its own station rule
   let station: Yard['station'] = null;
   if (withStation) {
     const s = def('cutting-station').size;
-    const c = cands.find((p) => fits({ c: p, half: [s[0] / 2 + 1.5, s[2] / 2 + 1.5], yaw }));
-    if (c) { placed.push({ c, half: [s[0] / 2 + 1.5, s[2] / 2 + 1.5], yaw }); station = { x: r3(c[0]), z: r3(c[1]), yaw }; }
+    // plot: the bench + 1.5 m all round; phase B: + its out-feed behind it (local +z, 4.6 m from its centre)
+    const back = phaseB ? 4.6 + 0.5 : s[2] / 2 + 1.5, front = s[2] / 2 + 1.5;
+    const mid = rot2([0, (back - front) / 2], yaw);
+    const plot = (p: Vec2): OBB2 => ({ c: [p[0] + mid[0], p[1] + mid[1]], half: [s[0] / 2 + 1.5, (back + front) / 2], yaw });
+    const c = cands.find((p) => fits(plot(p)));
+    if (c) { placed.push(plot(c)); station = { x: r3(c[0]), z: r3(c[1]), yaw }; }
     else refused.push({ id: 'cutting-station', reason: `no free plot within ${R} m for the cutting station` });
   }
-  // phase B: more piles after the phase-A yard and its station (so the skeleton's yard is unchanged), largest first
+  // phase B: the bundles beyond the skeleton's, after the station, largest first
   for (const pile of [...more].sort((a, b) => def(b.def).size[0] * def(b.def).size[2] - def(a.def).size[0] * def(a.def).size[2] || (a.id < b.id ? -1 : 1))) placePile(pile);
   // extra plots (phase B: the scrap pile), nearest the station when there is one
   const ex: NonNullable<Yard['extra']> = [];

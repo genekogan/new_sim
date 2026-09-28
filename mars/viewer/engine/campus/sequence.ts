@@ -39,7 +39,7 @@ import { bundleEntity } from '../construction/bundle.ts';
 import { GIVE_MAX, GROUND_HANG_MAX, LOAD_OUT, rungs, STANCE_DOWN, STANCE_SEP, STANCE_UP } from '../construction/stance.ts';
 import type { AsmNode, AssemblyGraph } from './assembly.ts';
 import { billOfMaterials, billOfMaterialsB, morePiles, placePiles, stockPiles, type Bom, type Yard } from './bom.ts';
-import { phaseBParts, type PartsB } from './parts-b.ts';
+import { phaseBParts, type PartB, type PartsB } from './parts-b.ts';
 import { phaseB, type Section } from './sequence-b.ts';
 import { bundleContents } from '../construction/bundle.ts';
 import type { CampusObstacle, CampusScene } from './types.ts';
@@ -104,7 +104,7 @@ type Frame = { node: AsmNode; k: number; r: number; c: Vec2 };
 
 /** Generate the skeleton-stage plan for one building of a year. */
 /** `bays`: build only the first N bays (frame lines 0…N) — a tranche; the rest is reported as outside it. */
-export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number; phaseB?: { sections?: readonly Section[] } } = {}): YearBuildPlan {
+export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB) => boolean } } = {}): YearBuildPlan {
   const crew = opts.crew ?? ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'];
   if (crew.length !== 6) throw new Error('yearBuildPlan: phase A uses a crew of six');
   const nodes = g.nodes.filter((n) => n.assembly === assembly);
@@ -113,11 +113,13 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   const unplaced: Unplaced[] = [];
   // phase B (W13): the material rules decide the stock, and the yard gets a scrap pile by the station
   // (the phase-A yard is placed first, exactly as without phase B; the extra bundles go in after it)
-  const partsB = opts.phaseB ? phaseBParts(g, assembly, { flip: (strip) => noRoomMinusU(strip, scene) }) : undefined;
+  const partsB0 = opts.phaseB ? phaseBParts(g, assembly, { flip: (strip) => noRoomMinusU(strip, scene) }) : undefined;
+  // a phase-B tranche (`only`): the other parts are reported as outside it
+  const partsB = partsB0 && opts.phaseB?.only ? { ...partsB0, parts: partsB0.parts.filter(opts.phaseB.only) } : partsB0;
   const bomA = billOfMaterials(g, [assembly]);
   const bom = partsB ? billOfMaterialsB(g, [assembly], partsB) : bomA;
   const piles = stockPiles(bomA);
-  const yard = placePiles(piles, nodes, scene.obstacles, 0, partsB ? { extra: [{ id: 'scrap-pile', def: 'scrap-pile' }], more: morePiles(bom, piles) } : {});
+  const yard = placePiles(piles, nodes, scene.obstacles, 0, partsB ? { extra: [{ id: 'scrap-pile', def: 'scrap-pile' }], more: morePiles(bom, piles), phaseB: true } : {});
   for (const r of yard.refused) unplaced.push({ node: r.id, kind: 'pile', reason: r.reason });
   // ---- grid of frame lines × rows
   const Y = frameNodes[0].box.yaw;
@@ -312,7 +314,8 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   for (const b of beams) if (!seqIds.has(b.node.id) && !unplaced.some((u) => u.node === b.node.id)) unplaced.push({ node: b.node.id, kind: 'beam', reason: outside(b.k + 1) ?? 'not reached by the generator' });
   for (const nd of nodes) {
     if (seqIds.has(nd.id) || unplaced.some((u) => u.node === nd.id)) continue;
-    if (nd.kind === 'feature' && partsB) unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: bom.unresolved.find((u) => u.feature === nd.feature)?.reason ?? `no phase B rule sequences this ${nd.feature}` });
+    if (nd.kind === 'feature' && partsB && partsB0!.parts.some((p) => p.nodes.includes(nd.id)) && opts.phaseB?.only) unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: 'outside the requested phase-B tranche' });
+    else if (nd.kind === 'feature' && partsB) unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: bom.unresolved.find((u) => u.feature === nd.feature)?.reason ?? `no phase B rule sequences this ${nd.feature}` });
     else if (nd.kind === 'feature') unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: nd.feature === 'stair-part' ? 'phase A: Kit stairs have no stringers and no catalog flight of their width (4.45 m, 8 treads, 2.22 m rise); stair verbs for them are phase B' : `phase A builds the skeleton only; ${nd.feature} is phase B` });
     else unplaced.push({ node: nd.id, kind: nd.kind, reason: 'not reached by the generator' });
   }

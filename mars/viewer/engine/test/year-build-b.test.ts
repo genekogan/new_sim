@@ -72,6 +72,35 @@ test('year build 2022, report only: the other three rack houses plan through the
   console.log(`[year-build B 2022 report-only] ${JSON.stringify(out)}`);
 });
 
+/** Pinned: the first-bay tranche + its first ground-floor deck strip (default suite). */
+const PIN_BAY1_DECK = { ticks: 53248, hash: 'd8274416df027cfd35ee1b4dc127836cfe6aedb82a9ced3db3d3a2e92e6ccff1' };
+
+test('year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned', () => {
+  const firstStrip = (p: { kind: string; meta: Record<string, number | string> }) => p.kind === 'deck' && Number(p.meta.level) < 1 && Number(p.meta.strip) < -9.5;
+  const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays: 1, phaseB: { sections: ['D0'], only: firstStrip } });
+  assert.equal(s.build.partsB!.parts.length, 3);
+  const t0 = performance.now();
+  const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
+  const ms = performance.now() - t0;
+  const bad = reh.report.steps.filter((x) => x.status !== 'completed');
+  assert.equal(reh.report.status, 'completed', JSON.stringify(bad.slice(0, 2)).slice(0, 800));
+  assert.deepEqual(reh.report.violations, []);
+  assert.ok(reh.report.settled, reh.report.unsettled.join('; '));
+  assert.deepEqual(compareToCanonical(reh.finalState, s.build).filter((c) => !c.ok), []);
+  const cmp = compareB(reh.finalState, s.build);
+  assert.equal(cmp.length, 3);
+  assert.deepEqual(cmp.filter((c) => !c.ok), []);
+  const verbs = kinds(s.plan.steps.slice(s.build.phaseAStepCount).map((x) => ({ kind: x.verb })));
+  assert.equal(verbs.cut, 3);
+  assert.equal(verbs.stack_offcut, 3);
+  assert.equal(verbs.pass_up, 3);
+  console.log(`[year-build B 2022 east-house, bay 1 + first deck strip] ${reh.report.steps.length} steps, ${reh.report.metrics.ticks} ticks (${reh.report.metrics.duration.toFixed(0)} s simulated), 0 violations, ${(ms / 1000).toFixed(1)} s wall, hash ${reh.report.finalStateHash}`);
+  if (PIN_BAY1_DECK.ticks) {
+    assert.equal(reh.report.metrics.ticks, PIN_BAY1_DECK.ticks);
+    assert.equal(reh.report.finalStateHash, PIN_BAY1_DECK.hash);
+  }
+});
+
 /** Pinned: the whole east-house A+B (YEAR_BUILD_FULL=1). */
 const PIN_FULL_AB = { ticks: 0, hash: '' };
 
