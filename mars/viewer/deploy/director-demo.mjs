@@ -124,7 +124,7 @@ try {
   section('1. Create a room, list verbs, query the world');
   const cap = newRoom();
   note(`room ${cap.room.slice(0, 12)}… (control capability = Bearer ROOM.KEY; view key = sha256(KEY))`);
-  let t0 = performance.now();
+  const t0 = performance.now();
   client = await connect(cap.headers);
   timings.push({ step, tool: 'mcp connect', wall: performance.now() - t0 });
   const tools = (await client.listTools()).tools.map((t) => t.name).filter((n) => n.startsWith('engine_'));
