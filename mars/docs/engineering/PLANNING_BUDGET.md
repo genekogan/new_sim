@@ -139,6 +139,28 @@ per encounter). That shifts encounter timing: stress-30 `a6e42f5c…0e26c` → `
 flagship build-bay `d54eca7c…0f610` (11522 ticks) → `79447f750779…96129` (11403 ticks, take
 `bf58b85269c981003ce6d9c6`); 0 violations. Campus flagship hash not re-measured here.
 
+**Re-pinned 2026-09-28 (grid lattice anchoring, not the budget):** grid cell coordinates were origin-relative
+(`centreOf` = x0 + (i + 0.5)·cell), so the same physical cell had centres differing by ulps under different
+bounds (the cropped vs full campus: x0 −12 vs −162), and the full-campus flagship diverged from the cropped one.
+Every `LevelGrid` now sits on one global lattice (`spatial/grid.ts`): integer offsets `ox/oz`, cell (i, j) =
+lattice cell (ox + i, oz + j), centre `latticeCentre(k) = (k + 0.5)·cell`, `cellOf` = floor(x / cell) − ox; the
+raster, EDT extents (`latticeOf(bounds)`), A* heuristic, lattice-aligned corridor coarse grids and the carry
+planner's field / closed-set bins all go through these. Moved pins (all 0 violations before and after):
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| probe / flagship build-bay | `79447f750779…96129` (take `bf58b85269c981003ce6d9c6`) | `c2c84663c993…67a41` (take `3d279fa1eeac4e9a3eec1584`) | 11403 → 11400 |
+| campus flagship (staging-east crop) | `b159317e2937…c0bda` | `42dec8e8f371…dde61` | 11950 → 11926 |
+| campus flagship, full uncropped | `3a01328f85ed…4a071` (≠ crop) | `42dec8e8f371…dde61` (= crop, now asserted) | 11986 → 11926 |
+| lab stress-30 (60 s) | `e55d3ee17dd5…8e989` | `0ec4d884598d…ecf58` | fixed 1200 |
+| carry gather routes (`G`) | `8b5ab468…125f8` | `ea04513b…539ab` | — |
+
+Behaviour check against the previous tree: the probe and the cropped campus flagship end with the same
+entities, every component bit-identical, every person at exactly the same pose and discrete state (all 24
+campus components installed); only the durations move (−3 / −24 ticks). The gather routes are the same cells,
+vertices ≤ 1 ulp apart. Stress-30 diverges visibly after 60 s (a soak whose walkers draw new goals from one
+shared RNG on arrival, so one shifted arrival reorders every later draw); 0 violations both.
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

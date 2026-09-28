@@ -4,7 +4,7 @@
 // samples are spaced so no disc moves more than SAMPLE metres between them
 // (margin ≥ SAMPLE/2 then covers the motion between samples).
 import { angleDelta, dcos, dsin, type Vec2 } from '../core/math.ts';
-import type { LevelGrid } from '../spatial/grid.ts';
+import { cellOf, type LevelGrid } from '../spatial/grid.ts';
 import type { Formation, SE2 } from './formation.ts';
 
 /** Max displacement of any formation point between two checked samples (m). */
@@ -87,10 +87,9 @@ export function sweep(g: LevelGrid, f: Formation, m: Motion, margin = PLAN_MARGI
 export function distanceField(g: LevelGrid, goal: Vec2, thresh: number, stopCell: number, margin: number): Float32Array {
   const N = g.nx * g.nz;
   const dist = new Float32Array(N).fill(Infinity);
-  const gi = Math.floor((goal[0] - g.x0) / g.cell), gj = Math.floor((goal[1] - g.z0) / g.cell);
-  if (gi < 0 || gj < 0 || gi >= g.nx || gj >= g.nz) return dist;
+  const g0 = cellOf(g, goal);
+  if (g0 < 0) return dist;
   const heap = new Heap();
-  const g0 = gj * g.nx + gi;
   dist[g0] = 0;
   heap.push(g0, 0);
   const done = new Uint8Array(N);

@@ -4,7 +4,10 @@
 // same level order — on random scenes and on every construction step of the real sequences.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildGrids, gridsWithObstacles, updateGrids, StaticRaster, BlockerMap, type GridSet } from '../spatial/grid.ts';
+import { buildGrids, gridsWithObstacles, updateGrids, StaticRaster, BlockerMap, cellOf, centreOf, type GridSet } from '../spatial/grid.ts';
+import { findRoute } from '../spatial/path.ts';
+import { HUMAN_PROFILE } from '../spatial/types.ts';
+import { provingGround } from '../scenes/proving-ground.ts';
 import { Spatial } from '../spatial/service.ts';
 import type { Level, Obstacle, SpatialScene, Surface } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
@@ -36,7 +39,7 @@ function assertSameGrids(a: GridSet, b: GridSet, what: string) {
   assert.deepEqual([...a.levels.keys()], [...b.levels.keys()], `${what}: level order`);
   for (const [id, ga] of a.levels) {
     const gb = b.levels.get(id)!;
-    for (const k of ['level', 'y', 'cell', 'nx', 'nz', 'x0', 'z0'] as const) assert.equal(ga[k], gb[k], `${what}: level ${id} ${k}`);
+    for (const k of ['level', 'y', 'cell', 'nx', 'nz', 'ox', 'oz', 'x0', 'z0'] as const) assert.equal(ga[k], gb[k], `${what}: level ${id} ${k}`);
     const df = ga.free.findIndex((v, i) => v !== gb.free[i]);
     assert.equal(df, -1, `${what}: level ${id} free differs at cell ${df}`);
     const ca = new Uint32Array(ga.clearance.buffer, ga.clearance.byteOffset, ga.clearance.length);
@@ -226,7 +229,7 @@ test('Spatial.sync patches === full rebuild at every construction step: build-ba
     for (let i = 0; i < 200; i++) { rt.step(); s.tick?.(rt); }
   });
   assert.ok(n > 100, `${n} rebuilds checked`);
-  assert.equal(hash, '79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129', 'determinism probe hash unchanged');
+  assert.equal(hash, 'c2c84663c9935244fd1a7533a40c6dda82ca705f84a6c4c36c0d9f881e367a41', 'determinism probe hash unchanged');
 });
 
 test('Spatial.sync patches === full rebuild at every construction step: campus flagship (staging-east crop)', () => {
@@ -247,7 +250,7 @@ test('Spatial.sync patches === full rebuild at every construction step: campus f
     const plan = bindTemplate(buildBayTemplate(site), buildBayBindings, { history: h, baseline: 'build', registry: buildBayRegistry() });
     const reh = rehearse(h, 'build', plan, cfg);
     assert.equal(reh.report.status, 'completed');
-    assert.equal(reh.take.finalStateHash, 'b159317e293797dd93c54a28c288feeff28ddfafcb421252c8686ae02c0c0bda', 'campus flagship hash unchanged');
+    assert.equal(reh.take.finalStateHash, '42dec8e8f37152e61463e97fe1ef10c4dee4b6d38bb523d24b24c5144a5dde61', 'campus flagship hash unchanged');
   });
   assert.ok(n > 300, `${n} rebuilds checked`);
 });
@@ -300,11 +303,44 @@ test('Spatial.gridsFor === buildGrids for every carry plan (gather routes, tall 
     h.fork('canon', 'ws', 'ws');
     const plan = bindTemplate(buildBayTemplate(BUILD_BAY_SITE), buildBayBindings, { history: h, baseline: 'ws', registry: buildBayRegistry() });
     const r = rehearse(h, 'ws', plan, { registry: buildBayRegistry(), invariants: BUILD_BAY_INVARIANTS, services: () => ({ spatial: new Spatial(buildBayGround(), { contributors: BUILD_BAY_CONTRIBUTORS }) }) });
-    assert.equal(r.take.finalStateHash, '79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129', 'determinism probe hash unchanged');
+    assert.equal(r.take.finalStateHash, 'c2c84663c9935244fd1a7533a40c6dda82ca705f84a6c4c36c0d9f881e367a41', 'determinism probe hash unchanged');
   });
   console.log(`  gridsFor: ${res.calls} calls, ${res.patched} patched`);
-  // gather routes as planned on the former whole-grid buildGrids (measured before the switch)
-  const G = '8b5ab468c0d586b1ec373a6f88b9e1903c969ff80dfd5ece869be56b70f125f8';
+  // gather routes as planned on the former whole-grid buildGrids (measured before the switch). Re-pinned
+  // (was 8b5ab468…125f8) by grid lattice anchoring, 2026-09-28: same cells, vertices moved ≤ 1 ulp (PLANNING_BUDGET.md)
+  const G = 'ea04513b9a6928810574d7e92475b455d6993599633179516c46e7324de539ab';
   assert.deepEqual(gathers, [G, G, 'failed:carry.target-blocked'], 'gather routes unchanged');
   assert.ok(res.calls >= 15 && res.patched === res.calls, `${res.patched}/${res.calls} patched`);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Grid lattice anchoring (2026-09-28): every grid's cells are cells of one global lattice, so a crop
+// (different bounds, off-lattice) changes no coordinate — shared cells have bit-identical centres and
+// rasters, and routes that stay inside both grids are bit-identical (campus-full.test.ts end to end).
+
+test('grids of different bounds share one lattice: same cell centres, free cells and routes', () => {
+  const big = provingGround();
+  const small: SpatialScene = { ...big, bounds: [-27.37, -28.93, 26.61, 29.77] };
+  const A = buildGrids(big, 0.1), B = buildGrids(small, 0.1);
+  for (const [id, a] of A.levels) {
+    const b = B.levels.get(id)!;
+    assert.ok(b.ox !== a.ox && b.oz !== a.oz, 'the crop moves the grid origin');
+    let checked = 0;
+    for (let j = 0; j < b.nz; j += 7)
+      for (let i = 0; i < b.nx; i += 7) {
+        const p = centreOf(b, j * b.nx + i), c = cellOf(a, p);
+        assert.equal(cellOf(b, p), j * b.nx + i, 'cellOf(centreOf(c)) === c');
+        assert.deepEqual(centreOf(a, c), p, `level ${id} cell (${i}, ${j}): same centre in both grids`);
+        assert.equal(a.free[c], b.free[j * b.nx + i], `level ${id} cell (${i}, ${j}): same free bit`);
+        checked++;
+      }
+    assert.ok(checked > 1000);
+  }
+  for (const planner of ['exact', 'corridor'] as const)
+    for (const [s, g] of [[[-18, -15], [-12, -15]], [[-15, 12], [-15, 20]], [[15, -20], [15, -10]], [[-20, -20], [20, 20]]] as [[number, number], [number, number]][]) {
+      const ra = findRoute(A, big, HUMAN_PROFILE, { level: 0, p: s }, { level: 0, p: g }, { planner });
+      const rb = findRoute(B, small, HUMAN_PROFILE, { level: 0, p: s }, { level: 0, p: g }, { planner });
+      assert.ok(ra.ok, JSON.stringify(ra).slice(0, 200));
+      assert.deepEqual(rb, ra, `${planner} route ${s} → ${g} identical on both grids`);
+    }
 });

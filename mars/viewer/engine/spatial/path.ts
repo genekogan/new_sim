@@ -5,7 +5,7 @@
 // can smooth inside them and never needs collision sliding to make progress.
 import { add2, dist2, rot2, sub2, type Vec2 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
-import { cellOf, centreOf, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from './grid.ts';
+import { cellOf, centreOf, latticeCentre, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from './grid.ts';
 import type { AgentProfile, Link, SpatialScene } from './types.ts';
 
 export type Place = { level: number; p: Vec2 };
@@ -141,7 +141,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   const gx0 = goalC[0], gz0 = goalC[1];
   // octile distance from a cell centre to the goal cell centre (same float ops as centreOf)
   const hAt = (g: LevelGrid, i: number, j: number) => {
-    const dx = Math.abs(g.x0 + (i + 0.5) * g.cell - gx0), dz = Math.abs(g.z0 + (j + 0.5) * g.cell - gz0);
+    const dx = Math.abs(latticeCentre(g.ox + i, g.cell) - gx0), dz = Math.abs(latticeCentre(g.oz + j, g.cell) - gz0);
     return Math.max(dx, dz) + (SQ2 - 1) * Math.min(dx, dz);
   };
   const h = (lv: number, c: number) => {
@@ -268,9 +268,10 @@ function corridorRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfil
   for (const id of cFound.chain) {
     const lv = Math.floor(id / Nc), c = id - lv * Nc;
     const cg = coarse.levels.get(lvIds[lv])!, g = grids.levels.get(lvIds[lv])!;
-    const ci = c % cg.nx, cj = (c - ci) / cg.nx;
-    const i0 = Math.max(0, (ci - k) * f), i1 = Math.min(g.nx, (ci + k + 1) * f);
-    const j0 = Math.max(0, (cj - k) * f), j1 = Math.min(g.nz, (cj + k + 1) * f);
+    // coarse lattice cell K covers fine lattice cells K·f … K·f + f − 1 (see coarseGrids)
+    const ci = cg.ox + (c % cg.nx), cj = cg.oz + Math.floor(c / cg.nx);
+    const i0 = Math.max(0, (ci - k) * f - g.ox), i1 = Math.min(g.nx, (ci + k + 1) * f - g.ox);
+    const j0 = Math.max(0, (cj - k) * f - g.oz), j1 = Math.min(g.nz, (cj + k + 1) * f - g.oz);
     for (let j = j0; j < j1; j++) for (let i = i0, row = lv * N + j * g.nx; i < i1; i++) S.mask[row + i] = mgen;
   }
   const found = search(grids, prep, opts, { stamp: S.mask, gen: mgen });
@@ -283,7 +284,11 @@ export function prepareCorridor(grids: GridSet) {
   coarseGrids(grids, Math.max(2, Math.round(CORRIDOR_CELL / grids.cell)));
 }
 
-/** Max-clearance coarsening (factor f) of every level, memoised per fine LevelGrid. */
+/**
+ * Max-clearance coarsening (factor f) of every level, memoised per fine LevelGrid. Lattice-aligned:
+ * coarse lattice cell K (cell f·cell) covers fine lattice cells K·f … K·f + f − 1, so the blocks do
+ * not depend on the fine grid's origin.
+ */
 const coarseCache = new WeakMap<LevelGrid, Map<number, LevelGrid>>();
 function coarseGrids(grids: GridSet, f: number): GridSet {
   const levels = new Map<number, LevelGrid>();
@@ -292,15 +297,16 @@ function coarseGrids(grids: GridSet, f: number): GridSet {
     if (!byF) coarseCache.set(g, (byF = new Map()));
     let cg = byF.get(f);
     if (!cg) {
-      const nx = Math.ceil(g.nx / f), nz = Math.ceil(g.nz / f);
+      const ox = Math.floor(g.ox / f), oz = Math.floor(g.oz / f);
+      const nx = g.nx ? Math.floor((g.ox + g.nx - 1) / f) - ox + 1 : 0, nz = g.nz ? Math.floor((g.oz + g.nz - 1) / f) - oz + 1 : 0;
       const clearance = new Float32Array(nx * nz), free = new Uint8Array(nx * nz);
       for (let j = 0; j < g.nz; j++)
-        for (let i = 0, cj = ((j / f) | 0) * nx; i < g.nx; i++) {
-          const v = g.clearance[j * g.nx + i], c = cj + ((i / f) | 0);
+        for (let i = 0, cj = (Math.floor((g.oz + j) / f) - oz) * nx; i < g.nx; i++) {
+          const v = g.clearance[j * g.nx + i], c = cj + Math.floor((g.ox + i) / f) - ox;
           if (v > clearance[c]) clearance[c] = v;
           if (g.free[j * g.nx + i]) free[c] = 1;
         }
-      cg = { level: g.level, y: g.y, cell: g.cell * f, nx, nz, x0: g.x0, z0: g.z0, free, clearance, blockers: new Map() };
+      cg = { level: g.level, y: g.y, cell: g.cell * f, nx, nz, ox, oz, x0: ox * g.cell * f, z0: oz * g.cell * f, free, clearance, blockers: new Map() };
       byF.set(f, cg);
     }
     levels.set(id, cg);

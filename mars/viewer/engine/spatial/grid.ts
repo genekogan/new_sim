@@ -11,6 +11,15 @@ export type LevelGrid = {
   cell: number;
   nx: number;
   nz: number;
+  /**
+   * Global lattice index of cell column 0 / row 0: cell (i, j) of every grid is lattice cell
+   * (ox + i, oz + j), spanning [(ox + i)·cell, (ox + i + 1)·cell) in x. Grids of different bounds
+   * (a crop vs the whole campus) share the lattice, so the same physical cell has bit-identical
+   * centres everywhere. Convert only with cellOf / centreOf / cellCentre (world ↔ cell).
+   */
+  ox: number;
+  oz: number;
+  /** ox·cell, oz·cell: the grid's world-space corner, for display only (never derive cells from it). */
   x0: number;
   z0: number;
   /** 1 = floor present and free of obstacles at body height. */
@@ -102,6 +111,21 @@ export class BlockerMap extends Map<number, string> {
   }
 }
 
+/**
+ * The global cell lattice: lattice cell k spans [k·cell, (k + 1)·cell) and has centre (k + 0.5)·cell.
+ * Every world ↔ cell conversion in the engine goes through these two functions, so a coordinate
+ * never depends on a grid's origin (only an integer index offset does).
+ */
+export const latticeIndex = (x: number, cell: number) => Math.floor(x / cell);
+export const latticeCentre = (k: number, cell: number) => (k + 0.5) * cell;
+
+/** Lattice extent covering `bounds`: first lattice cell (ox, oz) and cell counts. */
+export function latticeOf(bounds: readonly [number, number, number, number], cell: number): { ox: number; oz: number; nx: number; nz: number } {
+  const [minX, minZ, maxX, maxZ] = bounds;
+  const ox = latticeIndex(minX, cell), oz = latticeIndex(minZ, cell);
+  return { ox, oz, nx: Math.max(0, Math.ceil(maxX / cell) - ox), nz: Math.max(0, Math.ceil(maxZ / cell) - oz) };
+}
+
 const BODY_HEIGHT = 1.8;
 const STEP = 0.22;
 
@@ -134,12 +158,12 @@ export class StaticRaster {
   firstCover(y: number): Int32Array {
     let m = this.byY.get(y);
     if (m) return m;
-    const [minX, minZ, maxX, maxZ] = this.bounds, cell = this.cell;
-    const nx = Math.ceil((maxX - minX) / cell), nz = Math.ceil((maxZ - minZ) / cell);
+    const cell = this.cell;
+    const { ox, oz, nx, nz } = latticeOf(this.bounds, cell);
     const cover = new Int32Array(nx * nz).fill(-1);
     this.obstacles.forEach((o, k) => {
       if (o.y1 <= y + STEP || o.y0 >= y + BODY_HEIGHT) return;
-      rasterObb(o.obb, minX, minZ, cell, nx, nz, (i) => { if (cover[i] < 0) cover[i] = k; }, true);
+      rasterObb(o.obb, ox, oz, cell, nx, nz, (i) => { if (cover[i] < 0) cover[i] = k; }, true);
     });
     if (this.byY.size >= 8) this.byY.delete(this.byY.keys().next().value!);
     this.byY.set(y, cover);
@@ -148,21 +172,22 @@ export class StaticRaster {
 }
 
 export function buildGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaster, keepColumns = false): GridSet {
-  const [minX, minZ, maxX, maxZ] = scene.bounds;
-  const nx = Math.ceil((maxX - minX) / cell), nz = Math.ceil((maxZ - minZ) / cell);
+  const lat = latticeOf(scene.bounds, cell);
   const levels = new Map<number, LevelGrid>();
   const pre = prefix?.fits(scene, cell) ? prefix : undefined;
-  for (const lv of scene.levels) levels.set(lv.id, buildLevel(scene, lv, cell, nx, nz, pre, keepColumns));
+  for (const lv of scene.levels) levels.set(lv.id, buildLevel(scene, lv, cell, lat, pre, keepColumns));
   return { cell, levels };
 }
 
-function buildLevel(scene: SpatialScene, lv: Level, cell: number, nx: number, nz: number, pre: StaticRaster | undefined, keepColumns: boolean): LevelGrid {
-  const [minX, minZ] = scene.bounds;
+type Lattice = ReturnType<typeof latticeOf>;
+
+function buildLevel(scene: SpatialScene, lv: Level, cell: number, lat: Lattice, pre: StaticRaster | undefined, keepColumns: boolean): LevelGrid {
+  const { ox, oz, nx, nz } = lat;
   const free = new Uint8Array(nx * nz);
   const blockers = new BlockerMap(nx * nz);
-  stampLevel(scene, lv, cell, nx, nz, pre, free, blockers);
+  stampLevel(scene, lv, cell, lat, pre, free, blockers);
   const cols = new Float64Array(nx * nz);
-  const g: LevelGrid = { level: lv.id, y: lv.y, cell, nx, nz, x0: minX, z0: minZ, free, clearance: edt(free, nx, nz, cell, cols), blockers };
+  const g: LevelGrid = { level: lv.id, y: lv.y, cell, nx, nz, ox, oz, x0: ox * cell, z0: oz * cell, free, clearance: edt(free, nx, nz, cell, cols), blockers };
   if (keepColumns) COLUMNS.set(g, cols);
   return g;
 }
@@ -176,10 +201,10 @@ type Rect = [number, number, number, number];
  * of that rectangle are recomputed (reset, then the same rule over the same list order) — each cell
  * depends only on the items covering it, so the result equals the full raster there.
  */
-function stampLevel(scene: SpatialScene, lv: Level, cell: number, nx: number, nz: number, pre: StaticRaster | undefined, free: Uint8Array, blockers: Map<number, string>, clip?: Rect) {
-  const [minX, minZ] = scene.bounds;
+function stampLevel(scene: SpatialScene, lv: Level, cell: number, lat: Lattice, pre: StaticRaster | undefined, free: Uint8Array, blockers: Map<number, string>, clip?: Rect) {
+  const { ox, oz, nx, nz } = lat;
   if (clip) for (let j = clip[2]; j <= clip[3]; j++) for (let i = clip[0], c = j * nx + clip[0]; i <= clip[1]; i++, c++) { free[c] = 0; blockers.delete(c); }
-  for (const s of scene.surfaces) if (s.level === lv.id) rasterObb(s.obb, minX, minZ, cell, nx, nz, (i) => (free[i] = 1), false, clip);
+  for (const s of scene.surfaces) if (s.level === lv.id) rasterObb(s.obb, ox, oz, cell, nx, nz, (i) => (free[i] = 1), false, clip);
   if (pre) {
     const cover = pre.firstCover(lv.y);
     const [i0, i1, j0, j1] = clip ?? [0, nx - 1, 0, nz - 1];
@@ -189,7 +214,7 @@ function stampLevel(scene: SpatialScene, lv: Level, cell: number, nx: number, nz
   for (let k = pre ? pre.obstacles.length : 0; k < scene.obstacles.length; k++) {
     const o = scene.obstacles[k];
     if (o.y1 <= lv.y + STEP || o.y0 >= lv.y + BODY_HEIGHT) continue; // below step height or overhead
-    rasterObb(o.obb, minX, minZ, cell, nx, nz, (i) => {
+    rasterObb(o.obb, ox, oz, cell, nx, nz, (i) => {
       if (free[i]) blockers.set(i, o.id);
       free[i] = 0;
     }, true, clip);
@@ -233,25 +258,25 @@ export function updateGrids(prev: GridSet, prevScene: SpatialScene, scene: Spati
   const obs = diffByKey(prevScene.obstacles.slice(p), scene.obstacles.slice(p), obstacleKey, true);
   const surf = diffByKey(prevScene.surfaces, scene.surfaces, surfaceKey, false);
   if (!obs || !surf) return null;
-  const [minX, minZ, maxX, maxZ] = scene.bounds;
-  const nx = Math.ceil((maxX - minX) / cell), nz = Math.ceil((maxZ - minZ) / cell);
+  const lat = latticeOf(scene.bounds, cell);
+  const { ox, oz, nx, nz } = lat;
   const changedObs = [...obs.gone, ...obs.added], changedSurf = [...surf.gone, ...surf.added];
   const levels = new Map<number, LevelGrid>();
   for (const lv of scene.levels) {
     const old = prev.levels.get(lv.id);
-    if (!old || old.y !== lv.y || old.nx !== nx || old.nz !== nz) {
-      levels.set(lv.id, buildLevel(scene, lv, cell, nx, nz, pre, true));
+    if (!old || old.y !== lv.y || old.nx !== nx || old.nz !== nz || old.ox !== ox || old.oz !== oz) {
+      levels.set(lv.id, buildLevel(scene, lv, cell, lat, pre, true));
       continue;
     }
     const rects: Rect[] = [];
-    for (const s of changedSurf) if (s.level === lv.id) pushRect(rects, obbRange(s.obb, minX, minZ, cell, nx, nz));
-    for (const o of changedObs) if (!(o.y1 <= lv.y + STEP || o.y0 >= lv.y + BODY_HEIGHT)) pushRect(rects, obbRange(o.obb, minX, minZ, cell, nx, nz));
+    for (const s of changedSurf) if (s.level === lv.id) pushRect(rects, obbRange(s.obb, ox, oz, cell, nx, nz));
+    for (const o of changedObs) if (!(o.y1 <= lv.y + STEP || o.y0 >= lv.y + BODY_HEIGHT)) pushRect(rects, obbRange(o.obb, ox, oz, cell, nx, nz));
     if (!rects.length) {
       levels.set(lv.id, old);
       continue;
     }
     const free = old.free.slice(), blockers = copyBlockers(old.blockers, nx * nz);
-    for (const r of rects) stampLevel(scene, lv, cell, nx, nz, pre, free, blockers, r);
+    for (const r of rects) stampLevel(scene, lv, cell, lat, pre, free, blockers, r);
     let ci0 = nx, ci1 = -1, cj0 = nz, cj1 = -1; // bounding box of cells whose free bit flipped
     for (const [i0, i1, j0, j1] of rects)
       for (let j = j0; j <= j1; j++)
@@ -338,7 +363,7 @@ export function gridsWithObstacles(base: GridSet, extra: Obstacle[]): GridSet {
     let ci0 = g.nx, ci1 = -1, cj0 = g.nz, cj1 = -1;
     for (const o of extra) {
       if (o.y1 <= g.y + STEP || o.y0 >= g.y + BODY_HEIGHT) continue;
-      rasterObb(o.obb, g.x0, g.z0, g.cell, g.nx, g.nz, (i) => {
+      rasterObb(o.obb, g.ox, g.oz, g.cell, g.nx, g.nz, (i) => {
         if (!(free ?? g.free)[i]) return;
         if (!free) { free = g.free.slice(); blockers = copyBlockers(g.blockers, g.nx * g.nz); }
         blockers.set(i, o.id);
@@ -355,12 +380,12 @@ export function gridsWithObstacles(base: GridSet, extra: Obstacle[]): GridSet {
   return { cell: base.cell, levels };
 }
 
-/** The cell rectangle rasterObb scans for `o` (may be empty: i0 > i1 or j0 > j1). */
-function obbRange(o: OBB2, x0: number, z0: number, cell: number, nx: number, nz: number): Rect {
+/** The cell rectangle rasterObb scans for `o` (may be empty: i0 > i1 or j0 > j1); a superset of the covered cells. */
+function obbRange(o: OBB2, ox: number, oz: number, cell: number, nx: number, nz: number): Rect {
   const cs = obbCorners(o);
   let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
   for (const [x, z] of cs) { ax = Math.min(ax, x); az = Math.min(az, z); bx = Math.max(bx, x); bz = Math.max(bz, z); }
-  return [Math.max(0, Math.floor((ax - x0) / cell)), Math.min(nx - 1, Math.ceil((bx - x0) / cell)), Math.max(0, Math.floor((az - z0) / cell)), Math.min(nz - 1, Math.ceil((bz - z0) / cell))];
+  return [Math.max(0, latticeIndex(ax, cell) - ox), Math.min(nx - 1, latticeIndex(bx, cell) + 1 - ox), Math.max(0, latticeIndex(az, cell) - oz), Math.min(nz - 1, latticeIndex(bz, cell) + 1 - oz)];
 }
 
 /**
@@ -369,12 +394,12 @@ function obbRange(o: OBB2, x0: number, z0: number, cell: number, nx: number, nz:
  * (floors): only cells whose centre lies inside, so floors never grow.
  * `clip` restricts the visit to a cell rectangle (same per-cell test).
  */
-export function rasterObb(o: OBB2, x0: number, z0: number, cell: number, nx: number, nz: number, fn: (i: number) => void, conservative = false, clip?: Rect) {
-  let [i0, i1, j0, j1] = obbRange(o, x0, z0, cell, nx, nz);
+export function rasterObb(o: OBB2, ox: number, oz: number, cell: number, nx: number, nz: number, fn: (i: number) => void, conservative = false, clip?: Rect) {
+  let [i0, i1, j0, j1] = obbRange(o, ox, oz, cell, nx, nz);
   if (clip) { i0 = Math.max(i0, clip[0]); i1 = Math.min(i1, clip[1]); j0 = Math.max(j0, clip[2]); j1 = Math.min(j1, clip[3]); }
   for (let j = j0; j <= j1; j++)
     for (let i = i0; i <= i1; i++) {
-      const p: Vec2 = [x0 + (i + 0.5) * cell, z0 + (j + 0.5) * cell];
+      const p: Vec2 = [latticeCentre(ox + i, cell), latticeCentre(oz + j, cell)];
       if (conservative ? obbOverlap(o, { c: p, half: [cell / 2 - 1e-9, cell / 2 - 1e-9], yaw: 0 }) : pointInObb(p, o, 1e-9)) fn(j * nx + i);
     }
 }
@@ -429,11 +454,14 @@ function edt(free: Uint8Array, nx: number, nz: number, cell: number, g = new Flo
   return out;
 }
 
+/** World point → cell index of `g` (−1 outside). Origin-independent: the lattice cell of p, offset by (ox, oz). */
 export const cellOf = (g: LevelGrid, p: Vec2) => {
-  const i = Math.floor((p[0] - g.x0) / g.cell), j = Math.floor((p[1] - g.z0) / g.cell);
+  const i = latticeIndex(p[0], g.cell) - g.ox, j = latticeIndex(p[1], g.cell) - g.oz;
   return i < 0 || j < 0 || i >= g.nx || j >= g.nz ? -1 : j * g.nx + i;
 };
-export const centreOf = (g: LevelGrid, idx: number): Vec2 => [g.x0 + ((idx % g.nx) + 0.5) * g.cell, g.z0 + (Math.floor(idx / g.nx) + 0.5) * g.cell];
+/** Centre of cell (i, j) of `g`: the lattice centre, bit-identical in every grid containing that cell. */
+export const cellCentre = (g: LevelGrid, i: number, j: number): Vec2 => [latticeCentre(g.ox + i, g.cell), latticeCentre(g.oz + j, g.cell)];
+export const centreOf = (g: LevelGrid, idx: number): Vec2 => cellCentre(g, idx % g.nx, Math.floor(idx / g.nx));
 
 /** Bilinear-free clearance lookup at a point (cell sample). Outside grid → 0. */
 export function clearanceAt(g: LevelGrid, p: Vec2): number {

@@ -2,14 +2,13 @@
 // and grids) instead of the ±40 m cropScene around staging-east that campus-flagship.test.ts uses.
 // Same fork, piles, crew, template and rules. Hypothetical build (spec §4).
 //
-// Finding (2026-09-27): the full run completes with 0 violations and ends physically identical to
-// the cropped run (same entities and discrete state, components bit-identical, people within
-// 1e-12 m), but NOT bit-identical: its final-state hash differs and it takes 36 more ticks. No
-// route leaves the crop and the free cells are identical; route vertices snapped to cell centres
-// (`centreOf` = x0 + (i + 0.5)·cell, from the grid origin: −12 cropped vs −162 full) differ in
-// the last ulps (17.05 vs 17.05000000000001, first in carryA's gather routes), and those ulps
-// later flip tick-level decisions (a make-way target, a step ending one tick earlier). The exact
-// hash equality is kept below as a todo until grid coordinates are origin-independent.
+// History: on 2026-09-27 the full run ended physically identical to the cropped run but NOT
+// bit-identical (36 more ticks): route vertices snapped to cell centres were computed from the grid
+// origin (x0 + (i + 0.5)·cell, with x0 −12 cropped vs −162 full), so the same cell's centre differed
+// in the last ulps (17.05 vs 17.05000000000001) and those ulps later flipped tick-level decisions.
+// Since 2026-09-28 every grid sits on one global lattice (spatial/grid.ts: cell (i, j) is lattice
+// cell (ox + i, oz + j), centre (k + 0.5)·cell), so the crop no longer changes any coordinate and
+// the full run is bit-identical to the cropped one (same final-state hash, same tick count).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hashOf } from '../core/hash.ts';
@@ -26,7 +25,7 @@ import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry,
 
 const RULES = 'mars-rules/flagship-campus-test';
 /** campus-flagship (staging-east crop) final state; also pinned in grid-incremental.test.ts. */
-const CROPPED_HASH = 'b159317e293797dd93c54a28c288feeff28ddfafcb421252c8686ae02c0c0bda';
+const CROPPED_HASH = '42dec8e8f37152e61463e97fe1ef10c4dee4b6d38bb523d24b24c5144a5dde61';
 
 function setup() {
   const file = readCampus2026File();
@@ -66,7 +65,7 @@ function both() {
   return (memo = { crop, full });
 }
 
-test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, ends physically identical to the cropped run', () => {
+test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, ends identical to the cropped run', () => {
   const { crop, full } = both();
   assert.equal(crop.reh.report.status, 'completed');
   assert.equal(crop.reh.take.finalStateHash, CROPPED_HASH, 'cropped campus flagship hash unchanged');
@@ -76,7 +75,7 @@ test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, 
   const final = replayFinalState(full.reh.take);
   assert.equal(final.entities.visitor.human!.level > 0, true, 'visitor on the new deck');
 
-  // same world up to float noise in people's poses (and the clock: see the header)
+  // same world (entity by entity, for a readable failure before the hash test below)
   const ref = replayFinalState(crop.reh.take);
   assert.deepEqual(Object.keys(final.entities), Object.keys(ref.entities));
   let maxHuman = 0;
@@ -86,8 +85,8 @@ test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, 
     maxHuman = Math.max(maxHuman, Math.hypot(e.pose.p[0] - r.pose.p[0], e.pose.p[1] - r.pose.p[1], e.pose.p[2] - r.pose.p[2]), Math.abs(e.pose.yaw - r.pose.yaw));
     assert.deepEqual({ ...e, pose: null }, { ...r, pose: null }, `${id}: same discrete state`);
   }
-  assert.ok(maxHuman < 1e-9, `people end within 1e-9 of the cropped run (max ${maxHuman})`);
-  assert.ok(Math.abs(full.reh.take.ticks - crop.reh.take.ticks) <= 200, `durations within 10 s (${full.reh.take.ticks} vs ${crop.reh.take.ticks} ticks)`);
+  assert.equal(maxHuman, 0, `people end exactly where the cropped run's do (max ${maxHuman})`);
+  assert.equal(full.reh.take.ticks, crop.reh.take.ticks, 'same duration as the cropped run');
 
   const ex = execute(full.h, 'build', full.plan, full.cfg);
   assert.ok(ex.ok, JSON.stringify(ex).slice(0, 300));
@@ -96,7 +95,7 @@ test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, 
   assert.equal(full.h.log(CAMPUS_ID).length, 1);
 });
 
-test('flagship full campus: final-state hash === the cropped run (bit-identical)', { todo: 'route vertices are cell centres computed from the grid origin, so a different crop changes them by ulps (see header)' }, () => {
+test('flagship full campus: final-state hash === the cropped run (bit-identical: grids share one lattice)', () => {
   const { crop, full } = both();
   assert.equal(full.reh.take.finalStateHash, crop.reh.take.finalStateHash);
 });

@@ -7,7 +7,7 @@
 // the smoothed motion passes the same swept checks. Deterministic.
 import { angleDelta, datan2, dcos, dist2, dsin, type Vec2 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
-import { nearestBlocker, type LevelGrid } from '../spatial/grid.ts';
+import { cellOf, latticeIndex, nearestBlocker, type LevelGrid } from '../spatial/grid.ts';
 import type { Formation, SE2 } from './formation.ts';
 import { distanceField, Heap, motionAt, motionEnd, motionSize, PLAN_MARGIN, sweep, type Hit, type Motion } from './sweep.ts';
 
@@ -70,10 +70,7 @@ export function planCarry(inp: PlanInput): PlanOk | PlanFail {
   const base = starts[0].th;
   const kOf = (th: number) => (((Math.round(angleDelta(base, th) / DTH) % HEADINGS) + HEADINGS) % HEADINGS);
   const goalP: Vec2 = [goals[0].x, goals[0].z];
-  const cellAt = (x: number, z: number) => {
-    const i = Math.floor((x - g.x0) / g.cell), j = Math.floor((z - g.z0) / g.cell);
-    return i < 0 || j < 0 || i >= g.nx || j >= g.nz ? -1 : j * g.nx + i;
-  };
+  const cellAt = (x: number, z: number) => cellOf(g, [x, z]);
   const field = distanceField(g, goalP, Math.max(0, f.loadDiscR - f.loadDiscSpacing / 2), cellAt(starts[0].x, starts[0].z), DETOUR);
   const fieldOk = starts.some((s) => Number.isFinite(field[cellAt(s.x, s.z)] ?? Infinity));
   const h = (x: number, z: number) => {
@@ -82,8 +79,9 @@ export function planCarry(inp: PlanInput): PlanOk | PlanFail {
     return c < 0 ? Infinity : field[c];
   };
   const prims = primitives(f);
-  const nzb = Math.ceil((g.nz * g.cell) / BIN) + 1;
-  const binKey = (q: SE2, k: number) => (Math.floor((q.x - g.x0) / BIN) * nzb + Math.floor((q.z - g.z0) / BIN)) * HEADINGS + k;
+  // closed-set bins on the global BIN lattice (origin-independent); bz0 only keeps keys unique
+  const bz0 = latticeIndex(g.z0, BIN) - 1, nzb = Math.ceil((g.nz * g.cell) / BIN) + 3;
+  const binKey = (q: SE2, k: number) => (latticeIndex(q.x, BIN) * nzb + latticeIndex(q.z, BIN) - bz0) * HEADINGS + k;
   // node storage
   const Q: SE2[] = [], K: number[] = [], G: number[] = [], P: number[] = [], M: (Motion | null)[] = [], ROOT: number[] = [];
   const best = new Map<number, number>();
