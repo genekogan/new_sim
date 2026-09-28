@@ -7,15 +7,15 @@
 import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { def } from '../../engine/world/catalog.ts';
-import { isPanel } from '../../engine/world/catalog-solar.ts';
+import { isPanel, isRail } from '../../engine/world/catalog-solar.ts';
 import { itemObject, setFill, type ItemObject } from './items.ts';
 import { PaintOverlay } from './paint.ts';
 import { rendererColor } from './palette.ts';
-import { solarPanelMesh } from './solar-mesh.ts';
+import { solarPanelMesh, solarRailMesh, solarTiltLegs } from './solar-mesh.ts';
 import { equipmentMesh } from './equipment-mesh.ts';
 
 type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: number };
-type View = { obj: THREE.Object3D; prev: Pose; cur: Pose; key: string; item?: ItemObject; inHand?: { by: string; hand: 'left' | 'right' }; paint?: PaintOverlay; label?: string };
+type View = { obj: THREE.Object3D; prev: Pose; cur: Pose; key: string; item?: ItemObject; inHand?: { by: string; hand: 'left' | 'right' }; paint?: PaintOverlay; label?: string; mount?: string };
 /** What a renderer of people offers held items: the rendered palm of a hand, and the head (mouth point, yaw). */
 export type Holders = { palmOf(id: string, hand: 'left' | 'right', out: THREE.Vector3): boolean; headOf(id: string, out: THREE.Vector3): number | null };
 
@@ -70,7 +70,11 @@ export class ComponentViews {
     }
     if (d.category === 'stair' && d.stair) return this.flight(e.def, sx, sy, sz, d.stair.treads, color);
     if (d.category === 'rack-upright') return this.upright(e.def, sx, sy, sz, color);
-    if (isPanel(e.def)) return this.panel(e.def, sx, sy, sz);
+    if (isRail(e.def)) return solarRailMesh(sx, this.kit);
+    if (isPanel(e.def)) {
+      if (v) v.mount = mountKey(e);
+      return this.panel(e, sx, sy, sz);
+    }
     if (d.category === 'equipment') {
       if (v) v.label = labelKey(e);
       return this.equipment(e, sx, sy, sz, color);
@@ -80,8 +84,8 @@ export class ComponentViews {
 
   /**
    * Upright = two columns (local x = ±depth/2) joined by diagonal bracing, the
-   * whole thing inside the catalog box. Reads as the blue braced frame rather
-   * than a solid slab, and makes pitch/lying orientation obvious.
+   * whole thing inside the catalog box. Reads as the braced frame (drawn in the photo green,
+   * palette.ts RACK_FRAME_GREEN) rather than a solid slab, and makes pitch/lying orientation obvious.
    */
   private upright(id: string, depth: number, h: number, t: number, color: string) {
     const g = new THREE.Group();
@@ -128,9 +132,24 @@ export class ComponentViews {
   /**
    * Solar panel (catalog-solar.ts: local x = length, y = frame depth, z = width): dark glass laminate
    * inside an aluminium frame, faint cell rows. Tilt is the engine pose (pitch / roll), like any part.
+   * An installed tilted module also gets two plumb rear risers under its high edge, down to the level of
+   * its low edge (the rails' top; SOLAR_PAINT.md install_panel); a carried or flat one gets none.
    */
-  private panel(id: string, l: number, t: number, w: number) {
-    return solarPanelMesh(id, l, t, w, this.kit);
+  private panel(e: Entity, l: number, t: number, w: number) {
+    const g = solarPanelMesh(e.def, l, t, w, this.kit);
+    if (!mountKey(e)) return g;
+    const pitch = e.pose.pitch ?? 0, roll = e.pose.roll ?? 0;
+    // engine/construction/solar.ts tiltedPose: roll lifts local +x (tilt axis ∥ z), pitch lifts local −z (axis ∥ x)
+    const byRoll = Math.abs(roll) >= Math.abs(pitch);
+    const tilt = byRoll ? roll : pitch, span = byRoll ? l : w, edge = byRoll ? w : l;
+    const legs = solarTiltLegs(edge, span * Math.abs(Math.sin(tilt)), this.kit);
+    if (byRoll) legs.position.x = (Math.sign(tilt) * l) / 2;
+    else legs.position.z = (-Math.sign(tilt) * w) / 2;
+    // undo the panel's tilt so the risers hang plumb; along the high edge (the legs' local x)
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, 0, roll, 'YXZ')).invert();
+    legs.quaternion.copy(byRoll ? q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)) : q);
+    g.add(legs);
+    return g;
   }
 
   private glassMat?: THREE.MeshStandardMaterial;
@@ -189,7 +208,7 @@ export class ComponentViews {
     for (const e of Object.values(world.entities)) {
       if (e.kind !== 'component') continue;
       let v = this.views.get(e.id);
-      if (!v || v.key !== e.def || (v.label !== undefined && v.label !== labelKey(e))) {
+      if (!v || v.key !== e.def || (v.label !== undefined && v.label !== labelKey(e)) || (v.mount !== undefined && v.mount !== mountKey(e))) {
         if (v) {
           this.group.remove(v.obj);
           disposeOwned(v);
@@ -199,7 +218,7 @@ export class ComponentViews {
         obj.name = e.id;
         this.group.add(obj);
         const p = poseOf(e);
-        v = { obj, prev: p, cur: p, key: e.def, item: nv.item, label: nv.label };
+        v = { obj, prev: p, cur: p, key: e.def, item: nv.item, label: nv.label, mount: nv.mount };
       } else {
         v.prev = v.cur;
         v.cur = poseOf(e);
@@ -321,6 +340,8 @@ function labelText(e: Entity): string[] {
   const parts = Object.keys(c).sort().map((k) => (unit[k] ? `${c[k]} ${unit[k]}` : String(c[k])));
   return [kind.toUpperCase().replace('-', ' '), parts.join(' · ')];
 }
+/** Installed tilted solar module: its tilt (so the view rebuilds with risers once fastened); '' otherwise. */
+const mountKey = (e: Entity) => (e.phase === 'installed' && (e.pose.pitch || e.pose.roll) ? `${e.pose.pitch ?? 0}:${e.pose.roll ?? 0}` : '');
 const labelKey = (e: Entity) => (def(e.def).category === 'equipment' ? labelText(e).join('|') : '');
 
 /** A small white-on-dark label texture (two lines). */

@@ -60,6 +60,9 @@ test('paint reveal, mounted solar module and distinct equipment', async ({ page 
   expect(mounted?.pose.roll).toBeCloseTo(20 * Math.PI / 180, 5);
   await look(page, [-7.6, 1.8, 7.8], [-5, 0.25, 6]);
   await capture(page, 'render-polish-mounted-panel', testInfo);
+  // installed at 20° roll: two plumb risers under the high (+x) edge down to the rails; C-channel rail ends
+  await look(page, [-2.6, 0.55, 8.4], [-4.3, 0.2, 6]);
+  await capture(page, 'render-polish-tilt-legs', testInfo);
   await look(page, [-5.2, 1.2, 12], [-5.2, 0.2, 9.5]);
   await capture(page, 'render-polish-equipment', testInfo);
   expect(errors, 'console/page/network errors').toEqual([]);
