@@ -444,3 +444,76 @@ Rollback (from `viewer/`):
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback cebd5827-b08d-4224-a320-afba968a1352 \
   --name mars-campus-2026 -m "rollback: <reason>"
 ```
+
+## Production deploy 7 (2026-09-28, Watch it being built)
+
+Gene authorised production deploys of the bleeding edge. Deployed by W40 from committed tree `d91057b` in a detached
+worktree (`scratchpad/w40-wt`, same recipe as deploy 6: CODEX.md symlinks; `.pw-browsers` excluded through
+`GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile GIT_CONFIG_VALUE_0=<exclude file>` on the gate process only, no
+repo config change; `E2E_VITE_PORT=5601`, `E2E_RUN=w40-gate`). Contents since `27e04f6`: W32 prone model = the measured
+rig (`0cd2f19`), the prone layer in the viewer (`9ddd6d8`), prone fields in takes (`6fc9b46`, `mars-take/4` additive),
+2×4 roof framing verbs (`03bed33`), chapter takes (`6a7fadb`) and the 2022 east-house A+B as 7 chapter takes
+(`3afc6fb`, set `8ce33bee`, final `ddb634d6` = the A+B pin), studio chapter-set playback "Watch it being built"
+(`295632c`, `c283820`), and the 14-tool integration fix (`fda800c`). The flagship and v3 take files are unchanged since
+release 6. No later `main` commits were left out
+(none landed during the gate).
+
+- **New version: `f709304d-fc55-45f2-a44b-200cfadf4ae1`** (created 17:54:08Z). It replaces
+  `07dce638-2950-444f-823f-0e19b8f62320`, which `wrangler deployments status` confirmed live at 100% twice before the
+  deploy (last at 17:53:31Z). `07dce638…` is the new rollback target.
+- **Gate:** `viewer/.cloudflare/gate/2026-09-28T17-38-47-294Z/report.json` in the W40 worktree (gitignored): `ok: true`,
+  `gitHead` `d91057b`, `gitDirty: false`. Results: `npm test` 56/56; `test:engine` 380 pass / 0 fail / 3 skip; `tsc`
+  clean; e2e 69 passed / 1 skipped in 759 s (`--workers=1`, no baseline refresh); probe `finalStateHash`
+  `b746b0947e65…62e7f0c3` (unchanged since release 6).
+- **Evidence (`d91057b`):** `npm run evidence`: 383 engine tests (380 pass / 0 fail / 3 skip); rows 17 PROVEN / 0 PARTIAL /
+  0 UNPROVEN; capabilities 27 / 1 / 0; milestones 8 / 0 / 0. `EVIDENCE.md` + `evidence.json` committed with this record.
+- **Build:** `prepare.py` staged 322 files (816.3 MiB, 8 large objects; `large-assets.json` byte-identical to release 6).
+  `CLOUDFLARE_RELEASE=1 npm run build` exited 0 with the known chunk-size warning plus one new, harmless
+  `INEFFECTIVE_DYNAMIC_IMPORT` note (`app/studio/chapter-set.ts` is imported both statically and dynamically). The route
+  list includes `/lab`, `/lab/`, `/studio`, `/studio/202x`, `/simulation-guide`; `chapter-set.worker-*.js` is emitted;
+  `dist/client/engine/takes/` holds the manifest + 11 take files. `upload.mjs` (with the main checkout's `uploaded.json`
+  copied into the worktree's `.cloudflare/`) made 0 uploads (8 × `Already uploaded`). The dry run exited 0 (363 assets,
+  5646.27 KiB / 1064.57 KiB gzip; bindings SIMULATIONS, MODELS, ASSETS). The deploy uploaded 25 new asset files (317
+  already present); startup 113 ms.
+- **Live smoke:** `/`, `/studio`, `/studio/2020`, `/studio/2022`, `/lab` and `/simulation-guide` returned 200 text/html.
+  `/simulation-agent-guide.md` 200 (28,275 B). `/engine/campus-2026.json` (1,081,647 B) and `/engine/campus-2022.json`
+  (238,055 B) 200 application/json. `/engine/takes/manifest.json` 200 (15,103 B; JSON-equal to the repo file) and every
+  file it lists 200 application/json: `flagship-campus-2026.json` (1,812,545 B), `build-bay-v3-campus-2026.json`
+  (2,418,487 B), `year-build-2022-east-house-bay1.json` (1,543,958 B), `year-build-2022-east-house.json` (4,451,737 B) and
+  the 7 chapters `year-build-2022-east-house-ab-{a,d0,d1,d2,s,w,p}.json` (4,036,903 / 2,475,693 / 2,601,402 / 2,816,338 /
+  2,355,412 / 2,198,075 / 991,829 B), which the chapter set entry references. `/nope` 404. `HEAD /browser/campus.glb`
+  200 model/gltf-binary from R2. `SITE_BASE=… ALL_ASSETS=1 node deploy/smoke.mjs` exited 0 (19 routes 200, 322 assets,
+  GLB range header verified, anonymous state denied).
+- **Integration:** `SIM_BASE=… node deploy/simulation-integration.mjs` (the committed script, now 14 engine tools) printed
+  all three PASS lines in 33 s, run on its own. Engine timings: rehearse 565 ms wall, execute 551 ms, camera 1491 ms;
+  take 22,918 B.
+- **Director demo:** `node deploy/director-demo.mjs --base https://mars-campus-2026.<workers-subdomain>.workers.dev` exited 0: all 9
+  steps asserted, including step 9 pause → fork → resume both branches; total 8.77 s.
+- **Browser `/lab`:** headless Chromium (SwiftShader) on production `/lab?scenario=build-bay`: tick 10901, done, 5/5
+  expectations (43/43 steps, 0 violations, visitor on level 4), 0 console errors. Screenshot:
+  `viewer/e2e/artifacts/prod-smoke-7/build-bay-end.png`.
+- **Cross-host determinism:** the production `stateHash()` is
+  `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3`, the same value as the gate's probe. **They match.**
+- **Browser `/studio/2022` chapter set:** "Watch it being built" offers the set entry first: "2022 east-house: skeleton,
+  decks, stair, walls, solar — from the piles · 8 h 20 min · 7 chapters", then the bay-1 and whole-skeleton takes. The
+  whole-set checks were done 9.1 s after load. Scrubbed to the end (8:20:29 of 30,029.95 s): chapter 7/7 P, 221/221
+  entities drawn, shot "solar: done", every chapter hash + start ✓ (A, D0, D1, D2, S, W, P), and the checks line reads
+  "✓ continuity: 7 / 7 chapter starts · ✓ final state ddb634d6… = A+B pin · last frame = final state (0.64 mm) · ✓ 66
+  frames + beams + 145 parts at the mars-2022 canonical pose (≤ 1 cm, 1°; max 0.57 mm)"; 0 console errors. Screenshot
+  `viewer/e2e/artifacts/prod-smoke-7/studio-2022-set-final.png` (reviewed: the finished two-storey east-house with deck,
+  wall panels and three solar panels on the roof, crew of 8 stood down in front; chapter bar all ✓; seam "W → P: ✓
+  9b16f8c3…"; banner; Diagnostics 0 violations · 105 refused/failed · 769 blocked waits). The log still shows `$crew[n]`
+  placeholders (known; W39).
+- **Browser `/studio`:** Replay take lists flagship and flagship v3; flagship `d2f16bd3…` scrubbed to "held" (t 209.6 s),
+  engine camera on (shot "orbit the raise"): 37/37 entities drawn, final-state hash = recorded = manifest
+  (`c56ea8da…7157`), HYPOTHETICAL banner visible, 0 console errors. Screenshot
+  `viewer/e2e/artifacts/prod-smoke-7/studio-take-held.png` (reviewed: crew holding both frames among the trailers,
+  "final state c56ea8da… = recorded · last frame = final state (0.69 mm)").
+- Compression audit: not required (the browser model was not rebuilt; `large-assets.json` unchanged).
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 07dce638-2950-444f-823f-0e19b8f62320 \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```

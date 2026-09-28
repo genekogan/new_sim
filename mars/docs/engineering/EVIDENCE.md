@@ -8,15 +8,15 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `1395dd4` (engine tree clean) |
-| Generated | 2026-09-28T13:06:09.386Z · Node v26.8.2 |
-| Engine suite | 361 tests in 54 files: 358 pass, 0 fail, 3 skipped · 43.6 s wall |
+| Git HEAD | `d91057b` (engine tree clean) |
+| Generated | 2026-09-28T17:59:16.741Z · Node v26.8.2 |
+| Engine suite | 383 tests in 58 files: 380 pass, 0 fail, 3 skipped · 43.7 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 27 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 5076 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 7855 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 12194 ms compute (cropped 7821 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 4732 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 7458 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 12549 ms compute (cropped 7642 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
@@ -948,49 +948,34 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `f4d6738` (2026-09-28T09:28:34.589Z): 35 added, 2 removed.
+Compared with the report at `1395dd4` (2026-09-28T13:06:09.386Z): 22 added, 0 removed.
 
-- added: camera-correct.test.ts :: checks: squeeze is a sustained narrow gap (two sheets 0.8 m apart), not a door; foreground, flare, horizon, motion are per sample
-- added: camera-correct.test.ts :: fixture "behind a head": a bystander walks past the lens during a hold → raise (or swing), only the crossing flagged
-- added: camera-correct.test.ts :: fixture "flare": a pan across the sun low in the west → swing within the sun-behind band, every sample ≥ 6° off axis
-- added: camera-correct.test.ts :: fixture "impossible": a fly-through into a sealed room is refused with every strategy listed
-- added: camera-correct.test.ts :: fixture "stuck between plywood": a dolly through two standing sheets 0.8 m apart → raise, recorded with the numbers
-- added: camera-correct.test.ts :: fixture "subject leaves frame": a 270° orbit of a crew that walks 6 m — the orbit centre follows, no correction; a fixed centre would fail
-- added: camera-correct.test.ts :: fixture "the group outgrows the frame": one of two people walks 5 m away mid-hold → widen (raise does not address framing)
-- added: camera-correct.test.ts :: phase-1 flagship shots through phase 2: the bay orbit (structure growing during it) is corrected for two crew members hiding the uprights (raise), the carry-crew orbit is valid as computed
-- added: camera-synth.test.ts :: (a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — through phase 2, planner validators pass
-- added: camera-take-file.test.ts :: take file: a directed track is carried beside the planned camera (`cameras`), round-trips through JSON, never changes the take; foreign / clashing tracks are refused
-- added: camera-take-file.test.ts :: takeSampler: piles are boxes (kind from finalState / entities0), the emptied pile leaves at its removal tick; legacyKinds reproduces the old people-piles
-- added: camera-take-file.test.ts :: takeSampler: the flagship has no piles — identical with and without legacyKinds, so its planned camera is unchanged
-- added: forklift.test.ts :: traffic determinism: the head-on run twice → same state hash and event log
-- added: forklift.test.ts :: traffic: a rider stopped in the forklift's lane — the forklift stops ≥ 1 m short and waits with the rider named; once the rider rides off it carries on; 0 violations
-- added: forklift.test.ts :: traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not
-- added: forklift.test.ts :: traffic: head-on forklift vs EUC in one 3 m lane — the rider (smaller) pulls over and waits ≥ 1 m clear of the forklift's lane, both arrive; 0 violations
-- added: forklift.test.ts :: traffic: plan-time vehicle.path-conflict — an EUC boxed against a wall inside a moving forklift's lane cannot yield, so its ride is refused naming both
-- added: forklift.test.ts :: traffic: two forklifts crossing — f2 (same size, id after f1) stops clear of f1's lane with the reason named, then crosses; 0 violations
-- added: movement.test.ts :: no jumps: a walker moves at most min(speed, 1.4 m/s)·DT per tick and publishes an honest speed — stress-30 (60 s), campfire evening (75 s)
-- added: review.test.ts :: no jumps (W21): a person on foot moves ≤ 0.15 m per tick (riders and carried loads keep 0.6 m); a published speed above its activity cap + 5 % is motion.overspeed
-- added: social.test.ts :: pre-emption determinism: seated carry + converse pre-emption twice → same state hash and event log
-- added: social.test.ts :: pre-emption: a gather of 4 round the campfire, one directed away → that member leaves (reason named), 3 keep warming, the gather goes on
-- added: social.test.ts :: pre-emption: a seated person given a directed carry stands up (0.6 s) first, then carries; the sit ends cancelled "pre-empted by <carry>"; 0 violations
-- added: social.test.ts :: pre-emption: a social verb never pre-empts another (reservation.conflict unchanged); preempt: false restores the refusal
-- added: social.test.ts :: pre-emption: an autonomous make-way nudge (walk.ts `<who>:make-way:<tick>`) is not a directive — refused as before, the conversation goes on
-- added: social.test.ts :: pre-emption: cancelling a waiting directive ends it cancelled without starting it; the stand-up still finishes
-- added: social.test.ts :: pre-emption: one of a converse pair gets a directed walk → the conversation ends for both with the reason, the other is idle, the walk runs
-- added: take-fields.test.ts :: take events (mars-take/4): compactEvents folds same-tick lifecycles losslessly and merges repeated blocked waits; final state and tracks unchanged
-- added: take-fields.test.ts :: take fields (mars-take/3): thinChanges — keyframes reproduce every tick of the step signal within tolerance; holds, shape changes and releases exact
-- added: take-fields.test.ts :: take fields (mars-take/4): entities0 + removed — an emptied stack removed mid-take is recorded as first seen, sampled until its removal tick; poses within TRACK_TOL every tick
-- added: take.test.ts :: take fidelity: sampling at every tick reproduces true poses within TRACK_TOL + ½ quantum (4.5 mm / 8.5 mrad, mars-take/4) and exact activity/level
-- added: year-build-b.test.ts :: year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1)
-- added: year-build-b.test.ts :: year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged
-- added: year-build-b.test.ts :: year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned
-- added: year-build-b.test.ts :: year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)
-- removed: camera-synth.test.ts :: (a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — planner validators pass
-- removed: take.test.ts :: take fidelity: sampling at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level
+- added: body-model.test.ts :: prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise
+- added: build-bay-v3.test.ts :: beam_walk step-off: a deck target whose cell reads < 0.28 m lands on the nearest spot with room within 0.15 m; a target truly at the edge is still refused (beam.no-room)
+- added: build-bay-v3.test.ts :: flagship v3 is origin-independent: completes with 0 violations at open-ground origins that used to fail (step-off target reading 0.25 m; spare tread at the s1/s2 corner)
+- added: framing.test.ts :: framing: a 16 ft bay gets 2 top plates, 4 rafters, 4 blocks by hand-up to the bracing — exact poses, 0 violations, refusals named, pinned
+- added: framing.test.ts :: framing: a sloped rafter — plates at different heights give the pitch; a wrong pitch is refused
+- added: framing.test.ts :: framing: catalog — plates / rafters / blocking are 2x4 sections cut to order from 16 ft stock; registry + invariants
+- added: framing.test.ts :: framing: determinism — the same scenario twice gives the same world hash
+- added: handup-prone.test.ts :: beyond the lip the lying body is swept (W29): joist tails 0.30 m past the lip under both decks put a chest / head / arm through a joist wherever they could lie — handup.rise-blocked naming it
+- added: handup-prone.test.ts :: one prone receiver takes a 4x6 sheet alone (carry crew 1–2); determinism: the same run twice is bit-identical
+- added: handup-prone.test.ts :: prone only where kneeling cannot reach: the same floor with no deck to lie on is refused handup.too-high, listing the three reaches
+- added: handup-prone.test.ts :: prone receivers at the tallest deck the rig reaches from (2.75 m): kneeling cannot reach (0.5 m), two people lying at the deck edge, turned toward the grips, take it ≈ 0.67 m below the deck and get up holding it; 0 violations, hands continuous
+- added: handup-prone.test.ts :: prone receivers take a sheet off the forks where kneeling cannot reach: at the limit at that presentation (0.70 m below the deck) green, 0 violations; deeper refused (0.72 m: no station reaches, 0.74 m: too-high "raise the forks")
+- added: handup-prone.test.ts :: the lying body is checked at its heading (toes 0.75 m behind S, half-width 0.20 m) against people and parts on the deck: where the only place a receiver can lie is taken, refused naming who / what is there
+- added: handup-prone.test.ts :: the next seat up (a 2.90 m deck: 0.83 m below it) is out of reach even lying prone: handup.too-high lists stand / kneel / prone reach
+- added: handup-prone.test.ts :: the rise is swept: a wall panel outside the deck edge in the way of the load coming up is refused handup.rise-blocked, naming it
+- added: handup.test.ts :: kneeling rise (W30): a sheet presented on the forks under the joist ends cannot rise there → handup.rise-blocked "where the forks hold it"
+- added: handup.test.ts :: kneeling rise (W30): joist ends 0.78 m past the edge beam push the corridor out of kneeling reach → handup.rise-blocked naming the joist (the old rise went through them)
+- added: take-chapters.test.ts :: chapter sets in the manifest: the first frame of chapter k is the final state of chapter k − 1 (hash, entities0, replayed first frame); Σ ticks and the last final state are the set's; the 2022 east-house A+B ends at its pin
+- added: take-chapters.test.ts :: chapter takes: the chaptered run is the unchaptered run cut at barriers — same ticks and final state, chapter k starts where k − 1 ended; a non-barrier bound is refused
+- added: take-prone-fields.test.ts :: take fields proneYaw (mrad) and phaseK (%): recorded when a prone receiver publishes them, cleared with null, replayed as state; nothing recorded when absent; still mars-take/4
+- added: year-build-b.test.ts :: set-part lift crews never walk through a bystander: the crew holds the part (setpart.path-occupied) and an idle person in the way is asked to step aside; 0 violations
+- added: year-build-b.test.ts :: year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)
 
 ## Tests not cited by any row or milestone
 
-68 of 361 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+90 of 383 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1004,6 +989,9 @@ Compared with the report at `f4d6738` (2026-09-28T09:28:34.589Z): 35 added, 2 re
 - `api.test.ts` pass: pause/resume (room): execute pauseAt mid-walk → resume ends in the unpaused final state; snapshots are state blobs; survives a room restart
 - `api.test.ts` pass: pause/resume (room): fork at a pause, resume both with different commands → distinct states; the pause checkpoint stays resumable
 - `api.test.ts` pass: pause/resume: pauseAt during a carry is refused naming the carry (allowDrop only before the lift); resume on a resting head is resume.not-resumable
+- `body-model.test.ts` pass: prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise
+- `build-bay-v3.test.ts` pass: flagship v3 is origin-independent: completes with 0 violations at open-ground origins that used to fail (step-off target reading 0.25 m; spare tread at the s1/s2 corner)
+- `build-bay-v3.test.ts` pass: beam_walk step-off: a deck target whose cell reads < 0.28 m lands on the nearest spot with room within 0.15 m; a target truly at the edge is still refused (beam.no-room)
 - `camera-framing.test.ts` pass: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind
 - `camera-framing.test.ts` pass: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8
 - `camera-framing.test.ts` pass: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)
@@ -1033,7 +1021,21 @@ Compared with the report at `f4d6738` (2026-09-28T09:28:34.589Z): 35 added, 2 re
 - `env-sun.test.ts` pass: sunDirectionVector is a unit vector consistent with solarPosition()
 - `env-sun.test.ts` pass: daylightFactors: night at large negative elevation, day at high elevation
 - `env-sun.test.ts` pass: smoothstep matches known fixed points
+- `framing.test.ts` pass: framing: a 16 ft bay gets 2 top plates, 4 rafters, 4 blocks by hand-up to the bracing — exact poses, 0 violations, refusals named, pinned
+- `framing.test.ts` pass: framing: determinism — the same scenario twice gives the same world hash
+- `framing.test.ts` pass: framing: catalog — plates / rafters / blocking are 2x4 sections cut to order from 16 ft stock; registry + invariants
+- `framing.test.ts` pass: framing: a sloped rafter — plates at different heights give the pitch; a wrong pitch is refused
 - `grid-incremental.test.ts` pass: grids of different bounds share one lattice: same cell centres, free cells and routes
+- `handup-prone.test.ts` pass: prone receivers at the tallest deck the rig reaches from (2.75 m): kneeling cannot reach (0.5 m), two people lying at the deck edge, turned toward the grips, take it ≈ 0.67 m below the deck and get up holding it; 0 violations, hands continuous
+- `handup-prone.test.ts` pass: one prone receiver takes a 4x6 sheet alone (carry crew 1–2); determinism: the same run twice is bit-identical
+- `handup-prone.test.ts` pass: the lying body is checked at its heading (toes 0.75 m behind S, half-width 0.20 m) against people and parts on the deck: where the only place a receiver can lie is taken, refused naming who / what is there
+- `handup-prone.test.ts` pass: prone only where kneeling cannot reach: the same floor with no deck to lie on is refused handup.too-high, listing the three reaches
+- `handup-prone.test.ts` pass: the next seat up (a 2.90 m deck: 0.83 m below it) is out of reach even lying prone: handup.too-high lists stand / kneel / prone reach
+- `handup-prone.test.ts` pass: the rise is swept: a wall panel outside the deck edge in the way of the load coming up is refused handup.rise-blocked, naming it
+- `handup-prone.test.ts` pass: beyond the lip the lying body is swept (W29): joist tails 0.30 m past the lip under both decks put a chest / head / arm through a joist wherever they could lie — handup.rise-blocked naming it
+- `handup-prone.test.ts` pass: prone receivers take a sheet off the forks where kneeling cannot reach: at the limit at that presentation (0.70 m below the deck) green, 0 violations; deeper refused (0.72 m: no station reaches, 0.74 m: too-high "raise the forks")
+- `handup.test.ts` pass: kneeling rise (W30): joist ends 0.78 m past the edge beam push the corridor out of kneeling reach → handup.rise-blocked naming the joist (the old rise went through them)
+- `handup.test.ts` pass: kneeling rise (W30): a sheet presented on the forks under the joist ends cannot rise there → handup.rise-blocked "where the forks hold it"
 - `history.test.ts` pass: physicalHash ignores env, clock, labels, tags and provenance
 - `history.test.ts` pass: physicalHash tracks poses, phases, supports, activity, inventory and RNG
 - `history.test.ts` pass: state store (review M5): index without states, lazy state reads, commits put only the new state, old blobs migrate
@@ -1055,12 +1057,17 @@ Compared with the report at `f4d6738` (2026-09-28T09:28:34.589Z): 35 added, 2 re
 - `sequence.test.ts` pass: runner: onFail abort cancels live steps and skips pending ones
 - `sequence.test.ts` pass: runner: onFail continue keeps independent branches, skips dependents
 - `sequence.test.ts` pass: runner: tick budget → timeout, live actions cancelled
+- `take-chapters.test.ts` pass: chapter takes: the chaptered run is the unchaptered run cut at barriers — same ticks and final state, chapter k starts where k − 1 ended; a non-barrier bound is refused
+- `take-chapters.test.ts` pass: chapter sets in the manifest: the first frame of chapter k is the final state of chapter k − 1 (hash, entities0, replayed first frame); Σ ticks and the last final state are the set's; the 2022 east-house A+B ends at its pin
+- `take-prone-fields.test.ts` pass: take fields proneYaw (mrad) and phaseK (%): recorded when a prone receiver publishes them, cleared with null, replayed as state; nothing recorded when absent; still mars-take/4
 - `take.test.ts` pass: take payload: 3 walkers × 60 s stays compact (bytes measured)
 - `take.test.ts` pass: sampleTake: ends hold, shortest-arc yaw, entities appear/disappear
 - `walk-perf.test.ts` pass: proveUnreachable: routeAround-style searches === frozen reference A*, walled-in pockets and cut-off decks included
 - `walk-perf.test.ts` pass: walker fast paths off === on: stress-30 (exact: the pin; corridor: its failing people-replan at tick 1126) and the meal
 - `walk-perf.test.ts` pass: narrow(): single-file component labels === the frozen reference (scenes, radii, and every call of the build-bay probe)
 - `walk.test.ts` pass: determinism: same inputs → same final state hash
+- `year-build-b.test.ts` pass: set-part lift crews never walk through a bystander: the crew holds the part (setpart.path-occupied) and an idle person in the way is asked to step aside; 0 violations
+- `year-build-b.test.ts` pass: year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)
 - `year-build.test.ts` skip: year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)
 
 </details>

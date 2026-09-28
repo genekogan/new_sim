@@ -309,17 +309,17 @@ node deploy/simulation-integration.mjs                         # real MCP incl. 
 
 - **Production:** Worker `mars-campus-2026`, R2 bucket `mars-campus-2026-models`, at
   `https://mars-campus-2026.<workers-subdomain>.workers.dev` (`/studio`, `/mcp`, `/simulation-agent-guide.md`).
-- **Live:** `07dce638-2950-444f-823f-0e19b8f62320` (deploy 6, the bleeding edge, from `27e04f6`).
-- **Rollback target:** `cebd5827-b08d-4224-a320-afba968a1352` (deploy 5, live before deploy 6, confirmed at
+- **Live:** `f709304d-fc55-45f2-a44b-200cfadf4ae1` (deploy 7, "Watch it being built", from `d91057b`).
+- **Rollback target:** `07dce638-2950-444f-823f-0e19b8f62320` (deploy 6, live before deploy 7, confirmed at
   100% with `wrangler deployments status`). `viewer/deploy/deployment.json` records it as
-  `rollback_version`; its `version` is the live `07dce638…`.
+  `rollback_version`; its `version` is the live `f709304d…`.
 - **Release gate:** a deploy starts from a green `npm run gate` report (`ok: true`, `gitHead` = the
   deployed commit, `gitDirty: false`). See `RELEASE_CHECKLIST.md`.
 - **Release steps** (`viewer/deploy/README.md`): `browser-model.py` → `compress-browser.mjs` →
   `prepare.py` → `CLOUDFLARE_RELEASE=1 npm run build` → `deploy/upload.mjs` →
   `wrangler deploy --config dist/server/cloudflare.json`; then `SITE_BASE=… ALL_ASSETS=1 node
   deploy/smoke.mjs` and `SIM_BASE=… node deploy/simulation-integration.mjs`.
-- **Shipped to production 2026-09-27** (deploys 1–4) **and 2026-09-28** (deploys 5 and 6; see below); before that, not live:
+- **Shipped to production 2026-09-27** (deploys 1–4) **and 2026-09-28** (deploys 5, 6 and 7; see below); before that, not live:
   the engine, the `engine_*` tools,
   `/api/simulation/engine/take`, `/lab` (`5f02352`) and the NOAA sun.
 - Git is local only; nothing is pushed without Gene.
@@ -403,6 +403,23 @@ the 2022 "Watch it being built" picker offers both year-build takes; flagship re
 recorded = manifest (`c56ea8da…`), banner visible, 0 errors. Details: `RELEASE_CHECKLIST.md` "Production deploy 6".
 Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback
 cebd5827-b08d-4224-a320-afba968a1352 --name mars-campus-2026 -m "rollback: <reason>"`
+
+**Production deploy 7 (2026-09-28, Watch it being built, W40):** Worker version
+`f709304d-fc55-45f2-a44b-200cfadf4ae1`, built from `d91057b`, replacing `07dce638-2950-444f-823f-0e19b8f62320` (now the
+rollback target). It ships W32's prone model and the viewer's prone layer (prone fields in takes, `mars-take/4`
+additive), the 2×4 roof framing verbs, chapter takes and the 2022 east-house A+B as 7 chapter takes, and studio
+chapter-set playback ("Watch it being built": one entry, set clock, continuity at every seam, whole-set checks). Nothing
+on `main` was left out. The gate was green (W40 worktree `.cloudflare/gate/2026-09-28T17-38-47-294Z`, gitDirty false):
+56 unit, engine 380 pass / 3 skip, tsc, e2e 69 passed / 1 skipped, probe `b746b094…f0c3` (unchanged). Evidence: 17/17
+rows, 27/28 capabilities (1 PARTIAL), 8/8 milestones PROVEN. Live smoke returned 200 on all routes (incl.
+`/studio/2022`), the manifest and all 11 take files, and the R2 GLB; `smoke.mjs ALL_ASSETS=1` OK. Integration PASSED
+(3/3, 14 engine tools). The director demo PASSED (9 steps, 8.8 s). Headless production `/lab` build-bay: 43/43 steps, 0
+violations, tick 10901; **the production hash equals the node probe hash.** Headless production `/studio/2022`: the
+chapter set scrubbed to its end reads "✓ continuity: 7 / 7 chapter starts · ✓ final state ddb634d6… = A+B pin · last
+frame = final state (0.64 mm) · ✓ 66 frames + beams + 145 parts at the mars-2022 canonical pose"; flagship replay on
+`/studio` at "held": 37/37, hash = recorded = manifest (`c56ea8da…`), banner, 0 errors. Details:
+`RELEASE_CHECKLIST.md` "Production deploy 7". Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
+./node_modules/.bin/wrangler rollback 07dce638-2950-444f-823f-0e19b8f62320 --name mars-campus-2026 -m "rollback: <reason>"`
 
 ## Suggested next tranche (prioritised)
 

@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "07dce638-2950-444f-823f-0e19b8f62320",
+  "version": "f709304d-fc55-45f2-a44b-200cfadf4ae1",
   "published": "2026-09-28",
   "verification": "../.cloudflare/audit/http-smoke.json",
   "updated": "2026-09-28",
-  "feature": "release 6 (bleeding edge, 27e04f6): hand-up + forklift, one body model, splined walking with no jumps, stairs IK, 2022 year build A+B, paint + solar, meals, fire, camera direction (engine_direct_camera), takes mars-take/4, studio \"Watch it being built\" 2022, flagship v3 take",
+  "feature": "release 7: Watch it being built · 2022 east-house A+B chapter set, prone receiver, framing verbs, v3 take",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,7 +17,7 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "cebd5827-b08d-4224-a320-afba968a1352",
+  "rollback_version": "07dce638-2950-444f-823f-0e19b8f62320",
   "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab",
-  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-6-2026-09-28"
+  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-7-2026-09-28-watch-it-being-built"
 }
