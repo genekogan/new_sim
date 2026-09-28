@@ -614,7 +614,25 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         }
         // the deck crew: one on the first-floor deck (top line of a ground wall / bottom line of the upper wall), one on the roof deck (upper wall's top line)
         const uIn = Lc([q.p[0], q.p[2]])[0] < (uMin + uMax) / 2 ? uMin + 0.33 : uMax - 0.33;
-        const vP = safeV(Lc([q.p[0], q.p[2]])[1], uIn);
+        let vP = safeV(Lc([q.p[0], q.p[2]])[1], uIn);
+        // the upper wall's three deck workers stand 0.62 m apart along it (never one above another: a walker cannot take a
+        // spot someone occupies in plan, whatever the level): first-floor taker, roof fastener, first-floor taker
+        const vc0 = Lc([q.p[0], q.p[2]])[1];
+        let vs = [vP, vP, vP]; // first-floor taker (−), roof fastener, first-floor taker (+)
+        if (upper) {
+          const flines = [...new Set(fr.map((f) => r3(Lc(f.c)[1])))];
+          const okL1 = (v: number) => v >= lineV(0) + 0.3 && v <= lineV(K - 1) - 0.3 && flines.every((L) => Math.abs(v - L) >= 0.4);
+          let best: number[] | null = null, cost = Infinity;
+          for (let a = vc0 - 1.2; a <= vc0 + 0.3; a += 0.05) for (let c = vc0 - 0.3; c <= vc0 + 1.2; c += 0.05) {
+            if (!okL1(a) || !okL1(c) || c - a < 1.24 - 1e-9 || Math.abs(a - (vc0 - 0.45)) > 0.7 || Math.abs(c - (vc0 + 0.45)) > 0.7) continue;
+            const b = (a + c) / 2;
+            if (b < lineV(0) + 0.3) continue;
+            const k = Math.abs(a - (vc0 - 0.45)) + Math.abs(c - (vc0 + 0.45)) + 0.01 * Math.abs(b - vc0);
+            if (k < cost - 1e-9) { cost = k; best = [a, b, c]; }
+          }
+          if (best) vs = best.map(r3);
+        }
+        if (upper) vP = vs[0];
         const d1 = W(uIn, vP);
         const pre: string[] = [];
         pre.push(step('walk_to', { actor: C(2), x: d1[0], z: d1[1], level: levelId(l1Top) }, [2], [], `${C(2)} kneels at the deck edge above ${p.id}`));
@@ -625,18 +643,23 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
           continue;
         }
         // upper wall: raised by the ground crew to two kneeling on the first-floor deck, screwed from both decks
-        const d3 = W(uIn, vP - 0.62 >= lineV(0) + 0.4 && !(vP + 0.62 <= lineV(K - 1) - 0.4 && vP + 0.62 <= Lc([q.p[0], q.p[2]])[1] + 1.2) ? vP - 0.62 : vP + 0.62);
+        const d3 = W(uIn, vs[2]);
         pre.push(step('walk_to', { actor: C(3), x: d3[0], z: d3[1], level: levelId(l1Top) }, [3], []));
         if (!onDeck.has(4)) { upOnto(0, seatOf(levels[2]), 4, uIn < (uMin + uMax) / 2 ? uMin : uMax, lineV(0) + 1.2); onDeck.set(4, l2Top); }
-        const d5 = W(uIn, vP);
+        const d5 = W(uIn, vs[1]);
         pre.push(step('walk_to', { actor: C(4), x: d5[0], z: d5[1], level: levelId(l2Top) }, [4], []));
         const st = step('install_wall', {
-          part: p.id, to: pose(p), lift, from, take: [{ actor: C(2), grip: [-0.3, sy * 0.01, -0.3] }, { actor: C(3), grip: [-0.3, sy * 0.01, 0.3] }], handoff: 0.95, fasten: [C(2), C(4)],
+          part: p.id, to: pose(p), lift, from, take: [{ actor: C(2), grip: [-0.3, sy * 0.01, -0.45] }, { actor: C(3), grip: [-0.3, sy * 0.01, 0.45] }], handoff: 0.95, fasten: [C(2), C(4)],
         }, [...G, 2, 3, 4], [f, ...pre], `raise ${p.id} to the deck crew; screwed from the first-floor and roof decks`);
         mark(p, st);
       }
     }
-    if (onDeck.has(4)) climbDown(0, seatOf(levels[2]), [4], [uMin]);
+    if (onDeck.has(4)) {
+      climbDown(0, seatOf(levels[2]), [4], [uMin]);
+      // off the ground crew's way (they walk the −x panels in along the wall from the far end)
+      const q = W(uMax + 2.2, lineV(0) - 1.5);
+      step('walk_to', { actor: C(4), x: q[0], z: q[1], level: 0 }, [4], [], `${C(4)} stands clear`);
+    }
   }
   // ---------------------------------------------------------------- P: solar, last (§9)
   if (secs.has('P')) {
