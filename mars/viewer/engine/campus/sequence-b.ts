@@ -320,7 +320,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         posOf.set(recv, { st: from, u: uEnd, v: vK });
         // the second fastener: someone else who can stand within reach of the piece, clear of the receiver's whole path
         const want = Math.min(Math.max(uc(p), uMin + 0.44), uMax - 0.44);
-        const lo = Math.min(uStart, uEnd) - 0.62, hi = Math.max(uStart, uEnd) + 0.62;
+        const lo = Math.min(uR, uStart, uEnd) - 0.64, hi = Math.max(uR, uStart, uEnd) + 0.64; // (walk-to spot, kneel spot, follow path)
         for (const m of up.filter((x) => x !== recv)) {
           const is = island(m);
           const cands: number[] = [];
