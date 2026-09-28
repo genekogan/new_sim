@@ -228,7 +228,7 @@ test('phase-1 flagship shots: the bay orbit (structure growing during it) and th
   assert.ok(rep.simulation!.valid && rep.simulation!.samples === 1201, JSON.stringify(rep.simulation));
   assert.equal(rep.simulation!.worst.minFramed, 1, 'every in-place member framed on every sample, including the ones placed during the orbit');
   // the structure grows during the orbit: members arrive inside its final box (the frame check follows them)
-  const bay = new SemanticWorld(input.scene, take.finalState, input.facts).assemblies.find((a) => a.id === 'structure:A')!;
+  const bay = new SemanticWorld(input.scene, take.finalState, input.facts).assemblies.find((a) => a.id === rep.subject.id)!; // the resolved rack bay (ids may change when the take is regenerated)
   const inside = (q: Vec3) => [0, 1, 2].every((j) => q[j] >= bay.box!.min[j] - 0.25 && q[j] <= bay.box!.max[j] + 0.25);
   const inPlace = (t: number) => { const now = input.sampler(t); return bay.members!.filter((m) => now[m] && subjectPoints(now[m]).every(inside)).length; };
   assert.ok(inPlace(at + 120) > inPlace(at), `members in place: ${inPlace(at)} → ${inPlace(at + 120)}`);
