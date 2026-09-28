@@ -909,3 +909,42 @@ Then: gate → release 5; HANDOFF refresh.
 - **W31 landed** `6a7fadb`, `3afc6fb`, `d9c603a`, `6fc9b46`, `ccdf9d2`, `6c6f23d` + W27's docs as `279d405` (≈290k tokens, 115 min): `engine/take/chapters.ts` (observer cuts the take at section barriers, fresh recorder on the same runtime), **2022 east-house A+B as 7 chapter takes** (A 117 277 / D0 99 007 / D1 100 831 / D2 107 341 / S 87 041 / W 72 915 / P 16 187 ticks = 600 599; set `8ce33bee…`; 15.4 MB raw / 2.16 MB gz; every chapter 100 % readable, 0 invalid); continuity by hash + exact entities + replayed first frame; manifest `chapterSets` + `kind: 'year-build-chapter'` (STUDIO_REPLAY "Chapter sets"); recorder FIELDS `proneYaw`/`phaseK` (still /4). 376 / 3 skip / 0 fail; `--check` OK for all 13 takes. Chapter A is a new take (the A+B yard has the phase-B piles). Lead review: accepted.
 - W37 spawned (studio): chapter-set playback back-to-back with continuity check, captures. W38 spawned (campus): the other three 2022 houses (chiba, kitchen, west-house) through phase A+B, fix rules, pins.
 - **W36 landed** `03bed33`, `d1f02c0` (≈375k tokens, 50 min; merged from `w36-framing`): `catalog-framing.ts` (plates 8/12/16 ft, rafters 4–16 ft, blocking 16/24 in; all cut-to-order from 16 ft stock), `construction/framing.ts` (`install_top_plate` / `install_rafter` / `install_blocking` via givers → optional relay → installers on stances/deck; `framing.gap`, `framing.out-of-reach`), support rules (≥ 2 bearings, ≤ 24 in overhang; rafters need both plates, 1.5 in bearing, ≤ 12 in tail; `RAFTER_SPACING_MAX` 24 in exported), invariants `framingHandsInReach`/`framingSupported`; test bay 7 674 ticks 0 violations pinned 935bfcee…; 7 refusal cases. 379 / 376 / 3 skip; all pins unchanged. **Finding:** the 2022 Kit has no 2x4 framing (roof sheets on the top beams; "roof" features = kitchen guard rail) → decision in OWNER_DECISIONS (framing only where the reconstruction has it), Q19 parked. Lead review: accepted. Weak: mid-bay top members unreachable from end-frame stances (needs a stand-on-the-top-beams verb); one person per frame face per height band.
+## W36 — 2x4 roof framing verbs: top plates, rafters, blocking (2026-09-29)
+- **Verbs** (`construction/framing.ts`, FRAMING.md; branch `w36-framing`):
+  - `install_top_plate {part, onto, at}`: rests on column tops of beam-stable frames that have their top beams, or on
+    top rack beams; ≥ 2 bearings of ≥ 1.5 in; ≤ 24 in overhang.
+  - `install_rafter {part, from, to, at, pitch?}`: plate to plate, square across; pitch from the plates' tops, checked
+    ±1°; ≥ 1.5 in on each plate, tail ≤ 12 in (names the lengths).
+  - `install_blocking {part, between, on}`: between two rafters on a plate, ≤ 1 cm play a side.
+  - All three go up by the hang_beam / pass_up relay pattern on set_part's helpers: givers → relay → installers on frame
+    stances or a deck, raised outside the structure, slid 2 cm over the supports, fastened. Hand-off heights are
+    searched inside both crews' reach.
+  - Refusals: `framing.gap` ("add a relay"), `framing.out-of-reach` (names the height, "use a stance/deck"),
+    `plate-not-installed`, `rafter-long/short`, `pitch-mismatch`, `blocking-length`, `plate-frame-not-ready`, … .
+  - Invariants: `framingHandsInReach` (stance / floor reach every tick) and `framingSupported`.
+- **Catalog** (`world/catalog-framing.ts`): plates 8/12/16 ft (flat), rafters 4–16 ft (on edge; a flat-roof rafter is
+  the ceiling joist, so there is no separate def), blocking 16/24 in centres. All are 2x4 section, cut to order from
+  16 ft stock by the unchanged `cut`.
+- **Additive changes:** `rules.ts` (`RAFTER_SPACING_MAX` 24 in for the sheet rule + limits, `frameTopProblem`),
+  `index.ts` / `api/registry.ts` (ENGINE_ACTIONS / ENGINE_INVARIANTS), `catalog.ts` (one registration).
+- **Test** (`framing.test.ts`, 4 tests):
+  - A 16 ft Kit bay (beams 0.22 / 2.48 / 4.757) gets 2 plates, 4 rafters and 4 blocks: 7 674 ticks, 0 violations,
+    every member within 1 cm / 1°, pinned `935bfcee…`.
+  - The seven refusals listed in FRAMING.md.
+  - Determinism; catalog / cut; sloped rafter (plan).
+  - Engine suite 379 / 376 pass / 0 fail / 3 skip; `npm test` 56/56; tsc clean.
+- **Pins unchanged:** `deploy/perf-walk.mjs` stress / probe / campus / meal / v3 all PIN-OK. The suite's year-build
+  tests (first bay, first bay + deck strip) are unchanged.
+- **Kit finding (for the campus worker):**
+  - 2022 has no roof framing. Its 10 "roof" features are the kitchen's first-floor guard rail: 8 `roof rail post`
+    (0.07 × 1.0 × 0.06, y 2.5–3.5, standing in the outer frame columns: unplaceable, the column is the post) and 2
+    `timber roof railing` (10.972 × 0.07 × 0.08 at y 3.45 along both long sides). They map to a guard-rail rule, not
+    to these verbs.
+  - A framed roof raises the roof sheets 13 cm above the Kit's 4.892 m roof deck, so framing in a replay is a
+    non-canonical addition. That needs a decision (FRAMING.md).
+- **Weak spots:**
+  - Mid-bay top members are out of reach from end-frame stances (refused) until there is a deck or a "stand on the top
+    beams" verb.
+  - One person per frame face per height band (0.31 m apart otherwise).
+  - No runtime make-way for the givers.
+  - Sloped framing only plan-tested.

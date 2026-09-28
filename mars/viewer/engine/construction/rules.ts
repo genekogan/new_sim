@@ -13,7 +13,7 @@
 // (v1.1, year builds) Other uprights of the group that are still held by ≥ holdCrew
 // people are exempt from the height count (their holders carry them); the upright
 // being judged never is.
-import { FT, datan2, rot2, type Vec2, type Vec3 } from '../core/math.ts';
+import { FT, IN, datan2, rot2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
@@ -147,4 +147,27 @@ export function holdStations(u: Entity, n: number): { p: Vec2; yaw: number }[] {
     const col = rot2([Math.sign(o[0]) * (d / 2), 0], u.pose.yaw);
     return { p, yaw: datan2(u.pose.p[2] + col[1] - p[1], u.pose.p[0] + col[0] - p[0]) };
   });
+}
+
+// ---- 2x4 roof framing (W36, construction/framing.ts, FRAMING.md — PROVISIONAL, Mars assembly model v1) ----
+/** Roof / ceiling sheets need rafters at ≤ this centre spacing (the sheet rule itself is the year-build's; W36 exports the number). */
+export const RAFTER_SPACING_MAX = 24 * IN;
+/** A framing member bears at least this far onto each member under it (1.5 in). */
+export const FRAMING_BEARING_MIN = 1.5 * IN;
+/** A rafter's tail beyond the far edge of a plate it rests on: at most this (12 in). */
+export const RAFTER_TAIL_MAX = 12 * IN;
+/** A top plate cantilevers at most this beyond its outermost bearing (24 in). */
+export const PLATE_OVERHANG_MAX = 24 * IN;
+/** "Top beams": installed beams on both columns within this of the frame's top tie the column tops a plate rests on. */
+export const TOP_BEAM_BAND = 0.35;
+/** Why a standing frame's column tops cannot carry a top plate yet (null = they can): it must be stable and tied by top beams on both columns. */
+export function frameTopProblem(w: WorldState, u: Entity): string | null {
+  if (!isUpright(u) || u.phase !== 'installed' || !isStanding(u)) return `${u.id} is not an installed, standing frame`;
+  if (!isSupported(w, u) || u.support?.kind === 'held') return `frame ${u.id} is not beam-stable (${groupStability(w, u).missing[0] ?? 'held by people'})`;
+  const h = def(u.def).size[1];
+  const links = beamLinks(w, u);
+  for (const col of [-1, 1] as const)
+    if (!links.some((l) => l.col === col && l.height >= h - TOP_BEAM_BAND - 1e-9))
+      return `frame ${u.id} has no top beam on its ${col < 0 ? 'left' : 'right'} column (within ${TOP_BEAM_BAND} m of its ${h.toFixed(2)} m top)`;
+  return null;
 }
