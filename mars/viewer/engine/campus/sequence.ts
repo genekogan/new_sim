@@ -215,7 +215,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     return { x: r3(p[0]), z: r3(p[1]) };
   };
   const done = new Map<string, string[]>();
-  const mark = (node: string, kind: string, ...ids: string[]) => { const d = done.get(node) ?? []; d.push(...ids); done.set(node, d); };
+  const mark = (node: string, _kind: string, ...ids: string[]) => { const d = done.get(node) ?? []; d.push(...ids); done.set(node, d); };
   const raised = new Map<string, string>(); // frame node → its hold step
   const raise = (f: Frame, holder: number): string | null => {
     // W38: a line-0 frame laid inward is held from outside, on ground nobody else uses: the holder takes the spot before

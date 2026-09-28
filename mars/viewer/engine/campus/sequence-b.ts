@@ -27,6 +27,7 @@ import { cutPlan } from '../construction/cut.ts';
 import { localToWorld } from '../construction/setpart.ts';
 import type { PartB, PartsB, UnplacedB } from './parts-b.ts';
 import type { Yard } from './bom.ts';
+import { defaultSortOrder } from '../core/order.ts';
 
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const BEAM_HALF = 0.0254, PLY_T = 0.01905, SHEET_HALF = 0.6096;
@@ -101,7 +102,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   const yawW = (localYaw: number) => localYaw + ctx.Y; // a local-frame heading → world yaw
   // ---------------------------------------------------------------- material flow
   const st = ctx.yard.station!;
-  const stU = rot2([1, 0], st.yaw), stV = rot2([0, 1], st.yaw);
+  const stV = rot2([0, 1], st.yaw);
   // in-feed spot: behind the operator (the bench's −z side), the stock parallel to the bench
   const inFeed = (d: string) => { const w = def(d).category === 'plywood' ? def(d).size[2] : Math.max(def(d).size[2], 0.1); const o = 0.5 + 0.45 + 0.35 + 0.3 + w / 2; return { x: r3(st.x - stV[0] * o), z: r3(st.z - stV[1] * o), yaw: r3(st.yaw) }; };
   let stationFree: string[] = []; // steps that clear the out-feed of the last cut
@@ -396,7 +397,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     };
     /** Fasten the pending pieces now reachable: two deck people kneeling on laid sheets next to each (same or any strip). */
     const fastenPending = (standOn: number[]) => {
-      for (const it of [...pending]) {
+      for (const it of Array.from(pending)) {
         const p = it.p, L = lenOf(p);
         let spot: { st: number; a: number; b: number } | null = null;
         for (const st of standOn) {
@@ -519,7 +520,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     };
     const byLat = [...stringers].sort((a, b) => latOf(b.pose.p[0], b.pose.p[2]) - latOf(a.pose.p[0], a.pose.p[2]));
     const shifted = (p: PartB) => { const b = layBack(p); return !!b && b.dl !== 0; };
-    for (const [i, p] of [...byLat.filter(shifted), ...byLat.filter((q) => !shifted(q))].entries()) {
+    for (const p of [...byLat.filter(shifted), ...byLat.filter((q) => !shifted(q))]) {
       const lat = latOf(p.pose.p[0], p.pose.p[2]);
       const nextFree0 = -0.37; // the crew's side: where no stringer is in yet (see the order above)
       const L = lenOf(p);
@@ -652,8 +653,6 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         const nrm: Vec2 = [-wa[1], wa[0]];
         const outN: Vec2 = dot2(nrm, outD) > 0 ? nrm : [-nrm[0], -nrm[1]];
         const sy = dot2(dY, outN) > 0 ? 1 : -1;
-        // lying flat outside the wall, its length along the wall
-        const Wd = def(p.def).size[2];
         // flat on the ground outside the wall (room for its carriers; closer where a neighbour's stair is 1.5 m out)
         const narrowW = Lc([q.p[0], q.p[2]])[0] < uMin + 0.1 && ctx.narrowMinusU(Lc([q.p[0], q.p[2]])[1]);
         // …or, where a neighbour's stair leaves no room beside the wall, beyond the house's far end (walked in upright)
@@ -755,7 +754,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     // neighbours in its row are still off (not tilted): every other panel of a row
     const rows = new Map<string, PartB[]>();
     for (const p of panels) { const k = `${r3(Lc([p.pose.p[0], p.pose.p[2]])[0])}`; rows.set(k, [...(rows.get(k) ?? []), p]); }
-    for (const [, row] of [...rows.entries()].sort()) {
+    for (const [, row] of [...rows.entries()].sort(defaultSortOrder)) {
       row.sort((a, b) => Lc([a.pose.p[0], a.pose.p[2]])[1] - Lc([b.pose.p[0], b.pose.p[2]])[1]);
       // mountable: both end stations (half its width + 0.45 m along the rails) on the roof deck, and no mounted neighbour
       const vOf = (p: PartB) => Lc([p.pose.p[0], p.pose.p[2]])[1];

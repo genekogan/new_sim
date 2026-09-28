@@ -21,6 +21,7 @@ import type { AsmNode, AssemblyGraph, CompBox, FeatureClass } from './assembly.t
 import type { CampusObstacle } from './types.ts';
 import type { PartsB } from './parts-b.ts';
 import { cutPlan } from '../construction/cut.ts';
+import { defaultSortOrder } from '../core/order.ts';
 
 const SHEET_L = 8 * 0.3048, SHEET_W = 4 * 0.3048;
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
@@ -125,8 +126,8 @@ export function stockPiles(bom: Bom): PileSpec[] {
     need.set(l.item, { count: (n?.count ?? 0) + l.count, phase: n?.phase === 'A' || l.phase === 'A' ? 'A' : 'B' });
   }
   const out: PileSpec[] = [];
-  for (const [piece, { count, phase }] of [...need.entries()].sort()) {
-    const b = Object.entries(BUNDLES).filter(([, s]) => s.piece === piece).sort()[0];
+  for (const [piece, { count, phase }] of [...need.entries()].sort(defaultSortOrder)) {
+    const b = Object.entries(BUNDLES).filter(([, s]) => s.piece === piece).sort(defaultSortOrder)[0];
     if (!b) throw new Error(`stockPiles: no bundle / stack holds ${piece}`);
     const [bid, spec] = b;
     for (let k = 0, left = count; left > 0; k++, left -= spec.capacity)
@@ -330,9 +331,9 @@ export function morePiles(bom: Bom, have: PileSpec[]): PileSpec[] {
   for (const p of want) need.set(p.piece, (need.get(p.piece) ?? 0) + p.count);
   for (const p of have) need.set(p.piece, (need.get(p.piece) ?? 0) - p.count);
   const out: PileSpec[] = [];
-  for (const [piece, n] of [...need.entries()].sort()) {
+  for (const [piece, n] of [...need.entries()].sort(defaultSortOrder)) {
     if (n <= 0) continue;
-    const [bid, spec] = Object.entries(BUNDLES).filter(([, s]) => s.piece === piece).sort()[0];
+    const [bid, spec] = Object.entries(BUNDLES).filter(([, s]) => s.piece === piece).sort(defaultSortOrder)[0];
     const k0 = have.filter((p) => p.piece === piece).length;
     for (let k = 0, left = n; left > 0; k++, left -= spec.capacity) out.push({ id: `pile-${piece}-${k0 + k + 1}`, def: bid, piece, count: Math.min(spec.capacity, left), capacity: spec.capacity, phase: 'B' });
   }
