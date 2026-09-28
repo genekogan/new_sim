@@ -13,4 +13,10 @@
   may be interpolated into place. Full requirements: OWNER_FEEDBACK_2026-09-28.md.
 - (2026-09-28) Movement quality bar: gradual splined turns; immediate reaction to blocks (no pushing into
   objects for strides); feet on stair treads; animated fire. Same file.
+- (2026-09-28) **Build order at Mars:** skeleton first — large tranches of pallet racks raised and connected,
+  then 2x4 framing (top plates, rafters, joists) and a 2x4 stair/ramp to the upper level — and only then floors,
+  ceilings and walls, gradually, in a logical, ergonomic and safe order. Wood comes as strapped bundles
+  (plywood, 2x4, 2x6, other sizes); there is cutting equipment on site; solar panels are their own piles and go
+  up last onto roofs. Photos: docs/engineering/evidence/. Headline milestone: replay each year's construction
+  from piles to the canonical state (OWNER_FEEDBACK_2026-09-28.md §7–10).
 

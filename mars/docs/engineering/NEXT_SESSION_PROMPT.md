@@ -39,7 +39,14 @@ receivers standing on the beams/uprights (builders climb and stand on the rack s
 that is how Martian floors are made), or by forklift; nothing levitates; (6) handling motions — crouch/kneel to pick up, stand with the load, reach up to pass, reach down to receive — so the hand-up is two people below reaching up and two above reaching down; (3) walkers must notice an
 obstacle the tick it happens and never push into it for strides; (2) turns are gradual splined paths,
 not straight–pivot–straight; (4) real stair climbing with feet on the treads (leg IK); (1) an animated
-fire instead of the static cone. Items 2–4 move pinned hashes: do them early and re-pin once.
+fire instead of the static cone.
+**Headline milestone (feedback items 7–10):** for each year 2020–2026, replay the ENTIRE construction from
+raw material piles (strapped plywood/2x4/2x6 bundles, uprights, beams, solar panels as their own piles,
+doors/windows where the reconstruction has them, a wood-cutting station) to the canonical campus — skeleton
+first (racks, 2x4 framing, stair/ramp), then floors/ceilings/walls gradually and safely — ending EQUAL to the
+year's protected checkpoint, watchable in the studio as "Watch it being built" with the engine camera and the
+refusal log. Also: people can stand in front of a wall and paint it. Photos of the real skeleton stage and
+piles are in `docs/engineering/evidence/`. Items 2–4 move pinned hashes: do them early and re-pin once.
 
 **Known open items, in priority order (details in HANDOFF "Suggested next tranche"):**
 0. Then the grid-origin fix below, in the same re-pin.

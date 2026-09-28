@@ -103,7 +103,74 @@ Proof: close-up captures of a pickup (crouch → stand), a hand-up (reach up bel
 a raise footer holding low; a per-tick test that every gripping hand is within 0.1 m of its engine
 hand point when the engine says it is reachable, and that no arm exceeds its length.
 
+## Evidence photos (Gene, 2026-09-28) — `docs/engineering/evidence/`
+- `2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg` — a building after most pallet racks are
+  up and the 2x4 top framing is in, before any plywood: mixed green/red/blue uprights (three frame heights
+  visible: a low run on the left, a taller middle, tallest at the right), orange and blue beams, 2x4 top
+  plates/rafters and a long 2x4 stair-ramp on the right end reaching the top level; trailers parked behind;
+  on the ground: strapped 2x4/2x6 bundles, plywood stacks, a metal grate, a folding chair; a forklift at
+  the far right. This is the canonical **skeleton stage**.
+- `2026-09-28-material-piles-plywood-2x4-2x6-timbers.jpg` — plywood in strapped bundles (~20–30 sheets,
+  several stacks), strapped bundles of 2x4 and 2x6 (long, ~16–20 ft), salvaged heavy timbers/railroad ties
+  at the right, loose boards on the ground, vehicle tracks. The pile geometry the piles in the engine
+  should look like (bundles, not loose sheets side by side).
+- `2026-09-28-material-piles-with-loader.jpg` — the same yard with a yellow loader/backhoe behind the
+  plywood, a wheel (EUC) on the ground, more timbers.
+
+## 7. MAJOR MILESTONE — replay the entire construction of each Mars year from raw piles
+Target: for each canonical year 2020–2026, a long timeline in which people build the campus **from
+material piles to the finished reconstruction**: uprights and beams, plywood, 2x4s, 2x6s and other wood,
+doors, windows and other features where the reconstruction has them, solar (item 9). The end state of
+the timeline must equal the year's canonical state (same components, same placements — the year's
+protected checkpoint is the acceptance target; provenance stays what it is, the *sequence* is
+hypothetical unless documented).
+Build order is the Mars way (photo 1): **skeleton first** — raise and connect large tranches of pallet
+racks, then the 2x4 framing (top plates, rafters, joists), then a stair/ramp to the upper level — and
+only then floors, ceilings and walls, added gradually in a logical, ergonomic and safe order (you can
+stand on what exists; you never need what doesn't exist yet). Materials arrive by the hand-up /
+climb-the-structure / forklift mechanisms of items 5–6; nothing levitates. There is wood-cutting
+equipment on site: a `cut` verb at a cutting station turns stock lengths into the sizes the
+reconstruction needs (a 4x8 sheet → the 4x6 the bay uses, a 16 ft 2x4 → 8 ft), with offcuts.
+Piles look like the photos: strapped bundles that are unbundled as people take from them.
+Deliverables: a per-year **construction sequence generator** (from the canonical scene, derive an
+assembly graph: which components rest on / connect to which, then a safe order that respects support
+rules and access), material piles sized from the year's bill of materials, a director-run take per year
+with camera tracks, and a comparison test: final state == canonical (component set and placements within
+1 cm / 1°; anything the generator could not place is reported, never faked). Milestone evidence: takes
+for all seven years replayable in the studio, each with its blocked/refused log and 0 violations.
+Where: `engine/construction/` (2x6, top plates, rafters, walls, ceilings, doors, windows as install
+verbs with support rules; `cut`; bill of materials), `engine/campus/` (assembly graph from the year
+scenes — needs the component kinds/relations the Kit already knows), `engine/scenarios/` (per-year
+templates), `deploy/record-year-take.mjs`, studio replay picker per year.
+
+## 8. Painting
+Target: a person stands in front of a wall panel and paints it: `paint {actor, panel, color|texture}`
+— walk to a standing spot facing the panel within arm's reach, a painting motion (arm sweeps over the
+reachable band; higher bands need standing on something — the reach rules apply), the panel's
+material changes progressively (coverage fraction per tick, visible in the renderer and stored in the
+take). Murals (e.g. 2024 flower mural) are the motivating case; texture from the reconstruction.
+Where: `engine/social/` or a new `engine/work/` (paint verb + progress state on the entity),
+renderer material progress, catalog `paintable` faces.
+
+## 9. Solar panels are their own thing
+Target: solar panels (and their mounts/rails) are catalog items with their own **piles**; people carry
+them (2-person carry, fragile: no tilting past ~30°, no dropping), pass them up (hand-up) or forklift
+them, and mount them on roofs/top decks at the reconstruction's tilt; batteries, charge controllers and
+inverters are placed items too (spec §19: identifiable and configurable, no electrical simulation yet).
+The 2024 stepped panels and every year's roof arrays come from the same verbs.
+Where: catalog (`solar-panel-<size>`, `panel-rail`), `construction/solar.ts` (install verbs with
+support: rails on framing), piles in the year bill of materials, renderer.
+
+## 10. What "done" looks like for this thread
+The studio's year picker offers, for each year, **"Watch it being built"**: a take from empty desert +
+piles to the canonical campus, with the engine camera, at any speed, with the log of every refusal
+and wait — and the final frame equal to the reconstruction. Together with items 1–6 this is the next
+tranche's headline.
+
 ## Priority
 5 with 6 (they are one feature: the hand-up is the reach-up/reach-down motion pair, and pickups need
-the crouch), then 3 and 2 (movement quality, spec §10), then 4, then 1 (visual only). Items 2–4 change pinned hashes; do them early in a
+the crouch) — these are prerequisites for 7; then 7 (the headline: full-year construction replays, start
+with 2026 or the simplest year, skeleton stage first as its own demo), with 9 (solar) and 8 (paint) as
+verbs inside it; 3 and 2 (movement quality, spec §10) and 4 alongside because every construction take
+shows them; 1 (fire) last. Items 2–4 change pinned hashes; do them early in a
 session and re-pin once, with the reason recorded in PLANNING_BUDGET.md.

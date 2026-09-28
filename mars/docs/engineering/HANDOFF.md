@@ -387,7 +387,9 @@ entities, banner visible, 0 errors. Rollback, from `viewer/`: `WRANGLER_WRITE_LO
 
 > **Owner feedback (2026-09-28) supersedes the ordering below:** see `OWNER_FEEDBACK_2026-09-28.md` —
 > hand-up / climb-the-structure floor building (no levitating materials), immediate reaction to blocks,
-> splined turns, feet on stair treads, animated fire. Then the items here.
+> splined turns, feet on stair treads, animated fire — and the headline milestone: replay every year's
+> construction from raw material piles to its canonical state (skeleton first), with painting and solar-panel
+> verbs. Then the items here.
 
 1. **Gate script + doc refresh.** Put `test:engine`, `npm test`, `typecheck`, `lint`, `e2e` and
    `test:simulation` in one gate script and record its output. Refresh stale numbers in
