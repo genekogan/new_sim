@@ -1261,3 +1261,19 @@ Then: gate → release 5; HANDOFF refresh.
     `#293c45` vs engine green; `components.ts` upright comment still says blue; `app/lab/solar-paint.ts` text says
     hashed stripes; RELEASE_CHECKLIST once lint is gated; `npm ci` for `oxlint-tsgolint`.
 - **W45 landed** (≈180k tokens, 75 min; main ff to `7a00405`): all four Codex branches ACCEPTED — tooling (`oxlint-tsgolint` 7.0.2003, lint runs type-aware but is red: 114 errors → not in the gate; `source-scan.test.ts` bans host transcendentals + `**` with a 14-line allowlist), camera-nl-parse (`parse.ts`, 55 sentences + 21 structured refusals, schema frozen; not wired into the app), 2026-frame-grouping (81 frames / 12 beams / 92 unclassified; every frame `catalogDef: null` — posts ≈ 1.02 m deep, not a stock size; `--check` byte-identical), fire-v2-render-polish (green uprights, fire draw calls unchanged; 9 baselines refreshed after inspection — green/firelight drift only). Full gate GREEN at `a7b0da2`: unit 73, engine 403/0/6, tsc, e2e 79 pass + 2 skip, probe = pin. Lead review: accepted. Follow-ups (Claude-owned): `components.ts` route `panel-rail` → `solarRailMesh()`, tilt legs for installed panels, `kit.ts:84` post colour, stale comments; lint findings (26 unused vars, 10 `any`, 3 template exprs, `setpart.ts:241` erasing-op — may move a pin); wire the parser into the Direct panel (→ W48); grouping → `assembly.ts` (2026 year build, later).
+
+- **W50 render follow-ups** (branch `w50-render-followups`, worktree `scratchpad/w50-wt`, port 5681): the two Codex
+  hand-offs. `components.ts` `build()` routes `panel-rail` → `solarRailMesh()` (C-channel); `panel()` takes the entity
+  and adds `solarTiltLegs()` only for an installed module with non-zero pitch/roll (two plumb risers under the high
+  edge, span × sin(tilt); view rebuilds on that mount key), carried/flat panels get none; upright comment fixed.
+  `kit.ts` rack posts import `RACK_FRAME_GREEN` (palette.ts) instead of `#293c45`. Baselines (all inspected): new
+  `render-polish-tilt-legs`, refreshed `render-polish-mounted-panel` + 9 post-recolour views (studio-2021-default /
+  -classroom-eye / -corridor-aluminet, studio-2022/2023/2024/2025-default, studio-2024-solarium-door,
+  lab-year-2022-top-prisms; each under the 0.2 pixelmatch threshold, 0.2–1.1 % raw, every changed pixel greener).
+  Specs: render-polish, solar-paint, lab-years, studio-years 29/29; year-build, studio-build, build-bay, poses 41 pass +
+  1 skip (studio-build "chapter set at 64×" failed once under the parallel load, passed 3/3 alone). Open: the
+  pre-existing Codex drift in poses/build-bay/solar-paint/year-build baselines (the same 0.03–1.24 % its REPORT lists)
+  is still unrefreshed; `scenes.ts:113` still draws the 2021 central upright `#293c45` (W47/W46 area); the Lab
+  `solar-paint` pv2 is rolled 20° with its x ∥ the rails and its origin unlifted, so its low edge sinks 0.34 m into
+  the ground (the engine's `tiltedPose` would pitch it and lift it span/2·sin); `app/lab/solar-paint.ts` header and
+  description still say textures are hashed stripes.
