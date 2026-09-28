@@ -396,7 +396,7 @@
       "name": "Flagship on the full uncropped 2026 campus",
       "required": "The campus flagship runs on the whole campus scene (7.6k obstacles, no crop) with 0 violations and the same final state as the ±40 m staging-east crop.",
       "tests": [
-        { "file": "campus-full.test.ts", "title": "ends physically identical to the cropped run" },
+        { "file": "campus-full.test.ts", "title": "ends identical to the cropped run" },
         { "file": "campus-full.test.ts", "title": "final-state hash === the cropped run" }
       ],
       "approximate": "Bit-identical since W1's global grid lattice (cell coordinates on one world lattice, not the crop's origin): the former todo is an assertion. Proven for this one scenario at the staging-east site; the whole campus is still ground level 0 only, and it costs about 2.5–3× the compute of the crop."
