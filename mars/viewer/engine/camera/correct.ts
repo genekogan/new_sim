@@ -56,6 +56,8 @@ export type DirectCorrection = {
   t1: number;
   /** Every strategy considered before this one (n/a with the reason, or failed with each attempt's result). */
   tried: TriedStrategy[];
+  /** The chosen strategy's own ladder up to the winning magnitude (e.g. swing +10° → flare ×2, then +20° → valid). */
+  attempts: { magnitude?: number; result: string }[];
 };
 export type FailureSummary = { kind: FailureKind; samples: number; t0: number; t1: number; worst: number; detail: string };
 /** The phase-2 simulation of the final shot, in the report. */
@@ -165,7 +167,7 @@ export function correctShot(intent: ShotIntent, ctx: SynthContext, prev: PrevPos
       else if (strategy === 'reroute') { tried.push({ strategy, outcome: 'n/a', why: 'not a routed move' }); continue; }
       else { tried.push({ strategy, outcome: 'n/a', why: 'no track to trim: the synthesis itself was refused' }); continue; }
       if (win) {
-        const corr: DirectCorrection = { failure: 'refused', samples: { count: 0, t0: intent.t0, t1: intent.t0 }, strategy, before, after: summarize(win.sc), reason: `${first.diagnostic.code}: ${first.diagnostic.message} → ${strategy} ${JSON.stringify(win.params)} gives a valid shot`, params: win.params, t0: win.shot.t0, t1: win.shot.t1, tried: [...tried] };
+        const corr: DirectCorrection = { failure: 'refused', samples: { count: 0, t0: intent.t0, t1: intent.t0 }, strategy, before, after: summarize(win.sc), reason: `${first.diagnostic.code}: ${first.diagnostic.message} → ${strategy} ${JSON.stringify(win.params)} gives a valid shot`, params: win.params, t0: win.shot.t0, t1: win.shot.t1, tried: [...tried], attempts };
         tried.push({ strategy, outcome: 'chosen', why: corr.reason, attempts });
         corr.tried = tried.slice(0, -1);
         return { ok: true, shots: [{ ...win.shot, corrections: [corr], simulation: simulationOf(win.sc) }] };
@@ -189,7 +191,7 @@ export function correctShot(intent: ShotIntent, ctx: SynthContext, prev: PrevPos
   const done = (strategy: CorrectionStrategy, shots: SynthShot[], sc: ShotScore, params: Record<string, number>, why: string, attempts: { magnitude?: number; result: string }[]): CorrectResult => {
     const t1 = shots[shots.length - 1].t1;
     const reason = `${target.kind} on ${target.samples} sample${target.samples === 1 ? '' : 's'} (${target.detail}); ${why}`;
-    const corr: DirectCorrection = { failure: target.kind, samples: { count: target.samples, t0: target.t0, t1: target.t1 }, strategy, before, after: summarize(sc), reason, params, t0: shots[0].t0, t1, tried: [...tried] };
+    const corr: DirectCorrection = { failure: target.kind, samples: { count: target.samples, t0: target.t0, t1: target.t1 }, strategy, before, after: summarize(sc), reason, params, t0: shots[0].t0, t1, tried: [...tried], attempts };
     tried.push({ strategy, outcome: 'chosen', why, attempts });
     const notes = shots.length > 1 ? [`${strategy}: part ${1} of 2`, `${strategy}: part 2 of 2 (after the cut at ${shots[1].t0} s)`] : [];
     return { ok: true, shots: shots.map((s, i) => ({ ...s, corrections: i === 0 ? [corr] : [], notes: notes.length ? [...s.notes, notes[i]] : s.notes, simulation: simulationOf(i === 0 || shots.length === 1 ? sc : simulate(s, intent, ctx, deps)) })) };

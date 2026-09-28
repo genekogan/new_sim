@@ -210,6 +210,9 @@ export type FailureKind = (typeof FAILURE_ORDER)[number];
 /** Penalty per failing sample (the scalar score is only for ranking / before-after reporting; validity = no failure). */
 export const FAILURE_WEIGHT: Record<FailureKind, number> = { collision: 100, squeeze: 10, foreground: 5, flare: 5, frame: 5, horizon: 3, motion: 3 };
 
+/** What `ShotFailure.worst` measures per kind. */
+const WORST_UNIT: Record<FailureKind, string> = { collision: ' samples', squeeze: ' m free', foreground: ' of the subject covered', flare: '° off axis', frame: ' of the points framed', horizon: '° pitch', motion: '°/s' };
+
 export type MotionCapsIn = { viewOmegaDeg: number; viewAlphaDeg: number; speed: number; accel: number };
 
 /** One computed shot to simulate. `keys[i].t` is relative to `t0` (take seconds). */
@@ -367,7 +370,8 @@ export function scoreShot(sim: ShotSim): ShotScore {
   const L = FAILURE_LIMITS;
   const near = 0.05, groundY = sim.groundY ?? 0;
   const yMin = 2 * (sim.safeBottom ?? 0) - 0.95;
-  const sun = sim.sunDir && sim.sunDir[1] > 0 ? sim.sunDir : null;
+  const sl = sim.sunDir ? hypot(sim.sunDir[0], sim.sunDir[1], sim.sunDir[2]) : 0;
+  const sun: Vec3 | null = sim.sunDir && sim.sunDir[1] > 0 && sl > 0 ? [sim.sunDir[0] / sl, sim.sunDir[1] / sl, sim.sunDir[2] / sl] : null;
   const samples: SampleScore[] = [];
   let prevW: number | null = null, prevV: number | null = null;
   const subjectSet = new Set(sim.subjects);
@@ -496,9 +500,10 @@ export function scoreShot(sim: ShotSim): ShotScore {
       }
       if (counts) {
         const run = samples.slice(i, j + 1);
-        const worst = kind === 'squeeze' ? Math.min(...run.map((s) => Math.min(s.freeWidth, s.partClearance))) : kind === 'foreground' ? Math.max(...run.map((s) => s.foreground?.cover ?? 0)) : kind === 'flare' ? Math.min(...run.map((s) => s.sunOffAxisDeg ?? 90)) : kind === 'frame' ? Math.min(...run.map((s) => s.framed)) : kind === 'horizon' ? Math.max(...run.map((s) => Math.abs(s.pitchDeg))) : kind === 'motion' ? Math.max(...run.map((s) => s.omegaDeg)) : run.length;
+        const minW = Math.min(...run.map((s) => s.freeWidth));
+        const worst = kind === 'squeeze' ? (Number.isFinite(minW) ? minW : Math.min(...run.map((s) => s.partClearance))) : kind === 'foreground' ? Math.max(...run.map((s) => s.foreground?.cover ?? 0)) : kind === 'flare' ? Math.min(...run.map((s) => s.sunOffAxisDeg ?? 90)) : kind === 'frame' ? Math.min(...run.map((s) => s.framed)) : kind === 'horizon' ? Math.max(...run.map((s) => Math.abs(s.pitchDeg))) : kind === 'motion' ? Math.max(...run.map((s) => s.omegaDeg)) : run.length;
         const who = [...new Set(run.flatMap((s) => (kind === 'foreground' && s.foreground ? [s.foreground.id] : kind === 'squeeze' && s.squeezedBy ? s.squeezedBy : [])))].sort();
-        failures.push({ kind, i0: i, i1: j, t0: samples[i].t, t1: samples[j].t, samples: j - i + 1, worst: r2(worst), detail: `t=${samples[i].t}–${samples[j].t} s: ${run[0].why[kind]}`, subjects: who });
+        failures.push({ kind, i0: i, i1: j, t0: samples[i].t, t1: samples[j].t, samples: j - i + 1, worst: r2(worst), detail: `t=${samples[i].t}–${samples[j].t} s: ${run[0].why[kind]}${j > i ? `; worst ${r2(worst)}${WORST_UNIT[kind]}` : ''}`, subjects: who });
         for (let q = i; q <= j; q++) failing.add(q);
       }
       i = j + 1;

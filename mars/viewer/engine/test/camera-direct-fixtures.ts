@@ -11,6 +11,9 @@ import { loadCampusYear } from '../campus/history.ts';
 import { loadCampusFile } from '../campus/history-node.ts';
 import { entityFootprint } from '../spatial/service.ts';
 import { DEFAULT_CAMERA_POLICY, type CameraPolicy } from '../camera/geom.ts';
+import { partOccluders } from '../camera/occluders.ts';
+import type { SubjectPose } from '../camera/shots.ts';
+import { datan2, type Vec3 } from '../core/math.ts';
 import { takeSampler } from '../camera/take-sampler.ts';
 import { takeFacts } from '../camera/direct.ts';
 import { takeDuration } from '../take/replay.ts';
@@ -97,3 +100,28 @@ export function stepTimes(take: Take): Map<string, { start: number; end: number 
   return m;
 }
 export const onGrid = (t: number) => Math.round(t * 10) / 10;
+
+// ---- phase 2 (self-correction) synthetic takes ---------------------------------------------------------------
+
+/**
+ * Flat 40×40 m yard, no static obstacles (unless given), with a 4×4 m region 'plot' at the origin — the subject of
+ * the synthetic self-correction takes (its box is 3 m high: nothing stands inside it).
+ */
+export function yardScene(obstacles: Obstacle[] = [], datetime?: string): { scene: SpatialScene; world: WorldState } {
+  const scene: SpatialScene = { bounds: [-20, -20, 20, 20], levels: [{ id: 0, y: 0, label: 'ground' }], surfaces: [{ id: 'ground', level: 0, y: 0, obb: { c: [0, 0], half: [20, 20], yaw: 0 } }], obstacles, links: [] };
+  const world = emptyWorld('synthetic-yard', scene);
+  world.regions.plot = { id: 'plot', label: 'the plot', kind: 'place', polygon: [[-2, -2], [2, -2], [2, 2], [-2, 2]], provenance: FIXTURE };
+  return { scene, world: datetime ? withTime(world, datetime) : world };
+}
+
+/**
+ * A 4x8 plywood sheet standing on its short edge (2.44 m tall, 1.22 m wide, 19 mm thick) as a take part: centred at
+ * (x, z), its 1.22 m width along the horizontal unit direction `along` (x, z). Sight-blocking box from the catalog
+ * (partOccluders), exactly as the take sampler gives a component.
+ */
+export function standingSheet(x: number, z: number, along: [number, number]): SubjectPose {
+  const yaw = datan2(-along[0], along[1]); // local z → (−sin yaw, cos yaw) = along
+  const pose = { p: [x, 1.22, z] as Vec3, yaw, roll: Math.PI / 2 }; // roll: local x (8 ft) vertical
+  return { p: pose.p, yaw, kind: 'component', occluders: partOccluders('plywood-4x8', pose) };
+}
+export const personAt = (p: Vec3, yaw = 0): SubjectPose => ({ p, yaw, kind: 'human' });
