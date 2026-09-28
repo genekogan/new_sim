@@ -15,7 +15,7 @@
 import { z } from 'zod';
 import { dist2, datan2, obbOverlap, rot2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
-import { canonicalEntityOrder, type Runtime } from '../runtime/runtime.ts';
+import { canonicalEntityOrder, type Invariant, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { BUNDLES } from '../world/catalog-stock.ts';
@@ -278,3 +278,21 @@ export const stackOffcut: ActionDef<OP, OProg, OExec> = {
 };
 
 export const MOVES_B: ActionDef[] = [climbStair, leaveStair, stepOntoBeam, stackOffcut];
+
+/** People standing on an unfinished stair (`human.on = stairwork:<board>`) stand on that installed, supported tread board, over it (climbing: at most 0.6 m off it). */
+export const stairWorkOk: Invariant = (rt) => {
+  const out: Diagnostic[] = [];
+  for (const h of Object.values(rt.world.entities).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    const on = h.human?.on;
+    if (!on?.startsWith(STAIRWORK)) continue;
+    const b = rt.world.entities[on.slice(STAIRWORK.length)];
+    if (!b || b.phase !== 'installed' || supportOf(rt.world, b)) { out.push({ code: 'stair.tread-gone', message: `${h.id} stands on ${on.slice(STAIRWORK.length)}, which is not an installed, supported tread board`, subjects: [h.id], at: h.pose.p }); continue; }
+    if (h.human!.activity.startsWith('climb')) continue;
+    const o = flatObb(b.pose, b);
+    const l = rot2([h.pose.p[0] - o.c[0], h.pose.p[2] - o.c[1]], -o.yaw);
+    const top = b.pose.p[1] + def(b.def).size[1];
+    if (Math.abs(l[0]) > o.half[0] + 0.01 || Math.abs(l[1]) > o.half[1] + 0.25 || Math.abs(h.pose.p[1] - top) > 0.03)
+      out.push({ code: 'stair.off-tread', message: `${h.id} is not standing on tread board ${b.id}`, subjects: [h.id, b.id], at: h.pose.p });
+  }
+  return out;
+};

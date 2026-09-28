@@ -23,7 +23,7 @@ import { WorldHistory } from '../history/store.ts';
 import { passUp } from '../construction/passup.ts';
 import { installStairPart, installStringer, kitPartHandsInReach, kitPartsSupported, kitStairContributor } from '../construction/setpart.ts';
 import { installWall } from '../construction/wall.ts';
-import { MOVES_B } from '../construction/moves-b.ts';
+import { MOVES_B, stairWorkOk } from '../construction/moves-b.ts';
 import { SOLAR_ACTIONS } from '../construction/solar.ts';
 import { progressiveContributor, progressiveSupported } from '../construction/contributor.ts';
 import type { Section } from '../campus/sequence-b.ts';
@@ -53,7 +53,7 @@ export function yearBuildRegistryB(): Map<string, ActionDef> {
   return r;
 }
 /** Phase B invariants; the support-chain checks re-run only when rack / deck / stair state changed (supportKey). */
-export const yearBuildBInvariants = (): Invariant[] => [...YEAR_BUILD_INVARIANTS, cachedInvariant(progressiveSupported), kitPartHandsInReach, cachedInvariant(kitPartsSupported)];
+export const yearBuildBInvariants = (): Invariant[] => [...YEAR_BUILD_INVARIANTS, cachedInvariant(progressiveSupported), kitPartHandsInReach, cachedInvariant(kitPartsSupported), stairWorkOk];
 export const YEAR_BUILD_B_INVARIANTS: Invariant[] = yearBuildBInvariants();
 
 export type YearBuildSetup = {

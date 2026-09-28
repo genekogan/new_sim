@@ -20,12 +20,14 @@
 //        deck under it (rails ∥ the tilt axis, shared by two neighbouring panels), tilted as the Kit tilts it.
 import { datan, datan2, dcos, dot2, dsin, obbOverlap, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import { CATALOG, def } from '../world/catalog.ts';
-import { KIT_STAIR_2022, kitStringerGeometry, BOARD_T, TREAD_BOARD_W } from '../world/catalog-phase-b.ts';
+import { KIT_STAIR_2022, kitStringerGeometry, BOARD_T, TREAD_BOARD_W, TREAD_BACK_W, TREAD_PAIR } from '../world/catalog-phase-b.ts';
 import type { Pose } from '../world/types.ts';
 import type { AsmNode, AssemblyGraph } from './assembly.ts';
 import type { KitStair } from '../construction/setpart.ts';
 
 export const PARTS_B_VERSION = 'mars-year-build-parts/b1';
+/** Risers: the rule exists (2x10 on the tread below) but no verb can set one yet — reported unplaced. */
+const RISERS = false;
 const FT = 0.3048;
 const PLY_T = 0.01905;
 const SHEET_W = 4 * FT;
@@ -254,19 +256,21 @@ function stairParts(nodes: AsmNode[], frames: AsmNode[], parts: PartB[], kit: Ki
   // tread boards: two per Kit tread, centred on it, tops at the Kit tread top; the top tread's back board notched
   for (const [i, t] of treads.entries()) {
     const sc = sOf(xz(t));
-    for (const [k, ds] of [-TREAD_BOARD_W / 2, TREAD_BOARD_W / 2].entries()) {
+    // front 2x10, back 2x8, the pair centred on the Kit tread
+    for (const [k, ds] of [-TREAD_PAIR / 2 + TREAD_BOARD_W / 2, TREAD_PAIR / 2 - TREAD_BACK_W / 2].entries()) {
       const c = at(sc + ds, lat0);
-      const d = i === treads.length - 1 && k === 1 ? 'stair-tread-board-kit-n' : 'stair-tread-board-kit';
+      const d = k === 0 ? 'stair-tread-board-kit' : i === treads.length - 1 ? 'stair-tread-board-kit-8n' : 'stair-tread-board-kit-8';
       parts.push({
-        id: `${t.id}-b${k + 1}`, nodes: [t.id], kind: 'stair', role: 'tread-board', def: d, stock: '2x10-16ft', cut: true,
+        id: `${t.id}-b${k + 1}`, nodes: [t.id], kind: 'stair', role: 'tread-board', def: d, stock: k === 0 ? '2x10-16ft' : '2x8-16ft', cut: true,
         pose: { p: [r4(c[0]), r4(t.box.y1 - BOARD_T), r4(c[1])], yaw: r4(alongYaw) }, y: r4(t.box.y1), key: [1, i, k], meta: { tread: i + 1, board: k + 1 },
       });
     }
-    ref(t, `two 2x10 boards 0.470 m deep centred on the Kit tread (0.448 m); tops at the Kit tread top`);
+    ref(t, `a 2x10 + a 2x8 (0.419 m) centred on the Kit tread (0.448 m); tops at the Kit tread top`);
   }
   // risers: 2x12 on edge at the Kit riser, where the Kit riser is a full riser
   for (const r of st.filter((n) => n.kitDef === 'stair riser')) {
     if (Math.abs(r.box.size[1] - riser) > 0.02) { un(r, `Kit riser is ${r.box.size[1].toFixed(3)} m tall (a full riser is ${riser.toFixed(4)} m): a sliver with no lumber rule`); continue; }
+    if (!RISERS) { un(r, `a riser stands in the slot between two treads (${r.box.y0.toFixed(2)}–${r.box.y1.toFixed(2)} m up): the set_part crews bring a board in only from the front, through the tread below — a lengthwise insertion from the stair's side is not modelled`); continue; }
     // on edge ON the tread below (its top = the Kit riser's top − rise + 0.03, the Kit tread's half thickness)
     const y0 = r4(r.box.y1 - riser + 0.03);
     parts.push({

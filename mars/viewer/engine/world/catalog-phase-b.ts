@@ -34,7 +34,9 @@ export const CUT_TO_ORDER = new Set<string>();
 /** Kit stair template of the 2022 rack houses (app/history/scenes.ts: k.stairs(stair, d − .12, BAY, 2.22, 0, 0, 8)). */
 export const KIT_STAIR_2022 = { treads: 8, width: 4.572 - 0.12, run: 12 * FT, rise: 2.22 } as const;
 /** Stringer section and the tread-board section. */
-export const STRINGER_H = 11.25 * IN, BOARD_T = 1.5 * IN, TREAD_BOARD_W = 9.25 * IN;
+export const STRINGER_H = 11.25 * IN, BOARD_T = 1.5 * IN, TREAD_BOARD_W = 9.25 * IN, TREAD_BACK_W = 7.25 * IN;
+/** A Kit tread = a 2x10 (front) + a 2x8 (back), 0.419 m, centred on the Kit tread (two 2x10 = 0.470 m would overlap the next tread in plan). */
+export const TREAD_PAIR = TREAD_BOARD_W + TREAD_BACK_W;
 /** End-frame half thickness (3 in columns): where the stringers' top ends bear. */
 const FRAME_HALF = 1.5 * IN;
 
@@ -51,7 +53,7 @@ export function kitStringerGeometry(t: { treads: number; run: number; rise: numb
   // s-axis: horizontal from tread 1's front edge toward the top; tread i (1-based) centre at (i − 0.5)·going
   const treadDepth = going - 0.009; // the Kit's tread box depth
   const frontEdge = (going - treadDepth) / 2; // Kit tread 1 front edge from its slot start
-  const sA = 0.5 * going + TREAD_BOARD_W - frontEdge; // back edge of tread 1's boards (centred pair)
+  const sA = 0.5 * going + TREAD_PAIR / 2 - frontEdge; // back edge of tread 1's boards (centred pair)
   const yA = 0.24 + 0.03 + riser - BOARD_T; // Kit tread 1 top (0.24 + rise/n + 0.03) − board thickness
   const sFrame = t.treads * going - frontEdge - FRAME_HALF; // the end frame's outer face (stair side)
   const h = STRINGER_H;
@@ -107,7 +109,7 @@ export type PhaseBMake = { bundle: (id: string, label: string, size: [number, nu
 /** Everything phase B adds to CATALOG (called from catalog-stock.ts stockAssets). */
 export function phaseBAssets(make: PhaseBMake): AssetDef[] {
   const out: AssetDef[] = [];
-  const stock = new Set(['2x12-14ft', '2x12-16ft', '2x10-16ft', 'solar-panel-107x163']);
+  const stock = new Set(['2x12-14ft', '2x12-16ft', '2x10-16ft', '2x8-16ft', 'solar-panel-107x163']);
   const notch = 2 * IN; // around 3 in columns: half the frame (1.5 in) + clearance
   // deck pieces (notched variants of the 4x6 / 4x3 cut from a 4x8)
   out.push(sheet('plywood-4x6n', '4x6 ft plywood, notched along a long edge for a rack frame (3/4 in)', 6 * FT, 4 * FT, 'a 4x8 cut to 6 ft and notched 2 in deep around the frame columns / bracing its edge lies on (the Kit draws deck sheets through the frame plane)', notch));
@@ -121,10 +123,12 @@ export function phaseBAssets(make: PhaseBMake): AssetDef[] {
   out.push(board('2x12-14ft', '14 ft 2x12', 14 * FT, 11.25, 1.5, 5.4, 'nominal 2x12 = 1.5 x 11.25 in'));
   out.push(board('2x12-16ft', '16 ft 2x12', 16 * FT, 11.25, 1.5, 5.4, 'nominal 2x12 = 1.5 x 11.25 in'));
   out.push(board('2x10-16ft', '16 ft 2x10', 16 * FT, 9.25, 1.5, 4.4, 'nominal 2x10 = 1.5 x 9.25 in'));
+  out.push(board('2x8-16ft', '16 ft 2x8', 16 * FT, 7.25, 1.5, 3.4, 'nominal 2x8 = 1.5 x 7.25 in'));
   out.push(board('stair-stringer-kit8', `2x12 stair stringer (${g.L.toFixed(3)} m, Kit 8-tread stair)`, g.L, 11.25, 1.5, 5.4,
     `a 14 ft 2x12 cut to ${g.L.toFixed(3)} m: top edge under the tread boards' back edges, foot on the ground, top end bolted to the end frame (slope ${(datan(g.tan) * 180 / Math.PI).toFixed(1)}°); the sawtooth cuts the treads sit in are not modelled`));
   out.push(board('stair-tread-board-kit', '2x10 stair tread board (4.452 m, Kit stair width)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'a 16 ft 2x10 cut to the Kit stair width, laid flat; two boards per Kit tread (0.470 m deep vs the Kit 0.448 m)', undefined, true));
-  out.push(board('stair-tread-board-kit-n', '2x10 stair tread board, notched for the end frame (4.452 m)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'the top tread\'s back board: the Kit draws it 4.5 cm into the end frame; notched 2 in around the columns / bracing', notch, true));
+  out.push(board('stair-tread-board-kit-8', '2x8 stair tread board (4.452 m, Kit stair width)', KIT_STAIR_2022.width, 7.25, 1.5, 3.4, 'a 16 ft 2x8 cut to the Kit stair width, laid flat: the back board of a Kit tread (2x10 + 2x8 = 0.419 m vs the Kit 0.448 m)', undefined, true));
+  out.push(board('stair-tread-board-kit-8n', '2x8 stair tread board, notched for the end frame (4.452 m)', KIT_STAIR_2022.width, 7.25, 1.5, 3.4, 'the top tread\'s back board: the Kit draws its tread into the end frame; notched 2 in around the columns / bracing', notch, true));
   out.push(board('stair-riser-kit', '2x10 stair riser (4.452 m)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'a 16 ft 2x10 cut to the stair width, on edge on the tread below, under the tread above (0.235 m of the 0.239 m between the boards; the Kit riser is 0.2775 m, drawn through the treads)'));
   out.push(board('stair-post-kit', '2x4 rail post (0.85 m)', 0.85, 3.5, 1.5, 1.9, 'an 8 ft 2x4 cut to the Kit rail-post height (0.85 m); stood up, bolted to the tread ends'));
   const railL = Math.sqrt(KIT_STAIR_2022.run * KIT_STAIR_2022.run + KIT_STAIR_2022.rise * KIT_STAIR_2022.rise);
@@ -155,6 +159,7 @@ export function phaseBAssets(make: PhaseBMake): AssetDef[] {
   // offcuts are stacked on a scrap pile by the station (moves-b.ts stack_offcut): one pile of mixed 1–5 ft pieces
   out.push(make.bundle('scrap-pile', 'offcut pile (plywood / lumber offcuts on dunnage)', [1.8, 0.1 + 0.6, 1.3], 'offcut', 200, 20,
     'offcuts from the cutting station stacked on dunnage beside it; not documented'));
+  out.push(make.bundle('bundle-2x8-16ft', 'strapped 2x8 unit (24 × 16 ft)', [16 * FT, 0.1 + 4 * 1.5 * IN, 6 * 7.25 * IN], '2x8-16ft', 24, 24 * 17, '6 wide × 4 high; a site-sized unit'));
   out.push(make.bundle('bundle-2x4-8ft', 'strapped 2x4 unit (48 × 8 ft)', [8 * FT, 0.1 + 6 * 1.5 * IN, 8 * 3.5 * IN], '2x4-8ft', 48, 48 * 5, '8 wide × 6 high, flat, strapped'));
   for (const d of out) if (!stock.has(d.id) && (d.category === 'timber' || d.category === 'plywood')) CUT_TO_ORDER.add(d.id);
   return out;

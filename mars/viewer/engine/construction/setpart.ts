@@ -20,7 +20,7 @@
 // Hands: `human.hands` every tick, `human.grip.slot` = `setpart-<i>:<lx>:<ly>:<lz>` (local grip), so
 // `setPartHands()` rebuilds them from a take.
 import { z } from 'zod';
-import { dcos, dist2, dsin, datan2, obbOverlap, rot2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { angleDelta, dcos, dist2, dsin, datan2, obbOverlap, rot2, wrapAngle, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Invariant, Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
@@ -43,7 +43,7 @@ const HAND_SPREAD = 0.15;
 const BODY_CLEAR = 0.25; // a held part in a holder's body band stays this far from their feet
 const FASTEN_S = 2.0;
 const SPEED = { carry: 0.6, set: 0.3, raise: 0.5 } as const;
-const STAGE = 3.0;
+const STAGE = 4.5; // m: the part lies this close to where it goes (carried there first)
 const STEP = 0.05;
 const TOL = 0.1; // per-tick envelope tolerance (as hand_up's)
 
@@ -216,9 +216,16 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
   if (lifters.some((h) => h.human!.on || Math.abs(h.pose.p[1] - floor) > 0.02)) return fail(`${prefix}.crew-floor`, 'the lift crew stands together on one floor', p.lift.map((l) => l.actor));
   if (Math.abs(e.pose.p[1] - floor) > 0.1) return fail(`${prefix}.not-staged`, `${e.id} lies at ${f2(e.pose.p[1])} m, not on the lift crew's floor (${f2(floor)} m)`, [e.id]);
   // poses: lying L, carried C (grips at hands-hanging height), pre P (= final + from), hand-off H (= final − handoff), final F
-  const L0 = e.pose;
-  const lowGrip = Math.min(...p.lift.map((l) => localToWorld(L0, l.grip)[1]));
-  const C = shift(L0, [0, floor + BODY_MODEL.restHand.up - lowGrip, 0]);
+  // a lying board / sheet is the same box turned by π: take the heading nearest where it goes (no half turn in the air)
+  // (on its face, pitch ±π/2 about the base-centre origin: (yaw + π, −pitch) is the same box)
+  const flatOrFace = !e.pose.roll && (!e.pose.pitch || Math.abs(Math.abs(e.pose.pitch) - Math.PI / 2) < 1e-6);
+  const L0: Pose = flatOrFace && Math.abs(angleDelta(e.pose.yaw, final.yaw)) > Math.PI / 2 ? { ...e.pose, yaw: wrapAngle(e.pose.yaw + Math.PI), ...(e.pose.pitch ? { pitch: -e.pose.pitch } : {}) } : e.pose;
+  // lifted: turned level in its own heading (off its face / edge, as the carry laid it) about its centre line, the
+  // lowest grip at hands-hanging height
+  const H0 = def(e.def).size[1];
+  const cl = localToWorld(L0, [0, H0 / 2, 0]);
+  const lowLocal = Math.min(...p.lift.map((l) => l.grip[1]));
+  const C: Pose = { p: [cl[0], floor + BODY_MODEL.restHand.up - lowLocal, cl[2]], yaw: L0.yaw, pitch: 0, roll: 0 };
   const from = p.from ?? { x: 0, y: 0, z: 0 };
   const P = shift(final, [from.x, from.y, from.z]);
   const H = take.length ? shift(final, [0, -p.handoff!, 0]) : null;
@@ -300,6 +307,18 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
     if (dh > BODY_MODEL.maxHorizontalFromFeet + 1e-9 || up > GIVE_MAX + 1e-9 || up < -REACH_DOWN - 1e-9)
       return fail(`${prefix}.fasten-reach`, `${a} cannot fasten ${e.id} from (${f2(feet[0])}, ${f2(feet[1])}, ${f2(feet[2])}): its nearest point is ${f2(dh)} m away and ${f2(up)} m above their feet (≤ ${BODY_MODEL.maxHorizontalFromFeet} m, −${REACH_DOWN}…${GIVE_MAX} m)`, [e.id, a], q);
   }
+  // nobody else stands where it goes (in its body band)
+  {
+    const f = entityFootprint({ ...e, pose: final });
+    const everyone = new Set(everyoneIds(p));
+    for (const h of Object.values(w.entities).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+      if (h.kind !== 'human' || everyone.has(h.id) || h.human?.on) continue;
+      if (f.y1 <= h.pose.p[1] + 0.22 || f.y0 >= h.pose.p[1] + HUMAN_PROFILE.height) continue;
+      const lp = rot2([h.pose.p[0] - f.obb.c[0], h.pose.p[2] - f.obb.c[1]], -f.obb.yaw);
+      const dx = Math.max(0, Math.abs(lp[0]) - f.obb.half[0]), dz = Math.max(0, Math.abs(lp[1]) - f.obb.half[1]);
+      if (Math.sqrt(dx * dx + dz * dz) < HUMAN_PROFILE.radius) return fail(`${prefix}.site-occupied`, `${h.id} stands where ${e.id} goes (at (${f2(h.pose.p[0])}, ${f2(h.pose.p[2])}))`, [e.id, h.id], h.pose.p);
+    }
+  }
   // ---- swept path (supports may be touched at the end; the part's own lying spot is skipped)
   const path = [C, P, ...(H ? [H] : []), final];
   const ignore = [...sup.supports];
@@ -311,6 +330,8 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
   void th;
   return { ok: true, program: { final, support: sup, segs, pickup, delta, fasten: p.fasten, floor } };
 }
+
+const everyoneIds = (p: SP) => [...p.lift.map((l) => l.actor), ...(p.take ?? []).map((t) => t.actor), ...p.fasten];
 
 /** Nearest point of the part's box surface (sampled on its corners / edge midpoints / centre) to a person's feet. */
 function nearestPoint(e: Entity, q: Pose, feet: Vec3): Vec3 {
@@ -377,6 +398,7 @@ export function stepSetPart(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (s === 'running') return { status: 'running', phase: 'approach' };
     ex.si = 0;
     ex.t = 0;
+    e.pose = { ...prog.segs[0].from, p: [...prog.segs[0].from.p] as Vec3 }; // the same box, described as the plan does
   }
   if (ex.si < prog.segs.length) {
     const seg = prog.segs[ex.si];

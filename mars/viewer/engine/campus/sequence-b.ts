@@ -92,7 +92,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   let stationFree: string[] = []; // steps that clear the out-feed of the last cut
   let inFeedFree: string[] = [];
   /** Where an offcut is laid beside the scrap pile before it is stacked (clear of the pile by 0.1 m). */
-  const scrapSpot = (d: string) => { const sc = ctx.scrap!; const o = rot2([0, def('scrap-pile').size[2] / 2 + 0.1 + def(d).size[2] / 2], sc.yaw); return { x: r3(sc.x + o[0]), z: r3(sc.z + o[1]), yaw: r3(sc.yaw) }; };
+  const scrapSpot = (d: string) => { const sc = ctx.scrap!; const gap = def(d).category === 'timber' ? 0.45 : 0.1; const o = rot2([0, def('scrap-pile').size[2] / 2 + gap + def(d).size[2] / 2], sc.yaw); return { x: r3(sc.x + o[0]), z: r3(sc.z + o[1]), yaw: r3(sc.yaw) }; };
   let scrapFree: string[] = [];
   const take = (piece: string, stockDef: string, crew: number[]): { step: string; pile: string } | null => {
     const p = ctx.yard.piles.find((x) => x.piece === stockDef && (ctx.left.get(x.id) ?? 0) > 0);
@@ -463,20 +463,23 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const halfW = sd.width / 2;
     const lo = lat0 - halfW, hi = lat0 + halfW;
     const yawDir = datan2(dir[1], dir[0]);
+    // everyone not building the stair stands clear of its site (beside the house, off the stair's side)
+    for (const [i, m] of [2, 3, 4, 5].entries()) { const q = W(uMax + 2.2, lineV(K - 1) - 1.0 - i * 1.1); step('walk_to', { actor: C(m), x: q[0], z: q[1], level: 0 }, [m], [], `${C(m)} stands clear of the stair site`); }
     // stringers: lying along the stair at their lateral position, lifted and walked up against the end frame
-    for (const [i, p] of stringers.entries()) {
+    // from the +lat end: the crews stand on the −lat side, where no stringer is in yet
+    for (const [i, p] of [...stringers].sort((a, b) => latOf(b.pose.p[0], b.pose.p[2]) - latOf(a.pose.p[0], a.pose.p[2])).entries()) {
       const lat = latOf(p.pose.p[0], p.pose.p[2]);
-      const nextFree = i < stringers.length - 1 ? 0.37 : 0.37; // stand on the side of the stringer still open (the next one is not in yet)
+      const nextFree = -0.37;
       const L = lenOf(p);
-      const g1: [number, number, number] = [-1.2, def(p.def).size[1], 0], g2: [number, number, number] = [-0.2, def(p.def).size[1], 0];
+      const g1: [number, number, number] = [-1.2, def(p.def).size[1] / 2, 0], g2: [number, number, number] = [-0.2, def(p.def).size[1] / 2, 0]; // on its centre line
       const a = localToWorld(p.pose, g1), b = localToWorld(p.pose, g2);
       const off = rot2([0, 1], 0); void off;
       const sc = sOf(p.pose.p[0], p.pose.p[2]);
-      const lie = S(sc - 1.6, lat);
+      const lie = S(sc - 1.6, lat); // along its own line, mostly under the stair site (only 1.5 m of ground lies beyond its foot here)
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(yawDir) }, G);
       if (!f) continue;
       const at = (q: number[]) => { const o = [q[0] + axis[0] * nextFree, q[2] + axis[1] * nextFree]; return { x: r3(o[0]), z: r3(o[1]) }; };
-      const s1 = step('install_stringer', { part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: g1, at: at(a) }, { actor: C(G[1]), grip: g2, at: at(b) }], from: { x: r3(dir[0] * -0.3), y: 0.05, z: r3(dir[1] * -0.3) }, fasten: G.map(C) }, G, [f], `set stringer ${i + 1} against the end frame`);
+      const s1 = step('install_stringer', { part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: g1, at: at(a) }, { actor: C(G[1]), grip: g2, at: at(b) }], from: { x: r3(dir[0] * -0.3), y: 0.05, z: r3(dir[1] * -0.3) }, fasten: G.map(C) }, G, [f], `set stringer ${p.id.slice(-1)} against the end frame`);
       mark(p, s1);
       void L;
     }
@@ -487,6 +490,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const top = sd.tops;
     const reachTop = 2.0; // highest board underside the ground crew can hold at its ends (reach_up envelope, 0.4 m out)
     const ur: { v: { who: number; tread: number } | null } = { v: null };
+    const treadStep = new Map<string, string>(); // tread board → the step that installed it
     const standOn = (who: number, k: number) => {
       // climb the installed treads 1…k to stand on tread k's centre
       const up = ur.v;
@@ -494,7 +498,8 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const out: string[] = [];
       if (up) out.push(step('leave_stair', { actor: C(up.who), boards: sd.treads.slice(0, up.tread).flat(), to: { x: S(-0.9, lat0 - halfW - 0.6)[0], z: S(-0.9, lat0 - halfW - 0.6)[1] } }, [up.who], []));
       const c = S(sOfTread(k), lat0);
-      out.push(step('climb_stair', { actor: C(who), boards: sd.treads.slice(0, k).flat(), to: { x: c[0], z: c[1] } }, [who], [], `${C(who)} climbs the treads to stand on tread ${k}`));
+      const need = sd.treads.slice(0, k).flat().map((id) => treadStep.get(id)).filter((x): x is string => !!x);
+      out.push(step('climb_stair', { actor: C(who), boards: sd.treads.slice(0, k).flat(), to: { x: c[0], z: c[1] } }, [who], need, `${C(who)} climbs the treads to stand on tread ${k}`));
       ur.v = { who, tread: k };
       return out;
     };
@@ -503,33 +508,36 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     for (let k = 1; k <= n; k++) {
       // the riser under tread k stands on tread k−1: set it before tread k
       for (const r of risers.filter((x) => Math.abs(x.y - top[k - 2]) < 0.02 && k >= 2)) placeLow(r, true);
-      for (const b of (byTread.get(k) ?? []).sort((a, c) => (a.meta.board as number) - (c.meta.board as number))) placeLow(b, false);
+      for (const b of (byTread.get(k) ?? []).sort((a, c) => (c.meta.board as number) - (a.meta.board as number))) placeLow(b, false); // the back board first: the front one slides in from the foot side
     }
     function placeLow(p: PartB, isRiser: boolean) {
       const sc = sOf(p.pose.p[0], p.pose.p[2]);
       const L = lenOf(p);
       const bottom = p.pose.p[1];
-      const g1: [number, number, number] = [-(L / 2) + 0.05, 0, 0], g2: [number, number, number] = [L / 2 - 0.05, 0, 0];
-      const e1 = S(sc, lo - 0.35), e2 = S(sc, hi + 0.35);
-      const lie = S(-0.9 - (isRiser ? 0.5 : 0), lat0);
+      const g1: [number, number, number] = [-(L / 2) + 0.02, def(p.def).size[1] / 2, 0], g2: [number, number, number] = [L / 2 - 0.02, def(p.def).size[1] / 2, 0];
+      const e1 = S(sc, lo - 0.45), e2 = S(sc, hi + 0.45); // beyond its ends (clear of the rack's low beams at the end frame)
+      const lie = S(-0.9, lat0); // where the tread boards lie too (the kitchen house is 1.5 m beyond the foot)
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(p.pose.yaw) }, G);
       if (!f) return;
-      const lift = Math.min(0.08, reachTop - bottom);
+      const gripY = bottom + def(p.def).size[1] / 2; // the crew holds it by its centre line
+      const lift = Math.min(0.08, reachTop - gripY);
       if (lift >= 0.02) {
-        const dz = -(sc - (-0.9 - (isRiser ? 0.5 : 0)));
+        const dz = -(sc - -0.9);
         const s1 = step('install_stair_part', { part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: g1, at: { x: e1[0], z: e1[1] } }, { actor: C(G[1]), grip: g2, at: { x: e2[0], z: e2[1] } }], from: { x: r3(dir[0] * dz), y: r3(lift), z: r3(dir[1] * dz) }, fasten: G.map(C) }, G, [f], `set ${p.id} ${isRiser ? 'on the tread below' : 'on the stringers'}`);
         mark(p, s1);
+        treadStep.set(p.id, s1);
         return;
       }
       // above the ground crew's reach: they raise it to a builder standing on the highest complete tread below
       const k = Math.max(...[...byTread.entries()].filter(([, bs]) => bs.every((b) => b.pose.p[1] + def(b.def).size[1] < bottom - 0.05)).map(([t]) => t));
       const pre = standOn(helper, k);
-      const handoff = r3(Math.max(0.05, bottom - (reachTop - 0.03)));
+      const handoff = r3(Math.max(0.05, gripY - (reachTop - 0.03)));
       const s1 = step('install_stair_part', {
         part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: g1, at: { x: e1[0], z: e1[1] } }, { actor: C(G[1]), grip: g2, at: { x: e2[0], z: e2[1] } }],
         take: [{ actor: C(helper), grip: [0, isRiser ? 0.05 : 0, 0] }], handoff, from: { x: r3(dir[0] * -(sc + 0.9)), y: r3(-handoff), z: r3(dir[1] * -(sc + 0.9)) }, fasten: [C(helper)],
       }, [...G, helper], [f, ...pre], `${C(helper)} on tread ${k} takes ${p.id} from the ground crew and sets it`);
       mark(p, s1);
+        treadStep.set(p.id, s1);
     }
     const last = ur.v;
     if (last) step('leave_stair', { actor: C(last.who), boards: sd.treads.slice(0, last.tread).flat(), to: { x: S(-0.9, lat0 - halfW - 0.6)[0], z: S(-0.9, lat0 - halfW - 0.6)[1] } }, [last.who], [], `${C(last.who)} climbs down the new treads`);
@@ -541,13 +549,13 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(yawDir) }, [G[0]]);
       if (!f) continue;
       const at = S(sp, side < 0 ? lo - 0.45 : hi + 0.45);
-      const s1 = step('install_stair_part', { part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: [-0.2, 0.044, 0], at: { x: at[0], z: at[1] } }], fasten: [C(G[0])] }, [G[0]], [f], `bolt post ${p.id} to the tread end`);
+      const s1 = step('install_stair_part', { part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: [-0.37, 0.044, 0], at: { x: at[0], z: at[1] } }], fasten: [C(G[0])] }, [G[0]], [f], `bolt post ${p.id} to the tread end`);
       mark(p, s1);
     }
     // handrails: two on the ground at its lower half, laid on the post tops from outside
     for (const p of rails) {
       const side = p.meta.side as number;
-      const g1: [number, number, number] = [-1.9, 0, 0], g2: [number, number, number] = [-0.6, 0, 0];
+      const g1: [number, number, number] = [-2.0, def(p.def).size[1] / 2, 0], g2: [number, number, number] = [-1.0, def(p.def).size[1] / 2, 0]; // its lower half (the upper end is above reach)
       const a = localToWorld(p.pose, g1), b = localToWorld(p.pose, g2);
       const o = (q: number[]) => { const l = latOf(q[0], q[2]) + side * 0.45; const w = S(sOf(q[0], q[2]), l); return { x: w[0], z: w[1] }; };
       const lie = S(1.5, side < 0 ? lo - 1.3 : hi + 1.3);

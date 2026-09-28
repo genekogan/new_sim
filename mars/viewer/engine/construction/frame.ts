@@ -209,6 +209,7 @@ export const frameAccessOk: Invariant = (rt) => {
     const links = new Map(frameLinks(rt.world).map((l) => [l.id, l]));
     for (const h of people) {
       const id = h.human!.on!;
+      if (id.startsWith('stairwork:')) continue; // on an unfinished Kit stair's treads (moves-b.ts stairWorkOk checks those)
       const l = links.get(id);
       const p = xz(h);
       now.set(h.id, p);
