@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {GROUND} from '../studio/ambience-math';
+import {RACK_FRAME_GREEN} from '../engine-view/palette';
 export const BAY = 3.6576;
 export const layers = {steel:'Rack steel', floor:'Timber, floors and stairs', roof:'Roofs and upper floors', wall:'Walls and screens', detail:'Interior details', context:'Site context'};
 type XYZ = [number,number,number];
@@ -112,7 +113,7 @@ export class Kit {
   const rows=Math.max(1,Math.round((depth-frameWidth)/1.8288)),step=(depth-frameWidth)/rows;
   for(let ix=0;ix<=nx;ix++)for(let iz=0;iz<=rows;iz++){
    const x=ix*BAY-w/2,z=iz*step-(depth-frameWidth)/2;
-   for(const dz of [-frameWidth/2,frameWidth/2])this.box(g,'rack upright',[.075,h,.075],[x,h/2,z+dz],this.mat('#293c45',.55),layers.steel);
+   for(const dz of [-frameWidth/2,frameWidth/2])this.box(g,'rack upright',[.075,h,.075],[x,h/2,z+dz],this.mat(RACK_FRAME_GREEN,.55),layers.steel); // the engine uprights' green (palette.ts)
    for(let y=.25;y<h-.6;y+=.7)this.rod(g,'upright bracing',[x,y,z-frameWidth/2],[x,y+.66,z+frameWidth/2],.014);
    this.box(g,'upright crossbar',[.04,.04,frameWidth],[x,.25,z],'#33464e',layers.steel);
   }
