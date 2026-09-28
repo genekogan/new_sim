@@ -155,8 +155,12 @@ receivers do (bentOver envelope from S, body gap 0.30 m).
   `handupHands(part, pose, holder, slot)` returns the two-hand grip (valid at `take` and from `stand_with_load` on);
   during `prone-reach` approach, `push-up` and `kneel-up` the free hand is only in `human.hands` (and a take's `hands`).
 - `human.hands` = `{ left, right }` world points every tick from `lie-down` to the release; continuous (≤ 0.25 m/tick,
-  measured ≤ 0.14 m). Deck-hand / lip points: `proneDeckHand`, `proneLipHand` (handup.ts).
+  measured ≤ 0.163 m at 2.9 m). Deck-hand / lip points: `proneDeckHand`, `proneLipHand` (handup.ts).
 - Outputs: a prone station's entry ends with `'prone'`.
+
+Measured at the 2.9 m deck (two givers, two prone receivers): 481 ticks; lie-down 0.8 s, reach 0.6 + take 0.4 s,
+push-up 1.0 s and kneel-up 0.8 s (the load rises 0.83 m: the 0.5 m/s cap sets them above the 0.8 / 0.6 s minimums),
+hand-off 0.83 m below the deck.
 
 **Crews.** One or two receivers (a 4x6 sheet: 1–2). Each station carries its posture, and a kneeling receiver beside a
 prone one would hold on through the rise (activity `take`); but because prone engages only where kneeling cannot reach
@@ -166,7 +170,8 @@ at all, today every receiver of a prone hand-up is prone.
 0 violations, all hand points continuous, the `hold` hand equal to its grip every rise tick, the free hand flat on the
 deck in the push-up, the sheet swept clear every tick of reach / take / rise; one receiver alone + bit-identical rerun;
 no deck → `handup.too-high` (…no deck covers b3 to lie on); 3.36 m deck → `handup.too-high` listing stand / kneel / prone;
-a wall panel in the rise corridor → `handup.rise-blocked` naming it.
+a wall panel in the rise corridor → `handup.rise-blocked` naming it; off the forks presented 0.75 m below the deck
+(kneelers on the beam would need 0.64 m) → prone, 0 violations, and 1.0 m below → `handup.too-high` "…raise the forks".
 
 **Approximate.** Lying down, the push-up and the knees are timed pose phases with published hands and hip heights, not a
 body simulation; the envelopes are cylinders about S. The body's footprint is checked against the static raster at plan

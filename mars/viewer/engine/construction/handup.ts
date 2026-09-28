@@ -439,7 +439,7 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
         return bad('handup.too-high', `${e.id} on the forks at ${f2(fp.p[1])} m is ${f2(edgeY - fp.p[1] - th)} m below the receivers' feet (${reachList(prone, fp.p[1] + th, edge)}); raise the forks`, [e.id], fp.p);
       // the forks cannot move it out: its rise past the deck edge must be clear where it is
       const hitR = sweepPoses(rt, e, [transfer, { ...transfer, p: [transfer.p[0], Math.max(ySlide, transfer.p[1]), transfer.p[2]] }], [vehicle!]);
-      if (hitR) return riseBlocked(e, edge, hitR, p.receivers, 'where the forks hold it');
+      if (hitR) return riseBlocked(e, edge, hitR, p.receivers, 'where the forks hold it (present it clear of it)');
     }
   }
   // ---- the part's path
@@ -679,7 +679,7 @@ function reachList(prone: ProneDeck | null, handY: number, edge: Link): string {
 
 function riseBlocked(e: Entity, edge: Link, hit: Hit, receivers: string[], where: string): Fail {
   const name = hit.o.label && hit.o.label !== hit.o.id ? `${hit.o.label} (${hit.o.id})` : hit.o.id;
-  return bad('handup.rise-blocked', `${e.id} cannot rise past the deck edge over ${edge.members![0]} in the hands of a receiver lying there: ${name} is in the way of its rise at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])}) ${where}, and clear of it nobody lying at the edge reaches it (hands ≤ ${PRONE_EDGE_REACH} m beyond the deck edge, ≤ ${REACH_DOWN_PRONE} m below it)`, [e.id, hit.o.id, edge.members![0], ...receivers], hit.q.p);
+  return bad('handup.rise-blocked', `${e.id} cannot rise past the deck edge over ${edge.members![0]} in the hands of a receiver lying there: ${name} is in the way of its rise at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])}) ${where}`, [e.id, hit.o.id, edge.members![0], ...receivers], hit.q.p);
 }
 
 /** Distance from q (inside o) along unit n to o's outline. */
@@ -827,13 +827,13 @@ function chooseProneStations(rt: Runtime, e: Entity, p: HP, edge: Link, nOut: Ve
   }
   if (!pick || !mid) {
     // something sticking out past the edge pushed the load's way up out of their reach: name it
-    if (riseHit) return riseBlocked(e, edge, riseHit, p.receivers, 'close to the edge');
+    if (riseHit) return riseBlocked(e, edge, riseHit, p.receivers, `close to the edge, and clear of it nobody lying at the edge reaches it (hands ≤ ${PRONE_EDGE_REACH} m beyond the deck edge, ≤ ${REACH_DOWN_PRONE} m below it)`);
     const reason = why.length ? `: e.g. ${why[0]}` : '';
     return bad('handup.no-receiver-station', `${e.id} cannot be received over ${edge.members![0]}: no ${n === 2 ? 'two places ≥ 0.6 m apart' : 'place'} at the deck edge from which ${n === 2 ? 'both receivers' : 'a receiver'} lying prone can take it (hands ≤ ${REACH_DOWN_PRONE} m below the deck, ≤ ${PRONE_EDGE_REACH} m beyond its edge), get up holding it and feed it in${reason}`, [e.id, edge.members![0], ...p.receivers]);
   }
   // the take and the rise, swept against everything (the members it will rest on included: it passes their ends)
   const hit = sweepPoses(rt, e, [tr, mid, up], ignore);
-  if (hit) return riseBlocked(e, edge, hit, p.receivers, 'beside the edge');
+  if (hit) return riseBlocked(e, edge, hit, p.receivers, 'beside the edge where they take it');
   // assign receivers (explicit: in order; else the nearer station to each, deterministic)
   let assign = pick;
   if (!p.stations && pick.length === 2) {
@@ -1149,7 +1149,7 @@ function stepHandup(rt: Runtime, ex: Exec, dt: number): StepResult {
 
 export const handUp: ActionDef<HP, HandupProgram, Exec> = {
   verb: 'hand_up',
-  description: `Hand a sheet or board up to people standing on the rack beams (or a deck): 1–2 givers lift it off the ground and raise it overhead at the edge (underside ≤ their floor + ${GIVE_MAX} m), 1–2 receivers reach down (≤ ${REACH_DOWN} m below their feet), take it and lay it in place, staged for install_*; via 'forklift' the receivers take it off the presented forks. Refused when the geometry allows no genuine hand-off.`,
+  description: `Hand a sheet or board up to people standing on the rack beams (or a deck): 1–2 givers lift it off the ground and raise it overhead at the edge (underside ≤ their floor + ${GIVE_MAX} m), 1–2 receivers reach down (kneeling ≤ ${REACH_DOWN} m below their feet; where that is not enough, lying prone at a deck edge ≤ ${REACH_DOWN_PRONE} m below the deck, getting up holding it), take it and lay it in place, staged for install_*; via 'forklift' the receivers take it off the presented forks. Refused when the geometry allows no genuine hand-off.`,
   schema: z.strictObject({
     part: z.string().max(80),
     givers: z.array(z.string().max(80)).max(2).optional(),

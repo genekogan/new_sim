@@ -619,3 +619,29 @@ Then: gate → release 5; HANDOFF refresh.
 ## 2026-09-29 morning — Gene is up
 - Answered: reach-down → keep 0.5 m kneel default, ADD a prone receiver posture with a continuous-hold rise (§13); top beams → climb-the-upright with two receivers confirmed as the real method (§14). Removed from Questions for Gene.
 - W27 spawned (engine construction): the A+B end-to-end overlap (parked crew vs wall-carry path) → green run, pin, take; v3 `onto_s2_4` `beam.no-room`. W28 spawned (engine hand-up): prone receiver + rise sequence.
+
+## 2026-09-29 — W28: prone receiver (owner feedback §13)
+- **Commits** (branch `w28-prone`): 4a209a4 (body model `BODY_MODEL.prone` + hand_up prone posture, rise, sweep, tests,
+  HANDUP / BODY_MODEL docs), then a follow-up (forklift prone test, rise-blocked wording, verb description, this entry).
+- **Body model:** station S 0.35 m behind the deck lip (standable on the 0.1 m raster), torso 0.30 m over the lip tipped
+  ≤ 60°, shoulders −0.32…+0.08 m → **reach 0.94 m below the deck** (§13 "≈ 1.0"), hands ≤ 0.45 m beyond the deck outline;
+  rise bands push-up (−0.32…0.62) and kneel-up (0.07…0.91), hips 0.10 → 0.46 → 0.46 → 0.89. All derived from the rig
+  numbers and checked in `body-model.test.ts`. BODY_MODEL.md "Prone receiver + rise".
+- **hand_up:** stand → kneel → prone; prone engages only where the kneel rule's depth cap refuses (the old
+  `handup.too-high`) and a deck covers the edge beam. Phases lie_down 0.8 s (while the givers work), reach_down 0.6,
+  take 0.4, push_up ≥ 0.8, kneel_up ≥ 0.6, then stand_with_load / lay / set_down; activities `lie-down`, `prone-wait`,
+  `prone-reach`, `push-up`, `kneel-up`; slot `handup-prone-<i>:<left|right>` (that hand never lets go). The corridor
+  beside the edge is swept up to slide height with everything (joist ends included) → `handup.rise-blocked` names the
+  member; `handup.too-high` now lists stand / kneel / prone reach. HANDUP.md "Prone receiver".
+- **Tests:** `handup-prone.test.ts` (6): 2.9 m deck, two prone receivers — hand-off 0.83 m below the deck, 0 violations,
+  481 ticks, worst hand step 0.163 m/tick, hold hand on the load every rise tick, sheet swept clear every tick; one
+  receiver + bit-identical rerun; no deck → too-high; 3.36 m deck → too-high listing all three; wall panel →
+  rise-blocked naming it; off the forks 0.75 m below the deck → prone, 1.0 m → too-high "raise the forks".
+  `body-model.test.ts` +1. `handup.test.ts`: three too-high message regexes updated (text only).
+- **Pins unchanged:** `deploy/perf-walk.mjs` stress / probe / campus / meal / v3 PIN-OK before and after (v3
+  `a2f782ad…` @16401); build-bay-v3 and year-build tranche tests green in the suite. Year builds do not call hand_up.
+- **Weak spots:** the kneeling hand-up's rise ignores the members the load will rest on, so its sheet passes through
+  its own joists' cantilevers (the 2.4 m green test does) — left for the pins; prone stations are searched on the edge
+  beam the load comes over only; envelopes are cylinders about S; lie-down / push-up / kneel-up are timed pose phases
+  (no body physics); a mixed prone + kneeling crew is supported in code but never arises under the depth gate; the rig
+  has not been posed prone (renderer track).

@@ -14,6 +14,11 @@ import { hashOf } from '../core/hash.ts';
 import { bay, BEAM_H, JOIST_H } from './frame-fixtures.ts';
 import { HAND_STEP_MAX } from './hands-check.ts';
 import { Runtime } from '../runtime/runtime.ts';
+import { human } from '../world/factory.ts';
+import { forklift, FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
+import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
+import { CARRY_INVARIANTS } from '../carry/invariants.ts';
+import { run } from './frame-fixtures.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { Entity } from '../world/types.ts';
 
@@ -25,10 +30,13 @@ const PT = def('plywood-4x3').size;
  * middle open (joists only) where sheet s1 goes; s1 on the ground east of the bay; p3 / p4 on the deck (south / north),
  * p1 / p2 on the ground. `decks: false` leaves the floor out (receivers can only kneel on the beams).
  */
-function proneBay(deck: number, o: { decks?: boolean; extra?: Entity[] } = {}) {
+function proneBay(deck: number, o: { decks?: boolean; extra?: Entity[]; fork?: boolean } = {}) {
   const seat = deck - PT[1] - JOIST_H - BEAM_H / 2;
   const jz = [0.25, 0.7, L / 2 - 0.75, L / 2 - 0.25, L / 2 + 0.25, L / 2 + 0.75, L - 0.7, L - 0.25];
-  const b = bay({ seat, beam: 'beam-12ft', joists: jz }, [component('s1', 'plywood-4x6', [2.6, 0, L / 2], Math.PI / 2, { phase: 'staged' })]);
+  const b = bay(
+    { seat, beam: 'beam-12ft', joists: jz, ...(o.fork ? { actions: [...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS], invariants: [...CARRY_INVARIANTS, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS] } : {}) },
+    [component('s1', 'plywood-4x6', [o.fork ? 5.6 : 2.6, 0, L / 2], Math.PI / 2, { phase: 'staged' }), ...(o.fork ? [forklift('f1', 10, L / 2, Math.PI), human('op', 10, L / 2 + 0.95)] : [])],
+  );
   const w = b.rt.world;
   const jt = b.top + JOIST_H;
   const deckY = jt + PT[1];
@@ -51,7 +59,7 @@ const d3 = (a: Vec3, b: Vec3) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) **
 
 /** Run a hand-up to the end, checking every tick: hand points continuous, prone hands in their envelopes, one hand
  *  on the load through the rise, the load clear of everything while taken and rising. */
-function watchProne(rt: Runtime, id: string, E: Record<string, Entity>, receivers: string[], deckY: number) {
+function watchProne(rt: Runtime, id: string, E: Record<string, Entity>, receivers: string[], deckY: number, ignore: string[] = []) {
   const r = rt.records.get(id)!;
   const prev = new Map<string, [Vec3, Vec3]>();
   const acts = new Map<string, string[]>();
@@ -91,7 +99,8 @@ function watchProne(rt: Runtime, id: string, E: Record<string, Entity>, receiver
         riseTicks++;
         assert.deepEqual(hs[hold], grip[hold], `${q} let go of the load while getting up (${a}, tick ${rt.tick})`);
         for (const p of hs) assert.ok(p[1] <= deckY + BODY_MODEL.armLength, 'a hand on the load or the deck');
-      } else if (a === PRONE_ACTIVITY.reach && s1.support?.kind === 'held' && s1.support.by.includes(q)) {
+      } else if (a === PRONE_ACTIVITY.reach) {
+        // deepest the hands go while reaching / taking = at the grip
         handoff = Math.max(handoff, deckY - Math.min(hs[0][1], hs[1][1]));
       }
       // pushing off the deck: the free hand flat on it beside the chest (the edge faces +x here)
@@ -101,7 +110,7 @@ function watchProne(rt: Runtime, id: string, E: Record<string, Entity>, receiver
     const ra = E[receivers[0]].human!.activity;
     if (ra === PRONE_ACTIVITY.reach || ra === 'push-up' || ra === 'kneel-up') {
       sweptTicks++;
-      const hit = sweepPoses(rt, s1, [s1.pose, s1.pose], []);
+      const hit = sweepPoses(rt, s1, [s1.pose, s1.pose], s1.support?.kind === 'forks' ? ignore : []);
       assert.equal(hit, null, `${s1.id} overlaps ${hit?.o.id} at tick ${rt.tick} (${ra})`);
     }
   }
@@ -174,4 +183,31 @@ test('the rise is swept: a wall panel outside the deck edge in the way of the lo
   // without the panel the same hand-up plans
   const ok = proneBay(2.9).rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
   assert.notEqual(ok.status, 'failed');
+});
+
+test('prone receivers take a sheet off the forks where kneeling cannot reach (presented 0.75 m below the deck), 0 violations', () => {
+  const b = proneBay(2.9, { fork: true });
+  const { rt, E, to, deckY } = b;
+  run(rt, 'mount', { actor: 'op', vehicle: 'f1' }, 400);
+  run(rt, 'forklift_pick', { operator: 'op', item: 's1' });
+  // outside the joist ends (2x4-6ft: ±0.91 m) by 6 cm, hands 0.75 m below the deck: 0.64 m below the beam kneelers would stand on
+  const W = def('plywood-4x6').size[2];
+  const at = { x: def('2x4-6ft').size[0] / 2 + 0.06 + W / 2, z: L / 2, y: deckY - 0.75 - def('plywood-4x6').size[1], yaw: Math.PI / 2 };
+  run(rt, 'forklift_present', { operator: 'op', at });
+  assert.equal(E.s1.support?.kind, 'forks');
+  const r = rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'op', receivers: ['p3', 'p4'], to });
+  assert.notEqual(r.status, 'failed', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
+  const w = watchProne(rt, r.id, E, ['p3', 'p4'], deckY, ['f1']);
+  assert.equal(w.r.status, 'completed', `${w.r.diagnostic?.code} ${w.r.diagnostic?.message}`);
+  assert.deepEqual(rt.violations, [], JSON.stringify(rt.violations.slice(0, 3)));
+  assert.ok(Math.abs(w.handoff - 0.75) < 0.01, `hand-off ${w.handoff.toFixed(3)} m below the deck`);
+  assert.equal(E.s1.phase, 'staged');
+  // presented lower than prone reach (1.0 m below the deck): refused, listing the three reaches
+  const b2 = proneBay(2.9, { fork: true });
+  run(b2.rt, 'mount', { actor: 'op', vehicle: 'f1' }, 400);
+  run(b2.rt, 'forklift_pick', { operator: 'op', item: 's1' });
+  run(b2.rt, 'forklift_present', { operator: 'op', at: { ...at, y: deckY - 1.0 - def('plywood-4x6').size[1] } });
+  const low = b2.rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'op', receivers: ['p3', 'p4'], to: b2.to });
+  assert.equal(low.diagnostic?.code, 'handup.too-high');
+  assert.match(low.diagnostic!.message, /lying prone at the edge of the deck at 2\.90 m ≤ 0\.94 m below it, here 1\.00 m\); raise the forks/);
 });
