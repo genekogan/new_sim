@@ -25,7 +25,8 @@ const sorted = (w: WorldState) => Object.values(w.entities).sort((a, b) => (a.id
 export function deckSurfaces(w: WorldState): Surface[] {
   const out: Surface[] = [];
   for (const e of sorted(w)) {
-    if (!isPlywood(e) || e.phase !== 'installed' || supportProblems(w, e).length) continue;
+    // standing sheets (wall panels, year builds phase B: wall.ts) are walls, not decks
+    if (!isPlywood(e) || e.phase !== 'installed' || Math.abs(e.pose.roll ?? 0) > 0.1 || Math.abs(e.pose.pitch ?? 0) > 0.1 || supportProblems(w, e).length) continue;
     const y = memberTop(e);
     out.push({ id: `deck:${e.id}`, level: levelFor(y), y, obb: flatObb(e.pose, e), label: `deck ${y.toFixed(2)} m` });
   }

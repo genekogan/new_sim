@@ -45,7 +45,9 @@ const fail = (code: string, message: string, subjects: string[]): { ok: false; d
 /** Same family: category and cross-section (timber: height × thickness; plywood: thickness × width). */
 export function sameFamily(a: AssetDef, b: AssetDef): boolean {
   if (a.category !== b.category || (a.category !== 'timber' && a.category !== 'plywood')) return false;
-  return Math.abs(a.size[1] - b.size[1]) < 0.002 && Math.abs(a.size[2] - b.size[2]) < 0.002;
+  if (Math.abs(a.size[1] - b.size[1]) < 0.002 && Math.abs(a.size[2] - b.size[2]) < 0.002) return true;
+  // a board defined lying flat (phase B stair treads) is the same lumber as the stock defined on edge
+  return a.category === 'timber' && Math.abs(a.size[1] - b.size[2]) < 0.002 && Math.abs(a.size[2] - b.size[1]) < 0.002;
 }
 
 // Phase B (W13, provisional): a plywood target may also be RIPPED narrower (one saw pass along its length,

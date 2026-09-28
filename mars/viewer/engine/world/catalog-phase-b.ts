@@ -59,14 +59,15 @@ export function kitStringerGeometry(t: { treads: number; run: number; rise: numb
   return { L, tan, cos: c, sin: s, sA, yA, sFrame, going, riser };
 }
 
-function board(id: string, label: string, lengthM: number, wIn: number, tIn: number, kgPerM: number, note: string, notch?: number): AssetDef {
+function board(id: string, label: string, lengthM: number, wIn: number, tIn: number, kgPerM: number, note: string, notch?: number, flat = false): AssetDef {
   const l = lengthM;
   if (notch) NOTCH[id] = notch;
   return {
     id,
     label,
     category: 'timber',
-    size: [l, wIn * IN, tIn * IN],
+    // lumber convention (catalog.ts, catalog-stock.ts): on edge, y = width, z = thickness; `flat` boards (treads) lie on their face
+    size: flat ? [l, tIn * IN, wIn * IN] : [l, wIn * IN, tIn * IN],
     massKg: Math.round(l * kgPerM * 10) / 10,
     color: '#c9a36b',
     handling: {
@@ -122,10 +123,10 @@ export function phaseBAssets(make: PhaseBMake): AssetDef[] {
   out.push(board('2x10-16ft', '16 ft 2x10', 16 * FT, 9.25, 1.5, 4.4, 'nominal 2x10 = 1.5 x 9.25 in'));
   out.push(board('stair-stringer-kit8', `2x12 stair stringer (${g.L.toFixed(3)} m, Kit 8-tread stair)`, g.L, 11.25, 1.5, 5.4,
     `a 14 ft 2x12 cut to ${g.L.toFixed(3)} m: top edge under the tread boards' back edges, foot on the ground, top end bolted to the end frame (slope ${(datan(g.tan) * 180 / Math.PI).toFixed(1)}°); the sawtooth cuts the treads sit in are not modelled`));
-  out.push(board('stair-tread-board-kit', '2x10 stair tread board (4.452 m, Kit stair width)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'a 16 ft 2x10 cut to the Kit stair width; two boards per Kit tread (0.470 m deep vs the Kit 0.448 m)'));
-  out.push(board('stair-tread-board-kit-n', '2x10 stair tread board, notched for the end frame (4.452 m)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'the top tread\'s back board: the Kit draws it 4.5 cm into the end frame; notched 2 in around the columns / bracing', notch));
-  out.push(board('stair-riser-kit', '2x12 stair riser (4.452 m)', KIT_STAIR_2022.width, 11.25, 1.5, 5.4, 'a 16 ft 2x12 cut to the stair width; 0.286 m tall vs the Kit riser 0.2775 m'));
-  out.push(board('2x4-850mm', '2x4 rail post (0.85 m)', 0.85, 3.5, 1.5, 1.9, 'an 8 ft 2x4 cut to the Kit rail-post height (0.85 m); stood up, bolted to the outer stringer'));
+  out.push(board('stair-tread-board-kit', '2x10 stair tread board (4.452 m, Kit stair width)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'a 16 ft 2x10 cut to the Kit stair width, laid flat; two boards per Kit tread (0.470 m deep vs the Kit 0.448 m)', undefined, true));
+  out.push(board('stair-tread-board-kit-n', '2x10 stair tread board, notched for the end frame (4.452 m)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'the top tread\'s back board: the Kit draws it 4.5 cm into the end frame; notched 2 in around the columns / bracing', notch, true));
+  out.push(board('stair-riser-kit', '2x10 stair riser (4.452 m)', KIT_STAIR_2022.width, 9.25, 1.5, 4.4, 'a 16 ft 2x10 cut to the stair width, on edge on the tread below, under the tread above (0.235 m of the 0.239 m between the boards; the Kit riser is 0.2775 m, drawn through the treads)'));
+  out.push(board('stair-post-kit', '2x4 rail post (0.85 m)', 0.85, 3.5, 1.5, 1.9, 'an 8 ft 2x4 cut to the Kit rail-post height (0.85 m); stood up, bolted to the tread ends'));
   const railL = Math.sqrt(KIT_STAIR_2022.run * KIT_STAIR_2022.run + KIT_STAIR_2022.rise * KIT_STAIR_2022.rise);
   out.push(board('stair-handrail-kit', `2x4 stair handrail (${railL.toFixed(3)} m)`, railL, 3.5, 1.5, 1.9, 'a 16 ft 2x4 cut to the Kit rail length; its top end notched 2 in into the end frame (the Kit draws it to the frame centre)', notch));
   // solar (Kit 2022 roof module) + rails in their own piles (§9)
