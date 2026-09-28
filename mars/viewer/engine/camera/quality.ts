@@ -6,6 +6,7 @@
 //   temporal coherence — angular velocity/acceleration, oscillation between alternatives.
 import { dacos, dtan, type Vec3 } from '../core/math.ts';
 import { CameraWorld, nearestSolid, raycast, solidName, type Solid } from './geom.ts';
+import { segmentBox } from './occluders.ts';
 import { DEFAULT_ASPECT, subjectPoints, type CameraPose, type SubjectPose } from './shots.ts';
 
 export const MIN_CLEARANCE = 0.3; // m
@@ -29,8 +30,10 @@ export function sweepCrossing(world: CameraWorld, a: Vec3, b: Vec3): Solid | nul
 }
 
 /** People as soft occluders (readability only, never camera collision): vertical capsule at the sampled pose. */
-export const PERSON_RADIUS = 0.28; // m
-export const PERSON_HEIGHT = 1.8; // m, total capsule height from the feet
+export const PERSON_RADIUS = 0.2; // m (0.28 over-occluded rays passing beside the skinned body: CAMERA_VERIFY.md)
+export const PERSON_HEIGHT = 1.7; // m, total capsule height from the feet
+/** A crew member (or another subject) is see-through only for subject points this close to one of its grip/contact points. */
+export const CONTACT_RADIUS = 0.6; // m
 
 /**
  * Does segment a→b pass within `r` of the vertical capsule axis standing at `base`
@@ -63,7 +66,7 @@ export function capsuleHit(a: Vec3, b: Vec3, base: Vec3, r = PERSON_RADIUS, h = 
   return px * px + py * py + pz * pz < r * r ? s : null;
 }
 
-/** Subject ids plus their crews (carriers of a carried part etc.): never occluders of this shot. */
+/** Subject ids plus their crews (carriers of a carried part etc.): see-through only near their contact points. */
 export function subjectGroup(subjects: Record<string, SubjectPose>, ids: string[]): Set<string> {
   const g = new Set(ids);
   for (const id of ids) for (const c of subjects[id]?.crew ?? []) g.add(c);
@@ -110,8 +113,11 @@ function toCam(cam: CameraPose, b: Basis, p: Vec3): Vec3 {
 
 /**
  * Readability of the named subjects from `cam`. Each subject's points are
- * ray-cast from the camera against the occlusion set and against every
- * bystander's capsule (humans in `subjects` outside the subjects' group); a point counts if it is
+ * ray-cast from the camera against the occlusion set, every other component's
+ * part boxes (`SubjectPose.occluders`, per tick) and every other human's capsule.
+ * A human of the subjects' group (another subject or a crew member) is see-through
+ * only for points within CONTACT_RADIUS of its contact points (a hand on its own
+ * load); a subject is never occluded by its own geometry. A point counts if it is
  * inside the frustum (5 % safe margin, above the `safeBottom` UI band) and unoccluded. Subject score =
  * visible fraction × min(1, size / minSize); aggregate = weighted mean.
  */
@@ -119,9 +125,12 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
   const aspect = opts.aspect ?? DEFAULT_ASPECT, minSize = opts.minSize ?? 0.08, near = opts.near ?? 0.1;
   const yMin = 2 * (opts.safeBottom ?? 0) - 0.95; // lowest usable NDC y (5 % margin above the UI band)
   const b = basis(cam, aspect);
-  // bystanders: humans that are neither a subject nor a subject's crew (sorted → deterministic naming)
+  // occluders (sorted → deterministic naming): every human's capsule, every part's boxes
   const group = subjectGroup(subjects, ids);
-  const people = opts.cutaway ? [] : Object.keys(subjects).filter((k) => subjects[k].kind === 'human' && !group.has(k)).sort().map((k) => ({ id: k, p: subjects[k].p }));
+  const keys = opts.cutaway ? [] : Object.keys(subjects).sort();
+  const people = keys.filter((k) => subjects[k].kind === 'human').map((k) => ({ id: k, p: subjects[k].p, contacts: group.has(k) ? subjects[k].contacts ?? [] : null }));
+  const parts = keys.flatMap((k) => (subjects[k].occluders ?? []).map((b) => ({ id: k, b })));
+  const cr2 = CONTACT_RADIUS * CONTACT_RADIUS;
   const out: SubjectReadability[] = [];
   const reasons: string[] = [];
   let wsum = 0, total = 0;
@@ -142,7 +151,15 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
       const end: Vec3 = [cam.position[0] + (p[0] - cam.position[0]) * u, cam.position[1] + (p[1] - cam.position[1]) * u, cam.position[2] + (p[2] - cam.position[2]) * u];
       const h = raycast(world, cam.position, end, 'occlude');
       let hit: { t: number; id: string; label: string } | null = h ? { t: h.t, id: h.solid.o.id, label: h.solid.o.label ?? h.solid.o.id } : null;
+      for (const q of parts) {
+        if (q.id === id) continue; // own geometry
+        const t = segmentBox(cam.position, end, q.b);
+        if (t !== null && (!hit || t < hit.t)) hit = { t, id: q.id, label: `part ${q.id}` };
+      }
       for (const q of people) {
+        if (q.id === id) continue;
+        // crew / co-subject: see-through only near its own grip (a hand on the load it carries)
+        if (q.contacts && q.contacts.some((c) => (c[0] - p[0]) ** 2 + (c[1] - p[1]) ** 2 + (c[2] - p[2]) ** 2 <= cr2)) continue;
         const t = capsuleHit(cam.position, end, q.p);
         if (t !== null && (!hit || t < hit.t)) hit = { t, id: q.id, label: `person ${q.id}` };
       }

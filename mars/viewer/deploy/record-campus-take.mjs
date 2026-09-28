@@ -39,7 +39,8 @@ const HZ = 10;
 // covers the bottom ~130 px of an 800 px viewport; subject framing keeps important points above it.
 // Coupling: restyling that bar means re-planning with a matching fraction (the track stores it as data.safeArea).
 const SAFE_BOTTOM = 0.17;
-const LIMIT = 1.5 * 1024 * 1024;
+// 2 MB raw (was 1.5): the camera track now stores its scored subject ids + points per sample (~0.4 MB, gzips well)
+const LIMIT = 2 * 1024 * 1024;
 const LABEL = 'Flagship rack bay at staging-east (HYPOTHETICAL build scenario — not historical)';
 const check = process.argv.includes('--check');
 
@@ -131,7 +132,8 @@ const buildSolids = Object.values(final.entities)
   .filter((e) => e.kind === 'component' && e.phase === 'installed')
   .map((e) => ({ id: `take:${e.id}`, kind: 'component', label: `hypothetical ${e.def} ${e.id}`, ...entityFootprint(e) }));
 const cameraScene = { ...local, obstacles: [...local.obstacles, ...buildSolids] };
-// the finished bay may not be entered or crossed at any time; it never occludes (it is not there yet for most of the take)
+// the finished bay may not be entered or crossed at any time; as a prism it never occludes (it is not there yet for
+// most of the take). Sight occlusion by parts comes per tick from takeSampler (kind-aware boxes: posts, stringers, slabs).
 const policy = { ...DEFAULT_CAMERA_POLICY, component: { collide: true, occlude: false } };
 const t1 = performance.now();
 // cutCost 2.5 s: bystanders are occluders now, and a crew walking past for ~1 s is not worth a cut away and back
@@ -163,7 +165,7 @@ const body = {
 const json = JSON.stringify(body);
 const bytes = Buffer.byteLength(json);
 const gz = gzipSync(json, { level: 9 }).length;
-if (bytes > LIMIT) throw new Error(`take payload ${bytes} bytes > 1.5 MB: thin replay samples to 10 Hz keyframes before shipping`);
+if (bytes > LIMIT) throw new Error(`take payload ${bytes} bytes > 2 MB: thin replay samples to 10 Hz keyframes before shipping`);
 const entities = Object.keys(take.tracks).length;
 const entry = {
   id: take.id,

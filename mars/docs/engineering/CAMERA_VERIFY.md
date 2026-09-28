@@ -99,6 +99,18 @@ The over-conservative samples all come from bystander **capsules**, since noPris
 
 A 0.28 m × 1.8 m capsule blocks rays that pass between or beside the skinned body.
 
+## After the fix (same take, track `cam-383c6af7…`, 2026-09-27)
+Fixes 1–4 below landed in `engine/camera` (`occluders.ts`, `quality.ts`, `take-sampler.ts`, `data.subjects`):
+
+| metric | before | after |
+| --- | --- | --- |
+| meanPlanner / meanReal | 0.973 / 0.942 | 0.953 / **0.963** |
+| maxAbsDiff, min real | 0.461, 0.389 | **0.200**, 0.511 |
+| \|planner − real\| ≥ 0.2 (real worse + over-conservative) | 31 + 9 = 40 | 0 + 1 = **1** |
+
+The planner now sees the deck and post cases, so it scores them honestly (deck shot 0.90 planner / 0.90 real). The
+largest remaining gaps (≤ 0.15) are skinned bodies vs capsules in the b1 close-up; noPrism still equals the planner.
+
 ## Recommended fixes
 1. **Parts as occluders, per tick.** Add the take's present components to the readability occlusion set from
    `takeSampler`: pose + catalog box, time-varying, so the finished bay does not occlude before it is built.

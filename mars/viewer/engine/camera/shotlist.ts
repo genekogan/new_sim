@@ -11,6 +11,7 @@ import type { SpatialScene } from '../spatial/types.ts';
 import { CameraWorld } from './geom.ts';
 import { planCameraTrack, type CameraPlan, type Cut, type Correction, type PlanOpts, type PlannedSample, type PlanReport } from './plan.ts';
 import { temporal } from './quality.ts';
+import { SubjectTrackBuilder, subjectReader } from './track.ts';
 import type { Sampler, ShotSpec } from './shots.ts';
 
 export type ShotWindow = { label: string; t0: number; t1: number; spec: ShotSpec };
@@ -28,6 +29,7 @@ export function planShotList(shots: ShotWindow[], sampler: Sampler, scene: Spati
     if (i && grid(s.t0) !== grid(shots[i - 1].t1)) throw new Error(`planShotList: shot '${s.label}' does not start where '${shots[i - 1].label}' ends`);
   });
   const samples: PlannedSample[] = [];
+  const scored = new SubjectTrackBuilder();
   const cuts: Cut[] = [], corrections: Correction[] = [], reasons: string[] = [];
   const planned: PlannedShot[] = [];
   let invalid = 0, crossings = 0, dInvalid = 0, dUnread = 0, dCross = 0, cutaway = false;
@@ -37,6 +39,8 @@ export function planShotList(shots: ShotWindow[], sampler: Sampler, scene: Spati
     const plan = planCameraTrack(shot.spec, (t) => sampler(off + t), world, { ...opts, hz, duration: (i1 - i0) / hz });
     const keep = last ? plan.samples : plan.samples.slice(0, -1); // the next shot owns t1
     keep.forEach((s, k) => samples.push({ ...s, t: q6((i0 + k) / hz), cut: k === 0 ? i > 0 : s.cut }));
+    const read = subjectReader(plan.subjects);
+    keep.forEach((_, k) => { const r = read(k); scored.push(r.ids, r.points); });
     const at = (t: number) => q6(off + t);
     const tag = `[${shot.label}]`;
     if (i) cuts.push({ t: at(0), from: shots[i - 1].label, to: shot.label, reason: `shot list: ${shot.label}` });
@@ -71,5 +75,5 @@ export function planShotList(shots: ShotWindow[], sampler: Sampler, scene: Spati
     cutaway,
   };
   const safeBottom = opts.safeArea?.bottom ?? 0;
-  return { spec: shots[0].spec, hz, duration: (samples.length - 1) / hz, ...(safeBottom > 0 ? { safeArea: { bottom: safeBottom } } : {}), samples, report, shots: planned };
+  return { spec: shots[0].spec, hz, duration: (samples.length - 1) / hz, ...(safeBottom > 0 ? { safeArea: { bottom: safeBottom } } : {}), samples, subjects: scored.track, report, shots: planned };
 }

@@ -20,10 +20,12 @@ test('camera readability: a bystander between camera and subject occludes; behin
   assert.match(between.reasons.join(';'), /subject s \d+% occluded by 'person b'/);
   assert.equal(readability(w, cam, { s: person(0, 0), b: person(0, 3) }, ['s']).score, 1, 'bystander behind the subject');
   assert.equal(readability(w, cam, { s: person(0, 0), b: person(1.2, -3) }, ['s']).score, 1, 'bystander beside the line of sight');
-  // a carried part's carriers are part of the subject, not occluders
+  // a carried part's carrier is see-through near its grip (a hand on its own load), not elsewhere
   const beam: SubjectPose = { p: [0, 0.9, 0], yaw: 0, kind: 'component', height: 1, points: [[-1.8, 0.95, 0], [0, 0.95, 0], [1.8, 0.95, 0]] };
-  assert.equal(readability(w, cam, { A: { ...beam, crew: ['c1'] }, c1: person(0, -3) }, ['A']).score, 1, 'carrier in front of its own beam');
-  assert.ok(readability(w, cam, { A: beam, c1: person(0, -3) }, ['A']).score < 1, 'the same person, not crew, occludes');
+  const grip = { contacts: [[0, 0.95, -0.2] as Vec3] };
+  assert.equal(readability(w, cam, { A: { ...beam, crew: ['c1'] }, c1: person(0, -0.4, grip) }, ['A']).score, 1, 'carrier at its grip in front of its own beam');
+  assert.ok(readability(w, cam, { A: beam, c1: person(0, -0.4, grip) }, ['A']).score < 1, 'the same person, not crew, occludes');
+  assert.ok(readability(w, cam, { A: { ...beam, crew: ['c1'] }, c1: person(0, -3) }, ['A']).score < 1, 'crew without a contact near the point occludes');
   // cutaway (inspection) ignores people too; people never make a camera placement invalid
   assert.equal(readability(w, cam, { s: person(0, 0), b: person(0, -3) }, ['s'], { cutaway: true }).score, 1);
 });

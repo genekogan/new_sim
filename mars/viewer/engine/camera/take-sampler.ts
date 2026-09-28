@@ -5,12 +5,16 @@
 // they occlude other subjects); components get their catalog box corners +
 // centre as points, so a carried beam or a seated sheet is a subject the camera
 // can frame and score. `crew` = humans gripping the part / sharing its action.
+// Components also carry their sight-blocking boxes (`occluders`, kind-aware:
+// upright posts, stair stringers, slabs/beams) and a gripping human its grip
+// point (`contacts`), so readability treats parts as occluders per tick.
 import { POS_Q, ANG_Q, type PoseSample, type Take } from '../take/types.ts';
 import { interpSample } from '../take/replay.ts';
 import { entityCorners } from '../spatial/service.ts';
 import type { Entity } from '../world/types.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { Sampler, SubjectPose } from './shots.ts';
+import { gripPoint, partOccluders, type PartPose } from './occluders.ts';
 
 type Info = { kind: string; def?: string; present: [number, boolean][]; track: PoseSample[]; grip: [number, unknown][]; task: [number, unknown][]; reservedBy: [number, unknown][] };
 
@@ -81,24 +85,31 @@ export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler 
       }
       return c.size ? [...c].sort() : undefined;
     };
+    // poses first (a carrier's contact point lies on the part it grips)
+    const poses = new Map<string, { e: Info; pose: PartPose }>();
     for (const [id, e] of info) {
       if (!presentAt(e.present, tick)) continue;
       const br = bracket(e.track, tick);
       if (!br) continue;
       const s = interpSample(br[0], br[1], tick);
-      const p: Vec3 = [s[1] / POS_Q, s[2] / POS_Q, s[3] / POS_Q];
-      const yaw = s[4] / ANG_Q;
+      poses.set(id, { e, pose: { p: [s[1] / POS_Q, s[2] / POS_Q, s[3] / POS_Q], yaw: s[4] / ANG_Q, pitch: (s[5] ?? 0) / ANG_Q, roll: (s[6] ?? 0) / ANG_Q } });
+    }
+    for (const [id, { e, pose }] of poses) {
+      const { p, yaw } = pose;
       const crew = crewOf(id, e);
       if (e.kind !== 'component' || !e.def) {
-        out[id] = { p, yaw, kind: 'human', ...(crew ? { crew } : {}) };
+        const grip = valueAt(e.grip, tick, null as unknown) as { entity?: string; slot?: string } | null;
+        const part = grip && typeof grip.entity === 'string' ? poses.get(grip.entity) : undefined;
+        const contact = part?.e.def && typeof grip!.slot === 'string' ? gripPoint(part.e.def, part.pose, grip!.slot, byGrip.get(grip!.entity!)?.length) : null;
+        out[id] = { p, yaw, kind: 'human', ...(crew ? { crew } : {}), ...(contact ? { contacts: [contact] } : {}) };
         continue;
       }
-      const ent = { def: e.def, pose: { p, yaw, pitch: (s[5] ?? 0) / ANG_Q, roll: (s[6] ?? 0) / ANG_Q } } as Entity;
-      const cs = entityCorners(ent);
+      const cs = entityCorners({ def: e.def, pose } as Entity);
       const c: Vec3 = [0, 0, 0];
       let top = -Infinity;
       for (const q of cs) { c[0] += q[0] / 8; c[1] += q[1] / 8; c[2] += q[2] / 8; top = Math.max(top, q[1]); }
-      out[id] = { p, yaw, height: Math.max(0.5, top - p[1]), points: [c, ...cs], kind: 'component', ...(crew ? { crew } : {}) };
+      const occluders = partOccluders(e.def, pose);
+      out[id] = { p, yaw, height: Math.max(0.5, top - p[1]), points: [c, ...cs], kind: 'component', ...(crew ? { crew } : {}), ...(occluders.length ? { occluders } : {}) };
     }
     if (cache.size >= limit) cache.delete(cache.keys().next().value!);
     cache.set(tick, out);

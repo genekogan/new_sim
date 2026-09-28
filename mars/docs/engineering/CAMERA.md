@@ -15,7 +15,8 @@ object that points at a take by id, so re-shooting a take can never change it (S
 | `plan.ts` | `planCameraTrack(spec, sampler, scene, {duration, hz})` is the lookahead planner for known futures (takes). It returns `{samples, report}`. |
 | `track.ts` | `toCameraTrack(id, takeId, plan)` produces the `CameraTrack` stored in `take/types.ts` (`data` = `mars-camera-track/1`). `sampleTrack(data, t)` interpolates, and holds across cuts. |
 | `samplers.ts` | `walker(polyline, speed, t0, loop)` gives synthetic subject motion for tests and previews. |
-| `take-sampler.ts` | `takeSampler(take)`: a `Sampler` over a recorded Take (same poses as `sampleTake`, indexed and memoised per tick). Humans are standing subjects; components carry their catalog box corners + centre as points. |
+| `take-sampler.ts` | `takeSampler(take)`: a `Sampler` over a recorded Take (same poses as `sampleTake`, indexed and memoised per tick). Humans are standing subjects (+ `contacts`: their grip point); components carry their catalog box corners + centre as points and `occluders`. |
+| `occluders.ts` | `partOccluders(def, pose)`: kind-aware sight boxes matching the render — upright = its two 3 in posts (braces ignored), stair flight = two stringers, beams/joists/2x4/treads/plywood = their catalog box; `segmentBox` (OBB slab test). |
 | `shotlist.ts` | `planShotList(windows, sampler, scene, opts)`: contiguous `[t0, t1)` shot windows, each planned by `planCameraTrack` on a time-shifted sampler, concatenated on one 1/hz grid with a cut at every boundary; merged report (per-shot findings prefixed with the shot label) plus `shots[]`. |
 
 **Sampler.** `sampler(t) → Record<id, SubjectPose>` with `SubjectPose = {p, yaw, height?, points?, weight?}`.
@@ -50,9 +51,10 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 2. **Readability.** For each point of each subject:
    - the point is in the frustum (5 % safe margin), and
    - a ray cast against the occlusion set is clear (stopping 5 cm short, so a carried load
-     does not hide its own socket), and it misses every **bystander capsule** (r 0.28 m, h 1.8 m;
-     `kind: 'human'` poses that are neither a subject nor a subject's `crew`: a part's carriers or
-     its reserving action's workers, from `takeSampler`). People occlude sight only, never collide.
+     does not hide its own socket), it misses every other **part's `occluders`** (per tick, so the bay
+     does not occlude before it is built) and every other human's **capsule** (r 0.2 m, h 1.7 m). A
+     co-subject or `crew` member (carriers, co-workers from `takeSampler`) is see-through only for points
+     within `CONTACT_RADIUS` 0.6 m of its grip. Parts and people occlude sight only, never collide.
    - it is above the `safeArea.bottom` UI band, if one is set.
 
    Subject score = visible fraction × min(1, projected extent / `minSize`) (default 8 % of frame
@@ -154,7 +156,7 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 - **Candidates are local to the desired target.** There is no global search, cross-subject
   cutting or reverse-angle grammar yet. Viterbi does not enforce a hard minimum shot length
   (the cut cost does this in practice, and `temporal.cutsPer2s` reports it).
-- **Not yet available:** render-side blending, debug overlays. Moving *parts* are still not occluders (people are).
+- **Not yet available:** render-side blending, debug overlays. People are capsules, not skinned bodies.
 - **Safe area coupling.** `safeArea: { bottom }` tilts subject/region shots so the subject sits in the usable band and
   scores points under the band as out of frame (fixed/path stay as authored). The campus take is planned with 0.17
   for the studio replay bar (~130 px; in the e2e 1280×800 layout the canvas is 593 px tall, so it is really ~0.22, and
@@ -173,10 +175,15 @@ The previous camera code on the same take (12 cuts) scores min 0.24, 84 samples 
 (`app/engine-view/take-replay.ts`, `app/studio/take-{host,panel}`); the camera track only drives the view when "Engine
 camera" is on, and the take's poses at any t are identical either way (`e2e/studio-take.spec.ts`).
 
+**Parts as occluders (2026-09-27):** re-planned on the same take (`c531eaf4…`, world unchanged): 16 cuts (was 14),
+readability min 0.60 / mean 0.95 (was 0.67 / 0.97 under the looser model), 0 invalid; the track now stores
+`data.subjects` (scored ids per sample + points when they change, `subjectReader`), payload 1.70 MB (limit raised to 2 MB).
+
 ## Verified against the render mesh (2026-09-27, `CAMERA_VERIFY.md`)
 `window.__marsStudio.verifyCamera(fromT, toT, hz)` (`app/studio/camera-verify.ts`; e2e `camera-verify.spec.ts`)
 ray-casts each planned pose's subject points against the rendered GLB, take parts and skinned people. Flagship take @
 2 Hz: meanPlanner 0.973 vs meanReal 0.942, 0 samples hidden by the real mesh (planner ≥ 0.8, real ≤ 0.3), 9
 over-conservative (bystander capsules). The gaps are take parts (not occluders here) and crew bodies (exempt), worst on
 "wide on the deck" (475–478 s: p3/p4 under the seated sheets, upright A's posts). Static campus never disagrees on
-this take. Next: per-tick part occluders (uprights as posts only), crew exemption only near contact, slimmer capsules.
+this take. After per-tick part occluders, contact-only crew exemption and 0.2 m capsules: meanReal 0.963, maxAbsDiff 0.20,
+1 sample differing by ≥ 0.2 (was 40).

@@ -2,6 +2,7 @@
 // depends only on (spec, sampler, t): it works identically against a live
 // runtime or a recorded take, and any t can be evaluated in any order.
 import { datan, dcos, dexp, dsin, dtan, type Vec3 } from '../core/math.ts';
+import type { OccBox } from './occluders.ts';
 
 /** What the camera needs to know about a subject at time t. */
 export type SubjectPose = {
@@ -16,6 +17,10 @@ export type SubjectPose = {
   kind?: 'human' | 'component';
   /** Ids that count as part of this subject for occlusion (a carried part's carriers, a human's co-workers). */
   crew?: string[];
+  /** A component's sight-blocking boxes (occluders.ts `partOccluders`): they hide every other subject's points. */
+  occluders?: OccBox[];
+  /** A human's grip / contact points: as another subject's crew it is see-through only within CONTACT_RADIUS of these. */
+  contacts?: Vec3[];
 };
 export type Sampler = (t: number) => Record<string, SubjectPose>;
 

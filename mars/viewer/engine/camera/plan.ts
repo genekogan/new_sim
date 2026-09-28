@@ -12,7 +12,8 @@
 import { dacos, q6, type Vec3 } from '../core/math.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import { CameraWorld, raycast, solidName, type CameraPolicy } from './geom.ts';
-import { evaluateShot, shotSubjects, type CameraPose, type Sampler, type ShotSpec } from './shots.ts';
+import { evaluateShot, shotSubjects, subjectPoints, type CameraPose, type Sampler, type ShotSpec } from './shots.ts';
+import { SubjectTrackBuilder, type SubjectTrack } from './track.ts';
 import { badness, candidates, VARIANT_KEYS, type Candidate, type SolveOpts } from './solve.ts';
 import { placement, readability, temporal, type Temporal } from './quality.ts';
 
@@ -44,8 +45,11 @@ export type PlanReport = {
   rejected: boolean;
   cutaway: boolean;
 };
-/** `safeArea` (only when non-zero): the bottom UI band the plan was framed for — the replaying view must match it. */
-export type CameraPlan = { spec: ShotSpec; hz: number; duration: number; safeArea?: { bottom: number }; samples: PlannedSample[]; report: PlanReport };
+/**
+ * `safeArea` (only when non-zero): the bottom UI band the plan was framed for — the replaying view must match it.
+ * `subjects`: the subject ids + points readability was scored on at each sample (track.ts `subjectReader`).
+ */
+export type CameraPlan = { spec: ShotSpec; hz: number; duration: number; safeArea?: { bottom: number }; samples: PlannedSample[]; subjects: SubjectTrack; report: PlanReport };
 
 const INF = 1e12;
 const DEG = Math.PI / 180;
@@ -78,9 +82,11 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
   // 1. candidate table + desired-shot analysis
   const table: (Candidate | null)[][] = [];
   const desired: Desired[] = [];
+  const scored = new SubjectTrackBuilder();
   for (let i = 0; i < N; i++) {
     const t = i * dt;
     const subjects = sampler(t);
+    scored.push(ids, Object.fromEntries(ids.map((id) => [id, subjects[id] ? subjectPoints(subjects[id]) : undefined])));
     const pose = evaluateShot(spec, sampler, t, { aspect: opts.aspect, safeBottom: opts.safeArea?.bottom });
     const row: (Candidate | null)[] = new Array(K).fill(null);
     for (const c of candidates(world, pose, subjects, ids, sopts)) row[VARIANT_KEYS.indexOf(c.key)] = c;
@@ -223,6 +229,7 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
     duration: opts.duration,
     ...(safeBottom > 0 ? { safeArea: { bottom: safeBottom } } : {}),
     samples,
+    subjects: scored.track,
     report: {
       samples: N,
       invalidSamples,

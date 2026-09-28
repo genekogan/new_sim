@@ -9,7 +9,8 @@ import { sampleTake, takeDuration } from '../take/replay.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { takeSampler } from '../camera/take-sampler.ts';
 import { planShotList, type ShotWindow } from '../camera/shotlist.ts';
-import { sampleTrack, toCameraTrack } from '../camera/track.ts';
+import { sampleTrack, subjectReader, toCameraTrack } from '../camera/track.ts';
+import { shotSubjects, subjectPoints } from '../camera/shots.ts';
 import { config, minuteBindings, minuteTemplate, pgHistory, registry } from './sequence-fixtures.ts';
 
 function minuteTake() {
@@ -36,6 +37,8 @@ test('takeSampler: same entities and poses as sampleTake at any time; components
   const panel = s(1).panel;
   assert.equal(panel.points?.length, 9, 'component subject = centre + 8 box corners');
   assert.ok(s(1).n1.points === undefined, 'humans use the default standing points');
+  assert.equal(panel.occluders?.length, 1, 'a panel occludes with its slab');
+  assert.equal(s(1).n1.occluders, undefined, 'people occlude as capsules, not boxes');
 });
 
 test('planShotList: contiguous windows → one uniform track, a cut at every shot boundary, take untouched', () => {
@@ -60,5 +63,19 @@ test('planShotList: contiguous windows → one uniform track, a cut at every sho
   const held = sampleTrack(track.data as never, mid - 0.05);
   assert.deepEqual(held.position, plan.samples[boundary - 1].position, 'the outgoing shot holds up to the cut (no blend across it)');
   assert.equal(hashOf(take), before, 'planning never mutates the take');
+  // the scored subjects are stored per sample (ids by set index, points only when they change)
+  const read = subjectReader(plan.subjects), sampler = takeSampler(take);
+  assert.equal(plan.subjects.set.length, plan.samples.length);
+  assert.ok(plan.subjects.points.length < plan.samples.length * 2, 'points written only when they change');
+  for (let i = 0; i < plan.samples.length; i += 7) {
+    const shot = shots.find((w) => plan.samples[i].t < w.t1 - 1e-9) ?? shots[1];
+    const r = read(i), want = shotSubjects(shot.spec);
+    assert.deepEqual(r.ids, want, `ids at sample ${i}`);
+    for (const id of want) {
+      const ref = subjectPoints(sampler(plan.samples[i].t)[id]);
+      assert.equal(r.points[id].length, ref.length);
+      r.points[id].forEach((p, k) => p.forEach((v, j) => assert.ok(Math.abs(v - ref[k][j]) <= 0.005 + 1e-9, `${id} point ${k} at sample ${i}`)));
+    }
+  }
   assert.throws(() => planShotList([shots[0], { ...shots[1], t0: mid + 1 }], takeSampler(take), provingGround(), { hz: 10 }), /does not start where/);
 });
