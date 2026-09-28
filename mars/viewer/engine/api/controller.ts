@@ -18,6 +18,7 @@ import { TakeLibrary } from '../take/store.ts';
 import { INTERP_FIELDS, type CameraTrack, type ChangeEvent, type PoseSample, type Take } from '../take/types.ts';
 import type { Spatial } from '../spatial/service.ts';
 import type { Leg, Route } from '../spatial/path.ts';
+import type { CarryProgram } from '../carry/validate.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { groupStability, isUpright } from '../construction/rules.ts';
@@ -412,7 +413,7 @@ export class EngineController {
     }
     if (q.route) out.route = this.preview(world, 'walk_to', q.route, (prog: Route) => ({ length: r2(prog.length), legs: summariseLegs(prog.legs) }));
     if (q.carry)
-      out.carry = this.preview(world, 'carry', q.carry, (p: any) => {
+      out.carry = this.preview(world, 'carry', q.carry, (p: CarryProgram) => {
         const poses = p.traj.poses as { x: number; z: number; th: number }[];
         const step = Math.max(1, Math.ceil(poses.length / 60));
         return {
@@ -431,7 +432,7 @@ export class EngineController {
   }
 
   /** Validate + plan one verb against a private copy of `world` with fresh services (the runtime's own plan()). */
-  private preview(world: WorldState, verb: string, params: unknown, summarise: (program: any) => unknown) {
+  private preview<P>(world: WorldState, verb: string, params: unknown, summarise: (program: P) => unknown) {
     const def = this.registry.get(verb);
     if (!def) return { ok: false, diagnostic: { code: 'action.unknown-verb', message: `no verb ${verb}` } };
     const parsed = def.schema.safeParse(params);
@@ -439,7 +440,7 @@ export class EngineController {
     const w = structuredClone(world);
     const rt = new Runtime(w, this.registry, this.cfg.services(w), []);
     const r = def.plan(rt, parsed.data);
-    return r.ok ? { ok: true, ...(summarise(r.program) as object), ...(r.notes ? { notes: r.notes } : {}) } : { ok: false, diagnostic: r.diagnostic as Diagnostic };
+    return r.ok ? { ok: true, ...(summarise(r.program as P) as object), ...(r.notes ? { notes: r.notes } : {}) } : { ok: false, diagnostic: r.diagnostic as Diagnostic };
   }
 
   log(q: OpInput<'log'>): OpResult {

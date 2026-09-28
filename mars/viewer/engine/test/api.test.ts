@@ -154,7 +154,7 @@ test('api: take replay is independent of camera track attachment', () => {
   const { cameras: cb, ...b } = before, { cameras: ca, ...a } = after;
   assert.deepEqual(a, b, 'take slice identical after attaching cameras');
   assert.deepEqual(cb, []);
-  assert.deepEqual(ca.map((x: any) => x.id).sort(defaultSortOrder), [cam1.track_id, 'wide'].sort());
+  assert.deepEqual(ca.map((x: any) => x.id).sort(defaultSortOrder), [cam1.track_id, 'wide'].sort(defaultSortOrder));
   const withCams = c.call('get_take', { take_id: ex.take_id, include: ['cameras'] }) as any;
   assert.equal(withCams.cameras.length, 2);
   assert.ok(withCams.cameras[0].data.samples.length > 10);
