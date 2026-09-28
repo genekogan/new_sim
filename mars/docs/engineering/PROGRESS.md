@@ -900,8 +900,8 @@ Then: gate → release 5; HANDOFF refresh.
 - **Prone take fields (lead note, W32):** `TakeRecorder` FIELDS gains `proneYaw` (integer mrad) and `phaseK` (integer %),
   still `mars-take/4` (additive: an absent field records nothing, so every manifest take re-checks byte-identical).
   Test `take-prone-fields.test.ts`. No pin moves.
-- **Commits** (branch `w31-chapters`, on main `858946e`): `feb486c` chapters.ts + tests, `88d6168` recorder + 7 takes +
-  manifest, `b21a0d3` docs, `0071785` prone take fields, + this entry. W27: `279d405` on main.
+- **Commits** (branch `w31-chapters`, on main `36772d7`): `6a7fadb` chapters.ts + tests, `3afc6fb` recorder + 7 takes +
+  manifest, `d9c603a` docs, `6fc9b46` prone take fields, `ccdf9d2` + this entry. W27: `279d405` on main.
 - **Weak spots:** the studio cannot play a set back to back yet (contract written; a renderer task). The chapters are not
   in "Watch it being built" by design (kind), but they are listed under "Replay take" for 2022 (7 more options). Work
   shots stay close on 1–4 people for minutes; the yard is seen only in the opening wide. Chapter moments are generic.
