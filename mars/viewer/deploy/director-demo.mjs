@@ -1,7 +1,8 @@
 // Director demo (spec §15/§16 north-star): an external agent directs the engine
 // through the real MCP endpoint — discover, design-edit the world (spawn a 19 ft
 // upright + crew), bind an impossible plan, read the diagnostic, revise, rehearse
-// clean, execute, shoot a camera track, fork an alternative future, hit plan
+// clean, execute, shoot a camera track, direct the camera in words (engine_direct_camera,
+// self-corrected), fork an alternative future, hit plan
 // staleness, read the ledger and clean up, then pause a run mid-action, fork the
 // pause and resume both branches differently. Prints an annotated transcript
 // with per-call and per-step timings. Reference write-up: docs/engineering/DIRECTOR_DEMO.md.
@@ -18,6 +19,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { engineTools } from '../engine/api/index.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argBase = process.argv.indexOf('--base');
@@ -129,6 +131,7 @@ try {
   timings.push({ step, tool: 'mcp connect', wall: performance.now() - t0 });
   const tools = (await client.listTools()).tools.map((t) => t.name).filter((n) => n.startsWith('engine_'));
   show('engine tools', tools.join(', '));
+  assert.deepEqual([...tools].sort(), engineTools().map((t) => t.name).sort(), 'the MCP listing is the controller op registry');
   const verbs = await call('engine_list_verbs', {});
   show('rules', verbs.rulesVersion);
   show(`${verbs.verbs.length} verbs`, verbs.verbs.map((v) => v.verb).join(', '));
@@ -229,6 +232,31 @@ try {
   const logCam = await call('engine_log', { workspace: 'scene-1' });
   assert.equal(logCam.head, ex.checkpoint.id, 'a camera track never moves a head');
   show('take unchanged', `takeHashUnchanged ${cam.takeHashUnchanged}; id ${withCams.id}, finalStateHash ${withCams.finalStateHash.slice(0, 16)}… before and after; scene-1 head still ${logCam.head}`);
+
+  // 5b ───────────────────────────────────────────────────────────────
+  section('5b. Direct the camera in words (engine_direct_camera)');
+  const dirs = [
+    { label: 'open on yard A', subject: { kind: 'region', ref: 'yard-a' }, motion: { verb: 'hold' }, duration: 3 },
+    { label: 'crane up over the beam as the crew carries it out', subject: { kind: 'entity', ref: 'b1' }, motion: { verb: 'crane', direction: 'up', rise: 8 }, duration: 12, framing: { size: 'wide' } },
+  ];
+  const dc = await call('engine_direct_camera', { take_id: ex.take_id, directions: dirs });
+  assert.equal(dc.ok, true);
+  assert.equal(dc.take_id, ex.take_id);
+  assert.equal(dc.takeHashUnchanged, true);
+  assert.match(dc.track_id, /^dir-/);
+  assert.equal(dc.report.shots.length, dirs.length);
+  show('directed track', `${dc.track_id}: ${dc.track.samples} samples at ${dc.track.hz} Hz over ${dc.track.duration} s, ${dc.track.keyframes.length} keyframes (1 Hz)`);
+  for (const [i, sh] of dc.report.shots.entries()) {
+    assert.ok(Array.isArray(sh.corrections), `shot ${i} reports its corrections`);
+    assert.ok(sh.simulation.valid, `shot ${i} simulates clean against the take`);
+    show(`shot ${i} ${sh.subject.kind} ${sh.subject.id}`, `${sh.corrections.length ? sh.corrections.map((c) => `${c.failure} → ${c.strategy}`).join(', ') : 'no correction needed'}; readability min ${sh.planner?.minReadability}`);
+  }
+  assert.ok(dc.report.shots[0].corrections.length >= 1, 'the opening hold on yard A is self-corrected (a wall occludes the computed view)');
+  const unknown = await call('engine_direct_camera', { take_id: ex.take_id, directions: [{ subject: { kind: 'entity', ref: 'the forklift' }, motion: { verb: 'hold' } }] }, { expectError: true });
+  assert.equal(unknown.code, 'camera.direct.unknown');
+  show('unknown subject', `${unknown.code}: ${unknown.message}`);
+  const logDir = await call('engine_log', { workspace: 'scene-1' });
+  assert.equal(logDir.head, ex.checkpoint.id, 'a directed track never moves a head');
 
   // 6 ────────────────────────────────────────────────────────────────
   section('6. Fork the workspace, run a different plan there');
