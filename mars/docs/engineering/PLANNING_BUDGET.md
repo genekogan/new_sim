@@ -389,7 +389,9 @@ open-ground target has room, so the step-off search never runs there. The pin mo
 | --- | --- | --- | --- |
 | build-bay v3 (`build-bay-v3.test.ts`) | `a2f782ad96a0…36e38` | `39a0fb3f4d24…7c2ba` | 16401 → 16374 |
 
-No other pin moves. The engine suite is otherwise unchanged. New regression tests: v3 at (28, −9, −0.16) and
+No other pin moves. The engine suite is otherwise unchanged. **First pin, same day (W27): the 2022 east-house A+B**
+(`year-build-b.test.ts` PIN_FULL_AB, YEAR_BUILD_FULL=1) = `ddb634d6e73d…cdf30a` @ 600 599 ticks. It is green once set-part
+lift crews wait for bystanders (setpart.ts, YEAR_BUILD.md). Re-verified on the head that includes W28's prone receiver. New regression tests: v3 at (28, −9, −0.16) and
 (0.07, 0.03), and a `beam_walk` step-off unit test (lands within 0.15 m; still refused at 0.12 m from an edge).
 
 ## Limits

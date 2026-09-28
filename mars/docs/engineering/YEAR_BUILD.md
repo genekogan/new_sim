@@ -319,8 +319,11 @@ parameters fit the 2022 rack-house template only; other years need more sheet sp
 and module sizes.
 
 ## What phase C needs
-- a director-run take per house / year (mars-take/4) with camera tracks (the east-house A+B: see PROGRESS W27 for its
-  take / size); the other three 2022 houses run (they plan with the same rules); idle crew parked against each section's
+- a director-run take per house / year (mars-take/4) with camera tracks. The east-house A+B take (`record-campus-take.mjs
+  --scenario year-build-2022-ab`, explicit only) reproduces the pin but is **12.0 MB**, 5.7 MB over the 6 MB budget:
+  take 10.5 MB (tracks 4.7, changes 3.7, events 1.75) + camera 1.0 MB at 0.1 Hz; gzip 2.0 MB. It needs thinning, a
+  per-section split or a larger budget, and shots written for phase B: the phase-A shot list gives min readability 0.15,
+  44.7 % readable; the other three 2022 houses run (they plan with the same rules); idle crew parked against each section's
   carry paths (today they are moved by make-way when a carry or set-part needs the ground);
 - install_panel side stations (solar.ts) — 7 of 10 modules wait on it; a lengthwise insertion for risers; a post rule
   at the end frame; notching / seating decks below the column tops (or a Kit decision) for the panels over frame lines;

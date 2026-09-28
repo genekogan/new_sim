@@ -7,6 +7,7 @@
 //   node deploy/record-campus-take.mjs --all                          # every scenario, in manifest order
 //   node deploy/record-campus-take.mjs --scenario year-build-2022-house  # 2022 east-house, whole skeleton (opt-in)
 //   ... --all --full                                                  # --all plus the opt-in whole-house take(s)
+//   node deploy/record-campus-take.mjs --scenario year-build-2022-ab  # 2022 east-house A+B (explicit only; over budget)
 //   ... --check                                                       # re-record and compare with the manifest (no writes)
 // Writes public/engine/takes/<file> and merges the scenario's entry into public/engine/takes/manifest.json.
 // `takes` lists what the 2026 studio can replay (flagship first: the studio e2e uses takes[0]); takes recorded
@@ -291,8 +292,7 @@ const SCENARIOS = {
 };
 
 // The whole 2022 east-house skeleton, phase A (12 frames + 54 beams; year-build.test.ts PIN_FULL, YEAR_BUILD_FULL): opt-in
-// (`--full` or `--scenario year-build-2022-house`), ≈ 1 min of rehearsal. Phase A + B is not recorded: unpinned, and at
-// 2026-09-28 it aborted on a beam_walk (and its take, ≈ 8 MB, is over this 6 MB budget).
+// (`--full` or `--scenario year-build-2022-house`), ≈ 1 min of rehearsal. Phase A + B: `year-build-2022-ab` below.
 SCENARIOS['year-build-2022-house'] = {
   ...SCENARIOS['year-build-2022'],
   file: 'year-build-2022-east-house.json',
@@ -312,6 +312,36 @@ SCENARIOS['year-build-2022-house'] = {
   shots(ctx) {
     const l = SCENARIOS['year-build-2022'].shots(ctx);
     l[l.length - 1] = { ...l[l.length - 1], label: 'the east-house skeleton standing' };
+    return l;
+  },
+};
+
+// The whole 2022 east-house, phase A + B (skeleton, decks, stair, walls, solar; year-build-b.test.ts PIN_FULL_AB,
+// YEAR_BUILD_FULL): explicit only (`--scenario year-build-2022-ab`; not in `--all --full`), ≈ 30 min (two 13-min
+// rehearsals: the take and the exact take). ≈ 8.3 h simulated; the planned camera runs at 0.1 Hz (0.5 Hz alone would be
+// ≈ 4.5 MB). NOT RECORDED (W27, 2026-09-29): the payload is 12 029 291 B (take 10.47 MB — tracks 4.74, changes 3.66,
+// events 1.75 — camera 1.03 MB; gzip 2.02 MB), 5 737 835 B over the 6 MB limit; the lead decides (thin the take,
+// raise the limit, or split it per section). Its final state equals the pin (take 53a180fd…).
+SCENARIOS['year-build-2022-ab'] = {
+  ...SCENARIOS['year-build-2022'],
+  file: 'year-build-2022-east-house-ab.json',
+  optIn: 'explicit',
+  label: '2022 east-house: skeleton, decks, stair, walls, solar — from the piles (HYPOTHETICAL build scenario — not historical)',
+  note: 'Year build phases A + B (YEAR_BUILD.md): a fork of protected mars-2022, the east-house removed and rebuilt from a hypothetical pile yard by a generic crew of six — skeleton (12 frames, 54 beams), ground / first-floor / roof decks (27 strips, 81 pieces cut at the station), the Kit stair, 25 plywood wall panels and 3 solar modules on rails — every sequenced part checked against the checkpoint through the provisional material rules. Coordinates are the 2022 year frame with ground at the Kit datum y = 0. Order, piles, crew and rules are hypothetical.',
+  limit: 6 * MB,
+  hz: 0.1,
+  pin: { ticks: 600599, finalStateHash: 'ddb634d6e73d99e679421ceecaaec20a0936643d25dc33845082dd6a4ecdf30a' }, // year-build-b.test.ts PIN_FULL_AB
+  run() {
+    const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { phaseB: {} });
+    const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
+    mustBeClean(reh, 'year build 2022 east-house A+B');
+    const fp = buildingFootprint(s.graph.nodes.filter((n) => n.assembly === 'east-house'));
+    const site = { origin: fp.c, yaw: fp.yaw ?? 0, groundY: s.build.groundY, half: fp.half };
+    return { reh, exact: () => rehearse(s.history, s.workspace, s.plan, { ...s.cfg, trackTol: 1 }).take, plan: s.plan, site, scene: s.scene, campus: 'mars-2022', crew: s.build.bindings.crew };
+  },
+  shots(ctx) {
+    const l = SCENARIOS['year-build-2022'].shots(ctx);
+    l[l.length - 1] = { ...l[l.length - 1], label: 'the east-house finished: decks, stair, walls, solar' };
     return l;
   },
 };
@@ -458,7 +488,7 @@ function record(name) {
 
 const ORDER = Object.keys(SCENARIOS);
 const full = process.argv.includes('--full');
-const names = process.argv.includes('--all') ? ORDER.filter((n) => full || !SCENARIOS[n].optIn) : [argOf('--scenario') ?? 'flagship'];
+const names = process.argv.includes('--all') ? ORDER.filter((n) => SCENARIOS[n].optIn !== 'explicit' && (full || !SCENARIOS[n].optIn)) : [argOf('--scenario') ?? 'flagship'];
 // each scenario fails loudly on its own; --all still records (and writes) the ones that complete, then exits non-zero
 const failed = [];
 const results = names.flatMap((n) => {

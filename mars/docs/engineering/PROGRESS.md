@@ -673,3 +673,45 @@ Then: gate → release 5; HANDOFF refresh.
   60°, head, arms to the grips) against members there — p3 / p4's chests pass through joist tails j2 / j7; (4) a phase
   fraction (`human.phaseK`) would make the rise timing exact and take replay mid-phase.
 - **W29 landed** `de94b9d`, `046a0cd` (≈470k tokens, 50 min): `app/engine-view/prone.ts` — one rise coordinate (lying 0 → knees 1 → kneel-up 2 → standing 3) driven by the phases, per-tick grid search over rise / torso pitch (≤ 60° lying, ≤ 150° kneeling) / body turn (≤ 45°, only while on an installed sheet); shoulders kept in reach, spine and head off the deck and edge beam; measured lying hips 0.15 / shoulders 0.10 m above the deck; flat hands on the deck; lab presets `prone`, `prone-forks`; `prone.spec` 3/3 (shoulders beyond the lip, chest within 1 mm of deck + depth, no vertex > 1.5 cm into the deck, no over-long arm). Hand points: prone-reach 45/80 by hand (p3 27/40, p4 18/40), 60/80 off the forks; 0 rig-reachable misses — the rig lying tipped 60° reaches 0.80 (punk) / 0.73 m (woman) below the deck vs the model's 0.94. Lead LOOKED at prone-reach + prone-push-up: accepted — reads as Gene described (on the stomach over the edge; then one hand on the deck, one on the sheet). Engine follow-ups → W32 (after W30 frees handup.ts): prone model = measured rig (chest 0.10, torso-over-edge per rig → reach ≈ 0.73 m; the 2.9 m test deck must drop to what the rig can do), a lying heading (`human.proneYaw` or S placed on the grip axis), a check beyond the lip (chest/head/arms vs joist tails), `human.phaseK` for mid-phase replay.
+
+## 2026-09-29 — W27: the 2022 east-house A+B green + pinned; v3 origin-independent
+- **Commits:** `82e00c0` (v3 origin-independent + re-pin), `81ce663` (v3 take), `f97d5db` (set-part bystander rule;
+  A+B pinned), + the recorder's A+B scenario and these docs.
+- **A+B overlap, root cause:** it was not the carry. `s1417-install-wall` (tip-up, then walk-in of wall panel p5 of
+  wall 113aa87d) moved m2's feet to 0.48 m from m6, who had stood idle outside +x since the stair section. The carry
+  that brought the panel had checked its set-down spots. The set-part engine (`install_wall` / `install_stringer` /
+  `install_stair_part`) checked lift-crew feet only against the static grid, so people were not obstacles. W15's
+  squeezed replan and `carry.path-occupied` belong to the carry verb and were never involved.
+- **The fix is in the engine, not in parking:** while the lift crew moves the part, anyone whom a lifter's feet would
+  come within 2r + 0.08 m of (and closer than now), in the next 1.2 m, stops the crew. The crew holds the part
+  (`setpart.path-occupied`) and an idle person is asked to make way (`makeWay` with a clear-of-the-lift-path test).
+  In the whole house it waits once, 17 ticks. Regression test: a sheet walked 3 m past an idle person (without the
+  rule: 31 overlap ticks).
+- **A+B end to end:** 1552 steps, **600 599 ticks ≈ 8.3 h simulated, 0 violations**, settled. Matched at 1 cm / 1°:
+  phase A 66 parts, phase B 145 parts (81 deck pieces, 25 wall panels, 6 stringers, 16 tread boards, 6 posts,
+  2 handrails, 6 rails, 3 panels; max 0.25 mm); unplaced 19 (solar 14, stair 5). Pinned `ddb634d6…` in
+  `year-build-b.test.ts` (YEAR_BUILD_FULL=1, 815 s wall), re-verified on the head with W28's prone receiver.
+- **A+B take: not recorded, over budget.** `record-campus-take.mjs --scenario year-build-2022-ab` (explicit only)
+  reproduces the pin (take `53a180fd…`). The payload is **12 029 291 B, 5 737 835 B over 6 MB**: take 10.47 MB (tracks
+  4.74, changes 3.66, events 1.75) + camera 1.03 MB at 0.1 Hz; gzip 2.02 MB. Its phase-A shot list reads poorly over
+  8 h (min 0.15, 44.7 % readable). **Lead decides:** thin, split per section, or a larger budget. No manifest entry.
+- **v3 `beam.no-room`, diagnosis:** the rule is framemove.ts `deckAt`: a beam_walk step-off target on a deck needs
+  grid clearance ≥ 0.28 m (the body radius). That value is a cell-centre clearance on the global 0.1 m lattice, so
+  the same site-local spot reads differently depending on where the site sits on the lattice. The s2 target (−0.2,
+  2.8) is truly 0.35 m from s2's north edge; at staging-east (28, −9) it reads 0.25 m. s2's laid pose and the beam
+  station do not vary; the quantisation of the target does. The step-off spot on the beam was already searched. At
+  HEAD a second origin bug showed up: `carry_spare` failed at 7 of my 17 open-ground origins. The spare tread's end
+  load disc (r 0.163 m) lay 0.171 m from the s1/s2 corner.
+- **v3 fix:** `beam_walk` lands on the nearest spot with room within 0.15 m (`stepOffSpot`: rings of 0.05 m in 16 fixed
+  directions; still refused when truly at an edge). `deckAt` is unchanged (handup.ts uses it). The spare tread now lies
+  at (0, 1.0). v3 completes with 0 violations at **17 of 17** origins (it was 10 of 17) and at staging-east. At the
+  origin the discrete outcome is identical. Re-pinned **`a2f782ad` @16401 → `39a0fb3f` @16374**
+  (PLANNING_BUDGET.md). New tests: v3 at (28, −9, −0.16) and (0.07, 0.03); a step-off unit test.
+- **v3 take:** `64c3331c…` at staging-east, 17 034 ticks, final `0fe37f01…`, camera `cam-c30b084c` (8 shots, min
+  readability 0.60), **2 086 540 B** (gzip 238 KB), manifest `takes[1]`, label "Flagship v3: hand-up + forklift deck,
+  at staging-east"; `--check` OK.
+- **Weak spots:** idle crew are still parked without regard to the next section's work; they get moved by make-way
+  (one wait here). The set-part bystander test looks 1.2 m ahead along the lift crew's feet, not the part's sweep
+  through a person's body band (the carried part at hand height). The whole-house A+B `kitOffsets` reports stair
+  2.017 m max centre offset (W13's metric, not examined). The studio e2e (`studio-build.spec.ts`) replays every
+  year-build manifest entry, so an A+B take, once in, will be a long e2e. e2e and gate not run.
