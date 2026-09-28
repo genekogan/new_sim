@@ -489,3 +489,30 @@ and north axis unverified; `npm run lint` broken locally (missing oxlint-tsgolin
 **Releases today:** 4 gated production deploys before this checkpoint (see RELEASE_CHECKLIST.md records); the fifth
 (this checkpoint) is recorded in the Deployment status section above if it completed.
 
+
+## Overnight addendum (lead: Fable 5.1 as PM, 2026-09-28 00:18 → in progress)
+
+Gene is asleep; no production deploys tonight (his instruction). Live log: `PROGRESS.md` (every worker's cost, acceptance
+verdict and follow-ups). Spec additions: `OWNER_FEEDBACK_2026-09-28.md` §12 (chairs/tables/eating); lead decision "One body
+model" in `OWNER_DECISIONS.md`.
+
+**Landed (all with tests; every pin re-pinned once more after W4, see PLANNING_BUDGET.md):** W1 global grid lattice (full campus
+== crop, `campus-full` todo → assertion); W3 animated fire (`app/engine-view/fire.ts`, `e2e/fire.spec.ts`); W5 items + eating
+(`engine/items/`, `catalog-items.ts`, ITEMS.md); W2 climb links / beam walkways / `hand_up` / forklift variant / `aloft.ts`
+(HANDUP.md, `build-bay-v3`); W4 splined turns + immediate block reaction + walk-stall metric = 0 (`locomotion/spline.ts`,
+`take/metrics.ts`, `human.speed`, MOVEMENT.md); W6 renderer foot IK on stairs, posture solver, arm IK to `human.hands`, items,
+legs-crossed sit, lab presets `meal` + `hand-up` (POSES.md).
+
+**In flight at the last checkpoint:** W7 §7 phase A (assembly graph, BOM + piles, `cut`, skeleton sequence, `year-build.test.ts`,
+YEAR_BUILD.md); W8 solar (§9) + paint (§8) + hand-up reach tightening; W9 rig arms → body model, kneel, replay consumption,
+lab-social t60 investigation.
+
+**Queued next (in order):** W10 engine body model (`engine/body/model.ts`, hand-up/items/paint constants from it, take recorder
+FIELDS += `hands`/`baseActivity`/`on`, crouch hand points move over the phase, v3 re-verify + re-pin with reason) — after W8;
+take regeneration (`deploy/record-campus-take.mjs`) + full `npm run gate` + `npm run evidence` consolidation — after W9/W10;
+§7 phase B (floors/ceilings/walls/doors/windows/solar in the year sequence, per-year takes, studio "Watch it being built");
+§11 camera-direction tranche last. Open engine items: stress-30 per-tick cost +40 % after W4; walker-vs-walker rules on the
+current direction; receiver reach/lean; long-load balance; lab-social t60.
+
+**If resuming after a cut-off:** `git status` — any unstaged files belong to a worker that did not finish; check `git log` for
+its partial commits, read its area doc, and re-brief from PROGRESS.md's last entry. Pinned hashes in the tests are the truth.
