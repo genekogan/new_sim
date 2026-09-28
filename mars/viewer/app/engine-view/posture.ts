@@ -39,6 +39,18 @@ export type Dims = {
   shHalf: number;
   /** Shoulder → elbow → palm length. */
   armLen: number;
+  /** The pivot (Hips bone) relative to the hip-joint midpoint, standing (prone.ts pitches the pelvis about the hip joints). */
+  pivotF: number;
+  pivotUp: number;
+  /**
+   * From the skinned mesh in the Idle pose (humans.ts measure): how far the front of the body (torso, thighs, shins)
+   * is ahead of the hip joints — the hip height of this body lying on its stomach (prone.ts) — and how far the front
+   * of the chest is ahead of the shoulder joints (lying flat, the shoulder joints are this high above the deck).
+   */
+  lieHip: number;
+  chestDepth: number;
+  /** Surface of the left foot relative to its ankle (f, up; standing, a sample of skinned vertices): how low it reaches when pitched. */
+  foot: [number, number][];
 };
 
 export type Style = 'knees' | 'hips' | 'up' | 'walk';

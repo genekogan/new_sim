@@ -176,6 +176,8 @@ export function installHook(view: LabView, notify: () => void) {
     perf: () => sim.stats(),
     /** Pose readout per person for the current tick (feet / soles, stair gait, posture, arms vs targets): docs/engineering/POSES.md. */
     bones: (id?: string) => view.poseNow().bones(id),
+    /** Rendered body surface of one person (skinned vertices, every `stride`-th, with body part): body-vs-deck checks. */
+    meshPoints: (id: string, stride = 3) => (view.poseNow(), view.humans.meshPoints(id, stride)),
     /** Held items (support in-hand): holder, hand, rendered item origin and the holder's rendered palm (after `bones()`). */
     heldItems: () =>
       Object.values(sim.rt.world.entities)

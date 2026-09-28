@@ -17,6 +17,7 @@ import { buildBay } from './build-bay.ts';
 import { campfireEvening } from './campfire-evening.ts';
 import { handUp } from './hand-up.ts';
 import { meal } from './meal.ts';
+import { prone, proneForks } from './prone.ts';
 import { yearWalkabouts } from './year-walkabout.ts';
 import { yearBuild, yearBuildHouse } from './year-build.ts';
 import { solarPaint } from './solar-paint.ts';
@@ -230,6 +231,8 @@ SCENARIOS.push(
   stress(30),
   buildBay,
   handUp,
+  prone,
+  proneForks,
   campfireEvening,
   meal,
   body,

@@ -1,14 +1,16 @@
-# Renderer poses: stairs, handling, eating, the rack structure (owner feedback §3 renderer half, §4, §5, §6, §7, §12)
+# Renderer poses: stairs, handling, eating, the rack structure, the prone receiver (owner feedback §3 renderer half, §4, §5, §6, §7, §12, §13)
 
 Code: `viewer/app/engine-view/` — `humans.ts` (per-person tick snapshots, layer order, arms), `rig.ts`
 (bone chains, two-bone IK, palm), `stair-gait.ts` (pure: tread-by-tread foot placement), `frame-gait.ts`
 (pure: climbing a frame, standing on its bracing, balance on a beam), `posture.ts`
-(pure: crouch / hip-bend / heel-raise / kneel solver), `items.ts` + `components.ts` (item meshes, in-hand
+(pure: crouch / hip-bend / heel-raise / kneel solver), `prone.ts` (pure: lying on the stomach at a deck edge and
+getting up), `items.ts` + `components.ts` (item meshes, in-hand
 attachment, food level), `fixtures.ts` (one line: the 6 ft table mesh), `take-replay.ts` (`TakePeople`:
-the take-replay half, shared by the studio and the lab check). Lab presets `meal`, `hand-up`, `body`,
-`year-build-2022` (`app/lab/meal.ts`, `hand-up.ts`, `body.ts`, `year-build.ts`); hook `__marsEngine.bones(id?)`, `stairs()`, `heldItems()`,
+the take-replay half, shared by the studio and the lab check). Lab presets `meal`, `hand-up`, `body`, `prone`,
+`prone-forks`, `year-build-2022` (`app/lab/meal.ts`, `hand-up.ts`, `body.ts`, `prone.ts`, `year-build.ts`); hook
+`__marsEngine.bones(id?)`, `meshPoints(id)`, `stairs()`, `heldItems()`,
 `probe()`, `bodyModel()`, `recordTake()` / `humanFields()` / `replayTake()`.
-Specs: `e2e/stairs.spec.ts`, `e2e/poses.spec.ts`, `e2e/meal.spec.ts` (+ `e2e/take-fixture.ts`), `e2e/year-build.spec.ts`.
+Specs: `e2e/stairs.spec.ts`, `e2e/poses.spec.ts`, `e2e/prone.spec.ts`, `e2e/meal.spec.ts` (+ `e2e/take-fixture.ts`), `e2e/year-build.spec.ts`.
 
 Renderers only read the world. Everything below is a deterministic function of the engine's tick
 history and the entity id (template, legs-crossed variant, warm-hands spread, which knee kneels);
@@ -191,7 +193,43 @@ stance soles on their node 44 516 / 44 516 (≤ 3 cm), planted climbing feet on 
 holds reached 99.95 % (47 257 / 47 280; the rest ≤ 1.07 arm lengths during the climb's top blend), v3 W2 climb
 85 / 85 planted feet on rungs and 140 / 140 holds, beam-walk arms on their balance points; no arm longer than its bones.
 
-## Items and eating (§12)
+## Prone receiver (§13; engine HANDUP.md "Prone receiver", BODY_MODEL.md "Prone receiver + rise"; W29)
+`prone.ts` (pure numbers) + `humans.ts` (`proneGoal` per tick, `proneBody` per frame, `flatHand`). The engine publishes
+`human.activity` (`lie-down`, `prone-wait`, `prone-reach`, `push-up`, `kneel-up`, then `stand_with_load` …), `human.hands`
+every tick and S = `pose.p` 0.35 m behind the deck lip facing out (`pose.yaw`); the rest is the renderer's.
+- **One rise coordinate r**: 0 lying on the stomach, 1 on both knees bent forward, 2 kneeling up, 3 standing (the clip's
+  legs). `lie-down` runs 3 → 0 over the engine's 0.8 s (kneel, then down onto the hands and the chest), `prone-wait` /
+  `prone-reach` 0, `push-up` 0 → 1 (clock T.pushUp 0.8 s), `kneel-up` 1 → 2 (T.kneelUp 0.6 s). Getting up, r follows the
+  clock but may **wait for the load it holds** (never goes back down, ≤ 1 per 0.35 s): the body rises with the sheet.
+  `stand_with_load` hands over to the posture solver (one-knee kneel / squat for hands at the deck) through a 0.4 s
+  **bone blend** (every touched bone's local transform lerped from the last prone pose, the arms solved after it); the
+  posture waits kneeling meanwhile, so it blends out of a kneel. Take replay (`setFrame`, no clock) shows each phase's end pose.
+- **Placement from the measured rig** (`measure()`, skinned vertices in the Idle pose): lying, the hip joints are
+  `lieHip` above the deck = the front of the torso ahead of the hip joints or a leg's radius about its bones, whichever
+  is more (0.13 m; the Idle clip's forward knee and the shoe tops are not "front"), so the chest rests on the deck —
+  the shoulder joints end `chestDepth` (0.097 punk – 0.102 woman) above it; the engine's `chest` is 0.08. The pelvis
+  pitches 90°, the legs lie straight back by leg IK, knees on the deck, feet pointed (the instep on it).
+- **Over the edge**: the chest tips down over the lip up to the engine's 60° (`tipMax`), all of it at the Torso joint
+  (the lower ribs), which lies 0.08 m past the lip — past the lip by ≥ its height × (sin 60° − tan 30° cos 60°), so the
+  tipping chest never cuts the deck corner — plus half a chest × tan(turn) when turned. The engine's hip placement
+  (torso / 3 behind the lip) comes out the same: hips 0.11 (punk) – 0.12 m (woman) behind it.
+- **Turn** (renderer's reading, like the stance turn): the whole body may turn about S toward the hands, ≤ 45°, only
+  where the lying body (hips → toes) or the kneeling one (knees, feet) still lies on an installed sheet at that level
+  (read from the world). At the 2.9 m fixture that allows ±20°.
+- **Per tick solve** (`solveProne`, grid): r in [previous, clock], torso pitch (lying: flat … 60° tip, arched back ≤ 25°
+  pushing up; kneeling: to 150°, the engine's bentOver bottom), turn; minimising, in order: hands beyond 0.92 of the arm
+  from their shoulder, beyond that + the girdle, any spine / head point closer than a chest depth to the deck slab or
+  the edge beam under the lip (face 2.5 cm out, 0.21 m down), then r behind the clock, pitch off its natural value, turn.
+  Changing pitch / turn from the last tick costs too (no turning back and forth); pitch ≤ 1.6 rad, turn ≤ 0.5 rad per 0.4 s.
+- **Arms**: IK to the engine's hand points, reach-honest as everywhere, plus the **shoulder girdle** reaching toward a
+  hand by up to 0.1 m (2 × shrug: the engine derives `reachDown` 0.94 with exactly this) only as far as the arm falls
+  short; elbows up beside the chest for a hand on the deck, forward and out (off the edge) reaching over it.
+  **Flat hand**: a hand on the deck behind the lip lies flat — the wrist turned palm down, fingers forward and a little
+  out (from the rig's own palm point and finger-curl axis), the IK re-solved after the turn, open (no grip curl), the palm
+  centre 2 cm up — blending in over the last 0.25 m down and out just past the lip.
+- **Feet / hands on the deck, measured**: each frame the foot (and a flat hand) as skinned is lifted by whatever of it
+  dips below the deck (vertex indices per template, `surfaceRefs`); also after the exit blend (slerping a pointed foot
+  into a planted one swings the toes down).
 Item meshes (`items.ts`): bowl / cup / plate / pot as lathe-turned open vessels (pot with side
 handles), spoon = handle + small bowl at local +x; a food disc whose height and radius follow
 `contents.fraction` (hidden at 0; stew brown). `table-6ft`: top slab + four legs + stretchers.
@@ -229,10 +267,11 @@ The studio host (`app/studio/take-host.ts`) passes no base scene (the flagship t
 construction stairs, found by the contributor); campus stairs in a take would need the campus scene.
 
 ## Approximate / not done
-- Wrists keep the clip rotation; the closed hand is one curl for every grip (no per-item hand shape).
-- Postures are knee squat + hip bend + heel raise + one-knee kneel: no two-knee kneel, no prone reach,
-  no side lean, no stepping, no torso twist; a 150° kneeling bend over an edge is steep (the head hangs
-  below the deck) — it is what reaching below a deck takes with this body.
+- Wrists keep the clip rotation (except a prone receiver's hand flat on the deck); the closed hand is one curl for
+  every grip (no per-item hand shape).
+- Postures are knee squat + hip bend + heel raise + one-knee kneel (the two-knee kneel and lying prone only in the
+  prone layer, "Prone receiver"): no side lean, no stepping, no torso twist; a 150° kneeling bend over an edge is steep
+  (the head hangs below the deck) — it is what reaching below a deck takes with this body.
 - Reach-down is shallower than the engine allows (Body model, "Open"); those receivers' arms hang.
 - No body-vs-object collision: a squatting foot can overlap a part lying on the ground, the crossed
   knee can touch the bowl, thighs can clip chair arms.
