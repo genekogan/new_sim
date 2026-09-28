@@ -193,17 +193,24 @@ stance soles on their node 44 516 / 44 516 (≤ 3 cm), planted climbing feet on 
 holds reached 99.95 % (47 257 / 47 280; the rest ≤ 1.07 arm lengths during the climb's top blend), v3 W2 climb
 85 / 85 planted feet on rungs and 140 / 140 holds, beam-walk arms on their balance points; no arm longer than its bones.
 
-## Prone receiver (§13; engine HANDUP.md "Prone receiver", BODY_MODEL.md "Prone receiver + rise"; W29)
+## Prone receiver (§13; engine HANDUP.md "Prone receiver", BODY_MODEL.md "Prone receiver + rise"; W29, W35)
 `prone.ts` (pure numbers) + `humans.ts` (`proneGoal` per tick, `proneBody` per frame, `flatHand`). The engine publishes
 `human.activity` (`lie-down`, `prone-wait`, `prone-reach`, `push-up`, `kneel-up`, then `stand_with_load` …), `human.hands`
-every tick and S = `pose.p` 0.35 m behind the deck lip facing out (`pose.yaw`); the rest is the renderer's.
+every tick, S = `pose.p` 0.35 m behind the deck lip facing out (`pose.yaw`), and since W32 **`human.proneYaw`** (the lying
+body's axis through the grip) and **`human.phaseK`** (0–1 within the current engine phase). The renderer reads both
+(W35); the torso pitch, the placement from the rig and the arms are the renderer's.
 - **One rise coordinate r**: 0 lying on the stomach, 1 on both knees bent forward, 2 kneeling up, 3 standing (the clip's
-  legs). `lie-down` runs 3 → 0 over the engine's 0.8 s (kneel, then down onto the hands and the chest), `prone-wait` /
-  `prone-reach` 0, `push-up` 0 → 1 (clock T.pushUp 0.8 s), `kneel-up` 1 → 2 (T.kneelUp 0.6 s). Getting up, r follows the
-  clock but may **wait for the load it holds** (never goes back down, ≤ 1 per 0.35 s): the body rises with the sheet.
+  legs). **On the engine's `phaseK`** (W35): `lie-down` r = 3 (1 − smooth(phaseK)) (kneel, then down onto the hands and
+  the chest), `prone-wait` / `prone-reach` 0, `push-up` r = smooth(phaseK), `kneel-up` 1 + smooth(phaseK) — exact, also
+  mid-phase (a longer phase, the load rising at ≤ 0.5 m/s, stretches the rise with it). **Fallback** (a take recorded
+  without phaseK — the recorder does not carry it yet): W29's clocks from the activity's age (T.lieDown 0.8 s, T.pushUp
+  0.8 s, T.kneelUp 0.6 s), getting up following the clock but **waiting for the load it holds** (never back down, ≤ 1 per
+  0.35 s).
   `stand_with_load` hands over to the posture solver (one-knee kneel / squat for hands at the deck) through a 0.4 s
   **bone blend** (every touched bone's local transform lerped from the last prone pose, the arms solved after it); the
-  posture waits kneeling meanwhile, so it blends out of a kneel. Take replay (`setFrame`, no clock) shows each phase's end pose.
+  posture waits kneeling meanwhile, so it blends out of a kneel. Take replay (`setFrame`, no clock) uses a frame's
+  `phaseK` / `proneYaw` when it has them (`SampledHuman` fields; `take-replay.ts` fills them once the recorder records
+  them), else shows each phase's end pose with the searched turn.
 - **Placement from the measured rig** (`measure()`, skinned vertices in the Idle pose): lying, the hip joints are
   `lieHip` above the deck = the front of the torso ahead of the hip joints or a leg's radius about its bones, whichever
   is more (0.13 m; the Idle clip's forward knee and the shoe tops are not "front"), so the chest rests on the deck —
@@ -213,16 +220,21 @@ every tick and S = `pose.p` 0.35 m behind the deck lip facing out (`pose.yaw`); 
   (the lower ribs), which lies 0.08 m past the lip — past the lip by ≥ its height × (sin 60° − tan 30° cos 60°), so the
   tipping chest never cuts the deck corner — plus half a chest × tan(turn) when turned. The engine's hip placement
   (torso / 3 behind the lip) comes out the same: hips 0.11 (punk) – 0.12 m (woman) behind it.
-- **Turn** (renderer's reading, like the stance turn): the whole body may turn about S toward the hands, ≤ 45°, only
-  where the lying body (hips → toes) or the kneeling one (knees, feet) still lies on an installed sheet at that level
-  (read from the world). At the 2.9 m fixture that allows ±20°.
+- **Turn** = the engine's lying heading (W35): `engineTurn` = angleDelta(pose.yaw, proneYaw) (≤ 45°), taken as is every
+  tick (the engine turns it with the lie-down's smoothstep and checked that heading's footprint, so no deck test and no
+  rate limit); the rendered yaw is then proneYaw, so a hand flat on the deck points its fingers along the heading like
+  the engine's `proneDeckHand`, and `lipAlong(turn)` puts the lip where the engine has it (`proneLipAlong`). At the 2.750 m
+  fixture p3 / p4 lie +20° / −20° by hand, ±25° off the forks. **Fallback** (no proneYaw): W29's search — ≤ 45°, only
+  where the lying body (hips → toes) or the kneeling one (knees, feet) still lies on an installed sheet at that level.
 - **Per tick solve** (`solveProne`, grid): r in [previous, clock], torso pitch (lying: flat … 60° tip, arched back ≤ 25°
-  pushing up; kneeling: to 150°, the engine's bentOver bottom), turn; minimising, in order: hands beyond 0.92 of the arm
+  pushing up; kneeling: to 150°, the engine's bentOver bottom), lying a **slide back** along the deck (0 … 0.16 m in 4 cm
+  steps, the body still on an installed sheet; ≤ 0.2 m per 0.4 s — W35, for deck hands behind a long torso's shoulders),
+  and the turn only in the fallback (else the engine's); minimising, in order: hands beyond 0.92 of the arm
   from their shoulder, beyond that + the girdle, any spine / head point closer than a chest depth to the deck slab or
   the edge beam under the lip (face 2.5 cm out, 0.21 m down), then r behind the clock, pitch off its natural value, turn.
   Changing pitch / turn from the last tick costs too (no turning back and forth); pitch ≤ 1.6 rad, turn ≤ 0.5 rad per 0.4 s.
 - **Arms**: IK to the engine's hand points, reach-honest as everywhere, plus the **shoulder girdle** reaching toward a
-  hand by up to 0.1 m (2 × shrug: the engine derives `reachDown` 0.94 with exactly this) only as far as the arm falls
+  hand by up to 0.1 m (2 × shrug: the engine derives `reachDown` 0.73 with exactly this, W32) only as far as the arm falls
   short; elbows up beside the chest for a hand on the deck, forward and out (off the edge) reaching over it.
   **Flat hand**: a hand on the deck behind the lip lies flat — the wrist turned palm down, fingers forward and a little
   out (from the rig's own palm point and finger-curl axis), the IK re-solved after the turn, open (no grip curl), the palm
@@ -231,29 +243,34 @@ every tick and S = `pose.p` 0.35 m behind the deck lip facing out (`pose.yaw`); 
   dips below the deck (vertex indices per template, `surfaceRefs`); also after the exit blend (slerping a pointed foot
   into a planted one swings the toes down).
 
-**Measured** (`e2e/prone.spec.ts`, lab `prone` = the 2.9 m engine fixture, 481 ticks, and `prone-forks`, 632; every tick,
-p3 = punk template, p4 = woman): lying, shoulders beyond the lip every tick and 0.001 m from deck + chest depth; the
-rendered surface (every 4th skinned vertex, every 2nd tick) over the deck never below its top by > 1.5 cm in any prone
-phase; no arm longer than its bones; **0 rig-reachable misses**. Engine hand points reached ≤ 0.1 m, by hand / off the
-forks: lie-down 60/60 · 60/60, prone-wait 1148/1148 · —, **prone-reach 45/80 · 60/80**, push-up 73/80 · 82/84, kneel-up
-64/64 · 48/48, stand_with_load 30/32 · 25/32, lay and set_down all. Per person at the reach: p3 27/40 · 40/40, p4 18/40 ·
-20/40; the missed points are 1.06–1.37 arm lengths from the shoulder and those arms hang. Why: this rig lying tipped 60°
-at the lip reaches **0.80 m (punk) / 0.73 m (woman)** straight down below the deck with the girdle (shoulders −0.10 /
-−0.03 m: chest 0.097 / 0.102 m, Torso joint → shoulders 0.27 / 0.19 m), the engine's `reachDown` 0.94 assumes 0.08 and
-0.30 m (shoulders −0.32); the take is 0.83 m below the deck by hand, 0.75 m off the forks; and the grips are 0.31–0.47 m
-to the side of S (a turn beyond ±20° would take the hips off the deck). The rise trace: pitch 150° (the 60° tip) at the
-take, hips on the knees (0.46 m) by the end of the push-up, torso 150° → 88° through the kneel-up, turn 20° → 0°.
-Logged, not asserted: the tipped chest / head / arms of p3 and p4 pass through the joist tails beyond the lip (j2 under
-p3, j7 under p4: engine station geometry); by hand the sheet's inner edge comes up 1 mm outside the joist ends (6 cm
-off the forks), never inside the deck; after the prone phases (lay / set_down, the kneeling receivers' grip) fingers
-wrapping the sheet's edge dip 4–7 cm below the top of d0 beside it.
-Captures (look at them): `prone-lie-down` (both kneeling up on the deck, hands coming down), `prone-reach` (baseline: two
-people on their stomachs tipped over the edge, the givers holding the sheet overhead below), `prone-take` (from the
-east: p3 draped over the edge, turned 20°, both fists on the sheet's edge), `prone-push-up` (baseline) / `prone-push-up-e`
-(on the knees, bent over the edge head down — the engine's kneel-up start, bentOver 150° — one hand flat on the deck at
-the lip, the other on the sheet coming up; p4 still lower, waiting for its load), `prone-kneel-up` (kneeling, bent
-forward, hands on the sheet at deck level beside the joist ends), `prone-standing` (baseline; the first `lay` tick: the
-posture layer's one-knee kneel bent over the sheet — hands at the deck 0.65 m ahead cannot be held standing up).
+**Measured** (W35; `e2e/prone.spec.ts`, lab `prone` = W32's engine fixture — 2.750 m deck, 4 ft deck joists ending at
+the lip, hand-off ≈ 0.67 m below — 477 ticks, and `prone-forks` — 2.902 m deck, the sheet 0.70 m below on the forks —
+632; every tick, p3 = punk template, p4 = woman): the body turn equals the engine's angleDelta(pose.yaw, proneYaw) on
+every prone tick (708 / 130 ticks, worst |Δ| 0.0000 rad: p3 / p4 +20° / −20° by hand, ±25° off the forks); the rise is
+never ahead of smooth(phaseK) and trails it while the body waits for the load (51 / 64 and 44 / 60 push-up / kneel-up
+ticks behind by > 0.01, worst 0.78 / 0.86 — p4 waiting for its load; p3 on its knees by the kneel-up and up, r 1.99, by
+its end); lying, shoulders beyond the lip every tick and 0.001 m from deck + chest depth; the rendered surface over the
+deck never below its top by > 1.5 cm in any prone phase; no arm longer than its bones; **0 rig-reachable misses**;
+deterministic (two runs, receivers' bones equal every tick). Engine hand points reached ≤ 0.1 m, by hand / off the
+forks (W29 at 2.9 m in brackets): lie-down 60/60 · 56/60, prone-wait 1148/1148 · —, **prone-reach 80/80 · 80/80**
+(45/80 · 60/80), push-up 64/64 · 72/72, kneel-up 64/64 · 48/48, stand_with_load 28/32 · 25/32, lay and set_down all.
+Misses: p4's stand_with_load (1.06–1.15 arm lengths, the posture layer taking over) and, off the forks, p3's last two
+lie-down ticks (1.2: the hands on their way to the lip while the body still settles). Two renderer fixes it took:
+(1) the engine's deck-hand points (0.20 m ahead of S along the heading) are set for the woman's torso; turned 20° the
+punk's shoulders lie ≈ 8 cm further out and its deck hands hung (1.18 arm lengths, prone-wait 574/1148) — lying flat
+the body now **slides back** along the deck by what the hands need (≤ 0.16 m, on the deck; 0.04–0.05 m used) and comes
+forward as the chest tips; (2) forcing r = smooth(phaseK) exactly left p4's held hand out of reach mid push-up (23/32)
+with that arm 0.14 m through the deck edge, so r keeps W29's wait for the load (never ahead of the engine).
+Logged, not asserted: arm / hand vertices ≤ 1.9 cm inside the middle joists' ends (p3 j3, p4 j6: the grips are the
+sheet's corners beside them, as W32 notes) and fingers wrapping the sheet as it rests on them; no chest or head inside
+any member (W29: p3 / p4 chests through the all-6-ft tails j2 / j7); by hand the sheet's inner edge comes up 1 mm outside
+the joist ends (6 cm off the forks); after the prone phases fingers wrapping the sheet's edge dip ≤ 4–7 cm below d0's top.
+Captures (looked at): `prone-lie-down`, `prone-reach` (baseline, tick 340: both on their stomachs on d0 / d2, chests
+tipped over the lip, arms straight down; the givers hold the sheet overhead), `prone-take` / `prone-take-ne` (from the
+east, tick 350: p3 draped over the edge, both fists on the sheet's inner south corner; p4 likewise on its north corner —
+both receivers' hands on the sheet), `prone-push-up` (baseline, tick 363 mid push-up: hips coming up, one hand flat on
+the deck, the other on the rising sheet) / `prone-push-up-e`, `prone-kneel-up`, `prone-standing` (baseline; the first
+`lay` tick: both kneeling on the deck — the posture layer's kneel — bent over the sheet at deck level, hands on its edge).
 Item meshes (`items.ts`): bowl / cup / plate / pot as lathe-turned open vessels (pot with side
 handles), spoon = handle + small bowl at local +x; a food disc whose height and radius follow
 `contents.fraction` (hidden at 0; stew brown). `table-6ft`: top slab + four legs + stretchers.
@@ -291,11 +308,11 @@ The studio host (`app/studio/take-host.ts`) passes no base scene (the flagship t
 construction stairs, found by the contributor); campus stairs in a take would need the campus scene.
 
 ## Approximate / not done
-- Prone receiver (above): the rig reaches 0.80 / 0.73 m below the deck lying, not the engine's 0.94, and only ±0.15 m
-  to its side (the engine's envelope is a cylinder about S) — those hands hang; the body turn is the renderer's; the
-  tipped chest can pass through joist tails beyond the lip (the engine checks the body on the deck, not beyond it); the
-  push-up reads as kneeling bent over the edge (the engine's own end-of-push-up pose); phase progress is counted from
-  the engine's minimum phase times (a longer phase ends with the body waiting), take replay shows each phase's end pose.
+- Prone receiver (above): the engine's reach is the rig's since W32 (0.73 m, the woman template; W29 measured this rig
+  reaching 0.80 / 0.73 m against the old 0.94); the push-up reads as kneeling bent over the edge (the engine's own
+  end-of-push-up pose); the torso pitch is still the renderer's grid search (the engine publishes the heading and the
+  phase progress, not the tip); take replay falls back to the searched turn and each phase's end pose until the recorder
+  carries proneYaw / phaseK.
 - Wrists keep the clip rotation (except a prone receiver's hand flat on the deck); the closed hand is one curl for
   every grip (no per-item hand shape).
 - Postures are knee squat + hip bend + heel raise + one-knee kneel (the two-knee kneel and lying prone only in the

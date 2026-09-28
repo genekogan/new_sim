@@ -11,13 +11,17 @@
 //   r = 2  kneeling up (the torso as upright as the hands allow);
 //   r = 3  standing (the clip's legs).
 // lie-down runs 3 → 0, push-up 0 → 1, kneel-up 1 → 2; stand_with_load hands over to the posture solver (humans.ts
-// blends the bones over 0.4 s). Per tick a small grid search picks the torso pitch (flat … a 60° tip over the edge
-// lying, anything to 150° kneeling) and a turn of the whole body about S (≤ 35°: the renderer's reading, as the stance
-// turn toward a load in frame-gait.ts) that bring the shoulders within reach of the engine's hand points, keeping every
-// spine point over the deck at least the body's front depth above it.
+// blends the bones over 0.4 s). The engine publishes where along that the body is (`human.phaseK`, 0–1 within the phase:
+// push-up r = smooth(phaseK), kneel-up 1 + smooth(phaseK); W32) and the lying heading (`human.proneYaw`: the body turn
+// about S is angleDelta(pose.yaw, proneYaw), ≤ 45°). Per tick a small grid search picks the torso pitch (flat … a 60°
+// tip over the edge lying, anything to 150° kneeling) that brings the shoulders within reach of the engine's hand
+// points, keeping every spine point over the deck at least the body's front depth above it. A take without those two
+// fields (the recorder does not carry them yet) falls back to W29's reading: the phase clocks (activity age) and a
+// search over the turn too (≤ 45°, only where the turned body still lies on an installed sheet).
 import { BEND_SHARE, KNEE_Y, type Dims, type Target } from './posture.ts';
 import { PRONE_ACTIVITY, PRONE_BACK, T as PHASE_T } from '../../engine/construction/handup.ts';
 import { DT } from '../../engine/runtime/runtime.ts';
+import { angleDelta } from '../../engine/core/math.ts';
 
 const DEG = Math.PI / 180;
 /** Activities with the prone layer (engine PRONE_ACTIVITY). */
@@ -41,25 +45,44 @@ const TIP_PAST_LIP = 0.08;
 
 /**
  * Pose of the prone layer: rise coordinate, torso pitch from vertical (rad), body turn about S relative to the engine's
- * yaw (rad), the rendered yaw (engine yaw + turn; kept while the layer fades out, so the body does not swing), weight.
+ * yaw (rad), the rendered yaw (engine yaw + turn; kept while the layer fades out, so the body does not swing), weight,
+ * and how far the lying body lies back along the deck from its tipping place (m, `SLIDE_MAX`).
  */
-export type ProneState = { r: number; bend: number; turn: number; yaw: number; w: number };
+export type ProneState = { r: number; bend: number; turn: number; yaw: number; w: number; slide: number };
+/**
+ * Lying flat the body may lie up to this much further back along the deck than its tipping place (the tip joint
+ * TIP_PAST_LIP beyond the lip), where hands on the deck need it: the engine's deck-hand points (0.20 m ahead of S) are
+ * set for its woman template (tip joint → shoulders 0.19 m); the punk's 0.27 m puts them 1.18 arm lengths behind its
+ * shoulders. The deck-gap cost keeps a tipping chest off the deck corner, so the body comes forward as it tips.
+ */
+export const SLIDE_MAX = 0.16;
+const SLIDE_STEP = 0.04;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const smooth = (k: number) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 /**
- * Rise coordinate for a prone activity, `age` ticks after it began (the engine's phase clocks: T.lieDown 0.8 s,
- * push-up ≥ T.pushUp 0.8 s, kneel-up ≥ T.kneelUp 0.6 s; a phase lasting longer — the load rising at ≤ 0.5 m/s — ends
- * with the body waiting at the knot while the hands keep rising).
+ * Rise coordinate for a prone activity: from the engine's `phaseK` (0–1 within the current phase, W32) when it is
+ * published — exact, also mid-phase in a replay; else `age` ticks after the activity began on the engine's minimum
+ * phase times (T.lieDown 0.8 s, push-up ≥ T.pushUp 0.8 s, kneel-up ≥ T.kneelUp 0.6 s; a phase lasting longer — the
+ * load rising at ≤ 0.5 m/s — then ends with the body waiting at the knot while the hands keep rising).
  */
-export function riseOf(activity: string, age: number): number {
-  const k = (t: number) => smooth(Math.min(1, ((age + 1) * DT) / t));
+export function riseOf(activity: string, age: number, phaseK?: number): number {
+  const k = (t: number) => smooth(phaseK !== undefined ? phaseK : Math.min(1, ((age + 1) * DT) / t));
   if (activity === PRONE_ACTIVITY.lieDown) return 3 * (1 - k(PHASE_T.lieDown));
   if (activity === PRONE_ACTIVITY.pushUp) return k(PHASE_T.pushUp);
   if (activity === PRONE_ACTIVITY.kneelUp) return 1 + k(PHASE_T.kneelUp);
   return 0; // prone-wait, prone-reach
+}
+
+/**
+ * The engine's body turn about S (rad; + = toward the engine's +yaw): angleDelta(pose.yaw, proneYaw) — `pose.yaw` keeps
+ * facing straight out over the edge, `proneYaw` is the lying body's axis through the grip (W32). Undefined when the
+ * engine does not publish it (a take recorded without it): the renderer then searches the turn itself.
+ */
+export function engineTurn(poseYaw: number, proneYaw: number | undefined): number | undefined {
+  return proneYaw === undefined ? undefined : clamp(angleDelta(poseYaw, proneYaw), -TURN_MAX, TURN_MAX);
 }
 
 /**
@@ -89,15 +112,15 @@ export type ProneFrame = {
   spine: { f: number; up: number }[];
 };
 
-/** Body frame for rise `r` and torso pitch `bend` (the lip `lip` m ahead along the body). */
-export function proneFrame(d: Dims, r: number, bend: number, lip: number): ProneFrame {
+/** Body frame for rise `r` and torso pitch `bend` (the lip `lip` m ahead along the body; lying `slide` m further back). */
+export function proneFrame(d: Dims, r: number, bend: number, lip: number, slide = 0): ProneFrame {
   const kneelHip = KNEE_Y + d.thigh;
   let hip: { f: number; up: number }, pitch = 0, share = BEND_SHARE;
   if (r >= 2) hip = { f: 0, up: lerp(kneelHip, d.hipH, smooth(r - 2)) };
   else if (r >= 1) hip = { f: 0, up: kneelHip };
   else {
     const k = smooth(r);
-    hip = { f: lerp(lieHipF(d, lip), 0, k), up: lerp(d.lieHip, kneelHip, k) };
+    hip = { f: lerp(lieHipF(d, lip) - slide, 0, k), up: lerp(d.lieHip, kneelHip, k) };
     pitch = (1 - k) * FLAT;
     share = LIE_SHARE.map((s, i) => lerp(s, BEND_SHARE[i], k));
   }
@@ -144,24 +167,29 @@ export function edgeGap(f: number, up: number, lip: number) {
  * (the engine's clock is rHi: getting up, the body may wait for the load it holds, never go back down); within reach
  * first (the girdle's 0.1 m last), then every spine / head point a chest depth off the deck slab and the edge beam
  * (not through the deck), then r close to the clock, the torso near its natural pitch for r, the body straight, and
- * both near where they were (`prev`: no turning back and forth).
+ * both near where they were (`prev`: no turning back and forth). `turn` given (the engine's lying heading,
+ * `engineTurn`): the body lies exactly so — the engine checked that heading's footprint — and only r / pitch / slide
+ * are searched. Lying (r < 1) the body may slide back along the deck (≤ SLIDE_MAX, still on it), a little cost per cm.
  */
-export function solveProne(d: Dims, ts: Target[], rLo: number, rHi: number, onDeck?: (f: number, lat: number) => boolean, prev?: { bend: number; turn: number }): { r: number; bend: number; turn: number } {
-  const NR = rHi - rLo > 1e-6 ? 8 : 0, NT = Math.round((2 * TURN_MAX) / (5 * DEG));
-  let best = { r: rHi, bend: bendRange(rHi)[2], turn: 0 }, bc = Infinity;
+export function solveProne(d: Dims, ts: Target[], rLo: number, rHi: number, onDeck?: (f: number, lat: number) => boolean, prev?: { bend: number; turn: number; slide: number }, turn?: number): { r: number; bend: number; turn: number; slide: number } {
+  const NR = rHi - rLo > 1e-6 ? 8 : 0, NT = turn === undefined ? Math.round((2 * TURN_MAX) / (5 * DEG)) : 0;
+  let best = { r: rHi, bend: bendRange(rHi)[2], turn: turn ?? 0, slide: 0 }, bc = Infinity;
   for (let m = 0; m <= NR; m++) {
     const r = NR ? rLo + ((rHi - rLo) * m) / NR : rHi;
     const [lo, hi, nom] = bendRange(r);
     const NB = Math.max(1, Math.round((hi - lo) / (2.5 * DEG)));
     for (let i = 0; i <= NT; i++) {
-      const turn = -TURN_MAX + (2 * TURN_MAX * i) / NT, c = Math.cos(turn), s = Math.sin(turn);
-      const lip = lipAlong(d, turn);
-      // turned, the body (hips → toes lying, knees and feet kneeling) must still lie on the deck
-      if (turn && onDeck && !bodyOnDeck(d, r, lip, c, s, onDeck)) continue;
+      const tn = turn ?? -TURN_MAX + (2 * TURN_MAX * i) / NT, c = Math.cos(tn), s = Math.sin(tn);
+      const lip = lipAlong(d, tn);
+      // searched: turned, the body (hips → toes lying, knees and feet kneeling) must still lie on the deck
+      if (turn === undefined && tn && onDeck && !bodyOnDeck(d, r, lip, c, s, onDeck)) continue;
       const local = ts.map((t) => ({ f: t.f * c + t.lat * s, lat: -t.f * s + t.lat * c, up: t.up }));
+      for (let sl = 0; sl <= (r < 1 ? SLIDE_MAX + 1e-9 : 0); sl += SLIDE_STEP) {
+      // slid back, the lying body must still lie on the deck
+      if (sl && onDeck && !bodyOnDeck(d, r, lip, c, s, onDeck, sl)) break;
       for (let j = 0; j <= NB; j++) {
         const bend = lo + ((hi - lo) * j) / NB;
-        const fr = proneFrame(d, r, bend, lip);
+        const fr = proneFrame(d, r, bend, lip, sl);
         const sh = fr.spine[3];
         let err = 0, girdle = 0, close = 0, deck = 0;
         for (const t of local) {
@@ -176,8 +204,9 @@ export function solveProne(d: Dims, ts: Target[], rLo: number, rHi: number, onDe
           const a = fr.spine[k - 1], b = fr.spine[k];
           for (let u = 0.25; u <= 1; u += 0.25) deck += Math.max(0, d.chestDepth - 0.005 - edgeGap(lerp(a.f, b.f, u), lerp(a.up, b.up, u), lip));
         }
-        const cost = 40 * err + 400 * girdle + 30 * close + 300 * deck + 4 * (rHi - r) + Math.abs(bend - nom) + 0.3 * Math.abs(turn) + (prev ? 2 * Math.abs(turn - prev.turn) + 0.5 * Math.abs(bend - prev.bend) : 0);
-        if (cost < bc - 1e-9) [best, bc] = [{ r, bend, turn }, cost];
+        const cost = 40 * err + 400 * girdle + 30 * close + 300 * deck + 4 * (rHi - r) + Math.abs(bend - nom) + 0.3 * Math.abs(tn) + 0.5 * sl + (prev ? 2 * Math.abs(tn - prev.turn) + 0.5 * Math.abs(bend - prev.bend) + 2 * Math.abs(sl - prev.slide) : 0);
+        if (cost < bc - 1e-9) [best, bc] = [{ r, bend, turn: tn, slide: sl }, cost];
+      }
       }
     }
   }
@@ -185,18 +214,19 @@ export function solveProne(d: Dims, ts: Target[], rLo: number, rHi: number, onDe
 }
 
 /** The body's points on the deck (hips, knees, toes lying; knees, feet kneeling; ±0.12 m across) all over a deck. */
-function bodyOnDeck(d: Dims, r: number, lip: number, c: number, s: number, onDeck: (f: number, lat: number) => boolean) {
-  const hf = proneFrame(d, Math.min(r, 1), FLAT, lip).hip.f;
+function bodyOnDeck(d: Dims, r: number, lip: number, c: number, s: number, onDeck: (f: number, lat: number) => boolean, slide = 0) {
+  const hf = proneFrame(d, Math.min(r, 1), FLAT, lip, slide).hip.f;
   const along = r < 1 ? [hf, hf - d.thigh, hf - d.legLen - 0.1] : [0, -0.45];
   for (const f of along) for (const lat of [-0.12, 0.12]) if (!onDeck(f * c - lat * s, f * s + lat * c)) return false;
   return true;
 }
 
-/** Move `cur` toward `goal` at ≤ 1.6 rad (pitch) / 0.5 rad (turn) per 0.4 s; r is rate-limited by the solve's range. */
-export function approachProne(cur: ProneState | null, goal: ProneState, k: number): ProneState {
+/** Move `cur` toward `goal` at ≤ 1.6 rad (pitch) / 0.5 rad (turn) / 0.2 m (slide) per 0.4 s; r is rate-limited by the
+ *  solve's range. `exactTurn`: the goal's turn is the engine's (already continuous: the lie-down's smoothstep) — as is. */
+export function approachProne(cur: ProneState | null, goal: ProneState, k: number, exactTurn = false): ProneState {
   if (!cur) return goal;
   const step = (a: number, b: number, max: number) => a + clamp(b - a, -max, max);
-  return { ...goal, bend: step(cur.bend, goal.bend, 1.6 * k), turn: step(cur.turn, goal.turn, 0.5 * k) };
+  return { ...goal, bend: step(cur.bend, goal.bend, 1.6 * k), turn: exactTurn ? goal.turn : step(cur.turn, goal.turn, 0.5 * k), slide: step(cur.slide, goal.slide, 0.2 * k) };
 }
 
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
@@ -204,5 +234,5 @@ const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 
 export const lerpProne = (a: ProneState | null, b: ProneState | null, t: number): ProneState | null => {
   if (!a && !b) return null;
   const p = a ?? { ...b!, w: 0 }, q = b ?? { ...a!, w: 0 };
-  return { r: lerp(p.r, q.r, t), bend: lerp(p.bend, q.bend, t), turn: lerp(p.turn, q.turn, t), yaw: lerpAngle(p.yaw, q.yaw, t), w: lerp(p.w, q.w, t) };
+  return { r: lerp(p.r, q.r, t), bend: lerp(p.bend, q.bend, t), turn: lerp(p.turn, q.turn, t), yaw: lerpAngle(p.yaw, q.yaw, t), w: lerp(p.w, q.w, t), slide: lerp(p.slide, q.slide, t) };
 };

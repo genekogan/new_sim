@@ -1,9 +1,12 @@
 // Engine Lab presets `prone` / `prone-forks` (owner feedback §13, HANDUP.md "Prone receiver", POSES.md "Prone
-// receiver"): the engine test fixture of engine/test/handup-prone.test.ts as a runnable scene — a 12 ft bay whose
-// upper floor is at 2.9 m, 4x3 sheets d0 / d2 installed at its south / north ends, the middle open where the 4x6
-// sheet s1 goes. Kneeling at the edge cannot reach 0.83 m below the deck (the 0.5 m kneel rule), so p3 / p4 walk to
-// the east deck edge, lie down on their stomachs over it, take s1 from the givers p1 / p2 below (or off the forks),
-// push up on one hand, kneel up and stand holding it, then lay it. Pure TS (no three.js / DOM).
+// receiver"): the engine test fixture of engine/test/handup-prone.test.ts (W32) as a runnable scene — a 12 ft bay whose
+// upper floor is at 2.750 m (the tallest 6 in beam seat whose hand-off from the ground is within the measured rig's
+// prone reach, 0.73 m), 4x3 sheets d0 / d2 installed at its south / north ends on 4 ft joists ending at the deck lip,
+// the open middle's 6 ft joists overhanging the east beam by 0.30 m, where the 4x6 sheet s1 goes. Kneeling at the edge
+// cannot reach ≈ 0.67 m below the deck (the 0.5 m kneel rule), so p3 / p4 walk to the east deck edge, lie down on their
+// stomachs turned toward the grips, take s1 from the givers p1 / p2 below, push up on one hand, kneel up and stand
+// holding it, then lay it. `prone-forks`: the next seat up (2.902 m deck — too high by hand, 0.83 m), the forklift
+// presenting s1 0.70 m below it, 6 cm outside the middle joists' ends. Pure TS (no three.js / DOM).
 import { component, human } from '../../engine/world/factory.ts';
 import { def } from '../../engine/world/catalog.ts';
 import { levelFor } from '../../engine/construction/access.ts';
@@ -16,14 +19,16 @@ import type { Scenario } from './scenarios.ts';
 
 const L = def('beam-12ft').size[0];
 const PT = def('plywood-4x3').size;
-/** Deck top (m) of the fixture: the beam seat nearest 2.9 m gives 2.90. */
-export const PRONE_DECK = 2.9;
+/** Deck top (m) by hand (engine test DECK: the seat gives 2.750) and off the forks (DECK_UP: 2.902). */
+export const PRONE_DECK = 2.75, PRONE_DECK_UP = 2.9;
+/** Off the forks: the sheet's underside this far below the deck top (engine test `present(0.7)`, the green limit). */
+export const FORK_DEPTH = 0.7;
 /** The hand-up's target pose (engine test `to`). */
 const TO = { x: 0, z: L / 2, yaw: Math.PI / 2 };
 
-/** engine/test/handup-prone.test.ts `proneBay(2.9, { fork })`, entity for entity. */
+/** engine/test/handup-prone.test.ts `proneBay(DECK)` / `proneBay(DECK_UP, { fork: true })`, entity for entity. */
 function proneBay(fork: boolean) {
-  const deck = PRONE_DECK;
+  const deck = fork ? PRONE_DECK_UP : PRONE_DECK;
   const seat = deck - PT[1] - JOIST_H - BEAM_H / 2;
   const jz = [0.25, 0.7, L / 2 - 0.75, L / 2 - 0.25, L / 2 + 0.25, L / 2 + 0.75, L - 0.7, L - 0.25];
   const b = bay(
@@ -33,6 +38,8 @@ function proneBay(fork: boolean) {
   const w = b.rt.world;
   const jt = b.top + JOIST_H;
   const deckY = jt + PT[1];
+  // the decks' joists are 4 ft, ending flush with the deck lip (W29's all-6-ft tails are the engine's rise-blocked case)
+  for (const j of ['j1', 'j2', 'j7', 'j8']) w.entities[j].def = '2x4-4ft';
   for (const [id, z, under] of [['d0', PT[0] / 2, ['j1', 'j2']], ['d2', L - PT[0] / 2, ['j7', 'j8']]] as const) {
     const s = component(id, 'plywood-4x3', [0, jt, z], Math.PI / 2, { phase: 'installed' });
     s.support = { kind: 'resting-on', on: under[0] };
@@ -46,13 +53,14 @@ function proneBay(fork: boolean) {
   };
   put('p3', -0.3, 0.45);
   put('p4', -0.3, L - 0.45);
-  return new Runtime(w, b.rt.registry, b.rt.services, b.rt.invariants);
+  return { rt: new Runtime(w, b.rt.registry, b.rt.services, b.rt.invariants), deckY };
 }
 
-/** Forklift script (engine test): mount, pick s1, present it outside the joist ends 0.75 m below the deck, hand it up. */
-function forkSteps(): [string, Record<string, unknown>][] {
+/** Forklift script (engine test): mount, pick s1, present it 6 cm outside the middle joists' ends with its underside
+ *  FORK_DEPTH below the deck (the hands), hand it up. */
+function forkSteps(deckY: number): [string, Record<string, unknown>][] {
   const W = def('plywood-4x6').size[2];
-  const at = { x: def('2x4-6ft').size[0] / 2 + 0.06 + W / 2, z: L / 2, y: PRONE_DECK - 0.75 - def('plywood-4x6').size[1], yaw: Math.PI / 2 };
+  const at = { x: def('2x4-6ft').size[0] / 2 + 0.06 + W / 2, z: L / 2, y: deckY - FORK_DEPTH - def('plywood-4x6').size[1], yaw: Math.PI / 2 };
   return [
     ['mount', { actor: 'op', vehicle: 'f1' }],
     ['forklift_pick', { operator: 'op', item: 's1' }],
@@ -78,18 +86,17 @@ const finished = (rt: Runtime) => {
 };
 
 function preset(fork: boolean): Scenario {
-  const steps = fork ? forkSteps() : HAND_STEPS;
   return {
     name: fork ? 'prone-forks' : 'prone',
-    title: fork ? 'Prone hand-up off the forks (2.9 m deck)' : 'Prone hand-up (2.9 m deck)',
+    title: fork ? 'Prone hand-up off the forks (2.902 m deck, 0.70 m below)' : 'Prone hand-up (2.750 m deck)',
     description: fork
-      ? 'HYPOTHETICAL (engine/test/handup-prone.test.ts): the forklift presents 4x6 sheet s1 outside the joist ends 0.75 m below a 2.9 m deck; p3 and p4 lie on their stomachs at the deck edge, take it off the forks, push up on one hand, kneel up and stand holding it, then lay it (owner feedback §13).'
-      : 'HYPOTHETICAL (engine/test/handup-prone.test.ts): givers p1 / p2 raise 4x6 sheet s1 overhead beside a 2.9 m deck — 0.83 m below its top, deeper than kneeling reaches — and p3 / p4, lying on their stomachs at the deck edge, reach down, take it, push up on one hand, kneel up and stand holding it, then lay it (owner feedback §13).',
+      ? 'HYPOTHETICAL (engine/test/handup-prone.test.ts, W32): a 2.902 m deck — too high by hand (0.83 m below its top; lying prone the rig reaches 0.73 m) — on 4 ft deck joists ending at the lip (6 ft in the open middle). The forklift presents 4x6 sheet s1 0.70 m below the deck, 6 cm outside the middle joists\' ends; p3 and p4 lie on their stomachs at the deck edge turned toward the grips, take it off the forks, push up on one hand, kneel up and stand holding it, then lay it (owner feedback §13).'
+      : 'HYPOTHETICAL (engine/test/handup-prone.test.ts, W32): givers p1 / p2 raise 4x6 sheet s1 overhead beside a 2.750 m deck (4 ft deck joists ending at the lip, 6 ft in the open middle) — ≈ 0.67 m below its top: deeper than kneeling reaches (0.5 m), within the 0.73 m the rig reaches lying prone — and p3 / p4, lying on their stomachs at the deck edge turned toward the grips (±20°), reach down, take it, push up on one hand, kneel up and stand holding it, then lay it (owner feedback §13).',
     scene: openGround,
     humans: () => [],
     build: () => {
-      const rt = proneBay(fork);
-      scripts.set(rt, { steps, ids: [] });
+      const { rt, deckY } = proneBay(fork);
+      scripts.set(rt, { steps: fork ? forkSteps(deckY) : HAND_STEPS, ids: [] });
       return rt;
     },
     start: advance,

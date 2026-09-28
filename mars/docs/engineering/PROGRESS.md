@@ -834,3 +834,40 @@ Then: gate → release 5; HANDOFF refresh.
 - W35 spawned (renderer): prone.ts reads `proneYaw`/`phaseK`, preset → 2.75 m + 4 ft deck joists, forks 0.70 m, POSES.md 0.94 → 0.73, spec green.
 - **W34 release 6 deployed** (12:11 → 12:36 EDT): gate GREEN at `27e04f6` in a detached worktree (unit 56/56, engine 370/0/3 skip, tsc clean, e2e 64 passed / 1 skipped in 729 s on port 5591, probe `b746b094…f0c3` = pin; `gitDirty: false`); production **`07dce638-2950-444f-823f-0e19b8f62320`** replaces `cebd5827…` (rollback target, confirmed 100 % before the deploy). Not in the deploy: `0cd2f19` (W32 prone engine) + `f350896`, `ce74ba0`, `848b895`, `858946e`. Smoke: all routes / `/engine/campus-2022.json` / 5 `/engine/takes/*` / R2 GLB 200, `smoke.mjs` OK; director demo PASS (9 steps, 7.96 s); prod `/lab` build-bay 43/43, 0 violations, tick 10901, **prod hash = probe**; prod `/studio`: 2022 "Watch it being built" picker (both takes), flagship replay at held 37/37, hash = recorded = manifest, banner, 0 errors (screenshots reviewed, `e2e/artifacts/prod-smoke-6/`). **Red: committed `deploy/simulation-integration.mjs` fails against prod** (its engine tool list predates `engine_direct_camera`); a scratch copy with that one name added passes all 3 lines — needs a one-line fix by the `deploy/` owner. Evidence not regenerated (out of scope). Record: RELEASE_CHECKLIST "Production deploy 6". Cost ≈ 0.16 M tokens, ≈ 25 min wall.
 - **W34 landed** `a98c0b3` (≈160k tokens, 25 min): **Release 6 live** — production `07dce638-2950-444f-823f-0e19b8f62320` from gated head `27e04f6` (gate GREEN: 56/56, engine 370/0/3, tsc, e2e 64 pass / 1 skip in 729 s, probe b746b094 = pin; report `w34-wt/viewer/.cloudflare/gate/2026-09-28T16-12-39-722Z`); rollback `cebd5827…` (command in RELEASE_CHECKLIST "Production deploy 6"). Smoke: all routes + engine files + 4 takes + R2 200; director demo PASS (9 steps, 8.0 s); prod `/lab` flagship 43/43, 0 violations, hash = probe; `/studio/2022` shows "Watch it being built" with both takes; flagship replay hash = recorded. Not in the deploy: W32 (`0cd2f19`…`848b895`). Lead fix: `deploy/simulation-integration.mjs` expected 13 engine tools → now 14 incl. `engine_direct_camera`; re-run against production: 3/3 PASS.
+
+## W35 — the prone layer on the engine's proneYaw / phaseK; lab presets = W32's fixture (2026-09-28)
+- **Renderer** (`app/engine-view/prone.ts`, `humans.ts` `proneGoal`): body turn = `engineTurn` = angleDelta(pose.yaw,
+  proneYaw), taken as is (no deck test, no rate limit — the engine checked that heading and turns it with the lie-down's
+  smoothstep); the rise clock = 3 (1 − smooth(phaseK)) lying down, smooth(phaseK) pushing up, 1 + smooth(phaseK) kneeling
+  up. Fallback without the fields (a take — the recorder does not carry them yet): W29's turn search and age clocks.
+  `SampledHuman` has optional `proneYaw` / `phaseK` (setFrame reads them; `take-replay.ts` must fill them once W31's
+  recorder records them). Two findings kept honest rather than exact: (1) r = smooth(phaseK) forced exactly left p4's
+  held hand out of reach mid push-up (23/32) with that arm 0.14 m through the deck edge, so the body still **waits for the
+  load it holds** (never ahead of the engine; the spec asserts that and logs the lag); (2) the engine's deck-hand points
+  (0.20 m ahead of S along the heading) are set for the woman's torso — the punk (p3, Torso joint → shoulders 0.27 vs
+  0.19 m) turned 20° had its deck hands 1.18 arm lengths away all through prone-wait (574/1148), so lying flat the body
+  may **slide back** along the deck (≤ 0.16 m, still on it; 4–5 cm used) and comes forward as the chest tips. Deck hand
+  along the heading: the rendered yaw is proneYaw, so the flat hand's fingers follow it. Reach honesty, the girdle rule
+  and the body-vs-deck checks unchanged. Diag `prone` gains `slide`, `engTurn`, `phaseK`.
+- **Lab** (`app/lab/prone.ts`): `prone` = 2.750 m deck, 4 ft deck joists (j1 j2 j7 j8) ending at the lip, 6 ft in the
+  open middle; `prone-forks` = 2.902 m deck, s1 presented 0.70 m below it, 6 cm outside the middle joists' ends — the
+  descriptions state the numbers. Headless: 477 ticks (= the engine test) / 632, all checks green, turns ±20° / ±25°.
+- **Spec** (`e2e/prone.spec.ts` 4/4, was 3): per tick turn vs the engine (worst |Δ| 0.0000 rad over 708 / 130 ticks), rise
+  never ahead of smooth(phaseK) (behind while waiting: 51/64 by hand, 44/60 off the forks, worst 0.78 / 0.86 — p4), a
+  determinism test (two runs, receivers' bones equal every tick, 477 ticks), a north-east take view. Hand points reached
+  ≤ 0.1 m by hand (before → after): **prone-reach 45/80 → 80/80** (p3 27 → 40, p4 18 → 40), prone-wait 1148/1148 (574 before
+  the slide), push-up 73/80 → 64/64, kneel-up 64/64, lie-down 60/60, stand_with_load 30/32 → 28/32 (p4, 1.08–1.10 arm
+  lengths); off the forks prone-reach 60/80 → 80/80, lie-down 56/60 (p3's last two ticks), stand_with_load 25/32. 0
+  rig-reachable misses, 0 over-long arms, 0 body vertices below the deck top in a prone phase, shoulders past the lip
+  every lying tick. Logged: arm / hand vertices ≤ 1.9 cm inside j3 / j6's ends (the grips are the sheet corners beside
+  them); no chest / head inside any member now (W29: through j2 / j7's tails).
+- **Baselines refreshed after looking**: `prone-reach` (tick 340: both on their stomachs, chests tipped over the lip, arms
+  straight down, the sheet overhead in the givers' hands), `prone-push-up` (now tick 363, mid push-up — `step(16)`
+  overshot into kneel-up on the 0.8 s phase: hips coming up, one hand flat on the deck, the other on the rising sheet),
+  `prone-standing` (first `lay` tick: both kneeling on the deck bent over the sheet at deck level). `prone-take` /
+  `prone-take-ne` show both receivers' hands on the sheet's inner corners; the turn reads as the engine's ±20°.
+- `POSES.md` "Prone receiver": proneYaw / phaseK consumption, slide, reach 0.94 → 0.73, W35 measured block; lab README row.
+- **Weak spots:** the rise trails the engine while the body waits (p4 up to 0.78 in r), so a replay frame (no history:
+  exact r) and the live run differ there; the slide is the renderer's (the engine's deck hand stays where it is); p4's
+  stand_with_load hands 1.06–1.15 arm lengths away (posture layer); take replay needs `take-replay.ts` to copy the two
+  fields once the recorder has them (not W35's file).
