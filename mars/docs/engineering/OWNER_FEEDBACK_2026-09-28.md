@@ -257,6 +257,23 @@ renderer `app/engine-view/humans.ts` (pose layer, hand props) + `components.ts`/
 Priority: after the hand-up/handling work; it shares the crouch/reach vocabulary of §6 and the hand-point
 schema, so it should reuse them rather than invent a second one.
 
+## 13. Prone receiver — lying on the deck to reach down (Gene, 2026-09-29 morning)
+Confirmed as a real Mars practice when there is no forklift: a receiver **lies on their stomach at the edge of the upper
+floor** to reach down and take a plank/sheet from the ground crew, then gets up **without letting go**: push off the floor
+with one hand while holding the wood with the other, come up to the knees, then from knees to feet, all while the wood never
+passes through the structure's walls, floor or beams. Gene: "seems complicated! but yes in real life that's often how it
+works." Model it as a third receiving posture after kneel: `prone` (reach-down ≈ 1.0 m below the feet, arm + shoulder
+over the edge), with a `rise` sequence (prone → one-hand push-up → kneel → stand) whose hand points stay continuous
+(one hand on the load throughout, the other on the floor then the load), swept against the structure (the load must clear
+the deck edge and beams every tick — refuse with a diagnostic naming the member if it cannot). Renderer: prone + rise
+pose layers. Priority: after the A+B run is green; it re-opens hand-offs the 0.5 m kneel rule now refuses.
+
+## 14. Top beams — how it is really done (Gene, 2026-09-29 morning)
+For beams too high to hang from the ground, two people climb the upright using its cross braces as steps, stay up there
+to receive the beam from someone below, then set it against the upright — each holding one side. This is the mechanism
+W7 built (`hang_beam` via `stance` + relay); confirmed, no longer hypothetical as a method (the sequence remains
+hypothetical).
+
 ## Priority
 5 with 6 (they are one feature: the hand-up is the reach-up/reach-down motion pair, and pickups need
 the crouch) — these are prerequisites for 7; then 7 (the headline: full-year construction replays, start

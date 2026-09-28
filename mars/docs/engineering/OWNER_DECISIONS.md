@@ -31,3 +31,7 @@
   below the feet at 0.45 m out. The engine model adopts these (shoulders 1.34, half-width 0.15, reach-down 0.5 m below the feet);
   the spec's "≈ 1.0 m reach-down" is therefore replaced by 0.5 m — hand-offs needing more are refused ("use the forklift").
   Supersedes the reach-down question in PROGRESS.md unless Gene wants a lying-down receiver posture instead.
+- (2026-09-29 morning, Gene) **Reach-down:** the 0.5 m kneel rule stands as the default; a **prone receiver** (lying on the
+  stomach at the deck edge, then rising to knees and feet while holding the load) is a real Mars practice and is to be modelled
+  as a further posture (OWNER_FEEDBACK §13). **Top beams:** two people climb the upright on its cross braces and each holds one
+  side of the beam while setting it — the `hang_beam`/stance mechanism is the real method (§14).
