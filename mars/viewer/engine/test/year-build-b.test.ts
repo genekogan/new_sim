@@ -25,6 +25,7 @@ import { emptyWorld, human, component } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { setPartVerb } from '../construction/setpart.ts';
 import { openGround } from './frame-fixtures.ts';
+import { isBarrier, sectionBounds } from '../take/chapters.ts';
 import type { ActionDef } from '../actions/types.ts';
 
 const kinds = (xs: { kind: string }[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x.kind] = (m[x.kind] ?? 0) + 1), m), {});
@@ -170,4 +171,17 @@ test('year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from
     assert.equal(reh.report.metrics.ticks, PIN_FULL_AB.ticks);
     assert.equal(reh.report.finalStateHash, PIN_FULL_AB.hash);
   }
+});
+
+// W31: the A+B take ships as chapters, one per section (engine/take/chapters.ts, deploy/record-campus-take.mjs
+// `year-build-2022-ab-chapters`), cut where sequence-b's section gates put a barrier. The plan side of that contract:
+// the section starts, and that each is a barrier (every later step depends on every earlier one), END folded into P.
+test('year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)', () => {
+  const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { phaseB: {} });
+  const b = sectionBounds(s.build, ['END']);
+  assert.deepEqual(b.map((x) => `${x.id}@${x.at}`), ['A@0', 'D0@552', 'D1@743', 'D2@954', 'S@1167', 'W@1341', 'P@1499']);
+  assert.equal(s.build.phaseAStepCount, 552);
+  assert.equal(s.plan.steps.length, 1552);
+  for (const x of [...b, ...s.build.sectionStarts!.map((y) => ({ id: y.section, at: y.at }))]) assert.ok(isBarrier(s.plan.steps, x.at), `${x.id} at ${x.at}`);
+  assert.ok(!isBarrier(s.plan.steps, 557) && !isBarrier(s.plan.steps, 800), 'steps inside D0 / D1 that are not barriers');
 });
