@@ -117,3 +117,33 @@ Routes (whole campus, 0.1 m, `HUMAN_PROFILE`), all ok: staging → west rack bui
 - The placement of the staging area and piles is algorithmic (nearest clear area east of Chiba). It is not a
   site decision. Re-running the extractor after model changes can move them; the tests re-validate clearance.
 - Rack members are CAD posts, not stock frames (AUDIT §2.4); they are not mapped to catalog uprights.
+
+## Historical years 2020–2025 (procedural, spec §21)
+Code `engine/campus/history{,-extract,-node}.ts`; extractor `viewer/deploy/history-scenes.mjs` (`--check`, optional
+year args); data `public/engine/campus-<year>.json` (200–283 KB, 24–32 KB gzip each); tests `engine/test/campus-history.test.ts`.
+```ts
+const { base, world } = loadCampusYear(2022, loadCampusFile(2022));  // browser: fetch(campusYearUrl(2022))
+publishCampusYear(history, 2022, file);  // protected 'mars-2022'; forkCampusYear(history, 2022, id, label) to edit
+```
+- **Method**: Node builds each year with the browser's Kit code (`createHistoricalScene`, esbuild bundle, texture
+  loads/canvases stubbed as in `history-ids.test.mjs`). `Kit.finalize()` supplies the stable ids
+  (HISTORY_IDS.md), so obstacle `component` = Kit id (pinned: 2021 `chiba-aluminet`, 2024 `chiba-flower-mural`).
+  Each component's world triangles go through the 2026 band pipeline (clip to G+0.06…G+2.0, cluster, min-area OBB →
+  `id`, `id.k`; above the band → `id.up…`). Same schema (`mars-campus-scene/1`), plus `year`; `source` names the scene.
+  G = −0.16, the studio ground for every year. Run ~0.1 s per year. `contentHash` as in 2026.
+- **Kinds**: rv-* trailers and vehicle parts → vehicle; glazing/translucent → glass; `Walls and screens` → wall;
+  `Interior details` and solar → fixture; everything else solid. 2020 scrub (`site_context`) and people are skipped.
+- **Confidence**: Kit `source` says "provisional", so 2021–25 are all `provisional`. 2020 groups say high → `inferred`,
+  medium/low → `provisional`. `historyNotes[year]` is carried as the obstacle provenance note.
+- **Walkable**: only the flat ground. The scenes draw decks, roofs and stairs, but declare no walkable surface, and
+  unknown ≠ walkable, so there are no levels or links. Halls block through their ground-floor decks (top 0.41 m above
+  G). No `interior:` prisms are needed: 65–100% of each Chiba hull blocks, and the rest is corridor/aisle ground.
+- **walkNoCollision** meshes (stair risers, the 2021 aluminet and MARS letters) keep only their overhead `.up` part.
+  So the 2021 corridor stays open at its south end, although the real cut-out letters stood there (caveat).
+- **Regions**: one convex hull per Kit assembly (chiba, kitchen, east-house, …, each rv-N). There are no
+  hypothetical staging areas or inventory: canonical worlds have no entities.
+- **Numbers** (0.1 m grids, warm): 70–107 ms, 0.63–1.30 M cells per year. 2022 N→S around the courtyard: 33.1 m vs
+  28.5 m straight, clearance 0.35. 2021 through the corridor: 34.0 m straight, clearance 2.15.
+- **Wiring rooms** (`engine/api/seeds.ts`, not done here): publish each year with `publishCampusYear(h, y, file)` next
+  to the proving ground. Node reads files with `loadCampusFile`. The DO/browser fetches `campusYearUrl(y)` from the
+  release (`prepare.py` stages `engine/**`).
