@@ -327,16 +327,20 @@ ended. END is folded into P. Each section start is a barrier of the plan (every 
 one; `isBarrier`, tested). Chapter k therefore starts exactly where k − 1 ended (same world, same tick), and the ticks add
 up to the run.
 
-| # | chapter | plan steps | ticks | sim min | take id | raw B | gzip B | camera min / mean readability | shots / cuts |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | A skeleton (12 frames, 54 beams) | 0–551 | 117 277 | 97.7 | `e8fd2e0d…` | 3 522 237 | 575 701 | 0.70 / 0.98 | 53 / 52 |
-| 2 | D0 ground-floor deck | 552–742 | 99 007 | 82.5 | `c1e76f1c…` | 2 171 414 | 298 376 | 0.70 / 0.99 | 29 / 28 |
-| 3 | D1 first-floor deck | 743–953 | 100 831 | 84.0 | `517ac94d…` | 2 285 860 | 312 987 | 0.80 / 1.00 | 29 / 28 |
-| 4 | D2 roof deck | 954–1166 | 107 341 | 89.5 | `5c5f7709…` | 2 477 582 | 331 119 | 0.67 / 1.00 | 29 / 28 |
-| 5 | S the Kit stair | 1167–1340 | 87 041 | 72.5 | `785987be…` | 2 074 902 | 281 470 | 0.80 / 1.00 | 32 / 31 |
-| 6 | W plywood walls | 1341–1498 | 72 915 | 60.8 | `0799de33…` | 1 942 049 | 254 990 | 0.60 / 0.94 | 27 / 27 |
-| 7 | P solar + END | 1499–1551 | 16 187 | 13.5 | `5cceb1c4…` | 896 593 | 104 365 | 0.60 / 0.96 | 9 / 9 |
-| | **set `8ce33bee…`** | 1552 | **600 599** | 500.5 | | **15 370 637** | 2 159 008 | | |
+Cameras and sizes are W39's re-record (`engine/camera/chapter-shots.ts`; same take ids, same set, same final state; bytes
+from `public/engine/takes/manifest.json`). Idle stretches = frameGroup stretches > 20 s in which every framed person is
+idle while someone else works (`shotActivityReport`); W31's cameras had 3–33 per chapter.
+
+| # | chapter | plan steps | ticks | sim min | take id | raw B | gzip B | cuts | camera min / mean readability | idle stretches |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | A skeleton (12 frames, 54 beams) | 0–551 | 117 277 | 97.7 | `e8fd2e0d…` | 3 737 564 | 647 498 | 123 | 0.70 / 0.977 | 0 |
+| 2 | D0 ground-floor deck | 552–742 | 99 007 | 82.5 | `c1e76f1c…` | 2 474 862 | 389 182 | 115 | 0.60 / 0.979 | 0 |
+| 3 | D1 first-floor deck | 743–953 | 100 831 | 84.0 | `517ac94d…` | 2 560 626 | 391 998 | 120 | 0.60 / 0.979 | 0 |
+| 4 | D2 roof deck | 954–1166 | 107 341 | 89.5 | `5c5f7709…` | 2 791 278 | 422 791 | 131 | 0.67 / 0.976 | 0 |
+| 5 | S the Kit stair | 1167–1340 | 87 041 | 72.5 | `785987be…` | 2 322 821 | 367 391 | 91 | 0.60 / 0.977 | 0 |
+| 6 | W plywood walls | 1341–1498 | 72 915 | 60.8 | `0799de33…` | 2 209 094 | 334 122 | 88 | 0.70 / 0.981 | 0 |
+| 7 | P solar + END | 1499–1551 | 16 187 | 13.5 | `5cceb1c4…` | 927 226 | 115 344 | 24 | 0.78 / 0.981 | 0 |
+| | **set `8ce33bee…`** | 1552 | **600 599** | 500.5 | | **17 023 471** | 2 668 326 | | | |
 
 Every chapter is 100 % readable, with 0 invalid samples and 0 crossings, at 0.5 Hz. The last chapter's final state is
 the A+B pin **`ddb634d6…` @ 600 599**. The chaptered run reproduces it: the cutter only swaps take recorders.
@@ -349,7 +353,7 @@ within ½ mm / ½ mrad. The manifest contract is in STUDIO_REPLAY.md "Chapter se
   A+B run. The skeleton take stays as its own entry.
 - The ticks differ from W13's per-section runs (D0 94 646 … W 68 331): those ran from separate snapshots, while the
   chapters are one continuous run.
-- **Cameras** (`workShots`): an establishing wide, then one frameGroup per 90–300 s of work at the house (cut at the
+- **Cameras (W31, replaced by W39's event-driven shot lists; CAMERA.md "Chapter shot lists")** (`workShots`): an establishing wide, then one frameGroup per 90–300 s of work at the house (cut at the
   starts of non-yard steps). Each frames the people who do that work *and* stay at the house (footprint + 2.5 m, for
   ≥ 70 % of the stretch). The camera sits outside the house on their side, ±30° alternately, at 10° for work on the
   ground (under the decks a steep camera sees plywood), 22° on the first floor and 30° on the roof. Each chapter ends on a
@@ -357,7 +361,8 @@ within ½ mm / ½ mrad. The manifest contract is in STUDIO_REPLAY.md "Chapter se
   deck crew was 4 % of frame height: min 0.25–0.37, mean 0.73–0.79 for D0 / D1 / D2 / W.
 - Weak spots: most work shots are close on one to four people for minutes. Nothing frames the piece being cut or
   carried, and the yard (the station, the carries) is seen only in the opening wide. Four W stretches and one D0 stretch frame people idle
-  at the house (nobody worked there then). Moments per chapter are generic (`work`, `middle`, `done`).
+  at the house (nobody worked there then). Moments per chapter were generic (`work`, `middle`, `done`). W39 fixed the idle framing and the moments (first of each
+  event + `done`); its own weak spots: cuts ×2.5–4 (a shot lasts under 1 s at 64×), min readability 0.60 on D0 / D1 / S.
 
 ## What phase C needs
 - a director-run take per house / year (mars-take/4) with camera tracks. The east-house A+B ships as 7 chapter takes
