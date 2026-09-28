@@ -872,3 +872,32 @@ Then: gate → release 5; HANDOFF refresh.
   stand_with_load hands 1.06–1.15 arm lengths away (posture layer); take replay needs `take-replay.ts` to copy the two
   fields once the recorder has them (not W35's file).
 - **W35 landed** `9ddd6d8`, `f2a52c8` (≈220k tokens, 20 min; merged from `w35-prone-rig-render`): `prone.ts` reads `proneYaw` (turn exact to the engine, 0.0000 rad over 708 ticks) and `phaseK` (rise clock, but the body never gets ahead of the load it holds — logged lag), lying slide-back ≤ 0.16 m for the longer punk torso; presets mirror W32's fixture (2.750 m / 4 ft deck joists; forks 0.70 m below 2.902 m); `prone.spec` 4/4; prone-reach 80/80 by hand (was 45/80) and 80/80 off the forks, no rig-reachable misses, no body vertex in the deck. Lead LOOKED at prone-reach: accepted — both on their stomachs over the lip, both pairs of hands at the sheet. Open: `take-replay.ts` must copy `proneYaw`/`phaseK` once W31's recorder carries them.
+
+## 2026-09-29 — W31: W27 landed; the 2022 east-house A+B as 7 chapter takes
+- **W27 landed:** `fulltest2` (YEAR_BUILD_FULL=1, the A+B test on `f97d5db`, the head with W28's prone receiver) ✔:
+  1552 steps, 600 599 ticks, 0 violations, `ddb634d6…`, 784 s wall. W27's recorder scenario + docs are committed in
+  w27-ab as `f9fa987` and cherry-picked to main as `279d405` (PROGRESS kept both sides).
+- **Chapter takes** (`engine/take/chapters.ts`, additive): ONE run recorded as consecutive takes. A `ChapterCutter`
+  observer finishes the TakeRecorder and starts the next at the end of the tick in which the last step before a bound
+  ended. The run is the ordinary `SequenceRunner.run`. Also `isBarrier` (a plan check: every later step depends on
+  every earlier one), `sectionBounds(build, ['END'])` (A@0, D0@552, D1@743, D2@954, S@1167, W@1341, P@1499; from
+  sequence-b's existing `sectionStarts`, so sequence-b.ts is unchanged), `chapterContinuity` and `rehearseChapters`.
+- **Recorded** (`--scenario year-build-2022-ab-chapters`, explicit, ≈ 30 min): set `8ce33bee…` "Watch it being built:
+  2022 east-house (A+B)", 7 chapters, **600 599 ticks = the A+B pin, final `ddb634d6…`**. Each chapter < 6 MB with its own
+  camera plan: **15 370 637 B total (gzip 2 159 008 B)**. The table is in YEAR_BUILD.md "A+B as chapter takes". Camera min
+  readability 0.60–0.80, mean 0.94–1.00 (the 8 h reuse of the skeleton shot list: min 0.15). Manifest: the chapters are
+  `otherYears` entries with `kind: 'year-build-chapter'` and `chapter` { of, index, id, startsFrom, startHash }; the set
+  is under a new top-level `chapterSets` (STUDIO_REPLAY.md "Chapter sets").
+- **Deviation:** the whole-skeleton take `69c41651…` could not be reused as chapter A. The A+B yard has ten more piles
+  (26 vs 16 initial entities), so that take's final state is not where D0 starts. Chapter A is recorded from the A+B run
+  (`e8fd2e0d…`, same 117 277 ticks). The skeleton take stays as its own entry.
+- **Tests:** `take-chapters.test.ts` checks the mechanism on open ground (the same ticks and final hash as the
+  unchaptered run, continuity, a non-barrier bound refused, 50 ms) and the shipped chapter set (continuity of every
+  join, Σ ticks, ends at the pin, 130 ms). `year-build-b.test.ts` gains a plan-only section-boundary test; the pins are
+  untouched. Suite 371 pass / 3 skipped; tsc clean.
+- **Recorder** refactored into `record` → `packageTake` (+ `recordChapters`). `--all --full --check` stays OK for the
+  flagship, v3, bay 1 and the whole skeleton (byte-identical). `--check` of the chapters is in the W31 report.
+- **Weak spots:** the studio cannot play a set back to back yet (contract written; a renderer task). The chapters are not
+  in "Watch it being built" by design (kind), but they are listed under "Replay take" for 2022 (7 more options). Work
+  shots stay close on 1–4 people for minutes; the yard is seen only in the opening wide. Chapter moments are generic.
+  Recording the set takes two 13-min rehearsals, and `--check` takes the same again.

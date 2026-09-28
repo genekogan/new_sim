@@ -413,6 +413,12 @@ needed:
 - `deploy/perf-walk.mjs` still pinned v3 at `a2f782ad…`, W27's predecessor, so it was reporting v3 as unpinned. It
   is now `39a0fb3f…` (`--only v3`: PIN-OK).
 
+**No pin moves (W31, chapter takes, 2026-09-29).** `engine/take/chapters.ts` records one run as consecutive takes. It
+adds one read-only observer (`ChapterCutter`) and swaps TakeRecorders at section barriers. The run is the ordinary
+`SequenceRunner.run`. The chaptered A+B run reproduces the pin: `ddb634d6…` @ 600 599 ticks, 0 violations, 773–777 s
+wall (the unchaptered run: 784–815 s). So does the chaptered first bay + first strip: `94db263e…` @ 53 604. The observer
+costs amortised O(1) per tick (a pointer over the steps before the next bound).
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

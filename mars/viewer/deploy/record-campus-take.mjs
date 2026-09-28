@@ -8,6 +8,7 @@
 //   node deploy/record-campus-take.mjs --scenario year-build-2022-house  # 2022 east-house, whole skeleton (opt-in)
 //   ... --all --full                                                  # --all plus the opt-in whole-house take(s)
 //   node deploy/record-campus-take.mjs --scenario year-build-2022-ab  # 2022 east-house A+B (explicit only; over budget)
+//   node deploy/record-campus-take.mjs --scenario year-build-2022-ab-chapters  # A+B as 7 chapter takes + manifest chapterSets (explicit)
 //   ... --check                                                       # re-record and compare with the manifest (no writes)
 // Writes public/engine/takes/<file> and merges the scenario's entry into public/engine/takes/manifest.json.
 // `takes` lists what the 2026 studio can replay (flagship first: the studio e2e uses takes[0]); takes recorded
@@ -322,8 +323,8 @@ SCENARIOS['year-build-2022-house'] = {
 // YEAR_BUILD_FULL): explicit only (`--scenario year-build-2022-ab`; not in `--all --full`), ≈ 30 min (two 13-min
 // rehearsals: the take and the exact take). ≈ 8.3 h simulated; the planned camera runs at 0.1 Hz (0.5 Hz alone would be
 // ≈ 4.5 MB). NOT RECORDED (W27, 2026-09-29): the payload is 12 029 291 B (take 10.47 MB — tracks 4.74, changes 3.66,
-// events 1.75 — camera 1.03 MB; gzip 2.02 MB), 5 737 835 B over the 6 MB limit; the lead decides (thin the take,
-// raise the limit, or split it per section). Its final state equals the pin (take 53a180fd…).
+// events 1.75 — camera 1.03 MB; gzip 2.02 MB), 5 737 835 B over the 6 MB limit. Lead decision: split per section —
+// `year-build-2022-ab-chapters` below ships it. Its final state equals the pin (take 53a180fd…).
 SCENARIOS['year-build-2022-ab'] = {
   ...SCENARIOS['year-build-2022'],
   file: 'year-build-2022-east-house-ab.json',

@@ -318,12 +318,51 @@ The phase-B rules are generic in form (strips jointed on beams, walls by height,
 parameters fit the 2022 rack-house template only; other years need more sheet splits, wall heights, stair templates
 and module sizes.
 
+## A+B as chapter takes (W31, 2026-09-29)
+As one take the whole A+B is **12.0 MB**, 5.7 MB over the 6 MB budget (`--scenario year-build-2022-ab`, W27). Its
+phase-A shot list read poorly over 8 h (min readability 0.15). Lead decision: split per section. `record-campus-take.mjs
+--scenario year-build-2022-ab-chapters` (explicit, ≈ 30 min) runs the pinned A+B plan **once**. `engine/take/chapters.ts`
+cuts the take at sequence-b's section barriers: the end of the tick in which the last step before a section start
+ended. END is folded into P. Each section start is a barrier of the plan (every later step depends on every earlier
+one; `isBarrier`, tested). Chapter k therefore starts exactly where k − 1 ended (same world, same tick), and the ticks add
+up to the run.
+
+| # | chapter | plan steps | ticks | sim min | take id | raw B | gzip B | camera min / mean readability | shots / cuts |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | A skeleton (12 frames, 54 beams) | 0–551 | 117 277 | 97.7 | `e8fd2e0d…` | 3 522 237 | 575 701 | 0.70 / 0.98 | 53 / 52 |
+| 2 | D0 ground-floor deck | 552–742 | 99 007 | 82.5 | `c1e76f1c…` | 2 171 414 | 298 376 | 0.70 / 0.99 | 29 / 28 |
+| 3 | D1 first-floor deck | 743–953 | 100 831 | 84.0 | `517ac94d…` | 2 285 860 | 312 987 | 0.80 / 1.00 | 29 / 28 |
+| 4 | D2 roof deck | 954–1166 | 107 341 | 89.5 | `5c5f7709…` | 2 477 582 | 331 119 | 0.67 / 1.00 | 29 / 28 |
+| 5 | S the Kit stair | 1167–1340 | 87 041 | 72.5 | `785987be…` | 2 074 902 | 281 470 | 0.80 / 1.00 | 32 / 31 |
+| 6 | W plywood walls | 1341–1498 | 72 915 | 60.8 | `0799de33…` | 1 942 049 | 254 990 | 0.60 / 0.94 | 27 / 27 |
+| 7 | P solar + END | 1499–1551 | 16 187 | 13.5 | `5cceb1c4…` | 896 593 | 104 365 | 0.60 / 0.96 | 9 / 9 |
+| | **set `8ce33bee…`** | 1552 | **600 599** | 500.5 | | **15 370 637** | 2 159 008 | | |
+
+Every chapter is 100 % readable, with 0 invalid samples and 0 crossings, at 0.5 Hz. The last chapter's final state is
+the A+B pin **`ddb634d6…` @ 600 599**. The chaptered run reproduces it: the cutter only swaps take recorders.
+Continuity is checked by the recorder and by `take-chapters.test.ts` on the shipped files. For each k: chapter k's
+`baselineStateHash` = k − 1's `finalStateHash`, its `entities0` = k − 1's final entities, and its replayed first frame is
+within ½ mm / ½ mrad. The manifest contract is in STUDIO_REPLAY.md "Chapter sets".
+- **The skeleton chapter is not the whole-skeleton take** (`69c41651…`, `d382e461…`). The A+B yard has ten more piles
+  (the phase-B stock: 2 plywood bundles, lumber, rails, the solar pallet, the scrap pile). That take's final state is
+  therefore not where D0 starts, even though its motion and ticks are the same (117 277). Chapter A is recorded from the
+  A+B run. The skeleton take stays as its own entry.
+- The ticks differ from W13's per-section runs (D0 94 646 … W 68 331): those ran from separate snapshots, while the
+  chapters are one continuous run.
+- **Cameras** (`workShots`): an establishing wide, then one frameGroup per 90–300 s of work at the house (cut at the
+  starts of non-yard steps). Each frames the people who do that work *and* stay at the house (footprint + 2.5 m, for
+  ≥ 70 % of the stretch). The camera sits outside the house on their side, ±30° alternately, at 10° for work on the
+  ground (under the decks a steep camera sees plywood), 22° on the first floor and 30° on the roof. Each chapter ends on a
+  wide. Before the stay filter, the ground givers (away at the station most of each stretch) widened the frame until the
+  deck crew was 4 % of frame height: min 0.25–0.37, mean 0.73–0.79 for D0 / D1 / D2 / W.
+- Weak spots: most work shots are close on one to four people for minutes. Nothing frames the piece being cut or
+  carried, and the yard (the station, the carries) is seen only in the opening wide. Four W stretches and one D0 stretch frame people idle
+  at the house (nobody worked there then). Moments per chapter are generic (`work`, `middle`, `done`).
+
 ## What phase C needs
-- a director-run take per house / year (mars-take/4) with camera tracks. The east-house A+B take (`record-campus-take.mjs
-  --scenario year-build-2022-ab`, explicit only) reproduces the pin but is **12.0 MB**, 5.7 MB over the 6 MB budget:
-  take 10.5 MB (tracks 4.7, changes 3.7, events 1.75) + camera 1.0 MB at 0.1 Hz; gzip 2.0 MB. It needs thinning, a
-  per-section split or a larger budget, and shots written for phase B: the phase-A shot list gives min readability 0.15,
-  44.7 % readable; the other three 2022 houses run (they plan with the same rules); idle crew parked against each section's
+- a director-run take per house / year (mars-take/4) with camera tracks. The east-house A+B ships as 7 chapter takes
+  (above). The studio does not yet play a chapter set back to back (a renderer task, STUDIO_REPLAY.md "Chapter sets").
+  The other three 2022 houses run (they plan with the same rules). Idle crew should be parked away from each section's
   carry paths (today they are moved by make-way when a carry or set-part needs the ground);
 - install_panel side stations (solar.ts) — 7 of 10 modules wait on it; a lengthwise insertion for risers; a post rule
   at the end frame; notching / seating decks below the column tops (or a Kit decision) for the panels over frame lines;

@@ -26,7 +26,8 @@ take shows up after the recorder rewrites the manifest.
 | `ticks` (optional) | option text; falls back to `duration / 0.05` |
 | `duration`, `entities`, `moments` | scrubber, readout, moment dots (labels: carry, held, deck, visitor, beam, bay; unknown keys show the key) |
 | `finalStateHash` | final-frame check (the replayed hash must equal it) |
-| `kind` (optional) | `'year-build'` marks a "Watch it being built" take. **Absent → inferred:** `rulesVersion` contains `year-build`. W17's recorder can add `kind` without a studio change. |
+| `kind` (optional) | `'year-build'` marks a "Watch it being built" take. **Absent → inferred:** `rulesVersion` contains `year-build`. W17's recorder can add `kind` without a studio change. `'year-build-chapter'` (W31) is one chapter of a chapter set (below). `isYearBuild` is false for it, so it is not in "Watch it being built" and not in `studio-build.spec.ts`. It is still listed under "Replay take" and plays alone like any take. |
+| `chapter` (optional, W31) | `{ of, index, id, startsFrom, startHash }`: the chapter set's id, the 0-based position, the section id (`A`, `D0`, …), the previous chapter's take id (`null` for the first) and this take's start state hash (= `take.baselineStateHash` = the previous chapter's `finalStateHash`). |
 
 From the take file, the studio also reads `campus`, `site { origin, yaw, groundY }`, `steps`, `take` and `camera`
 (`take.finalState.base.campus` is `mars-<year>:build:<assembly>` for a year-build fork).
@@ -37,6 +38,54 @@ still `mars-take/2`; the replay also reads `/3` (§2). **Since W22** the 2022 fi
 (`year-build-2022-east-house.json`, `otherYears`, recorded with `--full`) are `mars-take/4` (TAKES_AND_PLANS.md "Compact
 tracks, events and entities0"), both with `kind: 'year-build'`. The flagship is still the /2 file: its re-record is
 held back by a camera-synth test (see there).
+
+### Chapter sets (W31): a long build as consecutive takes
+
+A build too long for one take (the 2022 east-house A+B: 600 599 ticks, 12.0 MB as one file against the 6 MB budget) is
+recorded as **one run cut into chapter takes** at plan barriers (`engine/take/chapters.ts`; the A+B chapters are
+sequence-b's sections A, D0, D1, D2, S, W, P+END). The manifest gets a top-level **`chapterSets`** list, which the
+current studio does not read. The chapters themselves are ordinary `otherYears` entries (`kind: 'year-build-chapter'`,
+`chapter`, see the table above), each with its own file, camera track and final-frame hash.
+
+`chapterSets[i]`:
+
+| field | meaning |
+| --- | --- |
+| `id` | the set's id: `hashOf({ set: <key>, takes: [chapter take ids] })` (24 hex). Every chapter's `chapter.of` |
+| `label`, `year`, `hypothetical` | option text, as for a take ("Watch it being built: 2022 east-house (A+B) (HYPOTHETICAL …)") |
+| `kind` | `'year-build-chapters'` |
+| `duration`, `ticks` | the whole run. `ticks` = Σ chapter ticks; `duration` = `ticks × dt` |
+| `startStateHash` | the first chapter's start state (`take.baselineStateHash`) |
+| `finalStateHash` | the last chapter's final state = the run's final state (for the A+B: the `year-build-b.test.ts` pin) |
+| `planHash`, `rulesVersion` | the one plan every chapter ran |
+| `bytes`, `gzipBytes` | Σ over the chapter files |
+| `chapters[]` | in play order: `{ id, label, take, file, from, to, ticks, fromStep, toStep }`. `take` / `file` = the chapter's manifest entry. `from` / `to` = the chapter's tick range within the run (`to − from = ticks`; `from` of chapter k = `to` of k − 1). `fromStep` / `toStep` = the plan step range `[fromStep, toStep)` |
+
+**Guarantees** (checked by the recorder on every record / `--check`, and by `engine/test/take-chapters.test.ts` on the
+shipped files):
+- **Continuity.** Chapter k's first frame is chapter k − 1's final state. `take.baselineStateHash` of k =
+  `take.finalStateHash` of k − 1 = `hashOf(finalState)` of k − 1. `take.entities0` of k holds every entity of k − 1's
+  `finalState` exactly (minus provenance / label / tags). `sampleTake(k, 0)` is within ½ mm / ½ mrad of those poses,
+  with the same phase / activity / level (`chapterContinuity`).
+- **One timeline.** `take.startTick` of k = `startTick + ticks` of k − 1, so absolute world ticks continue across the
+  chapters. Within a take, times are relative (from 0), as for every take.
+- **Own steps only.** A chapter's `steps` / events hold only the lifecycles of its own plan steps (`fromStep … toStep`).
+  Ambient make-way walks belong to the chapter in which they run.
+
+**Playing a set back to back (the renderer task; not built yet).** Offer each `chapterSets` entry under "Watch it being
+built" as one item, with its `ticks` and `duration`. Keep the chapter entries out of that picker (they already are, by
+`kind`). Then:
+1. Fetch chapter 0 and open it as today: datum offset, hide the rebuilt building, fixtures, camera = its `camera`.
+2. At its end (or on seek past `to`), open chapter k + 1. The scene need not be rebuilt: chapter k + 1's `entities0` is
+   chapter k's final frame, so the swap is seamless. Check `chapter.startHash === previous.take.finalStateHash` before
+   the swap and show a continuity error instead if it fails.
+3. The set's scrubber runs over `[0, duration)`. Map a set time T to the chapter k with `from ≤ T/dt < to` and the local
+   time `T − from·dt`. Moments are per chapter (`work`, `middle`, `done`: take seconds within the chapter). Offset them by
+   `from·dt`.
+4. Final checks: the last chapter's hash check covers the whole set (`finalStateHash` of the set = of the last chapter).
+   The canonical check (year-build) runs on the last chapter's replayed last frame. Earlier chapters can run it on their
+   own last frame; parts not yet built there are "outside this take".
+5. Prefetch chapter k + 1 while k plays (each file ≤ 6 MB raw; the A+B chapters are 0.9–3.5 MB, gzip 0.1–0.6 MB).
 
 ## 2. The take host per year
 
