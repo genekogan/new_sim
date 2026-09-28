@@ -494,3 +494,25 @@ Then: gate → release 5; HANDOFF refresh.
     studio-build pass. The `studio-take-visitor` baseline was refreshed after looking at it.
 - **W23 landed** `7422331`, `7362943`, `a6f4a02`, `8c91825` (≈280k tokens, 25 min; merged ff from `w23-camera`): the 0.56 = p1/p2 crossing the sight line at t 259.2 s under W21's timing (orbit geometry unchanged); new phase-2 failure `occluded` (planner readability < 0.6 caused by non-subjects; off for fly-throughs) → test (a) corrected by raise +2.5 m (height 9.77 m, min 0.61, recorded reason); corrections keep the searched start heading; proving-ground n1 orbit now swing −90° (raise had looked through the wall). Sampler classifies by kind via `finalState`/`entities0` (every pile had been a person), dropped at `removed`; take files carry `cameras: {id: track}` (`camera/track.ts` helpers; read path for the studio in CAMERA_DIRECT §8.2). Flagship re-recorded `d2f16bd3…` = pin c56ea8da @11459 (1.54 MB / 234 KB gz). 347 / 344 / 3 skip; studio-take, camera-verify, studio-direct, studio-build green; `studio-take-visitor` refreshed (inspected). Lead review: accepted. **Lead decision:** accept the sampler delta — drop `legacyKinds: true` in the recorder and re-record `--scenario year-build-2022` + `--full` (bay-1 min readability 0.40 → 0.42; whole house cuts 50 → 52) — folded into the next consolidation.
 - 07:40 EDT: W24 spawned (studio: file cameras in the replay bar + save directed track, whole-skeleton "Watch it being built" at 64× with frame-time numbers, drifted meal baseline); W25 spawned (engine, hash-identical: automatic pre-emption of social holds by directed tasks, vehicle–vehicle collision + yielding). W13 still in flight (phase B: decks, stair, solar landed; walls + A+B run + report pending).
+- **W24 (studio: file cameras, save directed track, whole skeleton at 64×, meal baseline, lab yard view)** — commits
+  `e607410`, `81ce842`, `0d0158e`, `9c2c012` + this docs commit (`STUDIO_REPLAY.md` §1–§6, `e2e/README.md`):
+  - **File cameras.** `TakeReplayFile.cameras?` typed and checked on load (`fileCameras`); replay-bar **Camera** picker:
+    planned, every `cameras` track (`kind · id · n shots`), an unsaved in-page directed track; plays via `fileCamera` →
+    `trackData` → `sampleTrack` like the planned one. Hook `verifyCamera(…, { track: { file: id } })`.
+  - **Save track** (Direct camera) → `withFileCamera` → download named like the shipped file (byte-identical + `cameras`,
+    tested); the owner copies it into `public/engine/takes/`. **Not posted to a room:** no controller op stores a
+    precomputed track or take file (`attach_camera_track` takes a shot spec, `direct_camera` directions, both for a
+    room-held take); the panel says so.
+  - **Whole skeleton.** Both 2022 builds offered with length + ticks; studio-build runs per take: whole skeleton ✓ 66 / 66
+    at the mars-2022 pose (max 0.2 mm), hash = manifest, last frame 0.57 mm. **64× for 10 s (SwiftShader):** 19.8 fps,
+    frames 50.8 / 66.7 / 83.3 ms (mean / p95 / max), 64.6 take-s per wall-s; redraw 1.38 ms mean, `sampleTake` 0.24 ms
+    (bay 1: 0.15) → **no cache** (a loaded-machine run stalled to p95 267 ms with redraw unchanged: rendering / CPU).
+    Log: merged waits "(×n over d s, until m:ss.s)", same waits resuming within 5 s fold (160 → 154 lines, totals kept).
+  - **meal-legs-crossed** refreshed: same eater and pose, moment tick 358 → 278 under W21 (diff zero on her).
+  - **Lab** "Oblique yard" on the year-build presets = the whole-skeleton take's first camera sample (tested to 1 mm).
+  - **Specs:** studio-direct 2, studio-take 1, camera-verify 2, studio-build 5, lab 8, meal captures 1 — all pass (in
+    the W24 scratch worktree on HEAD; the main tree's tsc error is W25's in-progress `social.test.ts`).
+  - **Open (not studio):** whole skeleton t 2682.3 s, m5 on a frame stance reaching *down* for the relayed top beam —
+    rendered palm 1.025 m from the recorded hand (`humans.ts` posing; the other 11 hand moments 0 mm). Template step
+    labels `$crew[0] steps out of the aisle` in the whole-skeleton take. The 95 make-way `reservation.conflict` refusals
+    (known since W14) show as "refused / failed" in the replay.

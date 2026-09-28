@@ -12,7 +12,8 @@ from both `takes` and `otherYears`, in manifest order. No take id, file name or 
 take shows up after the recorder rewrites the manifest.
 
 - **Replay take** (bottom of the stage, every year with at least one take). Each option reads
-  `label · year · ticks · hypothetical|historical`. The label's "(HYPOTHETICAL …)" suffix is dropped because the flag says it.
+  `label · year · length · ticks · hypothetical|historical` (W24 added the length: "… the whole house, from the piles ·
+  2022 · 1 h 38 min · 117,277 ticks · hypothetical" beside "… first bay, from the piles · 2022 · 34 min · 41,317 ticks"). The label's "(HYPOTHETICAL …)" suffix is dropped because the flag says it.
 - **Watch it being built** (header, right of the year picker). This lists only the year-build entries of that year and is
   hidden when there are none. It drives the same host, so the bottom panel then shows the transport.
 
@@ -73,8 +74,22 @@ drawn at t.
 
 The two newest entries up to the current time are always shown (`role="log"`, "Take log"), and the last 12 are in the
 Diagnostics drop-down with the whole-take totals. The 2022 take has 101 blocked waits, 0 failed and 0 violations.
-Since mars-take/4, repeated identical waits are one line "(×n until t s)", and the totals count each wait (the /4 first
+Since mars-take/4, repeated identical waits are one line, and the totals count each wait (the /4 first
 bay: 106 waits, whole skeleton: 242).
+
+**W24 (`takeLog` in take-replay.ts).** A merged wait reads "(×n over d s, until m:ss.s)" in the log's own clock (it read
+"until 1236.1 s" beside an m:ss clock). A wait of the same action with the same code and message that starts again
+within 5 s of the previous one's end (a resume between them kept them apart in the take) folds into that line: the
+whole skeleton's last two lines were "96:19 … a484 … m5 is waiting for m4 …" and "96:20 …" the same, now
+"96:19 blocked · walk_to a484 waiting: traffic.yield — m5 is waiting for m4 to clear a single-file passage (×2 over 1.3 s,
+until 96:20.5)". Whole skeleton 160 wait events → 154 lines; totals unchanged (flagship 57, bay 1 106, whole 242). A step
+reads as its label; an unlabelled step or a sub-action as `verb id` (`walk_to a484`, `m6:make-way:62896`), a step id
+that already names its verb as is (`s0539-leave-stance`).
+
+The whole skeleton also shows **95 refused / failed**: 94 `reservation.conflict` + 1 `route.unreachable`, all ambient
+make-way walks the engine submits for a person already reserved by a waiting step (`m6:make-way:62896 … actor:m6 is
+already reserved by action step:s0294-climb-stance`). Every sequence step completes; known since W14 (PROGRESS). The
+first bay has none.
 
 ### Final-frame checks (`take-checks.ts`)
 
@@ -86,6 +101,8 @@ bay: 106 waits, whole skeleton: 242).
   (installed, upright, ≤ 1 cm, ≤ 1°) is run on the **replayed last frame**.
   - 2022 first bay: **✓ 24 / 24 at the mars-2022 canonical pose, max 0.2 mm / 0.02°**. The house's other 42 frames and
     beams are reported as "outside this take" (a tranche), never as failures.
+  - 2022 whole skeleton (W24): **✓ 66 / 66, max 0.2 mm / 0.02°**, nothing outside; hash = recorded = manifest
+    (`d382e461…`), last frame = final state within 0.57 mm.
   - The protected checkpoint is not rebuilt in the browser. The graph comes from the same year file that
     `publishCampusYear` publishes as `mars-<year>`.
   - The reconstructed year-build scene hashes to the take's `base.staticHash` (`a3ffdd2f…`), which `direct-camera.ts`
@@ -103,6 +120,8 @@ bay: 106 waits, whole skeleton: 242).
   samples and the phase-2 simulation verdict. Under each shot are its corrections
   (`failure → strategy (n samples, t0–t1 s): reason · tried first: …`) or "valid as computed — no correction".
   A refusal shows its code and message, plus the candidates for an ambiguity.
+- **Save track** (W24) writes the compiled directed track into the open take's file and offers that file as a download
+  (below, "Where a saved track goes").
 - **Play directed track** switches the engine camera to the directed track (`TakeReplay.setTrack`), seeks to its first
   shot, plays, and folds the form away. **Back to the take's camera** restores the take's own track. The take, its hash
   and its poses are untouched (tested).
@@ -118,6 +137,28 @@ compiler itself (`direct-camera.ts` → `engine/camera/synth.ts directCamera`, p
   - in both cases the installed parts are added as collision-only prisms.
 
 The track id is named as the op names it (`dir-<hash>`).
+
+### Camera picker and saved tracks (W24)
+
+A take file may carry extra tracks beside its planned `camera` (`cameras: { id: CameraTrack }`, CAMERA_DIRECT.md §8.2).
+- **Read.** `TakeReplayFile.cameras?` is typed; `loadTakeFile` runs `fileCameras(f)`, so a malformed track or one of
+  another take refuses the file. The replay bar's **Camera** picker (beside Engine camera) lists the planned track, then
+  every `cameras` entry in id order (`fileCameras`), each as `kind · id · n shots` ("planned · cam-bb4b6990b0c93c33 ·
+  10 shots", "directed · dir-3c000e40cf0b · 2 shots"), then a directed track compiled on this page and not yet saved
+  ("… · unsaved"). Choosing one plays it exactly as the planned camera: `fileCamera` → `trackData` → `sampleTrack` per
+  frame, plus the datum offset. A directed track starts at its first shot.
+- **Where a saved track goes.** Save track → `withFileCamera(file, { id, takeId, kind: 'directed', data })` (checked:
+  the take's own id, not the planned camera's id; the take and the planned camera untouched) → a JSON download named
+  like the shipped file (`flagship-campus-2026.json`). The browser cannot write `public/`, so the owner puts the file
+  into `public/engine/takes/`; the recorder keeps its `cameras` across a re-record of the same take id and drops them
+  (with a log line) when the take changes. The open replay carries the track from then on (the picker lists it as
+  saved). The downloaded file is the shipped file byte-for-byte plus `cameras` (tested).
+- **Not posted to a room.** The controller's ops are `get_take`, `attach_camera_track` (a shot spec, planned in the
+  room) and `direct_camera` (directions, compiled in the room), all for a take the room holds. None stores a precomputed
+  track or a take file, and the public takes are not in any room, so Save track is download-only even with `wrangler
+  dev` up; the panel says so. A room that held the take would store the same direction with `direct_camera`.
+- **Verify.** The hook's `verifyCamera(from, to, hz, { track: { file: id } })` resolves the track through `fileCamera`.
+  The saved directed track verifies sample-for-sample like the in-page one (`studio-direct.spec.ts` "save track").
 
 The **Simulation & MCP** room path was not used, because none of these takes exists in a room. A room-held take would
 go through the panel's existing `/api/simulation` MCP calls; that wiring is left for when rooms hold recorded takes.
@@ -138,7 +179,8 @@ unknown group is refused with `camera.direct.unknown`.
 - **Coordinates.** Rays are cast in scene coordinates (the take + `offsetY`). Framing, size and the planner comparison
   stay in take coordinates, since a translation changes neither.
 - **Test hooks** (`window.__marsStudio`):
-  - `verifyCamera(from, to, hz, { track: 'take'|'directed'|'year' })`;
+  - `verifyCamera(from, to, hz, { track: 'take'|'directed'|'year'|{ file: id } })` (`{ file }`: W24);
+  - `cameras()`, `useCamera(id)` (the Camera picker), `takePerf(reset?)` (redraw timing) — W24;
   - `direct(directions)`, `playDirected(on)`;
   - `directOnYear(directions, { datetime, crop, duration })`: the year's canonical campus with nobody in it, as in the
     fixtures `campus2026()` / `campus2024()`;
@@ -166,8 +208,14 @@ regression fixture.
   for /4 takes and lists such ids only for older ones.
 - **Year-build takes have no dedicated "watch" camera.** They use the recorder's planned shot list (0.5 Hz; readability
   mean 0.81). A directed track can be computed and played instead.
-- **Direction in the studio compiles in the page.** The directed track lives only in the page and is not stored beside
-  the take.
+- **Direction in the studio compiles in the page.** The directed track lives in the page until **Save track** puts it
+  into a downloaded copy of the take file; shipping it is a manual copy into `public/engine/takes/` (W24).
+- **A reach-down from a frame stance misses by ~1 m.** Whole skeleton, t 2682.3 s, m5 standing on a frame at 3.01 m
+  (`reach_up`, taking the top beam handed up through the relay): the recorded right hand is 0.38 m *below* the feet
+  and 0.75 m to the side; the rendered palm is 1.025 m from it (arm posing, `humans.ts`). The other 11 sampled hand
+  moments are within 0 mm, so the spec's median criterion passes. Not fixed here (not a studio file).
+- **Unbound step labels.** Some whole-skeleton step labels are template text (`$crew[0] steps out of the aisle`); the log
+  shows them as recorded (recorder / sequence side).
 - **Chiba verify is weak evidence.** A static subject's focus points lie on its own bounding-box face (3 per sample).
   The render check therefore only sees occlusion by *other* meshes, never the facade itself. Chiba's 1.0 / 1.0 says
   nothing blocks the view, not that the frame shows Chiba well.
@@ -177,3 +225,30 @@ regression fixture.
   covering the crew's points.
 - **Worst-sample captures of take-less tracks** use the orbit camera at the sample's pose with the studio fov, not the
   track fov.
+
+## 6. Whole skeleton at 64× (W24)
+
+`studio-build.spec.ts` "at 64×": each year-build take plays at 64× for 10 s from 40 % of its length, engine camera on,
+headless Chromium + SwiftShader (software WebGL) at 1280×800. `redraw` = `TakeReplay.perf()`: `pose` is the whole
+`TakePeople.show` (sampleTake + posing people, parts and piles), `sample` is `sampleTake` alone; rendering is not in it.
+
+| take | ticks / entities | fps | frame mean / p95 / max (ms) | take-s per wall-s | redraw mean / max (ms) | sampleTake mean / max (ms) |
+| --- | --- | --- | --- | --- | --- | --- |
+| first bay | 41 317 / 40 | 19.6 | 51.1 / 66.7 / 83.3 | 64.5 | 1.44 / 2.3 | 0.15 / 0.3 |
+| whole skeleton | 117 277 / 82 | 19.8 | 50.8 / 66.7 / 83.3 | 64.6 | 1.38 / 2.1 | 0.24 / 0.4 |
+| whole skeleton, loaded machine (load avg ≈ 12) | | 13.8 | 73.1 / 266.7 / 516.7 | 50.6 | 1.44 / 2.5 | 0.25 / 0.4 |
+
+Node, the same stepping (64 / 60 s per call, 2 000 calls): `sampleTake` 0.066 ms mean on the first bay, 0.144 ms on the
+whole skeleton — it grows with the entity count (binary search per field), not with the take's length. **No per-tick
+cache**: the redraw is ≈ 3 % of a SwiftShader frame, and at 64× every frame is a new tick (≈ 21 ticks apart), so a cache
+of the visible window would never hit. The studio loop clamps dt to 0.1 s, so frames slower than 100 ms play below 64×
+(the loaded run: 50.6×); on the 50 ms SwiftShader frames the take keeps 64×. Frame stalls on the loaded run came with
+unchanged redraw times, i.e. rendering / CPU contention, not the replay.
+
+Captures looked at (W24): `studio-build-east-house-yard.png` (the establishing shot: ten piles, the cutting station, the
+crew of six, the other three 2022 houses, the east-house hidden), `-mid.png` (48:52: part of the skeleton standing, the
+crew at the frames, two blocked-wait lines), `-final.png` (97:43: all twelve frames with beams, emptied pallets, "✓ 66 /
+66 frames + beams"). The lab's year-build presets have the same yard framing as an **Oblique yard** button
+(LAB_GUIDE-level detail in `app/lab/year-build.ts`: the establishing spec evaluated with `evaluateShot`, equal to the
+take's first camera sample).
+
