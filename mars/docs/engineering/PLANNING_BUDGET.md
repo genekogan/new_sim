@@ -419,6 +419,20 @@ adds one read-only observer (`ChapterCutter`) and swaps TakeRecorders at section
 wall (the unchaptered run: 784–815 s). So does the chaptered first bay + first strip: `94db263e…` @ 53 604. The observer
 costs amortised O(1) per tick (a pointer over the steps before the next bound).
 
+**New pins, no pin moves (W38, the other 2022 houses, 2026-09-28).** `year-build-houses.test.ts` pins the default-suite
+tranche of each other house (first bay + first ground-floor deck strip, `yearBuildHouseSetup(…, { tranche: true })`):
+chiba `940e9f64…` @ 60 997, kitchen `4862adfc…` @ 55 293, west-house `b4c42210…` @ 54 322 (13–17 s wall each). Their full
+A+B runs are not green yet (`todo`, YEAR_BUILD.md). Shared, additive rule changes: `raise.ts` (the raise crew waits for
+bystanders), `stance.ts` (hang_beam walk-in waits for bystanders), `locomotion/walk.ts` (static guard: never step to where
+clearance < r − 3 cm; passage release on a mutual goal / yield wait). None moves a pinned scenario:
+- perf-walk stress / probe / campus / meal / v3: PIN-OK after every commit (`deploy/perf-walk.mjs`);
+- east-house bay-1 `251a44c5…` @41317 and bay-1 + first strip `94db263e…` @53604: green in every suite run;
+- east-house skeleton `d382e461…` @117277 and A+B `ddb634d6…` @600599 (`YEAR_BUILD_FULL=1`): green on the final head (9 / 9, run in full), bit-identical.
+East-house's plans (plan hash, entities, template) are byte-identical before and after every change (checked per edit).
+The new rules either apply only where the east-house run never gets (a neighbour at the line-0 end, a narrow +u side, a
+taken stringer spot, a reversed build), or they wait / hold where the east-house run never had a bystander or a
+static near-miss.
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

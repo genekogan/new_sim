@@ -23,7 +23,7 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status: **17 open blocks** (Q1, Q2, Q4–Q14, Q19 and W44's site-axis Q20–Q22; two pairs were duplicates and are merged) and **3 answered** (A3 north, §13 reach-down, §14 top beams).
+Status: **20 open blocks** (Q1, Q2, Q4–Q14, Q19, W44's site-axis Q20–Q22 and W38's year-build Q25–Q27; two pairs were duplicates and are merged) and **3 answered** (A3 north, §13 reach-down, §14 top beams).
 Status: **17 open blocks** (Q1–Q14, Q19, Q20 and Q21; 16 + 3 questions, two pairs were duplicates and are merged) and **2 answered**.
 
 **Gene's page.** `questions/index.html` shows every open block as a card Gene can read and answer (plain question,
@@ -747,6 +747,75 @@ pinned `chiba-solarium-door` (kind `plexiglass door` → engine `glass`), standi
 describing the opening. **Default:** as modelled.
 **What the answer changes.** Only the door pieces move (new hashed ids for the jambs and header; the leaf keeps its pinned id).
 A closed door would need a camera/walk rule for door objects (CAMERA_DIRECT.md: today openings are gaps).
+Gene:
+
+---
+
+## Year build checkpoint 1: the other three 2022 houses (W38)
+
+### Q25. 2022 Chiba: what were the two screens, and the 2.30 m wall on the same line as its 2.23 m wall?
+
+```question
+id: Q25
+urgency: none
+plain: In 2022, what were the two screens inside Chiba, and was there really a second, taller plywood wall along the same side?
+context: The model shows two framed screens inside Chiba (about 1.75 × 0.96 m and 3.45 × 1.95 m) and a 2.30 m plywood wall drawn on the same line as its 2.23 m wall. The replay builds walls only from plywood panels of the known heights, so it leaves these out and says why.
+changes: Screens would become placed items like furniture; a real second wall layer would get panels cut to 2.30 m and be built.
+options:
+  - Projection / display screens; one plywood wall on that side
+  - Screens, and a second (taller) layer on that wall
+  - Something else (say below)
+images:
+  - none | Two framed screens inside Chiba and a 2.30 m plywood wall drawn over its 2.23 m wall (YEAR_BUILD.md "Checkpoint 1").
+```
+
+(W38.) **What the engine sees.** Chiba 2022 has 2 screens + 2 bezels (1.750 × 0.962 m at 1.14–2.10 m; 3.450 × 1.950 m at
+0.68–2.63 m) and a 10.972 × 2.300 m plywood wall at y 0.23–2.53 on the same beam line as its 10.972 × 2.230 m wall. None has a
+material rule; the A+B plan leaves them unplaced with that reason. **What the answer changes.** Screens → placed items; a second
+layer → a 2.30 m panel def, and chiba's A+B plan and pins move.
+Gene:
+
+### Q26. 2022 kitchen: how did people get onto the roof deck over the far bay?
+
+```question
+id: Q26
+urgency: none
+plain: In 2022, the kitchen's top deck covered only the bay farthest from its stair. How did people get up there to lay it?
+context: The replay's builders reach the upper decks by climbing the frames at the stair end and walking along the beams. The kitchen's top deck is 7 m from the stair end, so the replay leaves it out and says why.
+changes: If they climbed the far end (or used a ladder), the replay builds that top deck too.
+options:
+  - Climbed the frames at the far end
+  - A ladder
+  - Walked across the beams from the stair end
+  - Don't know
+images:
+  - none | The kitchen's top deck covers bay 0 only (3 strips), 7 m from its stair end.
+```
+
+(W38.) **What the engine sees.** Kitchen 2022's 4.757 m deck covers bay 0 only (3 strips). The D1 / D2 crews climb only the
+stair-end frames and walk one beam's walkway, so the level is reported unplaced. **What the answer changes.** A D2 start from
+either end; kitchen gains 3 strips; its A+B plan and pins move.
+Gene:
+
+### Q27. 2022 kitchen and west house: what were the low walls (0.90 m and 1.00 m)?
+
+```question
+id: Q27
+urgency: none
+plain: In 2022, the kitchen had a waist-high plywood wall (0.9 m) and the west house a 1 m one. Were these counter fronts or railings, and how were they made?
+context: The replay cuts plywood wall panels only to the full wall heights (2.23 and 2.20 m), so it leaves these two low walls out and says why.
+changes: A half-height panel rule would build them.
+options:
+  - Counter / bench fronts, plywood on a 2x4 frame
+  - Railings with plywood
+  - Something else (say below)
+images:
+  - none | A 0.90 m plywood wall in the kitchen (y 0.30–1.20) and a 1.00 m one in the west house (y 0.30–1.30).
+```
+
+(W38.) **What the engine sees.** Kitchen: 3.658 × 0.900 m at (1.17, 6.31), y 0.30–1.20; west-house: 3.658 × 1.000 m at (−6.31,
+1.17), y 0.30–1.30. No panel def of those heights: unplaced with the reason. **What the answer changes.** A half-height panel
+rule; both houses' A+B plans and pins move.
 Gene:
 
 ---

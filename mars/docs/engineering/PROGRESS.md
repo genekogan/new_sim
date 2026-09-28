@@ -1144,3 +1144,22 @@ Then: gate → release 5; HANDOFF refresh.
   door is now one (tagged as above; the navmesh sees it as a gap, so no rule changed).
 - **W43 landed** `9f70386`, `24f1e84` (≈270k tokens, 55 min; merged): Chiba 2024 front rebuilt from Gene's photos in `photographic-corrections.ts` (`frontage2024`): vertical inset 2.5 bays wide in the frame-front plane, flaps leaning out with bottoms 2.65 m proud + cheeks, straight 12-riser flights to a 3.46 × 1.45 m landing at 2.49 m, sliding double door, right-flap stepped plexiglass (20 panes, 2x4 lattice) with the eye pane, plexiglass end wall on studs with `chiba-solarium-door` open 90° — the first door object in any year scene (walker 5.5 m and camera navmesh 5.0 m through it); new renderer material `plexiglass` (engine kind `glass`: collides, doesn't block view); 1446/1606 ids kept, 76 successors + 84 nulls in `id-migration.json`; `campus-2024.json` re-seeded (`reconstruction-edit` with both photos as evidence, protected); HISTORY_IDS gained a "Reconstruction edits" procedure; history-ids/geometry tests extended. 387 / 384 / 0 fail; studio-years 14/14; lab 2024 0 violations. Lead LOOKED at front-eye + solarium: accepted (matches the photo's structure; still differs: width 6 vs 7 bays → Q23, solar rows 4+4+2+2 vs 6+6+4+4, flat plexiglass, an upright in the front doorway, plywood deck where the photo shows sand). Q24 = end-wall door position/swing. Merge note: the three 2024 studio baselines conflicted with W42's north refresh — W43's taken, to be re-captured (W46). CAMERA_DIRECT §7 door line updated by the lead.
 - W46 spawned (Kit/renderer): prop datum fixes (tables +0.26, benches, crates, fridge, cafe counter, 2020 RVs/toilets/workshop table, trailer wheels) with id migration; re-capture the 2024 studio baselines with north −90 + the new front.
+- **W38 (2026-09-28, the other three 2022 houses, checkpoint 1; branch `w38-houses`, rebased on `b4b5284`).**
+  `yearBuildHouseSetup(2022, house, file, { tranche? })` runs chiba, kitchen, west-house (and east-house, report only)
+  through the same generator A+B, crew of six. The four houses are checked to be one template (12 × `upright-16ft-kit`
+  4 × 3, 54 × `beam-12ft` at 0.22 / 2.48 / 4.757, same footprint); the phase-B split rules apply unchanged. Differences:
+  kitchen's roof deck covers bay 0 only and it has no solar; chiba has two screens + bezels and a 2.30 m wall; kitchen /
+  west-house have 0.90 / 1.00 m walls (all unplaced with reasons; geometry in YEAR_BUILD.md).
+  - **Default suite: each house's first bay + first ground-floor strip is green and pinned**: chiba `940e9f64…` @60 997,
+    kitchen `4862adfc…` @55 293, west-house `b4c42210…` @54 322 (0 violations, 24 + 3 parts at pose, max 0.49 mm).
+  - **Full A+B: not green yet** (0 violations up to the refusal, `todo` behind `YEAR_BUILD_FULL=1`): chiba and west-house stop
+    in D1 (`s0770-walk-to`, a first-floor receiver spot beside frame 9172e067 has no standing room); kitchen stops in S
+    (`stringer.site-occupied`, idle crew parked on the stair site). Each got through the skeleton (66 / 66) and D0.
+  - **11 provisional rules** (YEAR_BUILD.md "Rules added or changed"): yard v2 (neighbours' work zones; opt-in, east-house
+    pins keep v1), yard work area on the ground, beam staging end, lay-out room / build direction (kitchen reverses),
+    raise / hang_beam walk-in bystanders, walker static guard and passage release, narrow +u side (one giver), unreachable
+    upper deck reported, stringer lay-down. Shared files touched additively: `raise.ts`, `stance.ts`, `locomotion/walk.ts`.
+  - **Pins:** no existing pin moved. East-house plans byte-identical after every change; suite bay-1 / bay-1 + strip green;
+    perf-walk 5 × PIN-OK; `YEAR_BUILD_FULL=1` skeleton `d382e461…` @117 277 and A+B `ddb634d6…` @600 599: green on the final head (9 / 9, run in full), bit-identical.
+  - Suite 391 tests: 385 pass, 0 fail, 6 skipped. Questions for Gene: Q25–Q27 in QUESTIONS_FOR_GENE.md. Lead decision:
+    move east-house onto yard v2 (re-pin `94db263e…` / `ddb634d6…` and W31's chapter takes) or keep v1.

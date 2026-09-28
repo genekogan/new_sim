@@ -374,3 +374,99 @@ within ½ mm / ½ mrad. The manifest contract is in STUDIO_REPLAY.md "Chapter se
 - rules for other years: deck layouts that are not whole-foot on beams, wall heights, stair templates (12–41 treads),
   more solar module sizes, roofs, doors, windows, fixtures as placed items;
 - performance: phase-B sections run ~1–4 s wall per simulated minute (support-chain checks are cached by supportKey).
+
+# Checkpoint 1: all four 2022 rack houses (W38, 2026-09-28)
+
+**HYPOTHETICAL** order, piles, crew; every rule added here is **PROVISIONAL**. `scenarios/year-build.ts`
+`yearBuildHouseSetup(2022, house, file, { tranche? })` runs any house through the same generator and rules
+(crew of six, no forklift). `tranche` = the default-suite slice: the first bay (frame lines 0–1) and the first
+ground-floor deck strip over it (`firstGroundStrip`). Tests: `engine/test/year-build-houses.test.ts`.
+
+## One template (checked, not assumed)
+The four houses (`HOUSES_2022`) are one template: 12 × `upright-16ft-kit` in 4 frame lines × 3 rows, 54 ×
+`beam-12ft` at seats 0.220 / 2.480 / 4.757 m, footprint half-size 2.326 × 5.525 m. East-house and west-house
+stand at yaw 0, chiba and kitchen at yaw π/2, in a pinwheel round the courtyard (centres (8.6, −4.8), (−8.6, 4.8),
+(−4.8, −8.6), (4.8, 8.6)). Every deck strip is a 4 ft × 15 ft sheet on the beams: the phase-B split rules (6 + 6 + 3 ft
+jointed on beams, notching on frame lines) apply unchanged. The deviations are in what else each house has:
+- **kitchen**: the roof deck (4.757 m) covers only bay 0, 3 strips (the other houses: 9); no solar; 10 roof parts,
+  a door, 79 fixtures (no rules); a **0.90 m** plywood wall (x 1.17, z 6.31; 3.658 × 0.900 m, y 0.30–1.20; a
+  counter front?) has no panel def (2.23 / 2.20 m only).
+- **chiba**: two **screens** (1.750 × 0.962 × 0.040 m at (−4.83, 1.62, −10.77), y 1.14–2.10; 3.450 × 1.950 × 0.040 m at
+  (−4.83, 1.65, −6.20), y 0.68–2.63) with **bezels** (1.800 × 1.012 × 0.076 and 3.500 × 2.000 × 0.076 m) —
+  projection / display screens mounted in the house, not plywood walls: no material rule; and a **2.30 m** plywood
+  wall (10.972 × 2.300 × 0.054 m at (−4.83, 1.38, −10.89), y 0.23–2.53) drawn over the same line as its 2.23 m wall
+  (10.972 × 2.230, y 0.25–2.48): a second, taller panel on the same beam line — no panel def of that height, and it
+  would stand in the 2.23 m wall's place. 16 fixtures.
+- **west-house**: a **1.00 m** plywood wall (x −6.31, z 1.17; 3.658 × 1.000 m, y 0.30–1.30) has no panel def; 5 fixtures.
+
+## Rules added or changed (all provisional)
+1. **Yard v2 — neighbours' work zones** (`bom.ts` `otherWorkZones`, `placePiles` `avoid`): no pile, station or
+   scrap plot on another rack house's work zone (its footprint + 3 m at the sides, 6 m at the ends). Used by
+   `yearBuildHouseSetup` for every house. **East-house's pinned runs keep the v1 yard**: its A+B yard puts
+   `pile-2x4-16ft-1` in kitchen's work zone and `pile-panel-rail-1` in chiba's, and moving them would move the
+   pins `94db263e…` / `ddb634d6…` (its phase-A yard is clear). Re-pinning east-house on v2 is a lead decision.
+2. **Yard work area on the build ground** (`bom.ts`, all yards): a plot's work area (the pile's take-out strip, the
+   station's in-feed, the offcut spot beside the scrap pile) must lie on the build scene's ground (the 35 m crop).
+   West-house's scrap pile had its offcut spot off the crop (`carry.target-blocked`). East-house unchanged.
+3. **Beam staging end** (`sequence.ts`): a beam is staged at the line-0 end of its aisle unless that plot (beam +
+   0.6 m at each end + 0.7 m each side) is taken by a scene obstacle; then at the far end (both → unplaced with
+   both blockers named). Chiba and west-house face a neighbour 5.6 m beyond line 0 (`hang.walk-blocked`: "m1 would
+   not fit … next to east-house-12-foot-orange-beam-0e197289"); 45 of their 54 beams (15 in the tranche) are staged at
+   the far end. The 18 low beams stay at line 0.
+4. **Lay-out room / build direction** (`sequence.ts`): frames are laid out beside their line before the raise
+   (line 0 outward, later lines over the unbuilt bays). Where the ground beyond one end of the house is taken within
+   a frame's length and the other end is open, the skeleton grows from the taken end: its first line is laid inward
+   over the unbuilt bays and held from outside (the holder walks there before the frame comes). Kitchen reverses:
+   `carry.clearance` "the load would intersect 'table top · West painted house'". Phase B keeps geometric line order
+   (k, beam columns and `engCol` mapped back).
+5. **Raise bystanders** (`construction/raise.ts`, shared, additive): the raise crew never walks through anyone
+   outside it. It holds the frame (`raise.path-occupied`) and an idle person is asked to make way (W27's set-part
+   rule). Kitchen: m2 raising frame (1, 2) passed 0.43 m from an idle m6 (7 × `collision.human-human`).
+6. **hang_beam walk-in bystanders** (`construction/stance.ts`): the same rule for the lifters walking a beam in
+   along its aisle (`hang.path-occupied`). Kitchen: m2 passed 0.35 m from an idle m3 (22 × `collision.human-human`).
+7. **Walker static guard** (`locomotion/walk.ts`, shared, additive): a walker never steps to where its clearance
+   would drop below r − 3 cm (the static invariant's measure) unless it already stands worse; it holds and replans.
+   Chiba: m3 leaving a stance started inside the radius, and the planner's first leg (straight to the snapped start
+   cell) cut a 0.22 m beam end (5 × `collision.human-static`, 0.17 m).
+8. **Narrow +u side** (`sequence.ts` `noRoomPlusU`, `sequence-b.ts`): beyond chiba's / west-house's +u edge stands the
+   other house's stair (rail posts 1.8 m out). Strips there put their middle piece in from −u. The outer +u piece
+   (3 ft, ≤ 12 kg) is pushed in by ONE giver on the strip's centre line; a heavier one would be held by its sides.
+   Before: `passup.giver-blocked` "m1 has no room to stand at (−6.54, −4.44)", then with side grips `passup.too-high`.
+9. **Unreachable upper deck** (`sequence-b.ts`): the D1 / D2 crews climb only the stair-end frames and walk one beam's
+   walkway, so a deck level whose strips stop short of the stair-end bay is not sequenced. Each piece is reported:
+   kitchen's roof deck (3 strips over bay 0, 7 m away), previously `beam.off-walkway` "5.33 m off beam … walkway".
+10. **Stringer lay-down** (`sequence-b.ts`): a stringer lies along its line, 1.6 m back from its place, unless something
+   0.5–1.3 m tall (a table, a wall) takes that footprint. Then it takes the nearest spot clear of everything 0.05–1.3 m
+   tall, with room for its carry formation (0.95 m each side), up to 1 m inward. That stringer is set first, and its
+   lift crew stands on the inward side. Kitchen's stringer 1 lies 0.9 m inward, clear of west-house's table and low beam
+   (`carry.clearance` ×2, then `stringer.no-room`). East-house is unchanged.
+11. **Passage release** (`locomotion/walk.ts`, shared, additive): a walker waiting for the person on its destination
+   lets go of its single-file passage when that person is yielding to it. Chiba D1: m3's destination lay inside a
+   passage m3 held, and m6 stood on it waiting for the passage (`walk.goal-occupied` ↔ `traffic.yield`), a deadlock to
+   the 16 h tick budget.
+Not kept: stepping off a stance foot onto standing room first (`leave_stance`). Rule 7 covers it.
+
+## Yards (`yearBuildHouseSetup`, v2)
+| house | piles | centroid | pile distance | station | scrap |
+| --- | --- | --- | --- | --- | --- |
+| chiba | 17 | (−8.5, −21.9) | 8.5–25.4 m | (10.17, −18.60) | (16.67, −15.60) |
+| east-house (report only) | 18 | (21.8, −7.0) | 8.1–25.5 m | (25.10, 9.17) | (29.60, 11.17) |
+| kitchen | 14 | (2.8, 21.7) | 8.1–23.6 m | (16.33, 25.10) | (17.83, 29.60) |
+| west-house | 17 | (−24.1, 6.2) | 9.5–25.3 m | (−33.10, 1.83) | (−33.60, −7.67) |
+0 refused for every house. East-house's pinned yard (v1) is W7/W13's.
+
+## Runs (`year-build-houses.test.ts`; full runs with `YEAR_BUILD_FULL=1`)
+| house | run | steps | ticks | sim | violations | at the canonical pose / target | unplaced (reasons above) | result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| chiba | tranche | 221 | 60 997 | 50.8 min | 0 | 24 skeleton + 3 deck pieces (max 0.41 mm) | — | **pinned `940e9f64…`** |
+| kitchen | tranche | 224 | 55 293 | 46.1 min | 0 | 24 + 3 (max 0.49 mm) | — | **pinned `4862adfc…`** |
+| west-house | tranche | 221 | 54 322 | 45.3 min | 0 | 24 + 3 (max 0.41 mm) | — | **pinned `b4c42210…`** |
+| chiba | A+B | 1462 | red at 242 501 (D1) | 3.4 h | 0 | skeleton 66 / 66 (max 0.49 mm), D0 done | fixtures 16, solar 14, stair 5, walls 5 | `s0770-walk-to`: "destination (−9.97, −7.68) on level 5 has no standing room … (blocked by chiba-frame-9172e067)" |
+| kitchen | A+B | 1240 | red at 316 443 (S) | 4.4 h | 0 | skeleton 66 / 66, D0 + D1 (54 pieces), stringers 1–2 | deck 3, door 1, fixtures 79, roof 10, stair 5, wall 1 | `s0986-install-stringer`: `stringer.site-occupied` "m4 stands where kitchen-stair-stringer-3 goes"; m4 was parked "clear of the stair site" by a spot rule that assumes east-house's side, then nudged onto it by a make-way |
+| west-house | A+B | 1480 | red at 236 596 (D1) | 3.3 h | 0 | skeleton 66 / 66, D0 done | fixtures 5, solar 14, stair 5, wall 1 | `s0770-walk-to`: the mirror of chiba's — "destination (−7.68, 9.97) on level 5 has no standing room … (blocked by west-house-frame-9172e067)" |
+
+Every full run has 0 violations up to the step that refuses. The refusals name the problem; nothing is forced.
+Full-house pins for chiba / kitchen / west-house do not exist yet: `PIN_FULL` in the test is empty and the full tests
+assert green only. **Next** (checkpoint 1b): a D1 receiver-spot rule that avoids frame planes on the mirrored houses
+(chiba / west-house); park the idle crew in the stair section from the stair's actual side and keep them out of the
+stair site (kitchen). Then the remaining sections (W, P, END) as they come.

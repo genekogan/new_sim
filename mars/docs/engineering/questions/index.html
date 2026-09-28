@@ -53,7 +53,7 @@ button{font:inherit;font-weight:600;padding:10px 18px;border-radius:8px;border:0
 <body>
 <main>
 <h1>Questions for Gene</h1>
-<p class="lede">19 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
+<p class="lede">22 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
 <section><h2>Worth answering first</h2>
 <article class="card" id="Q2" data-id="Q2" data-plain="In 2023 and 2024 the model has two trailers parked inside Chiba, under its roof (red outlines). Was that real?">
 <div class="qid">Q2</div>
@@ -679,6 +679,76 @@ pinned `chiba-solarium-door` (kind `plexiglass door` → engine `glass`), standi
 describing the opening. **Default:** as modelled.
 **What the answer changes.** Only the door pieces move (new hashed ids for the jambs and header; the leaf keeps its pinned id).
 A closed door would need a camera/walk rule for door objects (CAMERA_DIRECT.md: today openings are gaps).
+Gene:
+
+---</pre></details>
+</article>
+<article class="card" id="Q25" data-id="Q25" data-plain="In 2022, what were the two screens inside Chiba, and was there really a second, taller plywood wall along the same side?">
+<div class="qid">Q25</div>
+<h3>In 2022, what were the two screens inside Chiba, and was there really a second, taller plywood wall along the same side?</h3>
+<p class="context">The model shows two framed screens inside Chiba (about 1.75 × 0.96 m and 3.45 × 1.95 m) and a 2.30 m plywood wall drawn on the same line as its 2.23 m wall. The replay builds walls only from plywood panels of the known heights, so it leaves these out and says why.</p>
+<div class="pics">
+<div class="noimg"><strong>No picture for this one.</strong> Two framed screens inside Chiba and a 2.30 m plywood wall drawn over its 2.23 m wall (YEAR_BUILD.md &quot;Checkpoint 1&quot;).</div>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q25" value="Projection / display screens; one plywood wall on that side"> <span>Projection / display screens; one plywood wall on that side</span></label>
+<label class="opt"><input type="radio" name="Q25" value="Screens, and a second (taller) layer on that wall"> <span>Screens, and a second (taller) layer on that wall</span></label>
+<label class="opt"><input type="radio" name="Q25" value="Something else (say below)"> <span>Something else (say below)</span></label>
+<label class="opt"><input type="radio" name="Q25" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> Screens would become placed items like furniture; a real second wall layer would get panels cut to 2.30 m and be built.</p>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(W38.) **What the engine sees.** Chiba 2022 has 2 screens + 2 bezels (1.750 × 0.962 m at 1.14–2.10 m; 3.450 × 1.950 m at
+0.68–2.63 m) and a 10.972 × 2.300 m plywood wall at y 0.23–2.53 on the same beam line as its 10.972 × 2.230 m wall. None has a
+material rule; the A+B plan leaves them unplaced with that reason. **What the answer changes.** Screens → placed items; a second
+layer → a 2.30 m panel def, and chiba's A+B plan and pins move.
+Gene:</pre></details>
+</article>
+<article class="card" id="Q26" data-id="Q26" data-plain="In 2022, the kitchen's top deck covered only the bay farthest from its stair. How did people get up there to lay it?">
+<div class="qid">Q26</div>
+<h3>In 2022, the kitchen's top deck covered only the bay farthest from its stair. How did people get up there to lay it?</h3>
+<p class="context">The replay's builders reach the upper decks by climbing the frames at the stair end and walking along the beams. The kitchen's top deck is 7 m from the stair end, so the replay leaves it out and says why.</p>
+<div class="pics">
+<div class="noimg"><strong>No picture for this one.</strong> The kitchen's top deck covers bay 0 only (3 strips), 7 m from its stair end.</div>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q26" value="Climbed the frames at the far end"> <span>Climbed the frames at the far end</span></label>
+<label class="opt"><input type="radio" name="Q26" value="A ladder"> <span>A ladder</span></label>
+<label class="opt"><input type="radio" name="Q26" value="Walked across the beams from the stair end"> <span>Walked across the beams from the stair end</span></label>
+<label class="opt"><input type="radio" name="Q26" value="Don't know"> <span>Don't know</span></label>
+<label class="opt"><input type="radio" name="Q26" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> If they climbed the far end (or used a ladder), the replay builds that top deck too.</p>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(W38.) **What the engine sees.** Kitchen 2022's 4.757 m deck covers bay 0 only (3 strips). The D1 / D2 crews climb only the
+stair-end frames and walk one beam's walkway, so the level is reported unplaced. **What the answer changes.** A D2 start from
+either end; kitchen gains 3 strips; its A+B plan and pins move.
+Gene:</pre></details>
+</article>
+<article class="card" id="Q27" data-id="Q27" data-plain="In 2022, the kitchen had a waist-high plywood wall (0.9 m) and the west house a 1 m one. Were these counter fronts or railings, and how were they made?">
+<div class="qid">Q27</div>
+<h3>In 2022, the kitchen had a waist-high plywood wall (0.9 m) and the west house a 1 m one. Were these counter fronts or railings, and how were they made?</h3>
+<p class="context">The replay cuts plywood wall panels only to the full wall heights (2.23 and 2.20 m), so it leaves these two low walls out and says why.</p>
+<div class="pics">
+<div class="noimg"><strong>No picture for this one.</strong> A 0.90 m plywood wall in the kitchen (y 0.30–1.20) and a 1.00 m one in the west house (y 0.30–1.30).</div>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q27" value="Counter / bench fronts, plywood on a 2x4 frame"> <span>Counter / bench fronts, plywood on a 2x4 frame</span></label>
+<label class="opt"><input type="radio" name="Q27" value="Railings with plywood"> <span>Railings with plywood</span></label>
+<label class="opt"><input type="radio" name="Q27" value="Something else (say below)"> <span>Something else (say below)</span></label>
+<label class="opt"><input type="radio" name="Q27" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> A half-height panel rule would build them.</p>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(W38.) **What the engine sees.** Kitchen: 3.658 × 0.900 m at (1.17, 6.31), y 0.30–1.20; west-house: 3.658 × 1.000 m at (−6.31,
+1.17), y 0.30–1.30. No panel def of those heights: unplaced with the reason. **What the answer changes.** A half-height panel
+rule; both houses' A+B plans and pins move.
 Gene:
 
 ---</pre></details>
