@@ -659,5 +659,70 @@ export const forkliftLoad: Invariant = (rt: Runtime) => {
   return out;
 };
 
-export const FORKLIFT_ACTIONS: ActionDef[] = [forkliftPick, forkliftDeliver];
+// ─── additive hook for construction hand_up (construction/handup.ts, HANDUP.md) ────────────────
+// forklift_present: drive the load on the forks up to a point in the air beside a deck / beam edge
+// and hold it there raised (no release): people standing on the structure take it off the forks.
+
+type At = { x: number; z: number; y: number; yaw: number };
+
+export function planPresent(rt: Runtime, p: { operator: string; at: At }): { ok: true; program: ForkProgram } | Fail {
+  const w = rt.world;
+  const op = operatorOf(w, p.operator);
+  if ('code' in op) return { ok: false, diagnostic: op };
+  const load = loadOn(w, op.v.id);
+  if (!load) return bad('forklift.no-load', `${op.v.id} has nothing on its forks (forklift_pick first)`, [op.v.id]);
+  const g = engagement(load.def)!;
+  const sp = spatial(rt);
+  sp.sync(w);
+  const floor = op.v.pose.p[1];
+  const lv = op.a.human!.level;
+  const c: Vec2 = [p.at.x, p.at.z];
+  const H = p.at.y - floor;
+  if (H < 0 || H > FORKLIFT.liftMax + 1e-9)
+    return bad('forklift.lift-range', `${load.id} would be held ${f2(H)} m above ${op.v.id}'s floor; its forks lift 0–${FORKLIFT.liftMax} m`, [op.v.id, load.id], c, p.at.y);
+  const psi0 = wrapAngle(p.at.yaw - (g.across ? Math.PI / 2 : 0));
+  const pr = loadedProfile(g);
+  const cands: Cand[] = [], why: string[] = [], subj: string[] = [];
+  let firstFail: Diagnostic | null = null;
+  for (const psi of [psi0, wrapAngle(psi0 + Math.PI)]) {
+    const T = sub2(c, rot2(loadLocal(g, 0, 0), psi));
+    const pre = sub2(T, scale(fwd(psi), FORKLIFT.backOff));
+    const side = `approaching along ${f2(psi)} rad`;
+    const tight = tightAt(sp, w, lv, T, FORKLIFT_PROFILE.radius) ?? tightAt(sp, w, lv, pre, FORKLIFT_PROFILE.radius);
+    if (tight) { why.push(`${side}: no clearance for the truck next to ${tight.join(' and ')}`); subj.push(...tight); continue; }
+    const up = overheadHit(sp, [{ p: pre, yaw: psi }, { p: T, yaw: psi }], floor, stackHeight(H), undefined, new Set());
+    if (up) { why.push(`${side}: the raised mast would strike ${obLabel(up.o)}`); subj.push(up.o.id); continue; }
+    const sweep = sweepHit(sp, load, g, pre, T, psi, 0, floor + H);
+    if (sweep) { why.push(`${side}: the raised load would strike ${obLabel(sweep)}`); subj.push(sweep.id); continue; }
+    const dr = planDrive(rt, op, pr, pre, psi, 0, g);
+    if (!dr.ok) { firstFail ??= dr.diagnostic; why.push(`${side}: ${dr.diagnostic.message}`); continue; }
+    const steps: Step[] = [...(dr.curve ? [{ k: 'drive' } as Step] : []), { k: 'square', yaw: psi }, { k: 'forks', to: H }, { k: 'align', c, ext: 0 }];
+    cands.push({ drive: dr, steps, out: { yaw: psi, presented: [c[0], p.at.y, c[1]] } });
+  }
+  const best = bestOf(cands);
+  if (!best) {
+    if (firstFail && !subj.length) return { ok: false, diagnostic: firstFail };
+    return bad('forklift.no-approach', `${op.v.id} cannot present ${load.id} at ${fmt(c)}, ${f2(p.at.y)} m up: ${why.join('; ')}`, [op.v.id, load.id, ...new Set(subj)], c, p.at.y);
+  }
+  return { ok: true, program: { curve: best.drive.curve, targets: best.drive.targets, steps: best.steps, g, out: best.out } };
+}
+
+export const forkliftPresent: ActionDef<{ operator: string; at: At }, ForkProgram, ForkExec> = {
+  verb: 'forklift_present',
+  description: `Drive the load on the forks to (x, z) and raise it to height y (0–${FORKLIFT.liftMax} m above the truck's floor), square to yaw, and hold it there raised for people on a deck or the rack beams to take it (hand_up via 'forklift').`,
+  schema: z.strictObject({
+    operator: z.string().max(80),
+    at: z.strictObject({ x: z.number().min(-1e4).max(1e4), z: z.number().min(-1e4).max(1e4), y: z.number().min(0).max(40), yaw: z.number().min(-10).max(10) }),
+  }),
+  reservations: (w, p) => opReservations(w, p.operator),
+  plan: planPresent,
+  start: (rt, p, prog, id) => {
+    const vid = rt.world.entities[p.operator].human!.riding!;
+    return startFork(rt, p.operator, loadOn(rt.world, vid)!.id, prog, id);
+  },
+  step: stepFork,
+  cancel: cancelFork,
+};
+
+export const FORKLIFT_ACTIONS: ActionDef[] = [forkliftPick, forkliftDeliver, forkliftPresent];
 export const FORKLIFT_INVARIANTS: Invariant[] = [forkliftLoad];

@@ -9,6 +9,10 @@ import { ENVELOPE_TOL, envelopeGap, GIVE_MAX, handsOf, REACH_DOWN } from '../con
 import { deckSurfaces } from '../construction/contributor.ts';
 import { bay, run } from './frame-fixtures.ts';
 import type { Runtime } from '../runtime/runtime.ts';
+import { human } from '../world/factory.ts';
+import { forklift, FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
+import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
+import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 
 const W = def('plywood-4x6').size[2]; // 1.22 m
 const JZ = (L: number) => [L / 2 - 0.75, L / 2 - 0.25, L / 2 + 0.25, L / 2 + 0.75]; // four joists under a sheet laid along the bay
@@ -119,4 +123,53 @@ test('hand points: the invariant flags a receiver whose hands are out of reach (
   const v = rt.violations.filter((x) => x.code === 'lift.hands-out-of-reach');
   assert.ok(v.some((x) => x.subjects?.includes('p3') && /below their feet/.test(x.message)), JSON.stringify(v));
   assert.ok(v.some((x) => x.subjects?.includes('p1') && /above their floor/.test(x.message)), JSON.stringify(v));
+});
+
+/** The 2.4 m bay with a forklift east of it and s1 on the ground in front of its forks. */
+function forkBay() {
+  const L = def('beam-12ft').size[0];
+  const b = bay({ seat: 2.29, beam: 'beam-12ft', joists: JZ(L), actions: [...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS], invariants: [...CARRY_INVARIANTS, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS] }, [
+    component('s1', 'plywood-4x6', [5.6, 0, L / 2], Math.PI / 2, { phase: 'staged' }),
+    forklift('f1', 10, L / 2, Math.PI),
+    human('op', 10, L / 2 + 0.95),
+  ]);
+  const to = { x: 0, z: L / 2, yaw: Math.PI / 2 };
+  run(b.rt, 'mount', { actor: 'op', vehicle: 'f1' }, 400);
+  run(b.rt, 'forklift_pick', { operator: 'op', item: 's1' });
+  return { ...b, to };
+}
+// the sheet's inner edge EDGE_GAP outside b3's face, at the height it is fed in (joist top + 5 cm)
+const presentAt = (b: { top: number; L: number }) => ({ x: def('upright-12ft').size[0] / 2 + def('beam-12ft').size[2] / 2 + 0.08 + W / 2, z: b.L / 2, y: b.top + def('2x4-6ft').size[1] + 0.05, yaw: Math.PI / 2 });
+
+test('hand_up via forklift: the forks present the sheet at deck height, two on the beams take it off the forks and lay it, 0 violations', () => {
+  const b = forkBay();
+  const { rt, E, to } = b;
+  run(rt, 'forklift_present', { operator: 'op', at: presentAt(b) });
+  assert.equal(E.s1.support?.kind, 'forks');
+  assert.ok(Math.abs(E.s1.pose.p[1] - presentAt(b).y) < 1e-6, `presented at ${E.s1.pose.p[1]}`);
+  const r = rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'op', receivers: ['p3', 'p4'], to });
+  assert.notEqual(r.status, 'failed', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
+  const w = watch(rt, r.id);
+  assert.equal(w.r.status, 'completed', `${w.r.diagnostic?.code} ${w.r.diagnostic?.message}`);
+  assert.deepEqual([...w.holders].sort(), ['p3', 'p4']);
+  assert.deepEqual(rt.violations, [], JSON.stringify(rt.violations.slice(0, 3)));
+  assert.equal(E.s1.phase, 'staged');
+  assert.equal(E.s1.support?.kind, 'resting-on');
+  run(rt, 'install_plywood', { crew: ['p3', 'p4'], sheet: 's1', x: to.x, z: to.z, yaw: to.yaw });
+  assert.equal(E.s1.phase, 'installed');
+  // the empty truck drives off
+  run(rt, 'ride_to', { actor: 'op', x: 12, z: b.L / 2 });
+  assert.deepEqual(rt.violations, []);
+});
+
+test('hand_up via forklift is refused when the forks hold it too low, or it is not on the forks', () => {
+  const b = forkBay();
+  const { rt, to } = b;
+  run(rt, 'forklift_present', { operator: 'op', at: { ...presentAt(b), y: 1.2 } });
+  const low = rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'op', receivers: ['p3', 'p4'], to });
+  assert.equal(low.diagnostic?.code, 'handup.too-high');
+  assert.match(low.diagnostic!.message, /below the receivers' feet \(max 1 m\); raise the forks/);
+  const b2 = sheetBay(2.29);
+  const none = b2.rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'p5', receivers: ['p3', 'p4'], to: b2.to });
+  assert.equal(none.diagnostic?.code, 'forklift.no-operator');
 });

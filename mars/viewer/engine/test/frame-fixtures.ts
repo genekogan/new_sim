@@ -2,7 +2,7 @@
 // standing 12 ft uprights built *by state* (beam seats above standing reach cannot be placed by a
 // ground crew, so the tests set the assembly directly, as progressive.test does for its second bay).
 // A at z 0 (yaw π), B at z L (yaw 0); columns at x ±D/2; beams along z; joists across x.
-import { Runtime } from '../runtime/runtime.ts';
+import { Runtime, type Invariant } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
@@ -34,6 +34,9 @@ export type BayOpts = {
   joists?: number[];
   /** Extra beams: [id, side (+1 = x +D/2), seat]. */
   extra?: [string, 1 | -1, number][];
+  /** Extra verbs / invariants (vehicles, forklift). */
+  actions?: ActionDef[];
+  invariants?: Invariant[];
 };
 
 /** Beam spec: [id, x side (+1 = x +D/2), seat]. A's column 'l' is at x +D/2 (A faces −z). */
@@ -84,9 +87,9 @@ export function bay(o: BayOpts, extras: Entity[] = []): Bay {
     j.connections = ['b4', 'b3'].map((b) => ({ socket: 'bears-on', to: b, toSocket: `joist@${z.toFixed(2)}` }));
     w.entities[id] = j;
   }
-  const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...CONSTRUCTION_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
+  const reg = new Map<string, ActionDef>([['walk_to', walkTo], ...[...CONSTRUCTION_ACTIONS, ...(o.actions ?? [])].map((a) => [a.verb, a] as [string, ActionDef])]);
   const rt = new Runtime(w, reg, { spatial: new Spatial(base, { contributors: [progressiveContributor, frameAccessContributor] }) }, [
-    ...DEFAULT_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk,
+    ...DEFAULT_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...(o.invariants ?? []),
   ]);
   return { rt, L, seat, top, E: rt.world.entities };
 }
