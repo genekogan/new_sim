@@ -795,3 +795,4 @@ Then: gate → release 5; HANDOFF refresh.
   corrected map says Claude. Amend it (W33 does not own it). No engine / app / spec file touched; the capture script was
   not committed.
 - Cost: ≈ 0.37 M tokens (incl. a 95k Explore subagent), ≈ 45 min wall.
+- **W33 landed** `70cc6ea`, `0650aa8`, `fe05070`, `f8e6675` (≈370k tokens, 45 min, docs only): CODEX.md, four Codex briefs, QUESTIONS_FOR_GENE.md (14 open + 2 answered, 10 images incl. 5 new lab captures), HANDOFF/NEXT_SESSION_PROMPT with the split + ETAs, questions removed from handoffs. Lead verified on main; **Gene alerted 11:55 EDT: "CODEX.md and briefs are on main".** Notes: parse brief uses `parseSentence/parseSentences` (name collision with `direct.ts` `parseDirection`); `**` scan needs an allowlist of 14 Claude-owned lines; green frames will drift many baselines (accept firelit/colour drift at merge); `npm run lint` fails on missing tsgolint (Codex tooling brief).
