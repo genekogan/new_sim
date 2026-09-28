@@ -50,3 +50,8 @@
   is on a `codex/*` branch.
 - (2026-09-29 ~12:00 EDT, Gene) **Deploy bleeding edge to production** (the public Worker link) now, then continue autonomously; Codex
   starts its tranche in parallel. Release protocol unchanged: full gate GREEN at the deployed head, rollback version recorded.
+- (2026-09-29 ~13:40 EDT, lead — Gene may veto) **2x4 framing in year replays only where the reconstruction has it.** The framing verbs
+  (`install_top_plate` / `install_rafter` / `install_blocking`, FRAMING.md) are landed and gated. The 2022 Kit draws no plates, rafters
+  or ceiling joists (roof sheets lie on the top beams; its 10 "roof" features are the kitchen guard rail), so the 2022 replays do not
+  sequence framing — adding it would put members in the take that the protected checkpoint lacks and lift the roof deck 13 cm
+  (breaking the 1 cm acceptance). Whether the real 2022 roofs had 2x4s under the plywood is parked in QUESTIONS_FOR_GENE.md.

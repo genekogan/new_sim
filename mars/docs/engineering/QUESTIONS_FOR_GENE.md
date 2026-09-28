@@ -260,3 +260,12 @@ OWNER_FEEDBACK §14).
 **Gene (2026-09-29):** the 0.5 m kneel rule stays the default. Add a prone receiver (lying on the stomach at
 the deck edge, then rising to knees and feet holding the load) as a further posture (OWNER_FEEDBACK §13).
 W28 and W29 landed it.
+
+## Q19 — Did the 2022 roofs have 2x4 framing under the plywood? (parked; non-blocking)
+**What the engine sees:** the 2022 Kit scenes have no top plates, rafters or ceiling joists; every roof sheet lies straight on the
+rack's top beams (0.22 / 2.48 / 4.757 m). The only "roof" features are the kitchen's 8 rail posts + 2 railings. The 2026 skeleton
+photo (`evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg`) shows 2x4 top framing before plywood.
+**What the answer changes:** if 2022 had framing, the replays would sequence `install_top_plate`/`install_rafter` before the roof
+deck and the protected `mars-2022` state would need a reconstruction-edit adding the members (roof deck rises ≈ 13 cm). If not,
+nothing changes — the framing verbs wait for 2026.
+Gene:
