@@ -24,6 +24,9 @@ import { groupStability, isUpright } from '../construction/rules.ts';
 import { planCameraTrack } from '../camera/plan.ts';
 import { toCameraTrack } from '../camera/track.ts';
 import type { Sampler, ShotSpec, SubjectPose } from '../camera/shots.ts';
+import { takeSampler } from '../camera/take-sampler.ts';
+import { takeFacts } from '../camera/direct.ts';
+import { directCamera } from '../camera/synth.ts';
 import { createRegistry, describeVerbs, engineConfig, ENGINE_INVARIANTS, jsonSchemaOf } from './registry.ts';
 import { opSchemas, type OpInput, type OpName } from './schemas.ts';
 import { applyEdits } from './edit.ts';
@@ -243,6 +246,7 @@ export class EngineController {
         case 'delete_workspace': return this.deleteWorkspace(parsed.data as OpInput<'delete_workspace'>);
         case 'get_take': return this.getTake(parsed.data as OpInput<'get_take'>);
         case 'attach_camera_track': return this.attachCameraTrack(parsed.data as OpInput<'attach_camera_track'>);
+        case 'direct_camera': return this.directCameraOp(parsed.data as OpInput<'direct_camera'>);
       }
     } catch (e) {
       if (e instanceof PlanError) return fail(e.code, e.message, { diagnostics: e.diagnostics });
@@ -685,6 +689,37 @@ export class EngineController {
       take_id: take.id,
       takeHashUnchanged: this.takes.takeHash(take.id) === before,
       report: { samples: r.samples, invalidSamples: r.invalidSamples, sweptCrossings: r.sweptCrossings, minReadability: r2(r.minReadability), readableFraction: r2(r.readableFraction), cuts: r.cuts, corrections: r.corrections.slice(0, 20), reasons: r.reasons.slice(0, 20) },
+    };
+  }
+
+  /** OWNER_FEEDBACK §11: directions → computed, validated camera track stored beside the take (camera/direct.ts, synth.ts). */
+  directCameraOp(q: OpInput<'direct_camera'>): OpResult {
+    const take = this.take(q.take_id);
+    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    const scene = this.scenes[take.finalState.base.campus];
+    if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
+    const hz = q.hz ?? 10;
+    const r = directCamera(q.directions, { scene, world: take.finalState, sampler: takeSampler(take), facts: takeFacts(take), duration: takeDuration(take), hz });
+    if (!r.ok) {
+      const d = r.diagnostics[0];
+      return fail(d.code, uniqueMessage(r.diagnostics.map((x) => x.message).join('; ')), { diagnostics: r.diagnostics, shots: r.shots });
+    }
+    if (this.unkept.has(take.id)) this.keepTake(take);
+    const before = this.takes.takeHash(take.id);
+    const trackId = q.track_id ?? `dir-${hashOf({ take: take.id, directions: q.directions, hz }).slice(0, 12)}`;
+    this.cameras(take.id);
+    this.takes.attachCamera(toCameraTrack(trackId, take.id, r.plan, 'directed'));
+    if (!this.changes.cameras.includes(take.id)) this.changes.cameras.push(take.id);
+    const rep = r.plan.report;
+    const every = Math.max(1, Math.round(hz));
+    return {
+      ok: !rep.rejected,
+      ...(rep.rejected ? { code: 'camera.rejected', message: uniqueMessage(`directed track ${trackId} rejected: ${rep.reasons.slice(0, 5).join('; ')}`) } : {}),
+      track_id: trackId,
+      take_id: take.id,
+      takeHashUnchanged: this.takes.takeHash(take.id) === before,
+      track: { hz, duration: r.plan.duration, samples: r.plan.samples.length, keyframes: r.plan.samples.filter((_, i) => i % every === 0).map((s) => ({ t: s.t, position: s.position, target: s.target, fov: s.fov, cut: s.cut })) },
+      report: r.report,
     };
   }
 

@@ -14,7 +14,7 @@
  * trailing offset/Z; it is always interpreted as Bombay Beach local time).
  */
 
-import { dacos, dcos, dsin, dtan } from '../core/math.ts';
+import { dacos, datan, datan2, dcos, dsin, dtan } from '../core/math.ts';
 
 export const BOMBAY_BEACH = { lat: 33.3506, lon: -115.7295 };
 
@@ -323,4 +323,72 @@ export function sunDirectionVector(elevationDeg: number, azimuthDeg: number): [n
   const elRad = elevationDeg * DEG2RAD;
   const cosEl = dcos(elRad);
   return [dsin(azRad) * cosEl, dsin(elRad), -dcos(azRad) * cosEl];
+}
+
+// ---------------------------------------------------------------------------
+// Sun-behind windows for camera direction (OWNER_FEEDBACK_2026-09-28 §11,
+// docs/engineering/CAMERA_DIRECT.md). Additive: nothing above depends on it.
+// ---------------------------------------------------------------------------
+
+/**
+ * World heading (radians, `datan2(z, x)` — the camera's `dirFrom` azimuth convention) of a compass
+ * azimuth (degrees clockwise from north), under the NORTH_AZIMUTH_OFFSET assumption above.
+ */
+export function worldHeadingOfAzimuth(azimuthDeg: number): number {
+  const d = sunDirectionVector(0, azimuthDeg);
+  return datan2(d[2], d[0]);
+}
+
+export type SunBehindOpts = {
+  /** Vertical field of view (deg) of the lens that must keep the sun in frame. */
+  vfovDeg: number;
+  /** Frame aspect (width / height), default 16:9. */
+  aspect?: number;
+  /** Keep the sun at least this far inside the frame edge (deg), default 3. */
+  marginDeg?: number;
+  /** Minimum angle between the optical axis and the sun (deg): flare / blown-out subject guard, default 6. */
+  flareDeg?: number;
+};
+
+/**
+ * Where a camera must be for the sun to sit *behind the subject*, in frame but off the optical axis, at a
+ * local Bombay Beach datetime:
+ * - `cameraHeading`: world heading from the subject to the camera (dirFrom convention) = sun heading + π,
+ *   with `halfWidth` = hfov/2 − margin (the sun stays horizontally inside the frame);
+ * - `pitch`: allowed view pitch (radians, + = looking up): the sun between `flare` and vfov/2 − margin above
+ *   the optical axis (sky in the upper frame, never dead centre).
+ * `aboveHorizon` false (sun set) means no such window exists: callers refuse.
+ */
+export type SunBehindWindow = {
+  datetime: string;
+  sun: { azimuthDeg: number; elevationDeg: number; direction: [number, number, number]; heading: number };
+  cameraHeading: { centre: number; halfWidth: number };
+  pitch: { min: number; max: number };
+  hfovDeg: number;
+  vfovDeg: number;
+  marginDeg: number;
+  flareDeg: number;
+  aboveHorizon: boolean;
+};
+
+export function sunBehindWindow(localIso: string, opts: SunBehindOpts): SunBehindWindow {
+  const s = solarPosition(localIso);
+  const aspect = opts.aspect ?? 16 / 9;
+  const margin = opts.marginDeg ?? 3;
+  const flare = opts.flareDeg ?? 6;
+  const hfovDeg = 2 * datan(dtan((opts.vfovDeg * DEG2RAD) / 2) * aspect) * RAD2DEG;
+  const heading = worldHeadingOfAzimuth(s.azimuthDeg);
+  let centre = heading + Math.PI;
+  if (centre > Math.PI) centre -= 2 * Math.PI;
+  return {
+    datetime: localIso,
+    sun: { azimuthDeg: s.azimuthDeg, elevationDeg: s.elevationDeg, direction: s.direction, heading },
+    cameraHeading: { centre, halfWidth: (hfovDeg / 2 - margin) * DEG2RAD },
+    pitch: { min: (s.elevationDeg - (opts.vfovDeg / 2 - margin)) * DEG2RAD, max: (s.elevationDeg - flare) * DEG2RAD },
+    hfovDeg,
+    vfovDeg: opts.vfovDeg,
+    marginDeg: margin,
+    flareDeg: flare,
+    aboveHorizon: s.elevationDeg > 0,
+  };
 }

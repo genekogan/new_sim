@@ -3,6 +3,7 @@
 // the Durable Object) and the JSON Schemas returned by list_verbs.
 import { z } from 'zod';
 import { templateSchema } from '../sequence/types.ts';
+import { cameraDirectionSchema } from '../camera/direct.ts';
 
 const id = z.string().min(1).max(120);
 const wsId = z.string().regex(/^[A-Za-z0-9][\w.-]{0,63}$/, 'workspace ids: letters, digits, _ . - (≤ 64)');
@@ -154,6 +155,12 @@ export const opSchemas = {
     shot: shotSpecSchema,
     hz: z.number().min(1).max(30).optional(),
   }),
+  direct_camera: z.strictObject({
+    take_id: id,
+    directions: z.array(cameraDirectionSchema).min(1).max(24).describe('camera directions in order (each starts when the previous ends unless `at` is given)'),
+    track_id: z.string().regex(/^[\w.-]{1,64}$/).optional(),
+    hz: z.number().min(1).max(30).optional(),
+  }),
 } as const;
 
 export type OpName = keyof typeof opSchemas;
@@ -200,4 +207,9 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
   log: { readOnly: true, description: 'Checkpoint history of a workspace (newest first: id, parent, cause, label). Without `workspace` lists all workspaces.' },
   get_take: { readOnly: true, description: 'Compact slice of a take: header, quantised pose tracks [tick, x_mm, y_mm, z_mm, yaw_mrad…] within [from, to] (bracketing samples included for interpolation), discrete changes, events; optional final state and camera tracks.' },
   attach_camera_track: { readOnly: false, description: 'Plan a camera track (shot spec → collision-aware, readability-scored samples with explained cuts) against a recorded take and store it beside the take. Never changes the take or its hash.' },
+  direct_camera: {
+    readOnly: false,
+    description:
+      "Direct the camera in words-as-data: each direction names a subject (entity, assembly e.g. 'rack bay' / a building, region, or group = the people in an action/activity), a motion (pan, tilt, dolly, orbit {degrees}, crane, push_in, pull_out, fly_through, hold), duration or speed, framing (wide/medium/close, headroom, thirds, side) and context (sunBehind, interior room, lookAt fixture e.g. 'sink'). Names are resolved in the take's world; an ambiguous name returns camera.direct.ambiguous with the candidates (ask, don't guess), an unknown one camera.direct.unknown with what is known. The trajectory is computed (orbit radius from extent + lens, sun-behind heading/pitch window from the sun model, interior routes through a camera navmesh), validated by the camera planner, and stored beside the take. Returns track_id, 1 Hz keyframes and a per-shot report (resolved subject, computed parameters, validation, corrections [] reserved for self-correction). Never changes the take.",
+  },
 };
