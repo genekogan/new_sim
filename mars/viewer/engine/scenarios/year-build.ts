@@ -29,7 +29,6 @@ import { progressiveContributor, progressiveSupported } from '../construction/co
 import type { Section } from '../campus/sequence-b.ts';
 import type { PartB } from '../campus/parts-b.ts';
 import { entityCorners, type Contributor, type SceneContribution } from '../spatial/service.ts';
-import type { Entity } from '../world/types.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import type { EngineConfig } from '../rehearsal/rehearse.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';

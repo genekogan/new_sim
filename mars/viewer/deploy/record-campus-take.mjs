@@ -33,7 +33,7 @@ import { WorldHistory } from '../engine/history/store.ts';
 import { Spatial, entityFootprint } from '../engine/spatial/service.ts';
 import { bindLabel, bindTemplate } from '../engine/sequence/bind.ts';
 import { rehearse } from '../engine/rehearsal/rehearse.ts';
-import { blockedWaits, expandEvents, replayFinalState, sampleTake, takeDuration } from '../engine/take/replay.ts';
+import { blockedWaits, expandEvents, replayFinalState, takeDuration } from '../engine/take/replay.ts';
 import { TakeLibrary } from '../engine/take/store.ts';
 import { readCampus2026File } from '../engine/campus/node.ts';
 import { loadCampusFile } from '../engine/campus/history-node.ts';

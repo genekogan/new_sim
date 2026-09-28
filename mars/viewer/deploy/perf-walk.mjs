@@ -37,9 +37,14 @@ export const PINS = {
 // ---- measurement harness (bench only) ----
 let costs = [];
 let prof = null;
+// oxlint-disable-next-line typescript/unbound-method -- saved and re-invoked with origStep.apply(this, a)
 const origStep = Runtime.prototype.step;
 Runtime.prototype.step = function (...a) {
-  if (prof && this.prof !== prof) this.profile = true, (this.prof = prof), this.services.spatial && (this.services.spatial.prof = prof);
+  if (prof && this.prof !== prof) {
+    this.profile = true;
+    this.prof = prof;
+    if (this.services.spatial) this.services.spatial.prof = prof;
+  }
   const t0 = performance.now();
   const r = origStep.apply(this, a);
   costs.push(performance.now() - t0);

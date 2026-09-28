@@ -14,7 +14,7 @@ import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { walkTo, WALK_MIN, TURN_IN_PLACE, DECIDE_TICKS, encounterOf, WALK_SPEED_CAP } from '../locomotion/walk.ts';
 import { smoothPolyline, denseClearance, filletCap, LAT_ACCEL, SHARP_CAP, type SmoothPath } from '../locomotion/spline.ts';
 import { buildGrids, type LevelGrid } from '../spatial/grid.ts';
-import { findRoute, PLAN_MARGIN, type WalkLeg } from '../spatial/path.ts';
+import { findRoute, PLAN_MARGIN } from '../spatial/path.ts';
 import { HUMAN_PROFILE, type SpatialScene } from '../spatial/types.ts';
 import { angleDelta, dist2, heading, sub2, type Vec2 } from '../core/math.ts';
 import { seedRng, nextRandom } from '../core/rng.ts';

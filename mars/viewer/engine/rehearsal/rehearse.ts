@@ -6,7 +6,7 @@
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
-import { Runtime, type Invariant, type Violation } from '../runtime/runtime.ts';
+import { Runtime, type Invariant, type RuntimeServices, type Violation } from '../runtime/runtime.ts';
 import { SequenceRunner, type SequenceResult, type SequenceStatus, type StepReport } from '../sequence/runner.ts';
 import type { BoundPlan } from '../sequence/types.ts';
 import { planHashOf } from '../sequence/bind.ts';
@@ -20,7 +20,7 @@ import { affectedSteps, planEnvelope, type AffectedStep, type PlanEnvelope } fro
 export type EngineConfig = {
   registry: Map<string, ActionDef>;
   invariants: Invariant[];
-  services: (world: WorldState) => Record<string, any>;
+  services: (world: WorldState) => RuntimeServices;
   maxTicks?: number;
   keyframeEvery?: number;
   /** Pose-track tolerance of the run's TakeRecorder (default TRACK_TOL). `deploy/record-campus-take.mjs` plans the camera
@@ -79,7 +79,7 @@ export type ExecuteResult =
   | { ok: false; code: 'execution.failed'; message: string; report: RunReport; take: Take };
 
 /** Fresh services for `world` from the factory; refuses a spatial service built for another static base. */
-export function runServices(world: WorldState, cfg: EngineConfig): Record<string, any> {
+export function runServices(world: WorldState, cfg: EngineConfig): RuntimeServices {
   const services = cfg.services(world);
   const sp = services.spatial as { base?: unknown; baseId?: string } | undefined;
   if (sp && sp.base !== undefined && (sp.baseId ?? hashOf(sp.base)) !== world.base.staticHash)

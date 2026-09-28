@@ -207,7 +207,7 @@ function evaluateRaw(spec: ShotSpec, sampler: Sampler, t: number, frameAspect: n
         if (!s) throw new Error(`camera: subject '${id}' not present at t=${t.toFixed(2)}`);
         pts.push(...subjectPoints(s));
       }
-      let lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
+      const lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
       for (const p of pts) for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], p[j]); hi[j] = Math.max(hi[j], p[j]); }
       const centre = lerp3(lo, hi, 0.5);
       const r = hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2 + (spec.padding ?? 0.5);

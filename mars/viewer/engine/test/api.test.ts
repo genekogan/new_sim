@@ -12,6 +12,7 @@ import { sampleTake } from '../take/replay.ts';
 import type { Take } from '../take/types.ts';
 import { crossBindings, crossTemplate, minuteBindings, minuteTemplate } from './sequence-fixtures.ts';
 import { hypot } from '../core/math.ts';
+import { defaultSortOrder } from '../core/order.ts';
 
 const TYPES = new Set(['object', 'array', 'string', 'number', 'integer', 'boolean', 'null']);
 /** Structural JSON Schema check (no validator dependency): known types, well-formed properties/required/items/combinators. */
@@ -153,7 +154,7 @@ test('api: take replay is independent of camera track attachment', () => {
   const { cameras: cb, ...b } = before, { cameras: ca, ...a } = after;
   assert.deepEqual(a, b, 'take slice identical after attaching cameras');
   assert.deepEqual(cb, []);
-  assert.deepEqual(ca.map((x: any) => x.id).sort(), [cam1.track_id, 'wide'].sort());
+  assert.deepEqual(ca.map((x: any) => x.id).sort(defaultSortOrder), [cam1.track_id, 'wide'].sort(defaultSortOrder));
   const withCams = c.call('get_take', { take_id: ex.take_id, include: ['cameras'] }) as any;
   assert.equal(withCams.cameras.length, 2);
   assert.ok(withCams.cameras[0].data.samples.length > 10);
@@ -221,7 +222,7 @@ test('api: pathological inputs (5,000-deep nesting, 1 MB array) return input.inv
   assert.equal(r.ok, false);
   assert.equal(r.code, 'input.invalid');
   assert.match(r.message, /nesting exceeds 32 levels/);
-  const big = new Array(1024 * 1024).fill(0);
+  const big = Array.from({ length: 1024 * 1024 }, () => 0);
   assert.doesNotThrow(() => (r = c.call('bind_plan', { template: crossTemplate, bindings: { crew: big }, workspace: 'ws' })));
   assert.equal(r.code, 'input.invalid');
   assert.match(r.message, /exceeds 256 KiB/);

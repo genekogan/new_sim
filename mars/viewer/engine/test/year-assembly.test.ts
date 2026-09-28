@@ -7,6 +7,7 @@ import { loadCampusFile } from '../campus/history-node.ts';
 import { assemblyGraph, graphCounts, topoOrder } from '../campus/assembly.ts';
 import type { CampusScene } from '../campus/types.ts';
 import { def } from '../world/catalog.ts';
+import { defaultSortOrder } from '../core/order.ts';
 
 const scene = (y: number) => loadCampusYear(y, loadCampusFile(y) as CampusYearFile).base;
 
@@ -42,7 +43,7 @@ test('assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part c
         seats.set(e.socket!.replace(/^col[lr]/, ''), (seats.get(e.socket!.replace(/^col[lr]/, '')) ?? 0) + 1);
       }
     }
-    assert.deepEqual([...seats].sort(), [['@0.220', 36], ['@2.480', 36], ['@4.757', 36]], house);
+    assert.deepEqual([...seats].sort(defaultSortOrder), [['@0.220', 36], ['@2.480', 36], ['@4.757', 36]], house);
     // deck sheets rest on the beams under them
     const sheets = h.nodes.filter((n) => n.feature === 'deck-sheet');
     assert.ok(sheets.length >= 21);

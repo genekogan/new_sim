@@ -9,7 +9,7 @@ import { WorldHistory } from '../history/store.ts';
 import { Spatial } from '../spatial/service.ts';
 import { Runtime } from '../runtime/runtime.ts';
 import { SequenceRunner } from '../sequence/runner.ts';
-import { emptyWorld, addAll } from '../world/factory.ts';
+import { emptyWorld } from '../world/factory.ts';
 import { bindTemplate } from '../sequence/bind.ts';
 import { rehearse, execute, type RehearsalResult } from '../rehearsal/rehearse.ts';
 import { replayFinalState } from '../take/replay.ts';

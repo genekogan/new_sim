@@ -38,7 +38,7 @@ test('year build 2022 east-house A+B: plan — material rules, bill of materials
   const roles = kinds(pb.parts.map((p) => ({ kind: p.role })));
   // 27 Kit deck strips (15 ft) → 6 + 6 + 3 ft pieces jointed on the beams, 25 wall panels, the Kit stair's lumber, 10 rails + 10 panels
   assert.deepEqual(roles, { 'deck-piece': 81, handrail: 2, panel: 10, 'panel-rail': 20, post: 6, stringer: 6, 'tread-board': 16, 'wall-panel': 25 });
-  assert.equal(pb.parts.filter((p) => /n$/.test(p.def)).length, 55, '54 deck pieces on frame lines + the top tread\'s back board are notched');
+  assert.equal(pb.parts.filter((p) => p.def.endsWith('n')).length, 55, '54 deck pieces on frame lines + the top tread\'s back board are notched');
   assert.ok(Math.abs(kitStringerGeometry().L - 4.0590) < 1e-3);
   // unplaced, each with its reason: two rail posts the Kit draws inside the end frame, three risers (a 6.5 cm sliver;
   // two in slots between treads no verb can reach), and the solar panels install_panel cannot stand a crew for

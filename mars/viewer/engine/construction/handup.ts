@@ -32,7 +32,7 @@ import { checkStations, walkCrew, childrenState, type Children } from './childre
 import { crewCheck, distToObb, f2, fail, lerpPose, smooth, spatialOf, STAGE_RADIUS, sweepPoses, sweptLiftPath, symmetricYaw, type Fail, type Hit } from './access.ts';
 import { flatObb, isJoist, isPlywood, memberTop, sheetSupports } from './deck.ts';
 import { isBeam } from './rules.ts';
-import { beamWalkways, climbLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
+import { beamWalkways, climbLinks, offWalkway, walkwayAtExit } from './frame.ts';
 import { deckAt, deckOver } from './framemove.ts';
 import { BODY_MODEL, postureGap, postureTop, proneAt, proneFrame, pronePoints, proneReachGap, restHands, sideOf, type Hand, type Posture, type ProneFrame } from '../body/model.ts';
 
@@ -868,7 +868,7 @@ function chooseProneStations(rt: Runtime, e: Entity, p: HP, edge: Link, nOut: Ve
     // the first heading that fits; else the first that fits but for the body past the lip (kept to name the member);
     // else why not — from the heading that got furthest (off the deck < parts < people < reach < deck hand)
     type Fit = { fr: ProneFrame; tip: number; lip?: LipHit };
-    const stage = (m: string) => (/hand flat beside/.test(m) ? 5 : /beyond reach/.test(m) ? 4 : /is there$/.test(m) ? 3 : /is in the way$/.test(m) ? 2 : /off the deck/.test(m) ? 1 : 0);
+    const stage = (m: string) => (/hand flat beside/.test(m) ? 5 : /beyond reach/.test(m) ? 4 : m.endsWith('is there') ? 3 : m.endsWith('is in the way') ? 2 : /off the deck/.test(m) ? 1 : 0);
     let first: string | null = null, fit: Fit | null = null, blocked: Fit | null = null;
     for (const t of turns) {
       const r = lying(S, feet, d, t, hs, where);
@@ -879,7 +879,6 @@ function chooseProneStations(rt: Runtime, e: Entity, p: HP, edge: Link, nOut: Ve
     fit ??= blocked;
     if (!fit) return first!;
     const { fr } = fit;
-    const turned = fr.turn ? ` turned ${deg0(fr.turn)}°` : '';
     // the take's other limits: the bounding envelope (what the per-tick invariant checks), the depth cap, the edge
     for (const h of hs) {
       const gap = envelopeGap(PRONE_ACTIVITY.reach, feet, h);

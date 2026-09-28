@@ -64,7 +64,6 @@ export type AssemblyGraph = {
 };
 
 const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
-const norm = (v: Vec2): Vec2 => { const l = Math.sqrt(v[0] * v[0] + v[1] * v[1]) || 1; return [v[0] / l, v[1] / l]; };
 const dist = (a: Vec2, b: Vec2) => { const dx = a[0] - b[0], dz = a[1] - b[1]; return Math.sqrt(dx * dx + dz * dz); };
 /** Yaw folded to [0, π): symmetric parts (frames, beams, sheets) have no front/back. */
 export const foldYaw = (y: number) => { let a = wrapAngle(y); if (a < 0) a += Math.PI; if (a >= Math.PI - 1e-9) a -= Math.PI; return a; };

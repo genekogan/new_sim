@@ -42,8 +42,13 @@ function parseFields(text, where) {
     if (!kv) fail(`${where}: cannot parse line "${raw}"`);
     const [, k, v] = kv;
     if (k in out) fail(`${where}: field "${k}" given twice`);
-    if (v) (out[k] = v), (list = null);
-    else (out[k] = []), (list = k);
+    if (v) {
+      out[k] = v;
+      list = null;
+    } else {
+      out[k] = [];
+      list = k;
+    }
   }
   return out;
 }

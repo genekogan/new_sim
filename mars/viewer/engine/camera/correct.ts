@@ -10,7 +10,7 @@ import { datan2, q6, type Vec3 } from '../core/math.ts';
 import { sunBehindWindow } from '../env/sun.ts';
 import type { Obstacle } from '../spatial/types.ts';
 import type { ShotIntent } from './direct.ts';
-import { FAILURE_LIMITS, FAILURE_ORDER, scoreShot, type FailureKind, type MotionCapsIn, type ShotScore, type ShotSim } from './solve.ts';
+import { FAILURE_ORDER, scoreShot, type FailureKind, type MotionCapsIn, type ShotScore, type ShotSim } from './solve.ts';
 import type { Key } from './shots.ts';
 import type { PrevPose, SynthContext, SynthOverrides, SynthResult, SynthShot, SynthValidation } from './synth.ts';
 
@@ -174,7 +174,7 @@ export function correctShot(intent: ShotIntent, ctx: SynthContext, prev: PrevPos
       }
       tried.push({ strategy, outcome: 'failed', why: `no ${strategy} magnitude gives a valid shot`, attempts });
     }
-    return { ok: false, diagnostic: { ...first.diagnostic, message: `${first.diagnostic.message} — self-correction tried ${STRATEGY_ORDER.join(', ')}: none gives a valid shot`, details: { ...(first.diagnostic.details ?? {}), corrections: { failure: 'refused', tried } } } };
+    return { ok: false, diagnostic: { ...first.diagnostic, message: `${first.diagnostic.message} — self-correction tried ${STRATEGY_ORDER.join(', ')}: none gives a valid shot`, details: { ...first.diagnostic.details, corrections: { failure: 'refused', tried } } } };
   }
   // --- simulate; valid → done
   const shot0 = first.shot;

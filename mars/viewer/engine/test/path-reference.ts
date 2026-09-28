@@ -2,7 +2,6 @@
 // planning-budget work). Test-only: planning.test.ts asserts the production
 // planner returns bit-identical routes. Do not edit or "improve" this file.
 import { dist2, type Vec2, hypot } from '../core/math.ts';
-import type { Diagnostic } from '../actions/types.ts';
 import { cellOf, centreOf, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from '../spatial/grid.ts';
 import type { AgentProfile, SpatialScene } from '../spatial/types.ts';
 import { linkApproach, PLAN_MARGIN, type Leg, type LinkLeg, type Place, type RouteResult, type WalkLeg } from '../spatial/path.ts';

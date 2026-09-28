@@ -206,7 +206,8 @@ export function datan(x: number): number {
   return neg ? -r : r;
 }
 
-const PI_ = 3.14159265358979311600e0, PI_LO = 1.2246467991473531772e-16, PIO2_ = 1.57079632679489655800e0;
+// fdlibm e_atan2.c pi / pi_lo / pi_o_2; pi_lo is written at double precision (it parses to the same double as fdlibm's 1.2246467991473531772e-16).
+const PI_ = 3.14159265358979311600e0, PI_LO = 1.2246467991473532e-16, PIO2_ = 1.57079632679489655800e0;
 const isNeg = (v: number) => v < 0 || (v === 0 && 1 / v < 0);
 
 /** Deterministic atan2(y, x) (<= 1 ulp), ECMAScript/C99 special cases incl. signed zeros. */
@@ -295,7 +296,7 @@ export function dlog(x: number): number {
   const f = F64[0] - 1, dk = k;
   if ((0x000fffff & (2 + hx)) < 3) { // |f| < 2^-20
     if (f === 0) return k === 0 ? 0 : dk * LN2_HI + dk * LN2_LO;
-    const R = f * f * (0.5 - 0.33333333333333333 * f);
+    const R = f * f * (0.5 - 0.3333333333333333 * f); // fdlibm 0.33333333333333333, same double
     return k === 0 ? f - R : dk * LN2_HI - ((R - dk * LN2_LO) - f);
   }
   const s = f / (2 + f), z = s * s, w = z * z;

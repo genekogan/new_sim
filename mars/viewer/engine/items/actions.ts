@@ -25,7 +25,7 @@ import {
   type BodyFrame, type Hand,
 } from './body.ts';
 import {
-  BODY_REACH, followHand, graspPoint, heldBy, inHand, isItem, itemDef, placeOnGround, placeOnSlot, putInHand,
+  BODY_REACH, followHand, graspPoint, heldBy, inHand, isItem, placeOnGround, placeOnSlot, putInHand,
   reachOf, reachStation, slotOccupant, surfaceSlot, whereIs, type Station, type SurfaceSlot,
 } from './model.ts';
 

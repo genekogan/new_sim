@@ -5,6 +5,7 @@ import {
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
+import { engineTools } from '../engine/api/index.ts';
 const base = process.env.SIM_BASE || 'http://localhost:8797';
 const hash = (s) => createHash('sha256').update(s).digest('hex'),
   key = randomBytes(32).toString('hex'),
@@ -59,10 +60,10 @@ const list = await client.listTools();
 const legacy = list.tools.filter((t) => !t.name.startsWith('engine_'));
 assert.equal(legacy.length, 20);
 const engineToolNames = list.tools.filter((t) => t.name.startsWith('engine_')).map((t) => t.name).sort();
-assert.deepEqual(engineToolNames, [
-  'engine_attach_camera_track', 'engine_bind_plan', 'engine_delete_workspace', 'engine_direct_camera', 'engine_edit_world', 'engine_execute', 'engine_fork', 'engine_get_take',
-  'engine_list', 'engine_list_verbs', 'engine_log', 'engine_query_world', 'engine_rehearse', 'engine_resume',
-]);
+// the MCP listing is the controller's op registry, read from it (not a literal list); every one is called below
+const ENGINE_TOOLS = engineTools().map((t) => t.name).sort();
+assert.deepEqual(engineToolNames, ENGINE_TOOLS);
+const calledEngineTools = new Set();
 const call = async (name, args) => {
   const r = await client.callTool({ name, arguments: args });
   if (r.isError) throw Error(r.content[0].text);
@@ -198,6 +199,7 @@ await call('start_activity', {
 await call('set_camera', { position: [11, 5, 33], target: [1, 1, 26] });
 // ---- engine tools (preview): same controller ops as in-process, via real MCP ----
 const ecall = async (name, args) => {
+  calledEngineTools.add(name);
   const t0 = performance.now();
   const r = await client.callTool({ name, arguments: args });
   const body = JSON.parse(r.content[0].text);
@@ -287,6 +289,29 @@ const refused = (label, r, code) => {
   return r.body;
 };
 const walkPlan = (id, x, z) => ({ schema: 'mars-sequence/1', id, params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x, z } }] });
+// ---- engine_direct_camera (LM-011): a real direction on the room's executed take. p1's 90° orbit passes behind
+// stairs A, so the DO's self-correction must act and report it per shot; the take stays bit-identical.
+{
+  const dirs = [{ subject: { kind: 'entity', ref: 'p1' }, motion: { verb: 'orbit', degrees: 90 }, duration: 12 }];
+  const dc = ok('direct camera', await ecall('engine_direct_camera', { take_id: ex.body.take_id, directions: dirs }));
+  assert.match(dc.track_id, /^dir-/);
+  assert.equal(dc.take_id, ex.body.take_id);
+  assert.equal(dc.takeHashUnchanged, true);
+  assert.ok(dc.track.samples > 1 && dc.track.keyframes.length >= 1, JSON.stringify(dc.track).slice(0, 300));
+  assert.equal(dc.report.shots.length, 1);
+  const [shot] = dc.report.shots;
+  assert.equal(shot.subject.id, 'p1');
+  assert.ok(shot.simulation.valid, 'the corrected shot simulates clean');
+  assert.ok(shot.corrections.length >= 1, `p1 behind stairs A is self-corrected: ${JSON.stringify(shot).slice(0, 400)}`);
+  for (const c of shot.corrections) assert.ok(c.failure && c.strategy && c.reason && Array.isArray(c.tried), JSON.stringify(c).slice(0, 400));
+  const again = ok('direct camera again', await ecall('engine_direct_camera', { take_id: ex.body.take_id, directions: dirs }));
+  assert.equal(again.track_id, dc.track_id, 'same directions, same track');
+  const stored = ok('take cameras', await ecall('engine_get_take', { take_id: ex.body.take_id, from: 0, to: 1, include: ['cameras'] })).cameras;
+  assert.ok(stored.some((t) => t.id === dc.track_id && t.kind === 'directed'), JSON.stringify(stored.map((t) => [t.id, t.kind])));
+  refused('direct camera: unknown subject', await ecall('engine_direct_camera', { take_id: ex.body.take_id, directions: [{ subject: { kind: 'entity', ref: 'nobody-here' }, motion: { verb: 'hold' } }] }), 'camera.direct.unknown');
+  const c0 = shot.corrections[0];
+  console.log(`ENGINE DIRECT CAMERA: track ${dc.track_id} ${dc.track.samples} samples; p1 orbit corrected: ${c0.failure} → ${c0.strategy} (${c0.reason.slice(0, 100)}…)`);
+}
 /** Every workspace head, log length and entity pose in the room (through the tools). */
 async function snapshot(c = ecall) {
   const ws = (await c('engine_query_world', {})).body.workspaces;
@@ -349,6 +374,7 @@ const key2 = randomBytes(32).toString('hex'), view2 = hash(key2), room2 = hash(v
 const client2 = new Client({ name: 'mars-verification-2', version: '1.0.0' });
 await client2.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${room2}.${key2}` } } }));
 const ecall2 = async (name, args) => {
+  calledEngineTools.add(name);
   const t0 = performance.now();
   const r = await client2.callTool({ name, arguments: args });
   const body = JSON.parse(r.content[0].text);
@@ -445,7 +471,7 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
   assert.deepEqual(led.takes.map((t) => t.order), led.takes.map((_, i) => i));
   assert.deepEqual(led.workspaces.find((w) => w.id === 'carry-yard').forks.sort(), ['ed', 'ed-fin']);
   const lc = ok('list cameras', await ecall('engine_list', { include: ['takes'], take_id: ex.body.take_id }));
-  assert.equal(lc.cameras.length, 1);
+  assert.equal(lc.cameras.length, 2, 'the attached frameGroup track + the directed track');
   refused('list unknown take', await ecall('engine_list', { take_id: 'nope' }), 'take.unknown');
   // deletion
   refused('delete canonical', await ecall('engine_delete_workspace', { workspace: 'carry-yard' }), 'workspace.protected');
@@ -508,6 +534,7 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
   const c22 = new Client({ name: 'mars-verification-2022', version: '1.0.0' });
   await c22.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp?year=2022`), { requestInit: { headers } }));
   const y = async (name, args) => {
+    calledEngineTools.add(name);
     const t0 = performance.now();
     const r = await c22.callTool({ name, arguments: args });
     const body = JSON.parse(r.content[0].text);
@@ -535,6 +562,7 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
 }
 console.log(`ENGINE ISOLATION (wall ms / in-DO ms): ${T.join('; ')}`);
 console.log('PASS: §28 replay isolation (view fetches + camera track leave heads/logs/poses/bytes unchanged; view capability refused MCP/commands; rooms isolated), fork isolation, plan invalidation (stale diff names s1; camera tracks do not stale) through the DO room.');
+assert.deepEqual(ENGINE_TOOLS.filter((n) => !calledEngineTools.has(n)), [], 'every registered engine tool is called through MCP');
 await writeFile(
   '.cloudflare/simulation-test-room.json',
   JSON.stringify({ room, key, view, base }),
@@ -542,7 +570,7 @@ await writeFile(
 );
 await client.close();
 console.log(
-  'PASS: MCP handshake + 20 legacy tools + 14 engine tools (bind/rehearse/execute/pause/resume/take/camera/direct_camera/edit/list/delete, one refusal envelope); room isolation, read-only access, invalid camera, idempotency, walking, activities, pause and persisted state; 2022 year room.',
+  `PASS: MCP handshake + 20 legacy tools + ${ENGINE_TOOLS.length} engine tools, each called (bind/rehearse/execute/pause/resume/take/camera/direct_camera with self-correction/edit/list/delete, one refusal envelope); room isolation, read-only access, invalid camera, idempotency, walking, activities, pause and persisted state; 2022 year room.`,
 );
 
 assert.equal(

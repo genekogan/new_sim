@@ -173,6 +173,7 @@ test('narrow(): single-file component labels === the frozen reference (scenes, r
     same(narrowComponents(g.clearance, g.nx, g.nz, 0.25, 0.15), narrowReference(g, 0.25), `random scene ${k}`);
   }
   // every narrow() the walkers make while the build-bay probe changes the grids (378 epochs); pinned hash
+  // oxlint-disable-next-line typescript/unbound-method -- saved to restore after the probe; re-invoked with orig.call(this, …)
   const orig = Spatial.prototype.narrow;
   let calls = 0;
   Spatial.prototype.narrow = function (this: Spatial, level: number, r: number, margin = 0.15) {

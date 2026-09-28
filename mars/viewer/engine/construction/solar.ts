@@ -530,7 +530,7 @@ export const placeEquipment: ActionDef<EquipP, EquipProg, PlaceExec & { p: Equip
     const to: Pose = { p: [q[0], f.y, q[1]], yaw: p.at.yaw };
     const r = planPlace(rt, e, [p.actor], e.pose, to, [...(on ? [on] : []), ...(e.support?.kind === 'resting-on' ? [e.support.on] : [])], { phase: 'configure', dur: T.configure }, 'solar.no-station');
     if (!r.ok) return r;
-    const cfg: Record<string, number | string | boolean> = { ...eq.defaults, ...(p.config ?? {}) };
+    const cfg: Record<string, number | string | boolean> = { ...eq.defaults, ...p.config };
     return { ok: true, program: { ...r.program, on, config: Object.fromEntries(Object.keys(cfg).sort().map((k) => [k, cfg[k]])) } };
   },
   start: (_rt, p, prog, id) => ({ id, p, prog, i: -1, t: 0, done: false }),

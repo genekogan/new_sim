@@ -19,6 +19,7 @@ const nodeTest = (out) => {
   return { tests, pass, fail, skipped, summary: pass === undefined ? '' : `${pass} pass / ${fail} fail${Number(skipped) ? ` / ${skipped} skip` : ''}` };
 };
 const playwright = (out) => {
+  // oxlint-disable-next-line no-control-regex -- strips Playwright's ANSI colour escapes (ESC [ … m) on purpose
   const plain = out.replace(/\x1b\[[0-9;]*m/g, '');
   const get = (k) => plain.match(new RegExp(`^\\s*(\\d+) ${k}\\b`, 'm'))?.[1];
   const [passed, failed, flaky, skipped] = ['passed', 'failed', 'flaky', 'skipped'].map(get);

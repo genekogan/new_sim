@@ -112,8 +112,9 @@ if (existsSync(outJson)) {
   try {
     const prev = JSON.parse(readFileSync(outJson, 'utf8'));
     const names = (list) => new Set(list.map((t) => `${t.file} :: ${t.name}`));
+    const codeUnits = (a, b) => (a < b ? -1 : a > b ? 1 : 0); // Array#sort's default order for these strings
     const before = names(prev.allTests ?? []), now = names(top);
-    since = { previousHead: prev.git?.head ?? null, previousDate: prev.generatedAt ?? null, added: [...now].filter((n) => !before.has(n)).sort(), removed: [...before].filter((n) => !now.has(n)).sort() };
+    since = { previousHead: prev.git?.head ?? null, previousDate: prev.generatedAt ?? null, added: [...now].filter((n) => !before.has(n)).sort(codeUnits), removed: [...before].filter((n) => !now.has(n)).sort(codeUnits) };
   } catch { since = null; }
 }
 

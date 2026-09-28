@@ -11,7 +11,7 @@ import { component } from '../world/factory.ts';
 import { def } from '../world/catalog.ts';
 import { levelFor, sweepPoses } from '../construction/access.ts';
 import { ENVELOPE_TOL, envelopeGap, handsOf, handupHands, PRONE_ACTIVITY, proneBodyHit, proneDeckHand, REACH_DOWN, REACH_DOWN_PRONE } from '../construction/handup.ts';
-import { BODY_MODEL, proneAt, proneFrame, proneReachGap, restHands } from '../body/model.ts';
+import { BODY_MODEL, proneFrame, proneReachGap, restHands } from '../body/model.ts';
 import { dcos, dsin, angleDelta } from '../core/math.ts';
 import { hashOf } from '../core/hash.ts';
 import { bay, BEAM_H, JOIST_H } from './frame-fixtures.ts';

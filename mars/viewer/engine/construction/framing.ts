@@ -161,7 +161,7 @@ export function placePlate(w: WorldState, e: Entity, onto: string[], at: { x: nu
   for (const [i, bs] of bearings.entries()) {
     const hits = bs.map((b) => bearing(e, pose, b));
     const ok = hits.filter((h): h is { len: number; along: [number, number] } => typeof h !== 'string');
-    if (!ok.length) return bad('framing.plate-no-bearing', `top plate ${e.id} at (${f2(at.x)}, ${f2(at.z)}) does not bear on ${onto[i]}: ${hits.join('; ')}`, [e.id, onto[i]]);
+    if (!ok.length) return bad('framing.plate-no-bearing', `top plate ${e.id} at (${f2(at.x)}, ${f2(at.z)}) does not bear on ${onto[i]}: ${hits.filter((h): h is string => typeof h === 'string').join('; ')}`, [e.id, onto[i]]);
     n += ok.length;
     for (const h of ok) { lo = Math.min(lo, h.along[0]); hi = Math.max(hi, h.along[1]); }
   }

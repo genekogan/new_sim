@@ -156,7 +156,7 @@ export class StaticRaster {
   }
 
   firstCover(y: number): Int32Array {
-    let m = this.byY.get(y);
+    const m = this.byY.get(y);
     if (m) return m;
     const cell = this.cell;
     const { ox, oz, nx, nz } = latticeOf(this.bounds, cell);
