@@ -6,6 +6,7 @@
 import { dcos, dsin, FT, IN, type Vec3 } from '../core/math.ts';
 import type { Confidence } from './types.ts';
 import { ITEM_ASSETS, type SurfaceSlotDef } from './catalog-items.ts';
+import { stockAssets } from './catalog-stock.ts';
 
 export type GripSlot = { id: string; local: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
@@ -318,6 +319,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
     ...ITEM_ASSETS,
+    ...stockAssets({ upright }),
     {
       id: 'test-wall',
       label: 'proving-ground wall block',
