@@ -715,3 +715,7 @@ Then: gate → release 5; HANDOFF refresh.
   through a person's body band (the carried part at hand height). The whole-house A+B `kitOffsets` reports stair
   2.017 m max centre offset (W13's metric, not examined). The studio e2e (`studio-build.spec.ts`) replays every
   year-build manifest entry, so an A+B take, once in, will be a long e2e. e2e and gate not run.
+
+## 2026-09-29 ~09:45 EDT — Codex split (Gene)
+- Ownership map + merge rule recorded in OWNER_DECISIONS.md. W33 spawned (docs only, ≤ 1 h): CODEX.md, `briefs/` (five Codex briefs), QUESTIONS_FOR_GENE.md with images, HANDOFF/NEXT_SESSION_PROMPT with the split + ETAs. A.1: W13's YEAR_BUILD.md already landed in `97957ca` (tree clean) — W33 verifies only.
+- In flight: W30 (kneel-rise sweep, v3), W31 (W27 docs + A+B chapter takes). Next toward checkpoint 1: W32 prone model = rig (after W30), then the other three 2022 houses + 2x4 framing (after W31).
