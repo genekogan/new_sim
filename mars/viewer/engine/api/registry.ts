@@ -11,7 +11,7 @@ import { SOCIAL_ACTIONS } from '../social/actions.ts';
 import { ITEM_ACTIONS } from '../items/actions.ts';
 import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
 import { FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
-import { CONSTRUCTION_ACTIONS, frameAccessContributor, frameAccessOk, liftHandsInReach, RULES_VERSION as ASSEMBLY_RULES, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
+import { CONSTRUCTION_ACTIONS, FRAMING_ACTIONS, FRAMING_INVARIANTS, frameAccessContributor, frameAccessOk, liftHandsInReach, RULES_VERSION as ASSEMBLY_RULES, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { SOLAR_ACTIONS } from '../construction/solar.ts';
 import { PAINT_ACTIONS } from '../work/paint.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
@@ -24,8 +24,8 @@ import type { WorldState } from '../world/types.ts';
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
 export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}`;
 
-export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS];
-export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS];
+export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS];
+export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS, ...FRAMING_INVARIANTS];
 
 export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> {
   const m = new Map<string, ActionDef>();

@@ -8,6 +8,7 @@ import type { Confidence } from './types.ts';
 import { ITEM_ASSETS, type SurfaceSlotDef } from './catalog-items.ts';
 import { stockAssets } from './catalog-stock.ts';
 import { SOLAR_ASSETS, type EquipmentKind } from './catalog-solar.ts';
+import { framingAssets } from './catalog-framing.ts';
 
 export type GripSlot = { id: string; local: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
@@ -333,6 +334,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     ...ITEM_ASSETS,
     ...SOLAR_ASSETS,
     ...stockAssets({ upright }),
+    ...framingAssets(), // 2x4 roof framing (catalog-framing.ts, construction/framing.ts)
     {
       id: 'test-wall',
       label: 'proving-ground wall block',
