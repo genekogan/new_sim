@@ -1,0 +1,3582 @@
+{
+  "schema": "mars-2026-frames/1",
+  "source": {
+    "scene": "viewer/public/engine/campus-2026.json",
+    "sceneContentHash": "0d980ad942b15d886e95f4b2739e3a9acff5af7217c1c873a0d57fe638a06af5",
+    "manifest": "viewer/public/modular/components.json"
+  },
+  "generator": "viewer/deploy/group-2026-frames.mjs",
+  "fieldSources": {
+    "heightDepthAndVerticalBounds": "manifest instances[].cad_bounds_m",
+    "worldXZAndYaw": "scene obstacles[] prisms",
+    "componentAndAssembly": "manifest instances[].id/assembly_id",
+    "nearestCatalogFit": "viewer/engine/world/catalog.ts (dimensions and 6 in seat sequence)"
+  },
+  "tolerances": {
+    "postMinHeightM": 2,
+    "postMaxSectionM": 0.2,
+    "coincidentPostM": 0.02,
+    "postBaseM": 0.02,
+    "postHeightM": 0.02,
+    "frameSpacingMinM": 0.85,
+    "frameSpacingMaxM": 1.15,
+    "frameHeightFitM": 0.02,
+    "frameDepthFitM": 0.01,
+    "memberPlaneM": 0.16,
+    "memberEndSlackM": 0.12,
+    "memberHeightSlackM": 0.08,
+    "beamLengthFitM": 0.02,
+    "beamEndM": 0.12,
+    "beamPerpendicularDot": 0.08
+  },
+  "frames": [
+    {
+      "id": "frame-2026-chiba-001",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0001",
+        "rack_member-0002"
+      ],
+      "members": [
+        "rack_member-0003",
+        "rack_member-0004",
+        "rack_member-0005",
+        "rack_member-0006",
+        "rack_member-0007",
+        "rack_member-0008",
+        "rack_member-0009"
+      ],
+      "base": [
+        2.745,
+        0.008,
+        9.979
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.022,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-002",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0010",
+        "rack_member-0011"
+      ],
+      "members": [
+        "rack_member-0012",
+        "rack_member-0013",
+        "rack_member-0014",
+        "rack_member-0015",
+        "rack_member-0016",
+        "rack_member-0017",
+        "rack_member-0018"
+      ],
+      "base": [
+        4.346,
+        0.008,
+        6.606
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-003",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0019",
+        "rack_member-0020"
+      ],
+      "members": [
+        "rack_member-0021",
+        "rack_member-0022",
+        "rack_member-0023",
+        "rack_member-0024",
+        "rack_member-0025",
+        "rack_member-0026",
+        "rack_member-0027"
+      ],
+      "base": [
+        1.143,
+        0.008,
+        13.352
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-004",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0028",
+        "rack_member-0029"
+      ],
+      "members": [
+        "rack_member-0030",
+        "rack_member-0031",
+        "rack_member-0032",
+        "rack_member-0033",
+        "rack_member-0034",
+        "rack_member-0035",
+        "rack_member-0036"
+      ],
+      "base": [
+        6.094,
+        0.008,
+        3.218
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-005",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0037",
+        "rack_member-0038"
+      ],
+      "members": [
+        "rack_member-0039",
+        "rack_member-0040",
+        "rack_member-0041",
+        "rack_member-0042",
+        "rack_member-0043",
+        "rack_member-0044",
+        "rack_member-0045"
+      ],
+      "base": [
+        -3.313,
+        0.008,
+        7.102
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-006",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0046",
+        "rack_member-0047"
+      ],
+      "members": [
+        "rack_member-0048",
+        "rack_member-0049",
+        "rack_member-0050",
+        "rack_member-0051",
+        "rack_member-0052",
+        "rack_member-0053",
+        "rack_member-0054"
+      ],
+      "base": [
+        -1.711,
+        0.008,
+        3.73
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-007",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0055",
+        "rack_member-0056"
+      ],
+      "members": [
+        "rack_member-0057",
+        "rack_member-0058",
+        "rack_member-0059",
+        "rack_member-0060",
+        "rack_member-0061",
+        "rack_member-0062",
+        "rack_member-0063"
+      ],
+      "base": [
+        -4.914,
+        0.008,
+        10.475
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.022,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-008",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0064",
+        "rack_member-0065"
+      ],
+      "members": [
+        "rack_member-0066",
+        "rack_member-0067",
+        "rack_member-0068",
+        "rack_member-0069",
+        "rack_member-0070",
+        "rack_member-0071",
+        "rack_member-0072"
+      ],
+      "base": [
+        0.037,
+        0.008,
+        0.342
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-009",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0073",
+        "rack_member-0074"
+      ],
+      "members": [
+        "rack_member-0075",
+        "rack_member-0076",
+        "rack_member-0077",
+        "rack_member-0078",
+        "rack_member-0079",
+        "rack_member-0080",
+        "rack_member-0081"
+      ],
+      "base": [
+        -6.341,
+        0.008,
+        5.664
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.022,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-010",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0082",
+        "rack_member-0083"
+      ],
+      "members": [
+        "rack_member-0084",
+        "rack_member-0085",
+        "rack_member-0086",
+        "rack_member-0087",
+        "rack_member-0088",
+        "rack_member-0089",
+        "rack_member-0090"
+      ],
+      "base": [
+        -4.74,
+        0.008,
+        2.291
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-011",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0091",
+        "rack_member-0092"
+      ],
+      "members": [
+        "rack_member-0093",
+        "rack_member-0094",
+        "rack_member-0095",
+        "rack_member-0096",
+        "rack_member-0097",
+        "rack_member-0098",
+        "rack_member-0099"
+      ],
+      "base": [
+        -7.943,
+        0.008,
+        9.037
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-012",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0100",
+        "rack_member-0101"
+      ],
+      "members": [
+        "rack_member-0102",
+        "rack_member-0103",
+        "rack_member-0104",
+        "rack_member-0105",
+        "rack_member-0106",
+        "rack_member-0107",
+        "rack_member-0108"
+      ],
+      "base": [
+        -2.992,
+        0.008,
+        -1.096
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-013",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0109",
+        "rack_member-0110"
+      ],
+      "members": [
+        "rack_member-0111",
+        "rack_member-0112",
+        "rack_member-0113",
+        "rack_member-0114",
+        "rack_member-0115",
+        "rack_member-0116",
+        "rack_member-0117"
+      ],
+      "base": [
+        5.796,
+        0.008,
+        11.428
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-014",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0118",
+        "rack_member-0119"
+      ],
+      "members": [
+        "rack_member-0120",
+        "rack_member-0121",
+        "rack_member-0122",
+        "rack_member-0123",
+        "rack_member-0124",
+        "rack_member-0125",
+        "rack_member-0126"
+      ],
+      "base": [
+        7.398,
+        0.008,
+        8.055
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.022,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-015",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0127",
+        "rack_member-0128"
+      ],
+      "members": [
+        "rack_member-0129",
+        "rack_member-0130",
+        "rack_member-0131",
+        "rack_member-0132",
+        "rack_member-0133",
+        "rack_member-0134",
+        "rack_member-0135"
+      ],
+      "base": [
+        4.195,
+        0.008,
+        14.8
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.022,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-016",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0136",
+        "rack_member-0137"
+      ],
+      "members": [
+        "rack_member-0138",
+        "rack_member-0139",
+        "rack_member-0140",
+        "rack_member-0141",
+        "rack_member-0142",
+        "rack_member-0143",
+        "rack_member-0144"
+      ],
+      "base": [
+        9.146,
+        0.008,
+        4.667
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-017",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0145",
+        "rack_member-0146"
+      ],
+      "members": [
+        "rack_member-0147",
+        "rack_member-0148",
+        "rack_member-0149",
+        "rack_member-0150",
+        "rack_member-0151",
+        "rack_member-0152",
+        "rack_member-0153"
+      ],
+      "base": [
+        -0.284,
+        0.008,
+        8.541
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-018",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0154",
+        "rack_member-0155"
+      ],
+      "members": [
+        "rack_member-0156",
+        "rack_member-0157",
+        "rack_member-0158",
+        "rack_member-0159",
+        "rack_member-0160",
+        "rack_member-0161",
+        "rack_member-0162"
+      ],
+      "base": [
+        1.317,
+        0.008,
+        5.168
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-019",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0163",
+        "rack_member-0164"
+      ],
+      "members": [
+        "rack_member-0165",
+        "rack_member-0166",
+        "rack_member-0167",
+        "rack_member-0168",
+        "rack_member-0169",
+        "rack_member-0170",
+        "rack_member-0171"
+      ],
+      "base": [
+        -1.886,
+        0.008,
+        11.913
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-020",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0172",
+        "rack_member-0173"
+      ],
+      "members": [
+        "rack_member-0174",
+        "rack_member-0175",
+        "rack_member-0176",
+        "rack_member-0177",
+        "rack_member-0178",
+        "rack_member-0179",
+        "rack_member-0180"
+      ],
+      "base": [
+        3.066,
+        0.008,
+        1.78
+      ],
+      "yaw": 0.443,
+      "height": 5.971,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-19ft",
+        "heightErr": 0.18,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-021",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0250",
+        "rack_member-0251"
+      ],
+      "members": [
+        "rack_member-0252",
+        "rack_member-0253",
+        "rack_member-0254",
+        "rack_member-0255",
+        "rack_member-0256",
+        "rack_member-0257",
+        "rack_member-0258"
+      ],
+      "base": [
+        -6.105,
+        0.008,
+        -6.858
+      ],
+      "yaw": 0.442,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-022",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0259",
+        "rack_member-0260"
+      ],
+      "members": [
+        "rack_member-0261",
+        "rack_member-0262",
+        "rack_member-0263",
+        "rack_member-0264",
+        "rack_member-0265",
+        "rack_member-0266",
+        "rack_member-0267"
+      ],
+      "base": [
+        -8.395,
+        0.008,
+        -7.946
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.022,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-023",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0268",
+        "rack_member-0269"
+      ],
+      "members": [
+        "rack_member-0270",
+        "rack_member-0271",
+        "rack_member-0272",
+        "rack_member-0273",
+        "rack_member-0274",
+        "rack_member-0275",
+        "rack_member-0276"
+      ],
+      "base": [
+        -3.731,
+        0.008,
+        -5.731
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-024",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0277",
+        "rack_member-0278"
+      ],
+      "members": [
+        "rack_member-0279",
+        "rack_member-0280",
+        "rack_member-0281",
+        "rack_member-0282",
+        "rack_member-0283",
+        "rack_member-0284",
+        "rack_member-0285"
+      ],
+      "base": [
+        -10.339,
+        0.008,
+        -8.869
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-025",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0286",
+        "rack_member-0287"
+      ],
+      "members": [
+        "rack_member-0288",
+        "rack_member-0289",
+        "rack_member-0290",
+        "rack_member-0291",
+        "rack_member-0292",
+        "rack_member-0293",
+        "rack_member-0294"
+      ],
+      "base": [
+        -1.419,
+        0.008,
+        -4.633
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-026",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0295",
+        "rack_member-0296"
+      ],
+      "members": [
+        "rack_member-0297",
+        "rack_member-0298",
+        "rack_member-0299",
+        "rack_member-0300",
+        "rack_member-0301",
+        "rack_member-0302",
+        "rack_member-0303"
+      ],
+      "base": [
+        -4.504,
+        0.008,
+        -10.231
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-027",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0304",
+        "rack_member-0305"
+      ],
+      "members": [
+        "rack_member-0306",
+        "rack_member-0307",
+        "rack_member-0308",
+        "rack_member-0309",
+        "rack_member-0310",
+        "rack_member-0311",
+        "rack_member-0312"
+      ],
+      "base": [
+        -6.794,
+        0.008,
+        -11.319
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-028",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0313",
+        "rack_member-0314"
+      ],
+      "members": [
+        "rack_member-0315",
+        "rack_member-0316",
+        "rack_member-0317",
+        "rack_member-0318",
+        "rack_member-0319",
+        "rack_member-0320",
+        "rack_member-0321"
+      ],
+      "base": [
+        -2.13,
+        0.008,
+        -9.104
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-029",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0322",
+        "rack_member-0323"
+      ],
+      "members": [
+        "rack_member-0324",
+        "rack_member-0325",
+        "rack_member-0326",
+        "rack_member-0327",
+        "rack_member-0328",
+        "rack_member-0329",
+        "rack_member-0330"
+      ],
+      "base": [
+        -8.738,
+        0.008,
+        -12.242
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-030",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0331",
+        "rack_member-0332"
+      ],
+      "members": [
+        "rack_member-0333",
+        "rack_member-0334",
+        "rack_member-0335",
+        "rack_member-0336",
+        "rack_member-0337",
+        "rack_member-0338",
+        "rack_member-0339"
+      ],
+      "base": [
+        0.182,
+        0.008,
+        -8.006
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-031",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0340",
+        "rack_member-0341"
+      ],
+      "members": [
+        "rack_member-0342",
+        "rack_member-0343",
+        "rack_member-0344",
+        "rack_member-0345",
+        "rack_member-0347",
+        "rack_member-0348"
+      ],
+      "base": [
+        -2.829,
+        -0.4,
+        -13.519
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-032",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0349",
+        "rack_member-0350"
+      ],
+      "members": [
+        "rack_member-0351",
+        "rack_member-0352",
+        "rack_member-0353",
+        "rack_member-0354",
+        "rack_member-0356",
+        "rack_member-0357"
+      ],
+      "base": [
+        -5.119,
+        -0.4,
+        -14.607
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-033",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0358",
+        "rack_member-0359"
+      ],
+      "members": [
+        "rack_member-0360",
+        "rack_member-0361",
+        "rack_member-0362",
+        "rack_member-0363",
+        "rack_member-0365",
+        "rack_member-0366"
+      ],
+      "base": [
+        -0.455,
+        -0.4,
+        -12.392
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-034",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0367",
+        "rack_member-0368"
+      ],
+      "members": [
+        "rack_member-0369",
+        "rack_member-0370",
+        "rack_member-0371",
+        "rack_member-0372",
+        "rack_member-0374",
+        "rack_member-0375"
+      ],
+      "base": [
+        -7.063,
+        -0.4,
+        -15.53
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-035",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0376",
+        "rack_member-0377"
+      ],
+      "members": [
+        "rack_member-0378",
+        "rack_member-0379",
+        "rack_member-0380",
+        "rack_member-0381",
+        "rack_member-0383",
+        "rack_member-0384"
+      ],
+      "base": [
+        1.857,
+        -0.4,
+        -11.294
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-036",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0385",
+        "rack_member-0386"
+      ],
+      "members": [
+        "rack_member-0387",
+        "rack_member-0388",
+        "rack_member-0389",
+        "rack_member-0390",
+        "rack_member-0391",
+        "rack_member-0392",
+        "rack_member-0393"
+      ],
+      "base": [
+        -6.105,
+        1.188,
+        -6.858
+      ],
+      "yaw": 0.442,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-037",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0394",
+        "rack_member-0395"
+      ],
+      "members": [
+        "rack_member-0396",
+        "rack_member-0397",
+        "rack_member-0398",
+        "rack_member-0399",
+        "rack_member-0400",
+        "rack_member-0401",
+        "rack_member-0402"
+      ],
+      "base": [
+        -8.395,
+        1.188,
+        -7.946
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.022,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-038",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0403",
+        "rack_member-0404"
+      ],
+      "members": [
+        "rack_member-0405",
+        "rack_member-0406",
+        "rack_member-0407",
+        "rack_member-0408",
+        "rack_member-0409",
+        "rack_member-0410",
+        "rack_member-0411"
+      ],
+      "base": [
+        -3.731,
+        1.188,
+        -5.731
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-039",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0412",
+        "rack_member-0413"
+      ],
+      "members": [
+        "rack_member-0414",
+        "rack_member-0415",
+        "rack_member-0416",
+        "rack_member-0417",
+        "rack_member-0418",
+        "rack_member-0419",
+        "rack_member-0420"
+      ],
+      "base": [
+        -10.339,
+        1.188,
+        -8.869
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-040",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0421",
+        "rack_member-0422"
+      ],
+      "members": [
+        "rack_member-0423",
+        "rack_member-0424",
+        "rack_member-0425",
+        "rack_member-0426",
+        "rack_member-0427",
+        "rack_member-0428",
+        "rack_member-0429"
+      ],
+      "base": [
+        -1.419,
+        1.188,
+        -4.633
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-041",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0430",
+        "rack_member-0431"
+      ],
+      "members": [
+        "rack_member-0432",
+        "rack_member-0433",
+        "rack_member-0434",
+        "rack_member-0435",
+        "rack_member-0436",
+        "rack_member-0437",
+        "rack_member-0438"
+      ],
+      "base": [
+        -4.504,
+        1.188,
+        -10.231
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-042",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0439",
+        "rack_member-0440"
+      ],
+      "members": [
+        "rack_member-0441",
+        "rack_member-0442",
+        "rack_member-0443",
+        "rack_member-0444",
+        "rack_member-0445",
+        "rack_member-0446",
+        "rack_member-0447"
+      ],
+      "base": [
+        -6.794,
+        1.188,
+        -11.319
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-043",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0448",
+        "rack_member-0449"
+      ],
+      "members": [
+        "rack_member-0450",
+        "rack_member-0451",
+        "rack_member-0452",
+        "rack_member-0453",
+        "rack_member-0454",
+        "rack_member-0455",
+        "rack_member-0456"
+      ],
+      "base": [
+        -2.13,
+        1.188,
+        -9.104
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-044",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0457",
+        "rack_member-0458"
+      ],
+      "members": [
+        "rack_member-0459",
+        "rack_member-0460",
+        "rack_member-0461",
+        "rack_member-0462",
+        "rack_member-0463",
+        "rack_member-0464",
+        "rack_member-0465"
+      ],
+      "base": [
+        -8.738,
+        1.188,
+        -12.242
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-045",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0466",
+        "rack_member-0467"
+      ],
+      "members": [
+        "rack_member-0468",
+        "rack_member-0469",
+        "rack_member-0470",
+        "rack_member-0471",
+        "rack_member-0472",
+        "rack_member-0473",
+        "rack_member-0474"
+      ],
+      "base": [
+        0.182,
+        1.188,
+        -8.006
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-046",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0475",
+        "rack_member-0476"
+      ],
+      "members": [
+        "rack_member-0477",
+        "rack_member-0478",
+        "rack_member-0479",
+        "rack_member-0480",
+        "rack_member-0482",
+        "rack_member-0483"
+      ],
+      "base": [
+        1.147,
+        -0.4,
+        -15.765
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-chiba-047",
+      "assembly": "chiba",
+      "posts": [
+        "rack_member-0484",
+        "rack_member-0485"
+      ],
+      "members": [
+        "rack_member-0486",
+        "rack_member-0487",
+        "rack_member-0488",
+        "rack_member-0489",
+        "rack_member-0491",
+        "rack_member-0492"
+      ],
+      "base": [
+        3.459,
+        -0.4,
+        -14.667
+      ],
+      "yaw": 0.443,
+      "height": 4.877,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": 0,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-001",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0181",
+        "rack_member-0182"
+      ],
+      "members": [
+        "rack_member-0183",
+        "rack_member-0184",
+        "rack_member-0185",
+        "rack_member-0186"
+      ],
+      "base": [
+        1.417,
+        0.096,
+        -79.656
+      ],
+      "yaw": 1.589,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-002",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0187",
+        "rack_member-0188"
+      ],
+      "members": [
+        "rack_member-0189",
+        "rack_member-0190",
+        "rack_member-0191",
+        "rack_member-0192",
+        "rack_member-0194",
+        "rack_member-0195",
+        "rack_member-0196",
+        "rack_member-0197"
+      ],
+      "base": [
+        5.15,
+        0.096,
+        -79.585
+      ],
+      "yaw": 1.59,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-003",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0198",
+        "rack_member-0199"
+      ],
+      "members": [
+        "rack_member-0200",
+        "rack_member-0201",
+        "rack_member-0202",
+        "rack_member-0203"
+      ],
+      "base": [
+        8.883,
+        0.096,
+        -79.513
+      ],
+      "yaw": 1.59,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-004",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0204",
+        "rack_member-0205"
+      ],
+      "members": [
+        "rack_member-0206",
+        "rack_member-0207",
+        "rack_member-0208",
+        "rack_member-0209",
+        "rack_member-0223",
+        "rack_member-0224",
+        "rack_member-0225",
+        "rack_member-0226"
+      ],
+      "base": [
+        5.208,
+        0.096,
+        -82.632
+      ],
+      "yaw": 1.59,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-005",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0210",
+        "rack_member-0211"
+      ],
+      "members": [
+        "rack_member-0212",
+        "rack_member-0213",
+        "rack_member-0214",
+        "rack_member-0215"
+      ],
+      "base": [
+        8.942,
+        0.096,
+        -82.561
+      ],
+      "yaw": 1.589,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-006",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0216",
+        "rack_member-0217"
+      ],
+      "members": [
+        "rack_member-0218",
+        "rack_member-0219",
+        "rack_member-0220",
+        "rack_member-0221"
+      ],
+      "base": [
+        1.475,
+        0.096,
+        -82.703
+      ],
+      "yaw": 1.59,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-007",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0227",
+        "rack_member-0228"
+      ],
+      "members": [
+        "rack_member-0229",
+        "rack_member-0230",
+        "rack_member-0231",
+        "rack_member-0232"
+      ],
+      "base": [
+        1.534,
+        0.096,
+        -85.751
+      ],
+      "yaw": 1.589,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-008",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0233",
+        "rack_member-0234"
+      ],
+      "members": [
+        "rack_member-0235",
+        "rack_member-0236",
+        "rack_member-0237",
+        "rack_member-0238",
+        "rack_member-0240",
+        "rack_member-0241",
+        "rack_member-0242",
+        "rack_member-0243"
+      ],
+      "base": [
+        5.267,
+        0.096,
+        -85.68
+      ],
+      "yaw": 1.59,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-north-rack-building-009",
+      "assembly": "north-rack-building",
+      "posts": [
+        "rack_member-0244",
+        "rack_member-0245"
+      ],
+      "members": [
+        "rack_member-0246",
+        "rack_member-0247",
+        "rack_member-0248",
+        "rack_member-0249"
+      ],
+      "base": [
+        9,
+        0.096,
+        -85.608
+      ],
+      "yaw": 1.59,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-001",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0562",
+        "rack_member-0563"
+      ],
+      "members": [
+        "rack_member-0564",
+        "rack_member-0565",
+        "rack_member-0566",
+        "rack_member-0567"
+      ],
+      "base": [
+        37.336,
+        0.008,
+        -89.952
+      ],
+      "yaw": 0.553,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-002",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0568",
+        "rack_member-0569"
+      ],
+      "members": [
+        "rack_member-0570",
+        "rack_member-0571",
+        "rack_member-0572",
+        "rack_member-0573"
+      ],
+      "base": [
+        39.297,
+        0.008,
+        -93.129
+      ],
+      "yaw": 0.553,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-003",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0574",
+        "rack_member-0575"
+      ],
+      "members": [
+        "rack_member-0576",
+        "rack_member-0577",
+        "rack_member-0578",
+        "rack_member-0579"
+      ],
+      "base": [
+        42.522,
+        0.008,
+        -86.748
+      ],
+      "yaw": 0.554,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-004",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0580",
+        "rack_member-0581"
+      ],
+      "members": [
+        "rack_member-0582",
+        "rack_member-0583",
+        "rack_member-0584",
+        "rack_member-0585"
+      ],
+      "base": [
+        44.484,
+        0.008,
+        -89.925
+      ],
+      "yaw": 0.554,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-005",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0586",
+        "rack_member-0587"
+      ],
+      "members": [
+        "rack_member-0588",
+        "rack_member-0589",
+        "rack_member-0590",
+        "rack_member-0591"
+      ],
+      "base": [
+        39.929,
+        0.008,
+        -88.35
+      ],
+      "yaw": 0.553,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-006",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0592",
+        "rack_member-0593"
+      ],
+      "members": [
+        "rack_member-0594",
+        "rack_member-0595",
+        "rack_member-0596",
+        "rack_member-0597"
+      ],
+      "base": [
+        41.891,
+        0.008,
+        -91.527
+      ],
+      "yaw": 0.553,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-007",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0598",
+        "rack_member-0599"
+      ],
+      "members": [
+        "rack_member-0600",
+        "rack_member-0601",
+        "rack_member-0602",
+        "rack_member-0603",
+        "rack_member-0617",
+        "rack_member-0618",
+        "rack_member-0619",
+        "rack_member-0620"
+      ],
+      "base": [
+        39.221,
+        0.008,
+        -98.77
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-008",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0604",
+        "rack_member-0605"
+      ],
+      "members": [
+        "rack_member-0606",
+        "rack_member-0607",
+        "rack_member-0608",
+        "rack_member-0609"
+      ],
+      "base": [
+        40.387,
+        0.008,
+        -102.317
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.105
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-009",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0610",
+        "rack_member-0611"
+      ],
+      "members": [
+        "rack_member-0612",
+        "rack_member-0613",
+        "rack_member-0614",
+        "rack_member-0615"
+      ],
+      "base": [
+        38.055,
+        0.008,
+        -95.223
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-010",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0621",
+        "rack_member-0622"
+      ],
+      "members": [
+        "rack_member-0623",
+        "rack_member-0624",
+        "rack_member-0625",
+        "rack_member-0626",
+        "rack_member-0652",
+        "rack_member-0653",
+        "rack_member-0654",
+        "rack_member-0655"
+      ],
+      "base": [
+        42.116,
+        0.008,
+        -97.818
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-011",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0627",
+        "rack_member-0628"
+      ],
+      "members": [
+        "rack_member-0629",
+        "rack_member-0630",
+        "rack_member-0631",
+        "rack_member-0632"
+      ],
+      "base": [
+        43.283,
+        0.008,
+        -101.365
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.105
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-012",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0633",
+        "rack_member-0634"
+      ],
+      "members": [
+        "rack_member-0635",
+        "rack_member-0636",
+        "rack_member-0637",
+        "rack_member-0638"
+      ],
+      "base": [
+        45.012,
+        0.008,
+        -96.866
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-013",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0639",
+        "rack_member-0640"
+      ],
+      "members": [
+        "rack_member-0641",
+        "rack_member-0642",
+        "rack_member-0643",
+        "rack_member-0644"
+      ],
+      "base": [
+        46.177,
+        0.008,
+        -100.413
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.105
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-014",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0645",
+        "rack_member-0646"
+      ],
+      "members": [
+        "rack_member-0647",
+        "rack_member-0648",
+        "rack_member-0649",
+        "rack_member-0650"
+      ],
+      "base": [
+        40.95,
+        0.008,
+        -94.271
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-015",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0656",
+        "rack_member-0657"
+      ],
+      "members": [
+        "rack_member-0658",
+        "rack_member-0659",
+        "rack_member-0660",
+        "rack_member-0661"
+      ],
+      "base": [
+        47.907,
+        0.008,
+        -95.914
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-northeast-compound-016",
+      "assembly": "northeast-compound",
+      "posts": [
+        "rack_member-0662",
+        "rack_member-0663"
+      ],
+      "members": [
+        "rack_member-0664",
+        "rack_member-0665",
+        "rack_member-0666",
+        "rack_member-0667"
+      ],
+      "base": [
+        49.073,
+        0.008,
+        -99.461
+      ],
+      "yaw": 0.317,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.105
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-001",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0493",
+        "rack_member-0494"
+      ],
+      "members": [
+        "rack_member-0495",
+        "rack_member-0496",
+        "rack_member-0497",
+        "rack_member-0498"
+      ],
+      "base": [
+        -115.663,
+        -0.378,
+        0.123
+      ],
+      "yaw": 2.222,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-002",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0499",
+        "rack_member-0500"
+      ],
+      "members": [
+        "rack_member-0501",
+        "rack_member-0502",
+        "rack_member-0503",
+        "rack_member-0504",
+        "rack_member-0506",
+        "rack_member-0507",
+        "rack_member-0508",
+        "rack_member-0509"
+      ],
+      "base": [
+        -112.693,
+        -0.378,
+        2.385
+      ],
+      "yaw": 2.221,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-003",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0510",
+        "rack_member-0511"
+      ],
+      "members": [
+        "rack_member-0512",
+        "rack_member-0513",
+        "rack_member-0514",
+        "rack_member-0515"
+      ],
+      "base": [
+        -109.723,
+        -0.378,
+        4.648
+      ],
+      "yaw": 2.221,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-004",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0516",
+        "rack_member-0517"
+      ],
+      "members": [
+        "rack_member-0518",
+        "rack_member-0519",
+        "rack_member-0520",
+        "rack_member-0521",
+        "rack_member-0535",
+        "rack_member-0536",
+        "rack_member-0537",
+        "rack_member-0538"
+      ],
+      "base": [
+        -110.846,
+        -0.378,
+        -0.039
+      ],
+      "yaw": 2.222,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-005",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0522",
+        "rack_member-0523"
+      ],
+      "members": [
+        "rack_member-0524",
+        "rack_member-0525",
+        "rack_member-0526",
+        "rack_member-0527"
+      ],
+      "base": [
+        -107.876,
+        -0.378,
+        2.223
+      ],
+      "yaw": 2.221,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-006",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0528",
+        "rack_member-0529"
+      ],
+      "members": [
+        "rack_member-0530",
+        "rack_member-0531",
+        "rack_member-0532",
+        "rack_member-0533"
+      ],
+      "base": [
+        -113.816,
+        -0.378,
+        -2.302
+      ],
+      "yaw": 2.222,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-007",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0539",
+        "rack_member-0540"
+      ],
+      "members": [
+        "rack_member-0541",
+        "rack_member-0542",
+        "rack_member-0543",
+        "rack_member-0544"
+      ],
+      "base": [
+        -111.969,
+        -0.378,
+        -4.726
+      ],
+      "yaw": 2.222,
+      "height": 4.292,
+      "depth": 1.021,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.107
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-008",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0545",
+        "rack_member-0546"
+      ],
+      "members": [
+        "rack_member-0547",
+        "rack_member-0548",
+        "rack_member-0549",
+        "rack_member-0550",
+        "rack_member-0552",
+        "rack_member-0553",
+        "rack_member-0554",
+        "rack_member-0555"
+      ],
+      "base": [
+        -108.999,
+        -0.378,
+        -2.464
+      ],
+      "yaw": 2.221,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.106
+      },
+      "confidence": "provisional"
+    },
+    {
+      "id": "frame-2026-west-rack-building-009",
+      "assembly": "west-rack-building",
+      "posts": [
+        "rack_member-0556",
+        "rack_member-0557"
+      ],
+      "members": [
+        "rack_member-0558",
+        "rack_member-0559",
+        "rack_member-0560",
+        "rack_member-0561"
+      ],
+      "base": [
+        -106.029,
+        -0.378,
+        -0.201
+      ],
+      "yaw": 2.222,
+      "height": 4.292,
+      "depth": 1.02,
+      "catalogDef": null,
+      "fit": {
+        "nearest": "upright-16ft",
+        "heightErr": -0.585,
+        "depthErr": 0.105
+      },
+      "confidence": "provisional"
+    }
+  ],
+  "beams": [
+    {
+      "id": "beam-2026-north-rack-building-001",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0001",
+      "frames": [
+        "frame-2026-north-rack-building-004",
+        "frame-2026-north-rack-building-005"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-004",
+          "post": "rack_member-0204",
+          "col": "l",
+          "face": "back",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-25",
+          "offset": -0.063
+        },
+        {
+          "frame": "frame-2026-north-rack-building-005",
+          "post": "rack_member-0210",
+          "col": "l",
+          "face": "front",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-25",
+          "offset": -0.063
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-002",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0002",
+      "frames": [
+        "frame-2026-north-rack-building-006",
+        "frame-2026-north-rack-building-004"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-006",
+          "post": "rack_member-0216",
+          "col": "l",
+          "face": "back",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-25",
+          "offset": -0.063
+        },
+        {
+          "frame": "frame-2026-north-rack-building-004",
+          "post": "rack_member-0204",
+          "col": "l",
+          "face": "front",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-25",
+          "offset": -0.063
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-003",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0003",
+      "frames": [
+        "frame-2026-north-rack-building-004",
+        "frame-2026-north-rack-building-005"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-004",
+          "post": "rack_member-0204",
+          "col": "l",
+          "face": "back",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-19",
+          "offset": 0.05
+        },
+        {
+          "frame": "frame-2026-north-rack-building-005",
+          "post": "rack_member-0210",
+          "col": "l",
+          "face": "front",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-19",
+          "offset": 0.05
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-004",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0004",
+      "frames": [
+        "frame-2026-north-rack-building-006",
+        "frame-2026-north-rack-building-004"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-006",
+          "post": "rack_member-0216",
+          "col": "l",
+          "face": "back",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-19",
+          "offset": 0.05
+        },
+        {
+          "frame": "frame-2026-north-rack-building-004",
+          "post": "rack_member-0204",
+          "col": "l",
+          "face": "front",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-19",
+          "offset": 0.05
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-005",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0005",
+      "frames": [
+        "frame-2026-north-rack-building-002",
+        "frame-2026-north-rack-building-003"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-002",
+          "post": "rack_member-0187",
+          "col": "l",
+          "face": "back",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-25",
+          "offset": -0.063
+        },
+        {
+          "frame": "frame-2026-north-rack-building-003",
+          "post": "rack_member-0198",
+          "col": "l",
+          "face": "front",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-25",
+          "offset": -0.063
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-006",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0006",
+      "frames": [
+        "frame-2026-north-rack-building-001",
+        "frame-2026-north-rack-building-002"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-001",
+          "post": "rack_member-0181",
+          "col": "l",
+          "face": "back",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-25",
+          "offset": -0.063
+        },
+        {
+          "frame": "frame-2026-north-rack-building-002",
+          "post": "rack_member-0187",
+          "col": "l",
+          "face": "front",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-25",
+          "offset": -0.063
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-007",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0007",
+      "frames": [
+        "frame-2026-north-rack-building-002",
+        "frame-2026-north-rack-building-003"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-002",
+          "post": "rack_member-0187",
+          "col": "l",
+          "face": "back",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-19",
+          "offset": 0.05
+        },
+        {
+          "frame": "frame-2026-north-rack-building-003",
+          "post": "rack_member-0198",
+          "col": "l",
+          "face": "front",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-19",
+          "offset": 0.05
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-008",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0008",
+      "frames": [
+        "frame-2026-north-rack-building-001",
+        "frame-2026-north-rack-building-002"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-001",
+          "post": "rack_member-0181",
+          "col": "l",
+          "face": "back",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-19",
+          "offset": 0.05
+        },
+        {
+          "frame": "frame-2026-north-rack-building-002",
+          "post": "rack_member-0187",
+          "col": "l",
+          "face": "front",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-19",
+          "offset": 0.05
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-009",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0017",
+      "frames": [
+        "frame-2026-north-rack-building-008",
+        "frame-2026-north-rack-building-009"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-008",
+          "post": "rack_member-0233",
+          "col": "l",
+          "face": "back",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-25",
+          "offset": -0.063
+        },
+        {
+          "frame": "frame-2026-north-rack-building-009",
+          "post": "rack_member-0244",
+          "col": "l",
+          "face": "front",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-25",
+          "offset": -0.063
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-010",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0018",
+      "frames": [
+        "frame-2026-north-rack-building-007",
+        "frame-2026-north-rack-building-008"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-007",
+          "post": "rack_member-0227",
+          "col": "l",
+          "face": "back",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-25",
+          "offset": -0.063
+        },
+        {
+          "frame": "frame-2026-north-rack-building-008",
+          "post": "rack_member-0233",
+          "col": "l",
+          "face": "front",
+          "height": 4.052,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-25",
+          "offset": -0.063
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-011",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0019",
+      "frames": [
+        "frame-2026-north-rack-building-008",
+        "frame-2026-north-rack-building-009"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-008",
+          "post": "rack_member-0233",
+          "col": "l",
+          "face": "back",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-19",
+          "offset": 0.05
+        },
+        {
+          "frame": "frame-2026-north-rack-building-009",
+          "post": "rack_member-0244",
+          "col": "l",
+          "face": "front",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-19",
+          "offset": 0.05
+        }
+      ]
+    },
+    {
+      "id": "beam-2026-north-rack-building-012",
+      "assembly": "north-rack-building",
+      "component": "beam_candidate-0020",
+      "frames": [
+        "frame-2026-north-rack-building-007",
+        "frame-2026-north-rack-building-008"
+      ],
+      "length": 3.65,
+      "catalogDef": "beam-12ft",
+      "fit": {
+        "lengthErr": -0.008
+      },
+      "seats": [
+        {
+          "frame": "frame-2026-north-rack-building-007",
+          "post": "rack_member-0227",
+          "col": "l",
+          "face": "back",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "back-l-19",
+          "offset": 0.05
+        },
+        {
+          "frame": "frame-2026-north-rack-building-008",
+          "post": "rack_member-0233",
+          "col": "l",
+          "face": "front",
+          "height": 3.251,
+          "seatSourceDef": "upright-16ft",
+          "nearestCatalogSeat": "front-l-19",
+          "offset": 0.05
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "rackMemberComponents": 667,
+    "sceneRackMemberComponents": 660,
+    "beamCandidates": 89,
+    "frames": 81,
+    "beams": 12,
+    "unclassified": 92,
+    "byAssembly": {
+      "chiba": {
+        "frames": 47,
+        "beams": 0,
+        "unclassified": 21
+      },
+      "north-rack-building": {
+        "frames": 9,
+        "beams": 12,
+        "unclassified": 15
+      },
+      "north-workshops": {
+        "frames": 0,
+        "beams": 0,
+        "unclassified": 28
+      },
+      "northeast-compound": {
+        "frames": 16,
+        "beams": 0,
+        "unclassified": 9
+      },
+      "west-rack-building": {
+        "frames": 9,
+        "beams": 0,
+        "unclassified": 19
+      }
+    },
+    "byCatalogDef": {
+      "unmatched-frame": 81,
+      "beam-12ft": 12
+    },
+    "byReason": {
+      "beam-end-miss": 12,
+      "panel-not-beam": 65,
+      "coincident-post": 8,
+      "no-scene-prism": 7
+    }
+  },
+  "unclassified": [
+    {
+      "component": "beam_candidate-0009",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0010",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0011",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0012",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0013",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0014",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0015",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0016",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0021",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0022",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0023",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0024",
+      "assembly": "north-rack-building",
+      "code": "beam-end-miss",
+      "reason": "beam end misses a grouped frame post by more than 0.12 m"
+    },
+    {
+      "component": "beam_candidate-0025",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0026",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0027",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0028",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0029",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0030",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0031",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0032",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0033",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0034",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0035",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0036",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0037",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0038",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0039",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0040",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0041",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0042",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0043",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0044",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0045",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0046",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0047",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0048",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0049",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0050",
+      "assembly": "west-rack-building",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0051",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0052",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0053",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0054",
+      "assembly": "chiba",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.323 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0055",
+      "assembly": "northeast-compound",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0056",
+      "assembly": "northeast-compound",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0057",
+      "assembly": "northeast-compound",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.467 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0058",
+      "assembly": "northeast-compound",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0059",
+      "assembly": "northeast-compound",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0060",
+      "assembly": "northeast-compound",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0061",
+      "assembly": "northeast-compound",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0062",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0063",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0064",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0065",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0066",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0067",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0068",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0069",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0070",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0071",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0072",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0073",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0074",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0075",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0076",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0077",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0078",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0079",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0080",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0081",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0082",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0083",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0084",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0085",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0086",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0087",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0088",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "beam_candidate-0089",
+      "assembly": "north-workshops",
+      "code": "panel-not-beam",
+      "reason": "CAD horizontal span 2.939 m is not a stock beam length; broad panel geometry"
+    },
+    {
+      "component": "rack_member-0193",
+      "assembly": "north-rack-building",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0188 within 0.02 m"
+    },
+    {
+      "component": "rack_member-0222",
+      "assembly": "north-rack-building",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0205 within 0.02 m"
+    },
+    {
+      "component": "rack_member-0239",
+      "assembly": "north-rack-building",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0234 within 0.02 m"
+    },
+    {
+      "component": "rack_member-0346",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0355",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0364",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0373",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0382",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0481",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0490",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0505",
+      "assembly": "west-rack-building",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0500 within 0.02 m"
+    },
+    {
+      "component": "rack_member-0534",
+      "assembly": "west-rack-building",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0517 within 0.02 m"
+    },
+    {
+      "component": "rack_member-0551",
+      "assembly": "west-rack-building",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0546 within 0.02 m"
+    },
+    {
+      "component": "rack_member-0616",
+      "assembly": "northeast-compound",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0599 within 0.02 m"
+    },
+    {
+      "component": "rack_member-0651",
+      "assembly": "northeast-compound",
+      "code": "coincident-post",
+      "reason": "post overlaps rack_member-0622 within 0.02 m"
+    }
+  ]
+}
