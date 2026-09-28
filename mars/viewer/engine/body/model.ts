@@ -7,7 +7,7 @@
 // 2026-09-28 ("Body model = the measured rig") the model IS the measured rig: a 1.75 m person with the
 // rigs' 1.34 m shoulders; test/body-model.test.ts checks it is internally consistent. Heights are above the feet (the person's ground point, `pose.p`), horizontal
 // distances from the body axis. Anything outside is refused by the engine, never interpolated.
-import { dcos, dsin, type Vec3 } from '../core/math.ts';
+import { datan2, dcos, dsin, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Entity } from '../world/types.ts';
 
 /** Shoulder-height band above the feet for a posture, and how far the shoulders may lean out horizontally. */
@@ -34,45 +34,82 @@ const RIG = {
 
 /**
  * Prone receiver (owner feedback §13, Gene 2026-09-29: "lies on their stomach at the edge of the upper floor … then
- * gets up without letting go"). Geometry, all from numbers above (BODY_MODEL.md "Prone receiver"):
+ * gets up without letting go"). Since W32 (2026-09-29) the prone model IS the measured rig lying at the edge (W29,
+ * e2e/prone.spec.ts, POSES.md "Prone receiver"), the **woman template** — the smaller reach — so every template
+ * reaches what the engine allows (punk / casual have slack: BODY_MODEL.md "Prone receiver"):
  * - the receiver kneels at station S on the deck, `back` 0.35 m behind the lip (a standable point: the spatial body
- *   radius 0.28 m, read on the 0.1 m clearance raster — 0.30 m from an edge reads 0.25 m), and lies down forward,
- *   perpendicular to the edge, head over it;
- * - the lower ribs rest on the lip; the torso beyond them (`overEdge` = RIG.torso × 2/3 = 0.30 m) tips down over the
- *   edge up to `tipMax` 60°; lying flat the shoulder joints are `chest` (= chestFwd 0.08) above the deck, so at
- *   the full tip they are 0.08 cos 60° − 0.30 sin 60° = −0.22 m, and the girdle reaching down (2 × shrug) takes
- *   them to −0.32 m: the band's bottom; the arm then reaches 0.32 + 0.62 = 0.94 m below the deck (`reachDown`;
- *   the §13 "≈ 1.0 m");
- * - shoulders at most `back` + `overEdge` = 0.65 m from S horizontally (the band's lean; at the full tip they are
- *   0.22 m past the lip); hands at the hand-off at most `edgeReach` (= reachDownOut 0.45) beyond the deck outline;
+ *   radius 0.28 m, read on the 0.1 m clearance raster — 0.30 m from an edge reads 0.25 m), and lies down along the
+ *   heading `proneYaw` whose axis passes through the load's grip (≤ `turnMax` 45° off the edge normal), head over the lip;
+ * - lying flat, the shoulder joints are `chest` 0.10 m above the deck (rig 0.097 punk – 0.102 woman); the torso tips down
+ *   over the lip about the tip (Torso) joint, which lies `tipPast` 0.08 m past the lip (renderer TIP_PAST_LIP: a 60°
+ *   tip then never cuts the deck corner) and `tipUp` 0.15 m above the deck (the lying hip joints, rig 0.15), up to
+ *   `tipMax` 60°; the tip joint → shoulder midpoint is `overEdge` 0.19 m (woman; punk 0.27). At the full tip the shoulders
+ *   are 0.034 m below the deck (rig: woman −0.03, punk −0.10 — this construction gives −0.106 for the punk's 0.27) and
+ *   0.13 m past the lip; the girdle reaches 2 × shrug toward a hand, the arm 0.97 × 0.62 straight (the elbow never
+ *   locks: overheadReach): `reachDown` = 0.034 + 0.10 + 0.60 = 0.73 m below the deck (rig: woman 0.73, punk 0.80);
+ * - a turned body: the lip lies `back` / cos(turn) + (shoulderHalf + 3 cm)·|tan turn| along its axis (W29 `lipAlong`: the
+ *   chest's near side reaches the lip first), so the tip joint goes that much further out;
+ * - hands at the hand-off at most `edgeReach` (= reachDownOut 0.45) beyond the deck outline;
  * - the body lies from the lip back to its toes: hips torso/3 behind the lip, legs RIG.hip + a 6 cm foot, so the
  *   toes are `bodyBack` = 0.75 m behind S; half-width `bodyHalf` = shoulderHalf + 5 cm.
+ * `proneFrame` / `pronePoints` / `proneReachGap` below are the exact (heading-aware) geometry; `posture.prone` is the
+ * cylinder about S that bounds it over every allowed turn (what a check without the heading — the per-tick invariant —
+ * can use).
  */
 const PRONE_BACK = 0.35;
-const PRONE_OVER = (RIG.torso * 2) / 3; // 0.30
+const PRONE_CHEST = 0.1; // shoulder joints above the deck lying flat (rig 0.097 punk – 0.102 woman)
+const PRONE_TIP_PAST = 0.08; // tip (Torso) joint past the lip (renderer prone.ts TIP_PAST_LIP)
+const PRONE_TIP_UP = 0.15; // tip joint above the deck lying (the lying hip joints, rig 0.15 — W29)
+const PRONE_OVER = 0.19; // tip joint → shoulder midpoint (rig: woman 0.19, punk 0.27)
 const PRONE_TIP = 60; // °
-const PRONE_CHEST = 0.08; // = chestFwd: the sternum on the deck, the shoulder joints this far above it
-const proneShoulderLo = PRONE_CHEST * dcos((PRONE_TIP * Math.PI) / 180) - PRONE_OVER * dsin((PRONE_TIP * Math.PI) / 180) - 2 * shrug; // −0.3198
+const PRONE_TURN = 45; // ° the lying body's axis off the edge normal (renderer TURN_MAX)
+const PRONE_GIRDLE = 2 * shrug; // the shoulder girdle reaching toward a hand (renderer GIRDLE 0.1)
+const PRONE_STRAIGHT = 0.97; // an arm straight down reaches this × its length (measured overhead: 1.34 + 0.05 + 0.97 × 0.62)
+const DEG = Math.PI / 180;
+/** The shoulder midpoint relative to the tip joint, (along the body, up), tipped `deg` down over the edge. */
+function proneShoulderRel(deg: number): [number, number] {
+  const dz = PRONE_CHEST - PRONE_TIP_UP, d = Math.sqrt(PRONE_OVER * PRONE_OVER - dz * dz);
+  const c = dcos(deg * DEG), s = dsin(deg * DEG);
+  return [d * c + dz * s, dz * c - d * s];
+}
+/** Lip distance along the axis of a body turned `turn` rad off the edge normal (W29 lipAlong, model shoulderHalf 0.15). */
+export function proneLipAlong(turn: number): number {
+  const c = dcos(turn), s = dsin(turn);
+  return PRONE_BACK / c + (0.15 + 0.03) * Math.abs(s / c);
+}
+const proneShoulderLo = PRONE_TIP_UP + proneShoulderRel(PRONE_TIP)[1]; // −0.0337: shoulders at the full tip
+// the bounding cylinder's radius: the farthest a shoulder joint gets from S (lying flat, turned turnMax: 0.94 m along the
+// axis, 0.15 m across) + the girdle — so it contains every hand proneReachGap allows (body-model.test.ts checks it)
+const proneAlongMax = proneLipAlong(PRONE_TURN * DEG) + PRONE_TIP_PAST + proneShoulderRel(0)[0]; // 0.938
+const proneLean = Math.ceil((Math.sqrt(proneAlongMax * proneAlongMax + 0.15 * 0.15) + PRONE_GIRDLE) * 100) / 100; // 1.06
+const proneLo = Math.round((proneShoulderLo - PRONE_GIRDLE) * 100) / 100; // −0.13
 const PRONE = {
   back: PRONE_BACK,
+  chest: PRONE_CHEST,
+  tipPast: PRONE_TIP_PAST,
+  tipUp: PRONE_TIP_UP,
   overEdge: PRONE_OVER,
   tipMax: PRONE_TIP,
-  chest: PRONE_CHEST,
-  /** Hands flat on the deck beside the chest (lying, and the push-up hand): 0.15 m behind the lip, 0.25 m to each side. */
+  turnMax: PRONE_TURN,
+  girdle: PRONE_GIRDLE,
+  /** Hands flat on the deck beside the chest (lying, and the push-up hand): 0.20 m ahead of S along the body, 0.25 m to each side. */
   deckHand: { fwd: PRONE_BACK - 0.15, side: 0.25 },
   /** S → toes, lying (hips torso/3 behind the lip; legs RIG.hip + 0.06 m foot). */
   bodyBack: RIG.hip + 0.06 - (PRONE_BACK - RIG.torso / 3),
   bodyHalf: 0.15 + 0.05,
-  /** Hands at most this far below the deck (= the prone band's bottom − arm, rounded to the cm). */
-  reachDown: Math.round((armLength - proneShoulderLo) * 100) / 100, // 0.94
+  /** Head: a ball this big, centred this far on from the shoulder midpoint along the torso (renderer: head 0.25 m on). */
+  head: { on: 0.15, r: 0.1 },
+  /** Hands at most this far below the deck: full tip + girdle + a straight arm (0.97 × arm), floored to the cm (0.73). */
+  reachDown: Math.floor((-proneShoulderLo + PRONE_GIRDLE + PRONE_STRAIGHT * armLength) * 100) / 100,
   /** At the hand-off, hands at most this far beyond the deck outline (= reachDownOut). */
   edgeReach: 0.45,
   /** Shoulder bands (feet = S) per phase of the rise; `hip` = hip-joint heights above the deck at the phase's end. */
   posture: {
-    /** lying at the edge, reaching down over it (hi: lying flat = chest; lo: the full tip + girdle, rounded to the cm) */
-    prone: { lo: Math.round(proneShoulderLo * 100) / 100, hi: PRONE_CHEST, lean: PRONE_BACK + PRONE_OVER },
+    /** lying at the edge, reaching down over it — the cylinder bounding proneReachGap over every allowed turn: lo the
+     *  full tip − girdle (rounded to the cm), hi lying flat + girdle, lean the farthest shoulder joint from S + girdle */
+    prone: { lo: proneLo, hi: PRONE_CHEST + PRONE_GIRDLE, lean: proneLean },
     /** push-up on one straight arm (the other holds the load): shoulders from the prone bottom to an arm above the deck */
-    pushUp: { lo: Math.round(proneShoulderLo * 100) / 100, hi: armLength, lean: PRONE_BACK + PRONE_OVER },
+    pushUp: { lo: proneLo, hi: armLength, lean: proneLean },
     /** knees → kneeling upright, still bent over the edge: bentOver's bottom to kneelHip + torso (0.91) */
     kneelUp: { lo: Math.round((RIG.kneelHip + RIG.torso * dcos((RIG.kneelBend * Math.PI) / 180)) * 100) / 100, hi: RIG.kneelHip + RIG.torso, lean: 0.35 },
   } satisfies Record<string, Posture>,
@@ -188,3 +225,63 @@ export const restHand = (b: BodyFrame, h: Hand) => at(b, M.restHand.fwd, sideOf(
 export const carryHand = (b: BodyFrame, h: Hand) => at(b, M.carryHand.fwd, sideOf(h) * M.carryHand.side, M.carryHand.up);
 /** Both empty hands [left, right] hanging at the hips of person `e` (where the renderer puts hands no engine point drives). */
 export const restHands = (e: Entity): [Vec3, Vec3] => { const b = bodyFrame(e); return [restHand(b, 'left'), restHand(b, 'right')]; };
+
+// ---- prone receiver: the lying body, exact (heading-aware) ----
+/**
+ * A body lying prone at station S (`feet`, deck top), its axis along the unit `heading` (xz), turned `turn` rad off the
+ * edge normal `out` (the lip is `back` behind … ahead of S along `out`). f / r = the axis / its right; `lip` = the lip's
+ * distance along the axis (proneLipAlong); `yaw` = the axis as a world yaw (`human.proneYaw`).
+ */
+export type ProneFrame = { feet: Vec3; f: Vec2; r: Vec2; out: Vec2; turn: number; lip: number; yaw: number };
+
+export function proneFrame(feet: Vec3, out: Vec2, heading: Vec2): ProneFrame {
+  const turn = datan2(out[0] * heading[1] - out[1] * heading[0], out[0] * heading[0] + out[1] * heading[1]);
+  return { feet, f: heading, r: [-heading[1], heading[0]], out, turn, lip: proneLipAlong(turn), yaw: datan2(heading[1], heading[0]) };
+}
+
+/** World point `a` along the axis, `s` to the right, `up` above the deck. */
+export function proneAt(b: ProneFrame, a: number, s: number, up: number): Vec3 {
+  return [b.feet[0] + b.f[0] * a + b.r[0] * s, b.feet[1] + up, b.feet[2] + b.f[1] * a + b.r[1] * s];
+}
+
+/**
+ * The lying body tipped `deg` (0 … tipMax) over the lip: the tip joint, the shoulder midpoint, the shoulder joints
+ * [left, right] (±shoulderHalf across), the head's centre, and the torso's unit direction / belly normal in (along, up).
+ */
+export function pronePoints(b: ProneFrame, deg: number) {
+  const P = BODY_MODEL.prone;
+  const ja = b.lip + P.tipPast;
+  const [sa, su] = proneShoulderRel(deg);
+  const len = Math.sqrt(sa * sa + su * su);
+  const dir: [number, number] = [sa / len, su / len]; // tip joint → shoulders
+  const belly: [number, number] = [dir[1], -dir[0]]; // the front of the torso (down, lying flat)
+  const mid = proneAt(b, ja + sa, 0, P.tipUp + su);
+  const hs = BODY_MODEL.shoulderHalf;
+  return {
+    joint: proneAt(b, ja, 0, P.tipUp),
+    mid,
+    shoulders: [proneAt(b, ja + sa, -hs, P.tipUp + su), proneAt(b, ja + sa, hs, P.tipUp + su)] as [Vec3, Vec3],
+    head: proneAt(b, ja + sa + P.head.on * dir[0], 0, P.tipUp + su + P.head.on * dir[1]),
+    /** (along, up) at axis distance `a` from the tip joint along the torso, `k` towards the belly */
+    torso: (t: number, k: number, s: number) => proneAt(b, ja + t * dir[0] + k * belly[0], s, P.tipUp + t * dir[1] + k * belly[1]),
+    len,
+  };
+}
+
+/**
+ * How far `hand` (world) is beyond the reach of the lying body's `side` shoulder (≤ 0 = reachable): the smallest tip
+ * (5° steps, 0 … tipMax) at which the hand is within arm + girdle of that shoulder joint, or the least miss over all
+ * tips. `tip` = that tip in degrees. The reach-down cap (hands ≤ reachDown below the deck) is separate.
+ */
+export function proneReachGap(b: ProneFrame, hand: Vec3, side: Hand): { gap: number; tip: number } {
+  const P = BODY_MODEL.prone, R = BODY_MODEL.armLength + P.girdle, j = side === 'left' ? 0 : 1;
+  let best = { gap: Infinity, tip: P.tipMax as number };
+  for (let deg = 0; deg <= P.tipMax + 1e-9; deg += 5) {
+    const s = pronePoints(b, deg).shoulders[j];
+    const dx = hand[0] - s[0], dy = hand[1] - s[1], dz = hand[2] - s[2];
+    const g = Math.sqrt(dx * dx + dy * dy + dz * dz) - R;
+    if (g <= 0) return { gap: g, tip: deg };
+    if (g < best.gap) best = { gap: g, tip: deg };
+  }
+  return best;
+}

@@ -797,3 +797,36 @@ Then: gate → release 5; HANDOFF refresh.
 - Cost: ≈ 0.37 M tokens (incl. a 95k Explore subagent), ≈ 45 min wall.
 - **W33 landed** `70cc6ea`, `0650aa8`, `fe05070`, `f8e6675` (≈370k tokens, 45 min, docs only): CODEX.md, four Codex briefs, QUESTIONS_FOR_GENE.md (14 open + 2 answered, 10 images incl. 5 new lab captures), HANDOFF/NEXT_SESSION_PROMPT with the split + ETAs, questions removed from handoffs. Lead verified on main; **Gene alerted 11:55 EDT: "CODEX.md and briefs are on main".** Notes: parse brief uses `parseSentence/parseSentences` (name collision with `direct.ts` `parseDirection`); `**` scan needs an allowlist of 14 Claude-owned lines; green frames will drift many baselines (accept firelit/colour drift at merge); `npm run lint` fails on missing tsgolint (Codex tooling brief).
 - 12:00 EDT Gene: deploy bleeding edge now (RELEASE_CHECKLIST protocol); Codex starts. W34 spawned: release 6 — full gate at HEAD in a worktree, deploy, smoke, deployment.json + rollback, RELEASE_CHECKLIST record. ETA to checkpoint 1 given to Gene: ≈ 18:00 EDT.
+## W32 — prone model = the measured rig; lying heading; body beyond the lip; phaseK (2026-09-29)
+- **Model** (`body/model.ts` `BODY_MODEL.prone`, BODY_MODEL.md "Prone receiver + rise"): the woman template lying at the
+  edge (W29's measurement, the smaller reach): chest 0.10 (rig 0.097–0.102), tip joint 0.08 past the lip (renderer) and
+  0.15 up (rig lying hips), tip joint → shoulders 0.19 (woman; punk 0.27). Tipped 60° the shoulders are −0.034 m
+  (measured −0.03; the punk construction −0.106 vs −0.10) → **reachDown 0.73 m** (0.034 + girdle 0.10 + 0.97 × 0.62;
+  was 0.94). Exact heading-aware geometry `proneFrame` / `pronePoints` / `proneReachGap` (arm + girdle from each shoulder
+  joint); `posture.prone` is now the cylinder bounding it over every turn ≤ 45° (−0.13 … 0.20, lean 1.06; checked on a
+  grid). Punk / casual reach ≈ 7 cm more: slack.
+- **hand_up** (`construction/handup.ts`): prone stations lie with the body's axis through the grip, else turned back
+  toward the edge normal in 5° steps; the lying body (toes 0.75 m behind S, half-width 0.20) checked at that heading
+  against the deck, parts and people (and two bodies against each other); the take planned with the exact reach; the
+  chest tipped as far as that needs, head and arms swept against everything past the lip → another heading / station, or
+  `handup.rise-blocked` naming the member when a crew would work but for that sweep. `human.proneYaw` (lying heading;
+  `pose.yaw` keeps facing out, so the renderer's `lipAlong(proneYaw − yaw)` is right) and `human.phaseK` (0–1 in the
+  current phase), prone receivers only, cleared at the release. `world/types.ts`: the two optional HumanState fields
+  (additive).
+- **Tests** (`handup-prone.test.ts` 8, was 6; `body-model.test.ts` prone test rewritten; `handup.test.ts` three
+  too-high regexes 0.94 → 0.73): with reach 0.73 the old 2.9 m hand-off (0.83 m) is `too-high`, so the green case is the
+  **2.75 m deck** (the tallest 6 in beam seat within reach from the ground: hand-off 0.67 m; 477 ticks, turns ±20°,
+  worst hand step 0.152) and **2.90 m** the too-high case; the fixture's deck joists are 4 ft (ending at the lip; the
+  middle keeps 6 ft) — W29's all-6-ft geometry (tails 0.30 m past the lip under the decks) is the new `rise-blocked`
+  regression (a chest / head / arm through a joist wherever they could lie); forks: 0.70 m below green, 0.72
+  no-receiver-station, 0.74 too-high. Per tick: exact reach + body clear at every take tick, proneYaw / phaseK schema.
+  Suite 375 / 372 / 3 skip, 0 fail; tsc clean.
+- **Pins unchanged:** `deploy/perf-walk.mjs` stress / probe / campus / meal / v3 all PIN-OK (v3 `39a0fb3f…` @16374);
+  full `YEAR_BUILD_FULL=1` set 8/8: phase A first bay `251a44c5…` @41317, whole skeleton `d382e461…` @117277, first bay +
+  deck strip `94db263e…` @53604, A+B `ddb634d6…` @600599 — all unchanged.
+- **For others:** the recorder needs `proneYaw` / `phaseK` in FIELDS (W31's area) for takes; W29's lab preset
+  `app/lab/prone.ts` mirrors the old 2.9 m / all-6-ft fixture — it now refuses (too-high) and must move to 2.75 m with 4 ft
+  deck joists; POSES.md still quotes the engine's 0.94.
+- **Weak spots:** the rise (push-up / kneel-up) still uses cylinders about S and is not body-swept; arms are straight
+  segments; the lying footprint vs people is a plan-time snapshot; the grip is always the load's point nearest S (no
+  choice of grip along the edge), which in this fixture is the sheet's corner beside a joist end.
