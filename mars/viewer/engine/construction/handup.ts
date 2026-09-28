@@ -32,7 +32,7 @@ import { crewCheck, f2, fail, lerpPose, smooth, spatialOf, STAGE_RADIUS, sweepPo
 import { flatObb, isJoist, isPlywood, memberTop, sheetSupports } from './deck.ts';
 import { isBeam } from './rules.ts';
 import { beamWalkways, climbLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
-import { deckAt } from './framemove.ts';
+import { deckAt, deckOver } from './framemove.ts';
 
 // ---- rules (metres, seconds) ----
 export const GIVE_MAX = 2.1; // givers' hands (the load's underside) never above their floor + this
@@ -211,6 +211,30 @@ function receiverHands(e: Entity, q: Pose, feet: Vec3): [Vec3, Vec3] {
   return handPair(o, n.q, n.t, q.p[1] + size(e)[1], [feet[0], feet[2]]);
 }
 
+/**
+ * Grip slot of a hand-up holder. Givers: `handup-give-<i>:<lx>:<lz>:<x|z>` = the grip point in the
+ * part's local frame (x, z; on its underside) and the local axis the two hands spread along.
+ * Receivers: `handup-take-<i>` = the part's top face, at its point nearest the receiver.
+ */
+export function giverSlot(i: number, g: { g: Vec2; tan: Vec2 }): string {
+  return `${HANDUP_SLOT_PREFIX}give-${i}:${g.g[0].toFixed(3)}:${g.g[1].toFixed(3)}:${Math.abs(g.tan[0]) > 0.5 ? 'x' : 'z'}`;
+}
+
+/**
+ * Both hand points [left, right] (world, m) of `holder` gripping `part` at pose `q` with a hand-up slot:
+ * a pure function of the part pose, the holder's position and the slot, so a renderer can rebuild them
+ * from a take (poses + grip) exactly as the engine publishes them in human.hands. null = not a hand-up slot.
+ */
+export function handupHands(part: Entity, q: Pose, holder: Entity, slot: string): [Vec3, Vec3] | null {
+  const feet = holder.pose.p;
+  if (/^handup-take-\d+$/.test(slot)) return receiverHands(part, q, feet);
+  const m = /^handup-give-\d+:(-?[\d.]+):(-?[\d.]+):([xz])$/.exec(slot);
+  if (!m) return null;
+  const g: Vec2 = [Number(m[1]), Number(m[2])];
+  const tan: Vec2 = m[3] === 'x' ? [1, 0] : [0, 1];
+  return handPair(flatObb(q, part), world(q, g), dirW(q, tan), q.p[1], [feet[0], feet[2]]);
+}
+
 /** Sample a pose segment every STEP m of the farthest point's motion. */
 function samples(e: Entity, a: Pose, b: Pose): Pose[] {
   const ext = Math.hypot(size(e)[0], size(e)[2]) / 2;
@@ -323,7 +347,8 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
       return bad('handup.too-high', `${e.id} on the forks at ${f2(fp.p[1])} m is ${f2(edgeY - fp.p[1] - th)} m below the receivers' feet (max ${REACH_DOWN} m); raise the forks`, [e.id], fp.p);
   }
   // ---- the part's path
-  const giverGrips = mode === 'hand' ? localOut(rot2(nOut, -yawH), size(e)[0], size(e)[2], givers.length) : [];
+  const q3 = (v: Vec2): Vec2 => [Number(v[0].toFixed(3)), Number(v[1].toFixed(3))];
+  const giverGrips = mode === 'hand' ? localOut(rot2(nOut, -yawH), size(e)[0], size(e)[2], givers.length).map((g) => ({ ...g, g: q3(g.g) })) : [];
   const giverSegs: Seg[] = [];
   const pickup: HandupProgram['pickup'] = [];
   const ignoreRest = [...rest.supports];
@@ -414,6 +439,7 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
     for (const [i, s] of p.stations.entries()) {
       const q: Vec2 = [s.x, s.z];
       const l = all.find((x) => offWalkway(x, q) <= x.width / 2 + 0.01);
+      if (l && deckOver(rt, l, q)) return bad('handup.receiver-not-aloft', `receiver station (${f2(s.x)}, ${f2(s.z)}) on ${l.id} is under a deck; stand on the deck instead`, [p.receivers[i]], [s.x, l.from.y, s.z]);
       if (l) { push([q[0], l.from.y, q[1]], l.id, null, l.id === edge.id, i); continue; }
       const d = deckAt(rt, edge, q);
       if (d && !('code' in d)) { push([q[0], d.y, q[1]], null, d.level, false, i); continue; }
@@ -425,7 +451,7 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
       const len = dist2(l.from.p, l.to.p);
       for (let s = 0; s <= len + 1e-9; s += STEP) {
         const q = add2(l.from.p, scale2(sub2(l.to.p, l.from.p), s / len));
-        push([q[0], l.from.y, q[1]], l.id, null, l.id === edge.id, k++);
+        if (!deckOver(rt, l, q)) push([q[0], l.from.y, q[1]], l.id, null, l.id === edge.id, k++);
       }
     }
   }
@@ -574,10 +600,11 @@ function holdGivers(rt: Runtime, ex: Exec, activity: string, q: Pose, feetFromPo
       const f = giverFeet(ex.prog, i, q, h.pose.p[1]);
       h.pose.p = f;
     }
-    const hands = giverHands(e, ex.prog, i, q, h.pose.p);
+    const slot = giverSlot(i, ex.prog.giverGrips[i]);
+    const hands = handupHands(e, q, h, slot)!;
     const c: Vec2 = [(hands[0][0] + hands[1][0]) / 2, (hands[0][2] + hands[1][2]) / 2];
     h.pose.yaw = datan2(c[1] - h.pose.p[2], c[0] - h.pose.p[0]);
-    Object.assign(h.human!, { activity, task: ex.id, grip: { entity: e.id, slot: `${HANDUP_SLOT_PREFIX}give-${i}` } });
+    Object.assign(h.human!, { activity, task: ex.id, grip: { entity: e.id, slot } });
     setHands(h, hands);
   }
 }
@@ -585,10 +612,11 @@ function holdReceivers(rt: Runtime, ex: Exec, activity: string, q: Pose) {
   const e = rt.world.entities[ex.p.part];
   for (const [i, st] of ex.prog.stations.entries()) {
     const h = rt.world.entities[st.actor];
-    const hands = receiverHands(e, q, h.pose.p);
+    const slot = `${HANDUP_SLOT_PREFIX}take-${i}`;
+    const hands = handupHands(e, q, h, slot)!;
     const c: Vec2 = [(hands[0][0] + hands[1][0]) / 2, (hands[0][2] + hands[1][2]) / 2];
     h.pose.yaw = datan2(c[1] - h.pose.p[2], c[0] - h.pose.p[0]);
-    Object.assign(h.human!, { activity, task: ex.id, grip: { entity: e.id, slot: `${HANDUP_SLOT_PREFIX}take-${i}` } });
+    Object.assign(h.human!, { activity, task: ex.id, grip: { entity: e.id, slot } });
     setHands(h, hands);
   }
 }

@@ -44,7 +44,8 @@ function beamState(w: WorldState, id: string, defId: string, side: 1 | -1, h: nu
   const A = w.entities.A, B = w.entities.B;
   const colA = side > 0 ? 'l' : 'r', colB = side > 0 ? 'r' : 'l';
   const kA = `col${colA}@${h.toFixed(3)}`, kB = `col${colB}@${h.toFixed(3)}`;
-  const b = component(id, defId, [(side * D12) / 2, h, L / 2], Math.PI / 2, { phase: 'installed' });
+  // connect_beam seats a beam centred on its seat hole (pose y = seat − half its 4 in height)
+  const b = component(id, defId, [(side * D12) / 2, h - BEAM_H / 2, L / 2], Math.PI / 2, { phase: 'installed' });
   b.support = { kind: 'connected', to: ['A', 'B'] };
   b.connections = [{ socket: 'end-l', to: 'A', toSocket: kA }, { socket: 'end-r', to: 'B', toSocket: kB }];
   (A.connections ??= []).push({ socket: kA, to: id, toSocket: 'end-l' });
@@ -79,7 +80,7 @@ export function bay(o: BayOpts, extras: Entity[] = []): Bay {
       Object.assign(w.entities[holder].human!, { activity: 'support', grip: { entity: u, slot: 'hold-0' } });
     } else e.support = { kind: 'connected', to: beams };
   }
-  const top = seat + BEAM_H;
+  const top = seat + BEAM_H / 2;
   for (const [k, z] of (o.joists ?? []).entries()) {
     const id = `j${k + 1}`;
     const j = component(id, '2x4-6ft', [0, top, z], Math.PI, { phase: 'installed' });

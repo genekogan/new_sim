@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DT } from '../runtime/runtime.ts';
 import { component } from '../world/factory.ts';
+import { def } from '../world/catalog.ts';
 import { beamWalkways, climbLinks, frameLinks, BEAM_SPEED, CLIMB_SPEED } from '../construction/frame.ts';
 import { spatialOf } from '../construction/access.ts';
 import { bay, run } from './frame-fixtures.ts';
@@ -124,4 +125,23 @@ test('someone on a beam whose partner beam is removed is flagged (frame.link-gon
   E.b4.phase = 'staged';
   rt.step();
   assert.ok(rt.violations.some((v) => v.code === 'frame.link-gone' && v.subjects?.includes('p1')), JSON.stringify(rt.violations));
+});
+
+test('nobody walks a beam under a deck; stepping off onto the deck goes from an open spot on the beam', () => {
+  const { rt, E, top } = bay({ seat: 1.8, joists: [0.25, 0.71, 1.17, 1.6] });
+  // a sheet installed on the three southern joists (by state): deck over the beams at z 0.1–1.32
+  const s = component('s1', 'plywood-4x6', [0, top + def('2x4-6ft').size[1], 0.71], 0, { phase: 'installed' });
+  s.support = { kind: 'resting-on', on: 'j1' };
+  s.connections = ['j1', 'j2', 'j3'].map((j) => ({ socket: 'bears-on', to: j, toSocket: 'deck' }));
+  rt.world.entities.s1 = s;
+  run(rt, 'climb_frame', { actor: 'p1', link: 'climb:B:r@1.83', dir: 'up' });
+  run(rt, 'beam_walk', { actor: 'p1', x: 0.61, z: 1.8 }); // b3 (x +D/2 in this fixture)
+  const under = rt.submit('beam_walk', { actor: 'p1', x: 0.61, z: 0.6 });
+  assert.equal(under.diagnostic?.code, 'beam.under-deck');
+  assert.match(under.diagnostic!.message, /under deck .* nobody stands on a beam beneath a deck/);
+  run(rt, 'beam_walk', { actor: 'p1', x: 0.3, z: 0.9 });
+  assert.equal(E.p1.human!.on, undefined);
+  assert.equal(E.p1.human!.level, 4);
+  assert.ok(Math.abs(E.p1.pose.p[1] - (top + def('2x4-6ft').size[1] + def('plywood-4x6').size[1])) < 1e-9, 'standing on the deck');
+  assert.deepEqual(rt.violations, [], JSON.stringify(rt.violations.slice(0, 3)));
 });

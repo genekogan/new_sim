@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { component } from '../world/factory.ts';
 import { def } from '../world/catalog.ts';
-import { ENVELOPE_TOL, envelopeGap, GIVE_MAX, handsOf, REACH_DOWN } from '../construction/handup.ts';
+import { ENVELOPE_TOL, envelopeGap, GIVE_MAX, handsOf, handupHands, REACH_DOWN } from '../construction/handup.ts';
 import { deckSurfaces } from '../construction/contributor.ts';
 import { bay, run } from './frame-fixtures.ts';
 import type { Runtime } from '../runtime/runtime.ts';
@@ -39,6 +39,9 @@ function watch(rt: Runtime, id: string, max = 20 * 400) {
       roles.set(h.id, slot);
       const hs = handsOf(h);
       assert.ok(hs, `${h.id} publishes no hand points at tick ${rt.tick}`);
+      // a renderer rebuilds them from the take alone (part pose + holder pose + grip slot)
+      const part = rt.world.entities[h.human!.grip!.entity];
+      assert.deepEqual(handupHands(part, part.pose, h, slot), hs, `${h.id} hands not reproducible from ${slot}`);
       for (const p of hs!) {
         const g = envelopeGap(h.human!.activity, h.pose.p, p);
         worst = Math.max(worst, g);
@@ -53,7 +56,8 @@ function watch(rt: Runtime, id: string, max = 20 * 400) {
 
 test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two givers, two receivers on the beams), 0 violations, hands in reach every tick', () => {
   const { rt, E, top, to } = sheetBay(2.29);
-  assert.ok(Math.abs(top - 2.388) < 0.01, `receivers stand at ${top}`);
+  assert.ok(Math.abs(top - 2.337) < 0.01, `receivers stand at ${top}`);
+  assert.ok(Math.abs(top + def('2x4-6ft').size[1] + def('plywood-4x6').size[1] - 2.445) < 0.01, 'deck top ≈ 2.4 m');
   const r = rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
   assert.notEqual(r.status, 'failed', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
   const acts = new Map<string, Set<string>>();
@@ -81,12 +85,12 @@ test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two give
   assert.deepEqual(rt.violations, []);
 });
 
-test('hand_up refuses a deck too high for a genuine hand-off (3.2 m): use the forklift', () => {
-  const { rt, to } = sheetBay(3.05);
+test('hand_up refuses a deck too high for a genuine hand-off (receivers at 3.25 m, deck 3.36 m): use the forklift', () => {
+  const { rt, to } = sheetBay(3.2);
   const r = rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
   assert.equal(r.status, 'failed');
   assert.equal(r.diagnostic?.code, 'handup.too-high');
-  assert.match(r.diagnostic!.message, /givers can raise it to 2\.10 m .* reach 1\.03 m below their feet \(max 1 m\); use the forklift/);
+  assert.match(r.diagnostic!.message, /givers can raise it to 2\.10 m .* reach 1\.13 m below their feet \(max 1 m\); use the forklift/);
 });
 
 test('hand_up refuses receivers who are not on a walkable beam or deck, and a beam without its partner', () => {
@@ -117,7 +121,7 @@ test('hand points: the invariant flags a receiver whose hands are out of reach (
   const { rt, E } = sheetBay(2.29);
   // fake a receiver holding the sheet far below their feet
   Object.assign(E.p3.human!, { activity: 'reach_down', grip: { entity: 's1', slot: 'handup-take-0' }, hands: { left: [0.6, 0.5, 0.3], right: [0.6, 0.5, 0.6] } });
-  E.p3.pose.p = [0.61, 2.388, 0.45];
+  E.p3.pose.p = [0.61, 2.337, 0.45];
   Object.assign(E.p1.human!, { activity: 'reach_up', grip: { entity: 's1', slot: 'handup-give-0' }, hands: { left: [E.p1.pose.p[0], 2.4, E.p1.pose.p[2]], right: [E.p1.pose.p[0], 2.4, E.p1.pose.p[2] + 0.2] } });
   rt.step();
   const v = rt.violations.filter((x) => x.code === 'lift.hands-out-of-reach');

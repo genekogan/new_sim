@@ -187,6 +187,25 @@ export function deckAt(rt: Runtime, l: Link, p: Vec2): Surface | Diagnostic | nu
   return s;
 }
 
+/** A deck surface over walkway point q within a person's height (people cannot stand on a beam under a deck). */
+export function deckOver(rt: Runtime, l: Link, q: Vec2): Surface | undefined {
+  return spatialOf(rt).scene.surfaces.find((x) => x.level > 0 && x.y > l.from.y + 0.02 && x.y < l.from.y + HUMAN_PROFILE.height && pointInObb(q, x.obb, UNDER_DECK_MARGIN));
+}
+export const UNDER_DECK_MARGIN = 0.1; // m beyond a deck's edge that still counts as under it
+
+/** First covered point walking along l from arc length s0 to s1 (sampled every 0.05 m), if any. */
+function coveredBetween(rt: Runtime, l: Link, s0: number, s1: number): { q: Vec2; deck: Surface } | null {
+  const len = dist2(l.from.p, l.to.p);
+  const n = Math.max(1, Math.ceil(Math.abs(s1 - s0) / 0.05));
+  for (let k = 0; k <= n; k++) {
+    const s = s0 + ((s1 - s0) * k) / n;
+    const q: Vec2 = [l.from.p[0] + ((l.to.p[0] - l.from.p[0]) * s) / len, l.from.p[1] + ((l.to.p[1] - l.from.p[1]) * s) / len];
+    const d = deckOver(rt, l, q);
+    if (d) return { q, deck: d };
+  }
+  return null;
+}
+
 export function planBeamWalk(rt: Runtime, p: BP): { ok: true; program: BProg } | { ok: false; diagnostic: Diagnostic } {
   const a = rt.world.entities[p.actor];
   if (!a?.human) return bad('actor.not-human', `"${p.actor}" is not a person in this world`, [p.actor]);
@@ -210,8 +229,23 @@ export function planBeamWalk(rt: Runtime, p: BP): { ok: true; program: BProg } |
       return bad('beam.off-walkway', `(${f2(p.x)}, ${f2(p.z)}) is ${f2(off)} m off beam ${beam}'s walkway and not on a deck within a step of it (≤ ${STEP_OFF_MAX} m, ±${STEP_UP_MAX} m)`, [a.id, beam], [p.x, l.from.y, p.z]);
     deck = d;
   }
-  const q = onWalkway(l, target).q;
+  let q = onWalkway(l, target).q;
+  if (deck) {
+    // step off from the beam point nearest the target that is not under a deck
+    const len = dist2(l.from.p, l.to.p);
+    let best: Vec2 | null = null;
+    for (let k = 0, n = Math.ceil(len / 0.05); k <= n; k++) {
+      const c: Vec2 = [l.from.p[0] + ((l.to.p[0] - l.from.p[0]) * k) / n, l.from.p[1] + ((l.to.p[1] - l.from.p[1]) * k) / n];
+      if (!deckOver(rt, l, c) && (!best || dist2(c, target) < dist2(best, target) - 1e-9)) best = c;
+    }
+    if (!best || dist2(best, target) > STEP_OFF_MAX)
+      return bad('beam.off-walkway', `${a.id} cannot step from beam ${beam} onto ${deck.label ?? deck.id} at (${f2(p.x)}, ${f2(p.z)}): no open spot on the beam within ${STEP_OFF_MAX} m`, [a.id, beam], [p.x, l.from.y, p.z]);
+    q = best;
+  }
   const s0 = onWalkway(l, xz(a)).s, s1 = onWalkway(l, q).s;
+  const under = coveredBetween(rt, l, s0, s1);
+  if (under)
+    return bad('beam.under-deck', `${a.id} cannot walk beam ${beam} under ${under.deck.label ?? under.deck.id} (at (${f2(under.q[0])}, ${f2(under.q[1])})): nobody stands on a beam beneath a deck; walk on the deck`, [a.id, beam, under.deck.id.replace(/^deck:/, '')], [under.q[0], l.from.y, under.q[1]]);
   const who = beamBlocker(rt, l, a.id, s0, s1);
   if (who) return bad('beam.occupied', `${who.id} stands on beam ${beam} in ${a.id}'s way; people cannot pass on a beam`, [a.id, who.id, beam], who.pose.p);
   return { ok: true, program: { walkway: l, q, deck, speed } };
