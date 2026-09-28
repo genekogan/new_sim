@@ -5,10 +5,14 @@
 // on a fixture (or sitting down), whose cancel is deferred by a 0.6 s 'stand-up' back to the
 // seat's approach point (seat fixtures are obstacles; see slots.ts seatApproach).
 //
-// Pre-emption (spec §17 "explicit director commands take precedence"): a social action owns its
-// people's `actor:<id>` reservations, so a directed task submitted for one of them fails with
-// `reservation.conflict` naming the social action. There is no automatic pre-emption yet: the
-// director cancels the social action first (`releaseForDirective` does exactly that per actor).
+// Pre-emption (spec §17 "explicit director commands take precedence"; SOCIAL.md "Pre-emption"): a
+// social action owns its people's `actor:<id>` reservations. Every social verb declares `yieldTo`
+// (actions/types.ts), so a directed task submitted for one of them makes the runtime release the
+// smallest social unit first — this person's seat / slot, their ambient walk, or the whole
+// converse / face — cancelled with reason `pre-empted by <id>`; a seated person stands up (0.6 s)
+// and the directive starts when they are off the seat. Social verbs never pre-empt each other
+// (reservation.conflict), and `preempt: false` on the directive restores the plain refusal.
+// `releaseForDirective` does the same release by hand.
 import { z } from 'zod';
 import { angleDelta, clamp, dist2, dsin, heading, rot2, sub2, add2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, ActionRecord, Diagnostic, Reservation, StepResult } from '../actions/types.ts';
@@ -220,6 +224,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
       idle(rt, [ex.actor], ex.id);
       return { ok: true };
     },
+    yieldTo: (_rt, self) => [self.id], // pre-emption: this person's own seat / slot (a gather keeps its other members)
   };
 }
 
@@ -274,6 +279,7 @@ export const stand: ActionDef<{ actor: string }, string, StandExec> = {
   },
   step: (rt, ex) => (rt.isActive(ex.released) ? { status: 'running', phase: 'stand-up' } : { status: 'completed', outputs: { released: ex.released } }),
   cancel: () => ({ ok: true }),
+  yieldTo: () => [], // social (never pre-empts); holds no one
 };
 
 // ---------- face ----------
@@ -324,6 +330,7 @@ export const face: ActionDef<FaceParams, number, FaceExec> = {
     idle(rt, [ex.actor], ex.id);
     return { ok: true };
   },
+  yieldTo: (_rt, self) => [self.id],
 };
 
 // ---------- converse ----------
@@ -431,6 +438,8 @@ export const converse: ActionDef<ConverseParams, Circle, ConverseExec> = {
     idle(rt, ex.actors, ex.id);
     return { ok: true };
   },
+  // pre-emption: the circle cannot re-form without a member, so the whole conversation ends (reason on its record)
+  yieldTo: (_rt, self) => [self.id],
 };
 
 // ---------- gather / campfire_circle ----------
@@ -493,6 +502,7 @@ export const gather: ActionDef<GatherParams, GatherProgram, GatherExec> = {
   start: (rt, _p, prog, id) => startGather(rt, prog, id),
   step: stepGather,
   cancel: () => ({ ok: true }), // the runtime cancels live children (take_slot → people idle in place)
+  yieldTo: (_rt, _self, holder) => [holder.id], // (members' take_slot children answer first: only that member leaves)
 };
 
 export const campfireCircle: ActionDef<{ actors: string[]; fire: string }, GatherProgram, GatherExec> = {
@@ -510,6 +520,7 @@ export const campfireCircle: ActionDef<{ actors: string[]; fire: string }, Gathe
   start: (rt, _p, prog, id) => startGather(rt, prog, id),
   step: stepGather,
   cancel: () => ({ ok: true }),
+  yieldTo: (_rt, _self, holder) => [holder.id],
 };
 
 // ---------- pre-emption helpers (director side) ----------
@@ -530,14 +541,14 @@ export function socialHolder(rt: Runtime, actor: string): ActionRecord | undefin
  * releases them for good), or the whole converse / face. Never touches non-social holders (a carry
  * or raise must be finished or cancelled by the director on its own terms). Returns cancelled ids.
  */
-export function releaseForDirective(rt: Runtime, actor: string): string[] {
+export function releaseForDirective(rt: Runtime, actor: string, reason?: Diagnostic): string[] {
   const out: string[] = [];
   for (const h of rt.holder(`actor:${actor}`)) {
     const rec = rt.records.get(h)!;
     const parent = rec.parent ? rt.records.get(rec.parent) : undefined;
     const target = rec.verb === 'walk_to' && parent?.verb === 'ambient_wander' ? rec : socialHolder(rt, actor);
     if (!target || !rt.isActive(target.id) || out.includes(target.id)) continue;
-    rt.cancel(target.id);
+    rt.cancel(target.id, reason);
     out.push(target.id);
   }
   return out;

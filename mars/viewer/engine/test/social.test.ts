@@ -17,6 +17,9 @@ import type { Entity } from '../world/types.ts';
 import { SOCIAL_ACTIONS, releaseForDirective } from '../social/actions.ts';
 import { allSlots, fixtureSlots, pointInPolygon, slotsOf, type SocialRegion } from '../social/slots.ts';
 import { createRegistry } from '../api/registry.ts';
+import { component } from '../world/factory.ts';
+import { carry } from '../carry/actions.ts';
+import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 
 const LAWN: [number, number][] = [[-10, -10], [-2, -10], [-2, -2], [-10, -2]];
 
@@ -76,9 +79,10 @@ test('sit: two people cannot hold one camp-chair (reservation.conflict names slo
   assert.equal(H(rt, 'p1').activity, 'sit');
   assert.ok(hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) < 0.05);
   assert.ok(Math.abs(angleDelta(rt.world.entities.p1.pose.yaw, Math.PI / 2)) < 0.05, 'faces the seat direction');
-  // a directed task for a seated person is refused: walk_to's plan finds its start inside the chair
-  // (route.start-blocked naming it) before the runtime reaches the sit's actor reservation
-  const w = rt.submit('walk_to', { actor: 'p1', x: -4, z: -5 });
+  // with pre-emption opted out, a directed task for a seated person is refused: walk_to's plan finds
+  // its start inside the chair (route.start-blocked naming it) before the runtime reaches the sit's
+  // actor reservation (the pre-empting default is tested in 'pre-emption: …' below)
+  const w = rt.submit('walk_to', { actor: 'p1', x: -4, z: -5, preempt: false });
   assert.equal(w.status, 'failed');
   assert.match(w.diagnostic!.message, /chair|\(sit,/);
   const s = rt.submit('stand', { actor: 'p1' });
@@ -318,4 +322,147 @@ test('a seat whose approach point is walled in front and behind is refused slot.
   assert.ok(noClaims(rt, ['p1']));
   const b = rt.submit('take_slot', { actor: 'p1', slot: 'gap#seat' });
   assert.equal(b.diagnostic?.code, 'slot.unreachable');
+});
+
+// ---------- automatic pre-emption of social holds by directed tasks (SOCIAL.md "Pre-emption") ----------
+
+function setupCarry(...es: Entity[]) {
+  const base = provingGround();
+  const w = addAll(emptyWorld('proving-ground', base), ...es);
+  const reg = new Map<string, ActionDef>([[walkTo.verb, walkTo], [carry.verb, carry], ...SOCIAL_ACTIONS.map((a) => [a.verb, a] as [string, ActionDef])]);
+  return new Runtime(w, reg, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS]);
+}
+const preempted = (r: ActionRecord, by: ActionRecord) => r.status === 'cancelled' && r.diagnostic?.code === 'social.pre-empted' && r.diagnostic.message.startsWith(`pre-empted by ${by.id} `);
+
+/** p1 seated on a camp-chair, p2 standing by a 12 ft beam; returns the runtime and the sit record once occupied. */
+function seatedScene() {
+  const rt = setupCarry(fixture('chair', 'camp-chair', 0, -5), component('b1', 'beam-12ft', [0, 0, 0], 0), human('p1', -2, -5), human('p2', 1.5, 1));
+  const sit = rt.submit('sit', { actor: 'p1', fixture: 'chair' });
+  assert.ok(runWhile(rt, () => sit.phase !== 'occupied', 20 * 30), sit.diagnostic?.message);
+  rt.step();
+  assert.equal(H(rt, 'p1').activity, 'sit');
+  return { rt, sit };
+}
+
+function runSeatedCarry() {
+  const { rt, sit } = seatedScene();
+  const c = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b1', to: { x: 6, z: 3, yaw: 0 } });
+  return { rt, sit, c };
+}
+
+test('pre-emption: a seated person given a directed carry stands up (0.6 s) first, then carries; the sit ends cancelled "pre-empted by <carry>"; 0 violations', () => {
+  const { rt, sit, c } = runSeatedCarry();
+  assert.equal(c.status, 'requested', 'waits for the stand-up');
+  assert.equal(c.phase, 'pre-empting');
+  assert.ok(rt.isActive(c.id));
+  assert.throws(() => rt.snapshot(), /pre-empted social holds/, 'no snapshot while a directive waits');
+  assert.equal(sit.phase, 'cancelling');
+  const t0 = rt.tick;
+  rt.step();
+  assert.equal(H(rt, 'p1').activity, 'stand-up');
+  assert.ok(runWhile(rt, () => c.status === 'requested', 20 * 2), 'the carry starts once the stand-up is over');
+  assert.ok(preempted(sit, c), `${sit.status} ${sit.diagnostic?.code} ${sit.diagnostic?.message}`);
+  assert.equal(sit.endedTick, c.history.find((h) => h.status === 'executing')!.tick, 'the carry starts the tick the seat is released');
+  assert.ok(Math.abs((sit.endedTick! - t0) * 0.05 - 0.6) < 0.051, `stand-up took ${(sit.endedTick! - t0) * 0.05} s`);
+  assert.ok(hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) > 0.55, 'off the seat before carrying');
+  const ev = rt.events.find((e) => e.type === 'action' && e.id === sit.id && e.status === 'cancelled');
+  assert.ok(ev && ev.type === 'action' && ev.code === 'social.pre-empted' && ev.message!.startsWith(`pre-empted by ${c.id}`), 'the take events carry the reason');
+  assert.ok(rt.runUntilIdle(20 * 180, [c.id]));
+  assert.equal(c.status, 'completed', c.diagnostic?.message);
+  assert.deepEqual(msgs(rt), []);
+  assert.ok(noClaims(rt, ['p1', 'p2']));
+});
+
+test('pre-emption: cancelling a waiting directive ends it cancelled without starting it; the stand-up still finishes', () => {
+  const { rt, sit, c } = runSeatedCarry();
+  rt.step();
+  rt.cancel(c.id);
+  assert.equal(c.status, 'cancelled');
+  assert.ok(!rt.isActive(c.id));
+  assert.ok(rt.runUntilIdle(20 * 5));
+  assert.equal(sit.status, 'cancelled');
+  assert.equal(H(rt, 'p1').activity, 'idle');
+  assert.ok(!c.history.some((h) => h.status === 'executing'));
+  assert.deepEqual(rt.world.entities.b1.pose.p, [0, 0, 0], 'the beam never moved');
+  assert.ok(noClaims(rt, ['p1', 'p2']));
+  assert.deepEqual(msgs(rt), []);
+});
+
+test('pre-emption: one of a converse pair gets a directed walk → the conversation ends for both with the reason, the other is idle, the walk runs', () => {
+  const rt = setup(human('a', -7, -6), human('b', -5, -6));
+  const cv = rt.submit('converse', { actors: ['a', 'b'] });
+  assert.ok(runWhile(rt, () => cv.phase !== 'talking', 20 * 20), cv.diagnostic?.message);
+  rt.step();
+  assert.equal(H(rt, 'b').activity, 'talk');
+  const w = rt.submit('walk_to', { actor: 'a', x: -9, z: -9 });
+  assert.equal(w.status, 'executing', 'a converse releases at once: the walk starts in the same submit');
+  assert.ok(preempted(cv, w), `${cv.status} ${cv.diagnostic?.message}`);
+  assert.equal(H(rt, 'b').activity, 'idle');
+  assert.equal(H(rt, 'b').task, undefined);
+  assert.ok(rt.runUntilIdle(20 * 20));
+  assert.equal(w.status, 'completed', w.diagnostic?.message);
+  assert.ok(noClaims(rt, ['a', 'b']));
+  assert.deepEqual(msgs(rt), []);
+});
+
+test('pre-emption: a gather of 4 round the campfire, one directed away → that member leaves (reason named), 3 keep warming, the gather goes on', () => {
+  const ids = ['g1', 'g2', 'g3', 'g4'];
+  const rt = setup(fixture('fire', 'campfire', -5, 4, 0, true), ...ids.map((id, i) => human(id, -8 + i * 2, 0)));
+  const g = rt.submit('campfire_circle', { actors: ids, fire: 'fire' });
+  assert.equal(g.status, 'executing', g.diagnostic?.message);
+  assert.ok(runWhile(rt, () => g.phase !== 'gathered', 20 * 30), g.diagnostic?.message);
+  rt.step();
+  const kid = (a: string) => [...rt.records.values()].find((r) => r.parent === g.id && (r.params as { actor: string }).actor === a)!;
+  const w = rt.submit('walk_to', { actor: 'g2', x: -9, z: -8 });
+  assert.equal(w.status, 'executing', w.diagnostic?.message);
+  assert.ok(preempted(kid('g2'), w), kid('g2').diagnostic?.message);
+  assert.ok(rt.runUntilIdle(20 * 30, [w.id]) && (w.status as string) === 'completed', w.diagnostic?.message);
+  assert.equal(g.status, 'executing', 'the gather keeps its other members');
+  for (const a of ['g1', 'g3', 'g4']) {
+    assert.equal(kid(a).status, 'executing');
+    assert.equal(H(rt, a).activity, 'warm');
+  }
+  assert.equal(allSlots(rt).filter((s) => s.claimedBy).length, 3);
+  rt.cancel(g.id);
+  assert.ok(noClaims(rt, ids));
+  assert.deepEqual(msgs(rt), []);
+});
+
+test('pre-emption: a social verb never pre-empts another (reservation.conflict unchanged); preempt: false restores the refusal', () => {
+  const rt = setup(fixture('chair', 'camp-chair', 0, -5), human('p1', -2, -5), human('p2', -4, -5), human('p3', -4, -7));
+  const sit = rt.submit('sit', { actor: 'p1', fixture: 'chair' });
+  assert.ok(runWhile(rt, () => sit.phase !== 'occupied', 20 * 30));
+  // a converse including the seated p1 is refused (its plan routes p1 out of the chair: route.start-blocked); the sit stays
+  const cv = rt.submit('converse', { actors: ['p1', 'p2'] });
+  assert.equal(cv.status, 'failed');
+  assert.equal(sit.status, 'executing');
+  const cv2 = rt.submit('converse', { actors: ['p2', 'p3'] });
+  assert.ok(runWhile(rt, () => cv2.phase !== 'talking', 20 * 20));
+  for (const [verb, params] of [['face', { actor: 'p2', target: { point: [5, -5] } }], ['take_slot', { actor: 'p3', slot: 'chair#seat' }], ['stand', { actor: 'p2' }]] as const) {
+    const r = rt.submit(verb, params);
+    assert.equal(r.status, 'failed', verb);
+    assert.match(r.diagnostic!.code, verb === 'stand' ? /social.in-group/ : /reservation.conflict/, `${verb}: ${r.diagnostic?.message}`);
+  }
+  const w1 = rt.submit('walk_to', { actor: 'p2', x: -8, z: -8, preempt: false });
+  assert.equal(w1.status, 'failed');
+  assert.equal(w1.diagnostic?.code, 'reservation.conflict');
+  assert.match(w1.diagnostic!.message, new RegExp(`${cv2.id} \\(converse,`));
+  const w2 = rt.submit('walk_to', { actor: 'p3', x: -8, z: -8 }, { preempt: false });
+  assert.equal(w2.diagnostic?.code, 'reservation.conflict');
+  assert.equal(sit.status, 'executing');
+  assert.equal(cv2.status, 'executing');
+  assert.equal(H(rt, 'p2').activity, 'talk');
+  assert.deepEqual(msgs(rt), []);
+});
+
+test('pre-emption determinism: seated carry + converse pre-emption twice → same state hash and event log', () => {
+  const run = () => {
+    const { rt, c } = runSeatedCarry();
+    rt.runUntilIdle(20 * 180, [c.id]);
+    return { hash: rt.stateHash(), ev: JSON.stringify(rt.events), status: c.status };
+  };
+  const a = run(), b = run();
+  assert.equal(a.status, 'completed');
+  assert.equal(a.hash, b.hash);
+  assert.equal(a.ev, b.ev);
 });

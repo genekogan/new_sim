@@ -125,4 +125,6 @@ export const ambientWander: ActionDef<WanderParams, WanderExec['poly'], WanderEx
     return { status: 'running', phase: stopping ? 'stopping' : 'wandering' };
   },
   cancel: () => ({ ok: true }), // no new walks; the runtime cancels in-progress walks (people stop where they are)
+  // pre-emption (SOCIAL.md): a directed task cancels only that person's current walk; ambient then lets them go for good
+  yieldTo: (_rt, _self, holder) => [holder.id],
 };
