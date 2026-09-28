@@ -8,7 +8,9 @@ Every reach number below comes from the one body model (`engine/body/model.ts`, 
 2026-09-28): arm 0.62 m, standing reach 2.06 m (the §5 "2.1 m" rule is 2.06 m), reach-down 0.5 m, kneel rule 0.8 m. Since
 2026-09-28 ("Body model = the measured rig", W12) these are the measured rig's numbers: shoulders 1.34 m; the spec's
 ≈ 1.0 m reach-down is **superseded** by 0.5 m (a kneeling body's shoulders stay above the deck: measured 0.35–0.54 m
-below the feet at 0.45 m out) — hand-offs needing more are refused (`handup.too-high`: use the forklift).
+below the feet at 0.45 m out) — hand-offs needing more are refused (`handup.too-high`: use the forklift) **unless a
+deck covers the edge: then receivers lie prone at its edge and reach 0.94 m below it** (owner feedback §13, W28:
+"Prone receiver" below).
 
 ## The rack structure is climbable / walkable (frame.ts, "only what exists is usable")
 | Link | Exists when | Rules |
@@ -80,7 +82,7 @@ Refusals: `handup.receiver-reach`, `handup.unbalanced`, `handup.too-high` ("…u
 `handup.receiver-not-aloft`, `handup.giver-aloft` (a giver on a beam: nobody walks a beam with a
 sheet), `handup.no-receiver-station`, `handup.path-blocked`, `handup.giver-blocked`, `handup.giver-reach`,
 `handup.not-staged`, `handup.not-on-forks`, `handup.forklift-orientation`, `handup.occupied`,
-`handup.no-support`, `handup.cancel-unsafe` (in the air), `crew.size`.
+`handup.no-support`, `handup.cancel-unsafe` (in the air), `crew.size`, `handup.rise-blocked` (prone, below).
 
 Invariant `lift.hands-out-of-reach` now covers both ends: holders with slot `handup-*` must publish
 both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.06 m, receivers ≥ feet − 0.5 m and (kneel rule)
@@ -100,6 +102,78 @@ both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.06 m, receivers
   the axis toward the middle); receivers `handup-take-<i>` = the part's top face at its point nearest them. Fastening
   (install_* aloft) uses slot `fasten` (no hand points: nearest point of the part).
 
+## Prone receiver (owner feedback §13, W28 2026-09-29)
+Gene: at Mars, with no forklift, a receiver **lies on their stomach at the edge of the upper floor** to take a plank /
+sheet from below, then gets up without letting go — pushing off the floor with one hand, to the knees, to the feet —
+and the wood never passes through the walls, floor or beams. Body numbers: BODY_MODEL.md "Prone receiver + rise".
+
+**When.** Receiving postures are tried stand → kneel → prone. Standing and kneeling are the rules above (one `bentOver`
+envelope; the 0.5 m reach-down cap is the kneel rule). Prone engages **only** where that cap refuses — the old
+`handup.too-high` condition — and a deck (installed plywood) covers the edge beam the load comes over. Nothing that
+planned before plans differently (pins unchanged: PROGRESS W28). If prone cannot reach either, `handup.too-high`
+lists all three: "…would have to reach 1.18 m below their feet (receivers reach down standing to 0.60 m above their
+feet, kneeling ≤ 0.5 m below them, lying prone at the edge of the deck at 3.36 m ≤ 0.94 m below it, here 1.29 m);
+use the forklift" (or "…but no deck covers b3 to lie on"). The forklift variant is the same with "raise the forks".
+
+**Where they lie.** Station S (the receiver's `pose.p`, feet level = the deck top) is 0.35 m behind the deck lip,
+facing straight out over the edge (`nOut`); the body lies **perpendicular to the edge, head and arms over it** (both
+hands can reach down; along the edge only one could). Candidates every 0.05 m along the edge beam wherever a deck
+covers it (or explicit `stations`, which must be 0.35 ± 0.05 m from the edge): S standable (`deckAt`), the body
+lip → toes (1.10 m) on the deck and clear (raster clearance ≥ 0.2 m less one cell). Preference: nearest to where the load
+ends up; two receivers ≥ 0.6 m apart. They walk there (`walk_to … face`) like any receiver on a deck.
+
+**Reach at the take** (plan time; per tick through the envelopes): both hands inside the `prone` envelope, ≤ **0.94 m**
+below the deck and ≤ **0.45 m** beyond the deck outline. Otherwise `handup.no-receiver-station` with the nearest reason.
+
+**The load's way up.** The givers raise it as before; with prone receivers the whole vertical corridor beside the edge,
+from the carry height up to slide height, must be clear before the edge offset is chosen — so it comes up outside the
+joist ends (a kneeling hand-up only checks the givers' part, below). During `take` and the rise it goes **straight up**
+outside the edge, level (no tilt, so the fragile-panel tilt limit holds trivially), and every sample of that path is
+swept against everything, the members it will rest on included. If something outside the edge (a wall panel, a
+cantilever) pushes the corridor out of prone reach, or blocks the rise where the forks hold it, the hand-up is refused
+`handup.rise-blocked`, naming it: "s1 cannot rise past the deck edge over b3 in the hands of a receiver lying there:
+plywood wall panel … (w1) is in the way of its rise at (…)". From slide height on they feed it in exactly as kneeling
+receivers do (bentOver envelope from S, body gap 0.30 m).
+
+**Phases** (receivers; each tick publishes `human.activity`, `human.hands`, `human.grip` from the reach on):
+
+| phase | time | activity | load | hands |
+| --- | --- | --- | --- | --- |
+| lie_down | 0.8 s, as soon as they are at S (while the givers work) | `lie-down`, then `prone-wait` | — | hips → flat on the deck beside the chest (S + 0.20 m out, ±0.25 m; smoothstep); no grip |
+| reach_down | 0.6 s (after the givers hold it at the edge) | `prone-reach` | held by the givers | deck → just outside the lip (+5 cm) → the grip (never through the edge) |
+| take | 0.4 s | `prone-reach` | givers let go at the end | on the grip |
+| push_up | ≥ 0.8 s (≤ 0.5 m/s average) | `push-up` | straight up to the lowest height both grips are in the kneel-up envelope | `hold` hand on the load; the other back over the lip onto the deck by 70 % of the phase, then pushing |
+| kneel_up | ≥ 0.6 s | `kneel-up` | on up to slide height (members' top + 5 cm) | `hold` hand on the load; the other off the deck, over the lip, back onto the load |
+| stand_with_load | 0.4 s | `stand_with_load` | still | both on the load; yaw turns from facing out to facing the hands |
+| lay, set_down | as kneeling | `lay`, `set_down` | fed in, set down | both on the load |
+
+**Hand-point schema** (what the renderer reads; pose layers are the renderer track's):
+- `human.activity` ∈ `lie-down`, `prone-wait`, `prone-reach`, `push-up`, `kneel-up` (then the existing `stand_with_load`,
+  `lay`, `set_down`); `PRONE_ACTIVITY` in handup.ts. Prone body: lying perpendicular to the edge, S = `pose.p` 0.35 m
+  behind the lip, facing `pose.yaw` (out over the edge until `stand_with_load`). Rise hip heights: BODY_MODEL.prone.hip.
+- `human.grip.slot` = `handup-prone-<i>:<left|right>`: the named hand never lets go from the take to the set-down.
+  `handupHands(part, pose, holder, slot)` returns the two-hand grip (valid at `take` and from `stand_with_load` on);
+  during `prone-reach` approach, `push-up` and `kneel-up` the free hand is only in `human.hands` (and a take's `hands`).
+- `human.hands` = `{ left, right }` world points every tick from `lie-down` to the release; continuous (≤ 0.25 m/tick,
+  measured ≤ 0.14 m). Deck-hand / lip points: `proneDeckHand`, `proneLipHand` (handup.ts).
+- Outputs: a prone station's entry ends with `'prone'`.
+
+**Crews.** One or two receivers (a 4x6 sheet: 1–2). Each station carries its posture, and a kneeling receiver beside a
+prone one would hold on through the rise (activity `take`); but because prone engages only where kneeling cannot reach
+at all, today every receiver of a prone hand-up is prone.
+
+**Tests** (`engine/test/handup-prone.test.ts`): 2.9 m deck, two prone receivers — hand-off 0.83 m below the deck,
+0 violations, all hand points continuous, the `hold` hand equal to its grip every rise tick, the free hand flat on the
+deck in the push-up, the sheet swept clear every tick of reach / take / rise; one receiver alone + bit-identical rerun;
+no deck → `handup.too-high` (…no deck covers b3 to lie on); 3.36 m deck → `handup.too-high` listing stand / kneel / prone;
+a wall panel in the rise corridor → `handup.rise-blocked` naming it.
+
+**Approximate.** Lying down, the push-up and the knees are timed pose phases with published hands and hip heights, not a
+body simulation; the envelopes are cylinders about S. The body's footprint is checked against the static raster at plan
+time (not against other people: two prone receivers are ≥ 0.6 m apart by construction). S stays at `pose.p` through
+the rise (the lying body's disc is where they knelt). Only the edge beam the load comes over is searched for prone
+stations. The load is always level and comes straight up.
+
 ## Flagship v3
 v2's build, deck handed up: 7 joists handed over b3 to crew[4] (on the beam), s1 by hand over b4 to
 crew[4]/crew[5] on the beams, s2 off the forks (west side) to crew[4] kneeling on b3 just north of s2 and
@@ -116,7 +190,10 @@ the bay). 88 steps, 16219 ticks (811 s simulated), 0 violations, ~6 s wall, pinn
   construction.
 - Balance is checked for a single giver only (lever grip, free end ≤ 1.5 m); a single receiver feeding
   a joist in end-first is assumed to slide it over the edge beam (not checked), and sheets are not checked.
-- Reach-down: 0.5 m below the feet (measured rig; the owner's §6 ≈ 1.0 m is superseded). The kneeling
+- Reach-down: 0.5 m below the feet kneeling (measured rig); lying prone at a deck edge 0.94 m below the deck (§13, above).
+- A kneeling hand-up sweeps the load's rise from the hand-off to slide height ignoring the members it will rest on, so
+  a sheet raised just outside the edge beam can pass through its own joists' cantilevers (the 2.4 m green test does);
+  the prone path sweeps that corridor with everything. Left as is to keep the pinned scenarios (W28). The kneeling
   envelope reaches 0.54 m at 0.45 m out, so the 0.5 m cap binds (`handup.too-high`), not station choice. Decks
   whose receivers stand > 2.05 + 0.5 ≈ 2.55 m above the givers' floor (plus the load's thickness) need the forklift.
 - Fork height is not state after the load leaves the forks (the truck just parks); `forklift_back` is
