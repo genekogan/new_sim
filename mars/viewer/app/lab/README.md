@@ -16,7 +16,7 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 | `year-walkabout.ts` | year walkabouts (pure TS): fetch `public/engine/campus-<year>.json` in `prepare()` (2026: `campus-2026.json` cropped ±60 m around staging-east), build `Spatial` + 0.1 m grids in the browser (timed for the HUD), four walkers at region-hull-derived spots (snapped to ≥ 0.6 m clearance) with `walk_to` targets across the campus and optional `via` passage checks |
 | `year-walkabout-view.ts` | the studio's real geometry as backdrop (`createHistoricalScene(year)` from `app/history/scenes.ts`, dynamically imported so the studio modules stay out of the lab's dev-server reload graph for other presets; 2026 = `browser/campus.glb` minus people/reference ground) and the **Engine obstacle prisms** overlay (ground-band blockers as one instanced translucent draw + outlines, depthTest off so footprints under roofs show) |
 | `social-hud.tsx`, `overlay-slots.ts` | social HUD (script status, slot occupancy, Idle-clip legend) and the **Interaction slots** overlay (green free · amber claimed · orange occupied, tick = heading) |
-| `../engine-view/fixtures.ts` | `kind: 'fixture'` meshes: bench, camp chair (seat faces local +z), campfire (stones, logs, flame; warm point light at dusk) |
+| `../engine-view/fixtures.ts`, `../engine-view/fire.ts` | `kind: 'fixture'` meshes: bench, camp chair (seat faces local +z), campfire (stones, logs + the shared animated fire: noise-shaded flame tongues, coal bed, embers, thin smoke, flickering warm point light at dusk; a pure function of entity-id seed + sim time, also used by the studio ambience fire) |
 | `sequence-hud.tsx` | sequence HUD on the canvas (active steps + phase, BLOCKED waits with code/message, last diagnostics) and the panel's step-chip timeline |
 | `sim.ts` | `LabSim`: builds `Runtime` (Spatial + walk_to + `DEFAULT_INVARIANTS`), fixed-DT accumulator, step cost stats, event log, replan detection |
 | `scene.ts` | ground, walls/solids as boxes from the `SpatialScene`, stairs from `link.path` (missing treads left out), component boxes |
@@ -57,6 +57,8 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 Baselines: `lab-stairs-mid-oblique`, `lab-narrow-passage-mid-top-debug`.
 
 `e2e/lab-social.spec.ts` covers campfire-evening: all expectations, zero violations, the arrangement at 20 s and 60 s (fire circle on the 1.6 m ring facing the fire, sitters on claimed seats facing the seat heading, c1/c2 facing each other, no two people closer than 2r), the two EXPECTED conflict banners and no FAILED banner, deterministic replay. Captures `lab-social-t{20,60}-{oblique,top}[-debug].png` (debug = agents, labels, slots, routes) and close-ups `lab-social-t60-close-{pair,circle,chairs,chairs-top}.png`. Baselines: `lab-social-t20-oblique`, `lab-social-t60-top-debug`.
+
+`e2e/fire.spec.ts` covers the animated campfire (campfire-evening at dusk, t 25.0 / 25.3 s): the flame region changes while a still standing person does not, the same tick replayed draws the identical fire, draw calls within +3 of the old cone, no console errors. Baselines: `fire-dusk-oblique`, `fire-dusk-close`.
 
 `e2e/lab-build-bay.spec.ts` covers the flagship sequence: completes, zero violations, final state hash equal to the node
 rehearsal (`engine/rehearsal/rehearse.ts`) — so live stepping is the rehearsal — geometry sanity from engine corners
