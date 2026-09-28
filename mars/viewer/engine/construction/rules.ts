@@ -30,6 +30,20 @@ export const isBeam = (e?: Entity) => !!e && def(e.def).category === 'rack-beam'
 export const isStanding = (e: Entity) => Math.abs(e.pose.pitch ?? 0) < 0.02 && Math.abs(e.pose.roll ?? 0) < 0.02;
 export const requiredLevels = (u: Entity) => (def(u.def).size[1] > 9.5 * FT ? 2 : 1);
 
+// ---- Kit decks on beams (year builds phase B, W13 — PROVISIONAL) ----
+// The procedural reconstruction lays its plywood decks straight onto the rack beams of its frames, with no 2x4
+// joists (app/history/kit.ts `deck`); a 2022 rack house has beams every 0.914 m. deck.ts's own rule (3/4 in
+// plywood spans ≤ 24 in; "in practice decks need joists") stays for every other scene. This rule applies only
+// when every member a sheet bears on is a rack beam hooked into reconstruction frames (`upright-<ft>ft-kit`,
+// catalog-stock.ts), i.e. only in year builds: 3/4 in plywood directly on beams at ≤ 4 ft centres.
+export const BEAM_DECK_SPAN_MAX = 4 * FT + 0.01;
+/** A reconstruction frame (`upright-<ft>ft-kit`), as opposed to a stock catalog upright. */
+export const isKitUpright = (e?: Entity) => !!e && isUpright(e) && e.def.endsWith('-kit');
+/** True when every support is a rack beam hooked into a reconstruction frame (the Kit deck rule applies). */
+export function beamDeckRule(w: WorldState, supports: Entity[]): boolean {
+  return supports.length >= 2 && supports.every((s) => isBeam(s) && (s.connections ?? []).some((c) => isKitUpright(w.entities[c.to])));
+}
+
 /** World position of a column seat on a standing upright. col ∈ {-1, 1}. */
 export function seatPoint(u: Entity, col: -1 | 1, height: number): Vec3 {
   const d = def(u.def).size[0];

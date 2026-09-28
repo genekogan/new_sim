@@ -20,6 +20,7 @@
 // Solar panels are W8's (§9 solar.ts): the bill of materials names them but defines no def here.
 import { FT, IN } from '../core/math.ts';
 import type { AssetDef } from './catalog.ts';
+import { phaseBAssets } from './catalog-phase-b.ts';
 
 const provisional = (note: string) => ({ confidence: 'provisional' as const, note });
 
@@ -131,5 +132,7 @@ export function stockAssets(make: { upright: (ft: number) => AssetDef }): AssetD
     obstacle: true,
     dims: provisional('generic site cutting bench: 3 m of in-feed / saw / out-feed at 0.9 m; Mars has cutting equipment on site (owner, 2026-09-28), its layout is not documented'),
   });
+  // phase B (W13): notched deck pieces, wall panels, Kit stair lumber, the Kit 2022 solar module, their piles
+  out.push(...phaseBAssets({ bundle }));
   return out;
 }

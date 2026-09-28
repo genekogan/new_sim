@@ -30,6 +30,7 @@ import { CATALOG, def, type AssetDef } from '../world/catalog.ts';
 import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 import { holdingDiagnostic } from './rules.ts';
 import { lyingObb, lyingPose, spotBlocker } from './bundle.ts';
+import { CUT_TO_ORDER, NOTCH } from '../world/catalog-phase-b.ts';
 
 export const KERF = 0.003; // m: saw blade
 export const FEED = 0.2; // m/s: saw feed across the piece
@@ -47,9 +48,19 @@ export function sameFamily(a: AssetDef, b: AssetDef): boolean {
   return Math.abs(a.size[1] - b.size[1]) < 0.002 && Math.abs(a.size[2] - b.size[2]) < 0.002;
 }
 
-/** Largest catalog piece of `stock`'s family no longer than `len` + 1 cm (≥ 0.3 m), or null. */
+// Phase B (W13, provisional): a plywood target may also be RIPPED narrower (one saw pass along its length,
+// the strip beyond it is waste) — a 15 ft wall closes with a 3 ft panel. Only one target per cut when ripping.
+export const RIP_MIN = 0.3; // m: narrowest rip
+/** A plywood target of the stock's thickness, narrower than it (≥ RIP_MIN): cut to length, then ripped. */
+export function ripFamily(stock: AssetDef, target: AssetDef): boolean {
+  return stock.category === 'plywood' && target.category === 'plywood' && Math.abs(stock.size[1] - target.size[1]) < 0.002 && target.size[2] < stock.size[2] - 0.002 && target.size[2] >= RIP_MIN;
+}
+/** Seconds to notch a piece around a frame (jigsaw, catalog-phase-b.ts NOTCH), per notched target. */
+export const NOTCH_S = 30;
+
+/** Largest catalog piece of `stock`'s family no longer than `len` + 1 cm (≥ 0.3 m), or null. Cut-to-order sizes (phase B: notched, Kit stair, wall panels) are never offcuts. */
 export function offcutDef(stock: AssetDef, len: number): AssetDef | null {
-  const fits = Object.values(CATALOG).filter((d) => sameFamily(d, stock) && d.size[0] >= 0.3 && d.size[0] <= len + 0.01 && d.id !== 'stair-tread').sort((a, b) => b.size[0] - a.size[0] || (a.id < b.id ? -1 : 1));
+  const fits = Object.values(CATALOG).filter((d) => sameFamily(d, stock) && d.size[0] >= 0.3 && d.size[0] <= len + 0.01 && d.id !== 'stair-tread' && !CUT_TO_ORDER.has(d.id)).sort((a, b) => b.size[0] - a.size[0] || (a.id < b.id ? -1 : 1));
   return fits[0] ?? null;
 }
 
@@ -59,7 +70,7 @@ export function cutPlan(stockDef: string, targets: string[]): { ok: true; cuts: 
   for (const t of targets) {
     const d = CATALOG[t];
     if (!d) return { ok: false, code: 'cut.wrong-stock', message: `unknown target "${t}"` };
-    if (!sameFamily(s, d)) return { ok: false, code: 'cut.wrong-stock', message: `a ${d.label} cannot be cut from a ${s.label} (${s.category === 'plywood' ? 'plywood is cut across its length only; no rips' : 'different section'})` };
+    if (!sameFamily(s, d) && !(ripFamily(s, d) && targets.length === 1)) return { ok: false, code: 'cut.wrong-stock', message: `a ${d.label} cannot be cut from a ${s.label} (${s.category === 'plywood' ? (ripFamily(s, d) ? 'a rip is cut on its own: one target per cut' : 'plywood is cut across its length, or ripped to ≥ 0.3 m wide') : 'different section'})` };
   }
   const L = s.size[0];
   const sum = targets.reduce((a, t) => a + def(t).size[0], 0);
@@ -116,7 +127,10 @@ function planCut(rt: Runtime, p: P): { ok: true; program: Prog } | { ok: false; 
   }
   const o = rot2([0, -(sd[2] / 2 + 0.45)], st.pose.yaw);
   const across = def(stock.def).category === 'plywood' ? def(stock.def).size[2] : def(stock.def).size[1];
-  const duration = MARK_S + plan.cuts * (HANDLE_S + across / FEED);
+  // phase B: a rip is one more pass along the piece; a notch is jigsaw time
+  const rips = p.cuts.filter((c) => ripFamily(def(stock.def), def(c.def))).reduce((a, c) => a + HANDLE_S + def(c.def).size[0] / FEED, 0);
+  const notches = p.cuts.filter((c) => NOTCH[c.def]).length * NOTCH_S;
+  const duration = MARK_S + plan.cuts * (HANDLE_S + across / FEED) + rips + notches;
   return { ok: true, program: { operator: { p: [st.pose.p[0] + o[0], st.pose.p[2] + o[1]], yaw: st.pose.yaw + Math.PI / 2 }, slots, duration, waste: plan.waste, rest: plan.rest } };
 }
 

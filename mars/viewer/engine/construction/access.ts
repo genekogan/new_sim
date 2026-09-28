@@ -19,7 +19,8 @@ import type { Obstacle } from '../spatial/types.ts';
 import { def } from '../world/catalog.ts';
 import { cellOf, clearanceAt, type LevelGrid } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
-import { holdingDiagnostic, STANDING_REACH } from './rules.ts';
+import { holdingDiagnostic, isKitUpright, STANDING_REACH } from './rules.ts';
+import { NOTCH } from '../world/catalog-phase-b.ts';
 import { childrenState, walkCrew, type Children } from './children.ts';
 import { BODY_MODEL } from '../body/model.ts';
 import { CREW_BLOCK_TIMEOUT, FOLLOW_SPEED, followCrew, handPoint, LIFT_APEX_MAX, pickupPlan, STATION_SLOT, type Hand } from './liftcrew.ts';
@@ -305,7 +306,20 @@ export const pathLength = (ps: Pose[]) => ps.slice(1).reduce((a, q, i) => a + Ma
 /** Duration of a lift along `path`: the verb's own duration for a straight lift, paced for a lift-over. */
 export const liftDuration = (path: LiftPath, base: number) => (path.via === 'straight' ? base : Math.max(base, pathLength(path.poses) / LIFT_PACE));
 
-function segmentHit(sp: Spatial, e: Entity, a: Pose, b: Pose, skip: Set<string>): Hit | null {
+/**
+ * Notched parts (year builds phase B, catalog-phase-b.ts NOTCH — PROVISIONAL): a deck sheet / board / handrail
+ * notched at the cutting station around a reconstruction frame's columns and bracing may share up to its notch
+ * depth of its edges with that frame (the Kit draws deck sheets through the frame planes). `soft` = the Kit
+ * upright obstacles such a part is tested against with its footprint shrunk by the notch depth; everything
+ * else — and every part without a notch — is tested as before.
+ */
+export function notchSoft(rt: Runtime, e: Entity): { ids: Set<string>; depth: number } | undefined {
+  const depth = NOTCH[e.def];
+  if (!depth) return undefined;
+  return { ids: new Set(Object.values(rt.world.entities).filter((u) => isKitUpright(u)).map((u) => u.id)), depth };
+}
+
+function segmentHit(sp: Spatial, e: Entity, a: Pose, b: Pose, skip: Set<string>, soft?: { ids: Set<string>; depth: number }): Hit | null {
   const ext = partExtent(e);
   const disp = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2])
     + ext * (Math.abs(angleDelta(a.yaw, b.yaw)) + Math.abs((b.pitch ?? 0) - (a.pitch ?? 0)) + Math.abs((b.roll ?? 0) - (a.roll ?? 0)));
@@ -324,15 +338,16 @@ function segmentHit(sp: Spatial, e: Entity, a: Pose, b: Pose, skip: Set<string>)
     const f = entityFootprint({ ...e, pose: q });
     for (const o of near) {
       if (o.y1 <= f.y0 + 0.005 || o.y0 >= f.y1 - 0.005) continue;
-      if (obbOverlap(f.obb, o.obb, -0.01)) return { o, q };
+      const fo = soft?.ids.has(o.id) ? { ...f.obb, half: [Math.max(0.001, f.obb.half[0] - soft.depth), Math.max(0.001, f.obb.half[1] - soft.depth)] as Vec2 } : f.obb;
+      if (obbOverlap(fo, o.obb, -0.01)) return { o, q };
     }
   }
   return null;
 }
 
-function pathHit(sp: Spatial, e: Entity, ps: Pose[], skip: Set<string>): Hit | null {
+function pathHit(sp: Spatial, e: Entity, ps: Pose[], skip: Set<string>, soft?: { ids: Set<string>; depth: number }): Hit | null {
   for (let i = 1; i < ps.length; i++) {
-    const h = segmentHit(sp, e, ps[i - 1], ps[i], skip);
+    const h = segmentHit(sp, e, ps[i - 1], ps[i], skip, soft);
     if (h) return h;
   }
   return null;
@@ -340,7 +355,7 @@ function pathHit(sp: Spatial, e: Entity, ps: Pose[], skip: Set<string>): Hit | n
 
 /** First obstacle the part's box meets along the pose polyline `ps` (except itself and `ignore`), or null. */
 export function sweepPoses(rt: Runtime, e: Entity, ps: Pose[], ignore: string[]): Hit | null {
-  return pathHit(spatialOf(rt), e, ps, new Set(ignore));
+  return pathHit(spatialOf(rt), e, ps, new Set(ignore), notchSoft(rt, e));
 }
 
 /**
@@ -355,7 +370,8 @@ export function sweptLiftPath(rt: Runtime, e: Entity, from: Pose, to: Pose, o: S
   for (const ob of sp.scene.obstacles)
     if (ob.id !== e.id && !(ob.y1 <= f0.y0 + 0.005 || ob.y0 >= f0.y1 - 0.005) && obbOverlap(f0.obb, ob.obb, -0.01)) skip.add(ob.id);
   const straight = [from, to];
-  const h1 = pathHit(sp, e, straight, skip);
+  const soft = notchSoft(rt, e);
+  const h1 = pathHit(sp, e, straight, skip, soft);
   if (!h1) return { ok: true, path: { poses: straight, via: 'straight' } };
   const what = o.what ?? `${def(e.def).label} ${e.id}`;
   const name = (h: Hit) => h.o.label && h.o.label !== h.o.id ? `${h.o.label} (${h.o.id})` : h.o.id;
@@ -368,7 +384,7 @@ export function sweptLiftPath(rt: Runtime, e: Entity, from: Pose, to: Pose, o: S
     if (yL - floor > LIFT_APEX_MAX + 1e-9)
       return fail('reach.too-high', `${what} would have to be lifted over at ${f2(yL)} m, ${f2(yL - floor)} m above the crew's floor (hand reach ${LIFT_APEX_MAX} m); ladders/scaffold are not modelled`, [e.id, h1.o.id], h1.q.p);
     const over: Pose[] = [from, { ...from, p: [from.p[0], yL, from.p[2]] }, { ...to, p: [to.p[0], yL, to.p[2]] }, to];
-    const h2 = pathHit(sp, e, over, skip);
+    const h2 = pathHit(sp, e, over, skip, soft);
     if (!h2) return { ok: true, path: { poses: over, via: 'lift-over' } };
     tail = `; lifting it over at ${f2(yL)} m is blocked too, by ${name(h2)} at ${at(h2)}`;
   }

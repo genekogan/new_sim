@@ -20,7 +20,7 @@ import type { ActionDef } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
-import { beamLinks, isBeam, isStanding, isSupported, isUpright, snapSeat } from './rules.ts';
+import { BEAM_DECK_SPAN_MAX, beamDeckRule, beamLinks, isBeam, isStanding, isSupported, isUpright, snapSeat } from './rules.ts';
 import { aloftCheck, fastenStep, isAloft } from './aloft.ts';
 import {
   approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, liftStep, releaseCrew, spatialOf, stagedCheck, stationFloor, sweptLiftPath, symmetricYaw,
@@ -231,9 +231,12 @@ export function sheetSupports(w: WorldState, sheet: Entity, obb: OBB2, height?: 
   if (bearing.length < 2)
     return fail('plywood.too-few-supports', `${sheet.id} needs ≥ 2 joists under it (or a beam pair ≤ 24 in apart); at ${f2(Y)} m it would rest on ${bearing.length ? bearing.map((s) => s.id).join(', ') : 'nothing that bears along it'} (${joists} joist${joists === 1 ? '' : 's'})`, [sheet.id, ...bearing.map((s) => s.id)]);
   const pos = bearing.map((s) => ({ id: s.id, v: dot2([s.pose.p[0], s.pose.p[2]], v) })).sort((a, b) => a.v - b.v);
+  // Kit decks (rules.ts beamDeckRule, provisional): straight onto the beams of reconstruction frames at ≤ 4 ft
+  const kit = beamDeckRule(w, bearing);
+  const spanMax = kit ? BEAM_DECK_SPAN_MAX : PLY_SPAN_MAX;
   for (let i = 1; i < pos.length; i++)
-    if (pos[i].v - pos[i - 1].v > PLY_SPAN_MAX)
-      return fail('plywood.span', `3/4 in plywood ${sheet.id} cannot span ${f2(pos[i].v - pos[i - 1].v)} m between ${pos[i - 1].id} and ${pos[i].id} (max ${f2(PLY_SPAN_MAX)} m / 24 in)${joists ? '' : '; install 2x4 joists first'}`, [sheet.id, pos[i - 1].id, pos[i].id]);
+    if (pos[i].v - pos[i - 1].v > spanMax)
+      return fail('plywood.span', `3/4 in plywood ${sheet.id} cannot span ${f2(pos[i].v - pos[i - 1].v)} m between ${pos[i - 1].id} and ${pos[i].id} (max ${f2(spanMax)} m / ${kit ? '4 ft on reconstruction-frame beams' : '24 in'})${joists || kit ? '' : '; install 2x4 joists first'}`, [sheet.id, pos[i - 1].id, pos[i].id]);
   const over = Math.max(pos[0].v - s0, s1 - pos[pos.length - 1].v);
   if (over > PLY_OVERHANG_MAX) return fail('plywood.overhang', `${sheet.id} would overhang its outermost support by ${f2(over)} m (max ${f2(PLY_OVERHANG_MAX)} m / 12 in)`, [sheet.id]);
   for (const s of bearing) {
