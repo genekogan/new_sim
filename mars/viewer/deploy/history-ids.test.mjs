@@ -54,7 +54,11 @@ test('history ids: frozen migration table maps every legacy id to a live compone
  // windows (84 entries: backing, glazing, frames → null = removed; HISTORY_IDS.md). 9 older nulls predate it.
  // W46 (props seated on their surfaces, 2026-09-29) re-pointed 243 entries at successors, removing none: 2020 70
  // (toilets 12, RV wheels 48, workshop legs + bins 10), 2021 58, 2023 41, 2024 41, 2025 33; 2022 and 2026 held.
- assert.equal(entries,7942-84);assert.equal(removed,9+84);
+ // W51 (2022 reconciliation, 2026-09-29): the 2022 stairs (treads, risers, rails, posts) and solar modules were re-made
+ // and their entries aliased by role (build order); 47 set to null: Ba Sing Se's 10th module (panel + cells), one
+ // surplus rail post per house (4), the corner table (top + 4 legs) and trailers rv-10…rv-12 (12 pieces each).
+ // 2023 / 2024 trailers moved out of Chiba keep their ids (placement is hashed relative to the trailer).
+ assert.equal(entries,7942-84-47);assert.equal(removed,9+84+47);
  assert.equal(legacyId(table,2021,'person-3'),undefined);
 });
 test('layouts: legacy ids migrate, unmappable legacy ids warn and drop, stable ids pass',()=>{

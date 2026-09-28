@@ -156,3 +156,75 @@ export function frontage2024(k:Kit,g:T.Group,w:number,d:number){
   ev(k.box(g,'door leaf rail',[LEAF,.038,.045],[lx,(.22+HEAD)/2+s*((HEAD-.22)/2-.03),lz],pine,layers.wall));
  }
 }
+
+// ---- Mars 2022 reconciliation (Gene's questionnaire, 2026-09-29 evening; RECONCILIATION_2022.md; W51) ----------------
+const EV_STAIR='RECONCILIATION_2022 §b (Gene: stairs PARALLEL to the building; aerial-03 + DJI_0829 end slots ≈ 3.5 × 4.5–5 m; foot on the courtyard side = Q29 default); provisional';
+const EV_SOLAR='RECONCILIATION_2022 §d (Gene: south-facing rows on triangular wood frames ≈ 45°, low edge on the south roof edge; rows per aerial-03 = Q28 default); provisional';
+/** Deck tops of a 2022 rack house (Kit decks: 0.065 m sheets centred at 2.46 / 4.86). */
+export const DECK1_TOP_2022=2.46+.0325,ROOF_TOP_2022=4.86+.0325;
+/**
+ * The end-slot stair of a 2022 rack house, in the house group's frame (house along x, courtyard on +z, the slot
+ * centred on `x`). Treads run PARALLEL to the house (their long side along x, one bay less 12 cm wide) and the flight
+ * climbs across the depth, from its foot on the sand at the courtyard face (z = +d/2) toward the outer side, to a
+ * landing at first-floor deck height over the outer frame bay. The landing reaches past the outer frame into the aisle
+ * between the outer and middle end frames, which is where one steps through the end-frame line onto the deck.
+ * 13 risers of top/13 (≈ 0.192 m) from y = 0, 12 goings of 0.25 m (≈ 37.5°); risers are walk-through (as Kit.stairs).
+ */
+export function stair2022(k:Kit,g:T.Group,x:number,d:number,width:number,top=DECK1_TOP_2022){
+ const s=new T.Group();s.userData={...g.userData,layer:layers.floor,source:EV_STAIR};s.position.x=x;g.add(s);
+ const n=13,r=top/n,go=.25,z0=d/2-.06,zTop=z0-(n-1)*go,zOut=-d/2+.06,w=width,wood='#b89a75',dark='#937654',rail='#a48661';
+ for(let i=1;i<n;i++){
+  k.box(s,'stair tread',[w,.06,go-.009],[0,i*r-.03,z0-(i-.5)*go],wood,layers.floor);
+  const rr=k.box(s,'stair riser',[w,r,.035],[0,(i-.5)*r,z0-(i-1)*go-.0175],dark,layers.floor);rr.userData.walkNoCollision=true;
+ }
+ const last=k.box(s,'stair riser',[w,r,.035],[0,(n-.5)*r,zTop-.0175],dark,layers.floor);last.userData.walkNoCollision=true;
+ k.box(s,'stair landing',[w,.065,zTop-zOut],[0,top-.0325,(zTop+zOut)/2],'#bfa17b',layers.floor);
+ // three stringers under the treads, foot on the sand, head under the landing's front edge
+ const run=z0-zTop,len=Math.hypot(run,top),tilt=Math.atan2(top,run);
+ for(const sx of [-w/2+.06,0,w/2-.06]){const m=k.box(s,'stair stringer',[.045,.286,len],[sx,top/2-.13,(z0+zTop)/2],dark,layers.floor);m.rotation.x=tilt;}
+ // landing posts to the sand at its outer corners and under its front edge
+ for(const sx of [-w/2+.06,w/2-.06])for(const z of [zOut+.05,zTop-.05])k.rod(s,'stair landing post',[sx,0,z],[sx,top-.065,z],.045,dark,layers.floor);
+ // handrail on the open (outer) side of the flight and round the landing's two open edges
+ const rx=w/2;k.rod(s,'stair rail',[rx,1.0,z0],[rx,top+1.0,zTop],.035,rail,layers.floor);
+ for(let i=0;i<=3;i++){const z=z0-i*run/3,y=i*top/3;k.rod(s,'stair rail post',[rx,y,z],[rx,y+1.0,z],.03,rail,layers.floor);}
+ k.rod(s,'stair rail',[rx,top+1.0,zTop],[rx,top+1.0,zOut],.035,rail,layers.floor);
+ k.rod(s,'stair rail',[rx,top+1.0,zOut],[-rx,top+1.0,zOut],.035,rail,layers.floor);
+ for(const [px,pz] of [[rx,zOut],[-rx,zOut],[0,zOut]] as [number,number][])k.rod(s,'stair rail post',[px,top,pz],[px,top+1.0,pz],.03,rail,layers.floor);
+ return s;
+}
+/**
+ * A row of solar modules on triangular 2x4 frames on a flat roof (group frame): `along` is the row axis, `face` the
+ * horizontal direction the modules face (south; perpendicular to `along`), `low` a point on the row's low edge at its
+ * middle (on the roof top, y = `roof`). Each module (1.65 m up the slope, `width` along the row) is tilted 45°: its
+ * low edge on the low-edge line, its high edge 1.17 m further north and 1.17 m up. One triangle frame per module edge
+ * (n + 1): a base on the deck, a vertical back prop on the north side and the 45° rafter under the modules.
+ */
+export function solarRow2022(k:Kit,g:T.Object3D,along:[number,number],face:[number,number],low:[number,number],roof:number,count:number,width=1.05){
+ const L=1.65,c=Math.SQRT1_2,p=L*c,rise=L*c,a=new T.Vector3(along[0],0,along[1]).normalize(),f=new T.Vector3(face[0],0,face[1]).normalize();
+ const up=new T.Vector3(0,1,0),slope=f.clone().multiplyScalar(-c).addScaledVector(up,c); // up the module, toward the back
+ let X=a.clone(),Y=new T.Vector3().crossVectors(slope,X);if(Y.y<0){X.negate();Y.negate();}
+ const q=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(X,Y,slope)),frame='#a8844f';
+ const P=(t:number,back:number,y:number):[number,number,number]=>[low[0]+a.x*t-f.x*back,y,low[1]+a.z*t-f.z*back];
+ const W=count*width,y0=roof+.045; // frame members 2x4 on edge: the rafter's top carries the module
+ for(let j=0;j<=count;j++){
+  const t=-W/2+j*width;
+  const tag=(o:T.Object3D)=>{o.userData.source=EV_SOLAR;return o;};
+  tag(k.rod(g,'solar frame base',P(t,0,roof+.02),P(t,p,roof+.02),.02,frame,layers.roof));
+  tag(k.rod(g,'solar frame back prop',P(t,p,roof),P(t,p,y0+rise),.02,frame,layers.roof));
+  tag(k.rod(g,'solar frame rafter',P(t,0,roof),P(t,p,y0+rise),.02,frame,layers.roof));
+ }
+ for(let j=0;j<count;j++){
+  const t=-W/2+(j+.5)*width,ctr=new T.Vector3(...P(t,p/2,y0+rise/2)).addScaledVector(Y,.045);
+  const panel=k.box(g,'solar panel',[width-.025,.045,L-.025],[ctr.x,ctr.y,ctr.z],k.mat('#a6abb1',.6),layers.roof);panel.quaternion.copy(q);panel.userData.source=EV_SOLAR;
+  const cells=k.box(g,'photovoltaic cells',[width-.08,.008,L-.08],[ctr.x+Y.x*.027,ctr.y+Y.y*.027,ctr.z+Y.z*.027],k.mat('#1c344b',.25),layers.roof);cells.quaternion.copy(q);cells.userData.source=EV_SOLAR;
+ }
+}
+/**
+ * 2022 trailers from aerial-03 (RECONCILIATION_2022 §c; model frame X = (px − 545)/8.3, Z = (py − 345)/8.3, ±1.5 m;
+ * picked by W51 on a 5 m grid over the photo): a nose-to-tail train of five on the −X (north) side, T1 at its head, and
+ * four scattered ones (T7 = a light-blue tarp over a trailer-sized box and T9 = a long grey flat trailer are uncertain).
+ * [id, x, z, heading (Kit rv angle: the shell's long axis is (sin a, cos a)), length].
+ */
+export const TRAILERS_2022:readonly [string,number,number,number,number][]=[
+ ['rv-1',-21.2,-11.8,2.554,7.2],['rv-2',-24.4,-.8,Math.PI,7.5],['rv-3',-23.4,8.7,-2.761,8.0],['rv-4',-17.9,17.6,-2.356,7.5],['rv-5',-12.9,18.4,-.503,6.9],
+ ['rv-6',-7.3,-15.2,1.794,7.8],['rv-7',4.1,-16.6,1.838,6.5],['rv-8',22.4,7.0,-.22,8.2],['rv-9',19.2,14.9,.802,7.5]];

@@ -4,11 +4,11 @@ import {build} from 'esbuild';
 import fs from 'node:fs/promises';
 import * as T from 'three';
 const file=new URL(`../.history-test-${process.pid}.mjs`,import.meta.url);
-await build({stdin:{contents:`export * from './app/history/scenes';export {SEAT_HELD_YEARS} from './app/history/kit';`,resolveDir:new URL('..',import.meta.url).pathname,loader:'ts'},bundle:true,platform:'node',format:'esm',packages:'external',outfile:file.pathname,logLevel:'error'});
+await build({stdin:{contents:`export * from './app/history/scenes';export {SEAT_HELD_YEARS,BAY} from './app/history/kit';export {YEAR_NORTH_AZIMUTH_OFFSET} from './engine/env/sun';export {DECK1_TOP_2022,ROOF_TOP_2022} from './app/history/photographic-corrections';`,resolveDir:new URL('..',import.meta.url).pathname,loader:'ts'},bundle:true,platform:'node',format:'esm',packages:'external',outfile:file.pathname,logLevel:'error'});
 T.TextureLoader.prototype.load=function(){return new T.Texture();};
 // oxlint-disable-next-line typescript/no-deprecated -- offline scene construction; no renderer
  globalThis.document={createElement:()=>({width:1,height:1,getContext:()=>new Proxy({}, {get:(_t,key)=>key==='createRadialGradient'?()=>({addColorStop(){}}):()=>{}})})};
-const {createHistoricalScene,SEAT_HELD_YEARS}=await import(file.href);
+const {createHistoricalScene,SEAT_HELD_YEARS,BAY,YEAR_NORTH_AZIMUTH_OFFSET,DECK1_TOP_2022,ROOF_TOP_2022,trailerClearance}=await import(file.href);
 after(()=>fs.unlink(file));
 function meshes(root,kind){root.updateMatrixWorld(true);const result=[];root.traverse(o=>{if(o instanceof T.Mesh&&(!kind||o.userData.kind===kind))result.push(o);});return result;}
 const bounds=o=>new T.Box3().setFromObject(o);
@@ -29,7 +29,11 @@ test('2022 ground footprints rotate symmetrically, with four traversable corner 
   const b=footprint(buildings[i]),rotation=new T.Matrix4().makeRotationY(-i*Math.PI/2),expected=first.clone().applyMatrix4(rotation);
   assert.ok(b.min.distanceTo(expected.min)<.001&&b.max.distanceTo(expected.max)<.001);
  }
- const north=footprint(buildings[0]),east=footprint(buildings[1]);assert.ok(east.min.x-north.max.x>1.8,'Corner passage must remain open');
+ // clockwise pinwheel as in aerial-03 / DJI_0829 (W51, shift −2): Ba Sing Se's stair end stands off Cahuilla's north
+ // end (they overlap in x) with an open corner passage between them (≈ 1.0 m in z)
+ const north=footprint(buildings[0]),east=footprint(buildings[1]);
+ assert.ok(north.max.x>east.min.x+2,'Ba Sing Se\'s stair end overlaps Cahuilla\'s end (clockwise pinwheel)');
+ assert.ok(east.min.z-north.max.z>.9,'Corner passage must remain open');
  for(const g of buildings)assert.equal(footprint(g).containsPoint(new T.Vector3(0,.2,0)),false);
 });
 test('2024 PV occupies only the left frontage; glazing and exposed central mural remain',()=>{
@@ -67,7 +71,7 @@ const PROP=/^(table leg|bench foot|stored food crate|white refrigerator|café pa
 const SUPPORT=/deck|beam|crossbar|platform/;
 /** Trailers whose ring passes through Chiba (wheels on the ground, shells through the hall's deck): a layout question, not
  *  a datum one (QUESTIONS Q21 / W46). Asserted so a layout fix shows up here; remove the entry when it no longer applies. */
-const TRAILERS_IN_CHIBA={2023:['rv-8','rv-9'],2024:['rv-10','rv-9']};
+const TRAILERS_IN_CHIBA={}; // W51: Q2 answered (none under Chiba in 2023 / 2024); the ring now keeps out (see below)
 function propGaps(root){
  root.updateMatrixWorld(true);const all=[],props=[];
  root.traverse(o=>{if(!(o instanceof T.Mesh)||o instanceof T.InstancedMesh)return;all.push(o);if(PROP.test(o.userData.kind??''))props.push(o);});
@@ -112,4 +116,60 @@ test('2020 RV wheels roll along the vehicle: tire ring in the RV\'s length–hei
  const q=new T.Quaternion(),along=new T.Vector3(1,0,0).applyQuaternion(rv.getWorldQuaternion(q));
  const tires=meshes(rv,'rv tire');assert.equal(tires.length,4);
  for(const t of tires){const axis=new T.Vector3(0,0,1).applyQuaternion(t.getWorldQuaternion(q));assert.ok(Math.abs(axis.dot(along))<1e-6&&Math.abs(axis.y)<1e-6,'tire axis across the vehicle');}
+});
+
+// ---- 2022 reconciliation (Gene's questionnaire 2026-09-29; RECONCILIATION_2022.md §a–§f; W51) ------------------------
+const HOUSES=[['chiba','Ba Sing Se'],['east-house','Cahuilla'],['kitchen','Chatsubo'],['west-house','Huaqiangbei']];
+const asm=(root,id)=>root.children.find(o=>o.userData.assembly_id===id);
+const axisOf=(o,v)=>new T.Vector3(...v).applyQuaternion(o.getWorldQuaternion(new T.Quaternion()));
+test('2022 names: Ba Sing Se / Cahuilla / Chatsubo / Huaqiangbei on the kept ids, and no "Chiba" in 2022',()=>{
+ const root=createHistoricalScene(2022);
+ for(const [id,name] of HOUSES)assert.equal(asm(root,id).name,name);
+ root.traverse(o=>assert.ok(!/chiba/i.test(o.name),`2022 shows "${o.name}"`));
+});
+test('2022 stairs: treads PARALLEL to the house, one bay wide, climbing across the depth from the sand at the courtyard face to the first-floor deck',()=>{
+ const root=createHistoricalScene(2022);root.updateMatrixWorld(true);
+ for(const [id] of HOUSES){
+  const g=asm(root,id),along=axisOf(g,[1,0,0]),treads=meshes(g,'stair tread').sort((a,b)=>bounds(a).max.y-bounds(b).max.y);
+  assert.equal(treads.length,12,`${id} treads`);
+  for(const t of treads){assert.ok(Math.abs(axisOf(t,[1,0,0]).dot(along))>Math.cos(Math.PI/180),`${id} tread parallel to the house`);assert.ok(Math.abs(t.geometry.parameters.width-(BAY-.12))<.01,`${id} tread one bay wide`);}
+  const p0=bounds(treads[0]).getCenter(new T.Vector3()),p1=bounds(treads.at(-1)).getCenter(new T.Vector3()),climb=p1.clone().sub(p0).setY(0);
+  assert.ok(Math.abs(climb.clone().normalize().dot(along))<.01,`${id} climbs across the depth`);
+  assert.ok(climb.length()>2.7&&climb.length()<4.6,`${id} run ${climb.length().toFixed(2)} m ≈ the depth`);
+  assert.ok(Math.hypot(p0.x,p0.z)<Math.hypot(p1.x,p1.z),`${id} foot on the courtyard side (Q29 default)`);
+  const risers=meshes(g,'stair riser');assert.ok(Math.abs(Math.min(...risers.map(r=>bounds(r).min.y)))<.005,`${id} first riser starts on the sand (y = 0)`);
+  const landing=meshes(g,'stair landing')[0];assert.ok(Math.abs(bounds(landing).max.y-DECK1_TOP_2022)<.01,`${id} landing at the deck top`);
+  for(const r of risers)assert.equal(r.userData.walkNoCollision,true);
+ }
+});
+test('2022 trailers: a train of five on the −X (north) side + four scattered (rv-10…12 gone); 2022–2024 trailers stay ≥ 0.5 m off every building, none under Chiba',()=>{
+ for(const year of [2022,2023,2024]){
+  const root=createHistoricalScene(year);root.updateMatrixWorld(true);
+  const rvs=root.children.filter(o=>/^rv-\d+$/.test(o.userData.assembly_id)),blds=root.children.filter(o=>o.userData.assembly_id&&!/^rv-|^people$/.test(o.userData.assembly_id));
+  if(year===2022){assert.deepEqual(rvs.map(o=>o.userData.assembly_id),['rv-1','rv-2','rv-3','rv-4','rv-5','rv-6','rv-7','rv-8','rv-9']);assert.ok(rvs.slice(0,5).every(o=>o.position.x<-10),'the train stands on the −X side');}
+  for(const rv of rvs){
+   const L=meshes(rv,'trailer shell')[0].geometry.parameters.depth,t={x:rv.position.x,z:rv.position.z,angle:rv.rotation.y,length:L};
+   for(const b of blds){const box=bounds(b),c=trailerClearance(t,[box.min.x,box.min.z,box.max.x,box.max.z]);assert.ok(c>=.5,`${year} ${rv.userData.assembly_id} is ${c.toFixed(2)} m from ${b.name}`);}
+  }
+ }
+});
+test('2022 solar: south-facing rows on 45° triangle frames, low edge on the south roof edge (Huaqiangbei, Cahuilla one row; Ba Sing Se three stepped rows; Chatsubo none)',()=>{
+ const root=createHistoricalScene(2022);root.updateMatrixWorld(true);
+ const n=YEAR_NORTH_AZIMUTH_OFFSET[2022],south=new T.Vector3(Math.sin((180+n)*Math.PI/180),0,-Math.cos((180+n)*Math.PI/180));
+ for(const [id,count,rows] of [['chiba',9,3],['east-house',10,1],['kitchen',0,0],['west-house',10,1]]){
+  const g=asm(root,id),panels=meshes(g,'solar panel');assert.equal(panels.length,count,`${id} modules`);
+  assert.equal(meshes(g,'solar frame rafter').length,count+rows,`${id}: one triangle frame per module edge`);
+  const roof=new T.Box3();for(const m of meshes(g,'plywood deck sheet'))if(bounds(m).min.y>4.5)roof.union(bounds(m));
+  for(const p of panels){
+   const nrm=axisOf(p,[0,1,0]),h=nrm.clone().setY(0).normalize();
+   assert.ok(h.angleTo(south)<15*Math.PI/180,`${id} panel faces ${(h.angleTo(south)*180/Math.PI).toFixed(1)}° off south`);
+   assert.ok(Math.abs(nrm.angleTo(new T.Vector3(0,1,0))-Math.PI/4)<Math.PI/180,`${id} panel tilt 45°`);
+   const b=bounds(p),pos=p.geometry.attributes.position,v=new T.Vector3(),pts=[];for(let i=0;i<pos.count;i++)pts.push(v.fromBufferAttribute(pos,i).applyMatrix4(p.matrixWorld).clone());
+   const lo=pts.reduce((a,q)=>q.y<a.y?q:a),hi=pts.reduce((a,q)=>q.y>a.y?q:a);
+   assert.ok(lo.dot(south)>hi.dot(south),`${id} low edge on the south side`);
+   assert.ok(b.min.y>ROOF_TOP_2022-.01,`${id} module above the roof deck`);
+   if(id!=='chiba'){const edge=Math.sign(south.x)>0?roof.max.x:roof.min.x;assert.ok(Math.abs(lo.x-edge)<.15,`${id} low edge ${lo.x.toFixed(2)} on the south roof edge ${edge.toFixed(2)}`);}
+  }
+ }
+ assert.equal(meshes(asm(root,'west-house'),'table top').length,0,'no table at the corner (Q1)');
 });

@@ -9,6 +9,9 @@ import {
   sunDirectionVector,
   worldHeadingOfAzimuth,
   NORTH_AZIMUTH_OFFSET,
+  YEAR_NORTH_AZIMUTH_OFFSET,
+  northAzimuthOffsetOf,
+  sunBehindWindow,
   BOMBAY_BEACH,
 } from '../env/sun.ts';
 import { daylightFactors, smoothstep } from '../env/daylight.ts';
@@ -206,4 +209,33 @@ test('the site bearing cannot move a construction pin: only camera/ and api/ (vi
   const outside = rel.filter((f) => !/^(env|camera|api)\//.test(f));
   assert.deepEqual(outside, [], `modules outside env/, camera/, api/ that see the sun: ${outside.join(', ')}`);
   for (const f of rel) assert.ok(!/^(runtime|world|construction|campus|take|rehearsal|scenarios|planning|history)\//.test(f), f);
+});
+
+// --- Per-year bearing (W51, RECONCILIATION_2022 §f): 2022 measured from DJI_0829; every other year keeps the global.
+test('per-year bearing: 2022 = −101 (world −X turned 11° toward +Z is north); the global stays −90 and is every other year\'s fallback', () => {
+  assert.deepEqual({ ...YEAR_NORTH_AZIMUTH_OFFSET }, { 2022: -101 });
+  assert.equal(NORTH_AZIMUTH_OFFSET, -90);
+  assert.equal(northAzimuthOffsetOf(undefined), -90);
+  assert.equal(northAzimuthOffsetOf({ meta: {} }), -90);
+  assert.equal(northAzimuthOffsetOf({ meta: { northAzimuthOffset: -101 } }), -101);
+  assert.equal(northAzimuthOffsetOf({ northAzimuthOffset: -101 }), -101);
+  const n = sunDirectionVector(0, 0, -101);
+  const deg = Math.PI / 180;
+  assert.ok(hypot(n[0] + dcos(11 * deg), n[1], n[2] - dsin(11 * deg)) < 1e-9, `2022 north ${n.map((v) => v.toFixed(3))}`);
+  // default arguments = the global: nothing that does not pass a bearing moves
+  assert.deepEqual(sunDirectionVector(30, 200), sunDirectionVector(30, 200, NORTH_AZIMUTH_OFFSET));
+  assert.deepEqual(solarPosition('2026-03-15T15:00').direction, solarPosition('2026-03-15T15:00', BOMBAY_BEACH.lat, BOMBAY_BEACH.lon, -90).direction);
+  // the sun-behind window turns with the bearing, by exactly the difference
+  const a = sunBehindWindow('2022-02-20T16:15', { vfovDeg: 50 }), b = sunBehindWindow('2022-02-20T16:15', { vfovDeg: 50, northAzimuthOffset: -101 });
+  let dh = b.cameraHeading.centre - a.cameraHeading.centre; dh = ((dh + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+  assert.ok(Math.abs(dh + 11 * deg) < 1e-9, `window turned (heading = datan2(z, x): −11° of bearing = −11° of heading) ${(dh / deg).toFixed(2)}°`);
+});
+
+test('2022 bearing sign: a February 16:15 PST sun throws the 2022 shadows toward screen up-left (−X, −Z), as in aerial-03', () => {
+  // aerial-03 (no telemetry) shows long afternoon shadows falling up-left in the model's top-down frame (up = −Z,
+  // left = −X); W49 read the sun at azimuth ≈ 244° from them at this bearing (RECONCILIATION_2022 §f).
+  const s = solarPosition('2022-02-20T16:15', BOMBAY_BEACH.lat, BOMBAY_BEACH.lon, -101);
+  assert.ok(s.azimuthDeg > 225 && s.azimuthDeg < 250 && s.elevationDeg > 10 && s.elevationDeg < 25, `az ${s.azimuthDeg.toFixed(1)} el ${s.elevationDeg.toFixed(1)}`);
+  const shadow = [-s.direction[0], -s.direction[2]];
+  assert.ok(shadow[0] < 0 && shadow[1] < 0, `shadow toward (${shadow.map((v) => v.toFixed(2))}) = up-left`);
 });

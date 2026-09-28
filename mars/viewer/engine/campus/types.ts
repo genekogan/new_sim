@@ -20,6 +20,9 @@ export type CampusSceneFile = {
   generator: string;
   source: { glb: string; glbBytes: number; manifest: string; status: string };
   groundY: number;
+  /** Site bearing of this scene's frame (degrees; engine/env/sun.ts NORTH_AZIMUTH_OFFSET convention). Absent = the
+   *  global; present only where a year was measured (YEAR_NORTH_AZIMUTH_OFFSET). Additive (W51). */
+  northAzimuthOffset?: number;
   bands: { low: [number, number]; note: string };
   bounds: [number, number, number, number];
   assemblies: { id: string; name: string }[];
@@ -45,5 +48,5 @@ export type CampusScene = Omit<SpatialScene, 'obstacles' | 'surfaces'> & {
   obstacles: CampusObstacle[];
   surfaces: CampusSurface[];
   regions: Region[];
-  meta: { groundY: number; contentHash: string; source: CampusSceneFile['source']; notes: string[] };
+  meta: { groundY: number; contentHash: string; source: CampusSceneFile['source']; notes: string[]; northAzimuthOffset?: number };
 };

@@ -118,6 +118,8 @@ export type YearBuildInput = {
   source: CampusYearFile['source'];
   assemblies: { id: string; name: string; confidence: Confidence }[];
   components: HistoryComponentInput[];
+  /** The year's measured site bearing (engine/env/sun.ts YEAR_NORTH_AZIMUTH_OFFSET); omitted = the global. */
+  northAzimuthOffset?: number;
 };
 
 /** Everything a year file holds, with `contentHash = hashOf(file minus contentHash)`. */
@@ -137,6 +139,7 @@ export function buildYearFile(inp: YearBuildInput): CampusYearFile {
     generator: inp.generator,
     source: inp.source,
     groundY: GROUND_Y,
+    ...(inp.northAzimuthOffset !== undefined ? { northAzimuthOffset: inp.northAzimuthOffset } : {}),
     bands: { low: LOW_BAND, note: 'low prisms = geometry within the ground body band; .up = above it (overhead). No walkable decks/stairs: none are declared by the procedural scene.' },
     bounds: [Math.floor(minX - m), Math.floor(minZ - m), Math.ceil(maxX + m), Math.ceil(maxZ + m)],
     assemblies: inp.assemblies.map((a) => ({ id: a.id, name: a.name })),
