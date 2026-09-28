@@ -60,6 +60,8 @@ export function applyEdits(start: WorldState, edits: WorldEdit[], spatialFor: (w
     if (edit.op === 'remove') {
       const e = w.entities[edit.id];
       if (!e) return refuse('entity.unknown', `no entity "${edit.id}"`, [edit.id]);
+      const rider = riderOf(w, e);
+      if (rider) return refuse('edit.vehicle-ridden', `${e.id} is ridden by ${rider}; dismount first`, [e.id, rider]);
       const why = removeIssue(w, e);
       if (why) return refuse('edit.immovable', why, [edit.id]);
       delete w.entities[edit.id];
@@ -91,6 +93,8 @@ export function applyEdits(start: WorldState, edits: WorldEdit[], spatialFor: (w
     } else {
       const cur = w.entities[edit.id];
       if (!cur) return refuse('entity.unknown', `no entity "${edit.id}"`, [edit.id]);
+      const rider = riderOf(w, cur);
+      if (rider) return refuse('edit.vehicle-ridden', `${cur.id} is ridden by ${rider}; dismount first (a design edit only moves a parked vehicle)`, [cur.id, rider]);
       const why = moveIssue(w, cur);
       if (why) return refuse('edit.immovable', why, [edit.id]);
       s = spatial();
@@ -138,6 +142,13 @@ function lyingPose(defId: string, l: { x: number; z: number; yaw: number }, y: n
   return poseAt(defId, orientationFor(d, 'flat'), { x: l.x, z: l.z, th: l.yaw }, { bottom: y });
 }
 
+/** The person riding a vehicle (support ridden-by, or a human whose `riding` names it), if any. */
+function riderOf(w: WorldState, e: Entity): string | undefined {
+  if (e.kind !== 'vehicle') return undefined;
+  if (e.support?.kind === 'ridden-by') return e.support.by;
+  return Object.values(w.entities).find((o) => o.human?.riding === e.id)?.id;
+}
+
 /** Resting-on/connected dependants that would be left floating if `e` moved. */
 function dependants(w: WorldState, id: string): string[] {
   const out: string[] = [];
@@ -156,7 +167,12 @@ function moveIssue(w: WorldState, e: Entity): string | null {
     if (h.task || h.activity !== 'idle' || h.grip) return `${e.id} is busy (${h.activity}${h.task ? `, task ${h.task}` : ''}); only idle people can be moved by a design edit`;
     return null;
   }
-  if (e.kind === 'vehicle' || e.kind === 'marker') return `${e.id} is a ${e.kind}; design edits move people, components and fixtures`;
+  if (e.kind === 'marker') return `${e.id} is a marker; design edits move people, components, fixtures and parked vehicles`;
+  if (e.kind === 'vehicle') {
+    // a parked vehicle is a static obstacle (LM-005): movable unless something is on its forks
+    const load = Object.values(w.entities).find((o) => o.support?.kind === 'forks' && o.support.vehicle === e.id);
+    if (load) return `${e.id} has ${load.id} on its forks; set the load down first`;
+  }
   if (e.phase && FIXED.has(e.phase)) return `${e.id} is ${e.phase}; only loose (stored/staged) components can be moved`;
   const s = e.support?.kind;
   if (s === 'held' || s === 'connected' || s === 'forks') return `${e.id} is ${s === 'held' ? 'held' : s === 'forks' ? 'on forks' : 'connected'}; only loose items can be moved`;

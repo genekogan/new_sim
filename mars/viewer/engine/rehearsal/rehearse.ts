@@ -14,6 +14,7 @@ import { TakeRecorder } from '../take/recorder.ts';
 import type { Take } from '../take/types.ts';
 import type { TakeLibrary } from '../take/store.ts';
 import { physicalView, type WorldState } from '../world/types.ts';
+import { affectedSteps, planEnvelope, type AffectedStep, type PlanEnvelope } from './envelope.ts';
 
 /** Everything needed to build a runtime. `services` is a factory: every run gets fresh, unshared service state. */
 export type EngineConfig = {
@@ -63,13 +64,18 @@ export type PhysicalDiff = {
   other: string[]; // top-level physical fields (inventory, rng)
 };
 
-export type StaleInfo = { code: 'plan.stale'; message: string; diff?: PhysicalDiff };
+/** `affected`: the steps the change reaches and why (region-scoped staleness, envelope.ts); absent when not scoped. */
+export type StaleInfo = { code: 'plan.stale'; message: string; diff?: PhysicalDiff; affected?: AffectedStep[] };
+/** The head differs physically from the plan's baseline, but outside every step's envelope: the plan stays valid. */
+export type ScopedPass = { diff: PhysicalDiff; summary: string };
+/** Supplies the plan's envelope on demand (null = none available: any physical change stales the plan). */
+export type EnvelopeSource = () => PlanEnvelope | null;
 
-export type RehearsalResult = { report: RunReport; take: Take; finalState: WorldState; stale?: StaleInfo };
+export type RehearsalResult = { report: RunReport; take: Take; finalState: WorldState; stale?: StaleInfo; envelope?: PlanEnvelope; outsideEnvelope?: ScopedPass };
 
 export type ExecuteResult =
-  | { ok: true; checkpoint: Checkpoint; report: RunReport; take: Take }
-  | { ok: false; code: 'plan.stale' | 'workspace.protected' | 'plan.corrupt'; message: string; diff?: PhysicalDiff }
+  | { ok: true; checkpoint: Checkpoint; report: RunReport; take: Take; outsideEnvelope?: ScopedPass }
+  | { ok: false; code: 'plan.stale' | 'workspace.protected' | 'plan.corrupt'; message: string; diff?: PhysicalDiff; affected?: AffectedStep[] }
   | { ok: false; code: 'execution.failed'; message: string; report: RunReport; take: Take };
 
 /** Fresh services for `world` from the factory; refuses a spatial service built for another static base. */
@@ -152,20 +158,56 @@ export function describeDiff(d: PhysicalDiff): string {
   return parts.join('; ') || 'no physical difference';
 }
 
-/** Does the workspace head still match the plan's assumptions? Env/camera/label-only edits pass. */
-export function checkPlan(history: WorldHistory, workspaceId: string, plan: BoundPlan): { ok: true; head: Checkpoint } | ({ ok: false; head: Checkpoint } & StaleInfo) {
+/**
+ * Does the workspace head still match the plan's assumptions? Env/camera/label-only edits pass. A physical
+ * change passes too when `envelope` supplies the plan's per-step envelope and the change is outside all of
+ * it (region-scoped staleness, envelope.ts); then `outsideEnvelope` describes what was ignored.
+ */
+export function checkPlan(
+  history: WorldHistory,
+  workspaceId: string,
+  plan: BoundPlan,
+  envelope?: EnvelopeSource,
+): ({ ok: true; head: Checkpoint; outsideEnvelope?: ScopedPass }) | ({ ok: false; head: Checkpoint } & StaleInfo) {
   const head = history.head(workspaceId);
   if (plan.rulesVersion !== history.rulesVersion)
     return { ok: false, head, code: 'plan.stale', message: `plan ${plan.planHash} was validated under rules ${plan.rulesVersion}; the runtime is now ${history.rulesVersion} — rehearse and rebind` };
   if (head.physicalHash === plan.baselinePhysicalHash) return { ok: true, head };
-  const diff = physicalDiff(history.read(plan.baselineCheckpoint), history.read(head.id));
+  const before = history.read(plan.baselineCheckpoint), after = history.read(head.id);
+  const diff = physicalDiff(before, after);
+  // physically identical (a checkpoint hashed under an older physicalView): nothing to scope
+  if (!diff.base && !diff.added.length && !diff.removed.length && !diff.changed.length && !diff.regions.length && !diff.other.length) return { ok: true, head };
+  const env = envelope?.() ?? null;
+  const summary = describeDiff(diff);
+  if (!env)
+    return {
+      ok: false,
+      head,
+      code: 'plan.stale',
+      message: `workspace ${workspaceId} changed physically since plan ${plan.planHash} was validated against ${plan.baselineCheckpoint}: ${summary} — revalidate (rehearse/rebind) before executing`,
+      diff,
+    };
+  const affected = affectedSteps(env, before, after, diff);
+  if (!affected.length) return { ok: true, head, outsideEnvelope: { diff, summary } };
+  const named = affected.slice(0, 8).map((a) => `step ${a.step} ← ${a.causes.join(', ')}`).join('; ');
   return {
     ok: false,
     head,
     code: 'plan.stale',
-    message: `workspace ${workspaceId} changed physically since plan ${plan.planHash} was validated against ${plan.baselineCheckpoint}: ${describeDiff(diff)} — revalidate (rehearse/rebind) before executing`,
+    message: `workspace ${workspaceId} changed physically since plan ${plan.planHash} was validated against ${plan.baselineCheckpoint}: ${summary}; inside the plan's route/footprint: ${named}${affected.length > 8 ? ` (+${affected.length - 8} more steps)` : ''} — revalidate (rehearse, or rebind: 'auto') before executing`,
     diff,
+    affected,
   };
+}
+
+/**
+ * The plan's envelope from a run from its own baseline checkpoint (deterministic; one full run), or null
+ * when that run does not complete cleanly (then there is no trustworthy route to scope staleness to).
+ */
+export function baselineEnvelope(history: WorldHistory, plan: BoundPlan, cfg: EngineConfig): PlanEnvelope | null {
+  const start = history.read(plan.baselineCheckpoint);
+  const r = runPlan(start, plan.baselineCheckpoint, plan, cfg, history.rulesVersion);
+  return r.report.ok ? planEnvelope(plan, start, r.take, r.report.steps) : null;
 }
 
 export function integrity(history: WorldHistory, plan: BoundPlan): string | null {
@@ -187,8 +229,11 @@ export function rehearse(history: WorldHistory, workspaceId: string, plan: Bound
     throw new HistoryError('plan.stale', `plan was bound under rules ${plan.rulesVersion}; runtime is ${history.rulesVersion} — rebind`);
   const start = history.read(plan.baselineCheckpoint);
   const r = runPlan(start, plan.baselineCheckpoint, plan, cfg, history.rulesVersion);
-  const chk = checkPlan(history, workspaceId, plan);
-  return chk.ok ? r : { ...r, stale: { code: chk.code, message: chk.message, diff: chk.diff } };
+  const envelope = r.report.ok ? planEnvelope(plan, start, r.take, r.report.steps) : undefined;
+  const chk = checkPlan(history, workspaceId, plan, () => envelope ?? null);
+  const withEnv = envelope ? { ...r, envelope } : r;
+  if (chk.ok) return chk.outsideEnvelope ? { ...withEnv, outsideEnvelope: chk.outsideEnvelope } : withEnv;
+  return { ...withEnv, stale: { code: chk.code, message: chk.message, ...(chk.diff ? { diff: chk.diff } : {}), ...(chk.affected ? { affected: chk.affected } : {}) } };
 }
 
 /**
@@ -203,7 +248,7 @@ export function execute(
   workspaceId: string,
   plan: BoundPlan,
   cfg: EngineConfig,
-  opts: { takes?: TakeLibrary; commitOnFailure?: boolean; label?: string } = {},
+  opts: { takes?: TakeLibrary; commitOnFailure?: boolean; label?: string; envelope?: EnvelopeSource } = {},
 ): ExecuteResult {
   const ws = history.workspaces.get(workspaceId);
   if (!ws) throw new HistoryError('unknown-workspace', `no workspace ${workspaceId}`);
@@ -211,8 +256,8 @@ export function execute(
     return { ok: false, code: 'workspace.protected', message: `workspace "${ws.label}" is a protected canonical state; fork it and execute in the fork` };
   const bad = integrity(history, plan);
   if (bad) return { ok: false, code: 'plan.corrupt', message: bad };
-  const chk = checkPlan(history, workspaceId, plan);
-  if (!chk.ok) return { ok: false, code: chk.code, message: chk.message, diff: chk.diff };
+  const chk = checkPlan(history, workspaceId, plan, opts.envelope);
+  if (!chk.ok) return { ok: false, code: chk.code, message: chk.message, diff: chk.diff, ...(chk.affected ? { affected: chk.affected } : {}) };
   const { report, take, finalState } = runPlan(history.read(chk.head.id), chk.head.id, plan, cfg, history.rulesVersion);
   opts.takes?.put(take);
   // an unsettled final state (live actions, loads held by nobody) is never committed as a resumable checkpoint (§22)
@@ -225,5 +270,5 @@ export function execute(
       take,
     };
   const checkpoint = history.commit(workspaceId, finalState, { kind: 'simulation-run', take: take.id, plan: plan.planHash }, opts.label);
-  return { ok: true, checkpoint, report, take };
+  return chk.outsideEnvelope ? { ok: true, checkpoint, report, take, outsideEnvelope: chk.outsideEnvelope } : { ok: true, checkpoint, report, take };
 }

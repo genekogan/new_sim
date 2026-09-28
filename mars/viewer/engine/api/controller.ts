@@ -6,7 +6,8 @@
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
-import { checkPlan, describeDiff, execute as executePlan, integrity, physicalDiff, rehearse as rehearsePlan, runReport, runServices, type EngineConfig, type RunReport } from '../rehearsal/rehearse.ts';
+import { baselineEnvelope, checkPlan, describeDiff, execute as executePlan, integrity, physicalDiff, rehearse as rehearsePlan, runReport, runServices, type EngineConfig, type EnvelopeSource, type RunReport, type StaleInfo } from '../rehearsal/rehearse.ts';
+import type { PlanEnvelope } from '../rehearsal/envelope.ts';
 import { DT, Runtime, type Invariant } from '../runtime/runtime.ts';
 import { SnapshotError } from '../runtime/snapshot.ts';
 import { bindTemplate, PlanError } from '../sequence/bind.ts';
@@ -22,7 +23,7 @@ import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { groupStability, isUpright } from '../construction/rules.ts';
 import { planCameraTrack } from '../camera/plan.ts';
-import { toCameraTrack } from '../camera/track.ts';
+import { toCameraTrack, withFileCamera } from '../camera/track.ts';
 import type { Sampler, ShotSpec, SubjectPose } from '../camera/shots.ts';
 import { takeSampler } from '../camera/take-sampler.ts';
 import { takeFacts } from '../camera/direct.ts';
@@ -32,7 +33,8 @@ import { opSchemas, type OpInput, type OpName } from './schemas.ts';
 import { applyEdits } from './edit.ts';
 import { appendCommands, describePoint, drive, isPauseSnapshot, liveActions, PAUSE_FORMAT, reached, stepProgress, type PauseContext, type PausePoint, type PauseSnapshot } from './pause.ts';
 
-export type StoredPlan = { plan: BoundPlan; workspace: string };
+/** `reboundFrom`: the stale plan this one was re-bound from (engine_execute / engine_rehearse `rebind: 'auto'`, LM-001). */
+export type StoredPlan = { plan: BoundPlan; workspace: string; reboundFrom?: string };
 
 /** Optional lazy loaders (the DO keeps takes/plans/cameras in SQLite and loads them on demand). */
 export type ControllerStore = {
@@ -72,6 +74,14 @@ export const MAX_INPUT_DEPTH = 32;
 export const MAX_INPUT_BYTES = 256 * 1024;
 /** Unkept rehearsal takes held in memory per controller (oldest dropped first). */
 export const UNKEPT_TAKES = 8;
+/** Plan envelopes (region-scoped staleness) cached in memory per controller; recomputed on demand (deterministic). */
+export const ENVELOPES = 16;
+/**
+ * Camera tracks stored beside one take, in bytes of JSON (all its tracks together): a byte cap, not a count
+ * (LM-018: counts let one long track outgrow a DO value; the room chunks values, so the cap bounds the take's
+ * `cams/<take>` blob). engine_store_camera_track accepts an input up to this size too.
+ */
+export const MAX_TAKE_CAMERA_BYTES = 4 * 1024 * 1024;
 
 /**
  * Iterative (stack-safe) pre-check of an op input: nesting depth and an estimate of its
@@ -214,6 +224,7 @@ export class EngineController {
   private camerasLoaded = new Set<string>();
   /** Rehearsal takes not kept (`keep: false`): in memory only, newest UNKEPT_TAKES, never persisted. */
   private unkept = new Map<string, Take>();
+  private envelopes = new Map<string, PlanEnvelope | null>();
   private changes: Changes = { history: false, takes: [], plans: [], cameras: [] };
 
   constructor(o: ControllerOptions) {
@@ -229,7 +240,7 @@ export class EngineController {
   call(name: string, input: unknown): OpResult {
     if (!Object.hasOwn(opSchemas, name)) return fail('op.unknown', `no engine operation "${name}"`);
     try {
-      const bounds = checkInputBounds(input ?? {});
+      const bounds = checkInputBounds(input ?? {}, MAX_INPUT_DEPTH, name === 'store_camera_track' ? MAX_TAKE_CAMERA_BYTES : MAX_INPUT_BYTES);
       if (bounds) return fail('input.invalid', `${name}: ${bounds}`);
       let parsed;
       try {
@@ -256,6 +267,7 @@ export class EngineController {
         case 'get_take': return this.getTake(parsed.data as OpInput<'get_take'>);
         case 'attach_camera_track': return this.attachCameraTrack(parsed.data as OpInput<'attach_camera_track'>);
         case 'direct_camera': return this.directCameraOp(parsed.data as OpInput<'direct_camera'>);
+        case 'store_camera_track': return this.storeCameraTrack(parsed.data as OpInput<'store_camera_track'>);
       }
     } catch (e) {
       if (e instanceof PlanError) return fail(e.code, e.message, { diagnostics: e.diagnostics });
@@ -466,7 +478,7 @@ export class EngineController {
       changes: inc.has('changes') ? s.changes : undefined,
       events: inc.has('events') ? s.events : undefined,
       finalState: inc.has('final') ? structuredClone(finalState) : undefined,
-      cameras: inc.has('cameras') ? this.cameras(take.id) : this.cameras(take.id).map((c) => ({ id: c.id, kind: c.kind })),
+      cameras: inc.has('cameras') ? this.cameras(take.id) : this.cameras(take.id).map(cameraListing),
     };
   }
 
@@ -485,38 +497,121 @@ export class EngineController {
   }
 
   rehearse(q: OpInput<'rehearse'>): OpResult {
-    const sp = this.plan(q.plan_id);
+    let sp = this.plan(q.plan_id);
     if (!sp) return fail('plan.unknown', `no plan ${q.plan_id} (bind_plan first)`);
     const ws = q.workspace ?? sp.workspace;
     if (!ws) return fail('op.invalid-input', 'plan was bound to a checkpoint; pass `workspace` to rehearse against');
+    let rebound: ReboundEvent | undefined;
+    if (q.rebind === 'auto') {
+      const rb = this.rebindIfStale(sp, ws);
+      if ('ok' in rb) return rb;
+      sp = rb.stored;
+      rebound = rb.event;
+    }
     const r = rehearsePlan(this.history, ws, sp.plan, this.cfg);
+    if (r.envelope) this.cacheEnvelope(sp.plan.planHash, r.envelope);
     // read-only by default: the take stays in memory (playable via get_take while it lasts) and is
     // stored only on request — or later, by execute / attach_camera_track on the same take id
     const kept = q.keep === true || this.takes.has(r.take.id);
     if (q.keep === true) this.keepTake(r.take);
     else if (!kept) this.holdUnkept(r.take);
-    const out: OpResult = { ok: r.report.ok, report: compactReport(r.report), take: { ...takeSummary(r.take), kept }, stale: r.stale };
+    const out: OpResult = {
+      ok: r.report.ok,
+      ...(rebound ? { plan_id: sp.plan.planHash, rebound } : {}),
+      report: compactReport(r.report),
+      take: { ...takeSummary(r.take), kept },
+      stale: r.stale,
+      ...(r.outsideEnvelope ? { outsideEnvelope: r.outsideEnvelope } : {}),
+    };
     return r.report.ok ? out : { ...out, ok: false, code: 'rehearsal.failed', message: failureMessage(r.report) };
   }
 
   execute(q: OpInput<'execute'>): OpResult {
-    const sp = this.plan(q.plan_id);
+    let sp = this.plan(q.plan_id);
     if (!sp) return fail('plan.unknown', `no plan ${q.plan_id} (bind_plan first)`);
     const ws = this.history.workspaces.get(q.workspace);
     if (ws && !ws.protected && this.history.resumable(ws.id))
       return fail('workspace.paused', `workspace ${ws.id} is paused mid-run at ${ws.head}; engine_resume it (or fork at its parent) before executing another plan there`);
-    if (q.pauseAt !== undefined) return this.executePausable(q, sp.plan);
-    const r = executePlan(this.history, q.workspace, sp.plan, this.cfg, { takes: this.takes, label: q.label });
+    let rebound: ReboundEvent | undefined;
+    if (q.rebind === 'auto' && ws && !ws.protected) {
+      const rb = this.rebindIfStale(sp, q.workspace);
+      if ('ok' in rb) return rb;
+      sp = rb.stored;
+      rebound = rb.event;
+    }
+    const re = rebound ? { plan_id: sp.plan.planHash, rebound } : {};
+    if (q.pauseAt !== undefined) {
+      const out = this.executePausable(q, sp.plan);
+      return rebound ? { ...out, ...re } : out;
+    }
+    const r = executePlan(this.history, q.workspace, sp.plan, this.cfg, { takes: this.takes, label: q.label, envelope: this.envelopeSource(sp.plan) });
     if ('take' in r) {
       this.unkept.delete(r.take.id);
       this.noteTake(r.take.id);
     }
     if (r.ok) {
       this.changes.history = true;
-      return { ok: true, workspace: q.workspace, checkpoint: compactCheckpoint(r.checkpoint), take_id: r.take.id, take: takeSummary(r.take), report: compactReport(r.report) };
+      return { ok: true, workspace: q.workspace, ...re, checkpoint: compactCheckpoint(r.checkpoint), take_id: r.take.id, take: takeSummary(r.take), report: compactReport(r.report), ...(r.outsideEnvelope ? { outsideEnvelope: r.outsideEnvelope } : {}) };
     }
-    if (r.code === 'execution.failed') return { ok: false, code: r.code, message: uniqueMessage(r.message), take_id: r.take.id, take: takeSummary(r.take), report: compactReport(r.report) };
-    return { ok: false, code: r.code, message: r.message, ...(r.diff ? { diff: r.diff } : {}) };
+    if (r.code === 'execution.failed') return { ok: false, code: r.code, message: uniqueMessage(r.message), ...re, take_id: r.take.id, take: takeSummary(r.take), report: compactReport(r.report) };
+    return { ok: false, code: r.code, message: r.message, ...(r.diff ? { diff: r.diff } : {}), ...(r.affected ? { affected: r.affected } : {}) };
+  }
+
+  /**
+   * LM-001: if `sp` is stale against `workspace`'s head (region-scoped, like execute), bind the same template +
+   * bindings against that head (a new plan hash; stored with `reboundFrom`) and return it with a `plan.rebound`
+   * event carrying the physical diff and the steps it reached. Not stale → `{ stored: sp }`. A binding that no
+   * longer holds → a `plan.rebind-failed` refusal naming the steps that cannot re-bind.
+   */
+  private rebindIfStale(sp: StoredPlan, workspace: string): { stored: StoredPlan; event?: ReboundEvent } | OpResult {
+    if (this.history.resumable(workspace))
+      return fail('workspace.paused', `${workspace} is a mid-action pause checkpoint; engine_resume it before re-binding a plan against it`);
+    const chk = checkPlan(this.history, workspace, sp.plan, this.envelopeSource(sp.plan));
+    if (chk.ok) return { stored: sp };
+    const stale: StaleInfo = { code: chk.code, message: chk.message, ...(chk.diff ? { diff: chk.diff } : {}), ...(chk.affected ? { affected: chk.affected } : {}) };
+    let plan: BoundPlan;
+    try {
+      plan = bindTemplate(sp.plan.template, sp.plan.bindings, { history: this.history, baseline: workspace, registry: this.registry });
+    } catch (e) {
+      if (!(e instanceof PlanError)) throw e;
+      const steps = stepsOf(sp.plan, e.diagnostics);
+      return fail(
+        'plan.rebind-failed',
+        uniqueMessage(`plan ${sp.plan.planHash} is stale (${stale.message}) and cannot be re-bound against ${workspace}: ${steps.length ? `step${steps.length > 1 ? 's' : ''} ${steps.join(', ')}: ` : ''}${e.diagnostics.map((d) => d.message).join('; ')}`),
+        { details: { steps, diagnostics: e.diagnostics, stale } },
+      );
+    }
+    const ws = this.history.workspaces.has(workspace) ? workspace : '';
+    const stored: StoredPlan = { plan, workspace: ws, reboundFrom: sp.plan.planHash };
+    if (!this.plans.has(plan.planHash)) {
+      this.plans.set(plan.planHash, stored);
+      this.changes.plans.push(plan.planHash);
+    }
+    const event: ReboundEvent = {
+      type: 'plan.rebound',
+      from: sp.plan.planHash,
+      to: plan.planHash,
+      workspace,
+      fromBaseline: sp.plan.baselineCheckpoint,
+      toBaseline: plan.baselineCheckpoint,
+      reason: stale.message,
+      ...(stale.diff ? { diff: stale.diff, summary: describeDiff(stale.diff) } : {}),
+      ...(stale.affected ? { affected: stale.affected } : {}),
+    };
+    return { stored: this.plans.get(plan.planHash)!, event };
+  }
+
+  /** The plan's envelope, cached; computed on first need by a run from the plan's baseline (deterministic). */
+  private envelopeSource(plan: BoundPlan): EnvelopeSource {
+    return () => {
+      if (!this.envelopes.has(plan.planHash)) this.cacheEnvelope(plan.planHash, baselineEnvelope(this.history, plan, this.cfg));
+      return this.envelopes.get(plan.planHash) ?? null;
+    };
+  }
+  private cacheEnvelope(id: string, env: PlanEnvelope | null) {
+    this.envelopes.delete(id);
+    this.envelopes.set(id, env);
+    for (const k of this.envelopes.keys()) if (this.envelopes.size > ENVELOPES) this.envelopes.delete(k);
   }
 
   /** execute with `pauseAt`: the same checks and runtime as execute, driven to the pause point (pause.ts). */
@@ -526,8 +621,8 @@ export class EngineController {
     if (ws.protected) return fail('workspace.protected', `workspace "${ws.label}" is a protected canonical state; fork it and execute in the fork`);
     const bad = integrity(this.history, plan);
     if (bad) return fail('plan.corrupt', bad);
-    const chk = checkPlan(this.history, q.workspace, plan);
-    if (!chk.ok) return fail(chk.code, chk.message, chk.diff ? { diff: chk.diff } : {});
+    const chk = checkPlan(this.history, q.workspace, plan, this.envelopeSource(plan));
+    if (!chk.ok) return fail(chk.code, chk.message, { ...(chk.diff ? { diff: chk.diff } : {}), ...(chk.affected ? { affected: chk.affected } : {}) });
     const p = q.pauseAt as PausePoint;
     if (typeof p === 'object' && !plan.steps.some((s) => s.id === p.step)) return fail('pause.unknown-step', `pauseAt: plan ${plan.planHash} has no step "${p.step}" (steps: ${plan.steps.map((s) => s.id).join(', ')})`);
     const world = this.history.read(chk.head.id);
@@ -701,6 +796,37 @@ export class EngineController {
     };
   }
 
+  /** LM-013: store a compiled camera track (a directed one from the studio) beside its take. */
+  storeCameraTrack(q: OpInput<'store_camera_track'>): OpResult {
+    const take = this.take(q.take_id);
+    if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+    const track = q.track as CameraTrack;
+    if (track.takeId !== take.id) return fail('camera.track-take-mismatch', `camera track ${track.id} belongs to take ${track.takeId}, not ${take.id}; store it beside its own take`, { details: { track: track.id, takeId: track.takeId } });
+    try {
+      withFileCamera({ take: { id: take.id }, camera: { id: '', takeId: take.id, kind: 'none', data: null } }, track);
+    } catch (e) {
+      return fail('camera.track-invalid', e instanceof Error ? e.message : String(e), { details: { track: track.id } });
+    }
+    const d = track.data as { hz: number; duration: number; samples: { t: number }[] };
+    const dur = takeDuration(take);
+    if (d.duration > dur + 1 / d.hz + 1e-6) return fail('camera.track-invalid', `camera track ${track.id} lasts ${r2(d.duration)} s but take ${take.id} is ${r2(dur)} s`, { details: { track: track.id } });
+    if (d.samples.length > Math.ceil(d.duration * d.hz) + 2) return fail('camera.track-invalid', `camera track ${track.id} has ${d.samples.length} samples; ${r2(d.duration)} s at ${d.hz} Hz allows ${Math.ceil(d.duration * d.hz) + 2}`, { details: { track: track.id } });
+    const existing = this.cameras(take.id);
+    const same = existing.find((c) => c.id === track.id) ?? this.takes.toJSON().cameras.find((c) => c.id === track.id);
+    if (same) {
+      if (stableStringify(same) === stableStringify(track)) return { ok: true, track_id: track.id, take_id: take.id, stored: false, note: 'identical track already stored', takeHashUnchanged: true };
+      return fail('camera.track-exists', `a different camera track ${track.id} is already stored${same.takeId !== take.id ? ` (beside take ${same.takeId})` : ''}; pick another id`, { details: { track: track.id, takeId: same.takeId } });
+    }
+    const bytes = existing.reduce((n, c) => n + JSON.stringify(c).length, 0) + JSON.stringify(track).length;
+    if (bytes > MAX_TAKE_CAMERA_BYTES)
+      return fail('camera.store-full', `take ${take.id} would hold ${bytes} bytes of camera tracks (cap ${MAX_TAKE_CAMERA_BYTES}); store a shorter or lower-rate track`, { details: { bytes, cap: MAX_TAKE_CAMERA_BYTES } });
+    if (this.unkept.has(take.id)) this.keepTake(take);
+    const before = this.takes.takeHash(take.id);
+    this.takes.attachCamera(track);
+    if (!this.changes.cameras.includes(take.id)) this.changes.cameras.push(take.id);
+    return { ok: true, track_id: track.id, take_id: take.id, stored: true, kind: track.kind, samples: d.samples.length, hz: d.hz, duration: d.duration, cameraBytes: bytes, takeHashUnchanged: this.takes.takeHash(take.id) === before };
+  }
+
   /** OWNER_FEEDBACK §11: directions → computed, validated camera track stored beside the take (camera/direct.ts, synth.ts). */
   directCameraOp(q: OpInput<'direct_camera'>): OpResult {
     const take = this.take(q.take_id);
@@ -777,6 +903,34 @@ export class EngineController {
   }
 }
 
+/** A stale plan re-bound against the workspace head (LM-001), returned as `rebound` by execute / rehearse. */
+export type ReboundEvent = {
+  type: 'plan.rebound';
+  from: string;
+  to: string;
+  workspace: string;
+  fromBaseline: string;
+  toBaseline: string;
+  reason: string;
+  diff?: ReturnType<typeof physicalDiff>;
+  summary?: string;
+  affected?: { step: string; causes: string[] }[];
+};
+
+/** Step ids a bind failure concerns: a step diagnostic's own subject, or the steps whose params use a failing binding. */
+function stepsOf(plan: BoundPlan, diags: Diagnostic[]): string[] {
+  const ids = new Set(plan.template.steps.map((s) => s.id));
+  const out = new Set<string>();
+  for (const d of diags) {
+    for (const x of d.subjects ?? []) if (ids.has(x)) out.add(x);
+    const param = /parameter "([^"]+)"/.exec(d.message)?.[1];
+    if (param)
+      for (const s of plan.template.steps)
+        if (new RegExp(`"\\$${param}(?![\\w])`).test(JSON.stringify(s.params))) out.add(s.id);
+  }
+  return [...out];
+}
+
 /** One-line reason for a failed rehearsal: status plus the first failing step's (or invariant's) diagnostic. */
 function failureMessage(r: RunReport) {
   const step = r.steps.find((s) => s.diagnostic && s.status !== 'completed');
@@ -792,6 +946,12 @@ function uniqueMessage(m: string, max = 800) {
   const parts = [...new Set(rest.join(': ').split('; '))];
   const s = parts.length ? `${head}: ${parts.join('; ')}` : head;
   return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+/** A camera track as get_take lists it without include 'cameras': id, kind and its shape. */
+function cameraListing(c: CameraTrack) {
+  const d = c.data as { hz?: number; duration?: number; samples?: unknown[] } | null;
+  return { id: c.id, kind: c.kind, ...(d && typeof d === 'object' ? { hz: d.hz, duration: d.duration, samples: d.samples?.length } : {}) };
 }
 
 function compactCheckpoint(c: Checkpoint) {

@@ -74,6 +74,12 @@ export const pausePointSchema = z.union([
   z.number().positive().max(3600).describe("seconds from the plan's start (same clock as `at` cues; rounded to the 1/20 s tick)"),
   z.strictObject({ step: stepId, event: z.enum(['started', 'completed']) }).describe('pause on the tick a step starts / right after it completes'),
 ]);
+const rebind = z
+  .enum(['auto', 'refuse'])
+  .describe(
+    "'auto': if the plan is stale against the workspace head (a physical change inside a step's route/footprint, or a rules change), bind the same template + bindings against the head first (new plan_id, returned with a `rebound` event: the diff and the steps it reached); a binding that no longer holds is refused with plan.rebind-failed naming the step. Default 'refuse': a stale plan is refused with plan.stale.",
+  )
+  .optional();
 const allowDrop = z
   .boolean()
   .describe('leave non-resumable live actions (carry, lifts, vehicles, ambient_wander) out of the pause; they finish as cancelled (snapshot.dropped) on resume. Still refused while one holds a load.')
@@ -104,6 +110,7 @@ export const opSchemas = {
     plan_id: id,
     workspace: wsId.describe('staleness is reported against this workspace (default: the one bound)').optional(),
     keep: z.boolean().describe('store the take durably (default false: held in memory only, playable via get_take until evicted)').optional(),
+    rebind,
   }),
   execute: z.strictObject({
     plan_id: id,
@@ -111,6 +118,7 @@ export const opSchemas = {
     label: z.string().max(200).optional(),
     pauseAt: pausePointSchema.describe('stop mid-run there and commit a resumable `pause` checkpoint instead of finishing (engine_resume continues it)').optional(),
     allowDrop,
+    rebind,
   }),
   resume: z.strictObject({
     workspace: wsId,
@@ -155,6 +163,17 @@ export const opSchemas = {
     shot: shotSpecSchema,
     hz: z.number().min(1).max(30).optional(),
   }),
+  store_camera_track: z.strictObject({
+    take_id: id,
+    track: z
+      .strictObject({
+        id: z.string().regex(/^[\w.-]{1,64}$/),
+        takeId: id.describe('must equal take_id'),
+        kind: z.string().min(1).max(40).describe("'directed' for a compiled direct_camera / studio Direct-panel track"),
+        data: z.record(z.string(), z.unknown()).describe('mars-camera-track/1 payload: { schema, hz, duration, samples[{t, position, target, fov, cut?}], … }'),
+      })
+      .describe('a compiled CameraTrack (e.g. a directed track downloaded from the studio) to store beside its take'),
+  }),
   direct_camera: z.strictObject({
     take_id: id,
     directions: z.array(cameraDirectionSchema).min(1).max(24).describe('camera directions in order (each starts when the previous ends unless `at` is given)'),
@@ -179,11 +198,11 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
     description:
       'Bind a mars-sequence/1 template to concrete actors/entities and a baseline workspace. Validates the step graph and every step against the verb schemas; returns plan_id (content hash) or all diagnostics at once. Stores the plan; does not run anything.',
   },
-  rehearse: { readOnly: true, description: 'Run a bound plan privately from its baseline (never mutates any workspace). Returns report (status, per-step diagnostics, invariant violations, metrics), a take summary (take_id playable via get_take; `kept` says whether it is stored) and `stale` if executing now would be refused. Stores nothing unless `keep: true` (then only the take); an unkept take lives in memory for the last few rehearsals — execute or attach a camera to keep it.' },
+  rehearse: { readOnly: true, description: 'Run a bound plan privately from its baseline (never mutates any workspace). Returns report (status, per-step diagnostics, invariant violations, metrics), a take summary (take_id playable via get_take; `kept` says whether it is stored) and `stale` if executing now would be refused. Stores nothing unless `keep: true` (then only the take); an unkept take lives in memory for the last few rehearsals — execute or attach a camera to keep it. Staleness is region-scoped: a physical change outside every step\'s route/footprint envelope is reported as `outsideEnvelope` and does not stale the plan; one inside names the steps (`stale.affected`). `rebind: \'auto\'` re-binds a stale plan against the workspace head first and rehearses that (`plan_id`, `rebound`).' },
   execute: {
     readOnly: false,
     description:
-      'Officially run a bound plan in an editable workspace and commit the successor checkpoint (cause simulation-run). Refuses protected canonical workspaces (fork first), stale plans (physical change since binding — returns a diff) and runs with violations (take still stored). With `pauseAt` (seconds or {step, event}) it stops there and commits a resumable `pause` checkpoint (returns checkpoint, live actions, the take so far); refused with snapshot.non-resumable naming the action if a carry / lift / vehicle is live then, unless `allowDrop`.',
+      'Officially run a bound plan in an editable workspace and commit the successor checkpoint (cause simulation-run). Refuses protected canonical workspaces (fork first), stale plans (a physical change since binding inside a step route/footprint envelope — returns the diff and `affected` steps; a change outside every envelope is ignored and reported as `outsideEnvelope`) and runs with violations (take still stored). `rebind: \'auto\'` re-binds a stale plan against the head (new plan_id + a `plan.rebound` event with the diff) instead of refusing, or refuses with plan.rebind-failed naming the step. With `pauseAt` (seconds or {step, event}) it stops there and commits a resumable `pause` checkpoint (returns checkpoint, live actions, the take so far); refused with snapshot.non-resumable naming the action if a carry / lift / vehicle is live then, unless `allowDrop`.',
   },
   resume: {
     readOnly: false,
@@ -194,7 +213,7 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
   edit_world: {
     readOnly: false,
     description:
-      "Design-edit an editable workspace (never a protected canonical one): spawn catalog items (only with inventory 'unlimited'; provenance design-edit/hypothetical), move idle people / loose components / fixtures to a pose or `lying` set-down (refused when the footprint would overlap static geometry, components or people, or leave the floor), remove stored/staged components (or anything a design edit spawned), add/replace regions. All-or-nothing; commits one checkpoint (cause design-edit + note) and returns the physical diff.",
+      "Design-edit an editable workspace (never a protected canonical one): spawn catalog items (only with inventory 'unlimited'; provenance design-edit/hypothetical), move idle people / loose components / fixtures / parked vehicles to a pose or `lying` set-down (refused when the footprint would overlap static geometry, components or people, or leave the floor), remove stored/staged components (or anything a design edit spawned), add/replace regions. A ridden vehicle is refused with edit.vehicle-ridden (dismount first). All-or-nothing; commits one checkpoint (cause design-edit + note) and returns the physical diff.",
   },
   list: {
     readOnly: true,
@@ -208,6 +227,11 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
   log: { readOnly: true, description: 'Checkpoint history of a workspace (newest first: id, parent, cause, label). Without `workspace` lists all workspaces.' },
   get_take: { readOnly: true, description: 'Compact slice of a take: header, quantised pose tracks [tick, x_mm, y_mm, z_mm, yaw_mrad…] within [from, to] (bracketing samples included for interpolation), discrete changes, events; optional final state and camera tracks.' },
   attach_camera_track: { readOnly: false, description: 'Plan a camera track (shot spec → collision-aware, readability-scored samples with explained cuts) against a recorded take and store it beside the take. Never changes the take or its hash.' },
+  store_camera_track: {
+    readOnly: false,
+    description:
+      'Store an already-compiled camera track (mars-camera-track/1, e.g. a directed track from the studio Direct panel) beside its take, like attach_camera_track / direct_camera do for tracks they compute. Validated with the take-file camera rules (schema, hz, samples, track.takeId = take_id, duration within the take). Refuses a track of another take (camera.track-take-mismatch), an id already used by a different track (camera.track-exists; re-storing the identical track is a no-op) and a take whose stored camera tracks would exceed the per-take byte cap (camera.store-full). Never changes the take or its hash; get_take lists it under `cameras`.',
+  },
   direct_camera: {
     readOnly: false,
     description:
