@@ -19,7 +19,7 @@
 // liftHandsInReach covers both ends): a geometry that does not allow a genuine hand-off is refused
 // (`handup.too-high`: "…use the forklift"), never interpolated.
 import { z } from 'zod';
-import { add2, angleDelta, datan2, dist2, dot2, rot2, scale2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
+import { add2, angleDelta, datan2, dist2, dot2, rot2, scale2, sub2, pointInObb, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { ActionDef, ActionRecord, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Link } from '../spatial/types.ts';
@@ -29,12 +29,12 @@ import { isRail } from '../world/catalog-solar.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { checkStations, walkCrew, childrenState, type Children } from './children.ts';
-import { crewCheck, f2, fail, lerpPose, smooth, spatialOf, STAGE_RADIUS, sweepPoses, sweptLiftPath, symmetricYaw, type Fail } from './access.ts';
+import { crewCheck, f2, fail, lerpPose, smooth, spatialOf, STAGE_RADIUS, sweepPoses, sweptLiftPath, symmetricYaw, type Fail, type Hit } from './access.ts';
 import { flatObb, isJoist, isPlywood, memberTop, sheetSupports } from './deck.ts';
 import { isBeam } from './rules.ts';
 import { beamWalkways, climbLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
 import { deckAt, deckOver } from './framemove.ts';
-import { BODY_MODEL, postureGap, postureTop, restHands, type Posture } from '../body/model.ts';
+import { BODY_MODEL, postureGap, postureTop, restHands, sideOf, type Hand, type Posture } from '../body/model.ts';
 
 // ---- rules (metres, seconds) ----
 // reach rules: engine/body/model.ts (BODY_MODEL.md)
@@ -53,7 +53,7 @@ export const LEVER_SIDE = HUMAN_PROFILE.radius + 0.03;
 export const HAND_SPREAD = 0.15; // each hand this far either side of a grip point, along the gripped edge
 export const BODY_GAP = HUMAN_PROFILE.radius + 0.02; // a load in someone's body band stays this far from them
 export const RECEIVER_SEP = 0.6; // m between receivers
-export const T = { crouch: 0.6, lift: 0.6, reachDown: 0.6, take: 0.4, stand: 0.4, setDown: 0.5 } as const;
+export const T = { crouch: 0.6, lift: 0.6, reachDown: 0.6, take: 0.4, stand: 0.4, setDown: 0.5, lieDown: 0.8, pushUp: 0.8, kneelUp: 0.6 } as const;
 export const SPEED = { carry: 0.6, raise: 0.5, slide: 0.4 } as const;
 export const FORK_LIFT_OFF = 0.03; // receivers lift the load this far off the forks before feeding it in
 export const STEP = 0.05; // m: sampling of every planned motion
@@ -78,7 +78,25 @@ export const POSTURE: Record<string, Posture> = {
   stand_with_load: PZ.bentOver,
   lay: PZ.bentOver,
   set_down: PZ.bentOver,
+  // prone receiver (owner feedback §13): lying at the deck edge, then the rise (body/model.ts BODY_MODEL.prone)
+  'prone-wait': BODY_MODEL.prone.posture.prone,
+  'prone-reach': BODY_MODEL.prone.posture.prone,
+  'push-up': BODY_MODEL.prone.posture.pushUp,
+  'kneel-up': BODY_MODEL.prone.posture.kneelUp,
 };
+// ---- prone receiver (owner feedback §13; HANDUP.md "Prone receiver") ----
+/** Receivers' hands at most this far below the deck they lie on (BODY_MODEL.prone.reachDown, 0.94). */
+export const REACH_DOWN_PRONE = BODY_MODEL.prone.reachDown;
+/** … and at the hand-off at most this far beyond the deck's outline (0.45). */
+export const PRONE_EDGE_REACH = BODY_MODEL.prone.edgeReach;
+/** A prone receiver's station S (their pose.p) is this far behind the deck lip, facing out over it. */
+export const PRONE_BACK = BODY_MODEL.prone.back;
+/** Standing receivers' hands go no lower than this above their feet (upright band bottom − arm: 0.60). */
+export const STAND_REACH = PZ.upright.lo - BODY_MODEL.armLength;
+/** Activities a prone receiver publishes, in order (then stand_with_load, lay, set_down as a kneeling one). */
+export const PRONE_ACTIVITY = { lieDown: 'lie-down', wait: 'prone-wait', reach: 'prone-reach', pushUp: 'push-up', kneelUp: 'kneel-up' } as const;
+/** The free hand reaches the deck by this fraction of push_up (then pushes); it goes back to the load over kneel_up. */
+export const PUSH_HAND_K = 0.7;
 export const HANDUP_SLOT_PREFIX = 'handup-';
 
 /** How far a hand is outside the reach envelope of a person in `activity` standing at `feet` (≤ 0 = inside). */
@@ -170,7 +188,10 @@ type HP = {
   stations?: { x: number; z: number }[];
 };
 
-type Station = { actor: string; feet: Vec3; walkway: string | null; deck: number | null };
+/** A receiver's station; `prone` only for a receiver lying at a deck edge (§13): feet = S (PRONE_BACK behind the lip,
+ *  facing `out`), `hold` = the hand that keeps the load through the rise, `deckObb` = the deck they lie on. */
+type Station = { actor: string; feet: Vec3; walkway: string | null; deck: number | null; prone?: ProneStation };
+type ProneStation = { out: Vec2; hold: Hand; deckObb: OBB2 };
 type Chain = { verb: string; params: Record<string, unknown> }[];
 type Seg = { phase: string; from: Pose; to: Pose; dur: number };
 export type HandupProgram = {
@@ -234,7 +255,9 @@ function receiverHands(e: Entity, q: Pose, feet: Vec3): [Vec3, Vec3] {
 /**
  * Grip slot of a hand-up holder. Givers: `handup-give-<i>:<lx>:<lz>:<x|z>` = the grip point in the
  * part's local frame (x, z; on its underside) and the local axis the two hands spread along.
- * Receivers: `handup-take-<i>` = the part's top face, at its point nearest the receiver.
+ * Receivers: `handup-take-<i>` = the part's top face, at its point nearest the receiver. Prone receivers (§13):
+ * `handup-prone-<i>:<left|right>` = the same grip; the named hand never lets go during the rise (the other pushes
+ * off the deck), so while `push-up` / `kneel-up` the free hand is only in `human.hands` (handupHands gives the grip).
  */
 export function giverSlot(i: number, g: { g: Vec2; tan: Vec2; out?: Vec2; lever?: true }): string {
   if (g.lever) return `${HANDUP_SLOT_PREFIX}give-${i}:${g.g[0].toFixed(3)}:${g.g[1].toFixed(3)}:${Math.abs(g.out![0]) > 0.5 ? 'x' : 'z'}:lever`;
@@ -248,7 +271,7 @@ export function giverSlot(i: number, g: { g: Vec2; tan: Vec2; out?: Vec2; lever?
  */
 export function handupHands(part: Entity, q: Pose, holder: Entity, slot: string): [Vec3, Vec3] | null {
   const feet = holder.pose.p;
-  if (/^handup-take-\d+$/.test(slot)) return receiverHands(part, q, feet);
+  if (/^handup-take-\d+$/.test(slot) || /^handup-prone-\d+:(left|right)$/.test(slot)) return receiverHands(part, q, feet);
   const m = /^handup-give-\d+:(-?[\d.]+):(-?[\d.]+):([xz])(:lever)?$/.exec(slot);
   if (!m) return null;
   const g: Vec2 = [Number(m[1]), Number(m[2])];
@@ -375,19 +398,30 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
   const th = size(e)[1];
   let transfer: Pose, lift0: Pose; // lift0: the pose the receivers first take it at
   let direct = false;
+  let prone: ProneDeck | null = null; // set when kneeling cannot reach and receivers lie at a deck edge (§13)
+  let riseHit: Hit | null = null; // the outermost thing the prone rise corridor had to clear
   if (mode === 'hand') {
     direct = ySlide <= gMax + 1e-9;
     const hT = direct ? ySlide : gMax;
     const handY = hT + th;
-    if (edgeY - handY > REACH_DOWN + 1e-9)
-      return bad('handup.too-high', `${e.id} cannot be handed up to people on ${edge.members![0]} at ${f2(edgeY)} m: the givers can raise it to ${f2(hT)} m (their floor + ${f2(hT - giverFloor)} m: hands out at the grips; ${GIVE_MAX} m straight overhead), so the receivers would have to reach ${f2(edgeY - handY)} m below their feet (max ${REACH_DOWN} m); use the forklift (hand_up via: 'forklift')`, [e.id, edge.members![0], ...givers, ...p.receivers], [O[0], hT, O[1]]);
-    // raised straight up outside the edge, clear of whatever sticks out past the beam (joist cantilevers …)
+    // stand → kneel → prone (§13): kneeling reaches REACH_DOWN below the beam; lying on a deck over the edge, REACH_DOWN_PRONE below the deck
+    if (edgeY - handY > REACH_DOWN + 1e-9) {
+      prone = proneDeck(rt, edge);
+      if (!prone || prone.y - handY > REACH_DOWN_PRONE + 1e-9)
+        return bad('handup.too-high', `${e.id} cannot be handed up to people on ${edge.members![0]} at ${f2(edgeY)} m: the givers can raise it to ${f2(hT)} m (their floor + ${f2(hT - giverFloor)} m: hands out at the grips; ${GIVE_MAX} m straight overhead), so the receivers would have to reach ${f2(edgeY - handY)} m below their feet (${reachList(prone, handY, edge)}); use the forklift (hand_up via: 'forklift')`, [e.id, edge.members![0], ...givers, ...p.receivers], [O[0], hT, O[1]]);
+    }
+    // raised straight up outside the edge, clear of whatever sticks out past the beam (joist cantilevers …); for prone
+    // receivers the load then rises in one hand up past the deck edge to slide height, so that corridor must be clear too
     for (let extra = 0; ; extra += STEP) {
       const Ox = add2(obbF.c, scale2(nOut, sOut + extra));
       const hit = sweepPoses(rt, e, [pose(Ox, giverFloor + CARRY_Y, yawH), pose(Ox, hT, yawH)], []);
-      if (!hit) { sOut += extra; break; }
-      if (extra >= 1.0 - 1e-9)
-        return bad('handup.path-blocked', `${e.id} cannot be raised beside ${edge.members![0]}: ${hit.o.label ?? hit.o.id} is in the way up to 1 m out from the edge`, [e.id, hit.o.id], hit.q.p);
+      const hitR = !hit && prone ? sweepPoses(rt, e, [pose(Ox, hT, yawH), pose(Ox, ySlide, yawH)], []) : null;
+      if (!hit && !hitR) { sOut += extra; break; }
+      if (hitR) riseHit = hitR;
+      if (extra >= 1.0 - 1e-9) {
+        if (hit) return bad('handup.path-blocked', `${e.id} cannot be raised beside ${edge.members![0]}: ${hit.o.label ?? hit.o.id} is in the way up to 1 m out from the edge`, [e.id, hit.o.id], hit.q.p);
+        return riseBlocked(e, edge, hitR!, p.receivers, 'up to 1 m out from the edge');
+      }
     }
     O = add2(obbF.c, scale2(nOut, sOut));
     transfer = at_s(0, hT);
@@ -399,8 +433,14 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
       return bad('handup.forklift-orientation', `${e.id} sits on the forks at yaw ${f2(fp.yaw)} but goes in at ${f2(yawH)}: the receivers feed it straight in, they do not turn a sheet over the bay; present it parallel to where it goes`, [e.id]);
     transfer = { p: [...fp.p] as Vec3, yaw: yawH };
     lift0 = transfer;
-    if (edgeY - (fp.p[1] + th) > REACH_DOWN + 1e-9)
-      return bad('handup.too-high', `${e.id} on the forks at ${f2(fp.p[1])} m is ${f2(edgeY - fp.p[1] - th)} m below the receivers' feet (max ${REACH_DOWN} m); raise the forks`, [e.id], fp.p);
+    if (edgeY - (fp.p[1] + th) > REACH_DOWN + 1e-9) {
+      prone = proneDeck(rt, edge);
+      if (!prone || prone.y - (fp.p[1] + th) > REACH_DOWN_PRONE + 1e-9)
+        return bad('handup.too-high', `${e.id} on the forks at ${f2(fp.p[1])} m is ${f2(edgeY - fp.p[1] - th)} m below the receivers' feet (${reachList(prone, fp.p[1] + th, edge)}); raise the forks`, [e.id], fp.p);
+      // the forks cannot move it out: its rise past the deck edge must be clear where it is
+      const hitR = sweepPoses(rt, e, [transfer, { ...transfer, p: [transfer.p[0], Math.max(ySlide, transfer.p[1]), transfer.p[2]] }], [vehicle!]);
+      if (hitR) return riseBlocked(e, edge, hitR, p.receivers, 'where the forks hold it (present it clear of it)');
+    }
   }
   // ---- the part's path
   const giverSegs: Seg[] = [];
@@ -458,7 +498,9 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
     let sMax = 0;
     if (direct) for (let s = STEP; s <= sOut + 1e-9; s += STEP) { if (!standable(at_s(s, ySlide))) break; sMax = s; }
     // ---- receivers
-    const r = chooseStations(rt, e, p, edge, { at_s, sOut, ySlide, direct, sMax, rest, final, ...(direct ? {} : { fixed: transfer }) });
+    const r = prone
+      ? chooseProneStations(rt, e, p, edge, nOut, { at_s, sOut, ySlide, direct, sMax, rest, final, fixed: transfer }, riseHit, [])
+      : chooseStations(rt, e, p, edge, { at_s, sOut, ySlide, direct, sMax, rest, final, ...(direct ? {} : { fixed: transfer }) });
     if ('ok' in r) return r as Fail;
     sT = r.sT;
     transfer = at_s(sT, direct ? ySlide : transfer.p[1]);
@@ -466,12 +508,13 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
     if (sT > 0) giverSegs.push({ phase: 'push', from: raised, to: transfer, dur: segDur(e, raised, transfer, SPEED.slide) });
     const blocked = sweepPoses(rt, e, [raised, transfer], ignoreRest);
     if (blocked) return bad('handup.path-blocked', `${e.id} cannot be pushed in over ${edge.members![0]}: it would hit ${blocked.o.label ?? blocked.o.id}`, [e.id, blocked.o.id], blocked.q.p);
-    return finishPlan(rt, e, p, mode, yawH, rest, edge, nOut, giverGrips, pickup, giverSegs, r.stations, lift0, transfer, final, ySlide, vehicle);
+    return finishPlan(rt, e, p, mode, yawH, rest, edge, nOut, giverGrips, pickup, giverSegs, r.stations, lift0, transfer, final, ySlide, vehicle, (r as { mid?: Pose }).mid);
   }
   // forklift: receivers take it where the forks hold it
-  const r = chooseStations(rt, e, p, edge, { at_s, sOut, ySlide, direct: false, sMax: 0, rest, final, fixed: transfer });
+  const geo: Geo = { at_s, sOut, ySlide, direct: false, sMax: 0, rest, final, fixed: transfer };
+  const r = prone ? chooseProneStations(rt, e, p, edge, nOut, geo, null, [vehicle!]) : chooseStations(rt, e, p, edge, geo);
   if ('ok' in r) return r as Fail;
-  return finishPlan(rt, e, p, mode, yawH, rest, edge, nOut, giverGrips, pickup, giverSegs, r.stations, lift0, transfer, final, ySlide, vehicle);
+  return finishPlan(rt, e, p, mode, yawH, rest, edge, nOut, giverGrips, pickup, giverSegs, r.stations, lift0, transfer, final, ySlide, vehicle, (r as { mid?: Pose }).mid);
 }
 
 /**
@@ -612,8 +655,197 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
   return { stations, sT: Math.max(...assign.map((c) => c.first)) };
 }
 
+// ---- prone receivers (owner feedback §13) ----
+type ProneDeck = { y: number };
+
+/** The highest deck covering the edge walkway (people lie on it at the edge), or null. */
+function proneDeck(rt: Runtime, edge: Link): ProneDeck | null {
+  const len = dist2(edge.from.p, edge.to.p);
+  let y = -Infinity;
+  for (let s = 0; s <= len + 1e-9; s += STEP) {
+    const d = deckOver(rt, edge, add2(edge.from.p, scale2(sub2(edge.to.p, edge.from.p), s / len)));
+    if (d) y = Math.max(y, d.y);
+  }
+  return y > -Infinity ? { y } : null;
+}
+
+/** The three receiving postures' reach down, for `handup.too-high`. */
+function reachList(prone: ProneDeck | null, handY: number, edge: Link): string {
+  const pr = prone
+    ? `lying prone at the edge of the deck at ${f2(prone.y)} m ≤ ${REACH_DOWN_PRONE} m below it, here ${f2(prone.y - handY)} m`
+    : `lying prone ≤ ${REACH_DOWN_PRONE} m below a deck, but no deck covers ${edge.members![0]} to lie on`;
+  return `receivers reach down standing to ${f2(STAND_REACH)} m above their feet, kneeling ≤ ${REACH_DOWN} m below them, ${pr}`;
+}
+
+function riseBlocked(e: Entity, edge: Link, hit: Hit, receivers: string[], where: string): Fail {
+  const name = hit.o.label && hit.o.label !== hit.o.id ? `${hit.o.label} (${hit.o.id})` : hit.o.id;
+  return bad('handup.rise-blocked', `${e.id} cannot rise past the deck edge over ${edge.members![0]} in the hands of a receiver lying there: ${name} is in the way of its rise at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])}) ${where}`, [e.id, hit.o.id, edge.members![0], ...receivers], hit.q.p);
+}
+
+/** Distance from q (inside o) along unit n to o's outline. */
+function exitAlong(o: OBB2, q: Vec2, n: Vec2): number {
+  const l = rot2(sub2(q, o.c), -o.yaw), d = rot2(n, -o.yaw);
+  let t = Infinity;
+  for (const k of [0, 1]) if (Math.abs(d[k]) > 1e-9) t = Math.min(t, ((d[k] > 0 ? o.half[k] : -o.half[k]) - l[k]) / d[k]);
+  return t;
+}
+
+const PR = BODY_MODEL.prone;
+const handSide = (j: number) => (j === 0 ? sideOf('left') : sideOf('right'));
+/** A prone receiver at S (feet) facing out: hand j flat on the deck beside the chest (lying, and the push-up hand). */
+export function proneDeckHand(feet: Vec3, out: Vec2, j: number): Vec3 {
+  const r: Vec2 = [-out[1], out[0]], k = handSide(j) * PR.deckHand.side;
+  return [feet[0] + out[0] * PR.deckHand.fwd + r[0] * k, feet[1], feet[2] + out[1] * PR.deckHand.fwd + r[1] * k];
+}
+/** … and the point just outside the lip, 5 cm above the deck, a hand passes going over the edge (never through it). */
+export function proneLipHand(feet: Vec3, out: Vec2, j: number): Vec3 {
+  const r: Vec2 = [-out[1], out[0]], k = handSide(j) * PR.deckHand.side, f = PRONE_BACK + 0.1;
+  return [feet[0] + out[0] * f + r[0] * k, feet[1] + 0.05, feet[2] + out[1] * f + r[1] * k];
+}
+/** Point at fraction t of the polyline's length. */
+function along(pts: Vec3[], t: number): Vec3 {
+  const L = pts.slice(1).map((p, i) => hypot(p[0] - pts[i][0], p[1] - pts[i][1], p[2] - pts[i][2]));
+  let d = t * L.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < L.length; i++) {
+    if (d <= L[i] || i === L.length - 1) {
+      const u = L[i] > 0 ? Math.min(1, d / L[i]) : 1, a = pts[i], b = pts[i + 1];
+      return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+    }
+    d -= L[i];
+  }
+  return [...pts[pts.length - 1]] as Vec3;
+}
+
+type PC = { feet: Vec3; level: number; obb: OBB2; key: number; hold: Hand; yMid: number };
+
+/**
+ * Stations for receivers lying prone at a deck edge over `edge` (§13), used only where kneeling cannot reach
+ * (`handup.too-high` for the kneel rule). Each station S is PRONE_BACK behind the lip, facing out along nOut; the body
+ * (lip → toes) lies on the deck, clear; at the take both hands are inside the prone envelope, ≤ REACH_DOWN_PRONE below
+ * the deck and ≤ PRONE_EDGE_REACH beyond its outline; the rise (push-up on one hand, kneel up) keeps the grips inside
+ * the push-up / kneel-up envelopes while the load comes straight up outside the edge (swept: `handup.rise-blocked`);
+ * from slide height on they feed it in like kneeling receivers (bentOver envelope, body gap).
+ */
+function chooseProneStations(rt: Runtime, e: Entity, p: HP, edge: Link, nOut: Vec2, g: Geo, riseHit: Hit | null, ignore: string[]): { stations: Station[]; sT: number; mid: Pose } | Fail {
+  const w = rt.world, sp = spatialOf(rt);
+  const tr = g.fixed!;
+  const th = size(e)[1];
+  const path = receiverPath(e, g, tr); // [take, up (slide height), slid in, set down]
+  const up = path[1];
+  const atY = (y: number): Pose => ({ ...tr, p: [tr.p[0], y, tr.p[2]] });
+  const inEnv = (act: string, feet: Vec3, q: Pose) => receiverHands(e, q, feet).every((h) => envelopeGap(act, feet, h) <= 1e-9);
+  const station = (S: Vec2, key: number): PC | string => {
+    const where = `(${f2(S[0])}, ${f2(S[1])})`;
+    const d = deckAt(rt, edge, S);
+    if (!d) return `${where} is not on a deck at ${f2(edge.from.y)} m`;
+    if ('code' in d) return d.message;
+    const lip = exitAlong(d.obb, S, nOut);
+    if (Math.abs(lip - PRONE_BACK) > 0.05 + 1e-9) return `${where} is ${f2(lip)} m from the deck edge facing out over ${edge.members![0]} (a prone receiver kneels ${PRONE_BACK} m from it and lies down over it)`;
+    const feet: Vec3 = [S[0], d.y, S[1]];
+    // the body, lip → toes, lies on the deck (exact) and has room (the clearance raster, less one cell)
+    const grid = sp.level(d.level);
+    for (let k = -(PRONE_BACK - 0.05); k <= PR.bodyBack + 1e-9; k += 0.1) {
+      const b = sub2(S, scale2(nOut, k));
+      if (!sp.scene.surfaces.some((x) => Math.abs(x.y - d.y) < 0.02 && pointInObb(b, x.obb))) return `lying down from ${where} their body would be off the deck at (${f2(b[0])}, ${f2(b[1])})`;
+      if (k >= 0 && grid && clearanceAt(grid, b) < PR.bodyHalf - grid.cell) return `no room to lie down from ${where}: something is in the way at (${f2(b[0])}, ${f2(b[1])})`;
+    }
+    // the take
+    const hs = receiverHands(e, tr, feet);
+    for (const h of hs) {
+      const gap = envelopeGap(PRONE_ACTIVITY.reach, feet, h);
+      if (gap > 1e-9) return `lying at ${where} their hands would be ${f2(gap)} m beyond reach of the load (arm ${ARM_LEN} m)`;
+      if (feet[1] - h[1] > REACH_DOWN_PRONE + 1e-9) return `lying at ${where} their hands would be ${f2(feet[1] - h[1])} m below the deck (max ${REACH_DOWN_PRONE} m)`;
+      const out = dist2(nearestOnRect(d.obb, [h[0], h[2]]).q, [h[0], h[2]]);
+      if (out > PRONE_EDGE_REACH + 1e-9) return `lying at ${where} their hands would be ${f2(out)} m beyond the deck edge (max ${PRONE_EDGE_REACH} m)`;
+    }
+    // the free hand's way over the lip and onto the deck stays in reach in every phase
+    for (const act of [PRONE_ACTIVITY.reach, PRONE_ACTIVITY.pushUp, PRONE_ACTIVITY.kneelUp])
+      for (const j of [0, 1])
+        for (const h of [proneDeckHand(feet, nOut, j), proneLipHand(feet, nOut, j)])
+          if (envelopeGap(act, feet, h) > 1e-9) return `lying at ${where} a hand on the deck would be out of reach (${act})`;
+    // the rise: from the lowest height the grips are in the kneel-up envelope all the way up (below it: push-up)
+    if (!inEnv(PRONE_ACTIVITY.kneelUp, feet, up)) return `kneeling up at ${where} they could not hold it at slide height`;
+    let yMid = up.p[1];
+    for (let y = up.p[1] - STEP; y > tr.p[1] + 1e-9; y -= STEP) { if (!inEnv(PRONE_ACTIVITY.kneelUp, feet, atY(y))) break; yMid = y; }
+    if (inEnv(PRONE_ACTIVITY.kneelUp, feet, tr) && yMid <= tr.p[1] + STEP + 1e-9) yMid = tr.p[1];
+    // feeding it in from there: kneeling at S, hands in reach, the load clear of the body
+    for (let i = 2; i < path.length; i++)
+      for (const q of samples(e, path[i - 1], path[i])) {
+        if (q.p[1] + th >= feet[1] + 0.02 && distRect(flatObb(q, e), S) < BODY_GAP) return `from ${where} the load would pass through them while it is fed in`;
+        if (!inEnv('lay', feet, q)) return `from ${where} they could not feed it in (hands beyond reach kneeling)`;
+      }
+    const r0 = dist2([hs[0][0], hs[0][2]], S), r1 = dist2([hs[1][0], hs[1][2]], S);
+    return { feet, level: d.level, obb: d.obb, key, hold: r0 < r1 - 1e-9 ? 'left' : 'right', yMid };
+  };
+  // candidates: explicit, or every STEP along the edge where a deck covers it (S straight behind the lip)
+  const cands: PC[] = [];
+  const why: string[] = [];
+  if (p.stations) {
+    if (p.stations.length !== p.receivers.length) return bad('handup.stations', `give one station per receiver (${p.receivers.length})`, p.receivers);
+    for (const [i, s] of p.stations.entries()) {
+      const c = station([s.x, s.z], i);
+      if (typeof c === 'string') return bad('handup.no-receiver-station', `${e.id} cannot be received over ${edge.members![0]} by ${p.receivers[i]} lying prone: ${c}`, [e.id, edge.members![0], p.receivers[i]], [s.x, edge.from.y, s.z]);
+      cands.push(c);
+    }
+  } else {
+    const len = dist2(edge.from.p, edge.to.p);
+    let k = 0;
+    for (let s = 0; s <= len + 1e-9; s += STEP) {
+      const q = add2(edge.from.p, scale2(sub2(edge.to.p, edge.from.p), s / len));
+      const d = deckOver(rt, edge, q);
+      if (!d || !pointInObb(q, d.obb, 0.01)) continue; // (a deck edge often lies on the beam's centreline)
+      const c = station(add2(q, scale2(nOut, exitAlong(d.obb, q, nOut) - PRONE_BACK)), k++);
+      if (typeof c === 'string') why.push(c);
+      else cands.push(c);
+    }
+  }
+  const n = p.receivers.length;
+  const oF = flatObb(g.final, e);
+  const near = (c: PC) => Math.round(distRect(oF, [c.feet[0], c.feet[2]]) * 20); // 5 cm bins
+  const good = [...cands].sort((a, b) => near(a) - near(b) || a.key - b.key);
+  // a crew works when every grip stays in the push-up envelope from the take to the common kneel-up height
+  const works = (cs: PC[]): Pose | null => {
+    const yMid = Math.max(...cs.map((c) => c.yMid));
+    for (let y = tr.p[1]; y <= yMid + 1e-9; y += STEP) for (const c of cs) if (!inEnv(PRONE_ACTIVITY.pushUp, c.feet, atY(Math.min(y, yMid)))) return null;
+    for (const c of cs) if (!inEnv(PRONE_ACTIVITY.pushUp, c.feet, atY(yMid))) return null;
+    return atY(yMid);
+  };
+  let pick: PC[] | null = null, mid: Pose | null = null;
+  if (p.stations) { mid = works(cands); pick = mid ? cands : null; }
+  else if (n === 1) { for (const c of good) if ((mid = works([c]))) { pick = [c]; break; } }
+  else {
+    let best: { c: PC[]; k: number } | null = null;
+    for (let i = 0; i < good.length; i++)
+      for (let j = i + 1; j < good.length; j++) {
+        const a = good[i], b = good[j];
+        if (dist2([a.feet[0], a.feet[2]], [b.feet[0], b.feet[2]]) < RECEIVER_SEP) continue;
+        const k = near(a) + near(b);
+        if (best && k >= best.k) continue;
+        if (works([a, b])) best = { c: [a, b], k };
+      }
+    if (best) { pick = best.c; mid = works(pick); }
+  }
+  if (!pick || !mid) {
+    // something sticking out past the edge pushed the load's way up out of their reach: name it
+    if (riseHit) return riseBlocked(e, edge, riseHit, p.receivers, `close to the edge, and clear of it nobody lying at the edge reaches it (hands ≤ ${PRONE_EDGE_REACH} m beyond the deck edge, ≤ ${REACH_DOWN_PRONE} m below it)`);
+    const reason = why.length ? `: e.g. ${why[0]}` : '';
+    return bad('handup.no-receiver-station', `${e.id} cannot be received over ${edge.members![0]}: no ${n === 2 ? 'two places ≥ 0.6 m apart' : 'place'} at the deck edge from which ${n === 2 ? 'both receivers' : 'a receiver'} lying prone can take it (hands ≤ ${REACH_DOWN_PRONE} m below the deck, ≤ ${PRONE_EDGE_REACH} m beyond its edge), get up holding it and feed it in${reason}`, [e.id, edge.members![0], ...p.receivers]);
+  }
+  // the take and the rise, swept against everything (the members it will rest on included: it passes their ends)
+  const hit = sweepPoses(rt, e, [tr, mid, up], ignore);
+  if (hit) return riseBlocked(e, edge, hit, p.receivers, 'beside the edge where they take it');
+  // assign receivers (explicit: in order; else the nearer station to each, deterministic)
+  let assign = pick;
+  if (!p.stations && pick.length === 2) {
+    const d = (a: string, c: PC) => dist2(xz(w.entities[a]), [c.feet[0], c.feet[2]]);
+    if (d(p.receivers[0], pick[1]) + d(p.receivers[1], pick[0]) < d(p.receivers[0], pick[0]) + d(p.receivers[1], pick[1]) - 1e-9) assign = [pick[1], pick[0]];
+  }
+  const stations: Station[] = p.receivers.map((a, i) => ({ actor: a, feet: assign[i].feet, walkway: null, deck: assign[i].level, prone: { out: nOut, hold: assign[i].hold, deckObb: assign[i].obb } }));
+  return { stations, sT: 0, mid };
+}
+
 function finishPlan(rt: Runtime, e: Entity, p: HP, mode: 'hand' | 'forklift', yaw: number, rest: Rest, edge: Link, nOut: Vec2, giverGrips: HandupProgram['giverGrips'], pickup: HandupProgram['pickup'],
-  giverSegs: Seg[], stations: Station[], lift0: Pose, transfer: Pose, final: Pose, ySlide: number, vehicle?: string): { ok: true; program: HandupProgram } | Fail {
+  giverSegs: Seg[], stations: Station[], lift0: Pose, transfer: Pose, final: Pose, ySlide: number, vehicle?: string, mid?: Pose): { ok: true; program: HandupProgram } | Fail {
   const w = rt.world;
   // receivers' access: beam_walk on their walkway / climb a frame first / walk on a deck
   const chains: Chain[] = [];
@@ -623,7 +855,8 @@ function finishPlan(rt: Runtime, e: Entity, p: HP, mode: 'hand' | 'forklift', ya
     if (st.deck !== null) {
       if (h.human!.on || h.human!.level !== st.deck)
         return bad('handup.receiver-route', `receiver ${st.actor} must already be on the deck (level ${st.deck}) to take ${e.id} there`, [st.actor]);
-      ch.push({ verb: 'walk_to', params: { actor: st.actor, x: st.feet[0], z: st.feet[2], level: st.deck, face: faceTo(e, transfer, st.feet) } });
+      const face = st.prone ? datan2(st.prone.out[1], st.prone.out[0]) : faceTo(e, transfer, st.feet); // prone: facing out over the edge
+      ch.push({ verb: 'walk_to', params: { actor: st.actor, x: st.feet[0], z: st.feet[2], level: st.deck, face } });
     } else if (h.human!.on === st.walkway) {
       if (dist2(xz(h), [st.feet[0], st.feet[2]]) > 0.01) ch.push({ verb: 'beam_walk', params: { actor: st.actor, x: st.feet[0], z: st.feet[2] } });
     } else if (h.human!.on) {
@@ -652,7 +885,17 @@ function finishPlan(rt: Runtime, e: Entity, p: HP, mode: 'hand' | 'forklift', ya
   const off: Pose = mode === 'forklift' ? { ...transfer, p: [transfer.p[0], transfer.p[1] + FORK_LIFT_OFF, transfer.p[2]] } : transfer;
   const up = path[1].p[1] > off.p[1] ? { ...off, p: [off.p[0], path[1].p[1], off.p[2]] as Vec3 } : off;
   const slid: Pose = { ...final, p: [final.p[0], up.p[1], final.p[2]] };
-  const receiverSegs: Seg[] = [
+  const receiverSegs: Seg[] = mid ? [
+    // prone (§13): reach down lying at the edge, take, push up on one hand, kneel up (the load straight up outside the
+    // edge in the holding hand), then kneeling with both hands on it as a kneeling receiver
+    { phase: 'reach_down', from: transfer, to: transfer, dur: T.reachDown },
+    { phase: 'take', from: transfer, to: transfer, dur: T.take },
+    { phase: 'push_up', from: transfer, to: mid, dur: Math.max(T.pushUp, segDur(e, transfer, mid, SPEED.raise)) },
+    { phase: 'kneel_up', from: mid, to: up, dur: Math.max(T.kneelUp, segDur(e, mid, up, SPEED.raise)) },
+    { phase: 'stand_with_load', from: up, to: up, dur: T.stand },
+    { phase: 'lay', from: up, to: slid, dur: segDur(e, up, slid, SPEED.slide) },
+    { phase: 'set_down', from: slid, to: final, dur: T.setDown },
+  ] : [
     { phase: 'reach_down', from: transfer, to: transfer, dur: T.reachDown },
     { phase: 'take', from: transfer, to: transfer, dur: T.take },
     { phase: 'stand_with_load', from: transfer, to: up, dur: Math.max(T.stand, segDur(e, transfer, up, SPEED.raise)) },
@@ -682,12 +925,14 @@ type Exec = {
   ri: number; rt: number; // receiver segment index / time
   walk?: Children; chainAt: number[]; chainRec: (ActionRecord | null)[]; retry: number[];
   givingDone: boolean; receiversReady: boolean;
+  /** Prone receivers: time spent lying down (T.lieDown; they lie down as soon as they are at their stations). */
+  lie: number;
 };
 
 const phaseK = (s: Seg, t: number) => (s.dur > 0 ? Math.min(1, t / s.dur) : 1);
 function poseAt(s: Seg, t: number): Pose {
   const k = s.dur > 0 ? Math.min(1, t / s.dur) : 1;
-  return lerpPose(s.from, s.to, s.phase === 'lift' || s.phase === 'set_down' || s.phase === 'reach_up' || s.phase === 'stand_with_load' ? smooth(k) : k);
+  return lerpPose(s.from, s.to, s.phase === 'lift' || s.phase === 'set_down' || s.phase === 'reach_up' || s.phase === 'stand_with_load' || s.phase === 'push_up' || s.phase === 'kneel_up' ? smooth(k) : k);
 }
 
 /**
@@ -720,10 +965,13 @@ function holdGivers(rt: Runtime, ex: Exec, activity: string, q: Pose, feetFromPo
     setHands(h, approach(h, hands, k));
   }
 }
-function holdReceivers(rt: Runtime, ex: Exec, activity: string, q: Pose, k?: number) {
+function holdReceivers(rt: Runtime, ex: Exec, phase: string, q: Pose, k?: number, kp = 1) {
   const e = rt.world.entities[ex.p.part];
   for (const [i, st] of ex.prog.stations.entries()) {
     const h = rt.world.entities[st.actor];
+    if (st.prone) { holdProne(h, e, ex.id, i, st.prone, phase, q, kp); continue; }
+    // (a kneeling receiver beside a prone one holds on while the other gets up)
+    const activity = phase === 'push_up' || phase === 'kneel_up' ? 'take' : phase;
     const slot = `${HANDUP_SLOT_PREFIX}take-${i}`;
     const hands = handupHands(e, q, h, slot)!;
     const c: Vec2 = [(hands[0][0] + hands[1][0]) / 2, (hands[0][2] + hands[1][2]) / 2];
@@ -732,6 +980,53 @@ function holdReceivers(rt: Runtime, ex: Exec, activity: string, q: Pose, k?: num
     setHands(h, approach(h, hands, k));
   }
 }
+/**
+ * A prone receiver's hands and activity for a receiver phase (k = phase fraction; HANDUP.md "Prone receiver"):
+ * reach_down → `prone-reach`, hands from flat on the deck over the lip down to the grip; take → `prone-reach` at the
+ * grip; push_up → `push-up`, the `hold` hand on the load, the other back over the lip onto the deck (by PUSH_HAND_K);
+ * kneel_up → `kneel-up`, that hand back over the lip onto the load; then stand_with_load / lay / set_down as kneeling
+ * (both hands on the load), turning from facing out to facing the hands during stand_with_load.
+ */
+function holdProne(h: Entity, e: Entity, task: string, i: number, pr: ProneStation, phase: string, q: Pose, k: number) {
+  const feet = h.pose.p;
+  const grip = receiverHands(e, q, feet);
+  const fi = pr.hold === 'left' ? 1 : 0; // the free hand
+  const face = datan2(pr.out[1], pr.out[0]);
+  const deck = (j: number) => proneDeckHand(feet, pr.out, j), lip = (j: number) => proneLipHand(feet, pr.out, j);
+  let hands: [Vec3, Vec3] = grip, activity = phase, yaw = face;
+  if (phase === 'reach_down') {
+    activity = PRONE_ACTIVITY.reach;
+    hands = [along([deck(0), lip(0), grip[0]], smooth(k)), along([deck(1), lip(1), grip[1]], smooth(k))];
+  } else if (phase === 'take') activity = PRONE_ACTIVITY.reach;
+  else if (phase === 'push_up') {
+    activity = PRONE_ACTIVITY.pushUp;
+    hands[fi] = along([grip[fi], lip(fi), deck(fi)], smooth(Math.min(1, k / PUSH_HAND_K)));
+  } else if (phase === 'kneel_up') {
+    activity = PRONE_ACTIVITY.kneelUp;
+    hands[fi] = along([deck(fi), lip(fi), grip[fi]], smooth(k));
+  } else {
+    const c: Vec2 = [(grip[0][0] + grip[1][0]) / 2, (grip[0][2] + grip[1][2]) / 2];
+    const toward = datan2(c[1] - feet[2], c[0] - feet[0]);
+    yaw = phase === 'stand_with_load' ? face + angleDelta(face, toward) * smooth(k) : toward;
+  }
+  h.pose.yaw = yaw;
+  Object.assign(h.human!, { activity, task, grip: { entity: e.id, slot: `${HANDUP_SLOT_PREFIX}prone-${i}:${pr.hold}` } });
+  setHands(h, hands);
+}
+
+/** Prone receivers lying down at their stations (k = fraction of T.lieDown): hands from the hips to flat on the deck. */
+function lieDown(rt: Runtime, ex: Exec, k: number) {
+  for (const st of ex.prog.stations) {
+    if (!st.prone) continue;
+    const h = rt.world.entities[st.actor];
+    const rest = restHands(h), s = smooth(Math.min(1, k));
+    const mix = (a: Vec3, b: Vec3): Vec3 => [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
+    h.pose.yaw = datan2(st.prone.out[1], st.prone.out[0]);
+    Object.assign(h.human!, { activity: k < 1 ? PRONE_ACTIVITY.lieDown : PRONE_ACTIVITY.wait, task: ex.id, grip: undefined });
+    setHands(h, [mix(rest[0], proneDeckHand(h.pose.p, st.prone.out, 0)), mix(rest[1], proneDeckHand(h.pose.p, st.prone.out, 1))]);
+  }
+}
+
 function release(rt: Runtime, who: string[]) {
   for (const a of who) {
     const h = rt.world.entities[a];
@@ -782,6 +1077,12 @@ function stepHandup(rt: Runtime, ex: Exec, dt: number): StepResult {
       for (const st of prog.stations) Object.assign(w.entities[st.actor].human!, { activity: 'wait', task: ex.id });
     }
   }
+  // prone receivers lie down at the edge as soon as they are there (while the givers work)
+  const prone = prog.stations.some((s) => s.prone);
+  if (prone && ex.receiversReady && ex.ri === 0 && ex.rt === 0) {
+    ex.lie = Math.min(T.lieDown, ex.lie + dt);
+    lieDown(rt, ex, ex.lie / T.lieDown);
+  }
   // givers: walk to the pickup, then their segments
   if (prog.mode === 'hand' && !ex.givingDone) {
     if (!ex.walk) {
@@ -813,17 +1114,18 @@ function stepHandup(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (ex.ri < 2) holdGivers(rt, ex, 'reach_up', e.pose, false);
   }
   if (!ex.receiversReady) return { status: 'running', phase: prog.mode === 'hand' ? 'hold' : 'receivers' };
+  if (prone && ex.lie < T.lieDown - 1e-9) return { status: 'running', phase: 'lie_down' };
   // receivers' segments
   const seg = prog.receiverSegs[ex.ri];
   ex.rt += dt;
   if (seg.phase === 'reach_down' && prog.mode === 'hand' && e.support?.kind === 'held' && !e.support.by.includes(prog.stations[0].actor))
     e.support = { kind: 'held', by: [...givers, ...prog.stations.map((s) => s.actor)] };
-  if (seg.phase === 'stand_with_load' && e.support?.kind !== 'held') {
+  if ((seg.phase === 'stand_with_load' || seg.phase === 'push_up') && e.support?.kind !== 'held') {
     e.phase = 'carried';
     e.support = { kind: 'held', by: prog.stations.map((s) => s.actor) };
   }
   if (seg.phase !== 'reach_down' && seg.phase !== 'take') e.pose = poseAt(seg, ex.rt);
-  holdReceivers(rt, ex, seg.phase, e.pose, seg.phase === 'reach_down' ? phaseK(seg, ex.rt) : undefined);
+  holdReceivers(rt, ex, seg.phase, e.pose, seg.phase === 'reach_down' ? phaseK(seg, ex.rt) : undefined, phaseK(seg, ex.rt));
   if (prog.mode === 'hand' && ex.ri < 2) holdGivers(rt, ex, 'reach_up', e.pose, false);
   if (ex.rt < seg.dur - 1e-9) return { status: 'running', phase: seg.phase };
   // segment done
@@ -842,12 +1144,12 @@ function stepHandup(rt: Runtime, ex: Exec, dt: number): StepResult {
   e.support = { kind: 'resting-on', on: prog.rest.supports[0] };
   release(rt, prog.stations.map((s) => s.actor));
   spatialOf(rt);
-  return { status: 'completed', outputs: { part: e.id, at: [...e.pose.p], supports: prog.rest.supports, edge: prog.edge, stations: prog.stations.map((s) => [s.actor, s.walkway ?? `deck level ${s.deck}`, ...s.feet]) } };
+  return { status: 'completed', outputs: { part: e.id, at: [...e.pose.p], supports: prog.rest.supports, edge: prog.edge, stations: prog.stations.map((s) => [s.actor, s.walkway ?? `deck level ${s.deck}`, ...s.feet, ...(s.prone ? ['prone'] : [])]) } };
 }
 
 export const handUp: ActionDef<HP, HandupProgram, Exec> = {
   verb: 'hand_up',
-  description: `Hand a sheet or board up to people standing on the rack beams (or a deck): 1–2 givers lift it off the ground and raise it overhead at the edge (underside ≤ their floor + ${GIVE_MAX} m), 1–2 receivers reach down (≤ ${REACH_DOWN} m below their feet), take it and lay it in place, staged for install_*; via 'forklift' the receivers take it off the presented forks. Refused when the geometry allows no genuine hand-off.`,
+  description: `Hand a sheet or board up to people standing on the rack beams (or a deck): 1–2 givers lift it off the ground and raise it overhead at the edge (underside ≤ their floor + ${GIVE_MAX} m), 1–2 receivers reach down (kneeling ≤ ${REACH_DOWN} m below their feet; where that is not enough, lying prone at a deck edge ≤ ${REACH_DOWN_PRONE} m below the deck, getting up holding it), take it and lay it in place, staged for install_*; via 'forklift' the receivers take it off the presented forks. Refused when the geometry allows no genuine hand-off.`,
   schema: z.strictObject({
     part: z.string().max(80),
     givers: z.array(z.string().max(80)).max(2).optional(),
@@ -868,7 +1170,7 @@ export const handUp: ActionDef<HP, HandupProgram, Exec> = {
   start(rt, p, prog, id) {
     const e = rt.world.entities[p.part];
     if (prog.mode === 'hand') e.phase = 'reserved';
-    return { id, p, prog, gi: -1, gt: 0, ri: 0, rt: 0, chainAt: prog.chains.map(() => 0), chainRec: prog.chains.map(() => null), retry: prog.chains.map(() => 0), givingDone: prog.mode !== 'hand', receiversReady: false };
+    return { id, p, prog, gi: -1, gt: 0, ri: 0, rt: 0, chainAt: prog.chains.map(() => 0), chainRec: prog.chains.map(() => null), retry: prog.chains.map(() => 0), givingDone: prog.mode !== 'hand', receiversReady: false, lie: 0 };
   },
   step: stepHandup,
   cancel(rt, ex) {

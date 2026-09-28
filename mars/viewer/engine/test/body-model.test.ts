@@ -4,7 +4,7 @@
 // envelopes do, the posture bands follow from the rig's proportions, and the landmarks are within an arm.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dcos } from '../core/math.ts';
+import { dcos, dsin } from '../core/math.ts';
 import { BODY_MODEL as M, postureGap, bodyFrame, restHand, carryHand, shoulderPoint, chestPoint, mouthPoint, type Posture } from '../body/model.ts';
 import { human } from '../world/factory.ts';
 import type { Vec3 } from '../core/math.ts';
@@ -85,4 +85,41 @@ test('body model is internally consistent: overhead, caps vs envelopes, bands fr
   assert.ok(Math.abs(M.restHand.up - (M.shoulderHeight - M.armLength)) < 1e-9, 'rest hand = shoulders − arm');
   assert.ok(chestPoint(b)[1] < M.shoulderHeight && chestPoint(b)[1] > M.restHand.up);
   assert.ok(mouthPoint(b)[1] > M.shoulderHeight && mouthPoint(b)[1] < M.height);
+});
+
+test('prone receiver + rise (owner feedback §13): numbers derived from the rig, reach ≈ 1.0 m below the deck, bands consistent through the rise', () => {
+  const P = M.prone, R = M.rig, pz = P.posture;
+  // derivations (BODY_MODEL.md "Prone receiver")
+  assert.ok(Math.abs(P.overEdge - (R.torso * 2) / 3) < 1e-9, 'lower ribs on the lip: torso × 2/3 beyond it');
+  assert.equal(P.chest, M.chestFwd, 'lying flat the shoulder joints are chestFwd above the deck');
+  const lo = P.chest * dcos(P.tipMax * DEG) - P.overEdge * dsin(P.tipMax * DEG) - 2 * M.shrug;
+  assert.ok(Math.abs(pz.prone.lo - lo) <= 0.005, `prone shoulders bottom ${pz.prone.lo} = full tip + girdle (${lo.toFixed(4)})`);
+  assert.equal(pz.prone.hi, P.chest);
+  assert.ok(Math.abs(pz.prone.lean - (P.back + P.overEdge)) < 1e-9, 'shoulders at most overEdge past the lip');
+  assert.ok(P.back >= 0.28, 'S is standable: ≥ the spatial body radius (0.28 m) from the lip');
+  assert.equal(P.edgeReach, M.reachDownOut);
+  // reach down: the envelope reaches exactly the stated cap straight below the shoulders (the cap binds), ≈ §13's 1.0 m
+  assert.ok(Math.abs(P.reachDown - (M.armLength - pz.prone.lo)) < 1e-9);
+  assert.ok(P.reachDown >= 0.9 && P.reachDown <= 1.0, `prone reach-down ${P.reachDown} ≈ 1.0 m`);
+  assert.ok(Math.abs(-deepest(pz.prone, P.back + 0.2) - P.reachDown) < 1e-6, 'envelope reaches the cap 0.2 m past the lip');
+  assert.ok(postureGap(pz.prone, FEET, [P.back, -P.reachDown - 0.02, 0]) > 0, '… and not 2 cm more');
+  assert.ok(P.reachDown > M.reachDownBelowFeet + 0.3, 'prone reaches well below the kneel rule');
+  // at the edge-reach limit (hands 0.45 m beyond the lip) still ≥ 0.9 m down
+  assert.ok(-deepest(pz.prone, P.back + P.edgeReach) >= 0.9, `${(-deepest(pz.prone, P.back + P.edgeReach)).toFixed(3)} m down 0.45 m past the lip`);
+  // the rise: push-up (one straight arm on the deck) → kneel-up (knees, torso rising) → stand (bentOver)
+  assert.deepEqual([pz.pushUp.lo, pz.pushUp.lean], [pz.prone.lo, pz.prone.lean], 'push-up starts from prone');
+  assert.equal(pz.pushUp.hi, M.armLength, 'push-up tops out an arm above the deck');
+  assert.equal(pz.kneelUp.lo, M.posture.bentOver.lo, 'kneel-up: kneeling bent over the edge …');
+  assert.ok(Math.abs(pz.kneelUp.hi - (R.kneelHip + R.torso)) < 1e-9, '… to kneeling upright');
+  assert.equal(pz.kneelUp.lean, M.posture.bentOver.lean);
+  assert.ok(pz.pushUp.hi >= pz.kneelUp.lo && pz.kneelUp.hi <= M.posture.bentOver.hi && pz.prone.hi <= pz.pushUp.hi, 'the shoulder bands overlap phase to phase');
+  const H = P.hip;
+  assert.ok(H.prone < H.pushUp && H.pushUp <= H.kneelUp && H.kneelUp < H.stand, 'hips rise monotonically');
+  assert.deepEqual([H.pushUp, H.kneelUp, H.stand], [R.kneelHip, R.kneelHip, R.hip]);
+  // the body lying at the edge: lip → toes + over the edge + head fits a 1.75 m person
+  assert.ok(Math.abs(P.bodyBack - (R.hip + 0.06 - (P.back - R.torso / 3))) < 1e-9);
+  assert.ok(P.back + P.bodyBack + P.overEdge + 0.25 <= M.height, 'lying body length ≤ height');
+  // the deck hand (lying, pushing up) is inside every prone-phase envelope
+  const deckHand: Vec3 = [P.deckHand.fwd, 0, P.deckHand.side];
+  for (const [name, b] of Object.entries(pz)) assert.ok(postureGap(b, FEET, deckHand) <= 0, `deck hand inside ${name}`);
 });

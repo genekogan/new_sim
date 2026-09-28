@@ -32,6 +32,55 @@ const RIG = {
   kneelBend: 150, // ° torso bend kneeling over an edge (rig.ts bendMax.kneel)
 } as const;
 
+/**
+ * Prone receiver (owner feedback §13, Gene 2026-09-29: "lies on their stomach at the edge of the upper floor … then
+ * gets up without letting go"). Geometry, all from numbers above (BODY_MODEL.md "Prone receiver"):
+ * - the receiver kneels at station S on the deck, `back` 0.35 m behind the lip (a standable point: the spatial body
+ *   radius 0.28 m, read on the 0.1 m clearance raster — 0.30 m from an edge reads 0.25 m), and lies down forward,
+ *   perpendicular to the edge, head over it;
+ * - the lower ribs rest on the lip; the torso beyond them (`overEdge` = RIG.torso × 2/3 = 0.30 m) tips down over the
+ *   edge up to `tipMax` 60°; lying flat the shoulder joints are `chest` (= chestFwd 0.08) above the deck, so at
+ *   the full tip they are 0.08 cos 60° − 0.30 sin 60° = −0.22 m, and the girdle reaching down (2 × shrug) takes
+ *   them to −0.32 m: the band's bottom; the arm then reaches 0.32 + 0.62 = 0.94 m below the deck (`reachDown`;
+ *   the §13 "≈ 1.0 m");
+ * - shoulders at most `back` + `overEdge` = 0.65 m from S horizontally (the band's lean; at the full tip they are
+ *   0.22 m past the lip); hands at the hand-off at most `edgeReach` (= reachDownOut 0.45) beyond the deck outline;
+ * - the body lies from the lip back to its toes: hips torso/3 behind the lip, legs RIG.hip + a 6 cm foot, so the
+ *   toes are `bodyBack` = 0.75 m behind S; half-width `bodyHalf` = shoulderHalf + 5 cm.
+ */
+const PRONE_BACK = 0.35;
+const PRONE_OVER = (RIG.torso * 2) / 3; // 0.30
+const PRONE_TIP = 60; // °
+const PRONE_CHEST = 0.08; // = chestFwd: the sternum on the deck, the shoulder joints this far above it
+const proneShoulderLo = PRONE_CHEST * dcos((PRONE_TIP * Math.PI) / 180) - PRONE_OVER * dsin((PRONE_TIP * Math.PI) / 180) - 2 * shrug; // −0.3198
+const PRONE = {
+  back: PRONE_BACK,
+  overEdge: PRONE_OVER,
+  tipMax: PRONE_TIP,
+  chest: PRONE_CHEST,
+  /** Hands flat on the deck beside the chest (lying, and the push-up hand): 0.15 m behind the lip, 0.25 m to each side. */
+  deckHand: { fwd: PRONE_BACK - 0.15, side: 0.25 },
+  /** S → toes, lying (hips torso/3 behind the lip; legs RIG.hip + 0.06 m foot). */
+  bodyBack: RIG.hip + 0.06 - (PRONE_BACK - RIG.torso / 3),
+  bodyHalf: 0.15 + 0.05,
+  /** Hands at most this far below the deck (= the prone band's bottom − arm, rounded to the cm). */
+  reachDown: Math.round((armLength - proneShoulderLo) * 100) / 100, // 0.94
+  /** At the hand-off, hands at most this far beyond the deck outline (= reachDownOut). */
+  edgeReach: 0.45,
+  /** Shoulder bands (feet = S) per phase of the rise; `hip` = hip-joint heights above the deck at the phase's end. */
+  posture: {
+    /** lying at the edge, reaching down over it (hi: lying flat = chest; lo: the full tip + girdle, rounded to the cm) */
+    prone: { lo: Math.round(proneShoulderLo * 100) / 100, hi: PRONE_CHEST, lean: PRONE_BACK + PRONE_OVER },
+    /** push-up on one straight arm (the other holds the load): shoulders from the prone bottom to an arm above the deck */
+    pushUp: { lo: Math.round(proneShoulderLo * 100) / 100, hi: armLength, lean: PRONE_BACK + PRONE_OVER },
+    /** knees → kneeling upright, still bent over the edge: bentOver's bottom to kneelHip + torso (0.91) */
+    kneelUp: { lo: Math.round((RIG.kneelHip + RIG.torso * dcos((RIG.kneelBend * Math.PI) / 180)) * 100) / 100, hi: RIG.kneelHip + RIG.torso, lean: 0.35 },
+  } satisfies Record<string, Posture>,
+  /** Hip-joint heights above the deck through the rise: lying (≈ half the pelvis), on the knees (thigh vertical =
+   *  RIG.kneelHip), standing (RIG.hip). */
+  hip: { prone: 0.1, pushUp: RIG.kneelHip, kneelUp: RIG.kneelHip, stand: RIG.hip },
+} as const;
+
 export const BODY_MODEL = {
   height: 1.75,
   shoulderHeight, // shoulder joints, standing (measured rig 1.340)
@@ -75,6 +124,9 @@ export const BODY_MODEL = {
     /** painting a vertical face in front of them (a half squat: shoulders ≥ 0.82) */
     painting: { lo: shoulderHeight - 0.52, hi: shoulderTop, lean: 0.35 },
   } satisfies Record<string, Posture>,
+  /** Prone receiver + rise (owner feedback §13): see PRONE above and BODY_MODEL.md "Prone receiver". Not in `posture`
+   *  (its bands do not top out at shoulders + shrug + heels: a lying / kneeling body cannot reach overhead). */
+  prone: PRONE,
   /** Seated on a chair / bench: landmark heights drop this much (pelvis on a ~0.45 m seat). */
   seatedDrop: 0.45,
   chestHeight: shoulderHeight - 0.12, // sternum, standing (1.22)
