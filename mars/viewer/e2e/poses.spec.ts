@@ -3,10 +3,11 @@
 // - hand-up (flagship v3, lab `hand-up`): runs to the end (all steps, zero violations); every tick,
 //   every arm with an engine hand point (`human.hands`) whose shoulder is within the arm's length of it
 //   has its palm within 0.1 m of the point and no arm is longer than its bones. The share of all
-//   published hand points reached is logged per activity and held to a regression floor (50 %; 54.8 % at cdcf731): the
-//   engine's reach envelope (handup.ts ARM_LEN 0.75 m, 2.1 m overhead, 1.0 m below the feet) is far
-//   larger than this rig's arm (0.44 m shoulder → palm), so many points are beyond it even after
-//   crouching / bending / heels up — those arms hang, honestly (POSES.md "Reach gap");
+//   published hand points reached is logged per activity and held to a regression floor (88 %; 89.5 %
+//   at b7c901a with the body-model arms, 63.3 % before them): what is still missed is beyond the
+//   body — reach_up above 2.06 m, reach_down deeper than a kneeling body reaches (the engine allows
+//   1.0 m below the feet; the rig 0.35–0.54 m, POSES.md "Body model"), the 0.6 s crouch still going
+//   down — and those arms hang, honestly;
 // - captures: pickup crouch and stand-with-load, the s1 hand-up moment (reach up below, reach down /
 //   take above), a raise footer holding the column base low (lab `build-bay`).
 import { test, expect, type Page } from '@playwright/test';
@@ -97,7 +98,7 @@ test('hand-up: rig-reachable hands on the engine hand points, arms never stretch
   for (const c of st.checks) expect(c.ok, c.message).toBe(true);
   expect(acc.over, 'no arm longer than its bones').toEqual([]);
   expect(acc.bad, 'every rig-reachable engine hand point is reached within 0.1 m').toEqual([]);
-  expect(acc.reached / acc.points, 'share of engine hand points reached (regression floor)').toBeGreaterThanOrEqual(0.5);
+  expect(acc.reached / acc.points, 'share of engine hand points reached (regression floor)').toBeGreaterThanOrEqual(0.88);
 });
 
 test('hand-up: captures (crouch, stand with load, reach up / reach down)', async ({ page }, testInfo) => {
@@ -163,4 +164,98 @@ test('raise: footer holds the column base low', async ({ page }, testInfo) => {
   await page.evaluate(([pos, t]) => window.__marsEngine!.camera(pos, t), [[f.p[0] + cx * 2.6, 1.4, f.p[2] + cz * 2.6], [f.p[0] - dx * 0.3, 0.55, f.p[2] - dz * 0.3]]);
   await labFrames(page, 4);
   await captureView(page, 'poses-raise-footer', { testInfo });
+});
+
+type Probe = { template: string; body: Record<string, number>; arms: Arm[]; pose: { drop: number; bend: number; rise: number; kneel: number } };
+type BodyRow = { id: string; template: string; shoulderH: number; shoulderHalf: number; armLen: number; overhead: number; heels: number; down: number; downPose: Probe['pose'] | null; out: number; stretched: number };
+
+// Body model (OWNER_DECISIONS "One body model", POSES.md "Body model"): lab preset `body`, one person per
+// rig template at the 3 m deck's edge. probe() sets hand points directly and returns bones() once the
+// posture has settled. Measured per template: standing shoulder height and arm length (Idle, t = 0);
+// overhead reach = the highest palm centre over a sweep of targets straight above the shoulders, flat
+// (activity idle: no heel raise) and on the toes (reach_up); reach-down = the deepest target
+// BODY_MODEL.reachDownOut ahead of the feet, beyond the edge, that both palms reach within 2 cm
+// (reach_down: kneel + bend). All within 2 cm of BODY_MODEL (reach-down: the shallowest template).
+test('body model: the loaded rig matches BODY_MODEL within 2 cm', async ({ page }, testInfo) => {
+  test.setTimeout(300_000);
+  await openLab(page, 'body');
+  await page.addStyleTag({ content: '.lab-perf { visibility: hidden }' });
+  await page.evaluate(() => window.__marsEngine!.runScenario('body', { paused: true }));
+  const { M, E, rows } = await page.evaluate(() => {
+    type H = { probe(id: string, s: unknown): Probe; bodyModel(): { renderer: Record<string, number>; engine: Record<string, number> }; state(): { humans: Human[] } };
+    const h = window.__marsEngine! as unknown as H;
+    const { renderer: M, engine: E } = h.bodyModel();
+    const d = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const rows: BodyRow[] = [];
+    for (const id of ['b1', 'b2', 'b0']) {
+      const [x, y, z] = h.state().humans.find((q) => q.id === id)!.p;
+      const rest = h.probe(id, { activity: 'idle', hands: null });
+      const sh = rest.arms.map((a) => a.shoulder);
+      let stretched = 0;
+      const look = (b: Probe) => {
+        for (const a of b.arms) stretched = Math.max(stretched, d(a.shoulder, a.palm) - a.len, Math.abs(a.len - M.armLength));
+        return b;
+      };
+      const over = (activity: string) => {
+        let top = -Infinity;
+        for (let hh = 1.85; hh <= 2.2; hh += 0.005) {
+          const b = look(h.probe(id, { activity, hands: { left: [sh[0][0], y + hh, sh[0][2]], right: [sh[1][0], y + hh, sh[1][2]] } }));
+          top = Math.max(top, Math.min(...b.arms.map((a) => a.palm[1])) - y);
+        }
+        return top;
+      };
+      const overhead = over('idle'), heels = over('reach_up');
+      const reached = (f: number, dd: number) => {
+        const b = look(h.probe(id, { activity: 'reach_down', hands: { left: [x + f, y - dd, z - 0.15], right: [x + f, y - dd, z + 0.15] } }));
+        return Math.max(...b.arms.map((a) => a.err!)) <= 0.02 ? b : null;
+      };
+      let down = 0, downPose: Probe['pose'] | null = null;
+      for (let dd = 0; dd <= 0.9; dd += 0.01) {
+        const b = reached(M.reachDownOut, dd);
+        if (b) [down, downPose] = [dd, b.pose];
+      }
+      // how far out a kneeling body reaches just below its feet (the engine's kneel rule allows 0.8 m)
+      let out = 0;
+      for (let f = 0.3; f <= 1.2; f += 0.01) if (reached(f, 0.1)) out = f;
+      h.probe(id, { activity: 'idle', hands: null });
+      rows.push({ id, template: rest.template, shoulderH: rest.body.shoulderH, shoulderHalf: rest.body.shoulderHalf, armLen: rest.body.armLen, overhead, heels, down, downPose, out, stretched });
+    }
+    return { M, E, rows };
+  });
+  for (const r of rows)
+    console.log(`[body] ${r.template}: shoulders ${r.shoulderH.toFixed(3)} m, arm ${r.armLen.toFixed(3)} m, overhead ${r.overhead.toFixed(3)} m flat / ${r.heels.toFixed(3)} m heels up, reach-down ${r.down.toFixed(2)} m below the feet ${M.reachDownOut} m out (kneel ${r.downPose?.kneel ?? '-'}, bend ${r.downPose ? ((r.downPose.bend * 180) / Math.PI).toFixed(0) : '-'}°), out to ${r.out.toFixed(2)} m at 0.1 m below the feet, worst stretch ${(r.stretched * 100).toFixed(2)} cm`);
+  const near = (a: number, b: number) => Math.abs(a - b) <= 0.02;
+  for (const r of rows) {
+    expect(near(r.shoulderH, M.shoulderHeight), `${r.template} shoulders ${r.shoulderH} vs ${M.shoulderHeight}`).toBe(true);
+    expect(near(r.armLen, M.armLength), `${r.template} arm ${r.armLen} vs ${M.armLength}`).toBe(true);
+    expect(near(r.overhead, M.overheadReach), `${r.template} overhead ${r.overhead} vs ${M.overheadReach}`).toBe(true);
+    expect(near(r.heels, M.overheadReach + M.heelRise), `${r.template} heels up ${r.heels} vs ${M.overheadReach + M.heelRise}`).toBe(true);
+    expect(r.down, `${r.template} reaches ${M.reachDown} m below the feet`).toBeGreaterThanOrEqual(M.reachDown - 0.02);
+    expect(r.downPose?.kneel, `${r.template} kneels to reach down`).toBe(1);
+    expect(r.stretched, `${r.template}: no arm longer than its bones`).toBeLessThanOrEqual(0.005);
+  }
+  expect(near(Math.min(...rows.map((r) => r.down)), M.reachDown), 'BODY_MODEL.reachDown = the shallowest template').toBe(true);
+  // the engine's copy (engine/body/model.ts): the numbers it shares with the rendered body must agree …
+  for (const r of rows) {
+    expect(near(r.armLen, E.armLength), `${r.template} arm vs engine armLength ${E.armLength}`).toBe(true);
+    expect(near(r.overhead, E.overheadReach), `${r.template} overhead vs engine overheadReach ${E.overheadReach}`).toBe(true);
+    expect(near(r.heels, E.overheadMax), `${r.template} heels up vs engine overheadMax ${E.overheadMax}`).toBe(true);
+  }
+  // … and where it asks for more than this body does, say so on every run (POSES.md "Body model": open)
+  const low = Math.min(...rows.map((r) => r.down)), sh = rows[0].shoulderH, half = Math.max(...rows.map((r) => r.shoulderHalf));
+  if (!near(sh, E.shoulderHeight)) console.log(`[body] ENGINE MISMATCH shoulderHeight: engine ${E.shoulderHeight} m, rendered ${sh} m`);
+  if (!near(half, E.shoulderHalf)) console.log(`[body] ENGINE MISMATCH shoulderHalf: engine ${E.shoulderHalf} m, rendered ≤ ${half} m`);
+  if (low < E.reachDownBelowFeet - 0.02) console.log(`[body] ENGINE MISMATCH reachDownBelowFeet: engine ${E.reachDownBelowFeet} m, a kneeling rig reaches ${low.toFixed(2)}–${Math.max(...rows.map((r) => r.down)).toFixed(2)} m`);
+  // capture: the three kneel at the edge reaching 0.3 m below the deck; the three below reach up to 2.0 m
+  await page.evaluate((M) => {
+    const h = window.__marsEngine! as unknown as { probe(id: string, s: unknown): Probe; state(): { humans: Human[] } };
+    for (const q of h.state().humans) {
+      const [x, y, z] = q.p;
+      if (q.id.startsWith('b')) h.probe(q.id, { activity: 'reach_down', hands: { left: [x + M.reachDownOut, y - 0.3, z - 0.15], right: [x + M.reachDownOut, y - 0.3, z + 0.15] } });
+      else h.probe(q.id, { activity: 'reach_up', hands: { left: [x - 0.35, 2.0, z - 0.15], right: [x - 0.35, 2.0, z + 0.15] } });
+    }
+  }, M);
+  await page.evaluate(() => window.__marsEngine!.camera([17.2, 3.4, 4.6], [14, 2.1, 10]));
+  await labFrames(page, 4);
+  await captureView(page, 'poses-body-kneel-edge', { testInfo, compare: false });
 });

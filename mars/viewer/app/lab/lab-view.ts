@@ -12,7 +12,7 @@ import { StaticScene } from './scene.ts';
 import { HumanViews } from '../engine-view/humans.ts';
 import { ComponentViews } from '../engine-view/components.ts';
 import { FixtureViews } from '../engine-view/fixtures.ts';
-import { loadTemplates } from '../engine-view/people.ts';
+import { loadTemplates, type Template } from '../engine-view/people.ts';
 import { GridOverlays } from './overlay-grids.ts';
 import { AgentOverlays } from './overlay-agents.ts';
 import { buildLinks, buildObstacles, buildRoutes, buildViolations } from './overlay-debug.ts';
@@ -49,6 +49,8 @@ export class LabView {
   private stairEpoch = -1;
   private reach = (id: string, from: THREE.Vector3, out: THREE.Vector3) => this.components.nearestPoint(id, from, out);
   overlays = new Set<OverlayName>();
+  /** The loaded people templates (the hook's take-replay check poses its own rigs from them). */
+  templates: Template[] = [];
   frames = 0;
   loaded = false;
   error = '';
@@ -86,6 +88,7 @@ export class LabView {
     };
     loadTemplates(this.abort.signal, this.resources)
       .then((ts) => {
+        this.templates = ts;
         this.humans.setTemplates(ts);
         this.humans.reset(this.sim.rt.world);
         this.loaded = true;

@@ -9,6 +9,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { labFrames, openLab } from './lab-helpers';
 import { captureView } from './helpers';
+import { recordWithFixture } from './take-fixture';
 
 type Arm = { side: string; shoulder: number[]; palm: number[]; len: number; target: number[] | null; source: string | null; contact: number; err: number | null; ratio: number | null };
 type Bones = Record<string, { activity: string; base: string; arms: Arm[]; pose: { drop: number; bend: number; rise: number } }>;
@@ -112,4 +113,54 @@ test('meal: captures (sit, spoon at the mouth, legs crossed)', async ({ page }, 
   await page.evaluate(() => window.__marsEngine!.cameraPreset('oblique'));
   await labFrames(page, 4);
   await captureView(page, 'meal-oblique', { testInfo, compare: false });
+});
+
+type ReplayOut = { tick: number; bones: Bones; held: { id: string; by: string; hand: string; rendered: number[] | null; palm: number[] | null }[]; flights: string[] };
+
+// Take replay consumption (POSES.md "Take replay"): the meal replayed from a lab-recorded take plus the
+// hands / baseActivity fixture (recordWithFixture) through TakePeople — the studio replay's path — at
+// every 20th tick: every arm the live lab drives to an engine hand point is driven to the same point in
+// the replay (hands source, target within 1 mm), the replay reaches at least as many of them within
+// 0.1 m (less 2 %), eaters keep their seated base, and held items ride the replayed palms.
+test('meal: take replay with hands / baseActivity (fixture) poses as in the lab', async ({ page }) => {
+  test.setTimeout(420_000);
+  await openLab(page, 'meal');
+  await page.evaluate(() => window.__marsEngine!.runScenario('meal', { paused: true }));
+  const { extra, live } = await recordWithFixture<Bones>(page, 20 * 180, 20);
+  let points = 0, liveOk = 0, replayOk = 0;
+  const wrong: string[] = [], items: string[] = [], bases: string[] = [];
+  for (const [ts, lb] of Object.entries(live)) {
+    const t = Number(ts);
+    const r: ReplayOut = await page.evaluate(([ex, t]) => (window.__marsEngine as unknown as { replayTake(e: unknown, t: number): ReplayOut }).replayTake(ex, (t as number) * 0.05), [extra, t] as const);
+    for (const [id, b] of Object.entries(lb)) {
+      const rb = r.bones[id];
+      if (!rb) {
+        wrong.push(`${t} ${id} missing in the replay`);
+        continue;
+      }
+      if (b.base !== rb.base) bases.push(`${t} ${id} live ${b.activity}/${b.base} replay ${rb.activity}/${rb.base}`);
+      b.arms.forEach((a, i) => {
+        if (a.source !== 'hands' || !a.target) return;
+        points++;
+        if (a.err! <= 0.1) liveOk++;
+        const ra = rb.arms[i];
+        if (ra.source !== 'hands' || !ra.target || dist(ra.target, a.target) > 0.001) wrong.push(`${t} ${id} ${a.side}: replay ${ra.source} ${JSON.stringify(ra.target)} vs ${JSON.stringify(a.target)}`);
+        else if (ra.err! <= 0.1) replayOk++;
+      });
+    }
+    for (const it of r.held) {
+      if (!it.palm || !it.rendered) continue;
+      const d = dist(it.palm, it.rendered);
+      const grip = it.id.startsWith('spoon') ? 0.16 : it.id.startsWith('pot') ? 0.31 : it.id.startsWith('cup') ? 0.08 : 0.02;
+      if (d > grip + 0.02) items.push(`${t} ${it.id} ${d.toFixed(3)} m from ${it.by}'s ${it.hand} palm`);
+    }
+  }
+  console.log(`[meal replay] ${Object.keys(live).length} frames, fixture events ${extra.length}, hand points ${points}: live reached ${liveOk}, replay reached ${replayOk}; wrong ${wrong.length}, base mismatches ${bases.length}, items off the palm ${items.length}`);
+  if (wrong.length) console.log(`[meal replay] ${wrong.slice(0, 5).join(' | ')}`);
+  if (bases.length) console.log(`[meal replay] ${bases.slice(0, 5).join(' | ')}`);
+  expect(points).toBeGreaterThan(50);
+  expect(wrong, 'replayed arms go to the recorded hand points').toEqual([]);
+  expect(bases, 'eat / serve keep their base (seated)').toEqual([]);
+  expect(replayOk, 'replay reaches the hand points as the lab does').toBeGreaterThanOrEqual(liveOk - Math.ceil(points * 0.02));
+  expect(items, 'held items ride the replayed palms').toEqual([]);
 });

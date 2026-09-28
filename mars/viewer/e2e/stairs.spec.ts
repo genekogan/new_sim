@@ -7,6 +7,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { labFrames, openLab } from './lab-helpers';
 import { captureView } from './helpers';
+import { recordWithFixture } from './take-fixture';
 
 type Flight = { id: string; o: [number, number]; dir: [number, number]; going: number; width: number; yBottom: number; yTop: number; treads: { s: number; y: number }[] };
 type Bones = { gait: { flight: string; u: number; weight: number; feet: { planted: boolean; k: number; top: number }[] } | null; feet: number[][]; soles: number[]; hipY: number; ankleH: number };
@@ -88,4 +89,36 @@ test('stair foot IK: capture mid-flight (up)', async ({ page }, testInfo) => {
   await page.evaluate(([q]) => window.__marsEngine!.camera([q[0] + 0.5, q[1] + 1.0, q[2] + 3.3], [q[0] + 0.15, q[1] + 0.8, q[2]]), [p]);
   await labFrames(page, 4);
   await captureView(page, 'poses-stairs-mid-flight', { testInfo });
+});
+
+// Take replay (POSES.md "Take replay"): the `stairs` climb recorded with the engine's TakeRecorder and
+// replayed through TakePeople (the studio replay's path) with the lab scene as its base SpatialScene:
+// on every 5th tick where the live climber is fully on the flight, the replayed climber is on the same
+// flight with the gait fully on, and each sole is within 2 cm of the live one (feet on the treads).
+test('stair foot IK: take replay walks the flight tread by tread', async ({ page }) => {
+  test.setTimeout(300_000);
+  await openLab(page, 'stairs');
+  await page.evaluate(() => window.__marsEngine!.runScenario('stairs', { paused: true }));
+  const { extra, live } = await recordWithFixture<Record<string, Bones>>(page, 20 * 90, 5, 'p1');
+  let frames = 0, worst = 0;
+  const bad: string[] = [];
+  for (const [ts, lb] of Object.entries(live)) {
+    const b = lb.p1;
+    if (!b?.gait || b.gait.weight < 0.999) continue;
+    frames++;
+    const t = Number(ts);
+    const r = await page.evaluate(([ex, t]) => (window.__marsEngine as unknown as { replayTake(e: unknown, t: number): { bones: Record<string, Bones>; flights: string[] } }).replayTake(ex, (t as number) * 0.05), [extra, t] as const);
+    const rb = r.bones.p1;
+    if (!rb?.gait || rb.gait.flight !== b.gait.flight || rb.gait.weight < 0.999) {
+      bad.push(`${t}: replay gait ${JSON.stringify(rb?.gait ?? null)} (flights ${r.flights.join(',')})`);
+      continue;
+    }
+    const d = Math.max(...b.soles.map((q, i) => Math.abs(q - rb.soles[i])));
+    worst = Math.max(worst, d);
+    if (d > 0.02) bad.push(`${t}: soles ${JSON.stringify(rb.soles)} vs live ${JSON.stringify(b.soles)}`);
+  }
+  console.log(`[stairs replay] ${frames} frames on the flight, worst |replay − live sole| ${(worst * 100).toFixed(1)} cm, bad ${bad.length}`);
+  if (bad.length) console.log(`[stairs replay] ${bad.slice(0, 5).join(' | ')}`);
+  expect(frames).toBeGreaterThan(8);
+  expect(bad).toEqual([]);
 });

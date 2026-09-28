@@ -11,6 +11,7 @@ import { nextRandom, seedRng } from '../../engine/core/rng.ts';
 import type { ActionDef } from '../../engine/actions/types.ts';
 import type { Entity } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
+import { body } from './body.ts';
 import { buildBay } from './build-bay.ts';
 import { campfireEvening } from './campfire-evening.ts';
 import { handUp } from './hand-up.ts';
@@ -226,6 +227,7 @@ SCENARIOS.push(
   handUp,
   campfireEvening,
   meal,
+  body,
   ...yearWalkabouts(),
 );
 

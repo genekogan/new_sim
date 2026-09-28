@@ -32,8 +32,8 @@ import { LIFT_HAND } from '../../engine/construction/raise.ts';
 import { DT } from '../../engine/runtime/runtime.ts';
 import { createRig, type Rig, type Template } from './people.ts';
 import { seatHeight } from './fixtures.ts';
-import { UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, legTo, legsOf, palm, place, smooth, spineOf, swing, turn, type Arm, type Leg, type Spine } from './rig.ts';
-import { BEND_SHARE, NEUTRAL, approach, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
+import { BODY_MODEL, UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, curlHand, legTo, legsOf, palm, place, smooth, spineOf, swing, turn, type Arm, type Leg, type Spine } from './rig.ts';
+import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
 import { axisPoint, flightOf, gaitAt, type Flight, type Gait } from './stair-gait.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
@@ -49,6 +49,8 @@ type View = {
   grip?: string;
   /** Grip slot on that part (engine/construction: lift-far, foot-l/r, hold-N, lift-end/edge/corner-*, lift-station, handup-*). */
   gripSlot?: string;
+  /** Rack-structure link stood on (engine human.on; readout). */
+  on?: string;
   arms: Arm[];
   legs: Leg[];
   spine?: Spine;
@@ -89,7 +91,23 @@ export type Diag = {
  * (0–1) and `walkDist` the metres walked along the track so far, so the Walk phase is a pure
  * function of take time: clip seconds = metres / clip ground speed (feet speed-matched).
  */
-export type SampledHuman = { id: string; p: [number, number, number]; yaw: number; walk: number; walkDist: number; activity?: string; grip?: string; gripSlot?: string; hands?: Hands; baseActivity?: string };
+export type SampledHuman = {
+  id: string;
+  p: [number, number, number];
+  yaw: number;
+  walk: number;
+  walkDist: number;
+  activity?: string;
+  grip?: string;
+  gripSlot?: string;
+  /** Engine hand points (take field `hands`): arms, posture and held items follow them as in the lab. */
+  hands?: Hands;
+  /** Activity an eat / serve overlay is layered on (take field `baseActivity`; 'sit' = seated). */
+  baseActivity?: string;
+  /** Rack-structure link the person stands on (take field `on`: `beam:…` / `climb:…`); readout only. */
+  on?: string;
+};
+export type { Hands };
 /** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
 type Part = { def: string; prev: Pose; cur: Pose };
 /** Nearest point of a gripped entity to a world point (components.ts nearestPoint). */
@@ -194,7 +212,7 @@ export class HumanViews {
     rig.holder.name = id;
     this.group.add(rig.holder);
     const arms = armsOf(rig), legs = legsOf(rig), spine = spineOf(rig);
-    const touched = [...arms.flatMap((a) => [a.upper, a.lower, a.shoulder, a.hand]), ...legs.flatMap((l) => [l.upper, l.lower, l.foot]), spine?.body, spine?.hips, spine?.abdomen, spine?.torso];
+    const touched = [...arms.flatMap((a) => [a.upper, a.lower, a.shoulder, a.hand, ...a.fingers, ...a.thumb]), ...legs.flatMap((l) => [l.upper, l.lower, l.foot]), spine?.body, spine?.hips, spine?.abdomen, spine?.torso];
     const saved = touched.filter((o): o is THREE.Object3D => !!o).map((o) => ({ o, p: o.position.clone(), q: o.quaternion.clone() }));
     const h = hashId(id);
     const v: View = { rig, prev: s, cur: { ...s }, speed: 0, activity, base: activity, arms, legs, spine, seat: SEAT_DEFAULT, vary: (h % 1000) / 1000, cross: ((Math.imul(h, 2654435761) >>> 15) & 1) === 1, saved, layered: false, reachRatio: [], ankle: [], footRest: [], footLat: [] };
@@ -230,6 +248,7 @@ export class HumanViews {
       v.base = base;
       v.grip = e.human.grip?.entity;
       v.gripSlot = e.human.grip?.slot;
+      v.on = e.human.on;
       // Honest clip mapping: Walk only while the body actually moves over the ground (walk, stairs,
       // carry on the move, a crew gathering), speed-matched; a walker pushed to a stop (engine 'wait',
       // speed 0) or anyone standing plays Idle within 0.2 s, with the pose layers of render() on top.
@@ -339,6 +358,7 @@ export class HumanViews {
       v.base = base;
       v.grip = f.grip;
       v.gripSlot = f.gripSlot;
+      v.on = f.on;
       v.seat = SEAT_DEFAULT;
       const walk = SEATED.has(base) ? 0 : f.walk;
       const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands } } as unknown as Entity;
@@ -392,8 +412,8 @@ export class HumanViews {
     v.diag = undefined;
     mixer.update(0);
     const sitW = a.sitW + (b.sitW - a.sitW) * alpha, warmW = a.warmW + (b.warmW - a.warmW) * alpha;
-    const pz: Posture = { drop: lerp(a.pose.drop, b.pose.drop, alpha), bend: lerp(a.pose.bend, b.pose.bend, alpha), rise: lerp(a.pose.rise, b.pose.rise, alpha) };
-    const posed = pz.drop > 1e-4 || pz.bend > 1e-4 || pz.rise > 1e-4;
+    const pz: Posture = { drop: lerp(a.pose.drop, b.pose.drop, alpha), bend: lerp(a.pose.bend, b.pose.bend, alpha), rise: lerp(a.pose.rise, b.pose.rise, alpha), kneel: lerp(a.pose.kneel, b.pose.kneel, alpha) };
+    const posed = pz.drop > 1e-4 || pz.bend > 1e-4 || pz.rise > 1e-4 || pz.kneel > 1e-4;
     const hands = lerpHands(a.hands, b.hands, alpha);
     const hasHands = !!(hands.left || hands.right);
     const part = v.grip ? this.parts.get(v.grip) : undefined;
@@ -436,6 +456,7 @@ export class HumanViews {
         if (!targets[i] && sitW > 0) handOnThigh(v, i, sitW);
       });
       if (sitW <= 0) dangle(v, pz.bend, k);
+      closeHands(v, k);
     } else if (gripping) {
       source = 'grip';
       const grip = v.grip!, slot = v.gripSlot ?? '', floor = h.position.y;
@@ -449,8 +470,9 @@ export class HumanViews {
         const t = V();
         if (find(_s, t)) targets[i] = t;
       });
-      const k = reachTo(v, targets, pz.rise > 0, v.activity === 'carry' ? 0.88 : 0.97, find);
+      const k = reachTo(v, targets, pz.rise > 0, v.activity === 'carry' ? 0.88 : BODY_MODEL.maxExtension, find);
       if (sitW <= 0) dangle(v, pz.bend, k);
+      closeHands(v, k);
     } else if (sitW > 0) v.arms.forEach((_, i) => handOnThigh(v, i, sitW));
     else dangle(v, pz.bend, []);
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
@@ -489,14 +511,17 @@ export class HumanViews {
 
   /** Per-person pose readout of the last render (lab hook `bones()`). */
   bones(id?: string) {
-    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number }> = {};
+    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number; template: string; body: Record<string, number>; armFit: { k: number; before: number }[]; on: string | null }> = {};
     for (const [k, v] of this.views) {
       if (id && k !== id) continue;
       if (!v.diag) {
         v.rig.holder.updateMatrixWorld(true);
         v.diag = diagOf(v, null, '', NEUTRAL, v.arms.map(() => null), null);
       }
-      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: +(v.dims?.ankleH ?? 0).toFixed(4), armLen: +(v.dims?.armLen ?? 0).toFixed(4), walkW: +v.cur.walkW.toFixed(3) };
+      const d = v.dims, r4 = (x: number) => +x.toFixed(4);
+      // standing rig measurements (Idle, t = 0): the body model's numbers as this rig has them
+      const body = d ? { shoulderH: r4(d.pivotH + d.sh.up), armLen: r4(d.armLen), hipH: r4(d.hipH), thigh: r4(d.thigh), shin: r4(d.shin), kneelHip: r4(d.hipH - kneelDrop(d)), shoulderHalf: r4(d.shHalf) } : ({} as Record<string, number>);
+      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: r4(d?.ankleH ?? 0), armLen: r4(d?.armLen ?? 0), walkW: +v.cur.walkW.toFixed(3), template: v.rig.template.name, body, armFit: v.rig.template.arms, on: v.on ?? null };
     }
     return out;
   }
@@ -507,7 +532,7 @@ export class HumanViews {
   }
 
   info() {
-    return [...this.views].map(([id, v]) => ({ id, template: v.rig.template.name, clipSpeed: +v.rig.template.walkSpeed.toFixed(3), forward: v.rig.template.forward, speed: +v.speed.toFixed(3), walkWeight: +v.cur.walkW.toFixed(2), activity: v.activity, base: v.base, grip: v.grip ?? null, gripSlot: v.gripSlot ?? null, reach: v.grip || v.cur.hands.left || v.cur.hands.right ? v.reachRatio : null, armLen: v.arms[0] ? +armLen(v.arms[0]).toFixed(3) : null, arms: v.arms.length, sit: +v.cur.sitW.toFixed(2), seat: v.cur.sitW > 0 ? +v.seat.toFixed(2) : null, crossed: v.cross, pose: { drop: +v.cur.pose.drop.toFixed(3), bend: +v.cur.pose.bend.toFixed(3), rise: +v.cur.pose.rise.toFixed(3) } }));
+    return [...this.views].map(([id, v]) => ({ id, template: v.rig.template.name, clipSpeed: +v.rig.template.walkSpeed.toFixed(3), forward: v.rig.template.forward, speed: +v.speed.toFixed(3), walkWeight: +v.cur.walkW.toFixed(2), activity: v.activity, base: v.base, grip: v.grip ?? null, gripSlot: v.gripSlot ?? null, reach: v.grip || v.cur.hands.left || v.cur.hands.right ? v.reachRatio : null, armLen: v.arms[0] ? +armLen(v.arms[0]).toFixed(3) : null, arms: v.arms.length, sit: +v.cur.sitW.toFixed(2), seat: v.cur.sitW > 0 ? +v.seat.toFixed(2) : null, crossed: v.cross, pose: { drop: +v.cur.pose.drop.toFixed(3), bend: +v.cur.pose.bend.toFixed(3), rise: +v.cur.pose.rise.toFixed(3), kneel: +v.cur.pose.kneel.toFixed(3) } }));
   }
 }
 
@@ -550,7 +575,8 @@ function measure(v: View) {
   for (const a of arms) a.side = w(a.upper).z > 0 ? -1 : 1;
   const hipH = (hips[0].y + hips[1].y) / 2;
   const ankleH = (feet[0].y + feet[1].y) / 2;
-  const legLen = (hips[0].distanceTo(knees[0]) + knees[0].distanceTo(feet[0]) + hips[1].distanceTo(knees[1]) + knees[1].distanceTo(feet[1])) / 2;
+  const thigh = (hips[0].distanceTo(knees[0]) + hips[1].distanceTo(knees[1])) / 2, shin = (knees[0].distanceTo(feet[0]) + knees[1].distanceTo(feet[1])) / 2;
+  const legLen = thigh + shin;
   const pivot = w(spine.hips ?? spine.body);
   const sh = arms.map((a) => w(a.upper));
   const shMid = sh.reduce((s, q) => s.add(q), V()).multiplyScalar(1 / sh.length);
@@ -560,6 +586,8 @@ function measure(v: View) {
     pivotH: pivot.y,
     ankleH,
     legLen,
+    thigh,
+    shin,
     sh: { f: shMid.x - pivot.x, up: shMid.y - pivot.y },
     chain: joints.slice(1).map((q, i) => ({ f: q.x - joints[i].x, up: q.y - joints[i].y })),
     shHalf: sh.length > 1 ? Math.abs(sh[0].z - sh[1].z) / 2 : 0.19,
@@ -582,11 +610,18 @@ function bendTorso(sp: Spine, bend: number) {
   turn(sp.torso, _ax, bend * (c - b));
 }
 
-/** Posture legs: pelvis down by `drop` (and back to balance a hip bend, up by `rise`), feet stay planted (leg IK, knees forward). */
+/**
+ * Posture legs: pelvis down by `drop` (and back to balance a standing hip bend, up by `rise`), feet stay
+ * planted (leg IK, knees forward). Kneeling (`kneel` → 1): one knee on the floor straight under its hip
+ * joint (the pelvis is at kneelDrop), that shin back along the floor with the toes tucked; the other
+ * foot planted out to its side (KNEEL_SIDE) with that knee up — so a person kneeling on a beam keeps
+ * both on the beam line. Which knee goes down is fixed per person (id hash).
+ */
 function postureLegs(v: View, pz: Posture) {
   const d = v.dims;
   if (!d || !v.spine || v.legs.length < 2) return;
   const feet = v.legs.map((l, i) => l.foot.getWorldPosition(_goals[i]).clone());
+  const floor = v.rig.holder.position.y;
   // heel raise: ankles up by `rise` (toes stay down)
   const back = shoulderAt(d, pz).back;
   v.spine.body.getWorldPosition(_c);
@@ -594,13 +629,40 @@ function postureLegs(v: View, pz: Posture) {
   _c.y += pz.rise - pz.drop;
   place(v.spine.body, _c.clone());
   const pole = _tmp.copy(_fwd).addScaledVector(UP, 0.2).clone();
+  const kn = smooth(pz.kneel), down = v.vary < 0.5 ? -1 : 1; // side of the kneeling leg (+1 = left)
+  const centre = v.rig.holder.position;
   v.legs.forEach((l, i) => {
     const goal = feet[i];
     goal.y += pz.rise;
-    const kp = pole.clone().addScaledVector(_right, -l.side * 0.25); // knees a little apart in a squat
-    const q = pz.rise > 0 ? footPitch(v, i, -Math.asin(Math.min(0.9, pz.rise / 0.13))) : undefined;
+    let kp = pole.clone().addScaledVector(_right, -l.side * 0.25); // knees a little apart in a squat
+    let q = pz.rise > 0 ? footPitch(v, i, -Math.asin(Math.min(0.9, pz.rise / 0.13))) : undefined;
+    if (kn > 0) {
+      l.upper.getWorldPosition(_hip);
+      if (l.side === down) {
+        // knee on the floor under the hip joint, a little forward; shin back along the floor, toes tucked
+        const kf = 0.05, kneeY = _hip.y - Math.sqrt(Math.max(0, d.thigh * d.thigh - kf * kf));
+        const ankleY = floor + 0.11, dy = kneeY - ankleY;
+        const run = Math.sqrt(Math.max(0, d.shin * d.shin - dy * dy));
+        const ankle = V().copy(_hip).addScaledVector(_fwd, kf - run);
+        ankle.y = ankleY;
+        goal.lerp(ankle, kn);
+        kp = kp.lerp(V().copy(_fwd).addScaledVector(UP, -0.3), kn);
+        q = footPitch(v, i, -1.1 * kn);
+      } else {
+        // up-knee: foot planted out to its side, a little forward; the knee points forward and out
+        const spot = V().copy(centre).addScaledVector(_right, -l.side * KNEEL_SIDE).addScaledVector(_fwd, 0.12);
+        spot.y = floor + d.ankleH;
+        goal.lerp(spot, kn);
+        kp = kp.lerp(V().copy(_fwd).addScaledVector(UP, 0.4).addScaledVector(_right, -l.side * 0.6), kn);
+      }
+    }
     legTo(l, v.ankle[i], goal, kp, 0.999, q);
   });
+}
+
+/** Closed hand on every arm that holds something (contact from 0.3, fully closed by 0.8). */
+function closeHands(v: View, contacts: number[]) {
+  v.arms.forEach((arm, i) => curlHand(arm, smooth(((contacts[i] ?? 0) - 0.3) / 0.5)));
 }
 
 /** World foot rotation = rest (relative to the holder) pitched by `pitch` rad about the person's right axis (− = toes down). */
@@ -714,7 +776,7 @@ function handOnThigh(v: View, i: number, w: number) {
  * the target height (up to 5 cm when reaching overhead). `refind` recomputes a grip point from the
  * shrugged shoulder (nearest-point grips).
  */
-function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, maxExt = 0.97, refind?: (from: THREE.Vector3, out: THREE.Vector3) => boolean) {
+function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, maxExt: number = BODY_MODEL.maxExtension, refind?: (from: THREE.Vector3, out: THREE.Vector3) => boolean) {
   v.reachRatio = v.arms.map(() => null);
   const contacts = v.arms.map(() => 0);
   v.arms.forEach((arm, i) => {
@@ -726,9 +788,23 @@ function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, 
     v.reachRatio[i] = +(_s.distanceTo(t) / len).toFixed(2);
     if (k <= 0) return;
     if (arm.shoulder) {
-      const up = (t.y - _s.y) / 0.4;
-      const dy = Math.max(-1, Math.min(overhead || up > 1 ? 2 : 1, up)) * 0.025 * k;
-      swing(arm.shoulder, _s.clone(), _s.clone().addScaledVector(UP, dy), 1);
+      // shrug: up to BODY_MODEL.shrug when the hand goes ≥ 0.5 m above the shoulder (or heels are up), 2.5 cm down
+      // (weighted by the contact the shrugged shoulder would have: the shrug is what brings the top of the reach in)
+      const up = t.y - _s.y;
+      const full = up >= 0 ? BODY_MODEL.shrug * (overhead ? 1 : clamp01(up / 0.5)) : -0.025 * clamp01(-up / 0.4);
+      const dy = full * contact(_tmp.copy(_s).addScaledVector(UP, full).distanceTo(t), len);
+      // turn the clavicle until the shoulder joint has risen by dy (a swing toward a raised point only
+      // gets part of the way: the joint moves on a circle about the clavicle's root)
+      const y0 = _s.y + dy;
+      for (let it = 0; it < 6 && Math.abs(y0 - _s.y) > 0.001; it++) {
+        swing(arm.shoulder, _s.clone(), _s.clone().addScaledVector(UP, 1.5 * (y0 - _s.y)), 1);
+        arm.upper.getWorldPosition(_s);
+      }
+      // the circle tops out after ~3 cm: the rest is the shoulder girdle elevating (the clavicle root moves up)
+      if (Math.abs(y0 - _s.y) > 0.001) {
+        place(arm.shoulder, arm.shoulder.getWorldPosition(V()).addScaledVector(UP, y0 - _s.y));
+        arm.upper.getWorldPosition(_s);
+      }
       arm.upper.getWorldPosition(_s);
       if (refind) refind(_s, t);
       k = contact(_s.distanceTo(t), len);
@@ -785,7 +861,7 @@ function diagOf(v: View, g: Gait | null, flight: string, pz: Posture, targets: (
     soles: order.map((i) => r4(feet[i][1] - ankleH)),
     hipY: r4(v.legs.length ? v.legs.reduce((s, l) => s + l.upper.getWorldPosition(V()).y, 0) / v.legs.length : 0),
     head: v.spine?.head ? a3(v.spine.head.getWorldPosition(V())) : null,
-    pose: { drop: r4(pz.drop), bend: r4(pz.bend), rise: r4(pz.rise) },
+    pose: { drop: r4(pz.drop), bend: r4(pz.bend), rise: r4(pz.rise), kneel: r4(pz.kneel) },
     arms: v.arms.map((arm, i) => {
       const sh = arm.upper.getWorldPosition(V()), pm = palm(arm, V()), len = armLen(arm), t = targets[i];
       return { side: armSide(v, i), shoulder: a3(sh), palm: a3(pm), len: r4(len), target: t ? a3(t) : null, source: t ? source : null, contact: t ? r4(contact(sh.distanceTo(t), len)) : 0, err: t ? r4(pm.distanceTo(t)) : null, ratio: t ? r4(sh.distanceTo(t) / len) : null };

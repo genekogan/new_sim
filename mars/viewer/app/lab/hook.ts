@@ -6,11 +6,23 @@ import { sequenceRows } from './sequence-hud.tsx';
 import { entityCorners } from '../../engine/spatial/service.ts';
 import { slotStates } from './overlay-slots.ts';
 import { scriptOf } from './campfire-evening.ts';
+import { BODY_MODEL } from '../engine-view/rig.ts';
+import { BODY_MODEL as ENGINE_BODY_MODEL } from '../../engine/body/model.ts';
+import { TakePeople } from '../engine-view/take-replay.ts';
+import { TakeRecorder } from '../../engine/take/recorder.ts';
+import type { ChangeEvent, Take } from '../../engine/take/types.ts';
 
 export type EngineHook = ReturnType<typeof installHook>;
 
 export function installHook(view: LabView, notify: () => void) {
   const sim = view.sim;
+  // take-replay check (recordTake / humanFields / replayTake)
+  let rec: TakeRecorder | null = null, take: Take | null = null, replay: TakePeople | null = null;
+  const dropReplay = () => {
+    replay?.dispose();
+    replay = null;
+    view.humans.group.visible = true;
+  };
   const state = () => {
     const rt = sim.rt;
     return {
@@ -42,6 +54,9 @@ export function installHook(view: LabView, notify: () => void) {
      *  Scenarios with async data (year walkabouts) return a Promise of the state. */
     runScenario(name: string, opts: { paused?: boolean; speed?: number } = {}) {
       const go = () => {
+        dropReplay();
+        rec = null;
+        take = null;
         sim.paused = opts.paused ?? true;
         sim.speed = opts.speed ?? sim.speed;
         sim.load(name);
@@ -136,6 +151,79 @@ export function installHook(view: LabView, notify: () => void) {
           const ok = view.humans.palmOf(s.by, s.hand, palm);
           return { id: e.id, def: e.def, by: s.by, hand: s.hand, rendered: view.components.positionOf(e.id), engine: e.pose.p, palm: ok ? palm.toArray() : null, fraction: e.contents?.fraction ?? null };
         }),
+    /**
+     * Body-model probe (preset `body` only): set a person's activity and hand points directly — renderer
+     * state the engine never produced — let the pose layers settle for `ticks` renderer ticks (the 0.4 s
+     * posture blend) and return that person's `bones()`. `hands: null` clears them.
+     */
+    probe(id: string, spec: { activity?: string; hands?: { left?: [number, number, number]; right?: [number, number, number] } | null }, ticks = 24) {
+      if (sim.scenario.name !== 'body') throw new Error('probe() is for the lab preset `body`');
+      const e = sim.rt.world.entities[id];
+      if (!e?.human) return null;
+      if (spec.activity) e.human.activity = spec.activity;
+      if (spec.hands === null) delete e.human.hands;
+      else if (spec.hands) e.human.hands = spec.hands;
+      for (let i = 0; i < ticks; i++) view.humans.onTick(sim.rt.world);
+      return view.poseNow().bones(id)[id] ?? null;
+    },
+    /**
+     * Take-replay check (POSES.md "Take replay"): start recording the running lab world with the engine's
+     * TakeRecorder (the studio's take format). Returns the recorder's start tick (take tick 0).
+     */
+    recordTake() {
+      dropReplay();
+      take = null;
+      rec = new TakeRecorder(sim.rt, { rulesVersion: 'lab-replay-check' });
+      return rec.startTick;
+    },
+    /**
+     * Per person, the HumanState fields the take recorder does not record yet (engine W10 will add them):
+     * hands, baseActivity, on. Specs build a FIXTURE from these (change events added to the lab-recorded
+     * take) — not real recorder output.
+     */
+    humanFields: () =>
+      Object.fromEntries(
+        Object.values(sim.rt.world.entities)
+          .filter((e) => e.kind === 'human')
+          .map((e) => [e.id, { hands: e.human!.hands ? structuredClone(e.human!.hands) : null, baseActivity: e.human!.baseActivity ?? null, on: e.human!.on ?? null }]), // copies: the engine may update hands in place
+      ),
+    /**
+     * Finish the recording (first call), add the spec's `extra` change events (the fixture fields), and pose
+     * the take at time t through TakePeople — the studio replay's people/components path — with the lab
+     * scene's base SpatialScene (its stairs links). `show` swaps the live people for the replayed ones on
+     * screen. Returns the replay's bones() and its held items (rendered origin vs rendered palm).
+     */
+    replayTake(extra: ChangeEvent[], t: number, show = false) {
+      if (!take) {
+        if (!rec) throw new Error('replayTake() before recordTake()');
+        take = rec.finish();
+        rec = null;
+        const all = [...take.changes, ...extra].map((c, i) => [c, i] as const);
+        all.sort((a, b) => a[0][0] - b[0][0] || a[1] - b[1]); // by tick, stable
+        take.changes = all.map(([c]) => c);
+      }
+      if (!replay) {
+        replay = new TakePeople(take, { scene: sim.rt.services.spatial.base });
+        replay.setTemplates(view.templates);
+        view.scene.add(replay.group);
+      }
+      const frame = replay.show(t);
+      replay.group.visible = show;
+      view.humans.group.visible = !show;
+      const held = Object.entries(frame.entities)
+        .filter(([, e]) => (e.state.support as { kind?: string } | undefined)?.kind === 'in-hand')
+        .map(([id, e]) => {
+          const s = e.state.support as { by: string; hand: 'left' | 'right' };
+          const palm = new THREE.Vector3();
+          const ok = replay!.palmOf(s.by, s.hand, palm);
+          return { id, by: s.by, hand: s.hand, rendered: replay!.positionOf(id), palm: ok ? palm.toArray() : null };
+        });
+      return { tick: frame.tick, bones: replay.bones(), held, flights: replay.flights().map((f) => f.id) };
+    },
+    /** Back to the live people (drops the replay rigs). */
+    endReplay: () => dropReplay(),
+    /** The body model: the renderer's copy (app/engine-view/rig.ts) and the engine's (engine/body/model.ts). */
+    bodyModel: () => JSON.parse(JSON.stringify({ renderer: BODY_MODEL, engine: ENGINE_BODY_MODEL })),
     /** Stair flights the renderer uses (tread centres along the axis and tread-top heights). */
     stairs: () => view.humans.stairs(),
   };
