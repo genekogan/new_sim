@@ -203,6 +203,28 @@ Then: gate → release 5; HANDOFF refresh.
   `Math.hypot` (intrusion / encounter / occupant / stairBlocker); swapping it for `dist2` may move hashes by ulps.
 - **W11 landed** `719ba10`, `ccd6839`, `fad3ccc`, `dfcaa93`, `67a9a00` (≈330k tokens, 45 min): one entity snapshot per walk step (Object.keys+index), `proveUnreachable` reverse flood (failing people-replan 90 → 9 ms), typed-array `narrow()`, `explainUnusable` skip; stress-30 mean 0.70 → 0.49 ms, campus crop compute 5.5 → 4.8 s; all five pins bit-identical (3/3 alternating runs), `walk-perf.test.ts` + `deploy/perf-walk.mjs`. Not met hash-identically: exact max tick (tick 5 = 27 synchronous A* ≈ 90 ms; corridor planner or spread submit-time planning would fix it but move hashes). W4's "+10–25 % compute" did not reproduce (host load). Lead review: accepted. Findings → W15: the fewer-obstacles fallback never fires (`findRoute` puts only link ids in `subjects`), explaining W9's 3.5 s wait; `walk.ts` uses host `Math.hypot` (source-scan test doesn't cover hypot).
 - W15 spawned (engine walk.ts behaviour, one re-pin): fallback fix, `Math.hypot` → `dist`/`dist2` + scan covers hypot, walker-vs-walker on the smoothed path, stationary-blocker decision ≤ 0.5 s.
+- **W14 (renderer): e2e catch-up, solar / paint / stock rendering, rack-structure poses, 2022 east-house preset.**
+  `8aedc3d`, `2408cb1`, `87ed562` (+ poses/docs commit). E2e on `36aa230`: 48/49 green; the one red was `poses-pickup-crouch`
+  (inspected: since W12's landmarks the joist giver squats with both hands on the joist instead of a kneel + >100° bend; refreshed).
+  Hand-up v3 (16237 ticks, 5554 points) 91.8 % → 92.5 % reached with a 25° walking bend (walk-load 478 → 514 / 514), 0 rig-reachable
+  misses; the `ENGINE MISMATCH reachDownBelowFeet` print stays (woman template 0.35 m vs 0.5). Rendering (`components.ts`,
+  `fixtures.ts`, `paint.ts`): solar panels (glass + aluminium frame + cells, tilt from the pose), rails, labelled battery / charge
+  controller / inverter (entity `equipment`), per-band paint overlay (width = band coverage; texture = hashed colour + stripe until
+  textures exist), bundles / stacks drawn to `contents.count` with straps, cutting station, Kit frames with the Kit's bracing.
+  Poses (`frame-gait.ts`, POSES.md "Rack structure"): climbing as a two-hand two-foot ladder cycle facing the frame (0.35 m rungs),
+  both soles on the bracing node on a stance, a turn on the rod toward a held beam, beam-walk arms out + short steps. Lab presets
+  `year-build-2022` (first bay; live = node rehearsal, 41 019 ticks `ad844b78…`) and `year-build-2022-house` (116 477 ticks
+  `14d5c768…` in 33–37 s wall in headless Chromium), `solar-paint`; specs `year-build.spec.ts`, `solar-paint.spec.ts`, poses climb /
+  beam-walk test; year build hand points 62.6 → 76.5 % reached. Skeleton vs the skeleton-stage photo: the rack vocabulary matches
+  (braced frames face-on, beams at three levels, open bays); missing the 2x4 timber frame (phase B), frames blue not green.
+  Findings for the engine: (1) `hang_beam` walk-in: both lifters face the direction of travel, so the rear lifter carries, lowers
+  and slides the beam with its hands 0.35–0.65 m behind its back (walk-load / lift / hook at the 0.22 m seat) — turn the rear lifter
+  to face the beam (or walk it backwards); (2) installers on a stance hold the beam 0.73–0.79 m beside the body point (column 0.3 m +
+  stage axis 0.457 m) while facing their frame — the engine envelope (a cylinder) allows it, a body needs to turn / lean (the renderer
+  turns it on the rod); a `human.facing` override for stances holding a load would let takes carry it; (3) the whole house submits
+  77 ambient make-way walks for people already reserved by a waiting step (`reservation.conflict`, a red FAILED banner each in the
+  lab; same outcome) — `makeWay` should skip reserved people; (4) no engine foot holds / climb facing: the renderer's ladder cycle and
+  climbing facing are its own reading of the link path.
 - **W15 landed** (engine walker behaviour, one re-pin; MOVEMENT.md §2, PLANNING_BUDGET.md §6 "walker fallback + hypot + encounters on the smoothed path"):
   - **§3 ≤ 0.5 s decisions.** The lab-social x1 wait was not the missing fallback: its walk_to crept 3 mm on alternate ticks
     between two ring neighbours. The static sidestep flipped side every tick (g3 +0.8 / g2 −0.2), and every creeping tick
@@ -233,3 +255,6 @@ Then: gate → release 5; HANDOFF refresh.
       metrics, camera quality, solar, stance, invariants, fragile, sun, hash (2 ** 32, exact).
     - 1.08–1.5 m gaps between people are walkable but not plannable at 0.1 m cells.
     - Head-on round a tight corner is decided by the single-file traffic rule, not by the encounter.
+- **W15 landed** `b7dd62e`, `d38a71d`, `9c8eb53` (≈430k tokens, 47 min): `findRoute` names the people/loads behind a failure (`nameObstacles`); the never-firing fallback replaced by a squeezed people-replan (0.22 m octagons, separation ≥ 0.54 m kept); one decision clock per blocked stretch (ends only > 0.15 m/s or 0.2 m progress) + sidestep latch — real root cause of x1's 79-tick wait (3 mm creep with the side flipping every tick); arrived walkers count as standing; encounters measured on the smoothed path 2.5 m ahead; `core/math.ts` `hypot` replaces host `Math.hypot` in 149 call sites (scan now bans it; `**` still unscanned on 14 lines). x1: blocked 79 → 9 ticks, warm 63.3 → 58.2 s. Re-pin "walker fallback + hypot + encounters": probe 0147f8f1 @10729; crop/full fee92ee0 @11316; stress-30 1298e2e5; meal 035e8c39 @626; v3 66800edc @16230; year-build first bay 695d2dcb @41182; whole house 35d12886 @117125 (66/66); G 9ba1037c. 312 / 310 / 2 skip. Lead review: accepted incl. the two beyond-brief behaviour changes (squeeze, settled = standing) — both documented in MOVEMENT.md.
+- usage.py 04:23 EDT: 5h 21 %, week 19 %. Tally: ≈ 5.9 M subagent tokens in 4 h (≈ 1.5 M/h — at the throttle; keep 3 workers but no more).
+- W16 spawned (engine camera, §11 phase 1): direction vocabulary + compiler, trajectory synthesis (orbit from extent, sun-behind window, camera navmesh through doors), MCP tool.
