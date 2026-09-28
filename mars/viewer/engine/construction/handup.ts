@@ -25,6 +25,7 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Link } from '../spatial/types.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
+import { isRail } from '../world/catalog-solar.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { checkStations, walkCrew, childrenState, type Children } from './children.ts';
@@ -133,7 +134,7 @@ function restOn(w: WorldState, e: Entity, o: OBB2): Rest | Fail {
     return { y: s.y, supports: s.supports };
   }
   const ms = Object.values(w.entities)
-    .filter((m) => (isJoist(m) || isBeam(m)) && m.phase === 'installed' && m.id !== e.id)
+    .filter((m) => (isJoist(m) || isBeam(m) || isRail(m.def)) && m.phase === 'installed' && m.id !== e.id)
     .filter((m) => overlap(o, flatObb(m.pose, m)))
     .sort((a, b) => (a.id < b.id ? -1 : 1));
   if (ms.length < 2) return fail('handup.no-support', `${e.id} at (${f2(o.c[0])}, ${f2(o.c[1])}) would not rest on two installed members (${ms.map((m) => m.id).join(', ') || 'none'} under it)`, [e.id, ...ms.map((m) => m.id)]);

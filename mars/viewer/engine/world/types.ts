@@ -90,6 +90,20 @@ export type Entity = {
   reservedBy?: string;
   /** Containers (bowl, pot…; catalog-items.ts CONTAINERS): what food is in it and how full (0..1). */
   contents?: { food: string; fraction: number };
+  /** Placed electrical equipment (construction/solar.ts place_equipment, spec §19): kind + configuration. */
+  equipment?: { kind: string; config: Record<string, number | string | boolean> };
+  /** Paint on a paintable face (engine/work/paint.ts): colour or texture, coverage 0..1 of the face, per reach band. */
+  paint?: PaintState;
+};
+
+/** Paint progress on a face (engine/work/paint.ts). Heights are metres above the face's bottom edge. */
+export type PaintState = {
+  face: 'front' | 'back';
+  color?: string;
+  texture?: string;
+  /** Painted fraction of the whole face (area-weighted over its bands), 0..1, rounded to 0.01. */
+  coverage: number;
+  bands: { from: number; to: number; coverage: number }[];
 };
 
 export type Region = {

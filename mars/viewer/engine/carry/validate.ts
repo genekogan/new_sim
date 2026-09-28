@@ -16,6 +16,7 @@ import { holdingDiagnostic } from '../construction/rules.ts';
 import { PLAN_MARGIN } from './sweep.ts';
 import { climbGeom, climbObstacles, climbPose, loadObstacleHit, stairClearance, STAIR_SIDE_MARGIN, type ClimbGeom } from './climb.ts';
 import type { Link } from '../spatial/types.ts';
+import { fragileFlightCheck } from './fragile.ts';
 
 /** `via`: the stair link to use when the target is on another level (default: the one a person would take). */
 export type CarryParams = { crew: string[]; item: string; to: { x: number; z: number; yaw: number; level?: number }; place?: 'lay'; via?: string };
@@ -143,6 +144,8 @@ export function planCarryAction(rt: Runtime, p: CarryParams): PlanResult<CarryPr
   const split = people.find((e) => e.human!.level !== level);
   if (split) return bad({ code: 'carry.crew-split', message: `${split.id} is on level ${split.human!.level} but ${people[0].id} is on level ${level}; the crew must start on one level`, subjects: [split.id] });
   const toLevel = p.to.level ?? level;
+  const fragile = fragileFlightCheck(rt, item, people[0], level, p.to, p.via); // a fragile load never follows a steep flight (carry/fragile.ts)
+  if (fragile) return bad({ ...fragile, subjects: [...(fragile.subjects ?? []), ...p.crew] });
   if (toLevel !== level && p.crew.length !== 1)
     return bad({ code: 'carry.level-change', message: `carrying the ${shortNameOf(item.def)} from level ${level} to level ${toLevel} with ${p.crew.length} carriers would need a crew on a stair flight; only a single carrier can carry between levels so far`, subjects: [item.id, ...p.crew] });
   sp.sync(w);

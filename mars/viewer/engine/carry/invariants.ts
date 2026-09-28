@@ -11,6 +11,7 @@ import { poseHit } from './sweep.ts';
 import { activeLoadDiscs } from './actions.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import { linkUnder, stairClearance } from './climb.ts';
+import { fragileLoadsOk } from './fragile.ts';
 
 export const GRIP_TOL = 0.05; // m
 const CLEAR_TOL = 0.03; // m, same tolerance as the human clearance invariant
@@ -106,4 +107,4 @@ export const carryStairsClearance: Invariant = (rt: Runtime) => {
   return out;
 };
 
-export const CARRY_INVARIANTS = [carryIntegrity, humanLoadClearance, carryStairsClearance];
+export const CARRY_INVARIANTS = [carryIntegrity, humanLoadClearance, carryStairsClearance, fragileLoadsOk];

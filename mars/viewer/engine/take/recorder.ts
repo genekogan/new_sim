@@ -28,6 +28,7 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['support', (e) => e.support],
   ['reservedBy', (e) => e.reservedBy],
   ['connections', (e) => e.connections],
+  ['equipment', (e) => e.equipment], // construction/solar.ts place_equipment (kind + config)
 ];
 
 type TrackState = { committed: PoseSample; pending: PoseSample[]; out: PoseSample[] };

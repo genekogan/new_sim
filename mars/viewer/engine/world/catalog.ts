@@ -7,6 +7,7 @@ import { dcos, dsin, FT, IN, type Vec3 } from '../core/math.ts';
 import type { Confidence } from './types.ts';
 import { ITEM_ASSETS, type SurfaceSlotDef } from './catalog-items.ts';
 import { stockAssets } from './catalog-stock.ts';
+import { SOLAR_ASSETS, type EquipmentKind } from './catalog-solar.ts';
 
 export type GripSlot = { id: string; local: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
@@ -40,7 +41,12 @@ export type Handling = {
    * (construction/frame.ts). Absent = not small.
    */
   smallLoad?: true;
+  /** Fragile (solar panels, catalog-solar.ts): never tilted past maxTilt (rad) from level while carried or held, never dropped. */
+  fragile?: { maxTilt: number };
 };
+
+/** A face that can be painted (engine/work/paint.ts): 'front' = the local +y broad face, 'back' = −y. */
+export type PaintFace = 'front' | 'back';
 
 /** Heaviest load that counts as "small" on the rack structure (climb / beam-walk): kg. */
 export const SMALL_LOAD_KG = 10;
@@ -48,7 +54,7 @@ export const SMALL_LOAD_KG = 10;
 export type AssetDef = {
   id: string;
   label: string;
-  category: 'rack-upright' | 'rack-beam' | 'timber' | 'plywood' | 'stair' | 'human' | 'vehicle' | 'fixture' | 'item' | 'test-block';
+  category: 'rack-upright' | 'rack-beam' | 'timber' | 'plywood' | 'stair' | 'human' | 'vehicle' | 'fixture' | 'item' | 'test-block' | 'solar' | 'equipment';
   /** Local axis-aligned box: x = width/length, y = height, z = depth/thickness (m). */
   size: Vec3;
   massKg: number;
@@ -68,6 +74,10 @@ export type AssetDef = {
   obstacle?: true;
   /** Rack beams: width of the top step flange a person can stand on (m); frame.ts beam walkways. */
   walkway?: { flange: number };
+  /** Faces that can be painted (engine/work/paint.ts). */
+  paintable?: { faces: PaintFace[] };
+  /** Placed electrical equipment (catalog-solar.ts, spec §19): its kind and default configuration. */
+  equipment?: { kind: EquipmentKind; defaults: Record<string, number | string> };
   dims: { confidence: Confidence; note: string };
 };
 
@@ -266,6 +276,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
       id: 'plywood-4x6',
       label: '4x6 ft plywood panel (3/4 in; a 4x8 sheet cut to 6 ft)',
       category: 'plywood',
+      paintable: { faces: ['front', 'back'] },
       size: [6 * FT, 0.75 * IN, 4 * FT],
       massKg: 20,
       color: '#d8b98a',
@@ -292,6 +303,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
       id: 'plywood-4x8',
       label: '4x8 ft plywood sheet (3/4 in)',
       category: 'plywood',
+      paintable: { faces: ['front', 'back'] },
       size: [8 * FT, 0.75 * IN, 4 * FT],
       massKg: 27,
       color: '#d8b98a',
@@ -319,6 +331,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
     ...ITEM_ASSETS,
+    ...SOLAR_ASSETS,
     ...stockAssets({ upright }),
     {
       id: 'test-wall',
