@@ -42,12 +42,11 @@ import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 import { crewCheck, f2, fail, lerpPose, smooth, spatialOf, symmetricYaw, sweepPoses, type Fail } from './access.ts';
 import { flatObb, isPlywood, memberTop, sheetSupports } from './deck.ts';
-import { BODY_GAP, CARRY_Y, EDGE_GAP, envelopeGap, GIVE_MAX, GIVER_OFF, HAND_SPREAD, HANDUP_SLOT_PREFIX, handupHands, KNEEL_BACK, nearestOnRect, POSTURE, REACH_DOWN, setHands, SLIDE_CLEAR, SPEED, STEP, T } from './handup.ts';
+import { BODY_GAP, CARRY_Y, EDGE_GAP, envelopeGap, GIVE_MAX, GIVER_OFF, HANDUP_SLOT_PREFIX, handupHands, nearestOnRect, POSTURE, REACH_DOWN, setHands, SLIDE_CLEAR, SPEED, STEP, T } from './handup.ts';
 import { BODY_MODEL, postureTop, restHands } from '../body/model.ts';
 
 export const HANDOFF_OUT = BODY_MODEL.maxHorizontalFromFeet; // kneel rule: hands ≤ this horizontally from the feet at a take
 const size = (e: Entity) => def(e.def).size;
-const xz = (e: Entity): Vec2 => [e.pose.p[0], e.pose.p[2]];
 const at = (q: Pose): Vec2 => [q.p[0], q.p[2]];
 const poseAtXZ = (c: Vec2, y: number, yaw: number): Pose => ({ p: [c[0], y, c[1]], yaw });
 

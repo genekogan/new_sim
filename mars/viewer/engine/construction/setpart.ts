@@ -20,7 +20,7 @@
 // Hands: `human.hands` every tick, `human.grip.slot` = `setpart-<i>:<lx>:<ly>:<lz>` (local grip), so
 // `setPartHands()` rebuilds them from a take.
 import { z } from 'zod';
-import { angleDelta, dcos, dist2, dsin, datan2, obbOverlap, rot2, wrapAngle, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { angleDelta, dcos, dist2, dsin, datan2, obbOverlap, rot2, wrapAngle, type Vec2, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Invariant, Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
@@ -52,7 +52,8 @@ const TOL = 0.1; // per-tick envelope tolerance (as hand_up's)
 /** A local point of an entity's box (x along its length, y up from its base, z across) in world coordinates (entityCorners' transform). */
 export function localToWorld(q: Pose, v: Vec3): Vec3 {
   const cr = dcos(q.roll ?? 0), sr = dsin(q.roll ?? 0), cp = dcos(q.pitch ?? 0), sp = dsin(q.pitch ?? 0), cy = dcos(q.yaw), sy = dsin(q.yaw);
-  let X = v[0] * cr - v[1] * sr, Y = v[0] * sr + v[1] * cr, Z = v[2];
+  const X = v[0] * cr - v[1] * sr;
+  let Y = v[0] * sr + v[1] * cr, Z = v[2];
   const Y2 = Y * cp - Z * sp, Z2 = Y * sp + Z * cp;
   Y = Y2; Z = Z2;
   const X3 = X * cy - Z * sy, Z3 = X * sy + Z * cy;
@@ -238,7 +239,7 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
   const feetAt = (i: number, q: Pose): Vec3 => standAt(p.lift[i], q, delta[i]);
   // a sheet that stands (a wall panel): tipped up where it was lifted, then walked in upright
   const standing = Math.abs(Math.abs(final.roll ?? 0) - Math.PI / 2) < 0.05 || Math.abs(Math.abs(final.pitch ?? 0) - Math.PI / 2) < 0.05;
-  const Up: Pose | null = standing ? { ...P, p: [C.p[0] + (P.p[0] - final.p[0]) * 0, C.p[1], C.p[2]] } : null;
+  const Up: Pose | null = standing ? { ...P, p: [C.p[0], C.p[1], C.p[2]] } : null;
   if (Up) {
     // same heading / tilt as P, its lowest grip at hands-hanging height, over where it was lifted
     const g = Math.min(...p.lift.map((l) => localToWorld({ ...P, p: [0, 0, 0] }, l.grip)[1]));
