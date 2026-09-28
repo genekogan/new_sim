@@ -26,7 +26,7 @@ import { SimulationPanel } from './simulation-panel';
 import { createTakeHost, type TakeHost } from './take-host';
 import { BuildPicker, TakePanel } from './take-panel';
 import { createWeather } from './weather';
-import { DEFAULT_SCENE_DATE } from '../../engine/env/sun';
+import { DEFAULT_SCENE_DATE, YEAR_NORTH_AZIMUTH_OFFSET } from '../../engine/env/sun';
 import { createGallery } from './gallery';
 import { add2026Details } from '../history/details-2026';
 import { createHistoricalScreens } from '../history/screens';
@@ -262,7 +262,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
     orbit.target.set(0, 2, 0);
     orbit.enableDamping = true;
     orbit.maxDistance = 600;
-    const environment = createEnvironment(scene, renderer);
+    const environment = createEnvironment(scene, renderer, { northAzimuthOffset: YEAR_NORTH_AZIMUTH_OFFSET[year] });
     const weather = createWeather(scene);
     let gallery: ReturnType<typeof createGallery> | null = null;
     let contextLost = false;
@@ -1335,7 +1335,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         <div className="studio-tabs">
           <label className="year-picker">Year <select aria-label="Campus year" value={year} onChange={e => { location.href = Number(e.target.value) === 2026 ? '/studio' : `/studio/${e.target.value}`; }}>{YEARS.map(y => <option key={y} value={y}>{y}{y === 2020 ? ' · Brahman' : ''}</option>)}</select></label>
           <BuildPicker host={() => api.current?.take ?? null} year={year} />
-          <button onClick={() => api.current?.view('chiba')}>{year === 2020 ? 'Portal' : 'Chiba'}</button>
+          <button onClick={() => api.current?.view('chiba')}>{year === 2020 ? 'Portal' : year === 2022 ? 'Ba Sing Se' : 'Chiba'}</button>
           <button onClick={() => api.current?.view('campus')}>
             Whole campus
           </button>

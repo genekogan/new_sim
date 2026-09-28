@@ -74,7 +74,7 @@ const SHOTS: Shot[] = [
     scenario: 'year-2022',
     marks: [
       { ids: ['east-house-plywood-deck-sheet-141763ed*'], label: 'deck strip, 4 ft × 15 ft', opts: { width: 0.03, lift: 1.2 } },
-      { ids: pick(2022, 'east-house-12-foot-orange-beam', (r) => (near(r[2], 6.314) || near(r[2], 10.886)) && near(r[3], -8.486) && near(r[8], 2.54)), label: 'beam', opts: { ...BLUE, lift: 0.5 } },
+      { ids: pick(2022, 'east-house-12-foot-orange-beam', (r) => (near(r[2], 6.314) || near(r[2], 10.886)) && near(r[3], -3.486) && near(r[8], 2.54)), /* W51: Cahuilla +5 m in z (pinwheel shift −2) */ label: 'beam', opts: { ...BLUE, lift: 0.5 } },
     ],
     cam: { eye: [6.0, 4.0, 4.0], look: [-0.8, 2.3, 0] },
   },

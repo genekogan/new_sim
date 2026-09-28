@@ -17,9 +17,9 @@ const BASELINES = new Set(['lab-year-2021-top-prisms', 'lab-year-2022-top-prisms
  * Passage checks the engine data currently fails (see app/lab/README.md "Year walkabouts"). Asserted
  * as failing so a data fix shows up here; remove the entry when it passes.
  */
-const KNOWN_BLOCKED: Record<string, string> = {
-  'year-2022:w3': '2022 south-west corner passage (kitchen / west-house) is closed at ground level by the west-house table + kitchen stair rail',
-};
+// W51: the 2022 south-west corner (kitchen / west-house = Chatsubo / Huaqiangbei) opened when its table went (Q1,
+// RECONCILIATION_2022 §e) and the stairs turned parallel to the houses; nothing is known-blocked now.
+const KNOWN_BLOCKED: Record<string, string> = {};
 
 /** Mid-route oblique cameras [position, target]: eye-level down the 2021 corridor, the 2022 south-west
  *  corner passage from outside, along the 2024 frontage. */

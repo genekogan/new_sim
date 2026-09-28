@@ -17,6 +17,7 @@ import { ARTIFACTS, captureView } from './helpers';
 import { loadCampusFile } from '../engine/campus/history-node.ts';
 import { yearBuildSetup } from '../engine/scenarios/year-build.ts';
 import { rehearse } from '../engine/rehearsal/rehearse.ts';
+const W51_FIXME = '2022 reconciliation W51: mars-2022 re-seeded (houses, stairs, solar, trailers moved); the recorded 2022 takes / pins no longer match it — re-record parked with the content (OWNER_DECISIONS 2026-09-29 evening; RECONCILIATION_2022.md)';
 
 /**
  * The node rehearsal of the same setup (engine/test/year-build.test.ts pins it: first bay 41 019 ticks
@@ -138,6 +139,7 @@ const comps = (page: Page) => page.evaluate(() => (window.__marsEngine as unknow
 const humans = async (page: Page) => (await page.evaluate(() => (window.__marsEngine as unknown as H).state())).humans;
 
 test('year-build 2022 east-house (first bay): live = rehearsal pin, rack poses on the bracing, captures', async ({ page }, testInfo) => {
+  test.fixme(true, W51_FIXME);
   test.setTimeout(1_800_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -255,6 +257,7 @@ test('year-build 2022 east-house (first bay): live = rehearsal pin, rack poses o
 });
 
 test('year-build 2022 east-house, whole house (YEAR_BUILD_FULL=1): live = rehearsal pin, timed, skeleton captures', async ({ page }, testInfo) => {
+  test.fixme(true, W51_FIXME);
   test.skip(process.env.YEAR_BUILD_FULL !== '1', 'whole house: set YEAR_BUILD_FULL=1');
   test.setTimeout(900_000);
   await openLab(page, 'year-build-2022-house');

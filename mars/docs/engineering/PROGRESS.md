@@ -1350,3 +1350,26 @@ Then: gate → release 5; HANDOFF refresh.
 
 ## 2026-09-29 ~22:40 EDT — Handoff procedure (Gene: transfer to Codex in ~1 h)
 - All running workers (W47, W51, W54, W57, W58) told to land at their next green checkpoint with an explicit "Next step" per unfinished item, full gate, then stop; no new workers. Then: docs refresh (HISTORICAL_CONTENT.md + banners, HANDOFF, NEXT_SESSION_PROMPT, LAST_MILE statuses) and the handoff prompt `docs/engineering/HANDOFF_PROMPT_ENGINE.md` for the next agent (engine / simulation / controller / app only; historical content is a separate agent's job).
+## 2026-09-29 evening — W51: 2022 reconciliation + 2023/24 trailers (reconstruction edits), per-year north
+- **Landed** (branch `w51-2022-scene`, rebased on `78cd157`): RECONCILIATION_2022 §a, §b-Kit, §c, §d-Kit, §e, §f, §i as one
+  re-seed per year (its banner has the per-section status, "Content is parked"). 2022: names Ba Sing Se / Cahuilla /
+  Chatsubo / Huaqiangbei on the kept ids (no "Chiba" in 2022, studio button included); `shift` 3 → −2 (clockwise);
+  parallel stairs (12 × 3.54 m treads, 13 risers from the sand, landing at the deck over the outer frame bay; Q29 default,
+  Q32 new); south-facing 45° solar rows on triangle frames (10 / 10 / 3 × 3 / none; Q28 default); no corner table; 9
+  trailers from aerial-03 (train of 5 on −X), rv-10…12 gone. 2023 / 2024: `ring()` keeps out of Chiba (Q2 done).
+  North: `YEAR_NORTH_AZIMUTH_OFFSET {2022: −101}` (DJI_0829; W51's own picks 95–103°, mean 100.4°), carried by the year
+  file and `scene.meta`, used by the camera (sun, sun-behind, compass side) and the studio sky; global −90 fallback.
+- **Ids:** 2022 999 / 1204 kept, stair + solar entries aliased by role, 47 → null; 2023 / 2024 all kept. contentHash
+  2022 8b88e6f0… → f8090a99…, 2023 8e401abb… → 883e6371…, 2024 832e8d9a… → bd2e0c79….
+- **Moved as planned (parked, not re-pinned):** 2022 year-build engine pins → `todo` "2022 reconciliation W51; re-pin by
+  W52" with old hashes in the tests (251a44c5, d382e461, 94db263e, ddb634d6, 940e9f64, 4862adfc, b4c42210; also the
+  phase-A / A+B plans, sections, report tables, year-stock BOM). e2e consumers of the recorded 2022 takes →
+  `test.fixme(W51_FIXME)` (studio-build watch ×3, lab "Oblique yard", year-build first bay + whole house). Causes besides
+  the moved neighbours: Cahuilla's beam staging end falls in Ba Sing Se (W38 rule 3, 9 beams), the stair template (no
+  stringer rule → no Kit stair link), tilted modules read as 1.18 m panels. perf-walk 5 pins PIN-OK.
+- **Baselines refreshed after looking:** studio 2022 (default, plan, courtyard), 2023 (default, plan), 2024 (default,
+  plan, front-eye, frontage, kitchen-eye, solarium, solarium-door), lab-year-2022/2024-top-prisms, render-polish
+  green-frame (the upright's surroundings moved). Lab 2022 walkabout: the SW corner is no longer known-blocked.
+- **Honest comparison with aerial-03:** handedness, stair ends, stair orientation, panel rows and Chatsubo bare match;
+  the train follows the photo's arc (positions ±1.5 m); the model courtyard reads ~1–2 m tighter than the photo (radius
+  8.6 unchanged), so each corner passage is 1.0 m (photo ≈ 2 m); Cahuilla's short second group is left out (Q28).

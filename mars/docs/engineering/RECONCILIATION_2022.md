@@ -1,5 +1,26 @@
 # 2022 reconciliation: the work plan for Gene's questionnaire answers (W49, 2026-09-29 evening)
 
+> **Content is parked (Gene, 2026-09-29 evening; OWNER_DECISIONS.md).** Historical content is Gene's separate job: no
+> further reconstruction workers are scheduled (W52 / W53 cancelled) and nothing is re-pinned or re-recorded for content.
+> W51 landed §a, §b-Kit, §c, §d-Kit, §e, §f and §i as **one re-seed per year** (`mars-2022` 8b88e6f0… → f8090a99…,
+> `mars-2023` 8e401abb… → 883e6371…, `mars-2024` 832e8d9a… → bd2e0c79…; HISTORY_IDS.md "Reconstruction edits"). The
+> 2022 year-build pins are `todo` ("2022 reconciliation W51; re-pin by W52") with their old hashes kept in the tests.
+>
+> | § | status | what landed / **next step** |
+> | --- | --- | --- |
+> | (j) datum y = 0 | not started | **Next:** as written below (Kit `GROUND` 0, studio offset, 2020 undo, `GROUND_Y_2026` check, regenerate 2021–2025). |
+> | (a) names + handedness | **done** (W51) | Names on the kept ids (no "Chiba" in 2022: labels, regions, the studio's building button); `shift` 3 → −2 (clockwise). Q20 stays open for Gene's confirmation. |
+> | (e) no corner table | **done** (W51) | Table top + 4 legs removed (→ `null`). |
+> | (c) trailers | **done** (W51) | rv-1…rv-9 per aerial-03 (train of 5 on −X + 4 scattered), rv-10…12 → `null`; every trailer ≥ 3.4 m from every house (`history-geometry` asserts ≥ 0.5 m). |
+> | (b) stairs parallel | **partial**: Kit done | Kit: 12 treads × 3.54 m parallel to each house, 13 risers from the sand, landing at the first-floor deck over the outer frame bay reaching into the outer aisle (Q29 default; landing arrangement = Q32). **Next (engine):** `stringerRule` / `treadRule` / catalog for the new template — until then every stair part is unplaced with the template reason ("Kit stairs have no … catalog flight"; its text still names the old 4.45 m / 8-tread template), so phase B has **no stair link** (the stair is never walkable). |
+> | (d) solar | **partial**: Kit done | Kit: south-facing 45° rows on triangle frames, low edge on the south roof edge (Huaqiangbei, Cahuilla 10 modules; Ba Sing Se 3 stepped rows of 3; Chatsubo none; Q28 default). **Next (engine):** `solar-frame-45-2x4` + `install_panel` onto frames; the engine now reads a tilted module's plan box as a 1.18 × 1.07 m panel (`year-stock` todo). |
+> | (g) floors: joists | not started | **Next:** as written below (Kit then engine). The stair landing / top riser rise with it (2.49 → 2.64 m). |
+> | (h) roofs: framing | not started | **Next:** as written below; the solar frames stand on the roof top (`ROOF_TOP_2022`) and rise with it. |
+> | (f) north | **done** (W51) | `YEAR_NORTH_AZIMUTH_OFFSET = {2022: −101}` (DJI_0829; W51's picks: axes at 95–103°, mean 100.4°); year files carry `northAzimuthOffset`; sun / camera / studio sky take the scene's value, the global −90 is the fallback. perf-walk 5 pins PIN-OK. |
+> | (i) 2023/24 trailers | **done** (W51) | `ring()` keeps out of Chiba's sector; no trailer under the roof, all ≥ 3.4 m off its walls; all trailer ids kept. Q2 done. |
+> | (k) third row | confirmation only | Nothing to build. |
+> | re-pins / takes | parked | The 2022 year-build pins (first bay `251a44c5…`, skeleton `d382e461…`, bay + strip `94db263e…`, A+B `ddb634d6…`, tranches `940e9f64…` / `4862adfc…` / `b4c42210…`) and the chapter takes stay as recorded. Moving causes, besides the neighbours: Cahuilla's beam staging end now falls inside Ba Sing Se's end (W38 rule 3: 9 beams unstaged), the stair and solar templates (above). |
+
 Source of truth: OWNER_DECISIONS.md, "(2026-09-29 evening, Gene — questionnaire answers)". The answers are also on the
 `Gene:` lines of QUESTIONS_FOR_GENE.md (Q1–Q14, Q19; Q3 correction). This file is a **plan**: nothing here is built
 yet. Every hour figure is a **labelled estimate**. Every photo measurement is a pixel pick by eye, with its error

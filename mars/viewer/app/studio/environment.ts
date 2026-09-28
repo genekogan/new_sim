@@ -33,6 +33,8 @@ function localDateTimeAt(date: string, hour: number): string {
 export function createEnvironment(
   scene: THREE.Scene,
   renderer: THREE.WebGLRenderer,
+  /** The year scene's site bearing (engine/env/sun.ts YEAR_NORTH_AZIMUTH_OFFSET; W51); omitted = the global. */
+  opts: { northAzimuthOffset?: number } = {},
 ) {
   const sky = new Sky();
   sky.scale.setScalar(1200);
@@ -182,7 +184,7 @@ export function createEnvironment(
     // NORTH_AZIMUTH_OFFSET there for the site bearing (−X north). Date
     // and hour are independent inputs, and both stay independent of
     // simulation elapsed time `time` (spec §19).
-    const sun_ = solarPosition(localDateTimeAt(date, hour), BOMBAY_BEACH.lat, BOMBAY_BEACH.lon);
+    const sun_ = solarPosition(localDateTimeAt(date, hour), BOMBAY_BEACH.lat, BOMBAY_BEACH.lon, opts.northAzimuthOffset);
     const direction = new THREE.Vector3(...sun_.direction);
     const state = daylightFactors(sun_.elevationDeg);
     uniforms.sunPosition.value.copy(direction).multiplyScalar(450000);

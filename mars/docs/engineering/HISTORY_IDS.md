@@ -88,3 +88,14 @@ Migration table (`2024.chiba`):
 - 84 entries set to `null`: the 14 right-hand salvaged windows (backing, glazing, 4 frames each) no longer exist.
 So the table now holds 7,858 live entries plus 93 nulls; 9 nulls predate this edit. `history-ids.test.mjs` asserts
 both numbers.
+
+**2022 / 2023 / 2024, 2026-09-29 evening (W51, RECONCILIATION_2022.md).** One re-seed per year; `contentHash` 2022
+8b88e6f0… → f8090a99…, 2023 8e401abb… → 883e6371…, 2024 832e8d9a… → bd2e0c79… (`campus-history.test.ts` freezes the
+three and proves pre-edit canonical + `reconstruction-edit` = the new canonical).
+- 2022: 999 of 1204 ids kept, including every rack, deck, wall and room piece (the house groups moved with `shift`, so
+  their placements inside the house are unchanged) and rv-1…rv-9 (moved; placements are relative to the trailer). The
+  stairs and solar rows were re-made: their migration entries are aliased by role in build order (tread k → tread k,
+  riser k → riser k, rails, posts, panel k → panel k, cells k → cells k); 47 entries → `null`: Ba Sing Se's 10th module
+  (panel + cells), one surplus rail post per house (4), the corner table (top + 4 legs) and rv-10…rv-12 (12 pieces each).
+- 2023 / 2024: every id kept (the ring's trailers moved out of Chiba; nothing aliased).
+So the table now holds 7,811 live entries plus 140 nulls; `history-ids.test.mjs` asserts both numbers.

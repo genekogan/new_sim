@@ -9,6 +9,7 @@ import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { captureView, collectConsoleErrors, openStudio, waitFrames, writeArtifact } from './helpers';
+const W51_FIXME = '2022 reconciliation W51: mars-2022 re-seeded (houses, stairs, solar, trailers moved); the recorded 2022 takes / pins no longer match it — re-record parked with the content (OWNER_DECISIONS 2026-09-29 evening; RECONCILIATION_2022.md)';
 
 type Entry = { id: string; file: string; year: number; duration: number; ticks?: number; entities: number; finalStateHash: string; rulesVersion?: string; kind?: string; moments: Record<string, number> };
 type Checks = { hash: { ok: boolean; replayed: string }; frame: { ok: boolean; maxMm: number }; canonical: { ok: boolean; atPose: number; total: number; outside: number; checkpoint: string; maxMm: number } | null };
@@ -59,6 +60,7 @@ test('the manifest has a year-build take', () => {
 });
 
 for (const e of builds) test(`watch it being built (${slug(e)}): year picker → piles to standing structure, log, final checks, hands`, async ({ page }, testInfo) => {
+  test.fixme(true, W51_FIXME);
   test.setTimeout(420_000);
   const takeName = slug(e);
   const errors = collectConsoleErrors(page);
@@ -238,6 +240,7 @@ test('the manifest has a chapter set, and its chapters are chapter takes', () =>
 });
 
 for (const s of sets) test(`watch it being built (chapter set ${s.id.slice(0, 8)}): one entry, chapter bar, continuity at the seams, stair, walls, final A+B checks`, async ({ page }, testInfo) => {
+  test.fixme(true, W51_FIXME);
   test.setTimeout(600_000);
   const errors = collectConsoleErrors(page);
   const report: Record<string, unknown> = { set: s.id };
