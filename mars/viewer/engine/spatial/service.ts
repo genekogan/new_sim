@@ -6,7 +6,7 @@ import { hashOf } from '../core/hash.ts';
 import { dcos, dsin, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { CATALOG, def } from '../world/catalog.ts';
-import { buildGrids, gridsWithObstacles, StaticRaster, type GridSet } from './grid.ts';
+import { buildGrids, gridsWithObstacles, StaticRaster, updateGrids, type GridSet } from './grid.ts';
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 import type { Profiler } from '../runtime/profile.ts';
@@ -83,6 +83,8 @@ export class Spatial {
   contributors: Contributor[];
   /** Route planner for route()/routeAround() (path.ts RouteOpts.planner); 'exact' unless opted in. */
   planner: 'exact' | 'corridor';
+  /** Patch the previous grids on sync (grid.ts updateGrids, bit-identical) instead of rebuilding; default on. */
+  incremental: boolean;
   scene!: SpatialScene;
   grids!: GridSet;
   epoch = 0;
@@ -92,12 +94,13 @@ export class Spatial {
   /** Rasters of the base obstacles (they lead every synced scene's obstacle list). */
   private raster: StaticRaster;
 
-  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor' } = {}) {
+  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor'; incremental?: boolean } = {}) {
     this.base = base;
     this.baseId = opts.baseId ?? hashOf(base);
     this.cell = opts.cell ?? 0.1;
     this.contributors = opts.contributors ?? [];
     this.planner = opts.planner ?? 'exact';
+    this.incremental = opts.incremental ?? true;
     this.raster = new StaticRaster(base.obstacles, base.bounds, this.cell);
   }
 
@@ -136,8 +139,11 @@ export class Spatial {
       }
       if (r.links) links.push(...r.links);
     }
+    const prev = this.scene;
     this.scene = { bounds: this.base.bounds, levels, surfaces, obstacles, links };
-    this.grids = buildGrids(this.scene, this.cell, this.raster);
+    // construction changes a few components: patch only their cells (and the clearance they can reach)
+    const grids = () => (this.incremental && prev && updateGrids(this.grids, prev, this.scene, this.cell, this.raster)) || buildGrids(this.scene, this.cell, this.raster, this.incremental);
+    this.grids = this.prof ? this.prof.time('spatial.sync.grids', grids) : grids();
     if (this.planner === 'corridor') prepareCorridor(this.grids);
     this.epoch++;
     return true;
