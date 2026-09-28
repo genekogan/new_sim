@@ -10,7 +10,7 @@
 //     next to another person, and with a walking route from where they are now.
 // Ladders / scaffold are not modelled: work more than 2.1 m above every
 // accessible floor is refused (`reach.too-high`).
-import { angleDelta, datan2, dcos, dsin, obbOverlap, rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { angleDelta, datan2, dcos, dsin, obbOverlap, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
@@ -46,7 +46,7 @@ export function spatialOf(rt: Runtime): Spatial {
 
 export function distToObb(p: Vec2, o: OBB2): number {
   const l = rot2(sub2(p, o.c), -o.yaw);
-  return Math.hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
+  return hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
 }
 
 /** Crew sanity shared by the construction verbs. */
@@ -66,7 +66,7 @@ export function crewCheck(rt: Runtime, crew: string[], min: number, max: number,
 export function stagedCheck(e: Entity, target: Vec2, code: string): Fail | null {
   if (!(e.phase === 'staged' || e.phase === 'stored') || e.support?.kind !== 'ground')
     return fail(code, `${e.id} must be lying on the ground at the work area (it is ${e.phase ?? 'unplaced'}, support ${e.support?.kind ?? 'none'})`, [e.id]);
-  const d = Math.hypot(e.pose.p[0] - target[0], e.pose.p[2] - target[1]);
+  const d = hypot(e.pose.p[0] - target[0], e.pose.p[2] - target[1]);
   if (d > STAGE_RADIUS)
     return fail(code, `${e.id} lies ${f2(d)} m from where it goes (${f2(target[0])}, ${f2(target[1])}); carry it within ${STAGE_RADIUS} m first`, [e.id]);
   return null;
@@ -110,7 +110,7 @@ export function findStations(rt: Runtime, crew: string[], anchors: Vec2[], t: Wo
         if (bodyBand && d < r + 0.05) continue;
         if (clearanceAt(g, p) < r + 0.03) continue;
         if (avoid.some((a) => distToObb(p, a) < r + 0.05)) continue;
-        if (others.some((h) => h.human!.level === lv.id && Math.hypot(h.pose.p[0] - p[0], h.pose.p[2] - p[1]) < 2 * r + 0.1)) continue;
+        if (others.some((h) => h.human!.level === lv.id && hypot(h.pose.p[0] - p[0], h.pose.p[2] - p[1]) < 2 * r + 0.1)) continue;
         cands.push({ level: lv.id, y: lv.y, p, k: cands.length });
       }
   }
@@ -119,8 +119,8 @@ export function findStations(rt: Runtime, crew: string[], anchors: Vec2[], t: Wo
     const a = w.entities[actor];
     const anchor = anchors[Math.min(i, anchors.length - 1)];
     const order = cands
-      .filter((c) => !chosen.some((s) => s.level === c.level && Math.hypot(s.p[0] - c.p[0], s.p[1] - c.p[1]) < 2 * r + 0.15))
-      .sort((x, y) => x.y - y.y || Math.hypot(x.p[0] - anchor[0], x.p[1] - anchor[1]) - Math.hypot(y.p[0] - anchor[0], y.p[1] - anchor[1]) || x.k - y.k);
+      .filter((c) => !chosen.some((s) => s.level === c.level && hypot(s.p[0] - c.p[0], s.p[1] - c.p[1]) < 2 * r + 0.15))
+      .sort((x, y) => x.y - y.y || hypot(x.p[0] - anchor[0], x.p[1] - anchor[1]) - hypot(y.p[0] - anchor[0], y.p[1] - anchor[1]) || x.k - y.k);
     let pick: Station | null = null;
     let lastWhy = '';
     // a failed route marks the candidate's whole connected standing region as unreachable
@@ -235,7 +235,7 @@ export function liftStep(rt: Runtime, ex: Pick<LiftExec, 'crew' | 'item' | 't' |
   const h0 = hands(item.pose);
   if (h0.length) {
     for (let k = 0; k < 6; k++) {
-      const dh = Math.max(0, ...hands(q).map((h, i) => Math.hypot(h.p[0] - h0[i].p[0], h.p[2] - h0[i].p[2])));
+      const dh = Math.max(0, ...hands(q).map((h, i) => hypot(h.p[0] - h0[i].p[0], h.p[2] - h0[i].p[2])));
       if (dh <= FOLLOW_SPEED * dt) break;
       t = ex.t + (t - ex.t) * ((FOLLOW_SPEED * dt) / dh) * 0.95;
       q = pathPose(path, t);
@@ -277,7 +277,7 @@ export type SweepOpts = { ignore: string[]; liftOver?: boolean; what?: string; f
 export type LiftPath = { poses: Pose[]; via: 'straight' | 'lift-over' };
 export type Hit = { o: Obstacle; q: Pose };
 
-const partExtent = (e: Entity) => Math.hypot(...def(e.def).size) / 2;
+const partExtent = (e: Entity) => hypot(...def(e.def).size) / 2;
 
 /**
  * Seated yaw for an end-for-end symmetric part (2x4, sheet, tread): of `yaw` and `yaw + π`, the one
@@ -290,7 +290,7 @@ export function symmetricYaw(from: number, yaw: number): number {
 /** Pose at time fraction t along a waypoint path: segment times ∝ length, eased within each segment. */
 export function pathPose(ps: Pose[], t: number): Pose {
   if (ps.length === 2) return lerpPose(ps[0], ps[1], smooth(t));
-  const lens = ps.slice(1).map((q, i) => Math.hypot(q.p[0] - ps[i].p[0], q.p[1] - ps[i].p[1], q.p[2] - ps[i].p[2]) + 1e-9);
+  const lens = ps.slice(1).map((q, i) => hypot(q.p[0] - ps[i].p[0], q.p[1] - ps[i].p[1], q.p[2] - ps[i].p[2]) + 1e-9);
   const total = lens.reduce((a, b) => a + b, 0);
   let acc = 0;
   for (let i = 0; i < lens.length; i++) {
@@ -301,7 +301,7 @@ export function pathPose(ps: Pose[], t: number): Pose {
   return ps[ps.length - 1];
 }
 
-export const pathLength = (ps: Pose[]) => ps.slice(1).reduce((a, q, i) => a + Math.hypot(q.p[0] - ps[i].p[0], q.p[1] - ps[i].p[1], q.p[2] - ps[i].p[2]), 0);
+export const pathLength = (ps: Pose[]) => ps.slice(1).reduce((a, q, i) => a + hypot(q.p[0] - ps[i].p[0], q.p[1] - ps[i].p[1], q.p[2] - ps[i].p[2]), 0);
 
 /** Duration of a lift along `path`: the verb's own duration for a straight lift, paced for a lift-over. */
 export const liftDuration = (path: LiftPath, base: number) => (path.via === 'straight' ? base : Math.max(base, pathLength(path.poses) / LIFT_PACE));
@@ -321,7 +321,7 @@ export function notchSoft(rt: Runtime, e: Entity): { ids: Set<string>; depth: nu
 
 function segmentHit(sp: Spatial, e: Entity, a: Pose, b: Pose, skip: Set<string>, soft?: { ids: Set<string>; depth: number }): Hit | null {
   const ext = partExtent(e);
-  const disp = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2])
+  const disp = hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2])
     + ext * (Math.abs(angleDelta(a.yaw, b.yaw)) + Math.abs((b.pitch ?? 0) - (a.pitch ?? 0)) + Math.abs((b.roll ?? 0) - (a.roll ?? 0)));
   const n = Math.max(LIFT_SAMPLES, Math.ceil(disp / LIFT_SAMPLE_STEP));
   // broad phase: obstacles near the segment's bounding box
@@ -329,7 +329,7 @@ function segmentHit(sp: Spatial, e: Entity, a: Pose, b: Pose, skip: Set<string>,
   const hi = [Math.max(a.p[0], b.p[0]) + ext, Math.max(a.p[1], b.p[1]) + ext, Math.max(a.p[2], b.p[2]) + ext];
   const near = sp.scene.obstacles.filter((o) => {
     if (o.id === e.id || skip.has(o.id) || o.y1 <= lo[1] || o.y0 >= hi[1]) return false;
-    const r = Math.hypot(o.obb.half[0], o.obb.half[1]);
+    const r = hypot(o.obb.half[0], o.obb.half[1]);
     return o.obb.c[0] + r >= lo[0] && o.obb.c[0] - r <= hi[0] && o.obb.c[1] + r >= lo[2] && o.obb.c[1] - r <= hi[2];
   });
   if (!near.length) return null;

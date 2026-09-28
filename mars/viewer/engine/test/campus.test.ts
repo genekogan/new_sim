@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hashOf } from '../core/hash.ts';
-import { obbOverlap, type Vec2 } from '../core/math.ts';
+import { obbOverlap, type Vec2, hypot } from '../core/math.ts';
 import { WorldHistory, HistoryError } from '../history/store.ts';
 import { buildGrids, clearanceAt, cellOf, centreOf } from '../spatial/grid.ts';
 import { Spatial, entityFootprint } from '../spatial/service.ts';
@@ -131,7 +131,7 @@ test('a walker can route from every pile to staging (±40 m crop)', () => {
     const start: Vec2 = [b.x0 - 0.6, (b.z0 + b.z1) / 2]; // pile edge, outside the laid items
     const r = sp.route(w, HUMAN_PROFILE, { level: 0, p: start }, { level: 0, p: goal });
     assert.ok(r.ok, `${id} → staging: ${r.ok ? '' : r.diagnostic.message}`);
-    if (r.ok) assert.ok(r.route.length < 3 * Math.hypot(goal[0] - start[0], goal[1] - start[1]) + 5, `${id} route ${r.route.length.toFixed(1)} m`);
+    if (r.ok) assert.ok(r.route.length < 3 * hypot(goal[0] - start[0], goal[1] - start[1]) + 5, `${id} route ${r.route.length.toFixed(1)} m`);
   }
   for (const e of Object.values(w.entities).filter((q) => q.kind === 'human'))
     assert.ok(cellOf(sp.level(0)!, [e.pose.p[0], e.pose.p[2]]) >= 0 && clearanceAt(sp.level(0)!, [e.pose.p[0], e.pose.p[2]]) >= HUMAN_PROFILE.radius, `${e.id} standable`);

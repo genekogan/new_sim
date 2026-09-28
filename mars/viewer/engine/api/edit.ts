@@ -6,7 +6,7 @@
 // floor, people), so an edit can never leave something inside a wall or a person.
 // Pure w.r.t. history: the controller commits the result (engine_edit_world).
 import type { z } from 'zod';
-import { obbCorners, obbOverlap, pointInObb, type Vec2 } from '../core/math.ts';
+import { obbCorners, obbOverlap, pointInObb, type Vec2, hypot } from '../core/math.ts';
 import { orientationFor, poseAt } from '../carry/formation.ts';
 import { canonicalEntityOrder } from '../runtime/runtime.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
@@ -192,7 +192,7 @@ export function placementIssue(sp: Spatial, w: WorldState, e: Entity, level: num
       return { code: 'edit.blocked', reason: `a person at ${at(p)} would be inside ${lab ? `'${lab}'` : 'the edge of the floor'}`, subjects: b ? [b] : [] };
     }
     for (const o of people)
-      if (Math.hypot(o.pose.p[0] - p[0], o.pose.p[2] - p[1]) < 2 * HUMAN_RADIUS) return { code: 'edit.blocked', reason: `a person at ${at(p)} would overlap ${o.id}`, subjects: [o.id] };
+      if (hypot(o.pose.p[0] - p[0], o.pose.p[2] - p[1]) < 2 * HUMAN_RADIUS) return { code: 'edit.blocked', reason: `a person at ${at(p)} would overlap ${o.id}`, subjects: [o.id] };
     return null;
   }
   const fp = entityFootprint(e);

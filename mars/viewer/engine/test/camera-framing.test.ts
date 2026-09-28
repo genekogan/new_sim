@@ -8,6 +8,7 @@ import { CameraWorld } from '../camera/geom.ts';
 import { readability } from '../camera/quality.ts';
 import { evaluateShot, type Sampler, type ShotSpec, type SubjectPose } from '../camera/shots.ts';
 import { planCameraTrack } from '../camera/plan.ts';
+import { hypot } from '../core/math.ts';
 
 const open = (): CameraWorld => new CameraWorld({ bounds: [-40, -40, 40, 40], levels: [], surfaces: [], obstacles: [], links: [] } as SpatialScene);
 const person = (x: number, z: number, extra: Partial<SubjectPose> = {}): SubjectPose => ({ p: [x, 0, z], yaw: 0, kind: 'human', ...extra });
@@ -82,7 +83,7 @@ test('camera orbit/frameGroup: the framing radius includes component extents (or
     const pose = evaluateShot(tight, sampler, t);
     const r = readability(w, pose, sampler(t), ['F']);
     assert.equal(r.subjects[0].inFrame, 1, `t=${t}: ${r.reasons.join(';')}`);
-    assert.ok(Math.hypot(pose.position[0], pose.position[2]) > 1.5 + 1e-6, 'pulled out');
+    assert.ok(hypot(pose.position[0], pose.position[2]) > 1.5 + 1e-6, 'pulled out');
   }
   // without subjects the orbit keeps its radius exactly
   const bare = evaluateShot({ kind: 'orbit', center: [0, 0, 0], radius: 1.5, height: 1.5, period: 8 }, sampler, 0);

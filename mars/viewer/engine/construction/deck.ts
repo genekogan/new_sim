@@ -15,7 +15,7 @@
 //   * Support is a chain: sheet → joists → beams → uprights (held or stable).
 //     Supports are recorded as `bears-on` connections on the supported part.
 import { z } from 'zod';
-import { dot2, IN, obbOverlap, rot2, sub2, type OBB2, type Vec2 } from '../core/math.ts';
+import { dot2, IN, obbOverlap, rot2, sub2, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
@@ -108,7 +108,7 @@ export function planJoist(rt: Runtime, p: JP): { ok: true; program: JProg } | Fa
     if (pr.length) return fail('joist.beam-unsupported', `joist ${j.id} cannot rest on ${id}: ${pr.join('; ')}`, [j.id, id]);
   }
   const pa: Vec2 = [a.pose.p[0], a.pose.p[2]], pb: Vec2 = [b.pose.p[0], b.pose.p[2]];
-  const L = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
+  const L = hypot(pb[0] - pa[0], pb[1] - pa[1]);
   const n: Vec2 = [(pb[0] - pa[0]) / L, (pb[1] - pa[1]) / L];
   if (p.at < 0.1 || p.at > L - 0.1) return fail('joist.out-of-bay', `joist position ${f2(p.at)} m is outside bay ${a.id}–${b.id} (0.10–${f2(L - 0.1)} m clear of the frames)`, [j.id]);
   const D = size(a)[0], len = size(j)[0];

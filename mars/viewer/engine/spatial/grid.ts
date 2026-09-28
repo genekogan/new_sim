@@ -2,7 +2,7 @@
 // Deterministic, allocation-light and pure TS so it runs in the Durable
 // Object as well as the browser. Rebuilt (or patched) when construction
 // changes the scene.
-import { obbCorners, obbOverlap, pointInObb, type OBB2, type Vec2 } from '../core/math.ts';
+import { obbCorners, obbOverlap, pointInObb, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { Level, Obstacle, SpatialScene, Surface } from './types.ts';
 
 export type LevelGrid = {
@@ -471,7 +471,7 @@ export function clearanceAt(g: LevelGrid, p: Vec2): number {
 
 /** Minimum clearance sampled along a segment (step ≤ half a cell). */
 export function segmentClearance(g: LevelGrid, a: Vec2, b: Vec2): number {
-  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const len = hypot(b[0] - a[0], b[1] - a[1]);
   const n = Math.max(1, Math.ceil(len / (g.cell * 0.5)));
   let m = Infinity;
   for (let k = 0; k <= n; k++) {

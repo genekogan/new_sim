@@ -3,7 +3,7 @@
 // the tall blue two-column braced frame; beams are the orange horizontals.
 // Other values are industry-typical and marked provisional until checked
 // against photos or the 2026 component catalog.
-import { dcos, dsin, FT, IN, type Vec3 } from '../core/math.ts';
+import { dcos, dsin, FT, IN, type Vec3, hypot } from '../core/math.ts';
 import type { Confidence } from './types.ts';
 import { ITEM_ASSETS, type SurfaceSlotDef } from './catalog-items.ts';
 import { stockAssets } from './catalog-stock.ts';
@@ -224,7 +224,7 @@ const BODY_R = 0.28;
  * ring that is 1.6 m (0.89 m clear of the corner, so ≥ 0.28 m body clearance with grid slack).
  */
 export const FIRE_RING_GAP = BODY_R + 0.3;
-export const fireRingRadius = (sx: number, sz: number) => Math.max(1.6, Math.hypot(sx, sz) / 2 + FIRE_RING_GAP);
+export const fireRingRadius = (sx: number, sz: number) => Math.max(1.6, hypot(sx, sz) / 2 + FIRE_RING_GAP);
 const FIRE_SIZE: Vec3 = [1.0, 0.35, 1.0];
 const FIRE_RING = fireRingRadius(FIRE_SIZE[0], FIRE_SIZE[2]); // m from the fire centre to where people stand
 const SOCIAL_FIXTURES: AssetDef[] = [

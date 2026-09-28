@@ -20,6 +20,7 @@ import { stagedCheck } from '../construction/access.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
 import type { SpatialScene } from '../spatial/types.ts';
+import { hypot } from '../core/math.ts';
 
 const REG = new Map<string, ActionDef>([['walk_to', walkTo], ['carry', carry]]);
 function setup(base: SpatialScene, ...es: Entity[]) {
@@ -53,7 +54,7 @@ function audit(rt: Runtime, item: string, carrier: string, watch: string[] = [])
       // watched people: plan distance from their body axis to any point of the load at body height
       for (const id of watch) {
         const o = rt.world.entities[id];
-        for (const p of pts) if (p[1] >= o.pose.p[1] && p[1] <= o.pose.p[1] + 1.8) s.personGap = Math.min(s.personGap, Math.hypot(p[0] - o.pose.p[0], p[2] - o.pose.p[2]));
+        for (const p of pts) if (p[1] >= o.pose.p[1] && p[1] <= o.pose.p[1] + 1.8) s.personGap = Math.min(s.personGap, hypot(p[0] - o.pose.p[0], p[2] - o.pose.p[2]));
       }
     },
   });

@@ -1,6 +1,6 @@
 // Geometry of a lying upright, independent of how its pose was encoded
 // (carry lays frames with roll −π/2; raise works in a canonical pitch-π/2 form).
-import { dcos, dsin, heading, type Vec2 } from '../core/math.ts';
+import { dcos, dsin, heading, type Vec2, hypot } from '../core/math.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { entityCorners } from '../spatial/service.ts';
@@ -29,7 +29,7 @@ export function canonicalLying(u: Entity, groundY: number, standNear?: Vec2): Po
   let { base, top } = frameEnds(u);
   // Frames are top/bottom symmetric in this model; the crew raises whichever end is
   // nearest the intended footing (choosing which end goes down is their call).
-  if (standNear && Math.hypot(top[0] - standNear[0], top[2] - standNear[1]) < Math.hypot(base[0] - standNear[0], base[2] - standNear[1])) [base, top] = [top, base];
+  if (standNear && hypot(top[0] - standNear[0], top[2] - standNear[1]) < hypot(base[0] - standNear[0], base[2] - standNear[1])) [base, top] = [top, base];
   const phi = heading([top[0] - base[0], top[2] - base[2]]);
   const t = def(u.def).size[2];
   return { p: [base[0], groundY + t / 2, base[2]], yaw: phi - Math.PI / 2, pitch: Math.PI / 2 };

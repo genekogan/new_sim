@@ -289,9 +289,11 @@ test('deterministic trig: golden bit patterns (any engine / refactor drift fails
   }
 });
 
-test('engine source never calls the host transcendentals (use core/math.ts d* versions)', () => {
+test('engine source never calls the host transcendentals or hypot (use the core/math.ts d* versions and its hypot)', () => {
   const root = path.resolve(import.meta.dirname, '..');
-  const banned = /\bMath\s*\.\s*(sin|cos|tan|asin|acos|atan2?|sinh|cosh|tanh|asinh|acosh|atanh|exp|expm1|log|log1p|log2|log10|cbrt|pow)\b/;
+  // (hypot: implementation-approximated like the transcendentals — V8, SpiderMonkey and JSC use different
+  // algorithms; core/math.ts `hypot` = √ of a sum of squares, correctly rounded ops only)
+  const banned = /\bMath\s*\.\s*(sin|cos|tan|asin|acos|atan2?|sinh|cosh|tanh|asinh|acosh|atanh|exp|expm1|log|log1p|log2|log10|cbrt|pow|hypot)\b/;
   const hits: string[] = [];
   const walk = (dir: string) => {
     for (const ent of readdirSync(dir, { withFileTypes: true })) {
@@ -306,5 +308,5 @@ test('engine source never calls the host transcendentals (use core/math.ts d* ve
     }
   };
   walk(root);
-  assert.deepEqual(hits, [], `host Math transcendentals differ across JS engines (last-bit), breaking cross-host state hashes; use dsin/dcos/dtan/dasin/dacos/datan/datan2/dexp/dlog from engine/core/math.ts:\n${hits.join('\n')}`);
+  assert.deepEqual(hits, [], `host Math transcendentals differ across JS engines (last-bit), breaking cross-host state hashes; use dsin/dcos/dtan/dasin/dacos/datan/datan2/dexp/dlog/hypot from engine/core/math.ts:\n${hits.join('\n')}`);
 });

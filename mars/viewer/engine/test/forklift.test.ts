@@ -16,6 +16,7 @@ import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
 import { forklift, FORKLIFT, FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
 import { stagedCheck } from '../construction/access.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
+import { hypot } from '../core/math.ts';
 
 const H = Math.PI / 2;
 type Opts = { extra?: Obstacle[]; scene?: (s: SpatialScene) => void; truck?: [number, number]; ents?: ReturnType<typeof human>[] };
@@ -54,7 +55,7 @@ test('forklift picks plywood off the ground and stages it on the 3 m deck (level
   assert.equal(ply.phase, 'staged');
   assert.deepEqual(ply.support, { kind: 'ground' });
   assert.ok(Math.abs(ply.pose.p[1] - 3.0) < 1e-9, `on the deck top: ${ply.pose.p[1]}`);
-  assert.ok(Math.hypot(ply.pose.p[0] - 10, ply.pose.p[2] - 7.7) < 1e-6, `placed at ${xz(rt, 'ply1')}`);
+  assert.ok(hypot(ply.pose.p[0] - 10, ply.pose.p[2] - 7.7) < 1e-6, `placed at ${xz(rt, 'ply1')}`);
   assert.equal((rt.services.spatial as Spatial).level(1)!.y, ply.pose.p[1]); // lying on level 1's floor
   // install_plywood's staged precondition accepts it where it now lies
   assert.equal(stagedCheck(ply, [10, 9], 'plywood.not-staged'), null);
@@ -124,12 +125,12 @@ test('a person walking into the lane stops the truck ≥ 1.5 m away; it asks the
   const gapTo = () => {
     const f = xz(rt, 'f1'), p = xz(rt, 'p2');
     // body gap to the truck box (yaw π/2: 0.6 m across x, 1.3 m along z)
-    return Math.hypot(Math.max(Math.abs(p[0] - f[0]) - 0.6, 0), Math.max(Math.abs(p[1] - f[1]) - 1.3, 0)) - HUMAN_RADIUS;
+    return hypot(Math.max(Math.abs(p[0] - f[0]) - 0.6, 0), Math.max(Math.abs(p[1] - f[1]) - 1.3, 0)) - HUMAN_RADIUS;
   };
   rt.observers.push({
     onTick() {
       const cur = xz(rt, 'f1');
-      const moved = Math.hypot(cur[0] - prev[0], cur[1] - prev[1]);
+      const moved = hypot(cur[0] - prev[0], cur[1] - prev[1]);
       if (a.status === 'blocked' && a.diagnostic?.code === 'traffic.person' && moved < 1e-9) stoppedTicks++;
       if (moved > 1e-9) minMovingGap = Math.min(minMovingGap, gapTo());
       prev = cur;

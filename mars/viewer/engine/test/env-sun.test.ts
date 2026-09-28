@@ -8,7 +8,7 @@ import {
   BOMBAY_BEACH,
 } from '../env/sun.ts';
 import { daylightFactors, smoothstep } from '../env/daylight.ts';
-import { dacos, dcos, dsin, dtan } from '../core/math.ts';
+import { dacos, dcos, dsin, dtan, hypot } from '../core/math.ts';
 
 // Reference values are cited from docs/engineering/RESEARCH.md #12 ("Sun position
 // for Bombay Beach") and the task brief's own worked noon-elevation approximations
@@ -124,9 +124,9 @@ test('US DST (since 2007) transition dates for 2026', () => {
 test('sunDirectionVector is a unit vector consistent with solarPosition()', () => {
   const pos = solarPosition('2026-06-21T08:00', BOMBAY_BEACH.lat, BOMBAY_BEACH.lon);
   const [x, y, z] = pos.direction;
-  assert.ok(Math.abs(Math.hypot(x, y, z) - 1) < 1e-9);
+  assert.ok(Math.abs(hypot(x, y, z) - 1) < 1e-9);
   const again = sunDirectionVector(pos.elevationDeg, pos.azimuthDeg);
-  assert.ok(Math.hypot(x - again[0], y - again[1], z - again[2]) < 1e-9);
+  assert.ok(hypot(x - again[0], y - again[1], z - again[2]) < 1e-9);
   assert.ok(y > 0, 'sun should be above the horizon at 08:00 in June');
 });
 

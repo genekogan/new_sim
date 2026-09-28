@@ -18,6 +18,7 @@ import { classifyHistory, historyConfidence } from '../campus/history-extract.ts
 import { loadCampusFile } from '../campus/history-node.ts';
 import type { Region } from '../world/types.ts';
 import { RULES_VERSION } from '../construction/rules.ts';
+import { hypot } from '../core/math.ts';
 
 const years = new Map<number, CampusYear>(HISTORY_YEARS.map((y) => [y, loadCampusYear(y, loadCampusFile(y))]));
 const Y = (y: number) => years.get(y)!;
@@ -98,11 +99,11 @@ test('grids build for every year (ms, cells)', () => {
   console.log(`  campus-history grids @0.1 m: ${report.join('; ')}`);
 });
 
-const routeLen = (pts: Vec2[]) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+const routeLen = (pts: Vec2[]) => pts.slice(1).reduce((s, p, i) => s + hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
 const samples = (pts: Vec2[], step = 0.25) => {
   const out: Vec2[] = [];
   for (let i = 1; i < pts.length; i++) {
-    const [a, b] = [pts[i - 1], pts[i]], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
+    const [a, b] = [pts[i - 1], pts[i]], n = Math.max(1, Math.ceil(hypot(b[0] - a[0], b[1] - a[1]) / step));
     for (let k = 0; k <= n; k++) out.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
   }
   return out;
@@ -125,12 +126,12 @@ test('2022: a walker routes around the courtyard buildings (N of chiba → S of 
   const r = route(2022, a, b);
   const g = r.grids.levels.get(0)!;
   assert.ok(segmentClearance(g, a, b) < HUMAN_PROFILE.radius, 'the straight line is blocked by the buildings');
-  assert.ok(r.len > Math.hypot(b[0] - a[0], b[1] - a[1]) + 0.5, 'the route detours');
+  assert.ok(r.len > hypot(b[0] - a[0], b[1] - a[1]) + 0.5, 'the route detours');
   assert.ok(r.clearance >= 0.28, `clearance ${r.clearance}`);
   // and the courtyard centre is reachable from outside through a corner passage
   const c = route(2022, [0, 0], a);
   assert.ok(c.clearance >= 0.28, `courtyard clearance ${c.clearance}`);
-  console.log(`  2022 around courtyard: ${r.len.toFixed(1)} m (straight ${Math.hypot(b[0] - a[0], b[1] - a[1]).toFixed(1)}), clearance ${r.clearance.toFixed(2)}, ${r.ms.toFixed(0)} ms; courtyard→outside ${c.len.toFixed(1)} m, clearance ${c.clearance.toFixed(2)}`);
+  console.log(`  2022 around courtyard: ${r.len.toFixed(1)} m (straight ${hypot(b[0] - a[0], b[1] - a[1]).toFixed(1)}), clearance ${r.clearance.toFixed(2)}, ${r.ms.toFixed(0)} ms; courtyard→outside ${c.len.toFixed(1)} m, clearance ${c.clearance.toFixed(2)}`);
 });
 
 test('2021: a walker goes straight through the corridor between the two long buildings', () => {
@@ -140,7 +141,7 @@ test('2021: a walker goes straight through the corridor between the two long bui
   const r = route(2021, a, b);
   const g = r.grids.levels.get(0)!;
   assert.ok(clearanceAt(g, [cx, (h.z0 + h.z1) / 2]) > 1.5, 'the corridor is a wide bare-ground passage');
-  assert.ok(r.len < Math.hypot(b[0] - a[0], b[1] - a[1]) + 1.5, `route ${r.len} m should not go around`);
+  assert.ok(r.len < hypot(b[0] - a[0], b[1] - a[1]) + 1.5, `route ${r.len} m should not go around`);
   const inside = samples(r.pts).filter((p) => p[1] > h.z0 + 2 && p[1] < h.z1 - 8);
   assert.ok(inside.length > 20);
   for (const p of inside) assert.ok(Math.abs(p[0] - cx) < 2.29, `(${p[0].toFixed(2)}, ${p[1].toFixed(2)}) left the 4.57 m corridor`);

@@ -5,7 +5,7 @@
 // (sweep.ts) for the whole formation: load cover discs + carrier bodies.
 // Output: a dense trajectory of formation poses, shortcut-smoothed only where
 // the smoothed motion passes the same swept checks. Deterministic.
-import { angleDelta, datan2, dcos, dist2, dsin, type Vec2 } from '../core/math.ts';
+import { angleDelta, datan2, dcos, dist2, dsin, type Vec2, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { cellOf, latticeIndex, nearestBlocker, type LevelGrid } from '../spatial/grid.ts';
 import type { Formation, SE2 } from './formation.ts';
@@ -54,7 +54,7 @@ function primitives(f: Formation): Prim[] {
 
 /** Direct straight motion a → b (uniform rotation) allowed for a crew: bounded curvature and crabbing. */
 function directOk(f: Formation, a: SE2, b: SE2, settle: boolean): boolean {
-  const d = Math.hypot(b.x - a.x, b.z - a.z);
+  const d = hypot(b.x - a.x, b.z - a.z);
   const dth = Math.abs(angleDelta(a.th, b.th));
   if (d < 0.05) return settle ? dth <= 1.5 * DTH : true; // in-place rotation (swept-checked by caller)
   const phi = datan2(b.z - a.z, b.x - a.x);
@@ -74,7 +74,7 @@ export function planCarry(inp: PlanInput): PlanOk | PlanFail {
   const field = distanceField(g, goalP, Math.max(0, f.loadDiscR - f.loadDiscSpacing / 2), cellAt(starts[0].x, starts[0].z), DETOUR);
   const fieldOk = starts.some((s) => Number.isFinite(field[cellAt(s.x, s.z)] ?? Infinity));
   const h = (x: number, z: number) => {
-    if (!fieldOk) return Math.hypot(x - goalP[0], z - goalP[1]);
+    if (!fieldOk) return hypot(x - goalP[0], z - goalP[1]);
     const c = cellAt(x, z);
     return c < 0 ? Infinity : field[c];
   };
@@ -173,7 +173,7 @@ function smooth(g: LevelGrid, f: Formation, keys: SE2[], motions: Motion[]): Tra
       const p = poses[poses.length - 1];
       th = p.th + angleDelta(p.th, q.th); // keep headings continuous for interpolation
       const dq = { x: q.x, z: q.z, th };
-      u.push(u[u.length - 1] + Math.hypot(dq.x - p.x, dq.z - p.z) + (f.length / 2) * Math.abs(dq.th - p.th));
+      u.push(u[u.length - 1] + hypot(dq.x - p.x, dq.z - p.z) + (f.length / 2) * Math.abs(dq.th - p.th));
       poses.push(dq);
     }
   }
@@ -220,7 +220,7 @@ function failure(inp: PlanInput, field: Float32Array, fieldOk: boolean, Q: SE2[]
   const part = !d ? 'the formation' : d.part === 'load' ? 'the load' : `carrier ${inp.carrierNames?.[d.carrier!] ?? `#${d.carrier}`}`;
   const blocker = hit ? nearestBlocker(g, hit.p, 1.0) : undefined;
   const what = blocker ? `'${inp.labelOf(blocker)}'` : 'the edge of walkable ground';
-  const remaining = Math.hypot(q.x - goals[0].x, q.z - goals[0].z);
+  const remaining = hypot(q.x - goals[0].x, q.z - goals[0].z);
   const wide = 2 * Math.max(...f.discs.map((x) => Math.abs(x.c[1]) + x.r));
   const deg = Math.round(((((phi * 180) / Math.PI) % 360) + 360) % 360);
   const message =

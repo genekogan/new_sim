@@ -3,7 +3,7 @@
 // each (push-out), score readability / deviation, and pick with hysteresis.
 // Nothing here hides architecture: occluders are only ignored when the spec
 // explicitly asks for `cutaway`.
-import { dacos, dasin, datan, datan2, dlog, dtan, type Vec3 } from '../core/math.ts';
+import { dacos, dasin, datan, datan2, dlog, dtan, type Vec3, hypot } from '../core/math.ts';
 import { CameraWorld, pointInside, pushOut, raycast } from './geom.ts';
 import { dirFrom, type CameraPose, type SubjectPose } from './shots.ts';
 import { MIN_CLEARANCE, placement, readability, type Placement, type Readability } from './quality.ts';
@@ -52,7 +52,7 @@ export const VARIANTS: Variant[] = [
 export const VARIANT_KEYS = VARIANTS.map((v) => v.key);
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const len = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
+const len = (a: Vec3) => hypot(a[0], a[1], a[2]);
 
 function spherical(pose: CameraPose) {
   const d = sub(pose.position, pose.target);
@@ -105,7 +105,7 @@ export function candidates(world: CameraWorld, desired: CameraPose, subjects: Re
     let pushed = false;
     if (!place.valid) {
       const po = pushOut(world, position, minClear + 0.02);
-      const drift = Math.hypot(po.p[0] - position[0], po.p[1] - position[1], po.p[2] - position[2]);
+      const drift = hypot(po.p[0] - position[0], po.p[1] - position[1], po.p[2] - position[2]);
       if (po.ok && drift <= (opts.maxPush ?? 1.5)) {
         position = po.p;
         pushed = true;

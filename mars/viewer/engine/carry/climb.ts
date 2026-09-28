@@ -12,7 +12,7 @@
 //   carrier: on C(s + along), offset laterally by oC (hands beside the grip).
 // oL/oC centre the load + carrier span on the flight. Clearance is checked
 // against the flight's step profile (link.path points as tread centres).
-import { datan2, obbOverlap, pointInObb, rot2, wrapAngle, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { datan2, obbOverlap, pointInObb, rot2, wrapAngle, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { Link, Obstacle } from '../spatial/types.ts';
 import type { Pose } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
@@ -46,7 +46,7 @@ export type ClimbPose = { q: SE2; y: number; tilt: number; load: Pose; carrier: 
 
 function line(pts: Vec3[]): Line3 {
   const s = [0];
-  for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]));
+  for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]));
   return { pts, s, total: s[s.length - 1] };
 }
 
@@ -85,7 +85,7 @@ export function climbGeom(link: Link, ascending: boolean, f: Formation, ext = f.
 export function climbPose(f: Formation, c: ClimbGeom, s: number): ClimbPose {
   const A = lineAt(c.line, s - f.length / 2), B = lineAt(c.line, s + f.length / 2), C = lineAt(c.line, s + c.along);
   const lat = rot2([0, 1], c.face);
-  const tilt = datan2(B[1] - A[1], Math.hypot(B[0] - A[0], B[2] - A[2]));
+  const tilt = datan2(B[1] - A[1], hypot(B[0] - A[0], B[2] - A[2]));
   const q: SE2 = { x: (A[0] + B[0]) / 2 + lat[0] * c.oL, z: (A[2] + B[2]) / 2 + lat[1] * c.oL, th: c.face };
   const y = (A[1] + B[1]) / 2 + f.carryHeight;
   const load = poseAt(f.defId, { pitch: f.carry.pitch, roll: f.carry.roll + tilt }, q, { centre: y });
@@ -95,7 +95,7 @@ export function climbPose(f: Formation, c: ClimbGeom, s: number): ClimbPose {
 /** The flight's plan footprint (first → last step point, link width). */
 export function flightObb(link: Link): OBB2 {
   const a = link.path[0], b = link.path[link.path.length - 1];
-  return { c: [(a[0] + b[0]) / 2, (a[2] + b[2]) / 2], half: [Math.hypot(b[0] - a[0], b[2] - a[2]) / 2, link.width / 2], yaw: link.heading };
+  return { c: [(a[0] + b[0]) / 2, (a[2] + b[2]) / 2], half: [hypot(b[0] - a[0], b[2] - a[2]) / 2, link.width / 2], yaw: link.heading };
 }
 
 /** Step-profile height under along-coordinate u (from link.from.p along link.heading): nearest step point; landings beyond. */
@@ -122,7 +122,7 @@ export function boxEdgeSamples(defId: string, pose: Pose, step = 0.05): Vec3[] {
     for (const bit of [1, 2, 4]) {
       if (i & bit) continue;
       const a = corner(i), b = corner(i | bit);
-      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / step));
+      const n = Math.max(1, Math.ceil(hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / step));
       for (let k = 0; k <= n; k++) out.push(toWorld(pose, [a[0] + (b[0] - a[0]) * (k / n), a[1] + (b[1] - a[1]) * (k / n), a[2] + (b[2] - a[2]) * (k / n)]));
     }
   return out;
@@ -175,7 +175,7 @@ export function linkUnder(links: Link[], at: Vec2, length: number): Link | null 
     const dir = rot2([1, 0], l.heading);
     const dx = at[0] - l.from.p[0], dz = at[1] - l.from.p[1];
     const u = dx * dir[0] + dz * dir[1], v = Math.abs(-dx * dir[1] + dz * dir[0]);
-    const run = Math.hypot(l.to.p[0] - l.from.p[0], l.to.p[1] - l.from.p[1]);
+    const run = hypot(l.to.p[0] - l.from.p[0], l.to.p[1] - l.from.p[1]);
     if (v > l.width / 2 + 0.6 || u < -length - 1 || u > run + length + 1) continue;
     if (v < bv) { bv = v; best = l; }
   }

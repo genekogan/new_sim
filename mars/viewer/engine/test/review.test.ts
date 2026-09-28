@@ -20,6 +20,7 @@ import { def } from '../world/catalog.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity } from '../world/types.ts';
+import { hypot } from '../core/math.ts';
 
 const open = (half: number, obstacles: SpatialScene['obstacles'] = []): SpatialScene => ({
   bounds: [-half, -half, half, half],
@@ -55,7 +56,7 @@ test('C1: a mid-carry replan never flips the formation (no carrier teleports); t
     rt.step();
     if (rec.phase === 'replan') replanned = true;
     const cur = pos();
-    worst = Math.max(worst, ...cur.map((p, i) => Math.hypot(p[0] - prev[i][0], p[2] - prev[i][2])));
+    worst = Math.max(worst, ...cur.map((p, i) => hypot(p[0] - prev[i][0], p[2] - prev[i][2])));
     prev = cur;
   }
   assert.ok(replanned, 'construction forced a replan');
@@ -105,7 +106,7 @@ test('C2: people holding up a frame cannot be assigned to carry (nor walk off by
   rt.world.entities.p1.human!.task = undefined;
   for (let i = 0; i < 20; i++) rt.step();
   assert.deepEqual(codes(rt), [], 'the frame stays held by both holders');
-  assert.ok(Math.hypot(rt.world.entities.p1.pose.p[0], rt.world.entities.p1.pose.p[2]) < 2, 'p1 stayed at the frame');
+  assert.ok(hypot(rt.world.entities.p1.pose.p[0], rt.world.entities.p1.pose.p[2]) < 2, 'p1 stayed at the frame');
 
   // the invariant: a holder whose grip is gone, or who stands away from the frame, is flagged
   rt.world.entities.p2.human!.grip = undefined;
@@ -197,7 +198,7 @@ test('C3: a walker crossing a carry waits for the load to pass (traffic.load), n
       const b = rt.world.entities.b;
       if (b.phase !== 'carried') continue;
       const p = rt.world.entities.p3.pose.p;
-      for (const d of worldDiscs(f, entityFrame(b).q)) if (d.d.part === 'load') worst = Math.min(worst, Math.hypot(d.p[0] - p[0], d.p[1] - p[2]) - d.d.r);
+      for (const d of worldDiscs(f, entityFrame(b).q)) if (d.d.part === 'load') worst = Math.min(worst, hypot(d.p[0] - p[0], d.p[1] - p[2]) - d.d.r);
     }
     assert.equal(c.status, 'completed', `carry (walk starts at load x ${startX})`);
     assert.equal(walk?.status, 'completed', `walk ${walk?.diagnostic?.code}`);
@@ -230,7 +231,7 @@ test('H2: a snapped walk_to goal ends at the snapped standable point, reports ou
   assert.ok(clearanceAt(sp.level(0)!, [p[0], p[2]]) >= 0.28, `arrival clearance ${clearanceAt(sp.level(0)!, [p[0], p[2]]).toFixed(2)} m`);
   const snapped = r.outputs?.snapped as number;
   assert.ok(snapped > 0.05 && snapped <= 0.35, `snapped ${snapped}`);
-  assert.ok(Math.abs(Math.hypot(p[0] - 4.75, p[2]) - snapped) < 0.01, 'the body stands at the reported snapped point');
+  assert.ok(Math.abs(hypot(p[0] - 4.75, p[2]) - snapped) < 0.01, 'the body stands at the reported snapped point');
   assert.deepEqual(codes(rt), [], 'no collision on arrival');
   // an exactly standable goal is reached exactly
   const ok = rt.submit('walk_to', { actor: 'p1', x: 2, z: 1 });

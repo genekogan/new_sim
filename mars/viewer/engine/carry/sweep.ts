@@ -3,7 +3,7 @@
 // bodies) must have clearance ≥ disc radius + margin at every sample, and
 // samples are spaced so no disc moves more than SAMPLE metres between them
 // (margin ≥ SAMPLE/2 then covers the motion between samples).
-import { angleDelta, dcos, dsin, type Vec2 } from '../core/math.ts';
+import { angleDelta, dcos, dsin, type Vec2, hypot } from '../core/math.ts';
 import { cellOf, type LevelGrid } from '../spatial/grid.ts';
 import type { Formation, SE2 } from './formation.ts';
 
@@ -37,7 +37,7 @@ export const motionEnd = (m: Motion) => (m.kind === 'line' ? m.b : motionAt(m, 1
 /** Centre path length and absolute heading change of a motion. */
 export function motionSize(m: Motion): { len: number; rot: number } {
   if (m.kind === 'arc') return { len: Math.abs(m.R * m.dth), rot: Math.abs(m.dth) };
-  return { len: Math.hypot(m.b.x - m.a.x, m.b.z - m.a.z), rot: Math.abs(angleDelta(m.a.th, m.b.th)) };
+  return { len: hypot(m.b.x - m.a.x, m.b.z - m.a.z), rot: Math.abs(angleDelta(m.a.th, m.b.th)) };
 }
 
 /** Upper bound on the displacement of any formation point over the motion. */

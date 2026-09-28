@@ -8,7 +8,7 @@
 // the top (contributor.ts); otherwise its link is emitted with usable = false
 // and a reason such as "treads 3, 7 missing" or "no landing at top".
 import { z } from 'zod';
-import { distPointSeg, obbOverlap, pointInObb, rot2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { distPointSeg, obbOverlap, pointInObb, rot2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
@@ -169,7 +169,7 @@ export function planStairFlight(rt: Runtime, p: SP): { ok: true; program: SProg 
   const off = g.width / 2 + 0.45;
   const offsets: Vec2[] = [[0, -off], [0, off]];
   const from = st.pose;
-  const dist = Math.hypot(to.p[0] - from.p[0], to.p[2] - from.p[2]);
+  const dist = hypot(to.p[0] - from.p[0], to.p[2] - from.p[2]);
   // the flight body (shared swept-lift check; it may touch the member its top hooks onto). It is
   // walked along the floor by its carriers, so it cannot be hoisted over an obstacle.
   const sweep: SweepOpts = { ignore: [sup.id], liftOver: false, what: `stair flight ${st.id}` };

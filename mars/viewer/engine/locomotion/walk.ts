@@ -12,7 +12,7 @@
 //   traffic   : single-file passages are exclusive resources per direction (yield, never oscillate)
 //   animation : consumers read pose + human.activity; they never write positions
 import { z } from 'zod';
-import { add2, angleDelta, clamp, dist2, heading, len2, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2 } from '../core/math.ts';
+import { add2, angleDelta, clamp, cross2, dist2, dot2, heading, len2, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
@@ -42,11 +42,29 @@ const PASS_SPEED = 0.7; // m/s cap while two walkers pass head-on with room for 
 const STATIC_OFFSET = 0.8; // m sidestep around a standing person
 const STUCK_TICKS = 80; // 4 s blocked by a person / load that keeps moving → replan around them anyway
 const MAX_PEOPLE_REPLANS = 6; // after this, stay blocked (fail loudly via diagnostics) rather than churn grids
+/**
+ * A blocked stretch ends only once the walker is really under way again: faster than CREEP_SPEED or
+ * BLOCK_PROGRESS further along the corridor. Creeping a few millimetres per tick round a blocker at the
+ * separation limit (stopped, 0.06 m/s, stopped …) is still the same block, so its decision clock runs on.
+ */
+const CREEP_SPEED = 0.15; // m/s
+/**
+ * A standing person as a planning obstacle in the squeezed people-replan: an octagon of this inradius
+ * (m) instead of the usual 0.3 m half-width square. With the conservative 0.1 m raster, cells are
+ * plannable from 0.60–0.875 m of a person's centre for the square and 0.61–0.78 m for this octagon
+ * (measured over directions and sub-cell offsets): never inside the 0.54 m separation, but a diagonal gap
+ * between two people needs ≈ 1.56 m instead of 1.75 m. (0.20 would open 1.2 m gaps but plans corridors
+ * down to 0.46 m from a centre, where the look-ahead stops the walker again.)
+ */
+const SQUEEZE_HALF = 0.22;
+const BLOCK_PROGRESS = 0.2; // m
 /** Construction replans per tick before walkers with a still-clear current segment wait their turn. */
 export const REPLANS_PER_TICK = 4;
 const REPLAN_MAX_WAIT = 10; // ticks a deferred walker may follow its old corridor before replanning regardless
 const YIELD_OFFSET = 0.9; // m lateral offset while waiting for oncoming traffic
 const LOOK = 2.5; // m look-ahead for conflicts
+const ENC_STEP = 0.1; // m between samples of the path ahead that encounters are measured against
+const ENC_TIME = 1.0; // s: another walker's heading is the chord of its own smoothed path over this much of its walking
 const MAX_CORRECTION = 0.55; // m per tick (below MAX_STEP_PER_TICK): larger corrections are spread over several ticks
 
 export type WalkParams = { actor: string; x: number; z: number; level?: number; face?: number; speed?: number };
@@ -82,7 +100,7 @@ type Exec = {
   stuck: number;
   turning: boolean;
   /** What blocks this walker now, and where every blocker of this blocked stretch stood when last seen moving. */
-  block?: { id: string; at: Record<string, Vec2> };
+  block?: { id: string; at: Record<string, Vec2>; s0: number; leg: number };
   /** Consecutive blocked ticks during which none of those blockers moved 0.1 m (DECIDE_TICKS). */
   still?: number;
   /** Ticks on which the hard separation layer (intrusion / loadIntrusion) had to cancel a step. */
@@ -472,7 +490,10 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   }
   const tan = tangentAt(ex, ex.s);
   const arrived = ex.s >= ex.total - 1e-6;
-  const enc: Encounter = arrived ? { kind: 'none' } : encounter(rt, ex, a, tan);
+  // walker-walker encounters are measured against the smoothed path ahead (not the current tangent), so
+  // two walkers on curved approaches resolve as they would on straight ones
+  const track = lazyTrack(ex, a);
+  const enc: Encounter = arrived ? { kind: 'none' } : encounter(rt, ex, a, track);
   // static sidestep, latched per standing person until they are behind us (no swinging back into
   // them while alongside, no flicker when they sit at the edge of the encounter band)
   if (arrived) { ex.side = 0; ex.sideFor = undefined; ex.sideAt = undefined; } // at the goal the body settles onto the corridor point
@@ -484,15 +505,14 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   if (arrived) ex.pass = undefined; // at the goal the body settles onto the corridor point
   else if (ex.pass) {
     const same = enc.kind !== 'none' && enc.id === ex.pass.id;
-    if (same ? enc.kind !== 'headon' : !stillPassing(rt, ex, a, tan, ex.pass.id)) ex.pass = undefined;
+    if (same ? enc.kind !== 'headon' : !stillPassing(rt, a, track, ex.pass.id)) ex.pass = undefined;
   }
   if (enc.kind === 'headon' && ex.pass?.id !== enc.id) {
     // keep right, unless the oncoming walker is already clearly on our right (then both pass on the
     // left: the test is symmetric, so both walkers pick the same way round)
-    const o = rt.world.entities[enc.id].pose.p;
-    const onRight = (o[0] - a.pose.p[0]) * tan[1] - (o[2] - a.pose.p[2]) * tan[0];
-    const side = onRight > 0.1 ? -1 : 1;
-    ex.pass = { id: enc.id, side, room: roomToPass(ex, g, tan, enc.along, side) };
+    // (onRight: signed lateral of the oncoming walker from my walked line where we meet)
+    const side = enc.onRight > 0.1 ? -1 : 1;
+    ex.pass = { id: enc.id, side, room: roomToPass(ex, g, enc.along, side) };
   }
   const passing = !yieldTo && !!ex.pass?.room && ex.held.size === 0 && !holdsTraffic(rt, ex.pass.id) && (enc.kind === 'none' || enc.id === ex.pass.id);
   // lateral offset target (bounded by clearance below)
@@ -509,9 +529,16 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     // where to pass standing people: the lateral offset with the most room at the encounter point
     // (grid clearance and every standing person there), recomputed when a new person is met
     if (!ex.side || (enc.kind === 'static' && enc.id !== ex.sideAt)) {
-      ex.sideTarget = sidestepTarget(rt, ex, a, g, enc.kind === 'static' ? enc.along : 0);
-      ex.side = ex.sideTarget >= 0 ? 1 : -1;
-      ex.sideAt = enc.kind === 'static' ? enc.id : ex.sideAt;
+      const t = sidestepTarget(rt, ex, a, g, enc.kind === 'static' ? enc.along : 0);
+      // never swing back towards the person the current sidestep is for while they are still alongside
+      // (two people flanking the way, e.g. a slot between neighbours in a ring, would otherwise flip the
+      // side every tick as each becomes the nearer encounter)
+      const flip = !!ex.side && (t >= 0 ? 1 : -1) !== ex.side && !!ex.sideAt && alongside(rt, ex, a, tan, ex.sideAt);
+      if (!flip) {
+        ex.sideTarget = t;
+        ex.side = t >= 0 ? 1 : -1;
+        ex.sideAt = enc.kind === 'static' ? enc.id : ex.sideAt;
+      }
     }
     targetOffset = ex.sideTarget ?? ex.side * STATIC_OFFSET;
   }
@@ -638,12 +665,13 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   // moving is waited for with a named reason, and routed around after STUCK_TICKS regardless
   // (one blocked stretch may alternate between two people, e.g. passing between them: it counts as one)
   const blocker = ex.v < 0.02 ? personBlock ?? loadBlock : null;
-  if (blocker) {
-    if (!ex.block) { ex.block = { id: blocker, at: {} }; ex.stuck = 0; ex.still = 0; }
-    ex.block.id = blocker;
+  const creeping = !blocker && !arrived && !!ex.block && ex.block.leg === ex.leg && ex.v < CREEP_SPEED && ex.s - ex.block.s0 < BLOCK_PROGRESS;
+  if (blocker || creeping) {
+    if (!ex.block) { ex.block = { id: blocker!, at: {}, s0: ex.s, leg: ex.leg }; ex.stuck = 0; ex.still = 0; }
+    if (blocker) ex.block.id = blocker;
     ex.stuck++;
     let moved = false;
-    for (const id of [...Object.keys(ex.block.at), ...(blocker in ex.block.at ? [] : [blocker])].sort()) {
+    for (const id of [...Object.keys(ex.block.at), ...(!blocker || blocker in ex.block.at ? [] : [blocker])].sort()) {
       const at = blockerAt(rt, a, id);
       if (!at) continue;
       const was = ex.block.at[id];
@@ -653,14 +681,15 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   } else { ex.block = undefined; ex.stuck = 0; ex.still = 0; }
   // the first decision comes within DECIDE_TICKS; if routing around did not free the walker, each
   // further attempt waits twice as long (0.5, 1, 2, 4 … s), so a crowd that clears is waited for
-  const decideAfter = DECIDE_TICKS * 2 ** Math.min(ex.peopleReplans, 5);
+  const decideAfter = DECIDE_TICKS * (1 << Math.min(ex.peopleReplans, 5)); // (a shift: `**` is host pow)
   if (ex.block && !arrived && ex.peopleReplans < MAX_PEOPLE_REPLANS && ((ex.still ?? 0) >= decideAfter || ex.stuck >= Math.max(STUCK_TICKS, decideAfter))) {
     ex.stuck = 0;
     ex.still = 0;
     ex.peopleReplans++;
     // a carried load in the way counts as an obstacle too: route around where it is now. In a crowd
-    // (a fire ring filling up) every standing person as an obstacle can wall the walker in: then route
-    // around just the people who blocked this stretch (and the loads)
+    // (a fire ring filling up) every standing person as a comfortable obstacle (0.3 m half-width) can wall
+    // the walker in, crowd its start or its goal: then squeeze — route around the same people planned
+    // smaller (SQUEEZE_HALF), still keeping the body separation from every one of them
     const loads = loadDiscsFor(rt, a).map((d, i) => ({ id: `${d.entity}#${i}`, p: d.p }));
     const blockers = Object.entries(ex.block.at).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).filter(([id]) => rt.world.entities[id]?.kind === 'human').map(([id, p]) => ({ id, p }));
     let others = [...standingPeople(rt, a), ...loads];
@@ -670,12 +699,15 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     // explanation (a second, successful search naming links) can matter only for a link with such an id
     const lazy = WALK_PERF.lazyLinkDiagnostics;
     let rr = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), others, lazy ? (id) => others.some((o) => o.id === id) : undefined);
-    // (only when the failure names someone we added: a structural failure, e.g. an unfinished stair,
-    // is not helped by fewer people, and a second failing search would double the cost)
-    if (!rr.ok && blockers.length && (rr.diagnostic.subjects ?? []).some((id) => others.some((o) => o.id === id) && !blockers.some((b) => b.id === id))) {
-      const fewer = [...blockers, ...loads];
-      const r2 = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), fewer, lazy ? () => false : undefined); // only r2.ok is read
-      if (r2.ok) { rr = r2; others = fewer; }
+    // (only when the failure names a person: `routeAround` names the people / loads that wall the walker
+    // in, crowd its start or goal, or stand at a stair it needs (path.ts nameObstacles); a structural
+    // failure, e.g. an unfinished stair, names nobody and is not searched twice. Routing round only the
+    // blockers, as before, walked the walker into the people it left out.)
+    const isPerson = (id: string) => rt.world.entities[id]?.kind === 'human';
+    if (!rr.ok && (rr.diagnostic.subjects ?? []).some((id) => isPerson(id) && others.some((o) => o.id === id))) {
+      const squeezed = others.map((o) => (isPerson(o.id) ? { ...o, half: SQUEEZE_HALF } : o));
+      const r2 = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), squeezed, lazy ? () => false : undefined); // only r2.ok is read
+      if (r2.ok) { rr = r2; others = squeezed; }
     }
     ex.plannedAround = Object.fromEntries(others.map((o) => [o.id, o.p]));
     if (rr.ok) {
@@ -743,9 +775,9 @@ function intrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): st
   for (const o of entitiesOf(rt)) {
     if (o.id === me.id || o.kind !== 'human' || o.human?.level !== me.human!.level) continue;
     if (Math.abs(o.pose.p[1] - me.pose.p[1]) > 1.0) continue;
-    const dTo = Math.hypot(o.pose.p[0] - to[0], o.pose.p[2] - to[1]);
+    const dTo = hypot(o.pose.p[0] - to[0], o.pose.p[2] - to[1]);
     if (dTo >= 2 * r - 0.02) continue;
-    const dFrom = Math.hypot(o.pose.p[0] - from[0], o.pose.p[2] - from[1]);
+    const dFrom = hypot(o.pose.p[0] - from[0], o.pose.p[2] - from[1]);
     if (dTo < dFrom - 1e-9) return o.id;
   }
   return null;
@@ -891,9 +923,9 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
 export function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: number): string | null {
   for (const o of entitiesOf(rt)) {
     if (o.id === me.id || o.kind !== 'human') continue;
-    const dTo = Math.hypot(o.pose.p[0] - to[0], (o.pose.p[1] - to[1]) * 0.5, o.pose.p[2] - to[2]);
+    const dTo = hypot(o.pose.p[0] - to[0], (o.pose.p[1] - to[1]) * 0.5, o.pose.p[2] - to[2]);
     if (dTo >= 2 * r - 0.02) continue;
-    const dFrom = Math.hypot(o.pose.p[0] - from[0], (o.pose.p[1] - from[1]) * 0.5, o.pose.p[2] - from[2]);
+    const dFrom = hypot(o.pose.p[0] - from[0], (o.pose.p[1] - from[1]) * 0.5, o.pose.p[2] - from[2]);
     if (dTo < dFrom - 1e-9) return o.id;
   }
   return null;
@@ -963,7 +995,7 @@ function stepAwayClear(rt: Runtime, me: Entity, from: Vec2, q: Vec2): boolean {
 
 function occupant(rt: Runtime, me: Entity, p: Vec2, r: number): string | null {
   for (const o of entitiesOf(rt))
-    if (o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level && Math.hypot(o.pose.p[0] - p[0], o.pose.p[2] - p[1]) < 2 * r) return o.id;
+    if (o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level && hypot(o.pose.p[0] - p[0], o.pose.p[2] - p[1]) < 2 * r) return o.id;
   return null;
 }
 
@@ -1008,12 +1040,18 @@ function standingPeople(rt: Runtime, me: Entity) {
     .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
 }
 
-/** A person whose walk is actually progressing. A blocked walker counts as standing (so others route around them). */
+/**
+ * A person whose walk is actually progressing. A blocked walker counts as standing (so others route around
+ * them), and so does one at the end of its route — settling onto its goal or turning to face (speed 0: its
+ * yaw is no heading, and treating it as oncoming or crossing traffic walked people into it).
+ */
 function isActiveWalker(rt: Runtime, o: Entity) {
   const t = o.human?.task;
   if (!t) return false;
   const rec = rt.records.get(t);
-  return !!rec && rec.verb === 'walk_to' && rt.isActive(t) && rec.status !== 'blocked';
+  if (!rec || rec.verb !== 'walk_to' || !rt.isActive(t) || rec.status === 'blocked') return false;
+  const ex = walkExecs(rt).get(t);
+  return !ex || ex.leg < ex.route.legs.length - 1 || ex.route.legs[ex.leg].kind !== 'walk' || ex.s < ex.total - 1e-6;
 }
 
 const holdsTraffic = (rt: Runtime, id: string) => [...traffic(rt).values()].some((t) => t.actors.has(id));
@@ -1024,14 +1062,15 @@ const holdsTraffic = (rt: Runtime, id: string) => [...traffic(rt).values()].some
  * radius (plus margin) of clearance, reachable straight from the corridor. In a 2.0 m corridor that holds
  * (centre clearance ≈ 0.95 m ≥ r + PASS_OFFSET); in the 1.0 m gap it does not, so the give-way applies.
  */
-function roomToPass(ex: Exec, g: LevelGrid, tan: Vec2, along: number, side: number): boolean {
+function roomToPass(ex: Exec, g: LevelGrid, along: number, side: number): boolean {
   const r = ex.profile.radius;
-  const n: Vec2 = rot2(tan, -Math.PI / 2); // offset −PASS_OFFSET maps to base + n·PASS_OFFSET
-  const ok = (base: Vec2, sgn: number) => {
+  const ok = (s: number, sgn: number) => {
+    const base = pointAt(ex, s);
+    const n: Vec2 = rot2(tangentAt(ex, s), -Math.PI / 2); // offset −PASS_OFFSET maps to base + n·PASS_OFFSET (the local normal)
     const q = add2(base, scale2(n, sgn * PASS_OFFSET));
     return clearanceAt(g, q) >= r + 0.04 && segmentClearance(g, base, q) >= r;
   };
-  return ok(pointAt(ex, ex.s), side) && ok(pointAt(ex, Math.min(ex.total, ex.s + along)), -side);
+  return ok(ex.s, side) && ok(Math.min(ex.total, ex.s + along), -side);
 }
 
 /** A standing person we are stepping round is still level with or ahead of us, near our line. */
@@ -1047,36 +1086,96 @@ function alongside(rt: Runtime, ex: Exec, a: Entity, tan: Vec2, id: string): boo
 }
 
 /** The pass partner is still an active walker ahead of us, near enough to our line to matter. */
-function stillPassing(rt: Runtime, ex: Exec, a: Entity, tan: Vec2, id: string): boolean {
+function stillPassing(rt: Runtime, a: Entity, track: () => Track, id: string): boolean {
   const o = rt.world.entities[id];
   if (!o || o.human?.level !== a.human!.level || !isActiveWalker(rt, o)) return false;
-  const d = sub2([o.pose.p[0], o.pose.p[2]], [a.pose.p[0], a.pose.p[2]]);
-  const along = d[0] * tan[0] + d[1] * tan[1];
-  const lateral = Math.abs(d[0] * -tan[1] + d[1] * tan[0]);
-  return along > -ex.profile.radius && along < LOOK && lateral < 2 * PASS_OFFSET + 2 * ex.profile.radius;
+  const r = HUMAN_PROFILE.radius;
+  const pr = project(track(), [o.pose.p[0], o.pose.p[2]]);
+  return pr.along > -r && pr.along < LOOK && pr.lateral < 2 * PASS_OFFSET + 2 * r;
 }
 
-type Encounter = { kind: 'none' } | { kind: 'follow' | 'headon' | 'crossing' | 'static'; id: string; along: number; lateral: number };
+export type Encounter = { kind: 'none' } | { kind: 'follow' | 'headon' | 'crossing' | 'static'; id: string; along: number; lateral: number; onRight: number };
 
-/** The most pressing person ahead within LOOK metres whose disc conflicts with our corridor. */
-function encounter(rt: Runtime, ex: Exec, a: Entity, tan: Vec2): Encounter {
+/**
+ * The line this walker will walk over the next LOOK metres: the smoothed path sampled every ENC_STEP,
+ * shifted by its current lateral offset and anchored at its body (on a straight path: the body plus the
+ * tangent, i.e. the old straight-line measure), then straight on past the goal. `t` = unit tangent there.
+ */
+type Track = { q: Vec2[]; t: Vec2[] };
+function lazyTrack(ex: Exec, a: Entity): () => Track {
+  let tr: Track | null = null;
+  return () => (tr ??= trackAhead(ex, a));
+}
+function trackAhead(ex: Exec, a: Entity): Track {
+  const me: Vec2 = [a.pose.p[0], a.pose.p[2]];
+  const endP = pointAt(ex, ex.total), endT = tangentAt(ex, ex.total);
+  const at = (s: number): { p: Vec2; t: Vec2 } => {
+    const t = s <= ex.total ? tangentAt(ex, s) : endT;
+    const base = s <= ex.total ? pointAt(ex, s) : add2(endP, scale2(endT, s - ex.total));
+    return { p: add2(base, scale2([t[1], -t[0]], -ex.offset)), t }; // (t[1], −t[0]) = the normal place() offsets along
+  };
+  const p0 = at(ex.s).p;
+  const n = Math.round(LOOK / ENC_STEP);
+  const q: Vec2[] = new Array(n + 1), t: Vec2[] = new Array(n + 1);
+  for (let k = 0; k <= n; k++) {
+    const x = at(ex.s + k * ENC_STEP);
+    q[k] = add2(me, sub2(x.p, p0));
+    t[k] = x.t;
+  }
+  return { q, t };
+}
+/** A point against the track: arc length ahead (negative = behind the body), unsigned and signed (+ = right) lateral distance, tangent there. */
+function project(tr: Track, p: Vec2): { along: number; lateral: number; onRight: number; t: Vec2 } {
+  let k = 0, best = Infinity;
+  for (let i = 0; i < tr.q.length; i++) {
+    const dx = p[0] - tr.q[i][0], dz = p[1] - tr.q[i][1];
+    const d = dx * dx + dz * dz;
+    if (d < best) { best = d; k = i; }
+  }
+  const d = sub2(p, tr.q[k]), t = tr.t[k];
+  const onRight = cross2(d, t);
+  return { along: k * ENC_STEP + dot2(d, t), lateral: Math.abs(onRight), onRight, t };
+}
+/** The encounter a live walk (action id) would react to now (tests / inspection; read-only, outside a step). */
+export function encounterOf(rt: Runtime, id: string): Encounter {
+  const ex = walkExecs(rt).get(id);
+  if (!ex || ex.route.legs[ex.leg]?.kind !== 'walk') return { kind: 'none' };
+  const a = rt.world.entities[ex.actor];
+  return encounter(rt, ex, a, lazyTrack(ex, a));
+}
+/** Where another walker is heading: the chord of its own smoothed path over its next ENC_TIME of walking (its yaw if it has none). */
+function headingOf(rt: Runtime, o: Entity): Vec2 {
+  const oex = o.human?.task ? walkExecs(rt).get(o.human.task) : undefined;
+  if (oex && oex.route.legs[oex.leg]?.kind === 'walk' && oex.segs.length) {
+    const p = pointAt(oex, oex.s), q = pointAt(oex, Math.min(oex.total, oex.s + Math.max(0.3, oex.speed * ENC_TIME)));
+    if (dist2(p, q) > 1e-3) return norm2(sub2(q, p));
+  }
+  return rot2([1, 0], o.pose.yaw);
+}
+
+/**
+ * The most pressing person within LOOK metres ahead along the path this walker will walk (its smoothed
+ * path at its current offset) whose disc conflicts with it. Kind: standing ('static'), or by the other
+ * walker's heading over its next ~1 s against this walker's path tangent where they meet: along it
+ * ('follow'), against it ('headon'), across it ('crossing').
+ */
+function encounter(rt: Runtime, ex: Exec, a: Entity, track: () => Track): Encounter {
   let best: Encounter = { kind: 'none' };
   const me: Vec2 = [a.pose.p[0], a.pose.p[2]];
+  const band = 2 * ex.profile.radius + 0.12;
   for (const o of entitiesOf(rt)) {
     if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level) continue;
+    const op: Vec2 = [o.pose.p[0], o.pose.p[2]];
     const pa = ex.plannedAround[o.id];
-    if (pa && Math.hypot(pa[0] - o.pose.p[0], pa[1] - o.pose.p[2]) < 0.15) continue; // route already avoids them
-    const d = sub2([o.pose.p[0], o.pose.p[2]], me);
-    const along = d[0] * tan[0] + d[1] * tan[1];
-    if (along < 0 || along > LOOK) continue;
-    const lateral = Math.abs(d[0] * -tan[1] + d[1] * tan[0]);
-    if (lateral >= 2 * ex.profile.radius + 0.12) continue;
-    if (best.kind !== 'none' && best.along <= along) continue;
+    if (pa && dist2(pa, op) < 0.15) continue; // route already avoids them
+    if (dist2(me, op) > LOOK + band) continue; // (the path ahead never reaches farther from the body)
+    const pr = project(track(), op);
+    if (pr.along < 0 || pr.along > LOOK || pr.lateral >= band) continue;
+    if (best.kind !== 'none' && best.along <= pr.along) continue;
     const walking = isActiveWalker(rt, o);
-    const f = rot2([1, 0], o.pose.yaw);
-    const dot = f[0] * tan[0] + f[1] * tan[1];
+    const dot = walking ? dot2(headingOf(rt, o), pr.t) : 0;
     const kind = !walking ? 'static' : dot > 0.3 ? 'follow' : dot < -0.3 ? 'headon' : 'crossing';
-    best = { kind, id: o.id, along, lateral };
+    best = { kind, id: o.id, along: pr.along, lateral: pr.lateral, onRight: pr.onRight };
   }
   return best;
 }
@@ -1142,7 +1241,7 @@ function linkGeometry(leg: LinkLeg): LinkGeometry {
   const entry = leg.ascending ? link.from : link.to, exit = leg.ascending ? link.to : link.from;
   const steps = leg.ascending ? link.path : [...link.path].reverse();
   const path: [number, number, number][] = [[entry.p[0], entry.y, entry.p[1]], ...steps, [exit.p[0], exit.y, exit.p[1]]];
-  const lens = path.slice(1).map((q, i) => Math.hypot(q[0] - path[i][0], q[1] - path[i][1], q[2] - path[i][2]));
+  const lens = path.slice(1).map((q, i) => hypot(q[0] - path[i][0], q[1] - path[i][1], q[2] - path[i][2]));
   return { entry, exit, path, lens, total: lens.reduce((s, x) => s + x, 0) };
 }
 

@@ -1,7 +1,7 @@
 // Named regions for the 2026 campus: canonical assembly footprints plus the
 // hypothetical flagship work areas (staging-east, material piles), found by a
 // deterministic clear-rectangle search on the engine grid near Chiba.
-import { obbCorners, obbOverlap, type OBB2, type Vec2 } from '../core/math.ts';
+import { obbCorners, obbOverlap, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import { buildGrids } from '../spatial/grid.ts';
 import type { Region } from '../world/types.ts';
 import { convexHull } from './geom.ts';
@@ -25,7 +25,7 @@ export function convexOverlap(a: Vec2[], b: Vec2[], gap = 0): boolean {
   for (const poly of [a, b])
     for (let i = 0; i < poly.length; i++) {
       const p = poly[i], q = poly[(i + 1) % poly.length];
-      const len = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const len = hypot(q[0] - p[0], q[1] - p[1]) || 1;
       const n: Vec2 = [-(q[1] - p[1]) / len, (q[0] - p[0]) / len];
       let amin = Infinity, amax = -Infinity, bmin = Infinity, bmax = -Infinity;
       for (const v of a) { const d = v[0] * n[0] + v[1] * n[1]; amin = Math.min(amin, d); amax = Math.max(amax, d); }
@@ -98,7 +98,7 @@ export function buildRegions(file: FileNoRegions): Region[] {
   let staging: Vec2 | null = null, best = Infinity;
   for (let cx = Math.ceil(cMaxX - 10); cx <= cMaxX + 70; cx++)
     for (let cz = Math.floor(cMinZ - 25); cz <= cMaxZ + 25; cz++) {
-      const dd = Math.hypot(cx - cMaxX, cz - cc[1]);
+      const dd = hypot(cx - cMaxX, cz - cc[1]);
       if (dd >= best || cx < cc[0]) continue;
       if (offPlaces(cx, cz, sw, sd, 3) && clear(cx, cz, sw, sd) && exactClear(cx, cz, sw, sd)) { best = dd; staging = [cx, cz]; }
     }
@@ -112,7 +112,7 @@ export function buildRegions(file: FileNoRegions): Region[] {
     let spot: Vec2 | null = null, bd = Infinity;
     for (let cx = Math.floor(staging[0] - 30); cx <= staging[0] + 30; cx++)
       for (let cz = Math.floor(staging[1] - 30); cz <= staging[1] + 30; cz++) {
-        const dd = Math.hypot(cx - staging[0], cz - staging[1]);
+        const dd = hypot(cx - staging[0], cz - staging[1]);
         if (dd >= bd) continue;
         const box: OBB2 = { c: [cx, cz], half: [pw / 2 + 1, pd / 2 + 1], yaw: 0 };
         if (taken.some((t) => obbOverlap(t, box))) continue;

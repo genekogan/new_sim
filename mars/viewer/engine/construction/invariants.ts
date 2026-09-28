@@ -5,6 +5,7 @@ import type { Invariant } from '../runtime/runtime.ts';
 import { isStanding, isSupported, isUpright } from './rules.ts';
 import { HAND_REACH, handPoint, LIFT_APEX_MAX } from './liftcrew.ts';
 import { EDGE_REACH, ENVELOPE_TOL, envelopeGap, GIVE_MAX, HANDUP_SLOT_PREFIX, handsOf, KNEEL_BACK, REACH_DOWN } from './handup.ts';
+import { hypot } from '../core/math.ts';
 
 export const uprightsSupported: Invariant = (rt) => {
   const out: Diagnostic[] = [];
@@ -38,7 +39,7 @@ export const liftHandsInReach: Invariant = (rt) => {
       const grip = h?.human?.activity === 'lift' ? h.human.grip : undefined;
       const hand = grip?.entity === e.id ? handPoint(e, e.pose, grip.slot) : null;
       if (!hand) continue;
-      const d = Math.hypot(h.pose.p[0] - hand.p[0], h.pose.p[2] - hand.p[2]);
+      const d = hypot(h.pose.p[0] - hand.p[0], h.pose.p[2] - hand.p[2]);
       const up = hand.p[1] - h.pose.p[1];
       if (d > HAND_REACH + 1e-6 || up > LIFT_APEX_MAX + 1e-6)
         out.push({

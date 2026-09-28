@@ -12,7 +12,7 @@
 // Both links are narrower than a person's routing disc (2 × 0.28 m), so the generic route planner
 // (spatial/path.ts skips links with width < 2r) never sends walkers up a frame: only the frame
 // verbs (framemove.ts) and hand_up (handup.ts) traverse them. A person on one has `human.on` = its id.
-import { add2, datan2, dist2, distPointSeg, dot2, rot2, scale2, sub2, type Vec2 } from '../core/math.ts';
+import { add2, datan2, dist2, distPointSeg, dot2, rot2, scale2, sub2, type Vec2, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { DT, type Invariant, type Runtime } from '../runtime/runtime.ts';
 import type { Link } from '../spatial/types.ts';
@@ -33,7 +33,7 @@ export const BEAM_END_IN = 0.15; // m: a walkway starts this far from the frame 
 
 const byId = (a: Entity, b: Entity) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 const f2 = (x: number) => x.toFixed(2);
-const unit = (v: Vec2): Vec2 => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+const unit = (v: Vec2): Vec2 => { const l = hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
 const xz = (e: Entity): Vec2 => [e.pose.p[0], e.pose.p[2]];
 
 export const isSmallLoad = (defId: string) => !!def(defId).handling?.smallLoad;

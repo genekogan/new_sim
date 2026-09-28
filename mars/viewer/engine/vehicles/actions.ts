@@ -5,7 +5,7 @@
 // walking verb can take the rider off it) with human.riding = vehicle id and activity 'ride'.
 // Riding follows a curvature-limited reference curve (curve.ts) with pure pursuit.
 import { z } from 'zod';
-import { add2, angleDelta, clamp, dcos, dist2, dsin, heading, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2 } from '../core/math.ts';
+import { add2, angleDelta, clamp, dcos, dist2, dsin, heading, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, WorldState } from '../world/types.ts';
@@ -55,7 +55,7 @@ function clearanceIgnoring(g: LevelGrid, p: Vec2, ignore: string, maxR = 1.5): n
   let best = maxR;
   for (let j = cj - k; j <= cj + k; j++)
     for (let i = ci - k; i <= ci + k; i++) {
-      if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) { best = Math.min(best, Math.max(0, Math.hypot(i - ci, j - cj) * g.cell - g.cell / 2)); continue; }
+      if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) { best = Math.min(best, Math.max(0, hypot(i - ci, j - cj) * g.cell - g.cell / 2)); continue; }
       const n = j * g.nx + i;
       if (g.free[n] || g.blockers.get(n) === ignore) continue;
       const d = dist2(centreOf(g, n), centreOf(g, c)) - g.cell / 2;
@@ -66,7 +66,7 @@ function clearanceIgnoring(g: LevelGrid, p: Vec2, ignore: string, maxR = 1.5): n
 
 const distToObb = (p: Vec2, o: OBB2) => {
   const l = rot2(sub2(p, o.c), -o.yaw);
-  return Math.hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
+  return hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
 };
 
 type Rider = { a: Entity; v: Entity; pr: VehicleProfile };

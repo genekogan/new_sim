@@ -3,7 +3,7 @@
 // connection" pattern expressed on rasters. Routes are corridors: polylines
 // whose every segment has a guaranteed clearance ≥ agent radius, so the mover
 // can smooth inside them and never needs collision sliding to make progress.
-import { add2, dist2, pointInObb, rot2, sub2, type Vec2 } from '../core/math.ts';
+import { add2, dist2, pointInObb, rot2, sub2, type Vec2, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { cellOf, centreOf, latticeCentre, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from './grid.ts';
 import type { AgentProfile, Link, SpatialScene } from './types.ts';
@@ -68,6 +68,13 @@ export type RouteOpts = {
    * A structural failure (geometry, an unfinished stair) names none of them. Routes are unaffected.
    */
   nameObstacles?: (id: string) => boolean;
+  /**
+   * How far (m) the start may snap to the nearest standable cell (default 0.5). The nearest cell is the
+   * same whatever the tolerance whenever one lies within it, so a larger value only turns some
+   * 'route.start-blocked' failures into routes (`Spatial.routeAround`: a walker standing in a gap between
+   * people steps out of it first).
+   */
+  startTolerance?: number;
 };
 
 /** Corridor planner: coarse cell size (m) and fine-search halo around the coarse path (m). */
@@ -122,10 +129,10 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
   const gs = grids.levels.get(start.level), gg = grids.levels.get(goal.level);
   if (!gs || !gg) return fail('route.unknown-level', `level ${!gs ? start.level : goal.level} does not exist`);
   const passable = (g: LevelGrid, c: number) => c >= 0 && g.clearance[c] >= r;
-  const s = snap(gs, start.p, r, 0.5);
+  const s = snap(gs, start.p, r, opts.startTolerance ?? 0.5);
   const near = (g: LevelGrid, p: Vec2, tol: number) => (opts.nameObstacles ? obstaclesNear(scene, g, p, r + tol + grids.cell, opts.nameObstacles) : undefined);
   if (s < 0)
-    return fail('route.start-blocked', `start (${fmt(start.p)}) on level ${start.level} is not standable${blk(gs, start.p)}`, start, near(gs, start.p, 0.5));
+    return fail('route.start-blocked', `start (${fmt(start.p)}) on level ${start.level} is not standable${blk(gs, start.p)}`, start, near(gs, start.p, opts.startTolerance ?? 0.5));
   const gt = snap(gg, goal.p, r, opts.goalTolerance ?? 0.35);
   if (gt < 0)
     return fail('route.goal-blocked', `destination (${fmt(goal.p)}) on level ${goal.level} has no standing room for a ${r} m-radius agent${blk(gg, goal.p)}`, goal, near(gg, goal.p, opts.goalTolerance ?? 0.35));
@@ -518,7 +525,7 @@ function snap(g: LevelGrid, p: Vec2, r: number, tol: number): number {
   return best;
 }
 
-const pathLen = (p: [number, number, number][]) => p.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - p[i][0], q[1] - p[i][1], q[2] - p[i][2]), 0);
+const pathLen = (p: [number, number, number][]) => p.slice(1).reduce((s, q, i) => s + hypot(q[0] - p[i][0], q[1] - p[i][1], q[2] - p[i][2]), 0);
 const pathLen2 = (p: Vec2[]) => p.slice(1).reduce((s, q, i) => s + dist2(q, p[i]), 0);
 const fmt = (p: Vec2) => `${p[0].toFixed(2)}, ${p[1].toFixed(2)}`;
 const blk = (g: LevelGrid, p: Vec2) => {

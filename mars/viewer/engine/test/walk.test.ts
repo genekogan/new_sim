@@ -13,6 +13,7 @@ import { carry } from '../carry/actions.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 import { carryCorridors } from '../carry/scenes.ts';
 import type { ActionDef } from '../actions/types.ts';
+import { hypot } from '../core/math.ts';
 
 function setup(...people: ReturnType<typeof human>[]) {
   const base = provingGround();
@@ -34,7 +35,7 @@ function trackJitter(rt: Runtime, id: string) {
       if (turn) s.prevTurn = turn;
       s.last = e.pose.yaw;
       const p = e.pose.p;
-      s.maxStep = Math.max(s.maxStep, Math.hypot(p[0] - s.prev[0], p[2] - s.prev[2]));
+      s.maxStep = Math.max(s.maxStep, hypot(p[0] - s.prev[0], p[2] - s.prev[2]));
       s.prev = [...p];
     },
   });
@@ -49,7 +50,7 @@ test('walk around wall: completes, no penetration, no teleport, little heading j
   assert.ok(rt.runUntilIdle(20 * 60));
   assert.equal(a.status, 'completed');
   const p = pos(rt, 'p1');
-  assert.ok(Math.hypot(p[0] + 12, p[2] + 15) < 0.05);
+  assert.ok(hypot(p[0] + 12, p[2] + 15) < 0.05);
   assert.deepEqual(rt.violations, []);
   assert.ok(j.maxStep <= 1.4 / 20 + 1e-6, `max step ${j.maxStep}`);
   assert.ok(j.flips <= 6, `turn direction flips ${j.flips}`);

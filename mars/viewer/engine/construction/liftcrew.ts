@@ -7,7 +7,7 @@
 // crew) and the lift fails `lift.crew-blocked` if a holder stays stuck > 2 s.
 // Holders working from a level above the part (a deck worker receiving a joist from
 // below) keep slot `lift-station` and stay put — hand-up is not modelled.
-import { datan2, rot2, type Vec2, type Vec3 } from '../core/math.ts';
+import { datan2, rot2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Spatial } from '../spatial/service.ts';
@@ -48,7 +48,7 @@ export function handPoint(e: Entity, q: Pose, slot: string): Hand | null {
 /** Standing context of one holder: its level grid and everyone else on that level. */
 export type Room = { g: LevelGrid; others: { id: string; p: Vec2 }[] };
 
-const d2 = (a: Vec2, b: Vec2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const d2 = (a: Vec2, b: Vec2) => hypot(a[0] - b[0], a[1] - b[1]);
 
 function crowd(r: Room, p: Vec2) {
   return r.others.find((o) => d2(o.p, p) < FOLLOW_PERSONAL);

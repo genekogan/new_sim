@@ -7,7 +7,7 @@
 // Only small loads (≤ 10 kg, catalog handling.smallLoad) may be held on either; a sheet goes up by
 // hand_up (handup.ts) instead. Mars assembly model v1, approximate.
 import { z } from 'zod';
-import { datan2, dist2, pointInObb, type Vec2, type Vec3 } from '../core/math.ts';
+import { datan2, dist2, pointInObb, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Link, Surface } from '../spatial/types.ts';
@@ -29,14 +29,14 @@ export const OCCUPIED_WAIT = 5.0; // s a climber waits for someone else on the s
 
 /** A polyline traversal state (positions along `pts`, arc length `s`). */
 export type Track = { pts: Vec3[]; s: number; len: number };
-export const track = (pts: Vec3[]): Track => ({ pts, s: 0, len: pts.slice(1).reduce((a, q, i) => a + Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1], q[2] - pts[i][2]), 0) });
+export const track = (pts: Vec3[]): Track => ({ pts, s: 0, len: pts.slice(1).reduce((a, q, i) => a + hypot(q[0] - pts[i][0], q[1] - pts[i][1], q[2] - pts[i][2]), 0) });
 
 /** Point at arc length s along the polyline. */
 export function trackAt(t: Track, s: number): Vec3 {
   let left = Math.max(0, Math.min(s, t.len));
   for (let i = 1; i < t.pts.length; i++) {
     const a = t.pts[i - 1], b = t.pts[i];
-    const l = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const l = hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
     if (left <= l || i === t.pts.length - 1) {
       const k = l > 1e-9 ? Math.min(1, left / l) : 1;
       return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
@@ -54,7 +54,7 @@ export function stepTrack(h: Entity, t: Track, speed: number, dt: number, face?:
   h.pose.p = p;
   const d: Vec2 = [p[0] - before[0], p[2] - before[2]];
   if (face !== undefined) h.pose.yaw = face;
-  else if (Math.hypot(d[0], d[1]) > 1e-6) h.pose.yaw = datan2(d[1], d[0]);
+  else if (hypot(d[0], d[1]) > 1e-6) h.pose.yaw = datan2(d[1], d[0]);
   return t.s >= t.len - 1e-9;
 }
 

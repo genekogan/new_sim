@@ -13,7 +13,7 @@ import { liftHandPoint, raiseRoles } from '../construction/raise.ts';
 import { entityCorners } from '../spatial/service.ts';
 import type { Entity } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
-import { angleDelta, dsin } from '../core/math.ts';
+import { angleDelta, dsin, hypot } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 
@@ -177,7 +177,7 @@ function reachToFrame(u: Entity, p: [number, number]): number {
     for (let k = 0; k <= 400; k++) {
       const q = a.map((v, i) => v + ((b[i] - v) * k) / 400);
       if (q[1] > 2.0) continue;
-      best = Math.min(best, Math.hypot(q[0] - p[0], q[2] - p[1]));
+      best = Math.min(best, hypot(q[0] - p[0], q[2] - p[1]));
     }
   }
   return best;
@@ -202,7 +202,7 @@ function watchRaise(rt: Runtime, rec: { id: string; phase?: string }, item: stri
         const h = r.world.entities[id];
         const p: [number, number] = [h.pose.p[0], h.pose.p[2]];
         const q = last.get(id);
-        if (q) seen.maxSpeed = Math.max(seen.maxSpeed, Math.hypot(p[0] - q[0], p[1] - q[1]) * 20);
+        if (q) seen.maxSpeed = Math.max(seen.maxSpeed, hypot(p[0] - q[0], p[1] - q[1]) * 20);
         last.set(id, p);
         if (h.human!.grip?.slot !== 'lift-far') continue;
         seen.ticks++;
@@ -211,7 +211,7 @@ function watchRaise(rt: Runtime, rec: { id: string; phase?: string }, item: stri
         const side = raiseRoles((rt.records.get(rec.id)!.params as { crew: string[] }).crew).find((x) => x.actor === id)!.side;
         const hand = liftHandPoint(u, 0, def(u.def).size[2] / 2, side);
         seen.maxHandY = Math.max(seen.maxHandY, hand[1]);
-        seen.maxHandDist = Math.max(seen.maxHandDist, Math.hypot(hand[0] - p[0], hand[2] - p[1]));
+        seen.maxHandDist = Math.max(seen.maxHandDist, hypot(hand[0] - p[0], hand[2] - p[1]));
       }
     },
   });
@@ -238,7 +238,7 @@ test('raise choreography (2 people): lifter walks the frame up, hands ≤ 2.0 m 
   const st = holdStations(A, 2);
   for (const [i, id] of ['p1', 'p2'].entries()) {
     const h = rt.world.entities[id];
-    assert.ok(Math.hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
+    assert.ok(hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
   }
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
@@ -255,7 +255,7 @@ test('raise choreography (4 people): two lifters step around the footers to the 
   const st = holdStations(rt.world.entities.A, 4);
   for (const [i, id] of ['p1', 'p2', 'p3', 'p4'].entries()) {
     const h = rt.world.entities[id];
-    assert.ok(Math.hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
+    assert.ok(hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
     assert.equal(h.human!.grip?.slot, `hold-${i}`);
   }
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
@@ -306,7 +306,7 @@ test('raise choreography (1 person, 8 ft frame): the lifter walks it up and ends
   assert.equal(E.pose.pitch, 0);
   assert.deepEqual(E.support, { kind: 'held', by: ['p1'] });
   const st = holdStations(E, 1)[0];
-  assert.ok(Math.hypot(h.pose.p[0] - st.p[0], h.pose.p[2] - st.p[1]) < 1e-6, 'ends at the base station');
+  assert.ok(hypot(h.pose.p[0] - st.p[0], h.pose.p[2] - st.p[1]) < 1e-6, 'ends at the base station');
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
 
@@ -347,7 +347,7 @@ test('19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s),
     const st = holdStations(u, 3);
     for (const [i, id] of crew.entries()) {
       const h = rt.world.entities[id];
-      assert.ok(Math.hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
+      assert.ok(hypot(h.pose.p[0] - st[i].p[0], h.pose.p[2] - st[i].p[1]) < 1e-6, `${id} ends at hold station ${i}`);
       assert.equal(h.human!.grip?.slot, `hold-${i}`);
     }
     const early = rt.submit('release_support', { item });

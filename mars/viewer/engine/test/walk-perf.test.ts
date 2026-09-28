@@ -109,7 +109,7 @@ function stressHash(fast: boolean, planner: 'exact' | 'corridor', ticks: number)
 
 test('walker fast paths off === on: stress-30 (exact: the pin; corridor: its failing people-replan at tick 1126) and the meal', () => {
   const on = stressHash(true, 'exact', 1200);
-  assert.equal(on, '093779fd18f0a1c1875c7cbe41347a967f4ea6da06b21b29113ab28b55fcac55');
+  assert.equal(on, '1298e2e57b62adf5fca2b579c5babbfdb743a395134afc432d4797a0c5b5ee6b');
   assert.equal(stressHash(false, 'exact', 1200), on);
   assert.equal(stressHash(true, 'corridor', 1200), stressHash(false, 'corridor', 1200));
   const meal = (fast: boolean) => {
@@ -125,7 +125,7 @@ test('walker fast paths off === on: stress-30 (exact: the pin; corridor: its fai
       WALK_PERF.lazyLinkDiagnostics = true;
     }
   };
-  assert.equal(meal(true), '9dae86bfd31ef8331c5930d345c7ceace5bd2f7a8a247ab02462c262f4a70f87');
+  assert.equal(meal(true), '035e8c3949b7404726c93f326430dc59e6728eee5b3596483fd2add39b8baba5');
   assert.equal(meal(false), meal(true));
 });
 
@@ -192,7 +192,7 @@ test('narrow(): single-file component labels === the frozen reference (scenes, r
   } finally {
     Spatial.prototype.narrow = orig;
   }
-  assert.equal(hash, '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b');
+  assert.equal(hash, '0147f8f12a997462f5e6adfe71ffef1a8bc7e850d84082289328111618fd30d5');
   assert.ok(calls >= 100, `${calls} narrow() calls in the probe`);
   assert.ok(compared >= 25);
 });

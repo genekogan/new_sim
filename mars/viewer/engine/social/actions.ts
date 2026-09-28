@@ -10,7 +10,7 @@
 // `reservation.conflict` naming the social action. There is no automatic pre-emption yet: the
 // director cancels the social action first (`releaseForDirective` does exactly that per actor).
 import { z } from 'zod';
-import { angleDelta, clamp, dist2, dsin, heading, rot2, sub2, add2, wrapAngle, type Vec2 } from '../core/math.ts';
+import { angleDelta, clamp, dist2, dsin, heading, rot2, sub2, add2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, ActionRecord, Diagnostic, Reservation, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
@@ -289,7 +289,7 @@ function targetYaw(rt: Runtime, actor: Entity, t: FaceParams['target']): number 
     q = pos2(e);
   } else q = t.point;
   const d = sub2(q, pos2(actor));
-  if (Math.hypot(d[0], d[1]) < 0.05) return { code: 'face.degenerate', message: `${actor.id} is standing on the point it was asked to face`, subjects: [actor.id] };
+  if (hypot(d[0], d[1]) < 0.05) return { code: 'face.degenerate', message: `${actor.id} is standing on the point it was asked to face`, subjects: [actor.id] };
   return heading(d);
 }
 

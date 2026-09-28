@@ -1,7 +1,7 @@
 // Shot specs as data + a stateless evaluator. `evaluateShot(spec, sampler, t)`
 // depends only on (spec, sampler, t): it works identically against a live
 // runtime or a recorded take, and any t can be evaluated in any order.
-import { datan, dcos, dexp, dsin, dtan, type Vec3 } from '../core/math.ts';
+import { datan, dcos, dexp, dsin, dtan, type Vec3, hypot } from '../core/math.ts';
 import type { OccBox } from './occluders.ts';
 
 /** What the camera needs to know about a subject at time t. */
@@ -110,10 +110,10 @@ export type FrameOpts = { aspect?: number; safeBottom?: number };
 export function aimForSafeArea(pose: CameraPose, safeBottom: number): CameraPose {
   if (!(safeBottom > 0)) return pose;
   const d: Vec3 = [pose.target[0] - pose.position[0], pose.target[1] - pose.position[1], pose.target[2] - pose.position[2]];
-  const l = Math.hypot(d[0], d[1], d[2]);
+  const l = hypot(d[0], d[1], d[2]);
   if (l < 1e-9) return pose;
   const f: Vec3 = [d[0] / l, d[1] / l, d[2] / l];
-  const rl = Math.hypot(f[0], f[2]);
+  const rl = hypot(f[0], f[2]);
   if (rl < 1e-9) return pose; // looking straight up/down: no defined screen-up
   const r: Vec3 = [-f[2] / rl, 0, f[0] / rl];
   const u: Vec3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
@@ -191,8 +191,8 @@ function evaluateRaw(spec: ShotSpec, sampler: Sampler, t: number, frameAspect: n
       // framing radius: every point of the shot's subjects (a lying frame's corners, a crew member at the edge)
       const all = sampler(t);
       let r = 0;
-      for (const id of shotSubjects(spec)) for (const q of all[id] ? subjectPoints(all[id]) : []) r = Math.max(r, Math.hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]));
-      const d0 = Math.hypot(off[0], off[1], off[2]);
+      for (const id of shotSubjects(spec)) for (const q of all[id] ? subjectPoints(all[id]) : []) r = Math.max(r, hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]));
+      const d0 = hypot(off[0], off[1], off[2]);
       if (r > 0 && d0 > 1e-9) {
         const d = fitDistance(r + (spec.padding ?? 0.5), fov, spec.aspect ?? frameAspect, sb);
         if (d > d0) off = scale(off, d / d0);
@@ -210,7 +210,7 @@ function evaluateRaw(spec: ShotSpec, sampler: Sampler, t: number, frameAspect: n
       let lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
       for (const p of pts) for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], p[j]); hi[j] = Math.max(hi[j], p[j]); }
       const centre = lerp3(lo, hi, 0.5);
-      const r = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2 + (spec.padding ?? 0.5);
+      const r = hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2 + (spec.padding ?? 0.5);
       const d = fitDistance(r, fov, spec.aspect ?? frameAspect, sb);
       return { position: add(centre, scale(dirFrom(spec.azimuth, spec.elevation), d)), target: centre, fov };
     }
@@ -228,7 +228,7 @@ function evaluateRaw(spec: ShotSpec, sampler: Sampler, t: number, frameAspect: n
       const { min, max } = spec.region;
       const y = spec.region.y ?? 0;
       const target: Vec3 = [(min[0] + max[0]) / 2, y, (min[1] + max[1]) / 2];
-      const r = Math.hypot(max[0] - min[0], max[1] - min[1]) / 2;
+      const r = hypot(max[0] - min[0], max[1] - min[1]) / 2;
       const d = fitDistance(r, fov, spec.aspect ?? frameAspect, sb);
       return { position: add(target, scale(dirFrom(spec.azimuth ?? -Math.PI / 2, spec.elevation ?? 35 * DEG), d)), target, fov };
     }

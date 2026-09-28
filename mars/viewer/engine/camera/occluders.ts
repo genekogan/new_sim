@@ -6,7 +6,7 @@
 //   stair flights → the two stringers (treads are their own entities),
 //   everything else (beams, joists, 2x4s, treads, plywood slabs) → its catalog box.
 // Orientation follows entityCorners(): roll about Z, pitch about X, yaw about Y.
-import { datan2, dcos, dsin, type Vec3 } from '../core/math.ts';
+import { datan2, dcos, dsin, type Vec3, hypot } from '../core/math.ts';
 import { CATALOG } from '../world/catalog.ts';
 
 /** Oriented box: centre, unit axes, half extents along them, plus its world AABB for broadphase. */
@@ -50,7 +50,7 @@ export function partOccluders(defId: string, pose: PartPose): OccBox[] {
     const top = (x: number) => riser * ((x + run / 2) / going + 0.5);
     const a = datan2(riser, going), ca = dcos(a), sa = dsin(a);
     const x0 = -run / 2, y0 = top(x0), x1 = run / 2, y1 = top(x1);
-    const L = Math.hypot(x1 - x0, y1 - y0);
+    const L = hypot(x1 - x0, y1 - y0);
     const mid: Vec3 = [(x0 + x1) / 2 + sa * 0.12, (y0 + y1) / 2 - ca * 0.12, 0];
     const lax: [Vec3, Vec3, Vec3] = [[ca, sa, 0], [-sa, ca, 0], [0, 0, 1]];
     return [-1, 1].map((s) => box(pose, [mid[0], mid[1], (s * (width - 0.04)) / 2], [L / 2, 0.12, 0.02], lax));

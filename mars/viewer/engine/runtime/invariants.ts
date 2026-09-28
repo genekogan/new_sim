@@ -5,7 +5,7 @@ import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { entityFootprint, type Spatial } from '../spatial/service.ts';
 import type { Invariant, Runtime } from './runtime.ts';
 import { def, HUMAN_RADIUS } from '../world/catalog.ts';
-import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { WorldState } from '../world/types.ts';
 
 const TOL = 0.03;
@@ -46,7 +46,7 @@ export const humanHumanSeparation: Invariant = (rt: Runtime) => {
       const a = hs[i], b = hs[j];
       if (a.human!.level !== b.human!.level) continue;
       if (Math.abs(a.pose.p[1] - b.pose.p[1]) > 1.0) continue;
-      const d = Math.hypot(a.pose.p[0] - b.pose.p[0], a.pose.p[2] - b.pose.p[2]);
+      const d = hypot(a.pose.p[0] - b.pose.p[0], a.pose.p[2] - b.pose.p[2]);
       if (d < 2 * HUMAN_RADIUS - 0.08)
         out.push({ code: 'collision.human-human', message: `${a.id} and ${b.id} overlap (${d.toFixed(2)} m apart)`, subjects: [a.id, b.id], at: a.pose.p });
     }
@@ -81,7 +81,7 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
     poses.set(e.id, cur);
     const q = valid ? prev!.poses.get(e.id) : undefined;
     if (!q) continue;
-    const lin = Math.hypot(cur.p[0] - q.p[0], cur.p[1] - q.p[1], cur.p[2] - q.p[2]);
+    const lin = hypot(cur.p[0] - q.p[0], cur.p[1] - q.p[1], cur.p[2] - q.p[2]);
     const d = lin + Math.abs(angleDelta(q.yaw, cur.yaw)) * ext;
     if (d > MAX_STEP_PER_TICK)
       out.push({
@@ -99,7 +99,7 @@ export const HOLD_REACH = 1.2; // m from the held entity's footprint
 
 const distToObb = (p: Vec2, o: OBB2) => {
   const l = rot2(sub2(p, o.c), -o.yaw);
-  return Math.hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
+  return hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
 };
 
 /**

@@ -11,7 +11,7 @@ import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { Spatial, entityCorners } from '../spatial/service.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
-import { walkTo, WALK_MIN, TURN_IN_PLACE, DECIDE_TICKS } from '../locomotion/walk.ts';
+import { walkTo, WALK_MIN, TURN_IN_PLACE, DECIDE_TICKS, encounterOf } from '../locomotion/walk.ts';
 import { smoothPolyline, denseClearance, filletCap, LAT_ACCEL, SHARP_CAP, type SmoothPath } from '../locomotion/spline.ts';
 import { buildGrids, type LevelGrid } from '../spatial/grid.ts';
 import { findRoute, PLAN_MARGIN, type WalkLeg } from '../spatial/path.ts';
@@ -377,4 +377,230 @@ test('stall metric = 0: build-bay flagship rehearsal take, lab stress-30 (60 s),
   assert.ok(bay.walkTicks > 5000 && sm.report.walkTicks > 20000 && fm.report.walkTicks > 2000, 'people really walked');
   assert.deepEqual(srt.violations, []);
   assert.deepEqual(frt.violations, []);
+});
+
+// W15 (2026-09-28, OWNER_FEEDBACK §3 "decide within ≤ 0.5 s"): a person standing still in the way is
+// routed around within DECIDE_TICKS of the walker stopping, whatever they are doing; a person who is
+// walking is waited for (followed), not routed around.
+test('stationary blocker (warm / idle / sit, speed 0) in a 1 m corridor → replan around within DECIDE_TICKS; no forward motion before it; never pushes', () => {
+  for (const activity of ['warm', 'idle', 'sit'] as const) {
+    const x = human('x', 0, 1, { yaw: 0 });
+    x.human!.activity = activity;
+    x.human!.task = 'holding-position'; // a directed task: cannot be asked to make way
+    const rt = corridorRuntime(human('n1', 0, -8, { yaw: Math.PI / 2 }), x);
+    const a = rt.submit('walk_to', { actor: 'n1', x: 0, z: 8 });
+    const ex = () => (rt.services.walkExecs as Map<string, { replans: number }>).get(a.id);
+    let blockedAt = -1, decidedAt = -1, zAtBlock = 0;
+    for (let i = 0; i < 20 * 20 && decidedAt < 0; i++) {
+      rt.step();
+      if (blockedAt < 0 && a.status === 'blocked') {
+        blockedAt = rt.tick;
+        zAtBlock = xz(rt, 'n1')[1];
+        assert.equal(a.diagnostic?.code, 'traffic.person');
+        assert.deepEqual(a.diagnostic?.subjects, ['n1', 'x']);
+      } else if (blockedAt >= 0) {
+        if (a.phase === 'replan' || (ex()?.replans ?? 0) > 0) decidedAt = rt.tick;
+        else assert.ok(xz(rt, 'n1')[1] <= zAtBlock + 1e-9, `${activity}: no forward motion while blocked`);
+      }
+    }
+    assert.ok(blockedAt > 0, `${activity}: the walker stopped for x`);
+    assert.ok(decidedAt > 0 && decidedAt - blockedAt <= DECIDE_TICKS, `${activity}: routed around ${decidedAt - blockedAt} ticks after stopping (≤ ${DECIDE_TICKS})`);
+    assert.equal(rt.world.entities.x.human!.speed ?? 0, 0);
+    assert.ok(rt.runUntilIdle(20 * 90, [a.id]));
+    assert.equal(a.status, 'completed', a.diagnostic?.message);
+    assert.equal(a.outputs?.replans, 1, `${activity}: one replan (round the corridor)`);
+    assert.equal(a.outputs?.pushes, 0);
+    assert.deepEqual(rt.violations.map((v) => v.message), []);
+  }
+});
+
+test('moving blocker: a walker catching up with a slower walker in the 1 m corridor follows it, never routes around it', () => {
+  const rt = corridorRuntime(human('lead', 0, -4.5, { yaw: Math.PI / 2 }), human('n1', 0, -8, { yaw: Math.PI / 2 }));
+  const meter = walkStallMeter(rt);
+  const lead = rt.submit('walk_to', { actor: 'lead', x: 0, z: 6, speed: 0.3 });
+  const a = rt.submit('walk_to', { actor: 'n1', x: 0, z: 8 });
+  let waited = 0, gap = Infinity;
+  while (lead.status !== 'completed' && rt.tick < 20 * 60) {
+    rt.step();
+    if (a.status === 'blocked') {
+      waited++;
+      assert.equal(a.diagnostic?.code, 'traffic.person');
+      assert.ok(a.diagnostic?.subjects?.includes('lead'));
+    }
+    assert.equal((rt.services.walkExecs as Map<string, { replans: number }>).get(a.id)?.replans ?? 0, 0, `no replan round a walker who keeps walking (tick ${rt.tick})`);
+    gap = Math.min(gap, dist2(xz(rt, 'n1'), xz(rt, 'lead')));
+  }
+  assert.equal(lead.status, 'completed');
+  assert.ok(waited > 0, 'it did catch up and wait behind');
+  assert.ok(gap >= 2 * R - 0.02, `kept its distance (${gap.toFixed(3)} m)`);
+  assert.ok(rt.runUntilIdle(20 * 60, [a.id]));
+  assert.equal(a.status, 'completed', a.diagnostic?.message);
+  assert.equal(a.outputs?.replans, 0);
+  assert.equal(a.outputs?.pushes, 0);
+  assert.equal(meter.report.stalls, 0, JSON.stringify(meter.report.first));
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+test('campfire evening: x1 (take_slot at 42 s) decides within DECIDE_TICKS of stopping behind the ring, without flickering between walking and blocked, and is warm by 60 s', () => {
+  const f = campfireEvening;
+  const rt = buildRuntime(f);
+  f.start(rt);
+  let rec: { id: string; status: string; phase?: string } | undefined;
+  let firstBlocked = -1, decided = -1, flips = 0, last = '', warmAt = -1;
+  while (rt.tick < 20 * 62 && warmAt < 0) {
+    rt.step();
+    f.tick!(rt);
+    rec ??= [...rt.records.values()].find((r) => r.verb === 'walk_to' && (r.params as { actor: string }).actor === 'x1');
+    if (rec && decided < 0) {
+      if (rec.status === 'blocked' && firstBlocked < 0) firstBlocked = rt.tick;
+      if (firstBlocked >= 0 && rec.phase === 'replan') decided = rt.tick;
+      if (firstBlocked >= 0 && rec.status !== last) flips++;
+      last = rec.status;
+    }
+    if (rt.world.entities.x1.human!.activity === 'warm') warmAt = rt.tick;
+  }
+  assert.ok(rec, 'x1 walked');
+  if (firstBlocked >= 0) {
+    assert.ok(decided > 0 && decided - firstBlocked <= DECIDE_TICKS, `decided ${decided - firstBlocked} ticks after stopping (was 79: the block flickered, resetting the clock)`);
+    assert.ok(flips <= 2, `${flips} blocked/walking flips before deciding`);
+  }
+  assert.ok(warmAt > 0 && warmAt <= 20 * 60, `x1 warm at ${(warmAt / 20).toFixed(1)} s`);
+  assert.deepEqual(rt.violations, []);
+});
+
+test('squeezed people-replan: routing round everyone fails (people crowd the goal), routing round everyone planned smaller succeeds — the walker replans within DECIDE_TICKS and arrives, never inside anyone\'s space', () => {
+  const still = (id: string, x: number, z: number) => {
+    const h = human(id, x, z, { yaw: 0 });
+    h.human!.activity = 'warm';
+    h.human!.task = 'holding-position';
+    return h;
+  };
+  // x blocks the corridor; f1 / f2 stand 0.66 m either side of the goal (room for a body between them,
+  // but as planning obstacles they leave the goal no standing room: route.goal-blocked names them; squeezed
+  // (walk.ts SQUEEZE_HALF) the goal snaps to the nearest plannable spot, which walk_to reports)
+  const rt = corridorRuntime(human('n1', 0, -8, { yaw: Math.PI / 2 }), still('x', 0, 1), still('f1', -0.66, 8), still('f2', 0.66, 8));
+  const sp = rt.services.spatial as Spatial;
+  const calls: string[] = [];
+  const orig = sp.routeAround.bind(sp);
+  sp.routeAround = (...args: Parameters<Spatial['routeAround']>) => {
+    const r = orig(...args);
+    calls.push(`${args[4].map((q) => q.id).join('+')}${args[4].some((q) => q.half !== undefined) ? ' (squeezed)' : ''}: ${r.ok ? 'ok' : `${r.diagnostic.code} ${r.diagnostic.subjects?.join(',')}`}`);
+    return r;
+  };
+  const a = rt.submit('walk_to', { actor: 'n1', x: 0, z: 8 });
+  let blockedAt = -1, decidedAt = -1;
+  while (decidedAt < 0 && rt.tick < 20 * 20) {
+    rt.step();
+    if (blockedAt < 0 && a.status === 'blocked') blockedAt = rt.tick;
+    if (blockedAt >= 0 && a.phase === 'replan') decidedAt = rt.tick;
+  }
+  assert.deepEqual(calls, ['f1+f2+x: route.goal-blocked f1,f2', 'f1+f2+x (squeezed): ok'], 'everyone → fails naming the goal crowd; everyone squeezed → ok');
+  assert.ok(decidedAt - blockedAt <= DECIDE_TICKS, `replanned ${decidedAt - blockedAt} ticks after stopping`);
+  const done = rt.runUntilIdle(20 * 90, [a.id]);
+  assert.ok(done, `${a.status} ${a.phase} ${a.diagnostic?.message} at ${xz(rt, 'n1').map((v) => v.toFixed(2))} calls ${calls.join(' | ')}`);
+  assert.equal(a.status, 'completed', a.diagnostic?.message);
+  const snapped = (a.outputs as { snapped: number }).snapped;
+  assert.ok(snapped <= 0.35 + 0.0708 && /* snap tolerance, counted in whole cells (≤ half a 0.1 m cell diagonal more) */ Math.abs(dist2(xz(rt, 'n1'), [0, 8]) - snapped) < 0.05, `at its goal or the reported snap (${snapped} m)`);
+  for (const f of ['f1', 'f2', 'x']) assert.ok(dist2(xz(rt, 'n1'), xz(rt, f)) >= 2 * R - 0.02, `clear of ${f}`);
+  assert.equal(a.outputs?.pushes, 0);
+  assert.deepEqual(rt.violations.map((v) => v.message), []);
+});
+
+// W15: walker-walker encounters (follow / head-on / crossing) are measured against the smoothed path
+// ahead (its tangent where the walkers meet, the other walker's own path over its next ~1 s), so curved
+// approaches resolve like straight ones.
+test('head-on in the 1 m passage on curved approaches: both get through, nobody pushes, nobody walks on the spot', () => {
+  let met = 0;
+  for (const [from, to] of [[[11.5, -19], [18.5, -11]], [[18.5, -19], [11.5, -11]], [[12, -18.5], [17.5, -11.5]]] as [Vec2, Vec2][]) {
+    const rt = setup(human('n1', from[0], from[1], { yaw: heading(sub2(to, from)) }), human('s1', to[0], to[1], { yaw: heading(sub2(from, to)) }));
+    const meter = walkStallMeter(rt);
+    const a = rt.submit('walk_to', { actor: 'n1', x: to[0], z: to[1] - 0.6 });
+    const b = rt.submit('walk_to', { actor: 's1', x: from[0], z: from[1] + 0.6 });
+    let near = Infinity;
+    for (let i = 0; i < 20 * 90 && !(a.status === 'completed' && b.status === 'completed'); i++) { rt.step(); near = Math.min(near, dist2(xz(rt, 'n1'), xz(rt, 's1'))); }
+    assert.equal(a.status, 'completed', a.diagnostic?.message);
+    assert.equal(b.status, 'completed', b.diagnostic?.message);
+    if (near < 1.5) met++;
+    assert.ok(near >= 2 * R - 0.02, `kept apart (${near.toFixed(3)} m)`);
+    assert.equal(a.outputs?.pushes, 0);
+    assert.equal(b.outputs?.pushes, 0);
+    assert.equal(meter.report.stalls, 0, JSON.stringify(meter.report.first));
+    assert.deepEqual(rt.violations.map((v) => v.message), []);
+  }
+  assert.ok(met >= 2, `the walkers actually met near the passage (${met}/3)`);
+});
+
+test('crossing at a corner: a walker turning round a block and one cutting across its corner never collide, never push, never stall', () => {
+  const scene = openScene([box('block', -5, -5, -0.8, -0.8)]) // only the way round its north-east corner;
+  let met = 0;
+  for (const delay of [0, 8, 16, 24, 32, 40]) {
+    const base = scene;
+    const rt = new Runtime(addAll(emptyWorld('corner', base), human('a', -4, 0, { yaw: 0 }), human('b', 2.5, -2.5, { yaw: heading([-1, 1]) })), new Map<string, ActionDef>([['walk_to', walkTo]]), { spatial: new Spatial(base) }, DEFAULT_INVARIANTS);
+    const meter = walkStallMeter(rt);
+    const A = rt.submit('walk_to', { actor: 'a', x: 0, z: -4 }); // east, then south round the block's corner (-0.8, -0.8)
+    let B: ReturnType<Runtime['submit']> | undefined;
+    let near = Infinity;
+    for (let i = 0; i < 20 * 60; i++) {
+      if (i === delay) B = rt.submit('walk_to', { actor: 'b', x: -2.5, z: 2.5 }); // north-west across the corner
+      rt.step();
+      near = Math.min(near, dist2(xz(rt, 'a'), xz(rt, 'b')));
+      if (A.status === 'completed' && B?.status === 'completed') break;
+    }
+    assert.equal(A.status, 'completed', A.diagnostic?.message);
+    assert.equal(B!.status, 'completed', B!.diagnostic?.message);
+    if (near < 1.2) met++;
+    console.log(`corner delay ${delay}: nearest ${near.toFixed(3)} m, ticks ${rt.tick}`);
+    assert.ok(near >= 2 * R - 0.02, `delay ${delay}: kept apart (${near.toFixed(3)} m)`);
+    assert.equal(A.outputs?.pushes, 0, `delay ${delay}`);
+    assert.equal(B!.outputs?.pushes, 0, `delay ${delay}`);
+    assert.equal(meter.report.stalls, 0, JSON.stringify(meter.report.first));
+    assert.deepEqual(rt.violations.map((v) => v.message), []);
+  }
+  assert.ok(met >= 3, `the paths really crossed near the corner in ${met}/6 staggers`);
+});
+
+test('encounters follow the smoothed path: a walker coming back along it just past the bend is head-on (though off the current tangent); a person dead ahead of the current tangent but off the curved path is no encounter', () => {
+  const scene = openScene([box('block', -5, -5, -0.8, -0.8)]); // the way round its north-east corner only
+  type Ex = { s: number; total: number; segs: { a: Vec2; b: Vec2; s0: number; len: number }[] };
+  const at = (ex: Ex, s: number): Vec2 => {
+    const g = ex.segs.find((q) => s <= q.s0 + q.len) ?? ex.segs[ex.segs.length - 1];
+    const u = Math.min(1, Math.max(0, (s - g.s0) / g.len));
+    return [g.a[0] + (g.b[0] - g.a[0]) * u, g.a[1] + (g.b[1] - g.a[1]) * u];
+  };
+  const dirAt = (ex: Ex, s: number): Vec2 => { const p = at(ex, s), q = at(ex, s + 0.05); const l = dist2(p, q); return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
+  const start = () => {
+    const rt = new Runtime(addAll(emptyWorld('corner', scene), human('a', -4, 0.3, { yaw: 0 })), new Map<string, ActionDef>([['walk_to', walkTo]]), { spatial: new Spatial(scene) }, DEFAULT_INVARIANTS);
+    const A = rt.submit('walk_to', { actor: 'a', x: 0.3, z: -4 });
+    const ex = () => (rt.services.walkExecs as Map<string, Ex>).get(A.id)!;
+    // walk until the path point 2 m ahead lies outside the old straight-tangent band (0.1 m margin)
+    const lat = () => { const e = ex(), me = xz(rt, 'a'), t = dirAt(e, e.s), d = sub2(at(e, e.s + 2.0), me); return Math.abs(d[0] * -t[1] + d[1] * t[0]); };
+    while (rt.tick < 200 && lat() < 2 * R + 0.22) rt.step();
+    return { rt, A, ex: ex(), me: xz(rt, 'a'), tan: dirAt(ex(), ex().s) };
+  };
+  // 1) b stands on the path 2.0 m ahead (past the bend) and walks back along it towards a
+  {
+    const { rt, A, ex, me, tan } = start();
+    const pb = at(ex, ex.s + 2.0);
+    const d = sub2(pb, me);
+    assert.ok(Math.abs(d[0] * -tan[1] + d[1] * tan[0]) >= 2 * R + 0.12, 'the old straight-tangent measure would not see b');
+    const back = dirAt(ex, ex.s + 2.0);
+    rt.world.entities.b = human('b', pb[0], pb[1], { yaw: heading([-back[0], -back[1]]) });
+    const B = rt.submit('walk_to', { actor: 'b', x: -4, z: 0.9 });
+    assert.equal(B.status, 'executing');
+    const enc = encounterOf(rt, A.id);
+    if (enc.kind === 'none') assert.fail('no encounter with b');
+    assert.equal(enc.kind, 'headon', JSON.stringify(enc));
+    assert.equal(enc.id, 'b');
+    assert.ok(Math.abs(enc.along - 2.0) < 0.15 && enc.lateral < 0.1, JSON.stringify(enc));
+  }
+  // 2) c stands 2.0 m dead ahead of a's current tangent, where the path has already turned away
+  {
+    const { rt, A, ex, me, tan } = start();
+    const pc: Vec2 = [me[0] + 2.0 * tan[0], me[1] + 2.0 * tan[1]];
+    let off = Infinity;
+    for (let s = ex.s; s <= ex.total; s += 0.05) off = Math.min(off, dist2(at(ex, s), pc));
+    assert.ok(off >= 2 * R + 0.12, `c is off the curved path (${off.toFixed(2)} m)`);
+    rt.world.entities.c = human('c', pc[0], pc[1], { yaw: 0 });
+    assert.equal(encounterOf(rt, A.id).kind, 'none', 'no encounter with someone the path does not pass');
+  }
 });

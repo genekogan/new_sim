@@ -12,6 +12,7 @@ import { activeLoadDiscs } from './actions.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import { linkUnder, stairClearance } from './climb.ts';
 import { fragileLoadsOk } from './fragile.ts';
+import { hypot } from '../core/math.ts';
 
 export const GRIP_TOL = 0.05; // m
 const CLEAR_TOL = 0.03; // m, same tolerance as the human clearance invariant
@@ -68,7 +69,7 @@ export const humanLoadClearance: Invariant = (rt: Runtime) => {
     if (h.kind !== 'human' || !h.human) continue;
     for (const d of discs) {
       if (d.crew.includes(h.id) || h.human.level !== d.level || seen.has(`${h.id}|${d.entity}`)) continue;
-      const gap = Math.hypot(h.pose.p[0] - d.p[0], h.pose.p[2] - d.p[1]) - d.r;
+      const gap = hypot(h.pose.p[0] - d.p[0], h.pose.p[2] - d.p[1]) - d.r;
       if (gap < HUMAN_RADIUS - CLEAR_TOL) {
         seen.add(`${h.id}|${d.entity}`);
         out.push({ code: 'collision.human-load', message: `${h.id} overlaps the carried ${d.entity} (body centre ${gap.toFixed(2)} m from the load cover, needs ${HUMAN_RADIUS} m)`, subjects: [h.id, d.entity], at: h.pose.p });

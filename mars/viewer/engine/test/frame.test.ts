@@ -9,6 +9,7 @@ import { def } from '../world/catalog.ts';
 import { beamWalkways, climbLinks, frameLinks, BEAM_SPEED, CLIMB_SPEED } from '../construction/frame.ts';
 import { spatialOf } from '../construction/access.ts';
 import { bay, run } from './frame-fixtures.ts';
+import { hypot } from '../core/math.ts';
 
 test('climb links exist only on installed uprights; one per column and beam seat', () => {
   const held = bay({ seat: 1.8, installed: false });
@@ -74,7 +75,7 @@ test('climb up, walk a beam at ≤ 0.4 m/s; walk_to cannot reach a beam; too fas
   while (r.status !== 'completed' && r.status !== 'failed' && rt.tick < t0 + 20 * 120) {
     rt.step();
     const p = [E.p1.pose.p[0], E.p1.pose.p[2]];
-    maxV = Math.max(maxV, Math.hypot(p[0] - last[0], p[1] - last[1]) / DT);
+    maxV = Math.max(maxV, hypot(p[0] - last[0], p[1] - last[1]) / DT);
     last = p;
   }
   assert.equal(r.status, 'completed', `${r.diagnostic?.message}`);

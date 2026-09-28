@@ -6,7 +6,7 @@
 // Everything here is pure geometry derived from the asset catalog's handling
 // data, so planner, action, invariant and tests agree on where the load and
 // each carrier are for a given formation pose.
-import { datan2, dcos, dist2, dsin, rot2, type Vec2, type Vec3 } from '../core/math.ts';
+import { datan2, dcos, dist2, dsin, rot2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import { def, HUMAN_RADIUS, type AssetDef } from '../world/catalog.ts';
@@ -151,12 +151,12 @@ export function formationFor(defId: string, n: number): Formation {
   const sTarget = Math.min(0.5, Math.max(0.2, 2 * w));
   const nAlong = Math.max(1, Math.ceil(L / sTarget));
   const s = L / nAlong;
-  const rho = Math.hypot(w, s / 2);
+  const rho = hypot(w, s / 2);
   const discs: Disc[] = [];
   for (let j = 0; j < rows; j++)
     for (let i = 0; i < nAlong; i++) discs.push({ c: [-L / 2 + s * (i + 0.5), -W / 2 + w * (2 * j + 1)], r: rho, part: 'load' });
   carriers.forEach((c, i) => discs.push({ c: [c.along, c.side * (W / 2 + REACH)], r: CARRIER_RADIUS, part: 'carrier', carrier: i }));
-  const extent = Math.max(...discs.map((q) => Math.hypot(q.c[0], q.c[1]) + q.r));
+  const extent = Math.max(...discs.map((q) => hypot(q.c[0], q.c[1]) + q.r));
   return {
     defId, crew: n, name: shortName(defId), massKg: d.massKg, length: L, width: W, height: H, carryHeight: h.carryHeight,
     carry, lay, carriers, discs, loadDiscR: rho, loadDiscSpacing: s, extent,

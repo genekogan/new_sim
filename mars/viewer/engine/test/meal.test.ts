@@ -86,10 +86,10 @@ test('items: verbs are registered in the one engine registry; catalog table + sm
  * Pinned against walk_to at e09a961 (a walk.ts / turning change re-pins this with the reason in
  * PLANNING_BUDGET.md, like every other pin). Re-pinned (was 689 ticks, baf84de6…ccbfd): splined turns +
  * immediate block reaction, 2026-09-28; same meal (5 cycles each, all seated, bowls and pot empty).
- * 631 ticks = 31.55 s.
+ * Re-pinned (was 631 ticks, 9dae86bf…0f87): walker fallback + hypot + encounters on the smoothed path, 2026-09-28; same meal. 626 ticks = 31.3 s.
  */
-const MEAL_TICKS = 631;
-const MEAL_HASH = '9dae86bfd31ef8331c5930d345c7ceace5bd2f7a8a247ab02462c262f4a70f87';
+const MEAL_TICKS = 626;
+const MEAL_HASH = '035e8c3949b7404726c93f326430dc59e6728eee5b3596483fd2add39b8baba5';
 
 test('meal: four people take bowl + spoon, serve, sit round the fire and eat together until the bowls are empty', () => {
   const rt = mealRuntime();

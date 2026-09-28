@@ -15,7 +15,7 @@ import { carry } from '../carry/actions.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 import { carryCorridors } from '../carry/scenes.ts';
 import { entityFrame, formationFor, laidPose, REACH } from '../carry/formation.ts';
-import { dcos, dsin, obbOverlap, rot2, sub2, type OBB2, type Vec2 } from '../core/math.ts';
+import { dcos, dsin, obbOverlap, rot2, sub2, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
 import type { SpatialScene } from '../spatial/types.ts';
@@ -33,7 +33,7 @@ const upright19 = (id: string, x: number, z: number, th = 0) => {
 function distObb(p: Vec2, o: OBB2) {
   const l = rot2(sub2(p, o.c), -o.yaw);
   const dx = Math.max(0, Math.abs(l[0]) - o.half[0]), dz = Math.max(0, Math.abs(l[1]) - o.half[1]);
-  return Math.hypot(dx, dz);
+  return hypot(dx, dz);
 }
 
 /** Independent per-tick audit: load vs walls (exact SAT), carriers vs walls, carriers at reach from the load edge. */
@@ -83,7 +83,7 @@ test('carry: 2 people carry a 12 ft beam around the L corner of the 2.5 m corrid
   assert.equal(b.phase, 'staged');
   assert.deepEqual(b.support, { kind: 'ground' });
   const fp = entityFootprint(b).obb;
-  assert.ok(Math.hypot(fp.c[0] - 18, fp.c[1] - 11) < 0.02, `set down at ${fp.c}`);
+  assert.ok(hypot(fp.c[0] - 18, fp.c[1] - 11) < 0.02, `set down at ${fp.c}`);
   assert.ok(Math.abs(dsin(fp.yaw - Math.PI / 2)) < 0.02 || Math.abs(dcos(fp.yaw)) < 0.02);
   for (const c of ['p1', 'p2']) {
     assert.equal(rt.world.entities[c].human!.activity, 'idle');

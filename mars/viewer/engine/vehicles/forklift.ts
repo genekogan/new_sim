@@ -8,7 +8,7 @@
 //   forklift_deliver {operator, to:{x,z,yaw,level}}  raise to a deck edge and set the load down
 // The load rides the forks: phase 'carried', support { kind: 'forks', vehicle }.
 import { z } from 'zod';
-import { add2, angleDelta, clamp, dist2, heading, obbCorners, obbOverlap, pointInObb, rot2, sub2, wrapAngle, type OBB2, type Vec2 } from '../core/math.ts';
+import { add2, angleDelta, clamp, dist2, heading, obbCorners, obbOverlap, pointInObb, rot2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Invariant, Runtime } from '../runtime/runtime.ts';
 import type { Entity, WorldState } from '../world/types.ts';
@@ -112,7 +112,7 @@ export const truckObb = (p: Vec2, yaw: number): OBB2 => ({ c: p, half: [HALF_L, 
 /** Farthest point of truck + load from the truck centre: the loaded routing disc. */
 export function loadedRadius(g: Engage): number {
   const far = HALF_L + FORKLIFT.gap + g.depth;
-  return Math.max(FORKLIFT_PROFILE.radius, Math.hypot(far, g.width / 2));
+  return Math.max(FORKLIFT_PROFILE.radius, hypot(far, g.width / 2));
 }
 export function loadedProfile(g: Engage): VehicleProfile {
   const r = Math.round(loadedRadius(g) * 100) / 100;
@@ -121,7 +121,7 @@ export function loadedProfile(g: Engage): VehicleProfile {
 
 const distToObb = (p: Vec2, o: OBB2) => {
   const l = rot2(sub2(p, o.c), -o.yaw);
-  return Math.hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
+  return hypot(Math.max(Math.abs(l[0]) - o.half[0], 0), Math.max(Math.abs(l[1]) - o.half[1], 0));
 };
 const obLabel = (o: Obstacle) => (o.label && o.label !== o.id ? `${o.label} (${o.id})` : o.id);
 

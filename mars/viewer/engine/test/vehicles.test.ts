@@ -13,7 +13,7 @@ import { emptyWorld, human, addAll } from '../world/factory.ts';
 import type { Entity } from '../world/types.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import type { ActionDef } from '../actions/types.ts';
-import { angleDelta } from '../core/math.ts';
+import { angleDelta, hypot } from '../core/math.ts';
 import { EUC_PROFILE, turnRadiusAt, vehicle, VEHICLE_ACTIONS, VEHICLE_INVARIANTS, STOP_GAP, planCurve } from '../vehicles/index.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 
@@ -25,7 +25,7 @@ function setup(ents: Entity[], extra?: Obstacle[]) {
 }
 const sp = (rt: Runtime) => rt.services.spatial as Spatial;
 const xz = (rt: Runtime, id: string): [number, number] => [rt.world.entities[id].pose.p[0], rt.world.entities[id].pose.p[2]];
-const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const dist = (a: [number, number], b: [number, number]) => hypot(a[0] - b[0], a[1] - b[1]);
 
 function mounted(rt: Runtime, actor: string, veh: string) {
   const m = rt.submit('mount', { actor, vehicle: veh });

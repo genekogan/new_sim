@@ -19,7 +19,7 @@
 // liftHandsInReach covers both ends): a geometry that does not allow a genuine hand-off is refused
 // (`handup.too-high`: "…use the forklift"), never interpolated.
 import { z } from 'zod';
-import { add2, angleDelta, datan2, dist2, dot2, rot2, scale2, sub2, type OBB2, type Vec2, type Vec3 } from '../core/math.ts';
+import { add2, angleDelta, datan2, dist2, dot2, rot2, scale2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { ActionDef, ActionRecord, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Link } from '../spatial/types.ts';
@@ -263,14 +263,14 @@ export function handupHands(part: Entity, q: Pose, holder: Entity, slot: string)
 
 /** Sample a pose segment every STEP m of the farthest point's motion. */
 function samples(e: Entity, a: Pose, b: Pose): Pose[] {
-  const ext = Math.hypot(size(e)[0], size(e)[2]) / 2;
-  const d = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) + ext * Math.abs(angleDelta(a.yaw, b.yaw));
+  const ext = hypot(size(e)[0], size(e)[2]) / 2;
+  const d = hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) + ext * Math.abs(angleDelta(a.yaw, b.yaw));
   const n = Math.max(1, Math.ceil(d / STEP));
   return Array.from({ length: n + 1 }, (_, k) => lerpPose(a, b, k / n));
 }
 const segDur = (e: Entity, a: Pose, b: Pose, speed: number) => {
-  const ext = Math.hypot(size(e)[0], size(e)[2]) / 2;
-  const d = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) + ext * Math.abs(angleDelta(a.yaw, b.yaw));
+  const ext = hypot(size(e)[0], size(e)[2]) / 2;
+  const d = hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) + ext * Math.abs(angleDelta(a.yaw, b.yaw));
   return Math.max(0.2, d / speed);
 };
 
@@ -492,7 +492,7 @@ export function balance(e: Entity, g: { g: Vec2; out: Vec2 }): { lever: boolean;
 /** Unit horizontal normal of walkway l pointing away from point c (the part's final centre). */
 function outward(l: Link, c: Vec2): Vec2 {
   const d = sub2(l.to.p, l.from.p);
-  const len = Math.hypot(d[0], d[1]) || 1;
+  const len = hypot(d[0], d[1]) || 1;
   const n: Vec2 = [-d[1] / len, d[0] / len];
   return dot2(sub2(c, l.from.p), n) > 0 ? [-n[0], -n[1]] : n;
 }

@@ -42,8 +42,9 @@ const HUMANS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'visitor', 'g1', 'g2', 'g3',
  *  584685f1…fd588): splined turns + immediate block reaction, 2026-09-28; re-pinned (was 16191 ticks, e121377d…24b9):
  *  kneel rule at the edge (W8 patch), 2026-09-28; re-pinned (was 16248 ticks, 0870c583…946a): body model
  *  unification, 2026-09-28 (PLANNING_BUDGET.md); re-pinned (was 16219 ticks, 339cf310…ad1e): body model = measured
- *  rig, 2026-09-28 (PLANNING_BUDGET.md); 0 violations, same outcome. */
-const PIN = { ticks: 16237, hash: '5f32379db672beaed823d46a367e5f11b2557f4cf2fa94b140cd9535715d0c73' };
+ *  rig, 2026-09-28 (PLANNING_BUDGET.md); re-pinned (was 16237 ticks, 5f32379d…0c73): walker fallback + hypot + encounters on the smoothed path, 2026-09-28
+ *  (PLANNING_BUDGET.md); 0 violations, same outcome. */
+const PIN = { ticks: 16230, hash: '66800edc569a37aa15a879c7525806b72a4c3d61557167e392ef87ccaa2af8d5' };
 
 test('flagship v3: deck handed up (joists + s1 by hand to two on the beams, s2 off the forklift), 0 violations, rehearse = execute, pinned', () => {
   const h = new WorldHistory('mars-rules/flagship-v3-test');

@@ -15,7 +15,7 @@
 //     around them to it (holdStations 2/3); the frame ends held by the whole crew.
 // A single person (8–9 ft frames) is the lifter and ends at the base as the footer.
 import { z } from 'zod';
-import { dcos, dsin, heading, obbOverlap, rot2, type Vec2, type Vec3 } from '../core/math.ts';
+import { dcos, dsin, heading, obbOverlap, rot2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
@@ -118,10 +118,10 @@ function stepPath(g: Geo, r: Role, thT: number): Vec2[] {
   const L = lat(g), s = r.side, back = -0.7; // holdStations 2/3 sit 0.7 m behind the base line
   return [local(g, s * L, reachR(g, thT)), local(g, s * (L + STEP_OUT), reachR(g, thT)), local(g, s * (L + STEP_OUT), back), local(g, s * L, back)];
 }
-const pathLen = (ps: Vec2[]) => ps.slice(1).reduce((a, q, i) => a + Math.hypot(q[0] - ps[i][0], q[1] - ps[i][1]), 0);
+const pathLen = (ps: Vec2[]) => ps.slice(1).reduce((a, q, i) => a + hypot(q[0] - ps[i][0], q[1] - ps[i][1]), 0);
 function along(ps: Vec2[], d: number): Vec2 {
   for (let i = 1; i < ps.length; i++) {
-    const l = Math.hypot(ps[i][0] - ps[i - 1][0], ps[i][1] - ps[i - 1][1]);
+    const l = hypot(ps[i][0] - ps[i - 1][0], ps[i][1] - ps[i - 1][1]);
     if (d <= l) return [ps[i - 1][0] + ((ps[i][0] - ps[i - 1][0]) * d) / (l || 1), ps[i - 1][1] + ((ps[i][1] - ps[i - 1][1]) * d) / (l || 1)];
     d -= l;
   }

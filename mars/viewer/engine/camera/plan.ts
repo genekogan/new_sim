@@ -9,7 +9,7 @@
 //                      a cut. A move is continuous only if it respects speed /
 //                      turn limits and its swept segment crosses no solid.
 // The result is plain data (CameraPlan) and never touches world state.
-import { dacos, q6, type Vec3 } from '../core/math.ts';
+import { dacos, q6, type Vec3, hypot } from '../core/math.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import { CameraWorld, raycast, solidName, type CameraPolicy } from './geom.ts';
 import { evaluateShot, shotSubjects, subjectPoints, type CameraPose, type Sampler, type ShotSpec } from './shots.ts';
@@ -59,7 +59,7 @@ const q3 = (v: Vec3): Vec3 => [q6(v[0]), q6(v[1]), q6(v[2])];
 function viewAngle(a: CameraPose, b: CameraPose): number {
   const da = [a.target[0] - a.position[0], a.target[1] - a.position[1], a.target[2] - a.position[2]];
   const db = [b.target[0] - b.position[0], b.target[1] - b.position[1], b.target[2] - b.position[2]];
-  const la = Math.hypot(da[0], da[1], da[2]) || 1, lb = Math.hypot(db[0], db[1], db[2]) || 1;
+  const la = hypot(da[0], da[1], da[2]) || 1, lb = hypot(db[0], db[1], db[2]) || 1;
   return dacos(Math.max(-1, Math.min(1, (da[0] * db[0] + da[1] * db[1] + da[2] * db[2]) / (la * lb))));
 }
 
@@ -110,7 +110,7 @@ export function planCameraTrack(spec: ShotSpec, sampler: Sampler, scene: Spatial
 
   const crossing = (a: Candidate, b: Candidate) => raycast(world, a.pose.position, b.pose.position, 'collide');
   const continuous = (a: Candidate, b: Candidate) => {
-    const d = Math.hypot(b.pose.position[0] - a.pose.position[0], b.pose.position[1] - a.pose.position[1], b.pose.position[2] - a.pose.position[2]);
+    const d = hypot(b.pose.position[0] - a.pose.position[0], b.pose.position[1] - a.pose.position[1], b.pose.position[2] - a.pose.position[2]);
     if (d > maxStep || viewAngle(a.pose, b.pose) > maxTurn || Math.abs(b.pose.fov - a.pose.fov) > 30 * dt) return false;
     return !crossing(a, b);
   };

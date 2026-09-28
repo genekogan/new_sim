@@ -1,6 +1,6 @@
 // connect_beam + release_support (spec §7, §12, §28 "Raise tall frame").
 import { z } from 'zod';
-import { angleDelta, datan2, dcos, dot2, dsin, rot2, sub2, wrapAngle, type Vec2 } from '../core/math.ts';
+import { angleDelta, datan2, dcos, dot2, dsin, rot2, sub2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
@@ -52,7 +52,7 @@ export function planBeam(rt: Runtime, p: CP): { ok: true; program: CProg } | { o
   const mid: [number, number, number] = [(sa[0] + sb[0]) / 2, sa[1] - def(beam.def).size[1] / 2, (sa[2] + sb[2]) / 2];
   // staged at the bay: lying roughly under its final position (the carry action delivers it here)
   const bp = beam.pose.p;
-  if (beam.support?.kind !== 'ground' || Math.hypot(bp[0] - mid[0], bp[2] - mid[2]) > 0.9)
+  if (beam.support?.kind !== 'ground' || hypot(bp[0] - mid[0], bp[2] - mid[2]) > 0.9)
     return fail('beam.not-staged', `${beam.id} must be lying on the ground within 0.9 m below its seat position (carry it to the bay first)`, [beam.id]);
   // installers stand just outside the column and outside the bay, facing the seat
   const sgn = Math.sign(rel[1]) || 1;

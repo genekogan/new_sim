@@ -3,7 +3,7 @@
 // scene or the world. Obstacles are split by per-kind policy into the
 // *collision* set (camera may not enter / cross) and the *occlusion* set
 // (blocks line of sight). Plexiglass ('glass') collides but does not occlude.
-import { dcos, dsin, type Vec3 } from '../core/math.ts';
+import { dcos, dsin, type Vec3, hypot } from '../core/math.ts';
 import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 
 export type ObstacleKind = NonNullable<Obstacle['kind']>;
@@ -148,7 +148,7 @@ export function signedDistance(p: Vec3, q: Solid): number {
   const hy = (q.y1 - q.y0) / 2;
   const ly = Math.abs(p[1] - (q.y0 + hy)) - hy;
   const ox = Math.max(lx, 0), oy = Math.max(ly, 0), oz = Math.max(lz, 0);
-  return Math.hypot(ox, oy, oz) + Math.min(Math.max(lx, ly, lz), 0);
+  return hypot(ox, oy, oz) + Math.min(Math.max(lx, ly, lz), 0);
 }
 
 export function pointInside(p: Vec3, q: Solid, margin = 0): boolean {
@@ -175,7 +175,7 @@ function gradient(p: Vec3, q: Solid): Vec3 {
     signedDistance([p[0], p[1] + e, p[2]], q) - signedDistance([p[0], p[1] - e, p[2]], q),
     signedDistance([p[0], p[1], p[2] + e], q) - signedDistance([p[0], p[1], p[2] - e], q),
   ];
-  const l = Math.hypot(g[0], g[1], g[2]);
+  const l = hypot(g[0], g[1], g[2]);
   return l > 1e-12 ? [g[0] / l, g[1] / l, g[2] / l] : [0, 1, 0];
 }
 

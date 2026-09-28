@@ -22,10 +22,11 @@ import { cropScene } from '../campus/load.ts';
 import type { CampusScene } from '../campus/types.ts';
 import { CAMPUS_ID, loadCampus2026 } from '../campus/world.ts';
 import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry, BUILD_BAY_INVARIANTS, BUILD_BAY_CONTRIBUTORS, type Site } from '../scenarios/build-bay.ts';
+import { hypot } from '../core/math.ts';
 
 const RULES = 'mars-rules/flagship-campus-test';
 /** campus-flagship (staging-east crop) final state; also pinned in grid-incremental.test.ts. */
-const CROPPED_HASH = 'ecb424c74d8797c5940ea5d2b3332c37e5efe4be4a1251d9ebd4b259f9dcbb3a';
+const CROPPED_HASH = 'fee92ee0a94fc91505be23eb5ccaf19f02f15293ce8630a1b357b482c0240c56';
 
 function setup() {
   const file = readCampus2026File();
@@ -82,7 +83,7 @@ test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, 
   for (const [id, e] of Object.entries(final.entities)) {
     const r = ref.entities[id];
     if (e.kind !== 'human') { assert.deepEqual(e, r, `component ${id} identical`); continue; }
-    maxHuman = Math.max(maxHuman, Math.hypot(e.pose.p[0] - r.pose.p[0], e.pose.p[1] - r.pose.p[1], e.pose.p[2] - r.pose.p[2]), Math.abs(e.pose.yaw - r.pose.yaw));
+    maxHuman = Math.max(maxHuman, hypot(e.pose.p[0] - r.pose.p[0], e.pose.p[1] - r.pose.p[1], e.pose.p[2] - r.pose.p[2]), Math.abs(e.pose.yaw - r.pose.yaw));
     assert.deepEqual({ ...e, pose: null }, { ...r, pose: null }, `${id}: same discrete state`);
   }
   assert.equal(maxHuman, 0, `people end exactly where the cropped run's do (max ${maxHuman})`);

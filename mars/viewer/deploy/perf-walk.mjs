@@ -22,13 +22,13 @@ import { cropScene } from '../engine/campus/load.ts';
 import { CAMPUS_ID, loadCampus2026 } from '../engine/campus/world.ts';
 import { mealRuntime, runMeal } from '../engine/scenarios/meal.ts';
 
-/** The pins asserted by the engine tests (planning / grid-incremental / campus-full / meal / build-bay-v3). */
+/** The pins asserted by the engine tests (planning / grid-incremental / campus-full / meal / build-bay-v3); re-pinned: walker fallback + hypot + encounters on the smoothed path, 2026-09-28. */
 export const PINS = {
-  stress: '093779fd18f0a1c1875c7cbe41347a967f4ea6da06b21b29113ab28b55fcac55',
-  probe: '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b',
-  campus: 'ecb424c74d8797c5940ea5d2b3332c37e5efe4be4a1251d9ebd4b259f9dcbb3a',
-  meal: '9dae86bfd31ef8331c5930d345c7ceace5bd2f7a8a247ab02462c262f4a70f87',
-  v3: '5f32379db672beaed823d46a367e5f11b2557f4cf2fa94b140cd9535715d0c73',
+  stress: '1298e2e57b62adf5fca2b579c5babbfdb743a395134afc432d4797a0c5b5ee6b',
+  probe: '0147f8f12a997462f5e6adfe71ffef1a8bc7e850d84082289328111618fd30d5',
+  campus: 'fee92ee0a94fc91505be23eb5ccaf19f02f15293ce8630a1b357b482c0240c56',
+  meal: '035e8c3949b7404726c93f326430dc59e6728eee5b3596483fd2add39b8baba5',
+  v3: '66800edc569a37aa15a879c7525806b72a4c3d61557167e392ef87ccaa2af8d5',
 };
 
 // ---- measurement harness (bench only) ----

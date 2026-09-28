@@ -16,6 +16,7 @@ import { seatPoint, snapSeat } from '../construction/rules.ts';
 import { def } from '../world/catalog.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
 import type { Obstacle, SpatialScene } from '../spatial/types.ts';
+import { hypot } from '../core/math.ts';
 
 const L9 = def('beam-9ft').size[0];
 const D12 = def('upright-12ft').size[0];
@@ -360,12 +361,12 @@ function watchHands(rt: Runtime, item: string) {
       const hand = handPoint(e, e.pose, slot);
       assert.ok(hand, `${id} holds ${item} by a follow slot (got ${slot})`);
       s.slots.add(`${id}:${slot}`);
-      s.maxD = Math.max(s.maxD, Math.hypot(h.pose.p[0] - hand.p[0], h.pose.p[2] - hand.p[2]));
+      s.maxD = Math.max(s.maxD, hypot(h.pose.p[0] - hand.p[0], h.pose.p[2] - hand.p[2]));
       s.maxUp = Math.max(s.maxUp, hand.p[1] - h.pose.p[1]);
       const p: [number, number] = [h.pose.p[0], h.pose.p[2]];
       const q = last.get(id);
       if (q) {
-        const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+        const d = hypot(p[0] - q[0], p[1] - q[1]);
         s.maxSpeed = Math.max(s.maxSpeed, d * 20);
         s.walked += d;
       }

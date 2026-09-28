@@ -5,7 +5,7 @@
 // never drops a load: it becomes a controlled set-down (deferred cancel) at
 // the current pose if that spot is clear, otherwise it is refused.
 import { z } from 'zod';
-import { angleDelta, clamp, dcos, dsin, rot2, wrapAngle, type Vec2 } from '../core/math.ts';
+import { angleDelta, clamp, dcos, dsin, rot2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, CancelResult, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
@@ -123,8 +123,8 @@ function pathBystander(rt: Runtime, ex: Exec, u: number): string | null {
   for (const o of Object.values(rt.world.entities)) {
     if (o.kind !== 'human' || p.crew.includes(o.id) || o.human?.level !== p.level) continue;
     const x = o.pose.p[0], z = o.pose.p[2];
-    if (discs.some((d) => Math.hypot(d.p[0] - x, d.p[1] - z) < d.d.r + 0.28 + 0.08)) return o.id;
-    if (spots.some((s) => Math.hypot(s[0] - x, s[1] - z) < 2 * 0.28 + 0.08)) return o.id;
+    if (discs.some((d) => hypot(d.p[0] - x, d.p[1] - z) < d.d.r + 0.28 + 0.08)) return o.id;
+    if (spots.some((s) => hypot(s[0] - x, s[1] - z) < 2 * 0.28 + 0.08)) return o.id;
   }
   return null;
 }
@@ -141,7 +141,7 @@ function clearOfRoute(rt: Runtime, ex: Exec, q: Vec2): boolean {
   const i0 = ex.i;
   let clear = true;
   for (let u = ex.u; clear; u = Math.min(U, u + 0.3)) {
-    for (const d of worldDiscs(f, poseAtU(ex, u))) if (Math.hypot(d.p[0] - q[0], d.p[1] - q[1]) < d.d.r + 0.28 + 0.15) { clear = false; break; }
+    for (const d of worldDiscs(f, poseAtU(ex, u))) if (hypot(d.p[0] - q[0], d.p[1] - q[1]) < d.d.r + 0.28 + 0.15) { clear = false; break; }
     if (u >= U) break;
   }
   ex.i = i0; // poseAtU advances the segment cursor; restore it
@@ -154,7 +154,7 @@ function bystanderAt(rt: Runtime, ex: Exec, spots: Vec2[], frame: ReturnType<typ
   for (const o of Object.values(rt.world.entities)) {
     if (o.kind !== 'human' || p.crew.includes(o.id) || o.human?.level !== p.level) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
-    if (spots.some((s) => Math.hypot(s[0] - q[0], s[1] - q[1]) < 2 * 0.28 + 0.12)) return o.id;
+    if (spots.some((s) => hypot(s[0] - q[0], s[1] - q[1]) < 2 * 0.28 + 0.12)) return o.id;
     if (frame) {
       const l = sub2r(q, [frame.q.x, frame.q.z], frame.q.th);
       if (Math.abs(l[0]) < p.f.length / 2 + 0.4 && Math.abs(l[1]) < frame.halfW + 0.4) return o.id;
@@ -174,7 +174,7 @@ const sub2r = (q: Vec2, c: Vec2, th: number): Vec2 => {
 function replanStarts(rt: Runtime, ex: Exec, here: SE2): SE2[] {
   const flip: SE2 = { ...here, th: wrapAngle(here.th + Math.PI) };
   const spots = carrierSpots(ex.p.f, flip);
-  const near = crewOf(rt, ex).every((h, i) => Math.hypot(spots[i][0] - h.pose.p[0], spots[i][1] - h.pose.p[2]) <= 0.3);
+  const near = crewOf(rt, ex).every((h, i) => hypot(spots[i][0] - h.pose.p[0], spots[i][1] - h.pose.p[2]) <= 0.3);
   return near ? [here, flip] : [here];
 }
 
@@ -485,10 +485,10 @@ function climbBlocker(rt: Runtime, ex: Exec, next: ClimbPose): string | null {
     const x = o.pose.p[0], z = o.pose.p[2];
     for (let k = 0; k < nextDiscs.length; k++) {
       const d = nextDiscs[k];
-      const dn = Math.hypot(d.p[0] - x, d.p[1] - z);
+      const dn = hypot(d.p[0] - x, d.p[1] - z);
       if (dn >= d.d.r + 0.28 + 0.05) continue;
       const c = nowDiscs[k];
-      if (!c || dn < Math.hypot(c.p[0] - x, c.p[1] - z) - 1e-9) return o.id;
+      if (!c || dn < hypot(c.p[0] - x, c.p[1] - z) - 1e-9) return o.id;
     }
   }
   return null;
@@ -527,7 +527,7 @@ function stepClimb(rt: Runtime, ex: Exec, dt: number): StepResult {
     const res = `link:${c.link.id}`;
     const entry = c.ascending ? c.link.from.p : c.link.to.p;
     const t = traffic(rt).get(res);
-    if (t && t.actors.size && Math.hypot(t.entry[0] - entry[0], t.entry[1] - entry[1]) > 0.5) {
+    if (t && t.actors.size && hypot(t.entry[0] - entry[0], t.entry[1] - entry[1]) > 0.5) {
       h.human!.activity = 'carry';
       return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${p.crew[0]} carrying ${p.item} waits for ${[...t.actors][0]} to finish using ${c.link.id}`, subjects: [p.crew[0], p.item, c.link.id] } };
     }

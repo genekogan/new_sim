@@ -21,8 +21,15 @@ export const sub2 = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
 export const scale2 = (a: Vec2, s: number): Vec2 => [a[0] * s, a[1] * s];
 export const dot2 = (a: Vec2, b: Vec2) => a[0] * b[0] + a[1] * b[1];
 export const cross2 = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
-export const len2 = (a: Vec2) => Math.hypot(a[0], a[1]);
-export const dist2 = (a: Vec2, b: Vec2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+/**
+ * √(x² + y² + z²) from correctly rounded IEEE operations only. Host `Math.hypot` is
+ * implementation-approximated (V8, SpiderMonkey and JavaScriptCore use different algorithms and can
+ * differ in the last bit), which breaks cross-host state hashes; it is banned in engine source
+ * (core.test.ts). No overflow guard: engine lengths are metres.
+ */
+export const hypot = (x: number, y: number, z = 0) => Math.sqrt(x * x + y * y + z * z);
+export const len2 = (a: Vec2) => hypot(a[0], a[1]);
+export const dist2 = (a: Vec2, b: Vec2) => hypot(a[0] - b[0], a[1] - b[1]);
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const lerp2 = (a: Vec2, b: Vec2, t: number): Vec2 => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
 export const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi : x);

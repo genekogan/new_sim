@@ -7,7 +7,7 @@ import { hashOf } from '../core/hash.ts';
 import type { Confidence, Region } from '../world/types.ts';
 import { fitPieces, GROUND_Y, LOW_BAND } from './extract.ts';
 import { clipTrianglesToBandPolys, clusterPolygons, convexHull } from './geom.ts';
-import { obbCorners } from '../core/math.ts';
+import { obbCorners, hypot } from '../core/math.ts';
 import type { ObstacleKind, ObstacleRow } from './types.ts';
 import { CAMPUS_SCENE_SCHEMA } from './types.ts';
 import type { CampusYearFile } from './history.ts';
@@ -126,7 +126,7 @@ export function buildYearFile(inp: YearBuildInput): CampusYearFile {
   const ex = extractHistoryObstacles(inp.components, names);
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
   for (const r of ex.rows) {
-    const e = Math.hypot(r[4], r[5]);
+    const e = hypot(r[4], r[5]);
     minX = Math.min(minX, r[2] - e); maxX = Math.max(maxX, r[2] + e); minZ = Math.min(minZ, r[3] - e); maxZ = Math.max(maxZ, r[3] + e);
   }
   const m = 10; // open-ground margin beyond the outermost object

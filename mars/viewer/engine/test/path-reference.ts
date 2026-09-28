@@ -1,7 +1,7 @@
 // FROZEN reference copy of spatial/path.ts findRoute as of f46f658 (before the
 // planning-budget work). Test-only: planning.test.ts asserts the production
 // planner returns bit-identical routes. Do not edit or "improve" this file.
-import { dist2, type Vec2 } from '../core/math.ts';
+import { dist2, type Vec2, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { cellOf, centreOf, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from '../spatial/grid.ts';
 import type { AgentProfile, SpatialScene } from '../spatial/types.ts';
@@ -195,7 +195,7 @@ function snap(g: LevelGrid, p: Vec2, r: number, tol: number): number {
   return best;
 }
 
-const pathLen = (p: [number, number, number][]) => p.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - p[i][0], q[1] - p[i][1], q[2] - p[i][2]), 0);
+const pathLen = (p: [number, number, number][]) => p.slice(1).reduce((s, q, i) => s + hypot(q[0] - p[i][0], q[1] - p[i][1], q[2] - p[i][2]), 0);
 const pathLen2 = (p: Vec2[]) => p.slice(1).reduce((s, q, i) => s + dist2(q, p[i]), 0);
 const fmt = (p: Vec2) => `${p[0].toFixed(2)}, ${p[1].toFixed(2)}`;
 const blk = (g: LevelGrid, p: Vec2) => {

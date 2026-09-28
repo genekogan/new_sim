@@ -4,7 +4,7 @@
 //   readability        — the action's subject points are in frame, unoccluded
 //                        (occlusion set only; glass is see-through), large enough;
 //   temporal coherence — angular velocity/acceleration, oscillation between alternatives.
-import { dacos, dtan, type Vec3 } from '../core/math.ts';
+import { dacos, dtan, type Vec3, hypot } from '../core/math.ts';
 import { CameraWorld, nearestSolid, raycast, solidName, type Solid } from './geom.ts';
 import { segmentBox } from './occluders.ts';
 import { DEFAULT_ASPECT, subjectPoints, type CameraPose, type SubjectPose } from './shots.ts';
@@ -46,7 +46,7 @@ export function capsuleHit(a: Vec3, b: Vec3, base: Vec3, r = PERSON_RADIUS, h = 
   const ex = base[0] - a[0], ez = base[2] - a[2];
   const hh = dx * dx + dz * dz;
   const s2 = hh > 1e-12 ? Math.min(1, Math.max(0, (ex * dx + ez * dz) / hh)) : 0;
-  if (Math.hypot(ex - dx * s2, ez - dz * s2) > r) return null;
+  if (hypot(ex - dx * s2, ez - dz * s2) > r) return null;
   // closest points between the segment and the vertical axis segment (Ericson §5.1.9)
   const y0 = base[1] + r, L = Math.max(0, h - 2 * r);
   const rx = a[0] - base[0], ry = a[1] - y0, rz = a[2] - base[2];
@@ -94,11 +94,11 @@ export type ReadOpts = {
 type Basis = { f: Vec3; r: Vec3; u: Vec3; tv: number; th: number };
 function basis(cam: CameraPose, aspect: number): Basis {
   const d: Vec3 = [cam.target[0] - cam.position[0], cam.target[1] - cam.position[1], cam.target[2] - cam.position[2]];
-  const l = Math.hypot(d[0], d[1], d[2]) || 1;
+  const l = hypot(d[0], d[1], d[2]) || 1;
   const f: Vec3 = [d[0] / l, d[1] / l, d[2] / l];
   // right = f × up(0,1,0)
   let r: Vec3 = [-f[2], 0, f[0]];
-  const rl = Math.hypot(r[0], r[2]);
+  const rl = hypot(r[0], r[2]);
   r = rl > 1e-9 ? [r[0] / rl, 0, r[2] / rl] : [1, 0, 0];
   const u: Vec3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
   const tv = dtan((cam.fov * DEG) / 2);
@@ -145,7 +145,7 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
       const framed = c[2] > near && Math.abs(c[0]) <= c[2] * b.th * 0.95 && c[1] <= c[2] * b.tv * 0.95 && c[1] >= c[2] * b.tv * yMin;
       if (framed) inFrame++;
       if (opts.cutaway) { if (framed) visible++; continue; }
-      const dist = Math.hypot(p[0] - cam.position[0], p[1] - cam.position[1], p[2] - cam.position[2]);
+      const dist = hypot(p[0] - cam.position[0], p[1] - cam.position[1], p[2] - cam.position[2]);
       // stop 5 cm short of the point so the subject's own carried object/socket doesn't self-occlude
       const u = Math.max(0, 1 - 0.05 / Math.max(dist, 1e-6));
       const end: Vec3 = [cam.position[0] + (p[0] - cam.position[0]) * u, cam.position[1] + (p[1] - cam.position[1]) * u, cam.position[2] + (p[2] - cam.position[2]) * u];
@@ -179,7 +179,7 @@ export function readability(world: CameraWorld, cam: CameraPose, subjects: Recor
       plo[j] = Math.min(plo[j], q[j]); phi[j] = Math.max(phi[j], q[j]);
       lo[j] = Math.min(lo[j], q[j]); hi[j] = Math.max(hi[j], q[j]);
     }
-    const extent = Math.max(hgt, Math.hypot(phi[0] - plo[0], phi[1] - plo[1], phi[2] - plo[2]));
+    const extent = Math.max(hgt, hypot(phi[0] - plo[0], phi[1] - plo[1], phi[2] - plo[2]));
     const depth = Math.max(near, toCam(cam, b, [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2])[2]);
     const size = extent / (2 * depth * b.tv);
     const n = pts.length;
@@ -208,7 +208,7 @@ export type Temporal = {
 
 const viewDir = (s: TrackSample): Vec3 => {
   const d: Vec3 = [s.target[0] - s.position[0], s.target[1] - s.position[1], s.target[2] - s.position[2]];
-  const l = Math.hypot(d[0], d[1], d[2]) || 1;
+  const l = hypot(d[0], d[1], d[2]) || 1;
   return [d[0] / l, d[1] / l, d[2] / l];
 };
 
@@ -226,7 +226,7 @@ export function temporal(samples: TrackSample[], window = 2): Temporal {
     if (dt <= 0) continue;
     const da = viewDir(a), db = viewDir(b);
     const w = dacos(Math.min(1, Math.max(-1, da[0] * db[0] + da[1] * db[1] + da[2] * db[2]))) / DEG / dt;
-    const v = Math.hypot(b.position[0] - a.position[0], b.position[1] - a.position[1], b.position[2] - a.position[2]) / dt;
+    const v = hypot(b.position[0] - a.position[0], b.position[1] - a.position[1], b.position[2] - a.position[2]) / dt;
     maxAngVel = Math.max(maxAngVel, w); maxLinVel = Math.max(maxLinVel, v);
     if (prevW !== null && prevV !== null) { maxAngAcc = Math.max(maxAngAcc, Math.abs(w - prevW) / dt); maxLinAcc = Math.max(maxLinAcc, Math.abs(v - prevV) / dt); }
     prevW = w; prevV = v;

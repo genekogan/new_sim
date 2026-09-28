@@ -72,10 +72,12 @@ function runAndCompare(bays?: number) {
   return { s, reh, cmp, E };
 }
 
-/** Pinned: final-state hash and length of the first-bay tranche (6 frames + 18 beams) of the east-house skeleton. */
-const PIN_BAY1 = { ticks: 41019, hash: 'ad844b78da3fc175f05bc0a4a39222ee90f952b2fd39b8e3a6e358476e248121' };
-/** Pinned: the whole east-house skeleton (YEAR_BUILD_FULL=1; ≈ 40–55 s wall). */
-const PIN_FULL = { ticks: 116477, hash: '14d5c768778250cf735aa6bed90d18f3872e79d0ae36f3b9b665b2a4a230c89a' };
+/** Pinned: final-state hash and length of the first-bay tranche (6 frames + 18 beams) of the east-house skeleton.
+ *  Re-pinned (was 41019 ticks, ad844b78…8121): walker fallback + hypot + encounters on the smoothed path, 2026-09-28 (PLANNING_BUDGET.md); 0 violations, 24/24 at the canonical pose. */
+const PIN_BAY1 = { ticks: 41182, hash: '695d2dcb001bb3cce944158075a8bb2e689b94525ee38b523fd1283a32080a81' };
+/** Pinned: the whole east-house skeleton (YEAR_BUILD_FULL=1; ≈ 40–55 s wall). Re-pinned (was 116477 ticks, 14d5c768…c89a):
+ *  walker fallback + hypot + encounters on the smoothed path, 2026-09-28; 0 violations, 66/66 at the canonical pose. */
+const PIN_FULL = { ticks: 117125, hash: '35d128861c5341222b9cf9f6f1953a83a5eec91bc1720c5dec662bb5b86e11da' };
 
 test('year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned', () => {
   const { s, reh, cmp, E } = runAndCompare(1);

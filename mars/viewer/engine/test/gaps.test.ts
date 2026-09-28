@@ -13,6 +13,7 @@ import { walkTo } from '../locomotion/walk.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
+import { hypot } from '../core/math.ts';
 
 /** The proving ground with its opt-in 2.0 m passing corridor. */
 function setup(...people: ReturnType<typeof human>[]) {
@@ -41,7 +42,7 @@ test('2.0 m corridor: two walkers head-on pass side by side without yielding, < 
   rt.observers.push({
     onTick: (r) => {
       const pa = r.world.entities.a.pose.p, pb = r.world.entities.b.pose.p;
-      const d = Math.hypot(pa[0] - pb[0], pa[2] - pb[2]);
+      const d = hypot(pa[0] - pb[0], pa[2] - pb[2]);
       if (d < meet.d) Object.assign(meet, { d, z: (pa[2] + pb[2]) / 2 });
     },
   });
@@ -77,10 +78,10 @@ test('2.0 m corridor: both walkers keep moving while passing (no traffic.person 
   rt.observers.push({
     onTick: (r) => {
       const pa = r.world.entities.a.pose.p, pb = r.world.entities.b.pose.p;
-      const d = Math.hypot(pa[0] - pb[0], pa[2] - pb[2]);
+      const d = hypot(pa[0] - pb[0], pa[2] - pb[2]);
       s.d = Math.min(s.d, d);
       // speed of both walkers while they are within 2 m of each other (the pass itself)
-      if (s.prev && d < 2) for (const [i, p] of [pa, pb].entries()) s.minV = Math.min(s.minV, Math.hypot(p[0] - s.prev[i][0], p[2] - s.prev[i][2]) * 20);
+      if (s.prev && d < 2) for (const [i, p] of [pa, pb].entries()) s.minV = Math.min(s.minV, hypot(p[0] - s.prev[i][0], p[2] - s.prev[i][2]) * 20);
       s.prev = [[...pa], [...pb]];
     },
   });
@@ -123,7 +124,7 @@ test('U-trap: a walker starting at the inner back wall walks out and around to a
   assert.ok(rt.runUntilIdle(20 * 90));
   assert.equal(a.status, 'completed', a.diagnostic?.message);
   const p = rt.world.entities.p1.pose.p;
-  assert.ok(Math.hypot(p[0] + 15, p[2] - 18) < 0.05, `arrived at (${p[0].toFixed(2)}, ${p[2].toFixed(2)})`);
+  assert.ok(hypot(p[0] + 15, p[2] - 18) < 0.05, `arrived at (${p[0].toFixed(2)}, ${p[2].toFixed(2)})`);
   assert.ok(s.minZ < 9, `left the cup through its opening (min z ${s.minZ.toFixed(2)})`);
   assert.ok(s.flips <= 6, `turn direction flips ${s.flips}`);
   assert.ok(s.minClear >= HUMAN_RADIUS, `min clearance ${s.minClear.toFixed(3)} m at (${s.at.map((v) => v.toFixed(2)).join(', ')})`);

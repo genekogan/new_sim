@@ -11,6 +11,7 @@ import { hashOf, stableStringify } from '../core/hash.ts';
 import { sampleTake } from '../take/replay.ts';
 import type { Take } from '../take/types.ts';
 import { crossBindings, crossTemplate, minuteBindings, minuteTemplate } from './sequence-fixtures.ts';
+import { hypot } from '../core/math.ts';
 
 const TYPES = new Set(['object', 'array', 'string', 'number', 'integer', 'boolean', 'null']);
 /** Structural JSON Schema check (no validator dependency): known types, well-formed properties/required/items/combinators. */
@@ -673,7 +674,7 @@ test('api: a historical year room (2022) seeds protected canonical mars-2022; wa
   const plan = room.call(2022, 'bind_plan', { template: walkPlan('court-walk', b[0], b[1]), bindings: { a: 'w1' }, workspace: 'court' }) as any;
   const reh = room.call(2022, 'rehearse', { plan_id: plan.plan_id }) as any;
   assert.ok(reh.ok, JSON.stringify(reh.report?.steps));
-  assert.ok(reh.report.metrics.pathLength > Math.hypot(b[0] - a[0], b[1] - a[1]) + 0.5, 'the walk detours around the courtyard buildings');
+  assert.ok(reh.report.metrics.pathLength > hypot(b[0] - a[0], b[1] - a[1]) + 0.5, 'the walk detours around the courtyard buildings');
   assert.equal((room.call(2022, 'execute', { plan_id: plan.plan_id, workspace: 'mars-2022' }) as any).code, 'workspace.protected');
   assert.equal((room.call(2022, 'edit_world', { workspace: 'mars-2022', note: 'x', edits: [{ op: 'remove', id: 'w1' }] }) as any).code, 'workspace.protected');
   assert.ok((room.call(2022, 'execute', { plan_id: plan.plan_id, workspace: 'court' }) as any).ok);
@@ -890,7 +891,7 @@ test('pause/resume (room): fork at a pause, resume both with different commands 
   assert.ok(alt.ok, alt.message);
   assert.notEqual(a.report.finalStateHash, alt.report.finalStateHash, 'different commands → different futures');
   const s1 = (w: string) => (room.call(2026, 'query_world', { workspace: w, ids: ['s1'] }) as any).entities[0].pose.p;
-  assert.ok(Math.hypot(s1('p')[0] + 5, s1('p')[2] - 5) < 0.3 && Math.hypot(s1('p-alt')[0], s1('p-alt')[2] + 5) < 0.3, `${s1('p')} / ${s1('p-alt')}`);
+  assert.ok(hypot(s1('p')[0] + 5, s1('p')[2] - 5) < 0.3 && hypot(s1('p-alt')[0], s1('p-alt')[2] + 5) < 0.3, `${s1('p')} / ${s1('p-alt')}`);
   // the parent pause checkpoint is untouched: p-plain still sits on it, resumable, and resumes to the unpaused state
   assert.equal((room.call(2026, 'log', { workspace: 'p-plain' }) as any).head, p.checkpoint.id);
   const plain = room.call(2026, 'resume', { workspace: 'p-plain' }) as any;

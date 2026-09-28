@@ -229,7 +229,7 @@ test('Spatial.sync patches === full rebuild at every construction step: build-ba
     for (let i = 0; i < 200; i++) { rt.step(); s.tick?.(rt); }
   });
   assert.ok(n > 100, `${n} rebuilds checked`);
-  assert.equal(hash, '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b', 'determinism probe hash unchanged');
+  assert.equal(hash, '0147f8f12a997462f5e6adfe71ffef1a8bc7e850d84082289328111618fd30d5', 'determinism probe hash unchanged');
 });
 
 test('Spatial.sync patches === full rebuild at every construction step: campus flagship (staging-east crop)', () => {
@@ -250,7 +250,7 @@ test('Spatial.sync patches === full rebuild at every construction step: campus f
     const plan = bindTemplate(buildBayTemplate(site), buildBayBindings, { history: h, baseline: 'build', registry: buildBayRegistry() });
     const reh = rehearse(h, 'build', plan, cfg);
     assert.equal(reh.report.status, 'completed');
-    assert.equal(reh.take.finalStateHash, 'ecb424c74d8797c5940ea5d2b3332c37e5efe4be4a1251d9ebd4b259f9dcbb3a', 'campus flagship hash unchanged');
+    assert.equal(reh.take.finalStateHash, 'fee92ee0a94fc91505be23eb5ccaf19f02f15293ce8630a1b357b482c0240c56', 'campus flagship hash unchanged');
   });
   assert.ok(n > 300, `${n} rebuilds checked`);
 });
@@ -303,12 +303,14 @@ test('Spatial.gridsFor === buildGrids for every carry plan (gather routes, tall 
     h.fork('canon', 'ws', 'ws');
     const plan = bindTemplate(buildBayTemplate(BUILD_BAY_SITE), buildBayBindings, { history: h, baseline: 'ws', registry: buildBayRegistry() });
     const r = rehearse(h, 'ws', plan, { registry: buildBayRegistry(), invariants: BUILD_BAY_INVARIANTS, services: () => ({ spatial: new Spatial(buildBayGround(), { contributors: BUILD_BAY_CONTRIBUTORS }) }) });
-    assert.equal(r.take.finalStateHash, '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b', 'determinism probe hash unchanged');
+    assert.equal(r.take.finalStateHash, '0147f8f12a997462f5e6adfe71ffef1a8bc7e850d84082289328111618fd30d5', 'determinism probe hash unchanged');
   });
   console.log(`  gridsFor: ${res.calls} calls, ${res.patched} patched`);
   // gather routes as planned on the former whole-grid buildGrids (measured before the switch). Re-pinned
-  // (was 8b5ab468…125f8) by grid lattice anchoring, 2026-09-28: same cells, vertices moved ≤ 1 ulp (PLANNING_BUDGET.md)
-  const G = 'ea04513b9a6928810574d7e92475b455d6993599633179516c46e7324de539ab';
+  // (was 8b5ab468…125f8) by grid lattice anchoring, 2026-09-28: same cells, vertices moved ≤ 1 ulp (PLANNING_BUDGET.md);
+  // re-pinned (was ea04513b…39ab) by walker fallback + hypot + encounters on the smoothed path, 2026-09-28: same
+  // cells and vertices, one leg length 1 ulp apart (dist2 = √ of the sum of squares instead of the host hypot)
+  const G = '9ba1037c4e200eb336fef7a58bfa79e1130388cefe6d1f84902aadb2bbe0133f';
   assert.deepEqual(gathers, [G, G, 'failed:carry.target-blocked'], 'gather routes unchanged');
   assert.ok(res.calls >= 15 && res.patched === res.calls, `${res.patched}/${res.calls} patched`);
 });

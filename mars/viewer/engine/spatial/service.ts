@@ -48,21 +48,28 @@ function sameNav(s: NavSnap, e: Entity): boolean {
 
 /** Bounded memo of people-augmented grids (each holds full-size rasters). */
 const AROUND_CACHE = 8;
+/** routeAround: how far the start of a people-avoiding route may snap (path.ts RouteOpts.startTolerance). */
+const AROUND_START_TOL = 1.0;
 /** Height band a standing person blocks above their feet. */
 const PERSON_H = 1.8;
 
-/** A temporary obstacle for gridsAround/routeAround: a person id (height from the world, or `y`) or `<entity>#i` load disc. */
-export type AroundPerson = { id: string; p: Vec2; y?: number };
+/**
+ * A temporary obstacle for gridsAround/routeAround: a person id (height from the world, or `y`) or `<entity>#i` load disc.
+ * Footprint: a 0.3 m half-width square; with `half`, an octagon (that square and the same square turned 45°)
+ * of that inradius, about as wide in every direction (the walker's squeezed people-replan).
+ */
+export type AroundPerson = { id: string; p: Vec2; y?: number; half?: number };
 
-function aroundObstacle(world: WorldState, q: AroundPerson): { o: Obstacle; foot?: number } {
+function aroundObstacle(world: WorldState, q: AroundPerson): { o: Obstacle; foot?: number }[] {
   const e = world.entities[q.id] ?? world.entities[q.id.split('#')[0]];
-  const obb = { c: q.p, half: [0.3, 0.3] as Vec2, yaw: 0 };
+  const h = q.half ?? 0.3;
+  const obbs = [{ c: q.p, half: [h, h] as Vec2, yaw: 0 }, ...(q.half === undefined ? [] : [{ c: q.p, half: [h, h] as Vec2, yaw: Math.PI / 4 }])];
   if (q.y === undefined && e && e.kind !== 'human') {
     const f = entityFootprint(e);
-    return { o: { id: q.id, obb, y0: f.y0, y1: f.y1, kind: 'solid', label: `${e.label ?? e.id} (moving)` } };
+    return obbs.map((obb) => ({ o: { id: q.id, obb, y0: f.y0, y1: f.y1, kind: 'solid' as const, label: `${e.label ?? e.id} (moving)` } }));
   }
   const foot = q.y ?? e?.pose.p[1] ?? 0;
-  return { o: { id: q.id, obb, y0: foot, y1: foot + PERSON_H, kind: 'solid', label: `person ${q.id}` }, foot };
+  return obbs.map((obb) => ({ o: { id: q.id, obb, y0: foot, y1: foot + PERSON_H, kind: 'solid' as const, label: `person ${q.id}` }, foot }));
 }
 
 /** World-space box corners for an entity (handles yaw/pitch/roll). */
@@ -238,8 +245,8 @@ export class Spatial {
 
   private gridsAroundNow(world: WorldState, people: AroundPerson[]): { scene: SpatialScene; grids: GridSet } {
     this.sync(world);
-    const placed = people.map((q) => aroundObstacle(world, q));
-    const key = `${this.epoch}|${placed.map(({ o, foot }) => `${o.id}@${o.obb.c[0]},${o.obb.c[1]},${o.y0},${o.y1},${foot ?? ''}`).join(';')}`;
+    const placed = people.flatMap((q) => aroundObstacle(world, q));
+    const key = `${this.epoch}|${placed.map(({ o, foot }) => `${o.id}@${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.yaw},${o.y0},${o.y1},${foot ?? ''}`).join(';')}`;
     let hit = this.aroundCache.get(key);
     if (hit) {
       this.aroundCache.delete(key);
@@ -269,8 +276,12 @@ export class Spatial {
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[], explainUnusable?: (linkId: string) => boolean): RouteResult {
     const run = () => {
       const { scene, grids } = this.gridsAround(world, people);
-      // a people-avoidance replan fails often (walled in, a pocket cut off): prove it early (path.ts proveUnreachable)
-      const opts: RouteOpts = { proveUnreachable: this.proveUnreachable, explainUnusable };
+      // a people-avoidance replan fails often (walled in, a pocket cut off): prove it early (path.ts proveUnreachable);
+      // a failure names the people / loads behind it (path.ts nameObstacles: the walker's fewer-obstacles fallback)
+      const ids = new Set(people.map((q) => q.id));
+      // and a walker standing between people (a gap in a ring) plans from the nearest standable spot up to
+      // 1 m away (it steps out of the gap first) instead of failing 'route.start-blocked'
+      const opts: RouteOpts = { proveUnreachable: this.proveUnreachable, explainUnusable, nameObstacles: (id) => ids.has(id), startTolerance: AROUND_START_TOL };
       if (this.planner !== 'exact') opts.planner = this.planner;
       return findRoute(grids, scene, profile, start, goal, opts);
     };

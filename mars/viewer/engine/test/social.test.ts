@@ -11,7 +11,7 @@ import { fireRingRadius, HUMAN_RADIUS } from '../world/catalog.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { emptyWorld, human, addAll, FIXTURE } from '../world/factory.ts';
 import { walkTo } from '../locomotion/walk.ts';
-import { add2, angleDelta, heading, pointInObb, rot2, type Vec2 } from '../core/math.ts';
+import { add2, angleDelta, heading, pointInObb, rot2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
 import { SOCIAL_ACTIONS, releaseForDirective } from '../social/actions.ts';
@@ -52,7 +52,7 @@ test('catalog slots: campfire has 8 fire-circle places 1.6 m out facing the cent
   assert.equal(ring.length, 8);
   for (const s of ring) {
     assert.equal(s.kind, 'fire-circle');
-    assert.ok(Math.abs(Math.hypot(s.p[0] + 5, s.p[1] - 4) - 1.6) < 1e-9);
+    assert.ok(Math.abs(hypot(s.p[0] + 5, s.p[1] - 4) - 1.6) < 1e-9);
     assert.ok(Math.abs(angleDelta(s.yaw, heading([-5 - s.p[0], 4 - s.p[1]]))) < 1e-9);
   }
   const seats = slotsOf(rt, 'bench');
@@ -74,7 +74,7 @@ test('sit: two people cannot hold one camp-chair (reservation.conflict names slo
   assert.ok(a.history.some((h) => h.phase === 'sit-down'), 'sat down through the approach point');
   rt.step();
   assert.equal(H(rt, 'p1').activity, 'sit');
-  assert.ok(Math.hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) < 0.05);
+  assert.ok(hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) < 0.05);
   assert.ok(Math.abs(angleDelta(rt.world.entities.p1.pose.yaw, Math.PI / 2)) < 0.05, 'faces the seat direction');
   // a directed task for a seated person is refused: walk_to's plan finds its start inside the chair
   // (route.start-blocked naming it) before the runtime reaches the sit's actor reservation
@@ -90,7 +90,7 @@ test('sit: two people cannot hold one camp-chair (reservation.conflict names slo
   assert.equal(s.status, 'completed');
   assert.equal(a.status, 'cancelled');
   assert.equal(H(rt, 'p1').activity, 'idle');
-  assert.ok(Math.hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) > 0.55, 'stood up onto the approach point, off the seat');
+  assert.ok(hypot(p2(rt, 'p1')[0], p2(rt, 'p1')[1] + 5) > 0.55, 'stood up onto the approach point, off the seat');
   assert.ok(noClaims(rt, ['p1']));
   const off = rt.submit('walk_to', { actor: 'p1', x: -2, z: -6 });
   assert.ok(rt.runUntilIdle(20 * 20, [off.id]) && off.status === 'completed', off.diagnostic?.message);
@@ -110,14 +110,14 @@ test('converse: 4 people form a circle, no overlaps, everyone faces the centre; 
   const ctr = (a.params as { at?: Vec2 }).at ?? ids.reduce<Vec2>((s, i) => [s[0] + p2(rt, i)[0] / 4, s[1] + p2(rt, i)[1] / 4], [0, 0]);
   for (const i of ids) {
     assert.equal(H(rt, i).activity, 'talk');
-    const d = Math.hypot(p2(rt, i)[0] - ctr[0], p2(rt, i)[1] - ctr[1]);
+    const d = hypot(p2(rt, i)[0] - ctr[0], p2(rt, i)[1] - ctr[1]);
     assert.ok(d >= 0.55 && d <= 1.05, `${i} is ${d.toFixed(2)} m from the centre`);
     const want = heading([ctr[0] - p2(rt, i)[0], ctr[1] - p2(rt, i)[1]]);
     assert.ok(Math.abs(angleDelta(rt.world.entities[i].pose.yaw, want)) < 0.2, `${i} faces the centre`);
   }
   for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
     const [x, y] = [p2(rt, ids[i]), p2(rt, ids[j])];
-    assert.ok(Math.hypot(x[0] - y[0], x[1] - y[1]) > 0.6, `${ids[i]}/${ids[j]} too close`);
+    assert.ok(hypot(x[0] - y[0], x[1] - y[1]) > 0.6, `${ids[i]}/${ids[j]} too close`);
   }
   assert.deepEqual(msgs(rt), []);
   rt.cancel(a.id);
@@ -155,7 +155,7 @@ test('campfire_circle with 10 people: 8 take fire-circle places, 2 fail slot.non
   for (const k of seated()) {
     const who = (k.params as { actor: string }).actor;
     assert.equal(H(rt, who).activity, 'warm');
-    const s = ring.find((q) => Math.hypot(q.p[0] - p2(rt, who)[0], q.p[1] - p2(rt, who)[1]) < 0.05);
+    const s = ring.find((q) => hypot(q.p[0] - p2(rt, who)[0], q.p[1] - p2(rt, who)[1]) < 0.05);
     assert.ok(s && s.claimedBy === k.id, `${who} stands on its claimed ring place`);
     assert.ok(Math.abs(angleDelta(rt.world.entities[who].pose.yaw, s!.yaw)) < 0.2);
   }
@@ -288,7 +288,7 @@ test('sitters walk around other chairs/benches (never inside another fixture foo
     assert.ok(r.history.some((h) => h.phase === 'sit-down'), `${who} sat down through the approach point`);
     const slot = fixtureSlots(rt, rt.world.entities[seatOf(r)]).find((s) => s.claimedBy === r.id)!;
     assert.ok(slot, `${who} holds a seat of ${seatOf(r)}`);
-    assert.ok(Math.hypot(p2(rt, who)[0] - slot.p[0], p2(rt, who)[1] - slot.p[1]) < 1e-6, `${who} is on ${slot.id}`);
+    assert.ok(hypot(p2(rt, who)[0] - slot.p[0], p2(rt, who)[1] - slot.p[1]) < 1e-6, `${who} is on ${slot.id}`);
     assert.equal(H(rt, who).activity, 'sit');
     assert.ok(Math.abs(angleDelta(rt.world.entities[who].pose.yaw, slot.yaw)) < 0.05);
   }

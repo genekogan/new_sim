@@ -7,7 +7,7 @@
 //   vehicle.max-speed          no vehicle exceeds its profile's maxSpeed
 //   vehicle.close-pass         no vehicle moving faster than PASS_SPEED passes within PASS_GAP of a person
 import type { Diagnostic } from '../actions/types.ts';
-import { angleDelta, type Vec3 } from '../core/math.ts';
+import { angleDelta, type Vec3, hypot } from '../core/math.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { DT, type Invariant, type Runtime } from '../runtime/runtime.ts';
@@ -33,7 +33,7 @@ export const vehicleRider: Invariant = (rt: Runtime) => {
       if (!h?.human || h.human.riding !== e.id)
         out.push({ code: 'vehicle.rider-off', message: `${e.id} is marked ridden by ${e.support.by}, who is not riding it (riding ${h?.human?.riding ?? 'nothing'})`, subjects: [e.id, e.support.by], at: e.pose.p });
       else if (h.human.activity === 'ride' && pr) {
-        const d = Math.hypot(h.pose.p[0] - e.pose.p[0], h.pose.p[2] - e.pose.p[2]);
+        const d = hypot(h.pose.p[0] - e.pose.p[0], h.pose.p[2] - e.pose.p[2]);
         const dy = h.pose.p[1] - (e.pose.p[1] + pr.riderY);
         const dyaw = Math.abs(angleDelta(e.pose.yaw, h.pose.yaw));
         if (d > POSE_TOL || Math.abs(dy) > POSE_TOL || dyaw > POSE_TOL)
@@ -91,7 +91,7 @@ export const vehicleMotion: Invariant = (rt: Runtime) => {
     poses.set(e.id, cur);
     const q = valid ? prev!.poses.get(e.id) : undefined;
     if (!q || !pr) continue;
-    const step = Math.hypot(cur[0] - q[0], cur[1] - q[1], cur[2] - q[2]);
+    const step = hypot(cur[0] - q[0], cur[1] - q[1], cur[2] - q[2]);
     const speed = step / DT;
     if (step > MAX_STEP_PER_TICK)
       out.push({ code: 'motion.teleport', message: `${e.id} moved ${step.toFixed(2)} m in one tick (max ${MAX_STEP_PER_TICK} m)`, subjects: [e.id], at: e.pose.p });
@@ -102,7 +102,7 @@ export const vehicleMotion: Invariant = (rt: Runtime) => {
     const level = rider?.human?.level ?? 0;
     for (const o of ents) {
       if (!o.human || o.id === rider?.id || o.human.level !== level || Math.abs(o.pose.p[1] - e.pose.p[1]) > 1.2) continue;
-      const gap = Math.hypot(o.pose.p[0] - cur[0], o.pose.p[2] - cur[2]) - pr.radius - HUMAN_RADIUS;
+      const gap = hypot(o.pose.p[0] - cur[0], o.pose.p[2] - cur[2]) - pr.radius - HUMAN_RADIUS;
       if (gap < PASS_GAP - 1e-6)
         out.push({ code: 'vehicle.close-pass', message: `${e.id} passed ${o.id} ${Math.max(0, gap).toFixed(2)} m apart at ${speed.toFixed(2)} m/s (at most ${PASS_SPEED} m/s within ${PASS_GAP} m of a person)`, subjects: [e.id, o.id], at: e.pose.p });
     }
