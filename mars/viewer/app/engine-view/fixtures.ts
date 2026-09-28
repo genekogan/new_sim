@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { CATALOG } from '../../engine/world/catalog.ts';
 import { createFire, seedOf, type Fire } from './fire.ts';
+import { tableObject } from './items.ts';
 
 type View = { obj: THREE.Object3D; key: string; fire?: Fire };
 
@@ -114,6 +115,7 @@ export class FixtureViews {
     if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
     else if (e.def === 'campfire') obj = this.campfire(e.id, sx, v);
+    else if (e.def === 'table-6ft') obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
     else obj = this.box(color, 0, 0, 0, sx, sy, sz);
     obj.name = e.id;
     v.obj = obj;

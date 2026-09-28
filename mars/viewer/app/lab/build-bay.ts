@@ -28,8 +28,10 @@ export const buildBayGround = (): SpatialScene => ({
 });
 
 const runners = new WeakMap<Runtime, SequenceRunner>();
-/** The live sequence driving a runtime (build-bay only). */
+/** The live sequence driving a runtime (sequence presets: build-bay, hand-up). */
 export const sequenceOf = (rt: Runtime) => runners.get(rt);
+/** Register the SequenceRunner driving a preset's runtime (HUD, hook `sequence()`, `runUntilSteps`). */
+export const bindRunner = (rt: Runtime, r: SequenceRunner) => void runners.set(rt, r);
 
 export function buildBayRuntime(): Runtime {
   const base = buildBayGround();

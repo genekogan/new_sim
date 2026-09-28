@@ -13,6 +13,8 @@ import type { Entity } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
 import { buildBay } from './build-bay.ts';
 import { campfireEvening } from './campfire-evening.ts';
+import { handUp } from './hand-up.ts';
+import { meal } from './meal.ts';
 import { yearWalkabouts } from './year-walkabout.ts';
 
 export type Check = { ok: boolean; message: string };
@@ -221,7 +223,9 @@ SCENARIOS.push(
   },
   stress(30),
   buildBay,
+  handUp,
   campfireEvening,
+  meal,
   ...yearWalkabouts(),
 );
 

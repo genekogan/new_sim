@@ -79,6 +79,8 @@ export type Diag = {
   feet: [number, number, number][];
   soles: number[];
   hipY: number;
+  /** Head bone (rendered). */
+  head: [number, number, number] | null;
   pose: Posture;
   arms: { side: 'left' | 'right'; shoulder: number[]; palm: number[]; len: number; target: number[] | null; source: 'hands' | 'grip' | null; contact: number; err: number | null; ratio: number | null }[];
 };
@@ -95,7 +97,7 @@ export type Reach = (entity: string, from: THREE.Vector3, out: THREE.Vector3) =>
 
 const BLEND = DT / 0.2; // Walk↔Idle crossfade: a stopped walker is standing within 0.2 s (§3)
 const POSE_BLEND = DT / 0.4; // sit / warm / postures in and out over 0.4 s
-const WALK_EPS = 0.05; // m/s: below this ground speed the Walk clip does not play (§3)
+const WALK_EPS = 0.08; // m/s: Walk plays iff ground speed ≥ this (engine locomotion/walk.ts WALK_MIN, MOVEMENT.md §3)
 const SEAT_DEFAULT = 0.45; // m, when the seat fixture is unknown (take replay)
 const SEAT_MATCH = 0.8; // m, body point to nearest seat point (covers the sit-down / stand-up approach line)
 const SEATED = new Set(['sit', 'sit-down', 'stand-up']);
@@ -195,7 +197,7 @@ export class HumanViews {
     const touched = [...arms.flatMap((a) => [a.upper, a.lower, a.shoulder, a.hand]), ...legs.flatMap((l) => [l.upper, l.lower, l.foot]), spine?.body, spine?.hips, spine?.abdomen, spine?.torso];
     const saved = touched.filter((o): o is THREE.Object3D => !!o).map((o) => ({ o, p: o.position.clone(), q: o.quaternion.clone() }));
     const h = hashId(id);
-    const v: View = { rig, prev: s, cur: { ...s }, speed: 0, activity, base: activity, arms, legs, spine, seat: SEAT_DEFAULT, vary: (h % 1000) / 1000, cross: ((h >>> 7) & 1) === 1, saved, layered: false, reachRatio: [], ankle: [], footRest: [], footLat: [] };
+    const v: View = { rig, prev: s, cur: { ...s }, speed: 0, activity, base: activity, arms, legs, spine, seat: SEAT_DEFAULT, vary: (h % 1000) / 1000, cross: ((Math.imul(h, 2654435761) >>> 15) & 1) === 1, saved, layered: false, reachRatio: [], ankle: [], footRest: [], footLat: [] };
     measure(v);
     this.views.set(id, v);
     return v;
@@ -234,7 +236,7 @@ export class HumanViews {
       // sit-down / stand-up (0.6 s, engine/social) slide the body point between the seat's approach
       // point and the seat: that is the sit pose blending in/out, not walking.
       const seated = SEATED.has(base);
-      const walking = !seated && ground > WALK_EPS;
+      const walking = !seated && ground >= WALK_EPS;
       if (seated || act === 'warm') {
         fx ??= fixturesOf(world);
         if (seated) {
@@ -417,6 +419,18 @@ export class HumanViews {
         const q = armSide(v, i) === 'left' ? hands.left : hands.right;
         if (q) targets[i] = new THREE.Vector3(q[0], q[1], q[2]);
       });
+      // A hand on the engine's mouth landmark (items/body.ts: 0.15 m ahead of the body axis at 1.58 m,
+      // −0.45 seated) would cover the rig's face (its lips are ~7 cm further back and 3 cm lower): the
+      // palm stops below and in front of the mouth and the spoon reaches the lips (components.ts).
+      if (v.activity === 'eat') {
+        const mouth = _tmp.copy(h.position).addScaledVector(_fwd, 0.15);
+        mouth.y += 1.58 - (SEATED.has(v.base) ? 0.45 : 0);
+        for (const t of targets) {
+          if (!t) continue;
+          const k = clamp01(1 - t.distanceTo(mouth) / 0.12);
+          if (k > 0) t.addScaledVector(_fwd, 0.05 * k).addScaledVector(UP, -0.07 * k);
+        }
+      }
       reachTo(v, targets, pz.rise > 0);
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0) handOnThigh(v, i, sitW);
@@ -743,6 +757,7 @@ function diagOf(v: View, g: Gait | null, flight: string, pz: Posture, targets: (
     feet: order.map((i) => feet[i]),
     soles: order.map((i) => r4(feet[i][1] - ankleH)),
     hipY: r4(v.legs.length ? v.legs.reduce((s, l) => s + l.upper.getWorldPosition(V()).y, 0) / v.legs.length : 0),
+    head: v.spine?.head ? a3(v.spine.head.getWorldPosition(V())) : null,
     pose: { drop: r4(pz.drop), bend: r4(pz.bend), rise: r4(pz.rise) },
     arms: v.arms.map((arm, i) => {
       const sh = arm.upper.getWorldPosition(V()), pm = palm(arm, V()), len = armLen(arm), t = targets[i];

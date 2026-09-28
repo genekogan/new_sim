@@ -1,4 +1,5 @@
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
+import * as THREE from 'three';
 import type { LabView, OverlayName } from './lab-view.ts';
 import { SCENARIOS } from './scenarios.ts';
 import { sequenceRows } from './sequence-hud.tsx';
@@ -125,6 +126,16 @@ export function installHook(view: LabView, notify: () => void) {
     perf: () => sim.stats(),
     /** Pose readout per person for the current tick (feet / soles, stair gait, posture, arms vs targets): docs/engineering/POSES.md. */
     bones: (id?: string) => view.poseNow().bones(id),
+    /** Held items (support in-hand): holder, hand, rendered item origin and the holder's rendered palm (after `bones()`). */
+    heldItems: () =>
+      Object.values(sim.rt.world.entities)
+        .filter((e) => e.support?.kind === 'in-hand')
+        .map((e) => {
+          const s = e.support as { by: string; hand: 'left' | 'right' };
+          const palm = new THREE.Vector3();
+          const ok = view.humans.palmOf(s.by, s.hand, palm);
+          return { id: e.id, def: e.def, by: s.by, hand: s.hand, rendered: view.components.positionOf(e.id), engine: e.pose.p, palm: ok ? palm.toArray() : null, fraction: e.contents?.fraction ?? null };
+        }),
     /** Stair flights the renderer uses (tread centres along the axis and tread-top heights). */
     stairs: () => view.humans.stairs(),
   };

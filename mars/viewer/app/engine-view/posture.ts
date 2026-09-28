@@ -71,7 +71,7 @@ function reachErr(d: Dims, p: Posture, ts: Target[]) {
     const side = t.lat >= 0 ? 1 : -1;
     const dist = Math.hypot(t.f - s.f, t.up - s.up, t.lat - side * d.shHalf);
     err += Math.max(0, dist - PLAN_REACH * d.armLen);
-    close += Math.max(0, 0.45 * d.armLen - dist);
+    close += Math.max(0, 0.4 * d.armLen - dist);
   }
   return { err, close };
 }
@@ -89,7 +89,7 @@ export function solvePosture(d: Dims, ts: Target[], style: Style): Posture {
       for (const rise of rises) {
         const p = { drop: (dropMax * i) / ND, bend: (st.bendMax * j) / NB, rise };
         const r = reachErr(d, p, ts);
-        const cost = 40 * r.err + 4 * r.close + st.wDrop * p.drop + st.wBend * p.bend + 3 * rise;
+        const cost = 40 * r.err + 30 * r.close + st.wDrop * p.drop + st.wBend * p.bend + 3 * rise;
         if (cost < bc - 1e-9) [best, bc] = [p, cost];
       }
   return best;

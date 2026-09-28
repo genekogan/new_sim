@@ -207,6 +207,7 @@ export class LabView {
     this.syncStairs();
     this.components.render(1);
     this.humans.render(1, this.reach);
+    this.components.attachHeld(this.humans);
     return this.humans;
   }
 
@@ -217,6 +218,7 @@ export class LabView {
     this.components.render(alpha);
     this.fixtures.render(this.sim.rt.time);
     this.humans.render(alpha, this.reach);
+    this.components.attachHeld(this.humans);
     this.syncOverlays();
     this.renderer.render(this.scene, this.camera);
     this.css.render(this.scene, this.camera);

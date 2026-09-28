@@ -7,11 +7,15 @@
 import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { def } from '../../engine/world/catalog.ts';
+import { itemObject, setFill, type ItemObject } from './items.ts';
 
 type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: number };
-type View = { obj: THREE.Object3D; prev: Pose; cur: Pose; key: string };
+type View = { obj: THREE.Object3D; prev: Pose; cur: Pose; key: string; item?: ItemObject; inHand?: { by: string; hand: 'left' | 'right' } };
+/** What a renderer of people offers held items: the rendered palm of a hand, and the head (mouth point, yaw). */
+export type Holders = { palmOf(id: string, hand: 'left' | 'right', out: THREE.Vector3): boolean; headOf(id: string, out: THREE.Vector3): number | null };
 
 const FALLBACK = '#d8b98a';
+const _palm = new THREE.Vector3(), _mouth = new THREE.Vector3(), _bowl = new THREE.Vector3(), _aim = new THREE.Vector3(), _dir = new THREE.Vector3(), _grip = new THREE.Vector3(), _x = new THREE.Vector3(1, 0, 0);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
 const poseOf = (e: Entity): Pose => ({ p: [...e.pose.p], yaw: e.pose.yaw, pitch: e.pose.pitch ?? 0, roll: e.pose.roll ?? 0 });
@@ -26,11 +30,13 @@ export class ComponentViews {
     this.group.name = 'engine components';
   }
 
-  private mat(color: string) {
-    let m = this.mats.get(color);
-    if (!m) this.mats.set(color, (m = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: color === '#1f5fbf' || color === '#e86a1a' ? 0.25 : 0 })));
+  private mat(color: string, side: THREE.Side = THREE.FrontSide) {
+    const key = side === THREE.FrontSide ? color : `${color}:${side}`;
+    let m = this.mats.get(key);
+    if (!m) this.mats.set(key, (m = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: color === '#1f5fbf' || color === '#e86a1a' || color === '#b8b8b8' ? 0.25 : 0, side })));
     return m;
   }
+  private kit = { mat: (c: string, side?: THREE.Side) => this.mat(c, side), geo: (k: string, make: () => THREE.BufferGeometry) => this.geo(k, make) };
 
   private geo(key: string, make: () => THREE.BufferGeometry) {
     let g = this.geos.get(key);
@@ -45,10 +51,15 @@ export class ComponentViews {
   }
 
   /** Object in the entity's local frame (origin at base centre). */
-  private build(e: Entity): THREE.Object3D {
+  private build(e: Entity, v?: Partial<View>): THREE.Object3D {
     const d = def(e.def);
     const [sx, sy, sz] = d.size;
     const color = d.color ?? FALLBACK;
+    if (d.category === 'item') {
+      const it = itemObject(e.def, [sx, sy, sz], color, this.kit);
+      if (it && v) v.item = it;
+      if (it) return it.obj;
+    }
     if (d.category === 'stair' && d.stair) return this.flight(e.def, sx, sy, sz, d.stair.treads, color);
     if (d.category === 'rack-upright') return this.upright(e.def, sx, sy, sz, color);
     return this.mesh(this.geo(`box:${e.def}`, () => new THREE.BoxGeometry(sx, sy, sz).translate(0, sy / 2, 0)), color);
@@ -134,16 +145,19 @@ export class ComponentViews {
       let v = this.views.get(e.id);
       if (!v || v.key !== e.def) {
         if (v) this.group.remove(v.obj);
-        const obj = this.build(e);
+        const nv: Partial<View> = {};
+        const obj = this.build(e, nv);
         obj.name = e.id;
         this.group.add(obj);
         const p = poseOf(e);
-        v = { obj, prev: p, cur: p, key: e.def };
-        this.views.set(e.id, v);
-        continue;
+        v = { obj, prev: p, cur: p, key: e.def, item: nv.item };
+      } else {
+        v.prev = v.cur;
+        v.cur = poseOf(e);
       }
-      v.prev = v.cur;
-      v.cur = poseOf(e);
+      this.views.set(e.id, v);
+      if (v.item) setFill(v.item, e.contents?.fraction);
+      v.inHand = e.support?.kind === 'in-hand' ? { by: e.support.by, hand: e.support.hand } : undefined;
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
@@ -159,6 +173,53 @@ export class ComponentViews {
       v.obj.position.set(lerp(a.p[0], b.p[0], alpha), lerp(a.p[1], b.p[1], alpha), lerp(a.p[2], b.p[2], alpha));
       v.obj.rotation.set(lerpAngle(a.pitch, b.pitch, alpha), -lerpAngle(a.yaw, b.yaw, alpha), lerpAngle(a.roll, b.roll, alpha), 'YXZ');
     }
+  }
+
+  /**
+   * Items held in a hand (support `in-hand`) ride on the holder's rendered palm with the catalog grip
+   * offset (item pose = palm − rot(grip, yaw), upright, yaw = the holder's), instead of the engine's
+   * tick pose: when an arm honestly cannot reach its engine hand point, the item stays in the hand.
+   * A spoon points from the hand toward the bowl in the other hand when low and toward the mouth
+   * when raised, sliding back in the grip so its tip stops at the lips. Call after the people render.
+   */
+  attachHeld(holders: Holders) {
+    for (const v of this.views.values()) {
+      if (!v.inHand || !holders.palmOf(v.inHand.by, v.inHand.hand, _palm)) continue;
+      const yaw = holders.headOf(v.inHand.by, _mouth) ?? -v.obj.rotation.y;
+      const g = def(v.key).handling?.grips?.[1]?.[0]?.local ?? [0, 0, 0];
+      _grip.set(g[0], g[1], g[2]);
+      if (v.key === 'spoon') {
+        const other = v.inHand.hand === 'left' ? 'right' : 'left';
+        const hasBowl = holders.palmOf(v.inHand.by, other, _bowl);
+        if (!hasBowl) _bowl.copy(_palm).add(_dir.set(Math.cos(yaw) * 0.2, -0.1, Math.sin(yaw) * 0.2));
+        else _bowl.y += 0.03;
+        const span = Math.max(0.05, _mouth.y - _bowl.y);
+        const k = Math.max(0, Math.min(1, (_palm.y - _bowl.y) / span));
+        _aim.copy(_bowl).lerp(_mouth, k * k);
+        _dir.subVectors(_aim, _palm);
+        if (_dir.lengthSq() < 1e-6) _dir.set(Math.cos(yaw), 0, Math.sin(yaw));
+        const reach = _dir.length();
+        _dir.normalize();
+        v.obj.quaternion.setFromUnitVectors(_x, _dir);
+        _grip.applyQuaternion(v.obj.quaternion);
+        v.obj.position.copy(_palm).sub(_grip);
+        // tip (local +x end) no further than the aim point: slide the spoon back in the hand
+        const tip = def('spoon').size[0] / 2 - g[0];
+        if (tip > reach) v.obj.position.addScaledVector(_dir, reach - tip);
+      } else {
+        v.obj.rotation.set(0, -yaw, 0);
+        _grip.applyEuler(v.obj.rotation);
+        v.obj.position.copy(_palm).sub(_grip);
+      }
+    }
+  }
+
+  /** Rendered world position of an entity's origin (tests: held items vs hands). */
+  positionOf(id: string) {
+    const v = this.views.get(id);
+    if (!v) return null;
+    v.obj.updateMatrixWorld(true);
+    return v.obj.getWorldPosition(new THREE.Vector3()).toArray();
   }
 
   /**
