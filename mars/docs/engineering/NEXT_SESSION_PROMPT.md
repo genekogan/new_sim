@@ -6,22 +6,35 @@ Paste the block below as the first message of a new Claude Code session opened i
 ---
 
 You are taking over the Mars College 3D Studio simulation-engine work from a previous session that
-ended at a clean checkpoint on 2026-09-28. Gene (the owner) is present and will report quota numbers
-to you; do not run `<usage-tool>`. Work as the lead: you evaluate and collate; delegate narrow,
-well-bounded tasks to Opus 5.5 subagents (Gene's preference; typically 3, up to 6 when he asks to
-accelerate). Every subagent brief must name the files it owns and the files other agents own, require
-small tool calls and early commits, and forbid host `Math.sin/cos/atan2…` in `viewer/engine/**`.
+ended at a clean checkpoint on 2026-09-28. You are running OVERNIGHT and unattended: Gene (the owner) is
+asleep and cannot answer questions or report usage numbers until morning. Work as the lead: you evaluate
+and collate; delegate narrow, well-bounded tasks to Opus 5.5 subagents. Every subagent brief must name
+the files it owns and the files other agents own, require small tool calls and early commits, and forbid
+host `Math.sin/cos/atan2…` in `viewer/engine/**`.
 
-**Manage your own parallelism against the 5-hour usage window.** Ask Gene for the current 5-hour and
-weekly percentages at the start and roughly every hour (he reports them; you cannot read them). Budget
-the window explicitly: decide how much of the 5-hour allowance this session may spend, divide by the
-hours left, and size the number of concurrent Opus subagents to that rate (one Opus task of this kind
-has cost roughly 150–300k subagent tokens; six in parallel exhausted a 5-hour window in about two
-hours on 2026-09-28). Scale up when the rate is under budget, down when over. Stop spawning when the
-window has ~30 minutes left and land what is running: every agent commits at its next green point, you
-regenerate EVIDENCE.md, append PROGRESS.md, and update this file and HANDOFF.md so the following
-session can resume from a clean tree — exactly the checkpoint pattern used on 2026-09-28. Never let a
-5-hour cut-off catch agents mid-write.
+**Self-manage usage so you are never cut off by the 5-hour limit.** Nobody will report numbers to you
+and `<usage-tool>` does not track this session, so budget by your own accounting:
+- Target: spend roughly **50 % of each 5-hour window** overnight, so the session never hits the cap.
+  Measured on 2026-09-28: one Opus subagent task of the usual size costs 150–300k subagent tokens and
+  runs 10–30 minutes; six in parallel exhausted a full 5-hour window in about two hours. So overnight run
+  **2–3 subagents at a time, never more**, and keep your own turns short (evaluate reports, don't
+  re-derive their work).
+- Keep a running tally in PROGRESS.md: for every subagent that finishes, note its reported token cost
+  and the wall-clock time. If the sum since the last window boundary exceeds ~1.5 M subagent tokens per
+  hour, drop to 2 workers; above ~2 M, drop to 1 and let it land. Window boundaries: assume windows
+  start when you start; note the start time in PROGRESS.md.
+- A 429 "session limit" error on any tool call means the window is exhausted: immediately stop
+  spawning, let nothing new start, and write the checkpoint (below). Do not retry in a loop.
+- Every ~2 hours, and always before you think a window may close: land what is running (each agent
+  commits at its next green point), regenerate EVIDENCE.md, append PROGRESS.md, and update this file and
+  HANDOFF.md so that a cut-off at any moment leaves a clean, resumable tree. Never let a limit catch
+  agents mid-write — that is exactly what happened at 20:00 on 2026-09-28 and it cost an hour.
+- In the morning Gene may raise the parallelism (he will say so and report numbers); until he does,
+  the overnight rule stands.
+
+**Overnight decision rule:** anything that needs Gene (the reconstruction questions below, a product
+choice, a doubt about historical truth) is written to PROGRESS.md under "Questions for Gene" and
+skipped; pick the next item that doesn't need him. Never guess historical facts.
 
 **Read in this order before doing anything:**
 1. `docs/engineering/HANDOFF.md` — state of the system, evidence, releases, known shortcomings, next tranche.
@@ -69,7 +82,7 @@ piles are in `docs/engineering/evidence/`. Items 2–4 move pinned hashes: do th
 1. Grid cell centres depend on the grid origin, so the uncropped campus run is physically identical to
    the cropped one but not hash-identical (`engine/test/campus-full.test.ts` todo). Fix in
    `spatial/grid.ts` at the START of a session (it re-pins every hash), then regenerate takes.
-2. Reconstruction questions for Gene (do not guess): 2022 south-west corner passage is closed by the
+2. Reconstruction questions for Gene (do not guess; log them and move on overnight): 2022 south-west corner passage is closed by the
    west-house table in the Kit scene; trailers `rv-8/9` (2023) and `rv-9/10` (2024) intrude into Chiba;
    9 ft frame not in the model library; north-axis assumption in `engine/env/sun.ts`.
 3. Renderer honesty gaps: footers/far arm out of reach during raise (rig can't crouch); no foot IK on
