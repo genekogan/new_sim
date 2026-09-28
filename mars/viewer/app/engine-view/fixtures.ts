@@ -7,10 +7,25 @@
 import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { CATALOG } from '../../engine/world/catalog.ts';
+import { BUNDLES } from '../../engine/world/catalog-stock.ts';
 import { createFire, seedOf, type Fire } from './fire.ts';
 import { tableObject } from './items.ts';
 
-type View = { obj: THREE.Object3D; key: string; fire?: Fire };
+/** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
+type Stack = { group: THREE.Group; count: number };
+type View = { obj: THREE.Object3D; key: string; fire?: Fire; stack?: Stack };
+
+/** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
+const DUNNAGE = 0.1;
+const STRAP = '#1d1f22';
+/** Pieces left in a bundle entity (contents.count; else the fraction of its capacity). */
+export function bundleCount(e: Entity): number | null {
+  const b = BUNDLES[e.def];
+  if (!b) return null;
+  const c = e.contents as { count?: number; fraction?: number } | undefined;
+  if (typeof c?.count === 'number') return c.count;
+  return Math.round((c?.fraction ?? 1) * b.capacity);
+}
 
 /** Top of the camp chair's fabric seat (m), as built by `chair()`. */
 const CHAIR_SEAT = 0.44;
@@ -106,6 +121,88 @@ export class FixtureViews {
     return g;
   }
 
+  /**
+   * A strapped bundle / stack (catalog-stock.ts BUNDLES): two dunnage runners, the pieces left and dark
+   * straps round them. The catalog box is the full stack; what is drawn is `count` pieces, so the
+   * stack's height shrinks as `take_from_bundle` pulls pieces off. Beams and uprights are drawn piece by
+   * piece (5 beams to a layer; frames lying flat, one per layer); sheets and lumber as one block of
+   * `count` layers with a line per layer at the edge.
+   */
+  private stack(e: Entity, sx: number, sy: number, sz: number, v: Partial<View>) {
+    const g = new THREE.Group();
+    for (const s of [-1, 1]) g.add(this.box('#5b4632', (s * sx) / 3, 0, 0, 0.09, DUNNAGE, sz));
+    const inner = new THREE.Group();
+    g.add(inner);
+    v.stack = { group: inner, count: -1 };
+    this.fillStack(e, v.stack, sx, sy, sz);
+    return g;
+  }
+
+  private fillStack(e: Entity, st: Stack, sx: number, sy: number, sz: number) {
+    const b = BUNDLES[e.def], n = Math.max(0, bundleCount(e) ?? 0);
+    if (!b || n === st.count) return;
+    st.count = n;
+    st.group.clear();
+    const piece = CATALOG[b.piece];
+    const color = piece?.color ?? '#c9a36b';
+    const perLayer = e.def.startsWith('stack-beam') ? 5 : e.def.startsWith('stack-upright') ? 1 : 1;
+    const layers = Math.ceil(b.capacity / perLayer);
+    const lh = (sy - DUNNAGE) / layers;
+    let top = DUNNAGE;
+    if (e.def.startsWith('stack-beam')) {
+      const pw = sz / perLayer;
+      for (let i = 0; i < n; i++) {
+        const layer = Math.floor(i / perLayer), k = i % perLayer;
+        st.group.add(this.box(color, 0, DUNNAGE + layer * lh, -sz / 2 + pw * (k + 0.5), sx, lh * 0.9, pw * 0.8, 0.25));
+      }
+      top = DUNNAGE + Math.ceil(n / perLayer) * lh;
+    } else if (e.def.startsWith('stack-upright')) {
+      // frames lying flat: two columns along the length, a few crossbars between them
+      const t = lh * 0.8;
+      for (let i = 0; i < n; i++) {
+        const y = DUNNAGE + i * lh;
+        for (const s of [-1, 1]) st.group.add(this.box(color, 0, y, (s * (sz - 0.08)) / 2, sx, t, 0.08, 0.25));
+        for (let k = 0; k < 6; k++) st.group.add(this.box(color, -sx / 2 + 0.1 + ((sx - 0.2) * k) / 5, y + t * 0.25, 0, 0.04, t * 0.5, sz - 0.1, 0.25));
+      }
+      top = DUNNAGE + n * lh;
+    } else {
+      top = DUNNAGE + n * lh;
+      if (n > 0) {
+        st.group.add(this.box(color, 0, DUNNAGE, 0, sx, n * lh, sz));
+        // a thin dark line every few layers on the long sides so the stack reads as sheets / boards
+        const every = Math.max(1, Math.round(0.04 / lh));
+        for (let k = every; k < n; k += every) for (const s of [-1, 1]) st.group.add(this.box('#8a6a45', 0, DUNNAGE + k * lh - 0.002, (s * sz) / 2, sx + 0.002, 0.004, 0.004));
+      }
+    }
+    // straps round the pieces (over the top, down both sides), 3 along a long bundle, 2 along a short one
+    if (n > 0) {
+      const h = top - DUNNAGE, k = sx > 3 ? 3 : 2;
+      for (let i = 0; i < k; i++) {
+        const x = -sx / 2 + (sx * (i + 0.5)) / k;
+        st.group.add(this.box(STRAP, x, top, 0, 0.035, 0.006, sz + 0.012));
+        for (const s of [-1, 1]) st.group.add(this.box(STRAP, x, DUNNAGE, (s * (sz + 0.006)) / 2, 0.035, h + 0.006, 0.006));
+      }
+    }
+  }
+
+  /** Cutting station (catalog-stock.ts): in-feed and out-feed tables either side of a chop-saw bench. */
+  private cutting(sx: number, sy: number, sz: number, color: string) {
+    const g = new THREE.Group();
+    const leg = '#3a3f44', top = 0.04;
+    g.add(this.box('#b89a6a', 0, sy - top, 0, sx, top, sz * 0.7)); // table top (in-feed · saw · out-feed)
+    for (const x of [-1, 1]) for (const z of [-1, 1]) g.add(this.box(leg, x * (sx / 2 - 0.08), 0, z * (sz * 0.35 - 0.05), 0.05, sy - top, 0.05, 0.3));
+    for (const x of [-1, 0, 1]) g.add(this.box(leg, x * (sx / 2 - 0.08), 0.25, 0, 0.04, 0.04, sz * 0.7 - 0.1, 0.3)); // stretchers
+    // the saw: motor block on a turntable at the back of the middle, blade over the fence
+    g.add(this.box(color, 0, sy, -sz * 0.18, 0.42, 0.06, 0.34, 0.3));
+    g.add(this.box('#c43d2a', 0, sy + 0.06, -sz * 0.24, 0.16, 0.26, 0.22, 0.2));
+    const blade = new THREE.Mesh(this.keep(new THREE.CylinderGeometry(0.13, 0.13, 0.006, 24).rotateX(Math.PI / 2)), this.std('#cfd3d6', 0.4, 0.8));
+    blade.position.set(0, sy + 0.17, -sz * 0.12);
+    blade.castShadow = true;
+    g.add(blade);
+    g.add(this.box(leg, 0, sy, -sz * 0.05, sx * 0.9, 0.06, 0.02, 0.4)); // fence
+    return g;
+  }
+
   private build(e: Entity): View {
     const d = CATALOG[e.def];
     const [sx, sy, sz] = d?.size ?? [0.5, 0.5, 0.5];
@@ -116,6 +213,8 @@ export class FixtureViews {
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
     else if (e.def === 'campfire') obj = this.campfire(e.id, sx, v);
     else if (e.def === 'table-6ft') obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
+    else if (BUNDLES[e.def]) obj = this.stack(e, sx, sy, sz, v);
+    else if (e.def === 'cutting-station') obj = this.cutting(sx, sy, sz, color);
     else obj = this.box(color, 0, 0, 0, sx, sy, sz);
     obj.name = e.id;
     v.obj = obj;
@@ -154,6 +253,10 @@ export class FixtureViews {
       }
       v.obj.position.set(e.pose.p[0], e.pose.p[1], e.pose.p[2]);
       v.obj.rotation.set(0, -e.pose.yaw, 0);
+      if (v.stack) {
+        const [sx, sy, sz] = CATALOG[e.def].size;
+        this.fillStack(e, v.stack, sx, sy, sz);
+      }
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
@@ -161,6 +264,14 @@ export class FixtureViews {
         v.fire?.dispose();
         this.views.delete(id);
       }
+  }
+
+  /** Pieces drawn per bundle / stack (tests: the stack shrinks with contents.count). */
+  stacks() {
+    return [...this.views].filter(([, v]) => v.stack).map(([id, v]) => {
+      const b = new THREE.Box3().setFromObject(v.stack!.group);
+      return { id, def: v.key, count: v.stack!.count, top: b.isEmpty() ? null : +b.max.y.toFixed(3) };
+    });
   }
 
   /** Animate the fires: a pure function of (entity id, `t` = seconds of sim time). */

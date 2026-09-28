@@ -35,6 +35,7 @@ import { seatHeight } from './fixtures.ts';
 import { BODY_MODEL, UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, curlHand, legTo, legsOf, palm, place, smooth, spineOf, swing, turn, type Arm, type Leg, type Spine } from './rig.ts';
 import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
 import { axisPoint, flightOf, gaitAt, type Flight, type Gait } from './stair-gait.ts';
+import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
 type Snap = { p: [number, number, number]; yaw: number; walkW: number; walkT: number; idleT: number; sitW: number; warmW: number; pose: Posture; hands: Hands };
@@ -51,6 +52,8 @@ type View = {
   gripSlot?: string;
   /** Rack-structure link stood on (engine human.on; readout). */
   on?: string;
+  /** Pose on the rack structure (frame-gait.ts): climbing a frame, standing on its bracing, walking a beam. */
+  frame?: FrameCtx | null;
   arms: Arm[];
   legs: Leg[];
   spine?: Spine;
@@ -84,8 +87,12 @@ export type Diag = {
   /** Head bone (rendered). */
   head: [number, number, number] | null;
   pose: Posture;
-  arms: { side: 'left' | 'right'; shoulder: number[]; palm: number[]; len: number; target: number[] | null; source: 'hands' | 'grip' | null; contact: number; err: number | null; ratio: number | null }[];
+  arms: { side: 'left' | 'right'; shoulder: number[]; palm: number[]; len: number; target: number[] | null; source: Source; contact: number; err: number | null; ratio: number | null }[];
+  /** Rack-structure layer (frame-gait.ts): kind, ladder rung coordinate, exit progress, blend weight, the planned soles. */
+  frame: { kind: string; u: number; exit: number; weight: number; feet: { p: number[]; planted: boolean }[] | null } | null;
 };
+/** Where an arm's target came from: engine hand points, a grip slot, or a renderer-chosen hold on the frame / balance pose. */
+type Source = 'hands' | 'grip' | 'frame' | null;
 /**
  * One person in a random-access frame (take replay / scrubbing). `walk` is the Walk clip weight
  * (0–1) and `walkDist` the metres walked along the track so far, so the Walk phase is a pure
@@ -123,6 +130,8 @@ const OVERLAYS = new Set(['eat', 'serve']);
 const PELVIS = 0.09; // m from the hip joints down to the sitting surface (thigh/buttock thickness)
 const WARM_REACH = 1.2; // m from the fire's edge within which people hold their hands out
 const HEEL = 0.06; // m: trailing heel lifted at the end of a stair stance (toe-off)
+const BEAM_WALK_W = 0.5; // Walk clip weight on a beam (short steps: half the leg swing, the rest Idle)
+const BEAM_CADENCE = 1.8; // Walk clip rate multiplier on a beam (half-length steps at the same ground speed)
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
 
 function hashId(id: string) {
@@ -165,6 +174,7 @@ function nearest(list: [number, number, number][], x: number, z: number) {
 
 /** Base activity: what the body does under an eat / serve overlay. */
 const baseOf = (act: string, base?: string) => (OVERLAYS.has(act) ? (base ?? 'idle') : act);
+const handList = (h: Hands): Vec3[] => [h.left, h.right].filter((q): q is Vec3 => !!q);
 const copyHands = (h?: Hands): Hands => ({ ...(h?.left ? { left: [...h.left] as Vec3 } : {}), ...(h?.right ? { right: [...h.right] as Vec3 } : {}) });
 
 export class HumanViews {
@@ -173,6 +183,7 @@ export class HumanViews {
   private templates: Template[] = [];
   private parts = new Map<string, Part>();
   private flights: Flight[] = [];
+  private climbs: { id: string; path: [number, number, number][] }[] = [];
 
   constructor() {
     this.group.name = 'engine humans';
@@ -185,6 +196,7 @@ export class HumanViews {
   /** Stair flights people may be on (the Spatial scene's usable stairs links; call when they change). */
   setStairs(links: Link[]) {
     this.flights = links.map(flightOf).filter((f): f is Flight => !!f);
+    this.climbs = links.filter((l) => l.kind === 'climb').map((l) => ({ id: l.id, path: l.path as [number, number, number][] }));
   }
 
   /** The flights in use (tests: tread tops). */
@@ -249,6 +261,7 @@ export class HumanViews {
       v.grip = e.human.grip?.entity;
       v.gripSlot = e.human.grip?.slot;
       v.on = e.human.on;
+      v.frame = frameCtx(e.human.on, act, (id) => world.entities[id], this.climbs);
       // Honest clip mapping: Walk only while the body actually moves over the ground (walk, stairs,
       // carry on the move, a crew gathering), speed-matched; a walker pushed to a stop (engine 'wait',
       // speed 0) or anyone standing plays Idle within 0.2 s, with the pose layers of render() on top.
@@ -265,7 +278,8 @@ export class HumanViews {
       }
       const sitting = (base === 'sit' || base === 'sit-down') && !walking;
       const walkW = clamp01(c.walkW + (walking ? BLEND : -BLEND));
-      const rate = walking ? Math.max(0.35, v.speed / v.rig.template.walkSpeed) : 1;
+      // on a beam: short steps — the stride at half the Walk weight is about half the clip's, so the cadence doubles
+      const rate = walking ? Math.max(0.35, v.speed / v.rig.template.walkSpeed) * (act === 'beam-walk' ? BEAM_CADENCE : 1) : 1;
       const dur = v.rig.walk.getClip().duration;
       v.prev = c;
       v.cur = {
@@ -295,8 +309,10 @@ export class HumanViews {
    */
   private postureGoal(v: View, e: Entity, world: WorldState, walking: boolean): Posture {
     const d = v.dims;
-    if (!d || SEATED.has(v.base)) return NEUTRAL;
-    const yaw = e.pose.yaw, c = Math.cos(yaw), s = Math.sin(yaw), o = e.pose.p;
+    if (!d || SEATED.has(v.base) || v.frame?.kind === 'ladder') return NEUTRAL;
+    // on a stance with a load the body turns on the rod toward it (frame-gait.ts): solve in that frame
+    const turned = v.frame?.kind === 'stance' ? stanceFacing(v.frame, [e.pose.p[0], e.pose.p[2]], handList(e.human?.hands ?? {})) : null;
+    const yaw = turned ?? e.pose.yaw, c = Math.cos(yaw), s = Math.sin(yaw), o = e.pose.p;
     const toBody = (x: number, y: number, z: number, side: number): Target => {
       const rx = x - o[0], rz = z - o[2], lat = -rx * s + rz * c;
       return { f: rx * c + rz * s, lat: side < 0 ? Math.min(lat, -0.01) : Math.max(lat, 0.01), up: y - o[1] };
@@ -319,7 +335,9 @@ export class HumanViews {
         }
       }
     }
-    return solvePosture(d, ts, styleFor(v.activity, walking));
+    const pz = solvePosture(d, ts, styleFor(v.activity, walking));
+    // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
+    return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
   }
 
   /** Keep the last two poses of every gripped part (and forget parts nobody grips). */
@@ -359,6 +377,7 @@ export class HumanViews {
       v.grip = f.grip;
       v.gripSlot = f.gripSlot;
       v.on = f.on;
+      v.frame = frameCtx(f.on, act, (id) => parts[id], this.climbs);
       v.seat = SEAT_DEFAULT;
       const walk = SEATED.has(base) ? 0 : f.walk;
       const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands } } as unknown as Entity;
@@ -396,9 +415,13 @@ export class HumanViews {
   private pose(v: View, alpha: number, reach?: Reach) {
     const a = v.prev, b = v.cur, h = v.rig.holder;
     h.position.set(a.p[0] + (b.p[0] - a.p[0]) * alpha, a.p[1] + (b.p[1] - a.p[1]) * alpha, a.p[2] + (b.p[2] - a.p[2]) * alpha);
-    const yaw = lerpAngle(a.yaw, b.yaw, alpha);
+    let yaw = lerpAngle(a.yaw, b.yaw, alpha);
+    // rack structure: a climber faces the frame (the engine keeps the stance / link heading), a person on the bracing faces it
+    const fp = v.frame ? framePose(v.frame, [h.position.x, h.position.y, h.position.z], yaw, handList(lerpHands(a.hands, b.hands, alpha))) : null;
+    const fw = fp?.weight ?? 0;
+    if (fp?.facing != null && fw > 0) yaw = lerpAngle(yaw, fp.facing, fw);
     h.rotation.y = -yaw;
-    const w = a.walkW + (b.walkW - a.walkW) * alpha;
+    const w = (a.walkW + (b.walkW - a.walkW) * alpha) * (fp?.kind === 'beam' ? BEAM_WALK_W : 1);
     const { walk, idle, mixer } = v.rig;
     const wt = b.walkT >= a.walkT ? a.walkT + (b.walkT - a.walkT) * alpha : b.walkT;
     walk.time = wt;
@@ -419,7 +442,7 @@ export class HumanViews {
     const part = v.grip ? this.parts.get(v.grip) : undefined;
     const gripping = !hasHands && !!((reach || part) && v.grip && v.arms.length);
     const gait = sitW > 0 ? null : this.gaitOf(h.position);
-    if (!(sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait)) return;
+    if (!(sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp)) return;
     for (const s of v.saved) s.p.copy(s.o.position), s.q.copy(s.o.quaternion);
     v.layered = true;
     h.updateMatrixWorld(true);
@@ -428,11 +451,12 @@ export class HumanViews {
     // legs / pelvis
     if (sitW > 0) sitPose(v, sitW, h.position.y);
     else if (gait) stairLegs(v, gait.g, gait.f, h);
+    else if (fp?.feet && fw > 0) frameLegs(v, fp, pz, fw);
     else if (posed) postureLegs(v, pz);
     if (sitW <= 0 && pz.bend > 1e-4 && v.spine) bendTorso(v.spine, pz.bend);
     // arms
     const targets: (THREE.Vector3 | null)[] = v.arms.map(() => null);
-    let source: 'hands' | 'grip' | null = null;
+    let source: Source = null;
     if (hasHands) {
       source = 'hands';
       v.arms.forEach((arm, i) => {
@@ -474,9 +498,19 @@ export class HumanViews {
       if (sitW <= 0) dangle(v, pz.bend, k);
       closeHands(v, k);
     } else if (sitW > 0) v.arms.forEach((_, i) => handOnThigh(v, i, sitW));
-    else dangle(v, pz.bend, []);
+    else if (fp && fw > 0 && (fp.hands[0] || fp.hands[1])) {
+      // free hands on the frame (climbing: the ladder cycle's holds; on the bracing: column + brace) or held
+      // out for balance on a beam — renderer-chosen, within reach by construction, reach-honest all the same
+      source = 'frame';
+      v.arms.forEach((_, i) => {
+        const q = fp.hands[armSide(v, i) === 'left' ? 0 : 1];
+        if (q) targets[i] = new THREE.Vector3(q[0], q[1], q[2]);
+      });
+      const k = reachTo(v, targets, false).map((c) => c * fw);
+      if (fp.kind !== 'beam') closeHands(v, k);
+    } else dangle(v, pz.bend, []);
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
-    v.diag = diagOf(v, gait?.g ?? null, gait?.f.id ?? '', pz, targets, source);
+    v.diag = diagOf(v, gait?.g ?? null, gait?.f.id ?? '', pz, targets, source, fp);
   }
 
   private gaitOf(p: THREE.Vector3): { g: Gait; f: Flight } | null {
@@ -511,17 +545,17 @@ export class HumanViews {
 
   /** Per-person pose readout of the last render (lab hook `bones()`). */
   bones(id?: string) {
-    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number; template: string; body: Record<string, number>; armFit: { k: number; before: number }[]; on: string | null }> = {};
+    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number; template: string; body: Record<string, number>; armFit: { k: number; before: number }[]; on: string | null; goal: Posture; dims: Dims | null }> = {};
     for (const [k, v] of this.views) {
       if (id && k !== id) continue;
       if (!v.diag) {
         v.rig.holder.updateMatrixWorld(true);
-        v.diag = diagOf(v, null, '', NEUTRAL, v.arms.map(() => null), null);
+        v.diag = diagOf(v, null, '', NEUTRAL, v.arms.map(() => null), null, null);
       }
       const d = v.dims, r4 = (x: number) => +x.toFixed(4);
       // standing rig measurements (Idle, t = 0): the body model's numbers as this rig has them
       const body = d ? { shoulderH: r4(d.pivotH + d.sh.up), armLen: r4(d.armLen), hipH: r4(d.hipH), thigh: r4(d.thigh), shin: r4(d.shin), kneelHip: r4(d.hipH - kneelDrop(d)), shoulderHalf: r4(d.shHalf) } : ({} as Record<string, number>);
-      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: r4(d?.ankleH ?? 0), armLen: r4(d?.armLen ?? 0), walkW: +v.cur.walkW.toFixed(3), template: v.rig.template.name, body, armFit: v.rig.template.arms, on: v.on ?? null };
+      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: r4(d?.ankleH ?? 0), armLen: r4(d?.armLen ?? 0), walkW: +v.cur.walkW.toFixed(3), template: v.rig.template.name, body, armFit: v.rig.template.arms, on: v.on ?? null, goal: v.cur.pose, dims: d ?? null };
     }
     return out;
   }
@@ -716,6 +750,34 @@ function stairLegs(v: View, g: Gait, f: Flight, holder: THREE.Object3D) {
 }
 
 /**
+ * Rack structure (frame-gait.ts): each foot to its sole point (a rung of the ladder cycle, or the bracing
+ * node of a stance), the pelvis over the body point, lowered by the posture's drop (a crouch on the rod)
+ * and further until both legs reach their feet at 0.97 of their length; knees forward and up.
+ * `w` blends it with the clip's legs (the first 0.2 m of a climb).
+ */
+function frameLegs(v: View, fp: FramePose, pz: Posture, w: number) {
+  const d = v.dims;
+  if (!d || !v.spine || v.legs.length < 2 || !fp.feet) return;
+  const goals = v.legs.map((l) => {
+    const f = fp.feet![l.side > 0 ? 0 : 1];
+    return l.foot.getWorldPosition(V()).lerp(new THREE.Vector3(f.p[0], f.p[1] + d.ankleH, f.p[2]), w);
+  });
+  const hipY = (v.legs[0].upper.getWorldPosition(_hip).y + v.legs[1].upper.getWorldPosition(_knee).y) / 2;
+  let target = hipY - pz.drop;
+  v.legs.forEach((l, i) => {
+    l.upper.getWorldPosition(_hip);
+    const dh = Math.hypot(goals[i].x - _hip.x, goals[i].z - _hip.z);
+    const reach = 0.97 * d.legLen;
+    target = Math.min(target, goals[i].y + Math.sqrt(Math.max(0, reach * reach - dh * dh)));
+  });
+  v.spine.body.getWorldPosition(_c);
+  _c.y += (target - hipY) * w;
+  place(v.spine.body, _c.clone());
+  const pole = _tmp.copy(_fwd).addScaledVector(UP, 0.35).clone();
+  v.legs.forEach((l, i) => legTo(l, v.ankle[i], goals[i], pole.clone().addScaledVector(_right, -l.side * 0.15), 0.999));
+}
+
+/**
  * Seated: lower the body so the hip joints sit PELVIS above the seat, then leg IK — thighs forward,
  * feet on the ground under the knees (the Foot bones are moved to the shin ends). Weight blends the
  * whole thing in/out (a crouch-down on the way). `cross`: one leg crossed over the other knee.
@@ -849,7 +911,7 @@ function warmHands(v: View, w: number, at: THREE.Vector3) {
   });
 }
 
-function diagOf(v: View, g: Gait | null, flight: string, pz: Posture, targets: (THREE.Vector3 | null)[], source: 'hands' | 'grip' | null): Diag {
+function diagOf(v: View, g: Gait | null, flight: string, pz: Posture, targets: (THREE.Vector3 | null)[], source: Source, fp: FramePose | null): Diag {
   const r4 = (x: number) => +x.toFixed(4);
   const a3 = (q: THREE.Vector3) => [r4(q.x), r4(q.y), r4(q.z)] as [number, number, number];
   const ankleH = v.dims?.ankleH ?? 0;
@@ -862,6 +924,7 @@ function diagOf(v: View, g: Gait | null, flight: string, pz: Posture, targets: (
     hipY: r4(v.legs.length ? v.legs.reduce((s, l) => s + l.upper.getWorldPosition(V()).y, 0) / v.legs.length : 0),
     head: v.spine?.head ? a3(v.spine.head.getWorldPosition(V())) : null,
     pose: { drop: r4(pz.drop), bend: r4(pz.bend), rise: r4(pz.rise), kneel: r4(pz.kneel) },
+    frame: fp ? { kind: fp.kind, u: r4(fp.u), exit: r4(fp.exit), weight: r4(fp.weight), feet: fp.feet?.map((f) => ({ p: f.p.map(r4), planted: f.planted })) ?? null } : null,
     arms: v.arms.map((arm, i) => {
       const sh = arm.upper.getWorldPosition(V()), pm = palm(arm, V()), len = armLen(arm), t = targets[i];
       return { side: armSide(v, i), shoulder: a3(sh), palm: a3(pm), len: r4(len), target: t ? a3(t) : null, source: t ? source : null, contact: t ? r4(contact(sh.distanceTo(t), len)) : 0, err: t ? r4(pm.distanceTo(t)) : null, ratio: t ? r4(sh.distanceTo(t) / len) : null };

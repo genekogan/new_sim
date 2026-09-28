@@ -7,14 +7,19 @@
 import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { def } from '../../engine/world/catalog.ts';
+import { isPanel } from '../../engine/world/catalog-solar.ts';
 import { itemObject, setFill, type ItemObject } from './items.ts';
+import { PaintOverlay } from './paint.ts';
 
 type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: number };
-type View = { obj: THREE.Object3D; prev: Pose; cur: Pose; key: string; item?: ItemObject; inHand?: { by: string; hand: 'left' | 'right' } };
+type View = { obj: THREE.Object3D; prev: Pose; cur: Pose; key: string; item?: ItemObject; inHand?: { by: string; hand: 'left' | 'right' }; paint?: PaintOverlay; label?: string };
 /** What a renderer of people offers held items: the rendered palm of a hand, and the head (mouth point, yaw). */
 export type Holders = { palmOf(id: string, hand: 'left' | 'right', out: THREE.Vector3): boolean; headOf(id: string, out: THREE.Vector3): number | null };
 
 const FALLBACK = '#d8b98a';
+/** Catalog colours drawn slightly metallic: rack steel, stringers, aluminium (rails, panel frames). */
+const METAL = new Set(['#1f5fbf', '#e86a1a', '#b8b8b8', '#b8bcc2']);
+const GLASS = '#10182c', FRAME = '#b8bcc2';
 const _palm = new THREE.Vector3(), _mouth = new THREE.Vector3(), _bowl = new THREE.Vector3(), _aim = new THREE.Vector3(), _dir = new THREE.Vector3(), _grip = new THREE.Vector3(), _x = new THREE.Vector3(1, 0, 0);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
@@ -33,7 +38,7 @@ export class ComponentViews {
   private mat(color: string, side: THREE.Side = THREE.FrontSide) {
     const key = side === THREE.FrontSide ? color : `${color}:${side}`;
     let m = this.mats.get(key);
-    if (!m) this.mats.set(key, (m = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: color === '#1f5fbf' || color === '#e86a1a' || color === '#b8b8b8' ? 0.25 : 0, side })));
+    if (!m) this.mats.set(key, (m = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: METAL.has(color) ? 0.25 : 0, side })));
     return m;
   }
   private kit = { mat: (c: string, side?: THREE.Side) => this.mat(c, side), geo: (k: string, make: () => THREE.BufferGeometry) => this.geo(k, make) };
@@ -62,6 +67,11 @@ export class ComponentViews {
     }
     if (d.category === 'stair' && d.stair) return this.flight(e.def, sx, sy, sz, d.stair.treads, color);
     if (d.category === 'rack-upright') return this.upright(e.def, sx, sy, sz, color);
+    if (isPanel(e.def)) return this.panel(e.def, sx, sy, sz);
+    if (d.category === 'equipment') {
+      if (v) v.label = labelKey(e);
+      return this.equipment(e, sx, sy, sz, color);
+    }
     return this.mesh(this.geo(`box:${e.def}`, () => new THREE.BoxGeometry(sx, sy, sz).translate(0, sy / 2, 0)), color);
   }
 
@@ -79,22 +89,95 @@ export class ComponentViews {
       g.add(m);
     }
     const inner = depth - t, bay = inner * 1.2; // brace panel height
-    const n = Math.max(1, Math.round((h - 0.2) / bay));
-    const step = (h - 0.2) / n;
-    const len = Math.hypot(inner, step);
-    const brace = this.geo(`brace:${id}:${n}`, () => new THREE.BoxGeometry(len, 0.03, t * 0.6));
     const rung = this.geo(`rung:${id}`, () => new THREE.BoxGeometry(inner, 0.035, t * 0.6));
-    for (let i = 0; i < n; i++) {
-      const b = this.mesh(brace, color);
-      b.position.set(0, 0.1 + step * (i + 0.5), 0);
-      b.rotation.z = (i % 2 ? 1 : -1) * Math.atan2(step, inner);
-      g.add(b);
+    if (id.endsWith('-kit')) {
+      // reconstruction frames (catalog-stock.ts): the Kit's bracing (app/history/kit.ts Kit.frame) — one rod per
+      // 0.7 m, from column −x at 0.25 + 0.7k to column +x 0.66 m higher, all the same way. Its ends are the
+      // bracing nodes people stand on (engine/construction/stance.ts rungs: 0.25 + 0.7k, 0.91 + 0.7k).
+      const rise = 0.66, len = Math.hypot(inner, rise);
+      const rod = this.geo(`kit-brace:${id}`, () => new THREE.BoxGeometry(len, 0.028, t * 0.5));
+      for (let y = 0.25; y < h - 0.6; y += 0.7) {
+        const b = this.mesh(rod, color);
+        b.position.set(0, y + rise / 2, 0);
+        b.rotation.z = Math.atan2(rise, inner);
+        g.add(b);
+      }
+    } else {
+      const n = Math.max(1, Math.round((h - 0.2) / bay));
+      const step = (h - 0.2) / n;
+      const len = Math.hypot(inner, step);
+      const brace = this.geo(`brace:${id}:${n}`, () => new THREE.BoxGeometry(len, 0.03, t * 0.6));
+      for (let i = 0; i < n; i++) {
+        const b = this.mesh(brace, color);
+        b.position.set(0, 0.1 + step * (i + 0.5), 0);
+        b.rotation.z = (i % 2 ? 1 : -1) * Math.atan2(step, inner);
+        g.add(b);
+      }
     }
     for (const y of [0.1, h - 0.1]) {
       const r = this.mesh(rung, color);
       r.position.y = y;
       g.add(r);
     }
+    return g;
+  }
+
+  /**
+   * Solar panel (catalog-solar.ts: local x = length, y = frame depth, z = width): dark glass laminate
+   * inside an aluminium frame, faint cell rows. Tilt is the engine pose (pitch / roll), like any part.
+   */
+  private panel(id: string, l: number, t: number, w: number) {
+    const g = new THREE.Group();
+    const f = 0.03; // frame width
+    const glass = new THREE.Mesh(this.geo(`pv-glass:${id}`, () => new THREE.BoxGeometry(l - 2 * f, t * 0.6, w - 2 * f).translate(0, t * 0.6, 0)), this.glass());
+    glass.castShadow = glass.receiveShadow = true;
+    g.add(glass);
+    const along = this.geo(`pv-frame-x:${id}`, () => new THREE.BoxGeometry(l, t, f).translate(0, t / 2, 0));
+    const across = this.geo(`pv-frame-z:${id}`, () => new THREE.BoxGeometry(f, t, w - 2 * f).translate(0, t / 2, 0));
+    for (const s of [-1, 1]) {
+      const a = this.mesh(along, FRAME);
+      a.position.z = (s * (w - f)) / 2;
+      const b = this.mesh(across, FRAME);
+      b.position.x = (s * (l - f)) / 2;
+      g.add(a, b);
+    }
+    // cell grid: thin light lines on the glass (6 cells across, ~10 along)
+    const n = Math.max(2, Math.round((l - 2 * f) / 0.166)), m = 6;
+    const line = this.mat('#3a4a6e');
+    const lx = this.geo(`pv-line-x:${id}`, () => new THREE.BoxGeometry(l - 2 * f, 0.002, 0.004));
+    const lz = this.geo(`pv-line-z:${id}`, () => new THREE.BoxGeometry(0.004, 0.002, w - 2 * f));
+    for (let k = 1; k < m; k++) {
+      const q = new THREE.Mesh(lx, line);
+      q.position.set(0, t * 1.2 + 0.001, -w / 2 + f + ((w - 2 * f) * k) / m);
+      g.add(q);
+    }
+    for (let k = 1; k < n; k++) {
+      const q = new THREE.Mesh(lz, line);
+      q.position.set(-l / 2 + f + ((l - 2 * f) * k) / n, t * 1.2 + 0.001, 0);
+      g.add(q);
+    }
+    return g;
+  }
+
+  private glassMat?: THREE.MeshStandardMaterial;
+  private glass() {
+    return (this.glassMat ??= new THREE.MeshStandardMaterial({ color: GLASS, roughness: 0.18, metalness: 0.55 }));
+  }
+
+  /** Battery / charge controller / inverter: its box plus a label plate on the top and the front (local +z). */
+  private equipment(e: Entity, sx: number, sy: number, sz: number, color: string) {
+    const g = new THREE.Group();
+    g.add(this.mesh(this.geo(`box:${e.def}`, () => new THREE.BoxGeometry(sx, sy, sz).translate(0, sy / 2, 0)), color));
+    const tex = labelTexture(labelText(e));
+    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+    const w = sx * 0.9, h = Math.min(sz * 0.9, w * 0.42);
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    top.rotation.x = -Math.PI / 2;
+    top.position.y = sy + 0.002;
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(w, Math.min(sy * 0.8, h)), mat);
+    front.position.set(0, sy / 2, sz / 2 + 0.002);
+    top.name = front.name = 'label';
+    g.add(top, front);
     return g;
   }
 
@@ -134,6 +217,7 @@ export class ComponentViews {
   }
 
   clear() {
+    for (const v of this.views.values()) disposeOwned(v);
     this.group.clear();
     this.views.clear();
   }
@@ -143,27 +227,37 @@ export class ComponentViews {
     for (const e of Object.values(world.entities)) {
       if (e.kind !== 'component') continue;
       let v = this.views.get(e.id);
-      if (!v || v.key !== e.def) {
-        if (v) this.group.remove(v.obj);
+      if (!v || v.key !== e.def || (v.label !== undefined && v.label !== labelKey(e))) {
+        if (v) {
+          this.group.remove(v.obj);
+          disposeOwned(v);
+        }
         const nv: Partial<View> = {};
         const obj = this.build(e, nv);
         obj.name = e.id;
         this.group.add(obj);
         const p = poseOf(e);
-        v = { obj, prev: p, cur: p, key: e.def, item: nv.item };
+        v = { obj, prev: p, cur: p, key: e.def, item: nv.item, label: nv.label };
       } else {
         v.prev = v.cur;
         v.cur = poseOf(e);
       }
       this.views.set(e.id, v);
       if (v.item) setFill(v.item, e.contents?.fraction);
+      if (e.paint || v.paint) (v.paint ??= new PaintOverlay(v.obj)).update(e);
       v.inHand = e.support?.kind === 'in-hand' ? { by: e.support.by, hand: e.support.hand } : undefined;
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
         this.group.remove(v.obj);
+        disposeOwned(v);
         this.views.delete(id);
       }
+  }
+
+  /** Paint overlays drawn (tests: bands and their drawn coverage). */
+  paints() {
+    return [...this.views].filter(([, v]) => v.paint?.state).map(([id, v]) => ({ id, ...v.paint!.state! }));
   }
 
   /** alpha ∈ [0,1] = fraction of the next tick elapsed. */
@@ -248,9 +342,56 @@ export class ComponentViews {
 
   dispose() {
     this.clear();
+    this.glassMat?.dispose();
     for (const g of this.geos.values()) g.dispose();
     for (const m of this.mats.values()) m.dispose();
     this.geos.clear();
     this.mats.clear();
   }
+}
+
+/** Label plate text: equipment kind and its configuration (entity `equipment`, else the catalog defaults). */
+function labelText(e: Entity): string[] {
+  const d = def(e.def);
+  const kind = e.equipment?.kind ?? d.equipment?.kind ?? e.def;
+  const c: Record<string, unknown> = { ...(d.equipment?.defaults ?? {}), ...(e.equipment?.config ?? {}) };
+  const unit: Record<string, string> = { voltage: 'V', capacityAh: 'Ah', maxPvVoltage: 'V PV', maxCurrentA: 'A', powerW: 'W', dcVoltage: 'V DC', acVoltage: 'V AC' };
+  const parts = Object.keys(c).sort().map((k) => (unit[k] ? `${c[k]} ${unit[k]}` : String(c[k])));
+  return [kind.toUpperCase().replace('-', ' '), parts.join(' · ')];
+}
+const labelKey = (e: Entity) => (def(e.def).category === 'equipment' ? labelText(e).join('|') : '');
+
+/** A small white-on-dark label texture (two lines). */
+function labelTexture(lines: string[]) {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 108;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#f2f2ee';
+  g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = '#1b1b1b';
+  g.lineWidth = 6;
+  g.strokeRect(3, 3, c.width - 6, c.height - 6);
+  g.fillStyle = '#111';
+  g.textAlign = 'center';
+  g.font = 'bold 34px sans-serif';
+  g.fillText(lines[0], c.width / 2, 44, c.width - 16);
+  g.font = '22px sans-serif';
+  g.fillText(lines[1] ?? '', c.width / 2, 84, c.width - 16);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** Free what a view built for itself (label textures / materials, paint overlays); shared geometry stays. */
+function disposeOwned(v: View) {
+  v.paint?.dispose();
+  v.obj.traverse((o) => {
+    if (o.name !== 'label' || !(o instanceof THREE.Mesh)) return;
+    o.geometry.dispose();
+    const m = o.material as THREE.MeshBasicMaterial;
+    m.map?.dispose();
+    m.dispose();
+  });
 }

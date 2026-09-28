@@ -62,7 +62,7 @@ const STYLE: Record<Style, { bendMax: number; wDrop: number; wBend: number; rise
   knees: { bendMax: BODY_MODEL.bendMax.knees, wDrop: 0.5, wBend: 1.4, rise: false, kneel: 2.0 }, // kneel only when a squat + bend cannot do it
   hips: { bendMax: BODY_MODEL.bendMax.hips, wDrop: 0.8, wBend: 0.35, rise: false, kneel: 0.45 },
   up: { bendMax: 30 * DEG, wDrop: 4, wBend: 3, rise: true },
-  walk: { bendMax: 15 * DEG, wDrop: 4, wBend: 2, rise: false, dropMax: 0.08 },
+  walk: { bendMax: 25 * DEG, wDrop: 4, wBend: 2, rise: false, dropMax: 0.08 }, // 25°: walking a load held out ahead (hang_beam walk-in: hands 0.5–0.65 m ahead at hip height)
 };
 
 /** Style for an engine activity (engine/construction/handup.ts phases, carry, raise, items). */

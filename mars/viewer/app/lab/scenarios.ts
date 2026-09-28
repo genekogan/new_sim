@@ -17,6 +17,8 @@ import { campfireEvening } from './campfire-evening.ts';
 import { handUp } from './hand-up.ts';
 import { meal } from './meal.ts';
 import { yearWalkabouts } from './year-walkabout.ts';
+import { yearBuild, yearBuildHouse } from './year-build.ts';
+import { solarPaint } from './solar-paint.ts';
 
 export type Check = { ok: boolean; message: string };
 export type Scenario = {
@@ -229,6 +231,9 @@ SCENARIOS.push(
   meal,
   body,
   ...yearWalkabouts(),
+  yearBuild,
+  yearBuildHouse,
+  solarPaint,
 );
 
 /**

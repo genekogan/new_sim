@@ -11,6 +11,8 @@ import { BODY_MODEL as ENGINE_BODY_MODEL } from '../../engine/body/model.ts';
 import { TakePeople } from '../engine-view/take-replay.ts';
 import { TakeRecorder } from '../../engine/take/recorder.ts';
 import type { ChangeEvent, Take } from '../../engine/take/types.ts';
+import { blockedLog, yearBuildOf } from './year-build.ts';
+import { compareToCanonical } from '../../engine/scenarios/year-build.ts';
 
 export type EngineHook = ReturnType<typeof installHook>;
 
@@ -102,6 +104,38 @@ export function installHook(view: LabView, notify: () => void) {
         .filter((e) => e.kind === 'component')
         .map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: JSON.parse(JSON.stringify(e.pose)), corners: entityCorners(e), rendered: view.components.bounds(e.id) })),
     stateHash: () => sim.rt.stateHash(),
+    /** Bundles / stacks as drawn: pieces left (contents.count) and the top of the drawn stack (m). */
+    stacks: () => view.fixtures.stacks(),
+    /** Paint overlays as drawn: per band the engine coverage and the drawn width fraction. */
+    paints: () => view.components.paints(),
+    /**
+     * Year-build presets: plan steps (id, verb, the params that locate them), piles, the comparison with the
+     * canonical checkpoint, unplaced counts by reason, setup timings, the blocked / refusal log. null otherwise.
+     */
+    yearBuild() {
+      const info = yearBuildOf(sim.rt);
+      if (!info) return null;
+      const b = info.setup.build;
+      const cmp = compareToCanonical(sim.rt.world, b);
+      const reasons: Record<string, number> = {};
+      for (const u of b.unplaced) reasons[u.reason.split(':')[0]] = (reasons[u.reason.split(':')[0]] ?? 0) + 1;
+      return {
+        bays: info.bays ?? null,
+        setupMs: +info.setupMs.toFixed(0),
+        fetchMs: +info.fetchMs.toFixed(0),
+        centre: info.centre,
+        steps: info.setup.plan.steps.map((st) => {
+          const q = st.params as Record<string, unknown>;
+          return { id: st.id, verb: st.verb, beam: q.beam ?? null, item: q.item ?? q.upright ?? null, height: typeof q.height === 'number' ? q.height : null, relay: Array.isArray(q.relay) && q.relay.length > 0 };
+        }),
+        piles: Object.values(sim.rt.world.entities)
+          .filter((e) => e.kind === 'fixture')
+          .map((e) => ({ id: e.id, def: e.def, p: e.pose.p, yaw: e.pose.yaw, count: (e.contents as { count?: number } | undefined)?.count ?? null })),
+        compare: { n: cmp.length, ok: cmp.filter((c) => c.ok).length, maxMm: +(cmp.reduce((m, c) => Math.max(m, Number.isFinite(c.dist) ? c.dist : 0), 0) * 1000).toFixed(2) },
+        unplaced: reasons,
+        blocked: blockedLog(sim.rt),
+      };
+    },
     /** Interaction slots (seats, fire places): claim holder, claimant, occupant, free/claimed/occupied. */
     slots: () => slotStates(sim.rt).map((q) => ({ ...q, p: [+q.p[0].toFixed(4), +q.p[1].toFixed(4)], yaw: +q.yaw.toFixed(4) })),
     /** Social presets: the fired script events (record ids/status/diagnostic) and the scripted diagnostics. */
