@@ -45,7 +45,7 @@ Claude workers run Vite and Playwright concurrently on this machine. The default
 | Local Durable Object for e2e | `E2E_SIMULATION=1` + `MARS_SIMULATION_PORT`; the inspector port 9337 is hard-coded | off / 8897 | **leave off** (no Codex brief needs it) |
 | Playwright run id → artifact dir `viewer/e2e/artifacts/<E2E_RUN>/` | env `E2E_RUN` | ISO timestamp | **`codex-<topic>-<n>`** |
 | Playwright `outputDir` (traces, failures) | `e2e/playwright.config.ts` `outputDir` = `viewer/test-results` | per worktree | per worktree (`$WT/viewer/test-results`); do not change the config |
-| Gate report dir | `deploy/gate.mjs` writes `viewer/.cloudflare/gate/<stamp>/`; no env override | per worktree | Codex does **not** run the gate (§3); if the tooling brief runs it, it lands in `$WT/viewer/.cloudflare/gate/` |
+| Gate report dir | `deploy/gate.mjs` writes `viewer/.cloudflare/gate/<stamp>/`; no env override | per worktree | Codex does **not** run the gate (§3). If it ever ran, the report would land in `$WT/viewer/.cloudflare/gate/` |
 
 `e2e/artifacts/`, `test-results/` and `.cloudflare/` are gitignored. Never commit anything from them.
 
