@@ -26,7 +26,7 @@ take shows up after the recorder rewrites the manifest.
 | `ticks` (optional) | option text; falls back to `duration / 0.05` |
 | `duration`, `entities`, `moments` | scrubber, readout, moment dots (labels: carry, held, deck, visitor, beam, bay; unknown keys show the key) |
 | `finalStateHash` | final-frame check (the replayed hash must equal it) |
-| `kind` (optional) | `'year-build'` marks a "Watch it being built" take. **Absent → inferred:** `rulesVersion` contains `year-build`. W17's recorder can add `kind` without a studio change. `'year-build-chapter'` (W31) is one chapter of a chapter set (below). `isYearBuild` is false for it, so it is not in "Watch it being built" and not in `studio-build.spec.ts`. It is still listed under "Replay take" and plays alone like any take. |
+| `kind` (optional) | `'year-build'` marks a "Watch it being built" take. **Absent → inferred:** `rulesVersion` contains `year-build`. W17's recorder can add `kind` without a studio change. `'year-build-chapter'` (W31) is one chapter of a chapter set (below). `isYearBuild` is false for it, and since W37 `isChapter` keeps it out of **both** pickers: a chapter plays only as part of its set. |
 | `chapter` (optional, W31) | `{ of, index, id, startsFrom, startHash }`: the chapter set's id, the 0-based position, the section id (`A`, `D0`, …), the previous chapter's take id (`null` for the first) and this take's start state hash (= `take.baselineStateHash` = the previous chapter's `finalStateHash`). |
 
 From the take file, the studio also reads `campus`, `site { origin, yaw, groundY }`, `steps`, `take` and `camera`
@@ -44,7 +44,7 @@ held back by a camera-synth test (see there).
 A build too long for one take (the 2022 east-house A+B: 600 599 ticks, 12.0 MB as one file against the 6 MB budget) is
 recorded as **one run cut into chapter takes** at plan barriers (`engine/take/chapters.ts`; the A+B chapters are
 sequence-b's sections A, D0, D1, D2, S, W, P+END). The manifest gets a top-level **`chapterSets`** list, which the
-current studio does not read. The chapters themselves are ordinary `otherYears` entries (`kind: 'year-build-chapter'`,
+studio offers as one "Watch it being built" entry per set (W37, "Chapter sets: playback" below). The chapters themselves are ordinary `otherYears` entries (`kind: 'year-build-chapter'`,
 `chapter`, see the table above), each with its own file, camera track and final-frame hash.
 
 `chapterSets[i]`:
@@ -72,7 +72,7 @@ shipped files):
 - **Own steps only.** A chapter's `steps` / events hold only the lifecycles of its own plan steps (`fromStep … toStep`).
   Ambient make-way walks belong to the chapter in which they run.
 
-**Playing a set back to back (the renderer task; not built yet).** Offer each `chapterSets` entry under "Watch it being
+**Playing a set back to back (the W31 recipe; built in W37, see "Chapter sets: playback" below).** Offer each `chapterSets` entry under "Watch it being
 built" as one item, with its `ticks` and `duration`. Keep the chapter entries out of that picker (they already are, by
 `kind`). Then:
 1. Fetch chapter 0 and open it as today: datum offset, hide the rebuilt building, fixtures, camera = its `camera`.
@@ -86,6 +86,77 @@ built" as one item, with its `ticks` and `duration`. Keep the chapter entries ou
    The canonical check (year-build) runs on the last chapter's replayed last frame. Earlier chapters can run it on their
    own last frame; parts not yet built there are "outside this take".
 5. Prefetch chapter k + 1 while k plays (each file ≤ 6 MB raw; the A+B chapters are 0.9–3.5 MB, gzip 0.1–0.6 MB).
+
+### Chapter sets: playback (W37)
+
+Code: `app/studio/chapter-set.ts` (`ChapterSetReplay`), `chapter-set.worker.ts` (whole-set checks), `chapter-panel.tsx`
+(transport), `take-host.ts` (`openSet`), `take-panel.tsx` (pickers). Spec: `e2e/studio-build.spec.ts` (the last three tests).
+
+- **One entry.** Each `chapterSets` entry of the studio year is one option (value `set:<id>`) in "Watch it being built"
+  **and** in "Replay take", above the single takes. The text is derived from the set, not written in code:
+  `<place>: <what the chapters build> — from the piles · <length> · <n> chapters`. `<place>` is the set label without its
+  "Watch it being built:" prefix and parentheticals; the chapter words are each chapter label's head noun (before " — " or
+  ","; a head listing two things reads as its first word), neighbours folded into a plural. For the A+B:
+  **"2022 east-house: skeleton, decks, stair, walls, solar — from the piles · 8 h 20 min · 7 chapters"** (30 029.95 s =
+  8 h 20.499 min; the picker's own `span` rounding). The 2022 bay-1 and whole-skeleton takes stay as they were; the seven
+  chapter takes are in neither picker (`isChapter`).
+- **One clock.** The set runs over `[0, duration)` on an h:mm:ss clock. Set time T maps to the chapter k with
+  `from·dt ≤ T < to·dt` and the local time `T − from·dt`. The scrubber covers the whole set; speeds 0.5–64×, as for a take.
+- **Chapter bar.** Under the scrubber: `A · D0 · D1 · D2 · S · W · P`, each as wide as its ticks, the chapter on screen
+  highlighted (`aria-current`); a click jumps to its start. Every seam carries the continuity mark (✓ / ✗ / … while it is
+  being read). The row below says "Chapter 4/7 · D2: roof deck — … · 0:45:37 in" and the seam of the chapter on screen:
+  "D1 → D2: ✓ 35b45a51… (first frame = D1's final state)"; chapter 0 reads "A starts from the pile yard b432a59b… ✓".
+- **One set of views.** A single `TakePeople` draws the whole set. At a boundary the next chapter's (datum-shifted) take is
+  swapped in with `TakePeople.setTake`: its first frame is the previous chapter's final state with the same ids, so no
+  rig or mesh is rebuilt. `show(t, clock)` poses at the local time but animates idle loops and fires on the set clock.
+  Poses depend only on T, as for a single take.
+- **Guard before a swap.** A chapter is used only if `take.baselineStateHash` = the previous chapter's manifest
+  `finalStateHash` (the set's `startStateHash` for chapter 0) = the manifest's `chapter.startHash`, and its take id is the
+  set's. Otherwise the clock stops and the panel shows "continuity ✗: chapter … starts from …, chapter … ended at …"
+  instead of the swap.
+- **Prefetch.** 300 ms after chapter k comes on screen, chapter k + 1 is fetched (fetch + JSON parse + the take's own
+  hash check in one task, the render copy and log in the next). Chapters k − 1 … k + 1 stay parsed; the rest are dropped.
+  If the clock reaches a chapter that is not loaded (a jump, or prefetch not done), it holds at the boundary
+  ("Loading chapter D2…") and goes on when it is in.
+- **Engine camera per chapter.** The camera is the chapter's own planned shot list (`camera` of its file), sampled at the
+  local time plus the datum offset. The camera picker and Direct camera are not offered for a set (they act on one take).
+- **Log on the set clock.** Every chapter's log (`takeLog(take, steps, { at: from·dt, clock })`) is on the set clock,
+  including a merged wait's "until" (h:mm:ss.s). At D0's start the log still shows A's last lines. The Diagnostics totals
+  cover the whole set once every chapter has been read (until then "(n / 7 chapters read)"). A+B totals: 0 violations,
+  105 refused / failed, 769 blocked waits.
+- **Whole-set checks (a worker).** `chapter-set.worker.ts` reads the chapters in order, one plus the previous at a time,
+  and posts per chapter: its final state hashes to its recorded and manifest hash; its start = the previous chapter's
+  final state (the three hashes above plus the engine's `chapterContinuity`: `entities0` = the previous final entities,
+  first frame within ½ mm / ½ mrad, same phase / activity / level); its log. Then the final checks on the last chapter's
+  replayed last frame: the final state = the set's `finalStateHash` (for the A+B: `year-build-b.test.ts` `PIN_FULL_AB`,
+  which the spec reads), last frame = final state, and the engine's `compareToCanonical` (frames / beams) plus `compareB`
+  (phase-B parts) against `yearBuildPlan(…, { phaseB: {} })` from the year file. It is a worker because the phase-B plan
+  takes ≈ 2 s to build. Shown as:
+  "✓ continuity: 7 / 7 chapter starts · ✓ final state ddb634d6… = A+B pin · last frame = final state (0.64 mm) ·
+  ✓ 66 frames + beams + 145 parts at the mars-2022 canonical pose (≤ 1 cm, 1°; max 0.57 mm)". The 145 parts: 81 deck pieces,
+  25 wall panels, 16 tread boards, 6 stringers, 6 posts, 2 handrails, 6 panel rails, 3 solar panels.
+- **Hooks.** `__marsStudio.takeSet()`: set clock, chapter (`k`, `id`, `local`), loaded chapters, `waiting`, `error`,
+  entities / rendered, shot, track, per-chapter checks and the final checks, boundary swaps. `takePerf()` adds `swaps`
+  (chapter, wall ms of the swap redraw, set time) and `loads` (chapter, fetch + parse ms, render-copy ms).
+
+**Measured (W37, headless Chromium + SwiftShader, 1280×800, `studio-build.spec.ts`).** Open to first frame: 0.4 s; the
+worker's whole-set checks (7 chapters read, then the phase-B plan and the final comparisons): done 2.9 s after opening. 64× for 10 s from 384 take-s before the A → D0
+seam (1 s warm-up): 17.7 fps, frame mean 56.8 / p95 66.7 / **max 66.8 ms**; the frames around the seam 50–66.7 ms; the
+swap's own redraw 2.6 ms; D0 was prefetched (36 ms fetch + parse) and D1 prefetched inside the window (20 ms + 1 ms);
+64.6 take-s per wall-s. Redraw mean 1.21 ms (sampleTake 0.34 ms).
+
+### Prone receivers in a take (W37)
+
+`TakePeople.show` hands the take's prone fields (mars-take/4, W32; recorded as discrete changes) to the renderer:
+`proneYaw` integer mrad → rad, `phaseK` integer % → 0–1, into `SampledHuman`, which `humans.ts setFrame` passes to the
+prone layer (W35). `e2e/studio-take-prone.spec.ts` records the lab `prone` preset with the engine's TakeRecorder and
+replays it through `TakePeople` at every tick where p3 / p4 are prone (708 samples): the engine numbers the replay receives
+equal the live lab's on every sample; the body turn is within 0.0005 rad; in prone-wait (574 samples) hips and head are
+within 0.6 mm; lying down / reaching the rise is within 0.021. Getting up, the replay rises exactly on smooth(phaseK) while
+the live body may wait for the load (live − replay ≤ 0.004, i.e. never ahead; behind by up to 0.79 at p4's kneel-up): the
+replay is random access (no tick history), so it cannot know that the live layer waited. The torso pitch search likewise
+lands differently without the previous tick's pose (up to 0.6 rad in lie-down / prone-reach, head up to 0.33 m).
+Without the fields the replay was off by 0.35 rad in body turn in every prone-wait tick, the rise by up to 2.97.
 
 ## 2. The take host per year
 
@@ -272,6 +343,13 @@ regression fixture.
   But the capture at 4 s (`studio-direct-playing.png`) still shows a bystander's head large in the lower centre of the
   frame. The rule measures cover of the subject's frame region and accepts a bystander who is big in the frame without
   covering the crew's points.
+- **Chapter sets (W37).** (1) The gait phase restarts at a seam for anyone walking across it: each chapter's walked
+  distance starts at 0 (a one-frame leg-phase jump; seams are plan barriers, so the crew is normally standing). (2) The
+  option's chapter words come from a head-noun rule tuned on the A+B labels; another set's labels may read less well.
+  (3) Direct camera and the camera picker are off for a set. (4) A jump into a chapter not yet parsed keeps the old frame
+  for the fetch (≈ 20–40 ms here); on a slow network the clock would hold at the seam ("Loading chapter …"). (5) The
+  captures are with the panel open: it covers the lower ≈ 20 % of the engine camera's frame (the D2 relay's giver on the
+  first-floor deck is at the panel's top edge).
 - **Worst-sample captures of take-less tracks** use the orbit camera at the sample's pose with the studio fov, not the
   track fov.
 
