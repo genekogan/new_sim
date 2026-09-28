@@ -17,7 +17,8 @@
 //   inventory + crew at the centre of `staging-east`, rehearse the 43-step plan (TakeRecorder inside runPlan).
 // build-bay-v3: engine/scenarios/build-bay-v3.ts (deck handed up to people on the beams, s2 off the forklift,
 //   stair, campfire) at the same site and crop. build-bay-v3.test.ts pins v3 on OPEN GROUND at the origin; this
-//   campus placement is its own run (own hash), checked here for completion and 0 violations only.
+//   campus placement is its own run (own hash), checked here for completion and 0 violations only (v3 is
+//   origin-independent since W27: the test also runs it at staging-east's origin on open ground).
 // year-build-2022: engine/scenarios/year-build.ts phase A, first bay (the suite's tranche; year-build.test.ts
 //   PIN_BAY1) on the 2022 year scene cropped round the house, ground at the Kit datum y = 0.
 // All HYPOTHETICAL: engine demonstrations, not documented historical builds (spec §4).
@@ -176,7 +177,7 @@ const SCENARIOS = {
     file: 'build-bay-v3-campus-2026.json',
     list: 'takes',
     year: 2026,
-    label: 'Flagship v3 at staging-east: deck handed up, forklift, stair, campfire (HYPOTHETICAL build scenario — not historical)',
+    label: 'Flagship v3: hand-up + forklift deck, at staging-east (HYPOTHETICAL build scenario — not historical)',
     note: 'Engine demonstration (flagship v3: joists and s1 handed up to two people on the beams, s2 taken off the forklift forks, stair, spare tread, campfire) on a fork of canonical Mars 2026 at the centre of the algorithmic staging-east clearing. The v3 pin (build-bay-v3.test.ts) is on open ground; this campus placement is its own run. People are generic, not attendees.',
     limit: 3 * MB,
     hz: 10,
