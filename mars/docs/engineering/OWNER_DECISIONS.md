@@ -36,13 +36,15 @@
   as a further posture (OWNER_FEEDBACK §13). **Top beams:** two people climb the upright on its cross braces and each holds one
   side of the beam while setting it — the `hang_beam`/stance mechanism is the real method (§14).
 - (2026-09-29 ~09:45 EDT, Gene) **External Codex split.** Bounded areas move to an external Codex contributor (not a Claude
-  subagent), working on `codex/<topic>` branches; the Claude lead merges after re-gating (test:engine + tsc + relevant e2e in a
-  worktree); a Codex change that moves a pin is rejected back with the reason. **Codex-owned:** `engine/camera/parse.ts` (+ tests),
-  `app/engine-view/fire.ts` + `e2e/fire.spec.ts`, paint/solar/equipment mesh files under `app/engine-view/`, `app/history/scenes.ts`,
-  `docs/engineering/data/**` (2026 grouping output), lint/gate tooling files, take tracks/events thinning in `engine/take/**` once the
-  lead's current work there is finished. **Claude-owned:** everything else — locomotion, construction, campus, spatial, body,
-  year-build sequencing, studio replay. Never brief Claude workers into Codex areas; never touch `codex/*` except to merge.
-  Contributor guide: `docs/engineering/CODEX.md`; briefs in `docs/engineering/briefs/`. Questions for Gene are parked in
-  `docs/engineering/QUESTIONS_FOR_GENE.md` (non-blocking; not re-surfaced in handoffs).
-- (same) **Checkpoint 1** = 2022 complete: phase B, 2x4 framing, all four houses, studio replay. Block F's 2026 frame-grouping half is
-  Codex's; Claude takes the integration half once its JSON exists.
+  subagent) on `codex/<topic>` branches off main; the Claude lead merges (ff/cherry-pick) after re-gating in a worktree; a Codex
+  change that moves a pin is rejected back with the reason. **Codex-owned:** `engine/camera/parse.ts` (+ its tests);
+  `app/engine-view/fire.ts` + `e2e/fire.spec.ts`; the paint/solar/equipment mesh files under `app/engine-view/` named by the
+  render-polish brief; `docs/engineering/data/**` (2026 grouping output); lint/gate tooling files. **Claude-owned:** everything
+  else — locomotion, construction, campus, spatial, body, take (`engine/take/**`), year-build sequencing, studio replay,
+  `app/history/scenes.ts`. Never brief Claude workers into Codex areas; never touch `codex/*` except to merge. Codex uses its own
+  Vite/Playwright port and artifact/.cloudflare dirs, reports to `docs/engineering/briefs/<brief>.REPORT.md`, never PROGRESS or
+  HANDOFF. Guide: `docs/engineering/CODEX.md`; briefs: `briefs/`. Questions for Gene are parked in `QUESTIONS_FOR_GENE.md`
+  (non-blocking; not re-surfaced in handoffs).
+- (same) **Checkpoint 1** = 2022 complete: phase B landed and pinned, 2x4 framing verbs, all four houses, studio "Watch it being
+  built · 2022". No deploy until Gene says so. The 2026 frame grouping is Codex's; Claude takes the integration half once its JSON
+  is on a `codex/*` branch.
