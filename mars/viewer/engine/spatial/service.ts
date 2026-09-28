@@ -114,6 +114,8 @@ export class Spatial {
   contributors: Contributor[];
   /** Route planner for route()/routeAround() (path.ts RouteOpts.planner); 'exact' unless opted in. */
   planner: 'exact' | 'corridor';
+  /** routeAround proves unreachable goals early (path.ts RouteOpts.proveUnreachable); identical results either way. */
+  proveUnreachable = true;
   /** Patch the previous grids on sync (grid.ts updateGrids, bit-identical) instead of rebuilding; default on. */
   incremental: boolean;
   scene!: SpatialScene;
@@ -267,7 +269,8 @@ export class Spatial {
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[]): RouteResult {
     const run = () => {
       const { scene, grids } = this.gridsAround(world, people);
-      return findRoute(grids, scene, profile, start, goal, this.planner === 'exact' ? undefined : { planner: this.planner });
+      // a people-avoidance replan fails often (walled in, a pocket cut off): prove it early (path.ts proveUnreachable)
+      return findRoute(grids, scene, profile, start, goal, this.planner === 'exact' ? { proveUnreachable: this.proveUnreachable } : { planner: this.planner, proveUnreachable: this.proveUnreachable });
     };
     return this.prof ? this.prof.time('spatial.routeAround', run) : run();
   }

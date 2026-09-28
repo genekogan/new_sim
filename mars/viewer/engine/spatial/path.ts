@@ -40,6 +40,15 @@ export type RouteOpts = {
    * Faster on long routes but NOT guaranteed to return the exact route (docs/engineering/PLANNING_BUDGET.md).
    */
   planner?: 'exact' | 'corridor';
+  /**
+   * Early exit for failing searches (people-avoidance replans, `Spatial.routeAround`): a reverse flood
+   * from the goal runs alongside the A*, one cell per expansion. If it runs out of cells without meeting
+   * the start, the goal is unreachable and the search returns the same `null` (→ the same diagnostic) the
+   * full expansion would have, without expanding the start's whole component. Only when the grid has no
+   * more cells than `maxExpand` (so 'route.search-limit' cannot be the answer). Results are identical
+   * with or without it (engine/test/walk-perf.test.ts).
+   */
+  proveUnreachable?: boolean;
 };
 
 /** Corridor planner: coarse cell size (m) and fine-search halo around the coarse path (m). */
@@ -156,7 +165,13 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   let expanded = 0;
   const maxExpand = opts.maxExpand ?? 4_000_000;
   const hasEdges = edges.size > 0;
+  let rev = opts.proveUnreachable && !mask && startId !== goalId && total <= maxExpand ? reverseFlood(S, prep, Ls, startId, goalId) : null;
   while (heap.size) {
+    if (rev) {
+      const st = rev.step();
+      if (st < 0) return null; // the goal's side ran out of cells: the A* could only exhaust the start's side
+      if (st > 0) rev = null; // the start can reach the goal: the A* decides as always
+    }
     const cur = heap.pop();
     if (shut[cur] === gen) continue; // (a closed cell re-queued by a relaxation, as in the reference)
     shut[cur] = gen;
@@ -213,6 +228,69 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   for (let id = goalId; id !== -1; id = came[id]) chain.push(id);
   chain.reverse();
   return { goalId, chain, viaLink, expanded };
+}
+
+/**
+ * Reverse flood from the goal over exactly the moves `search` makes, backwards: a cell X is entered
+ * from a neighbour Y when X is passable, Y is passable or the start, and (diagonals) both corner cells
+ * are passable; a link edge F → X is entered from F. The A* only ever expands the start and passable
+ * cells, so "the flood ran out without meeting the start" ⇔ "the A* would exhaust without the goal".
+ * `step()` visits one cell: −1 exhausted without the start, 1 met the start, 0 not decided yet.
+ */
+function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, goalId: number) {
+  const { r, N, idxOf, edges } = prep;
+  if (!S.rseen || S.rseen.length !== S.total) { S.rseen = new Uint32Array(S.total); S.rq = new Int32Array(S.total); }
+  const seen = S.rseen, q = S.rq!, gen = S.gen;
+  let into: Map<number, number[]> | null = null;
+  if (edges.size) {
+    into = new Map();
+    for (const [from, list] of edges)
+      for (const e of list) {
+        const to = idxOf.get(e.toLevel)! * N + e.toCell;
+        const l = into.get(to);
+        if (l) l.push(from);
+        else into.set(to, [from]);
+      }
+  }
+  let head = 0, tail = 0;
+  seen[goalId] = gen;
+  q[tail++] = goalId;
+  return {
+    step(): number {
+      if (head === tail) return -1;
+      const x = q[head++];
+      const lv = Math.floor(x / N), c = x - lv * N;
+      const g = Ls[lv];
+      const nx = g.nx, nz = g.nz, cl = g.clearance, base = lv * N;
+      if (cl[c] >= r) {
+        const xi = c % nx, xj = (c - xi) / nx;
+        for (let dj = -1; dj <= 1; dj++) {
+          const yj = xj + dj;
+          if (yj < 0 || yj >= nz) continue;
+          for (let di = -1; di <= 1; di++) {
+            if (!di && !dj) continue;
+            const yi = xi + di;
+            if (yi < 0 || yi >= nx) continue;
+            if (di && dj && (!(cl[yj * nx + xi] >= r) || !(cl[xj * nx + yi] >= r))) continue;
+            const y = base + yj * nx + yi;
+            if (y === startId) return 1;
+            if (seen[y] === gen || !(cl[yj * nx + yi] >= r)) continue;
+            seen[y] = gen;
+            q[tail++] = y;
+          }
+        }
+      }
+      const from = into?.get(x);
+      if (from)
+        for (const y of from) {
+          if (y === startId) return 1;
+          if (seen[y] === gen) continue;
+          seen[y] = gen;
+          q[tail++] = y;
+        }
+      return head === tail ? -1 : 0;
+    },
+  };
 }
 
 /** Cell chain → legs (string-pulled walk legs + link legs). */
@@ -433,7 +511,7 @@ class Heap {
 
 /** Reusable search workspaces keyed by search size (fine + coarse grids of the last scenes).
  *  findRoute is not reentrant while searching; its only recursion runs after its search is done. */
-type Scratch = { total: number; gen: number; gScore: Float64Array; came: Int32Array; pos: Int32Array; stamp: Uint32Array; shut: Uint32Array; heap: Heap; mask?: Uint32Array; maskGen: number };
+type Scratch = { total: number; gen: number; gScore: Float64Array; came: Int32Array; pos: Int32Array; stamp: Uint32Array; shut: Uint32Array; heap: Heap; mask?: Uint32Array; maskGen: number; rseen?: Uint32Array; rq?: Int32Array };
 const scratches = new Map<number, Scratch>();
 const SCRATCHES = 3;
 function scratchFor(total: number): Scratch {
@@ -447,6 +525,7 @@ function scratchFor(total: number): Scratch {
     sc.gen = 0;
     sc.stamp.fill(0);
     sc.shut.fill(0);
+    sc.rseen?.fill(0);
   }
   sc.gen++;
   return sc;

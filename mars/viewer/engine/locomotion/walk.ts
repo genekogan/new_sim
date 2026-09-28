@@ -122,6 +122,18 @@ export const walkSchema = z.strictObject({
 });
 
 const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
+
+/**
+ * The world's entities in world order, read once per `walk_to` step (PLANNING_BUDGET.md §6): the people
+ * scans (encounter, look-ahead, intrusion, vehicles, stairs) ran `Object.values` 4–6× per walker per tick,
+ * and `world.entities` is a V8 dictionary-mode object, where each call sorts and copies (~2 µs for 30).
+ * A walker's step never adds, removes or replaces an entity (it moves poses in place, read live through
+ * these same objects), so the snapshot is exactly what each scan would read. Outside a step: a fresh read.
+ */
+let stepEntities: Entity[] | null = null;
+/** Pure-performance switches (PLANNING_BUDGET.md §6). Each leaves every result bit-identical; tests turn them off to prove it. */
+export const WALK_PERF = { entitySnapshot: true };
+const entitiesOf = (rt: Runtime): Entity[] => stepEntities ?? Object.values(rt.world.entities);
 /** Where the current route leads: the goal, or the step-aside spot while walking to it. */
 const targetOf = (ex: Exec) => (ex.detour?.stage === 'going' ? { level: ex.detour.level, p: ex.detour.spot } : ex.goal);
 /** Live walk_to execs by action id (so `makeWay` can ask a blocked walker to step aside). */
@@ -170,7 +182,14 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
   step(rt, ex, dt) {
     const h = rt.world.entities[ex.actor];
     const x0 = h.pose.p[0], z0 = h.pose.p[2];
-    const r = stepWalk(rt, ex, dt);
+    const outer = stepEntities;
+    stepEntities = WALK_PERF.entitySnapshot ? Object.values(rt.world.entities) : null;
+    let r: StepResult;
+    try {
+      r = stepWalk(rt, ex, dt);
+    } finally {
+      stepEntities = outer;
+    }
     if (r.status === 'completed' || r.status === 'failed') {
       walkExecs(rt).delete(ex.id);
       delete h.human!.speed;
@@ -706,7 +725,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
 
 /** Id of a person that moving from `from` to `to` would intrude on (closer than 2r and getting closer). */
 function intrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): string | null {
-  for (const o of Object.values(rt.world.entities)) {
+  for (const o of entitiesOf(rt)) {
     if (o.id === me.id || o.kind !== 'human' || o.human?.level !== me.human!.level) continue;
     if (Math.abs(o.pose.p[1] - me.pose.p[1]) > 1.0) continue;
     const dTo = Math.hypot(o.pose.p[0] - to[0], o.pose.p[2] - to[1]);
@@ -745,7 +764,7 @@ function blockerAt(rt: Runtime, me: Entity, id: string): Vec2 | null {
 /** Footprints of vehicles being driven right now (the rider's action executing, not stopped/blocked). */
 function drivenVehicles(rt: Runtime, me: Entity): OBB2[] {
   const out: OBB2[] = [];
-  for (const o of Object.values(rt.world.entities)) {
+  for (const o of entitiesOf(rt)) {
     const vid = o.human?.riding, t = o.human?.task;
     if (!vid || !t || o.human!.level !== me.human!.level) continue;
     const rec = rt.records.get(t);
@@ -793,7 +812,7 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
   // `near`: only the next few centimetres matter (contact avoidance, no cancelled steps): a walker that
   // is momentarily blocked is still a walker, handled by the encounter rules (give way, pass, follow)
   const cands: { id: string; kind: 'person' | 'load'; p: Vec2; need: number; now: number; near?: boolean }[] = [];
-  for (const o of Object.values(rt.world.entities)) {
+  for (const o of entitiesOf(rt)) {
     if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level || Math.abs(o.pose.p[1] - a.pose.p[1]) > 1.0) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
     const now = dist2(me, q);
@@ -854,7 +873,7 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
 
 /** A person that moving from `from` to `to` on a flight would bring `me` within 2r of (and closer). Also used by the carry climb. */
 export function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: number): string | null {
-  for (const o of Object.values(rt.world.entities)) {
+  for (const o of entitiesOf(rt)) {
     if (o.id === me.id || o.kind !== 'human') continue;
     const dTo = Math.hypot(o.pose.p[0] - to[0], (o.pose.p[1] - to[1]) * 0.5, o.pose.p[2] - to[2]);
     if (dTo >= 2 * r - 0.02) continue;
@@ -914,7 +933,7 @@ function stepAwayClear(rt: Runtime, me: Entity, from: Vec2, q: Vec2): boolean {
   const r = HUMAN_PROFILE.radius;
   const discs = [
     ...loadDiscsFor(rt, me).map((d) => ({ p: d.p, need: d.r + r + 0.05 })),
-    ...Object.values(rt.world.entities)
+    ...entitiesOf(rt)
       .filter((o) => o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level)
       .map((o) => ({ p: [o.pose.p[0], o.pose.p[2]] as Vec2, need: 2 * r + 0.05 })),
   ];
@@ -927,7 +946,7 @@ function stepAwayClear(rt: Runtime, me: Entity, from: Vec2, q: Vec2): boolean {
 }
 
 function occupant(rt: Runtime, me: Entity, p: Vec2, r: number): string | null {
-  for (const o of Object.values(rt.world.entities))
+  for (const o of entitiesOf(rt))
     if (o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level && Math.hypot(o.pose.p[0] - p[0], o.pose.p[2] - p[1]) < 2 * r) return o.id;
   return null;
 }
@@ -946,7 +965,7 @@ function sidestepTarget(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, along: n
   const base = pointAt(ex, s);
   const n: Vec2 = rot2(tangentAt(ex, s), -Math.PI / 2);
   const people: Vec2[] = [];
-  for (const o of Object.values(rt.world.entities)) {
+  for (const o of entitiesOf(rt)) {
     if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level || isActiveWalker(rt, o)) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
     if (dist2(q, base) < STATIC_OFFSET + 2 * r + 0.5) people.push(q);
@@ -968,7 +987,7 @@ function sidestepTarget(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, along: n
 }
 
 function standingPeople(rt: Runtime, me: Entity) {
-  return Object.values(rt.world.entities)
+  return entitiesOf(rt)
     .filter((o) => o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level && !isActiveWalker(rt, o))
     .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
 }
@@ -1027,7 +1046,7 @@ type Encounter = { kind: 'none' } | { kind: 'follow' | 'headon' | 'crossing' | '
 function encounter(rt: Runtime, ex: Exec, a: Entity, tan: Vec2): Encounter {
   let best: Encounter = { kind: 'none' };
   const me: Vec2 = [a.pose.p[0], a.pose.p[2]];
-  for (const o of Object.values(rt.world.entities)) {
+  for (const o of entitiesOf(rt)) {
     if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level) continue;
     const pa = ex.plannedAround[o.id];
     if (pa && Math.hypot(pa[0] - o.pose.p[0], pa[1] - o.pose.p[2]) < 0.15) continue; // route already avoids them
