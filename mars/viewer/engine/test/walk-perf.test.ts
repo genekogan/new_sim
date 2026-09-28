@@ -11,8 +11,14 @@ import { seedRng, nextRandom } from '../core/rng.ts';
 import { dcos, dsin } from '../core/math.ts';
 import { findRouteReference } from './path-reference.ts';
 import { WALK_PERF } from '../locomotion/walk.ts';
-import type { Spatial } from '../spatial/service.ts';
+import { Spatial, narrowComponents } from '../spatial/service.ts';
 import { stress, buildRuntime } from '../../app/lab/scenarios.ts';
+import { WorldHistory } from '../history/store.ts';
+import { emptyWorld, addAll } from '../world/factory.ts';
+import { bindTemplate } from '../sequence/bind.ts';
+import { rehearse } from '../rehearsal/rehearse.ts';
+import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry, BUILD_BAY_INVARIANTS, BUILD_BAY_CONTRIBUTORS } from '../scenarios/build-bay.ts';
+import { buildBayGround, BUILD_BAY_RULES, BUILD_BAY_SITE } from '../../app/lab/build-bay.ts';
 import { mealRuntime, runMeal } from '../scenarios/meal.ts';
 
 const P = (level: number, x: number, z: number): Place => ({ level, p: [x, z] });
@@ -74,7 +80,7 @@ test('proveUnreachable: routeAround-style searches === frozen reference A*, wall
 });
 
 function stressHash(fast: boolean, planner: 'exact' | 'corridor', ticks: number) {
-  WALK_PERF.entitySnapshot = fast;
+  WALK_PERF.stepSnapshot = fast;
   try {
     const s = stress(30);
     const rt = buildRuntime(s);
@@ -89,7 +95,7 @@ function stressHash(fast: boolean, planner: 'exact' | 'corridor', ticks: number)
     assert.equal(rt.violations.length, 0);
     return rt.stateHash();
   } finally {
-    WALK_PERF.entitySnapshot = true;
+    WALK_PERF.stepSnapshot = true;
   }
 }
 
@@ -99,16 +105,84 @@ test('walker fast paths off === on: stress-30 (exact: the pin; corridor: its fai
   assert.equal(stressHash(false, 'exact', 1200), on);
   assert.equal(stressHash(true, 'corridor', 1200), stressHash(false, 'corridor', 1200));
   const meal = (fast: boolean) => {
-    WALK_PERF.entitySnapshot = fast;
+    WALK_PERF.stepSnapshot = fast;
     try {
       const rt = mealRuntime();
       (rt.services.spatial as Spatial).proveUnreachable = fast;
       runMeal(rt);
       return rt.stateHash();
     } finally {
-      WALK_PERF.entitySnapshot = true;
+      WALK_PERF.stepSnapshot = true;
     }
   };
   assert.equal(meal(true), '9dae86bfd31ef8331c5930d345c7ceace5bd2f7a8a247ab02462c262f4a70f87');
   assert.equal(meal(false), meal(true));
+});
+
+/** Spatial.narrow as it was before PLANNING_BUDGET.md §6, verbatim (frozen reference). */
+function narrowReference(g: { nx: number; nz: number; clearance: Float32Array }, r: number, margin = 0.15): Int32Array {
+  const n = g.nx * g.nz;
+  const lab = new Int32Array(n).fill(-1);
+  const isNarrow = (c: number) => g.clearance[c] >= r && g.clearance[c] < 2 * r + margin;
+  let next = 0;
+  const stack: number[] = [];
+  for (let c = 0; c < n; c++) {
+    if (lab[c] !== -1 || !isNarrow(c)) continue;
+    lab[c] = next;
+    stack.push(c);
+    while (stack.length) {
+      const k = stack.pop()!;
+      const i = k % g.nx, j = (k - i) / g.nx;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + di, nj = j + dj;
+        if (ni < 0 || nj < 0 || ni >= g.nx || nj >= g.nz) continue;
+        const m = nj * g.nx + ni;
+        if (lab[m] === -1 && isNarrow(m)) { lab[m] = next; stack.push(m); }
+      }
+    }
+    next++;
+  }
+  return lab;
+}
+
+test('narrow(): single-file component labels === the frozen reference (scenes, radii, and every call of the build-bay probe)', () => {
+  const scene = provingGround();
+  const grids = buildGrids(scene, 0.1);
+  let compared = 0;
+  const same = (a: Int32Array, b: Int32Array, what: string) => {
+    assert.equal(a.length, b.length, what);
+    assert.ok(a.every((v, i) => v === b[i]), what);
+    compared++;
+  };
+  for (const [lv, g] of grids.levels) for (const [r, m] of [[0.25, 0.15], [0.3, 0.15], [0.25, 0], [0.5, 0.3]]) same(narrowComponents(g.clearance, g.nx, g.nz, r, m), narrowReference(g, r, m), `level ${lv} r ${r} margin ${m}`);
+  const st = seedRng('walk-perf-narrow');
+  const rand = () => nextRandom(st);
+  for (let k = 0; k < 12; k++) {
+    const extra: Obstacle[] = Array.from({ length: 30 }, (_, i) => ({ id: `b${i}`, obb: { c: [-28 + rand() * 56, -28 + rand() * 56] as [number, number], half: [0.1 + rand() * 2, 0.1 + rand() * 0.6] as [number, number], yaw: rand() * 3 }, y0: 0, y1: 2, kind: 'solid' as const, label: `b${i}` }));
+    const g = gridsWithObstacles(grids, extra).levels.get(0)!;
+    same(narrowComponents(g.clearance, g.nx, g.nz, 0.25, 0.15), narrowReference(g, 0.25), `random scene ${k}`);
+  }
+  // every narrow() the walkers make while the build-bay probe changes the grids (378 epochs); pinned hash
+  const orig = Spatial.prototype.narrow;
+  let calls = 0;
+  Spatial.prototype.narrow = function (this: Spatial, level: number, r: number, margin = 0.15) {
+    const got = orig.call(this, level, r, margin);
+    same(got, narrowReference(this.grids.levels.get(level)!, r, margin), `construction epoch ${this.epoch} level ${level}`);
+    calls++;
+    return got;
+  };
+  let hash = '';
+  try {
+    const h = new WorldHistory(BUILD_BAY_RULES);
+    h.publishCanonical('canon', 'open ground', addAll(emptyWorld('open-ground', buildBayGround()), ...buildBayEntities(BUILD_BAY_SITE)), 'probe');
+    h.fork('canon', 'ws', 'ws');
+    const plan = bindTemplate(buildBayTemplate(BUILD_BAY_SITE), buildBayBindings, { history: h, baseline: 'ws', registry: buildBayRegistry() });
+    const r = rehearse(h, 'ws', plan, { registry: buildBayRegistry(), invariants: BUILD_BAY_INVARIANTS, services: () => ({ spatial: new Spatial(buildBayGround(), { contributors: BUILD_BAY_CONTRIBUTORS }) }) });
+    hash = r.take.finalStateHash;
+  } finally {
+    Spatial.prototype.narrow = orig;
+  }
+  assert.equal(hash, '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b');
+  assert.ok(calls >= 100, `${calls} narrow() calls in the probe`);
+  assert.ok(compared >= 25);
 });

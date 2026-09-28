@@ -287,28 +287,49 @@ export class Spatial {
     if (lab) return lab;
     if (this.narrowCache.size > 16) this.narrowCache.clear();
     const g = this.grids.levels.get(level)!;
-    const n = g.nx * g.nz;
-    lab = new Int32Array(n).fill(-1);
-    const isNarrow = (c: number) => g.clearance[c] >= r && g.clearance[c] < 2 * r + margin;
-    let next = 0;
-    const stack: number[] = [];
-    for (let c = 0; c < n; c++) {
-      if (lab[c] !== -1 || !isNarrow(c)) continue;
-      lab[c] = next;
-      stack.push(c);
-      while (stack.length) {
-        const k = stack.pop()!;
-        const i = k % g.nx, j = (k - i) / g.nx;
-        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const ni = i + di, nj = j + dj;
-          if (ni < 0 || nj < 0 || ni >= g.nx || nj >= g.nz) continue;
-          const m = nj * g.nx + ni;
-          if (lab[m] === -1 && isNarrow(m)) { lab[m] = next; stack.push(m); }
-        }
-      }
-      next++;
-    }
+    // labels depend only on (clearance, nx, nz, r, margin): a construction step that flips no cell of
+    // this level keeps its clearance array (grid.ts updateGrids), so its labels carry over unchanged
+    const byArr = narrowLabels.get(g.clearance);
+    const sub = `${g.nx}:${g.nz}:${r}:${margin}`;
+    lab = byArr?.get(sub) ?? narrowComponents(g.clearance, g.nx, g.nz, r, margin);
+    if (!byArr) narrowLabels.set(g.clearance, new Map([[sub, lab]]));
+    else byArr.set(sub, lab);
     this.narrowCache.set(key, lab);
     return lab;
   }
 }
+
+/** narrow() labels per clearance array (never mutated after it is built; PLANNING_BUDGET.md §6). */
+const narrowLabels = new WeakMap<Float32Array, Map<string, Int32Array>>();
+
+/**
+ * 4-connected components of the cells with r ≤ clearance < 2r + margin, numbered in the order of
+ * their first cell in row-major scan (so the numbering does not depend on the flood order).
+ */
+export function narrowComponents(cl: Float32Array, nx: number, nz: number, r: number, margin: number): Int32Array {
+  const n = nx * nz;
+  const lab = new Int32Array(n).fill(-1);
+  const hi = 2 * r + margin;
+  const stack = narrowStack.length >= n ? narrowStack : (narrowStack = new Int32Array(n));
+  let next = 0;
+  for (let c = 0; c < n; c++) {
+    if (lab[c] !== -1) continue;
+    const v = cl[c];
+    if (!(v >= r && v < hi)) continue;
+    lab[c] = next;
+    let top = 0;
+    stack[top++] = c;
+    while (top) {
+      const k = stack[--top];
+      const i = k % nx;
+      let m: number, w: number;
+      if (i + 1 < nx && lab[(m = k + 1)] === -1 && (w = cl[m]) >= r && w < hi) { lab[m] = next; stack[top++] = m; }
+      if (i > 0 && lab[(m = k - 1)] === -1 && (w = cl[m]) >= r && w < hi) { lab[m] = next; stack[top++] = m; }
+      if (k + nx < n && lab[(m = k + nx)] === -1 && (w = cl[m]) >= r && w < hi) { lab[m] = next; stack[top++] = m; }
+      if (k >= nx && lab[(m = k - nx)] === -1 && (w = cl[m]) >= r && w < hi) { lab[m] = next; stack[top++] = m; }
+    }
+    next++;
+  }
+  return lab;
+}
+let narrowStack = new Int32Array(0);

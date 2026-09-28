@@ -124,16 +124,20 @@ export const walkSchema = z.strictObject({
 const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
 
 /**
- * The world's entities in world order, read once per `walk_to` step (PLANNING_BUDGET.md §6): the people
- * scans (encounter, look-ahead, intrusion, vehicles, stairs) ran `Object.values` 4–6× per walker per tick,
- * and `world.entities` is a V8 dictionary-mode object, where each call sorts and copies (~2 µs for 30).
- * A walker's step never adds, removes or replaces an entity (it moves poses in place, read live through
- * these same objects), so the snapshot is exactly what each scan would read. Outside a step: a fresh read.
+ * What a `walk_to` step reads about everyone else, read once per step (PLANNING_BUDGET.md §6):
+ * - the world's entities in world order: the people scans (encounter, look-ahead, intrusion, vehicles,
+ *   stairs) ran `Object.values` 4–6× per walker per tick, and `world.entities` is a V8 dictionary-mode
+ *   object, where each call sorts and copies (~2 µs for 30);
+ * - the carried-load discs (`services.loadDiscs`, rebuilt from every carried component on each call),
+ *   on first use.
+ * A walker's step never adds, removes or replaces an entity (it moves its own pose, read live through
+ * these same objects), and never moves a load or changes a carry, so each snapshot is exactly what
+ * every read in the step would return. Outside a step: fresh reads.
  */
-let stepEntities: Entity[] | null = null;
+let stepScope: { entities: Entity[]; discs?: LoadDiscView[] } | null = null;
 /** Pure-performance switches (PLANNING_BUDGET.md §6). Each leaves every result bit-identical; tests turn them off to prove it. */
-export const WALK_PERF = { entitySnapshot: true };
-const entitiesOf = (rt: Runtime): Entity[] => stepEntities ?? Object.values(rt.world.entities);
+export const WALK_PERF = { stepSnapshot: true };
+const entitiesOf = (rt: Runtime): Entity[] => stepScope?.entities ?? Object.values(rt.world.entities);
 /** Where the current route leads: the goal, or the step-aside spot while walking to it. */
 const targetOf = (ex: Exec) => (ex.detour?.stage === 'going' ? { level: ex.detour.level, p: ex.detour.spot } : ex.goal);
 /** Live walk_to execs by action id (so `makeWay` can ask a blocked walker to step aside). */
@@ -182,13 +186,13 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
   step(rt, ex, dt) {
     const h = rt.world.entities[ex.actor];
     const x0 = h.pose.p[0], z0 = h.pose.p[2];
-    const outer = stepEntities;
-    stepEntities = WALK_PERF.entitySnapshot ? Object.values(rt.world.entities) : null;
+    const outer = stepScope;
+    stepScope = WALK_PERF.stepSnapshot ? { entities: Object.values(rt.world.entities) } : null;
     let r: StepResult;
     try {
       r = stepWalk(rt, ex, dt);
     } finally {
-      stepEntities = outer;
+      stepScope = outer;
     }
     if (r.status === 'completed' || r.status === 'failed') {
       walkExecs(rt).delete(ex.id);
@@ -739,7 +743,8 @@ function intrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): st
 /** Carried-load discs published by the carry action (`rt.services.loadDiscs`, see carry/actions.ts activeLoadDiscs). */
 type LoadDiscView = { p: Vec2; r: number; entity: string; crew: string[]; level: number };
 function loadDiscsFor(rt: Runtime, me: Entity): LoadDiscView[] {
-  const all = (rt.services.loadDiscs?.() ?? []) as LoadDiscView[];
+  const read = () => (rt.services.loadDiscs?.() ?? []) as LoadDiscView[];
+  const all = stepScope ? (stepScope.discs ??= read()) : read();
   return all.filter((d) => !d.crew.includes(me.id) && d.level === me.human!.level);
 }
 
