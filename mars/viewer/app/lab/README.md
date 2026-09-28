@@ -123,14 +123,14 @@ Findings in the engine data (not fixed here; the scene files belong to `deploy/h
 - Walk-clip ground speed at 1.75 m: woman 0.955 m/s, casual 1.19 m/s. Walk timeScale = ground speed / clip speed (minimum 0.35).
 
 ## Known limitations (honest)
-- **Social poses**: only Idle/Walk clips exist, so sit / warm / talk / watch are the standing Idle pose. Seated people stand at the seat point inside the chair / bench mesh (the engine has no approach point or sit transition, and seats are not obstacles, so a sitter walks onto the chair).
+- **Social poses**: only Idle/Walk clips exist. `sit` is a procedural pose (lowered body, leg IK, hands on thighs); the sit-down is a 0.4 s blend (a crouch into the seat), not a clip. `warm` only adds hands held out; `talk` / `watch` / `listen` are the plain Idle pose (no gestures, no head look-at). Seated torsos are upright and do not touch the chair back; there is no body-vs-chair collision, so thighs can clip an armrest.
 - **Stairs**: the flat-ground Walk clip plays along the stair line. Feet sink or hover by up to half a riser (≈ 0.09 m) between treads. No foot IK.
 - **Stair ends (engine)**: there is a 0.40–0.47 m horizontal teleport at both ends of every traversal (see report).
 - **Turning in place** plays Idle (activity is `idle` during `turn`).
 - **Route overlay** reads Runtime's private `live` map (`sim.ts liveRoutes`). An engine inspect API should replace it.
 - **Construction** mutates the world between ticks (as `walk.test.ts` does), not through an install action.
-- **Build-bay people**: only Idle/Walk clips are used (Wave is unused); carry/hold/lift are Idle or Walk plus arm IK, so
-  bodies do not lean, crouch or lift. The IK picks the nearest point of the gripped part per arm, not the engine's grip slot.
+- **Build-bay people**: only Idle/Walk clips are used (Wave is unused); carry/hold/lift are Idle or Walk plus arm IK, a
+  slight forward lean and a shoulder shrug toward the part; bodies do not crouch or lift, and legs are never adjusted. The IK picks the nearest point of the gripped part per arm, not the engine's grip slot.
 - **Raise (engine model)**: the raise crew stands at its final hold stations beside the frame's base for the whole raise;
   nobody is at the rising end, so mid-raise their hands are (honestly) out of reach and the frame visibly rotates up on its own.
 - Lifts are interpolated (PROGRESSIVE.md), so a joist/sheet may pass through a beam while being lifted.
