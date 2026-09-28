@@ -8,7 +8,7 @@ import { Runtime } from '../runtime/runtime.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
-import { forgetMotion } from '../runtime/invariants.ts';
+import { forgetMotion, DEFAULT_INVARIANTS, MAX_HUMAN_STEP_PER_TICK, MAX_STEP_PER_TICK, SPEED_CAPS } from '../runtime/invariants.ts';
 import { planWalk, traffic, walkTo } from '../locomotion/walk.ts';
 import { holdStations } from '../construction/rules.ts';
 import { entityFrame, formationFor, worldDiscs } from '../carry/formation.ts';
@@ -71,6 +71,42 @@ test('C1: a mid-carry replan never flips the formation (no carrier teleports); t
   rt2.step();
   assert.deepEqual(codes(rt2), ['motion.teleport']);
   assert.match(rt2.violations[0].message, /p1 moved 3\.00 m in one tick/);
+});
+
+test('no jumps (W21): a person on foot moves ≤ 0.15 m per tick (riders and carried loads keep 0.6 m); a published speed above its activity cap + 5 % is motion.overspeed', () => {
+  assert.equal(MAX_HUMAN_STEP_PER_TICK, 0.15);
+  assert.equal(MAX_STEP_PER_TICK, 0.6);
+  const base = open(10);
+  const rt = new Runtime(addAll(emptyWorld('open', base), human('p1', 0, 0), human('p2', 0, 3), human('r1', 0, -3)), new Map(), { spatial: new Spatial(base) }, DEFAULT_INVARIANTS);
+  rt.world.entities.r1.human!.riding = 'euc-1'; // a rider moves with its vehicle (its own bound)
+  rt.step();
+  const E = rt.world.entities;
+  // 0.2 m in one tick on foot (the smallest W20 spike was 0.2 m): a teleport; 0.14 m is not
+  E.p1.pose.p = [0.2, 0, 0];
+  E.p2.pose.p = [0.14, 0, 3];
+  E.r1.pose.p = [0.5, 0, -3];
+  rt.step();
+  assert.deepEqual(rt.violations.map((v) => `${v.code}:${(v.subjects ?? []).join()}`), ['motion.teleport:p1']);
+  assert.match(rt.violations[0].message, /p1 moved 0\.20 m in one tick \(max 0\.15 m, activity idle\)/);
+  E.r1.pose.p = [1.2, 0, -3]; // 0.7 m: past a vehicle's bound too
+  rt.step();
+  assert.deepEqual(rt.violations.slice(1).map((v) => `${v.code}:${(v.subjects ?? []).join()}`), ['motion.teleport:r1']);
+  // published speed per activity: walk ≤ 1.4 m/s (+ 5 %), climbing ≤ 0.45, idle / wait under WALK_MIN; no cap → violation
+  const over = (activity: string, speed: number) => {
+    const r = new Runtime(addAll(emptyWorld('open', base), human('p', 0, 0)), new Map(), { spatial: new Spatial(base) }, DEFAULT_INVARIANTS);
+    Object.assign(r.world.entities.p.human!, { activity, speed });
+    r.step();
+    return r.violations.map((v) => v.code);
+  };
+  assert.deepEqual(over('walk', 1.35), []);
+  assert.deepEqual(over('walk', 1.47), []);
+  assert.deepEqual(over('walk', 1.5), ['motion.overspeed']);
+  assert.deepEqual(over('climb-up', 0.45), []);
+  assert.deepEqual(over('climb-down', 0.6), ['motion.overspeed']);
+  assert.deepEqual(over('idle', 0.08), []);
+  assert.deepEqual(over('wait', 0.3), ['motion.overspeed']);
+  assert.deepEqual(over('sit', 0.1), ['motion.overspeed'], 'a published speed in an activity with no cap fails loudly');
+  assert.deepEqual(Object.keys(SPEED_CAPS).sort(), ['climb-down', 'climb-up', 'climb-wait', 'idle', 'wait', 'walk']);
 });
 
 const REST_Y12 = def('upright-12ft').size[2] / 2;

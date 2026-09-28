@@ -7,6 +7,7 @@ import type { Invariant, Runtime } from './runtime.ts';
 import { def, HUMAN_RADIUS } from '../world/catalog.ts';
 import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { WorldState } from '../world/types.ts';
+import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP } from '../locomotion/walk.ts';
 
 const TOL = 0.03;
 /**
@@ -58,7 +59,14 @@ export const noUnsupported: Invariant = (rt: Runtime) =>
     .filter((e) => e.kind === 'component' && e.support?.kind === 'none')
     .map((e) => ({ code: 'support.unsupported', message: `${e.id} (${e.def}) has no support`, subjects: [e.id], at: e.pose.p }));
 
-export const MAX_STEP_PER_TICK = 0.6; // m: far above any walking / carrying / climbing speed × DT
+export const MAX_STEP_PER_TICK = 0.6; // m: carried components (farthest point, rotation included) and vehicle riders
+/**
+ * m per tick for a person on foot (3 m/s): twice the fastest walk (WALK_SPEED_CAP 1.4 m/s = 0.07 m/tick),
+ * above every carry / climb / sit / stance transition measured (≤ 0.121 m/tick, a frame climb), far below
+ * the 0.2–0.55 m jumps walk_to used to make (MOVEMENT.md "No jumps"). A rider (`human.riding`) moves with
+ * its vehicle and keeps MAX_STEP_PER_TICK (vehicles: engine/vehicles, EUC ≤ 5 m/s = 0.25 m/tick).
+ */
+export const MAX_HUMAN_STEP_PER_TICK = 0.15;
 
 /** Poses at the end of the previous tick, per runtime (only compared across consecutive ticks of the same world object). */
 const lastPoses = new WeakMap<Runtime, { tick: number; world: WorldState; poses: Map<string, { p: Vec3; yaw: number; ext: number }> }>();
@@ -83,15 +91,53 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
     if (!q) continue;
     const lin = hypot(cur.p[0] - q.p[0], cur.p[1] - q.p[1], cur.p[2] - q.p[2]);
     const d = lin + Math.abs(angleDelta(q.yaw, cur.yaw)) * ext;
-    if (d > MAX_STEP_PER_TICK)
+    const max = human && !e.human!.riding ? MAX_HUMAN_STEP_PER_TICK : MAX_STEP_PER_TICK;
+    if (d > max)
       out.push({
         code: 'motion.teleport',
-        message: `${e.id} moved ${d.toFixed(2)} m in one tick (max ${MAX_STEP_PER_TICK} m) from (${q.p[0].toFixed(2)}, ${q.p[2].toFixed(2)}) to (${cur.p[0].toFixed(2)}, ${cur.p[2].toFixed(2)})`,
+        message: `${e.id} moved ${d.toFixed(2)} m in one tick (max ${max} m${human ? `, activity ${e.human!.activity}` : ''}) from (${q.p[0].toFixed(2)}, ${q.p[2].toFixed(2)}) to (${cur.p[0].toFixed(2)}, ${cur.p[2].toFixed(2)})`,
         subjects: [e.id],
         at: cur.p,
       });
   }
   lastPoses.set(rt, { tick: rt.tick, world: rt.world, poses });
+  return out;
+};
+
+/**
+ * Published ground speed (`human.speed`, m/s over the last tick; walk_to publishes it every tick it owns
+ * the person) per activity: a person shown walking is at most WALK_SPEED_CAP, one on a flight at most
+ * CLIMB_SPEED, one waiting / idle / standing on a flight under WALK_MIN (below it the body is not shown
+ * walking). An activity with a published speed and no cap here is a violation too (fail loudly).
+ */
+export const SPEED_CAPS: Readonly<Record<string, number>> = {
+  walk: WALK_SPEED_CAP,
+  'climb-up': CLIMB_SPEED,
+  'climb-down': CLIMB_SPEED,
+  'climb-wait': WALK_MIN,
+  idle: WALK_MIN,
+  wait: WALK_MIN,
+};
+const OVERSPEED_TOL = 1.05;
+
+/** No person's published speed exceeds its activity's cap + 5 % (MOVEMENT.md "No jumps"). */
+export const speedWithinCap: Invariant = (rt: Runtime) => {
+  const out: Diagnostic[] = [];
+  for (const e of Object.values(rt.world.entities)) {
+    const sp = e.human?.speed;
+    if (sp === undefined) continue;
+    const cap = SPEED_CAPS[e.human!.activity];
+    if (cap !== undefined && sp <= cap * OVERSPEED_TOL) continue;
+    out.push({
+      code: 'motion.overspeed',
+      message:
+        cap === undefined
+          ? `${e.id} publishes a ground speed of ${sp} m/s in activity ${e.human!.activity}, which has no speed cap`
+          : `${e.id} moved at ${sp} m/s over the last tick in activity ${e.human!.activity} (cap ${cap} m/s + 5 %)`,
+      subjects: [e.id],
+      at: e.pose.p,
+    });
+  }
   return out;
 };
 
@@ -139,4 +185,4 @@ export function forgetMotion(rt: Runtime) {
   lastPoses.delete(rt);
 }
 
-export const DEFAULT_INVARIANTS = [humanStaticClearance, humanHumanSeparation, noUnsupported, maxStepPerTick, holdersPresent];
+export const DEFAULT_INVARIANTS = [humanStaticClearance, humanHumanSeparation, noUnsupported, maxStepPerTick, speedWithinCap, holdersPresent];

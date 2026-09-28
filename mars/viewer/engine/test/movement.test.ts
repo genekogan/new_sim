@@ -7,11 +7,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
-import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
+import { DEFAULT_INVARIANTS, SPEED_CAPS } from '../runtime/invariants.ts';
 import { Spatial, entityCorners } from '../spatial/service.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
-import { walkTo, WALK_MIN, TURN_IN_PLACE, DECIDE_TICKS, encounterOf } from '../locomotion/walk.ts';
+import { walkTo, WALK_MIN, TURN_IN_PLACE, DECIDE_TICKS, encounterOf, WALK_SPEED_CAP } from '../locomotion/walk.ts';
 import { smoothPolyline, denseClearance, filletCap, LAT_ACCEL, SHARP_CAP, type SmoothPath } from '../locomotion/spline.ts';
 import { buildGrids, type LevelGrid } from '../spatial/grid.ts';
 import { findRoute, PLAN_MARGIN, type WalkLeg } from '../spatial/path.ts';
@@ -603,4 +603,51 @@ test('encounters follow the smoothed path: a walker coming back along it just pa
     rt.world.entities.c = human('c', pc[0], pc[1], { yaw: 0 });
     assert.equal(encounterOf(rt, A.id).kind, 'none', 'no encounter with someone the path does not pass');
   }
+});
+
+// W21 (2026-09-28): walkers never jump. At 9ee061a walk_to moved bodies up to 0.55 m in one tick (published
+// speeds of 4–11 m/s) under the old 0.6 m motion.teleport bound. Three classes (MOVEMENT.md "No jumps"):
+// A. release after a hold — while the hard separation layer cancelled a step, the lateral offset kept moving
+//    towards its sidestep target, and the body jumped to it on release (stress-30 w09 @1132: 0.55 m);
+// B. offset collapse — an offset spot without clearance halved the offset in one step (w07 @97: 0.29 m);
+// C. offset swept round a bend / sidestep on top of full speed — 1.5–3 m/s over 221 person-ticks of stress-30.
+// Now every tick's forward progress, sidestep and pull-back share one budget of min(speed, WALK_SPEED_CAP)·DT.
+test('no jumps: a walker moves at most min(speed, 1.4 m/s)·DT per tick and publishes an honest speed — stress-30 (60 s), campfire evening (75 s)', () => {
+  const watch = (rt: Runtime) => {
+    const out = { worst: 0, at: '', ticks: 0, over: [] as string[] };
+    let prev = new Map<string, [number, number]>();
+    rt.invariants.push((r) => {
+      const cur = new Map<string, [number, number]>();
+      for (const e of Object.values(r.world.entities)) {
+        if (e.kind !== 'human' || e.human?.speed === undefined) continue; // walk_to owns this person this tick
+        cur.set(e.id, [e.pose.p[0], e.pose.p[2]]);
+        const q = prev.get(e.id);
+        const d = q ? dist2(q, [e.pose.p[0], e.pose.p[2]]) : 0;
+        if (d > out.worst) { out.worst = d; out.at = `${e.id}@${r.tick}`; }
+        if (e.human.speed > SPEED_CAPS[e.human.activity] * 1.05) out.over.push(`${e.id}@${r.tick} ${e.human.activity} ${e.human.speed}`);
+        out.ticks++;
+      }
+      prev = cur;
+      return [];
+    });
+    return out;
+  };
+  const s = stress(30);
+  const srt = buildRuntime(s);
+  s.start(srt);
+  const sw = watch(srt);
+  for (let i = 0; i < 20 * 60; i++) { srt.step(); s.tick!(srt); }
+  const f = campfireEvening;
+  const frt = buildRuntime(f);
+  f.start(frt);
+  const fw = watch(frt);
+  while (!f.done!(frt)) { frt.step(); f.tick!(frt); }
+  console.log(`max one-tick walker distance: stress-30 ${sw.worst.toFixed(4)} m (${sw.at}) over ${sw.ticks} person-ticks, campfire ${fw.worst.toFixed(4)} m (${fw.at}) over ${fw.ticks}`);
+  const cap = WALK_SPEED_CAP * 0.05 + 1e-9;
+  assert.ok(sw.worst <= cap, `stress-30: ${sw.worst} m at ${sw.at}`);
+  assert.ok(fw.worst <= cap, `campfire: ${fw.worst} m at ${fw.at}`);
+  assert.ok(sw.ticks > 20000 && fw.ticks > 2000, 'people really walked');
+  assert.deepEqual([...sw.over, ...fw.over], []);
+  assert.deepEqual(srt.violations, []);
+  assert.deepEqual(frt.violations, []);
 });

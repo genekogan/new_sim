@@ -25,8 +25,9 @@ import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry,
 import { hypot } from '../core/math.ts';
 
 const RULES = 'mars-rules/flagship-campus-test';
-/** campus-flagship (staging-east crop) final state; also pinned in grid-incremental.test.ts. */
-const CROPPED_HASH = 'fee92ee0a94fc91505be23eb5ccaf19f02f15293ce8630a1b357b482c0240c56';
+/** campus-flagship (staging-east crop) final state; also pinned in grid-incremental.test.ts. Re-pinned (was fee92ee0…0c56 @11316):
+ *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; now 11459 ticks (PLANNING_BUDGET.md). */
+const CROPPED_HASH = 'c56ea8da9b0382a785680e2d70850632ae577cc88901817ef63f332e23247157';
 
 function setup() {
   const file = readCampus2026File();

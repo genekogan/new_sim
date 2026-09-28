@@ -22,13 +22,14 @@ import { cropScene } from '../engine/campus/load.ts';
 import { CAMPUS_ID, loadCampus2026 } from '../engine/campus/world.ts';
 import { mealRuntime, runMeal } from '../engine/scenarios/meal.ts';
 
-/** The pins asserted by the engine tests (planning / grid-incremental / campus-full / meal / build-bay-v3); re-pinned: walker fallback + hypot + encounters on the smoothed path, 2026-09-28. */
+/** The pins asserted by the engine tests (planning / grid-incremental / campus-full / meal / build-bay-v3); re-pinned: walker fallback + hypot + encounters on the smoothed path, 2026-09-28;
+ *  re-pinned: no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 (PLANNING_BUDGET.md). */
 export const PINS = {
-  stress: '1298e2e57b62adf5fca2b579c5babbfdb743a395134afc432d4797a0c5b5ee6b',
-  probe: '0147f8f12a997462f5e6adfe71ffef1a8bc7e850d84082289328111618fd30d5',
-  campus: 'fee92ee0a94fc91505be23eb5ccaf19f02f15293ce8630a1b357b482c0240c56',
-  meal: '035e8c3949b7404726c93f326430dc59e6728eee5b3596483fd2add39b8baba5',
-  v3: '66800edc569a37aa15a879c7525806b72a4c3d61557167e392ef87ccaa2af8d5',
+  stress: '5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e',
+  probe: 'b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3',
+  campus: 'c56ea8da9b0382a785680e2d70850632ae577cc88901817ef63f332e23247157',
+  meal: '3c28879fa21e485e910eef10f0266ced8562534d3c83623232b00a94e26090eb',
+  v3: 'a2f782ad96a039c0d7f064f90359f8b52ea62ba8452f3b5fac84a1ccfd036e38',
 };
 
 // ---- measurement harness (bench only) ----

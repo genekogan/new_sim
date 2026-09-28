@@ -73,11 +73,13 @@ function runAndCompare(bays?: number) {
 }
 
 /** Pinned: final-state hash and length of the first-bay tranche (6 frames + 18 beams) of the east-house skeleton.
- *  Re-pinned (was 41019 ticks, ad844b78…8121): walker fallback + hypot + encounters on the smoothed path, 2026-09-28 (PLANNING_BUDGET.md); 0 violations, 24/24 at the canonical pose. */
-const PIN_BAY1 = { ticks: 41182, hash: '695d2dcb001bb3cce944158075a8bb2e689b94525ee38b523fd1283a32080a81' };
+ *  Re-pinned (was 41019 ticks, ad844b78…8121): walker fallback + hypot + encounters on the smoothed path, 2026-09-28 (PLANNING_BUDGET.md); re-pinned (was 41182 ticks, 695d2dcb…0a81):
+ *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 (PLANNING_BUDGET.md); 0 violations, 24/24 at the canonical pose. */
+const PIN_BAY1 = { ticks: 41317, hash: '251a44c5422990d351698865a9ab4fa53db784cf85004d71275a79eea314c96f' };
 /** Pinned: the whole east-house skeleton (YEAR_BUILD_FULL=1; ≈ 40–55 s wall). Re-pinned (was 116477 ticks, 14d5c768…c89a):
- *  walker fallback + hypot + encounters on the smoothed path, 2026-09-28; 0 violations, 66/66 at the canonical pose. */
-const PIN_FULL = { ticks: 117125, hash: '35d128861c5341222b9cf9f6f1953a83a5eec91bc1720c5dec662bb5b86e11da' };
+ *  walker fallback + hypot + encounters on the smoothed path, 2026-09-28; re-pinned (was 117125 ticks, 35d12886…11da):
+ *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; 0 violations, 66/66 at the canonical pose. */
+const PIN_FULL = { ticks: 117277, hash: 'd382e4614e8ae157ad971ab7a4cb2b922c4737197006b39b4a209dc0db040617' };
 
 test('year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned', () => {
   const { s, reh, cmp, E } = runAndCompare(1);

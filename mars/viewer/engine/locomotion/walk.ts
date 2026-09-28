@@ -24,7 +24,14 @@ import { HUMAN_PROFILE, type AgentProfile } from '../spatial/types.ts';
 
 const ACCEL = 1.2; // m/s²
 const BRAKE = 2 * ACCEL; // m/s² ordinary deceleration
-const CLIMB_SPEED = 0.45; // m/s along the stair path
+/** m/s along the stair path (the horizontal ground speed on a flight is at most this). */
+export const CLIMB_SPEED = 0.45;
+/**
+ * The fastest a person walks (m/s): `walk_to`'s `speed` may not exceed it, and no walker's body moves more
+ * than min(its speed, this) × DT in one tick (MOVEMENT.md "No jumps"): lateral sidesteps, offsets swept
+ * round a bend and pulling back into line all come out of that one per-tick budget, never on top of it.
+ */
+export const WALK_SPEED_CAP = 1.4;
 /** Heading error (rad) at and above which the walker cannot walk off: it turns in place (120°). */
 export const TURN_IN_PLACE = 2.1;
 const HEAD_FULL = 0.35; // rad heading error up to which full speed is allowed; linear down to 0 at TURN_IN_PLACE
@@ -65,7 +72,6 @@ const YIELD_OFFSET = 0.9; // m lateral offset while waiting for oncoming traffic
 const LOOK = 2.5; // m look-ahead for conflicts
 const ENC_STEP = 0.1; // m between samples of the path ahead that encounters are measured against
 const ENC_TIME = 1.0; // s: another walker's heading is the chord of its own smoothed path over this much of its walking
-const MAX_CORRECTION = 0.55; // m per tick (below MAX_STEP_PER_TICK): larger corrections are spread over several ticks
 
 export type WalkParams = { actor: string; x: number; z: number; level?: number; face?: number; speed?: number };
 
@@ -136,7 +142,7 @@ export const walkSchema = z.strictObject({
   z: z.number().min(-500).max(500),
   level: z.number().int().min(0).max(20).optional(),
   face: z.number().min(-7).max(7).optional(),
-  speed: z.number().min(0.3).max(3).optional(),
+  speed: z.number().min(0.3).max(WALK_SPEED_CAP).optional(),
 });
 
 const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
@@ -542,6 +548,8 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     }
     targetOffset = ex.sideTarget ?? ex.side * STATIC_OFFSET;
   }
+  // the lateral offset the body is at now (the body stands at the corridor point of ex.s shifted by it)
+  const bodyOff = ex.offset;
   ex.offset += clamp(targetOffset - ex.offset, -0.9 * dt, 0.9 * dt);
   // speed planning: curvature / sharp-corner caps of the smoothed path ahead (spline.ts), arrival
   let vmax = Math.min(ex.speed, capAhead(ex));
@@ -586,7 +594,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   if (hz) vmax = Math.min(vmax, Math.sqrt(2 * ACCEL * Math.max(0, hz.d - STOP_GAP)));
   // stopped by it already: hold, do not creep up to it, until the decision (or until it moves off)
   if (hz && ex.block?.at[hz.id]) vmax = 0;
-  const prevS = ex.s, prevOffset = ex.offset;
+  const prevS = ex.s;
   ex.v += clamp(vmax - ex.v, -BRAKE * dt, ACCEL * dt);
   if (ex.v < 0) ex.v = 0;
   let adv = ex.v * dt;
@@ -606,43 +614,101 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   if (!arrived) a.pose.yaw = turnToward(a.pose.yaw, faceAt(ex, ex.s), ex.profile.turnRate * dt);
   // position = corridor point + bounded lateral offset (never outside clearance)
   const cur: Vec2 = [a.pose.p[0], a.pose.p[2]];
-  const place = (offset: number): { p: Vec2; off: number; lagging: boolean } => {
-    const base = pointAt(ex, ex.s);
-    const fq = pointAt(ex, Math.min(ex.total, ex.s + FACE_LOOK));
-    const ahead: Vec2 = dist2(base, fq) > 1e-6 ? norm2(sub2(fq, base)) : tangentAt(ex, ex.s);
+  const place = (s: number, offset: number): { p: Vec2; off: number } => {
+    const base = pointAt(ex, s);
+    const fq = pointAt(ex, Math.min(ex.total, s + FACE_LOOK));
+    const ahead: Vec2 = dist2(base, fq) > 1e-6 ? norm2(sub2(fq, base)) : tangentAt(ex, s);
     const normal: Vec2 = rot2(ahead, -Math.PI / 2);
-    let off = offset;
-    let q = add2(base, scale2(normal, -off));
-    for (let k = 0; k < 6 && (clearanceAt(g, q) < r || segmentClearance(g, base, q) < r); k++) {
-      off *= 0.5;
-      q = add2(base, scale2(normal, -off));
+    const at = (off: number) => add2(base, scale2(normal, -off));
+    const clear = (q: Vec2) => clearanceAt(g, q) >= r && segmentClearance(g, base, q) >= r;
+    let q = at(offset);
+    if (offset === 0 || clear(q)) return { p: q, off: offset };
+    if (clearanceAt(g, base) < r) return { p: base, off: 0 };
+    // no room at the full offset here: the largest fraction of it that has room (bisection), so the
+    // offset narrows continuously with the corridor's clearance instead of halving in one step
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 8; k++) {
+      const mid = (lo + hi) / 2;
+      if (clear(at(offset * mid))) lo = mid;
+      else hi = mid;
     }
-    if (clearanceAt(g, q) < r) { q = base; off = 0; }
-    // motion limit: a large correction (falling back onto the corridor when construction removed the
-    // clearance at the offset spot) is spread over several ticks, never jumped (invariant motion.teleport)
-    const jump = dist2(cur, q);
-    const lagging = jump > MAX_CORRECTION + 1e-9;
-    if (lagging) q = add2(cur, scale2(sub2(q, cur), MAX_CORRECTION / jump));
-    return { p: q, off, lagging };
+    q = at(offset * lo);
+    return { p: q, off: offset * lo };
   };
-  let pl = place(ex.offset);
+  // No jumps (MOVEMENT.md): the body moves at most min(speed, WALK_SPEED_CAP) × dt this tick, forward
+  // progress, sidestep and any pull back into line together. Over budget, the walker takes the largest
+  // fraction t of this tick's corridor progress and offset change that fits (it slows down: an offset
+  // swept round the outside of a bend, a sidestep while walking at full speed). If that leaves it
+  // (nearly) stuck because the offset must narrow ahead (a gap the sidestep does not fit through), it
+  // first steps back towards the corridor where it is; a body away from its corridor point (a walk
+  // started off its route) walks straight back to it.
+  const stepMax = Math.min(ex.speed, WALK_SPEED_CAP) * dt;
+  const sNew = ex.s, offNew = ex.offset;
+  const at = (t: number) => place(prevS + (sNew - prevS) * t, bodyOff + (offNew - bodyOff) * t);
+  let pl = at(1);
+  let frac = 1;
+  let lagging = false;
+  if (dist2(cur, pl.p) > stepMax + 1e-9) {
+    const p0 = at(0);
+    const j0 = dist2(cur, p0.p);
+    if (j0 > stepMax + 1e-9) {
+      // off the corridor point: walk back to it, holding the corridor progress
+      pl = { p: add2(cur, scale2(sub2(p0.p, cur), stepMax / j0)), off: bodyOff };
+      frac = 0;
+      lagging = true;
+    } else {
+      let lo = 0, hi = 1, best = p0;
+      for (let k = 0; k < 10; k++) {
+        const mid = (lo + hi) / 2;
+        const q = at(mid);
+        if (dist2(cur, q.p) <= stepMax) { lo = mid; best = q; }
+        else hi = mid;
+      }
+      frac = lo;
+      pl = best;
+      const want = at(1).off;
+      const narrows = lo < 0.5 && Math.abs(want) < Math.abs(bodyOff) - 1e-6;
+      if ((narrows || lo === 0) && bodyOff !== 0) {
+        // the offset must narrow ahead (or nothing fits at all): pull it in here first, straight towards
+        // this spot's corridor point (the segment the body was placed on, so inside its clearance), then
+        // walk on. Stuck with no progress at all, it pulls in towards the corridor itself.
+        const to = narrows ? want : 0;
+        const nOff = bodyOff + clamp(to - bodyOff, -stepMax, stepMax);
+        const base = place(prevS, 0).p;
+        pl = { p: add2(base, scale2(sub2(cur, base), nOff / bodyOff)), off: nOff };
+        frac = 0;
+      } else if (lo === 0) {
+        // on the corridor line and still no fraction fits (the corridor point itself jumps): take this
+        // tick's progress and walk to its point over the next ticks (held there, as off the corridor above)
+        const p1 = at(1);
+        pl = { p: add2(cur, scale2(sub2(p1.p, cur), stepMax / dist2(cur, p1.p))), off: p1.off };
+        frac = 1;
+        lagging = true;
+      }
+      lagging ||= frac < 1;
+    }
+    ex.s = prevS + (sNew - prevS) * frac;
+    ex.v = Math.min(ex.v, (ex.s - prevS) / dt);
+  }
   // hard separation guarantee (collision-enforcement layer, independent of the avoidance heuristics):
   // never take a step that brings this body inside another person's space or a carried load. The
   // look-ahead above normally stops the walker first. If only the sidestep would intrude, the step
   // is taken without it (the offset holds); a step cancelled outright is counted (`pushes`).
   let into = intrusion(rt, a, cur, pl.p, r) ?? loadIntrusion(rt, a, cur, pl.p, r);
-  if (into && ex.offset !== prevOffset) {
-    const keep = place(prevOffset);
-    if (!(intrusion(rt, a, cur, keep.p, r) ?? loadIntrusion(rt, a, cur, keep.p, r))) { pl = keep; into = null; }
+  if (into && pl.off !== bodyOff && !lagging) {
+    const keep = place(ex.s, bodyOff);
+    if (dist2(cur, keep.p) <= stepMax + 1e-9 && !(intrusion(rt, a, cur, keep.p, r) ?? loadIntrusion(rt, a, cur, keep.p, r))) { pl = keep; into = null; }
   }
   let p = pl.p;
-  const lagging = pl.lagging;
   ex.offset = pl.off;
   if (into) {
+    // the body stays where it is: so do its corridor progress and its offset (an offset that kept
+    // moving towards a sidestep target while the body was held would be jumped to on release)
     ex.s = prevS;
-    ex.offset = prevOffset;
+    ex.offset = bodyOff;
     ex.v = 0;
     p = cur;
+    lagging = false;
     if (rt.world.entities[into]?.kind === 'human') personBlock ??= into;
     else loadBlock ??= into;
     ex.pushes++;
@@ -1185,6 +1251,17 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
   if (!link.usable) return { status: 'failed', diagnostic: { code: 'route.link-unusable', message: `${link.kind} ${link.id} became unusable: ${link.reason ?? ''}`, subjects: [ex.actor, link.id] } };
   const face = leg.ascending ? link.heading : wrapAngle(link.heading + Math.PI);
   if (ex.phase === 'align') {
+    // a walk leg ends within 5 cm of the flight's standing entry point (its settle tolerance): step onto
+    // it at walking pace first, so the climb starts from where the body is (no jump onto the first step)
+    const en = leg.ascending ? link.from : link.to;
+    const gap = dist2([a.pose.p[0], a.pose.p[2]], en.p);
+    if (gap > 1e-3) {
+      const k = Math.min(1, (Math.min(ex.speed, WALK_SPEED_CAP) * dt) / gap);
+      a.pose.p = [a.pose.p[0] + (en.p[0] - a.pose.p[0]) * k, a.pose.p[1], a.pose.p[2] + (en.p[1] - a.pose.p[2]) * k];
+      a.pose.yaw = wrapAngle(a.pose.yaw + clamp(angleDelta(a.pose.yaw, face), -ex.profile.turnRate * dt, ex.profile.turnRate * dt));
+      a.human!.activity = (gap * k) / dt >= WALK_MIN ? 'walk' : 'idle';
+      return { status: 'running', phase: 'align' };
+    }
     const e = angleDelta(a.pose.yaw, face);
     if (Math.abs(e) > 0.05) {
       a.pose.yaw = wrapAngle(a.pose.yaw + clamp(e, -ex.profile.turnRate * dt, ex.profile.turnRate * dt));

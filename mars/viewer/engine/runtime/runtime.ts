@@ -263,7 +263,7 @@ export class Runtime {
   /**
    * A failed or cancelled action leaves no state behind (review H1): its live children are
    * cancelled, entities it reserved but never picked up return to their prior phase, its actors'
-   * task is cleared, and their single-file traffic entries (walk.ts `services.traffic`) released.
+   * task and published speed are cleared, and their single-file traffic entries (walk.ts `services.traffic`) released.
    */
   private cleanup(l: Live) {
     const id = l.rec.id;
@@ -281,6 +281,7 @@ export class Runtime {
       if (!e.human || e.human.task !== id) continue;
       e.human.task = undefined;
       if (!e.human.grip) e.human.activity = 'idle';
+      delete e.human.speed; // walk_to's published ground speed ends with the task (MOVEMENT.md §3)
       if (traffic)
         for (const [k, t] of [...traffic]) {
           t.actors.delete(e.id);

@@ -175,6 +175,10 @@ export const climbStance: ActionDef<CP, null, CE> = {
       const pr = stanceProblem(rt, ex.s, ex.p.actor);
       if (pr) return { status: 'blocked', diagnostic: pr };
       ex.path = climbPath(w.entities[ex.p.upright], ex.s);
+      // the walk ends on the nearest standable spot, which may lie up to 0.35 m off the foot beside the
+      // column (walk_to's goal snap): the climb steps in from where the body is, never jumps (motion.teleport)
+      const b = a.pose.p;
+      if (Math.abs(b[0] - ex.path[0][0]) + Math.abs(b[2] - ex.path[0][2]) > 1e-3) ex.path = [[b[0], b[1], b[2]], ...ex.path];
       ex.len = pathLen(ex.path);
       ex.phase = 'climb';
       ex.t = 0;

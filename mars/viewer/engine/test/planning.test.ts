@@ -181,7 +181,8 @@ test('stress-30: exact planner keeps the pinned result; per-tick cost bounded; z
   // Re-pinned again (was e55d3ee1…8e989) by grid lattice anchoring, 2026-09-28: cell centres moved by ulps, which
   // shifts arrival ticks and so the shared goal-RNG draws of this soak; 0 violations before and after (PLANNING_BUDGET.md).
   // Re-pinned again (was 0ec4d884…ecf58): splined turns + immediate block reaction, 2026-09-28 (walk.ts; MOVEMENT.md).
-  assert.equal(exact.rt.stateHash(), '1298e2e57b62adf5fca2b579c5babbfdb743a395134afc432d4797a0c5b5ee6b', 'stress-30 final state unchanged by the planning-budget work');
+  // Re-pinned again (was 1298e2e5…5ee6b): no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 (MOVEMENT.md "No jumps"); 0 violations.
+  assert.equal(exact.rt.stateHash(), '5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e', 'stress-30 final state unchanged by the planning-budget work');
   const corr = stressRun('corridor');
   assert.equal(corr.rt.violations.length, 0);
   console.log(`stress-30 max tick: exact ${exact.max.toFixed(1)} ms (mean ${exact.mean.toFixed(2)}), corridor ${corr.max.toFixed(1)} ms (mean ${corr.mean.toFixed(2)})`);
