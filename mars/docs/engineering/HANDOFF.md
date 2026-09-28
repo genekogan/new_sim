@@ -433,3 +433,36 @@ Landed after the draft above was written; all commits are in the deployed tree `
   without losing committed work. `<usage-tool>` read a flat 11 % all night and did not track
   this session. Git is local only (author genekogan); nothing was pushed — Gene adds the remote.
 
+## Checkpoint addendum (lead, 2026-09-28 evening)
+
+State at the session checkpoint; the takeover prompt is `NEXT_SESSION_PROMPT.md`.
+
+**Landed since the previous addendum** (each with tests; pinned hashes unchanged unless noted; details in the
+per-area docs): seats/benches/campfire as obstacles with approach points and sit-down/stand-up; director demo over
+MCP (`deploy/director-demo.mjs` → DIRECTOR_DEMO.md); `prepare.py` folder allowlist + test; stable historical ids
+with a 7,942-entry migration (HISTORY_IDS.md); single-carrier loads up/down stairs; replay/fork/staleness proven
+through the real room; camera: people + take parts as per-tick occluders, verified against the render
+(planner-vs-render disagreements 40 → 1, CAMERA_VERIFY.md); engine scenes and protected states for 2020–2025 with
+year rooms; EUC/bicycle riders and a forklift as engine agents (VEHICLES.md); region-local grid updates and a
+non-hashing sync key (campus flagship compute 56 s → ~5 s, bit-identical); MCP `engine_edit_world`, `engine_list`,
+`engine_delete_workspace`, one refusal envelope, `engine_execute {pauseAt}` + `engine_resume` (13 engine tools);
+mid-action resumable checkpoints for the walking/social subset; renderer sit/warm/hold poses driven by engine grip
+slots; Lab campfire-evening and year-walkabout scenarios with baselines; flagship v2 (forklift delivery, tread
+carried up the stair, campfire ending: 66 steps, 0 violations, open ground 677 s / campus 724 s simulated).
+
+**Evidence:** `npm run evidence` → 17/17 §28 rows, 8/8 milestones, 11/12 capability rows PROVEN; the PARTIAL row is
+the uncropped campus run (physically identical, hash differs — grid cell centres depend on the grid origin; fix in
+`spatial/grid.ts` first thing next session, it re-pins every hash).
+
+**Reconstruction questions surfaced by the year walkabout (for Gene, not guessed):** the 2022 south-west corner
+passage is closed by the west-house table in the Kit scene (NE/SE/NW are open); trailers `rv-8/9` (2023) and
+`rv-9/10` (2024) intrude into Chiba's footprint under the roof.
+
+**Open (see NEXT_SESSION_PROMPT.md for priority):** grid-origin hash; renderer reach gaps (footers, far arm, no foot
+IK, talk/watch Idle); crews on stairs; vehicle–vehicle collision; social pre-emption is manual
+(`releaseForDirective`); static geometry not editable over MCP; region layout edits don't stale plans; 9 ft frame
+and north axis unverified; `npm run lint` broken locally (missing oxlint-tsgolint) and not in the gate.
+
+**Releases today:** 4 gated production deploys before this checkpoint (see RELEASE_CHECKLIST.md records); the fifth
+(this checkpoint) is recorded in the Deployment status section above if it completed.
+
