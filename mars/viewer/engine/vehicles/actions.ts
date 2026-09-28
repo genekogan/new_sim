@@ -17,6 +17,7 @@ import { FIXTURE } from '../world/factory.ts';
 import { makeWay } from '../locomotion/walk.ts';
 import { turnRadiusAt, vehicleProfile, type VehicleProfile } from './profiles.ts';
 import { blockersNear, planCurve, vehicleGrids, type Curve } from './curve.ts';
+import { boxGap, describe, dropLane, footprintOf, outranks, othersOnLevel, pathConflict, place, publishLane, pullOverSpot, bandGap, vehicleAround, V_ON_PATH, V_STOP_GAP, YIELD_GAP, type Lane, type Other } from './traffic.ts';
 
 /** Max distance (m) from a person to a parked vehicle's centre to mount it. */
 export const MOUNT_REACH = 1.2;
@@ -256,6 +257,12 @@ type RideExec = {
   maxSpeed: number;
   distance: number;
   ticks: number;
+  /** Tick the ride started: right of way between equal vehicles (traffic.ts outranks). */
+  since?: number;
+  /** Pulled over for another vehicle's lane: the targets to resume toward once at the spot. */
+  yielding?: { to: string; targets: Vec2[] };
+  /** Ticks until the next pull-over / resume planning attempt. */
+  retry?: number;
 };
 
 const riderReservations = (w: WorldState, actor: string) => {
@@ -278,8 +285,14 @@ function planRide(rt: Runtime, actor: string, targets: Vec2[], level: number | u
   }
   if (speed !== undefined && speed > pr.maxSpeed) return bad('vehicle.speed-limit', `${speed} m/s exceeds the ${pr.id} limit of ${pr.maxSpeed} m/s`, [actor, v.id]);
   const cruise = Math.min(speed ?? pr.speed, pr.maxSpeed);
-  const r = planCurve(spatial(rt), rt.world, pr, `${actor} on ${v.id}`, lv, xz(v), targets, cruise);
+  // other ridden vehicles (traffic.ts): plan around the stationary ones, refuse a conflict nobody can yield in
+  const others = othersOnLevel(rt, v.id, lv);
+  const r = planCurve(spatial(rt), rt.world, pr, `${actor} on ${v.id}`, lv, xz(v), targets, cruise, others.length ? stillAround(others) : undefined);
   if (!r.ok) return r;
+  if (others.length) {
+    const d = pathConflict(rt, { actor, v, pr, level: lv }, r.curve, cruise);
+    if (d) return { ok: false, diagnostic: d };
+  }
   return { ok: true, program: { curve: r.curve, targets, cruise } };
 }
 
@@ -288,7 +301,7 @@ function startRide(rt: Runtime, actor: string, prog: RideProgram, id: string): R
   a.human!.task = id;
   return {
     id, actor, vehicle: a.human!.riding!, level: a.human!.level, curve: prog.curve, targets: prog.targets, cruise: prog.cruise, idx: 0, v: 0, phase: 'pivot',
-    epoch: spatial(rt).epoch, replan: false, replans: 0, stuck: 0, cancelling: false, maxLat: 0, maxSpeed: 0, distance: 0, ticks: 0,
+    epoch: spatial(rt).epoch, replan: false, replans: 0, stuck: 0, cancelling: false, maxLat: 0, maxSpeed: 0, distance: 0, ticks: 0, since: rt.tick,
   };
 }
 
@@ -329,7 +342,7 @@ function peopleAhead(rt: Runtime, ex: RideExec, rd: Rider, cur: Vec2): PeopleVie
       if (d < r + HR + ON_PATH) { onPath = true; break; }
     }
     if (slow >= 0 && (out.slowS === undefined || S[slow].s < out.slowS)) out.slowS = S[slow].s;
-    if (onPath) {
+    if (onPath && !o.human.riding) {
       const stopS = kStop >= 0 ? S[kStop].s : sN;
       if (out.stopS === undefined || stopS < out.stopS) { out.stopS = stopS; out.blocker = o.id; }
     }
@@ -357,14 +370,14 @@ function askToStepAside(rt: Runtime, ex: RideExec, who: string) {
 /** People to plan around after being stuck: everyone else on the level who is not walking somewhere. */
 function standing(rt: Runtime, rd: Rider): AroundPerson[] {
   return Object.values(rt.world.entities)
-    .filter((o) => o.id !== rd.a.id && o.human && o.human.level === rd.a.human!.level && (!o.human.task || rt.records.get(o.human.task)?.status === 'blocked'))
+    .filter((o) => o.id !== rd.a.id && o.human && !o.human.riding && o.human.level === rd.a.human!.level && (!o.human.task || rt.records.get(o.human.task)?.status === 'blocked'))
     .map((o) => ({ id: o.id, p: xz(o) }));
 }
 
-function replan(rt: Runtime, ex: RideExec, rd: Rider, around?: AroundPerson[]): Diagnostic | null {
+/** Targets not yet reached: those whose closest curve point lies ahead of the rider (at least the last). */
+function remainingTargets(ex: RideExec): Vec2[] {
   const S = ex.curve.samples;
   const sN = S[ex.idx].s;
-  // targets not yet reached: those whose closest curve point lies ahead of the rider
   let from = 0;
   const remaining: Vec2[] = [];
   for (const t of ex.targets) {
@@ -377,7 +390,21 @@ function replan(rt: Runtime, ex: RideExec, rd: Rider, around?: AroundPerson[]): 
     if (S[bj].s > sN + 0.3) remaining.push(t);
   }
   if (!remaining.length) remaining.push(ex.targets[ex.targets.length - 1]);
-  const r = planCurve(spatial(rt), rt.world, rd.pr, `${rd.a.id} on ${rd.v.id}`, ex.level, xz(rd.v), remaining, ex.cruise, around);
+  return remaining;
+}
+
+/**
+ * Other ridden vehicles as obstacles to plan around. A vehicle riding a lane is yielded to (lane
+ * rule), not avoided — unless `stopped` also counts one standing still on its lane right now (the
+ * stuck-replan case).
+ */
+const stillAround = (others: Other[], stopped = false) => vehicleAround(others.filter((o) => !o.lane || (stopped && o.lane.v < 0.05)));
+
+function replan(rt: Runtime, ex: RideExec, rd: Rider, around?: AroundPerson[]): Diagnostic | null {
+  const remaining = remainingTargets(ex);
+  const vs = othersOnLevel(rt, rd.v.id, ex.level);
+  const all = vs.length ? [...(around ?? []), ...stillAround(vs, around !== undefined)] : around;
+  const r = planCurve(spatial(rt), rt.world, rd.pr, `${rd.a.id} on ${rd.v.id}`, ex.level, xz(rd.v), remaining, ex.cruise, all?.length ? all : undefined);
   if (!r.ok) return r.diagnostic;
   ex.curve = r.curve;
   ex.targets = remaining;
@@ -387,7 +414,121 @@ function replan(rt: Runtime, ex: RideExec, rd: Rider, around?: AroundPerson[]): 
   return null;
 }
 
+type VehicleView = { stopS?: number; blocker?: Other; why?: 'footprint' | 'lane'; pullOver?: Other & { lane: Lane } };
+
+/**
+ * Other ridden vehicles relative to the remaining path (VEHICLES.md "Vehicle–vehicle collision"):
+ * (i) a footprint the swept path would bring closer than now and within V_ON_PATH → stop
+ * V_STOP_GAP short of it; (ii) for a vehicle with the right of way that is riding a lane: stop
+ * YIELD_GAP clear of its lane, or — already inside it with no way out within 3 m — pull over.
+ */
+function vehiclesAhead(rt: Runtime, ex: RideExec, rd: Rider, cur: Vec2, others: Other[]): VehicleView {
+  const out: VehicleView = {};
+  const S = ex.curve.samples;
+  const sN = S[ex.idx].s;
+  const fp = footprintOf(rt.world, rd.v);
+  const horizon = sN + (ex.v * ex.v) / (2 * rd.pr.brake) + V_STOP_GAP + fp.reach + 3;
+  const mine = { rank: rd.pr.radius, since: ex.since ?? 0, id: rd.v.id };
+  const yawAt = (j: number) => heading(sub2(S[Math.min(j + 1, S.length - 1)].p, S[Math.max(j - 1, 0)].p));
+  const stop = (s: number, o: Other, why: 'footprint' | 'lane') => {
+    if (out.stopS === undefined || s < out.stopS) { out.stopS = s; out.blocker = o; out.why = why; }
+  };
+  for (const o of others) {
+    const ob = o.boxes.map((b) => b.obb);
+    const gCur = boxGap(place(fp, cur, rd.v.pose.yaw).map((b) => b.obb), ob);
+    let kStop = -1;
+    for (let j = ex.idx; j < S.length && S[j].s <= horizon; j++) {
+      const g = boxGap(place(fp, S[j].p, yawAt(j)).map((b) => b.obb), ob);
+      if (g >= gCur - 1e-6) continue; // moving away from (or along) it
+      if (kStop < 0 && g < V_STOP_GAP + 0.1) kStop = j;
+      // already inside the stop band: stop here rather than creep sample by sample toward it
+      if (g < V_ON_PATH) { stop(kStop >= 0 && gCur >= V_STOP_GAP + 0.1 ? S[kStop].s : sN, o, 'footprint'); break; }
+    }
+    const lane = o.lane;
+    if (!lane || lane.path.length < 2 || ex.yielding?.to === o.v.id || outranks(mine, { rank: lane.rank, since: lane.since, id: o.v.id })) continue;
+    const zone = (p: Vec2) => bandGap(p, fp.reach, lane, o.boxes);
+    if (zone(cur) < YIELD_GAP - 0.05) {
+      // inside its lane: carry on only if the path leaves it within 3 m and stays out
+      let exit = -1, back = false;
+      for (let j = ex.idx; j < S.length && S[j].s <= sN + 3; j++) if (zone(S[j].p) >= YIELD_GAP + 0.1) { exit = j; break; }
+      if (exit >= 0) for (let j = exit; j < S.length && S[j].s <= horizon; j++) if (zone(S[j].p) < YIELD_GAP) { back = true; break; }
+      if ((exit < 0 || back) && !out.pullOver) out.pullOver = { ...o, lane };
+      continue;
+    }
+    const zCur = zone(cur);
+    for (let j = ex.idx; j < S.length && S[j].s <= horizon; j++)
+      if (zone(S[j].p) < YIELD_GAP + 0.1 && zone(S[j].p) < zCur - 1e-6) { stop(zCur < YIELD_GAP + 0.1 ? sN : S[j].s, o, 'lane'); break; }
+  }
+  return out;
+}
+
+const PULL_RETRY = 10; // ticks between pull-over / resume planning attempts
+const RESUME_GIVE_UP = 20 * 60; // ticks pulled over without a resumable route before the ride fails
+
+/** Arrived at a pull-over spot: plan on toward the remaining targets (the lane rule then holds it at the lane's edge until the other has passed). */
+function resume(rt: Runtime, ex: RideExec, rd: Rider, others: Other[]): StepResult {
+  if ((ex.retry ?? 0) > 0) { ex.retry!--; return { status: 'blocked', diagnostic: { code: 'traffic.vehicle', message: `${rd.a.id} on ${rd.v.id} is pulled over at ${fmt(xz(rd.v))}, giving way to ${ex.yielding!.to}`, subjects: [rd.a.id, rd.v.id, ex.yielding!.to] } }; }
+  const targets = ex.yielding!.targets;
+  const r = planCurve(spatial(rt), rt.world, rd.pr, `${rd.a.id} on ${rd.v.id}`, ex.level, xz(rd.v), targets, ex.cruise, others.length ? stillAround(others) : undefined);
+  if (!r.ok) {
+    ex.stuck += PULL_RETRY;
+    if (ex.stuck > RESUME_GIVE_UP) return { status: 'failed', diagnostic: { ...r.diagnostic, message: `${rd.a.id} on ${rd.v.id} pulled over for ${ex.yielding!.to} and cannot ride on: ${r.diagnostic.message}` } };
+    ex.retry = PULL_RETRY;
+    return { status: 'blocked', diagnostic: { code: 'traffic.vehicle', message: `${rd.a.id} on ${rd.v.id} is pulled over at ${fmt(xz(rd.v))} and waits for a route on (${r.diagnostic.message})`, subjects: [rd.a.id, rd.v.id, ex.yielding!.to] } };
+  }
+  ex.curve = r.curve;
+  ex.targets = targets;
+  ex.idx = 0;
+  ex.phase = 'pivot';
+  ex.yielding = undefined;
+  ex.stuck = 0;
+  ex.replans++;
+  return { status: 'running', phase: 'resume' };
+}
+
+/** Stopped inside a right-of-way vehicle's lane: drive to a spot beside it (traffic.ts pullOverSpot). */
+function pullOver(rt: Runtime, ex: RideExec, rd: Rider, o: Other & { lane: Lane }, others: Other[]): StepResult {
+  const who = `${rd.a.id} on ${rd.v.id}`;
+  const subjects = [rd.a.id, rd.v.id, o.rider.id, o.v.id];
+  if ((ex.retry ?? 0) > 0) { ex.retry!--; return { status: 'blocked', diagnostic: { code: 'traffic.vehicle', message: `${who} must give way to ${describe(o)} but has no room to pull over at ${fmt(xz(rd.v))}; waiting`, subjects } }; }
+  const fp = footprintOf(rt.world, rd.v);
+  const spot = pullOverSpot(rt, { v: rd.v, pr: rd.pr, fp, level: ex.level, who }, o, xz(rd.v), stillAround(others));
+  if (!spot) {
+    ex.retry = PULL_RETRY;
+    return { status: 'blocked', diagnostic: { code: 'traffic.vehicle', message: `${who} must give way to ${describe(o)} but has no room to pull over at ${fmt(xz(rd.v))}; waiting`, subjects } };
+  }
+  ex.yielding = { to: o.v.id, targets: remainingTargets(ex) };
+  ex.curve = spot.curve;
+  ex.targets = [spot.spot];
+  ex.idx = 0;
+  ex.phase = 'pivot';
+  ex.stuck = 0;
+  ex.replans++;
+  return { status: 'running', phase: 'pull-over' };
+}
+
+function vehicleWait(rd: Rider, o: Other, why: 'footprint' | 'lane', at: Vec2): Diagnostic {
+  const who = `${rd.a.id} on ${rd.v.id}`;
+  const moving = !!o.lane && o.lane.v > 0.05;
+  const message = why === 'lane'
+    ? `${who} gives way to ${describe(o)}: waits ${YIELD_GAP} m clear of its lane at ${fmt(at)}`
+    : `${who} waits for ${describe(o)}, ${moving ? 'moving' : 'stopped'} in its lane at ${fmt(xz(o.v))}`;
+  return { code: 'traffic.vehicle', message, subjects: [rd.a.id, rd.v.id, o.rider.id, o.v.id], at: [at[0], rd.v.pose.p[1], at[1]] };
+}
+
+/** ride_to / ride_loop step: the follower (stepRideCore), then its lane in services.vehicleLanes (dropped when the ride ends). */
 function stepRide(rt: Runtime, ex: RideExec, dt: number): StepResult {
+  const r = stepRideCore(rt, ex, dt);
+  const v = rt.world.entities[ex.vehicle];
+  if (r.status === 'completed' || r.status === 'failed' || !v) dropLane(rt, ex.vehicle);
+  else {
+    const pr = vehicleProfile(v.def);
+    if (pr) publishLane(rt, { vehicle: v, actor: ex.actor, level: ex.level, since: ex.since ?? 0, v: ex.v, cruise: ex.cruise, pr, samples: ex.curve.samples, idx: ex.idx });
+  }
+  return r;
+}
+
+function stepRideCore(rt: Runtime, ex: RideExec, dt: number): StepResult {
   const rd = riderOf(rt.world, ex.actor);
   if ('code' in rd || rd.v.id !== ex.vehicle) return { status: 'failed', diagnostic: { code: 'vehicle.rider-lost', message: `${ex.actor} is no longer riding ${ex.vehicle}`, subjects: [ex.actor, ex.vehicle] } };
   const { a, v, pr } = rd;
@@ -418,6 +559,11 @@ function stepRide(rt: Runtime, ex: RideExec, dt: number): StepResult {
   const sN = S[bi].s;
   const end = S[S.length - 1].p;
   const rem = ex.curve.length - sN < 1.0 ? dist2(cur, end) : ex.curve.length - sN;
+  const others = othersOnLevel(rt, v.id, ex.level);
+  if (ex.yielding && (ex.curve.length - sN < 0.06 || rem < 0.06) && !ex.cancelling) {
+    ex.v = 0;
+    return resume(rt, ex, rd, others);
+  }
   if ((ex.curve.length - sN < 0.06 || rem < 0.06) && !ex.cancelling) {
     ex.v = 0;
     a.human!.task = undefined;
@@ -442,10 +588,16 @@ function stepRide(rt: Runtime, ex: RideExec, dt: number): StepResult {
   vt = Math.min(vt, Math.sqrt(2 * pr.accel * rem));
   const ppl = peopleAhead(rt, ex, rd, cur);
   if (ppl.stopS !== undefined) vt = Math.min(vt, Math.sqrt(2 * pr.brake * Math.max(0, ppl.stopS - sN - 0.05)));
+  const vv = others.length ? vehiclesAhead(rt, ex, rd, cur, others) : null;
+  if (vv?.stopS !== undefined) vt = Math.min(vt, Math.sqrt(2 * pr.brake * Math.max(0, vv.stopS - sN - 0.05)));
+  if (vv?.pullOver && !ex.cancelling) {
+    vt = 0;
+    if (ex.v < 0.02) { ex.v = 0; return pullOver(rt, ex, rd, vv.pullOver, others); }
+  }
   if (ppl.slowS !== undefined) vt = Math.min(vt, Math.sqrt(NEAR_SPEED * NEAR_SPEED + 2 * pr.brake * Math.max(0, ppl.slowS - sN)));
   if (ppl.near) vt = Math.min(vt, NEAR_SPEED);
   if (ex.cancelling || ex.replan) vt = 0;
-  const dec = ppl.stopS !== undefined || ex.cancelling ? 2 * pr.brake : pr.brake;
+  const dec = ppl.stopS !== undefined || vv?.stopS !== undefined || vv?.pullOver || ex.cancelling ? 2 * pr.brake : pr.brake;
   ex.v = clamp(ex.v + clamp(vt - ex.v, -dec * dt, pr.accel * dt), 0, pr.maxSpeed);
   if (ex.cancelling && ex.v < 1e-6) {
     a.human!.task = undefined;
@@ -472,9 +624,20 @@ function stepRide(rt: Runtime, ex: RideExec, dt: number): StepResult {
   // hard guards: never into a person's space, never below body clearance
   let blocker = ppl.blocker;
   for (const o of Object.values(rt.world.entities)) {
-    if (o.id === a.id || !o.human || o.human.level !== a.human!.level || Math.abs(o.pose.p[1] - a.pose.p[1]) > 1.0) continue;
+    if (o.id === a.id || !o.human || o.human.riding || o.human.level !== a.human!.level || Math.abs(o.pose.p[1] - a.pose.p[1]) > 1.0) continue;
     const dTo = dist2(nx.p, xz(o));
     if (dTo < r + HR + 0.02 && dTo < dist2(cur, xz(o)) - 1e-9) { blocker = o.id; ex.v = 0; nx = { p: cur, yaw: v.pose.yaw, k: 0 }; break; }
+  }
+  // never into another vehicle's footprint (the step must not close a gap that is already under 2 cm)
+  let vBlock: Other | undefined = vv?.stopS !== undefined && ex.v < 0.02 ? vv.blocker : undefined;
+  if (others.length && ex.v > 0) {
+    const fp = footprintOf(rt.world, v);
+    const here = place(fp, cur, v.pose.yaw).map((b) => b.obb), next = place(fp, nx.p, nx.yaw).map((b) => b.obb);
+    for (const o of others) {
+      const ob = o.boxes.map((b) => b.obb);
+      const gn = boxGap(next, ob);
+      if (gn < 0.02 && gn < boxGap(here, ob) - 1e-9) { ex.v = 0; nx = { p: cur, yaw: v.pose.yaw, k: 0 }; vBlock = o; break; }
+    }
   }
   if (ex.v > 0 && segmentClearance(g, cur, nx.p) < r) {
     const b = nearestBlocker(g, nx.p) ?? 'geometry';
@@ -494,6 +657,16 @@ function stepRide(rt: Runtime, ex: RideExec, dt: number): StepResult {
       if (!replan(rt, ex, rd, standing(rt, rd))) return { status: 'running', phase: 'replan' };
     }
     return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${a.id} on ${v.id} waits for ${blocker} to move off its path`, subjects: [a.id, blocker] } };
+  }
+  if (vBlock && ex.v < 0.02) {
+    ex.stuck++;
+    // a vehicle standing still in the path (not one being given way to): after STUCK_REPLAN plan around it
+    const still = !vBlock.lane || vBlock.lane.v < 0.05;
+    if (vv?.why !== 'lane' && still && ex.stuck > STUCK_REPLAN && ex.replans < MAX_REPLANS) {
+      ex.stuck = 0;
+      if (!replan(rt, ex, rd, standing(rt, rd))) return { status: 'running', phase: 'replan' };
+    }
+    return { status: 'blocked', diagnostic: vehicleWait(rd, vBlock, vv?.blocker === vBlock ? vv.why ?? 'footprint' : 'footprint', cur) };
   }
   ex.stuck = 0;
   return { status: 'running', phase: 'ride' };

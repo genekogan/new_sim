@@ -6,6 +6,7 @@
 //   motion.teleport            no vehicle moves more than MAX_STEP_PER_TICK in one tick
 //   vehicle.max-speed          no vehicle exceeds its profile's maxSpeed
 //   vehicle.close-pass         no vehicle moving faster than PASS_SPEED passes within PASS_GAP of a person
+//   collision.vehicle-vehicle  no two vehicles' footprints (box, rider, fork tines, load) overlap (traffic.ts)
 import type { Diagnostic } from '../actions/types.ts';
 import { angleDelta, type Vec3, hypot } from '../core/math.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
@@ -17,6 +18,7 @@ import type { Entity, WorldState } from '../world/types.ts';
 import { vehicleProfile } from './profiles.ts';
 import { vehicleGrids } from './curve.ts';
 import { PASS_GAP, PASS_SPEED } from './actions.ts';
+import { vehicleCollision } from './traffic.ts';
 
 const TOL = 0.03;
 const POSE_TOL = 0.01;
@@ -111,4 +113,4 @@ export const vehicleMotion: Invariant = (rt: Runtime) => {
   return out;
 };
 
-export const VEHICLE_INVARIANTS: Invariant[] = [vehicleRider, vehicleClearance, vehicleMotion];
+export const VEHICLE_INVARIANTS: Invariant[] = [vehicleRider, vehicleClearance, vehicleMotion, vehicleCollision];

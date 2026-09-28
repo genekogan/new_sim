@@ -153,3 +153,173 @@ test('determinism: two identical runs of pick + deliver end in the same state', 
   };
   assert.deepEqual(once(), once());
 });
+
+// ---------- vehicle–vehicle traffic (VEHICLES.md "Vehicle–vehicle collision") ----------
+
+import { vehicle, footprintOf } from '../vehicles/index.ts';
+import { boxGap, place, vehicleCollision } from '../vehicles/traffic.ts';
+import type { Entity } from '../world/types.ts';
+
+function traffic(ents: Entity[], extra?: Obstacle[]) {
+  const base = provingGround({ extra });
+  const w = addAll(emptyWorld('proving-ground', base), ...ents);
+  const reg = new Map<string, ActionDef>([walkTo, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS].map((a) => [a.verb, a]));
+  return new Runtime(w, reg, { spatial: new Spatial(base) }, [...DEFAULT_INVARIANTS, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS]);
+}
+/** Ground-plan gap between two vehicles' whole footprints (box, rider, tines, load). */
+function vgap(rt: Runtime, a: string, b: string) {
+  const fp = (id: string) => { const v = rt.world.entities[id]; return place(footprintOf(rt.world, v), xz(rt, id), v.pose.yaw).map((x) => x.obb); };
+  return boxGap(fp(a), fp(b));
+}
+function runUntil(rt: Runtime, cond: () => boolean, max: number) {
+  for (let n = 0; n < max && !cond(); n++) rt.step();
+  return cond();
+}
+const msgsOf = (rt: Runtime) => rt.violations.map((v) => `${v.code}: ${v.message}`);
+
+function headOn() {
+  const rt = traffic([forklift('f1', -12, -6, 0), human('op1', -12, -6.95), vehicle('e1', 'euc', 10, -6, Math.PI), human('r1', 10, -5.3)]);
+  run(rt, 'mount', { actor: 'op1', vehicle: 'f1' }, 200);
+  run(rt, 'mount', { actor: 'r1', vehicle: 'e1' }, 200);
+  let minGap = Infinity, waitBand = Infinity;
+  const reach = footprintOf(rt.world, rt.world.entities.e1).reach;
+  rt.observers.push({
+    onTick: (r) => {
+      minGap = Math.min(minGap, vgap(r, 'f1', 'e1'));
+      // while it gives way, the rider's body stays ≥ YIELD_GAP from the forklift's lane (the line z = -6, ± 0.6 m truck half-width)
+      const rec = [...r.records.values()].find((x) => x.verb === 'ride_to' && (x.params as { actor: string }).actor === 'r1');
+      if (rec?.status === 'blocked' && rec.diagnostic?.code === 'traffic.vehicle') waitBand = Math.min(waitBand, Math.abs(xz(r, 'e1')[1] + 6) - 0.6 - reach);
+    },
+  });
+  // the EUC sets off first (its lane is published), so the forklift plans through the lane rather than around it
+  const e = rt.submit('ride_to', { actor: 'r1', x: -5, z: -6 });
+  assert.equal(e.status, 'executing', e.diagnostic?.message);
+  rt.step();
+  const f = rt.submit('ride_to', { actor: 'op1', x: 12, z: -6 });
+  assert.equal(f.status, 'executing', f.diagnostic?.message);
+  const done = rt.runUntilIdle(20 * 120, [f.id, e.id]);
+  return { rt, f, e, done, minGap, waitBand };
+}
+
+test('traffic: head-on forklift vs EUC in one 3 m lane — the rider (smaller) pulls over and waits ≥ 1 m clear of the forklift\'s lane, both arrive; 0 violations', () => {
+  const { rt, f, e, done, minGap, waitBand } = headOn();
+  assert.ok(done, `not finished: f ${f.status} ${f.diagnostic?.message} / e ${e.status} ${e.diagnostic?.message}`);
+  assert.equal(f.status, 'completed', f.diagnostic?.message);
+  assert.equal(e.status, 'completed', e.diagnostic?.message);
+  assert.ok(e.history.some((h) => h.phase === 'pull-over'), 'the EUC (smaller) yields by pulling over');
+  assert.ok(!f.history.some((h) => h.phase === 'pull-over'), 'the forklift keeps its lane');
+  const waits = rt.events.filter((x) => x.type === 'action' && x.code === 'traffic.vehicle');
+  assert.ok(waits.some((x) => x.type === 'action' && x.id === e.id && /gives way to op1 on f1 \(forklift\)/.test(x.message ?? '')), JSON.stringify(waits.map((x) => x.type === 'action' && x.message)));
+  assert.ok(minGap >= 0.9, `the vehicles came ${minGap.toFixed(2)} m apart`);
+  assert.ok(waitBand >= 1.0 - 0.02 && waitBand < Infinity, `gave way ${waitBand.toFixed(2)} m from the lane`);
+  assert.ok(hypot(xz(rt, 'e1')[0] + 5, xz(rt, 'e1')[1] + 6) < 0.3, 'the rider resumed to its target');
+  assert.deepEqual(msgsOf(rt), []);
+});
+
+test('traffic: a rider stopped in the forklift\'s lane — the forklift stops ≥ 1 m short and waits with the rider named; once the rider rides off it carries on; 0 violations', () => {
+  const rt = traffic([forklift('f1', -12, -6, 0), human('op1', -12, -6.95), vehicle('e1', 'euc', 0, -4.5, -H), human('r1', 0.7, -4.5)]);
+  run(rt, 'mount', { actor: 'op1', vehicle: 'f1' }, 200);
+  run(rt, 'mount', { actor: 'r1', vehicle: 'e1' }, 200);
+  // the EUC rides 1.5 m into the forklift's line and stops there before the forklift's lane reaches it
+  // (riding nowhere after that, in the way); the forklift planned while the EUC was moving, so not round it
+  const e = rt.submit('ride_to', { actor: 'r1', x: 0, z: -6 });
+  assert.equal(e.status, 'executing', e.diagnostic?.message);
+  rt.step();
+  const f = rt.submit('ride_to', { actor: 'op1', x: 12, z: -6 });
+  assert.equal(f.status, 'executing', f.diagnostic?.message);
+  let minGap = Infinity;
+  rt.observers.push({ onTick: (r) => { minGap = Math.min(minGap, vgap(r, 'f1', 'e1')); } });
+  assert.ok(runUntil(rt, () => f.status === 'blocked', 20 * 30), f.status);
+  assert.equal(e.status, 'completed', e.diagnostic?.message);
+  assert.ok(!e.history.some((h) => h.phase === 'pull-over'), 'the EUC stopped in the lane before the lane reached it');
+  assert.equal(f.diagnostic?.code, 'traffic.vehicle');
+  assert.match(f.diagnostic!.message, /op1 on f1 waits for r1 on e1 \(euc\), stopped in its lane/);
+  for (const id of ['op1', 'f1', 'r1', 'e1']) assert.ok(f.diagnostic!.subjects!.includes(id), id);
+  for (let i = 0; i < 20 * 5; i++) rt.step();
+  assert.equal(f.status, 'blocked', 'still waiting: a forklift cannot swerve round it from 1 m (2.5 m turn radius, no reversing)');
+  assert.ok(minGap >= 0.95, `closest while waiting ${minGap.toFixed(2)} m`);
+  // the rider rides off (it starts inside the forklift's lane and leaves it within 3 m: no pull-over needed)
+  const off = rt.submit('ride_to', { actor: 'r1', x: 0, z: -2 });
+  assert.equal(off.status, 'executing', off.diagnostic?.message);
+  assert.ok(rt.runUntilIdle(20 * 60, [f.id, off.id]));
+  assert.equal(off.status, 'completed', off.diagnostic?.message);
+  assert.equal(f.status, 'completed', f.diagnostic?.message);
+  assert.ok(minGap >= 0.5, `closest while the EUC left and the forklift slowed past it: ${minGap.toFixed(2)} m`);
+  assert.deepEqual(msgsOf(rt), []);
+});
+
+test('traffic: two forklifts crossing — f2 (same size, id after f1) stops clear of f1\'s lane with the reason named, then crosses; 0 violations', () => {
+  const rt = traffic([forklift('f1', -2, -6, 0), human('op1', -2, -6.95), forklift('f2', 4, -12, H), human('op2', 4.95, -12)]);
+  run(rt, 'mount', { actor: 'op1', vehicle: 'f1' }, 200);
+  run(rt, 'mount', { actor: 'op2', vehicle: 'f2' }, 200);
+  let minGap = Infinity;
+  rt.observers.push({ onTick: (r) => { minGap = Math.min(minGap, vgap(r, 'f1', 'f2')); } });
+  const a = rt.submit('ride_to', { actor: 'op1', x: 12, z: -6 });
+  const b = rt.submit('ride_to', { actor: 'op2', x: 4, z: 3 });
+  assert.equal(b.status, 'executing', b.diagnostic?.message);
+  assert.ok(rt.runUntilIdle(20 * 120, [a.id, b.id]));
+  assert.equal(a.status, 'completed', a.diagnostic?.message);
+  assert.equal(b.status, 'completed', b.diagnostic?.message);
+  const wait = rt.events.find((x) => x.type === 'action' && x.id === b.id && x.status === 'blocked' && x.code === 'traffic.vehicle');
+  assert.ok(wait && wait.type === 'action' && /op2 on f2 gives way to op1 on f1 \(forklift\): waits 1 m clear of its lane/.test(wait.message!), JSON.stringify(wait));
+  assert.ok(!a.history.some((h) => h.status === 'blocked'), 'f1 never waited');
+  assert.ok(minGap >= 1.0, `closest ${minGap.toFixed(2)} m`);
+  assert.deepEqual(msgsOf(rt), []);
+});
+
+test('traffic: plan-time vehicle.path-conflict — an EUC boxed against a wall inside a moving forklift\'s lane cannot yield, so its ride is refused naming both', () => {
+  // wall face 0.6 m behind the EUC (1.85 m off the forklift's line): no pull-over spot ≥ 1 m clear of the lane
+  const wall: Obstacle = { id: 'lane-wall', obb: { c: [0, -3.45], half: [11, 0.1], yaw: 0 }, y0: 0, y1: 2.4, kind: 'wall', label: 'lane wall' };
+  const rt = traffic([forklift('f1', -12, -6, 0), human('op1', -12, -6.95), vehicle('e1', 'euc', 2, -4.15, Math.PI), human('r1', 1.3, -4.15)], [wall]);
+  run(rt, 'mount', { actor: 'op1', vehicle: 'f1' }, 200);
+  const f = rt.submit('ride_to', { actor: 'op1', x: 12, z: -6 });
+  assert.equal(f.status, 'executing', f.diagnostic?.message);
+  run(rt, 'mount', { actor: 'r1', vehicle: 'e1' }, 200);
+  while (xz(rt, 'f1')[0] < -7 && rt.isActive(f.id)) rt.step();
+  const e = rt.submit('ride_to', { actor: 'r1', x: -10, z: -4.15 });
+  assert.equal(e.status, 'failed');
+  assert.equal(e.diagnostic?.code, 'vehicle.path-conflict', e.diagnostic?.message);
+  assert.match(e.diagnostic!.message, /r1 on e1 \(euc\) would meet op1 on f1 \(forklift\).*must give way.*no room to pull over/);
+  for (const id of ['r1', 'e1', 'op1', 'f1']) assert.ok(e.diagnostic!.subjects!.includes(id), id);
+  // the same ride once the forklift has passed is fine
+  assert.ok(rt.runUntilIdle(20 * 60, [f.id]) && (f.status as string) === 'completed', f.diagnostic?.message);
+  const later = rt.submit('ride_to', { actor: 'r1', x: -10, z: -4.15 });
+  assert.equal(later.status, 'executing', later.diagnostic?.message);
+  assert.ok(rt.runUntilIdle(20 * 60, [later.id]) && (later.status as string) === 'completed', later.diagnostic?.message);
+  assert.deepEqual(msgsOf(rt), []);
+});
+
+test('traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not', () => {
+  const rt = setup({ ents: [human('r1', 3, 3)] });
+  addAll(rt.world, vehicle('e1', 'euc', 3, 2, 0));
+  mountAndPick(rt); // ply1 on f1's forks at travel height
+  const load = rt.world.entities.ply1;
+  assert.equal(load.support?.kind, 'forks');
+  assert.deepEqual(msgsOf(rt), []);
+  // forced (direct world edit — edit_world itself refuses to move vehicles): park e1 under the load
+  const e1 = rt.world.entities.e1;
+  e1.pose.p = [load.pose.p[0], 0, load.pose.p[2]];
+  rt.step();
+  const v = rt.violations.filter((x) => x.code === 'collision.vehicle-vehicle');
+  assert.equal(v.length, 1, msgsOf(rt).join('\n'));
+  assert.ok(['e1', 'f1', 'ply1'].every((id) => v[0].subjects!.includes(id)), v[0].message);
+  assert.match(v[0].message, /f1's ply1 overlaps e1 \(euc\)|e1 \(euc\) overlaps f1's ply1/);
+  // the load 2.5 m up is clear of a parked (riderless) EUC's 0.55 m box
+  const n0 = rt.violations.length;
+  load.pose.p = [load.pose.p[0], 2.5, load.pose.p[2]];
+  rt.world.entities.e1.pose.p = [load.pose.p[0] + 0, 0, load.pose.p[2]];
+  const col = vehicleCollision;
+  assert.deepEqual(col(rt).map((d) => d.code), []);
+  // truck body on truck body
+  addAll(rt.world, forklift('f2', xz(rt, 'f1')[0] + 1, xz(rt, 'f1')[1], H));
+  const d = col(rt);
+  assert.equal(d.length, 1);
+  assert.deepEqual(d[0].subjects!.slice(0, 2), ['f1', 'f2']);
+  assert.ok(rt.violations.length === n0);
+});
+
+test('traffic determinism: the head-on run twice → same state hash and event log', () => {
+  const a = headOn(), b = headOn();
+  assert.equal(a.rt.stateHash(), b.rt.stateHash());
+  assert.equal(JSON.stringify(a.rt.events), JSON.stringify(b.rt.events));
+});

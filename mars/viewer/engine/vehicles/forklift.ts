@@ -21,6 +21,7 @@ import { makeWay } from '../locomotion/walk.ts';
 import { VEHICLE_PROFILES, type VehicleProfile } from './profiles.ts';
 import { blockersNear, planCurve, vehicleGrids, type Curve } from './curve.ts';
 import { rideTo } from './actions.ts';
+import { boxGap, describe, FOOTPRINT_PARTS, footprintOf, othersOnLevel, pathConflict, place, vehicleAround } from './traffic.ts';
 
 /** Geometry and limits (catalog def 'forklift' carries the box; these are the working limits). */
 export const FORKLIFT = {
@@ -67,6 +68,14 @@ export const FORKLIFT_PROFILE: VehicleProfile = {
 };
 // registered next to the EUC / bicycle so mount, dismount and the vehicle invariants know it
 VEHICLE_PROFILES.forklift = FORKLIFT_PROFILE;
+// vehicle–vehicle footprint (traffic.ts): the fork tines ahead of the truck, full truck width, just
+// under a load on the forks, else at most 0.45 m up (the empty-fork height is not world state; empty
+// forks travel at 0.3 m). The load itself is added by traffic.ts.
+FOOTPRINT_PARTS.forklift = (w, v) => {
+  const load = loadOn(w, v.id);
+  const y0 = load ? load.pose.p[1] - 0.1 : v.pose.p[1], y1 = load ? load.pose.p[1] + 0.02 : v.pose.p[1] + 0.45;
+  return [{ c: [FORKLIFT.length / 2 + FORKLIFT.forkLength / 2, 0], half: [FORKLIFT.forkLength / 2, FORKLIFT.width / 2], yaw: 0, y0, y1, part: v.id }];
+};
 
 const HALF_L = FORKLIFT.length / 2;
 const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
@@ -195,7 +204,7 @@ function personNear(w: WorldState, op: Op, gap: number, load?: Entity): { id: st
   if (load) { const d = def(load.def); boxes.push({ c: xz(load), half: [d.size[0] / 2, d.size[2] / 2], yaw: load.pose.yaw }); }
   let best: { id: string; gap: number } | null = null;
   for (const o of Object.values(w.entities)) {
-    if (!o.human || o.id === op.a.id || o.human.level !== op.a.human!.level || Math.abs(o.pose.p[1] - op.v.pose.p[1]) > 1.2) continue;
+    if (!o.human || o.id === op.a.id || o.human.riding || o.human.level !== op.a.human!.level || Math.abs(o.pose.p[1] - op.v.pose.p[1]) > 1.2) continue;
     const g = Math.min(...boxes.map((b) => distToObb(xz(o), b))) - HUMAN_RADIUS;
     if (g < gap && (!best || g < best.gap)) best = { id: o.id, gap: g };
   }
@@ -265,6 +274,27 @@ function peopleStop(rt: Runtime, ex: ForkExec, extra = 0): StepResult | null {
   return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.operator} on ${ex.vehicle} stops: ${pn.id} is ${f2(Math.max(0, pn.gap))} m from the truck${load ? ` and its load ${load.id}` : ''} (keeps ${FORKLIFT.peopleGap} m); waiting for them to move away`, subjects: [ex.operator, ex.vehicle, pn.id] } };
 }
 
+/**
+ * Square-up / creep moves the truck outside the ride follower: refuse a move that would bring truck
+ * + load within 0.3 m of another ridden vehicle's footprint (closer than it is now) → blocked
+ * traffic.vehicle naming it, until it has moved away.
+ */
+function vehicleStop(rt: Runtime, ex: ForkExec, p: Vec2, yaw: number): StepResult | null {
+  const v = rt.world.entities[ex.vehicle];
+  const level = rt.world.entities[ex.operator].human!.level;
+  const others = othersOnLevel(rt, v.id, level);
+  if (!others.length) return null;
+  const fp = footprintOf(rt.world, v);
+  const here = place(fp, xz(v), v.pose.yaw).map((b) => b.obb), next = place(fp, p, yaw).map((b) => b.obb);
+  for (const o of others) {
+    const ob = o.boxes.map((b) => b.obb);
+    const gn = boxGap(next, ob);
+    if (gn < 0.3 && gn < boxGap(here, ob) - 1e-9)
+      return { status: 'blocked', diagnostic: { code: 'traffic.vehicle', message: `${ex.operator} on ${ex.vehicle} stops: ${describe(o)} is ${f2(gn)} m from the truck${fp.boxes.length > 3 ? ' and its load' : ''}; waiting for it to move away`, subjects: [ex.operator, ex.vehicle, o.rider.id, o.v.id] } };
+  }
+  return null;
+}
+
 function stepDrive(rt: Runtime, ex: ForkExec, dt: number): StepResult | 'done' {
   const a = rt.world.entities[ex.operator];
   if (!ex.ride) ex.ride = rideTo.start(rt, { actor: ex.operator, x: ex.targets[ex.targets.length - 1][0], z: ex.targets[ex.targets.length - 1][1] }, { curve: ex.curve!, targets: ex.targets, cruise: FORKLIFT_PROFILE.speed }, ex.id);
@@ -305,6 +335,8 @@ function advance(rt: Runtime, ex: ForkExec, dt: number): StepResult {
       const ps = peopleStop(rt, ex);
       if (ps) return ps;
       const d = clamp(err, -FORKLIFT_PROFILE.turnRate * dt, FORKLIFT_PROFILE.turnRate * dt);
+      const vs = vehicleStop(rt, ex, xz(v), Math.abs(err - d) < 1e-6 ? st.yaw : wrapAngle(v.pose.yaw + d));
+      if (vs) return vs;
       placeTruck(rt, ex, xz(v), Math.abs(err - d) < 1e-6 ? st.yaw : wrapAngle(v.pose.yaw + d));
       return loadCheck(rt, ex) ?? { status: 'running', phase: 'square' };
     }
@@ -345,6 +377,8 @@ function advance(rt: Runtime, ex: ForkExec, dt: number): StepResult {
       const ps = peopleStop(rt, ex);
       if (ps) return ps;
       const ds = clamp(st.d - done, -FORKLIFT.creepSpeed * dt, FORKLIFT.creepSpeed * dt);
+      const vs = vehicleStop(rt, ex, add2(xz(v), rot2([ds, 0], v.pose.yaw)), v.pose.yaw);
+      if (vs) return vs;
       st.done = Math.abs(st.d - done - ds) < 1e-9 ? st.d : done + ds;
       placeTruck(rt, ex, add2(xz(v), rot2([st.done - done, 0], v.pose.yaw)), v.pose.yaw);
       return loadCheck(rt, ex) ?? { status: 'running', phase: st.d < 0 ? 'back-off' : 'creep' };
@@ -399,8 +433,13 @@ function planDrive(rt: Runtime, op: Op, pr: VehicleProfile, pre: Vec2, yaw: numb
   if (dist2(start, pre) < 0.05 && Math.abs(angleDelta(op.v.pose.yaw, yaw)) < 0.3) return { ok: true, curve: null, targets: [], length: 0 };
   const lead = sub2(pre, rot2([FORKLIFT.leadIn, 0], yaw));
   const targets: Vec2[] = dist2(start, pre) > FORKLIFT.leadIn + 1 ? [lead, pre] : [pre];
-  const r = planCurve(sp, rt.world, pr, `${op.a.id} on ${op.v.id}`, op.a.human!.level, start, targets, pr.speed);
+  const others = othersOnLevel(rt, op.v.id, op.a.human!.level);
+  const r = planCurve(sp, rt.world, pr, `${op.a.id} on ${op.v.id}`, op.a.human!.level, start, targets, pr.speed, others.length ? vehicleAround(others.filter((o) => !o.lane)) : undefined);
   if (!r.ok) return r;
+  if (others.length) {
+    const pc = pathConflict(rt, { actor: op.a.id, v: op.v, pr, level: op.a.human!.level }, r.curve, pr.speed);
+    if (pc) return { ok: false, diagnostic: pc };
+  }
   const hit = overheadHit(sp, curvePoses(r.curve), op.v.pose.p[1], stackHeight(FORKLIFT.travelHeight, g), g, new Set());
   if (hit) return bad('forklift.overhead', `${op.v.id}${g ? ' with its load' : ''} (${f2(stackHeight(FORKLIFT.travelHeight, g))} m tall) cannot pass under ${obLabel(hit.o)} (${f2(hit.o.y0)} m up) at ${fmt(hit.p)}`, [op.v.id, hit.o.id], hit.p);
   return { ok: true, curve: r.curve, targets, length: r.curve.length };
