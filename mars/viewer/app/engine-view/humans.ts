@@ -33,7 +33,7 @@ import { DT } from '../../engine/runtime/runtime.ts';
 import { createRig, type Rig, type Template } from './people.ts';
 import { seatHeight } from './fixtures.ts';
 import { UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, legTo, legsOf, palm, place, smooth, spineOf, swing, turn, type Arm, type Leg, type Spine } from './rig.ts';
-import { NEUTRAL, approach, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
+import { BEND_SHARE, NEUTRAL, approach, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
 import { axisPoint, flightOf, gaitAt, type Flight, type Gait } from './stair-gait.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
@@ -551,12 +551,14 @@ function measure(v: View) {
   const pivot = w(spine.hips ?? spine.body);
   const sh = arms.map((a) => w(a.upper));
   const shMid = sh.reduce((s, q) => s.add(q), V()).multiplyScalar(1 / sh.length);
+  const joints = [pivot, w(spine.abdomen), w(spine.torso), shMid];
   v.dims = {
     hipH,
     pivotH: pivot.y,
     ankleH,
     legLen,
     sh: { f: shMid.x - pivot.x, up: shMid.y - pivot.y },
+    chain: joints.slice(1).map((q, i) => ({ f: q.x - joints[i].x, up: q.y - joints[i].y })),
     shHalf: sh.length > 1 ? Math.abs(sh[0].z - sh[1].z) / 2 : 0.19,
     armLen: armLen(arms[0]),
   };
@@ -571,9 +573,10 @@ function measure(v: View) {
 /** Bend the upper body forward by `bend` rad at the hips (60 %), abdomen (20 %) and torso (20 %). */
 function bendTorso(sp: Spine, bend: number) {
   _ax.crossVectors(UP, _fwd).normalize(); // rotating up about up×fwd tips it forward
-  if (sp.hips) turn(sp.hips, _ax, bend * 0.6);
-  turn(sp.abdomen, _ax, bend * (sp.hips ? 0.2 : 0.6));
-  turn(sp.torso, _ax, bend * (sp.hips ? 0.2 : 0.4));
+  const [a, b, c] = BEND_SHARE;
+  if (sp.hips) turn(sp.hips, _ax, bend * a);
+  turn(sp.abdomen, _ax, bend * (sp.hips ? b - a : b));
+  turn(sp.torso, _ax, bend * (c - b));
 }
 
 /** Posture legs: pelvis down by `drop` (and back to balance a hip bend, up by `rise`), feet stay planted (leg IK, knees forward). */
@@ -582,7 +585,7 @@ function postureLegs(v: View, pz: Posture) {
   if (!d || !v.spine || v.legs.length < 2) return;
   const feet = v.legs.map((l, i) => l.foot.getWorldPosition(_goals[i]).clone());
   // heel raise: ankles up by `rise` (toes stay down)
-  const back = pz.bend > 0 ? 0.3 * (d.sh.f * (Math.cos(pz.bend) - 1) + d.sh.up * Math.sin(pz.bend)) : 0;
+  const back = shoulderAt(d, pz).back;
   v.spine.body.getWorldPosition(_c);
   _c.addScaledVector(_fwd, -back);
   _c.y += pz.rise - pz.drop;

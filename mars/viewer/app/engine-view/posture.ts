@@ -22,6 +22,11 @@ export type Dims = {
   legLen: number;
   /** Shoulder-joint midpoint relative to the pivot (standing). */
   sh: { f: number; up: number };
+  /**
+   * The spine as the pose layer bends it: pivot (Hips) → Abdomen → Torso → shoulder midpoint, each
+   * segment (f, up) standing; the bend turns them by 0.6, 0.8 and 1.0 × bend (humans.ts bendTorso).
+   */
+  chain: { f: number; up: number }[];
   /** Shoulder joint lateral half-width. */
   shHalf: number;
   /** Shoulder → elbow → palm length. */
@@ -38,12 +43,12 @@ const DEG = Math.PI / 180;
 export const SQUAT_HIP = 0.42;
 export const RISE_MAX = 0.06;
 /** Arm reach the solver plans with (fraction of the arm length; the IK clamps at 0.97). */
-const PLAN_REACH = 0.93;
+const PLAN_REACH = 0.92;
 
 const STYLE: Record<Style, { bendMax: number; wDrop: number; wBend: number; rise: boolean; dropMax?: number }> = {
-  knees: { bendMax: 45 * DEG, wDrop: 0.5, wBend: 1.4, rise: false },
-  hips: { bendMax: 100 * DEG, wDrop: 1.6, wBend: 0.35, rise: false },
-  up: { bendMax: 10 * DEG, wDrop: 4, wBend: 3, rise: true },
+  knees: { bendMax: 80 * DEG, wDrop: 0.5, wBend: 1.4, rise: false },
+  hips: { bendMax: 100 * DEG, wDrop: 0.8, wBend: 0.35, rise: false },
+  up: { bendMax: 30 * DEG, wDrop: 4, wBend: 3, rise: true },
   walk: { bendMax: 15 * DEG, wDrop: 4, wBend: 2, rise: false, dropMax: 0.08 },
 };
 
@@ -55,11 +60,21 @@ export function styleFor(activity: string, walking: boolean): Style {
   return 'knees'; // crouch, lift, stand_with_load, carry, support, hold, release, idle with a grip
 }
 
-/** Shoulder midpoint (f, up) for a posture. The pelvis shifts back by 0.3 × the torso's forward travel. */
+/** Share of the bend reached at each spine joint (Hips, Abdomen, Torso): humans.ts bendTorso. */
+export const BEND_SHARE = [0.6, 0.8, 1.0];
+
+/**
+ * Shoulder midpoint (f, up above the floor) for a posture, through the bent spine chain. The pelvis
+ * shifts back by 0.3 × the shoulders' forward travel to balance a bend (`back`, m).
+ */
 export function shoulderAt(d: Dims, p: Posture) {
-  const c = Math.cos(p.bend), s = Math.sin(p.bend);
-  const f = d.sh.f * c + d.sh.up * s, up = d.sh.up * c - d.sh.f * s;
-  const back = 0.3 * (f - d.sh.f);
+  let f = 0, up = 0;
+  d.chain.forEach((sg, i) => {
+    const a = p.bend * BEND_SHARE[i], c = Math.cos(a), s = Math.sin(a);
+    f += sg.f * c + sg.up * s;
+    up += sg.up * c - sg.f * s;
+  });
+  const back = 0.3 * Math.max(0, f - d.sh.f);
   return { f: f - back, up: d.pivotH - p.drop + p.rise + up, back };
 }
 
