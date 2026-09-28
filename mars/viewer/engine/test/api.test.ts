@@ -101,7 +101,7 @@ test('api: bind → rehearse → execute → get_take (60 s, 3 walkers) — rehe
   const sl = c.call('get_take', { take_id: ex.take_id, from: 10, to: 20 }) as any;
   assert.ok(sl.ok);
   assert.equal(sl.finalState, undefined);
-  assert.deepEqual(sl.range, { from: 200, to: 400 });
+  assert.deepEqual(sl.range, { from: 10, to: 20, fromTick: 200, toTick: 400 }, 'seconds in, seconds out; ticks as extra fields');
   const asTake = { ...full, tracks: sl.tracks, changes: sl.changes, events: sl.events } as Take;
   for (const t of [10, 12.34, 15, 19.95, 20]) assert.deepEqual(sampleTake(asTake, t), sampleTake(full, t), `t=${t}`);
   assert.ok(stableStringify(sl).length < stableStringify(full).length / 2, 'slice is compact');
@@ -744,4 +744,42 @@ test('api: list (plans/takes/workspaces/cameras ledger) and delete_workspace (re
   const kept = room.call(2026, 'rehearse', { plan_id: extra.plan_id, keep: true }) as any;
   assert.ok(kept.ok, JSON.stringify(kept).slice(0, 300));
   assert.deepEqual((room.call(2026, 'list', { include: ['takes'] }) as any).takes.map((t: any) => t.take_id), [tA, kept.take.take_id], "rb's take was evicted");
+});
+
+test('api: every refusal is one JSON envelope { ok:false, code, message, details? } — input validation, engine refusals, failed rehearsals', async () => {
+  const c = fresh();
+  const envelope = (r: any, code: string) => {
+    assert.equal(r.ok, false, JSON.stringify(r));
+    assert.equal(r.code, code, JSON.stringify(r));
+    assert.equal(typeof r.message, 'string');
+    assert.ok(r.message.length > 5, r.message);
+    if (r.details !== undefined) assert.equal(typeof r.details, 'object');
+    assert.deepEqual(JSON.parse(JSON.stringify(r)), JSON.parse(JSON.stringify(r)), 'plain JSON');
+    return r;
+  };
+  const bad = envelope(c.call('fork', { from: 'proving-ground', name: 'has space', extra: 1 }), 'op.invalid-input');
+  assert.deepEqual(bad.details.issues.map((i: any) => i.path).sort(), ['(root)', 'name']);
+  assert.match(bad.message, /^fork: input: /);
+  envelope(c.call('edit_world', { workspace: 'ws', note: 'x', edits: [{ op: 'teleport', id: 'n1' }] }), 'op.invalid-input');
+  envelope(c.call('nope', {}), 'op.unknown');
+  envelope(c.call('rehearse', { plan_id: 'x'.repeat(24) }), 'plan.unknown');
+  envelope(c.call('get_take', { take_id: 'nope' }), 'take.unknown');
+  envelope(c.call('fork', { from: 'proving-ground', name: 'ws' }), 'exists');
+  envelope(c.call('log', { workspace: 'ghost' }), 'unknown-workspace');
+  envelope(c.call('edit_world', { workspace: 'proving-ground', note: 'x', edits: [{ op: 'remove', id: 'panel' }] }), 'workspace.protected');
+  envelope(c.call('delete_workspace', { workspace: 'proving-ground' }), 'workspace.protected');
+  const bb = envelope(c.call('bind_plan', { template: crossTemplate, bindings: { crew: ['n1', 'ghost', 'panel'], deck: [10, 10] }, workspace: 'ws' }), 'plan.invalid');
+  assert.ok(bb.diagnostics.length >= 2, 'bind keeps its diagnostics payload');
+  // a failed rehearsal: message names the failing step; the report still rides along
+  const imp = bind(c, walkPlan('into-wall', -15, -15), { a: 'p1' });
+  const rf = envelope(c.call('rehearse', { plan_id: imp }), 'rehearsal.failed');
+  assert.match(rf.message, /step s \(walk_to\) route\./);
+  assert.equal(rf.report.steps[0].status, 'failed');
+  // the MCP listing publishes the zod JSON Schema but passes input through to the controller
+  const { listedSchema } = await import('../../simulation/engine-tools.ts');
+  for (const t of engineTools()) {
+    const ls = listedSchema(t.inputSchema)['~standard'];
+    assert.deepEqual(ls.jsonSchema.input({ target: 'draft-2020-12' }), (t.inputSchema as any)['~standard'].jsonSchema.input({ target: 'draft-2020-12' }), t.name);
+    assert.deepEqual(ls.validate({ junk: [1] }), { value: { junk: [1] } });
+  }
 });

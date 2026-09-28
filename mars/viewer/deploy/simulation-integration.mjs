@@ -234,6 +234,14 @@ assert.equal(bound.isError, false, JSON.stringify(bound.body));
 const planId = bound.body.plan_id;
 const badInput = await client.callTool({ name: 'engine_bind_plan', arguments: { template: minute, bindings: {}, workspace: 'itest', extra: 1 } });
 assert.equal(badInput.isError, true, 'MCP validates input with the same zod schema');
+{
+  // input validation failures use the same JSON refusal envelope as every other engine failure
+  const env = JSON.parse(badInput.content[0].text);
+  assert.equal(env.ok, false);
+  assert.equal(env.code, 'op.invalid-input');
+  assert.match(env.message, /^bind_plan: input: /);
+  assert.ok(env.details.issues.some((i) => i.path === '(root)' && /extra/.test(i.message)), JSON.stringify(env));
+}
 const reh = await ecall('engine_rehearse', { plan_id: planId });
 assert.equal(reh.isError, false, JSON.stringify(reh.body.report?.diagnostics));
 assert.ok(reh.body.report.metrics.duration > 50);
@@ -253,7 +261,7 @@ assert.equal(cam.body.takeHashUnchanged, true);
 const takeRes = await fetch(`${base}/api/simulation/engine/take?id=${ex.body.take_id}&from=10&to=20`, { headers: { Authorization: `Bearer ${room}.${view}` } });
 assert.equal(takeRes.status, 200);
 const slice = await takeRes.json();
-assert.deepEqual(slice.range, { from: 200, to: 400 });
+assert.deepEqual(slice.range, { from: 10, to: 20, fromTick: 200, toTick: 400 });
 assert.ok(slice.tracks.n1.length > 1);
 assert.equal(slice.cameras.length, 1);
 assert.equal((await fetch(`${base}/api/simulation/engine/take?id=nope`, { headers })).status, 404);

@@ -54,6 +54,8 @@ export type ControllerOptions = {
 export type OpResult = { ok: boolean; [k: string]: unknown };
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
+/** Seconds without float noise from tick × dt (1 µs resolution). */
+const sec = (x: number) => Math.round(x * 1e6) / 1e6;
 const fail = (code: string, message: string, extra: Record<string, unknown> = {}): OpResult => ({ ok: false, code, message, ...extra });
 
 /** Input bounds checked before zod sees the input (zod, stableStringify and structuredClone all recurse). */
@@ -217,7 +219,10 @@ export class EngineController {
       } catch (e) {
         return fail('input.invalid', `${name}: input could not be validated (${e instanceof Error ? e.message : String(e)})`);
       }
-      if (!parsed.success) return fail('op.invalid-input', parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; '));
+      if (!parsed.success) {
+        const issues = parsed.error.issues.map((i) => ({ path: i.path.join('.') || '(root)', message: i.message }));
+        return fail('op.invalid-input', `${name}: ${uniqueMessage(`input: ${issues.map((i) => `${i.path}: ${i.message}`).join('; ')}`)}`, { details: { issues } });
+      }
       switch (name as OpName) {
         case 'list_verbs': return this.listVerbs();
         case 'query_world': return this.queryWorld(parsed.data as OpInput<'query_world'>);
@@ -428,7 +433,7 @@ export class EngineController {
       ok: true,
       ...header,
       duration: r2(takeDuration(take)),
-      range: { from: t0, to: t1 },
+      range: { from: sec(t0 * take.dt), to: sec(t1 * take.dt), fromTick: t0, toTick: t1 },
       tracks: s.tracks,
       changes: inc.has('changes') ? s.changes : undefined,
       events: inc.has('events') ? s.events : undefined,
@@ -460,7 +465,8 @@ export class EngineController {
     const kept = q.keep === true || this.takes.has(r.take.id);
     if (q.keep === true) this.keepTake(r.take);
     else if (!kept) this.holdUnkept(r.take);
-    return { ok: r.report.ok, code: r.report.ok ? undefined : 'rehearsal.failed', report: compactReport(r.report), take: { ...takeSummary(r.take), kept }, stale: r.stale };
+    const out: OpResult = { ok: r.report.ok, report: compactReport(r.report), take: { ...takeSummary(r.take), kept }, stale: r.stale };
+    return r.report.ok ? out : { ...out, ok: false, code: 'rehearsal.failed', message: failureMessage(r.report) };
   }
 
   execute(q: OpInput<'execute'>): OpResult {
@@ -529,7 +535,7 @@ export class EngineController {
     const r = plan.report;
     return {
       ok: !r.rejected,
-      code: r.rejected ? 'camera.rejected' : undefined,
+      ...(r.rejected ? { code: 'camera.rejected', message: uniqueMessage(`camera track ${trackId} rejected: ${r.reasons.slice(0, 5).join('; ') || 'no readable framing'}`) } : {}),
       track_id: trackId,
       take_id: take.id,
       takeHashUnchanged: this.takes.takeHash(take.id) === before,
@@ -580,6 +586,15 @@ export class EngineController {
   private noteTake(id: string) {
     if (!this.changes.takes.includes(id)) this.changes.takes.push(id);
   }
+}
+
+/** One-line reason for a failed rehearsal: status plus the first failing step's (or invariant's) diagnostic. */
+function failureMessage(r: RunReport) {
+  const step = r.steps.find((s) => s.diagnostic && s.status !== 'completed');
+  if (step?.diagnostic) return uniqueMessage(`rehearsal ${r.status}: step ${step.id} (${step.verb}) ${step.diagnostic.code}: ${step.diagnostic.message}`);
+  if (r.violations.length) return uniqueMessage(`rehearsal ${r.status} with ${r.violations.length} invariant violation(s): ${r.violations[0].code}: ${r.violations[0].message}`);
+  const d = r.diagnostics[0];
+  return uniqueMessage(`rehearsal ${r.status}${d ? `: ${d.code}: ${d.message}` : ''}`);
 }
 
 /** Collapse repeated '; '-joined diagnostic messages and cap the length (tool output stays readable). */
