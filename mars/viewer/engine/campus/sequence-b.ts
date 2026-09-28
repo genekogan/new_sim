@@ -571,7 +571,8 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   if (secs.has('W')) {
     begin('W');
     const panels = P('wall-panel');
-    const walls = [...new Set(panels.map((p) => p.nodes[0]))].sort();
+    // upper walls first: an upper panel is handed up in the plane of the ground wall below it
+    const walls = [...new Set(panels.map((p) => p.nodes[0]))].sort((a, b) => { const ya = panels.find((p) => p.nodes[0] === a)!.y, yb = panels.find((p) => p.nodes[0] === b)!.y; return (yb > 1 ? 1 : 0) - (ya > 1 ? 1 : 0) || (a < b ? -1 : 1); });
     const onDeck = new Map<number, number>(); // who is up on which deck (level y)
     for (const wid of walls) {
       const ps = panels.filter((p) => p.nodes[0] === wid).sort((a, b) => (a.meta.panel as number) - (b.meta.panel as number));
@@ -586,20 +587,26 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         const hc = W((uMin + uMax) / 2, (lineV(0) + lineV(K - 1)) / 2);
         const outD: Vec2 = [q.p[0] - hc[0], q.p[2] - hc[1]];
         const wallAxis = localToWorld(q, [0, 0, 1]);
-        const wa: Vec2 = [wallAxis[0] - o[0], wallAxis[2] - o[1]];
+        const wa: Vec2 = [wallAxis[0] - o[0], wallAxis[2] - o[2]];
         const nrm: Vec2 = [-wa[1], wa[0]];
         const outN: Vec2 = dot2(nrm, outD) > 0 ? nrm : [-nrm[0], -nrm[1]];
         const sy = dot2(dY, outN) > 0 ? 1 : -1;
         // lying flat outside the wall, its length along the wall
         const Wd = def(p.def).size[2];
-        const lc: Vec2 = [q.p[0] + outN[0] * (0.3 + Wd / 2 + 0.05), q.p[2] + outN[1] * (0.3 + Wd / 2 + 0.05)];
-        const f = fetch(p, { x: r3(lc[0]), z: r3(lc[1]), yaw: r3(q.yaw + Math.PI / 2) }, G);
+        // flat on the ground outside the wall (room for its carriers; closer where a neighbour's stair is 1.5 m out)
+        const narrowW = Lc([q.p[0], q.p[2]])[0] < uMin + 0.1 && ctx.narrowMinusU(Lc([q.p[0], q.p[2]])[1]);
+        // …or, where a neighbour's stair leaves no room beside the wall, beyond the house's far end (walked in upright)
+        // (lying with the wall's heading, its length pointing away from the wall: tipping it up is a pure roll)
+        const Lp = def(p.def).size[0];
+        const lc: Vec2 = narrowW ? W(uMin - 0.3, lineV(0) - 1.9) : [q.p[0] + outN[0] * (0.4 + Lp / 2), q.p[2] + outN[1] * (0.4 + Lp / 2)];
+        const f = fetch(p, { x: r3(lc[0]), z: r3(lc[1]), yaw: r3(q.yaw) }, G);
         if (!f) continue;
         const lift = [
-          { actor: C(G[0]), grip: [upper ? -0.9 : 0, sy * 0.01, -0.4] as [number, number, number], stand: [-1.35, sy * 0.45, 0] as [number, number, number] },
-          { actor: C(G[1]), grip: [upper ? -0.9 : 0, sy * 0.01, 0.4] as [number, number, number], stand: [1.35, sy * 0.45, 0] as [number, number, number] },
+          // by its long edges; flat they stand 0.3 m beyond those edges, stood up 0.45 m out from its face
+          { actor: C(G[0]), grip: [upper ? -0.9 : 0, sy * 0.01, -0.55] as [number, number, number], stand: [0, sy * 0.45, -0.36] as [number, number, number] },
+          { actor: C(G[1]), grip: [upper ? -0.9 : 0, sy * 0.01, 0.55] as [number, number, number], stand: [0, sy * 0.45, 0.36] as [number, number, number] },
         ];
-        const from = { x: r3(outN[0] * 0.3), y: 0, z: r3(outN[1] * 0.3) };
+        const from = { x: r3(outN[0] * 0.3), y: upper ? -0.95 : 0, z: r3(outN[1] * 0.3) }; // the upper panel is walked in at its hand-off height
         if (line === 'frame' && !upper) {
           const st = step('install_wall', { part: p.id, to: pose(p), lift, from, fasten: G.map(C) }, G, [f], `stand ${p.id} against the end frames and screw it to them`);
           mark(p, st);
@@ -618,13 +625,13 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
           continue;
         }
         // upper wall: raised by the ground crew to two kneeling on the first-floor deck, screwed from both decks
-        const d3 = W(uIn, vP + (vP > Lc([q.p[0], q.p[2]])[1] ? 0.62 : -0.62));
+        const d3 = W(uIn, vP - 0.62 >= lineV(0) + 0.4 && !(vP + 0.62 <= lineV(K - 1) - 0.4 && vP + 0.62 <= Lc([q.p[0], q.p[2]])[1] + 1.2) ? vP - 0.62 : vP + 0.62);
         pre.push(step('walk_to', { actor: C(3), x: d3[0], z: d3[1], level: levelId(l1Top) }, [3], []));
         if (!onDeck.has(4)) { upOnto(0, seatOf(levels[2]), 4, uIn < (uMin + uMax) / 2 ? uMin : uMax, lineV(0) + 1.2); onDeck.set(4, l2Top); }
         const d5 = W(uIn, vP);
         pre.push(step('walk_to', { actor: C(4), x: d5[0], z: d5[1], level: levelId(l2Top) }, [4], []));
         const st = step('install_wall', {
-          part: p.id, to: pose(p), lift, from, take: [{ actor: C(2), grip: [-0.55, sy * 0.01, -0.3] }, { actor: C(3), grip: [-0.55, sy * 0.01, 0.3] }], handoff: 0.85, fasten: [C(2), C(4)],
+          part: p.id, to: pose(p), lift, from, take: [{ actor: C(2), grip: [-0.3, sy * 0.01, -0.3] }, { actor: C(3), grip: [-0.3, sy * 0.01, 0.3] }], handoff: 0.95, fasten: [C(2), C(4)],
         }, [...G, 2, 3, 4], [f, ...pre], `raise ${p.id} to the deck crew; screwed from the first-floor and roof decks`);
         mark(p, st);
       }
@@ -659,9 +666,19 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     for (const p of panels) { const k = `${r3(Lc([p.pose.p[0], p.pose.p[2]])[0])}`; rows.set(k, [...(rows.get(k) ?? []), p]); }
     for (const [, row] of [...rows.entries()].sort()) {
       row.sort((a, b) => Lc([a.pose.p[0], a.pose.p[2]])[1] - Lc([b.pose.p[0], b.pose.p[2]])[1]);
+      // mountable: both end stations (half its width + 0.45 m along the rails) on the roof deck, and no mounted neighbour
+      const vOf = (p: PartB) => Lc([p.pose.p[0], p.pose.p[2]])[1];
+      const reachEnd = def(row[0].def).size[2] / 2 + 0.45;
+      const vLo = lineV(0) - 0.0381 + 0.3, vHi = lineV(K - 1) + 0.0381 - 0.3; // (the deck spans frame centre to frame centre)
+      const chosen = new Set<number>();
+      for (let i = 0; i < row.length; i++) if (vOf(row[i]) - reachEnd >= vLo && vOf(row[i]) + reachEnd <= vHi && !chosen.has(i - 1)) chosen.add(i);
+      const pitch = row.length > 1 ? vOf(row[1]) - vOf(row[0]) : 0;
       for (const [i, p] of row.entries()) {
-        if (i % 2 === 1) {
-          for (const n of p.nodes) unplaced.push({ node: n, kind: 'feature:solar', reason: `not mounted: install_panel (solar.ts) stands its crew beyond both ends of the tilt axis, inside the neighbouring panels' places (${(1.0723 / 2 + 0.45).toFixed(2)} m from its centre vs ${(Lc([row[1].pose.p[0], row[1].pose.p[2]])[1] - Lc([row[0].pose.p[0], row[0].pose.p[2]])[1]).toFixed(2)} m panel pitch); with the neighbours tilted there is no station — needs side stations in install_panel` });
+        if (!chosen.has(i)) {
+          const why = vOf(p) - reachEnd < vLo || vOf(p) + reachEnd > vHi
+            ? `install_panel (solar.ts) stands its crew beyond both ends of the tilt axis (${reachEnd.toFixed(2)} m from the centre): one end falls off the roof deck at the end of the row`
+            : `install_panel (solar.ts) stands its crew beyond both ends of the tilt axis, inside the neighbouring panels' places (${reachEnd.toFixed(2)} m from its centre vs a ${pitch.toFixed(2)} m pitch): a tilted neighbour leaves no station, so only every other panel of the row is mounted`;
+          for (const n of p.nodes) unplaced.push({ node: n, kind: 'feature:solar', reason: `not mounted: ${why} — needs side stations in install_panel` });
           continue;
         }
         const vp = Lc([p.pose.p[0], p.pose.p[2]])[1];

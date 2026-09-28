@@ -43,7 +43,7 @@ const HAND_SPREAD = 0.15;
 const BODY_CLEAR = 0.25; // a held part in a holder's body band stays this far from their feet
 const FASTEN_S = 2.0;
 const SPEED = { carry: 0.6, set: 0.3, raise: 0.5 } as const;
-const STAGE = 4.5; // m: the part lies this close to where it goes (carried there first)
+const STAGE = 7.0; // m: the part lies this close to where it goes (carried there first; walked in by its crew)
 const STEP = 0.05;
 const TOL = 0.1; // per-tick envelope tolerance (as hand_up's)
 
@@ -235,10 +235,19 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
   const place = H ?? final;
   const delta: Vec2[] = p.lift.map((l) => { if (!l.at) return [0, 0]; const g = localToWorld(place, l.grip); return [l.at.x - g[0], l.at.z - g[2]]; });
   const feetAt = (i: number, q: Pose): Vec3 => standAt(p.lift[i], q, delta[i]);
+  // a sheet that stands (a wall panel): tipped up where it was lifted, then walked in upright
+  const standing = Math.abs(Math.abs(final.roll ?? 0) - Math.PI / 2) < 0.05 || Math.abs(Math.abs(final.pitch ?? 0) - Math.PI / 2) < 0.05;
+  const Up: Pose | null = standing ? { ...P, p: [C.p[0] + (P.p[0] - final.p[0]) * 0, C.p[1], C.p[2]] } : null;
+  if (Up) {
+    // same heading / tilt as P, its lowest grip at hands-hanging height, over where it was lifted
+    const g = Math.min(...p.lift.map((l) => localToWorld({ ...P, p: [0, 0, 0] }, l.grip)[1]));
+    Up.p = [C.p[0], floor + BODY_MODEL.restHand.up + 0.3 - g, C.p[2]];
+  }
   const segs: Seg[] = [
     { phase: 'crouch', who: 'lift', from: L0, to: L0, dur: T.crouch, follow: false },
     { phase: 'lift', who: 'lift', from: L0, to: C, dur: T.lift, follow: false },
-    { phase: 'walk-load', who: 'lift', from: C, to: P, dur: dur(C, P, SPEED.carry), follow: true },
+    ...(Up ? [{ phase: 'tip', who: 'lift' as const, from: C, to: Up, dur: 2.0, follow: true }] : []),
+    { phase: 'walk-load', who: 'lift', from: Up ?? C, to: P, dur: dur(Up ?? C, P, SPEED.carry), follow: true },
   ];
   if (H) {
     segs.push({ phase: 'reach_up', who: 'lift', from: P, to: H, dur: dur(P, H, SPEED.raise), follow: true });
@@ -320,7 +329,7 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
     }
   }
   // ---- swept path (supports may be touched at the end; the part's own lying spot is skipped)
-  const path = [C, P, ...(H ? [H] : []), final];
+  const path = [C, ...(Up ? [Up] : []), P, ...(H ? [H] : []), final];
   const ignore = [...sup.supports];
   const hit = sweepPoses(rt, e, path, ignore);
   if (hit) return fail(`${prefix}.path-blocked`, `${e.id} cannot be ${what === 'wall panel' ? 'stood' : 'set'} in place: it would hit ${hit.o.label ?? hit.o.id} at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])})`, [e.id, hit.o.id], hit.q.p);
@@ -427,8 +436,9 @@ export function stepSetPart(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (ex.si < prog.segs.length) return { status: 'running', phase: seg.phase };
     e.pose = { ...prog.final, p: [...prog.final.p] as Vec3 };
   }
-  // fastening (the holders keep hold until it is fastened)
+  // fastening (the holders keep hold until it is fastened; whoever screws it holds it too)
   ex.t += dt;
+  if (e.support?.kind === 'held') { const by = [...new Set([...e.support.by, ...prog.fasten])].sort(); if (by.length !== e.support.by.length) e.support = { kind: 'held', by }; }
   for (const a of prog.fasten) {
     const h = w.entities[a];
     const q = nearestPoint(e, prog.final, h.pose.p);

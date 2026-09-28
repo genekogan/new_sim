@@ -27,16 +27,17 @@ test('year build 2022 east-house A+B: plan — material rules, bill of materials
   const pb = b.partsB!;
   const roles = kinds(pb.parts.map((p) => ({ kind: p.role })));
   // 27 Kit deck strips (15 ft) → 6 + 6 + 3 ft pieces jointed on the beams, 25 wall panels, the Kit stair's lumber, 10 rails + 10 panels
-  assert.deepEqual(roles, { 'deck-piece': 81, handrail: 2, panel: 10, 'panel-rail': 10, post: 6, riser: 2, stringer: 6, 'tread-board': 16, 'wall-panel': 25 });
-  assert.equal(pb.parts.filter((p) => p.def.endsWith('n')).length, 55, '54 deck pieces on frame lines + the top tread\'s back board are notched');
-  assert.ok(Math.abs(kitStringerGeometry().L - 4.0293) < 1e-3);
-  // unplaced, each with its reason: the Kit draws two rail posts inside the end frame, one riser is a 6.5 cm sliver,
-  // and install_panel's end stations leave every other panel of the contiguous row unmountable
-  assert.deepEqual(kinds(b.unplaced), { 'feature:solar': 10, 'feature:stair-part': 3 });
+  assert.deepEqual(roles, { 'deck-piece': 81, handrail: 2, panel: 10, 'panel-rail': 10, post: 6, stringer: 6, 'tread-board': 16, 'wall-panel': 25 });
+  assert.equal(pb.parts.filter((p) => /n$/.test(p.def)).length, 55, '54 deck pieces on frame lines + the top tread\'s back board are notched');
+  assert.ok(Math.abs(kitStringerGeometry().L - 4.0590) < 1e-3);
+  // unplaced, each with its reason: two rail posts the Kit draws inside the end frame, three risers (a 6.5 cm sliver;
+  // two in slots between treads no verb can reach), and the solar panels install_panel cannot stand a crew for
+  // (the row's two end panels: a station off the roof deck; then every other one: tilted neighbours)
+  assert.deepEqual(kinds(b.unplaced), { 'feature:solar': 12, 'feature:stair-part': 5 });
   for (const u of b.unplaced) assert.ok(u.reason.length > 20, `${u.node}: ${u.reason}`);
   assert.ok(b.unplaced.filter((u) => u.kind === 'feature:solar').every((u) => /install_panel/.test(u.reason)));
   // sequenced: the skeleton and every other phase-B Kit feature
-  assert.deepEqual(kinds(b.sequenced), { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 10, 'feature:stair-part': 18, 'feature:wall': 4, upright: 12 });
+  assert.deepEqual(kinds(b.sequenced), { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 8, 'feature:stair-part': 16, 'feature:wall': 4, upright: 12 });
   // the phase-A part of the template is the phase-A plan itself (same yard, same steps)
   const a = yearBuildSetup(2022, 'east-house', loadCampusFile(2022));
   assert.equal(hashOf(b.template.steps.slice(0, b.phaseAStepCount)), hashOf(a.build.template.steps));
