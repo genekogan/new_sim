@@ -126,6 +126,7 @@ const PIN_TRANCHE: Record<string, { ticks: number; hash: string }> = {
 /** Whole-house A+B runs (YEAR_BUILD_FULL=1). W47 (checkpoint 1b): chiba and west-house green end to end and pinned; kitchen
  *  still stops at a refusal with 0 violations before it (`todo`, YEAR_BUILD.md "Checkpoint 1b … Next step"). */
 const FULL_RED: Record<string, string> = {
+  chiba: 'content parked (W51 re-seeded the 2022 scene after this run was pinned on the pre-W51 scene, 0ee1da11 @564548): re-run and re-pin with the content agent — see HISTORICAL_CONTENT.md',
   'west-house': 'S s1328-carry: carry.gather-stuck — m1 and m2 meet head-on in the take-out strip of pile-2x4-16ft-1 gathering round the handrail stock (the gather sends each carrier to the end the other stands at); needs a crossing-free gather assignment',
   kitchen: 'S s0995-carry: carry.path-occupied without end — idle m4, nudged onto the stair foot by make-ways, has no room to step aside (parking clear of the carry corridors moves east-house\'s A+B pin: held back)',
 };

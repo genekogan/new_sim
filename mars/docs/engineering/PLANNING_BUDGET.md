@@ -444,3 +444,9 @@ unchanged (engine suite green; east-house phase A reaches D0 at the same tick an
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
+
+### 2022 pins parked (W51, 2026-09-29)
+The 2022 scene was re-seeded (reconciliation a–f, i; content hash 8b88e6f0 → f8090a99). Every 2022 year-build pin is `todo` in
+its test with the old hash kept (east: 251a44c5 @41317, d382e461 @117277, 94db263e @53604, ddb634d6 @600599; tranches 940e9f64 /
+4862adfc / b4c42210; chiba full 0ee1da11 @564548). Nothing is re-pinned for content; the content agent re-runs and re-pins per
+HISTORICAL_CONTENT.md. The five perf-walk pins and the hypothetical flagship/v3/meal/stress pins are unchanged.
