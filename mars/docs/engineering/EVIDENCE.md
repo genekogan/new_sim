@@ -8,16 +8,16 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `f4d6738` (engine tree clean) |
-| Generated | 2026-09-28T09:28:34.589Z · Node v26.8.2 |
-| Engine suite | 328 tests in 51 files: 326 pass, 0 fail, 2 skipped · 55.8 s wall |
+| Git HEAD | `1395dd4` (engine tree clean) |
+| Generated | 2026-09-28T13:06:09.386Z · Node v26.8.2 |
+| Engine suite | 361 tests in 54 files: 358 pass, 0 fail, 3 skipped · 43.6 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
-| Capabilities beyond §28 | 21 PROVEN · 0 PARTIAL · 1 UNPROVEN (of 22) |
+| Capabilities beyond §28 | 27 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 536.5 s simulated, 6070 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 565.8 s simulated, 12488 ms compute, take 539425 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 565.8 s simulated, 18591 ms compute (cropped 12579 ms in the same test) · final `fee92ee0…` = cropped `fee92ee0…` (`campus-full.test.ts`) |
-| Determinism probe | `build-bay/open-ground` completed, 10729 ticks · final state `0147f8f12a997462f5e6adfe71ffef1a8bc7e850d84082289328111618fd30d5` · take `dd263bf6e82d889c7baa2466` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 5076 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 7855 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 12194 ms compute (cropped 7821 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
+| Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
 PROVEN means only that the listed tests pass; the approximation notes say what they do not show.
@@ -292,8 +292,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Capability | Status | Tests passed | What remains approximate |
 | --- | --- | ---: | --- |
 | Loads on stairs (single carrier) | PROVEN | 7/7 | Single carrier only: no crews on a flight, no ladders, no turning flights or more than one flight per carry, no loads whose carry pose has a pitch (plywood on edge), no mid-flight replanning, and cancel on the flight is refused rather than modelled. One straight flight on the proving ground; the set-down check is distance only (CARRY.md 'Between levels'). |
-| Social vocabulary + slots (reservation semantics) | PROVEN | 13/13 | Seats have no armrest or leg geometry: each fixture is one catalog box (a chair's includes its back), and the seated exemption is by activity, not per fixture. Approach points are not reserved (a person standing on one makes the sitter yield/replan). No turn-taking, gaze, gestures, group re-forming or automatic pre-emption; ambient never re-adopts a released person (SOCIAL.md). |
-| EUC / bicycle riding | PROVEN | 8/8 | No vehicle-vehicle collision or traffic rules (each sees the other's rider as a person). Vehicles are discs (the bicycle's 1.75 m length is not swept), with no lean, wheel or balance kinematics and no reversing; one level only (no links). Walkers see a rider as a 0.28 m person, not the vehicle disc. Proving ground only, not the campus (VEHICLES.md). |
+| Social vocabulary + slots (reservation semantics) | PROVEN | 13/13 | Seats have no armrest or leg geometry: each fixture is one catalog box (a chair's includes its back), and the seated exemption is by activity, not per fixture. Approach points are not reserved (a person standing on one makes the sitter yield/replan). No turn-taking, gaze, gestures or group re-forming; ambient never re-adopts a released person. Automatic pre-emption by directed tasks is its own row (social-preemption) (SOCIAL.md). |
+| EUC / bicycle riding | PROVEN | 8/8 | Vehicles are discs for walkers and for their own path planning (the bicycle's 1.75 m length is not swept), with no lean, wheel or balance kinematics and no reversing; one level only (no links). Walkers see a rider as a 0.28 m person, not the vehicle disc. Proving ground only, not the campus. Vehicle–vehicle collision and right of way are their own row (vehicle-traffic) (VEHICLES.md). |
 | Forklift to deck edges (rule-based) | PROVEN | 7/7 | Rule-based, not dynamics: no tilt, pallets or dunnage, flat 1000 kg capacity (no load-moment chart), final alignment by standstill pivot + side-shift (no three-point turns); the truck body is not swept against people beyond the 1.5 m stop rule. Proving ground only (VEHICLES.md). |
 | Historical years as protected states (2020–2025) | PROVEN | 8/8 | The years are the procedural reconstructions from app/history (hypothesis-grade geometry, not surveys), ground-only (decks block; no upper floors or stairs). Routes are proven in 2021 and 2022 only; no build or carry has been run in a historical year. |
 | Camera occlusion parity with the render | PROVEN | 5/5 | The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15. |
@@ -309,10 +309,16 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Solar panels, rails and equipment | PROVEN | 4/4 | Tilt legs / rear risers are implied and the tilt direction is fixed (no azimuth choice); rails, equipment and low panels are set from ≤ 1 m; rails are assumed screwed to the sheets; sloped roofs are not modelled; no wiring (SOLAR_PAINT.md). Proven on a synthetic deck, not in a year build. |
 | Painting a wall | PROVEN | 3/3 | Flat upright faces only, one rectangular face per call, no drips, layers or drying; coverage is an area fraction, not a texture mask; the band below 0.5 m (crouching) is out of reach (SOLAR_PAINT.md). Renderer texture = colour + stripe until textures exist. |
 | Year build phase A: a historical skeleton from the piles | PROVEN | 9/9 | The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md). |
-| Year build phase B: floors, stairs, walls, solar in the year sequence | UNPROVEN | 0/0 | Not proven by this suite at all. |
+| Year build phase B: floors, stairs, walls, solar in the year sequence | PARTIAL | 3/4 | PARTIAL by construction: the default suite executes only the plan (material rules for deck strips, the Kit stair, walls and solar; BOM; yard; unplaced reasons; determinism), the report-only plans of the other three 2022 houses, and ONE executed phase-B section — the first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pass_up, screwed; 0 violations, pinned 94db263e… @53604). The whole east-house A+B run (decks, stair, walls, solar) is gated YEAR_BUILD_FULL=1, is skipped here and has no pin yet (PIN_FULL_AB empty at HEAD); W13 reports each section (ground / first-floor / roof deck, Kit stair, walls, solar) running clean in its own runs (commits d44c601…c3405da), but no committed test executes the stair, wall or solar sections — in this suite they are proven only as plans. Kit geometry (deck strips at beam height without joists, an 8-tread stair without stringers) is a reconstruction guess — open questions for Gene (PROGRESS.md). |
 | Natural walking: splined turns, block reaction, stall metric | PROVEN | 17/17 | Walker–walker encounters use the smoothed path ahead and a 1 s chord of the other's path — no time-to-collision model; head-on round a tight corner falls to the single-file rule; the emergency stop is velocity to 0 in one tick; a walker walled in by a crowd that never moves waits with a named reason; 1.08–1.5 m gaps between people are walkable but not plannable at 0.1 m cells (MOVEMENT.md §6). Still heuristic, not ORCA, not proven deadlock-free. |
-| One body model (engine reach = the measured rig) and mars-take/2 fields | PROVEN | 4/4 | The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. `hands` changes dominate long takes (≈ 0.9 MB of the 2.4 MB 2022 first-bay take): recorded per change, not thinned. |
+| One body model (engine reach = the measured rig) and mars-take/2 fields | PROVEN | 5/5 | The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact). |
 | Composite flagship builds (v2: forklift + stairs carry + campfire) | PROVEN | 3/3 | Layouts were adjusted until refusals stopped (the forklift stages s2 beside the bay, benches use gather); the engine gap `carryIntegrity` flags fork loads is routed around in the scenario (HANDOFF flagship v2). v3 (hand-up) is in the hand-up row and has no campus variant. |
+| Camera direction, phase 1: directions compile to computed trajectories | PROVEN | 15/15 | Synthesis collides with static geometry only (people and parts per tick come from phase 2). No year scene has door objects: the 2024 'kitchen' route enters over a 1.26 m half wall / through a 0.79 m serving hatch, and 2026 has no kitchen or sink. 'Main pallet racks' resolves through the take's 'rack bay' structure, not a named asset. The sun model's north offset is 0 (unverified site bearing), so 'sunset behind' is only as right as that assumption. The camera navmesh is rebuilt per call (100–250 ms). Only the flagship take, the 2026 and 2024 year scenes and proving-ground fixtures are exercised. |
+| Camera direction, phase 2: every shot simulated and self-corrected (incl. occluded) | PROVEN | 11/11 | Ladders are fixed and the first candidate valid on every sample wins — not an optimiser (the flagship orbit needed raise +2.5 m after +0.5/+1/+1.5 m stayed occluded). Thresholds (squeeze 1.2 m wide / 1.0 m high / 0.3 m from a part for ≥ 0.3 m or 0.5 s; bystander ≤ 1.5 m covering ≥ 25 %; sun < 6°; < 75 % framed; readability 0.6) are chosen, not measured against footage. Occlusion and readability use the planner's prisms and per-tick people / part boxes, not the render mesh; the render comparison (verifyCamera over directed tracks) runs only in Playwright, not in this report. Fixtures are synthetic yards; the only real takes exercised are the flagship and the 2024 kitchen route. Readability of the year-build takes stays low (bay 1 min 0.42, whole house 0.31) — the planner's 0.5 Hz slow shots accept it. |
+| Takes mars-take/3 + /4: thinned hands / speed, entities0 + removed, compact events, file cameras | PROVEN | 4/4 | A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track. |
+| No walker jumps: per-tick step budget, teleport and overspeed invariants | PROVEN | 2/2 | The suite measures the per-tick bound on stress-30 and the campfire evening (max 0.0675 m); the six-run diagnosis (classes A–C) was a scratch spy, and the other pinned runs are covered only through the invariants during their own tests. Carry, climb, stance and sit publish no speed, so they are bounded only by motion.teleport. The look-ahead still assumes 0.9 m/s lateral, so walkers briefly slow while sidestepping. Runs got 1–2 % longer (MOVEMENT.md §7). |
+| Automatic pre-emption of social holds by directed tasks | PROVEN | 7/7 | No resumption: a pre-empted sit or conversation is not resumed after the task; a converse loses all its members, not only the directed one. Only actor claims under social actions are pre-emptible — any other conflict is still refused. snapshot() refuses while a directive waits for a stand-up. Proven on proving-ground fixtures, not on a campus scene. |
+| Vehicle–vehicle collision and right of way | PROVEN | 6/6 | Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world cannot move vehicles, so the forced overlaps in the tests are raw world edits. Proving ground only. |
 
 ### Loads on stairs (single carrier) — PROVEN
 
@@ -350,7 +356,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `social.test.ts` | a seat whose approach point is walled in front and behind is refused slot.unreachable naming the wall; nothing is reserved |
 | pass | `api.test.ts` | api: seeds carry regions and a campfire + benches, so social verbs have targets over the op API |
 
-*Approximate:* Seats have no armrest or leg geometry: each fixture is one catalog box (a chair's includes its back), and the seated exemption is by activity, not per fixture. Approach points are not reserved (a person standing on one makes the sitter yield/replan). No turn-taking, gaze, gestures, group re-forming or automatic pre-emption; ambient never re-adopts a released person (SOCIAL.md).
+*Approximate:* Seats have no armrest or leg geometry: each fixture is one catalog box (a chair's includes its back), and the seated exemption is by activity, not per fixture. Approach points are not reserved (a person standing on one makes the sitter yield/replan). No turn-taking, gaze, gestures or group re-forming; ambient never re-adopts a released person. Automatic pre-emption by directed tasks is its own row (social-preemption) (SOCIAL.md).
 
 ### EUC / bicycle riding — PROVEN
 
@@ -367,7 +373,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `vehicles.test.ts` | kerbs: a 12 cm kerb a walker steps over blocks the EUC (step 5 cm), which rides round it |
 | pass | `vehicles.test.ts` | vehicle invariants fire on deliberately invalid states (close pass, rider off the pose, teleport, speed) |
 
-*Approximate:* No vehicle-vehicle collision or traffic rules (each sees the other's rider as a person). Vehicles are discs (the bicycle's 1.75 m length is not swept), with no lean, wheel or balance kinematics and no reversing; one level only (no links). Walkers see a rider as a 0.28 m person, not the vehicle disc. Proving ground only, not the campus (VEHICLES.md).
+*Approximate:* Vehicles are discs for walkers and for their own path planning (the bicycle's 1.75 m length is not swept), with no lean, wheel or balance kinematics and no reversing; one level only (no links). Walkers see a rider as a 0.28 m person, not the vehicle disc. Proving ground only, not the campus. Vehicle–vehicle collision and right of way are their own row (vehicle-traffic) (VEHICLES.md).
 
 ### Forklift to deck edges (rule-based) — PROVEN
 
@@ -598,13 +604,20 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 *Approximate:* The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md).
 
-### Year build phase B: floors, stairs, walls, solar in the year sequence — UNPROVEN
+### Year build phase B: floors, stairs, walls, solar in the year sequence — PARTIAL
 
 *Required:* The skeleton is completed from the piles: deck sheets cut and handed up, the Kit stair built from stringers and treads, plywood walls, solar modules on rails — ending equal to the year's protected checkpoint (owner feedback §7–§9).
 
-**No test.** Phase B foundations and a WIP generator are at HEAD (catalog-phase-b.ts, parts-b.ts, pass_up, set_part/install_* verbs, sequence-b.ts: a ground-floor deck section runs clean in the lab), but no engine test cites phaseB, parts-b, sequence-b, moves-b or pass_up yet; W13 is still working on it.
+| Result | File | Test |
+| --- | --- | --- |
+| pass | `year-build-b.test.ts` | year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged |
+| pass | `year-build-b.test.ts` | year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons) |
+| pass | `year-build-b.test.ts` | year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned |
+| skip | `year-build-b.test.ts` | year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1) |
 
-*Approximate:* Not proven by this suite at all.
+*Evidence outside this suite (not run here):* `docs/engineering/YEAR_BUILD.md`
+
+*Approximate:* PARTIAL by construction: the default suite executes only the plan (material rules for deck strips, the Kit stair, walls and solar; BOM; yard; unplaced reasons; determinism), the report-only plans of the other three 2022 houses, and ONE executed phase-B section — the first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pass_up, screwed; 0 violations, pinned 94db263e… @53604). The whole east-house A+B run (decks, stair, walls, solar) is gated YEAR_BUILD_FULL=1, is skipped here and has no pin yet (PIN_FULL_AB empty at HEAD); W13 reports each section (ground / first-floor / roof deck, Kit stair, walls, solar) running clean in its own runs (commits d44c601…c3405da), but no committed test executes the stair, wall or solar sections — in this suite they are proven only as plans. Kit geometry (deck strips at beam height without joists, an 8-tread stair without stringers) is a reconstruction guess — open questions for Gene (PROGRESS.md).
 
 ### Natural walking: splined turns, block reaction, stall metric — PROVEN
 
@@ -642,10 +655,11 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `body-model.test.ts` | body model is internally consistent: overhead, caps vs envelopes, bands from the rig, landmarks |
 | pass | `take-fields.test.ts` | take fields (mars-take/2): the meal take carries hands, baseActivity, speed and bowl contents tick for tick |
 | pass | `take-fields.test.ts` | take fields (mars-take/2): a hand-up take carries every holder's hands (incl. the crouch / reach_down approach) and who stands on the beam |
+| pass | `take-fields.test.ts` | take fields (mars-take/3): thinChanges — keyframes reproduce every tick of the step signal within tolerance; holds, shape changes and releases exact |
 
 *Evidence outside this suite (not run here):* `viewer/e2e/poses.spec.ts`, `docs/engineering/BODY_MODEL.md`
 
-*Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. `hands` changes dominate long takes (≈ 0.9 MB of the 2.4 MB 2022 first-bay take): recorded per change, not thinned.
+*Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
 
 ### Composite flagship builds (v2: forklift + stairs carry + campfire) — PROVEN
 
@@ -659,6 +673,117 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 *Approximate:* Layouts were adjusted until refusals stopped (the forklift stages s2 beside the bay, benches use gather); the engine gap `carryIntegrity` flags fork loads is routed around in the scenario (HANDOFF flagship v2). v3 (hand-up) is in the hand-up row and has no campus variant.
 
+### Camera direction, phase 1: directions compile to computed trajectories — PROVEN
+
+*Required:* Owner feedback §11: typed directions (pan / tilt / dolly / orbit / crane / push_in / pull_out / fly_through / hold, subject entity / structure / region / group, framing, sun-behind, interior) compile to shot programs whose trajectories are computed — orbit radius from subject extent and lens, sun-behind windows from the sun model, interior moves routed through openings on a camera navmesh — under motion caps; ambiguous or unknown subjects are refused with candidates, never guessed; exposed as engine_direct_camera.
+
+| Result | File | Test |
+| --- | --- | --- |
+| pass | `camera-direct.test.ts` | vocabulary: invalid verbs, a revolution without an angle, duration + speed are refused by the schema |
+| pass | `camera-direct.test.ts` | sentence: "do a 270° revolution around the main pallet racks over 2 minutes" → orbit of the take's rack bay |
+| pass | `camera-direct.test.ts` | sentence: "do a pan across Chiba with the sunset in the background" → pan + sun window from the sun model |
+| pass | `camera-direct.test.ts` | sentence: "go inside the kitchen and face the sink" (2024) → interior room + clustered sink fixture |
+| pass | `camera-direct.test.ts` | sentence: "look at this crowd of people having this activity" → the group in that action at that time |
+| pass | `camera-direct.test.ts` | resolver: ambiguous and unknown names are refused with candidates / what is known, never guessed |
+| pass | `camera-direct.test.ts` | program: lead-in hold, one dense path shot per direction, contiguous windows, corrections reserved |
+| pass | `camera-direct.test.ts` | api: engine_direct_camera plans + stores a directed track beside the take; refusals are structured; the take is untouched |
+| pass | `camera-synth.test.ts` | (b) 2026: pan across Chiba with the sunset behind — every sample in the sun window (checked against solarPosition) |
+| pass | `camera-synth.test.ts` | (c) 2024: go inside the kitchen and face the sink — routed through the opening, never through a wall |
+| pass | `camera-synth.test.ts` | group: the carry crew is orbited with the orbit centre following the group |
+| pass | `camera-synth.test.ts` | navmesh: through the door; over an open-top wall on the flight layer; a sealed room is refused |
+| pass | `camera-synth.test.ts` | motion caps: too-fast moves are refused with the minimum duration; defaults stay under the caps |
+| pass | `camera-synth.test.ts` | verbs: tilt / dolly / crane / pull_out / hold have the geometry their names promise, all valid |
+| pass | `camera-synth.test.ts` | determinism: the same directions give the identical track hash, and the track round-trips through JSON |
+
+*Evidence outside this suite (not run here):* `viewer/e2e/studio-direct.spec.ts`, `docs/engineering/CAMERA_DIRECT.md`
+
+*Approximate:* Synthesis collides with static geometry only (people and parts per tick come from phase 2). No year scene has door objects: the 2024 'kitchen' route enters over a 1.26 m half wall / through a 0.79 m serving hatch, and 2026 has no kitchen or sink. 'Main pallet racks' resolves through the take's 'rack bay' structure, not a named asset. The sun model's north offset is 0 (unverified site bearing), so 'sunset behind' is only as right as that assumption. The camera navmesh is rebuilt per call (100–250 ms). Only the flagship take, the 2026 and 2024 year scenes and proving-ground fixtures are exercised.
+
+### Camera direction, phase 2: every shot simulated and self-corrected (incl. occluded) — PROVEN
+
+*Required:* Every directed shot is simulated sample by sample against the take (people and parts per tick, the sun, the motion caps) for collision, squeeze (stuck between plywood), foreground (behind a head), flare, subject leaving frame, horizon, motion and occlusion of the subject by non-subjects (planner readability < 0.6); failures are fixed by an explicit ladder (raise → widen → swing → re-route → shorten → split → cut), one knob per correction with the searched start heading kept, each recorded with failure, samples, strategy, before/after and reason; nothing works → refused with every strategy listed. The take sampler classifies entities by kind (piles are boxes, removed entities leave at their removal tick).
+
+| Result | File | Test |
+| --- | --- | --- |
+| pass | `camera-correct.test.ts` | checks: squeeze is a sustained narrow gap (two sheets 0.8 m apart), not a door; foreground, flare, horizon, motion are per sample |
+| pass | `camera-correct.test.ts` | fixture "stuck between plywood": a dolly through two standing sheets 0.8 m apart → raise, recorded with the numbers |
+| pass | `camera-correct.test.ts` | fixture "behind a head": a bystander walks past the lens during a hold → raise (or swing), only the crossing flagged |
+| pass | `camera-correct.test.ts` | fixture "the group outgrows the frame": one of two people walks 5 m away mid-hold → widen (raise does not address framing) |
+| pass | `camera-correct.test.ts` | fixture "subject leaves frame": a 270° orbit of a crew that walks 6 m — the orbit centre follows, no correction; a fixed centre would fail |
+| pass | `camera-correct.test.ts` | fixture "flare": a pan across the sun low in the west → swing within the sun-behind band, every sample ≥ 6° off axis |
+| pass | `camera-correct.test.ts` | fixture "impossible": a fly-through into a sealed room is refused with every strategy listed |
+| pass | `camera-correct.test.ts` | phase-1 flagship shots through phase 2: the bay orbit (structure growing during it) is corrected for two crew members hiding the uprights (raise), the carry-crew orbit is valid as computed |
+| pass | `camera-synth.test.ts` | (a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — through phase 2, planner validators pass |
+| pass | `camera-take-file.test.ts` | takeSampler: piles are boxes (kind from finalState / entities0), the emptied pile leaves at its removal tick; legacyKinds reproduces the old people-piles |
+| pass | `camera-take-file.test.ts` | takeSampler: the flagship has no piles — identical with and without legacyKinds, so its planned camera is unchanged |
+
+*Evidence outside this suite (not run here):* `viewer/e2e/camera-verify.spec.ts`, `viewer/e2e/studio-direct.spec.ts`, `docs/engineering/CAMERA_DIRECT.md`, `docs/engineering/CAMERA_VERIFY.md`
+
+*Approximate:* Ladders are fixed and the first candidate valid on every sample wins — not an optimiser (the flagship orbit needed raise +2.5 m after +0.5/+1/+1.5 m stayed occluded). Thresholds (squeeze 1.2 m wide / 1.0 m high / 0.3 m from a part for ≥ 0.3 m or 0.5 s; bystander ≤ 1.5 m covering ≥ 25 %; sun < 6°; < 75 % framed; readability 0.6) are chosen, not measured against footage. Occlusion and readability use the planner's prisms and per-tick people / part boxes, not the render mesh; the render comparison (verifyCamera over directed tracks) runs only in Playwright, not in this report. Fixtures are synthetic yards; the only real takes exercised are the flagship and the 2024 kitchen route. Readability of the year-build takes stays low (bay 1 min 0.42, whole house 0.31) — the planner's 0.5 Hz slow shots accept it.
+
+### Takes mars-take/3 + /4: thinned hands / speed, entities0 + removed, compact events, file cameras — PROVEN
+
+*Required:* Long year-build takes stay small without changing what a replay shows: hands / speed thinned to keyframes (5 mm / 1 cm/s, releases exact), pose tracks at 4 mm / 8 mrad with exact hold ends, every tracked entity's initial state (entities0) and removal tick so emptied piles stay drawable, same-tick lifecycle runs and repeated blocked waits folded losslessly, and extra camera tracks carried beside the planned one in the take file; final state and every pin unchanged.
+
+| Result | File | Test |
+| --- | --- | --- |
+| pass | `take-fields.test.ts` | take fields (mars-take/3): thinChanges — keyframes reproduce every tick of the step signal within tolerance; holds, shape changes and releases exact |
+| pass | `take-fields.test.ts` | take fields (mars-take/4): entities0 + removed — an emptied stack removed mid-take is recorded as first seen, sampled until its removal tick; poses within TRACK_TOL every tick |
+| pass | `take-fields.test.ts` | take events (mars-take/4): compactEvents folds same-tick lifecycles losslessly and merges repeated blocked waits; final state and tracks unchanged |
+| pass | `camera-take-file.test.ts` | take file: a directed track is carried beside the planned camera (`cameras`), round-trips through JSON, never changes the take; foreign / clashing tracks are refused |
+
+*Evidence outside this suite (not run here):* `viewer/deploy/record-campus-take.mjs`, `viewer/e2e/studio-build.spec.ts`, `viewer/e2e/studio-take.spec.ts`, `docs/engineering/TAKES_AND_PLANS.md`
+
+*Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
+
+### No walker jumps: per-tick step budget, teleport and overspeed invariants — PROVEN
+
+*Required:* A person on foot moves at most min(speed, 1.4 m/s)·DT per tick — forward progress, sidestep and pull-back share one budget, offsets are reverted with a cancelled step and narrow by bisection, stair entries and frame climbs start from the body — and publishes an honest speed; the invariants motion.teleport (0.15 m/tick on foot; riders and carried loads 0.6 m) and motion.overspeed (published speed ≤ activity cap + 5 %) fail loudly otherwise.
+
+| Result | File | Test |
+| --- | --- | --- |
+| pass | `movement.test.ts` | no jumps: a walker moves at most min(speed, 1.4 m/s)·DT per tick and publishes an honest speed — stress-30 (60 s), campfire evening (75 s) |
+| pass | `review.test.ts` | no jumps (W21): a person on foot moves ≤ 0.15 m per tick (riders and carried loads keep 0.6 m); a published speed above its activity cap + 5 % is motion.overspeed |
+
+*Evidence outside this suite (not run here):* `docs/engineering/MOVEMENT.md`
+
+*Approximate:* The suite measures the per-tick bound on stress-30 and the campfire evening (max 0.0675 m); the six-run diagnosis (classes A–C) was a scratch spy, and the other pinned runs are covered only through the invariants during their own tests. Carry, climb, stance and sit publish no speed, so they are bounded only by motion.teleport. The look-ahead still assumes 0.9 m/s lateral, so walkers briefly slow while sidestepping. Runs got 1–2 % longer (MOVEMENT.md §7).
+
+### Automatic pre-emption of social holds by directed tasks — PROVEN
+
+*Required:* A directed task whose only conflicts are actor claims held by social actions pre-empts them: the smallest unit is released (the person's own seat / slot — a gather keeps the rest; the ambient walk; the whole converse / face), a seated person stands up (0.6 s) before the directive plans, the reason 'pre-empted by <id> (<verb>)' is recorded on the action and in take events; social vs social stays a reservation conflict; autonomous make-way nudges are not directives; preempt: false restores the refusal; deterministic.
+
+| Result | File | Test |
+| --- | --- | --- |
+| pass | `social.test.ts` | pre-emption: a seated person given a directed carry stands up (0.6 s) first, then carries; the sit ends cancelled "pre-empted by <carry>"; 0 violations |
+| pass | `social.test.ts` | pre-emption: cancelling a waiting directive ends it cancelled without starting it; the stand-up still finishes |
+| pass | `social.test.ts` | pre-emption: one of a converse pair gets a directed walk → the conversation ends for both with the reason, the other is idle, the walk runs |
+| pass | `social.test.ts` | pre-emption: a gather of 4 round the campfire, one directed away → that member leaves (reason named), 3 keep warming, the gather goes on |
+| pass | `social.test.ts` | pre-emption: a social verb never pre-empts another (reservation.conflict unchanged); preempt: false restores the refusal |
+| pass | `social.test.ts` | pre-emption: an autonomous make-way nudge (walk.ts `<who>:make-way:<tick>`) is not a directive — refused as before, the conversation goes on |
+| pass | `social.test.ts` | pre-emption determinism: seated carry + converse pre-emption twice → same state hash and event log |
+
+*Evidence outside this suite (not run here):* `docs/engineering/SOCIAL.md`
+
+*Approximate:* No resumption: a pre-empted sit or conversation is not resumed after the task; a converse loses all its members, not only the directed one. Only actor claims under social actions are pre-emptible — any other conflict is still refused. snapshot() refuses while a directive waits for a stand-up. Proven on proving-ground fixtures, not on a campus scene.
+
+### Vehicle–vehicle collision and right of way — PROVEN
+
+*Required:* Ridden vehicles see each other's footprints (box + rider + tines + fork load): an invariant collision.vehicle-vehicle names both; right of way (smaller yields, then the earlier ride, then id); a follower stops ≥ 1 m short of a vehicle on its path with traffic.vehicle naming it, yields 1 m clear of a right-of-way lane or pulls over and resumes; stationary ridden vehicles are planned round; an unyieldable conflict is refused at plan time as vehicle.path-conflict naming both.
+
+| Result | File | Test |
+| --- | --- | --- |
+| pass | `forklift.test.ts` | traffic: head-on forklift vs EUC in one 3 m lane — the rider (smaller) pulls over and waits ≥ 1 m clear of the forklift's lane, both arrive; 0 violations |
+| pass | `forklift.test.ts` | traffic: a rider stopped in the forklift's lane — the forklift stops ≥ 1 m short and waits with the rider named; once the rider rides off it carries on; 0 violations |
+| pass | `forklift.test.ts` | traffic: two forklifts crossing — f2 (same size, id after f1) stops clear of f1's lane with the reason named, then crosses; 0 violations |
+| pass | `forklift.test.ts` | traffic: plan-time vehicle.path-conflict — an EUC boxed against a wall inside a moving forklift's lane cannot yield, so its ride is refused naming both |
+| pass | `forklift.test.ts` | traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not |
+| pass | `forklift.test.ts` | traffic determinism: the head-on run twice → same state hash and event log |
+
+*Evidence outside this suite (not run here):* `docs/engineering/VEHICLES.md`
+
+*Approximate:* Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world cannot move vehicles, so the forced overlaps in the tests are raw world edits. Proving ground only.
+
 ## SPEC §30 milestones
 
 | Milestone | Status | Tests passed | What remains approximate |
@@ -670,7 +795,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | E. Progressive construction | PROVEN | 11/11 | One bay on the proving ground, not an extended multi-bay run; the 2022 first bay (capability 'Year build phase A') is the multi-frame case. The forklift is used inside the v2/v3 sequences (staging beside the bay, presenting s2 at deck height), and people now climb frames and stand on beams, but there are still no ladders or scaffold. Deck/stair/tread dimensions and the plywood span rule are provisional. |
 | F. Rehearsal + official execution | PROVEN | 8/8 | The engine detects failures and staleness; fixing them is the external director's job (rebind), with no automatic repair loop in the suite. The campus flagship is hypothetical (design-edit inventory and crew), not a documented historical build. |
 | G. Replay + branching | PROVEN | 9/9 | Forks resume from quiescent checkpoints, or mid-action for walking/social only (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video. |
-| H. Inhabited Mars scenes | PROVEN | 9/9 | Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze, gestures or automatic pre-emption (SOCIAL.md). |
+| H. Inhabited Mars scenes | PROVEN | 9/9 | Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze or gestures; pre-emption by directed tasks exists (capability social-preemption) but a pre-empted sit / conversation is not resumed (SOCIAL.md). |
 
 ### A. Audited foundation — PROVEN
 
@@ -791,7 +916,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | Result | File | Test |
 | --- | --- | --- |
-| pass | `take.test.ts` | take fidelity: sampling at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level |
+| pass | `take.test.ts` | take fidelity: sampling at every tick reproduces true poses within TRACK_TOL + ½ quantum (4.5 mm / 8.5 mrad, mars-take/4) and exact activity/level |
 | pass | `take.test.ts` | deterministic take bytes: identical runs produce byte-identical takes |
 | pass | `take.test.ts` | replay camera independence: camera tracks never change the take, its hash or its final state |
 | pass | `take.test.ts` | replay isolation: sampling an old take never touches history, the live workspace or the take |
@@ -819,105 +944,53 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `social.test.ts` | ambient_wander: 6 people for 60 s, every target inside the region, 0 violations; a directed task claims a person and ambient lets go |
 | pass | `social.test.ts` | determinism: gather + converse + ambient twice → same state hash |
 
-*Approximate:* Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze, gestures or automatic pre-emption (SOCIAL.md).
+*Approximate:* Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze or gestures; pre-emption by directed tasks exists (capability social-preemption) but a pre-empted sit / conversation is not resumed (SOCIAL.md).
 
 ## New regressions since the previous report
 
-Compared with the report at `6ad36f0` (2026-09-28T02:26:31.956Z): 86 added, 3 removed.
+Compared with the report at `f4d6738` (2026-09-28T09:28:34.589Z): 35 added, 2 removed.
 
-- added: body-model.test.ts :: body model = the measured rig (W9, poses.spec.ts "body model", within 2 cm)
-- added: body-model.test.ts :: body model is internally consistent: overhead, caps vs envelopes, bands from the rig, landmarks
-- added: build-bay-v3.test.ts :: flagship v3: deck handed up (joists + s1 by hand to two on the beams, s2 off the forklift), 0 violations, rehearse = execute, pinned
-- added: camera-direct.test.ts :: api: engine_direct_camera plans + stores a directed track beside the take; refusals are structured; the take is untouched
-- added: camera-direct.test.ts :: program: lead-in hold, one dense path shot per direction, contiguous windows, corrections reserved
-- added: camera-direct.test.ts :: resolver: ambiguous and unknown names are refused with candidates / what is known, never guessed
-- added: camera-direct.test.ts :: sentence: "do a 270° revolution around the main pallet racks over 2 minutes" → orbit of the take's rack bay
-- added: camera-direct.test.ts :: sentence: "do a pan across Chiba with the sunset in the background" → pan + sun window from the sun model
-- added: camera-direct.test.ts :: sentence: "go inside the kitchen and face the sink" (2024) → interior room + clustered sink fixture
-- added: camera-direct.test.ts :: sentence: "look at this crowd of people having this activity" → the group in that action at that time
-- added: camera-direct.test.ts :: vocabulary: invalid verbs, a revolution without an angle, duration + speed are refused by the schema
-- added: camera-synth.test.ts :: (a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — planner validators pass
-- added: camera-synth.test.ts :: (b) 2026: pan across Chiba with the sunset behind — every sample in the sun window (checked against solarPosition)
-- added: camera-synth.test.ts :: (c) 2024: go inside the kitchen and face the sink — routed through the opening, never through a wall
-- added: camera-synth.test.ts :: determinism: the same directions give the identical track hash, and the track round-trips through JSON
-- added: camera-synth.test.ts :: group: the carry crew is orbited with the orbit centre following the group
-- added: camera-synth.test.ts :: motion caps: too-fast moves are refused with the minimum duration; defaults stay under the caps
-- added: camera-synth.test.ts :: navmesh: through the door; over an open-top wall on the flight layer; a sealed room is refused
-- added: camera-synth.test.ts :: verbs: tilt / dolly / crane / pull_out / hold have the geometry their names promise, all valid
-- added: campus-full.test.ts :: flagship full campus: final-state hash === the cropped run (bit-identical: grids share one lattice)
-- added: campus-full.test.ts :: flagship on the full uncropped Mars 2026 campus: completes, 0 violations, ends identical to the cropped run
-- added: core.test.ts :: engine source never calls the host transcendentals or hypot (use the core/math.ts d* versions and its hypot)
-- added: frame.test.ts :: a beam walkway exists only when both beams connect the frames at that height
-- added: frame.test.ts :: climb links exist only on installed uprights; one per column and beam seat
-- added: frame.test.ts :: climb up, walk a beam at ≤ 0.4 m/s; walk_to cannot reach a beam; too fast is refused
-- added: frame.test.ts :: no carrying a sheet on a beam or up a frame (small loads only); the diagnostic names the beam
-- added: frame.test.ts :: nobody walks a beam under a deck; stepping off onto the deck goes from an open spot on the beam
-- added: frame.test.ts :: someone on a beam whose partner beam is removed is flagged (frame.link-gone)
-- added: grid-incremental.test.ts :: grids of different bounds share one lattice: same cell centres, free cells and routes
-- added: handup-rules.test.ts :: API spatial scene: frame climb links / beam walkways are in it by default, opt-out with frameAccess: false
-- added: handup-rules.test.ts :: hand_up balance: a joist handed up end-first by one giver uses a two-handed lever grip (hands LEVER apart along it), 0 violations
-- added: handup-rules.test.ts :: hand_up balance: an 8 ft 2x4 held by one end by one giver is refused (handup.unbalanced names the free end)
-- added: handup-rules.test.ts :: hand_up receiver rule: a sheet presented 0.7 m out from the beam edge is refused (handup.receiver-reach names the distance)
-- added: handup.test.ts :: hand points: the invariant flags a receiver whose hands are out of reach (both ends covered)
-- added: handup.test.ts :: hand_up green: a sheet from the ground to staged on a 2.4 m deck (two givers, two receivers on the beams), 0 violations, hands in reach every tick
-- added: handup.test.ts :: hand_up refuses a deck too high for a genuine hand-off (receivers at 3.25 m, deck 3.36 m): use the forklift
-- added: handup.test.ts :: hand_up refuses a giver standing on a beam (nobody walks a beam with a sheet)
-- added: handup.test.ts :: hand_up refuses receivers who are not on a walkable beam or deck, and a beam without its partner
-- added: handup.test.ts :: hand_up via forklift is refused when the forks hold it too low, or it is not on the forks
-- added: handup.test.ts :: hand_up via forklift: the forks present the sheet at deck height, two on the beams take it off the forks and lay it, 0 violations
-- added: meal.test.ts :: eat inside a converse: two standing people talk and eat; activity eat over base talk, converse keeps them
-- added: meal.test.ts :: items refusals: out of reach, hand full, held by someone else, not hand-held, eat while walking, empty bowl, occupied slot, occupied chair
-- added: meal.test.ts :: items: verbs are registered in the one engine registry; catalog table + small items
-- added: meal.test.ts :: meal: eat is resumable mid-cycle — snapshot, JSON round-trip, restore; both continue to the same state
-- added: meal.test.ts :: meal: four people take bowl + spoon, serve, sit round the fire and eat together until the bowls are empty
-- added: meal.test.ts :: take_item: an item out of reach behind a wall is refused item.unreachable naming the wall
-- added: movement.test.ts :: animation signal: activity 'walk' iff the body covers ≥ WALK_MIN m/s; human.speed published while walking, removed after
-- added: movement.test.ts :: block reaction: a panel placed 0.4 m ahead inside a 1 m corridor → replan within 2 ticks, no forward motion into it, arrives around it
-- added: movement.test.ts :: block reaction: a person appearing 0.4 m ahead inside a 1 m corridor → blocked within 2 ticks, no forward motion, decision (replan) within 0.5 s, never pushes
-- added: movement.test.ts :: campfire evening: x1 (take_slot at 42 s) decides within DECIDE_TICKS of stopping behind the ring, without flickering between walking and blocked, and is warm by 60 s
-- added: movement.test.ts :: crossing at a corner: a walker turning round a block and one cutting across its corner never collide, never push, never stall
-- added: movement.test.ts :: curved footprints: at ≥ 1.0 m/s the walked path never turns tighter than ~0.6 m (wall and U-trap routes)
-- added: movement.test.ts :: encounters follow the smoothed path: a walker coming back along it just past the bend is head-on (though off the current tangent); a person dead ahead of the current tangent but off the curved path is no encounter
-- added: movement.test.ts :: head-on in the 1 m passage on curved approaches: both get through, nobody pushes, nobody walks on the spot
-- added: movement.test.ts :: head-on in the 1 m passage: both walkers get through, nobody pushes, nobody walks on the spot
-- added: movement.test.ts :: heading rate: never more than turnRate·dt per tick; in-place turns only beyond 120° and never past 180°; corners are walked, not pivoted
-- added: movement.test.ts :: moving blocker: a walker catching up with a slower walker in the 1 m corridor follows it, never routes around it
-- added: movement.test.ts :: spline (adversarial): a post on the wide arcs forces a tighter or pushed-out fillet; short legs and a reversal stay sharp; clearance always holds
-- added: movement.test.ts :: spline: proving-ground routes (wall, U-trap, 1 m passage, stairs approach, 150 seeded) stay inside the corridor clearance, turn on fillets, keep their endpoints
-- added: movement.test.ts :: squeezed people-replan: routing round everyone fails (people crowd the goal), routing round everyone planned smaller succeeds — the walker replans within DECIDE_TICKS and arrives, never inside anyone's space
-- added: movement.test.ts :: stall metric = 0: build-bay flagship rehearsal take, lab stress-30 (60 s), campfire evening (75 s)
-- added: movement.test.ts :: stall metric: the take computation equals the live meter; a deliberately faked walk-in-place is counted
-- added: movement.test.ts :: stationary blocker (warm / idle / sit, speed 0) in a 1 m corridor → replan around within DECIDE_TICKS; no forward motion before it; never pushes
-- added: navigation.test.ts :: a failed route names the people walling it in (nameObstacles); a structural failure names none
-- added: paint.test.ts :: paint green: a person on the ground paints a standing 4x8 sheet — the reachable band 0.5–2.06 m reaches coverage 1.0, hands in the envelope every tick, progress in the take
-- added: paint.test.ts :: paint refusals: a non-paintable beam, a band above reach from the ground, a sheet mounted out of reach, painting while walking
-- added: paint.test.ts :: paint top band: the top 0.38 m of a standing 4x8 (2.06–2.44 m) is out of reach from the ground — refused, not hidden; from a 0.6 m platform it is painted
-- added: solar.test.ts :: fragile: two people carrying a solar panel up a 37° stair are refused with the tilt named; the invariant flags a tilted held panel
-- added: solar.test.ts :: solar green: rails fastened on a 2.4 m deck, a panel handed up onto them and mounted at 20°, a battery placed and configured — 0 violations
-- added: solar.test.ts :: solar refusal: a panel lying on the ground cannot be mounted on rails 2.48 m up without a hand-up or the forklift
-- added: solar.test.ts :: solar refusals: a panel on a single rail / an uninstalled rail; rails on nothing; equipment off the deck
-- added: take-fields.test.ts :: take fields (mars-take/2): a hand-up take carries every holder's hands (incl. the crouch / reach_down approach) and who stands on the beam
-- added: take-fields.test.ts :: take fields (mars-take/2): the meal take carries hands, baseActivity, speed and bowl contents tick for tick
-- added: walk-perf.test.ts :: narrow(): single-file component labels === the frozen reference (scenes, radii, and every call of the build-bay probe)
-- added: walk-perf.test.ts :: proveUnreachable: routeAround-style searches === frozen reference A*, walled-in pockets and cut-off decks included
-- added: walk-perf.test.ts :: walker fast paths off === on: stress-30 (exact: the pin; corridor: its failing people-replan at tick 1126) and the meal
-- added: year-assembly.test.ts :: assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part classified, deterministic
-- added: year-assembly.test.ts :: assembly graph: deliberately broken geometry is reported with a reason, never faked
-- added: year-assembly.test.ts :: assembly graph: every year builds and orders; 2020 racks do not map onto catalog frames and are reported, not forced
-- added: year-build.test.ts :: year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned
-- added: year-build.test.ts :: year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)
-- added: year-build.test.ts :: year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic
-- added: year-hang.test.ts :: hang_beam: a 16 ft reconstruction bay — 0.22 m from the ground, 2.48 m from the bracing, 4.757 m through a relay; exact seats, 0 violations
-- added: year-stock.test.ts :: bill of materials + piles, 2022 east-house: exact skeleton counts, bundles like the photos, one yard clear of everything
-- added: year-stock.test.ts :: cut: 4x8 → 4x6 + a 4x2 offcut stored at the station, 16 ft 2x4 → two 8 ft; insufficient / wrong family / busy / not there are refused
-- added: year-stock.test.ts :: take_from_bundle: pieces come off the stack one at a time onto the take-out spot, the stack empties and goes; refusals name the problem
-- removed: campus-full.test.ts :: flagship full campus: final-state hash === the cropped run (bit-identical)
-- removed: campus-full.test.ts :: flagship on the full uncropped Mars 2026 campus: completes, 0 violations, ends physically identical to the cropped run
-- removed: core.test.ts :: engine source never calls the host transcendentals (use core/math.ts d* versions)
+- added: camera-correct.test.ts :: checks: squeeze is a sustained narrow gap (two sheets 0.8 m apart), not a door; foreground, flare, horizon, motion are per sample
+- added: camera-correct.test.ts :: fixture "behind a head": a bystander walks past the lens during a hold → raise (or swing), only the crossing flagged
+- added: camera-correct.test.ts :: fixture "flare": a pan across the sun low in the west → swing within the sun-behind band, every sample ≥ 6° off axis
+- added: camera-correct.test.ts :: fixture "impossible": a fly-through into a sealed room is refused with every strategy listed
+- added: camera-correct.test.ts :: fixture "stuck between plywood": a dolly through two standing sheets 0.8 m apart → raise, recorded with the numbers
+- added: camera-correct.test.ts :: fixture "subject leaves frame": a 270° orbit of a crew that walks 6 m — the orbit centre follows, no correction; a fixed centre would fail
+- added: camera-correct.test.ts :: fixture "the group outgrows the frame": one of two people walks 5 m away mid-hold → widen (raise does not address framing)
+- added: camera-correct.test.ts :: phase-1 flagship shots through phase 2: the bay orbit (structure growing during it) is corrected for two crew members hiding the uprights (raise), the carry-crew orbit is valid as computed
+- added: camera-synth.test.ts :: (a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — through phase 2, planner validators pass
+- added: camera-take-file.test.ts :: take file: a directed track is carried beside the planned camera (`cameras`), round-trips through JSON, never changes the take; foreign / clashing tracks are refused
+- added: camera-take-file.test.ts :: takeSampler: piles are boxes (kind from finalState / entities0), the emptied pile leaves at its removal tick; legacyKinds reproduces the old people-piles
+- added: camera-take-file.test.ts :: takeSampler: the flagship has no piles — identical with and without legacyKinds, so its planned camera is unchanged
+- added: forklift.test.ts :: traffic determinism: the head-on run twice → same state hash and event log
+- added: forklift.test.ts :: traffic: a rider stopped in the forklift's lane — the forklift stops ≥ 1 m short and waits with the rider named; once the rider rides off it carries on; 0 violations
+- added: forklift.test.ts :: traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not
+- added: forklift.test.ts :: traffic: head-on forklift vs EUC in one 3 m lane — the rider (smaller) pulls over and waits ≥ 1 m clear of the forklift's lane, both arrive; 0 violations
+- added: forklift.test.ts :: traffic: plan-time vehicle.path-conflict — an EUC boxed against a wall inside a moving forklift's lane cannot yield, so its ride is refused naming both
+- added: forklift.test.ts :: traffic: two forklifts crossing — f2 (same size, id after f1) stops clear of f1's lane with the reason named, then crosses; 0 violations
+- added: movement.test.ts :: no jumps: a walker moves at most min(speed, 1.4 m/s)·DT per tick and publishes an honest speed — stress-30 (60 s), campfire evening (75 s)
+- added: review.test.ts :: no jumps (W21): a person on foot moves ≤ 0.15 m per tick (riders and carried loads keep 0.6 m); a published speed above its activity cap + 5 % is motion.overspeed
+- added: social.test.ts :: pre-emption determinism: seated carry + converse pre-emption twice → same state hash and event log
+- added: social.test.ts :: pre-emption: a gather of 4 round the campfire, one directed away → that member leaves (reason named), 3 keep warming, the gather goes on
+- added: social.test.ts :: pre-emption: a seated person given a directed carry stands up (0.6 s) first, then carries; the sit ends cancelled "pre-empted by <carry>"; 0 violations
+- added: social.test.ts :: pre-emption: a social verb never pre-empts another (reservation.conflict unchanged); preempt: false restores the refusal
+- added: social.test.ts :: pre-emption: an autonomous make-way nudge (walk.ts `<who>:make-way:<tick>`) is not a directive — refused as before, the conversation goes on
+- added: social.test.ts :: pre-emption: cancelling a waiting directive ends it cancelled without starting it; the stand-up still finishes
+- added: social.test.ts :: pre-emption: one of a converse pair gets a directed walk → the conversation ends for both with the reason, the other is idle, the walk runs
+- added: take-fields.test.ts :: take events (mars-take/4): compactEvents folds same-tick lifecycles losslessly and merges repeated blocked waits; final state and tracks unchanged
+- added: take-fields.test.ts :: take fields (mars-take/3): thinChanges — keyframes reproduce every tick of the step signal within tolerance; holds, shape changes and releases exact
+- added: take-fields.test.ts :: take fields (mars-take/4): entities0 + removed — an emptied stack removed mid-take is recorded as first seen, sampled until its removal tick; poses within TRACK_TOL every tick
+- added: take.test.ts :: take fidelity: sampling at every tick reproduces true poses within TRACK_TOL + ½ quantum (4.5 mm / 8.5 mrad, mars-take/4) and exact activity/level
+- added: year-build-b.test.ts :: year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1)
+- added: year-build-b.test.ts :: year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged
+- added: year-build-b.test.ts :: year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned
+- added: year-build-b.test.ts :: year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)
+- removed: camera-synth.test.ts :: (a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — planner validators pass
+- removed: take.test.ts :: take fidelity: sampling at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level
 
 ## Tests not cited by any row or milestone
 
-84 of 328 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+68 of 361 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -931,14 +1004,6 @@ Compared with the report at `6ad36f0` (2026-09-28T02:26:31.956Z): 86 added, 3 re
 - `api.test.ts` pass: pause/resume (room): execute pauseAt mid-walk → resume ends in the unpaused final state; snapshots are state blobs; survives a room restart
 - `api.test.ts` pass: pause/resume (room): fork at a pause, resume both with different commands → distinct states; the pause checkpoint stays resumable
 - `api.test.ts` pass: pause/resume: pauseAt during a carry is refused naming the carry (allowDrop only before the lift); resume on a resting head is resume.not-resumable
-- `camera-direct.test.ts` pass: vocabulary: invalid verbs, a revolution without an angle, duration + speed are refused by the schema
-- `camera-direct.test.ts` pass: sentence: "do a 270° revolution around the main pallet racks over 2 minutes" → orbit of the take's rack bay
-- `camera-direct.test.ts` pass: sentence: "do a pan across Chiba with the sunset in the background" → pan + sun window from the sun model
-- `camera-direct.test.ts` pass: sentence: "go inside the kitchen and face the sink" (2024) → interior room + clustered sink fixture
-- `camera-direct.test.ts` pass: sentence: "look at this crowd of people having this activity" → the group in that action at that time
-- `camera-direct.test.ts` pass: resolver: ambiguous and unknown names are refused with candidates / what is known, never guessed
-- `camera-direct.test.ts` pass: program: lead-in hold, one dense path shot per direction, contiguous windows, corrections reserved
-- `camera-direct.test.ts` pass: api: engine_direct_camera plans + stores a directed track beside the take; refusals are structured; the take is untouched
 - `camera-framing.test.ts` pass: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind
 - `camera-framing.test.ts` pass: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8
 - `camera-framing.test.ts` pass: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)
@@ -946,14 +1011,6 @@ Compared with the report at `6ad36f0` (2026-09-28T02:26:31.956Z): 86 added, 3 re
 - `camera-geom.test.ts` pass: camera geom: glass collides but does not occlude; policy is per kind
 - `camera-geom.test.ts` pass: camera shots: stateless evaluation (random access == sequential), Catmull-Rom through keys
 - `camera-replay.test.ts` pass: camera perf: plan a 60 s track at 10 Hz with 3 subjects in < 1 s
-- `camera-synth.test.ts` pass: (a) flagship: 270° orbit of the rack bay over 120 s with the crew moving inside — planner validators pass
-- `camera-synth.test.ts` pass: (b) 2026: pan across Chiba with the sunset behind — every sample in the sun window (checked against solarPosition)
-- `camera-synth.test.ts` pass: (c) 2024: go inside the kitchen and face the sink — routed through the opening, never through a wall
-- `camera-synth.test.ts` pass: group: the carry crew is orbited with the orbit centre following the group
-- `camera-synth.test.ts` pass: navmesh: through the door; over an open-top wall on the flight layer; a sealed room is refused
-- `camera-synth.test.ts` pass: motion caps: too-fast moves are refused with the minimum duration; defaults stay under the caps
-- `camera-synth.test.ts` pass: verbs: tilt / dolly / crane / pull_out / hold have the geometry their names promise, all valid
-- `camera-synth.test.ts` pass: determinism: the same directions give the identical track hash, and the track round-trips through JSON
 - `campus-extract.test.ts` pass: a 6 m post with vertices only at its ends is caught by band clipping
 - `campus-extract.test.ts` pass: a 10 m thin wall stays one prism (big triangles are not split into end posts)
 - `campus-extract.test.ts` pass: an L-shaped component is split so the inner corner stays open
