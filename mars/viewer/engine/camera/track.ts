@@ -1,6 +1,7 @@
 // CameraTrack payload: a planned camera is self-contained plain JSON stored
 // as `CameraTrack.data` next to a take. It references the take only by id, so
 // attaching, editing or replacing it can never change the take or its hash.
+import { z } from 'zod';
 import type { CameraTrack } from '../take/types.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { CameraPose } from './shots.ts';
@@ -18,6 +19,54 @@ export function trackData(track: CameraTrack): CameraTrackData {
   const d = track.data as CameraTrackData;
   if (!d || d.schema !== CAMERA_TRACK_SCHEMA) throw new Error(`camera track ${track.id}: data is not ${CAMERA_TRACK_SCHEMA}`);
   return d;
+}
+
+// ---- camera tracks carried by a recorded take file ---------------------------------------------------------------
+// A take file (`mars-take-replay/1`, deploy/record-campus-take.mjs) carries its planned track as `camera`, and may carry
+// more tracks of the same take — directed ones (`engine_direct_camera`, the studio's Direct-camera panel) — in an
+// additive `cameras: { [track id]: CameraTrack }` map, absent when empty. The take and its hash never change; a track of
+// another take is refused. Readers: `fileCameras(file)` (planned first, then the map in id order), `fileCamera(file, id)`.
+
+/** The extra tracks of a take file, keyed by track id. */
+export type TakeFileCameras = Record<string, CameraTrack>;
+/** The part of a take file the camera helpers read / write. */
+export type TakeFileWithCameras = { take: { id: string }; camera: CameraTrack; cameras?: TakeFileCameras };
+
+const TrackSchema = z.object({
+  id: z.string().min(1),
+  takeId: z.string().min(1),
+  kind: z.string().min(1),
+  data: z.looseObject({ schema: z.literal(CAMERA_TRACK_SCHEMA), hz: z.number().positive(), duration: z.number().nonnegative(), samples: z.array(z.looseObject({ t: z.number(), position: z.array(z.number()).length(3), target: z.array(z.number()).length(3), fov: z.number() })).min(1) }),
+});
+
+function checkTrack(file: TakeFileWithCameras, track: unknown, key: string): CameraTrack {
+  const r = TrackSchema.safeParse(track);
+  if (!r.success) throw new Error(`camera track ${key}: not a ${CAMERA_TRACK_SCHEMA} track (${r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).slice(0, 3).join('; ')})`);
+  const t = track as CameraTrack;
+  if (t.id !== key) throw new Error(`camera track ${t.id} is stored under ${key}`);
+  if (t.takeId !== file.take.id) throw new Error(`camera track ${t.id} belongs to take ${t.takeId}, not ${file.take.id}`);
+  return t;
+}
+
+/** The file with `track` added to (or replacing the same id in) its `cameras` map, ids sorted. The planned `camera` and the take are untouched. */
+export function withFileCamera<F extends TakeFileWithCameras>(file: F, track: CameraTrack): F {
+  checkTrack(file, track, track.id);
+  if (track.id === file.camera.id) throw new Error(`camera track ${track.id} is the file's planned camera`);
+  const all: TakeFileCameras = { ...(file.cameras ?? {}), [track.id]: structuredClone(track) };
+  return { ...file, cameras: Object.fromEntries(Object.keys(all).sort().map((k) => [k, all[k]])) };
+}
+
+/** Every camera track of a take file: the planned `camera` first, then `cameras` in id order — each checked (schema, key, take id). */
+export function fileCameras(file: TakeFileWithCameras): CameraTrack[] {
+  const planned = checkTrack(file, file.camera, file.camera.id);
+  if (file.cameras === undefined) return [planned];
+  if (!file.cameras || typeof file.cameras !== 'object' || Array.isArray(file.cameras)) throw new Error('take file: `cameras` is not a map of camera tracks');
+  return [planned, ...Object.keys(file.cameras).sort().map((k) => checkTrack(file, file.cameras![k], k))];
+}
+
+/** One camera track of a take file by id (the planned one or one of `cameras`), or undefined. */
+export function fileCamera(file: TakeFileWithCameras, id: string): CameraTrack | undefined {
+  return fileCameras(file).find((c) => c.id === id);
 }
 
 /** Pose at time t: linear between samples, held (no interpolation) across a cut. */

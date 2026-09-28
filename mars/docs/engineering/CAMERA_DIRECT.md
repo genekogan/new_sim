@@ -1,6 +1,7 @@
 # Camera direction: words → shot program → computed trajectory → self-correction (`viewer/engine/camera/{direct,synth,solve,correct}.ts`)
 
-OWNER_FEEDBACK_2026-09-28 §11, **phase 1** (layers 1 and 2, W16) and **phase 2** (layer 3, W18). A director (an LLM
+OWNER_FEEDBACK_2026-09-28 §11, **phase 1** (layers 1 and 2, W16) and **phase 2** (layer 3, W18; the `occluded` failure,
+kind-aware take sampling and take-file `cameras`: W23, §8). A director (an LLM
 or a person) writes typed `CameraDirection`s. The engine:
 1. resolves every name through the semantic world, or asks a structured question;
 2. **computes** the move: orbit radius from the subject's extent and the lens, sun-behind geometry from the sun
@@ -218,7 +219,7 @@ Default speeds: pan 8°/s, tilt 6°/s, orbit 6°/s, dolly 1 m/s, crane 0.8 m/s, 
 
 | Take | Direction | Computed |
 | --- | --- | --- |
-| Flagship take, bay orbit from `seat_b1` start (≈226 s) | 270° over 120 s, wide | Structure `structure:A` (24 parts), scored A + B. R 3.47 m → distance 14.94 m, orbit radius 13.86 m, height 7.27 m. Start heading searched (north). View ≤ 3.9°/s. Planner: 0 invalid, 0 crossings, readability min 0.67 / mean 0.94, readable 100 %. At least two crew members move more than 1 m inside the bay's footprint during the orbit (tested). |
+| Flagship take, bay orbit from `seat_b1` start (208.6 s; take `d2f16bd3…`, W21's walker motion) | 270° over 120 s, wide | Structure `structure:A` (24 parts), scored A + B. R 3.47 m → distance 14.94 m, orbit radius 13.86 m, height 7.27 m computed. Start heading searched (90°). View ≤ 3.9°/s. As computed, the planner's readability dips to 0.56 on 2 samples (p1 / p2 in front of the uprights, §6.4); phase 2 raises it **+2.5 m (height 9.77 m)**, same centre / radius / heading: 0 invalid, 0 crossings, readability min 0.61 / mean 0.92, readable 100 %. At least two crew members move more than 1 m inside the bay's footprint during the orbit (tested). |
 | 2026 Chiba, 17:18 (20 min before sunset) | Pan | Sun az 258.3°, el 3.72°. Camera heading window compass 41.6–114.9°, pitch window −18.3…−2.3°. Distance raised to 31.07 m, camera 5.35 m up. 71.3° sweep in 8.9 s. 90 / 90 samples in the window with the sun in frame, min 7.05° off axis. Readability 1.0. At the take's own 16:00 light (sun ~19° up) the same pan works looking up. |
 | 2024 kitchen (the 2026 scene has neither) | Fly-through from (8, 1.6, 36) outside, lookAt sink | Straight line blocked by the east plywood wall. 9.1 m route over the 1.26 m half wall (entry at z 39.84) — in fact through the 0.79 m hatch above it, which phase 2 flags and splits (§6.4). Clustered sink (bowl + rim) at (5.07, 1.01, 43.0). Viewpoint 1.8 m in front at eye height. 18 s (profile minimum 15.7 s); ≤ 16.7°/s, ≤ 29°/s², ≤ 0.87 m/s. 0 invalid, 0 crossings. The sink is readable for the last part of the move (it is behind the wall before). From the east (9, 1.6, 43) the route hairpins round the half wall's end: 26 s. |
 
@@ -239,14 +240,17 @@ of everything tried. Deterministic (fixed ladders, fixed order, sorted ids); the
 | `squeeze` | **free width** across the camera: 4 horizontal axes, both opposite rays (3 m probe) hit a static solid or a take-part box → width = the sum; **free height** over the camera body's 0.6 m square footprint (exact column test: every solid / part whose footprint overlaps bounds it above or below; only when something is above); **part clearance**: distance to the nearest take-part box (parts do not collide in the planner) | width < 1.2 m (a 0.6 m rig + 0.3 m each side: a 1.6 m door passes, two sheets 0.8 m apart do not); height < 1.0 m; part < 0.3 m | sustained: ≥ 0.3 m of camera travel or ≥ 0.5 s — crossing a door's jambs (one sample) is not a squeeze |
 | `foreground` | a person (not a subject) within 1.5 m of the camera (to the capsule axis) whose projected capsule (r 0.2 m, five axis points) covers the subject's frame region (NDC box of the subject / focus points, ≥ 0.1 NDC) and is in front of the subject | cover ≥ 25 % | ≥ 3 samples (0.3 s) |
 | `flare` | the sun (above the horizon, not hidden by an occluding solid within 80 m) off the optical axis | < 6° (`sunBehindWindow`'s flare) | 1 sample |
+| `occluded` (W23) | the **planner's own readability** (`quality.ts readability()`: the scored subject ids + injected focus points, the take's people as capsules and parts as boxes at that tick, the static occluders, the UI band) — below the threshold, **still below it with the subjects' own bodies / parts ignored** (a crew member in front of another is the group's composition, not an obstruction) and **not below it without occluders** (cutaway: framing / size are other failures). Off for `fly_through` (its subject may be behind a wall before it arrives). | < 0.6 (the planner's `minReadability`) | 1 sample (the planner itself corrects a single sample) |
 | `frame` | fraction of the subject's points inside the frame (5 % margin, UI band): people's points, focus points, and for a take structure under construction **every member whose points lie inside the structure's final box (±0.25 m) at that tick** — the extent grows during the shot | < 75 % | ≥ 3 samples; off for `fly_through` (it looks along its route) |
 | `horizon` | view pitch (a look-at camera's roll is undefined near vertical); explicit key `roll` | \|pitch\| > 75°; roll > 1° | 1 sample |
 | `motion` | per-sample view ω, α and camera v, a (as `motionPeaks`) | the `MOTION_CAPS` (+0.5°/s, +1°/s², +0.05 m/s, +0.1 m/s²) | 1 sample |
 
 Each failure is a run `{ kind, t0, t1, samples, worst, detail, subjects }` (detail names what: *"free width 0.8 m
 between 'part s2' and 'part s1'"*, *"person w1 0.97 m from the camera covers 73% of the subject's frame region"*,
-*"sun 5.54° off the optical axis; worst 3.62°"*). The scalar `penalty` (collision 100, squeeze 10, foreground /
-flare / frame 5, horizon / motion 3 per failing sample) is only for before/after reporting.
+*"sun 5.54° off the optical axis; worst 3.62°"*, *"readability 0.56 < 0.6 (A 44% by 'person p2', B 44% by 'person p1');
+1 without occluders"* — its `subjects` are the occluders). The scalar `penalty` (collision 100, squeeze 10, foreground /
+flare / frame / occluded 5, horizon / motion 3 per failing sample) is only for before/after reporting. `FAILURE_ORDER`:
+collision, squeeze, foreground, flare, frame, occluded, horizon, motion.
 
 ### 6.2 Ranked corrections (`STRATEGY_ORDER`, `LADDERS`, `ADDRESSES`)
 
@@ -255,13 +259,19 @@ the first valid magnitude wins.
 
 | Rank | Strategy | Knob (re-synthesis) | Ladder | Addresses | n/a when |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `raise` | `heightOffset` (camera / orbit / fixture viewpoint) | +0.5, 1, 1.5, 2.5, 4 m | collision, squeeze, foreground | — |
-| 2 | `widen` | `distanceScale` (subject distance) | ×1.15, 1.3, 1.5, 1.8 | collision, squeeze, foreground, frame, horizon, motion | fly_through (fixture distance) |
-| 3 | `swing` | `bearingOffset` (orbit start / hold / sweep bearing) | ±10, ±20, ±30, ±45, ±60, ±90° | collision, squeeze, foreground, flare | fly_through; for flare with a backlit shot only offsets that keep the camera heading inside the **sun-behind band** (`sunBehindWindow` heading ± (hfov/2 − 3°)), so the sun stays in frame |
+| 1 | `raise` | `heightOffset` (camera / orbit / fixture viewpoint) | +0.5, 1, 1.5, 2.5, 4 m | collision, squeeze, foreground, occluded | — |
+| 2 | `widen` | `distanceScale` (subject distance) | ×1.15, 1.3, 1.5, 1.8 | collision, squeeze, foreground, frame, occluded, horizon, motion | fly_through (fixture distance) |
+| 3 | `swing` | `bearingOffset` (orbit start / hold / sweep bearing) | ±10, ±20, ±30, ±45, ±60, ±90° | collision, squeeze, foreground, flare, occluded | fly_through; for flare with a backlit shot only offsets that keep the camera heading inside the **sun-behind band** (`sunBehindWindow` heading ± (hfov/2 − 3°)), so the sun stays in frame |
 | 4 | `reroute` | `navRadius` + `avoid`: the navmesh re-searched with the squeezed stretch **blocked** (a vertical slot between two static solids is blocked whole — their footprint overlap from the lower top to the upper bottom; otherwise a 0.6 m cell per failing sample) and the take's part boxes (1 Hz over the shot) as obstacles | camera radius 0.3, 0.45 m | collision, squeeze | not a routed move |
-| 5 | `shorten` | `duration` = up to the first failing sample (the whole move, faster, under the caps) | one | all but motion | it would keep < 50 % of the shot (that is a cut) |
+| 5 | `shorten` | `duration` = up to the first failing sample (the whole move, faster, under the caps) | one | all but motion (occluded included) | it would keep < 50 % of the shot (that is a cut) |
 | 6 | `split` | two shots with a cut: A = the valid lead, B = the path after the failing interval re-timed to end on time (take time runs on; every window boundary is a planner cut) | one | all | < 1 s valid on either side |
 | 7 | `cut` | keep the longest valid run (≥ 2 s); a dropped lead is held on the previous frame, which must be valid too | one | all | — |
+
+**One knob per correction (W23).** Every re-synthesis re-uses the start heading the first synthesis *searched*
+(`SynthShot.searchedHeading` → `SynthOverrides.heading`): a raise or a widen changes only height or distance, and a swing
+is an offset from the computed bearing. (Before, each candidate re-ran the heading search, which ranks by the first
+pose's readability — the flagship raise +2.5 m silently turned the orbit's start from 90° to 45°.) A forced heading
+(`side`, `sunBehind`) is unaffected.
 
 A **refused synthesis** (`camera.nav.*`, `camera.direct.no-viewpoint`) is corrected the same way (raise, re-route);
 the director's own constraints (explicit durations over the caps, the sun window, `beyond-take`, ambiguity) are never
@@ -271,7 +281,7 @@ changed. The refusal keeps its code and gains `details.corrections.tried`.
 
 ```ts
 corrections: [{
-  failure: 'collision'|'squeeze'|'foreground'|'flare'|'frame'|'horizon'|'motion'|'refused',  // the first failure in FAILURE_ORDER
+  failure: 'collision'|'squeeze'|'foreground'|'flare'|'frame'|'occluded'|'horizon'|'motion'|'refused',  // the first failure in FAILURE_ORDER
   samples: { count, t0, t1 },                 // its failing samples (take s)
   strategy: 'raise'|'widen'|'swing'|'reroute'|'shorten'|'split'|'cut',
   before: { valid, failingSamples, penalty, failures: [{ kind, samples, t0, t1, worst, detail }] } | { refused, message },
@@ -283,7 +293,7 @@ corrections: [{
   attempts: [{ magnitude?, result }],         // the chosen ladder up to the winner ("flare ×16", "flare ×10", "valid")
 }]
 simulation: { valid, samples, failingSamples, penalty, failures, worst: { minFreeWidth, minPartClearance,
-  maxForegroundCover, minSunOffAxisDeg, minFramed, maxAbsPitchDeg, maxOmegaDeg, maxAlphaDeg, maxSpeed, maxAccel } }
+  maxForegroundCover, minSunOffAxisDeg, minFramed, minReadability, maxAbsPitchDeg, maxOmegaDeg, maxAlphaDeg, maxSpeed, maxAccel } }
 ```
 An uncorrectable shot: `camera.direct.uncorrectable` with `details: { before, corrections: { failure, tried } }`.
 
@@ -291,17 +301,26 @@ An uncorrectable shot: `camera.direct.uncorrectable` with `details: { before, co
 
 | Fixture | Failure detected | Chosen |
 | --- | --- | --- |
-| **Stuck between plywood**: a dolly (6 m, eye level 1.7 m) across the yard plot, two 4x8 sheets standing on their short edge 0.8 m apart as take parts around its path (the planner sees nothing: parts do not collide) | squeeze on 9 samples (t 3.6–4.4 s), free width 0.80 m between `s1` and `s2` | **raise +1 m** (+0.5 m: still squeeze ×9; +1 m: over the 2.44 m tops, part clearance 0.47 m) |
+| **Stuck between plywood**: a dolly (6 m, eye level 1.7 m) across the yard plot, two 4x8 sheets standing on their short edge 0.8 m apart as take parts around its path (the planner sees nothing: parts do not collide) | squeeze on 9 samples (t 3.6–4.4 s), free width 0.80 m between `s1` and `s2` | **raise +1 m** (+0.5 m: still squeeze ×9, and the sheets hide the subject: occluded ×9; +1 m: over the 2.44 m tops, part clearance 0.47 m) |
 | **Behind a head**: an eye-level hold (camera 1.83 m) on two people talking; `w1` walks 6 m across 0.9 m in front of the lens between 2 and 6 s | foreground on 3 samples (t 3.9–4.1 s): `w1` 0.97 m from the camera covers 73 % of the pair | **raise +0.5 m**, the whole hold (no mid-shot jump) |
 | **Group outgrows the frame**: the same hold; `s2` walks 5 m away mid-shot | frame on 22 samples (t 5.9–8 s), worst half the points framed | **widen ×1.15** (raise does not address framing) |
-| **Subject leaves frame**: a 270° orbit (45 s) of a crew of three walking 6 m | none: the orbit centre follows the crew (target moves 6 m), min framed 1.0 | **no correction** (`corrections: []`); the same orbit about the crew's *starting* centre fails `frame` on 91 samples (t 36–45 s, worst 0 framed) |
+| **Subject leaves frame**: a 270° orbit (45 s) of a crew of three walking 6 m | none: the orbit centre follows the crew (target moves 6 m), min framed 1.0 | **no correction** (`corrections: []`); the same orbit about the crew's *starting* centre fails `frame` on 91 samples (t 36–45 s, worst 0 framed). The planner's readability dips to 0.47 where the three walk in line (p2 in front of p1 / p3) — co-subjects, so not `occluded` |
 | **Flare**: a 30° pan from the east of the plot at 18:43 on 2026-03-20 (sun az 268.6°, el 1.8°) | flare on 7 samples (t 1.6–2.2 s), worst 3.62° off axis | **swing +20°** inside the sun-behind band (±36.66°): +10° flare ×16, −10° flare ×10, +20° valid; min 7.25° off axis, the sun in frame on most samples (a backlit pan); raise / widen n/a |
 | **Impossible**: fly-through into the sealed synthetic room | `camera.nav.unreachable` | **refused**, all seven listed: raise failed (5 × unreachable), widen / swing n/a (routed), re-route failed (2 × unreachable), shorten / split / cut n/a (no track) |
 
 **Phase-1 shots re-scored:**
-- Flagship bay orbit (270° / 120 s from `seat_b1`): **valid as computed, `corrections: []`**. The structure grows
-  during the orbit (members inside its final box: 5 → 7) and every in-place member is framed on every sample; min
-  sun off axis 41°; ω ≤ 3.9°/s. Carry-crew orbit (90° / 20 s): valid, `[]`. Chiba sunset pan: valid, `[]`.
+- Flagship bay orbit (270° / 120 s from `seat_b1`): at the /2 take (W16–W22) valid as computed, planner min 0.67. **At
+  W21's walker motion (take `d2f16bd3…`, pin `c56ea8da…` @ 11 459) the computed orbit is unchanged** (centre
+  (29.26, 1.67, −7.63), radius 13.86 m, height 7.27 m, start 90°: the bay and its fit did not move; `seat_b1` starts
+  0.3 s earlier) but the crew's timing is: `carry_j1` runs 231.2–263.5 s (was 230.8–257.3 s). At t 259.2–259.3 s
+  (50.6 s into the orbit) the camera passes due west of the bay at (15.5, 7.27, −9.1) while **p2 stands at upright A's
+  foot** (26.97, −9.00) and **p1 walks across the sight line to B** (26.06, −6.53): each upright loses its four bottom
+  corners (4/9 points, 44 %), readability 0.56. Not a synthesis bug — a genuine two-sample occlusion by crew who are
+  not the subject. Phase 2 (`occluded`) corrects it: **raise +2.5 m** (+0.5, +1 m: occluded ×2; +1.5 m: ×1 — looking
+  down more steeply clears their heads only from +2.5 m), orbit height 9.77 m, pitch ≤ 30.3°, same centre / radius /
+  start heading; planner min 0.61, mean 0.92; `camera-synth.test (a)` asserts it through `correct: true`. The structure
+  grows during the orbit (members inside its final box) and every in-place member is framed on every sample; min sun
+  off axis 53.5°; ω ≤ 3.6°/s. Carry-crew orbit (90° / 20 s): valid, `[]`. Chiba sunset pan: valid, `[]`.
 - **Genuine issue — 2024 kitchen move.** "Over the 1.26 m half wall" in fact threads a **0.79 m serving hatch**
   between the half wall (0.23–1.26 m) and the wall panel above (from 2.05 m) at z 39.34: free height 0.78 m on 10
   samples (0.9 s) — "stuck between two sheets of plywood". Raise: +0.5 m exceeds the caps, ≥ +1 m finds no
@@ -310,16 +329,18 @@ An uncorrectable shot: `camera.direct.uncorrectable` with `details: { before, co
   (5.6 s from (8, 1.6, 36); 14.1 s from the east), the move still ends on time inside, facing the sink.
 - **Genuine issue — proving-ground orbit of `n1`** (the API test): the computed 90° orbit passed *inside* the
   passage west wall (8 invalid samples, 4 swept crossings, clearance −0.12 m); phase 1 left it to the planner, which
-  cut away from it. Phase 2: **raise +1 m**, 0 invalid, no planner cut.
+  cut away from it. Phase 2 (W18): raise +1 m — which clears the wall but then looks at n1 *through* it (80 % hidden
+  for ~1.3 s, invisible to phase 2 before `occluded`). Now: raise fails (+1 m: occluded ×11 + ×2; +4 m: ×5), widen
+  fails, **swing −90°** is valid: 0 invalid, planner min 0.6, no planner cut.
 
 ### 6.5 Render-side verification (CAMERA_VERIFY)
 The render pass cannot run from node: `app/studio/camera-verify.ts verifyCamera(scene, replay)` needs the studio's
 THREE scene (the GLB, skinned bodies, instanced parts) and verifies `replay.file.camera` — the camera track *inside
-a take file* the studio fetches from `public/engine/takes`. A directed track lives in the controller's take store
-(`attachCamera`), so no directed track can reach the pass today. What it needs (app / e2e owners): either
-`verifyCamera(…, { track })` (verify any stored track of the open take, e.g. from `get_take { include: ['cameras'] }`),
-or a take file written with the directed track as its `camera`. The e2e spec (`e2e/camera-verify.spec.ts`) would then
-run W16's three shots and the fixtures above; any planner-vs-render gap ≥ 0.2 becomes a `camera-*.test.ts` fixture.
+a take file* the studio fetches from `public/engine/takes` — or, since W19, `{ track }`: a directed track the studio
+compiled in the browser (`app/studio/direct-camera.ts`, the same `directCamera` with `takeSampler(take)`).
+`e2e/camera-verify.spec.ts` runs the bay orbit, the Chiba pan, the 2024 kitchen and a corrected hold that way; any
+planner-vs-render gap ≥ 0.2 becomes a `camera-*.test.ts` fixture. A take file can now also *carry* directed tracks
+(§8.2), so a saved one can be verified without recompiling it.
 The last run on the recorder's track (CAMERA_VERIFY "After the fix") left one |planner − real| ≥ 0.2 sample (skinned
 body vs capsule, b1 close-up) — not a directed track, so no regression is added from it.
 
@@ -341,8 +362,13 @@ body vs capsule, b1 close-up) — not a directed track, so no regression is adde
 - **Phase 2, honestly:**
   - one correction per shot: the winning candidate must fix *every* failure at once; strategies are never combined
     (raise + swing), so a shot needing two fixes is refused rather than half-fixed;
-  - static-subject readability (occlusion by the scene) is still the planner's score, not a phase-2 failure: a brief
-    wall wipe in a fly-through is allowed, a subject hidden for the whole shot is only reported (`planner.minReadability`);
+  - `occluded` (W23) is the planner's readability under a threshold, one sample enough — the planner's own rule. It
+    is off for fly-throughs (a brief wall wipe before arrival is allowed and only reported, `planner.minReadability`)
+    and ignores the subjects' own bodies / parts (a group orbit where the crew walk in line stays at 0.47, reported,
+    not failed). Its occluders are box points vs capsules / part boxes, as in the planner: CAMERA_VERIFY found the
+    capsule over-occludes a skinned body on some samples, so a 0.56 on the model may be a little better on screen;
+  - raise fixes the flagship occlusion by looking down more steeply (+2.5 m, pitch 30°): a steeper, higher orbit than
+    the director asked for, recorded; a swing would also have worked but ranks after raise;
   - `shorten` and `cut` have no fixture where they win (raise / widen / swing fix every synthetic case first); their
     mechanics are exercised only through the refusal lists;
   - split re-times the rest of the path: for a *moving* subject its targets were computed for the original times —
@@ -354,3 +380,46 @@ body vs capsule, b1 close-up) — not a directed track, so no regression is adde
   - the render-side verification of directed tracks needs the browser and a studio change (§6.5).
 - **Region subjects without an assembly** get a box height from obstacles whose centres lie inside the polygon,
   or 3 m.
+
+## 8. Take-side inputs (W23)
+
+### 8.1 The take sampler classifies by kind (`take-sampler.ts`)
+Kind and def come from `take.finalState`, else from `take.entities0` (mars-take/4). **Only humans are capsules.** A
+component, or any other entity with a catalog def (the year-build piles `stack-*` / `bundle-*`, the cutting station:
+`kind: 'fixture'`), is sampled like a part: centre + 8 box corners and its box as a sight occluder (`partOccluders`: the
+full stack box — a half-empty pile still occludes as a full one). An entity leaves the sampler at its removal tick
+(`take.removed`, the tick of its `present: false`). A non-human without a def is not sampled; an entity of a pre-/4
+take that is in neither record stays a person (the old fallback).
+
+Before, the kind came from the final state only and **every** non-component was sampled as a person: in the 2022
+year-build takes all nine piles and the cutting station stood in as 1.7 m capsules, and the emptied
+`pile-upright-16ft-kit-1` (absent from the final state) as well. **Delta on the planned cameras** (recorder, exact
+re-run): flagship — none (no piles; the sampler is identical with and without `legacyKinds`, tested; `--check` OK).
+2022 first bay — `cam-305a0efe…` → `cam-7492f43a…`: min readability 0.403 → 0.42, mean 0.806 → 0.81, readable 77.0 %,
+cuts 19 → 19. Whole house — `cam-9609b6f7…` → `cam-b83a6828…`: min 0.31 → 0.31, mean 0.789 → 0.79, readable 76.5 →
+76.6 %, cuts 50 → 52. **Not re-recorded:** the recorder plans the year-build cameras with `takeSampler(exact, {
+legacyKinds: true })` (the old classification, byte-identical), so the shipped tracks and `--check` are unchanged
+until the lead accepts the delta; then drop that option and re-record both (`--scenario year-build-2022`, `--full`).
+Everything else (directed cameras, `attach_camera_track`, the studio) uses the corrected sampler.
+
+### 8.2 Take files carry extra camera tracks (`track.ts`)
+A take file (`mars-take-replay/1`) may carry, beside its planned `camera`, an additive map
+`cameras: { [track id]: CameraTrack }` (absent when empty) — e.g. the `directed` tracks `engine_direct_camera` stores in
+the controller's take store, or the one the studio's Direct-camera panel compiles. The take and its hash never change.
+- **Write:** `withFileCamera(file, track)` — checks the track (zod: `mars-camera-track/1` data with hz / duration /
+  samples), that `track.takeId === file.take.id` and that it is not the planned `camera`'s id; adds or replaces it,
+  ids sorted. From the controller: `get_take { take_id, include: ['cameras'] }` → each `{ kind: 'directed' }` track →
+  `withFileCamera`. From the studio: the panel's `DirectResult.plan` → `toCameraTrack(id, take.id, plan, 'directed')`
+  → `withFileCamera` → a file the owner saves into `public/engine/takes/` (the browser cannot write there; a dev-only
+  download or a deploy script is the app owner's choice).
+- **Re-record:** `record-campus-take.mjs` keeps a file's `cameras` when the re-recorded take has the same id (checked
+  with `fileCameras`) and lists them in the manifest entry (`cameras: [ids]`, absent when none); a changed take drops
+  them with a log line (they were computed against the old take). The shipped files carry none (bytes unchanged).
+- **Read path (W19 / the app owner):** `loadTakeFile(url)` already returns the whole JSON, so `f.cameras` is there
+  untyped today. Add `cameras?: TakeFileCameras` to `TakeReplayFile` (app/engine-view/take-replay.ts), list
+  `fileCameras(f)` (planned first, then the map in id order — each checked, it throws on a track of another take), pick
+  one with `fileCamera(f, id)`, then `trackData(track)` → `sampleTrack(data, t)` for the pose, exactly as the planned
+  `camera` is played today. `verifyCamera`'s `{ track }` option selects `'take' | 'directed' | 'year'` today; a
+  file track needs one more choice (e.g. `{ track: { file: id } }`) resolved through `fileCamera`. Tested in
+  `camera-take-file.test.ts` (a directed carry-crew orbit added to the flagship file, JSON round trip, poses equal,
+  take hash unchanged, foreign / clashing / malformed tracks refused).

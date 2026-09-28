@@ -41,7 +41,7 @@ import { RULES_VERSION } from '../engine/construction/rules.ts';
 import { DEFAULT_CAMERA_POLICY } from '../engine/camera/geom.ts';
 import { planShotList } from '../engine/camera/shotlist.ts';
 import { takeSampler } from '../engine/camera/take-sampler.ts';
-import { toCameraTrack } from '../engine/camera/track.ts';
+import { fileCameras, toCameraTrack } from '../engine/camera/track.ts';
 import { buildBayEntities, buildBayTemplate, buildBayBindings, buildBayRegistry, BUILD_BAY_INVARIANTS, BUILD_BAY_CONTRIBUTORS } from '../engine/scenarios/build-bay.ts';
 import { buildBayV3Entities, buildBayV3Regions, buildBayV3Template, buildBayV3Bindings, buildBayV3Registry, BUILD_BAY_V3_INVARIANTS, BUILD_BAY_V3_CONTRIBUTORS } from '../engine/scenarios/build-bay-v3.ts';
 import { yearBuildSetup } from '../engine/scenarios/year-build.ts';
@@ -363,7 +363,10 @@ function record(name) {
   if (exact.ticks !== take.ticks || exact.finalStateHash !== take.finalStateHash) throw new Error(`${name}: the exact re-run differs from the take (${exact.ticks} / ${exact.finalStateHash})`);
   const t1 = performance.now();
   // cutCost 2.5 s: bystanders are occluders now, and a crew walking past for ~1 s is not worth a cut away and back
-  const cam = planShotList(shots, takeSampler(exact), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
+  // legacyKinds: the shipped year-build cameras were planned with every pile sampled as a person (W23: takeSampler now
+  // classifies piles as boxes from entities0; bay-1's camera would change cam-305a0efe… → cam-7492f43a…). Kept until the
+  // lead accepts that delta and re-records them; the flagship has no piles (identical either way).
+  const cam = planShotList(shots, takeSampler(exact, { legacyKinds: S.kind === 'year-build' }), cameraScene, { hz: HZ, policy, cutCost: 2.5, safeArea: { bottom: SAFE_BOTTOM } });
   const tCam = performance.now() - t1;
   const track = toCameraTrack('', take.id, cam, 'planned-shot-list');
   track.id = `cam-${hashOf({ takeId: take.id, data: track.data }).slice(0, 16)}`;
@@ -384,6 +387,17 @@ function record(name) {
     take,
     camera: track,
   };
+  // extra camera tracks saved beside the take (`cameras`, e.g. directed ones: engine/camera/track.ts withFileCamera)
+  // survive a re-record that reproduces the same take; a changed take drops them (they were computed against the old one)
+  const prevPath = join(OUT_DIR, S.file);
+  const prevFile = existsSync(prevPath) ? JSON.parse(readFileSync(prevPath, 'utf8')) : null;
+  const kept = [];
+  if (prevFile?.cameras && Object.keys(prevFile.cameras).length) {
+    if (prevFile.take?.id === take.id) {
+      body.cameras = prevFile.cameras;
+      kept.push(...fileCameras(body).slice(1).map((c) => c.id)); // checked: schema, key, same take
+    } else console.log(`cameras      dropped ${Object.keys(prevFile.cameras).length} extra track(s) of the previous take ${prevFile.take?.id}: ${Object.keys(prevFile.cameras).join(', ')}`);
+  }
   const json = JSON.stringify(body);
   const bytes = Buffer.byteLength(json);
   const gz = gzipSync(json, { level: 9 }).length;
@@ -403,6 +417,7 @@ function record(name) {
     takeSchema: take.schema,
     ...(S.kind ? { kind: S.kind } : {}),
     cameraTrack: track.id,
+    ...(kept.length ? { cameras: kept } : {}),
     camera: {
       shots: shots.length,
       hz: HZ,

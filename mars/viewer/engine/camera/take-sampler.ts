@@ -8,6 +8,12 @@
 // Components also carry their sight-blocking boxes (`occluders`, kind-aware:
 // upright posts, stair stringers, slabs/beams) and a gripping human its grip
 // point (`contacts`), so readability treats parts as occluders per tick.
+// Kind and def come from the final state, else from `entities0` (mars-take/4: an entity removed mid-take, e.g. an
+// emptied pile, is absent from the final state). Only humans are capsules: a fixture with a catalog def (a pile, a
+// cutting station) is sampled like a part (box points + its box as an occluder); it disappears at its removal tick
+// (`removed`, the same tick as its `present: false` change). An entity with no known kind (a pre-/4 take whose
+// removed entity is in neither) stays a person, as before. `legacyKinds` restores the pre-W23 classification (kind from
+// the final state only; every non-component a person) to re-check cameras planned with it (the shipped year-build takes).
 import { POS_Q, ANG_Q, type PoseSample, type Take } from '../take/types.ts';
 import { interpSample } from '../take/replay.ts';
 import { entityCorners } from '../spatial/service.ts';
@@ -15,8 +21,9 @@ import type { Entity } from '../world/types.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { Sampler, SubjectPose } from './shots.ts';
 import { gripPoint, partOccluders, type PartPose } from './occluders.ts';
+import { CATALOG } from '../world/catalog.ts';
 
-type Info = { kind: string; def?: string; present: [number, boolean][]; track: PoseSample[]; grip: [number, unknown][]; task: [number, unknown][]; reservedBy: [number, unknown][] };
+type Info = { kind: string; def?: string; removedAt?: number; present: [number, boolean][]; track: PoseSample[]; grip: [number, unknown][]; task: [number, unknown][]; reservedBy: [number, unknown][] };
 
 function bracket(s: PoseSample[], tick: number): [PoseSample, PoseSample] | null {
   if (!s.length || tick < s[0][0]) return null;
@@ -37,15 +44,25 @@ function valueAt<T>(p: [number, T][], tick: number, v: T): T {
   }
   return v;
 }
-const presentAt = (p: [number, boolean][], tick: number) => valueAt(p, tick, false);
+const presentAt = (e: Info, tick: number) => (e.removedAt === undefined || tick < e.removedAt) && valueAt(e.present, tick, false);
 const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
 
 /** Subject poses for every entity present at time t (seconds from take start). Pure; memoised per tick. */
-export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler {
+export function takeSampler(take: Take, opts: { cache?: number; legacyKinds?: boolean } = {}): Sampler {
   const info = new Map<string, Info>();
+  const removedAt = new Map((take.removed ?? []).map((r) => [r.id, r.t]));
   for (const id of Object.keys(take.tracks)) {
-    const e = take.finalState.entities[id];
-    info.set(id, { kind: e?.kind ?? 'human', def: e?.def, present: [], track: take.tracks[id], grip: [], task: [], reservedBy: [] });
+    if (opts.legacyKinds) {
+      const f = take.finalState.entities[id];
+      info.set(id, { kind: f?.kind ?? 'human', def: f?.def, present: [], track: take.tracks[id], grip: [], task: [], reservedBy: [] });
+      continue;
+    }
+    const e = take.finalState.entities[id] ?? take.entities0?.[id];
+    const kind = e?.kind ?? 'human';
+    // a part: a component, or any other non-human with a catalog def (piles, stations); a non-human without one is not sampled
+    const def = kind !== 'human' && e?.def && CATALOG[e.def] ? e.def : undefined;
+    if (kind !== 'human' && !def) continue;
+    info.set(id, { kind: kind === 'human' ? 'human' : 'component', def, removedAt: removedAt.get(id), present: [], track: take.tracks[id], grip: [], task: [], reservedBy: [] });
   }
   for (const [t, id, field, value] of take.changes) {
     const e = info.get(id);
@@ -64,7 +81,7 @@ export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler 
     const byTask = new Map<string, string[]>(), byGrip = new Map<string, string[]>();
     const push = (m: Map<string, string[]>, k: string, id: string) => { const l = m.get(k); if (l) l.push(id); else m.set(k, [id]); };
     for (const [id, e] of info) {
-      if (e.kind === 'component' || !presentAt(e.present, tick)) continue;
+      if (e.kind === 'component' || !presentAt(e, tick)) continue;
       const task = str(valueAt(e.task, tick, null as unknown));
       const grip = valueAt(e.grip, tick, null as unknown) as { entity?: string } | null;
       if (task) push(byTask, task, id);
@@ -88,7 +105,7 @@ export function takeSampler(take: Take, opts: { cache?: number } = {}): Sampler 
     // poses first (a carrier's contact point lies on the part it grips)
     const poses = new Map<string, { e: Info; pose: PartPose }>();
     for (const [id, e] of info) {
-      if (!presentAt(e.present, tick)) continue;
+      if (!presentAt(e, tick)) continue;
       const br = bracket(e.track, tick);
       if (!br) continue;
       const s = interpSample(br[0], br[1], tick);
