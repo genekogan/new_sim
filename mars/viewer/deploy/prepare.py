@@ -91,6 +91,24 @@ def resolve():
         raise SystemExit(f'allowlisted files missing from public/: {missing}')
     return sorted(paths)
 
+# Gene's questions page (deploy/questions-html.mjs writes docs/engineering/questions/index.html): served at
+# /questions/ as index.html plus exactly the files it references (captures, photos, diagrams), nothing else
+# from that folder (tools/, the engineer Markdown's older PNGs). deploy/questions-html.test.mjs checks the list.
+QUESTIONS = ROOT.parent / 'docs/engineering/questions'
+
+def questions():
+    """Paths relative to docs/engineering/questions/ that the release stages under /questions/."""
+    html = (QUESTIONS / 'index.html').read_text()
+    refs = {m for m in re.findall(r'(?:src|href)="([^"#?]+)"', html) if not re.match(r'[a-z]+:|/', m)}
+    missing = sorted(r for r in refs if not (QUESTIONS / r).is_file())
+    if missing:
+        raise SystemExit(f'questions/index.html references missing files: {missing}')
+    return ['index.html'] + sorted(refs)
+
+if '--questions' in sys.argv:
+    print(json.dumps(questions()))
+    raise SystemExit(0)
+
 if '--list' in sys.argv:
     print(json.dumps({'globs': GLOBS, 'files': resolve()}))
     raise SystemExit(0)
@@ -126,6 +144,14 @@ for rel in resolve():
     records.append({'path': f'/{namespace}/{name}', 'bytes': len(payload),
         'sha256': hashlib.sha256(payload).hexdigest(),
         'storage': 'r2' if len(payload) > LIMIT else 'static'})
+
+for rel in questions():
+    payload = (QUESTIONS / rel).read_bytes()
+    target = PUBLIC / 'questions' / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    records.append({'path': f'/questions/{rel}', 'bytes': len(payload),
+        'sha256': hashlib.sha256(payload).hexdigest(), 'storage': 'static'})
 
 shutil.copy2(ROOT / 'public/favicon.svg', PUBLIC / 'favicon.svg')
 shutil.copy2(ROOT / 'public/simulation-agent-guide.md', PUBLIC / 'simulation-agent-guide.md')

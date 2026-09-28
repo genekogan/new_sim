@@ -23,6 +23,12 @@ for (const path of [
     assert.equal(a.status, 200, match[1]);
   }
 }
+{ // Gene's questions page (deploy/prepare.py → /questions/)
+  const q = await fetch(base + '/questions/');
+  assert.equal(q.status, 200, '/questions/');
+  assert.match(await q.text(), /<title>Questions for Gene<\/title>/);
+  assert.equal((await fetch(base + '/questions', { redirect: 'manual' })).status, 301);
+}
 assert.equal((await fetch(base + '/not-a-campus-route')).status, 404);
 assert.equal((await fetch(base + '/api/simulation/state')).status, 401);
 assert.equal((await fetch(base + '/studio', { method: 'POST' })).status, 405);
