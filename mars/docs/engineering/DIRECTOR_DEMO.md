@@ -84,8 +84,9 @@ server-side op time (`_meta.elapsedMs`).
                 engine_attach_camera_track
 → engine_list_verbs {}                                                        [13 ms · 0 ms]
 ← rules: mars-engine/1+mars-assembly/2
-← 17 verbs: walk_to, carry, raise_upright, connect_beam, release_support, install_joist, install_plywood, install_stair_flight,
-            install_tread, sit, take_slot, stand, face, converse, gather, campfire_circle, ambient_wander
+← 21 verbs: walk_to, carry, raise_upright, connect_beam, release_support, install_joist, install_plywood, install_stair_flight,
+            install_tread, sit, take_slot, stand, face, converse, gather, campfire_circle, ambient_wander,
+            mount, ride_to, ride_loop, dismount
 ← carry params: crew, item, to, place, via
 → engine_query_world {}                                                       [5 ms · 0 ms]
 ← workspace proving-ground: protected, head ff738e2e16495227a730be56
