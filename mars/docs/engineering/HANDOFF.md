@@ -639,3 +639,10 @@ week 24 %.
 
 **If resuming:** `git status` in the main tree — unstaged files there belong to W13 (`engine/campus/**`, `construction/**`,
 `scenarios/year-build.ts`, `test/year-build-b.test.ts`, `YEAR_BUILD.md`). Pinned hashes in the tests are the truth.
+
+**Addendum after W26 (lead, 09:40 EDT): W13 landed** (`77e9d28`…`97957ca`, 13 commits) — §7 phase B for 2022 east-house: decks, stair, walls and
+solar sequenced from piles with `cut`, `pass_up`, `install_wall`, stringer/tread/post/handrail verbs; each section 0 violations; 12 frames,
+54 beams, 81 deck pieces, 25 wall panels, 16/21 stair parts, 6/20 solar parts at their target poses; 19 unplaced with reasons; default-suite
+tranche pinned `94db263e…` @53604; **the end-to-end A+B run is not green** (37 ticks `collision.human-human`, a wall carrier vs a parked crew
+member) and has no pin/take yet — first item for the next session. Report-only plans exist for all six years (YEAR_BUILD.md). Final head
+`97957ca`: tsc clean, engine 358/0/3 of 361 (lead-verified); full gate last GREEN at `1395dd4`, W13's later commits are engine + docs.
