@@ -8,7 +8,6 @@ import * as THREE from 'three';
 import type { Runtime } from '../../engine/runtime/runtime.ts';
 import type { Spatial } from '../../engine/spatial/service.ts';
 import { obbCorners } from '../../engine/core/math.ts';
-import { createHistoricalScene } from '../history/scenes';
 import { loadGltf, ThreeResources } from '../../lib/three-resources';
 import { walkaboutInfo } from './year-walkabout.ts';
 import { clearGroup } from './overlay-debug.ts';
@@ -83,8 +82,17 @@ export function yearBackdrop(rt: Runtime, onError: (message: string) => void): B
         if (!disposed) onError(`2026 campus GLB could not load: ${e.message}`);
       });
   } else {
-    group.add(createHistoricalScene(info.year));
-    loaded = true;
+    // dynamic: keeps the studio's scene modules out of the lab's import graph (and its dev-server
+    // reloads) until a year walkabout is opened
+    import('../history/scenes')
+      .then(({ createHistoricalScene }) => {
+        if (disposed) return;
+        group.add(createHistoricalScene(info.year));
+        loaded = true;
+      })
+      .catch((e) => {
+        if (!disposed) onError(`studio ${info.year} scene could not load: ${e.message}`);
+      });
   }
   const r = (x1 - x0 + z1 - z0) / 2;
   return {
