@@ -16,15 +16,16 @@
 //   1. frame (k+1, r) [and (0, r) for the first bay]: off its stack onto the take-out spot, carried
 //      to where it lies, raised by two, taken over by a holder standing behind it (the unbuilt side),
 //      the raise crew lets go;
-//   2. the two low beams (seat ≤ 1.2 m): off the beam stack, carried to lie 0.4 m outside their seat
-//      lines (in the aisle between rows, or outside the rack), hung by the two who carried them;
+//   2. the two low beams (seat ≤ 1.2 m): off the beam stack, carried to the line-0 end of their stage axis
+//      (0.457 m outside the seat line: the aisle centre between rows, or outside the rack), walked in and hung
+//      by the two who carried them (every beam is staged and walked in that way);
 //   3. the two middle beams: two installers climb the frames' bracing (≤ 1 m on held frames), the two
 //      carriers hand each beam up to them;
 //   4. the new frame (and the first one) released: beam-stable (two levels on both columns);
 //   5. the two top beams: installers climb higher on the now-stable frames, the two former holders
 //      climb below them as a relay, the carriers hand each beam up, relay → installers hook it.
 // Rules respected by construction and re-checked by every verb at run time: only what exists is usable
-// (stances on standing frames, held frames only to 1 m), support (stability v1.1), reach (hands ≤ 2.1 m
+// (stances on standing frames, held frames only to 1 m), support (stability v1.1), reach (hands ≤ 2.06 m
 // from the floor / stance, relay when the gap is too big), crew sizes (catalog carry / raise crews),
 // material availability (one piece per take, the take-out spot cleared by its carry before the next).
 // No cutting is needed for the skeleton (frames and beams are used as stocked); cuts belong to phase B.
@@ -43,7 +44,7 @@ import type { CampusObstacle, CampusScene } from './types.ts';
 export const YEAR_BUILD_VERSION = 'mars-year-build/phase-a-1';
 const HYPO: Provenance = { origin: 'design-edit', confidence: 'hypothetical', note: 'year build phase A (skeleton) — hypothetical piles, crew and order, not historical' };
 const AISLE_END = 1.5; // m beyond frame line 0 where an aisle beam's near end lies before it is walked in
-const HOOK_MAX = 1.8; // m: installers hook a beam at most this far above their feet (margin under the 2.1 m reach)
+const HOOK_MAX = 1.8; // m: installers hook a beam at most this far above their feet (margin under the 2.06 m reach, body/model.ts)
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const dot = (a: Vec2, b: Vec2) => a[0] * b[0] + a[1] * b[1];
 

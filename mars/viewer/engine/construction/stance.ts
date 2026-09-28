@@ -522,7 +522,7 @@ function planHang(rt: Runtime, p: BP): { ok: true; program: Geo } | { ok: false;
 
 export const hangBeam: ActionDef<BP, Geo, BE> = {
   verb: 'hang_beam',
-  description: 'Hang a beam lying on the axis 0.4 m outside its seat line (beside the bay, or further along an aisle: it is walked in) on the same column of two standing uprights: from the ground (seat ≤ 1.2 m), or handed up by two givers to two installers on the frames\' bracing (optionally through two relay people lower on the frames).',
+  description: 'Hang a beam lying on the axis 0.457 m outside its seat line (beside the bay, or further along an aisle: it is walked in) on the same column of two standing uprights: from the ground (seat ≤ 1.2 m), or handed up by two givers to two installers on the frames\' bracing (optionally through two relay people lower on the frames).',
   schema: z.strictObject({
     beam: z.string().max(80), a: z.string().max(80), b: z.string().max(80), column: z.enum(['l', 'r']), height: z.number().min(0.1).max(8),
     installers: z.array(z.string().max(80)).length(2), givers: z.array(z.string().max(80)).max(2).optional(), relay: z.array(z.string().max(80)).max(2).optional(),
