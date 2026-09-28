@@ -11,6 +11,7 @@ import { nextRandom, seedRng } from '../../engine/core/rng.ts';
 import type { ActionDef } from '../../engine/actions/types.ts';
 import type { Entity } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
+import type { CameraPose } from '../../engine/camera/shots.ts';
 import { body } from './body.ts';
 import { buildBay } from './build-bay.ts';
 import { campfireEvening } from './campfire-evening.ts';
@@ -39,6 +40,8 @@ export type Scenario = {
   maxTicks: number;
   /** Camera focus (x, z), framing radius and optional oblique azimuth (deg, 0 = camera on +x, 90 = on +z). */
   focus: [number, number, number, number?];
+  /** Named extra framings (a lab button each, `cameraPreset(name)`): a camera pose, or null before build(). */
+  views?: Record<string, () => CameraPose | null>;
   /** Tick ranges worth capturing mid-action (fractions of completion ticks). */
   capture?: number[];
   /** Dusk lighting; fixtures such as a campfire glow (campfire-evening). */

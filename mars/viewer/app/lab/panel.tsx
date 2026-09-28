@@ -99,6 +99,9 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <div className="lab-row">
         <button onClick={() => view.preset('top')}>Top-down</button>
         <button onClick={() => view.preset('oblique')}>Oblique</button>
+        {Object.keys(s.views ?? {}).map((k) => (
+          <button key={k} onClick={() => view.preset(k)}>{k}</button>
+        ))}
       </div>
       <p className="lab-meta lab-perf">
         step {st.meanMs.toFixed(3)} ms mean · p95 {st.p95Ms.toFixed(3)} · max {st.maxMs.toFixed(2)} · {info.calls} draws · {(info.triangles / 1000).toFixed(0)}k tris

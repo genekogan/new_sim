@@ -167,10 +167,11 @@ export function installHook(view: LabView, notify: () => void) {
     camera(pos: number[], target: number[]) {
       view.look(pos, target);
     },
-    /** Framing presets for a scenario: top-down diagnostic and oblique. */
-    cameraPreset(kind: 'top' | 'oblique') {
+    /** Framing presets for a scenario: top-down diagnostic and oblique, or a named scenario view ('Oblique yard'). */
+    cameraPreset(kind: string) {
       view.preset(kind);
     },
+    cameraPose: () => view.cameraPose(),
     info: () => view.info(),
     perf: () => sim.stats(),
     /** Pose readout per person for the current tick (feet / soles, stair gait, posture, arms vs targets): docs/engineering/POSES.md. */

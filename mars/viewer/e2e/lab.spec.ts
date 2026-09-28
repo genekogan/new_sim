@@ -2,6 +2,8 @@
 // window.__marsEngine, assert expectations + zero violations, capture
 // top-down/oblique shots with overlays off and on. See app/lab/README.md.
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 import { captureView, collectConsoleErrors, recordVideo, writeArtifact } from './helpers';
 import { labFrames, openLab, setOverlays, type LabState } from './lab-helpers';
 
@@ -163,4 +165,27 @@ test('lab perf: step cost + render stats for trio and stress-30', async ({ page 
   writeArtifact('lab-perf.json', out);
   console.log(JSON.stringify(out, null, 1));
   expect(errors).toEqual([]);
+});
+
+// Lab "Oblique yard" (year-build presets): the recorded whole-skeleton take's opening shot — the yard + crew region from
+// the south-east at 32°, the planner's bottom safe area — as a lab button. Same pose as the take's first camera sample.
+test('lab: year-build "Oblique yard" view = the whole-skeleton take\'s opening camera', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  const errors = collectConsoleErrors(page);
+  await openLab(page, 'year-build-2022-house');
+  await page.evaluate(() => (window.__marsEngine as unknown as { runScenario(n: string, o: object): Promise<unknown> }).runScenario('year-build-2022-house', { paused: true }));
+  await page.getByRole('button', { name: 'Oblique yard' }).click();
+  await labFrames(page, 4);
+  const pose = await page.evaluate(() => (window.__marsEngine as unknown as { cameraPose(): { position: number[]; target: number[]; fov: number } }).cameraPose());
+  const take = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../public/engine/takes/year-build-2022-east-house.json'), 'utf8'));
+  const s0 = take.camera.data.samples[0] as { position: number[]; target: number[]; fov: number };
+  for (let i = 0; i < 3; i++) {
+    expect(pose.position[i], `position[${i}]`).toBeCloseTo(s0.position[i], 3);
+    expect(pose.target[i], `target[${i}]`).toBeCloseTo(s0.target[i], 3);
+  }
+  expect(pose.fov).toBe(s0.fov);
+  await captureView(page, 'lab-year-build-oblique-yard', { testInfo, compare: false });
+  await page.getByRole('button', { name: 'Oblique', exact: true }).click();
+  expect((await page.evaluate(() => (window.__marsEngine as unknown as { cameraPose(): { fov: number } }).cameraPose())).fov, 'the other presets restore the lab fov').toBe(45);
+  expect(errors, 'console/page errors').toEqual([]);
 });

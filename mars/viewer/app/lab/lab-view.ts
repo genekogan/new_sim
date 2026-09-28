@@ -133,8 +133,18 @@ export class LabView {
     this.fixtures.setDusk(evening);
   }
 
-  /** Framing presets from the scenario focus: straight-down diagnostic or oblique. */
-  preset(kind: 'top' | 'oblique') {
+  /** Framing presets from the scenario focus: straight-down diagnostic or oblique; or one of the scenario's named `views`. */
+  preset(kind: string) {
+    const v = this.sim.scenario.views?.[kind];
+    if (v) {
+      const pose = v();
+      if (!pose) return;
+      this.setFov(pose.fov);
+      this.look(pose.position, pose.target);
+      return;
+    }
+    if (kind !== 'top' && kind !== 'oblique') throw Error(`unknown view "${kind}" (have top, oblique${Object.keys(this.sim.scenario.views ?? {}).map((k) => `, ${k}`).join('')})`);
+    this.setFov(45);
     const [x, z, r, az = 50] = this.sim.scenario.focus;
     const a = (az * Math.PI) / 180;
     if (kind === 'top') this.look([x, r * 2.6, z + 0.01], [x, 0, z]);
@@ -144,6 +154,17 @@ export class LabView {
   /** Static geometry finished loading (year backdrops: Kit photos / 2026 GLB). */
   get staticsReady() {
     return this.statics?.ready?.() ?? true;
+  }
+
+  /** Camera readout (tests): position, orbit target, vertical fov. */
+  cameraPose() {
+    return { position: this.camera.position.toArray(), target: this.orbit.target.toArray(), fov: this.camera.fov };
+  }
+
+  private setFov(fov: number) {
+    if (this.camera.fov === fov) return;
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
   }
 
   look(pos: number[], target: number[]) {

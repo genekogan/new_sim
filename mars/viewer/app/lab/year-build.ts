@@ -14,6 +14,7 @@ import { campusYearUrl, type CampusYearFile } from '../../engine/campus/history.
 import { buildingFootprint } from '../../engine/campus/bom.ts';
 import { compareToCanonical, yearBuildSetup, type YearBuildSetup } from '../../engine/scenarios/year-build.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
+import { evaluateShot } from '../../engine/camera/shots.ts';
 import { bindRunner, sequenceOf } from './build-bay.ts';
 import type { Check, Scenario } from './scenarios.ts';
 
@@ -37,7 +38,7 @@ export function prepareYearBuild(): Promise<void> {
   return pending;
 }
 
-type Info = { setup: YearBuildSetup; bays: number | undefined; setupMs: number; fetchMs: number; centre: [number, number] };
+type Info = { setup: YearBuildSetup; bays: number | undefined; setupMs: number; fetchMs: number; centre: [number, number]; yard: { min: [number, number]; max: [number, number] } };
 const infos = new WeakMap<Runtime, Info>();
 /** The setup behind a year-build runtime (hook / spec: plan steps, targets, unplaced, yard). */
 export const yearBuildOf = (rt: Runtime) => infos.get(rt);
@@ -57,7 +58,10 @@ export function yearBuildRuntime(bays: number | undefined): Runtime {
   const rt = new Runtime(world, setup.cfg.registry, runServices(world, setup.cfg), setup.cfg.invariants);
   bindRunner(rt, new SequenceRunner(rt, setup.plan.steps));
   const fp = buildingFootprint(setup.graph.nodes.filter((n) => n.assembly === YEAR_BUILD_ASSEMBLY));
-  last = { setup, bays, setupMs: performance.now() - t0, fetchMs, centre: fp.c };
+  // the pile yard and crew as first placed (x, z bounds + 2 m): the region of the recorder's establishing shot
+  const ps = Object.values(world.entities).map((e) => e.pose.p);
+  const yard = { min: [Math.min(...ps.map((p) => p[0])) - 2, Math.min(...ps.map((p) => p[2])) - 2], max: [Math.max(...ps.map((p) => p[0])) + 2, Math.max(...ps.map((p) => p[2])) + 2] } as Info['yard'];
+  last = { setup, bays, setupMs: performance.now() - t0, fetchMs, centre: fp.c, yard };
   infos.set(rt, last);
   return rt;
 }
@@ -99,6 +103,13 @@ function preset(name: string, bays: number | undefined, title: string, maxTicks:
     get focus(): [number, number, number, number] {
       // the building from the south-east, the pile yard (+x side) in view
       return last ? [last.centre[0] + 3, last.centre[1], 16, 35] : [0, 0, 20, 35];
+    },
+    views: {
+      // the take's opening shot (deploy/record-campus-take.mjs, year-build: "establishing: yard and site from the
+      // south-east"): the yard + crew region, azimuth 45°, elevation 32°, the planner's 0.17 bottom safe area — the
+      // same pose as the recorded take's first camera sample
+      'Oblique yard': () =>
+        last && evaluateShot({ kind: 'establishing', region: { ...last.yard, y: last.setup.build.groundY }, azimuth: Math.PI / 4, elevation: (32 * Math.PI) / 180 }, () => ({}), 0, { safeBottom: 0.17 }),
     },
     expect: (rt): Check[] => {
       const r = sequenceOf(rt)!;
