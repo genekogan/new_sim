@@ -53,6 +53,8 @@ export type PhaseBCtx = {
   lastSteps: () => string[];
   /** Is the ground beside the house on its −u side taken near local v (a neighbour's stair)? The givers then hold the pieces by their sides. */
   narrowMinusU: (v: number) => boolean;
+  /** The same beyond the +u end (W38): a strip's middle piece then goes in from the −u side, when that side is open. */
+  narrowPlusU?: (v: number) => boolean;
   /** Crew positions at the start of phase B when run from a snapshot (sections only). */
 };
 export type PhaseBResult = { sequenced: { node: string; kind: string; steps: string[] }[]; unplaced: UnplacedB[]; done: string[]; sectionStarts: { section: Section; at: number }[] };
@@ -160,7 +162,12 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   const stripsOf = (lv: number) => [...new Set(decks.filter((p) => p.meta.level === lv).map((p) => p.meta.strip as number))].sort((a, b) => a - b);
   const piecesOf = (lv: number, s: number) => decks.filter((p) => p.meta.level === lv && p.meta.strip === s).sort((a, b) => (a.meta.piece as number) - (b.meta.piece as number));
   const lenOf = (p: PartB) => def(p.def).size[0];
-  const sideOf = (p: PartB) => ((p.meta.piece as number) <= (p.meta.of as number) / 2 ? -1 : 1); // −u side first piece(s), +u the rest
+  // −u side first piece(s), +u the rest; W38 (PROVISIONAL): where the ground beyond the strip's +u end is taken (a neighbour's
+  // stair) and its −u end is open, the middle piece(s) go in from the −u side too (only the outer +u piece from +u)
+  const sideOf = (p: PartB) => {
+    const s0 = (p.meta.piece as number) <= (p.meta.of as number) / 2 ? -1 : 1;
+    return s0 > 0 && (p.meta.piece as number) < (p.meta.of as number) && ctx.narrowPlusU?.(vc(p)) && !ctx.narrowMinusU(vc(p)) ? -1 : s0;
+  };
   const uc = (p: PartB) => Lc([p.pose.p[0], p.pose.p[2]])[0];
   const vc = (p: PartB) => Lc([p.pose.p[0], p.pose.p[2]])[1];
   const levelId = (y: number) => Math.round(y / 0.5);
@@ -183,7 +190,9 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         const edge = side < 0 ? uMin - BEAM_HALF : uMax + BEAM_HALF;
         const Rc = side < 0 ? edge - 0.08 - L / 2 : edge + 0.08 + L / 2;
         const narrow = side < 0 && ctx.narrowMinusU(vc(p));
-        const lw = W(Rc + side * (narrow ? 0.3 : 0.6), vc(p)); // set down a little further out than where it goes up (room for the carry formation)
+        // W38: going in from a +u side whose ground is narrow (a neighbour's stair), the givers hold it by its sides, set down closer
+        const narrowP = side > 0 && !!ctx.narrowPlusU?.(vc(p));
+        const lw = W(Rc + side * (narrow || narrowP ? 0.3 : 0.6), vc(p)); // set down a little further out than where it goes up (room for the carry formation)
         // receiver: in the aisle within reach both of where the givers can push it to (up to the edge) and of its place
         const fin: [number, number] = [uc(p) - L / 2, uc(p) + L / 2];
         const pushed: [number, number] = side < 0 ? [uMin, uMin + L] : [uMax - L, uMax];
@@ -200,7 +209,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         const who2 = f2nd.actor === C(G[0]) ? [] : [recv === a0 ? a1 : a0];
         const pu = step('pass_up', {
           part: p.id, to: { x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(p.y) }, edge: r3(side < 0 ? -edge : edge), out: { x: W(side, 0)[0], z: W(side, 0)[1] },
-          givers: G.map(C), receivers: [C(recv)], receiverAt: [{ x: qa[0], z: qa[1], level: 0 }], give: r3(p.y + 0.05), push: true, fasten: [f2nd],
+          givers: G.map(C), receivers: [C(recv)], receiverAt: [{ x: qa[0], z: qa[1], level: 0 }], give: r3(p.y + 0.05), push: true, fasten: [f2nd], ...(narrowP ? { side: true } : {}),
         }, [...G, recv, ...who2], [f], `push ${p.id} in over the edge beam; ${C(recv)} takes it in the aisle; screwed down`);
         mark(p, pu);
       }
@@ -305,7 +314,8 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const edge = side < 0 ? uMin - BEAM_HALF : uMax + BEAM_HALF;
       const Rc = side < 0 ? edge - 0.08 - L / 2 : edge + 0.08 + L / 2;
       const narrow = side < 0 && ctx.narrowMinusU(vc(p));
-      const lw = W(Rc + side * (narrow ? 0.3 : 0.6), vc(p));
+      const narrowP = side > 0 && !!ctx.narrowPlusU?.(vc(p)); // W38: as in D0
+      const lw = W(Rc + side * (narrow || narrowP ? 0.3 : 0.6), vc(p));
       const outV = W(side, 0);
       let recv = side < 0 ? up[0] : up[1];
       let recvAt: { x: number; z: number; level: number; kneel?: { x: number; z: number } } | undefined, fz: number | null = null, fzAt: { x: number; z: number; level: number } | undefined;
@@ -371,7 +381,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         part: p.id, to: { x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(yTop) }, edge: r3(side < 0 ? -edge : edge), out: { x: outV[0], z: outV[1] },
         givers: G.map(C), ...(cfg.relay !== null ? { relay: [C(cfg.relay)], relayAt } : {}), receivers: [C(recv)], ...(recvAt ? { receiverAt: [recvAt], ...(follow ? { follow: true } : {}) } : {}),
         // screwed down where it lies: by the receiver and a second person, or by the receiver alone when nobody else reaches it
-        fasten: fz !== null ? [{ actor: C(fz), ...(fzAt ? { at: fzAt } : {}) }] : [],
+        fasten: fz !== null ? [{ actor: C(fz), ...(fzAt ? { at: fzAt } : {}) }] : [], ...(narrowP ? { side: true } : {}),
       }, [...G, recv, ...(fz !== null ? [fz] : []), ...(cfg.relay !== null ? [cfg.relay] : [])], [f, ...pre], `pass ${p.id} up${cfg.relay !== null ? ' through the relay' : ''} to ${yTop.toFixed(2)} m; screwed down${fz !== null ? '' : ' by the receiver alone'}`);
       mark(p, pu);
       all.push(pu);

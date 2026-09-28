@@ -20,10 +20,10 @@ const FILE = loadCampusFile(2022);
 
 /** Expected A+B plans (yearBuildHouseSetup): steps, sequenced and unplaced Kit components by kind. */
 const PLANS: Record<string, { steps: number; far: number; sequenced: Record<string, number>; unplaced: Record<string, number> }> = {
-  chiba: { steps: 1460, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 2, upright: 12 }, unplaced: { 'feature:fixture': 16, 'feature:solar': 14, 'feature:stair-part': 5, 'feature:wall': 5 } },
+  chiba: { steps: 1462, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 2, upright: 12 }, unplaced: { 'feature:fixture': 16, 'feature:solar': 14, 'feature:stair-part': 5, 'feature:wall': 5 } },
   'east-house': { steps: 1552, far: 0, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 4, upright: 12 }, unplaced: { 'feature:solar': 14, 'feature:stair-part': 5 } },
-  kitchen: { steps: 1322, far: 0, sequenced: { beam: 54, 'feature:deck-sheet': 21, 'feature:stair-part': 16, 'feature:wall': 3, upright: 12 }, unplaced: { 'feature:door': 1, 'feature:fixture': 79, 'feature:roof': 10, 'feature:stair-part': 5, 'feature:wall': 1 } },
-  'west-house': { steps: 1478, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 3, upright: 12 }, unplaced: { 'feature:fixture': 5, 'feature:solar': 14, 'feature:stair-part': 5, 'feature:wall': 1 } },
+  kitchen: { steps: 1325, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 21, 'feature:stair-part': 16, 'feature:wall': 3, upright: 12 }, unplaced: { 'feature:door': 1, 'feature:fixture': 79, 'feature:roof': 10, 'feature:stair-part': 5, 'feature:wall': 1 } },
+  'west-house': { steps: 1480, far: 45, sequenced: { beam: 54, 'feature:deck-sheet': 27, 'feature:solar': 6, 'feature:stair-part': 16, 'feature:wall': 3, upright: 12 }, unplaced: { 'feature:fixture': 5, 'feature:solar': 14, 'feature:stair-part': 5, 'feature:wall': 1 } },
 };
 
 /** Every pile's box and the cutting station clear of the other rack houses' work zones. */
@@ -67,7 +67,7 @@ test('year build 2022, all four houses A+B: plans through the same rules — cou
     const b = s.build;
     const e = PLANS[h];
     assert.equal(b.template.steps.length, e.steps, h);
-    assert.equal(b.phaseAStepCount, 552, h);
+    assert.equal(b.phaseAStepCount, h === 'kitchen' ? 555 : 552, h); // kitchen: built from its far end, three holders walk out first
     assert.deepEqual(kinds(b.sequenced), e.sequenced, h);
     assert.deepEqual(kinds(b.unplaced), e.unplaced, h);
     for (const u of b.unplaced) assert.ok(u.reason.length > 20, `${u.node}: ${u.reason}`);
@@ -116,7 +116,7 @@ function runHouse(h: string, tranche: boolean) {
 /** First pins 2026-09-28 (W38). */
 const PIN_TRANCHE: Record<string, { ticks: number; hash: string }> = {
   chiba: { ticks: 60997, hash: '940e9f64fa5c4758baa1772b955e4299623e5a8c2d00b51b84c9fa2ad95cbecd' },
-  kitchen: { ticks: 52246, hash: 'dbb5563883acaf89972fefbeab799a59eb2634176f1c667d78ab10b5450f0bca' },
+  kitchen: { ticks: 55293, hash: '4862adfcb6b14bec685758fce5b732cb831a47c9b9a65a6167a5f6b3ead28f7e' },
   'west-house': { ticks: 54322, hash: 'b4c422105d2d818dbe49643f75978544c80e15b2994612e99a675ed0b3e345f7' },
 };
 /** Pinned whole-house A+B runs (YEAR_BUILD_FULL=1). */

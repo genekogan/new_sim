@@ -70,7 +70,7 @@ export type YearBuildSetup = {
 };
 
 /** Publish `mars-<year>` (protected), fork it, commit the piles + crew, bind the skeleton template. */
-export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB, i: number, all: PartB[]) => boolean }; avoidNeighbours?: boolean } = {}): YearBuildSetup {
+export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB, i: number, all: PartB[], dir: 1 | -1) => boolean }; avoidNeighbours?: boolean } = {}): YearBuildSetup {
   const history = new WorldHistory(YEAR_BUILD_RULES);
   const { canonical, base } = publishCampusYear(history, year, file);
   const graph = assemblyGraph(year, base);
@@ -100,12 +100,17 @@ export function yearBuildSetup(year: number, assembly: string, file: CampusYearF
 // ---- W38: every 2022 rack house through the same rules ----
 /** The four rack houses of Mars 2022: one template (12 frames of 16 ft × 3 ft in 4 lines × 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m). */
 export const HOUSES_2022 = ['chiba', 'east-house', 'kitchen', 'west-house'] as const;
-/** Phase-B tranche filter: the first ground-floor deck strip — the lowest level's lowest strip (next to frame line 0 in every 2022 house). */
-export function firstGroundStrip(p: PartB, _i: number, all: PartB[]): boolean {
+/**
+ * Phase-B tranche filter: the first ground-floor deck strip over the first bay built — the lowest level's lowest strip
+ * (next to geometric frame line 0 in every 2022 house), or its highest when the skeleton is built from the other end
+ * (`dir` −1, sequence.ts lay-out room rule).
+ */
+export function firstGroundStrip(p: PartB, _i: number, all: PartB[], dir: 1 | -1 = 1): boolean {
   if (p.kind !== 'deck') return false;
   const decks = all.filter((x) => x.kind === 'deck');
   const lv = Math.min(...decks.map((x) => Number(x.meta.level)));
-  const s0 = Math.min(...decks.filter((x) => Number(x.meta.level) === lv).map((x) => Number(x.meta.strip)));
+  const vs = decks.filter((x) => Number(x.meta.level) === lv).map((x) => Number(x.meta.strip));
+  const s0 = dir === 1 ? Math.min(...vs) : Math.max(...vs);
   return Number(p.meta.level) === lv && Number(p.meta.strip) === s0;
 }
 /**

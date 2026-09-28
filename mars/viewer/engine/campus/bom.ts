@@ -185,7 +185,7 @@ export function otherWorkZones(g: AssemblyGraph, assembly: string): { assembly: 
  * (≤ `radius` m from the building) is searched nearest-to-that-side's-anchor first (ties by x, z);
  * the side where everything fits with the least total distance to the building wins (ties: side order).
  */
-export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean; extra?: { id: string; def: string }[]; more?: PileSpec[]; phaseB?: boolean; avoid?: OBB2[] } = {}): Yard {
+export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean; extra?: { id: string; def: string }[]; more?: PileSpec[]; phaseB?: boolean; avoid?: OBB2[]; ground?: OBB2 } = {}): Yard {
   const fp = buildingFootprint(nodes);
   // frames stand in lines along the frames' normal (local z): the ends are where frames are laid out
   const workZone = workZoneOf(fp);
@@ -202,20 +202,23 @@ export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: Campu
     const a = rot2([sd[0] * (workZone.half[0] + 4), sd[1] * (workZone.half[1] + 4)], fp.yaw);
     const anchor: Vec2 = [fp.c[0] + a[0], fp.c[1] + a[1]];
     const cands = lattice.map((p) => ({ p, d: dist(p, anchor) })).sort((x, y) => x.d - y.d || x.p[0] - y.p[0] || x.p[1] - y.p[1]).map((x) => x.p);
-    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false, opts.extra ?? [], opts.more ?? [], opts.phaseB ?? false, opts.avoid ?? []);
+    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false, opts.extra ?? [], opts.more ?? [], opts.phaseB ?? false, opts.avoid ?? [], opts.ground ?? null);
     const cost = yard.refused.length * 1e6 + yard.piles.reduce((s, p) => s + dist([p.x, p.z], fp.c), 0) + (yard.station ? dist([yard.station.x, yard.station.z], fp.c) : 0);
     if (cost < bestCost - 1e-9) { best = yard; bestCost = cost; }
   }
   return best!;
 }
 
-function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean, extra: { id: string; def: string }[] = [], more: PileSpec[] = [], phaseB = false, avoid: OBB2[] = []): Yard {
+function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean, extra: { id: string; def: string }[] = [], more: PileSpec[] = [], phaseB = false, avoid: OBB2[] = [], ground: OBB2 | null = null): Yard {
   const placed: OBB2[] = [];
   const out: PilePlacement[] = [];
   const refused: Yard['refused'] = [];
   // the pile's long axis along the building's long axis (frame normal, local z of the frames' yaw)
   const yaw = fp.yaw + Math.PI / 2;
-  const fits = (plot: OBB2) => !obbOverlap(plot, workZone) && !avoid.some((z) => obbOverlap(z, plot)) && !placed.some((q) => obbOverlap(q, plot)) && !near.some((o) => obbOverlap(o.obb, plot));
+  // W38: the plot's work area (where the piece is laid and people stand: `work`, default the plot) on the ground (`ground`)
+  const fits = (plot: OBB2, work: OBB2 = plot) => !obbOverlap(plot, workZone) && !avoid.some((z) => obbOverlap(z, plot)) && !placed.some((q) => obbOverlap(q, plot)) && !near.some((o) => obbOverlap(o.obb, plot)) && (!ground || inside(work, ground));
+  /** A pile-local band z ∈ [za, zb], x ∈ ±hx of a plot centred at p (local z along rot2([0, 1], yaw)). */
+  const band = (p: Vec2, hx: number, za: number, zb: number): OBB2 => { const m = rot2([0, (za + zb) / 2], yaw); return { c: [p[0] + m[0], p[1] + m[1]], half: [hx, (zb - za) / 2], yaw }; };
   const order = [...piles].sort((a, b) => def(b.def).size[0] * def(b.def).size[2] - def(a.def).size[0] * def(a.def).size[2] || (a.id < b.id ? -1 : 1));
   const placePile = (pile: PileSpec) => {
     const d = def(pile.def), pc = def(pile.piece);
@@ -225,7 +228,8 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
     // plot (pile-local): pile across [−D/2, D/2], take-out strip beyond it on +z, access margin all round
     const D = d.size[2], z0 = -D / 2 - PILE_ACCESS, z1 = D / 2 + OUT_GAP + pieceW + PILE_ACCESS;
     const mid = rot2([0, (z0 + z1) / 2], yaw);
-    const c = cands.find((p) => fits({ c: [p[0] + mid[0], p[1] + mid[1]], half: [L / 2 + PILE_ACCESS, (z1 - z0) / 2], yaw }));
+    // work area: the pile's back face (no access needed behind it) to the take-out strip + its access margin
+    const c = cands.find((p) => fits({ c: [p[0] + mid[0], p[1] + mid[1]], half: [L / 2 + PILE_ACCESS, (z1 - z0) / 2], yaw }, band(p, L / 2 + PILE_ACCESS, -D / 2, z1)));
     if (!c) { refused.push({ id: pile.id, reason: `no free ${(L + 2 * PILE_ACCESS).toFixed(1)} × ${(z1 - z0).toFixed(1)} m plot within ${R} m of the building outside its work zone` }); return; }
     placed.push({ c: [c[0] + mid[0], c[1] + mid[1]], half: [L / 2 + PILE_ACCESS, (z1 - z0) / 2], yaw });
     const o = rot2([0, D / 2 + OUT_GAP + pieceW / 2], yaw);
@@ -241,7 +245,8 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
     const back = phaseB ? 4.6 + 0.5 : s[2] / 2 + 1.5, front = s[2] / 2 + 1.5;
     const mid = rot2([0, (back - front) / 2], yaw);
     const plot = (p: Vec2): OBB2 => ({ c: [p[0] + mid[0], p[1] + mid[1]], half: [s[0] / 2 + 1.5, (back + front) / 2], yaw });
-    const c = cands.find((p) => fits(plot(p)));
+    // work area: the plot + the in-feed in front of the operator (sequence-b inFeed: ≤ 2.82 m out for a 4x8, + 0.3 m)
+    const c = cands.find((p) => fits(plot(p), band(p, s[0] / 2 + 1.5, -Math.max(front, STATION_INFEED), back)));
     if (c) { placed.push(plot(c)); station = { x: r3(c[0]), z: r3(c[1]), yaw }; }
     else refused.push({ id: 'cutting-station', reason: `no free plot within ${R} m for the cutting station` });
   }
@@ -253,7 +258,8 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
     const s = def(x.def).size;
     const half: Vec2 = [s[0] / 2 + 1.5, s[2] / 2 + 1.5];
     const byStation = station ? [...cands].sort((a, b) => dist(a, [station!.x, station!.z]) - dist(b, [station!.x, station!.z]) || a[0] - b[0] || a[1] - b[1]) : cands;
-    const c = byStation.find((p) => fits({ c: p, half, yaw }));
+    // work area: the pile's back face to the offcut spot beside it (sequence-b scrapSpot: ≤ 0.45 m gap + a 4 ft piece) + 1 m
+    const c = byStation.find((p) => fits({ c: p, half, yaw }, band(p, half[0], -s[2] / 2, s[2] / 2 + 0.45 + SHEET_W + PILE_ACCESS)));
     if (c) { placed.push({ c, half, yaw }); ex.push({ id: x.id, def: x.def, x: r3(c[0]), z: r3(c[1]), yaw }); }
     else refused.push({ id: x.id, reason: `no free plot within ${R} m for ${x.id}` });
   }
@@ -262,6 +268,16 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
 }
 
 const dist = (a: Vec2, b: Vec2) => { const dx = a[0] - b[0], dz = a[1] - b[1]; return Math.sqrt(dx * dx + dz * dz); };
+const STATION_INFEED = 0.5 + 0.45 + 0.35 + 0.3 + SHEET_W + 0.3;
+/** Every corner of `a` inside `g` (5 cm in from its edge). */
+function inside(a: OBB2, g: OBB2): boolean {
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const w = rot2([sx * a.half[0], sz * a.half[1]], a.yaw);
+    const l = rot2([a.c[0] + w[0] - g.c[0], a.c[1] + w[1] - g.c[1]], -g.yaw);
+    if (Math.abs(l[0]) > g.half[0] - 0.05 || Math.abs(l[1]) > g.half[1] - 0.05) return false;
+  }
+  return true;
+}
 
 /** Totals for reports: pieces per item and phase, bundles per def. */
 export function bomTotals(bom: Bom, piles: PileSpec[]) {

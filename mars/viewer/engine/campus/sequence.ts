@@ -104,26 +104,38 @@ type Frame = { node: AsmNode; k: number; r: number; c: Vec2 };
 
 /** Generate the skeleton-stage plan for one building of a year. */
 /** `bays`: build only the first N bays (frame lines 0…N) — a tranche; the rest is reported as outside it. */
-export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB, i: number, all: PartB[]) => boolean }; avoid?: OBB2[] } = {}): YearBuildPlan {
+export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB, i: number, all: PartB[], dir: 1 | -1) => boolean }; avoid?: OBB2[] } = {}): YearBuildPlan {
   const crew = opts.crew ?? ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'];
   if (crew.length !== 6) throw new Error('yearBuildPlan: phase A uses a crew of six');
   const nodes = g.nodes.filter((n) => n.assembly === assembly);
   const frameNodes = nodes.filter((n) => n.kind === 'upright');
   if (!frameNodes.length) throw new Error(`yearBuildPlan: ${assembly} has no classified frames`);
   const unplaced: Unplaced[] = [];
+  const Y = frameNodes[0].box.yaw;
+  const n0 = rot2([0, 1], Y);
+  // W38 (PROVISIONAL, lay-out room rule): a frame is laid out beside its line before it is raised — line 0 outward, every
+  // later line over the bays not built yet, so the LAST line lies outward too. Where the ground beyond one end of the house
+  // is taken (a neighbour's table / wall within a frame's length) and the other end is open, the skeleton grows from the
+  // taken end (build direction reversed: lines numbered along −n) and its first line lies inward over the unbuilt bays.
+  const U0 = frameNodes[0].def!;
+  const extreme = (sg: 1 | -1) => { const v = frameNodes.map((f) => sg * dot([f.box.c[0], f.box.c[2]], n0)); const m = Math.max(...v); return frameNodes.filter((_, i) => v[i] > m - 0.2); };
+  const roomBeyond = (sg: 1 | -1) => extreme(sg).every((f) => layBlocker([f.box.c[0], f.box.c[2]], [sg * n0[0], sg * n0[1]], U0, scene) === null);
+  const plusRoom = roomBeyond(1), minusRoom = roomBeyond(-1);
+  const dir: 1 | -1 = !plusRoom && minusRoom ? -1 : 1;
+  const n: Vec2 = [dir * n0[0], dir * n0[1]];
+  const line0Out = dir === 1 ? minusRoom || !plusRoom : plusRoom;
   // phase B (W13): the material rules decide the stock, and the yard gets a scrap pile by the station
   // (the phase-A yard is placed first, exactly as without phase B; the extra bundles go in after it)
   const partsB0 = opts.phaseB ? phaseBParts(g, assembly, { flip: (strip) => noRoomMinusU(strip, scene) }) : undefined;
   // a phase-B tranche (`only`): the other parts are reported as outside it
-  const partsB = partsB0 && opts.phaseB?.only ? { ...partsB0, parts: partsB0.parts.filter(opts.phaseB.only) } : partsB0;
+  const partsB = partsB0 && opts.phaseB?.only ? { ...partsB0, parts: partsB0.parts.filter((p, i, all) => opts.phaseB!.only!(p, i, all, dir)) } : partsB0;
   const bomA = billOfMaterials(g, [assembly]);
   const bom = partsB ? billOfMaterialsB(g, [assembly], partsB) : bomA;
   const piles = stockPiles(bomA);
-  const yard = placePiles(piles, nodes, scene.obstacles, 0, { ...(partsB ? { extra: [{ id: 'scrap-pile', def: 'scrap-pile' }], more: morePiles(bom, piles), phaseB: true } : {}), ...(opts.avoid?.length ? { avoid: opts.avoid } : {}) });
+  const yard = placePiles(piles, nodes, scene.obstacles, 0, { ...(partsB ? { extra: [{ id: 'scrap-pile', def: 'scrap-pile' }], more: morePiles(bom, piles), phaseB: true } : {}), ...(opts.avoid?.length ? { avoid: opts.avoid } : {}), ground: scene.surfaces.find((x) => x.id === 'ground')!.obb });
   for (const r of yard.refused) unplaced.push({ node: r.id, kind: 'pile', reason: r.reason });
   // ---- grid of frame lines × rows
-  const Y = frameNodes[0].box.yaw;
-  const across = rot2([1, 0], Y), n = rot2([0, 1], Y);
+  const across = rot2([1, 0], Y);
   const q = (x: number, step: number) => Math.round(x / step);
   const lineOf = new Map<number, number>(), rowOf = new Map<number, number>();
   const pos = frameNodes.map((f) => ({ f, s: dot([f.box.c[0], f.box.c[2]], n), t: dot([f.box.c[0], f.box.c[2]], across) }));
@@ -149,7 +161,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     beams.push({ node: b, k: fs[lo].k, r: fs[0].r, col, seat: b.seat! });
   }
   // engine yaw of each frame after its raise: lying heading φ − π/2 (line 0 lies toward −n, later lines toward +n)
-  const phiOf = (k: number) => datan2(k === 0 ? -n[1] : n[1], k === 0 ? -n[0] : n[0]);
+  const phiOf = (k: number) => datan2(k === 0 && line0Out ? -n[1] : n[1], k === 0 && line0Out ? -n[0] : n[0]);
   const yawOf = (k: number) => phiOf(k) - Math.PI / 2;
   /** Engine column (of frame line k) for a canonical column of that frame. */
   const engCol = (k: number, col: 'l' | 'r'): 'l' | 'r' => {
@@ -196,7 +208,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   /** Where people wait near bay k (beside the rack on the yard side, clear of staged beams). */
   const waitAt = (k: number, i: number): { x: number; z: number } => {
     const outer = frames.reduce((m, f) => Math.max(m, side * dot(f.c, across)), -Infinity) + def(U).size[0] / 2;
-    const s0 = (lineCoord(frames, k) + lineCoord(frames, Math.min(k + 1, K - 1))) / 2;
+    const s0 = (lineCoord(frames, k, dir) + lineCoord(frames, Math.min(k + 1, K - 1), dir)) / 2;
     const p = [0, 0].map((_, j) => across[j] * side * (outer + 2.0) + n[j] * (s0 + (i - 2.5) * 1.1));
     return { x: r3(p[0]), z: r3(p[1]) };
   };
@@ -204,6 +216,12 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   const mark = (node: string, kind: string, ...ids: string[]) => { const d = done.get(node) ?? []; d.push(...ids); done.set(node, d); };
   const raised = new Map<string, string>(); // frame node → its hold step
   const raise = (f: Frame, holder: number): string | null => {
+    // W38: a line-0 frame laid inward is held from outside, on ground nobody else uses: the holder takes the spot before
+    // the frame is fetched (idle people nudged aside by the carry / raise would otherwise end up standing on it)
+    if (f.k === 0 && !line0Out) {
+      const bk = rot2([0, -1], yawOf(0));
+      step('walk_to', { actor: C(holder), x: r3(f.c[0] + bk[0] * 0.6), z: r3(f.c[1] + bk[1] * 0.6), level: 0 }, [holder], [], `${C(holder)} goes to hold frame (0, ${f.r}) from outside`);
+    }
     const t = take(f.node.id, U);
     if (!t) { unplaced.push({ node: f.node.id, kind: 'upright', reason: `no ${U} left in the piles` }); return null; }
     const phi = phiOf(f.k);
@@ -211,7 +229,9 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     const c = step('carry', { crew: G.map(C), item: f.node.id, to: { x: r3(lay.x), z: r3(lay.z), yaw: lay.yaw } }, G, [t.step], `carry frame ${f.node.id} to lie at line ${f.k}, row ${f.r}`);
     spotClear.set(t.pile, c);
     const rz = step('raise_upright', { crew: G.map(C), item: f.node.id, stand_at: { x: f.c[0], z: f.c[1] } }, G, [], `raise frame (${f.k}, ${f.r})`);
-    const back = rot2([0, 1], yawOf(f.k)); // engine normal = the lying heading: behind = the unbuilt side
+    // engine normal = the lying heading: behind = the unbuilt side; a line-0 frame laid inward (W38) is held from outside
+    // (inside bay 0 the holder would be boxed in by the bay's low beams)
+    const back = f.k === 0 && !line0Out ? rot2([0, -1], yawOf(f.k)) : rot2([0, 1], yawOf(f.k));
     const at = { x: r3(f.c[0] + back[0] * 0.6), z: r3(f.c[1] + back[1] * 0.6) };
     const h = step('hold_frame', { actor: C(holder), item: f.node.id, at }, [holder], [rz], `${C(holder)} holds frame (${f.k}, ${f.r}) from behind`);
     const lg = step('let_go', { actor: C(G[0]), item: f.node.id }, [G[0]], [h]);
@@ -233,7 +253,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     // then the far end beyond the last frame line — hang_beam walks it in from either end along the open aisle
     const L = def(b.node.def!).size[0];
     const at = (s: number) => { const back = dot(mid, n) - s; return { x: r3(mid[0] + cv[0] * LOAD_OUT - n[0] * back), z: r3(mid[1] + cv[1] * LOAD_OUT - n[1] * back) }; };
-    const ends = [{ ...at(lineCoord(frames, 0) - (L / 2 + AISLE_END)), end: 'line-0' }, { ...at(lineCoord(frames, K - 1) + (L / 2 + AISLE_END)), end: `far (line ${K - 1})` }];
+    const ends = [{ ...at(lineCoord(frames, 0, dir) - (L / 2 + AISLE_END)), end: 'line-0' }, { ...at(lineCoord(frames, K - 1, dir) + (L / 2 + AISLE_END)), end: `far (line ${K - 1})` }];
     const free = ends.find((e) => stagePlotFree(e, b.node.box.yaw, L, scene));
     if (!free) { unplaced.push({ node: b.node.id, kind: 'beam', reason: `no room to stage it at either end of its aisle: ${ends.map((e) => `${e.end} end (${e.x}, ${e.z}) blocked by ${stagePlotBlocker(e, b.node.box.yaw, L, scene)}`).join('; ')}` }); return null; }
     const { x, z } = free;
@@ -306,9 +326,11 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     const scrap = yard.extra?.find((x) => x.id === 'scrap-pile');
     resB = phaseB({
       assembly, parts: partsB, step, C, yard, scrap: scrap ? { id: scrap.id, x: scrap.x, z: scrap.z, yaw: scrap.yaw } : null, left, spotClear,
-      frames: frames.map((f) => ({ id: f.node.id, k: f.k, r: f.r, c: f.c, def: f.node.def! })), beams: beams.map((b) => ({ id: b.node.id, k: b.k, r: b.r, col: b.col, seat: b.seat })),
+      // phase B works on the finished skeleton in geometric line order (k along +n0), whatever the build direction
+      frames: frames.map((f) => ({ id: f.node.id, k: dir === 1 ? f.k : K - 1 - f.k, r: f.r, c: f.c, def: f.node.def! })), beams: beams.map((b) => ({ id: b.node.id, k: dir === 1 ? b.k : K - 2 - b.k, r: b.r, col: b.col, seat: b.seat })),
       engCol, Y, sections: opts.phaseB.sections, count: () => S.length, lastSteps: () => [...new Set(last.values())].sort(),
       narrowMinusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomMinusU(nodes.find((x) => x.id === nd.node)!, scene); },
+      narrowPlusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomPlusU(nodes.find((x) => x.id === nd.node)!, scene); },
     });
     for (const x of resB.sequenced) done.set(x.node, x.steps);
     for (const u of [...partsB.unplaced, ...resB.unplaced]) if (!unplaced.some((v) => v.node === u.node)) unplaced.push(u);
@@ -361,10 +383,20 @@ function stagePlotBlocker(p: { x: number; z: number }, yaw: number, L: number, s
 }
 const stagePlotFree = (p: { x: number; z: number }, yaw: number, L: number, scene: CampusScene) => stagePlotBlocker(p, yaw, L, scene) === null;
 
-function lineCoord(frames: Frame[], k: number): number {
+function lineCoord(frames: Frame[], k: number, dir: 1 | -1 = 1): number {
   const f = frames.find((x) => x.k === k)!;
   const n = rot2([0, 1], f.node.box.yaw);
-  return dot(f.c, n);
+  return dir * dot(f.c, n);
+}
+
+/**
+ * W38: what takes the ground where a frame standing at `c` would be laid out, lying along heading `h` (its box + 0.5 m
+ * beyond its top end, the carry crew 0.8 m to each side): the first static obstacle 0.05–1.3 m tall there, else null.
+ */
+function layBlocker(c: Vec2, h: Vec2, U: string, scene: CampusScene): string | null {
+  const [W, H] = [def(U).size[0], def(U).size[1]];
+  const plot = { c: [c[0] + h[0] * (H + 0.5) / 2, c[1] + h[1] * (H + 0.5) / 2] as Vec2, half: [(H + 0.5) / 2, W / 2 + 0.8] as Vec2, yaw: datan2(h[1], h[0]) };
+  return scene.obstacles.find((o) => o.y1 > 0.05 && o.y0 < 1.3 && obbOverlap(o.obb, plot))?.id ?? null;
 }
 
 /** Which side (±1 along the frames' across axis) of the building the yard is on (sides only; ends → +1). */
@@ -379,6 +411,13 @@ function sideOfYard(yard: Yard, frames: Frame[], across: Vec2): 1 | -1 {
  * Phase B: is the ground beside a deck strip's −u end (its long axis) taken — something 0.22–2.2 m tall within 2.3 m of
  * the house there (a neighbour's stair, a wall)? Then its long pieces go up on the +u side (parts-b.ts flip).
  */
+/** W38: the same test beyond the strip's +u end (chiba 2022: west-house's stair foot 1.8 m outside its +u edge). */
+function noRoomPlusU(strip: AsmNode, scene: CampusScene): boolean {
+  const u = rot2([1, 0], strip.box.yaw);
+  const c: Vec2 = [strip.box.c[0] + u[0] * (strip.box.size[0] / 2 + 1.2), strip.box.c[2] + u[1] * (strip.box.size[0] / 2 + 1.2)];
+  const band = { c, half: [1.1, strip.box.size[2] / 2] as Vec2, yaw: strip.box.yaw };
+  return scene.obstacles.some((o) => o.y1 > 0.22 && o.y0 < 2.2 && obbOverlap(o.obb, band));
+}
 function noRoomMinusU(strip: AsmNode, scene: CampusScene): boolean {
   const u = rot2([1, 0], strip.box.yaw);
   const c: Vec2 = [strip.box.c[0] - u[0] * (strip.box.size[0] / 2 + 1.2), strip.box.c[2] - u[1] * (strip.box.size[0] / 2 + 1.2)];
