@@ -23,8 +23,7 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status: **20 open blocks** (Q1, Q2, Q4–Q14, Q19, W44's site-axis Q20–Q22 and W38's year-build Q25–Q27; two pairs were duplicates and are merged) and **3 answered** (A3 north, §13 reach-down, §14 top beams).
-Status: **17 open blocks** (Q1–Q14, Q19, Q20 and Q21; 16 + 3 questions, two pairs were duplicates and are merged) and **2 answered**.
+Status (W49, 2026-09-29 evening): **12 open blocks** (W44's site-axis Q20–Q22, W43's Chiba 2024 Q23–Q24, W38's year-build Q25–Q27 and W49's 2022 follow-ups Q28–Q31) and **17 answered cards** (Q1–Q14 and Q19 from Gene's questionnaire, 2026-09-29 evening; Q3 = A3 north, now with Gene's 2022 correction; A1 top beams; A2 reach-down). Answered blocks stay in place with `status: answered`; the page moves them to its record. The work plan for the answers is RECONCILIATION_2022.md.
 
 **Gene's page.** `questions/index.html` shows every open block as a card Gene can read and answer (plain question,
 pictures, options, export button); it is served at `/questions/` after a deploy. It is generated from this file:
@@ -56,6 +55,7 @@ The answer on the card's record comes from the block's `Gene:` line.
 id: Q1
 urgency: first
 order: 3
+status: answered
 plain: In 2022, could you walk out of the courtyard at its south-west corner (between the west house and the kitchen), or did a table block the gap?
 context: The model's 2022 drawing has a table standing in that gap, tucked under the kitchen stair, so people in the replay cannot leave the courtyard at that corner (the other three corners are open). We ask because it decides whether that corner is a way in and out when you walk the 2022 scene.
 changes: If it was open, the table moves and people can walk through that corner; if a table really stood there, nothing changes.
@@ -83,7 +83,7 @@ protected `mars-2022` state is re-seeded with a `reconstruction-edit` cause. The
 are re-checked. If the table really stood there, nothing changes, and the walkabout's "known blocked" entry
 becomes a documented fact.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) no table at the SW corner (tables are incidental). → Open: the table goes (RECONCILIATION_2022.md §e).
 
 ### Q2. 2023 and 2024: do trailers rv-8/9 (2023) and rv-9/10 (2024) really stand inside Chiba's footprint?
 
@@ -91,6 +91,7 @@ Gene:
 id: Q2
 urgency: first
 order: 2
+status: answered
 plain: In 2023 and 2024 the model has two trailers parked inside Chiba, under its roof (red outlines). Was that real?
 context: The model puts the trailers on a neat circle, and that circle clips the back of Chiba, so two trailers each year end up under its roof. In the photos below the trailers ring the open ground outside Chiba; if none stood inside, they move out and the inside of Chiba becomes open floor you can walk through.
 changes: Two trailers per year move out of Chiba and Chiba's floor opens up for walking; nothing else moves.
@@ -117,7 +118,7 @@ its footprint. These are the tilted orange-brown boxes inside the pink roof area
 `mars-2023` / `mars-2024` are re-seeded (`reconstruction-edit`, id aliases). Chiba's interior becomes walkable
 where they stood. If it is real (the trailers parked under the roof), nothing changes.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) no trailers under Chiba in 2023/2024, and side trailers must not touch the walls. → Move them out (RECONCILIATION_2022.md §i).
 
 ### Q3. North axis: which way is north on site?
 
@@ -151,7 +152,7 @@ windows all follow from this.
 the studio lighting rotate by the offset. Directed camera tracks re-plan. Construction pins are not expected to
 move, because the environment is outside `physicalView()` (inferred, not yet tested).
 
-Gene: (2026-09-29) the long axis of the 2020 tire ring runs north–south; W42 fixed the sign from the DJI_0079 shadows → world −X is north in 2020 (`NORTH_AZIMUTH_OFFSET = −90`). See A3 below for the per-year caveat.
+Gene: (2026-09-29) the long axis of the 2020 tire ring runs north–south; W42 fixed the sign from the DJI_0079 shadows → world −X is north in 2020 (`NORTH_AZIMUTH_OFFSET = −90`). See A3 below for the per-year caveat. **Correction (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md):** north ≈ 8 o'clock of the render, not straight up; derive exactly from the south-facing panels. The per-year bearing stays open (Q22); 2022 estimate in RECONCILIATION_2022.md §f.
 
 ### Q4. Ground datum: is the ground at y = 0 or at −0.16 m?
 
@@ -159,6 +160,7 @@ Gene: (2026-09-29) the long axis of the 2020 tire ring runs north–south; W42 f
 id: Q4
 urgency: none
 order: 1
+status: answered
 plain: Did the rack posts stand directly on the sand?
 context: Two parts of the model disagree by 16 cm about where the ground is, so in the studio the rebuilt racks sit 16 cm lower than the original drawing. We need one ground level; it only matters beyond housekeeping if the posts stood on blocks or pads.
 changes: Everything shifts by 16 cm once and the saved build replays are re-recorded; you would not notice it by eye.
@@ -214,7 +216,7 @@ datum). The intrinsic lifts (tables +0.10, crates +0.22, benches +0.05) are sepa
 Re-basing moves every year-build pin once (first bay, whole skeleton, A+B `ddb634d6…`), and the takes are
 re-recorded.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) posts stood directly on the sand → ground datum y = 0; the drawn −0.16 ground is wrong (RECONCILIATION_2022.md §j).
 
 ---
 
@@ -259,6 +261,12 @@ X → −X or Z → −Z; which one depends on which photo building is which), `
 year build (first bay, whole skeleton, A+B `ddb634d6…`) and its 7 chapter takes are re-planned and re-recorded, so
 their pins move once. Q1 (the south-west corner table) is re-read on the mirrored plan. If the model is right,
 nothing changes and A3's 2022 row becomes "mirror checked: model right".
+
+**W49 note (2026-09-29 evening, not an answer).** Gene's names put the same building in each quadrant of the model
+and of both drone photos: Ba Sing Se = the model's Chiba (up), Cahuilla = east house (right, south), Chatsubo = kitchen
+(down), Huaqiangbei = west house (left). So the photo can be matched without mirroring the whole scene: each house
+keeps its quadrant and stair end, and only its offset along its own length flips (`make2022` `shift = 3` → ≈ −2).
+Plan: RECONCILIATION_2022.md §a. Left open for Gene to confirm the photo is right.
 
 Gene:
 
@@ -339,6 +347,7 @@ Gene:
 id: Q5
 urgency: none
 order: 3
+status: answered
 plain: Your list of rack sizes included a 9 ft piece. Was it a frame or a beam, and what size was it?
 terms:
   - frame | The ladder-like end of a rack: two posts joined by diagonal braces.
@@ -362,7 +371,7 @@ to show.
 as is. If it is a frame, it needs a depth and a seat pattern (catalog entry, `mars-assembly` rules version).
 The provisional flag goes either way.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) unknown (skip). → The provisional `upright-9ft` stays provisional; nothing uses it.
 
 ### Q6. Beam heights: keep the Kit's 0.22 / 2.48 / 4.757 m, or snap to the real hole pitch?
 
@@ -370,6 +379,7 @@ Gene:
 id: Q6
 urgency: none
 order: 2
+status: answered
 plain: The model hangs the beams at 22 cm, 2.48 m and 4.76 m, as measured from photos. Keep those heights, or move each beam to the nearest real hole in the posts (at most 2.5 cm away)?
 context: The heights were estimated from photos, while the real posts have holes every 2 inches, so each real beam sat in one of those holes. The lowest height (22 cm) is also lower than the first hole could plausibly be.
 changes: Beams move by up to 2.5 cm and the saved build replays are re-recorded once; invisible by eye.
@@ -393,7 +403,7 @@ checkpoint to 1 cm. Snapping to a 2 in hole pitch would move beams by up to ±2.
 states are re-seeded (`reconstruction-edit`), beam stable ids move (aliases), and every year-build pin moves
 once. Keeping the Kit heights changes nothing.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) beam hole pitch unknown (skip). → Keep the Kit heights 0.22 / 2.48 / 4.757 m.
 
 ### Q7. Stock on site: how many pieces per bundle, and how were uprights and beams stacked?
 
@@ -401,6 +411,7 @@ Gene:
 id: Q7
 urgency: fidelity
 order: 8
+status: answered
 plain: When the materials were on site, how were they piled: how many plywood sheets per stack, and were the rack frames and beams stacked flat or bundled?
 context: The replay's material yard is a guess made to look like the photos: plywood in strapped stacks of about 24 sheets, frames lying flat, beams in strapped bundles, and a cutting table. The size of the yard sets how many trips the crew makes and how long a build takes.
 changes: The yard's size, the number of trips and the length of the build replay; the finished houses do not change.
@@ -426,7 +437,7 @@ images:
 number of `take_from_bundle` trips, and how long a year build runs. The material rules stay the same.
 Year-build pins move.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) piles look right. → Yard unchanged.
 
 ### Q8. Plywood span: may a sheet lie directly on a beam pair up to 4 ft apart, or only up to 24 in?
 
@@ -434,6 +445,7 @@ Gene:
 id: Q8
 urgency: fidelity
 order: 1
+status: answered
 plain: Could a plywood sheet lie straight across beams 4 ft apart with nothing under the middle, or did it need support about every 2 ft?
 context: Standard 3/4 in plywood is rated for 2 ft between supports, so the model refuses to lay plywood across a 4 ft gap and puts joists in first. Your earlier brief said 4 ft was fine; if so, floors can be built without joists.
 terms:
@@ -456,7 +468,7 @@ refusal reads "cannot span 1.22 m between b3 and b4 (max 0.62 m / 24 in); instal
 **What the answer changes.** One constant plus a rules-version bump. At 4 ft, plans without joists become
 valid. The flagship still installs joists, but its bound plans would report `plan.stale`. Relates to Q9.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) floors = orange beams → 2x4 joists laid across several beams perpendicularly → plywood on the joists (criss-cross; plywood never directly on beams). → The 24 in span rule stands; `beamDeckRule` is retired (RECONCILIATION_2022.md §g).
 
 ---
 
@@ -476,6 +488,7 @@ re-pin A+B. The pictures show the Kit's drawing of 2022, which is what the engin
 id: Q9
 urgency: first
 order: 4
+status: answered
 plain: How were the floors built: plywood strips laid on top of the beams, sheets set into a ledge on the beams, or 4x8 sheets on joists?
 terms:
   - joist | A smaller board (here a 2x4) laid across the main beams to hold up the plywood.
@@ -503,7 +516,7 @@ beams, 5.7 cm above the Kit's surface.
 the deck section gains a 2x4 joist layer, and 2x4 framing is Claude's checkpoint-1 work, so this answer shapes
 it directly. See also Q8.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) C: floors = orange beams → 2x4 joists laid across several beams perpendicularly → plywood on the joists (criss-cross; plywood never directly on beams) (RECONCILIATION_2022.md §g).
 
 ### Q10. How was a 15 ft deck strip made from 4x8 sheets?
 
@@ -511,6 +524,7 @@ Gene:
 id: Q10
 urgency: fidelity
 order: 2
+status: answered
 plain: A floor strip is 15 ft long but plywood comes in 8 ft sheets. How was a strip pieced together?
 context: The model cuts each strip from 6 ft + 6 ft + 3 ft pieces, joined where they sit on beams. That sets how many cuts and pieces the build replay needs (81 pieces for 27 strips).
 changes: Only the cutting and the piece count in the build replay.
@@ -531,7 +545,7 @@ station, 81 deck pieces for 27 strips).
 **What the answer changes.** For example 8 + 7 with blocking: different cuts, piece counts and blocking parts
 in `parts-b.ts`.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) strips sometimes get a sideways third row (3 ft). → ≈ the current 6 + 6 + 3 ft rule, whose 3 ft piece is cross-cut (RECONCILIATION_2022.md §k).
 
 ### Q11. Wall panels: outside or inside the beam line, and how were they fastened at the aisles?
 
@@ -539,6 +553,7 @@ Gene:
 id: Q11
 urgency: fidelity
 order: 5
+status: answered
 plain: Were the plywood walls fixed on the outside of the rack beams or on the inside, and what were they fixed to where a walkway runs through?
 context: The model hangs the wall panels just outside the beams, and the 2022 murals are painted on those panels. Where a walkway opens the rack, a panel has no beam behind it, so the replay needs to know what it was fixed to.
 changes: Where the wall panels sit (a few centimetres) and where the builders stand to fix them; the murals stay.
@@ -562,7 +577,7 @@ above).
 **What the answer changes.** Inside the beam line means a different panel plane and different fastening
 stations. At the aisles, the fastening rule decides what a panel bears on.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) walls outside the beams (as now). → No change.
 
 ### Q12. The rack-house stair: width, stringers, treads, and where its foot stands
 
@@ -570,6 +585,7 @@ Gene:
 id: Q12
 urgency: fidelity
 order: 3
+status: answered
 plain: What was the stair up to the east house's first floor like: how wide, how many stringers under the steps, and where did its bottom step land?
 terms:
   - stringer | The sloped board along the side (or middle) of a stair that the steps rest on.
@@ -598,7 +614,7 @@ engine builds it after both upper decks (crews climb the end frames). It places 
 **What the answer changes.** Stringer count and lumber, tread boards, width, and whether it was a ramp. The
 foot position decides the 0.55 m first step and the 5 unplaced parts.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) each building's stairs run PARALLEL to the building (wide), not perpendicular (RECONCILIATION_2022.md §b; foot side open, Q29).
 
 ### Q13. Solar: rails or a frame under the modules, and how were they mounted?
 
@@ -606,6 +622,7 @@ Gene:
 id: Q13
 urgency: fidelity
 order: 4
+status: answered
 plain: What held up the solar panels on the roof: two rails, or a frame of wood or metal? And which side did people work from to install them?
 context: The model shows the panels in one continuous row over posts rising above the roof, and the replay mounts them on two rails. With no gap between panels there is nowhere to stand beside them, so 14 of the 20 solar parts cannot be placed yet.
 changes: What sits under the panels and where the installers stand; it decides whether the 14 unplaced parts get placed.
@@ -630,7 +647,7 @@ beside a module.
 mount parts and where installers stand in `construction/solar.ts`. It decides whether the 14 unplaced parts
 can be placed.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) one row on two buildings, staggered on another, all facing south, on triangular wood frames ≈ 45° propped on one side with the low edge on the SOUTH roof edge (not a table in the middle) (RECONCILIATION_2022.md §d; which building is which, Q28).
 
 ### Q14. Upper decks: passed up by a relay on the first-floor deck, or by forklift / ladder?
 
@@ -638,6 +655,7 @@ Gene:
 id: Q14
 urgency: fidelity
 order: 7
+status: answered
 plain: How did plywood and beams get up to the upper floors: handed up by people standing on the lower floor, or with a forklift or a ladder?
 context: In the replay, people stand on the first floor and pass material up hand to hand, and top beams go up with people climbing the rack's braces (you confirmed that part). If a forklift or ladder did the lifting, the replay's crew and steps for the upper floors change.
 changes: Only the upper-floor steps of the build replay: who stands where and how long it takes.
@@ -661,7 +679,7 @@ first-floor deck. Top beams go up by the relay on the bracing (picture).
 **What the answer changes.** A forklift or ladder route changes the upper-deck section's verbs and crew
 stations, and the A+B pin.
 
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) materials hand-to-hand (as now), but the forklift must stay supported. → Relay unchanged.
 
 ### Q19. Did the 2022 roofs have 2x4 framing under the plywood?
 
@@ -669,6 +687,7 @@ Gene:
 id: Q19
 urgency: fidelity
 order: 6
+status: answered
 plain: In 2022, did the roofs have 2x4 framing under the plywood (as in the 2026 photo), or did the plywood lie straight on the top beams?
 context: The model's 2022 houses have no roof framing: every roof sheet lies straight on the top beams. The 2026 photo shows 2x4 framing going on before the plywood, so we want to know whether 2022 was built the same way.
 changes: If yes, the 2022 roofs gain framing, sit about 13 cm higher, and the replay builds the framing first; if no, nothing changes.
@@ -690,7 +709,7 @@ photo (`evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg`) 
 **What the answer changes.** if 2022 had framing, the replays would sequence `install_top_plate`/`install_rafter` before the roof
 deck and the protected `mars-2022` state would need a reconstruction-edit adding the members (roof deck rises ≈ 13 cm). If not,
 nothing changes — the framing verbs wait for 2026.
-Gene:
+Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) Yes: roofs had 2x4 framing as in 2026 (RECONCILIATION_2022.md §h).
 
 ---
 
@@ -827,6 +846,104 @@ images:
 (W38.) **What the engine sees.** Kitchen: 3.658 × 0.900 m at (1.17, 6.31), y 0.30–1.20; west-house: 3.658 × 1.000 m at (−6.31,
 1.17), y 0.30–1.30. No panel def of those heights: unplaced with the reason. **What the answer changes.** A half-height panel
 rule; both houses' A+B plans and pins move.
+Gene:
+
+---
+
+## 2022 reconciliation follow-ups (W49, from the questionnaire answers and the 2022 aerials)
+
+These come from reading Gene's 2026-09-29 answers against `photos/2022-aerial-03.jpg` and DJI_0829
+(RECONCILIATION_2022.md). Each has a default the reconciliation uses now.
+
+![2022 aerial with the new names, stairs, solar rows and trailers](questions/r2022-aerial-annotated.jpg)
+
+### Q28. 2022 solar: which building had the staggered panels, and did Cahuilla have a second short row?
+
+```question
+id: Q28
+urgency: fidelity
+order: 9
+plain: You said one row of panels on two buildings and staggered on another. In the drone photos Huaqiangbei has one long row, Ba Sing Se has three short rows stepped along it, and Cahuilla has one long row plus a short group beside it. Is Ba Sing Se the staggered one, and was Cahuilla's short group real?
+context: The photos are small, so the short group on Cahuilla could be a second row, loose panels or something else on the roof. We will draw what the photo shows unless you say otherwise.
+changes: Only where the panel frames stand on Ba Sing Se and Cahuilla.
+options:
+  - Yes: Ba Sing Se staggered; Cahuilla one row, the short group was something else
+  - Ba Sing Se staggered, and Cahuilla really had a second short row
+  - Cahuilla was the staggered one (say what Ba Sing Se had below)
+images:
+  - questions/r2022-aerial-annotated.jpg | Drone photo, 2022, with the names: green boxes are the panel rows as we read them.
+  - questions/q20-2022-model-vs-drone.jpg | Right: drone photo DJI_0829 turned north-up; the same panels from another angle.
+```
+
+**Default (RECONCILIATION_2022.md §d):** Huaqiangbei and Cahuilla one row each, Ba Sing Se three short rows, one per
+bay, stepped; Cahuilla's short group left out. Chatsubo has no panels (as the model already has for the kitchen).
+
+Gene:
+
+### Q29. 2022 stairs: from which side did you step onto each stair?
+
+```question
+id: Q29
+urgency: fidelity
+order: 10
+plain: Each building's wide stair filled one end of the building, with its steps running along the building. Did you start up it from the courtyard side or from the outside?
+context: A photo from straight above shows which way the steps run but not which end is the bottom. We assume you started from the courtyard, the side people walked on.
+changes: Where the bottom step lands for each of the four buildings.
+options:
+  - From the courtyard side, on all four
+  - From the outside, on all four
+  - It differed (say which below)
+images:
+  - questions/r2022-aerial-annotated.jpg | Orange boxes: the four stairs; the orange lines show which way the steps run.
+  - questions/photos/2022-exterior-09.jpg | Real photo, 2022: a building with a stair at its end.
+```
+
+**Default (RECONCILIATION_2022.md §b):** foot on the courtyard side, top at the outer long wall's end frame.
+
+Gene:
+
+### Q30. 2022 floors: which way did the plywood run on the 2x4s, and were the 2x4s on edge?
+
+```question
+id: Q30
+urgency: fidelity
+order: 11
+plain: Under each floor the 2x4s crossed the orange beams. Were the 2x4s standing on their narrow edge or lying flat, about how far apart, and did the plywood sheets run across the 2x4s or along them?
+terms:
+  - joist | A 2x4 laid across the orange beams to carry the plywood.
+context: This sets how high every floor sits (a 2x4 on edge adds 9 cm, lying flat 4 cm) and how the sheets are cut. We assume on edge, about 2 ft apart, with the long 15 ft strips kept as they are.
+changes: The height of every floor by a few centimetres and the cutting list; the houses look the same.
+options:
+  - On edge, about 2 ft apart, sheets along the long strips (as we assume)
+  - On edge, sheets across the 2x4s (long side of each sheet crossing them)
+  - Lying flat
+  - Don't remember
+images:
+  - questions/diagrams/q09-deck-options.svg | Diagram: option C is the floor on 2x4s.
+  - questions/photos/2022-exterior-24.jpg | Real photo, 2022: the boards between the orange beams in the ceiling.
+```
+
+**Default (RECONCILIATION_2022.md §g):** joists on edge (3.5 in), 24 in apart, running across the beams (along the
+15 ft depth); the Q10 strips on top, with 2x4 blocking under the cross joints.
+
+Gene:
+
+### Q31. 2022: what was in each building?
+
+```question
+id: Q31
+urgency: none
+order: 4
+plain: The model calls the four 2022 buildings a classroom (now Ba Sing Se), a painted-arches house (Cahuilla), a kitchen (Chatsubo) and a painted house (Huaqiangbei). Is that what each one held?
+context: The names are fixed now, but what we put inside each building came from guesses about a different set of names. It only changes furniture and signs, not the buildings.
+changes: The furniture and the labels inside each building.
+options:
+  - Yes, that is right
+  - Some are wrong (say which below)
+images:
+  - questions/r2022-names-model-vs-photo.jpg | Left: the model with its old labels and the new names. Right: the drone photo with the same names.
+```
+
 Gene:
 
 ---
