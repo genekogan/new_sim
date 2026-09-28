@@ -1144,3 +1144,43 @@ Then: gate → release 5; HANDOFF refresh.
   door is now one (tagged as above; the navmesh sees it as a gap, so no rule changed).
 - **W43 landed** `9f70386`, `24f1e84` (≈270k tokens, 55 min; merged): Chiba 2024 front rebuilt from Gene's photos in `photographic-corrections.ts` (`frontage2024`): vertical inset 2.5 bays wide in the frame-front plane, flaps leaning out with bottoms 2.65 m proud + cheeks, straight 12-riser flights to a 3.46 × 1.45 m landing at 2.49 m, sliding double door, right-flap stepped plexiglass (20 panes, 2x4 lattice) with the eye pane, plexiglass end wall on studs with `chiba-solarium-door` open 90° — the first door object in any year scene (walker 5.5 m and camera navmesh 5.0 m through it); new renderer material `plexiglass` (engine kind `glass`: collides, doesn't block view); 1446/1606 ids kept, 76 successors + 84 nulls in `id-migration.json`; `campus-2024.json` re-seeded (`reconstruction-edit` with both photos as evidence, protected); HISTORY_IDS gained a "Reconstruction edits" procedure; history-ids/geometry tests extended. 387 / 384 / 0 fail; studio-years 14/14; lab 2024 0 violations. Lead LOOKED at front-eye + solarium: accepted (matches the photo's structure; still differs: width 6 vs 7 bays → Q23, solar rows 4+4+2+2 vs 6+6+4+4, flat plexiglass, an upright in the front doorway, plywood deck where the photo shows sand). Q24 = end-wall door position/swing. Merge note: the three 2024 studio baselines conflicted with W42's north refresh — W43's taken, to be re-captured (W46). CAMERA_DIRECT §7 door line updated by the lead.
 - W46 spawned (Kit/renderer): prop datum fixes (tables +0.26, benches, crates, fridge, cafe counter, 2020 RVs/toilets/workshop table, trailer wheels) with id migration; re-capture the 2024 studio baselines with north −90 + the new front.
+- **W46 prop datum** (branch `w46-prop-datum`, `8c5b8df`): props seated on the surface under them (§15), computed, not
+  hard-coded — `Kit.surface()` = the highest upward structure face (floor/steel/roof layers: deck sheets, beams,
+  crossbars; never other furniture) under the prop's footprint, else the studio ground (`GROUND` −0.16 = every year
+  file's `groundY`; the studio draws the soil there in every year). Legs/feet run from it to their unchanged tops;
+  rigid props rest on it; trailers/RVs/toilets stand on the ground. **Re-measured** (ray from 0.5 m above the prop's
+  bottom, structure only): W42's "+0.26 tables / +0.38 crates" were rays from inside the ground-floor deck (top
+  0.2525) — most Kit props were **sunk**, not floating.
+
+  | Scene | Prop | Before (gap to its surface) | After | Ids aliased |
+  | --- | --- | --- | --- | --- |
+  | 2020 | RV tires (6 RVs × 4) | +0.089 over ground; wheels turned 90° (rolling sideways) | 0.000, rolling along the body | 48 (tire + hub) |
+  | 2020 | portable toilets (4) | +0.190 over ground | 0.000 | 12 (body, roof, door) |
+  | 2020 | workshop table legs (4) / counter legs (3) | −0.100 / −0.070 (inside the platform) | 0.000 on the platform top | 4 / 0 (same 5 cm bucket) |
+  | 2020 | workshop storage bins (6) | +0.015 over the platform | 0.000 | 6 |
+  | 2021/23/24/25 | table legs (classroom, library, kitchens, cafe, chiba, lounge) | −0.13 … −0.18 (inside the deck) | 0.000 (edge legs on a beam that stands 2.75 cm proud of the deck) | 24+4+12 / 28 / 28 / 20 |
+  | 2021 | classroom bench feet (12) | from 0.05, i.e. −0.20 inside the deck | 0.000, floor to seat underside | 12 |
+  | 2021/23/24/25 | stored food crates (12 per kitchen) | −0.01 … −0.06 (deck / proud beam) | 0.000 | 2 / 8 / 8 / 8 |
+  | 2021/23/24/25 | white refrigerator (+ seam, handles) | −0.21 / −0.23 | 0.000 (one corner on a beam) | 4 each year |
+  | 2023/24/25 | café painted counter | −0.15 | 0.000, spans floor → counter top 0.9 | 1 each |
+  | 2021/23/24/25 | trailer wheels (all rings) | +0.160 over ground | 0.000 | 0 (assembly moved) |
+  | 2022 | all of the above | unchanged (held) | unchanged | 0 |
+
+  243 legacy entries re-pointed at successors in `id-migration.json` (2020 70, 2021 58, 2023 41, 2024 41, 2025 33; no
+  nulls; live/null totals 7,858 / 93 unchanged); campus-2020/21/23/24/25.json regenerated, `--check` deterministic for
+  all six. **2022 held** (`SEAT_HELD_YEARS`): its furniture is inside the year-build static scene (the east-house fork
+  keeps every other obstacle within 35 m) — nudging one 2022 bench-foot obstacle moved the first-bay pin
+  251a44c5 → ca200e08. Seat 2022 together with the next year-build re-pin (re-record the 2022 takes; lead decision).
+  2026 details held too (CAD room floors are not visible to the Kit). Pins: perf-walk 5/5 PIN-OK, year-build first
+  bay + whole skeleton (`YEAR_BUILD_FULL=1`) + A+B chapter pin green, `campus-2022.json` byte-identical.
+  Tests: `history-geometry` per-year "every prop stands on its surface" (lowest vertex ≤ 1 cm from the highest
+  support under any bottom vertex, nothing poking > 1 cm into the footprint core; bites: with seating off, 2021/23/24/25
+  fail) + RV wheel axis; npm test 67/67, engine 397/394/0 fail/3 skip, tsc clean. Baselines (looked at each):
+  2020 default/plan/ring-edge (only "76 definitions" + RV edge), 2021/2023/2025 default/plan + 2021 corridor (trailers
+  16 cm lower), 2024 default/plan/frontage/front-eye/solarium/solarium-door re-captured with north −90 (shadows swing to
+  the front/left; solarium end now in shade), lab-year 2021/2024 top-prisms (north lighting, trailer shadows shorter);
+  new eye-level `studio-2020-rv-eye` (round wheels on the soil), `studio-2021-classroom-eye`, `studio-2024-kitchen-eye`
+  (crates on the deck). Weak spots: deck-standing tops keep their y = 0 authored heights, so tables/counters are 0.53–0.66 m
+  and benches 0.19 m above the deck; the fridge footprint still overlaps the counter end; 2020 counter legs pass through
+  two storage bins; 2023 rv-8/9 and 2024 rv-9/10 stand inside Chiba (ring through the hall; asserted in the test);
+  the café counter photo is squashed 19 % vertically.

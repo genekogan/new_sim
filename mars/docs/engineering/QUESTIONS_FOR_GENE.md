@@ -195,6 +195,17 @@ They now rest on the ground and on their surfaces. Everything else waits for thi
 | 2021–2025 | trailer wheels `rv-N-trailer-wheel-*` | +0.16 (datum only) | `kit.ts` rv() |
 | 2026 studio | campfire ring (`scenery.ts`): rocks embedded 0–4 cm, lowest log +0.05 (thick end) | ≈ on the ground | studio ambience (datum −0.16, correct) |
 
+**W46 (props seated, 2026-09-29): which floats were the datum and which were Kit bugs.** Re-measured from above (structure
+only), the table above mixes two things. **Kit bugs, fixed:** most Kit furniture stands on the ground-floor deck (top
+0.2525), and its legs, feet, crates, fridge and café counter started *inside* that deck (legs at 0.1, feet at 0.05, fridge
+at 0.02) — the "+0.26 / +0.38" figures were rays from inside the deck down to the ground; the 2020 worktable legs started
+inside their platform; the 2020 RV wheels were also turned 90°. These now stand on the deck, platform or beam under
+them. **Datum floats, fixed only for props:** trailers (+0.16), 2020 RVs (+0.089), toilets (+0.19) and the 2022
+west-house table (+0.26, held with all of 2022 for the year-build pins) stood on the Kit's y = 0 over the −0.16 ground;
+the props now stand on −0.16, like W42's tires. **Still open here:** the racks, decks and every other structure stay on
+the Kit datum (y = 0, 16 cm over the drawn ground), and furniture tops keep heights authored for y = 0, so tables sit
+0.53–0.66 m and benches 0.19 m above the deck. Answering Q4 moves the structure; the props will follow their surfaces.
+
 The lab (engine datum y = 0, ground at 0) and the year walk-about (ground at the file's `groundY`) draw props on their own
 ground, with no offset. Answering "ground at −0.16" would move every Kit row above by −0.16 in one place (the Kit's
 datum). The intrinsic lifts (tables +0.10, crates +0.22, benches +0.05) are separate Kit fixes.
