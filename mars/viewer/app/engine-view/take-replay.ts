@@ -5,7 +5,7 @@
 // given t (spec §18: the take plays identically with any camera).
 import * as THREE from 'three';
 import { hashOf } from '../../engine/core/hash.ts';
-import { ANG_Q, POS_Q, type CameraTrack, type PoseSample, type Take, type TakeEvent } from '../../engine/take/types.ts';
+import { ANG_Q, POS_Q, type CameraTrack, type PoseSample, type Take } from '../../engine/take/types.ts';
 import { interpSample, replayFinalState, sampleTake, takeDuration, type TakeFrame } from '../../engine/take/replay.ts';
 import { fileCamera, fileCameras, sampleTrack, trackData, withFileCamera, type CameraTrackData, type TakeFileCameras } from '../../engine/camera/track.ts';
 import type { CameraPose } from '../../engine/camera/shots.ts';
@@ -18,9 +18,10 @@ import { isPlywood } from '../../engine/construction/deck.ts';
 import { ComponentViews } from './components.ts';
 import { FixtureViews } from './fixtures.ts';
 import { HumanViews, type Hands, type SampledHuman } from './humans.ts';
+import { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 import type { Template } from './people.ts';
 
-export type TakeStep = { id: string; verb: string; label?: string; start: number | null; end: number | null; status?: string };
+export { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 export type TakeManifestEntry = {
   id: string;
   file: string;
@@ -64,16 +65,6 @@ export type TakeReplayFile = {
 /** A year-build ("Watch it being built") manifest entry: explicit `kind`, else the year-build rules version. */
 export const isYearBuild = (e: Pick<TakeManifestEntry, 'kind' | 'rulesVersion'>) => (e.kind ? e.kind === 'year-build' : /year-build/.test(e.rulesVersion ?? ''));
 export const TAKE_MANIFEST_URL = '/engine/takes/manifest.json';
-
-/** A take-log line for the diagnostics readout (failures, blocked waits, violations). `n`: repeated waits merged into
- *  the line (mars-take/4 events), counted in the totals. */
-export type LogLine = { t: number; kind: 'violation' | 'failed' | 'blocked'; text: string; n?: number };
-
-/** Take time as the log's clock with tenths: 0:31.5, 97:42.9 (merged waits end mid-second). */
-const clockTenths = (s: number) => {
-  const d = Math.round(s * 10);
-  return `${Math.floor(d / 600)}:${String(Math.floor((d % 600) / 10)).padStart(2, '0')}.${d % 10}`;
-};
 
 /** The entity record the replay draws `id` from: the final state, else (mars-take/4) as first recorded (removed before the end). */
 const recordOf = (take: Take, id: string) => take.finalState.entities[id] ?? take.entities0?.[id];
@@ -123,7 +114,7 @@ const EMPTY_SCENE: SpatialScene = { bounds: [0, 0, 0, 0], levels: [], surfaces: 
  */
 export class TakePeople {
   readonly group = new THREE.Group();
-  readonly take: Take;
+  take: Take;
   private comps = new ComponentViews();
   private fixtures = new FixtureViews();
   private humans = new HumanViews();
@@ -138,13 +129,31 @@ export class TakePeople {
     this.take = take;
     this.base = opts.scene ?? EMPTY_SCENE;
     this.group.add(this.comps.group, this.fixtures.group, this.humans.group);
-    for (const [id, s] of Object.entries(take.tracks)) {
-      if (recordOf(take, id)?.kind !== 'human') continue;
+    this.indexWalks();
+    this.humans.setStairs(this.base.links);
+  }
+
+  private indexWalks() {
+    this.walks.clear();
+    for (const [id, s] of Object.entries(this.take.tracks)) {
+      if (recordOf(this.take, id)?.kind !== 'human') continue;
       const cum = [0];
       for (let i = 1; i < s.length; i++) cum.push(cum[i - 1] + Math.hypot(s[i][1] - s[i - 1][1], s[i][3] - s[i - 1][3]) / POS_Q);
       this.walks.set(id, { ticks: s.map((x) => x[0]), cum, track: s });
     }
-    this.humans.setStairs(this.base.links);
+  }
+
+  /**
+   * Continue with another take on the same views (a chapter set, STUDIO_REPLAY.md "Chapter sets": chapter k + 1's first
+   * frame is chapter k's final state, same ids). People, parts and piles keep their three.js objects, so the swap costs
+   * no rig or mesh rebuild. The next show() poses the new take.
+   */
+  setTake(take: Take) {
+    if (take === this.take) return;
+    this.take = take;
+    this.indexWalks();
+    this.stairKey = '';
+    this.frame = null;
   }
 
   setTemplates(ts: Template[]) {
@@ -176,8 +185,11 @@ export class TakePeople {
     this.humans.setStairs([...this.base.links, ...links]);
   }
 
-  /** Pose everything at take time t (seconds). */
-  show(t: number) {
+  /**
+   * Pose everything at take time t (seconds). `clock`: the time the views animate on (idle loops, fire flicker); a
+   * chapter set passes its set time so it runs on across a chapter boundary. Poses depend only on t.
+   */
+  show(t: number, clock = t) {
     const s0 = performance.now();
     const frame = (this.frame = sampleTake(this.take, t));
     this.sampleMs = performance.now() - s0;
@@ -188,7 +200,7 @@ export class TakePeople {
     for (const [id, e] of Object.entries(frame.entities)) {
       const src = recordOf(this.take, id) as Entity | undefined; // pose / phase / contents below come from the frame
       if (!src) continue;
-      const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; on?: string };
+      const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; on?: string; proneYaw?: number; phaseK?: number };
       if (src.kind === 'component') {
         // discrete state as of t (the final state's phase / support would put every item in its last place)
         comps[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(e.phase ? { phase: e.phase as Entity['phase'] } : {}), ...('support' in st ? { support: st.support ?? undefined } : {}), ...('connections' in st ? { connections: st.connections ?? undefined } : {}), ...(st.contents ? { contents: st.contents } : {}) };
@@ -205,14 +217,17 @@ export class TakePeople {
       const speed = w ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
       const g = st.grip;
-      people.push({ id, p: e.p, yaw: e.yaw, walk: climbing ? 1 : clamp01((speed - 0.06) / 0.25), walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined });
+      // prone receiver (mars-take/4, W32): the lying heading in integer mrad and the phase progress in integer % → rad, 0–1
+      const proneYaw = typeof st.proneYaw === 'number' ? st.proneYaw / ANG_Q : undefined;
+      const phaseK = typeof st.phaseK === 'number' ? st.phaseK / 100 : undefined;
+      people.push({ id, p: e.p, yaw: e.yaw, walk: climbing ? 1 : clamp01((speed - 0.06) / 0.25), walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}) });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });
     this.comps.render(1);
     this.fixtures.onTick({ entities: fixtures });
-    this.fixtures.render(t);
-    this.humans.setFrame(people, t, { ...comps, ...fixtures }); // seats / fires come from the fixtures
+    this.fixtures.render(clock);
+    this.humans.setFrame(people, clock, { ...comps, ...fixtures }); // seats / fires come from the fixtures
     this.humans.render(1, (id, from, out) => this.comps.nearestPoint(id, from, out));
     this.comps.attachHeld(this.humans);
     return frame;
@@ -252,49 +267,6 @@ export class TakePeople {
     this.fixtures.dispose();
     this.group.removeFromParent();
   }
-}
-
-/** A repeated wait folds into the line before it when it starts within this many seconds of that line's end. */
-const REFOLD_S = 5;
-
-/**
- * The take's diagnostics as log lines: violations, failed actions (refusals) and blocked waits. A step reads as its
- * label; an unlabelled step or a sub-action (`a484`, a crew member's make-way walk) as `verb id`. Waits that
- * mars-take/4 merged (`n`, `until`) and waits of the same action with the same code and message that start again within
- * REFOLD_S s of the previous one's end (a resume between them kept them apart in the take) share one line
- * "(×n over d s, until m:ss.s)"; `n` counts every wait, so the totals equal the take's blocked-wait count.
- */
-export function takeLog(take: Take, steps: TakeStep[]): LogLine[] {
-  const label = new Map(steps.map((s) => [`step:${s.id}`, s.label]));
-  const who = (e: { id: string; verb: string }) => {
-    const id = e.id.replace(/^step:/, '');
-    return label.get(e.id) ?? (id.includes(e.verb.replace(/_/g, '-')) ? id : `${e.verb} ${id}`); // s0539-leave-stance names its verb
-  };
-  type Wait = LogLine & { key: string; end: number; head: string };
-  const out: (LogLine | Wait)[] = [];
-  const open = new Map<string, Wait>();
-  for (const e of take.events as TakeEvent[]) {
-    const t = e.t * take.dt;
-    if (e.type === 'violation') out.push({ t, kind: 'violation', text: `${e.code}: ${e.message}` });
-    if (e.type !== 'action') continue;
-    if (e.status === 'failed') out.push({ t, kind: 'failed', text: `${who(e)} failed${e.code ? ` (${e.code})` : ''}${e.message ? `: ${e.message}` : ''}` });
-    if (e.status !== 'blocked') continue;
-    const key = `${e.id}|${e.code}|${e.message}`, n = e.n ?? 1, end = (e.until ?? e.t) * take.dt;
-    const prev = open.get(key);
-    if (prev && t - prev.end <= REFOLD_S) {
-      prev.n = (prev.n ?? 1) + n;
-      prev.end = Math.max(prev.end, end);
-      continue;
-    }
-    const w: Wait = { t, kind: 'blocked', text: '', n, key, end, head: `${who(e)} waiting: ${e.code ?? 'blocked'}${e.message ? ` — ${e.message}` : ''}` };
-    open.set(key, w);
-    out.push(w);
-  }
-  return out.map((l) => {
-    if (!('key' in l)) return l;
-    const n = l.n ?? 1;
-    return { t: l.t, kind: l.kind, text: n > 1 ? `${l.head} (×${n} over ${(l.end - l.t).toFixed(1)} s, until ${clockTenths(l.end)})` : l.head, ...(n > 1 ? { n } : {}) };
-  });
 }
 
 /** A camera track the replay can drive the view with: the take's own planned track or a directed one. */
