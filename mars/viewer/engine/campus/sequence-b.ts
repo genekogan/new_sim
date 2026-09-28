@@ -55,8 +55,8 @@ export type PhaseBCtx = {
   narrowMinusU: (v: number) => boolean;
   /** The same beyond the +u end (W38): a strip's middle piece then goes in from the −u side, when that side is open. */
   narrowPlusU?: (v: number) => boolean;
-  /** W38: is this ground plot clear of the build scene's obstacles reaching 0.5–1.3 m (tables, walls)? */
-  groundFree?: (o: { c: Vec2; half: Vec2; yaw: number }) => boolean;
+  /** W38: is this ground plot clear of the build scene's obstacles (0.05–1.3 m tall)? */
+  groundFree?: (o: { c: Vec2; half: Vec2; yaw: number }, minTop?: number) => boolean;
   /** Crew positions at the start of phase B when run from a snapshot (sections only). */
 };
 export type PhaseBResult = { sequenced: { node: string; kind: string; steps: string[] }[]; unplaced: UnplacedB[]; done: string[]; sectionStarts: { section: Section; at: number }[] };
@@ -502,9 +502,26 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     for (const [i, m] of [2, 3, 4, 5].entries()) { const q = W(uMax + 2.2, lineV(K - 1) - 1.0 - i * 1.1); step('walk_to', { actor: C(m), x: q[0], z: q[1], level: 0 }, [m], [], `${C(m)} stands clear of the stair site`); }
     // stringers: lying along the stair at their lateral position, lifted and walked up against the end frame
     // from the +lat end: the crews stand on the −lat side, where no stringer is in yet
-    for (const [i, p] of [...stringers].sort((a, b) => latOf(b.pose.p[0], b.pose.p[2]) - latOf(a.pose.p[0], a.pose.p[2])).entries()) {
+    // W38 (PROVISIONAL): a stringer that must lie shifted off its line (layBack) is set FIRST, while the ground beside its
+    // line is still free for its carry formation (kitchen 2022: stringer 1, shifted clear of west-house's table, could
+    // not turn in beside stringer 2 already set); the rest from the +lat end as before
+    const layBack = (p: PartB) => {
+      const lat = latOf(p.pose.p[0], p.pose.p[2]), L = lenOf(p), sc = sOf(p.pose.p[0], p.pose.p[2]), inward = lat < lat0 ? 1 : -1;
+      // the standard spot unless something 0.5–1.3 m tall (a table, a wall) takes its footprint; then the nearest spot clear of
+      // everything 0.05–1.3 m tall with 0.25 m at the ends (it is set down end-on), shifted inward ≤ 1 m
+      if (ctx.groundFree?.({ c: S(sc - 1.6, lat), half: [L / 2, 0.15], yaw: yawDir }, 0.5) ?? true) return { x: 1.6, dl: 0 };
+      // (the carry formation straddles it: 0.95 m each side clear too; it is set first, so the ground inward is still free)
+      for (let d = 0; d <= 10; d++) for (let k = 16; k >= 4; k--) {
+        const x = k / 10, dl = inward * d / 10;
+        if (ctx.groundFree!({ c: S(sc - x, lat + dl), half: [L / 2 + 0.25, 0.95], yaw: yawDir })) return { x, dl };
+      }
+      return null;
+    };
+    const byLat = [...stringers].sort((a, b) => latOf(b.pose.p[0], b.pose.p[2]) - latOf(a.pose.p[0], a.pose.p[2]));
+    const shifted = (p: PartB) => { const b = layBack(p); return !!b && b.dl !== 0; };
+    for (const [i, p] of [...byLat.filter(shifted), ...byLat.filter((q) => !shifted(q))].entries()) {
       const lat = latOf(p.pose.p[0], p.pose.p[2]);
-      const nextFree = -0.37;
+      const nextFree0 = -0.37; // the crew's side: where no stringer is in yet (see the order above)
       const L = lenOf(p);
       const g1: [number, number, number] = [-1.2, def(p.def).size[1] / 2, 0], g2: [number, number, number] = [-0.2, def(p.def).size[1] / 2, 0]; // on its centre line
       const a = localToWorld(p.pose, g1), b = localToWorld(p.pose, g2);
@@ -515,16 +532,11 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       // where its top end would pass its installed top end; none clear → unplaced with the reason
       // and, where even that is taken, shifted up to 0.4 m inward (toward the stair's centre line: ground still free, the
       // stringers go in from the +lat side first) — the lift crew carries it the rest of the way sideways
-      const inward = lat < lat0 ? 1 : -1;
-      const back = (() => {
-        for (let d = 0; d <= 4; d++) for (let k = 16; k >= 4; k--) {
-          const x = k / 10, dl = inward * d / 10;
-          if (ctx.groundFree?.({ c: S(sc - x, lat + dl), half: [L / 2, 0.15], yaw: yawDir }) ?? true) return { x, dl }; // the stringer's own lying footprint
-        }
-        return null;
-      })();
+      const back = layBack(p);
       if (back === null) { unplaced.push({ node: p.nodes[0], kind: 'feature:stair-part', reason: `no clear ground to lay stringer ${p.id} near its line before it is set (the ground beyond the stair foot is taken)` }); continue; }
       const lie = S(sc - back.x, lat + back.dl);
+      // a shifted stringer is set first: its crew stands on the inward side (its outer side is what is taken)
+      const nextFree = back.dl !== 0 ? Math.sign(back.dl) * -nextFree0 : nextFree0;
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(yawDir) }, G);
       if (!f) continue;
       const at = (q: number[]) => { const o = [q[0] + axis[0] * nextFree, q[2] + axis[1] * nextFree]; return { x: r3(o[0]), z: r3(o[1]) }; };

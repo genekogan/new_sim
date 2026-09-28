@@ -823,6 +823,10 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (Math.abs(ex.offset) > 0.05) {
       const occ = occupant(rt, a, pointAt(ex, ex.total), ex.profile.radius);
       if (occ) {
+        // W38: the person on my destination waits for me to clear a single-file passage my destination lies in — I hold it
+        // while I wait for them (chiba 2022, D1: m3 / m6 deadlocked for 16 h): let the passage go so they walk on through
+        const ot = rt.world.entities[occ].human?.task, orec = ot ? rt.records.get(ot) : undefined;
+        if (ex.held.size && orec?.status === 'blocked' && orec.diagnostic?.code === 'traffic.yield' && orec.diagnostic.subjects?.includes(ex.actor)) releaseAll(rt, ex);
         makeWay(rt, occ, pointAt(ex, ex.total));
         return { status: 'blocked', diagnostic: { code: 'walk.goal-occupied', message: `${ex.actor} cannot step onto its destination: ${occ} is standing there`, subjects: [ex.actor, occ] } };
       }

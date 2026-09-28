@@ -332,7 +332,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
       frames: frames.map((f) => ({ id: f.node.id, k: dir === 1 ? f.k : K - 1 - f.k, r: f.r, c: f.c, def: f.node.def! })), beams: beams.map((b) => ({ id: b.node.id, k: dir === 1 ? b.k : K - 2 - b.k, r: b.r, col: b.colG, seat: b.seat })),
       engCol: (kg, col) => engCol(dir === 1 ? kg : K - 1 - kg, col), Y, sections: opts.phaseB.sections, count: () => S.length, lastSteps: () => [...new Set(last.values())].sort(),
       narrowMinusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomMinusU(nodes.find((x) => x.id === nd.node)!, scene); },
-      groundFree: (o) => !scene.obstacles.some((x) => x.y1 > 0.5 && x.y0 < 1.3 && obbOverlap(x.obb, o)), // tables, walls (not low beams a load clears)
+      groundFree: (o, minTop = 0.05) => !scene.obstacles.some((x) => x.y1 > minTop && x.y0 < 1.3 && obbOverlap(x.obb, o)),
       narrowPlusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomPlusU(nodes.find((x) => x.id === nd.node)!, scene); },
     });
     for (const x of resB.sequenced) done.set(x.node, x.steps);
