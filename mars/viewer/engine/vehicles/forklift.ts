@@ -724,5 +724,58 @@ export const forkliftPresent: ActionDef<{ operator: string; at: At }, ForkProgra
   cancel: cancelFork,
 };
 
-export const FORKLIFT_ACTIONS: ActionDef[] = [forkliftPick, forkliftDeliver, forkliftPresent];
+/**
+ * forklift_back {operator, d}: creep straight back d m (people stop it), then lower the forks to the
+ * ground. With nothing on the forks (after hand_up took the load) or with a load at travel height.
+ * Forklifts here do not reverse along curves; this is the only way out of a nose-in position.
+ */
+type BackExec = ForkExec;
+export const forkliftBack: ActionDef<{ operator: string; d: number }, { steps: Step[]; g: Engage }, BackExec> = {
+  verb: 'forklift_back',
+  description: `Back the forklift straight out ${FORKLIFT.creepSpeed} m/s over d metres (it stops for people), then lower its forks.`,
+  schema: z.strictObject({ operator: z.string().max(80), d: z.number().min(0.1).max(10) }),
+  reservations: (w, p) => opReservations(w, p.operator),
+  plan(rt, p) {
+    const w = rt.world;
+    const op = operatorOf(w, p.operator);
+    if ('code' in op) return { ok: false, diagnostic: op };
+    const load = loadOn(w, op.v.id);
+    const g = load ? engagement(load.def)! : { across: true, depth: 0, width: 0, height: 0 };
+    const sp = spatial(rt);
+    sp.sync(w);
+    const to = sub2(xz(op.v), scale(fwd(op.v.pose.yaw), p.d));
+    const tight = tightAt(sp, w, op.a.human!.level, to, FORKLIFT_PROFILE.radius);
+    if (tight) return bad('forklift.no-approach', `${op.v.id} cannot back ${f2(p.d)} m to ${fmt(to)}: no clearance next to ${tight.join(' and ')}`, [op.v.id, ...tight], to);
+    return { ok: true, program: { steps: [{ k: 'creep', d: -p.d }, { k: 'forks', to: load ? FORKLIFT.travelHeight : 0 }], g } };
+  },
+  start(rt, p, prog, id) {
+    const a = rt.world.entities[p.operator];
+    a.human!.task = id;
+    const vid = a.human!.riding!;
+    const load = loadOn(rt.world, vid);
+    return { id, operator: p.operator, vehicle: vid, item: load?.id ?? '', g: prog.g, steps: prog.steps.map((s) => ({ ...s })), i: 0, curve: null, targets: [], h: load ? load.pose.p[1] - rt.world.entities[vid].pose.p[1] : 0, ext: 0, s: 0, skip: [], out: {}, ticks: 0 };
+  },
+  step(rt, ex, dt) {
+    if (ex.item) return stepFork(rt, ex, dt);
+    // empty forks: the same scripted steps, finished without a load
+    ex.ticks++;
+    const a = rt.world.entities[ex.operator];
+    if (a?.human?.riding !== ex.vehicle) return failed('vehicle.rider-lost', `${ex.operator} is no longer driving ${ex.vehicle}`, [ex.operator, ex.vehicle]);
+    for (let n = 0; n < 6; n++) {
+      const i = ex.i;
+      const r = advance(rt, ex, dt);
+      if (r.status !== 'running') return r;
+      if (ex.i >= ex.steps.length) {
+        a.human!.task = undefined;
+        const v = rt.world.entities[ex.vehicle];
+        return { status: 'completed', outputs: { vehicle: v.id, x: v.pose.p[0], z: v.pose.p[2], ticks: ex.ticks } };
+      }
+      if (ex.i === i) return r;
+    }
+    return { status: 'running', phase: ex.steps[ex.i]?.k ?? 'done' };
+  },
+  cancel: cancelFork,
+};
+
+export const FORKLIFT_ACTIONS: ActionDef[] = [forkliftPick, forkliftDeliver, forkliftPresent, forkliftBack];
 export const FORKLIFT_INVARIANTS: Invariant[] = [forkliftLoad];

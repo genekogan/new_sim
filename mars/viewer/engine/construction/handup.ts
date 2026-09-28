@@ -318,8 +318,8 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
   const u = (q: Vec2) => dot2(sub2(q, edge!.from.p), nOut);
   const cornersF = [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([a, b]) => add2(obbF.c, rot2([a * obbF.half[0], b * obbF.half[1]], obbF.yaw)));
   const uMin = Math.min(...cornersF.map(u));
-  const sOut = Math.max(0, beamT + EDGE_GAP - uMin);
-  const O = add2(obbF.c, scale2(nOut, sOut));
+  let sOut = Math.max(0, beamT + EDGE_GAP - uMin);
+  let O = add2(obbF.c, scale2(nOut, sOut));
   const at_s = (s: number, y: number) => pose(sub2(O, scale2(nOut, s)), y, yawH);
   const edgeY = edge.from.y;
   // ---- heights and the reach rule for a genuine hand-off
@@ -334,6 +334,15 @@ export function planHandup(rt: Runtime, p: HP): { ok: true; program: HandupProgr
     const handY = hT + th;
     if (edgeY - handY > REACH_DOWN + 1e-9)
       return bad('handup.too-high', `${e.id} cannot be handed up to people on ${edge.members![0]} at ${f2(edgeY)} m: the givers can raise it to ${f2(hT)} m (their floor + ${GIVE_MAX} m), so the receivers would have to reach ${f2(edgeY - handY)} m below their feet (max ${REACH_DOWN} m); use the forklift (hand_up via: 'forklift')`, [e.id, edge.members![0], ...givers, ...p.receivers], [O[0], hT, O[1]]);
+    // raised straight up outside the edge, clear of whatever sticks out past the beam (joist cantilevers …)
+    for (let extra = 0; ; extra += STEP) {
+      const Ox = add2(obbF.c, scale2(nOut, sOut + extra));
+      const hit = sweepPoses(rt, e, [pose(Ox, giverFloor + CARRY_Y, yawH), pose(Ox, hT, yawH)], []);
+      if (!hit) { sOut += extra; break; }
+      if (extra >= 1.0 - 1e-9)
+        return bad('handup.path-blocked', `${e.id} cannot be raised beside ${edge.members![0]}: ${hit.o.label ?? hit.o.id} is in the way up to 1 m out from the edge`, [e.id, hit.o.id], hit.q.p);
+    }
+    O = add2(obbF.c, scale2(nOut, sOut));
     transfer = at_s(0, hT);
     lift0 = transfer;
   } else {
@@ -485,7 +494,10 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
   }
   const good = cands.filter((c) => c.first < Infinity);
   const n = p.receivers.length;
-  const order = (a: Cand, b: Cand) => a.first - b.first || (a.edge === b.edge ? 0 : a.edge ? -1 : 1) || a.key - b.key;
+  // prefer: taken earliest, on the edge beam, close to where the part ends up (so they can also fasten it)
+  const oF = flatObb(g.final, e);
+  const near = (c: Cand) => Math.round(distRect(oF, [c.feet[0], c.feet[2]]) * 20); // 5 cm bins
+  const order = (a: Cand, b: Cand) => a.first - b.first || (a.edge === b.edge ? 0 : a.edge ? -1 : 1) || near(a) - near(b) || a.key - b.key;
   good.sort(order);
   let pick: Cand[] | null = null;
   if (p.stations) pick = cands.every((c) => c.first < Infinity) ? cands : null;
@@ -496,8 +508,8 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
       for (let j = i + 1; j < good.length; j++) {
         const a = good[i], b = good[j];
         if (dist2([a.feet[0], a.feet[2]], [b.feet[0], b.feet[2]]) < RECEIVER_SEP) continue;
-        const s = Math.max(a.first, b.first), k = (a.edge ? 0 : 1) + (b.edge ? 0 : 1);
-        if (!best || s < best.s - 1e-9 || (Math.abs(s - best.s) < 1e-9 && k < best.k)) best = { c: [a, b], s, k };
+        const s = Math.max(a.first, b.first), k = (a.edge ? 0 : 1) + (b.edge ? 0 : 1) + 0.01 * (near(a) + near(b));
+        if (!best || s < best.s - 1e-9 || (Math.abs(s - best.s) < 1e-9 && k < best.k - 1e-9)) best = { c: [a, b], s, k };
       }
     pick = best ? best.c : null;
   }
