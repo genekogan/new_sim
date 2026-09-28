@@ -268,12 +268,12 @@ export function planPassUp(rt: Runtime, p: PP): { ok: true; program: PassUpProgr
     let top = rfloor + GIVE_MAX;
     for (const [i, h] of rl.entries()) {
       const hands = handsFor(e, R(top), h, giveSlot(i, relayGrips[i]));
-      for (const hh of hands) top = Math.min(top, rfloor + postureTop(POSTURE.reach_up, dist2([hh[0], hh[2]], at(h.pose))));
+      for (const hh of hands) top = Math.min(top, rfloor + postureTop(POSTURE.stand_with_load, dist2([hh[0], hh[2]], at(h.pose))));
     }
     if (top <= give) return fail('passup.too-high', `the relay on the deck at ${f2(rfloor)} m cannot raise ${e.id} above the givers' ${f2(give)} m`, relay);
     for (const q2 of samples(e, R(give), R(top)))
       for (const [i, h] of rl.entries()) {
-        const why = holderOk(h, q2, 'reach_up', giveSlot(i, relayGrips[i]), false);
+        const why = holderOk(h, q2, 'stand_with_load', giveSlot(i, relayGrips[i]), false); // from kneeling at the edge up to overhead
         if (why) return fail('passup.relay-reach', `relay ${h.id} cannot raise ${e.id} to ${f2(top)} m: at ${f2(q2.p[1])} m ${why}`, [e.id, h.id], h.pose.p);
       }
     relayTop = top;
@@ -365,7 +365,7 @@ export function planPassUp(rt: Runtime, p: PP): { ok: true; program: PassUpProgr
   if (relayTop !== null) {
     segs.push({ phase: 'reach_down', who: 'relay', from: R(give), to: R(give), dur: T.reachDown });
     segs.push({ phase: 'take', who: 'relay', from: R(give), to: R(give), dur: T.take });
-    segs.push({ phase: 'reach_up', who: 'relay', from: R(give), to: R(relayTop), dur: segDur(R(give), R(relayTop), SPEED.raise) });
+    segs.push({ phase: 'stand_with_load', who: 'relay', from: R(give), to: R(relayTop), dur: segDur(R(give), R(relayTop), SPEED.raise) });
   }
   segs.push({ phase: 'reach_down', who: 'receivers', from: tr, to: tr, dur: T.reachDown });
   segs.push({ phase: 'take', who: 'receivers', from: tr, to: tr, dur: T.take });
@@ -462,7 +462,7 @@ function stepPassUp(rt: Runtime, ex: Exec, dt: number): StepResult {
       ex.feet0 ??= Object.fromEntries(ex.p.receivers.map((a) => [a, [...w.entities[a].pose.p] as Vec3]));
       for (const a of ex.p.receivers) { const f0 = ex.feet0[a]; w.entities[a].pose.p = [f0[0] + e.pose.p[0] - tr0.p[0], f0[1], f0[2] + e.pose.p[2] - tr0.p[2]]; }
     }
-    hold(rt, ex, seg.who, seg.phase, e.pose, { k, give: seg.who === 'relay' && seg.phase === 'reach_up' });
+    hold(rt, ex, seg.who, seg.phase, e.pose, { k, give: seg.who === 'relay' && seg.phase === 'stand_with_load' });
   }
   if (ex.t < seg.dur - 1e-9) return { status: 'running', phase: `${seg.who}:${seg.phase}` };
   if (seg.phase === 'take') {

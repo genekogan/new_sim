@@ -248,7 +248,8 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const c = climbAt(k, u, seat);
     if (!c) return false;
     step('climb_frame', { actor: C(m), link: c.link, dir: 'up' }, [m], [], `${C(m)} climbs the end frame to the ${seat.toFixed(2)} m deck`);
-    const q = W(Math.min(Math.max(u, uMin + 0.44), uMax - 0.44), v);
+    // step off 0.45 m into the deck, toward the middle of the house (never onto the beam line itself)
+    const q = W(u + (u < (uMin + uMax) / 2 ? 0.45 : -0.45), v);
     step('beam_walk', { actor: C(m), x: q[0], z: q[1] }, [m], [], `${C(m)} steps onto the deck`);
     return true;
   };
@@ -441,9 +442,9 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     begin('D2');
     // the relay kneels on the first-floor deck (up the end frame and off its beam); the roof crew climbs to the roof beams
     const s1 = seatOf(levels[1]);
-    upOnto(KE, s1, 2, uMin + depth, lineV(KE) - 1.0);
+    upOnto(KE, s1, 2, uMax - depth, lineV(KE) - 1.0); // a column none of the roof crew climbs
     const r = upperDeck({ lv: levels[2], relay: 2, relayY, up: [3, 4, 5] });
-    if (r) { climbDown(KE, r.seat, r.down, r.down.map((m) => uWalk[[3, 4, 5].indexOf(m)]), r.last); climbDown(KE, s1, [2], [uMin + depth], r.last); }
+    if (r) { climbDown(KE, r.seat, r.down, r.down.map((m) => uWalk[[3, 4, 5].indexOf(m)]), r.last); climbDown(KE, s1, [2], [uMax - depth], r.last); }
   }
   // ---------------------------------------------------------------- stair
   if (secs.has('S')) { begin('S'); stairSection(); }
