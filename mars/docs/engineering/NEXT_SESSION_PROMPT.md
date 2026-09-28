@@ -45,23 +45,27 @@ skipped; pick the next item that doesn't need him. Never guess historical facts.
 4. Per area as needed: CARRY, PROGRESSIVE, SOCIAL, VEHICLES, CAMERA + CAMERA_VERIFY, TAKES_AND_PLANS
    (resumability), CAMPUS_SCENE, HISTORY_IDS, PLANNING_BUDGET, DIRECTOR_DEMO, RELEASE_CHECKLIST.
 
-**Ground truth at the checkpoint (verify, don't assume):**
+**Ground truth at the checkpoint (end of the overnight session, 2026-09-28 ~08:45 EDT; verify, don't assume):**
 - Repo: local git only at `<mars-campus-repo>` (author genekogan; no remote yet —
-  Gene adds github.com/genekogan; never push without him). Tree clean at HEAD (~170 commits). Production = release 5 (`cebd5827…`, rollback `89e65c8c…`).
-- Gates: `cd viewer && npm run gate` — last green 2026-09-28 (W17, `3d04649`): unit 56, engine 326 pass / 0 fail / 2 skip
-  of 328, tsc clean, Playwright 52 passed / 1 skipped, determinism probe `0147f8f12a99…` @10729. `npm run evidence` regenerates
-  EVIDENCE.md (17/17 rows, 21/22 capabilities — year build B has no test —, 8/8 milestones). A gate in a scratch worktree
-  needs `node_modules`, `.pw-browsers`, `public/browser/campus.glb` and `campus.glb.br` symlinked in. `deploy/director-demo.mjs` and
-  `deploy/simulation-integration.mjs` exercise the real MCP control plane against `wrangler dev`.
-- Current pins (PLANNING_BUDGET.md re-pin tables, last: W15): probe `0147f8f1…` @10729; campus flagship crop = full `fee92ee0…`
-  @11316; stress-30 `1298e2e5…`; meal `035e8c39…` @626; v3 (open ground) `66800edc…` @16230; year build 2022 first bay
-  `695d2dcb…` @41182, whole house `35d12886…` @117125.
-- Takes (`public/engine/takes/`, `node deploy/record-campus-take.mjs --all [--check]`): flagship `969c8bf9…` (= `fee92ee0…`,
-  1.75 MB) in the studio picker; 2022 first-bay year build `9970e93e…` (= `695d2dcb…`, 2.88 MB) under `otherYears` until the
-  studio filters takes by year; v3 is not recordable on the campus yet (onto_s2_4 `beam.no-room`).
+  Gene adds github.com/genekogan; never push without him). HEAD = the W26 docs commit after the gated `1395dd4` (~315 commits). W13 (year build phase B) may still
+  have unstaged files in the main tree (`engine/campus/**`, `construction/**`, `scenarios/year-build.ts`, `test/year-build-b.test.ts`,
+  `YEAR_BUILD.md`): they are W13's, not debris. Production = release 5 (`cebd5827…`, rollback `89e65c8c…`); nothing deployed overnight.
+- Gates: `cd viewer && npm run gate` — last green 2026-09-28 (W26, `1395dd4`, worktree): unit 56, engine 358 pass / 0 fail / 3 skip of 361, tsc clean, Playwright 61 passed / 1 skipped, determinism probe `b746b0947e65…` @10901. `npm run evidence` regenerates
+  EVIDENCE.md (17/17 rows, capabilities 27 PROVEN / 1 PARTIAL (year build B) of 28, 8/8 milestones). A gate in a scratch worktree needs `node_modules`, `.pw-browsers`,
+  `public/browser/campus.glb` and `campus.glb.br` symlinked in. `deploy/director-demo.mjs` and `deploy/simulation-integration.mjs`
+  exercise the real MCP control plane against `wrangler dev`.
+- Current pins (PLANNING_BUDGET.md re-pin tables, last: W21 "no walker jumps"): probe `b746b094…` @10901; campus flagship crop = full
+  `c56ea8da…` @11459; stress-30 `5c3a3355…`; meal `3c28879f…` @608; v3 `a2f782ad…` @16401; year build 2022 first bay `251a44c5…` @41317,
+  whole skeleton `d382e461…` @117277 (`YEAR_BUILD_FULL=1`); year build B first bay + first deck strip `94db263e…` @53604; A+B whole
+  house unpinned.
+- Takes (`public/engine/takes/`, all `mars-take/4`; `node deploy/record-campus-take.mjs --all --full --check` → OK for all three, v3
+  still fails `beam.no-room`): flagship `d2f16bd3…` (= `c56ea8da…`, 1.54 MB, camera `cam-bb4b6990…`) in the 2026 picker; 2022
+  east-house first bay `b7b882fd…` (= `251a44c5…`, 1.34 MB, camera `cam-7492f43a…`) and whole skeleton `69c41651…` (= `d382e461…`,
+  3.85 MB, camera `cam-b83a6828…`) under the 2022 picker's "Watch it being built". Directed cameras can be saved into a take file's
+  `cameras` (a download the owner copies into `public/engine/takes/`).
 - Production: https://mars-campus-2026.<workers-subdomain>.workers.dev — see `viewer/deploy/deployment.json` for the
   live version and rollback target; RELEASE_CHECKLIST.md has the exact deploy + rollback commands.
-  Production deploys of gated work are allowed ("pre-release, ok to break stuff").
+  Production deploys of gated work are allowed ("pre-release, ok to break stuff") — but Gene said no deploys overnight; ask him first.
 - Pinned hashes (determinism probe, stress-30, campus flagship) are listed in PLANNING_BUDGET.md /
   planning.test.ts; a behaviour change that moves them must say so and re-pin with a reason.
 
@@ -85,19 +89,23 @@ through doors on a camera navmesh), and every shot is simulated and self-correct
 (stuck between plywood, behind a head, flare, subject leaving frame) with the fix and reason recorded. Photos of the real skeleton stage and
 piles are in `docs/engineering/evidence/`. Items 2–4 move pinned hashes: do them early and re-pin once.
 
-**Known open items, in priority order (details in HANDOFF "Suggested next tranche"):**
-0. Then the grid-origin fix below, in the same re-pin.
-1. Grid cell centres depend on the grid origin, so the uncropped campus run is physically identical to
-   the cropped one but not hash-identical (`engine/test/campus-full.test.ts` todo). Fix in
-   `spatial/grid.ts` at the START of a session (it re-pins every hash), then regenerate takes.
-2. Reconstruction questions for Gene (do not guess; log them and move on overnight): 2022 south-west corner passage is closed by the
-   west-house table in the Kit scene; trailers `rv-8/9` (2023) and `rv-9/10` (2024) intrude into Chiba;
-   9 ft frame not in the model library; north-axis assumption in `engine/env/sun.ts`.
-3. Renderer honesty gaps: footers/far arm out of reach during raise (rig can't crouch); no foot IK on
-   stairs; talk/watch are Idle; no carry-pose clips (only Idle/Walk/Wave exist).
-4. Engine: crews (multi-carrier) on stairs; vehicle–vehicle collision; automatic pre-emption of social
-   holds by directed tasks; static geometry not editable via MCP; region layout edits don't stale plans.
-5. Spec item not started: scanned real Martians (needs consent); electrical model (deferred by spec).
+**Known open items, in priority order (details and the full list in HANDOFF "End of night"):**
+0. Questions for Gene (HANDOFF "Questions for Gene", 11 items: 2022 SW passage, rv intrusions into Chiba, 9 ft frame, north axis,
+   ground datum, Kit beam heights, how top beams were hung, stock per bundle, the 2022 stair, deck strips vs sheets on joists,
+   reach-down 0.5 m) — ask them first in the morning; never guess.
+1. Year build phase B (W13): commit a test that executes the stair / wall / solar sections, pin the whole east-house A+B run, record it
+   as a take (≈ 8 MB last time — thin further), then the other 2022 houses and the other years (2020 / 2025 racks don't map yet).
+2. Flagship v3 `onto_s2_4` `beam_walk` `beam.no-room` (0.25 < 0.28 m; passes by ≈ 3 cm only at the pinned origin) — fix, then record v3.
+3. Frame-stance bodies (`construction/stance.ts`): rear `hang_beam` lifter carries the beam behind its back; stance holders' hands
+   0.73–0.79 m beside the body (needs an engine facing / turn); one reach-down palm 1.025 m off in the whole skeleton; no foot / hand holds.
+4. `makeWay` asks reserved people (95 `reservation.conflict` "refused / failed" lines in the whole-skeleton replay); `$crew[0]` step labels.
+5. Year-build camera readability (min 0.31 / 0.42); reach-down cap vs the woman template (0.35 m < 0.5); hand points reached 76.6 % (year
+   build) / 92.5 % (v3).
+6. Engine: resumption after pre-emption; forklift waits forever behind a parked rider; vehicle reach / side-shift vs vehicles; walker
+   look-ahead at 0.9 m/s lateral; crews (multi-carrier) on stairs; static geometry not editable via MCP; region layout edits don't stale
+   plans; host `**` unscanned (14 lines); stress-30 tick-5 spike ≈ 90 ms.
+7. Renderer honesty gaps: talk / watch are Idle; no carry-pose clips; fire smoke / billboards; paint textures; frames blue not green.
+8. Spec items not started: scanned real Martians (needs consent); electrical model (deferred by spec).
 
 **Method that worked:** every capability ships with tests including deliberately invalid cases and, for
 anything visual, Playwright captures that you LOOK at yourself (Read the PNGs) before accepting. Keep

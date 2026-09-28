@@ -363,8 +363,9 @@ sweeping round at 2–3 m/s, and step back into line before a gap. `deploy/perf-
 shared host had stress-30 at a 0.30 ms mean and 27 ms max tick. The limiter's bisection runs only when a step is over
 budget.
 
-Not re-recorded (lead): `public/engine/takes/*.json` and `deploy/record-campus-take.mjs --check` still name the old final
-states; the studio-take e2e baselines follow the re-record.
+Takes re-recorded at these pins afterwards: the 2022 first bay and whole skeleton (W22, mars-take/4; cameras re-planned with
+the kind-aware sampler in W26) and the flagship (W23, `d2f16bd3…`); `record-campus-take.mjs --all --full --check` is OK for
+all three (W26).
 
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the

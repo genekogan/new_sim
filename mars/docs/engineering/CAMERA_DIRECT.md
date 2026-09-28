@@ -397,10 +397,11 @@ year-build takes all nine piles and the cutting station stood in as 1.7 m capsul
 re-run): flagship — none (no piles; the sampler is identical with and without `legacyKinds`, tested; `--check` OK).
 2022 first bay — `cam-305a0efe…` → `cam-7492f43a…`: min readability 0.403 → 0.42, mean 0.806 → 0.81, readable 77.0 %,
 cuts 19 → 19. Whole house — `cam-9609b6f7…` → `cam-b83a6828…`: min 0.31 → 0.31, mean 0.789 → 0.79, readable 76.5 →
-76.6 %, cuts 50 → 52. **Not re-recorded:** the recorder plans the year-build cameras with `takeSampler(exact, {
-legacyKinds: true })` (the old classification, byte-identical), so the shipped tracks and `--check` are unchanged
-until the lead accepts the delta; then drop that option and re-record both (`--scenario year-build-2022`, `--full`).
-Everything else (directed cameras, `attach_camera_track`, the studio) uses the corrected sampler.
+76.6 %, cuts 50 → 52. **Re-recorded (W26, lead decision):** the recorder now plans every take with the corrected
+`takeSampler(exact)`; both year-build takes were re-recorded and reproduce exactly these tracks (bay 1 min 0.416,
+1 335 100 B; whole house 52 cuts, 3 852 499 B; takes and final states unchanged; `--check` OK for all three takes).
+`legacyKinds` stays in `take-sampler.ts` for the regression test only. Everything else (directed cameras,
+`attach_camera_track`, the studio) already used the corrected sampler.
 
 ### 8.2 Take files carry extra camera tracks (`track.ts`)
 A take file (`mars-take-replay/1`) may carry, beside its planned `camera`, an additive map

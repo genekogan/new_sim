@@ -543,3 +543,37 @@ Then: gate → release 5; HANDOFF refresh.
     cannot move vehicles, so forced overlaps are world edits in tests.
 - **W25 landed** `17a1c9b`, `e95d607`, `1a361a3` (≈390k tokens, 40 min): automatic pre-emption of social holds by directed tasks (smallest unit released; stand-up first; directive waits in phase `pre-empting`; `social.pre-empted` reason in events; `preempt: false` opt-out; make-way nudges exempt); vehicle–vehicle collision (`vehicles/traffic.ts`: footprints incl. rider/tines/load, `collision.vehicle-vehicle` invariant, right-of-way smaller→earlier→lower id, stop 1 m short with `traffic.vehicle`, pull-over, `vehicle.path-conflict` refusal). 361 / 358 / 3 skip; all pins bit-identical (perf-walk ×5 + first bay). Lead review: accepted. Weak: no resumption after pre-emption; forklift waits indefinitely behind a parked rider; `edit_world` can't move vehicles.
 - W26 spawned: FINAL overnight consolidation — worktree gate, year-build re-record without `legacyKinds`, evidence (map camera-direct/phase-2/pre-emption/vehicles/take-4), HANDOFF + NEXT_SESSION_PROMPT for Gene's morning.
+- **W26 (final overnight consolidation)** — worktree of `c27093d` on branch `w26-final`; commits `9f3cf9c` (takes), `7b47955`
+  (evidence map), `a00fc08` (allowlist comment), `7ed5ea0` + `1395dd4` (pose baselines), `554a81a` (evidence) + this docs commit:
+  - **Year-build takes re-recorded with the kind-aware sampler** (lead decision after W23): `record-campus-take.mjs` drops
+    `legacyKinds`. Takes and final states unchanged (bay 1 `b7b882fd…` = `251a44c5…` @41317; whole skeleton `69c41651…` =
+    `d382e461…` @117277). Cameras: bay 1 `cam-305a0efe…` → `cam-7492f43a…` (min readability 0.403 → 0.416, mean 0.806, 19 → 19
+    cuts, 1 335 154 → 1 335 100 B, gzip 246 884 B); whole skeleton `cam-9609b6f7…` → `cam-b83a6828…` (min 0.310, mean 0.789,
+    cuts 50 → 52, 3 851 872 → 3 852 499 B, gzip 697 763 B) — exactly W23's prediction. `--all --full --check`: OK for flagship,
+    bay 1 and whole skeleton; v3 still fails `beam.no-room` at `onto_s2_4` (tick 11 009). studio-build (5), studio-take (1),
+    camera-verify (2) pass with no baseline change; looked at studio-build-east-house-mid (48:52, frames + beams rising, camera
+    picker shows `cam-b83a6828…`, ✓ 66 / 66) and -bay1-yard (piles, cutting station, crew, the other three houses).
+  - **Gate GREEN** at `1395dd4` (worktree), report `.cloudflare/gate/2026-09-28T12-53-41-373Z` (W26 worktree):
+
+    | stage | result | time |
+    | --- | --- | --- |
+    | unit | 56 / 56 | 0.4 s |
+    | engine | 358 pass / 0 fail / 3 skip (361) | 43.5 s |
+    | tsc | clean | 1.5 s |
+    | e2e | 61 passed / 1 skipped | 643.5 s |
+    | determinism probe | `b746b0947e65…` @10901 (= pin) | 2.7 s |
+
+    Reds on the way, both fixed and committed: (1) **unit 55/56 since `0ab2e6f` (W19)** — `prepare-allowlist.test.mjs` read the
+    JSDoc "`/engine/campus-<year>.json`" in `app/studio/direct-camera.ts:34` as an unstaged URL; comment reworded (no behaviour
+    change). Nobody had run `npm test` since W19. (2) **Three v3 hand-up captures** off their W14 baselines: `poses-pickup-crouch`
+    3.59 %, `poses-handup-joist` 2.57 % (masked by the first until it was fixed), `poses-climb-frame` 2.06 % — the same moments at
+    +117 ticks (W21's walker: carry_j1 now waits 3.9 s for p4), poses unchanged; looked at baseline / new / diff for each; refreshed.
+  - **Evidence** at `1395dd4`: rows 17/17; capabilities 27 PROVEN / 1 PARTIAL (year build B 3/4) / 0 UNPROVEN of 28; milestones 8/8.
+    New rows: camera-direct (15), camera-correct incl. `occluded` + sampler (11), take-schema-4 (4), no-jumps (2),
+    social-preemption (7), vehicle-traffic (6); year-build-b now cites W13's committed `year-build-b.test.ts` (the A+B whole-house
+    test is `YEAR_BUILD_FULL`-gated and has no pin → PARTIAL); stale "no pre-emption / no vehicle–vehicle" notes corrected.
+  - **Docs:** HANDOFF "End of night" replaces the Overnight addendum (landed by §1–§12, gate, takes, pins, vetoable decisions,
+    11 questions for Gene, 15 prioritised open items, cost); NEXT_SESSION_PROMPT ground truth + open items refreshed;
+    CAMERA_DIRECT §6 and PLANNING_BUDGET "not re-recorded" notes updated.
+  - **W13:** no commits on `main` during W26 (its unstaged `YEAR_BUILD.md` is still in the main tree).
+  - Cost: ≈ 0.35 M tokens, ≈ 1 h 10 min.

@@ -1,5 +1,9 @@
 # Handoff: Mars Studio simulation engine, tranche of 2026-09-27
 
+> **Current state (morning of 2026-09-28): read "End of night" at the bottom first** — what landed overnight, the gate,
+> takes, pins, decisions you may veto, questions for Gene, open items. The sections below are the 2026-09-27 report and
+> the later addenda, kept as history.
+
 This is the end-of-tranche report that SPEC.md §30 and §33 ask for. The engine suite was re-run for
 this handoff at HEAD `19aa5b6` on 2026-09-27 (M3 Max, Node 26). Other numbers cite a file, test or
 commit. Anything not checked is marked **(unverified)**. Where a committed doc or commit message
@@ -482,64 +486,156 @@ passage is closed by the west-house table in the Kit scene (NE/SE/NW are open); 
 `rv-9/10` (2024) intrude into Chiba's footprint under the roof.
 
 **Open (see NEXT_SESSION_PROMPT.md for priority):** grid-origin hash; renderer reach gaps (footers, far arm, no foot
-IK, talk/watch Idle); crews on stairs; vehicle–vehicle collision; social pre-emption is manual
-(`releaseForDirective`); static geometry not editable over MCP; region layout edits don't stale plans; 9 ft frame
+IK, talk/watch Idle); crews on stairs; ~~vehicle–vehicle collision~~ (closed overnight, W25: `vehicles/traffic.ts`);
+~~social pre-emption is manual (`releaseForDirective`)~~ (closed overnight, W25: automatic, SOCIAL.md); static geometry not editable over MCP; region layout edits don't stale plans; 9 ft frame
 and north axis unverified; `npm run lint` broken locally (missing oxlint-tsgolint) and not in the gate.
 
 **Releases today:** 4 gated production deploys before this checkpoint (see RELEASE_CHECKLIST.md records); the fifth
 (this checkpoint) is recorded in the Deployment status section above if it completed.
 
 
-## Overnight addendum (lead: Fable 5.1 as PM, 2026-09-28 00:18 → in progress)
+## End of night: overnight session 2026-09-28 (lead: Fable 5.1 as PM, Opus 5.5 workers; 00:18 → ~08:45 EDT)
 
-Gene is asleep; no production deploys tonight (his instruction). Live log: `PROGRESS.md` (every worker's cost, acceptance
-verdict and follow-ups). Spec additions: `OWNER_FEEDBACK_2026-09-28.md` §12 (chairs/tables/eating); lead decision "One body
-model" in `OWNER_DECISIONS.md`.
+For Gene. Every number below is from a file or a test run tonight; the live log with each worker's report, cost and the lead's
+verdict is `PROGRESS.md` (from "Overnight session start"). Nothing was deployed (your instruction); nothing was pushed.
+Consolidated by W26 in a worktree of `c27093d` (branch `w26-final`, fast-forwarded onto `main`).
 
-**Landed (all with tests; every pin re-pinned once more after W4, see PLANNING_BUDGET.md):** W1 global grid lattice (full campus
-== crop, `campus-full` todo → assertion); W3 animated fire (`app/engine-view/fire.ts`, `e2e/fire.spec.ts`); W5 items + eating
-(`engine/items/`, `catalog-items.ts`, ITEMS.md); W2 climb links / beam walkways / `hand_up` / forklift variant / `aloft.ts`
-(HANDUP.md, `build-bay-v3`); W4 splined turns + immediate block reaction + walk-stall metric = 0 (`locomotion/spline.ts`,
-`take/metrics.ts`, `human.speed`, MOVEMENT.md); W6 renderer foot IK on stairs, posture solver, arm IK to `human.hands`, items,
-legs-crossed sit, lab presets `meal` + `hand-up` (POSES.md).
+### What landed, by owner-feedback item (`OWNER_FEEDBACK_2026-09-28.md`)
 
-**In flight at the last checkpoint:** W7 §7 phase A (assembly graph, BOM + piles, `cut`, skeleton sequence, `year-build.test.ts`,
-YEAR_BUILD.md); W8 solar (§9) + paint (§8) + hand-up reach tightening; W9 rig arms → body model, kneel, replay consumption,
-lab-social t60 investigation.
+| § | What exists now | Workers | Doc |
+| --- | --- | --- | --- |
+| 1 fire | Animated fire shared by lab + studio (`app/engine-view/fire.ts`): 3 billboard flame layers, coal bed, embers, smoke, seeded flickering light; pure function of id + sim time (`e2e/fire.spec.ts`). | W3 | PROGRESS W3 |
+| 2 splined turns | Walk legs = straight runs + circular fillets checked every 2 cm against corridor clearance, curvature speed cap, turn in place only > 120°. | W4 | MOVEMENT.md |
+| 3 react to blocks | 1.5 s look-ahead, stop on the tick something appears, decision ≤ 0.5 s (wait with reason / route around); squeezed people-replan; encounters on the smoothed path; walk-stall metric = 0; **no jumps**: ≤ min(speed, 1.4 m/s)·DT per tick, `motion.teleport` 0.15 m/tick on foot, new `motion.overspeed`. | W4, W15, W21 | MOVEMENT.md (§2, §7) |
+| 4 stairs | Two-bone leg IK, tread-by-tread gait: soles 0.0 cm from treads at every plant, up and down. | W6 | POSES.md |
+| 5 hand-up / forklift | Climbable frames + beam walkways, `hand_up` (ground crew → receivers on the beams), forklift variant, `aloft.ts` fastening, receiver edge / kneel rules, lever grip + `handup.unbalanced`; flagship v3 (87→88 steps, 0 violations). | W2, W8, W10, W12 | HANDUP.md |
+| 6 handling motions | One body model (`engine/body/model.ts` = the measured rig: shoulders 1.34, arm 0.62, overhead 2.00/2.06, reach-down 0.5 m); posture solver (crouch, one-knee kneel, bend), closed grip, arm IK to engine hand points; hand-up v3 92.5 % of hand points reached, 0 rig-reachable misses; ladder-cycle climbing, beam-walk. | W6, W9, W10, W12, W14 | BODY_MODEL.md, POSES.md |
+| 7 year build (headline) | **Phase A done for 2022 east-house**: assembly graph, BOM + strapped piles, `cut`, frame stances, `hang_beam` — 552 steps, 117 277 ticks, 0 violations, 66/66 frames + beams at the canonical pose. **Phase B partial (W13, still in flight)**: material rules + generator for decks, Kit stair, walls, solar; each section reported clean in W13's runs; the suite executes the plan and one tranche (first bay + first ground-floor deck strip, 53 604 ticks, pinned `94db263e…`); the whole A+B run has no pin and no take. | W7, W13, W14 | YEAR_BUILD.md |
+| 8 paint | `paint` verb, 0.2 m bands, top band from a 0.6 m platform, rendered band overlay (colour + stripe, no textures). | W8, W12, W14 | SOLAR_PAINT.md |
+| 9 solar | Rails, panels, battery / charge controller / inverter, fragile-tilt refusal, rendered; in the year build as a phase-B section (plan-tested only). | W8, W14, W13 | SOLAR_PAINT.md |
+| 10 "watch it being built" | Studio year picker → **Watch it being built** for 2022 (first bay, whole skeleton): engine camera, refusal / blocked log, 64× (≈ 20 fps SwiftShader), final check = recorded hash + parts at the canonical pose. | W19, W24, W17, W22, W26 | STUDIO_REPLAY.md |
+| 11 camera direction | Phase 1: typed directions → computed trajectories (orbit radius from extent, sun-behind window, camera navmesh), `engine_direct_camera`. Phase 2: every shot simulated + self-corrected (collision, squeeze, foreground, flare, frame, horizon, motion, `occluded`), recorded reasons. Studio Direct-camera panel, file cameras, Save track, `verifyCamera { track }`. | W16, W18, W23, W19, W24 | CAMERA_DIRECT.md, STUDIO_REPLAY.md |
+| 12 meal | Table / bowl / spoon / cup / pot, `take_item` / `put_item` / `serve` / `eat` (overlay inside sit / gather / converse), legs-crossed sit, spoon at the lips. | W5, W6 | ITEMS.md, POSES.md |
+| (open items) | Grid on one global lattice (full campus == crop, bit-identical); walker perf (stress-30 mean 0.70 → 0.49 ms); takes mars-take/3 + /4 (thinned hands / speed / tracks, entities0, compact events, file cameras; whole house 8.3 → 3.85 MB); automatic pre-emption of social holds; vehicle–vehicle collision + right of way. | W1, W11, W20, W22, W25 | PLANNING_BUDGET.md, TAKES_AND_PLANS.md, SOCIAL.md, VEHICLES.md |
 
-**Queued next (in order):** W10 engine body model (`engine/body/model.ts`, hand-up/items/paint constants from it, take recorder
-FIELDS += `hands`/`baseActivity`/`on`, crouch hand points move over the phase, v3 re-verify + re-pin with reason) — after W8;
-take regeneration (`deploy/record-campus-take.mjs`) + full `npm run gate` + `npm run evidence` consolidation — after W9/W10;
-§7 phase B (floors/ceilings/walls/doors/windows/solar in the year sequence, per-year takes, studio "Watch it being built");
-§11 camera-direction tranche last. Open engine items: stress-30 per-tick cost +40 % after W4; walker-vs-walker rules on the
-current direction; receiver reach/lean; long-load balance; lab-social t60.
+### Gate (W26 worktree)
 
-**If resuming after a cut-off:** `git status` — any unstaged files belong to a worker that did not finish; check `git log` for
-its partial commits, read its area doc, and re-brief from PROGRESS.md's last entry. Pinned hashes in the tests are the truth.
+GREEN at `1395dd4` (worktree; `gitDirty: true` only from these docs being written and the untracked `.pw-browsers`
+symlink). Report `viewer/.cloudflare/gate/2026-09-28T12-53-41-373Z/report.json` in the W26 worktree (gitignored).
 
-**Consolidation (W17, 2026-09-28 ~05:30 EDT, tree `cd69215` + W17 commits; numbers re-run, not copied).**
-- **Gate GREEN** at `3d04649` (worktree; `gitDirty: true` only from the untracked `viewer/.pw-browsers` symlink, as W14's; nothing
-  uncommitted under `viewer/`): unit 56/56 (0.4 s) · engine 326 pass / 0 fail / 2 skip of 328 (42.1 s) · tsc clean (4.6 s) ·
-  Playwright 52 passed / 1 skipped (524.1 s) · determinism probe `0147f8f12a99…fd30d5` @10729 (= the W15 pin). Report
-  `viewer/.cloudflare/gate/2026-09-28T09-15-51-095Z/report.json` (in the W17 worktree; gitignored).
-- **Takes regenerated** (`deploy/record-campus-take.mjs`, now `--scenario flagship | build-bay-v3 | year-build-2022`, `--all`,
-  `--check`). All are `mars-take/2` inside the unchanged `mars-take-replay/1` wrapper (the studio loader checks only the wrapper,
-  the camera/take id and the final hash — no schema bump needed):
-  - flagship on 2026 staging-east: take `969c8bf92d9c6ce1524dde9a`, `fee92ee0a94f…0c56` @11316 ticks (= pin), camera
-    `cam-fcbd4f960ecf1e79` (10 shots, 12 cuts, readability min 0.60), **1 746 020 B / 288 378 B gzip** (was `c531eaf4…` /
-    `b159317e…` @11950, 1 736 933 / 280 180). Its only new field in use is `speed` (no hand-up / items / climbing in it).
-  - 2022 east-house first bay (year build A): take `9970e93e96cefb6267cf0bba`, `695d2dcb001b…0a81` @41182 (= PIN_BAY1), camera
-    `cam-7c787f709540d87d` at 0.5 Hz (6 slow shots, readability min 0.42, mean 0.81), **2 881 438 B / ~482 KB gzip**. In the
-    manifest's `otherYears`, not `takes`: the 2026 studio replays every `takes` entry on the 2026 scene and does not filter by
-    `year` (the take is in 2022 coordinates on the Kit datum y = 0). `hands` changes are ~0.9 MB of its 2.4 MB take.
-  - flagship v3: **not recorded** — at staging-east its `onto_s2_4` beam_walk fails `beam.no-room` (clearance 0.25 < 0.28 m on
-    s2); on open ground it passes at the pinned origin but fails at most other sites (PROGRESS W17).
-- **Baselines refreshed (inspected):** `studio-take-held`, `studio-take-visitor` — the new take's moments (209.9 s, 565.8 s).
-- **Evidence** (`f4d6738`): §28 rows 17/17 PROVEN; capabilities 21 PROVEN / 0 PARTIAL / 1 UNPROVEN of 22 (new rows: hand-up,
-  rack access, items/eating, solar, paint, year build A, year build B = UNPROVEN (no engine test yet), movement, body model +
-  take fields, composite v2; campus-full is bit-identical now); milestones 8/8 PROVEN; 86 tests added since `6ad36f0`.
+| stage | result | time |
+| --- | --- | --- |
+| unit (`npm test`) | 56 / 56 | 0.4 s |
+| engine | 358 pass / 0 fail / 3 skip (361 in 54 files) | 43.5 s |
+| tsc | clean | 1.5 s |
+| e2e (Playwright) | 61 passed / 1 skipped | 643.5 s |
+| determinism probe | `b746b0947e65…62e7f0c3` @ 10 901 (= pin) | 2.7 s |
 
-**06:45 EDT milestone:** the studio's 2022 year picker offers **"Watch it being built"** — a take from empty site + strapped piles to
-the canonical first bay (24/24 frames + beams at the mars-2022 pose, max 0.2 mm), engine camera, refusal/blocked log, any speed
-(W7 + W17 + W19). Phase B (decks, stair, solar, walls) is landing in W13. Camera direction (§11) phases 1+2 are in the engine and
-the studio replay bar (W16, W18, W19). Full log in PROGRESS.md.
+Two reds found and fixed on the way (details PROGRESS W26): `npm test` had been 55/56 since `0ab2e6f` (W19) — the release-allowlist
+scanner read a doc comment in `app/studio/direct-camera.ts` as an unstaged URL (comment reworded); three live-lab hand-up
+baselines (`poses-pickup-crouch`, `poses-handup-joist`, `poses-climb-frame`, 2.1–3.6 % off) drifted with W21's walker timing
+(same moments, +117 ticks; looked at baseline / new / diff; refreshed).
+
+### Takes (`viewer/public/engine/takes/`, `node deploy/record-campus-take.mjs --all --full --check` → OK for all three)
+
+| take | take id | final state @ ticks | camera | cuts | readability min / mean | file / gzip |
+| --- | --- | --- | --- | ---: | --- | --- |
+| flagship, 2026 staging-east | `d2f16bd3424c67066f25f2a5` | `c56ea8da…` @ 11 459 | `cam-bb4b6990b0c93c33` | 12 | 0.60 / 0.96 | 1 542 240 B / 239 672 B |
+| 2022 east-house, first bay | `b7b882fda48c63e8e21d4e88` | `251a44c5…` @ 41 317 | `cam-7492f43a731bf215` (was `cam-305a0efe…`) | 19 | 0.42 / 0.81 (was 0.40 / 0.81) | 1 335 100 B / 246 884 B |
+| 2022 east-house, whole skeleton | `69c41651fc6002f64ee3b32d` | `d382e461…` @ 117 277 | `cam-b83a682873e5b1c5` (was `cam-9609b6f7…`) | 52 (was 50) | 0.31 / 0.79 | 3 852 499 B / 697 763 B |
+
+All `mars-take/4`, `hypothetical: true`. The two year-build cameras were re-planned tonight with the kind-aware sampler (piles
+are boxes, not people; lead decision after W23); takes and final states are unchanged. Not recordable: flagship v3
+(`onto_s2_4` `beam_walk` → `beam.no-room`, clearance 0.25 < 0.28 m, tick 11 009) and year build A+B (no pin yet).
+
+### Pins (PLANNING_BUDGET.md, last re-pin "no walker jumps", W21; unchanged by W22–W26)
+
+probe / flagship build-bay `b746b094…` @ 10 901 · campus flagship crop = full uncropped `c56ea8da…` @ 11 459 · stress-30
+`5c3a3355…` · meal `3c28879f…` @ 608 · build-bay v3 `a2f782ad…` @ 16 401 · year build first bay `251a44c5…` @ 41 317 (24/24) ·
+whole skeleton `d382e461…` @ 117 277 (66/66, `YEAR_BUILD_FULL=1`) · year build B first bay + first deck strip `94db263e…` @ 53 604
+(`year-build-b.test.ts`) · gather routes `G` unchanged. Seven re-pins overnight, each with a stated reason and an outcome diff:
+grid lattice (W1), splines (W4), walker fallback (W15), no jumps (W21) moved every pin; kneel rule, body model, measured rig
+(W10, W10, W12) moved v3 only.
+
+### Lead decisions taken overnight that you may veto
+
+1. **One body model** (OWNER_DECISIONS, 02:20): engine reach and the rendered rig come from one `engine/body/model.ts`; the rig's
+   arms are scaled to it; anything outside it is refused.
+2. **Body model = the measured rig** (OWNER_DECISIONS, 04:20): shoulders 1.34 m, reach-down **0.5 m** below the feet (the spec said
+   ≈ 1.0 m); deeper hand-offs are refused ("use the forklift"). Alternative: a lying-down receiver posture.
+3. **Kneel rule at the edge** (PROGRESS W8/W10): receivers' hands ≤ 0.8 m horizontally from their feet; `RULES_VERSION`
+   `mars-assembly/3`.
+4. **Walker behaviour beyond brief** (PROGRESS W15): squeezed people-replan; an arrived walker counts as standing.
+5. **Year-build camera sampler** (PROGRESS W23): piles sampled as boxes, re-recorded tonight (above).
+6. **No production deploy** tonight (your instruction, 00:35): production is still release 5 (`cebd5827…`).
+
+### Questions for Gene (collected from PROGRESS.md; the engine does not guess these)
+
+1. 2022: the south-west corner passage is closed by the west-house table in the Kit scene — real?
+2. Trailers `rv-8/9` (2023) and `rv-9/10` (2024) intrude into Chiba's footprint — real, or scene error?
+3. The 9 ft frame is not in the model library (`catalog.ts` marks it provisional, 4 ft depth assumed).
+4. North axis: world −Z is taken as north (`NORTH_AZIMUTH_OFFSET = 0`); sunsets / shadows may be rotated.
+5. Ground datum: the Kit stands parts on y = 0, the published year scenes on −0.16 m — which is right for the build takes?
+6. Beam heights: the Kit's 0.22 / 2.48 / 4.757 m are on no real hole pitch — keep them or snap to the 2 in pitch (±2.5 cm)?
+7. How were the top beams (~4.76 m) hung — climbing the bracing (as modelled), ladders, a lift, the forklift, or bays assembled
+   lying down and raised?
+8. Stock on site: sheets per plywood bundle, pieces per lumber unit, how uprights / beams were stacked.
+9. The 2022 stair: the Kit draws a 4.45 m-wide 8-tread stair with no stringers — what was built (width, stringers, ramp)?
+10. Decks: the Kit draws 4 ft × 15 ft strips at beam height with no joists — or 4x8 sheets on 2x4 joists?
+11. Reach-down: accept 0.5 m (decision 2 above) or model a lying-down receiver (≈ 1.0 m)?
+
+### Known shortcomings and open items (deduplicated, highest first)
+
+1. **Year build B is not finished.** No committed test executes the stair / wall / solar sections; the whole A+B run has no pin
+   and no take (≈ 8 MB when last tried); only 2022 east-house is sequenced (other houses plan only; 2020 / 2025 racks don't map).
+2. **Flagship v3 is a knife edge:** `onto_s2_4` `beam_walk` needs 0.28 m and has 0.25 m at staging-east and at 11 of 17 open-ground
+   origins; the pinned run passes by ≈ 3 cm. Not recordable as a take.
+3. **Frame-stance bodies:** the rear `hang_beam` lifter faces travel with the beam behind its back; stance holders' hands sit
+   0.73–0.79 m beside the body while facing the frame (needs a facing / turn in the engine); one whole-skeleton reach-down renders
+   the palm 1.025 m from the recorded hand (t 2682.3 s); no engine foot / hand holds on the bracing.
+4. **makeWay asks reserved people:** 95 `reservation.conflict` make-way refusals show as "refused / failed" in the
+   whole-skeleton replay (same outcome); unfilled `$crew[0]` step labels in that take.
+5. **Year-build camera readability is low:** min 0.31 (whole skeleton) / 0.42 (bay 1) at 0.5 Hz slow shots.
+6. **Reach model vs bodies:** one reach-down cap (0.5 m) for templates reaching 0.35–0.54 m (woman template below the cap →
+   per-person body variant); giver hands sit at 0 mm slack on the envelope; hand-up v3 92.5 % and year build 76.6 % of engine hand
+   points reached by the rig.
+7. **Pre-emption (W25):** a pre-empted sit / conversation is not resumed; a converse loses all members.
+8. **Vehicles (W25):** a forklift behind a parked-but-ridden EUC waits indefinitely (no swerve / reverse); reach / side-shift /
+   raise not checked against vehicles; 3-vehicle yield cycles undetected; `edit_world` cannot move vehicles.
+9. **Walking:** look-ahead assumes 0.9 m/s lateral; carry / climb / stance / sit publish no speed; 1.08–1.5 m gaps between people are
+   walkable but not plannable at 0.1 m cells; head-on round a tight corner falls to the single-file rule; heuristic, not ORCA.
+10. **Camera:** correction ladders are fixed (first valid wins), thresholds chosen not measured; synthesis collides with static
+    geometry only; no door objects in year scenes; navmesh rebuilt per call (100–250 ms); render parity only in Playwright.
+11. **Studio:** rebuilt racks draw 0.16 m below the Kit's (datum); a saved directed track is a download the owner copies into
+    `public/engine/takes/` (no room op stores it).
+12. **Performance:** stress-30 tick 5 = 27–30 synchronous exact A\* ≈ 90 ms (only the corridor planner gets < 60 ms, and it moves
+    hashes).
+13. **Items / fire / render:** reach over a table (1.1 m) unchecked, 1-tick item lag while walking, no item–item collision; fire
+    smoke faint, core saturates, billboards flat from above; paint has no textures; frames render blue (photo: green); skeleton lacks
+    the 2x4 top framing.
+14. **Engine hygiene:** host `**` on 14 non-test engine lines is not scanned; W7 follow-ups (climb paths not body-checked, beam
+    walk-in checks static geometry only, bundle keeps its full box until empty, `contents.count` untyped, BOM solar ids vs W8's).
+15. **Carried from before tonight:** crews (multi-carrier) on stairs; static geometry not editable over MCP; region layout edits
+    don't stale plans; talk / watch are Idle; `npm run lint` broken locally; scanned Martians (consent), electrical model.
+
+Closed tonight (were open at the checkpoint): grid-origin hash dependence (W1); lab-social t60 (W9/W15); foot IK on stairs (W6);
+**automatic pre-emption of social holds (W25)**; **vehicle–vehicle collision (W25)**; take size (W20/W22); emptied piles undrawable
+(W22); camera sampler treating piles as people (W23, re-recorded W26).
+
+### Evidence
+
+`npm run evidence` at `1395dd4` (`EVIDENCE.md`, `evidence.json`): §28 rows **17 / 17 PROVEN**; capabilities **27 PROVEN / 1 PARTIAL /
+0 UNPROVEN of 28** — the PARTIAL is year build B (3 / 4: plan, report-only, first bay + first deck strip pass; the whole A+B house is
+`YEAR_BUILD_FULL`-gated and unpinned); new rows tonight: camera direction phase 1 (15 tests), phase 2 incl. `occluded` (11), takes
+/3 + /4 (4), no walker jumps (2), social pre-emption (7), vehicle–vehicle (6); milestones **8 / 8**. Campus flagship compute 7.9 s;
+full uncropped = cropped `c56ea8da…`.
+
+### Cost (subagent tally from PROGRESS.md)
+
+24 landed workers (W1–W12, W14–W25): **≈ 8.65 M subagent tokens, ≈ 1 460 worker-minutes (≈ 24 h)** over ≈ 8 h wall (00:25 →
+08:15 EDT), i.e. ≈ 1.1 M tokens/h, 2–3 workers at a time. Largest: W7 620k, W2 530k, W4 525k, W14 520k, W16 500k. Not included:
+W13 (phase B, still running at this write-up) and W26 (this consolidation, ≈ 0.35 M tokens, ≈ 1 h 10 min). usage.py at 07:07 EDT: 5-h window 3 %,
+week 24 %.
+
+**If resuming:** `git status` in the main tree — unstaged files there belong to W13 (`engine/campus/**`, `construction/**`,
+`scenarios/year-build.ts`, `test/year-build-b.test.ts`, `YEAR_BUILD.md`). Pinned hashes in the tests are the truth.
