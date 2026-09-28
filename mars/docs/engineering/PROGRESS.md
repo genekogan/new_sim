@@ -463,3 +463,32 @@ Then: gate → release 5; HANDOFF refresh.
 - usage.py 07:07 EDT: window 3 began ~07:00; 5h 3 %, week 24 %. Tally ≈ 9.5 M subagent tokens over 6.8 h (≈ 1.4 M/h).
 - W23 spawned (engine camera): phase-1 tests through the phase-2 pipeline (orbit self-corrects instead of failing a threshold), missing-entity sampler fix, directed track stored beside the take, then re-record the flagship as /4.
 - **W21 report received** (≈350k tokens, 80 min): spike classes A release-after-hold (0.55 m), B offset collapse, C offset swept round a bend at full speed, + stance climb entry; all six runs now ≤ 0.0675 m/tick on foot; stale-speed and climb-start bugs fixed too. Lead review: accepted. Open: look-ahead still assumes 0.9 m/s lateral (walkers briefly slow while sidestepping); carry/climb/stance/sit publish no speed (bounded only by 0.15 m/tick); runs 1–2 % longer. W13 told to fix its red `year-build-b` "A+B: plan" test (`riser: 2`) and to look at both `beam_walk` refusals (v3 `onto_s2_4`, A+B `--full`).
+- **W23 (engine camera: flagship re-record, occluded, kind-aware sampler, take-file cameras)** on branch `w23-camera` (rebased on `294926e`) + docs (`CAMERA_DIRECT.md` §6, §8):
+  - **Diagnosis of the 0.56.** The directed 270° bay orbit is geometrically the same at W21's motion (centre
+    (29.26, 1.67, −7.63), radius 13.86 m, height 7.27 m, start 90°). The crew's timing changed: `carry_j1` runs
+    231.2–263.5 s (it was 230.8–257.3 s). At t 259.2–259.3 s the camera passes due west of the bay while p2 stands at
+    upright A's foot and p1 walks across the line to B. Each upright loses its 4 bottom points (44 %), giving
+    readability 0.56 on 2 samples. This is not a synthesis bug: phase 2 had no failure mode for the planner's
+    readability.
+  - **Phase 2 `occluded`.** A sample fails when the planner's own readability is < 0.6 because of something that is
+    not the subject: co-subjects are ignored, framing and size are excluded (cutaway ≥ 0.6), and fly-throughs are off.
+    One sample is enough. raise, widen, swing, shorten, split and cut address it.
+  - **One knob per correction.** Corrections re-use the first synthesis's searched start heading; before, a raise
+    re-searched the heading and moved it from 90° to 45°.
+  - **Flagship orbit corrected.** The orbit now goes through `correct: true`: raise +2.5 m (+0.5 m and +1 m still
+    occluded on 2 samples, +1.5 m on 1). Height is 9.77 m, with the same centre, radius and start heading. Planner
+    min readability is 0.61, mean 0.92; the 0.6 threshold is kept.
+  - **Proving-ground n1 orbit.** raise +1 m used to clear the wall but looked at n1 through it; the correction is
+    now swing −90°.
+  - **Sampler.** Kind now comes from finalState, else from entities0. Piles and the cutting station are boxes, and an
+    entity leaves at its removal tick. Before, *every* pile was a person, not only the removed one. The flagship is
+    identical.
+  - **Year-build cameras, not re-recorded (for the lead).** The fix would move bay-1 `cam-305a0efe` → `cam-7492f43a`
+    (min 0.403 → 0.42) and the whole house `cam-9609b6f7` → `cam-b83a6828` (cuts 50 → 52). The recorder keeps
+    `legacyKinds` for year-build until the lead accepts that delta.
+  - **Take-file cameras.** Take files carry `cameras: { [id]: track }` (`withFileCamera` / `fileCameras` /
+    `fileCamera`). The recorder keeps them across a same-take re-record. The studio read path is in §8.2.
+  - **Flagship take.** `d2f16bd3…` (pin `c56ea8da…` @ 11 459, mars-take/4), 1.54 MB, gzip 234 KB, camera
+    `cam-bb4b6990b0c93c33`. `--check` is OK for all three takes.
+  - **Tests.** Engine: 347 tests, 344 pass, 3 skip, 0 fail. E2E: studio-take, camera-verify (2), studio-direct and
+    studio-build pass. The `studio-take-visitor` baseline was refreshed after looking at it.
