@@ -895,8 +895,13 @@ Then: gate → release 5; HANDOFF refresh.
   unchaptered run, continuity, a non-barrier bound refused, 50 ms) and the shipped chapter set (continuity of every
   join, Σ ticks, ends at the pin, 130 ms). `year-build-b.test.ts` gains a plan-only section-boundary test; the pins are
   untouched. Suite 371 pass / 3 skipped; tsc clean.
-- **Recorder** refactored into `record` → `packageTake` (+ `recordChapters`). `--all --full --check` stays OK for the
-  flagship, v3, bay 1 and the whole skeleton (byte-identical). `--check` of the chapters is in the W31 report.
+- **Recorder** refactored into `record` → `packageTake` (+ `recordChapters`). **`--check` OK for every manifest take**
+  on the head with W30 + W32 merged: flagship, v3, bay 1, whole skeleton (byte-identical), and the 7 chapters + the set.
+- **Prone take fields (lead note, W32):** `TakeRecorder` FIELDS gains `proneYaw` (integer mrad) and `phaseK` (integer %),
+  still `mars-take/4` (additive: an absent field records nothing, so every manifest take re-checks byte-identical).
+  Test `take-prone-fields.test.ts`. No pin moves.
+- **Commits** (branch `w31-chapters`, on main `858946e`): `feb486c` chapters.ts + tests, `88d6168` recorder + 7 takes +
+  manifest, `b21a0d3` docs, `0071785` prone take fields, + this entry. W27: `279d405` on main.
 - **Weak spots:** the studio cannot play a set back to back yet (contract written; a renderer task). The chapters are not
   in "Watch it being built" by design (kind), but they are listed under "Replay take" for 2022 (7 more options). Work
   shots stay close on 1–4 people for minutes; the yard is seen only in the opening wide. Chapter moments are generic.
