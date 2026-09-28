@@ -29,7 +29,7 @@ function kitchenBuilding(k:Kit,x:number,z:number,year:number){
  // Three bays: enclosed workspaces either side of an open central lounge.
  k.wall(g,w,2.25,0,-d/2,1.36);for(const side of [-1,1]){k.wall(g,d,2.25,side*w/2,0,1.36,'#b99b75',Math.PI/2);k.wall(g,BAY,1.03,side*BAY,d/2,.75);k.wall(g,BAY,.4,side*BAY,d/2,2.25);k.wall(g,BAY,.6,side*BAY,d/2,3.05);}
  const interior=k.assembly('kitchen-interior','Kitchen · sink, pantry and appliances',[-BAY,0,0]);g.add(interior);k.kitchen(interior,BAY,2*BAY,year);
- const cafe=k.assembly('cafe','Café / lounge',[BAY,0,0]);g.add(cafe);k.table(cafe,0,1,2.6,.65,.92);k.screen(cafe,0,1.8,-2.9,1.15);k.box(cafe,'café painted counter',[2.8,.8,.08],[0,.5,1.4],k.photo('/history/2023/cafe-front.webp'));k.wall(cafe,2.8,1.4,0,-3,1.35,k.photo('/history/2023/swirls.webp'));
+ const cafe=k.assembly('cafe','Café / lounge',[BAY,0,0]);g.add(cafe);k.table(cafe,0,1,2.6,.65,.92);k.screen(cafe,0,1.8,-2.9,1.15);{const floor=k.seat?k.surface(cafe,Kit.footprint(0,1.4,2.8,.08),.9):.1;k.box(cafe,'café painted counter',[2.8,.9-floor,.08],[0,(.9+floor)/2,1.4],k.photo('/history/2023/cafe-front.webp'));/* floor to counter top (.9) */}k.wall(cafe,2.8,1.4,0,-3,1.35,k.photo('/history/2023/swirls.webp'));
  k.solar(g,BAY,3.6,BAY,2.9,-.3,.15);
  // Raised central rooftop canopy, present in the later kitchen aerials.
  k.box(g,'central rooftop canopy',[BAY,.07,BAY],[0,4.45,-BAY/2],'#b89b73',layers.roof);k.stairs(g,2.7,4,2.22,0,5.7,12);
@@ -37,7 +37,7 @@ function kitchenBuilding(k:Kit,x:number,z:number,year:number){
 }
 function classroom(k:Kit,g:T.Group,w:number,d:number){
  k.wall(g,w,2.3,0,-d/2,1.38,'#d0ccc0');k.screen(g,0,1.62,-d/2+.08,1.8);
- for(let z=-d/2+1.7;z<d/2-1;z+=2){k.table(g,-w/4,z,2,.7);k.table(g,w/4,z,2,.7);for(const x of [-w/4,w/4]){k.box(g,'classroom bench',[1.8,.075,.35],[x,.48,z+.75],'#aa8b63');for(const dx of [-.7,.7])k.box(g,'bench foot',[.065,.4,.25],[x+dx,.25,z+.75],'#685744');}}
+ for(let z=-d/2+1.7;z<d/2-1;z+=2){k.table(g,-w/4,z,2,.7);k.table(g,w/4,z,2,.7);for(const x of [-w/4,w/4]){k.box(g,'classroom bench',[1.8,.075,.35],[x,.48,z+.75],'#aa8b63');for(const dx of [-.7,.7]){const floor=k.seat?k.surface(g,Kit.footprint(x+dx,z+.75,.065,.25),.4425):0,[h,cy]=k.seat?[.4425-floor,(.4425+floor)/2]:[.4,.25];k.box(g,'bench foot',[.065,h,.25],[x+dx,cy,z+.75],'#685744');}}} // feet: floor to seat underside (held years: as before W46)
 }
 function make2021(k:Kit){
  const d=6*BAY,wingDepth=4.572,offset=wingDepth,w=3*wingDepth,g=k.assembly('chiba','Main hall · MARS');
