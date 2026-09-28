@@ -17,8 +17,9 @@ import { GridOverlays } from './overlay-grids.ts';
 import { AgentOverlays } from './overlay-agents.ts';
 import { buildLinks, buildObstacles, buildRoutes, buildViolations } from './overlay-debug.ts';
 import { buildSlots } from './overlay-slots.ts';
+import { buildPrisms, yearBackdrop, type Backdrop } from './year-walkabout-view.ts';
 
-export const OVERLAYS = ['grid', 'routes', 'traffic', 'agents', 'obstacles', 'links', 'labels', 'violations', 'slots'] as const;
+export const OVERLAYS = ['grid', 'routes', 'traffic', 'agents', 'obstacles', 'prisms', 'links', 'labels', 'violations', 'slots'] as const;
 export type OverlayName = (typeof OVERLAYS)[number];
 
 export class LabView {
@@ -37,7 +38,7 @@ export class LabView {
   private grids = new GridOverlays();
   private agents = new AgentOverlays();
   private groups: Record<OverlayName, THREE.Group>;
-  private statics?: StaticScene;
+  private statics?: Backdrop;
   private resources = new ThreeResources();
   private abort = new AbortController();
   private raf = 0;
@@ -74,7 +75,7 @@ export class LabView {
     Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, far: 100 });
     this.scene.add(sun, this.humans.group, this.components.group, this.fixtures.group);
     const mk = (n: string) => Object.assign(new THREE.Group(), { name: `overlay:${n}` });
-    this.groups = { grid: this.grids.heat, traffic: this.grids.traffic, agents: this.agents.discs, labels: this.agents.labels, routes: mk('routes'), obstacles: mk('obstacles'), links: mk('links'), violations: mk('violations'), slots: mk('slots') };
+    this.groups = { grid: this.grids.heat, traffic: this.grids.traffic, agents: this.agents.discs, labels: this.agents.labels, routes: mk('routes'), obstacles: mk('obstacles'), prisms: mk('prisms'), links: mk('links'), violations: mk('violations'), slots: mk('slots') };
     for (const g of Object.values(this.groups)) this.scene.add(g);
     this.sim.onReset = (rt) => this.reset(rt);
     this.sim.onTick = (rt) => {
@@ -98,8 +99,10 @@ export class LabView {
   private reset(rt: LabSim['rt']) {
     this.statics?.dispose();
     if (this.statics) this.scene.remove(this.statics.group);
-    this.statics = new StaticScene(rt.services.spatial.base);
+    this.statics = yearBackdrop(rt, (m) => (this.error = m)) ?? new StaticScene(rt.services.spatial.base);
     this.scene.add(this.statics.group);
+    const fog = this.scene.fog as THREE.Fog;
+    [fog.near, fog.far] = this.statics.fog ?? [70, 160];
     this.humans.reset(rt.world);
     this.components.reset(rt.world);
     this.fixtures.reset(rt.world);
@@ -131,6 +134,11 @@ export class LabView {
     const a = (az * Math.PI) / 180;
     if (kind === 'top') this.look([x, r * 2.6, z + 0.01], [x, 0, z]);
     else this.look([x + Math.cos(a) * r * 1.4, r * 0.9, z + Math.sin(a) * r * 1.4], [x, 0.8, z]);
+  }
+
+  /** Static geometry finished loading (year backdrops: Kit photos / 2026 GLB). */
+  get staticsReady() {
+    return this.statics?.ready?.() ?? true;
   }
 
   look(pos: number[], target: number[]) {
@@ -168,6 +176,7 @@ export class LabView {
     if (this.epoch !== sp.epoch) {
       this.epoch = sp.epoch;
       if (on.has('obstacles')) buildObstacles(this.groups.obstacles, sp);
+      if (on.has('prisms')) buildPrisms(this.groups.prisms, sp);
       if (on.has('links')) buildLinks(this.groups.links, sp);
     }
     if (on.has('slots') && this.slotTick !== rt.tick) {

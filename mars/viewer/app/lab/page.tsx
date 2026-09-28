@@ -18,14 +18,21 @@ export default function Lab() {
     const v = new LabView(host.current!);
     const initial =
       new URLSearchParams(location.search).get('scenario') ?? SCENARIOS[0].name;
-    v.sim.load(
-      SCENARIOS.some((s) => s.name === initial) ? initial : SCENARIOS[0].name,
-    );
+    const first = SCENARIOS.find((s) => s.name === initial) ?? SCENARIOS[0];
+    let live = true;
+    // scenarios with async data (year walkabouts) start on the default preset until it arrives
+    v.sim.load(first.prepare ? SCENARIOS[0].name : first.name);
+    if (first.prepare)
+      v.sim.loadAsync(first.name).then(
+        () => live && refresh(),
+        (e) => live && ((v.error = `${first.name}: ${e.message}`), refresh()),
+      );
     installHook(v, refresh);
     v.start();
     setView(v);
     const t = setInterval(refresh, 250);
     return () => {
+      live = false;
       clearInterval(t);
       removeHook();
       v.dispose();
@@ -79,9 +86,13 @@ export default function Lab() {
           view={view}
           checks={checks}
           onScenario={(name) => {
-            view.sim.load(name);
-            history.replaceState(null, '', `/lab?scenario=${name}`);
-            refresh();
+            view.sim.loadAsync(name).then(
+              () => {
+                history.replaceState(null, '', `/lab?scenario=${name}`);
+                refresh();
+              },
+              (e) => ((view.error = `${name}: ${e.message}`), refresh()),
+            );
           }}
           onOverlay={(name: OverlayName, on: boolean) => {
             view.setOverlay(name, on);

@@ -28,6 +28,12 @@ export class LabSim {
   onTick: (rt: Runtime) => void = () => {};
   onReset: (rt: Runtime) => void = () => {};
 
+  /** load() after the scenario's async prepare() (fetched scene files); plain load() for the rest. */
+  async loadAsync(name: string) {
+    await scenarioByName(name)?.prepare?.();
+    this.load(name);
+  }
+
   load(name: string) {
     const s = scenarioByName(name);
     if (!s) throw Error(`unknown scenario "${name}" (have ${SCENARIOS.map((x) => x.name).join(', ')})`);

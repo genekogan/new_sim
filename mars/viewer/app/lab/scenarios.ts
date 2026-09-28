@@ -13,6 +13,7 @@ import type { Entity } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
 import { buildBay } from './build-bay.ts';
 import { campfireEvening } from './campfire-evening.ts';
+import { yearWalkabouts } from './year-walkabout.ts';
 
 export type Check = { ok: boolean; message: string };
 export type Scenario = {
@@ -40,6 +41,10 @@ export type Scenario = {
   /** Failed actions the script provokes on purpose (shown as amber EXPECTED diagnostics, not red failures). */
   expectedFailure?: (rt: Runtime, actionId: string) => boolean;
   expect: (rt: Runtime) => Check[];
+  /** Async data the scenario needs before scene()/build() (fetched scene files); awaited by LabSim.loadAsync. */
+  prepare?: () => Promise<void>;
+  /** Extra status lines for the panel (e.g. year-walkabout build times). */
+  hud?: (rt: Runtime) => string[];
 };
 
 export function buildRuntime(s: Scenario) {
@@ -217,6 +222,7 @@ SCENARIOS.push(
   stress(30),
   buildBay,
   campfireEvening,
+  ...yearWalkabouts(),
 );
 
 /**

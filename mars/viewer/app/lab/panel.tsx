@@ -11,6 +11,7 @@ const OVERLAY_LABEL: Record<OverlayName, string> = {
   traffic: 'Single-file traffic',
   agents: 'Agent discs + facing',
   obstacles: 'Obstacle footprints',
+  prisms: 'Engine obstacle prisms (ground band, translucent, on top)',
   links: 'Stair links',
   labels: 'Action phase labels',
   violations: 'Violation markers',
@@ -69,6 +70,13 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <p className="lab-meta">
         tick {sim.rt.tick} · t {sim.rt.time.toFixed(2)} s {sim.done() ? '· done' : sim.paused ? '· paused' : ''}
       </p>
+      {s.hud && (
+        <ul className="lab-meta lab-hud" data-testid="lab-scenario-hud">
+          {s.hud(sim.rt).map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+      )}
       <h2>Expectations</h2>
       <ul className="lab-checks">
         {checks.map((c, i) => (

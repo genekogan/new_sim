@@ -37,14 +37,25 @@ export function installHook(view: LabView, notify: () => void) {
       return view.error;
     },
     scenarios: () => SCENARIOS.map((s) => ({ name: s.name, title: s.title, continuous: !!s.continuous })),
-    /** Load a scenario (fresh world). Pass { paused: false } to let it play in real time. */
+    /** Load a scenario (fresh world). Pass { paused: false } to let it play in real time.
+     *  Scenarios with async data (year walkabouts) return a Promise of the state. */
     runScenario(name: string, opts: { paused?: boolean; speed?: number } = {}) {
-      sim.paused = opts.paused ?? true;
-      sim.speed = opts.speed ?? sim.speed;
-      sim.load(name);
-      notify();
-      return state();
+      const go = () => {
+        sim.paused = opts.paused ?? true;
+        sim.speed = opts.speed ?? sim.speed;
+        sim.load(name);
+        notify();
+        return state();
+      };
+      const s = SCENARIOS.find((x) => x.name === name);
+      return s?.prepare ? s.prepare().then(go) : go();
     },
+    /** Static geometry finished loading (year walkabouts: studio Kit scene photos / 2026 GLB). */
+    get backdropReady() {
+      return view.staticsReady;
+    },
+    /** The scenario's panel HUD lines (year walkabouts: file size, fetch/parse/build ms). */
+    scenarioHud: () => sim.scenario.hud?.(sim.rt) ?? [],
     /** Fast-forward n fixed ticks synchronously (stops at the scenario's tick budget). */
     step(n = 1) {
       sim.stepN(n);
