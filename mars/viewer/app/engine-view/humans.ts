@@ -36,7 +36,7 @@ import { BODY_MODEL, UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, cu
 import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
 import { axisPoint, flightOf, gaitAt, type Flight, type Gait } from './stair-gait.ts';
 import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
-import { GIRDLE, LIP, PRONE_ACTS, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
+import { GIRDLE, LIP, PRONE_ACTS, engineTurn, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
@@ -47,8 +47,10 @@ type View = {
   cur: Snap;
   speed: number;
   activity: string;
-  /** Ticks since `activity` began (the prone rise clock, prone.ts riseOf). */
+  /** Ticks since `activity` began (the prone rise clock, prone.ts riseOf, when the engine publishes no phaseK). */
   age: number;
+  /** The engine's prone body turn / phaseK at the latest tick (diagnostics; undefined: not published). */
+  proneEng?: { turn?: number; k?: number };
   /** The activity an overlay (eat / serve) is layered on (engine human.baseActivity). */
   base: string;
   grip?: string;
@@ -96,8 +98,9 @@ export type Diag = {
   arms: { side: 'left' | 'right'; shoulder: number[]; palm: number[]; len: number; target: number[] | null; source: Source; contact: number; err: number | null; ratio: number | null }[];
   /** Rack-structure layer (frame-gait.ts): kind, ladder rung coordinate, exit progress, blend weight, the planned soles. */
   frame: { kind: string; u: number; exit: number; weight: number; feet: { p: number[]; planted: boolean }[] | null } | null;
-  /** Prone layer (prone.ts): rise coordinate, torso pitch and body turn (rad), rendered yaw, layer weight. */
-  prone: ProneState | null;
+  /** Prone layer (prone.ts): rise coordinate, torso pitch and body turn (rad), rendered yaw, layer weight; what the
+   *  engine published at the latest tick (its body turn angleDelta(pose.yaw, proneYaw), phaseK; null: not published). */
+  prone: (ProneState & { engTurn: number | null; phaseK: number | null }) | null;
 };
 /** Where an arm's target came from: engine hand points, a grip slot, or a renderer-chosen hold on the frame / balance pose. */
 type Source = 'hands' | 'grip' | 'frame' | null;
@@ -121,6 +124,10 @@ export type SampledHuman = {
   baseActivity?: string;
   /** Rack-structure link the person stands on (take field `on`: `beam:…` / `climb:…`); readout only. */
   on?: string;
+  /** Prone receiver (engine W32; take fields once the recorder carries them): lying heading (world yaw) and 0–1 progress
+   *  within the engine phase — the prone layer's body turn and exact rise mid-phase (else each phase's end pose). */
+  proneYaw?: number;
+  phaseK?: number;
 };
 export type { Hands };
 /** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
@@ -353,17 +360,21 @@ export class HumanViews {
   }
 
   /**
-   * Prone layer (prone.ts) for this tick: in a prone activity the rise coordinate from the engine's phase clock
-   * (`v.age`; a take frame has no clock, `settled`: the phase's end pose) and the torso pitch / body turn that bring
-   * the shoulders within reach of the engine's hand points; after it the last pose, fading out over 0.4 s while the
-   * posture layer takes over (humans.ts pose blends the bones).
+   * Prone layer (prone.ts) for this tick: in a prone activity the rise coordinate from the engine's `phaseK` (exact),
+   * else its phase clock (`v.age`; a take frame without phaseK has no clock, `settled`: the phase's end pose), the body
+   * turn from the engine's lying heading (`proneYaw`; else searched), and the torso pitch that brings the shoulders
+   * within reach of the engine's hand points; after it the last pose, fading out over 0.4 s while the posture layer
+   * takes over (humans.ts pose blends the bones).
    */
   private proneGoal(v: View, e: Entity, world: WorldState, cur: ProneState | null, settled: boolean): ProneState | null {
     const d = v.dims, act = v.activity;
     if (!d) return null;
     if (PRONE_ACTS.has(act)) {
-      // getting up the body follows the engine's clock but may wait for the load it holds (never goes back down)
-      const clock = riseOf(act, settled ? 1e6 : v.age), prev = settled ? null : cur;
+      const k = e.human?.phaseK, turn = engineTurn(e.pose.yaw, e.human?.proneYaw);
+      v.proneEng = { turn, k };
+      const clock = riseOf(act, settled ? 1e6 : v.age, k), prev = settled ? null : cur;
+      // getting up the body follows the engine's rise (smooth(phaseK); the fallback clock without it) but may wait for
+      // the load it holds, never ahead of the engine and never back down (this rig's arms are not the engine's cylinder)
       const rising = act === PRONE_ACTIVITY.pushUp || act === PRONE_ACTIVITY.kneelUp;
       const rLo = rising && prev ? Math.min(prev.r, clock) : clock, rHi = rising && prev ? Math.min(clock, prev.r + RISE_STEP) : clock;
       const c = Math.cos(e.pose.yaw), s = Math.sin(e.pose.yaw), o = e.pose.p;
@@ -380,10 +391,11 @@ export class HumanViews {
           return Math.abs(dx * qc + dz * qs) <= sz[0] / 2 + 1e-6 && Math.abs(-dx * qs + dz * qc) <= sz[2] / 2 + 1e-6;
         });
       };
-      const g = solveProne(d, ts, rLo, rHi, onDeck, prev ?? undefined);
-      const next = approachProne(prev, { r: g.r, bend: g.bend, turn: g.turn, yaw: 0, w: 1 }, POSE_BLEND);
+      const g = solveProne(d, ts, rLo, rHi, onDeck, prev ?? undefined, turn);
+      const next = approachProne(prev, { r: g.r, bend: g.bend, turn: g.turn, yaw: 0, w: 1, slide: g.slide }, POSE_BLEND, turn !== undefined);
       return { ...next, yaw: e.pose.yaw + next.turn };
     }
+    v.proneEng = undefined;
     return cur && cur.w > 0 ? { ...cur, w: Math.max(0, cur.w - POSE_BLEND) } : null;
   }
 
@@ -427,7 +439,7 @@ export class HumanViews {
       v.frame = frameCtx(f.on, act, (id) => parts[id], this.climbs);
       v.seat = SEAT_DEFAULT;
       const walk = SEATED.has(base) ? 0 : f.walk;
-      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands } } as unknown as Entity;
+      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK } } as unknown as Entity;
       const snap: Snap = {
         p: [...f.p],
         yaw: f.yaw,
@@ -912,7 +924,7 @@ function ankleFor(d: Dims, pitch: number) {
  */
 function proneBody(v: View, pr: ProneState) {
   const d = v.dims!, sp = v.spine!, h = v.rig.holder, floor = h.position.y;
-  const fr = proneFrame(d, pr.r, pr.bend, lipAlong(d, pr.turn));
+  const fr = proneFrame(d, pr.r, pr.bend, lipAlong(d, pr.turn), pr.slide);
   const clipFeet = v.legs.map((l) => l.foot.getWorldPosition(V()));
   _ax.crossVectors(UP, _fwd).normalize(); // turning about up×fwd tips the body forward
   if (fr.pitch) turn(sp.body, _ax, fr.pitch);
@@ -1213,7 +1225,7 @@ function diagOf(v: View, g: Gait | null, flight: string, pz: Posture, targets: (
     hipY: r4(v.legs.length ? v.legs.reduce((s, l) => s + l.upper.getWorldPosition(V()).y, 0) / v.legs.length : 0),
     head: v.spine?.head ? a3(v.spine.head.getWorldPosition(V())) : null,
     pose: { drop: r4(pz.drop), bend: r4(pz.bend), rise: r4(pz.rise), kneel: r4(pz.kneel) },
-    prone: pr ? { r: r4(pr.r), bend: r4(pr.bend), turn: r4(pr.turn), yaw: r4(pr.yaw), w: r4(pr.w) } : null,
+    prone: pr ? { r: r4(pr.r), bend: r4(pr.bend), turn: r4(pr.turn), yaw: r4(pr.yaw), w: r4(pr.w), slide: r4(pr.slide), engTurn: v.proneEng?.turn !== undefined ? r4(v.proneEng.turn) : null, phaseK: v.proneEng?.k !== undefined ? r4(v.proneEng.k) : null } : null,
     frame: fp ? { kind: fp.kind, u: r4(fp.u), exit: r4(fp.exit), weight: r4(fp.weight), feet: fp.feet?.map((f) => ({ p: f.p.map(r4), planted: f.planted })) ?? null } : null,
     arms: v.arms.map((arm, i) => {
       const sh = arm.upper.getWorldPosition(V()), pm = palm(arm, V()), len = armLen(arm), t = targets[i];
