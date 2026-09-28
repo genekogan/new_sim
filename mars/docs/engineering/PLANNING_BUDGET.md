@@ -161,6 +161,28 @@ campus components installed); only the durations move (−3 / −24 ticks). The 
 vertices ≤ 1 ulp apart. Stress-30 diverges visibly after 60 s (a soak whose walkers draw new goals from one
 shared RNG on arrival, so one shifted arrival reorders every later draw); 0 violations both.
 
+**Re-pinned 2026-09-28 (splined turns + immediate block reaction, 2026-09-28 — not the budget; `9e1c2f4`,
+`docs/engineering/MOVEMENT.md`):** walk legs are smoothed into fillets with curvature speed caps, heading follows the path
+(turn in place only beyond 120°), a 1.5 s look-ahead stops walkers short of standing people / loads and a block is decided
+within 0.5 s. Every walk changes timing, so every pin moves once. Verified in a clean worktree (HEAD `11cd063` + only these
+changes): each run ends with 0 violations and the same discrete outcome — same step statuses, every component in the same
+phase / support, every person on the same level with the same final activity (v2: p1 and p2 both sit; meal: 5 cycles each,
+bowls and pot empty; v3: every joist / sheet handed and received by the same people) — only durations shrink:
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| probe / flagship build-bay | `c2c84663c993…67a41` | `93fa2a0a7900…ac67b` | 11400 → 10693 |
+| campus flagship (staging-east crop) = full uncropped | `42dec8e8f371…dde61` | `ecb424c74d87…cbb3a` (crop == full still asserted) | 11926 → 11227 |
+| lab stress-30 (60 s) | `0ec4d884598d…ecf58` | `093779fd18f0…fcac55` | fixed 1200 |
+| meal (`meal.test.ts`) | `baf84de6a939…0ccbfd` | `9dae86bfd31e…a70f87` | 689 → 631 |
+| build-bay v3 (`build-bay-v3.test.ts`) | `584685f13886…7fd588` | `e121377dd6d7…a75924b9` | 17288 → 16191 |
+| build-bay v2 (not hash-pinned; outcome checked) | `5695f7a8e535…` | `a463bfe2ef12…` | 13536 → 12802 |
+| carry gather routes (`G`) | `ea04513b…539ab` | unchanged | — |
+
+Cost: stress-30 mean tick 0.41–0.63 → 0.71–0.85 ms (look-ahead + 0.5 s decisions; `walk_to.step` ≈ 2×), max tick
+exact 99–113 ms (tick 5), corridor 83–95 ms (a failing `routeAround` decision, ~90 ms, falls back to the exact planner);
+the test's bounds (≤ 250 / ≤ 120 ms) hold. Flagship rehearsal compute +10–25 % (loaded host).
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
