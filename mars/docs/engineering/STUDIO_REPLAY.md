@@ -121,7 +121,8 @@ Code: `app/studio/chapter-set.ts` (`ChapterSetReplay`), `chapter-set.worker.ts` 
   If the clock reaches a chapter that is not loaded (a jump, or prefetch not done), it holds at the boundary
   ("Loading chapter D2…") and goes on when it is in.
 - **Engine camera per chapter.** The camera is the chapter's own planned shot list (`camera` of its file), sampled at the
-  local time plus the datum offset. The camera picker and Direct camera are not offered for a set (they act on one take).
+  local time plus the datum offset, with the shot hold at high speed (W48, below). The camera picker is not offered for a
+  set; Direct camera acts on the chapter on screen (W48, below).
 - **Log on the set clock.** Every chapter's log (`takeLog(take, steps, { at: from·dt, clock })`) is on the set clock,
   including a merged wait's "until" (h:mm:ss.s). At D0's start the log still shows A's last lines. The Diagnostics totals
   cover the whole set once every chapter has been read (until then "(n / 7 chapters read)"). A+B totals: 0 violations,
@@ -146,6 +147,80 @@ worker's whole-set checks (7 chapters read, then the phase-B plan and the final 
 seam (1 s warm-up): 17.7 fps, frame mean 56.8 / p95 66.7 / **max 66.8 ms**; the frames around the seam 50–66.7 ms; the
 swap's own redraw 2.6 ms; D0 was prefetched (36 ms fetch + parse) and D1 prefetched inside the window (20 ms + 1 ms);
 64.6 take-s per wall-s. Redraw mean 1.21 ms (sampleTake 0.34 ms).
+
+### Chapter sets: shot hold, gait across seams, Direct camera (W48)
+
+Code: `app/studio/chapter-set.ts` (`HOLD_S`, `holdNext`, `holdSeg`, `walkOffsets`, `setDirected`, `withTrack`),
+`app/engine-view/take-walk.ts` (`walkCum`, `walkTotals`), `take-replay.ts` (`TakePeople.setTake(take, walkOffsets)`,
+`gait()`), `chapter-set.worker.ts` (posts `walked`), `chapter-panel.tsx`, `direct-panel.tsx` (`DirectClock`),
+`take-host.ts`. Spec: `e2e/studio-build.spec.ts` (the last three tests).
+
+**Shot hold (the rule).** W39's chapter cameras cut every 12–90 s (mean 45–54 s), so at 64× a shot lasts 0.2–1.4 s on
+screen. The set player now shows each engine-camera shot for at least **`HOLD_S` = 1.5 wall seconds**; the world keeps
+its speed. In set seconds, with span = 1.5 × speed (96 s at 64×):
+- The chain starts at the **anchor**: the set time of the last seek (scrubber, chapter bar, a moment) or speed change.
+  Play / pause and the clock advancing do not move it; waiting for a chapter does not matter (the chain is in set time).
+- A displayed shot starts at d with the planned shot there (entered at its own time, so its camera is exactly the
+  planned one) and lasts until **r = min(duration, max(planned end, d + span))**. The next starts at r with the planned
+  shot at r. Shots wholly inside a hold are skipped.
+- Held past its planned end, the camera keeps **that shot's last pose** (locked off) while the build goes on. The
+  panel's shot line then ends in "· held".
+- A planned end is clamped to its chapter's end. A hold may run over a seam: the first ≤ span s of the next chapter
+  are then seen through the previous chapter's last pose (same site and datum; chapter k − 1 is still loaded).
+- **Deterministic** given the speed and the anchor: `holdNext` is pure, and the camera at T is a function of (anchor,
+  speed, T). A shot at least span long is shown exactly as planned. So at 1×–16× (every shot ≥ 12 s ≥ 1.5 × 8) the
+  camera is the planned one. People's poses never depend on the hold.
+- "Hold shots ≥ 1.5 s" (checkbox beside Engine camera, on by default) turns it off. The directed track of a chapter
+  (below) is not held.
+
+Measured (`studio-build.spec.ts` "shot hold", 64× for 60 s wall from 384 set-s before the A → D0 seam, headless
+SwiftShader, 63–64 set-s per wall-s):
+
+| | shots on screen | mean on screen | min | p10 | max |
+| --- | --- | --- | --- | --- | --- |
+| planned camera (hold off) | 89 | 0.67 s | 0.17 s | 0.20 s | 1.43 s |
+| shot hold | **41** | **1.50 s** | **1.47 s** | 1.47 s | 1.57 s |
+
+(The gated run; a first run gave 89 / 0.68 / 0.15 and 40 / 1.50 / 1.47 / max 1.68: the count and the extremes move by a frame
+with the frame timing.) The sequence of shots on screen equals the chain the spec computes from the anchor with the rule restated in the spec
+(not imported). The spec also pauses inside a hold tail and captures it (`studio-build-set-hold-held.png`: D0, 16 set-s past the planned end of "carry …-e87192d2-p1-stock to the cutting
+station — m1 m2"; m1 is still in frame, at its left edge, by the cutting table).
+
+**Leg phase across a seam.** The Walk clip's phase is a pure function of the metres walked (`walkT = metres /
+walkSpeed mod clip length`, humans.ts). W37 counted each chapter from 0, so a walker's legs jumped at a seam. Now
+`TakePeople.setTake(take, walkOffsets)` adds, per walker, the metres walked in chapters 0 … k − 1 (`walkTotals`, one
+helper shared with `TakePeople`'s own odometer, so the sums are bit-identical). Totals come from each loaded chapter
+and from the worker (every chapter's `walked`). Offsets are summed in chapter order, so they do not depend on how a
+chapter was reached. Until every earlier chapter's totals are known (a jump before the worker has read them), the clock
+holds ("Reading the walks of the chapters before D2…"). Poses stay a function of T only.
+
+Measured (`studio-build.spec.ts` "seams": every person at set time seam − 0.1 ms, the last frame of chapter k − 1,
+against the seam, the first frame of chapter k; leg phase = the renderer's formula from `TakePeople.gait()`):
+
+| seam | people | walking (weight > 0) | max leg-phase jump, W37 (restart at 0) | W48 (carried) |
+| --- | --- | --- | --- | --- |
+| A → D0 | 6 | m2 (sets off on the seam tick) | 0.447 | **0** |
+| D0 → D1 | 6 | m4 | 0.471 (m4: 0.373) | **0** |
+
+The walked metres agree to the millimetre either side (m2 3426.123 m, m4 654.373 m).
+
+**Direct camera for a set.** The Direct-camera panel is under the set transport. It acts on **the chapter on screen**:
+- The summary reads "Direct camera · chapter D2", and a note at the top of the form says so in full: "Applies to chapter
+  4/7 · D2: roof deck — … Directions compile against D2's take, with D2's own times (now 0:45:28 in); the track plays
+  while D2 is on screen; Save track adds it to D2's file (year-build-2022-east-house-ab-d2.json)."
+- "at the current time" is the chapter's local time ("at 2728.8 s of D2").
+- **Compute** runs `directForTake` on that chapter's file: world = its final state, sampler = its take, the year-build
+  camera scene.
+- **Play directed track** jumps to the first directed shot in that chapter and drives the camera with the track while
+  that chapter is on screen. Other chapters play their own (held) cameras. The shot line reads "Directed (D2): …".
+- **Save track** → `withFileCamera(D2's file, track)` → a download named like D2's file (the shipped file byte-for-byte
+  plus `cameras`). The loaded chapter carries it, also after it is dropped and read again on this page.
+- **Back to the take's camera** restores the planned / held camera.
+
+Tested: a medium `hold` on crew member m1 at the D2 roof-deck relay (local 2728.8 s, 20 s). One shot, "builder 1",
+readability min 1 / mean 1, 0 invalid, simulated valid, no correction. The `directCamera` call took 5.6 s (panel meta;
+6.0 s click → shot list), against 17–35 ms for the flagship's close hold: D2 is a 5 367 s take with 220 tracked
+entities. `studio-build-set-direct-{panel,hold}.png`.
 
 ### Prone receivers in a take (W37)
 
@@ -345,13 +420,26 @@ regression fixture.
   But the capture at 4 s (`studio-direct-playing.png`) still shows a bystander's head large in the lower centre of the
   frame. The rule measures cover of the subject's frame region and accepts a bystander who is big in the frame without
   covering the crew's points.
-- **Chapter sets (W37).** (1) The gait phase restarts at a seam for anyone walking across it: each chapter's walked
-  distance starts at 0 (a one-frame leg-phase jump; seams are plan barriers, so the crew is normally standing). (2) The
+- **Chapter sets (W37).** (1) ~~The gait phase restarts at a seam~~: carried across since W48. (2) The
   option's chapter words come from a head-noun rule tuned on the A+B labels; another set's labels may read less well.
-  (3) Direct camera and the camera picker are off for a set. (4) A jump into a chapter not yet parsed keeps the old frame
+  (3) ~~Direct camera is off for a set~~ (W48: on the chapter on screen); the camera picker still is. (4) A jump into a chapter not yet parsed keeps the old frame
   for the fetch (≈ 20–40 ms here); on a slow network the clock would hold at the seam ("Loading chapter …"). (5) The
   captures are with the panel open: it covers the lower ≈ 20 % of the engine camera's frame (the D2 relay's giver on the
   first-floor deck is at the panel's top edge).
+- **Chapter sets (W48).**
+  - **Hold tails are locked off.** While a shot is held past its planned end, the camera stays at the shot's last pose
+    and the working people may walk out of frame. At 64× a tail lasts up to 84 set-s (1.3 wall-s).
+  - **The walk weight still steps at a seam.** The Walk weight comes from a ±0.15 s speed window, which is clamped at
+    each take's edge. At a seam it sees one side only: m2 reads 0 on A's last frame and 0.96 on D0's first. The leg
+    phase is continuous; the blend into walking is one frame late.
+  - **The hold is the set's.** A single take played at 64× still cuts at every planned shot.
+  - **Offsets after a jump need the worker.** A jump deep into a set before the worker has read the earlier chapters
+    holds the clock until it has (≈ 3 s after opening here).
+  - **Direct camera compiles on the main thread.** Against a chapter take, `directCamera` took 5.6 s for one 20 s hold
+    (D2: 5 367 s, 220 entities), and the page does not redraw meanwhile. Not profiled; a worker or a sampler cropped to
+    the directed window are the obvious fixes.
+  - **The directed track is not held**, and the Camera picker is not offered for a set: a saved track is played
+    through the panel, not picked.
 - **Worst-sample captures of take-less tracks** use the orbit camera at the sample's pose with the studio fov, not the
   track fov.
 

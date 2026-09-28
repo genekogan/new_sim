@@ -4,9 +4,22 @@
 // `engine_direct_camera` op runs, phase 2 self-correction on). It shows the shot list, per shot the corrections
 // with their reasons (or the refusal with its candidates), and plays the directed track with the engine camera.
 // No natural-language parsing in this tranche.
+// For a chapter set (W48) it acts on the chapter on screen: `scope` names that chapter, times are its own (local), the
+// directed track plays while that chapter is on screen and "Save track" adds it to that chapter's file.
 import { useRef, useState } from 'react';
-import type { TakeReplay } from '../engine-view/take-replay.ts';
 import type { TakeHost } from './take-host.ts';
+
+/**
+ * What the panel directs: the take time directions start at (a set: the chapter's local time), play state, whether the
+ * directed track drives the camera, and for a set the chapter it applies to (`scope`: shown at the top of the panel).
+ */
+export type DirectClock = {
+  t: number;
+  playing: boolean;
+  directedOn: boolean;
+  setPlaying: (on: boolean) => void;
+  scope?: { chapter: string; text: string } | null;
+};
 
 const KINDS = ['entity', 'assembly', 'region', 'group'] as const;
 const VERBS = ['orbit', 'pan', 'tilt', 'dolly', 'crane', 'push_in', 'pull_out', 'fly_through', 'hold'] as const;
@@ -55,7 +68,7 @@ function direction(f: Form, t: number): Record<string, unknown> {
   };
 }
 
-export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay: TakeReplay; onChange: () => void }) {
+export function DirectPanel({ host, clock, onChange }: { host: TakeHost; clock: DirectClock; onChange: () => void }) {
   const [form, setForm] = useState<Form>(INITIAL);
   const [json, setJson] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,7 +77,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
   const box = useRef<HTMLDetailsElement>(null);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const directed = host.directed();
-  const playing = !replay.trackInfo().own;
+  const playing = clock.directedOn;
 
   const list = (): unknown[] => {
     if (!json.trim()) return [];
@@ -73,7 +86,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
   };
   const add = (replace: boolean) => {
     try {
-      const d = direction(form, replay.t);
+      const d = direction(form, clock.t);
       setJson(JSON.stringify(replace ? [d] : [...list(), d], null, 1));
       setError('');
     } catch (e) {
@@ -84,7 +97,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
     let dirs: unknown[];
     try {
       dirs = list();
-      if (!dirs.length) dirs = [direction(form, replay.t)];
+      if (!dirs.length) dirs = [direction(form, clock.t)];
       setJson(JSON.stringify(dirs, null, 1));
     } catch (e) {
       return setError(`Directions JSON: ${(e as Error).message}`);
@@ -106,7 +119,8 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
   const res = directed?.result;
   return (
     <details className="take-direct" ref={box}>
-      <summary>Direct camera{directed ? ` · ${res?.ok ? `${res.report.shots.length} shot${res.report.shots.length === 1 ? '' : 's'}` : 'refused'}` : ''}{playing ? ' · playing the directed track' : ''}</summary>
+      <summary>Direct camera{clock.scope ? ` · chapter ${clock.scope.chapter}` : ''}{directed ? ` · ${res?.ok ? `${res.report.shots.length} shot${res.report.shots.length === 1 ? '' : 's'}` : 'refused'}` : ''}{playing ? ' · playing the directed track' : ''}</summary>
+      {clock.scope && <p className="direct-scope" role="note" aria-label="Direct camera applies to">{clock.scope.text}</p>}
       <div className="direct-form" role="group" aria-label="Direction builder">
         <label>Subject<select aria-label="Subject kind" value={form.kind} onChange={(e) => set('kind', e.target.value as Form['kind'])}>{KINDS.map((k) => <option key={k}>{k}</option>)}</select></label>
         <input aria-label="Subject" value={form.ref} onChange={(e) => set('ref', e.target.value)} placeholder="rack bay · chiba · carryA · p1" />
@@ -114,7 +128,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
         {(form.verb === 'orbit' || form.verb === 'pan' || form.verb === 'tilt') && <label>°<input aria-label="Degrees" type="number" value={form.degrees} onChange={(e) => set('degrees', e.target.value)} /></label>}
         {DIRS[form.verb] && <select aria-label="Direction" value={form.dir} onChange={(e) => set('dir', e.target.value)}><option value="">default</option>{DIRS[form.verb].map((d) => <option key={d}>{d}</option>)}</select>}
         <label>Duration s<input aria-label="Duration" type="number" min={0} value={form.duration} onChange={(e) => set('duration', e.target.value)} placeholder="auto" /></label>
-        <label><input type="checkbox" aria-label="Start at the current time" checked={form.atNow} onChange={(e) => set('atNow', e.target.checked)} />at {r1(replay.t)} s</label>
+        <label><input type="checkbox" aria-label="Start at the current time" checked={form.atNow} onChange={(e) => set('atNow', e.target.checked)} />at {r1(clock.t)} s{clock.scope ? ` of ${clock.scope.chapter}` : ''}</label>
         <label>Framing<select aria-label="Framing" value={form.size} onChange={(e) => set('size', e.target.value)}><option value="">auto</option><option>wide</option><option>medium</option><option>close</option></select></label>
         <select aria-label="Side" value={form.side} onChange={(e) => set('side', e.target.value)}><option value="">any side</option>{SIDES.map((s) => <option key={s}>{s}</option>)}</select>
         <label><input type="checkbox" aria-label="Sun behind" checked={form.sunBehind} onChange={(e) => set('sunBehind', e.target.checked)} />sun behind</label>
@@ -130,7 +144,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
         {res?.ok && (
           <button onClick={() => {
             host.playDirected(!playing);
-            replay.playing = !playing;
+            clock.setPlaying(!playing);
             if (!playing && box.current) box.current.open = false; // fold the form away: the shot needs the view
             onChange();
           }}>

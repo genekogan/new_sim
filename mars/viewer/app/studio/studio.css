@@ -1167,6 +1167,10 @@
   color: #cfe3b0;
   margin: 6px 0 0;
 }
+.direct-scope {
+  margin: 4px 0 6px;
+  color: #f0d9a0;
+}
 .take-camera-track select {
   max-width: 230px;
 }

@@ -28,6 +28,8 @@ export function createTakeHost(
   let hidden: string | null = null;
   let checks: TakeChecks | null = null;
   let directed: Directed | null = null;
+  /** Chapter the directed track was compiled against (a set), else null. */
+  let directedChapter: { k: number; id: string; label: string; url: string } | null = null;
   let driving = false;
   // a chapter set ("Watch it being built" of a long build, STUDIO_REPLAY.md "Chapter sets: playback")
   let setReplay: ChapterSetReplay | null = null;
@@ -130,6 +132,7 @@ export function createTakeHost(
     entry = null;
     checks = null;
     directed = null;
+    directedChapter = null;
     if (hidden) opts.hideAssembly(hidden, false);
     hidden = null;
     if (!replay) return;
@@ -168,14 +171,24 @@ export function createTakeHost(
      * `play`: drive the engine camera with the directed track from its first shot.
      */
     async direct(directions: unknown[], o: { correct?: boolean; datetime?: string } = {}) {
-      const r = replay;
-      if (!r) return null;
+      const r = replay, sr = setReplay;
+      // a chapter set: the chapter on screen (its take, its local times; the track plays within that chapter)
+      const ch = !r && sr ? sr.chapterFile() : null;
+      const file = r?.file ?? ch?.file;
+      if (!file) return null;
       const { directForTake } = await import('./direct-camera.ts');
-      const d = await directForTake(r.file, directions, o);
-      if (replay === r) { directed = d; changed(); }
+      const d = await directForTake(file, directions, o);
+      if (replay === r && setReplay === sr) {
+        directed = d;
+        directedChapter = ch ? { k: ch.k, id: ch.id, label: ch.label, url: ch.url } : null;
+        sr?.setDirected(null);
+        changed();
+      }
       return d;
     },
     directed: () => directed,
+    /** For a set: the chapter the directed track belongs to (compiled against its take), else null. */
+    directedChapter: () => directedChapter,
     /**
      * The replay bar's camera picker: every track the take file carries (planned first, then `cameras` in id order)
      * plus the directed track compiled on this page when it is not saved in the file yet.
@@ -211,6 +224,11 @@ export function createTakeHost(
      */
     saveDirected(): { name: string; json: string; trackId: string; cameras: string[] } | null {
       const d = directed?.track;
+      if (setReplay && directedChapter && d) {
+        const f = setReplay.withTrack(directedChapter.k, d);
+        changed();
+        return { name: directedChapter.url.split('/').pop() ?? `${f.take.id}.json`, json: JSON.stringify(f), trackId: d.id, cameras: Object.keys(f.cameras ?? {}) };
+      }
       if (!replay || !entry || !d) return null;
       const f = replay.withTrack(d);
       changed();
@@ -218,6 +236,17 @@ export function createTakeHost(
     },
     /** Drive the engine camera with the directed track (true) or the take's own (false). */
     playDirected(on: boolean) {
+      if (setReplay) {
+        // the directed track plays within its chapter: go there (its first shot) and drive the camera while it is on screen
+        const c = directedChapter;
+        if (on && c && directed?.result.ok && directed.track) {
+          setReplay.seek(setReplay.startOf(c.k) + (directed.result.report.shots[0]?.t0 ?? 0));
+          setReplay.setDirected(directed.track, c.k);
+          setReplay.engineCamera = true;
+        } else setReplay.setDirected(null);
+        changed();
+        return;
+      }
       if (!replay) return;
       replay.setTrack(on && directed?.track ? directed.track : null);
       if (on && directed?.result.ok) {
