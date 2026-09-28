@@ -743,3 +743,5 @@ Then: gate → release 5; HANDOFF refresh.
   always comes straight up. The plan-time sweep samples every 5 cm of motion (the per-tick test sweep covers the
   ticks). No pinned scenario exercises a kneeling rise past joist ends, so the change is covered only by the
   handup.test.ts fixtures.
+- **W30 landed** `166b0d4`, `32a85ec`, `c5afddd` (≈180k tokens, 45 min; merged from `w30-kneel-sweep`): the hand-off corridor search now sweeps the kneeling receivers' rise against everything (load goes straight up outside the joist ends, then in); `handup.rise-blocked` for kneelers naming the member (+ forklift variant "present it clear of it"); `finishPlan` sweeps take/rise/feed-in; tests sweep every held tick (2.4 m green test 0 intersections, was 4 ticks through j1; +2 regressions). v3 pin unchanged (39a0fb3f @16374 — v3's loads are raised to slide height by the givers); `perf-walk.mjs` v3 pin was stale, fixed; full year-build set 8/8 green (A+B ddb634d6 @600599). 373 / 370 / 3 skip. Lead review: accepted.
+- W32 spawned (engine handup/body): prone model = measured rig (W29's numbers), lying heading, beyond-lip check, `phaseK`.
