@@ -207,6 +207,17 @@ export class Spatial {
     return this.grids.levels.get(id);
   }
 
+  /**
+   * Grids of `scene`, a variant of the synced scene (same bounds, the base obstacles leading, some
+   * obstacles removed or appended, any subset of its levels), patched from the synced grids by
+   * updateGrids — bit-identical to `buildGrids(scene, cell)` (grid-incremental.test.ts); a full
+   * build when the diff is not a pure add / remove. Call after sync(world).
+   */
+  gridsFor(scene: SpatialScene): GridSet {
+    const run = () => updateGrids(this.grids, this.scene, scene, this.cell, this.raster) ?? buildGrids(scene, this.cell, this.raster);
+    return this.prof ? this.prof.time('spatial.gridsFor', run) : run();
+  }
+
   private aroundCache = new Map<string, { scene: SpatialScene; grids: GridSet }>();
   /**
    * Grids of the current scene with the given standing people added as soft obstacles (for

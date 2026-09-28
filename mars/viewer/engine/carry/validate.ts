@@ -6,7 +6,7 @@ import type { Diagnostic, PlanResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import { entityFootprint, type Spatial } from '../spatial/service.ts';
-import { buildGrids, clearanceAt, nearestBlocker, type LevelGrid } from '../spatial/grid.ts';
+import { clearanceAt, nearestBlocker, type GridSet, type LevelGrid } from '../spatial/grid.ts';
 import { findRoute, type Route } from '../spatial/path.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { carrierSpots, CARRIER_RADIUS, checkCrew, entityFrame, formationFor, laidPose, REACH, shortName as shortNameOf, type Formation, type SE2 } from './formation.ts';
@@ -105,14 +105,14 @@ export function laidIssue(sp: Spatial, f: Formation, q: SE2, level: number, leve
 function gatherRoutes(sp: Spatial, item: Entity, people: Entity[], f: Formation, pickup: SE2, halfW: number, level: number, levelY: number): { ok: true; approach: Vec2[]; gather: (Route | null)[] } | { ok: false; diagnostic: Diagnostic } {
   const approach = carrierSpots(f, pickup, halfW);
   const gather: (Route | null)[] = [];
-  let aug: ReturnType<typeof buildGrids> | null = null;
+  let aug: GridSet | null = null;
   for (let i = 0; i < people.length; i++) {
     const e = people[i];
     const at: Vec2 = [e.pose.p[0], e.pose.p[2]];
     if (dist2(at, approach[i]) < 0.05) { gather.push(null); continue; }
     const fp = entityFootprint(item);
     const scene = { ...sp.scene, levels: sp.scene.levels.filter((l) => l.id === level), links: [], obstacles: [...sp.scene.obstacles.filter((o) => o.id !== item.id), { id: item.id, obb: fp.obb, y0: levelY, y1: levelY + 1, kind: 'component' as const }] };
-    aug ??= buildGrids(scene, sp.cell);
+    aug ??= sp.gridsFor(scene); // the synced grids with the item's footprint patched in (bit-identical to buildGrids)
     const rr = findRoute(aug, scene, HUMAN_PROFILE, { level, p: at }, { level, p: approach[i] }, { goalTolerance: 0.5 });
     if (!rr.ok) return bad({ ...rr.diagnostic, code: 'carry.gather-unreachable', message: `${e.id} cannot reach grip ${f.carriers[i].slot} of ${item.id} at ${fmt(approach[i][0], approach[i][1])}: ${rr.diagnostic.message}`, subjects: [e.id, item.id] });
     gather.push(rr.route);
@@ -151,7 +151,7 @@ export function planCarryAction(rt: Runtime, p: CarryParams): PlanResult<CarryPr
   const levelY = g.y;
   // a tall-lying item would block its own pickup in the grid: plan on a grid without it
   const own = sp.scene.obstacles.find((o) => o.id === item.id);
-  if (own && own.y1 > levelY + 0.22) g = buildGrids({ ...sp.scene, levels: sp.scene.levels.filter((l) => l.id === level), obstacles: sp.scene.obstacles.filter((o) => o.id !== item.id) }, sp.cell).levels.get(level)!;
+  if (own && own.y1 > levelY + 0.22) g = sp.gridsFor({ ...sp.scene, levels: sp.scene.levels.filter((l) => l.id === level), obstacles: sp.scene.obstacles.filter((o) => o.id !== item.id) }).levels.get(level)!;
   const f = formationFor(item.def, p.crew.length);
   const lie = entityFrame(item);
   // pickup: the crew may lift facing either way along the load

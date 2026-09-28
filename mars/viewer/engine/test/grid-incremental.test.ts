@@ -19,6 +19,16 @@ import { scenarioByName, buildRuntime } from '../../app/lab/scenarios.ts';
 import { readCampus2026File } from '../campus/node.ts';
 import { cropScene } from '../campus/load.ts';
 import { CAMPUS_ID, loadCampus2026 } from '../campus/world.ts';
+import { Runtime } from '../runtime/runtime.ts';
+import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
+import { human, component } from '../world/factory.ts';
+import { walkTo } from '../locomotion/walk.ts';
+import { carry } from '../carry/actions.ts';
+import { CARRY_INVARIANTS } from '../carry/invariants.ts';
+import { carryCorridors } from '../carry/scenes.ts';
+import { hashOf } from '../core/hash.ts';
+import type { ActionDef } from '../actions/types.ts';
+import type { Entity } from '../world/types.ts';
 
 /** Throws naming the first difference between two grid sets (level order, dims, free, clearance bits, blockers). */
 function assertSameGrids(a: GridSet, b: GridSet, what: string) {
@@ -240,4 +250,61 @@ test('Spatial.sync patches === full rebuild at every construction step: campus f
     assert.equal(reh.take.finalStateHash, 'b159317e293797dd93c54a28c288feeff28ddfafcb421252c8686ae02c0c0bda', 'campus flagship hash unchanged');
   });
   assert.ok(n > 300, `${n} rebuilds checked`);
+});
+
+// ---------------------------------------------------------------------------------------------
+// carry/validate.ts: the approach-route grids (item as a 1 m obstacle) and the pickup grid (a tall
+// item left out) are patched from the synced grids by Spatial.gridsFor instead of rebuilt
+
+/** Runs `fn` with every Spatial.gridsFor result compared with a from-scratch buildGrids of its scene. */
+function checkingGridsFor(fn: () => void): { calls: number; patched: number } {
+  const proto = Spatial.prototype;
+  const orig = proto.gridsFor;
+  const out = { calls: 0, patched: 0 };
+  proto.gridsFor = function (this: Spatial, scene: SpatialScene) {
+    const got = orig.call(this, scene);
+    out.calls++;
+    const self = this as unknown as { raster: StaticRaster; grids: GridSet; scene: SpatialScene };
+    if (updateGrids(self.grids, self.scene, scene, this.cell, self.raster)) out.patched++;
+    assertSameGrids(got, buildGrids(scene, this.cell, new StaticRaster(this.base.obstacles, this.base.bounds, this.cell)), `gridsFor ${out.calls}`);
+    if (this.base.obstacles.length < 200) assertSameGrids(got, buildGrids(scene, this.cell), `gridsFor ${out.calls} (plain)`);
+    return got;
+  };
+  try {
+    fn();
+  } finally {
+    proto.gridsFor = orig;
+  }
+  return out;
+}
+
+test('Spatial.gridsFor === buildGrids for every carry plan (gather routes, tall pickup), and the routes it yields are unchanged', () => {
+  const REG = new Map<string, ActionDef>([['walk_to', walkTo], ['carry', carry]]);
+  const setup = (...es: Entity[]) => new Runtime(addAll(emptyWorld('carry-test', carryCorridors()), ...es), REG, { spatial: new Spatial(carryCorridors()) }, [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS]);
+  const gathers: string[] = [];
+  const gatherOf = (rt: Runtime, id: string) => hashOf((rt as unknown as { live: Map<string, { program: { gather: unknown } }> }).live.get(id)!.program.gather);
+  const res = checkingGridsFor(() => {
+    // corner run (2 carriers, 12 ft beam), with a stack beside the path, and a standing upright (tall pickup)
+    for (const extra of [[], [component('stack', '2x4-8ft', [12, 0, 4], 0)]]) {
+      const rt = setup(component('b1', 'beam-12ft', [4, 0, 4], 0), human('p1', 2, 6.5), human('p2', 6, 1.5), ...extra);
+      const a = rt.submit('carry', { crew: ['p1', 'p2'], item: 'b1', to: { x: 18, z: 11, yaw: Math.PI / 2 } });
+      assert.equal(a.status, 'executing', a.diagnostic?.message);
+      gathers.push(gatherOf(rt, a.id));
+    }
+    const rt = setup(component('u8', 'upright-8ft', [4, 0, 4], 0), human('p1', 2, 6.5), human('p2', 6, 1.5));
+    const a = rt.submit('carry', { crew: ['p1', 'p2'], item: 'u8', to: { x: 18, z: 11, yaw: Math.PI / 2 } });
+    gathers.push(`${a.status}:${a.diagnostic?.code ?? gatherOf(rt, a.id)}`);
+    // the build-bay probe: 13 carries on open ground
+    const h = new WorldHistory(BUILD_BAY_RULES);
+    h.publishCanonical('canon', 'open ground', addAll(emptyWorld('open-ground', buildBayGround()), ...buildBayEntities(BUILD_BAY_SITE)), 'probe');
+    h.fork('canon', 'ws', 'ws');
+    const plan = bindTemplate(buildBayTemplate(BUILD_BAY_SITE), buildBayBindings, { history: h, baseline: 'ws', registry: buildBayRegistry() });
+    const r = rehearse(h, 'ws', plan, { registry: buildBayRegistry(), invariants: BUILD_BAY_INVARIANTS, services: () => ({ spatial: new Spatial(buildBayGround(), { contributors: BUILD_BAY_CONTRIBUTORS }) }) });
+    assert.equal(r.take.finalStateHash, '79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129', 'determinism probe hash unchanged');
+  });
+  console.log(`  gridsFor: ${res.calls} calls, ${res.patched} patched`);
+  // gather routes as planned on the former whole-grid buildGrids (measured before the switch)
+  const G = '8b5ab468c0d586b1ec373a6f88b9e1903c969ff80dfd5ece869be56b70f125f8';
+  assert.deepEqual(gathers, [G, G, 'failed:carry.target-blocked'], 'gather routes unchanged');
+  assert.ok(res.calls >= 15 && res.patched === res.calls, `${res.patched}/${res.calls} patched`);
 });
