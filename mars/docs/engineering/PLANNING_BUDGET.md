@@ -51,6 +51,52 @@ A walker whose remaining corridor was invalidated replans only within the tick's
   The same 6 walkers replan, with 0 violations.
 - **Existing scenarios** peak at 1 construction replan per tick, so the budget never binds there.
 
+## 4. Region-local grid updates on construction (`spatial/grid.ts` `updateGrids`)
+Every construction step changes a few components, and `Spatial.sync` used to rebuild every level:
+re-raster all surfaces and dynamic obstacles, then a full EDT. On the campus crop (800 × 800 cells, 2,696 prisms)
+that is ~34 ms per sync: ~19 ms rasterising the ground surface, ~15 ms EDT, plus a 70k-entry `blockers` map.
+- **Diff:** the new scene's obstacles (after the `StaticRaster` base prefix) and surfaces are diffed against
+  the previous scene by id + raster geometry. Reordered shared obstacles or repeated keys make it
+  fall back to a full rebuild (the first covering obstacle names a cell's blocker).
+- **Raster:** each level re-rasterises only the cell rectangles of the removed and added items, with the same
+  rule and list order (`stampLevel` clipped). An untouched level keeps its `LevelGrid` object, so the corridor
+  planner's coarse grids stay memoised. A new level (a deck appearing) or a level whose height moved is built in full.
+- **Clearance, exact on a window:** the column pass is kept per level (`keepColumns`) and redone only on columns
+  whose free bit flipped. The row pass is redone only on rows that can change: a cell outside the changed box
+  grown by r keeps its distance when the largest old distance on that ring is < r. The old distance is
+  1-Lipschitz, and its old nearest blocked cell is neither freed nor beaten. r grows until the bound holds.
+  Squared distances are exact integers, so the patch equals the full EDT bit for bit.
+  `gridsWithObstacles` (people for `routeAround`) uses the same window.
+- **`blockers`** is a `BlockerMap`: a `Map<number, string>` stored as an Int32Array index into an id table.
+  A patch copies it with one memcpy instead of rebuilding a 70k-entry Map. It is still read with get / has, and iterates in cell order.
+- **Semantics:** `epoch` still bumps on every change, so the `narrow()` and `gridsAround` caches are still keyed by it.
+  `new Spatial(base, { incremental: false })` restores the full rebuild.
+
+**Proof (`engine/test/grid-incremental.test.ts`):**
+- 240 seeded random scenes × 5 chained edits (insert/remove/move obstacles, overhead and sub-step bands,
+  rotated boxes, boxes past the edge, deck sheets that create levels, ground resize, with and without prefix).
+  Every patch is compared with a full `buildGrids`: identical `free` bytes, `clearance` float32 bits,
+  `blockers` entries and level order. All 1,200 patch.
+- 600+ people overlays via `gridsWithObstacles`, windowed and full, compared the same way.
+- Every one of the 378 + 378 rebuilds of the build-bay probe run, the lab `construction` scenario and the
+  campus flagship is checked against a from-scratch build, with both pinned hashes asserted.
+- Mutation check: breaking the ring bound (skipping the loop, or under-estimating by 1.5 cells) fails the random test.
+
+| per-sync grid rebuild (378 per run), node 26, M3 Max, loaded host | before | after |
+| --- | ---: | ---: |
+| build-bay probe, open ground 35 × 30 m: mean / max | 5.8 / 9–11 ms | 0.7 / 5.5 ms |
+| probe total rehearsal | 6.0 s | 4.1 s |
+| campus flagship (80 m crop): mean excl. first build | 34.9 ms | 1.9 ms (first full build ~200 ms, unchanged) |
+| campus flagship: rebuilds total / rehearsal compute | 13.4 s / 22.5 s | 0.9–1.3 s / 9.9–11.8 s |
+| stress-30 tick mean / max | 0.69–0.72 / 132–177 ms | 0.65–0.67 / 131–132 ms |
+
+Hashes unchanged: probe `79447f750779…96129`, stress-30 `e55d3ee17dd5…8e989`, campus flagship
+`b159317e2937…c0bda`. The `f60e10b4…` campus hash below predates the walk.ts re-pin: the tree before this
+change already printed `b159317e…`, the manifest hash in `RELEASE_CHECKLIST.md`.
+**Remaining sync cost:** the navigation key itself (`hashOf` over the static entities on each of ~35k sync calls):
+~2 s per flagship or probe run, now larger than the grid work. `carry/validate.ts` still does a whole-grid
+`buildGrids` of the scene minus the carried item.
+
 ## Hashes: before = after, no changes
 Probe / flagship build-bay `d54eca7c402a…0f610`; campus flagship `f60e10b461dd…4c182`; lab stress-30
 `a6e42f5c6bfb…0e26c` (now pinned in `planning.test.ts`); the other 8 lab scenarios are unchanged too.
