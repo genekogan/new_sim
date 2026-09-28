@@ -69,6 +69,16 @@ export type HumanState = {
    * when speed ≥ 0.08 (locomotion/walk.ts WALK_MIN), a blocked walker is 'wait' with speed 0.
    */
   speed?: number;
+  /**
+   * Prone receiver only (construction/handup.ts, HANDUP.md "Prone receiver"): progress 0–1 within the current hand-up
+   * phase (lie-down, then each receiver phase), every tick from lie-down to the release; absent otherwise.
+   */
+  phaseK?: number;
+  /**
+   * Prone receiver only: world yaw of the lying body's axis (S → head, through the grip), from lie-down through
+   * kneel-up; `pose.yaw` keeps facing straight out over the edge (the lip PRONE_BACK ahead of `pose.p` along it).
+   */
+  proneYaw?: number;
 };
 
 export type Entity = {

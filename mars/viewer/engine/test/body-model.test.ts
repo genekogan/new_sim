@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dcos, dsin } from '../core/math.ts';
-import { BODY_MODEL as M, postureGap, bodyFrame, restHand, carryHand, shoulderPoint, chestPoint, mouthPoint, type Posture } from '../body/model.ts';
+import { BODY_MODEL as M, postureGap, proneAt, proneFrame, pronePoints, proneReachGap, bodyFrame, restHand, carryHand, shoulderPoint, chestPoint, mouthPoint, type Posture } from '../body/model.ts';
 import { human } from '../world/factory.ts';
 import type { Vec3 } from '../core/math.ts';
 
@@ -87,25 +87,62 @@ test('body model is internally consistent: overhead, caps vs envelopes, bands fr
   assert.ok(mouthPoint(b)[1] > M.shoulderHeight && mouthPoint(b)[1] < M.height);
 });
 
-test('prone receiver + rise (owner feedback §13): numbers derived from the rig, reach ≈ 1.0 m below the deck, bands consistent through the rise', () => {
+test('prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise', () => {
   const P = M.prone, R = M.rig, pz = P.posture;
-  // derivations (BODY_MODEL.md "Prone receiver")
-  assert.ok(Math.abs(P.overEdge - (R.torso * 2) / 3) < 1e-9, 'lower ribs on the lip: torso × 2/3 beyond it');
-  assert.equal(P.chest, M.chestFwd, 'lying flat the shoulder joints are chestFwd above the deck');
-  const lo = P.chest * dcos(P.tipMax * DEG) - P.overEdge * dsin(P.tipMax * DEG) - 2 * M.shrug;
-  assert.ok(Math.abs(pz.prone.lo - lo) <= 0.005, `prone shoulders bottom ${pz.prone.lo} = full tip + girdle (${lo.toFixed(4)})`);
-  assert.equal(pz.prone.hi, P.chest);
-  assert.ok(Math.abs(pz.prone.lean - (P.back + P.overEdge)) < 1e-9, 'shoulders at most overEdge past the lip');
+  // measured (W29, e2e/prone.spec.ts, POSES.md "Prone receiver"): chest 0.097 (punk) – 0.102 (woman); Torso joint →
+  // shoulders 0.27 / 0.19; tip joint 0.08 past the lip; lying hips 0.15; tipped 60° the shoulders −0.10 / −0.03 and the
+  // reach straight down 0.80 / 0.73 m. The model is the woman (the smaller): every template reaches what it allows.
+  assert.ok(P.chest >= 0.097 - 0.005 && P.chest <= 0.102 + 0.005, `chest ${P.chest}`);
+  assert.equal(P.overEdge, 0.19, 'tip joint → shoulders: the woman template');
+  assert.equal(P.tipPast, 0.08);
+  assert.equal(P.tipUp, 0.15);
+  assert.equal(P.girdle, 2 * M.shrug, 'the girdle reaches 2 × shrug (renderer GIRDLE 0.1)');
+  // the construction reproduces the measured tipped shoulders for both templates (within 1 cm)
+  const shoulderAtTip = (over: number, chest: number) => {
+    const dz = chest - P.tipUp, d = Math.sqrt(over * over - dz * dz);
+    return P.tipUp + dz * dcos(P.tipMax * DEG) - d * dsin(P.tipMax * DEG);
+  };
+  const woman = shoulderAtTip(0.19, 0.102), punk = shoulderAtTip(0.27, 0.097);
+  assert.ok(Math.abs(woman - -0.03) <= 0.01 && Math.abs(punk - -0.1) <= 0.01, `tipped shoulders woman ${woman.toFixed(3)} punk ${punk.toFixed(3)}`);
+  // reach straight down = shoulders + girdle + 0.97 × arm (the elbow never locks, as overhead): woman 0.73 = the cap
+  const reach = (sh: number) => -sh + P.girdle + 0.97 * M.armLength;
+  assert.equal(P.reachDown, Math.floor(reach(shoulderAtTip(P.overEdge, P.chest)) * 100) / 100);
+  assert.equal(P.reachDown, 0.73);
+  assert.ok(Math.abs(reach(woman) - 0.73) <= 0.02 && Math.abs(reach(punk) - 0.8) <= 0.02, `rig reach woman ${reach(woman).toFixed(3)} punk ${reach(punk).toFixed(3)}`);
+  assert.ok(reach(punk) - P.reachDown >= 0.06, 'punk / casual reach ≥ 6 cm more (slack)');
+  assert.ok(P.reachDown > M.reachDownBelowFeet + 0.2, 'prone reaches well below the kneel rule');
+  // the band: lo = tipped shoulders − girdle (rounded), hi = lying flat; the cylinder reaches past the cap straight down
+  assert.ok(Math.abs(pz.prone.lo - (shoulderAtTip(P.overEdge, P.chest) - P.girdle)) <= 0.005, `prone band bottom ${pz.prone.lo}`);
+  assert.ok(Math.abs(pz.prone.hi - (P.chest + P.girdle)) < 1e-9, 'lying flat + girdle');
+  assert.ok(M.armLength - pz.prone.lo >= P.reachDown, 'the cap binds before the envelope (as overheadMax)');
+  // exact geometry: lying straight out, S 0.35 m behind the lip, a hand straight below a shoulder reaches the cap and not 3 cm more
+  const out: [number, number] = [1, 0];
+  const fr = proneFrame(FEET, out, out);
+  assert.ok(Math.abs(fr.lip - P.back) < 1e-12 && fr.turn === 0 && fr.yaw === 0);
+  const sh = pronePoints(fr, P.tipMax).shoulders[1];
+  assert.ok(Math.abs(sh[1] - shoulderAtTip(P.overEdge, P.chest)) < 1e-9 && Math.abs(sh[2] - M.shoulderHalf) < 1e-9);
+  assert.ok(sh[0] - P.back > 0.1 && sh[0] - P.back < 0.15, `tipped shoulders ${(sh[0] - P.back).toFixed(3)} m past the lip`);
+  assert.ok(proneReachGap(fr, [sh[0], -P.reachDown, sh[2]], 'right').gap <= 0, 'reaches the cap below the shoulder');
+  assert.ok(proneReachGap(fr, [sh[0], -P.reachDown - 0.03 - P.girdle, sh[2]], 'right').gap > 0, '… not 3 cm below arm + girdle');
+  // 0.45 m past the lip (edgeReach) the shoulders still reach ≥ 0.6 m down (the tipped shoulders are 0.13 m past it)
+  const at45 = (y: number) => proneReachGap(fr, [P.back + P.edgeReach, y, M.shoulderHalf], 'right').gap <= 0;
+  assert.ok(at45(-0.6) && !at45(-0.72), '0.45 m out: 0.6 m down in reach, 0.72 not');
+  // a hand 0.3 m to the side of the axis is 0.15 m from the shoulder: turning (proneYaw) is what brings the axis to it
+  const side: Vec3 = [P.back + 0.2, -0.7, 0.45];
+  assert.ok(proneReachGap(fr, side, 'right').gap > 0, 'straight out, a hand 0.45 m to the side 0.70 m down: out of reach');
+  const turned = proneFrame(FEET, out, [dcos(30 * DEG), dsin(30 * DEG)]);
+  assert.ok(Math.abs(turned.turn - 30 * DEG) < 1e-12 && turned.lip > P.back / dcos(30 * DEG), 'the lip lies farther along a turned body');
+  assert.ok(proneReachGap(turned, side, 'right').gap <= 0, '… turned 30° toward it: in reach');
+  // the cylinder bounds the exact envelope over every allowed turn (what the per-tick invariant can check without it)
+  for (const tdeg of [-P.turnMax, -20, 0, 20, P.turnMax]) {
+    const f = proneFrame(FEET, out, [dcos(tdeg * DEG), dsin(tdeg * DEG)]);
+    for (let a = 0; a <= 1.6; a += 0.1) for (let sd = -0.6; sd <= 0.6; sd += 0.1) for (let y = -0.8; y <= 0.3; y += 0.1) {
+      const h = proneAt(f, a, sd, y);
+      if (proneReachGap(f, h, sd < 0 ? 'left' : 'right').gap <= 0 && -y <= P.reachDown) assert.ok(postureGap(pz.prone, FEET, h) <= 1e-9, `turn ${tdeg}° (${a.toFixed(1)}, ${sd.toFixed(1)}, ${y.toFixed(1)}) inside the exact reach, outside the cylinder`);
+    }
+  }
   assert.ok(P.back >= 0.28, 'S is standable: ≥ the spatial body radius (0.28 m) from the lip');
   assert.equal(P.edgeReach, M.reachDownOut);
-  // reach down: the envelope reaches exactly the stated cap straight below the shoulders (the cap binds), ≈ §13's 1.0 m
-  assert.ok(Math.abs(P.reachDown - (M.armLength - pz.prone.lo)) < 1e-9);
-  assert.ok(P.reachDown >= 0.9 && P.reachDown <= 1.0, `prone reach-down ${P.reachDown} ≈ 1.0 m`);
-  assert.ok(Math.abs(-deepest(pz.prone, P.back + 0.2) - P.reachDown) < 1e-6, 'envelope reaches the cap 0.2 m past the lip');
-  assert.ok(postureGap(pz.prone, FEET, [P.back, -P.reachDown - 0.02, 0]) > 0, '… and not 2 cm more');
-  assert.ok(P.reachDown > M.reachDownBelowFeet + 0.3, 'prone reaches well below the kneel rule');
-  // at the edge-reach limit (hands 0.45 m beyond the lip) still ≥ 0.9 m down
-  assert.ok(-deepest(pz.prone, P.back + P.edgeReach) >= 0.9, `${(-deepest(pz.prone, P.back + P.edgeReach)).toFixed(3)} m down 0.45 m past the lip`);
   // the rise: push-up (one straight arm on the deck) → kneel-up (knees, torso rising) → stand (bentOver)
   assert.deepEqual([pz.pushUp.lo, pz.pushUp.lean], [pz.prone.lo, pz.prone.lean], 'push-up starts from prone');
   assert.equal(pz.pushUp.hi, M.armLength, 'push-up tops out an arm above the deck');
@@ -116,9 +153,9 @@ test('prone receiver + rise (owner feedback §13): numbers derived from the rig,
   const H = P.hip;
   assert.ok(H.prone < H.pushUp && H.pushUp <= H.kneelUp && H.kneelUp < H.stand, 'hips rise monotonically');
   assert.deepEqual([H.pushUp, H.kneelUp, H.stand], [R.kneelHip, R.kneelHip, R.hip]);
-  // the body lying at the edge: lip → toes + over the edge + head fits a 1.75 m person
+  // the body lying at the edge: toes → lip, tip joint, torso and head fit a 1.75 m person
   assert.ok(Math.abs(P.bodyBack - (R.hip + 0.06 - (P.back - R.torso / 3))) < 1e-9);
-  assert.ok(P.back + P.bodyBack + P.overEdge + 0.25 <= M.height, 'lying body length ≤ height');
+  assert.ok(P.bodyBack + P.back + P.tipPast + P.overEdge + P.head.on + P.head.r <= M.height, 'lying body length ≤ height');
   // the deck hand (lying, pushing up) is inside every prone-phase envelope
   const deckHand: Vec3 = [P.deckHand.fwd, 0, P.deckHand.side];
   for (const [name, b] of Object.entries(pz)) assert.ok(postureGap(b, FEET, deckHand) <= 0, `deck hand inside ${name}`);

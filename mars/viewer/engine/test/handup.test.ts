@@ -128,13 +128,13 @@ test('hand_up refuses a deck too high for a genuine hand-off (receivers at 3.25 
   const r = rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
   assert.equal(r.status, 'failed');
   assert.equal(r.diagnostic?.code, 'handup.too-high');
-  assert.match(r.diagnostic!.message, /givers can raise it to 2\.05 m \(their floor \+ 2\.05 m: hands out at the grips; 2\.06 m straight overhead\), so the receivers would have to reach 1\.18 m below their feet \(receivers reach down standing to 0\.60 m above their feet, kneeling ≤ 0\.5 m below them, lying prone ≤ 0\.94 m below a deck, but no deck covers b3 to lie on\); use the forklift/);
+  assert.match(r.diagnostic!.message, /givers can raise it to 2\.05 m \(their floor \+ 2\.05 m: hands out at the grips; 2\.06 m straight overhead\), so the receivers would have to reach 1\.18 m below their feet \(receivers reach down standing to 0\.60 m above their feet, kneeling ≤ 0\.5 m below them, lying prone ≤ 0\.73 m below a deck, but no deck covers b3 to lie on\); use the forklift/);
   // body model = the measured rig (2026-09-28): a kneeling receiver reaches 0.5 m below the feet, not 1.0 — so a
   // deck the old rule allowed (receivers at ≈ 2.65 m: 0.58 m below their feet) is now refused → the forklift
   const mid = sheetBay(2.6);
   const m = mid.rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to: mid.to });
   assert.equal(m.diagnostic?.code, 'handup.too-high');
-  assert.match(m.diagnostic!.message, /reach 0\.5\d m below their feet \(receivers reach down standing to 0\.60 m above their feet, kneeling ≤ 0\.5 m below them, lying prone ≤ 0\.94 m below a deck, but no deck covers b3 to lie on\); use the forklift/);
+  assert.match(m.diagnostic!.message, /reach 0\.5\d m below their feet \(receivers reach down standing to 0\.60 m above their feet, kneeling ≤ 0\.5 m below them, lying prone ≤ 0\.73 m below a deck, but no deck covers b3 to lie on\); use the forklift/);
 });
 
 test('hand_up refuses receivers who are not on a walkable beam or deck, and a beam without its partner', () => {
@@ -216,7 +216,7 @@ test('hand_up via forklift is refused when the forks hold it too low, or it is n
   run(rt, 'forklift_present', { operator: 'op', at: { ...presentAt(b), y: 1.2 } });
   const low = rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'op', receivers: ['p3', 'p4'], to });
   assert.equal(low.diagnostic?.code, 'handup.too-high');
-  assert.match(low.diagnostic!.message, /on the forks at 1\.20 m is 1\.12 m below the receivers' feet \(receivers reach down standing to 0\.60 m above their feet, kneeling ≤ 0\.5 m below them, lying prone ≤ 0\.94 m below a deck, but no deck covers b3 to lie on\); raise the forks/);
+  assert.match(low.diagnostic!.message, /on the forks at 1\.20 m is 1\.12 m below the receivers' feet \(receivers reach down standing to 0\.60 m above their feet, kneeling ≤ 0\.5 m below them, lying prone ≤ 0\.73 m below a deck, but no deck covers b3 to lie on\); raise the forks/);
   const b2 = sheetBay(2.29);
   const none = b2.rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'p5', receivers: ['p3', 'p4'], to: b2.to });
   assert.equal(none.diagnostic?.code, 'forklift.no-operator');

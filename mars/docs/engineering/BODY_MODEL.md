@@ -42,32 +42,49 @@ hips / torso; rest and carry hands within an arm of the shoulder).
 The envelope for a posture is a shoulder cylinder (band × lean) plus the arm: `postureGap(pz, feet, hand)` ≤ 0
 means inside. It is convex, so a straight hand path between two inside points stays inside.
 
-## Prone receiver + rise (owner feedback §13, W28 2026-09-29)
+## Prone receiver + rise (owner feedback §13, W28 2026-09-29; the measured rig since W32)
 `BODY_MODEL.prone` — a receiver lying on their stomach at a deck edge to reach down, then getting up without letting go
 (push-up on one hand, knees, feet). Kept out of `posture` (those bands all top out at shoulders + shrug + heels; a lying or
-kneeling body cannot reach overhead). Every number derives from the rig numbers above; `test/body-model.test.ts`
-("prone receiver + rise") checks each derivation and that the bands chain phase to phase.
+kneeling body cannot reach overhead). Since W32 (2026-09-29) the prone model **is the measured rig lying at the edge**
+(W29: `e2e/prone.spec.ts`, POSES.md "Prone receiver"), like the standing / kneeling model since W12: the **woman template**,
+the smaller reach, so every template reaches what the engine allows (punk / casual have ≈ 7 cm of slack). W28's numbers
+(chest 0.08, torso 0.30 m over the edge → 0.94 m) were stated, not measured; the rig lying tipped 60° reached 0.73–0.80 m,
+and the engine's hand points 0.83 m down and 0.31–0.47 m to the side of S hung (prone-reach 45/80 by hand). `test/body-model.test.ts`
+("prone receiver + rise") checks each number against the measurement and each derivation.
 
-| constant | value | derivation |
+| constant | value | source |
 | --- | --- | --- |
-| `back` | 0.35 m | station S (the receiver's `pose.p`) behind the deck lip: a standable point — the spatial body radius 0.28 m read on the 0.1 m clearance raster (0.30 m from an edge reads 0.25 m). They kneel at S and lie down forward, **perpendicular to the edge, head over it** |
-| `overEdge` | 0.30 m | RIG.torso × 2/3: the lower ribs rest on the lip, the torso above them is beyond it |
-| `chest` | 0.08 m | = `chestFwd`: lying flat, the shoulder joints are this far above the deck |
-| `tipMax` | 60° | the torso beyond the lip tips down at most this far (chest still on the deck) |
-| `posture.prone` | shoulders **−0.32 … +0.08 m**, lean **0.65** | bottom: 0.08 cos 60° − 0.30 sin 60° = −0.22, girdle reaching down 2 × shrug → −0.32; top: lying flat; lean = back + overEdge (shoulders ≤ 0.30 m past the lip) |
-| `reachDown` | **0.94 m** below the deck | arm − prone bottom = 0.62 + 0.32 (the §13 "≈ 1.0 m"); the envelope reaches exactly this, so the cap binds with it |
-| `edgeReach` | 0.45 m | = `reachDownOut`: at the hand-off the hands are at most this far beyond the deck outline (there the envelope still reaches 0.92 m down) |
-| `posture.pushUp` | shoulders −0.32 … **0.62 m**, lean 0.65 | from prone up to one straight arm (0.62) on the deck; the other hand holds the load |
-| `posture.kneelUp` | shoulders **0.07 … 0.91 m**, lean 0.35 | kneeling bent over the edge (= bentOver's bottom, RIG kneel hips + torso × cos 150°) up to kneeling upright (kneelHip 0.46 + torso 0.45) |
+| `back` | 0.35 m | station S (the receiver's `pose.p`) behind the deck lip: a standable point — the spatial body radius 0.28 m read on the 0.1 m clearance raster (W28) |
+| `chest` | **0.10 m** (was 0.08) | measured: shoulder joints above the deck lying flat, 0.097 (punk) – 0.102 (woman) |
+| `tipPast` | **0.08 m** | the renderer's TIP_PAST_LIP: the tip (Torso) joint this far past the lip, so a 60° tip never cuts the deck corner |
+| `tipUp` | **0.15 m** | the tip joint's height lying = the measured lying hip joints (0.15); with it the construction reproduces the measured tipped shoulders (below) |
+| `overEdge` | **0.19 m** (was 0.30 = torso × 2/3) | measured Torso joint → shoulder midpoint: woman 0.19 (punk 0.27) |
+| `tipMax` | 60° | the torso tips over the lip at most this far (renderer TIP_MAX) |
+| `turnMax` | **45°** | the lying body's axis at most this far off the edge normal (renderer TURN_MAX) |
+| `girdle` | 0.10 m | 2 × shrug: the shoulder girdle reaching toward a hand (renderer GIRDLE) |
+| shoulders at the full tip | **−0.034 m**, 0.13 m past the lip | tip joint + (0.183, −0.05) rotated 60°: measured woman −0.03 (the punk's 0.27 gives −0.106, measured −0.10) |
+| `reachDown` | **0.73 m** below the deck (was 0.94) | 0.034 + girdle 0.10 + 0.97 × 0.62 (a straight arm: the elbow never locks, as `overheadReach`) = 0.735, floored: the measured woman 0.73 (punk 0.80: slack) |
+| `edgeReach` | 0.45 m | = `reachDownOut`: at the hand-off the hands at most this far beyond the deck outline (the exact reach binds first: 0.45 m out, straight lying reaches 0.68 m down) |
+| `head` | ball 0.10 m, 0.15 m on from the shoulders | renderer: head point 0.25 m on along the torso |
+| `posture.prone` | shoulders **−0.13 … +0.20 m**, lean **1.06** (was −0.32 … 0.08, 0.65) | the cylinder about S **bounding** the exact reach over every allowed turn (lo: tipped shoulders − girdle; hi: flat + girdle; lean: the farthest shoulder joint from S, lying flat turned 45° = 0.95, + girdle) — what the per-tick invariant checks (it has no heading) |
+| `posture.pushUp` | shoulders −0.13 … 0.62 m, lean 1.06 | from prone up to one straight arm on the deck; the other hand holds the load |
+| `posture.kneelUp` | shoulders 0.07 … 0.91 m, lean 0.35 | kneeling bent over the edge (= bentOver's bottom) up to kneeling upright (unchanged) |
 | then | `posture.bentOver` | stand_with_load / lay / set_down exactly as a kneeling receiver |
-| `hip` | prone 0.10 → push-up 0.46 → kneel-up 0.46 → stand 0.89 m | lying (≈ half the pelvis, stated), thigh vertical on the knees (RIG.kneelHip), standing (RIG.hip) — for the renderer's rise pose |
-| `deckHand` | 0.20 m ahead of S (0.15 m behind the lip), ±0.25 m to the side | hands flat on the deck beside the chest: lying, and the push-up hand; inside every prone-phase envelope |
-| `bodyBack` | 0.75 m | S → toes: hips torso/3 behind the lip, legs RIG.hip + a 6 cm foot; lip → toes 1.10 m must lie on the deck |
-| `bodyHalf` | 0.20 m | shoulderHalf + 5 cm: the lying body's clearance half-width (less one raster cell) |
+| `hip` | prone 0.10 → push-up 0.46 → kneel-up 0.46 → stand 0.89 m | (unchanged; the rig lies with its hips at 0.15: renderer's) |
+| `deckHand` | 0.20 m ahead of S along the body, ±0.25 m across | hands flat on the deck beside the chest: lying, and the push-up hand (now along the lying heading) |
+| `bodyBack` / `bodyHalf` | 0.75 / 0.20 m | S → toes / the lying body's half-width (unchanged) |
+
+**The exact (heading-aware) geometry** (`body/model.ts`): `proneFrame(S, out, heading)` — the body lying along a unit heading
+turned `turn` off the edge normal `out`; the lip lies `back / cos(turn) + (shoulderHalf + 0.03)·|tan turn|` along its axis
+(`proneLipAlong`, the renderer's `lipAlong`: the chest's near side reaches the lip first). `pronePoints(frame, tip°)` — tip
+joint, shoulder midpoint, shoulder joints (±0.15 m across), head centre, torso sampler. `proneReachGap(frame, hand, side)` — how
+far a hand is beyond arm 0.62 + girdle 0.10 of its own shoulder joint at the best tip (5° steps, 0…60°), and that tip. Hand-up
+plans with this (plus the 0.73 m cap and the 0.45 m edge rule); the cylinder bounds it (checked on a grid, 5 turns).
 
 Consumers: `construction/handup.ts` (`REACH_DOWN_PRONE`, `PRONE_EDGE_REACH`, `PRONE_BACK`, `POSTURE['prone-wait' |
-'prone-reach' | 'push-up' | 'kneel-up']`, `proneDeckHand`, `proneLipHand`); through `envelopeGap` the invariant
-`lift.hands-out-of-reach`. HANDUP.md "Prone receiver" has the phases.
+'prone-reach' | 'push-up' | 'kneel-up']`, `proneDeckHand`, `proneLipHand`, `proneBodyHit`, `proneBeyondLip`); through
+`envelopeGap` the invariant `lift.hands-out-of-reach`. HANDUP.md "Prone receiver" has the phases, the lying heading and the
+body sweep beyond the lip.
 
 ## Who imports it
 
@@ -93,7 +110,7 @@ ground distance, `LIFT_APEX_MAX` 2.4 m for the lift-over apex: crews raising upr
 | --- | --- | --- | --- |
 | standing reach (hands / a load's underside above the floor) | ≤ 2.06 m | hand_up (plan + tick), solar, aloft fastening, paint, beam seats | `handup.too-high`, `lift.hands-out-of-reach`, `solar.too-high`, `paint.out-of-reach`, `reach.too-high` |
 | reach down from an edge | ≤ 0.5 m below the feet (measured rig; was 1.0) | hand_up receivers, solar, aloft | `handup.too-high`, `solar.too-low`, `lift.hands-out-of-reach` |
-| reach down lying prone at a deck edge (only where kneeling cannot reach) | ≤ 0.94 m below the deck, ≤ 0.45 m beyond its outline | hand_up receivers (plan; tick via the prone envelopes) | `handup.too-high` (lists stand / kneel / prone), `handup.no-receiver-station`, `handup.rise-blocked`, `lift.hands-out-of-reach` |
+| reach down lying prone at a deck edge (only where kneeling cannot reach) | ≤ 0.73 m below the deck (measured rig, W32; was 0.94), each hand within arm + girdle of its shoulder lying along `proneYaw`, ≤ 0.45 m beyond its outline; the body past the lip clear | hand_up receivers (plan; tick via the bounding prone envelopes) | `handup.too-high` (lists stand / kneel / prone), `handup.no-receiver-station`, `handup.rise-blocked` (names a member the rise or the lying body meets), `lift.hands-out-of-reach` |
 | kneel rule at a hand-off | hands ≤ 0.8 m from the feet, ≤ 0.5 m beyond the edge | hand_up (plan + tick at `reach_down` / `take`) | `handup.receiver-reach`, `lift.hands-out-of-reach` |
 | posture envelope | hands within arm 0.62 m of the shoulder band + lean | hand_up (plan; tick + 0.1 m), solar, paint | `handup.giver-reach`, `handup.no-receiver-station`, `solar.no-station`, `paint.out-of-reach` |
 | station reach | part ≤ 0.8 m horizontally from the station | raise / install (access.ts) | `….out-of-reach` |
@@ -158,9 +175,10 @@ Arm bones scaled to 0.62 m from 1.34 m shoulders (the engine model is the same r
 - `postureGap` treats the shoulders as one cylinder about the body axis (not two shoulder joints ±0.15 m).
 - `overheadReach` 2.0 m is the measured 1.997 (shoulders 1.34 + shrug 0.05 + 0.97 × arm: the elbow never locks); the
   envelope's straight-up reach is 1.45 + 0.62 = 2.07 m, so the 2.06 m `overheadMax` cap binds.
-- Prone (§13): the envelopes are cylinders about S (not about the lip, not two shoulders), so they are generous
-  sideways and behind; the edge rules (hands ≤ 0.45 m beyond the deck outline, the load outside the edge) supply the
-  direction. `tipMax` 60°, the 2 × shrug girdle, `hip.prone` 0.10 and the 6 cm foot are stated, not measured; the rig has
-  not been posed prone yet (renderer track).
+- Prone (§13, W32): the take is planned with the exact lying geometry (shoulder joints along `proneYaw`, arm + girdle,
+  tipped ≤ 60°); the push-up / kneel-up rise still uses cylinders about S, and the per-tick invariant the bounding
+  cylinder (lean 1.06: generous, it has no heading). `tipUp` 0.15 is the rig's lying hips taken as the tip joint's height
+  (fits the measured tipped shoulders within 1 cm, both templates); the head is a 0.1 m ball; arms are straight segments
+  (no elbow routing around a joist); `hip.prone` 0.10 and the 6 cm foot are stated.
 - Release is not blended in the engine (hands clear when a holder lets go; the renderer's 0.4 s posture blend
   returns them).
