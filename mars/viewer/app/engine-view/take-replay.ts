@@ -152,12 +152,12 @@ export class TakeReplay {
       const dist = w ? this.walked(w, frame.tick) : 0;
       const speed = w ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
-      const grip = (e.state.grip as { entity?: string } | undefined)?.entity;
-      people.push({ id, p: e.p, yaw: e.yaw, walk: climbing ? 1 : clamp01((speed - 0.06) / 0.25), walkDist: dist, activity: e.activity, grip });
+      const g = e.state.grip as { entity?: string; slot?: string } | undefined;
+      people.push({ id, p: e.p, yaw: e.yaw, walk: climbing ? 1 : clamp01((speed - 0.06) / 0.25), walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot });
     }
     this.comps.onTick({ entities: comps });
     this.comps.render(1);
-    this.humans.setFrame(people, this.t);
+    this.humans.setFrame(people, this.t, comps);
     this.humans.render(1, (id, from, out) => this.comps.nearestPoint(id, from, out));
   }
 

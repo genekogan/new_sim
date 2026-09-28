@@ -11,14 +11,17 @@
 // - warm: forearms held out toward the fire when its edge is within 1.2 m.
 // All of it is a pure function of (world history, entity id): no randomness.
 import * as THREE from 'three';
-import type { WorldState } from '../../engine/world/types.ts';
+import type { Entity, Pose, WorldState } from '../../engine/world/types.ts';
 import { CATALOG } from '../../engine/world/catalog.ts';
+import { entityCorners } from '../../engine/spatial/service.ts';
+import { handPoint, STATION_SLOT } from '../../engine/construction/liftcrew.ts';
+import { LIFT_HAND } from '../../engine/construction/raise.ts';
 import { DT } from '../../engine/runtime/runtime.ts';
 import { createRig, type Rig, type Template } from './people.ts';
 import { seatHeight } from './fixtures.ts';
 
 type Snap = { p: [number, number, number]; yaw: number; walkW: number; walkT: number; idleT: number; sitW: number; warmW: number };
-type Arm = { upper: THREE.Object3D; lower: THREE.Object3D; hand: THREE.Object3D; shoulder?: THREE.Object3D; side: number };
+type Arm = { upper: THREE.Object3D; lower: THREE.Object3D; hand: THREE.Object3D; knuckle?: THREE.Object3D; shoulder?: THREE.Object3D; side: number };
 /** Leg chain. The Quaternius rig's Foot bones are children of Root (baked IK targets), not of LowerLeg. */
 type Leg = { upper: THREE.Object3D; lower: THREE.Object3D; foot: THREE.Object3D };
 type Spine = { body: THREE.Object3D; abdomen: THREE.Object3D; torso: THREE.Object3D };
@@ -29,6 +32,8 @@ type View = {
   speed: number;
   activity: string;
   grip?: string;
+  /** Grip slot on that part (engine/construction: lift-far, foot-l/r, hold-N, lift-end/edge/corner-*, lift-station). */
+  gripSlot?: string;
   arms: Arm[];
   legs: Leg[];
   spine?: Spine;
@@ -40,6 +45,8 @@ type View = {
   vary: number;
   /** Bones the pose layers touch, with their clip-local transforms from the last mixer apply. */
   saved: { o: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion }[];
+  /** Diagnostics: per arm, shoulder→grip point distance / arm length at the last frame (null = no point). */
+  reachRatio: (number | null)[];
   layered: boolean;
 };
 /**
@@ -47,7 +54,9 @@ type View = {
  * (0–1) and `walkDist` the metres walked along the track so far, so the Walk phase is a pure
  * function of take time: clip seconds = metres / clip ground speed (feet speed-matched).
  */
-export type SampledHuman = { id: string; p: [number, number, number]; yaw: number; walk: number; walkDist: number; activity?: string; grip?: string };
+export type SampledHuman = { id: string; p: [number, number, number]; yaw: number; walk: number; walkDist: number; activity?: string; grip?: string; gripSlot?: string };
+/** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
+type Part = { def: string; prev: Pose; cur: Pose };
 /** Nearest point of a gripped entity to a world point (components.ts nearestPoint). */
 export type Reach = (entity: string, from: THREE.Vector3, out: THREE.Vector3) => boolean;
 
@@ -104,6 +113,7 @@ export class HumanViews {
   readonly group = new THREE.Group();
   private views = new Map<string, View>();
   private templates: Template[] = [];
+  private parts = new Map<string, Part>();
 
   constructor() {
     this.group.name = 'engine humans';
@@ -135,7 +145,7 @@ export class HumanViews {
     const arms = armsOf(rig), legs = legsOf(rig), spine = spineOf(rig);
     const touched = [...arms.flatMap((a) => [a.upper, a.lower, a.shoulder]), ...legs.flatMap((l) => [l.upper, l.lower, l.foot]), spine?.body, spine?.abdomen, spine?.torso];
     const saved = touched.filter((o): o is THREE.Object3D => !!o).map((o) => ({ o, p: o.position.clone(), q: o.quaternion.clone() }));
-    const v: View = { rig, prev: s, cur: { ...s }, speed: 0, activity, arms, legs, spine, seat: SEAT_DEFAULT, vary: (hashId(id) % 1000) / 1000, saved, layered: false };
+    const v: View = { rig, prev: s, cur: { ...s }, speed: 0, activity, arms, legs, spine, seat: SEAT_DEFAULT, vary: (hashId(id) % 1000) / 1000, saved, layered: false, reachRatio: [] };
     this.views.set(id, v);
     return v;
   }
@@ -152,6 +162,7 @@ export class HumanViews {
         const s: Snap = { p: [...e.pose.p], yaw: e.pose.yaw, walkW: 0, walkT: 0, idleT: (e.id.length * 0.37) % 1, sitW: act === 'sit' ? 1 : 0, warmW: act === 'warm' ? 1 : 0 };
         v = this.make(e.id, s, act);
         v.grip = e.human.grip?.entity;
+        v.gripSlot = e.human.grip?.slot;
         continue;
       }
       const c = v.cur;
@@ -160,6 +171,7 @@ export class HumanViews {
       v.speed += (inst - v.speed) * 0.5;
       v.activity = act;
       v.grip = e.human.grip?.entity;
+      v.gripSlot = e.human.grip?.slot;
       // Honest clip mapping: anyone translating over the ground plays Walk speed-matched (walk,
       // climb, carry on the move, a crew gathering); anyone standing plays Idle, with the pose
       // layers of render() on top (sit, warm, hold/support/lift/carry grips).
@@ -194,6 +206,21 @@ export class HumanViews {
         this.group.remove(v.rig.holder);
         this.views.delete(id);
       }
+    this.trackParts((id) => world.entities[id]);
+  }
+
+  /** Keep the last two poses of every gripped part (and forget parts nobody grips). */
+  private trackParts(get: (id: string) => Entity | undefined) {
+    const held = new Set<string>();
+    for (const v of this.views.values()) if (v.grip) held.add(v.grip);
+    for (const id of this.parts.keys()) if (!held.has(id)) this.parts.delete(id);
+    for (const id of held) {
+      const e = get(id);
+      if (!e) continue;
+      const pose: Pose = { p: [...e.pose.p], yaw: e.pose.yaw, pitch: e.pose.pitch ?? 0, roll: e.pose.roll ?? 0 };
+      const was = this.parts.get(id);
+      this.parts.set(id, { def: e.def, prev: was?.def === e.def ? was.cur : pose, cur: pose });
+    }
   }
 
   /**
@@ -202,7 +229,7 @@ export class HumanViews {
    * therefore fully in or out, at the default seat height — takes carry no fixtures).
    * Rigs for ids missing from `frame` are removed. Follow with `render(1, reach)`.
    */
-  setFrame(frame: SampledHuman[], t: number) {
+  setFrame(frame: SampledHuman[], t: number, parts: Record<string, Entity> = {}) {
     if (!this.templates.length) return;
     const seen = new Set<string>();
     for (const f of frame) {
@@ -223,6 +250,7 @@ export class HumanViews {
       v.prev = v.cur = snap;
       v.activity = act;
       v.grip = f.grip;
+      v.gripSlot = f.gripSlot;
       v.seat = SEAT_DEFAULT;
     }
     for (const [id, v] of this.views)
@@ -231,6 +259,8 @@ export class HumanViews {
         this.group.remove(v.rig.holder);
         this.views.delete(id);
       }
+    this.parts.clear(); // random access: no tick history, so prev = cur
+    this.trackParts((id) => parts[id]);
   }
 
   /**
@@ -258,14 +288,22 @@ export class HumanViews {
       v.layered = false;
       mixer.update(0);
       const sitW = a.sitW + (b.sitW - a.sitW) * alpha, warmW = a.warmW + (b.warmW - a.warmW) * alpha;
-      const gripping = !!(reach && v.grip && v.arms.length);
+      const part = v.grip ? this.parts.get(v.grip) : undefined;
+      const gripping = !!((reach || part) && v.grip && v.arms.length);
       if (!(sitW > 0 || warmW > 0 || gripping)) continue;
       for (const b of v.saved) b.p.copy(b.o.position), b.q.copy(b.o.quaternion);
       v.layered = true;
       h.updateMatrixWorld(true);
       _fwd.set(Math.cos(yaw), 0, Math.sin(yaw)); // engine yaw 0 faces +x; holder.rotation.y = -yaw
       if (sitW > 0) sitPose(v, sitW, h.position.y);
-      if (gripping) holdPose(v, reach!, v.grip!);
+      if (gripping) {
+        const grip = v.grip!, slot = v.gripSlot ?? '', floor = h.position.y;
+        const q = part && lerpPose(part.prev, part.cur, alpha);
+        holdPose(v, (from, out) => {
+          const r = part ? slotPoint({ def: part.def, pose: q! } as Entity, slot, from, floor, out) : undefined;
+          return r ?? (reach ? reach(grip, from, out) : false);
+        });
+      }
       else if (sitW > 0) handsOnThighs(v, sitW);
       if (warmW > 0 && v.fire && !gripping) warmHands(v, warmW, h.position);
     }
@@ -277,7 +315,7 @@ export class HumanViews {
   }
 
   info() {
-    return [...this.views].map(([id, v]) => ({ id, template: v.rig.template.name, clipSpeed: +v.rig.template.walkSpeed.toFixed(3), forward: v.rig.template.forward, speed: +v.speed.toFixed(3), walkWeight: +v.cur.walkW.toFixed(2), activity: v.activity, grip: v.grip ?? null, arms: v.arms.length, sit: +v.cur.sitW.toFixed(2), seat: v.cur.sitW > 0 ? +v.seat.toFixed(2) : null }));
+    return [...this.views].map(([id, v]) => ({ id, template: v.rig.template.name, clipSpeed: +v.rig.template.walkSpeed.toFixed(3), forward: v.rig.template.forward, speed: +v.speed.toFixed(3), walkWeight: +v.cur.walkW.toFixed(2), activity: v.activity, grip: v.grip ?? null, gripSlot: v.gripSlot ?? null, reach: v.grip ? v.reachRatio : null, armLen: v.arms[0] ? +armLen(v.arms[0]).toFixed(3) : null, arms: v.arms.length, sit: +v.cur.sitW.toFixed(2), seat: v.cur.sitW > 0 ? +v.seat.toFixed(2) : null }));
   }
 }
 
@@ -293,7 +331,7 @@ function armsOf(rig: Rig): Arm[] {
   const out: Arm[] = [];
   for (const [k, side] of [['L', 1], ['R', -1]] as const) {
     const upper = bone(rig, `UpperArm${k}`), lower = bone(rig, `LowerArm${k}`), hand = bone(rig, `Wrist${k}`);
-    if (upper && lower && hand) out.push({ upper, lower, hand, shoulder: bone(rig, `Shoulder${k}`), side });
+    if (upper && lower && hand) out.push({ upper, lower, hand, knuckle: bone(rig, `Middle2${k}`), shoulder: bone(rig, `Shoulder${k}`), side });
   }
   return out;
 }
@@ -377,11 +415,21 @@ function ik(upper: THREE.Object3D, lower: THREE.Object3D, end: THREE.Vector3, go
   lower.localToWorld(end);
 }
 
-/** Arm chain length (shoulder→elbow→wrist) in world metres. */
+/**
+ * Palm centre (midway wrist → finger base): the point that touches a part. It rides rigidly on the
+ * forearm (the wrist keeps its clip rotation), so the IK end effector is the palm, not the wrist.
+ */
+function palm(arm: Arm, out: THREE.Vector3) {
+  arm.hand.getWorldPosition(out);
+  if (arm.knuckle) out.lerp(arm.knuckle.getWorldPosition(_tmp), 0.5);
+  return out;
+}
+
+/** Arm chain length (shoulder→elbow→palm) in world metres. */
 function armLen(arm: Arm) {
   arm.upper.getWorldPosition(_s);
   arm.lower.getWorldPosition(_e);
-  arm.hand.getWorldPosition(_w);
+  palm(arm, _w);
   return _s.distanceTo(_e) + _e.distanceTo(_w);
 }
 
@@ -396,7 +444,7 @@ function elbowPole(arm: Arm, body: THREE.Object3D, out: THREE.Vector3) {
 
 /** Arm IK onto `goal` by `weight`. */
 function armTo(arm: Arm, goal: THREE.Vector3, weight: number, maxExt: number, body: THREE.Object3D) {
-  arm.hand.getWorldPosition(_end);
+  palm(arm, _end);
   ik(arm.upper, arm.lower, _end, goal, elbowPole(arm, body, _n.clone()), weight, maxExt);
 }
 
@@ -461,14 +509,16 @@ function handsOnThighs(v: View, w: number) {
  * it (both scaled by how much of it is within reach), then put the hands on it by arm IK. Carriers
  * keep their elbows bent. Out of reach: no lean, arms as the clip has them.
  */
-function holdPose(v: View, reach: Reach, grip: string) {
+function holdPose(v: View, reach: (from: THREE.Vector3, out: THREE.Vector3) => boolean) {
   const carry = v.activity === 'carry';
+  v.reachRatio = v.arms.map(() => null);
   const lens = v.arms.map(armLen);
   let lean = 0;
   v.arms.forEach((arm, i) => {
     arm.upper.getWorldPosition(_s);
-    if (!reach(grip, _s, _goals[i])) return;
+    if (!reach(_s, _goals[i])) return;
     const k = contact(_s.distanceTo(_goals[i]), lens[i]);
+    v.reachRatio[i] = +(_s.distanceTo(_goals[i]) / lens[i]).toFixed(2);
     _d.subVectors(_goals[i], _s).setY(0);
     const ahead = _d.lengthSq() > 1e-6 ? clamp01(_d.normalize().dot(_fwd) + 0.3) : 0;
     lean = Math.max(lean, k * ahead);
@@ -481,7 +531,7 @@ function holdPose(v: View, reach: Reach, grip: string) {
   }
   v.arms.forEach((arm, i) => {
     arm.upper.getWorldPosition(_s);
-    if (!reach(grip, _s, _goals[i])) return;
+    if (!reach(_s, _goals[i])) return;
     const k = contact(_s.distanceTo(_goals[i]), lens[i]);
     if (k <= 0) return;
     if (arm.shoulder) {
@@ -489,7 +539,7 @@ function holdPose(v: View, reach: Reach, grip: string) {
       const dy = Math.max(-1, Math.min(1, (_goals[i].y - _s.y) / 0.4)) * 0.025 * k;
       swing(arm.shoulder, _s.clone(), _s.clone().addScaledVector(UP, dy), 1);
       arm.upper.getWorldPosition(_s);
-      reach(grip, _s, _goals[i]);
+      reach(_s, _goals[i]);
     }
     armTo(arm, _goals[i], k, carry ? 0.88 : 0.97, v.rig.holder);
   });
@@ -509,4 +559,61 @@ function warmHands(v: View, w: number, at: THREE.Vector3) {
     const goal = _s.clone().addScaledVector(dir, len * ext).addScaledVector(UP, -len * 0.38);
     armTo(arm, goal, k * 0.85, 0.95, v.rig.holder);
   });
+}
+
+const lerpPose = (a: Pose, b: Pose, t: number): Pose => ({
+  p: [a.p[0] + (b.p[0] - a.p[0]) * t, a.p[1] + (b.p[1] - a.p[1]) * t, a.p[2] + (b.p[2] - a.p[2]) * t],
+  yaw: lerpAngle(a.yaw, b.yaw, t),
+  pitch: lerpAngle(a.pitch ?? 0, b.pitch ?? 0, t),
+  roll: lerpAngle(a.roll ?? 0, b.roll ?? 0, t),
+});
+
+/**
+ * The upright frame's two column lines (base → top): mid-thickness edges at local x = ±size/2 of
+ * the part's box (entityCorners order: x, then y, then z).
+ */
+function columns(e: Entity): [THREE.Vector3, THREE.Vector3][] {
+  const c = entityCorners(e).map((k) => new THREE.Vector3(k[0], k[1], k[2]));
+  const mid = (i: number, j: number) => c[i].clone().add(c[j]).multiplyScalar(0.5);
+  return [0, 4].map((x) => [mid(x, x + 1), mid(x + 2, x + 3)] as [THREE.Vector3, THREE.Vector3]);
+}
+
+/**
+ * Hand point of an engine grip slot on part `e` (interpolated pose), nearest to `from` (a shoulder):
+ * - `lift-far` / `hold-N` (raise_upright, construction/raise.ts): on the nearer column line, the point
+ *   nearest the shoulder, kept ≤ LIFT_HAND (1.9 m) above the person's floor, as the engine holds it;
+ * - `foot-l` / `foot-r`: the nearer column base (the engine's footers — at ground level, so a standing
+ *   rig honestly cannot reach it: no crouch);
+ * - `lift-end-*` / `lift-edge-*` / `lift-corner-*` (construction/liftcrew.ts `handPoint`): that box
+ *   feature at the part's underside;
+ * - `lift-station`: false (hand-up is not modelled; the arms hang).
+ * undefined = not a slot we know (the caller falls back to the part's nearest point).
+ */
+function slotPoint(e: Entity, slot: string, from: THREE.Vector3, floor: number, out: THREE.Vector3): boolean | undefined {
+  if (slot === STATION_SLOT) return false;
+  if (slot.startsWith('lift-') && slot !== 'lift-far') {
+    const h = handPoint(e, e.pose, slot);
+    if (!h) return undefined;
+    out.set(h.p[0], h.p[1], h.p[2]);
+    return true;
+  }
+  const foot = slot === 'foot-l' || slot === 'foot-r';
+  if (!(foot || slot === 'lift-far' || /^hold-\d+$/.test(slot))) return undefined;
+  if (!CATALOG[e.def]) return undefined;
+  let best = Infinity;
+  for (const [a, b] of columns(e)) {
+    const p = foot ? a.clone() : nearestOnSegment(a, b, from, floor + LIFT_HAND);
+    const d = p.distanceTo(from);
+    if (d < best) [best, out.x, out.y, out.z] = [d, p.x, p.y, p.z];
+  }
+  return true;
+}
+
+/** Point of segment a→b nearest `q`, then moved down the segment until it is at most `maxY` high. */
+function nearestOnSegment(a: THREE.Vector3, b: THREE.Vector3, q: THREE.Vector3, maxY: number) {
+  const ab = b.clone().sub(a), L2 = ab.lengthSq();
+  let t = L2 > 1e-9 ? clamp01(q.clone().sub(a).dot(ab) / L2) : 0;
+  const y = a.y + ab.y * t;
+  if (y > maxY && Math.abs(ab.y) > 1e-6) t = clamp01(Math.min(t, (maxY - a.y) / ab.y));
+  return a.clone().addScaledVector(ab, t);
 }

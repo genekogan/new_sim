@@ -119,5 +119,7 @@ region, 0 violations, directed task takes one and ambient lets go); determinism 
 - No conversation turn-taking, gaze, gestures or group re-forming when a member leaves.
 - No automatic pre-emption or resumption; ambient never re-adopts a released person.
 - Regions are single-level; audience layouts do not use seats/benches inside the region.
-- The engine view (`app/engine-view/humans.ts`) draws `sit` / `talk` / `warm` / `watch` as a
-  standing idle pose; the poses are a renderer follow-up.
+- The engine view (`app/engine-view/humans.ts`) layers procedural poses on the Idle clip: `sit` /
+  `sit-down` / `stand-up` lower the body onto the seat (leg IK, hands on thighs, 0.4 s blend) and
+  `warm` holds the hands out toward the fire; `talk` / `watch` / `listen` are still the plain
+  standing Idle pose (no gestures or gaze).
