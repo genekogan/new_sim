@@ -323,3 +323,60 @@ Rollback (from `viewer/`):
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 17f7c9aa-84d1-437d-b1d6-287c85e553fe \
   --name mars-campus-2026 -m "rollback: <reason>"
 ```
+
+## Production deploy 5 (2026-09-28, session checkpoint)
+
+Deployed from committed tree `d5d2f84` (clean `git status`). The gate ran at `26acb78`. The commits
+after it (`71efed0`, `6ad36f0`, `d5d2f84`) change only docs and the regenerated evidence, so the code
+is identical. Contents: pause/resume, `engine_edit_world` and the list/delete ops over MCP; forklift;
+EUC/bicycle riders; social scenes; carrying loads on stairs; engine year scenes 2020–2025 and year rooms;
+stable historical ids; camera occluders; region-local grid updates; renderer sit/hold poses; flagship v2.
+
+- **New version: `cebd5827-b08d-4224-a320-afba968a1352`** (created 02:28Z). It replaces
+  `89e65c8c-5abb-4377-a693-3689de30d465`, which `wrangler deployments status` confirmed live at 100%
+  just before the deploy. `89e65c8c…` is the new rollback target.
+- **Gate:** `viewer/.cloudflare/gate/2026-09-28T02-12-46-239Z/report.json`: `ok: true`, `gitHead`
+  `26acb78`, `gitDirty: false`. Results: `npm test` 56/56; `test:engine` 243 pass / 1 skip / 1 todo (the
+  known `campus-full.test.ts` todo: grid origin); `tsc` clean; e2e 37/37 in 385 s (studio-years 11,
+  lab 13, lab-years 7, lab-build-bay 2, lab-social 1, lab-poses 1, studio-take 1, camera-verify 1; no
+  baseline refresh); probe `finalStateHash` `79447f75…6129` at 11403 ticks (unchanged since deploy 4).
+- **Evidence (`d5d2f84`):** `npm run evidence` gave 17/17 rows, 11/12 capabilities (1 PARTIAL) and
+  8/8 milestones PROVEN.
+- **Build:** `prepare.py` staged 312 files (791.8 MiB, 8 large objects). `CLOUDFLARE_RELEASE=1 npm run
+  build` exited 0 with only the known chunk-size warning. The route list includes `/lab` and `/lab/`.
+  `dist/client/engine/campus-2020…2026.json` (219–309 KB each for 2020–2025, 1,081,647 B for 2026),
+  `engine/takes/manifest.json` (921 B) and `engine/takes/flagship-campus-2026.json` (2,038,943 B) are
+  present. The dry run exited 0 (344 assets, 5119.02 KiB / 922.23 KiB gzip; bindings SIMULATIONS,
+  MODELS, ASSETS). `upload.mjs` made 0 uploads (8 × `Already uploaded`). The deploy uploaded 20 new
+  asset files (303 already present); startup 117 ms.
+- **Live smoke:** `/`, `/studio`, `/lab` and `/simulation-guide` returned 200 text/html.
+  `/simulation-agent-guide.md` returned 200 (28,275 B). `/engine/campus-2026.json` (parses),
+  `/engine/campus-2022.json`, `/engine/takes/manifest.json` and `/engine/takes/flagship-campus-2026.json`
+  returned 200 application/json. `/nope` returned 404. `HEAD /browser/campus.glb` returned 200
+  model/gltf-binary from R2.
+- **Integration:** `SIM_BASE=… node deploy/simulation-integration.mjs` printed all three PASS lines
+  (§28 replay/fork/plan-invalidation through the room; MCP handshake + 20 legacy + 13 engine tools
+  including pause/resume/edit/list/delete, and the 2022 year room; auth/method/prototype/body limits).
+  Engine timings: rehearse(keep) 565 ms wall, execute 535 ms, attach camera 997 ms; take 46,642 B.
+- **Director demo:** `node deploy/director-demo.mjs --base https://mars-campus-2026.<workers-subdomain>.workers.dev`
+  exited 0: all 9 steps (53 calls) asserted, including step 9 pause → fork → resume both branches;
+  total 7.4 s.
+- **Browser `/lab`:** headless Chromium (SwiftShader) on production `/lab?scenario=build-bay` ran
+  `runScenario` + `runToEnd`: tick 11403, done, 5/5 expectations (43/43 steps, 0 violations, visitor on
+  level 4), 0 console errors. Screenshot: `viewer/e2e/artifacts/prod-smoke-5/build-bay-end-oblique.png`
+  (reviewed: deck, stair and visitor on the deck).
+- **Cross-host determinism:** the production `stateHash()` is
+  `79447f7507797d3b2cfcb4ed01a1880538b06b4c36249a392b9f3f4c46f96129`, the same value
+  `node deploy/determinism-probe.mjs` gives (11403 ticks). **They match.**
+- **Browser `/studio`:** take `c531eaf4…` scrubbed to "held" (t 227.6 s), engine camera on (shot "orbit
+  the raise"). 37/37 entities drawn; the final-state hash equals the recorded and the manifest hash
+  (`b159317e…0bda`); HYPOTHETICAL banner visible; 0 console errors. Screenshot:
+  `viewer/e2e/artifacts/prod-smoke-5/studio-take-held.png`. Reviewed: it is visually identical to the
+  `studio-take-held` baseline.
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 89e65c8c-5abb-4377-a693-3689de30d465 \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```

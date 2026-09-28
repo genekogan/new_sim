@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "89e65c8c-5abb-4377-a693-3689de30d465",
+  "version": "cebd5827-b08d-4224-a320-afba968a1352",
   "published": "2026-09-05",
   "verification": "../.cloudflare/audit/http-smoke.json",
-  "updated": "2026-09-27",
-  "feature": "studio take replay + engine camera, social vocabulary + campfire lab scene, review M3/M5/M6 + caps, deterministic head-on passing, evidence report, gate",
+  "updated": "2026-09-28",
+  "feature": "checkpoint: pause/resume + edit_world + list ops, forklift, vehicles, social scenes, stairs carry, year scenes 2020–2025, stable ids, camera occluders, incremental grids, renderer poses, flagship v2",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,6 +17,6 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "17f7c9aa-84d1-437d-b1d6-287c85e553fe",
+  "rollback_version": "89e65c8c-5abb-4377-a693-3689de30d465",
   "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab"
 }
