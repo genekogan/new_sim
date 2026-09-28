@@ -42,9 +42,34 @@ export type TakeManifestEntry = {
   takeSchema?: string;
   /** 'year-build' marks a "Watch it being built" take; absent → inferred from `rulesVersion` (STUDIO_REPLAY.md). */
   kind?: string;
+  /** One chapter of a chapter set (`kind: 'year-build-chapter'`, W31; STUDIO_REPLAY.md "Chapter sets"). */
+  chapter?: ChapterRef;
+};
+/** A chapter take's place in its set: the set id, 0-based position, section id, the previous chapter's take id (null for
+ *  the first) and this take's start state hash (= the previous chapter's `finalStateHash`). */
+export type ChapterRef = { of: string; index: number; id: string; startsFrom: string | null; startHash: string };
+/** One chapter of a set, in play order: its take / file (= the chapter's manifest entry), its tick range within the run
+ *  (`from` of chapter k = `to` of k − 1) and its plan step range [fromStep, toStep). */
+export type SetChapter = { id: string; label: string; take: string; file: string; from: number; to: number; ticks: number; fromStep: number; toStep: number };
+/** A long build recorded as one run cut into consecutive chapter takes (manifest `chapterSets`, W31). */
+export type ChapterSetEntry = {
+  id: string;
+  label: string;
+  year: number;
+  hypothetical: boolean;
+  kind: string;
+  duration: number;
+  ticks: number;
+  startStateHash: string;
+  finalStateHash: string;
+  planHash?: string;
+  rulesVersion?: string;
+  bytes?: number;
+  gzipBytes?: number;
+  chapters: SetChapter[];
 };
 /** `takes`: recorded on the 2026 scene; `otherYears`: recorded in another year's frame. The studio lists both, filtered by `year`. */
-export type TakeManifest = { schema: 'mars-take-manifest/1'; takes: TakeManifestEntry[]; otherYears?: TakeManifestEntry[] };
+export type TakeManifest = { schema: 'mars-take-manifest/1'; takes: TakeManifestEntry[]; otherYears?: TakeManifestEntry[]; chapterSets?: ChapterSetEntry[] };
 /** Build site of a take; `groundY` is the take's ground datum (the year-build fork: the Kit datum 0). */
 export type TakeSite = { origin: [number, number]; yaw: number; groundY: number };
 export type TakeReplayFile = {
@@ -64,6 +89,8 @@ export type TakeReplayFile = {
 };
 /** A year-build ("Watch it being built") manifest entry: explicit `kind`, else the year-build rules version. */
 export const isYearBuild = (e: Pick<TakeManifestEntry, 'kind' | 'rulesVersion'>) => (e.kind ? e.kind === 'year-build' : /year-build/.test(e.rulesVersion ?? ''));
+/** One chapter of a chapter set: played as part of its set ("Watch it being built"), never offered on its own. */
+export const isChapter = (e: Pick<TakeManifestEntry, 'kind' | 'chapter'>) => e.kind === 'year-build-chapter' || !!e.chapter;
 export const TAKE_MANIFEST_URL = '/engine/takes/manifest.json';
 
 /** The entity record the replay draws `id` from: the final state, else (mars-take/4) as first recorded (removed before the end). */

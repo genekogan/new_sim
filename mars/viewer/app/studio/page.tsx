@@ -319,7 +319,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       onError: setError,
       userFov: camera.fov,
     });
-    orbit.addEventListener('start', () => { const r = takeHost?.replay(); if (r) r.engineCamera = false; }); // grabbing the view hands it to the user
+    orbit.addEventListener('start', () => { const r = takeHost?.transport(); if (r) r.engineCamera = false; }); // grabbing the view hands it to the user
     const transform = new TransformControls(camera, renderer.domElement);
     transform.setTranslationSnap(0.01);
     transform.setRotationSnap(THREE.MathUtils.degToRad(1));
@@ -1182,6 +1182,8 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       atmosphere: (options: Parameters<Api['atmosphere']>[0]) =>
         api.current?.atmosphere(options),
       take: () => takeHost?.info() ?? null,
+      // the chapter set open (STUDIO_REPLAY.md "Chapter sets: playback"): set clock, chapter, loads, swaps, whole-set checks
+      takeSet: () => takeHost?.setInfo() ?? null,
       // Engine camera vs render mesh (docs/engineering/CAMERA_VERIFY.md); lazy, off the main chunk.
       // `track`: 'take' (the take's own camera, default), 'directed' (the last directed track of the open take) or
       // 'year' (the last take-less track from directOnYear: verified with no replay, ambient people hidden), or
@@ -1194,7 +1196,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
           try {
             return await verifyCamera(scene, null, { fromT, toT, hz, track: yearTrack.data, trackId: yearTrack.id });
           } finally {
-            life?.setHidden(!!takeHost.replay());
+            life?.setHidden(!!takeHost.transport());
           }
         }
         const r = takeHost.replay();
@@ -1241,7 +1243,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       },
       // rendered palm (scene) vs the recorded hand point (take + offsetY) of a person at the current take time
       palm: (id: string, hand: 'left' | 'right') => {
-        const r = takeHost.replay();
+        const r = takeHost.transport();
         if (!r) return null;
         const v = new THREE.Vector3();
         const rec = r.recordedHands(id)?.[hand];

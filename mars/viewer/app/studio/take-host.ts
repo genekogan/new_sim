@@ -6,11 +6,14 @@
 import * as THREE from 'three';
 import { ThreeResources, disposeSkeletons } from '../../lib/three-resources';
 import { loadTemplates, type Template } from '../engine-view/people.ts';
-import { cameraLabel, loadTakeFile, TakeReplay, type ActiveTrack, type CameraOption, type TakeManifestEntry } from '../engine-view/take-replay.ts';
+import { cameraLabel, loadTakeFile, TakeReplay, type ActiveTrack, type CameraOption, type ChapterSetEntry, type TakeManifestEntry, type TakeReplayFile } from '../engine-view/take-replay.ts';
+import type { ChapterSetReplay, SetCheckIn, SetWorkerOut } from './chapter-set.ts';
 import type { TakeChecks } from './take-checks.ts';
 import type { Directed } from './direct-camera.ts';
 
 export type TakeHost = ReturnType<typeof createTakeHost>;
+/** What the transport drives: a single take (TakeReplay) or a chapter set played back to back (ChapterSetReplay). */
+export type Transport = TakeReplay | ChapterSetReplay;
 
 export function createTakeHost(
   scene: THREE.Scene,
@@ -26,6 +29,11 @@ export function createTakeHost(
   let checks: TakeChecks | null = null;
   let directed: Directed | null = null;
   let driving = false;
+  // a chapter set ("Watch it being built" of a long build, STUDIO_REPLAY.md "Chapter sets: playback")
+  let setReplay: ChapterSetReplay | null = null;
+  let setEntry: ChapterSetEntry | null = null;
+  let setLoading: ChapterSetEntry | null = null;
+  let worker: Worker | null = null;
   const listeners = new Set<() => void>();
   const changed = () => listeners.forEach((f) => f());
 
@@ -64,7 +72,60 @@ export function createTakeHost(
     }
   }
 
+  /** Scene ground − take ground (see open()). */
+  async function datum(file: TakeReplayFile) {
+    if (!file.site) return 0;
+    const { yearFile } = await import('./direct-camera.ts');
+    return (await yearFile(opts.year)).groundY - file.site.groundY;
+  }
+
+  /**
+   * Open a chapter set: chapter 0 as a take (datum, hidden building, ambient people hidden), then the chapters in turn
+   * (ChapterSetReplay), and the whole-set checks in a worker (chapter-set.worker.ts). `entries`: the chapters' manifest
+   * entries by position (their `finalStateHash` / `chapter.startHash` guard every boundary).
+   */
+  async function openSet(s: ChapterSetEntry | null, entries: (TakeManifestEntry | null)[] = []) {
+    close();
+    if (!s) return changed();
+    setLoading = s;
+    changed();
+    try {
+      templates ??= loadTemplates(abort.signal, resources);
+      const [{ ChapterSetReplay }, { buildOf }, ts] = await Promise.all([import('./chapter-set.ts'), import('./direct-camera.ts'), templates]);
+      if (setLoading !== s) return;
+      const r = await ChapterSetReplay.open(s, entries, { signal: abort.signal, datum, templates: ts });
+      if (setLoading !== s) return r.dispose();
+      setReplay = r;
+      setEntry = s;
+      r.onChange = changed;
+      scene.add(r.group);
+      opts.hideAmbient(true);
+      const first = r.firstTake();
+      const build = first && buildOf(first);
+      if (build && build.year === opts.year && opts.hideAssembly(build.assembly, true)) hidden = build.assembly;
+      worker = new Worker(new URL('./chapter-set.worker.ts', import.meta.url), { type: 'module' });
+      worker.onmessage = (e: MessageEvent<SetWorkerOut>) => { if (setReplay === r) { r.onCheck(e.data); changed(); } };
+      worker.onerror = (e) => { if (setReplay === r) { r.onCheck({ type: 'error', message: e.message || 'worker error' }); changed(); } };
+      worker.postMessage({ set: s, entries } satisfies SetCheckIn);
+    } catch (err) {
+      if (!abort.signal.aborted) opts.onError(`Chapter set could not load: ${(err as Error).message}`);
+    } finally {
+      if (setLoading === s) setLoading = null;
+      changed();
+    }
+  }
+
   function close() {
+    setLoading = null;
+    setEntry = null;
+    worker?.terminate();
+    worker = null;
+    if (setReplay) {
+      disposeSkeletons(setReplay.group);
+      setReplay.dispose();
+      setReplay = null;
+      opts.hideAmbient(false);
+    }
     loading = null;
     entry = null;
     checks = null;
@@ -78,13 +139,22 @@ export function createTakeHost(
     opts.hideAmbient(false);
   }
 
+  const transport = (): Transport | null => replay ?? setReplay;
+
   return {
     open,
+    openSet,
     close,
     replay: () => replay,
+    /** The chapter set open (ChapterSetReplay), else null. */
+    setReplay: () => setReplay,
+    /** The chapter set open (or loading). */
+    set: () => setEntry ?? setLoading,
+    /** Whichever is open: the single take or the chapter set (clock, speed, engine camera). */
+    transport,
     /** The manifest entry open (or loading). */
     entry: () => entry ?? loading,
-    loading: () => !!loading,
+    loading: () => !!loading || !!setLoading,
     /** Final-frame checks (null while computing). */
     checks: () => checks,
     /** The building hidden while the take is open (a year-build take rebuilds it). */
@@ -158,7 +228,7 @@ export function createTakeHost(
     },
     /** Advance/redraw the take. Call once per frame. */
     update(dt: number) {
-      replay?.update(dt);
+      transport()?.update(dt);
     },
     /**
      * Put the studio camera on the engine camera when it is on. Returns true when it drove the camera this frame
@@ -166,9 +236,10 @@ export function createTakeHost(
      * and restores the studio fov.
      */
     drive(camera: THREE.PerspectiveCamera, target: THREE.Vector3) {
-      const on = !!replay && replay.engineCamera;
+      const r = transport();
+      const on = !!r && r.engineCamera;
       if (on) {
-        const pose = replay!.cameraPose();
+        const pose = r!.cameraPose();
         camera.position.fromArray(pose.position);
         target.fromArray(pose.target);
         camera.lookAt(target);
@@ -184,8 +255,10 @@ export function createTakeHost(
       return on;
     },
     info: () => (replay ? { ...replay.info(), hiddenAssembly: hidden, checks } : null),
-    /** Redraw timing of the open replay (TakeReplay.perf). */
-    perf: (reset = false) => replay?.perf(reset) ?? null,
+    /** Chapter set readout (ChapterSetReplay.info + the hidden building), null when no set is open. */
+    setInfo: () => (setReplay ? { ...setReplay.info(), hiddenAssembly: hidden } : null),
+    /** Redraw timing of the open replay (TakeReplay.perf / ChapterSetReplay.perf: with boundary swaps and chapter loads). */
+    perf: (reset = false) => transport()?.perf(reset) ?? null,
     dispose() {
       close();
       abort.abort();

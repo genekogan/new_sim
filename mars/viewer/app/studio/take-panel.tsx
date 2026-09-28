@@ -4,10 +4,14 @@
 // code change; year-build entries (`isYearBuild`) are also offered under the year picker. Mouse-only transport:
 // take select, play/pause, scrubber with the take's key moments, speed, engine-camera toggle, current shot/steps,
 // the take's refusal / blocked-wait log as it happens, the final-frame checks and camera direction.
+// Chapter sets (manifest `chapterSets`, W31/W37): each set is ONE entry in both pickers ("set:<id>") and plays its
+// chapters back to back (chapter-panel.tsx); the chapter takes themselves are never offered on their own.
 import { useEffect, useState } from 'react';
-import { TAKE_MANIFEST_URL, isYearBuild, type TakeManifest, type TakeManifestEntry } from '../engine-view/take-replay.ts';
+import { TAKE_MANIFEST_URL, isChapter, isYearBuild, type ChapterSetEntry, type TakeManifest, type TakeManifestEntry } from '../engine-view/take-replay.ts';
 import type { TakeHost } from './take-host.ts';
 import { DirectPanel } from './direct-panel';
+import { SetTransport } from './chapter-panel';
+import { setClock, setOptionText } from './chapter-set.ts';
 
 const SPEEDS = [0.5, 1, 2, 4, 8, 16, 64];
 const MOMENT_LABELS: Record<string, string> = {
@@ -28,9 +32,13 @@ export const takeOptionText = (t: TakeManifestEntry) =>
   `${shortLabel(t.label)} · ${t.year} · ${span(t.duration)} · ${ticksOf(t).toLocaleString('en-US')} ticks · ${t.hypothetical ? 'hypothetical' : 'historical'}`;
 
 const manifests = new Map<string, Promise<TakeManifest | null>>();
-/** Every manifest entry recorded for `year` (`takes` + `otherYears`), in manifest order. */
-export function useYearTakes(year: number) {
-  const [takes, setTakes] = useState<TakeManifestEntry[]>([]);
+type YearEntries = { takes: TakeManifestEntry[]; sets: ChapterSetEntry[]; all: TakeManifestEntry[] };
+/**
+ * The manifest for `year`: `takes` = every entry recorded for it (`takes` + `otherYears`, in manifest order) except
+ * chapter takes; `sets` = its chapter sets; `all` = every entry, chapters included (a set's chapter entries).
+ */
+export function useYearEntries(year: number): YearEntries {
+  const [out, setOut] = useState<YearEntries>({ takes: [], sets: [], all: [] });
   useEffect(() => {
     let live = true;
     let p = manifests.get(TAKE_MANIFEST_URL);
@@ -38,10 +46,29 @@ export function useYearTakes(year: number) {
       p = fetch(TAKE_MANIFEST_URL).then((r) => (r.ok ? (r.json() as Promise<TakeManifest>) : null)).catch(() => null);
       manifests.set(TAKE_MANIFEST_URL, p);
     }
-    void p.then((m) => { if (live) setTakes([...(m?.takes ?? []), ...(m?.otherYears ?? [])].filter((t) => t.year === year)); });
+    void p.then((m) => {
+      if (!live) return;
+      const all = [...(m?.takes ?? []), ...(m?.otherYears ?? [])].filter((t) => t.year === year);
+      setOut({ takes: all.filter((t) => !isChapter(t)), sets: (m?.chapterSets ?? []).filter((x) => x.year === year && x.chapters?.length), all });
+    });
     return () => { live = false; };
   }, [year]);
-  return takes;
+  return out;
+}
+/** Every manifest entry recorded for `year` that plays on its own (chapter takes are played through their set). */
+export function useYearTakes(year: number) {
+  return useYearEntries(year).takes;
+}
+/** A set's chapter entries by position (their hashes guard every boundary). */
+const chapterEntries = (s: ChapterSetEntry, all: TakeManifestEntry[]) => s.chapters.map((c) => all.find((e) => e.id === c.take) ?? null);
+const SET = 'set:';
+/** Picker change: a set ("set:<id>") or a take id ('' = off). */
+function choose(h: TakeHost | null, v: string, y: YearEntries) {
+  if (!h) return;
+  if (v.startsWith(SET)) {
+    const s = y.sets.find((x) => x.id === v.slice(SET.length)) ?? null;
+    void h.openSet(s, s ? chapterEntries(s, y.all) : []);
+  } else void h.open(y.takes.find((t) => t.id === v) ?? null);
 }
 
 /** Re-render on host changes (open / close / checks / directed) and every 100 ms while a take is open. */
@@ -49,7 +76,7 @@ function useHost(host: () => TakeHost | null) {
   const [, setTick] = useState(0);
   const h = host();
   useEffect(() => h?.subscribe(() => setTick((n) => n + 1)), [h]);
-  const open = !!h?.entry();
+  const open = !!h?.entry() || !!h?.set();
   useEffect(() => {
     if (!open) return;
     const id = setInterval(() => setTick((n) => n + 1), 100);
@@ -60,16 +87,22 @@ function useHost(host: () => TakeHost | null) {
 
 /** Header control under the year picker: the year's year-build takes ("Watch it being built"). Hidden when none. */
 export function BuildPicker({ host, year }: { host: () => TakeHost | null; year: number }) {
-  const builds = useYearTakes(year).filter(isYearBuild);
+  const y = useYearEntries(year);
+  const builds = y.takes.filter(isYearBuild);
   const { host: h } = useHost(host);
-  if (!builds.length) return null;
-  const current = h?.entry();
-  const value = current && builds.some((b) => b.id === current.id) ? current.id : '';
+  if (!builds.length && !y.sets.length) return null;
+  const current = h?.entry(), set = h?.set();
+  const value = set ? SET + set.id : current && builds.some((b) => b.id === current.id) ? current.id : '';
   return (
     <label className="year-picker build-picker">
       Watch it being built
-      <select aria-label="Watch it being built" value={value} onChange={(e) => void host()?.open(builds.find((b) => b.id === e.target.value) ?? null)}>
+      <select aria-label="Watch it being built" value={value} onChange={(e) => choose(host(), e.target.value, y)}>
         <option value="">— off —</option>
+        {y.sets.map((s) => (
+          <option key={s.id} value={SET + s.id}>
+            {setOptionText(s)}
+          </option>
+        ))}
         {builds.map((b) => (
           <option key={b.id} value={b.id}>
             {takeOptionText(b)}
@@ -81,24 +114,33 @@ export function BuildPicker({ host, year }: { host: () => TakeHost | null; year:
 }
 
 export function TakePanel({ host, year }: { host: () => TakeHost | null; year: number }) {
-  const takes = useYearTakes(year);
+  const y = useYearEntries(year);
+  const takes = y.takes;
   const { host: h, bump } = useHost(host);
-  if (!takes.length) return null;
+  if (!takes.length && !y.sets.length) return null;
   const replay = h?.replay() ?? null;
   const entry = h?.entry() ?? null;
-  const building = !!entry && isYearBuild(entry);
-  const diag = replay?.diagnostics();
+  const set = h?.set() ?? null;
+  const setReplay = h?.setReplay() ?? null;
+  const building = (!!entry && isYearBuild(entry)) || !!set;
+  const diag = replay?.diagnostics() ?? setReplay?.diagnostics();
+  const at = setReplay ? setClock : clock;
   const steps = replay?.activeSteps() ?? [];
   const checks = h?.checks() ?? null;
   const done = !!replay && replay.t >= replay.duration - 1e-6;
   const track = replay?.trackInfo();
   return (
-    <div className={`take-panel ${replay ? 'open' : ''}`} data-testid="take-panel">
+    <div className={`take-panel ${replay || setReplay ? 'open' : ''}`} data-testid="take-panel">
       <div className="take-row">
         <label className="take-picker">
           {building ? 'Watch it being built' : 'Replay take'}
-          <select aria-label="Replay take" value={entry?.id ?? ''} onChange={(e) => void host()?.open(takes.find((t) => t.id === e.target.value) ?? null)}>
+          <select aria-label="Replay take" value={set ? SET + set.id : (entry?.id ?? '')} onChange={(e) => choose(host(), e.target.value, y)}>
             <option value="">— off —</option>
+            {y.sets.map((s) => (
+              <option key={s.id} value={SET + s.id}>
+                {setOptionText(s)}
+              </option>
+            ))}
             {takes.map((t) => (
               <option key={t.id} value={t.id}>
                 {takeOptionText(t)}
@@ -107,20 +149,21 @@ export function TakePanel({ host, year }: { host: () => TakeHost | null; year: n
           </select>
         </label>
         {h?.loading() && <span className="take-loading" role="status">Loading take…</span>}
-        {replay && entry && (
+        {((replay && entry) || (setReplay && set)) && (
           <div className="take-banner" role="note">
-            {entry.hypothetical ? 'HYPOTHETICAL build scenario — not historical' : 'Historical record'}
+            {(entry ?? set)!.hypothetical ? 'HYPOTHETICAL build scenario — not historical' : 'Historical record'}
           </div>
         )}
-        {replay && diag && (
+        {(replay || setReplay) && diag && (
           <details className="take-diagnostics">
             <summary>
               Diagnostics: {diag.violations} violations · {diag.failed} refused / failed · {diag.blocked} blocked waits
+              {setReplay && setReplay.diagnostics().chapters < setReplay.set.chapters.length ? ` (${setReplay.diagnostics().chapters} / ${setReplay.set.chapters.length} chapters read)` : ''}
             </summary>
             <ol>
               {diag.lines.slice(-12).map((l, i) => (
                 <li key={i} className={l.kind}>
-                  <b>{clock(l.t)}</b> {l.text}
+                  <b>{at(l.t)}</b> {l.text}
                 </li>
               ))}
               {!diag.lines.length && <li>No diagnostics yet at this time.</li>}
@@ -128,6 +171,7 @@ export function TakePanel({ host, year }: { host: () => TakeHost | null; year: n
           </details>
         )}
       </div>
+      {setReplay && set && <SetTransport r={setReplay} onChange={bump} />}
       {replay && entry && (
         <>
           <div className="take-row take-transport">
