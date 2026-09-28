@@ -834,3 +834,43 @@ Then: gate → release 5; HANDOFF refresh.
 - W35 spawned (renderer): prone.ts reads `proneYaw`/`phaseK`, preset → 2.75 m + 4 ft deck joists, forks 0.70 m, POSES.md 0.94 → 0.73, spec green.
 - **W34 release 6 deployed** (12:11 → 12:36 EDT): gate GREEN at `27e04f6` in a detached worktree (unit 56/56, engine 370/0/3 skip, tsc clean, e2e 64 passed / 1 skipped in 729 s on port 5591, probe `b746b094…f0c3` = pin; `gitDirty: false`); production **`07dce638-2950-444f-823f-0e19b8f62320`** replaces `cebd5827…` (rollback target, confirmed 100 % before the deploy). Not in the deploy: `0cd2f19` (W32 prone engine) + `f350896`, `ce74ba0`, `848b895`, `858946e`. Smoke: all routes / `/engine/campus-2022.json` / 5 `/engine/takes/*` / R2 GLB 200, `smoke.mjs` OK; director demo PASS (9 steps, 7.96 s); prod `/lab` build-bay 43/43, 0 violations, tick 10901, **prod hash = probe**; prod `/studio`: 2022 "Watch it being built" picker (both takes), flagship replay at held 37/37, hash = recorded = manifest, banner, 0 errors (screenshots reviewed, `e2e/artifacts/prod-smoke-6/`). **Red: committed `deploy/simulation-integration.mjs` fails against prod** (its engine tool list predates `engine_direct_camera`); a scratch copy with that one name added passes all 3 lines — needs a one-line fix by the `deploy/` owner. Evidence not regenerated (out of scope). Record: RELEASE_CHECKLIST "Production deploy 6". Cost ≈ 0.16 M tokens, ≈ 25 min wall.
 - **W34 landed** `a98c0b3` (≈160k tokens, 25 min): **Release 6 live** — production `07dce638-2950-444f-823f-0e19b8f62320` from gated head `27e04f6` (gate GREEN: 56/56, engine 370/0/3, tsc, e2e 64 pass / 1 skip in 729 s, probe b746b094 = pin; report `w34-wt/viewer/.cloudflare/gate/2026-09-28T16-12-39-722Z`); rollback `cebd5827…` (command in RELEASE_CHECKLIST "Production deploy 6"). Smoke: all routes + engine files + 4 takes + R2 200; director demo PASS (9 steps, 8.0 s); prod `/lab` flagship 43/43, 0 violations, hash = probe; `/studio/2022` shows "Watch it being built" with both takes; flagship replay hash = recorded. Not in the deploy: W32 (`0cd2f19`…`848b895`). Lead fix: `deploy/simulation-integration.mjs` expected 13 engine tools → now 14 incl. `engine_direct_camera`; re-run against production: 3/3 PASS.
+
+## W36 — 2x4 roof framing verbs: top plates, rafters, blocking (2026-09-29)
+- **Verbs** (`construction/framing.ts`, FRAMING.md; branch `w36-framing`):
+  - `install_top_plate {part, onto, at}`: rests on column tops of beam-stable frames that have their top beams, or on
+    top rack beams; ≥ 2 bearings of ≥ 1.5 in; ≤ 24 in overhang.
+  - `install_rafter {part, from, to, at, pitch?}`: plate to plate, square across; pitch from the plates' tops, checked
+    ±1°; ≥ 1.5 in on each plate, tail ≤ 12 in (names the lengths).
+  - `install_blocking {part, between, on}`: between two rafters on a plate, ≤ 1 cm play a side.
+  - All three go up by the hang_beam / pass_up relay pattern on set_part's helpers: givers → relay → installers on frame
+    stances or a deck, raised outside the structure, slid 2 cm over the supports, fastened. Hand-off heights are
+    searched inside both crews' reach.
+  - Refusals: `framing.gap` ("add a relay"), `framing.out-of-reach` (names the height, "use a stance/deck"),
+    `plate-not-installed`, `rafter-long/short`, `pitch-mismatch`, `blocking-length`, `plate-frame-not-ready`, … .
+  - Invariants: `framingHandsInReach` (stance / floor reach every tick) and `framingSupported`.
+- **Catalog** (`world/catalog-framing.ts`): plates 8/12/16 ft (flat), rafters 4–16 ft (on edge; a flat-roof rafter is
+  the ceiling joist, so there is no separate def), blocking 16/24 in centres. All are 2x4 section, cut to order from
+  16 ft stock by the unchanged `cut`.
+- **Additive changes:** `rules.ts` (`RAFTER_SPACING_MAX` 24 in for the sheet rule + limits, `frameTopProblem`),
+  `index.ts` / `api/registry.ts` (ENGINE_ACTIONS / ENGINE_INVARIANTS), `catalog.ts` (one registration).
+- **Test** (`framing.test.ts`, 4 tests):
+  - A 16 ft Kit bay (beams 0.22 / 2.48 / 4.757) gets 2 plates, 4 rafters and 4 blocks: 7 674 ticks, 0 violations,
+    every member within 1 cm / 1°, pinned `935bfcee…`.
+  - The seven refusals listed in FRAMING.md.
+  - Determinism; catalog / cut; sloped rafter (plan).
+  - Engine suite 379 / 376 pass / 0 fail / 3 skip; `npm test` 56/56; tsc clean.
+- **Pins unchanged:** `deploy/perf-walk.mjs` stress / probe / campus / meal / v3 all PIN-OK. The suite's year-build
+  tests (first bay, first bay + deck strip) are unchanged.
+- **Kit finding (for the campus worker):**
+  - 2022 has no roof framing. Its 10 "roof" features are the kitchen's first-floor guard rail: 8 `roof rail post`
+    (0.07 × 1.0 × 0.06, y 2.5–3.5, standing in the outer frame columns: unplaceable, the column is the post) and 2
+    `timber roof railing` (10.972 × 0.07 × 0.08 at y 3.45 along both long sides). They map to a guard-rail rule, not
+    to these verbs.
+  - A framed roof raises the roof sheets 13 cm above the Kit's 4.892 m roof deck, so framing in a replay is a
+    non-canonical addition. That needs a decision (FRAMING.md).
+- **Weak spots:**
+  - Mid-bay top members are out of reach from end-frame stances (refused) until there is a deck or a "stand on the top
+    beams" verb.
+  - One person per frame face per height band (0.31 m apart otherwise).
+  - No runtime make-way for the givers.
+  - Sloped framing only plan-tested.
