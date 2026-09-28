@@ -301,7 +301,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     resB = phaseB({
       assembly, parts: partsB, step, C, yard, scrap: scrap ? { id: scrap.id, x: scrap.x, z: scrap.z, yaw: scrap.yaw } : null, left, spotClear,
       frames: frames.map((f) => ({ id: f.node.id, k: f.k, r: f.r, c: f.c, def: f.node.def! })), beams: beams.map((b) => ({ id: b.node.id, k: b.k, r: b.r, col: b.col, seat: b.seat })),
-      engCol, Y, sections: opts.phaseB.sections, count: () => S.length,
+      engCol, Y, sections: opts.phaseB.sections, count: () => S.length, lastSteps: () => [...new Set(last.values())].sort(),
       narrowMinusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomMinusU(nodes.find((x) => x.id === nd.node)!, scene); },
     });
     for (const x of resB.sequenced) done.set(x.node, x.steps);

@@ -73,7 +73,7 @@ test('year build 2022, report only: the other three rack houses plan through the
 });
 
 /** Pinned: the first-bay tranche + its first ground-floor deck strip (default suite). */
-const PIN_BAY1_DECK = { ticks: 53248, hash: 'd8274416df027cfd35ee1b4dc127836cfe6aedb82a9ced3db3d3a2e92e6ccff1' };
+const PIN_BAY1_DECK = { ticks: 53604, hash: '94db263edb961cb21d491445e7d9401be0f3a7609a287680ed1052a6b67d73cb' };
 
 test('year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned', () => {
   const firstStrip = (p: { kind: string; meta: Record<string, number | string> }) => p.kind === 'deck' && Number(p.meta.level) < 1 && Number(p.meta.strip) < -9.5;

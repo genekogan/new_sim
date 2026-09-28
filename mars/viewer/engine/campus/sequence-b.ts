@@ -49,6 +49,8 @@ export type PhaseBCtx = {
   sections?: readonly Section[];
   /** Template steps so far (to record where each section starts). */
   count: () => number;
+  /** Every crew member's last step so far (the section barrier). */
+  lastSteps: () => string[];
   /** Is the ground beside the house on its −u side taken near local v (a neighbour's stair)? The givers then hold the pieces by their sides. */
   narrowMinusU: (v: number) => boolean;
   /** Crew positions at the start of phase B when run from a snapshot (sections only). */
@@ -56,7 +58,16 @@ export type PhaseBCtx = {
 export type PhaseBResult = { sequenced: { node: string; kind: string; steps: string[] }[]; unplaced: UnplacedB[]; done: string[]; sectionStarts: { section: Section; at: number }[] };
 
 export function phaseB(ctx: PhaseBCtx): PhaseBResult {
-  const { step, C, parts } = ctx;
+  const { C, parts } = ctx;
+  // section barriers (the Mars order): each crew member's first step of a section waits for everyone's last step of the
+  // sections before it — otherwise a crew member free early starts, e.g., climbing onto a deck not laid yet
+  let gate: string[] = [];
+  const seen = new Set<number>();
+  const step = (verb: string, params: Record<string, unknown>, actors: number[], deps: string[], label?: string): string => {
+    const fresh = actors.filter((a) => !seen.has(a));
+    for (const a of fresh) seen.add(a);
+    return ctx.step(verb, params, actors, fresh.length ? [...new Set([...deps, ...gate])] : deps, label);
+  };
   const secs = new Set(ctx.sections ?? SECTIONS);
   const G = [0, 1];
   const U = rot2([1, 0], ctx.Y), V = rot2([0, 1], ctx.Y);
@@ -77,7 +88,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   };
   const done: string[] = [];
   const sectionStarts: PhaseBResult['sectionStarts'] = [];
-  const begin = (sec: Section) => sectionStarts.push({ section: sec, at: ctx.count() });
+  const begin = (sec: Section) => { sectionStarts.push({ section: sec, at: ctx.count() }); gate = ctx.lastSteps(); seen.clear(); };
   const seqd = new Map<string, string[]>();
   // (a panel rail serves two panels: it is not a Kit component and does not make its panels "sequenced")
   const mark = (p: PartB, ...ids: string[]) => { if (p.role !== 'panel-rail') for (const n of p.nodes) { const a = seqd.get(n) ?? []; a.push(...ids); seqd.set(n, a); } if (!done.includes(p.id)) done.push(p.id); };
