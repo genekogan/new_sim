@@ -175,6 +175,18 @@ The 19 ft upright with 4 carriers is rejected, naming carrier q2 and 'corridor A
 grid build 29.7 ms (600×600×2); long route 51.2 ms, 94,909 expansions. Progressive full sequence:
 4767 ticks = 238.3 s, 98 actions, 0 violations.
 
+**Flagship v2** (`scenarios/build-bay-v2.ts`, `build-bay-v2.test.ts`; a second template, v1 and its
+pins untouched): v1's build plus (a) plywood s2 picked off its stack by a forklift (p6 mounts,
+`forklift_pick`, `forklift_deliver` beside the bay, `ride_to` back, dismount), then installed by p3/p4;
+(b) p1 carries a spare stair tread up the finished flight onto the deck (single-carrier stairs carry);
+(c) two sit on benches, 8 people fill the campfire's 8 places, two wander (`ambient_wander`, 45 s, is
+the clock), then everyone `stand`s and the run ends settled. Open ground: **66 steps, 676.9 s
+simulated, ~3.7 s compute, 0 violations**, execute == rehearsal, canonical untouched. Campus fork
+(staging-east): **66 steps, 723.8 s simulated, ~6.4 s compute, take 571,196 B**. Layout changes forced
+by refusals: the forklift cannot stage s2 on the deck (truck refused next to frames A/B, tested), a
+2x4 cannot be carried onto the 1.83 m deck (`carry.stairs-blocked`), a `sit` step ends `cancelled`
+(benches use `gather`). Engine gap routed around in the scenario: `carryIntegrity` flags fork loads.
+
 ## Visual evidence (paths to committed baselines and artifact dirs)
 
 **Committed baselines** (`viewer/e2e/baselines/`): 17 studio images (`studio-{default,plan}`,
