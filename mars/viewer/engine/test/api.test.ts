@@ -614,3 +614,35 @@ test('api: edit_world — design edits spawn/move/remove/region, all-or-nothing,
   assert.equal(inst.code, 'edit.immovable');
   assert.match(inst.message, /installed/);
 });
+
+test('api: seeds carry regions and a campfire + benches, so social verbs have targets over the op API', () => {
+  const c = fresh();
+  const pg = c.call('query_world', { workspace: 'proving-ground', include: ['regions'], kind: 'fixture' }) as any;
+  assert.deepEqual(pg.regions.map((r: any) => r.id), ['lawn', 'staging', 'deck']);
+  assert.deepEqual(pg.entities.map((e: any) => e.def).sort(), ['bench-6ft', 'bench-6ft', 'campfire']);
+  const cy = c.call('query_world', { workspace: 'carry-yard', include: ['regions'], kind: 'fixture' }) as any;
+  assert.deepEqual(cy.regions.map((r: any) => r.id), ['yard-a', 'yard-b', 'yard-b2']);
+  assert.deepEqual(cy.entities.map((e: any) => e.id), ['bench-e', 'bench-s', 'fire']);
+  const run = (ws: string, template: unknown, bindings: unknown) => {
+    const r = c.call('rehearse', { plan_id: bind(c, template, bindings, ws) }) as any;
+    assert.ok(r.ok, JSON.stringify(r.report.steps.map((s: any) => s.diagnostic)));
+    return r;
+  };
+  // a campfire evening: three people take fire-circle places, then stand up at t = 60 s
+  const evening = {
+    schema: 'mars-sequence/1', id: 'evening', params: { crew: { kind: 'actors' } },
+    steps: [
+      { id: 'fire', verb: 'campfire_circle', params: { actors: '$crew', fire: 'fire' } },
+      ...['n1', 's1', 'p1'].map((a, i) => ({ id: `up${i}`, verb: 'stand', params: { actor: a }, at: 60 })),
+    ],
+  };
+  const ev = run('ws', evening, { crew: ['n1', 's1', 'p1'] });
+  assert.equal(ev.report.violations.count, 0);
+  // region targets: wander the lawn (proving ground) and yard A (carry yard) for a bounded time
+  const wander = (region: string) => ({ schema: 'mars-sequence/1', id: `wander-${region}`, params: { crew: { kind: 'actors' } }, steps: [{ id: 'w', verb: 'ambient_wander', params: { actors: '$crew', region, duration: 30 } }] });
+  run('ws', wander('lawn'), { crew: ['n1', 's1'] });
+  assert.ok(c.call('fork', { from: 'carry-yard', name: 'cy' }).ok);
+  run('cy', wander('yard-a'), { crew: ['p1', 'p2'] });
+  // the fixtures in yard B2 keep the beam delivery along corridor A feasible
+  assert.ok((c.call('query_world', { workspace: 'cy', carry: { crew: ['p1', 'p2'], item: 'b1', to: { x: 18, z: 11, yaw: Math.PI / 2 } } }) as any).carry.ok);
+});
