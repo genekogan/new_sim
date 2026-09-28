@@ -23,7 +23,7 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status (W49, 2026-09-29 evening): **12 open blocks** (W44's site-axis Q20–Q22, W43's Chiba 2024 Q23–Q24, W38's year-build Q25–Q27 and W49's 2022 follow-ups Q28–Q31) and **17 answered cards** (Q1–Q14 and Q19 from Gene's questionnaire, 2026-09-29 evening; Q3 = A3 north, now with Gene's 2022 correction; A1 top beams; A2 reach-down). Answered blocks stay in place with `status: answered`; the page moves them to its record. The work plan for the answers is RECONCILIATION_2022.md.
+Status (W51, 2026-09-29 evening): **13 open blocks** (W44's site-axis Q20–Q22, W43's Chiba 2024 Q23–Q24, W38's year-build Q25–Q27, W49's 2022 follow-ups Q28–Q31 and W51's Q32; W51 applied the Q2 answer and the Q20 / Q28 / Q29 defaults) and **17 answered cards** (Q1–Q14 and Q19 from Gene's questionnaire, 2026-09-29 evening; Q3 = A3 north, now with Gene's 2022 correction; A1 top beams; A2 reach-down). Answered blocks stay in place with `status: answered`; the page moves them to its record. The work plan for the answers is RECONCILIATION_2022.md.
 
 **Gene's page.** `questions/index.html` shows every open block as a card Gene can read and answer (plain question,
 pictures, options, export button); it is served at `/questions/` after a deploy. It is generated from this file:
@@ -119,6 +119,9 @@ its footprint. These are the tilted orange-brown boxes inside the pink roof area
 where they stood. If it is real (the trailers parked under the roof), nothing changes.
 
 Gene: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) no trailers under Chiba in 2023/2024, and side trailers must not touch the walls. → Move them out (RECONCILIATION_2022.md §i).
+
+**Done (W51, 2026-09-29 evening):** the 2023 and 2024 trailer rings leave Chiba's sector open; no trailer stands under
+its roof and every one is ≥ 3.4 m from its walls (`history-geometry` asserts ≥ 0.5 m; CAMPUS_SCENE.md). Trailer ids kept.
 
 ### Q3. North axis: which way is north on site?
 
@@ -267,6 +270,9 @@ and of both drone photos: Ba Sing Se = the model's Chiba (up), Cahuilla = east h
 (down), Huaqiangbei = west house (left). So the photo can be matched without mirroring the whole scene: each house
 keeps its quadrant and stair end, and only its offset along its own length flips (`make2022` `shift = 3` → ≈ −2).
 Plan: RECONCILIATION_2022.md §a. Left open for Gene to confirm the photo is right.
+
+**Applied (W51, 2026-09-29 evening):** `shift` −2 is in the model (clockwise, as both photos); still open for Gene to
+confirm.
 
 Gene:
 
@@ -943,6 +949,30 @@ options:
 images:
   - questions/r2022-names-model-vs-photo.jpg | Left: the model with its old labels and the new names. Right: the drone photo with the same names.
 ```
+
+Gene:
+
+### Q32. 2022 stairs: how did the top of each stair reach the first floor?
+
+```question
+id: Q32
+urgency: fidelity
+order: 11
+plain: With the steps running along the building, the stair climbs across the end of the building. The model ends it on a small landing at first-floor height over the outer end frame, and you step off sideways through the gap between two end frames onto the floor. Is that how it worked?
+context: The photos from above show the steps but not how the top met the floor. The end of each building is three braced frames with 3 ft gaps between them, so the only way through is one of those gaps.
+changes: Only the top of the four stairs (the landing and where you step through).
+options:
+  - Yes, a landing at the top and a step through the gap
+  - The stair ran straight up to the floor (say how below)
+  - Something else (say below)
+images:
+  - questions/r2022-aerial-annotated.jpg | Orange boxes: the four stairs; the orange lines show which way the steps run.
+  - questions/photos/2022-exterior-09.jpg | Real photo, 2022: a building with a stair at its end.
+```
+
+**Default (W51, `photographic-corrections.ts stair2022`):** 12 treads of 3.54 m parallel to the house and 13 risers of
+0.19 m from the sand at the courtyard face; a landing at the first-floor deck top (2.49 m) over the outer frame bay,
+reaching 0.6 m into the aisle between the outer and middle end frames.
 
 Gene:
 

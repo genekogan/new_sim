@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { captureView, collectConsoleErrors, recordVideo, writeArtifact } from './helpers';
 import { labFrames, openLab, setOverlays, type LabState } from './lab-helpers';
+const W51_FIXME = '2022 reconciliation W51: mars-2022 re-seeded (houses, stairs, solar, trailers moved); the recorded 2022 takes / pins no longer match it — re-record parked with the content (OWNER_DECISIONS 2026-09-29 evening; RECONCILIATION_2022.md)';
 
 const SCENARIOS: { name: string; capture: number[] }[] = [
   { name: 'wall', capture: [0.5] },
@@ -170,6 +171,7 @@ test('lab perf: step cost + render stats for trio and stress-30', async ({ page 
 // Lab "Oblique yard" (year-build presets): the recorded whole-skeleton take's opening shot — the yard + crew region from
 // the south-east at 32°, the planner's bottom safe area — as a lab button. Same pose as the take's first camera sample.
 test('lab: year-build "Oblique yard" view = the whole-skeleton take\'s opening camera', async ({ page }, testInfo) => {
+  test.fixme(true, W51_FIXME);
   test.setTimeout(180_000);
   const errors = collectConsoleErrors(page);
   await openLab(page, 'year-build-2022-house');

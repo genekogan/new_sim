@@ -14,6 +14,7 @@ import { build } from 'esbuild';
 import * as T from 'three';
 import { buildYearFile, historyConfidence } from '../engine/campus/history-extract.ts';
 import { HISTORY_YEARS } from '../engine/campus/history.ts';
+import { YEAR_NORTH_AZIMUTH_OFFSET } from '../engine/env/sun.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outOf = (year) => `public/engine/campus-${year}.json`;
@@ -73,6 +74,7 @@ export function extractYear(scenes, year) {
     },
     assemblies,
     components,
+    northAzimuthOffset: YEAR_NORTH_AZIMUTH_OFFSET[year], // measured bearings only (W51); absent = the global
   });
 }
 

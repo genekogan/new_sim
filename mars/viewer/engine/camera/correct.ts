@@ -139,7 +139,7 @@ const lerp3 = (a: Vec3, b: Vec3, u: number): Vec3 => [a[0] + (b[0] - a[0]) * u, 
 /** Is the camera heading (subject → camera, mid-shot) inside the sun-behind band for this lens? Returns the band when the sun is up. */
 function sunBand(ctx: SynthContext, shot: SynthShot): { centre: number; half: number; heading: number } | null {
   if (!ctx.sun || ctx.sun.direction[1] <= 0) return null;
-  const w = sunBehindWindow(ctx.sun.datetime, { vfovDeg: shot.fov, aspect: ctx.aspect });
+  const w = sunBehindWindow(ctx.sun.datetime, { vfovDeg: shot.fov, aspect: ctx.aspect, ...(ctx.north !== undefined ? { northAzimuthOffset: ctx.north } : {}) });
   const k = shot.keys[Math.floor(shot.keys.length / 2)];
   return { centre: w.cameraHeading.centre, half: w.cameraHeading.halfWidth, heading: datan2(k.position[2] - k.target[2], k.position[0] - k.target[0]) };
 }

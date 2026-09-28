@@ -43,6 +43,22 @@ export const DEFAULT_SCENE_DATE = '2026-03-15';
  */
 export const NORTH_AZIMUTH_OFFSET = -90;
 
+/**
+ * Per-year site bearing (degrees, same convention as NORTH_AZIMUTH_OFFSET) for the year scenes whose frame was
+ * measured separately; a year not listed uses the global (exact for 2020; the others are unmeasured: Q22).
+ * - 2022 = −101 (W51, RECONCILIATION_2022 §f): DJI_0829 turned north-up by its logged FlightYaw 110.2° shows the
+ *   houses' long walls and panel rows at bearings 95–103° (five picks, mean 100.4°; W49 read 10–12° clockwise of E–W),
+ *   i.e. world −Z (Huaqiangbei's long axis) points ≈ 101° and north is world −X turned 11° toward +Z. ±5° (FlightYaw,
+ *   not GimbalYaw; pitch −86.4°; picks by eye). Gene's estimate ("8 o'clock") would be −120.
+ * The year files carry it (`northAzimuthOffset`, deploy/history-scenes.mjs); the camera reads the scene's value.
+ */
+export const YEAR_NORTH_AZIMUTH_OFFSET: Readonly<Partial<Record<number, number>>> = { 2022: -101 };
+/** The site bearing of a scene (its `meta.northAzimuthOffset` / file field), else the global. */
+export const northAzimuthOffsetOf = (s?: object | null): number => {
+  const o = s as { northAzimuthOffset?: number; meta?: { northAzimuthOffset?: number } } | null | undefined;
+  return o?.northAzimuthOffset ?? o?.meta?.northAzimuthOffset ?? NORTH_AZIMUTH_OFFSET;
+};
+
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -234,6 +250,8 @@ export function solarPosition(
   localIso: string,
   lat = BOMBAY_BEACH.lat,
   lon = BOMBAY_BEACH.lon,
+  /** The scene's site bearing (YEAR_NORTH_AZIMUTH_OFFSET / northAzimuthOffsetOf); only `direction` depends on it. */
+  northOffset = NORTH_AZIMUTH_OFFSET,
 ): SolarPosition {
   const t = parseLocalDateTime(localIso);
   const hourDecimal = t.hour + t.minute / 60 + t.second / 3600;
@@ -276,7 +294,7 @@ export function solarPosition(
     elevationDeg,
     trueElevationDeg,
     azimuthDeg,
-    direction: sunDirectionVector(elevationDeg, azimuthDeg),
+    direction: sunDirectionVector(elevationDeg, azimuthDeg, northOffset),
   };
 }
 
@@ -318,8 +336,8 @@ export function sunTimes(
  * Project elevation/azimuth to a unit direction vector in the studio's (x, y, z)
  * frame — see NORTH_AZIMUTH_OFFSET above for the site bearing this bakes in.
  */
-export function sunDirectionVector(elevationDeg: number, azimuthDeg: number): [number, number, number] {
-  const azRad = (azimuthDeg + NORTH_AZIMUTH_OFFSET) * DEG2RAD;
+export function sunDirectionVector(elevationDeg: number, azimuthDeg: number, northOffset = NORTH_AZIMUTH_OFFSET): [number, number, number] {
+  const azRad = (azimuthDeg + northOffset) * DEG2RAD;
   const elRad = elevationDeg * DEG2RAD;
   const cosEl = dcos(elRad);
   return [dsin(azRad) * cosEl, dsin(elRad), -dcos(azRad) * cosEl];
@@ -334,8 +352,8 @@ export function sunDirectionVector(elevationDeg: number, azimuthDeg: number): [n
  * World heading (radians, `datan2(z, x)` — the camera's `dirFrom` azimuth convention) of a compass
  * azimuth (degrees clockwise from north), under the NORTH_AZIMUTH_OFFSET bearing above.
  */
-export function worldHeadingOfAzimuth(azimuthDeg: number): number {
-  const d = sunDirectionVector(0, azimuthDeg);
+export function worldHeadingOfAzimuth(azimuthDeg: number, northOffset = NORTH_AZIMUTH_OFFSET): number {
+  const d = sunDirectionVector(0, azimuthDeg, northOffset);
   return datan2(d[2], d[0]);
 }
 
@@ -348,6 +366,8 @@ export type SunBehindOpts = {
   marginDeg?: number;
   /** Minimum angle between the optical axis and the sun (deg): flare / blown-out subject guard, default 6. */
   flareDeg?: number;
+  /** The scene's site bearing (default: the global NORTH_AZIMUTH_OFFSET). */
+  northAzimuthOffset?: number;
 };
 
 /**
@@ -372,12 +392,13 @@ export type SunBehindWindow = {
 };
 
 export function sunBehindWindow(localIso: string, opts: SunBehindOpts): SunBehindWindow {
-  const s = solarPosition(localIso);
+  const north = opts.northAzimuthOffset ?? NORTH_AZIMUTH_OFFSET;
+  const s = solarPosition(localIso, BOMBAY_BEACH.lat, BOMBAY_BEACH.lon, north);
   const aspect = opts.aspect ?? 16 / 9;
   const margin = opts.marginDeg ?? 3;
   const flare = opts.flareDeg ?? 6;
   const hfovDeg = 2 * datan(dtan((opts.vfovDeg * DEG2RAD) / 2) * aspect) * RAD2DEG;
-  const heading = worldHeadingOfAzimuth(s.azimuthDeg);
+  const heading = worldHeadingOfAzimuth(s.azimuthDeg, north);
   let centre = heading + Math.PI;
   if (centre > Math.PI) centre -= 2 * Math.PI;
   return {

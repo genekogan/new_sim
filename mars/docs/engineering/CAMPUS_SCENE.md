@@ -72,11 +72,15 @@ per scene (A3), all one parcel:
 | 2026 CAD (this file) | −X turned ~33° toward −Z (offset ≈ −57° ± 8°; DJI_0005, DJI_0098) | high |
 | 2025 Kit | −Z (offset 0°) | medium (±20°) |
 | 2024 Kit | Chiba fits −Z; kitchen + trailer ring on the wrong side of Chiba (Q21) | medium-high |
-| 2022 Kit | authored −Z, but mirrored (Q20) | high on the mirror |
+| 2022 Kit | **−X turned 11° toward +Z (offset −101, measured; W51)**; the pinwheel's handedness fixed by `shift` −2 (Q20 open for confirmation) | ±5° |
 | 2021 / 2023 Kit | authored −Z, unverified | low |
 
-The engine uses the one constant −90 for every scene, so the 2026 sun and shadows are ~33° off until a per-year
-bearing lands (Q22). The site bearing never moves a construction pin (`physicalView()` excludes env). Bounds: x −162…96, z −147…69 (outermost object + 10 m).
+**Per-year bearing (W51).** `engine/env/sun.ts YEAR_NORTH_AZIMUTH_OFFSET` holds the measured years (only 2022 = −101
+so far); `deploy/history-scenes.mjs` writes it into the year file as the optional `northAzimuthOffset` (absent = the
+global), `sceneFromFile` / `sceneFromYearFile` put it on `scene.meta`, and `solarPosition`, `sunDirectionVector`,
+`worldHeadingOfAzimuth` and `sunBehindWindow` take it as an optional argument whose default is the global −90. The camera
+(`directCamera`: sun, sun-behind windows, compass `side`) and the studio sky (`createEnvironment(…, {northAzimuthOffset})`)
+use the scene's value. Every other scene still uses −90, so the 2026 sun and shadows are ~33° off until Q22 is measured. The site bearing never moves a construction pin (`physicalView()` excludes env). Bounds: x −162…96, z −147…69 (outermost object + 10 m).
 
 ## What is walkable, and why — LOUDLY
 - **Only the flat ground (level 0, y = −0.16) is walkable.** There are no other levels, no links and no stairs.
@@ -241,3 +245,41 @@ Re-seed and migration: HISTORY_IDS.md "Reconstruction edits".
 - the solarium floor next to the hall is the hall's plywood deck, where the interior photo shows sand;
 - no tables, chairs or people inside;
 - roof railings and the upper stair are unchanged.
+
+### 2022 reconciliation + 2023/24 trailers: reconstruction edits, 2026-09-29 evening (W51)
+Cause: Gene's questionnaire answers (OWNER_DECISIONS.md), planned in RECONCILIATION_2022.md (§a–§f, §i; its banner has
+the per-section status). Evidence: `questions/photos/2022-aerial-03.jpg` (positions on a 5 m grid at 8.3 px/m, ±1.5 m),
+`questions/photos/2022-DJI_0829.jpg` (bearing). Code: `scenes.ts make2022` / `ring(…, keepOut)`,
+`photographic-corrections.ts stair2022 / solarRow2022 / TRAILERS_2022` (new pieces carry Kit `source` = the section).
+
+**2022 legend: ids kept, names changed.** `chiba` = **Ba Sing Se** (east in the real compass), `east-house` =
+**Cahuilla** (south), `kitchen` = **Chatsubo** (west), `west-house` = **Huaqiangbei** (north). No "Chiba" anywhere in
+2022 (labels, regions, the studio's building button).
+- **Pinwheel:** `shift` 3 → −2 (clockwise as both aerials). Ba Sing Se spans X −5.35…9.29 (photo −5.4…9.0); its stair
+  end stands off Cahuilla's north end with a 1.0 m corner passage (the four passages are rotations of one another).
+- **Stairs** (`stair2022`): in the end slot, treads PARALLEL to the house (12 × 3.54 m, going 0.25 m), 13 risers of
+  0.192 m from the sand (y = 0) at the courtyard face, three stringers, a landing at the first-floor deck top (2.49 m)
+  over the outer frame bay that reaches 0.6 m into the outer aisle, where one steps through the end-frame line (Q29
+  default; Q32). The year files stay ground-only (no stair link); the year build's Kit-stair link needs W52's rule.
+- **Solar** (`solarRow2022`): modules 1.65 m up a 45° slope on 2x4 triangle frames (base, north back prop, rafter; n + 1
+  per row), facing the house side nearest the year's south (11° off true south), low edge on that edge of the roof deck.
+  Huaqiangbei and Cahuilla one row of 10 along the house; Ba Sing Se three stepped rows of 3 across it (x −4.4 / −1.6 /
+  1.2, z +0.45 / 0 / −0.45 in the rack frame); Chatsubo none (Q28 default).
+- **Trailers:** rv-1…rv-5 the train on −X (T1 head, headings along the arc), rv-6…rv-9 scattered (rv-7 tarp box and
+  rv-9 flat trailer uncertain); rv-10…12 removed. Nearest house ≥ 3.4 m.
+- **Table** at the Huaqiangbei–Chatsubo corner removed (Q1).
+- **Bearing** −101 (above).
+
+**2023 / 2024 (Q2 answered):** `ring(k, n, rx, rz, cz, gap, {box: Chiba core, clear: 1})` leaves open the smallest
+sector of the ellipse round Chiba whose edge trailer clears it by 1 m and spreads the same trailers over the two
+remaining arcs. No trailer under Chiba; nearest wall 3.96 m (2023) / 3.45 m (2024); every trailer id kept (placement
+hashed relative to the trailer). Chiba's interior grid is now exactly what it is without any trailer
+(`campus-history.test.ts`); the existing rule still blocks through its ground-floor deck.
+
+**Ids** (full Kit manifest): 2022 1204 → 1331, 999 kept (racks, decks, walls, rooms, rv-1…9), 205 gone (4 × 26 old stair
+pieces, 3 × 20 solar pieces, the 5-piece table, rv-10…12 = 36), 332 new; 2023 1523 and 2024 1606, all kept. Migration
+table: 2022 stair / solar entries aliased by role, 47 → `null` (HISTORY_IDS.md).
+`contentHash`: 2022 8b88e6f0… → f8090a99…, 2023 8e401abb… → 883e6371…, 2024 832e8d9a… → bd2e0c79….
+**Moves (planned):** the 2022 year-build pins and chapter takes (`todo`, old hashes kept); no construction pin outside
+2022; perf-walk's 5 pins PIN-OK.
+

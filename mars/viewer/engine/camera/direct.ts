@@ -395,6 +395,8 @@ export type DirectContext = {
   /** Take length (s); shots must end inside it. */
   duration: number;
   sampler?: (t: number) => Record<string, unknown>;
+  /** The scene's site bearing (engine/env/sun.ts); absent = the global NORTH_AZIMUTH_OFFSET. */
+  north?: number;
 };
 export type IntentResult = { ok: true; intent: ShotIntent } | { ok: false; diagnostics: Diagnostic[] };
 
@@ -433,7 +435,7 @@ export function compileDirection(d: CameraDirection, index: number, t0: number, 
   const fov = d.fov ?? DEFAULT_FOV;
   if (c.sunBehind) {
     const o = typeof c.sunBehind === 'object' ? c.sunBehind : {};
-    sun = sunBehindWindow(ctx.datetime, { vfovDeg: fov, ...(o.flareDeg !== undefined ? { flareDeg: o.flareDeg } : {}) });
+    sun = sunBehindWindow(ctx.datetime, { vfovDeg: fov, ...(o.flareDeg !== undefined ? { flareDeg: o.flareDeg } : {}), ...(ctx.north !== undefined ? { northAzimuthOffset: ctx.north } : {}) });
     const el = sun.sun.elevationDeg;
     if (!sun.aboveHorizon) diags.push({ code: 'camera.direct.sun-below-horizon', message: `${where}: the take is lit at ${ctx.datetime}, when the sun is ${el.toFixed(1)}° (below the horizon) — no sun to put behind the subject` });
     else if (o.sunset && el > SUNSET_MAX_ELEVATION) diags.push({ code: 'camera.direct.not-sunset', message: `${where}: 'sunset' needs the sun ≤ ${SUNSET_MAX_ELEVATION}° up, but the take is lit at ${ctx.datetime} (sun ${el.toFixed(1)}° up, azimuth ${sun.sun.azimuthDeg.toFixed(0)}°) — change the take's time of day or drop 'sunset'`, details: { elevationDeg: el, datetime: ctx.datetime } });

@@ -9,7 +9,7 @@
 import type { Diagnostic } from '../actions/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { datan, datan2, dcos, dsin, dtan, hypot, q6, type Vec3 } from '../core/math.ts';
-import { solarPosition, worldHeadingOfAzimuth } from '../env/sun.ts';
+import { northAzimuthOffsetOf, solarPosition, worldHeadingOfAzimuth } from '../env/sun.ts';
 import { buildGrids, cellOf, latticeOf, type LevelGrid } from '../spatial/grid.ts';
 import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
@@ -113,6 +113,8 @@ export type SynthContext = {
   /** The sun when above the horizon at the take's datetime (phase-2 flare check, sun-behind band). */
   sun?: { direction: Vec3; datetime: string } | null;
   policy?: CameraPolicy;
+  /** The scene's site bearing (engine/env/sun.ts northAzimuthOffsetOf); absent = the global NORTH_AZIMUTH_OFFSET. */
+  north?: number;
 };
 export type PrevPose = { position: Vec3; target: Vec3 };
 export type SynthResult = { ok: true; shot: SynthShot } | { ok: false; diagnostic: Diagnostic };
@@ -460,16 +462,16 @@ type Framed = { size: 'wide' | 'medium' | 'close'; fill: number; elevation: numb
 const framedOf = (d: CameraDirection): Framed => { const size = d.framing?.size ?? 'medium'; return { size, fill: FRAMING[size].fill, elevation: FRAMING[size].elevationDeg * DEG }; };
 
 /** Camera heading forced by the direction (compass side or sun window), or null (search). */
-function forcedHeading(intent: ShotIntent, over: SynthOverrides): number | null {
+function forcedHeading(intent: ShotIntent, over: SynthOverrides, north?: number): number | null {
   const side = intent.direction.framing?.side;
   if (intent.sun) return intent.sun.cameraHeading.centre + (over.bearingOffset ?? 0);
-  if (side) return worldHeadingOfAzimuth(COMPASS.indexOf(side) * 45) + (over.bearingOffset ?? 0);
+  if (side) return worldHeadingOfAzimuth(COMPASS.indexOf(side) * 45, north) + (over.bearingOffset ?? 0);
   return null;
 }
 
 /** Pick the camera heading (subject → camera) with the fewest invalid samples, then best readability; ties → lowest index. */
 function pickHeading(ctx: SynthContext, intent: ShotIntent, over: SynthOverrides, prev: PrevPose | undefined, centre: Vec3, poses: (h: number) => CameraPose[], scoreIds: string[], focus: Vec3[]): { heading: number; searched: boolean } {
-  const forced = forcedHeading(intent, over);
+  const forced = forcedHeading(intent, over, ctx.north);
   if (forced !== null) return { heading: forced, searched: false };
   if (over.heading !== undefined) return { heading: over.heading + (over.bearingOffset ?? 0), searched: true };
   const cands: number[] = [];
@@ -1045,9 +1047,11 @@ export function directCamera(directions: unknown[], input: DirectInput): DirectR
   const world = new CameraWorld(input.scene, input.policy);
   const groundY = input.scene.levels.find((l) => l.id === 0)?.y ?? 0;
   const semantic = new SemanticWorld(input.scene, input.world, input.facts);
-  const sp = solarPosition(input.world.env.datetime);
+  // the scene's site bearing (a year file's northAzimuthOffset, W51), else the global: only directions depend on it
+  const north = northAzimuthOffsetOf(input.scene);
+  const sp = solarPosition(input.world.env.datetime, undefined, undefined, north);
   const sun = sp.elevationDeg > 0 ? { direction: sp.direction as Vec3, datetime: input.world.env.datetime } : null;
-  const ctx: SynthContext = { world, scene: input.scene, sampler: input.sampler, hz, aspect: input.aspect ?? DEFAULT_ASPECT, safeBottom: input.safeBottom ?? 0, groundY, duration: input.duration, sun, policy: input.policy };
+  const ctx: SynthContext = { world, scene: input.scene, sampler: input.sampler, hz, aspect: input.aspect ?? DEFAULT_ASPECT, safeBottom: input.safeBottom ?? 0, groundY, duration: input.duration, sun, policy: input.policy, north };
   const deps: CorrectDeps = { synthesize: synthesizeShot, validate: validateKeys, caps: { viewOmegaDeg: MOTION_CAPS.viewOmegaDeg, viewAlphaDeg: MOTION_CAPS.viewAlphaDeg, speedExterior: MOTION_CAPS.speedExterior, speedInterior: MOTION_CAPS.speedInterior, accel: MOTION_CAPS.accel } };
   const diagnostics: Diagnostic[] = [];
   const parsed: CameraDirection[] = [];
@@ -1061,7 +1065,7 @@ export function directCamera(directions: unknown[], input: DirectInput): DirectR
     const d = parsed[i];
     const t0 = Math.round((d.at ?? tEnd) * hz) / hz;
     if (t0 + 1e-9 < tEnd) { diagnostics.push({ code: 'camera.direct.overlap', message: `direction ${i}: starts at ${t0} s, before direction ${i - 1} ends (${tEnd} s)` }); break; }
-    const c = compileDirection(d, i, t0, { semantic, datetime: input.world.env.datetime, duration: input.duration, sampler: input.sampler });
+    const c = compileDirection(d, i, t0, { semantic, datetime: input.world.env.datetime, duration: input.duration, sampler: input.sampler, north });
     if (!c.ok) { diagnostics.push(...c.diagnostics); break; }
     const cres = input.correct === false ? (() => { const r = synthesizeShot(c.intent, ctx, prev); return r.ok ? { ok: true as const, shots: [r.shot] } : r; })() : correctShot(c.intent, ctx, prev, deps);
     if (!cres.ok) { diagnostics.push(cres.diagnostic); break; }

@@ -51,7 +51,7 @@ export function sceneFromFile(f: Omit<CampusSceneFile, 'contentHash'> & { conten
     obstacles,
     links: [],
     regions: f.regions,
-    meta: { groundY: f.groundY, contentHash: f.contentHash ?? '', source: f.source, notes: WALKABILITY_NOTES },
+    meta: { groundY: f.groundY, contentHash: f.contentHash ?? '', source: f.source, notes: WALKABILITY_NOTES, ...(f.northAzimuthOffset !== undefined ? { northAzimuthOffset: f.northAzimuthOffset } : {}) },
   };
 }
 

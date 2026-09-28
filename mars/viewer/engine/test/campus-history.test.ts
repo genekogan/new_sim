@@ -302,3 +302,59 @@ test('Chiba 2024 edit: walkers and the camera navmesh pass the solarium door; th
   assert.ok(lenC > len + 3, `closed door: ${rc.ok ? `${lenC.toFixed(1)} m detour` : 'no route'}`);
   console.log(`  2024 solarium door: walker ${w.len.toFixed(1)} m (clearance ${w.clearance.toFixed(2)}); camera ${len.toFixed(1)} m at eye level; closed door → ${rc.ok ? `${lenC.toFixed(1)} m` : 'no route'}; hall ${((100 * blocked) / n).toFixed(0)}% blocked`);
 });
+
+// ---- 2022 reconciliation + 2023/24 trailers out of Chiba, reconstruction edits of 2026-09-29 evening (W51) ----------
+// Gene's questionnaire answers (OWNER_DECISIONS.md; RECONCILIATION_2022.md §a–§f, §i): 2022 names, clockwise pinwheel,
+// stairs parallel to the houses, south-facing 45° solar frames, trailer train, no corner table, north −101°;
+// 2023 / 2024 trailer ring keeps out of Chiba (Q2). One re-seed per year (HISTORY_IDS.md "Reconstruction edits").
+const PRE_EDIT_W51: Record<number, string> = {
+  2022: '8b88e6f090c79b92784954787f0329295286d5b6f5e76f0d9d450023da8c49f2',
+  2023: '8e401abb922bbea265694577a71dd7ae9521022646094cf7924d447c1d3e44dc',
+  2024: '832e8d9af699feb5afed6949189b4995354db7696ccbaa3c50e52126e37f8865',
+};
+const W51_EVIDENCE = ['docs/engineering/RECONCILIATION_2022.md', 'docs/engineering/questions/photos/2022-aerial-03.jpg', 'docs/engineering/questions/photos/2022-DJI_0829.jpg'];
+for (const year of [2022, 2023, 2024]) test(`W51 ${year} edit: mars-${year} re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical`, () => {
+  const f = loadCampusFile(year);
+  assert.notEqual(f.contentHash, PRE_EDIT_W51[year], 'the edit changed the static scene');
+  const now = loadCampusYear(year, f).world;
+  const pre: WorldState = { ...structuredClone(now), base: { ...now.base, staticHash: PRE_EDIT_W51[year] } };
+  const h = new WorldHistory(RULES_VERSION);
+  h.publishCanonical(campusYearId(year), `Mars ${year} (before the W51 edit)`, pre, `campus-${year}.json before the W51 reconstruction edit`);
+  h.fork(campusYearId(year), `mars-${year}-w51`, 'W51 reconstruction edit');
+  const cp = h.commit(`mars-${year}-w51`, now, { kind: 'reconstruction-edit', note: year === 2022 ? '2022 reconciliation (names, pinwheel, stairs, solar, trailers, no corner table; W51)' : `${year} trailers out of Chiba, off its walls (Q2; W51)`, evidence: W51_EVIDENCE }, 'reconstruction-edit W51');
+  const h2 = new WorldHistory(RULES_VERSION);
+  publishCampusYear(h2, year, f);
+  assert.equal(h2.head(campusYearId(year)).physicalHash, cp.physicalHash);
+  assert.equal(hashOf(h2.read(campusYearId(year))), hashOf(h.read(cp.id)));
+});
+
+test('W51 2022: ids kept (racks, decks, walls, rooms; rv-1…9), stairs / solar re-made, rv-10…12 and the corner table gone; names on the regions; north −101 on the scene', () => {
+  const comps = new Set(Y(2022).base.obstacles.map((o) => o.component));
+  for (const k of ['chiba-rack-upright-', 'east-house-12-foot-orange-beam-', 'kitchen-plywood-deck-sheet-', 'west-house-plywood-wall-', 'rv-9-trailer-shell-']) assert.ok([...comps].some((c) => c.startsWith(k)), k);
+  assert.ok(comps.has('east-house-plywood-deck-sheet-141763ed'), 'a deck strip kept its id (group moved, placement in the house unchanged)');
+  for (const k of ['rv-10-', 'rv-11-', 'rv-12-', 'west-house-table-']) assert.ok(![...comps].some((c) => c.startsWith(k)), `${k} removed`);
+  assert.ok([...comps].some((c) => c.startsWith('chiba-stair-landing-')) && [...comps].some((c) => c.startsWith('west-house-solar-frame-rafter-')));
+  assert.deepEqual(['chiba', 'east-house', 'kitchen', 'west-house'].map((id) => reg(2022, id).label), ['Ba Sing Se', 'Cahuilla', 'Chatsubo', 'Huaqiangbei']);
+  assert.ok(!Y(2022).base.obstacles.some((o) => /chiba/i.test(o.label ?? '')), 'no "Chiba" label in 2022');
+  assert.equal(Y(2022).base.meta.northAzimuthOffset, -101);
+  for (const y of [2020, 2021, 2023, 2024, 2025]) assert.equal(Y(y).base.meta.northAzimuthOffset, undefined, `${y} uses the global bearing`);
+});
+
+test('W51 2023/2024: no trailer stands in or against Chiba — its footprint grid is exactly what it is without any trailer', () => {
+  for (const y of [2023, 2024]) {
+    const ch = box(reg(y, 'chiba'));
+    const rvs = Y(y).base.obstacles.filter((o) => /^rv-\d+$/.test(o.assembly));
+    assert.ok(rvs.length > 0);
+    const full = buildGrids(asScene(y), 0.25).levels.get(0)!;
+    const bare = buildGrids({ ...asScene(y), obstacles: Y(y).base.obstacles.filter((o) => !/^rv-\d+$/.test(o.assembly)) } as unknown as SpatialScene, 0.25).levels.get(0)!;
+    assert.equal(full.nx, bare.nx);
+    let inside = 0;
+    for (let c = 0; c < full.nx * full.nz; c++) {
+      const [px, pz] = centreOf(full, c);
+      if (px < ch.x0 - 0.5 || px > ch.x1 + 0.5 || pz < ch.z0 - 0.5 || pz > ch.z1 + 0.5) continue;
+      inside++;
+      assert.equal(full.free[c], bare.free[c], `${y} cell (${px.toFixed(2)}, ${pz.toFixed(2)}) in / beside Chiba is changed by a trailer`);
+    }
+    assert.ok(inside > 1000);
+  }
+});

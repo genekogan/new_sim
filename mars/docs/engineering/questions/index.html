@@ -53,7 +53,7 @@ button{font:inherit;font-weight:600;padding:10px 18px;border-radius:8px;border:0
 <body>
 <main>
 <h1>Questions for Gene</h1>
-<p class="lede">12 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
+<p class="lede">13 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
 <section><h2>Worth answering first</h2>
 <article class="card" id="Q20" data-id="Q20" data-plain="The model's four 2022 houses spin one way (counter-clockwise from above); the drone photo shows them spinning the other way. Which is right — or is the model's map flipped left-to-right?">
 <div class="qid">Q20</div>
@@ -92,6 +92,9 @@ and of both drone photos: Ba Sing Se = the model's Chiba (up), Cahuilla = east h
 (down), Huaqiangbei = west house (left). So the photo can be matched without mirroring the whole scene: each house
 keeps its quadrant and stair end, and only its offset along its own length flips (`make2022` `shift = 3` → ≈ −2).
 Plan: RECONCILIATION_2022.md §a. Left open for Gene to confirm the photo is right.
+
+**Applied (W51, 2026-09-29 evening):** `shift` −2 is in the model (clockwise, as both photos); still open for Gene to
+confirm.
 
 Gene:</pre></details>
 </article>
@@ -260,6 +263,32 @@ Gene:</pre></details>
 15 ft depth); the Q10 strips on top, with 2x4 blocking under the cross joints.
 
 Gene:</pre></details>
+</article>
+<article class="card" id="Q32" data-id="Q32" data-plain="With the steps running along the building, the stair climbs across the end of the building. The model ends it on a small landing at first-floor height over the outer end frame, and you step off sideways through the gap between two end frames onto the floor. Is that how it worked?">
+<div class="qid">Q32</div>
+<h3>With the steps running along the building, the stair climbs across the end of the building. The model ends it on a small landing at first-floor height over the outer end frame, and you step off sideways through the gap between two end frames onto the floor. Is that how it worked?</h3>
+<p class="context">The photos from above show the steps but not how the top met the floor. The end of each building is three braced frames with 3 ft gaps between them, so the only way through is one of those gaps.</p>
+<div class="pics">
+<figure><a href="r2022-aerial-annotated.jpg" target="_blank" rel="noopener"><img src="r2022-aerial-annotated.jpg" alt="Orange boxes: the four stairs; the orange lines show which way the steps run." loading="lazy"></a><figcaption>Orange boxes: the four stairs; the orange lines show which way the steps run.</figcaption></figure>
+<figure><a href="photos/2022-exterior-09.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-09.jpg" alt="Real photo, 2022: a building with a stair at its end." loading="lazy"></a><figcaption>Real photo, 2022: a building with a stair at its end.</figcaption></figure>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q32" value="Yes, a landing at the top and a step through the gap"> <span>Yes, a landing at the top and a step through the gap</span></label>
+<label class="opt"><input type="radio" name="Q32" value="The stair ran straight up to the floor (say how below)"> <span>The stair ran straight up to the floor (say how below)</span></label>
+<label class="opt"><input type="radio" name="Q32" value="Something else (say below)"> <span>Something else (say below)</span></label>
+<label class="opt"><input type="radio" name="Q32" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> Only the top of the four stairs (the landing and where you step through).</p>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**Default (W51, `photographic-corrections.ts stair2022`):** 12 treads of 3.54 m parallel to the house and 13 risers of
+0.19 m from the sand at the courtyard face; a landing at the first-floor deck top (2.49 m) over the outer frame bay,
+reaching 0.6 m into the aisle between the outer and middle end frames.
+
+Gene:
+
+---</pre></details>
 </article></section>
 <section><h2>Blocks nothing (housekeeping)</h2>
 <article class="card" id="Q31" data-id="Q31" data-plain="The model calls the four 2022 buildings a classroom (now Ba Sing Se), a painted-arches house (Cahuilla), a kitchen (Chatsubo) and a painted house (Huaqiangbei). Is that what each one held?">
@@ -278,9 +307,7 @@ Gene:</pre></details>
 <textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
 </fieldset>
 <p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> The furniture and the labels inside each building.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>Gene:
-
----</pre></details>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>Gene:</pre></details>
 </article>
 <article class="card" id="Q24" data-id="Q24" data-plain="The right-hand end of the 2024 solarium was a clear plastic wall with a door. Where in that wall was the door, and did it swing out, swing in, or slide?">
 <div class="qid">Q24</div>

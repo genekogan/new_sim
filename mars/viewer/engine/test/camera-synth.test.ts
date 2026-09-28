@@ -5,7 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { datan, datan2, dtan, hypot, type Vec3 } from '../core/math.ts';
 import { hashOf } from '../core/hash.ts';
-import { NORTH_AZIMUTH_OFFSET, solarPosition } from '../env/sun.ts';
+import { NORTH_AZIMUTH_OFFSET, northAzimuthOffsetOf, solarPosition } from '../env/sun.ts';
+import { loadCampusYear } from '../campus/history.ts';
+import { loadCampusFile } from '../campus/history-node.ts';
+import { cropScene } from '../campus/load.ts';
 import { CameraWorld, raycast } from '../camera/geom.ts';
 import { placement } from '../camera/quality.ts';
 import { subjectPoints } from '../camera/shots.ts';
@@ -16,7 +19,7 @@ import { beforeSunset, campus2024, campus2026, flagship, onGrid, roomScene, step
 const DEG = Math.PI / 180;
 /** Compass bearing (deg clockwise from north) of a world ground vector — the inverse of sun.ts's projection
  * (x = sin(az + NORTH_AZIMUTH_OFFSET), z = −cos(az + NORTH_AZIMUTH_OFFSET)). */
-const compassOf = (v: Vec3) => (((datan2(v[0], -v[2]) / DEG - NORTH_AZIMUTH_OFFSET) % 360) + 360) % 360;
+const compassOf = (v: Vec3, north = NORTH_AZIMUTH_OFFSET) => (((datan2(v[0], -v[2]) / DEG - north) % 360) + 360) % 360; // north: the scene's bearing (northAzimuthOffsetOf)
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const unit = (a: Vec3): Vec3 => { const l = hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; };
 const angleDeg = (a: Vec3, b: Vec3) => { const u = unit(a), v = unit(b); const c = Math.min(1, Math.max(-1, u[0] * v[0] + u[1] * v[1] + u[2] * v[2])); return datan2(Math.sqrt(1 - c * c), c) / DEG; };
@@ -87,7 +90,7 @@ test('(b) 2026: pan across Chiba with the sunset behind — every sample in the 
   for (const s of samples) {
     assert.deepEqual(s.position, p0, 'a pan keeps the camera still');
     const v = sub(s.position, s.target);
-    const camAz = compassOf(v); // compass bearing subject → camera (site frame: −X north, −Z east)
+    const camAz = compassOf(v, northAzimuthOffsetOf(scene)); // compass bearing subject → camera (the scene's site frame)
     let d = camAz - ((sun.azimuthDeg + 180) % 360);
     d = ((d + 540) % 360) - 180;
     assert.ok(Math.abs(d) <= halfH - 3 + 1e-6, `t=${s.t}: camera azimuth ${camAz.toFixed(1)}° is ${d.toFixed(1)}° from opposite-the-sun`);
@@ -251,7 +254,7 @@ test('verbs: tilt / dolly / crane / pull_out / hold have the geometry their name
   assert.equal(hk.length, 31);
   assert.ok(hk.every((k) => JSON.stringify(k.position) === JSON.stringify(hk[0].position)));
   const v = sub(hk[0].position, hk[0].target);
-  const az = compassOf(v);
+  const az = compassOf(v, northAzimuthOffsetOf(scene));
   assert.ok(Math.abs(az - 180) < 1, `side: south → camera due south of the subject (${az.toFixed(1)}°)`);
 });
 
@@ -266,4 +269,25 @@ test('determinism: the same directions give the identical track hash, and the tr
   const k1 = ok(directCamera(k, { scene, world, sampler: () => ({}), duration: 120 })), k2 = ok(directCamera(k, { scene, world, sampler: () => ({}), duration: 120 }));
   assert.equal(k1.report.trackHash, k2.report.trackHash);
   assert.deepEqual(k1.report, k2.report);
+});
+
+test('per-year bearing (W51): on mars-2022 (northAzimuthOffset −101) "side: south" and the sun window use the 2022 frame, not the global', () => {
+  const { base, world } = loadCampusYear(2022, loadCampusFile(2022));
+  assert.equal(northAzimuthOffsetOf(base), -101);
+  const scene = cropScene(base, [-30, -35, 35, 30]);
+  const hold = ok(directCamera([{ subject: { kind: 'region', ref: 'chiba' }, motion: { verb: 'hold' }, duration: 3, framing: { size: 'close', side: 'south' } }], { scene, world, sampler: () => ({}), duration: 600 }));
+  const v = sub(hold.shots[0].keys[0].position, hold.shots[0].keys[0].target);
+  assert.ok(Math.abs(compassOf(v, -101) - 180) < 1, `camera due south of Ba Sing Se in the 2022 frame (${compassOf(v, -101).toFixed(1)}°)`);
+  assert.ok(Math.abs(compassOf(v) - 169) < 1, 'and 11° off the global frame\'s south (bearing = world angle − north)');
+  // sun behind the subject at the year's default light (2022-03-01T16:00): a wide pan on Huaqiangbei keeps every sample
+  // opposite the sun under the 2022 bearing (the same pan on Ba Sing Se is occluded by trailer T6 once the window turns 11°)
+  const at = world.env.datetime, sun = solarPosition(at);
+  const r = ok(directCamera([{ subject: { kind: 'region', ref: 'west-house' }, motion: { verb: 'pan' }, framing: { size: 'wide' }, context: { sunBehind: true } }], { scene, world, sampler: () => ({}), duration: 600 }));
+  const halfH = datan(dtan(25 * DEG) * 16 / 9) / DEG;
+  for (const smp of r.plan.samples) {
+    const w = sub(smp.position, smp.target);
+    let d = compassOf(w, -101) - ((sun.azimuthDeg + 180) % 360);
+    d = ((d + 540) % 360) - 180;
+    assert.ok(Math.abs(d) <= halfH - 3 + 1e-6, `t=${smp.t}: camera ${compassOf(w, -101).toFixed(1)}° is ${d.toFixed(1)}° from opposite-the-sun in the 2022 frame`);
+  }
 });

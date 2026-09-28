@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {Kit,BAY,layers,assignStableIds,type IdEntry,type KitHooks} from './kit';
-import {aluminet2021,frontage2024} from './photographic-corrections';
+import {aluminet2021,frontage2024,stair2022,solarRow2022,TRAILERS_2022,ROOF_TOP_2022} from './photographic-corrections';
+import {YEAR_NORTH_AZIMUTH_OFFSET,NORTH_AZIMUTH_OFFSET} from '../../engine/env/sun';
 import {createBrahman2020Scene} from '../studio-2020/scene';
 export const YEARS=[2020,2021,2022,2023,2024,2025,2026] as const;
 export const historyNotes:Record<number,string>={
@@ -23,7 +24,35 @@ function auditorium(k:Kit,g:T.Group,d:number){
 }
 
 function roofRails(k:Kit,g:T.Group,w:number,d:number,y:number){for(const z of [-d/2,d/2])k.rod(g,'timber roof railing',[-w/2,y+.95,z],[w/2,y+.95,z],.04,'#ae9165',layers.roof);for(let x=-w/2;x<=w/2+.01;x+=BAY)for(const z of [-d/2,d/2])k.rod(g,'roof rail post',[x,y,z],[x,y+1,z],.035,'#ae9165',layers.roof);}
-function ring(k:Kit,count:number,rx:number,rz:number,cz:number,gap=.38){for(let i=0;i<count;i++){const a=gap+(i/(count-1))*(Math.PI*2-2*gap);k.rv(`rv-${i+1}`,Math.sin(a)*rx,cz+Math.cos(a)*rz,-a+.12*Math.sin(i),5.8+(i%4)*.65);}}
+/** Trailer ring on an ellipse (angle 0 = +Z end, left open by `gap` for the kitchen). `keepOut` (2023/24, Q2 answered
+ *  by Gene 2026-09-29: "no trailers under Chiba … side trailers must not touch the walls"): a building's world box
+ *  [x0, z0, x1, z1] the ring must stay `clear` metres off. The ring then also leaves open the sector of the ellipse
+ *  round the box (the smallest symmetric sector about angle π, where the ellipse meets it, whose edge trailer clears
+ *  the box by `clear`), and its trailers spread evenly over the two remaining arcs; ids, headings and lengths follow
+ *  the index as before. */
+function ring(k:Kit,count:number,rx:number,rz:number,cz:number,gap=.38,keepOut?:{box:[number,number,number,number];clear:number}){
+ const place=(i:number,a:number)=>({x:Math.sin(a)*rx,z:cz+Math.cos(a)*rz,angle:-a+.12*Math.sin(i),length:5.8+(i%4)*.65});
+ let e=0;
+ if(keepOut){const fits=(i:number,a:number)=>trailerClearance(place(i,a),keepOut.box)>=keepOut.clear;
+  // widen the sector (0.005 rad steps) until a trailer of any index (heading / length) on either edge clears the box
+  while(e<Math.PI-gap&&![...Array(count).keys()].every(i=>fits(i,Math.PI-e)&&fits(i,Math.PI+e)))e+=.005;}
+ const span=Math.PI*2-2*gap-2*e,arc=span/2;
+ for(let i=0;i<count;i++){const s=(i/(count-1))*span,a=gap+(s<=arc?s:s+2*e);const t=place(i,a);k.rv(`rv-${i+1}`,t.x,t.z,t.angle,t.length);}
+}
+/** Plan clearance (m) between a Kit trailer (2.35 m wide × `length`, long axis (sin angle, cos angle)) and a world box. */
+export function trailerClearance(t:{x:number;z:number;angle:number;length:number},box:[number,number,number,number]){
+ const ax=Math.sin(t.angle),az=Math.cos(t.angle),hw=1.175,hl=t.length/2;
+ const corners=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([u,v])=>[t.x+az*hw*u+ax*hl*v,t.z-ax*hw*u+az*hl*v]);
+ const [x0,z0,x1,z1]=box;
+ // separating distance of two convex polygons: 0 if they overlap, else the min distance between their edges
+ const inBox=(p:number[])=>p[0]>=x0&&p[0]<=x1&&p[1]>=z0&&p[1]<=z1;
+ const inT=(p:number[])=>{const dx=p[0]-t.x,dz=p[1]-t.z;return Math.abs(dx*az-dz*ax)<=hw&&Math.abs(dx*ax+dz*az)<=hl;};
+ const boxC=[[x0,z0],[x1,z0],[x1,z1],[x0,z1]];
+ if(corners.some(inBox)||boxC.some(inT))return 0;
+ const seg=(p:number[],a:number[],b:number[])=>{const vx=b[0]-a[0],vz=b[1]-a[1],l=vx*vx+vz*vz,u=Math.max(0,Math.min(1,((p[0]-a[0])*vx+(p[1]-a[1])*vz)/l));return Math.hypot(p[0]-a[0]-u*vx,p[1]-a[1]-u*vz);};
+ let d=Infinity;for(let i=0;i<4;i++){for(const p of boxC)d=Math.min(d,seg(p,corners[i],corners[(i+1)%4]));for(const p of corners)d=Math.min(d,seg(p,boxC[i],boxC[(i+1)%4]));}
+ return d;
+}
 function kitchenBuilding(k:Kit,x:number,z:number,year:number){
  const g=hall(k,'kitchen','Communal kitchen and lounge',x,z,3,2);const w=3*BAY,d=2*BAY;
  // Three bays: enclosed workspaces either side of an open central lounge.
@@ -60,12 +89,21 @@ function make2021(k:Kit){
  ring(k,15,29,33,2,.65);
 }
 function make2022(k:Kit){
- // As-built pinwheel: DJI_0829 overhead, DJI_0806 orbit and March rooftop panorama.
+ // As-built pinwheel: DJI_0829 overhead, DJI_0806 orbit, March rooftop panorama and aerial-03.
  // Four matching footprints, each with an end stair. Corner passages stay open.
  // Nominal rack scale and estimated spacing; no pre-season SketchUp coordinates.
- const d=4.572,radius=8.6,shift=3;
+ // 2022 reconciliation (Gene, 2026-09-29 evening; RECONCILIATION_2022.md §a–§f; W51): the buildings are Ba Sing Se,
+ // Cahuilla, Chatsubo and Huaqiangbei (display names; the ids are kept so every stable id, plan and pin still resolves:
+ // 2022 `chiba` = Ba Sing Se, `east-house` = Cahuilla, `kitchen` = Chatsubo, `west-house` = Huaqiangbei). `shift` −2
+ // (was 3) turns the pinwheel clockwise as in both aerials: each house keeps its quadrant, stair end and rotation, and
+ // only the overlap reverses (Ba Sing Se's stair end now stands off Cahuilla's north end). Stairs PARALLEL to the house
+ // (stair2022); solar rows face south on 45° triangle frames (solarRow2022; Chatsubo none); no table at the corner (Q1);
+ // trailers per aerial-03 (TRAILERS_2022).
+ const d=4.572,radius=8.6,shift=-2;
  const ids=['chiba','east-house','kitchen','west-house'];
- const names=['North classroom','Painted arches house','South kitchen','West painted house'];
+ const names=['Ba Sing Se','Cahuilla','Chatsubo','Huaqiangbei'];
+ // south in the 2022 frame (engine/env/sun.ts YEAR_NORTH_AZIMUTH_OFFSET; compass azimuth 180 → x = sin, z = −cos)
+ const north=YEAR_NORTH_AZIMUTH_OFFSET[2022]??NORTH_AZIMUTH_OFFSET,south=new T.Vector3(Math.sin((180+north)*Math.PI/180),0,-Math.cos((180+north)*Math.PI/180));
  for(let i=0;i<4;i++){
   const angle=-i*Math.PI/2,origin=new T.Vector3(-shift,0,-radius).applyAxisAngle(new T.Vector3(0,1,0),angle);
   const g=k.assembly(ids[i],names[i],[origin.x,0,origin.z],angle);
@@ -73,24 +111,26 @@ function make2022(k:Kit){
   k.frame(rack,3,2,4.8768,true,d);k.deck(rack,3*BAY,d,.22);k.deck(rack,3*BAY,d,2.46,0,0,true);
   // The kitchen has a smaller high roof and a broad open lower terrace.
   k.deck(rack,(i===2?1:3)*BAY,d,4.86,i===2?-BAY:0,0,true);
-  if(i!==2)k.solar(rack,3*BAY,1.65,0,5.05,-d/2+.6,.24);
-  const stair=new T.Group();stair.userData={...g.userData,layer:layers.floor};stair.position.x=1.5*BAY;stair.rotation.y=Math.PI/2;g.add(stair);
-  k.stairs(stair,d-.12,BAY,2.22,0,0,8);
+  // Solar (Q13 / Q28 default): the house side that faces south (rack-local ±x / ±z, world normal within 45° of south).
+  const side=([[1,0],[-1,0],[0,1],[0,-1]] as [number,number][]).find(([x,z])=>new T.Vector3(x,0,z).applyAxisAngle(new T.Vector3(0,1,0),angle).dot(south)>Math.SQRT1_2)!;
+  if(i===1||i===3)solarRow2022(k,rack,[1,0],side,[0,side[1]*(d/2-.05)],ROOF_TOP_2022,10,3*BAY/10); // one row along the house, low edge on the south roof edge
+  if(i===0)for(const [xc,zc] of [[-4.4,.45],[-1.6,0],[1.2,-.45]] as [number,number][])solarRow2022(k,rack,[0,1],side,[xc+side[0]*.58,zc],ROOF_TOP_2022,3); // three short stepped rows across the house
+  stair2022(k,g,1.5*BAY,d,BAY-.12);
   k.wall(rack,3*BAY,2.23,0,-d/2,1.365);
   k.wall(rack,d,2.23,-1.5*BAY,0,1.365,i===3?'#517e9c':'#b99b75',Math.PI/2);
   if(i===0){classroom(k,rack,3*BAY,d);k.screen(rack,0,1.65,d/2+.07,3.5,0,2.0);}
   if(i===1){k.wall(rack,3*BAY,2.23,0,d/2,1.365,k.photo('/history/2022/arches.webp'));k.wall(rack,BAY,2.2,-BAY,d/2,3.66,k.photo('/history/2022/arches-upper.webp'));}
   if(i===2){k.kitchen(rack,6,d);k.wall(rack,BAY,2.23,-BAY,d/2,1.365);k.wall(rack,BAY,.9,BAY,d/2,.75);roofRails(k,rack,3*BAY,d,2.5);}
-  if(i===3){k.wall(rack,BAY,2.23,-BAY,d/2,1.365,'#517e9c');k.wall(rack,BAY,1,BAY,d/2,.8,'#517e9c');k.table(rack,0,d/2+1.2,3,.8);}
+  if(i===3){k.wall(rack,BAY,2.23,-BAY,d/2,1.365,'#517e9c');k.wall(rack,BAY,1,BAY,d/2,.8,'#517e9c');}
  }
- ring(k,12,25,28,0,.45);
+ for(const [id,x,z,a,l] of TRAILERS_2022)k.rv(id,x,z,a,l);
 }
 function make2023(k:Kit){
  const w=7*BAY,d=8.5344,g=hall(k,'chiba','Chiba · roof terrace and main room',0,0,7,3,4.8768,true,d);
  k.deck(g,w,d,4.86,0,0,true);roofRails(k,g,w,d,4.7);k.wall(g,w,2.25,0,-d/2,1.37);k.wall(g,d,2.3,-w/2,0,1.38,k.photo('/history/2022/arches.webp'),Math.PI/2);k.wall(g,d,2.3,w/2,0,1.38,'#b79a76',Math.PI/2);
  k.solar(g,8.7,7.0,-6.5,2.24,7,.62);k.solar(g,8.7,6.2,6.5,2.15,6.8,.62);k.stairs(g,3.4,6.2,4.4,.4,8.5,20);auditorium(k,g,d);
  kitchenBuilding(k,0,43,2023).rotation.y=Math.PI;
- ring(k,16,30,24,22,.5);
+ ring(k,16,30,24,22,.5,{box:[-w/2,-d/2,w/2,d/2],clear:1});
 }
 function make2024(k:Kit){
  const w=6*BAY,d=3*BAY,g=hall(k,'chiba','Chiba · painted frontage, solar and glazing',0,0,6,3,4.8768,true);
@@ -102,7 +142,7 @@ function make2024(k:Kit){
  const upperStair=new T.Group();upperStair.userData={...g.userData,layer:layers.floor};upperStair.position.y=2.3;g.add(upperStair);k.stairs(upperStair,2.7,3.6,2.1,0,d/2-1.7,10);
 
  auditorium(k,g,d);
- kitchenBuilding(k,0,43,2024).rotation.y=Math.PI;ring(k,18,32,24,22,.55);
+ kitchenBuilding(k,0,43,2024).rotation.y=Math.PI;ring(k,18,32,24,22,.55,{box:[-w/2,-d/2,w/2,d/2],clear:1});
 }
 function make2025(k:Kit){
  const w=3*BAY,d=3*BAY,g=hall(k,'chiba','Chiba · central steps and red wings',0,0,3,3);
