@@ -6,6 +6,7 @@ import { TERMINAL } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { Profiler } from './profile.ts';
+import { applySnapshot, decodeSnapshot, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
 
@@ -26,7 +27,7 @@ export type Invariant = (rt: Runtime) => Diagnostic[];
 
 /** `prior`: phase of each reserved entity before start(), restored if the action fails / is cancelled before using it. */
 type Phase = WorldState['entities'][string]['phase'];
-type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; prior: Map<string, Phase> };
+type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; prior: Map<string, Phase> }; // = snapshot.ts LiveEntry
 
 export class Runtime {
   readonly records = new Map<string, ActionRecord>();
@@ -188,6 +189,42 @@ export class Runtime {
   }
   stateHash() {
     return hashOf(this.world);
+  }
+
+  /**
+   * Resumable mid-action checkpoint (runtime/snapshot.ts, spec §22): world, records, live execs,
+   * reservations, plain-data services, navigation epoch. Throws a SnapshotError naming every live
+   * action that is not resumable, unless `allowDrop` (then they are left out and reported).
+   */
+  snapshot(opts?: SnapshotOptions): RuntimeSnapshot {
+    return takeSnapshot(this, this.internals(), opts);
+  }
+
+  /** Rebuild a runtime from a snapshot; stepping it matches stepping the paused original tick for tick.
+   *  `services` must be this runtime's own (a fresh Spatial for the same base scene). */
+  static restore(snap: RuntimeSnapshot, registry: Map<string, ActionDef>, services: Record<string, any>, invariants: Invariant[] = []): Runtime {
+    const g = decodeSnapshot(snap);
+    const rt = new Runtime(g.world, registry, services, invariants);
+    applySnapshot(rt, rt.internals(), snap, g);
+    return rt;
+  }
+
+  private internals(): RuntimeInternals {
+    const self = this;
+    return {
+      live: this.live,
+      owners: this.owners,
+      get nextId() {
+        return self.nextId;
+      },
+      set nextId(n: number) {
+        self.nextId = n;
+      },
+      forceFinish: (l, status, d) => {
+        l.rec.diagnostic = d;
+        this.finish(l, status, d);
+      },
+    };
   }
 
   /** Resources held by `parent` (or its ancestors) are delegable to child actions (hierarchical tasks). */

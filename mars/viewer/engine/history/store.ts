@@ -4,15 +4,19 @@
 // Reconstruction edits and simulated events are different causes and are
 // never conflated. There is deliberately no merge operation.
 import { hashOf } from '../core/hash.ts';
+import { decode } from '../runtime/codec.ts';
 import type { WorldState } from '../world/types.ts';
 import { physicalView } from '../world/types.ts';
+import type { RuntimeSnapshot } from '../runtime/snapshot.ts';
 
 export type Cause =
   | { kind: 'canonical-publish'; note: string }
   | { kind: 'reconstruction-edit'; note: string; evidence?: string[] } // "we learned it was 6 ft east"
   | { kind: 'design-edit'; note: string } // hypothetical/future campus editing
   | { kind: 'simulation-run'; take: string; plan?: string } // "three people moved it"
-  | { kind: 'fork'; note?: string };
+  | { kind: 'fork'; note?: string }
+  /** A mid-action pause: the checkpoint also stores a resumable runtime snapshot (runtime/snapshot.ts). */
+  | { kind: 'pause'; note: string };
 
 export type Checkpoint = {
   id: string; // hash of {state, parent, cause}
@@ -23,6 +27,8 @@ export type Checkpoint = {
   rulesVersion: string;
   label?: string;
   created: number; // tick-free ordinal (store sequence), not wall clock → deterministic ids
+  /** Pause checkpoints: hash of the stored RuntimeSnapshot (`read(id, { resume: true })`). */
+  resume?: string;
 };
 
 export type Workspace = { id: string; head: string; protected: boolean; label: string; forkedFrom?: string };
@@ -49,6 +55,8 @@ export type HistoryJSON = {
   states?: [string, WorldState][];
   checkpoints: Checkpoint[];
   workspaces: Workspace[];
+  /** Resumable runtime snapshots of pause checkpoints, by hash. */
+  resumes?: [string, RuntimeSnapshot][];
 };
 
 export class WorldHistory {
@@ -58,16 +66,18 @@ export class WorldHistory {
   readonly checkpoints = new Map<string, Checkpoint>();
   readonly workspaces = new Map<string, Workspace>();
   private seq = 0;
+  private resumes = new Map<string, RuntimeSnapshot>();
 
   rulesVersion: string;
   constructor(rulesVersion: string) {
     this.rulesVersion = rulesVersion;
   }
 
-  private put(state: WorldState, parent: string | null, cause: Cause, label?: string): Checkpoint {
+  private put(state: WorldState, parent: string | null, cause: Cause, label?: string, snap?: RuntimeSnapshot): Checkpoint {
     const frozen = deepFreeze(structuredClone(state));
     const stateHash = hashOf(frozen);
-    const id = hashOf({ stateHash, parent, cause, rulesVersion: this.rulesVersion }).slice(0, 24);
+    const resume = snap ? hashOf(snap) : undefined;
+    const id = hashOf(resume ? { stateHash, parent, cause, rulesVersion: this.rulesVersion, resume } : { stateHash, parent, cause, rulesVersion: this.rulesVersion }).slice(0, 24);
     const existing = this.checkpoints.get(id);
     if (existing) return existing;
     // first clone wins (review M6); with a store, only a state it does not hold yet is written
@@ -85,6 +95,10 @@ export class WorldHistory {
       label,
       created: this.seq++,
     };
+    if (snap && resume) {
+      cp.resume = resume;
+      if (!this.resumes.has(resume)) this.resumes.set(resume, deepFreeze(structuredClone(snap)));
+    }
     this.checkpoints.set(id, cp);
     return cp;
   }
@@ -107,8 +121,12 @@ export class WorldHistory {
     return ws;
   }
 
-  /** Commit a successor state to a workspace. Protected workspaces reject all commits. */
-  commit(workspace: string, state: WorldState, cause: Cause, label?: string): Checkpoint {
+  /**
+   * Commit a successor state to a workspace. Protected workspaces reject all commits. A `pause` cause
+   * takes a RuntimeSnapshot (`rt.snapshot()`): the checkpoint's state is its world, and the snapshot is
+   * stored with it so the checkpoint — and any workspace forked at it — is resumable mid-action.
+   */
+  commit(workspace: string, state: WorldState | RuntimeSnapshot, cause: Cause, label?: string): Checkpoint {
     const ws = this.ws(workspace);
     if (ws.protected)
       throw new HistoryError(
@@ -116,16 +134,41 @@ export class WorldHistory {
         `workspace "${ws.label}" is a protected canonical state; fork it before editing or simulating`,
       );
     if (cause.kind === 'canonical-publish') throw new HistoryError('bad-cause', 'use publishCanonical');
-    const cp = this.put(state, ws.head, cause, label);
+    const isSnap = (state as RuntimeSnapshot).format === 'mars-runtime-snapshot/1';
+    if ((cause.kind === 'pause') !== isSnap)
+      throw new HistoryError('bad-cause', cause.kind === 'pause' ? 'a pause checkpoint needs a runtime snapshot (rt.snapshot()), not a bare world state' : `a runtime snapshot can only be committed with cause 'pause', not '${cause.kind}'`);
+    const snap = isSnap ? (state as RuntimeSnapshot) : undefined;
+    let world = state as WorldState;
+    if (snap) {
+      world = (decode(snap.data) as { world: WorldState }).world;
+      if (hashOf(world) !== snap.stateHash) throw new HistoryError('bad-snapshot', 'runtime snapshot world does not match its stateHash');
+    }
+    const cp = this.put(world, ws.head, cause, label, snap);
     ws.head = cp.id;
     return cp;
   }
 
-  /** Returns a mutable deep copy — edits never touch stored history. */
-  read(checkpointOrWorkspace: string): WorldState {
+  /**
+   * Returns a mutable deep copy — edits never touch stored history. With `{ resume: true }` returns the
+   * world plus the checkpoint's resumable runtime snapshot (null unless it is a pause checkpoint);
+   * resume with `Runtime.restore(snapshot, registry, services)`.
+   */
+  read(checkpointOrWorkspace: string): WorldState;
+  read(checkpointOrWorkspace: string, o: { resume: true }): { world: WorldState; snapshot: RuntimeSnapshot | null };
+  read(checkpointOrWorkspace: string, o?: { resume: true }): WorldState | { world: WorldState; snapshot: RuntimeSnapshot | null } {
     const ws = this.workspaces.get(checkpointOrWorkspace);
     const cp = this.checkpoint(ws ? ws.head : checkpointOrWorkspace);
-    return structuredClone(this.state(cp.stateHash)) as WorldState;
+    const world = structuredClone(this.state(cp.stateHash)) as WorldState;
+    if (!o?.resume) return world;
+    const snap = cp.resume ? this.resumes.get(cp.resume) : undefined;
+    if (cp.resume && !snap) throw new HistoryError('missing-state', `runtime snapshot ${cp.resume.slice(0, 16)}… of pause checkpoint ${cp.id} is not stored`);
+    return { world, snapshot: snap ? (structuredClone(snap) as RuntimeSnapshot) : null };
+  }
+
+  /** Is this checkpoint (or workspace head) a resumable mid-action pause? */
+  resumable(checkpointOrWorkspace: string): boolean {
+    const ws = this.workspaces.get(checkpointOrWorkspace);
+    return !!this.checkpoint(ws ? ws.head : checkpointOrWorkspace).resume;
   }
 
   /** The frozen state for a hash: from the cache, else loaded once from the attached store. */
@@ -195,6 +238,7 @@ export class WorldHistory {
       ...(o.states === false ? {} : { states: [...this.states.entries()] }),
       checkpoints: [...this.checkpoints.values()],
       workspaces: [...this.workspaces.values()],
+      ...(this.resumes.size ? { resumes: [...this.resumes.entries()] } : {}),
     };
   }
 
@@ -205,6 +249,7 @@ export class WorldHistory {
     for (const [k, s] of j.states ?? []) h.states.set(k, deepFreeze(s));
     for (const c of j.checkpoints) h.checkpoints.set(c.id, c);
     for (const w of j.workspaces) h.workspaces.set(w.id, { ...w });
+    for (const [k, s] of j.resumes ?? []) h.resumes.set(k, deepFreeze(s));
     return h;
   }
 }

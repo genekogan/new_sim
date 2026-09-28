@@ -61,6 +61,17 @@ export interface ActionDef<Params = any, Program = any, Exec = any> {
    * when stopping would leave an unsupported load (spec §13 `cancelled`).
    */
   cancel(rt: Runtime, exec: Exec): CancelResult;
+  /**
+   * Resumable snapshots (runtime/snapshot.ts, spec §22). `true`: the exec is plain data (Maps, Sets,
+   * aliasing and ActionRecord references are fine; closures and class instances are not) and resumes
+   * tick-exact with the default graph codec. A string: why this action refuses to be snapshotted.
+   * Unset: runtime/snapshot.ts RESUMABLE_VERBS / NON_RESUMABLE decide.
+   */
+  resumable?: true | string;
+  /** Custom exec serialisation (e.g. an exec holding a class instance); must return codec-encodable data. */
+  serializeExec?(rt: Runtime, exec: Exec): unknown;
+  /** Inverse of serializeExec, called on the restored runtime after world, records and services are loaded. */
+  restoreExec?(rt: Runtime, data: unknown): Exec;
 }
 
 export type ActionRecord = {

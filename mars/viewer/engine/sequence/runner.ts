@@ -52,6 +52,26 @@ export const SETTLE_S = 20;
 /** While settling, refused cancels are retried this often (a carry may refuse until the ground is clear). */
 const RETRY_CANCEL_TICKS = 20;
 
+/**
+ * Everything a SequenceRunner holds between ticks (plain JSON). Together with a Runtime snapshot
+ * (runtime/snapshot.ts) it resumes a sequence paused between — or during — steps.
+ */
+export type RunnerState = {
+  format: 'mars-sequence-runner/1';
+  steps: StepSpec[];
+  prefix: string;
+  t0: number;
+  reports: StepReport[];
+  diagnostics: Diagnostic[];
+  violationStart: number;
+  aborted: boolean;
+  timedOut: boolean;
+  cut: string[];
+  cutReason: [string, Diagnostic][];
+  refused: string[];
+  settleTicks: number;
+};
+
 const DONE: ReadonlySet<StepStatus> = new Set(['completed', 'failed', 'skipped', 'cancelled']);
 
 export class SequenceRunner {
@@ -84,6 +104,51 @@ export class SequenceRunner {
       this.byId.set(s.id, r);
       return r;
     });
+  }
+
+  /** Plain-JSON runner state (pair it with `rt.snapshot()` taken at the same tick). */
+  serialize(): RunnerState {
+    return structuredClone({
+      format: 'mars-sequence-runner/1' as const,
+      steps: this.steps,
+      prefix: this.prefix,
+      t0: this.t0,
+      reports: this.reports,
+      diagnostics: this.diagnostics,
+      violationStart: this.violationStart,
+      aborted: this.aborted,
+      timedOut: this.timedOut,
+      cut: this.cut,
+      cutReason: [...this.cutReason],
+      refused: [...this.refused],
+      settleTicks: this.settleTicks,
+    });
+  }
+
+  /** Rebuild a runner over `rt` (a runtime restored from the snapshot taken with this state). */
+  static restore(rt: Runtime, state: RunnerState): SequenceRunner {
+    if (state?.format !== 'mars-sequence-runner/1') throw new Error('not a mars-sequence-runner/1 state');
+    const s = structuredClone(state);
+    const r = new SequenceRunner(rt, s.steps, { actionPrefix: s.prefix });
+    (r as { t0: number }).t0 = s.t0;
+    r.reports.splice(0, r.reports.length, ...s.reports);
+    r.byId = new Map(r.reports.map((x) => [x.id, x]));
+    r.diagnostics.push(...s.diagnostics);
+    r.violationStart = s.violationStart;
+    r.aborted = s.aborted;
+    r.timedOut = s.timedOut;
+    r.cut = s.cut;
+    r.cutReason = new Map(s.cutReason);
+    r.refused = new Set(s.refused);
+    r.settleTicks = s.settleTicks;
+    return r;
+  }
+
+  /** One tick of `run()`: step the runtime, mirror records into reports, submit newly ready steps. */
+  tick() {
+    this.rt.step();
+    this.poll();
+    this.advance();
   }
 
   get done(): boolean {
@@ -137,10 +202,8 @@ export class SequenceRunner {
     this.advance();
     let n = 0;
     while (!this.done && n < maxTicks) {
-      this.rt.step();
+      this.tick();
       n++;
-      this.poll();
-      this.advance();
     }
     if (!this.done) {
       this.timeout();
