@@ -21,6 +21,7 @@ export const carryIntegrity: Invariant = (rt: Runtime) => {
   for (const e of Object.values(ents)) {
     if (e.kind !== 'component' || e.phase !== 'carried') continue;
     const s = e.support;
+    if (s?.kind === 'forks') continue; // on a forklift: covered by the forkliftLoad invariant (vehicles/forklift.ts)
     if (s?.kind !== 'held' || !s.by.length) {
       out.push({ code: 'carry.support', message: `${e.id} is carried but not held (support ${s?.kind ?? 'none'})`, subjects: [e.id], at: e.pose.p });
       continue;
