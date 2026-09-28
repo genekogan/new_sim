@@ -9,7 +9,8 @@
 //   off the nearest 6 in seat). The variant keeps every stock seat and adds the Kit levels, so the
 //   engine can hang beams exactly where the canonical scene has them (provisional; Questions for
 //   Gene in PROGRESS.md).
-// * Lumber stock: 16 ft 2x4 / 2x6 (and 8 ft 2x6) pieces.
+// * Lumber: 2x4 / 2x6 in every whole foot 1–16 ft the stock catalog lacks, and 4x1…4x7 plywood panels,
+//   so stock, cut pieces and offcuts are all real catalog pieces.
 // * Bundles and stacks: ONE static obstacle entity each (kind fixture, `obstacle`), sized for its
 //   full capacity; the entity's `contents` carries `{ food: 'stock:<piece def>', fraction, count }`
 //   (count = pieces left; fraction = count / capacity for renderers). `take_from_bundle`
@@ -56,6 +57,25 @@ function lumber(id: string, label: string, lengthFt: number, wIn: number, tIn: n
   };
 }
 
+function plywoodPanel(ft: number): AssetDef {
+  const l = ft * FT;
+  return {
+    id: `plywood-4x${ft}`,
+    label: `4x${ft} ft plywood panel (3/4 in; cut from a 4x8 sheet)`,
+    category: 'plywood',
+    size: [l, 0.75 * IN, 4 * FT],
+    massKg: Math.round(27 * ft / 8 * 10) / 10,
+    color: '#d8b98a',
+    handling: {
+      carryCrew: [1, 2],
+      carryPose: 'edge',
+      grips: { 1: [{ id: 'mid', local: [0, 0, 0] }], 2: [{ id: 'g0', local: [-l * 0.35, 0, 0] }, { id: 'g1', local: [l * 0.35, 0, 0] }] },
+      carryHeight: 0.75,
+    },
+    dims: { confidence: 'documented', note: `4x8 sheet cut to ${ft} ft` },
+  };
+}
+
 function bundle(id: string, label: string, size: [number, number, number], piece: string, capacity: number, massKg: number, note: string): AssetDef {
   BUNDLES[id] = { piece, capacity, note };
   return { id, label, category: 'fixture', size, massKg, color: '#b89160', obstacle: true, dims: provisional(note) };
@@ -78,11 +98,13 @@ export function stockAssets(make: { upright: (ft: number) => AssetDef }): AssetD
       dims: provisional(`${base.dims.note}; extra seats at the procedural reconstruction's beam levels (Kit.frame), not a real hole pitch`),
     });
   }
-  out.push(
-    lumber('2x4-16ft', '16 ft 2x4', 16, 3.5, 1.5, 1.9),
-    lumber('2x6-16ft', '16 ft 2x6', 16, 5.5, 1.5, 2.9),
-    lumber('2x6-8ft', '8 ft 2x6', 8, 5.5, 1.5, 2.9),
-  );
+  // whole-foot lumber the stock catalog lacks (cut pieces and offcuts are real catalog pieces)
+  for (let ft = 1; ft <= 16; ft++) {
+    if (![4, 6, 8, 12].includes(ft)) out.push(lumber(`2x4-${ft}ft`, `${ft} ft 2x4`, ft, 3.5, 1.5, 1.9));
+    out.push(lumber(`2x6-${ft}ft`, `${ft} ft 2x6`, ft, 5.5, 1.5, 2.9));
+  }
+  // plywood panels cut from a 4x8 sheet across its length (4x6 and 4x8 are stock catalog defs)
+  for (const ft of [1, 2, 3, 4, 5, 7]) out.push(plywoodPanel(ft));
   const sheetT = 0.75 * IN, dunnage = 0.1;
   out.push(
     bundle('bundle-plywood-4x8', 'strapped plywood bundle (24 × 4x8 sheets on dunnage)', [8 * FT, dunnage + 24 * sheetT, 4 * FT], 'plywood-4x8', 24, 24 * 27,
