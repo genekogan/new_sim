@@ -1334,3 +1334,15 @@ Then: gate → release 5; HANDOFF refresh.
 
 ## 2026-09-29 ~20:40 EDT — Gene: content parked, last-mile goal
 - Decisions recorded in OWNER_DECISIONS.md. W47/W51 told to land at their next green checkpoint with a full gate and stop; W52/W53 cancelled before start. W55 spawned: `LAST_MILE.md` inventory. W56 (HISTORICAL_CONTENT.md + banners) after W47/W51 land. Merge protocol from now: the worker runs a full `npm run gate` on its rebased branch and reports the table; the lead merges only green.
+
+## 2026-09-29 — W55 LAST_MILE inventory (docs only)
+- `docs/engineering/LAST_MILE.md`: 216 deduped items from HANDOFF, EVIDENCE, PROGRESS W1–W54, REVIEW, the 24 area docs, the Codex REPORTs, SPEC (144 requirements) and OWNER_FEEDBACK §1–§15 (81), plus the lint output, skip markers and the integration-vs-registry check. Each item has a source, category, proposal, effort, pin impact, dependencies and a "fixed means" test.
+- Counts: 188 fix (controller 21, engine 68, simulation 37, renderer 30, tooling 22, evidence 10), 16 re-classify: content, 12 re-classify: out-of-scope (SPEC §32/§22/§8). About 400 worker-hours of fixes. 49 rows certainly move pins and 60 might, to be batched into one re-pin window. 126 briefs of 1–3 h in 17 file-ownership lanes (A–X; X = Codex).
+- Findings:
+  - Lint is **123** (not 114) and is still not a gate step.
+  - Integration never calls `engine_direct_camera`, and the gate runs integration only with `SIM_BASE`.
+  - EVIDENCE.md is stale at `d91057b` (5 new test files and 90 tests unmapped; the phase-B row is PARTIAL although `PIN_FULL_AB` is set).
+  - REVIEW L1–L5 and L7–L9 are still open in code.
+  - `setpart.ts:241` erasing-op; `core/math.ts:209,298` lose precision.
+  - Three W50 follow-ups were orphaned by the W53 cancel (LM-143).
+- Needs a ruling (LAST_MILE §9): party/dance (SP §30 H) vs "no new features"; ladders, dismantling, cherry-pick, API visual capture and the Studio-editor unification (proposed out-of-scope or de-scope); whether the other 2022 houses' todo tests are content.
