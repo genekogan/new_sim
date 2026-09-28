@@ -4,7 +4,7 @@
 // `engine_direct_camera` op runs, phase 2 self-correction on). It shows the shot list, per shot the corrections
 // with their reasons (or the refusal with its candidates), and plays the directed track with the engine camera.
 // No natural-language parsing in this tranche.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { TakeReplay } from '../engine-view/take-replay.ts';
 import type { TakeHost } from './take-host.ts';
 
@@ -48,6 +48,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
   const [json, setJson] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const box = useRef<HTMLDetailsElement>(null);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const directed = host.directed();
   const playing = !replay.trackInfo().own;
@@ -90,7 +91,7 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
 
   const res = directed?.result;
   return (
-    <details className="take-direct">
+    <details className="take-direct" ref={box}>
       <summary>Direct camera{directed ? ` · ${res?.ok ? `${res.report.shots.length} shot${res.report.shots.length === 1 ? '' : 's'}` : 'refused'}` : ''}{playing ? ' · playing the directed track' : ''}</summary>
       <div className="direct-form" role="group" aria-label="Direction builder">
         <label>Subject<select aria-label="Subject kind" value={form.kind} onChange={(e) => set('kind', e.target.value as Form['kind'])}>{KINDS.map((k) => <option key={k}>{k}</option>)}</select></label>
@@ -113,7 +114,12 @@ export function DirectPanel({ host, replay, onChange }: { host: TakeHost; replay
       <div className="direct-actions">
         <button onClick={() => void compute()} disabled={busy}>{busy ? 'Computing…' : 'Compute camera'}</button>
         {res?.ok && (
-          <button onClick={() => { host.playDirected(!playing); replay.playing = !playing; onChange(); }}>
+          <button onClick={() => {
+            host.playDirected(!playing);
+            replay.playing = !playing;
+            if (!playing && box.current) box.current.open = false; // fold the form away: the shot needs the view
+            onChange();
+          }}>
             {playing ? "Back to the take's camera" : 'Play directed track'}
           </button>
         )}
