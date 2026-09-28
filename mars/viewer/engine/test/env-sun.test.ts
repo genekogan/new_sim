@@ -1,10 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
   solarPosition,
   sunTimes,
   losAngelesUtcOffsetHours,
   sunDirectionVector,
+  worldHeadingOfAzimuth,
+  NORTH_AZIMUTH_OFFSET,
   BOMBAY_BEACH,
 } from '../env/sun.ts';
 import { daylightFactors, smoothstep } from '../env/daylight.ts';
@@ -153,3 +157,53 @@ function minutesSinceMidnight(iso: string): number {
   const [h, m, s] = time.split(':').map(Number);
   return h * 60 + m + (s ?? 0) / 60;
 }
+
+// --- Site bearing (OWNER_FEEDBACK §15, QUESTIONS_FOR_GENE Q3 answered; OWNER_DECISIONS 2026-09-29 "North bearing").
+
+test('site bearing: world −X is north, −Z east, +X south, +Z west (the 2020 tire ring\'s long axis X runs N–S)', () => {
+  assert.equal(NORTH_AZIMUTH_OFFSET, -90);
+  const near = (v: number[], e: number[]) => hypot(v[0] - e[0], v[1] - e[1], v[2] - e[2]) < 1e-9;
+  assert.ok(near(sunDirectionVector(0, 0), [-1, 0, 0]), 'north → −X');
+  assert.ok(near(sunDirectionVector(0, 90), [0, 0, -1]), 'east → −Z');
+  assert.ok(near(sunDirectionVector(0, 180), [1, 0, 0]), 'south → +X');
+  assert.ok(near(sunDirectionVector(0, 270), [0, 0, 1]), 'west → +Z');
+  // the camera's dirFrom heading (datan2(z, x)) of north is π (−X)
+  assert.ok(Math.abs(Math.abs(worldHeadingOfAzimuth(0)) - Math.PI) < 1e-9);
+});
+
+test('site bearing evidence: DJI_0079 (2020-03-04 10:10:34 PST) — the sun stands on the +X/−Z side, shadows fall toward −X/+Z', () => {
+  // EXIF DateTimeOriginal 2020:03:04 10:10:34, GPS 33.3625 N 115.7162 W, FlightYawDegree +99.4 (camera faces ~east).
+  // The 2020 scene is laid out as the photo sees it: camera looking along −Z, +X to its right. The photo's shadows
+  // (geodesic sphere, Forest racks) fall to the left and slightly toward the camera, i.e. toward −X/+Z.
+  const s = solarPosition('2020-03-04T10:10:34', 33.3625, -115.7162);
+  assert.ok(Math.abs(s.azimuthDeg - 143.2) < 0.5 && Math.abs(s.elevationDeg - 43.1) < 0.5, `az ${s.azimuthDeg} el ${s.elevationDeg}`);
+  const h = hypot(s.direction[0], s.direction[2]), x = s.direction[0] / h, z = s.direction[2] / h;
+  assert.ok(x > 0.7 && z < -0.5, `sun toward (+X, −Z): ${x.toFixed(2)}, ${z.toFixed(2)}`);
+  // shadows point away from the sun: left (−X) more than toward the camera (+Z), as in the photo
+  assert.ok(-x < 0 && -z > 0 && Math.abs(x) > Math.abs(z));
+});
+
+test('the site bearing cannot move a construction pin: only camera/ and api/ (via camera) import env/sun.ts', () => {
+  // The simulation, planning, rehearsal, construction and take code never import the sun, and physicalView()
+  // excludes env (history.test.ts "physicalHash ignores env"), so NORTH_AZIMUTH_OFFSET moves shadows and the
+  // camera's sun windows only. deploy/perf-walk.mjs's five pins and the year-build pins were re-run at −90: PIN-OK.
+  const root = path.resolve(import.meta.dirname, '..');
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, ent.name);
+      if (ent.isDirectory()) { if (p !== path.join(root, 'test')) walk(p); } else if (ent.name.endsWith('.ts')) files.push(p);
+    }
+  };
+  walk(root);
+  const deps = new Map(files.map((f) => [f, [...readFileSync(f, 'utf8').matchAll(/from '(\.[^']+)'/g)].map((m) => path.resolve(path.dirname(f), m[1]))]));
+  const reach = new Set([path.join(root, 'env', 'sun.ts')]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const f of files) if (!reach.has(f) && deps.get(f)!.some((d) => reach.has(d))) { reach.add(f); grew = true; }
+  }
+  const rel = [...reach].map((f) => path.relative(root, f).split(path.sep).join('/')).sort();
+  const outside = rel.filter((f) => !/^(env|camera|api)\//.test(f));
+  assert.deepEqual(outside, [], `modules outside env/, camera/, api/ that see the sun: ${outside.join(', ')}`);
+  for (const f of rel) assert.ok(!/^(runtime|world|construction|campus|take|rehearsal|scenarios|planning|history)\//.test(f), f);
+});

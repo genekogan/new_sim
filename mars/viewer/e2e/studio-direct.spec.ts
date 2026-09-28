@@ -1,7 +1,8 @@
 // Studio "Direct camera" (docs/engineering/STUDIO_REPLAY.md, CAMERA_DIRECT.md): the director builds a typed direction
 // with the replay bar's form, the studio compiles it in the browser against the open flagship take (phase 2
 // self-correction on), shows the shot list with each correction and its reason, and plays the directed track with the
-// engine camera. The direction is a close hold on the first carry crew from the east at 1 s: a bystander walks
+// engine camera. The direction is a close hold on the first carry crew from the south (world +X; sun.ts site bearing,
+// −X north — this was 'east' under the old −Z-north assumption, same camera side) at 1 s: a bystander walks
 // between the lens and the crew, so the compiler must correct it (foreground → raise). A second direction names a
 // group nobody is in and must be refused with the compiler's diagnostic. Captures
 // artifacts/<run>/studio-direct-{shots,playing}.png.
@@ -37,10 +38,10 @@ test('direct camera: form → shot list with a correction → play the directed 
   await form.getByRole('textbox', { name: 'Subject' }).fill('carryA');
   await form.getByRole('combobox', { name: 'Verb' }).selectOption('hold');
   await form.getByRole('combobox', { name: 'Framing' }).selectOption('close');
-  await form.getByRole('combobox', { name: 'Side' }).selectOption('east');
+  await form.getByRole('combobox', { name: 'Side' }).selectOption('south');
   await form.getByRole('button', { name: 'Replace' }).click();
   const json = JSON.parse(await page.getByRole('textbox', { name: 'Directions JSON' }).inputValue());
-  expect(json, 'the form writes the typed direction the compiler takes').toEqual([{ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' }, at: 1, framing: { size: 'close', side: 'east' } }]);
+  expect(json, 'the form writes the typed direction the compiler takes').toEqual([{ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' }, at: 1, framing: { size: 'close', side: 'south' } }]);
 
   await page.getByRole('button', { name: 'Compute camera' }).click();
   const shots = page.getByRole('list', { name: 'Shot list' });
@@ -102,7 +103,7 @@ test('save track: directed track → take file with `cameras` → picker lists a
   await expect(camera.locator('option').first()).toContainText(`planned · ${entry.cameraTrack}`);
 
   await page.locator('.take-direct summary').click();
-  const direction = [{ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' }, at: 1, framing: { size: 'close', side: 'east' } }];
+  const direction = [{ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' }, at: 1, framing: { size: 'close', side: 'south' } }];
   await page.getByRole('textbox', { name: 'Directions JSON' }).fill(JSON.stringify(direction));
   await page.getByRole('button', { name: 'Compute camera' }).click();
   await expect(page.getByRole('list', { name: 'Shot list' })).toBeVisible({ timeout: 60_000 });

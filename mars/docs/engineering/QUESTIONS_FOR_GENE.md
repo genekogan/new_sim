@@ -23,7 +23,7 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status: **14 open blocks** (16 questions; two pairs were duplicates and are merged) and **2 answered**.
+Status: **13 open blocks** (15 questions; two pairs were duplicates and are merged) and **3 answered**.
 
 ---
 
@@ -57,20 +57,6 @@ its footprint. These are the tilted orange-brown boxes inside the pink roof area
 **What the answer changes.** If this is a scene error, the trailers move out in `scenes.ts`, and
 `mars-2023` / `mars-2024` are re-seeded (`reconstruction-edit`, id aliases). Chiba's interior becomes walkable
 where they stood. If it is real (the trailers parked under the roof), nothing changes.
-
-Gene:
-
-### Q3. North axis: which way is north on site?
-
-**What the engine sees.** World −Z is taken as geographic north (`NORTH_AZIMUTH_OFFSET = 0`,
-`engine/env/sun.ts`). No site bearing was found. The NOAA sun, the shadows and the camera's "sunset behind"
-windows all follow from this.
-
-![2022 shadows under the assumed north](../../viewer/e2e/baselines/lab-year-2022-top-prisms.png)
-
-**What the answer changes.** It sets one constant. Every shadow, every sunset / sun-behind camera direction and
-the studio lighting rotate by the offset. Directed camera tracks re-plan. Construction pins are not expected to
-move, because the environment is outside `physicalView()` (inferred, not yet tested).
 
 Gene:
 
@@ -260,6 +246,43 @@ OWNER_FEEDBACK §14).
 **Gene (2026-09-29):** the 0.5 m kneel rule stays the default. Add a prone receiver (lying on the stomach at
 the deck edge, then rising to knees and feet holding the load) as a further posture (OWNER_FEEDBACK §13).
 W28 and W29 landed it.
+
+### A3. North axis: which way is north on site? (was Q3)
+
+**Gene (2026-09-29, OWNER_FEEDBACK §15):** the long axis of the 2020 tire ring (world X) runs north–south.
+**Sign, from evidence (W42):** world **−X is north** in the 2020 scene (`NORTH_AZIMUTH_OFFSET = −90`,
+`engine/env/sun.ts`). The March 4 2020 aerial `DJI_0079.JPG` was taken at 10:10:34 PST (EXIF), with
+`FlightYawDegree +99.4`, so the camera faces about east. The 2020 scene is laid out as this photo sees it: the Portal →
+container → canopy → Forest row runs left → right (+X), the geodesic sphere (z = +17) is nearest and the RV camp
+(z ≈ −50) is far. `solarPosition()` puts the sun at azimuth 143°, elevation 43°, so shadows fall toward 323° (NW),
+behind-left of an east-facing camera. The photo shows exactly that: the sphere's and the Forest racks' shadows fall
+left and slightly toward the camera. The tire line runs left-right across the frame, which is N–S for this heading.
+
+![DJI_0079, 2020-03-04 10:10 PST, camera facing ~east](questions/q3-dji0079-march4-2020.jpg)
+
+Proven harmless to construction: only `camera/` and `api/` (via camera) import `env/sun.ts`, and `physicalView()`
+excludes env (`engine/test/env-sun.test.ts`, "the site bearing cannot move a construction pin"). The five
+`deploy/perf-walk.mjs` pins and every year-build pin re-ran green at −90.
+
+**The other years do NOT share this frame** (W42, measured against drone stills with XMP yaw + solar-shadow checks;
+2020 and 2021+ are the same parcel, and the 2020 tire ring lies west of the later campus):
+
+| Scene | North in world | Evidence | Confidence |
+| --- | --- | --- | --- |
+| 2020 (studio-2020) | −X (offset −90°) | DJI_0079 above | high |
+| 2026 CAD | −X turned ~33° toward −Z (offset ≈ −57° ± 8°) | 2026 DJI_0005 (yaw −91.7, near-nadir, 3-19 14:31) and DJI_0098 (nadir), rotated north-up vs the CAD plan: Chiba's hall axis, the Chiba → container row and the RV arc are all ~33° off | high |
+| 2025 Kit | −Z (offset 0°) | 2025 pano 16:14, sun as azimuth reference; Chiba N of the drone, steps facing S, kitchen SW | medium (±20°) |
+| 2024 Kit | Chiba alone fits −Z; the kitchen and RV ring are on the wrong side of Chiba | DJI_20240122144543_0335_D nadir, oriented by the tire ring | medium-high |
+| 2023 Kit | unverified (authored like 2024) | no still with telemetry | — |
+| 2022 Kit | authored as −Z, but **mirrored** (the real pinwheel turns clockwise, the Kit's counter-clockwise) | 2022 DJI_0829 (yaw 110.2, pitch −86.4) | high on the mirror |
+| 2021 Kit | authored as −Z | no usable February still | low |
+
+![2026 CAD plotted −X-up next to DJI_0098 and DJI_0005 rotated north-up](questions/q3-2026-cad-vs-drone-north-up.jpg)
+
+So one global offset cannot be right for every year. −90° is exact for 2020 and is the nearer of the two simple
+values for 2026 (33° off instead of 57°). CAMPUS_SCENE.md's "North = −z" for the CAD comes from assembly names
+and is about 57° off. Open follow-up (lead / Gene): a per-year site bearing (2026 ≈ −57°), and whether the 2022 mirror
+and the 2024 kitchen/RV side are scene edits (HISTORY_IDS reconstruction edits), since no rotation fixes them.
 
 ## Q19 — Did the 2022 roofs have 2x4 framing under the plywood? (parked; non-blocking)
 **What the engine sees:** the 2022 Kit scenes have no top plates, rafters or ceiling joists; every roof sheet lies straight on the

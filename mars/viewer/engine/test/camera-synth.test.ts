@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { datan, datan2, dtan, hypot, type Vec3 } from '../core/math.ts';
 import { hashOf } from '../core/hash.ts';
-import { solarPosition } from '../env/sun.ts';
+import { NORTH_AZIMUTH_OFFSET, solarPosition } from '../env/sun.ts';
 import { CameraWorld, raycast } from '../camera/geom.ts';
 import { placement } from '../camera/quality.ts';
 import { subjectPoints } from '../camera/shots.ts';
@@ -14,6 +14,9 @@ import { directCamera, MOTION_CAPS, type DirectResult } from '../camera/synth.ts
 import { beforeSunset, campus2024, campus2026, flagship, onGrid, roomScene, stepTimes, withTime } from './camera-direct-fixtures.ts';
 
 const DEG = Math.PI / 180;
+/** Compass bearing (deg clockwise from north) of a world ground vector — the inverse of sun.ts's projection
+ * (x = sin(az + NORTH_AZIMUTH_OFFSET), z = −cos(az + NORTH_AZIMUTH_OFFSET)). */
+const compassOf = (v: Vec3) => (((datan2(v[0], -v[2]) / DEG - NORTH_AZIMUTH_OFFSET) % 360) + 360) % 360;
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const unit = (a: Vec3): Vec3 => { const l = hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; };
 const angleDeg = (a: Vec3, b: Vec3) => { const u = unit(a), v = unit(b); const c = Math.min(1, Math.max(-1, u[0] * v[0] + u[1] * v[1] + u[2] * v[2])); return datan2(Math.sqrt(1 - c * c), c) / DEG; };
@@ -84,7 +87,7 @@ test('(b) 2026: pan across Chiba with the sunset behind — every sample in the 
   for (const s of samples) {
     assert.deepEqual(s.position, p0, 'a pan keeps the camera still');
     const v = sub(s.position, s.target);
-    const camAz = ((datan2(v[0], -v[2]) / DEG) % 360 + 360) % 360; // compass bearing subject → camera (-Z north, +X east)
+    const camAz = compassOf(v); // compass bearing subject → camera (site frame: −X north, −Z east)
     let d = camAz - ((sun.azimuthDeg + 180) % 360);
     d = ((d + 540) % 360) - 180;
     assert.ok(Math.abs(d) <= halfH - 3 + 1e-6, `t=${s.t}: camera azimuth ${camAz.toFixed(1)}° is ${d.toFixed(1)}° from opposite-the-sun`);
@@ -248,7 +251,7 @@ test('verbs: tilt / dolly / crane / pull_out / hold have the geometry their name
   assert.equal(hk.length, 31);
   assert.ok(hk.every((k) => JSON.stringify(k.position) === JSON.stringify(hk[0].position)));
   const v = sub(hk[0].position, hk[0].target);
-  const az = ((datan2(v[0], -v[2]) / DEG) % 360 + 360) % 360;
+  const az = compassOf(v);
   assert.ok(Math.abs(az - 180) < 1, `side: south → camera due south of the subject (${az.toFixed(1)}°)`);
 });
 

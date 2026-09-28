@@ -179,7 +179,7 @@ export function createEnvironment(
     date: string = DEFAULT_SCENE_DATE,
   ) {
     // Real NOAA solar position (engine/env/sun.ts), season-aware — see
-    // NORTH_AZIMUTH_OFFSET there for the stated world-north assumption. Date
+    // NORTH_AZIMUTH_OFFSET there for the site bearing (−X north). Date
     // and hour are independent inputs, and both stay independent of
     // simulation elapsed time `time` (spec §19).
     const sun_ = solarPosition(localDateTimeAt(date, hour), BOMBAY_BEACH.lat, BOMBAY_BEACH.lon);
