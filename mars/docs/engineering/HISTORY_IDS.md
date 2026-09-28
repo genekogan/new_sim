@@ -34,13 +34,13 @@ k.named(k.box(g, 'Chiba entry sign', size, p, material, layers.wall), 'entry-sig
 
 Names are slugged, must be unique per scene (duplicates throw), and are assigned before
 hashed ids. Pinned today: 2021 `chiba-mars-letters`, `chiba-aluminet`; 2024
-`chiba-flower-mural`, `chiba-entry-sign`. Plans/replays (SPEC §21, §25) should reference
+`chiba-flower-mural`, `chiba-entry-sign`, `chiba-solarium-door` (2026-09-29). Plans/replays (SPEC §21, §25) should reference
 pinned names, or hashed ids captured from the exact revision they were validated against.
 
 ## Legacy layouts
 
 `app/history/id-migration.json` is a frozen map from every legacy serial id
-(7,942 entries across 2020–2026) to its stable id, generated once by zipping the
+(7,942 entries across 2020–2026; 84 point at pieces removed by the 2024 reconstruction edit, below) to its stable id, generated once by zipping the
 pre-change build with the new build in identical traversal order. Format:
 `years[year][assembly] = {start, ids}`, where `ids[i]` is the suffix after
 `${assembly}-` for legacy serial `start + i` (`null` = piece removed after tagging).
@@ -58,3 +58,33 @@ changes an id that the table targets, `deploy/history-ids.test.mjs` fails; add a
 **Tests:** `deploy/history-ids.test.mjs`: per-year determinism/uniqueness; a 2021 build with a dummy
 injected as the first chiba piece (`KitHooks.assembly`) keeps every id; pins; live table
 targets; migration, warn-and-drop and rejection paths through `validateLayout`.
+
+## Reconstruction edits of a protected year (first: Chiba 2024 front, 2026-09-29)
+
+A protected `mars-<year>` is re-published from `public/engine/campus-<year>.json` by every loader
+(`publishCampusYear`; the year rooms too). So a reconstruction edit is a **re-seed**: change the Kit scene, then
+regenerate the file. The edit's cause is recorded as a `reconstruction-edit` checkpoint (engine/history/store.ts).
+Procedure:
+
+1. Edit the Kit scene. Keep untouched pieces' kind and placement, including any parent group's transform, so their
+   hashed ids survive. Pin a name for anything a plan should address. Tag new pieces with the evidence (Kit `source`).
+2. `node deploy/history-scenes.mjs <year>`, then `--check` (all years deterministic).
+3. `deploy/history-ids.test.mjs` names every legacy entry whose target vanished. Point each one at its successor
+   (same role, build order: an **alias**). Set it to `null` when the piece no longer exists. Edit only that
+   assembly's line; never regenerate the table.
+4. `engine/test/campus-history.test.ts`: freeze the pre-edit `contentHash`. Prove that publishing a pre-edit
+   canonical, forking it and committing the regenerated world with `{kind: 'reconstruction-edit', note, evidence}`
+   gives the same `physicalHash` as `publishCampusYear` on the new file. Name kept and removed ids, and check that the
+   year room still seeds.
+5. Re-baseline the year's studio and lab captures, look at them, and record the edit in CAMPUS_SCENE.md.
+
+**2024, 2026-09-29 (W43).** `contentHash` c542f3fe… → d197e6ae…. Full Kit manifest:
+- 1446 of 1606 ids kept, including every non-Chiba id, the PV, the left clear strip, the yellow door leaf, the frame,
+  the decks and the upper stair;
+- 160 Chiba pieces replaced or added.
+Migration table (`2024.chiba`):
+- 76 entries aliased to successors: the stair treads, risers, rails and posts; the landing sheets; the two orange
+  murals; the eye pane; the two leaning "painted frontage side" boxes → `left flap` / the right flap's base;
+- 84 entries set to `null`: the 14 right-hand salvaged windows (backing, glazing, 4 frames each) no longer exist.
+So the table now holds 7,858 live entries plus 93 nulls; 9 nulls predate this edit. `history-ids.test.mjs` asserts
+both numbers.

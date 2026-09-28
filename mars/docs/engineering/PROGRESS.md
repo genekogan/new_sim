@@ -1108,3 +1108,37 @@ Then: gate → release 5; HANDOFF refresh.
   card). Q21 rests on one wet-day nadir whose north comes from the tire ring, not EXIF. The eye-level 2026 capture only
   identifies Chiba.
 - **W44 landed** `5eeedb7`, `047fc68` (≈190k tokens, 40 min; merged): cards Q20 (2022 mirrored — model vs DJI_0829 north-up, spin arrows), Q21 (2024 kitchen + trailer ring north or south of Chiba — vs DJI_20240122144543_0335_D), Q22 (2026 north ≈ 33° off — vs DJI_0005; option "each year's own north"), all "worth answering first" with outlined captures + drone stills; page 17 open / 3 answered; STUDIO_REPLAY moments, YEAR_BUILD camera table, CAMPUS_SCENE per-year north. Lead LOOKED at q20-2022-model-vs-drone: accepted. Note: Q21's answer also settles Q2 for 2024.
+## 2026-09-29 — W43: Chiba 2024 front as photographed (reconstruction edit of `mars-2024`)
+
+- **Scene** (`app/history/photographic-corrections.ts frontage2024`, `scenes.ts make2024`):
+  - a VERTICAL inset (2.5 bays) at the frame front, 2.65 m behind the flap bottoms;
+  - two straight stair flights (run 2.6, rise 2.08, 12 risers; the old shear matrix is gone) to a 3.46 × 1.45 m
+    landing at the upper-floor level above a sliding double door (yellow leaf kept, orange leaf added);
+  - flaps keep the 29.7° lean, with triangular cheeks against the inset and a left upper step under the top PV rows;
+  - right flap = 4 rows of `plexiglass` panes (new renderer-only material) on a 2x4 lattice, with the painted eye pane
+    and no opaque backing, so the solarium shows through;
+  - the solarium's end: a plexiglass wall on 2x4 studs with a 1.21 × 2.0 m door standing open. This is the **first
+    door object**: pinned `chiba-solarium-door`, kind `plexiglass door` → engine `glass`, `userData.door` = the
+    opening.
+  Measurements and pixel reasoning: CAMPUS_SCENE.md "Chiba 2024 front".
+- **Re-seed** (new HISTORY_IDS.md "Reconstruction edits" procedure): `campus-2024.json` c542f3fe… → d197e6ae…
+  - 1446 of 1606 Kit ids kept (all non-Chiba, PV, left strip, yellow leaf, frame, decks, upper stair); 160 Chiba
+    pieces replaced or added; the pins survive;
+  - migration table: 76 aliases, 84 nulls (the removed right-hand salvaged windows);
+  - `campus-history.test.ts` (+4 tests): pre-edit canonical → fork → `reconstruction-edit` checkpoint = the new
+    canonical (same physicalHash); the 2024 year room seeds protected `mars-2024`; walker 5.5 m and eye-level camera
+    navmesh 5.0 m through the door (closed-door counterfactual: no route); the hall interior still 100 % blocked;
+  - `history-geometry.test.mjs`: a new photographed-front test (vertical inset, level treads, flaps proud, an exact
+    open doorway).
+- **Captures** (looked at):
+  - studio 2024 default / plan / frontage re-baselined, plus new `front-eye` (the photo's framing), `solarium`
+    (through the right panes) and `solarium-door`;
+  - lab `year-2024-top-prisms` refreshed (4 walkers, zero violations).
+  Still differs from the photo: width (Q20: the photo's door/landing scale suggests ~7 bays), the older PV row layout,
+  flat plexiglass (no glare), an upright in the front doorway, a plywood floor where the interior photo shows sand, and
+  no furniture.
+- **Questions:** Q20 (6 vs 7 bays), Q21 (end-wall door position / swing); the page is regenerated (17 open cards).
+- **Gates:** `npm test` 60/60, `test:engine` 384 pass / 0 fail, `tsc` clean, `--check` 6/6 deterministic,
+  studio-years 14/14, lab-years year-2024 pass.
+- **Not changed, flag for the lead:** CAMERA_DIRECT.md §7 still says "No door objects in any scene". The 2024 solarium
+  door is now one (tagged as above; the navmesh sees it as a gap, so no rule changed).

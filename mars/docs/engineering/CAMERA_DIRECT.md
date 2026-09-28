@@ -345,7 +345,7 @@ The last run on the recorder's track (CAMERA_VERIFY "After the fix") left one |p
 body vs capsule, b1 close-up) — not a directed track, so no regression is added from it.
 
 ## 7. Limits (honest)
-- **No door objects in any scene:** openings are just gaps. In 2024 the only camera-sized way into the kitchen is
+- **Door objects: the 2024 Chiba solarium end wall has the first (`chiba-solarium-door`, open 90°, a real 1.21 × 2.0 m opening for walkers and the camera navmesh — W43); other scenes still have none:** openings are just gaps. In 2024 the only camera-sized way into the kitchen is
   the 0.79 m serving hatch above the counter-height half wall; phase 2 flags it as a squeeze and splits the move at
   it (§6.4).
 - **The 2026 campus has no kitchen region and no sink fixture.** Its interiors are blocked `interior:*` prisms by

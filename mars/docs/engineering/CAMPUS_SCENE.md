@@ -168,3 +168,76 @@ publishCampusYear(history, 2022, file);  // protected 'mars-2022'; forkCampusYea
 - **Wiring rooms** (`engine/api/seeds.ts`, not done here): publish each year with `publishCampusYear(h, y, file)` next
   to the proving ground. Node reads files with `loadCampusFile`. The DO/browser fetches `campusYearUrl(y)` from the
   release (`prepare.py` stages `engine/**`).
+
+### Chiba 2024 front: reconstruction edit, 2026-09-29 (W43, OWNER_FEEDBACK §15)
+Evidence: `evidence/2024-chiba-facade-front-vertical-inset-stairs-plexiglass.webp` (1000 × 497 px, frontal, cropped,
+lens unknown) and `evidence/2024-chiba-solarium-interior-plexiglass-roof.jpg`. Code: `app/history/photographic-corrections.ts
+frontage2024` (called by `scenes.ts make2024`). Every new piece carries Kit `source` = "photo 2024 front / interior,
+2026-09-29 (reconstruction-edit; provisional photographic fit)". **All measurements are provisional.**
+
+**Before:** one leaning plane (29.7°, bottom 2.65 m proud of the frame front, top at the roof edge) carried the whole
+front, and the two stair flights sat in a shear matrix that leaned with it.
+
+**Measured (pixel reasoning):**
+- **Scales.** The ground width is 953 px. Keeping 6 bays (21.95 m) gives ≈ 43.4 px/m at the flap bottoms. The door
+  leaves (70 px) and the landing (88 px above the ground, at the upper-floor level) give ≈ 35–36 px/m at the inset.
+  The outer flap edges converge by ≈ 10 % bottom→top, so the camera is ≈ 25 m away. The two scales disagree by ≈ 10 %,
+  which suggests about 7 bays. The footprint is **kept at 6 bays**; see QUESTIONS_FOR_GENE **Q20**.
+- **Inset width.** The red vertical panel between the flaps is 310→712 px = 402 px ≈ 9.26 m at the flap scale, so it
+  is **2.5 bays (±4.572 m)**, centred on the door (door centre at 512 px, 0.25 m off the facade centre: noise).
+- **Set-back.** The right flap's inner cheek shows ≈ 25–30 px at the bottom and tapers to 0 at the top. At ≈ 25 m and
+  ≈ 5 m lateral offset that means ≈ 2.5–3 m of depth. So the inset sits in the frame-front plane (z = d/2), **2.65 m
+  behind the flap bottoms**. At the top the left flap overlaps the mural panel (the PV rows reach 405 px against the
+  mural's 336 px edge), so the flaps are in front of the inset at every height. That is consistent.
+- **Flap angle.** A frontal photo cannot give it. The old 29.7° lean (from the Jan 29 oblique) is kept. The flaps'
+  bottoms protrude 2.65 m past the inset; triangular **cheeks** at x = ±4.572 close them against it.
+- **Door.** Sliding double door on a top track. The left leaf is yellow (461–493 px), the opening 493–535 px, the right
+  leaf orange-red (535–564 px). At ≈ 39 px/m that is 0.75 m leaves and a 1.16 m opening. The yellow leaf is the existing
+  piece (x −0.96); the orange leaf is added at +0.96.
+- **Stairs.** Two straight flights parallel to the inset, from the ground at the outer ends (356 / 665 px) up to the
+  landing above the door (444 / 580 px), in elevation at ≈ 45°. Modelled: run 2.6 m, rise 2.08 m, 12 risers
+  (0.173 × 0.217 m), width 1.2 m against the wall. Landing 3.46 × 1.45 m, top 2.49 m (the upper-floor level), on two
+  front posts, with a front rail at 3.45 m; the Chiba sign is on its fascia (1.97–2.54 m, photo 238–258 px).
+- **Right flap (solarium roof).** Red base, slant 0–1.65 m. Then four glazed rows, whose left edge steps in toward the top
+  (707 / 739 / 768 px):
+  - row C, slant 1.65–3.2: one tall pane plus 2 × 4 panes;
+  - row B, 3.2–4.3: 5 panes plus the painted eye pane (808–848 px);
+  - row A, 4.3–5.25: 6 panes.
+  The panes sit on a 2x4 lattice (22 mullions, 5 rails), per the interior photo. Material `plexiglass` (renderer-only:
+  `plexiglass()`, opacity 0.3). The old salvaged windows and their opaque backing are removed, so the solarium is
+  visible through the panes.
+- **End wall + door.** The end wall is not in either photo; its position comes from Gene's §15 text. It is a plexiglass
+  wall at x = +w/2 under the right flap, on 2x4 studs and rails. The door is next to the frame (dz 0.145–1.355 m, height
+  0.22–2.22 m), the only place a 2 m door fits under the slope. See **Q21**.
+
+**Door tagging (first door object in any year scene).** The leaf is the pinned `chiba-solarium-door`, Kit kind
+`plexiglass door` (→ engine kind `glass`: collides, does not occlude). It stands **open 90° outwards**, so the opening
+is a real gap in the rasters. The jambs and header are `solarium door jamb/header` (hashed). `userData.door =
+{state:'open', swing:'out-90', hinge, opening:{x, z:[z0,z1], y:[y0,y1]}}` is on the Kit mesh only. The year-file schema
+is unchanged, and the camera and walker rules are unchanged: openings are gaps (CAMERA_DIRECT.md §7).
+
+**Walkability.** Unchanged rule. The hall's deck footprint still blocks (100 % of the 2024 hall interior at 0.25 m).
+The solarium floor is ground level (sand in the interior photo), so walkers reach it through the door. Before the edit
+they reached it through the open flap ends.
+
+**Numbers** (`campus-history.test.ts`):
+- walker, outside → solarium through the door: 5.5 m, clearance 0.55;
+- camera navmesh at eye level through the door: 5.0 m; with the door closed, no route in a 16 × 14 m crop.
+
+**Ids** (full Kit manifest, 1606 before / 1606 after):
+- 1446 kept, including every non-Chiba id, the PV, the left clear strip, the yellow leaf, the frame, the decks and the
+  upper stair;
+- 160 replaced or added;
+- pins `chiba-flower-mural` and `chiba-entry-sign` kept (moved onto the inset);
+- `contentHash` c542f3fe… → d197e6ae….
+Re-seed and migration: HISTORY_IDS.md "Reconstruction edits".
+
+**Still differs from the photo:**
+- width (Q20);
+- the PV layout keeps its older 4 + 4 + 2 + 2 rows (the photo has 6 + 6 + 4 + 4 + a clear row, the top rows running
+  to 405 px);
+- the plexiglass is a flat translucent material, not the photo's sun-glare;
+- the rack upright at x = 0 still stands in the front doorway (skeleton unchanged);
+- the solarium floor next to the hall is the hall's plywood deck, where the interior photo shows sand;
+- no tables, chairs or people inside;
+- roof railings and the upper stair are unchanged.
