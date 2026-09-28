@@ -4,6 +4,7 @@ export * from './registry.ts';
 export * from './schemas.ts';
 export * from './controller.ts';
 export * from './seeds.ts';
+export * from './camera-vocab.ts';
 
 export const ENGINE_TOOL_PREFIX = 'engine_';
 

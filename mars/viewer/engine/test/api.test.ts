@@ -1137,3 +1137,91 @@ test('edit_world (LM-005): a parked vehicle moves with the same footprint checks
   assert.match(ridden.message, /ridden by p1; dismount first/);
   assert.equal(c.call('edit_world', { workspace: 'v', edits: [{ op: 'remove', id: 'bike' }], note: 'remove ridden' }).code, 'edit.vehicle-ridden');
 });
+
+// ---- LM-007 / 008 / 010: camera sentences over the op API (W58) --------------------------------------
+
+test('parse_camera (LM-007/008): Gene’s four sentences through the op — racks alias → the take’s rack bay, kitchen unknown in 2026, deictic question', async () => {
+  const { flagship } = await import('./camera-direct-fixtures.ts');
+  const { take, input } = flagship();
+  const c = createController({ history: seedHistory(), scenes: { ...ENGINE_SCENES, [take.finalState.base.campus]: input.scene } });
+  c.takes.put(take);
+  const four = [
+    'do a pan across Chiba with the sunset in the background',
+    'do a 270° revolution around the main pallet racks over 2 minutes',
+    'go inside the kitchen and face the sink',
+    'look at this crowd of people having this activity',
+  ];
+  const r = c.call('parse_camera', { take_id: take.id, sentences: four }) as any;
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'camera.direct.unknown', 'first refusal (sentence 3) names the code');
+  assert.deepEqual(r.directions.map((d: any) => d.index), [0, 1]);
+  assert.deepEqual(r.directions[0].direction, { subject: { kind: 'region', ref: 'chiba' }, motion: { verb: 'pan' }, context: { sunBehind: { sunset: true } } });
+  const racks = r.directions[1];
+  assert.equal(racks.subject.said, 'rack bay');
+  assert.match(racks.subject.id, /^structure:/, 'the alias resolves to the take’s rack bay structure');
+  assert.deepEqual(racks.direction, { subject: { kind: 'assembly', ref: racks.subject.id }, motion: { verb: 'orbit', degrees: 270 }, duration: 120 });
+  assert.deepEqual(r.refusals.map((x: any) => [x.index, x.code]), [[2, 'camera.direct.unknown'], [3, 'camera.parse.deictic']]);
+  assert.match(r.refusals[0].message, /no region named 'kitchen-interior'/);
+  assert.match(r.refusals[1].question, /which activity/i);
+  assert.deepEqual(r.refusals[1].span, [8, 12]);
+  // determinism + read-only
+  assert.deepEqual(c.call('parse_camera', { take_id: take.id, sentences: four }), r);
+  assert.equal(c.cameras(take.id).length, 0);
+  // input refusals
+  assert.equal(c.call('parse_camera', { sentences: four }).code, 'op.invalid-input');
+  assert.equal(c.call('parse_camera', { take_id: take.id, workspace: 'proving-ground', sentences: four }).code, 'op.invalid-input');
+  assert.equal(c.call('parse_camera', { take_id: take.id, sentences: [] }).code, 'op.invalid-input');
+  assert.equal(c.call('parse_camera', { take_id: 'nope', sentences: four }).code, 'take.unknown');
+});
+
+test('parse_camera (LM-007/008/010): 2024 kitchen + sink resolve; bare 2026 racks are a question with candidates; unknown names and unsupported phrasing are refusals', async () => {
+  const { campus2024, campus2026 } = await import('./camera-direct-fixtures.ts');
+  const y24 = campus2024(), y26 = campus2026();
+  const history = seedHistory();
+  history.publishCanonical('y24', 'Mars 2024', y24.world, 'test');
+  history.publishCanonical('y26', 'Mars 2026', y26.world, 'test');
+  const c = createController({ history, scenes: { ...ENGINE_SCENES, [y24.world.base.campus]: y24.scene, [y26.world.base.campus]: y26.scene } });
+  const k = c.call('parse_camera', { workspace: 'y24', sentences: ['go inside the kitchen and face the sink'] }) as any;
+  assert.ok(k.ok, k.message);
+  assert.deepEqual(k.directions[0].direction, { subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through' }, context: { interior: 'kitchen-interior', lookAt: 'sink' } });
+  assert.equal(k.source.campus, y24.world.base.campus);
+  // no built bay in the bare 2026 campus: the rack alias falls back to the scene's rack buildings — a question, not a guess
+  const amb = c.call('parse_camera', { workspace: 'y26', sentences: ['do a 270° revolution around the main pallet racks over 2 minutes'] }) as any;
+  assert.equal(amb.code, 'camera.direct.ambiguous');
+  assert.ok(['north-rack-building', 'west-rack-building'].every((id) => amb.refusals[0].candidates.includes(id)), JSON.stringify(amb.refusals[0].candidates));
+  assert.match(amb.refusals[0].question, /Which assembly/);
+  // a named rack building resolves directly
+  const north = c.call('parse_camera', { workspace: 'y26', sentences: ['pan across the north rack building'] }) as any;
+  assert.ok(north.ok, north.message);
+  assert.deepEqual([north.directions[0].subject.kind, north.directions[0].subject.id], ['region', 'north-rack-building'], 'a building region is named once, as the region');
+  // unknown: lists what is known
+  const venus = c.call('parse_camera', { workspace: 'y26', sentences: ['hold on Venus'] }) as any;
+  assert.equal(venus.code, 'camera.direct.unknown');
+  assert.ok(venus.refusals[0].details.known.some((x: any) => x.id === 'chiba'));
+  // LM-010: untested paraphrases are refusals / notes by design, through the op too
+  const para = c.call('parse_camera', { workspace: 'y26', sentences: ['zoom in on Chiba', 'orbit around Chiba', 'hold on Chiba with a wide lens', 'watch the crowd of people eating'] }) as any;
+  assert.deepEqual(para.refusals.map((x: any) => [x.index, x.code]), [[0, 'camera.parse.unknown-verb'], [1, 'camera.parse.missing'], [3, 'camera.direct.unknown']]);
+  assert.deepEqual(para.directions.map((d: any) => [d.index, d.notes]), [[2, ['wide lens has no numeric fov; lens choice left to the engine']]]);
+  assert.match(para.refusals[2].message, /nobody is doing 'eat'/);
+});
+
+test('direct_camera (LM-007): `sentences` are parsed then compiled in one call — the same track as the parsed directions; refusals compile nothing', async () => {
+  const { flagship } = await import('./camera-direct-fixtures.ts');
+  const { take, input } = flagship();
+  const c = createController({ history: seedHistory(), scenes: { ...ENGINE_SCENES, [take.finalState.base.campus]: input.scene } });
+  c.takes.put(take);
+  const sentence = 'do a 270° revolution around the main pallet racks over 2 minutes';
+  const parsed = (c.call('parse_camera', { take_id: take.id, sentences: [sentence] }) as any).directions.map((d: any) => d.direction);
+  const r = c.call('direct_camera', { take_id: take.id, sentences: [sentence] }) as any;
+  assert.ok(r.ok, r.message);
+  assert.equal(r.track_id, `dir-${hashOf({ take: take.id, directions: parsed, hz: 10 }).slice(0, 12)}`, 'same id as direct_camera { directions: parsed }');
+  assert.equal(r.parsed[0].subject.said, 'rack bay');
+  assert.equal(r.takeHashUnchanged, true);
+  assert.deepEqual(c.cameras(take.id).map((x) => x.id), [r.track_id]);
+  const bad = c.call('direct_camera', { take_id: take.id, sentences: [sentence, 'zoom in on Chiba'] }) as any;
+  assert.equal(bad.code, 'camera.parse.unknown-verb');
+  assert.deepEqual(bad.refusals.map((x: any) => x.index), [1]);
+  assert.equal(c.cameras(take.id).length, 1, 'a refused sentence compiles and stores nothing');
+  assert.equal(c.call('direct_camera', { take_id: take.id }).code, 'op.invalid-input');
+  assert.equal(c.call('direct_camera', { take_id: take.id, sentences: [sentence], directions: parsed }).code, 'op.invalid-input');
+});

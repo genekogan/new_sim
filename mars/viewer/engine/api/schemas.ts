@@ -174,9 +174,20 @@ export const opSchemas = {
       })
       .describe('a compiled CameraTrack (e.g. a directed track downloaded from the studio) to store beside its take'),
   }),
+  parse_camera: z.strictObject({
+    take_id: id.describe("resolve names in this take's world (who-does-what from the take); give this or workspace").optional(),
+    workspace: z.string().max(120).describe('or: resolve names in this workspace / checkpoint state').optional(),
+    sentences: z.array(z.string().min(1).max(400)).min(1).max(24).describe('camera sentences, one direction each, e.g. "do a 270° revolution around the main pallet racks over 2 minutes"'),
+  }),
   direct_camera: z.strictObject({
     take_id: id,
-    directions: z.array(cameraDirectionSchema).min(1).max(24).describe('camera directions in order (each starts when the previous ends unless `at` is given)'),
+    directions: z.array(cameraDirectionSchema).min(1).max(24).describe('camera directions in order (each starts when the previous ends unless `at` is given); give this or `sentences`').optional(),
+    sentences: z
+      .array(z.string().min(1).max(400))
+      .min(1)
+      .max(24)
+      .describe('or: camera sentences, parsed and resolved exactly as engine_parse_camera does (any refusal refuses the call, nothing is compiled), then compiled as those directions')
+      .optional(),
     track_id: z.string().regex(/^[\w.-]{1,64}$/).optional(),
     hz: z.number().min(1).max(30).optional(),
     correct: z.boolean().describe('self-correction (default true): simulate every shot against the take and apply ranked corrections (raise, widen, swing, re-route, shorten, split, cut), recorded per shot; false = the computed move as is').optional(),
@@ -231,6 +242,11 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
     readOnly: false,
     description:
       'Store an already-compiled camera track (mars-camera-track/1, e.g. a directed track from the studio Direct panel) beside its take, like attach_camera_track / direct_camera do for tracks they compute. Validated with the take-file camera rules (schema, hz, samples, track.takeId = take_id, duration within the take). Refuses a track of another take (camera.track-take-mismatch), an id already used by a different track (camera.track-exists; re-storing the identical track is a no-op) and a take whose stored camera tracks would exceed the per-take byte cap (camera.store-full). Never changes the take or its hash; get_take lists it under `cameras`.',
+  },
+  parse_camera: {
+    readOnly: true,
+    description:
+      "Parse camera sentences into camera directions (the engine_direct_camera `directions` schema) with the bounded, deterministic sentence grammar, using the names of the take's (or workspace's) world: regions, scene assemblies, fixtures, the activities people do, and an alias table ('the main pallet racks' → the take's rack bay structure). Each subject, interior and look-at is resolved in that world; returns { directions: [{ index, sentence, direction, notes, subject }], refusals: [{ index, sentence, code, message, question?, candidates?, span? }] } — ambiguous names are a question with candidates, unknown ones list what is known, unsupported phrasing (e.g. 'zoom in', an orbit with no angle, a deictic 'this') is refused by the grammar. Nothing is stored.",
   },
   direct_camera: {
     readOnly: false,

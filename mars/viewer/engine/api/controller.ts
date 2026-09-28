@@ -21,12 +21,14 @@ import type { Spatial } from '../spatial/service.ts';
 import type { Leg, Route } from '../spatial/path.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
+import type { CameraDirection } from '../camera/direct.ts';
 import { groupStability, isUpright } from '../construction/rules.ts';
 import { planCameraTrack } from '../camera/plan.ts';
 import { toCameraTrack, withFileCamera } from '../camera/track.ts';
 import type { Sampler, ShotSpec, SubjectPose } from '../camera/shots.ts';
 import { takeSampler } from '../camera/take-sampler.ts';
-import { takeFacts } from '../camera/direct.ts';
+import { SemanticWorld, takeFacts, worldFacts } from '../camera/direct.ts';
+import { activitiesOf, cameraVocab, parseCameraSentences, type ParsedSentence, type SentenceRefusal } from './camera-vocab.ts';
 import { directCamera } from '../camera/synth.ts';
 import { createRegistry, describeVerbs, engineConfig, ENGINE_INVARIANTS, jsonSchemaOf } from './registry.ts';
 import { opSchemas, type OpInput, type OpName } from './schemas.ts';
@@ -267,6 +269,7 @@ export class EngineController {
         case 'get_take': return this.getTake(parsed.data as OpInput<'get_take'>);
         case 'attach_camera_track': return this.attachCameraTrack(parsed.data as OpInput<'attach_camera_track'>);
         case 'direct_camera': return this.directCameraOp(parsed.data as OpInput<'direct_camera'>);
+        case 'parse_camera': return this.parseCamera(parsed.data as OpInput<'parse_camera'>);
         case 'store_camera_track': return this.storeCameraTrack(parsed.data as OpInput<'store_camera_track'>);
       }
     } catch (e) {
@@ -796,6 +799,28 @@ export class EngineController {
     };
   }
 
+  /** LM-007/008: camera sentences → directions, resolved in a take's or workspace's world (camera-vocab.ts). */
+  parseCamera(q: OpInput<'parse_camera'>): OpResult {
+    if ((q.take_id ? 1 : 0) + (q.workspace ? 1 : 0) !== 1) return fail('op.invalid-input', 'parse_camera: give exactly one of `take_id`, `workspace`');
+    let world: WorldState, take: Take | undefined;
+    if (q.take_id) {
+      take = this.take(q.take_id);
+      if (!take) return fail('take.unknown', `no take ${q.take_id}`);
+      world = take.finalState;
+    } else world = this.history.read(q.workspace!);
+    const scene = this.scenes[world.base.campus];
+    if (!scene) return fail('camera.no-scene', `no static scene for campus ${world.base.campus}`);
+    const p = this.parseSentencesIn(scene, world, take, q.sentences);
+    const source = { ...(q.take_id ? { take_id: q.take_id } : { workspace: q.workspace }), campus: world.base.campus };
+    if (p.refusals.length) return { ...sentenceRefusal(p.directions, p.refusals), source };
+    return { ok: true, source, directions: p.directions, refusals: [] };
+  }
+
+  private parseSentencesIn(scene: SpatialScene, world: WorldState, take: Take | undefined, sentences: string[]) {
+    const sw = new SemanticWorld(scene, world, take ? takeFacts(take) : worldFacts(world));
+    return parseCameraSentences(sw, sentences, cameraVocab(sw, activitiesOf(world, take)));
+  }
+
   /** LM-013: store a compiled camera track (a directed one from the studio) beside its take. */
   storeCameraTrack(q: OpInput<'store_camera_track'>): OpResult {
     const take = this.take(q.take_id);
@@ -833,14 +858,25 @@ export class EngineController {
     if (!take) return fail('take.unknown', `no take ${q.take_id}`);
     const scene = this.scenes[take.finalState.base.campus];
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
+    if ((q.directions ? 1 : 0) + (q.sentences ? 1 : 0) !== 1) return fail('op.invalid-input', 'direct_camera: give exactly one of `directions`, `sentences`');
+    let directions = q.directions as CameraDirection[] | undefined;
+    let parsedFrom: ParsedSentence[] | undefined;
+    if (q.sentences) {
+      const p = this.parseSentencesIn(scene, take.finalState, take, q.sentences);
+      if (p.refusals.length) return sentenceRefusal(p.directions, p.refusals);
+      parsedFrom = p.directions;
+      directions = p.directions.map((x) => x.direction);
+    }
+    q = { ...q, directions: directions! };
     const hz = q.hz ?? 10;
-    const r = directCamera(q.directions, { scene, world: take.finalState, sampler: takeSampler(take), facts: takeFacts(take), duration: takeDuration(take), hz, ...(q.correct === false ? { correct: false } : {}) });
+    const r = directCamera(q.directions!, { scene, world: take.finalState, sampler: takeSampler(take), facts: takeFacts(take), duration: takeDuration(take), hz, ...(q.correct === false ? { correct: false } : {}) });
     if (!r.ok) {
       const d = r.diagnostics[0];
       return fail(d.code, uniqueMessage(r.diagnostics.map((x) => x.message).join('; ')), { diagnostics: r.diagnostics, shots: r.shots });
     }
     if (this.unkept.has(take.id)) this.keepTake(take);
     const before = this.takes.takeHash(take.id);
+    // the id hashes the directions (parsed ones for sentences), so sentences and their parsed directions give the same track
     const trackId = q.track_id ?? `dir-${hashOf({ take: take.id, directions: q.directions, hz, ...(q.correct === false ? { correct: false } : {}) }).slice(0, 12)}`;
     this.cameras(take.id);
     this.takes.attachCamera(toCameraTrack(trackId, take.id, r.plan, 'directed'));
@@ -853,6 +889,7 @@ export class EngineController {
       track_id: trackId,
       take_id: take.id,
       takeHashUnchanged: this.takes.takeHash(take.id) === before,
+      ...(parsedFrom ? { parsed: parsedFrom.map((x) => ({ index: x.index, sentence: x.sentence, direction: x.direction, notes: x.notes, subject: x.subject })) } : {}),
       track: { hz, duration: r.plan.duration, samples: r.plan.samples.length, keyframes: r.plan.samples.filter((_, i) => i % every === 0).map((s) => ({ t: s.t, position: s.position, target: s.target, fov: s.fov, cut: s.cut })) },
       report: r.report,
     };
@@ -946,6 +983,12 @@ function uniqueMessage(m: string, max = 800) {
   const parts = [...new Set(rest.join(': ').split('; '))];
   const s = parts.length ? `${head}: ${parts.join('; ')}` : head;
   return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+/** Some sentences were refused: one envelope, the first refusal's code, every refusal and whatever did parse. */
+function sentenceRefusal(directions: ParsedSentence[], refusals: SentenceRefusal[]): OpResult {
+  const f = refusals[0];
+  return fail(f.code, uniqueMessage(`${refusals.length} of ${directions.length + refusals.length} camera sentence(s) refused: ${refusals.map((r) => `[${r.index}] ${r.message}${r.question ? ` (${r.question})` : ''}`).join('; ')}`), { directions, refusals });
 }
 
 /** A camera track as get_take lists it without include 'cameras': id, kind and its shape. */
