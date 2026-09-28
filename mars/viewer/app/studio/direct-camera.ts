@@ -31,7 +31,7 @@ export const DIRECT_POLICY: CameraPolicy = { ...DEFAULT_CAMERA_POLICY, component
 const BUILD = /^mars-(\d{4}):build:(.+)$/;
 
 const files = new Map<string, Promise<unknown>>();
-/** The year's campus scene file (`/engine/campus-<year>.json`), fetched once per page. */
+/** The year's campus scene file (`campusYearUrl(year)`; 2026: `CAMPUS_2026_URL`), fetched once per page. */
 export function yearFile(year: number): Promise<CampusYearFile & { groundY: number }> {
   const url = year === 2026 ? CAMPUS_2026_URL : campusYearUrl(year);
   let p = files.get(url);
