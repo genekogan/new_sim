@@ -4,7 +4,7 @@
 import { hashOf } from '../core/hash.ts';
 import type { Vec3 } from '../core/math.ts';
 import type { WorldState } from '../world/types.ts';
-import { ANG_Q, POS_Q, SPEED_Q, type PoseSample, type Take, type TakeEvent } from './types.ts';
+import { ANG_Q, INTERP_FIELDS, POS_Q, SPEED_Q, type ChangeEvent, type PoseSample, type Take, type TakeEvent } from './types.ts';
 
 export type SampledEntity = {
   p: Vec3;
@@ -14,9 +14,10 @@ export type SampledEntity = {
   activity?: string;
   level?: number;
   phase?: string;
-  /** Hand points (metres, world) as the engine published them on the last tick ≤ t (mars-take/2; absent = hands free). */
+  /** Hand points (metres, world): the engine's human.hands at t, within 5.5 mm (mars-take/3 keyframes, interpolated
+   *  also between ticks; absent = hands free, exact at its tick). */
   hands?: { left?: Vec3; right?: Vec3 };
-  /** Ground speed (m/s, to 1 cm/s) published by walk_to on the last tick ≤ t (mars-take/2). */
+  /** Ground speed (m/s) published by walk_to at t, within 1.5 cm/s (mars-take/3 keyframes, interpolated). */
   speed?: number;
   /** Other discrete fields (task, grip, support, reservedBy, connections, equipment, paint, baseActivity, on,
    *  contents) as last recorded. */
@@ -67,21 +68,83 @@ const wrap = (a: number) => {
   return a - Math.PI;
 };
 
+/** A thinned field's value as numbers + a shape key (which hands are present); null = cleared. */
+function fieldVec(field: string, v: unknown): { shape: string; v: number[] } | null {
+  if (v === null || v === undefined) return null;
+  if (field === 'speed') return typeof v === 'number' ? { shape: 's', v: [v] } : null;
+  const h = v as { left?: number[]; right?: number[] };
+  if (!h.left && !h.right) return null;
+  return { shape: (h.left ? 'L' : '') + (h.right ? 'R' : ''), v: [...(h.left ?? []), ...(h.right ?? [])] };
+}
+function fromVec(field: string, shape: string, v: number[]): unknown {
+  if (field === 'speed') return v[0];
+  const out: { left?: number[]; right?: number[] } = {};
+  let k = 0;
+  if (shape.includes('L')) out.left = v.slice(k, (k += 3));
+  if (shape.includes('R')) out.right = v.slice(k, (k += 3));
+  return out;
+}
+
+/**
+ * The value of an INTERP_FIELDS field at (fractional) `tick` between its keyframes a (at ta ≤ tick) and b (at tb > tick,
+ * or none): linear when both are non-null and of the same shape, else a (held). Quantised units (mm, cm/s), floats.
+ */
+export function interpChange(field: string, a: unknown, ta: number, b: unknown, tb: number | undefined, tick: number): unknown {
+  const A = fieldVec(field, a);
+  if (!A) return null;
+  const B = tb === undefined ? null : fieldVec(field, b);
+  if (!B || B.shape !== A.shape || tick <= ta) return a;
+  const u = tick >= tb! ? 1 : (tick - ta) / (tb! - ta);
+  return fromVec(field, A.shape, A.v.map((x, i) => x + (B.v[i] - x) * u));
+}
+
+type FieldIndex = { t: number[]; v: unknown[] };
+type ChangeIndex = Map<string, Map<string, FieldIndex>>;
+// takes are immutable (TakeLibrary freezes them): one index per changes array
+const INDEX = new WeakMap<ChangeEvent[], ChangeIndex>();
+function changeIndex(take: Take): ChangeIndex {
+  let ix = INDEX.get(take.changes);
+  if (ix) return ix;
+  ix = new Map();
+  for (const [t, id, field, value] of take.changes) {
+    let m = ix.get(id);
+    if (!m) ix.set(id, (m = new Map()));
+    let f = m.get(field);
+    if (!f) m.set(field, (f = { t: [], v: [] }));
+    f.t.push(t);
+    f.v.push(value);
+  }
+  INDEX.set(take.changes, ix);
+  return ix;
+}
+/** Index of the last entry with t ≤ tick (the last one of equal ticks), or -1. */
+function lastAtOrBefore(ts: number[], tick: number) {
+  let lo = 0, hi = ts.length - 1;
+  if (hi < 0 || ts[0] > tick) return -1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (ts[mid] <= tick) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
 /** Entity poses + discrete state at time t (seconds from take start). Entities not present at t are omitted. */
 export function sampleTake(take: Take, t: number): TakeFrame {
   // round away float noise (162 * 0.05 / 0.05 = 161.99999…) so same-tick changes are included
   const tick = Math.min(Math.max(0, Math.round((t / take.dt) * 1e6) / 1e6), take.ticks);
-  const discrete = new Map<string, Record<string, unknown>>();
-  for (const [ct, id, field, value] of take.changes) {
-    if (ct > tick) break;
-    let m = discrete.get(id);
-    if (!m) discrete.set(id, (m = {}));
-    m[field] = value;
-  }
+  const ix = changeIndex(take);
   const entities: Record<string, SampledEntity> = {};
   for (const id of Object.keys(take.tracks)) {
-    const st = discrete.get(id);
-    if (!st || st.present !== true) continue;
+    const fields = ix.get(id);
+    if (!fields) continue;
+    const st: Record<string, unknown> = {};
+    for (const [field, f] of fields) {
+      const k = lastAtOrBefore(f.t, tick);
+      if (k < 0) continue;
+      st[field] = field in INTERP_FIELDS ? interpChange(field, f.v[k], f.t[k], f.v[k + 1], f.t[k + 1], tick) : f.v[k];
+    }
+    if (st.present !== true) continue;
     const br = bracket(take.tracks[id], tick);
     if (!br) continue;
     const s = interpSample(br[0], br[1], tick);

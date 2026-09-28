@@ -15,7 +15,7 @@ import { TakeRecorder } from '../take/recorder.ts';
 import { PLAN_SCHEMA, SEQUENCE_SCHEMA, templateSchema, type BoundPlan, type SequenceTemplate } from '../sequence/types.ts';
 import { sampleTake, takeDuration } from '../take/replay.ts';
 import { TakeLibrary } from '../take/store.ts';
-import type { CameraTrack, ChangeEvent, PoseSample, Take } from '../take/types.ts';
+import { INTERP_FIELDS, type CameraTrack, type ChangeEvent, type PoseSample, type Take } from '../take/types.ts';
 import type { Spatial } from '../spatial/service.ts';
 import type { Leg, Route } from '../spatial/path.ts';
 import type { SpatialScene } from '../spatial/types.ts';
@@ -178,20 +178,29 @@ export function sliceTake(take: Take, t0: number, t1: number, entities?: string[
     while (b > 0 && s[b - 1][0] >= t1) b--;
     tracks[id] = s.slice(a, b + 1).map((x) => [...x]);
   }
-  // fold discrete state up to t0 into synthetic changes at t0, then real changes in (t0, t1]
-  const folded = new Map<string, Map<string, unknown>>();
+  // fold discrete state up to t0 into synthetic changes at t0, then real changes in (t0, t1]. Interpolated fields
+  // (mars-take/3 INTERP_FIELDS) keep their bracketing keyframes instead: the last one ≤ t0 at its own tick, and the
+  // first one after t1 — like the tracks' bracketing samples.
+  const folded = new Map<string, Map<string, ChangeEvent>>();
   const changes: ChangeEvent[] = [];
+  const tail: ChangeEvent[] = [];
+  const after = new Set<string>();
   for (const c of take.changes) {
     if (keep && !keep.has(c[1])) continue;
     if (c[0] <= t0) {
       let m = folded.get(c[1]);
       if (!m) folded.set(c[1], (m = new Map()));
-      m.set(c[2], c[3]);
+      m.set(c[2], c);
     } else if (c[0] <= t1) changes.push(structuredClone(c));
+    else if (c[2] in INTERP_FIELDS && !after.has(`${c[1]}|${c[2]}`)) {
+      after.add(`${c[1]}|${c[2]}`);
+      tail.push(structuredClone(c));
+    }
   }
   const head: ChangeEvent[] = [];
-  for (const [id, m] of folded) for (const [f, v] of m) head.push([t0, id, f, structuredClone(v)]);
-  return { tracks, changes: [...head, ...changes], events: take.events.filter((e) => e.t >= t0 && e.t <= t1).map((e) => structuredClone(e)) };
+  for (const [id, m] of folded) for (const [f, c] of m) head.push([f in INTERP_FIELDS ? c[0] : t0, id, f, structuredClone(c[3])]);
+  head.sort((a, b) => a[0] - b[0]);
+  return { tracks, changes: [...head, ...changes, ...tail], events: take.events.filter((e) => e.t >= t0 && e.t <= t1).map((e) => structuredClone(e)) };
 }
 
 export class EngineController {

@@ -4,10 +4,12 @@
 // replay does it) between its neighbours reproduces every dropped sample within
 // `tol` quanta. Static entities cost nothing after their first sample; a moving
 // entity gets a forced keyframe at least every `keyframeEvery` ticks.
+// mars-take/3: the `hands` / `speed` changes (INTERP_FIELDS) are thinned the same way when the take is finished
+// (`thinChanges`): keyframes, linear in between, each recorded tick reproduced within the field's tolerance.
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { DT, type Runtime, type RuntimeObserver } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
-import { ANG_Q, POS_Q, SPEED_Q, TAKE_SCHEMA, type ChangeEvent, type PoseSample, type Take, type TakeEvent, type TakeHands } from './types.ts';
+import { ANG_Q, INTERP_FIELDS, POS_Q, SPEED_Q, TAKE_SCHEMA, type ChangeEvent, type PoseSample, type Take, type TakeEvent, type TakeHands } from './types.ts';
 import { interpSample } from './replay.ts';
 
 export type RecorderOptions = {
@@ -17,6 +19,8 @@ export type RecorderOptions = {
   keyframeEvery?: number;
   /** Simplification tolerance in quanta (mm / mrad). 0 keeps every changed sample. */
   tol?: number;
+  /** Tolerances of the thinned change fields (quanta; default INTERP_FIELDS: hands 5 mm, speed 1 cm/s). 0 = exact. */
+  fieldTol?: Record<string, number>;
 };
 
 type TrackState = { committed: PoseSample; pending: PoseSample[]; out: PoseSample[] };
@@ -190,7 +194,7 @@ export class TakeRecorder implements RuntimeObserver {
       ticks: this.rt.tick - this.startTick,
       keyframeEvery: this.opts.keyframeEvery,
       tracks,
-      changes: dedupeChanges(this.changes),
+      changes: thinChanges(dedupeChanges(this.changes), { ...INTERP_FIELDS, ...this.opts.fieldTol }),
       events: this.events,
       finalStateHash: hashOf(finalState),
       finalState,
@@ -241,4 +245,102 @@ function stripUndefined<T extends object>(o: T): T {
   const out = { ...o } as Record<string, unknown>;
   for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
   return out as T;
+}
+
+/** Longest run of recorded points one keyframe pair may cover (bounds the simplifier's work per point). */
+const THIN_MAX_PENDING = 256;
+
+type Pt = { t: number; v: number[]; value: unknown };
+const vecOf = (field: string, v: unknown): { shape: string; v: number[] } | null => {
+  if (v === null || v === undefined) return null;
+  if (field === 'speed') return typeof v === 'number' ? { shape: 's', v: [v] } : null;
+  const h = v as { left?: number[]; right?: number[] };
+  if (!h.left && !h.right) return null;
+  return { shape: (h.left ? 'L' : '') + (h.right ? 'R' : ''), v: [...(h.left ?? []), ...(h.right ?? [])] };
+};
+/** Does the line A→B reproduce the recorded point p within eps? Per 3-vector (a hand point) Euclidean, a scalar
+ *  absolute. Same arithmetic as `interpChange` (x + (y − x)·u), so the check is what sampleTake will return. */
+function fits(A: Pt, B: Pt, p: Pt, eps: number): boolean {
+  const u = (p.t - A.t) / (B.t - A.t);
+  const n = p.v.length;
+  if (n < 3) return Math.abs(A.v[0] + (B.v[0] - A.v[0]) * u - p.v[0]) <= eps;
+  for (let i = 0; i + 2 < n; i += 3) {
+    const dx = A.v[i] + (B.v[i] - A.v[i]) * u - p.v[i];
+    const dy = A.v[i + 1] + (B.v[i + 1] - A.v[i + 1]) * u - p.v[i + 1];
+    const dz = A.v[i + 2] + (B.v[i + 2] - A.v[i + 2]) * u - p.v[i + 2];
+    if (dx * dx + dy * dy + dz * dz > eps * eps) return false;
+  }
+  return true;
+}
+
+/**
+ * mars-take/3 thinning of the INTERP_FIELDS changes (`tol`: field → quanta). Per entity and field the recorded changes
+ * are a step signal (a value holds until the next change); it is split into runs of one shape (the same hands present)
+ * and each run is simplified like a pose track: a point is dropped when linear interpolation between the kept
+ * neighbours (`interpChange`, exactly as sampleTake does it) reproduces it within `tol`. A hold contributes its first
+ * and last tick (the error of a line against a constant is largest at the ends, so every tick of it is covered).
+ * Clearing (null) and shape changes are kept at their exact tick. Other fields pass through unchanged, in order;
+ * added keyframes (a hold's last tick) are placed after the other changes of their tick.
+ */
+export function thinChanges(changes: ChangeEvent[], tol: Record<string, number>): ChangeEvent[] {
+  const series = new Map<string, ChangeEvent[]>();
+  const rest: ChangeEvent[] = [];
+  for (const c of changes) {
+    if (!(c[2] in tol)) { rest.push(c); continue; }
+    const k = `${c[1]}\u0000${c[2]}`;
+    const l = series.get(k);
+    if (l) l.push(c); else series.set(k, [c]);
+  }
+  const kept: ChangeEvent[] = [];
+  for (const l of series.values()) {
+    const [, id, field] = l[0];
+    const eps = tol[field];
+    let run: Pt[] = [];
+    let shape = '';
+    const flush = () => {
+      if (!run.length) return;
+      let A = run[0];
+      kept.push([A.t, id, field, A.value]);
+      let pending: Pt[] = [];
+      for (let i = 1; i < run.length; i++) {
+        const s = run[i];
+        if (pending.length < THIN_MAX_PENDING && pending.every((p) => fits(A, s, p, eps))) { pending.push(s); continue; }
+        const B = pending[pending.length - 1];
+        if (B) {
+          kept.push([B.t, id, field, B.value]);
+          A = B;
+          pending = [s];
+        } else {
+          kept.push([s.t, id, field, s.value]);
+          A = s;
+        }
+      }
+      const B = pending[pending.length - 1];
+      if (B) kept.push([B.t, id, field, B.value]);
+      run = [];
+    };
+    for (let i = 0; i < l.length; i++) {
+      const [t, , , value] = l[i];
+      const v = vecOf(field, value);
+      if (!v || v.shape !== shape) flush();
+      if (!v) { kept.push(l[i]); shape = ''; continue; }
+      shape = v.shape;
+      run.push({ t, v: v.v, value });
+      // the hold's last tick, when the next change continues this run later (a line must not smear the hold; at a
+      // run's end sampleTake holds the last keyframe anyway)
+      const n = l[i + 1];
+      if (n && n[0] - 1 > t && vecOf(field, n[3])?.shape === shape) run.push({ t: n[0] - 1, v: v.v, value: structuredClone(value) });
+    }
+    flush();
+  }
+  // stable by tick: the other fields keep their order, thinned keyframes follow them within a tick
+  const out: ChangeEvent[] = [];
+  kept.sort((a, b) => a[0] - b[0]);
+  let j = 0;
+  for (let i = 0; i < rest.length; i++) {
+    while (j < kept.length && kept[j][0] < rest[i][0]) out.push(kept[j++]);
+    out.push(rest[i]);
+  }
+  while (j < kept.length) out.push(kept[j++]);
+  return out;
 }

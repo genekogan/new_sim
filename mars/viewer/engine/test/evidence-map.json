@@ -530,10 +530,11 @@
         { "file": "body-model.test.ts", "title": "body model = the measured rig" },
         { "file": "body-model.test.ts", "title": "body model is internally consistent" },
         { "file": "take-fields.test.ts", "title": "take fields (mars-take/2): the meal take carries hands, baseActivity, speed and bowl contents" },
-        { "file": "take-fields.test.ts", "title": "take fields (mars-take/2): a hand-up take carries every holder" }
+        { "file": "take-fields.test.ts", "title": "take fields (mars-take/2): a hand-up take carries every holder" },
+        { "file": "take-fields.test.ts", "title": "take fields (mars-take/3): thinChanges" }
       ],
       "outsideSuite": ["viewer/e2e/poses.spec.ts", "docs/engineering/BODY_MODEL.md"],
-      "approximate": "The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. `hands` changes dominate long takes (≈ 0.9 MB of the 2.4 MB 2022 first-bay take): recorded per change, not thinned."
+      "approximate": "The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact)."
     },
     {
       "id": "composite-flagships",

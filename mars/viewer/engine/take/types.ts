@@ -5,13 +5,19 @@
 // of the take body, so attaching/editing them can never change the take hash.
 import type { WorldState } from '../world/types.ts';
 
-/** /2 (2026-09-28, W10): changes also carry hands (integer mm), baseActivity, on, speed (integer cm/s), contents. */
-export const TAKE_SCHEMA = 'mars-take/2';
+/**
+ * /2 (2026-09-28, W10): changes also carry hands (integer mm), baseActivity, on, speed (integer cm/s), contents.
+ * /3 (2026-09-28, W20): `hands` and `speed` changes are thinned keyframes (INTERP_FIELDS), linearly interpolated
+ * between consecutive keyframes of the same entity (TAKES_AND_PLANS.md "Thinned fields"); every other field is
+ * still a step (last value ≤ t). A /2 reader sees the same shapes, but holds each keyframe instead of interpolating.
+ */
+export const TAKE_SCHEMA = 'mars-take/3';
 
 /** Quantised pose sample: [tick, x mm, y mm, z mm, yaw mrad] or + [pitch mrad, roll mrad] when non-zero. */
 export type PoseSample = number[];
 
-/** A `hands` change value: the engine's human.hands in integer millimetres (a missing hand is free / at rest). */
+/** A `hands` change value: the engine's human.hands in integer millimetres (a missing hand is free / at rest). A keyframe
+ *  since mars-take/3 (INTERP_FIELDS). */
 export type TakeHands = { left?: [number, number, number]; right?: [number, number, number] };
 
 /**
@@ -54,3 +60,12 @@ export type CameraTrack = { id: string; takeId: string; kind: string; data: unkn
 export const POS_Q = 1000; // samples are integer millimetres
 export const ANG_Q = 1000; // and integer milliradians
 export const SPEED_Q = 100; // a `speed` change is integer cm/s (mm/s changed almost every walking tick: +128 KB on v3)
+
+/**
+ * mars-take/3 thinned change fields and their recording tolerance (quanta: mm per hand point, Euclidean; cm/s).
+ * Their changes are keyframes: between two consecutive keyframes of one entity that are both non-null and of the
+ * same shape (the same hands present) the value is linear in the tick; otherwise it holds until the next keyframe.
+ * null (hands free / not walking) and shape changes are exact at their tick. TakeRecorder keeps a keyframe only
+ * where that interpolation would miss a recorded tick by more than the tolerance (`thinChanges`).
+ */
+export const INTERP_FIELDS: Record<string, number> = { hands: 5, speed: 1 };
