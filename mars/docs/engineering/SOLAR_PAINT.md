@@ -25,7 +25,8 @@ Verbs (all publish `human.activity` + `human.hands` every tick; nothing moves wi
   parallel to them (`solar.panel-skew`). Where the panel is:
   - resting on the rails — it arrived by `hand_up` (receivers lay it on them; `handup.ts` now rests loads
     on installed rails) or off the forks (`hand_up via: 'forklift'`);
-  - on the floor with the rails ≤ 2.1 m above it — the crew lays it on the rails at `at` from ≤ 1 m;
+  - on the floor with the rails ≤ 2.06 m above it (standing reach, `BODY_MODEL.overheadMax`; was 2.1) — the
+    crew lays it on the rails at `at` from ≤ 1 m;
   - on the floor with the rails higher — **refused** `solar.panel-too-high` ("…hand it up … or bring it on
     the forklift"); on the forks — `solar.panel-on-forks`.
   Then the crew stands beyond both ends of the tilt axis: `tilt` 2 s (flat → `tilt`° about the rails'
@@ -44,14 +45,15 @@ support `none` → `carry.fragile-dropped`.
 `paint {actor, panel, color | texture, face?, band?:{from,to}}` (heights in m above the face's bottom edge).
 - Paintable: catalog `paintable: { faces: ['front','back'] }` (front = local +y broad face) on
   `plywood-4x6`, `plywood-4x8`; the face must be upright (`paint.face-not-vertical`).
-- The painter walks to a spot 0.4 m in front of the face (one per ≤ 1.3 m column, sidestep walks
-  between) and paints 0.2 m bands top-down, the brush sweeping at 0.8 m/s, the other hand holding the pot.
-- Reach (plan time): 0.5–2.1 m above the floor they stand on; default band = the face's reachable part;
+- The painter walks to a spot 0.4 m in front of the face (one per ≤ 1.0 m column — was 1.3 m, which a
+  0.62 m arm cannot cover at the top corners; sidestep walks between, activity `idle` while sidestepping) and paints 0.2 m bands top-down, the brush sweeping at 0.8 m/s, the other hand holding the pot.
+- Reach (plan time): 0.5–2.06 m above the floor they stand on; default band = the face's reachable part;
   a band outside it is `paint.out-of-reach` naming the band and its world heights ("…is above that — stand
   on a deck or beam"). A painter on a beam paints from where they stand (no walking).
 - Refusals: `paint.not-paintable`, `paint.what` (both / neither of colour and texture), `paint.while-walking`,
   `paint.busy`, `paint.panel-moving`, `paint.no-station`; mid-run `paint.moved` if pushed off the spot.
-- Envelope: shoulder 0.9–1.5 m above the feet, lean 0.35 m, arm 0.75 m (`paintEnvelopeGap`).
+- Envelope: `BODY_MODEL.posture.painting` — shoulder 0.9–1.48 m above the feet, lean 0.35 m, arm 0.62 m
+  (`paintEnvelopeGap`; was 1.5 m / 0.75 m). All reach numbers: `engine/body/model.ts`, BODY_MODEL.md.
 
 ### Renderer contract (per tick)
 - **Paint progress**: panel `paint = { face, color | texture, coverage, bands: [{from, to, coverage}] }`

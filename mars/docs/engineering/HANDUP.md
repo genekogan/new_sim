@@ -4,6 +4,8 @@ Code: `viewer/engine/construction/{frame,framemove,handup,aloft}.ts`, additive h
 `vehicles/forklift.ts` (`forklift_present`, `forklift_back`). Tests: `engine/test/frame.test.ts`,
 `handup.test.ts`, `build-bay-v3.test.ts`. Flagship: `engine/scenarios/build-bay-v3.ts`.
 **Mars assembly model v1, approximate**: rule-based plausibility, not ergonomics.
+Every reach number below comes from the one body model (`engine/body/model.ts`, `BODY_MODEL.md`, W10
+2026-09-28): arm 0.62 m, standing reach 2.06 m (the §5 "2.1 m" rule is 2.06 m), reach-down 1.0 m, kneel rule 0.8 m.
 
 ## The rack structure is climbable / walkable (frame.ts, "only what exists is usable")
 | Link | Exists when | Rules |
@@ -30,11 +32,12 @@ The part ends **staged exactly where it goes**, resting on the members under it 
 within 0.8 m, part at its install pose ± 2 cm; 2 s / 3 s). Ground-staged parts keep the old lift path.
 
 Phases (each publishes `human.activity`):
-- givers (1–2, on the floor): `walk` → `crouch` 0.6 s → `lift` 0.6 s (stand with it, underside 0.75 m)
-  → `walk-load` (≤ 0.6 m/s to below the edge) → `reach_up` (≤ 0.5 m/s, underside ≤ floor + 2.1 m)
+- givers (1–2, on the floor): `walk` → `crouch` 0.6 s (hands travel from the hips to the grip) → `lift` 0.6 s
+  (stand with it, underside 0.80 m = hands hanging) → `walk-load` (≤ 0.6 m/s to below the edge) → `reach_up`
+  (≤ 0.5 m/s, underside ≤ floor + 2.06 m)
   → [push it in over the edge while still in reach] → hold → let go after the take.
 - receivers (1–2): `walk` → `climb-up` → `beam-walk` to a station beside the load's path (or already
-  on a beam / a deck) → `wait` → `reach_down` 0.6 s → `take` 0.4 s → `stand_with_load` (raise to
+  on a beam / a deck) → `wait` → `reach_down` 0.6 s (hands travel from the hips down to the load) → `take` 0.4 s → `stand_with_load` (raise to
   5 cm above the members) → `lay` (fed in ≤ 0.4 m/s hand over hand; nobody walks with it) → `set_down` 0.5 s.
 - `via: 'forklift'`: `forklift_pick`, `forklift_present {operator, at:{x,z,y,yaw}}` (drive, square,
   raise, creep; holds it raised), then `hand_up` with `operator` and no givers; the receivers lift it
@@ -42,39 +45,49 @@ Phases (each publishes `human.activity`):
 
 Geometry: the load comes over one beam walkway (`edge`, else the one facing where it lies), is raised
 outside it (clear of anything sticking out, e.g. joist cantilevers), and fed in perpendicular to it
-without turning. With the members' top ≤ givers' floor + 2.05 m the givers push it partway in
+without turning. With the members' top ≤ givers' floor + 2.01 m (GIVE_MAX − the 5 cm slide clearance) the givers push it partway in
 themselves ("direct"); else they hand it up below the beam and the receivers lift it the rest.
 
 ### Reach rules (engine rules; plan time and every tick)
-- givers' hands (the load's underside) ≤ their floor + **2.1 m**;
+- givers' hands (the load's underside) ≤ their floor + **2.06 m** (`BODY_MODEL.overheadMax`; was 2.1);
 - receivers' hands ≥ their feet − **1.0 m**; at the hand-off within **0.5 m** horizontally beyond the
   edge they kneel at — a beam walkway's side (`offWalkway − width/2`) or, standing on a deck, the deck's
   outline (W8); refused with `handup.receiver-reach` naming the distance (e.g. "hands would be 0.70 m
   beyond the edge of beam b3 they kneel at (max 0.5 m)");
+- **kneel rule** (W8 patch, applied by W10 2026-09-28): at `reach_down` / `take` the receivers' hands are
+  ≤ **0.8 m** horizontally from their feet (they kneel *at* the edge, not stand back and lean) — planned
+  (station choice) and per tick (`lift.hands-out-of-reach`, + 0.1 m);
 - long-load balance (W8): one giver handing up a `timber` / `rack-beam` end-first holds it with a
   two-handed **lever grip** (outer hand at the end, inner hand `LEVER` 0.4 m toward the middle; slot
   suffix `:lever`); a free end > **1.5 m** from the inner hand is `handup.unbalanced` (6 ft 2x4: 1.34 m ok;
-  8 ft: 1.92 m refused — hand it up side-on or with two givers);
-- every holder's hands inside a posture envelope: shoulder cylinder above the feet
-  (`crouch/lift` 0.55–1.45 m, `walk-load/reach_up` 1.3–1.45 m, receivers' `reach_down…set_down`
-  −0.15–1.45 m, i.e. kneeling / bent over the edge), horizontal lean 0.2–0.45 m, arm 0.75 m;
-  planning requires inside, the invariant allows +0.1 m;
+  8 ft: 1.92 m refused — hand it up side-on or with two givers); a lever giver stands **beside** the end
+  (`LEVER_SIDE` = body radius + 3 cm, the load passing their hip), not 0.3 m beyond it — with a 0.62 m arm the
+  inner hand 0.7 m out was unreachable;
+- every holder's hands inside a posture envelope (`BODY_MODEL.posture`): shoulder cylinder above the feet
+  (`crouch/lift` 0.55–1.48 m, `walk-load/reach_up` 1.3–1.48 m, receivers' `reach_down…set_down`
+  −0.15–1.48 m, i.e. kneeling / bent over the edge), horizontal lean 0.2–0.45 m, arm **0.62 m** (was 0.75);
+  planning requires inside (`handup.giver-reach` names a giver's hand beyond reach), the invariant allows +0.1 m;
 - a load in a receiver's body band stays ≥ 0.30 m from them; receivers ≥ 0.6 m apart.
 
 Refusals: `handup.receiver-reach`, `handup.unbalanced`, `handup.too-high` ("…use the forklift" / "raise the forks"), `handup.no-walkway`,
 `handup.receiver-not-aloft`, `handup.giver-aloft` (a giver on a beam: nobody walks a beam with a
-sheet), `handup.no-receiver-station`, `handup.path-blocked`, `handup.giver-blocked`,
+sheet), `handup.no-receiver-station`, `handup.path-blocked`, `handup.giver-blocked`, `handup.giver-reach`,
 `handup.not-staged`, `handup.not-on-forks`, `handup.forklift-orientation`, `handup.occupied`,
 `handup.no-support`, `handup.cancel-unsafe` (in the air), `crew.size`.
 
 Invariant `lift.hands-out-of-reach` now covers both ends: holders with slot `handup-*` must publish
-both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.1 m, receivers ≥ feet − 1.0 m.
+both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.06 m, receivers ≥ feet − 1.0 m and (kneel rule)
+≤ 0.8 m horizontally from their feet at `reach_down` / `take`.
 
 ### Hand points for the renderer
 - Live world: `human.hands = { left: [x,y,z], right: [x,y,z] }` every tick while holding (the same
   field engine/items uses; cleared on release), `human.grip = { entity, slot }`, `human.activity`.
-- From a take (which records poses + `grip`, not `hands`): `handupHands(part, part.pose, holder, slot)`
-  (construction/handup.ts) rebuilds them exactly. Slots: givers `handup-give-<i>:<lx>:<lz>:<x|z>` =
+- During `crouch` (givers) and `reach_down` (receivers) the hands travel from the hanging rest hands
+  (`restHands`, body/model.ts) to the grip with a smoothstep over the phase; from `lift` / `take` on they are
+  on the part (which moves smoothly). Tests enforce `hands.teleport` (≤ 0.25 m per tick, `test/hands-check.ts`).
+- From a take: since `mars-take/2` the take records `hands` (integer mm) — read them (`sampleTake(...).entities[id].hands`).
+  `handupHands(part, part.pose, holder, slot)` (construction/handup.ts) rebuilds the *grip* exactly (not the
+  crouch / reach_down approach). Slots: givers `handup-give-<i>:<lx>:<lz>:<x|z>` =
   grip point in the part's local frame on its underside + the local axis the hands spread along
   (±0.15 m), or with suffix `:lever` a one-end grip (one hand at the grip point, the other 0.4 m along
   the axis toward the middle); receivers `handup-take-<i>` = the part's top face at its point nearest them. Fastening
@@ -82,22 +95,22 @@ both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.1 m, receivers 
 
 ## Flagship v3
 v2's build, deck handed up: 7 joists handed over b3 to crew[4] (on the beam), s1 by hand over b4 to
-crew[4]/crew[5] on the beams, s2 off the forks (west side) to crew[4]/crew[5] standing on s1, then v2's
+crew[4]/crew[5] on the beams, s2 off the forks (west side) to crew[4] kneeling on b3 just north of s2 and
+crew[5] at s1's north-west corner (kneel rule; crew[4] steps onto s2 once it is fastened), then v2's
 stair, spare tread, visitor, campfire. 12 ft bay (forks present a 4x6 long side first; s2 lies along
-the bay). 87 steps, 17288 ticks (864 s simulated), 0 violations, ~6.5 s wall, pinned hash `584685f1…`
-at the walk.ts of `e09a961` (a walk.ts change re-pins it; with W4's in-flight splines it ran 16191 ticks).
+the bay). 88 steps, 16219 ticks (811 s simulated), 0 violations, ~6 s wall, pinned hash `339cf310…`
+(body model unification, 2026-09-28; history of re-pins in PLANNING_BUDGET.md).
 
 ## Approximate / not modelled
 - Receivers feed a load hand over hand from a fixed station (their grip slides along the nearest edge);
   a sheet is never turned over the bay, so the forks can only deliver sheets parallel to the edge.
 - The body envelope is a cylinder + arm-length test, not IK; bodies vs parts only through the 0.30 m
-  body-gap rule for receivers; givers stand 0.3 m beyond the grip by construction.
+  body-gap rule for receivers; givers stand 0.3 m beyond the grip (a lever giver 0.25 m beside the end) by
+  construction.
 - Balance is checked for a single giver only (lever grip, free end ≤ 1.5 m); a single receiver feeding
   a joist in end-first is assumed to slide it over the edge beam (not checked), and sheets are not checked.
-- The receivers' edge rule does not yet require the body at the edge: a receiver may stand back on a deck
-  and lean (envelope lean 0.45 m + arm 0.75 m). The stricter "kneel at the edge" rule (hands ≤ 0.8 m
-  horizontally from the feet) is ready but moves v3's pin (s2's deck receivers stand ≈ 1 m back) — see
-  PROGRESS W8.
+- Reach-down: the 1.0 m cap is the owner's §6 figure, but the kneeling envelope (shoulders ≥ 0.15 m below
+  the feet + arm 0.62 m) binds at 0.77 m — see BODY_MODEL.md "Approximate".
 - Fork height is not state after the load leaves the forks (the truck just parks); `forklift_back` is
   a straight creep.
 - Climb paths are three straight segments; climbing is ≤ 1 person per link but two links on one

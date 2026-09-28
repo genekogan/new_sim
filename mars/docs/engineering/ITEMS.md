@@ -1,6 +1,7 @@
 # Tables, hand-held items and eating (owner feedback §12, 80/20)
 
-Code: `viewer/engine/world/catalog-items.ts` (defs), `viewer/engine/items/` (`body.ts` reach model,
+Code: `viewer/engine/world/catalog-items.ts` (defs), `viewer/engine/items/` (`body.ts` eat landmarks over the one
+body model `engine/body/model.ts` — BODY_MODEL.md; arm 0.62 m, was 0.75,
 `model.ts` support / surfaces / standing points, `actions.ts` verbs), `viewer/engine/scenarios/meal.ts`;
 tests `viewer/engine/test/meal.test.ts`. Verbs are in the one registry (`api/registry.ts` `ITEM_ACTIONS`).
 
@@ -70,12 +71,12 @@ Per tick, world frame (metres, Y up, same frame as `pose.p`):
 - Items: `support.kind === 'in-hand'` → attach to the `support.hand` bone with the catalog grip offset
   (`CATALOG[def].handling.grips[1][0].local`), or use `pose` directly (it is exactly hand − rot(grip, yaw),
   yaw = the holder's yaw). `resting-on` / `ground` → render at `pose`. `contents.fraction` → food level.
-- Body landmarks (`items/body.ts`, forward f = (cos yaw, sin yaw), right r = (−sin yaw, cos yaw) in x,z;
+- Body landmarks (`body/model.ts` via `items/body.ts`, forward f = (cos yaw, sin yaw), right r = (−sin yaw, cos yaw) in x,z;
   heights above the ground point, −0.45 m seated): chest 1.30 m (+0.08 fwd), shoulders 1.42 m ±0.19 m,
   mouth point 1.58 m +0.15 m fwd, carry point 1.00 m +0.28 fwd ±0.16, bowl hand = chest + 0.25 fwd − 0.10.
   Eat: spoon hand rim (bowl hand + 0.12 up, 0.07 to the spoon side) → dip (inside the bowl) → rim → mouth
-  point → (pause) → rim. Measured in the meal: bowl hand ≤ 0.4 m from the chest and spoon hand ≤ 0.75 m from
-  its shoulder on every eating tick; the spoon hand is exactly at the mouth point through every pause.
+  point → (pause) → rim. Measured in the meal: bowl hand ≤ 0.4 m from the chest and spoon hand ≤ 0.62 m (the
+  model's arm) from its shoulder on every eating tick; the spoon hand is exactly at the mouth point through every pause.
 
 ## Meal scenario (`scenarios/meal.ts`, `meal.test.ts`)
 Proving-ground lawn: table at (−6, −8.5) with a pot of stew (r1c2), 4 empty bowls, 4 spoons; campfire at
@@ -90,7 +91,7 @@ naming `wall`).
 
 ## Approximate / missing
 - Reach over a table assumes a forward bend: shoulder → item can be ~1.1 m during `reach` (only eating is
-  checked against the 0.75 m arm envelope). Standing points are not reserved (people yield / replan).
+  checked against the 0.62 m arm envelope). Standing points are not reserved (people yield / replan).
 - Items do not collide with each other: a 0.32 m pot on a 0.3 m lattice overlaps its neighbours' footprints.
 - `hold_items` steps before the walker that moves the body (it is created earlier), so a carried item trails
   its hand by one tick (≤ 7 cm at walking speed) while walking; eat / serve / take / put write the item
