@@ -4,7 +4,7 @@ import type { Diagnostic } from '../actions/types.ts';
 import type { Invariant } from '../runtime/runtime.ts';
 import { isStanding, isSupported, isUpright } from './rules.ts';
 import { HAND_REACH, handPoint, LIFT_APEX_MAX } from './liftcrew.ts';
-import { ENVELOPE_TOL, envelopeGap, GIVE_MAX, HANDUP_SLOT_PREFIX, handsOf, REACH_DOWN } from './handup.ts';
+import { EDGE_REACH, ENVELOPE_TOL, envelopeGap, GIVE_MAX, HANDUP_SLOT_PREFIX, handsOf, KNEEL_BACK, REACH_DOWN } from './handup.ts';
 
 export const uprightsSupported: Invariant = (rt) => {
   const out: Diagnostic[] = [];
@@ -64,6 +64,10 @@ export const liftHandsInReach: Invariant = (rt) => {
       const up = p[1] - h.pose.p[1];
       if (slot.includes('give') && up > GIVE_MAX + 1e-6) bad(`hands ${up.toFixed(2)} m above their floor (max ${GIVE_MAX} m)`, p);
       if (slot.includes('take') && -up > REACH_DOWN + 1e-6) bad(`hands ${(-up).toFixed(2)} m below their feet (max ${REACH_DOWN} m)`, p);
+      // the hand-off: kneeling at the edge, hands ≤ EDGE_REACH + KNEEL_BACK horizontally from the feet
+      const hz = Math.sqrt((p[0] - h.pose.p[0]) ** 2 + (p[2] - h.pose.p[2]) ** 2);
+      if (slot.includes('take') && (act === 'reach_down' || act === 'take') && hz > EDGE_REACH + KNEEL_BACK + ENVELOPE_TOL + 1e-6)
+        bad(`hands ${hz.toFixed(2)} m out from their feet at the hand-off (kneeling at the edge: max ${EDGE_REACH + KNEEL_BACK} m)`, p);
     }
   }
   return out;

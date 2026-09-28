@@ -39,6 +39,7 @@ import { deckAt, deckOver } from './framemove.ts';
 export const GIVE_MAX = 2.1; // givers' hands (the load's underside) never above their floor + this
 export const REACH_DOWN = 1.0; // receivers' hands at most this far below their feet
 export const EDGE_REACH = 0.5; // at the hand-off, a receiver's hands within this of the edge they stand on
+export const KNEEL_BACK = 0.3; // … and they kneel at that edge: hands ≤ EDGE_REACH + this horizontally from their feet
 export const EDGE_GAP = 0.08; // a load raised outside the edge clears the edge beam's face by this
 export const SLIDE_CLEAR = 0.05; // the load is fed in this far above the members it will rest on
 export const CARRY_Y = 0.75; // underside while the givers walk with it
@@ -523,7 +524,7 @@ function chooseStations(rt: Runtime, e: Entity, p: HP, edge: Link, g: Geo): { st
   };
   const reachOk = (c: Cand, q: Pose, act: string) => receiverHands(e, q, c.feet).every((h) => envelopeGap(act, c.feet, h) <= 0 && h[1] >= c.feet[1] - REACH_DOWN - 1e-9);
   // at the hand-off the load is within EDGE_REACH of the edge they kneel at (beam side face / deck outline)
-  const outOf = (c: Cand, q: Pose) => Math.max(...receiverHands(e, q, c.feet).map((h) => edgeOut(all, c, h)));
+  const outOf = (c: Cand, q: Pose) => Math.max(...receiverHands(e, q, c.feet).map((h) => Math.max(edgeOut(all, c, h), dist2([h[0], h[2]], [c.feet[0], c.feet[2]]) - KNEEL_BACK)));
   const edgeOk = (c: Cand, q: Pose) => outOf(c, q) <= EDGE_REACH + 1e-9;
   // the part's whole path from the first moment it is in the air beside the edge
   const before = g.fixed ? [g.fixed] : trs.map((t) => t.q);

@@ -19,7 +19,8 @@ import type { Entity, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 
 // 2: crews accompany lifted parts; swept lifts; raise choreography
-export const RULES_VERSION = 'mars-assembly/2';
+// 3: hand_up (receivers kneel at the edge: hands ≤ 0.8 m from their feet), items / eating, solar, paint
+export const RULES_VERSION = 'mars-assembly/3';
 export const STANDING_REACH = 2.1; // m: highest beam seat a person on the ground can place
 export const LADDER_REACH = 3.6; // m: with a ladder at the station
 

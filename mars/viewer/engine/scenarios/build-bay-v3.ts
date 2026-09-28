@@ -74,7 +74,11 @@ export const V3_LAYOUT = {
   visit: { x: 0, z: 2.4 }, // the visitor walks onto s2
   // receivers' places for the sheets (site-local); b3 is the west upper beam, b4 the east one
   s1Receivers: [{ x: -COL, z: 1.65 }, { x: COL, z: 1.65 }], // on b3 / b4, north of s1
-  s2Receivers: [{ x: -0.45, z: 0.9 }, { x: 0.25, z: 0.9 }], // on s1, south of s2 (crew[4] from b3, crew[5] from b4)
+  // s2 comes off the forks west of b3; its receivers kneel at an edge within 0.5 m of it (hand_up's receiver
+  // rule): crew[4] on b3 just north of where s2 goes, crew[5] on s1 at its north-west corner — one per end
+  s2Receivers: [{ x: -COL, z: 0.1 + PW + PL + 0.32 }, { x: -0.45, z: 0.95 }],
+  s2StepOff: { x: 0.25, z: 0.9 }, // where crew[5] steps off b4 onto s1
+  s2Off: { x: -0.2, z: 2.8 }, // where crew[4] steps off b3 onto s2 once it is fastened
   presentY: 0, // filled below: s2's underside while presented (joist top + 5 cm)
 };
 const BEAM_TOP = 1.8288 + def('beam-12ft').size[1] / 2;
@@ -184,8 +188,9 @@ export function buildBayV3Template(site: Site): SequenceTemplate {
   step('fk_mount', 'mount', { actor: '$crew[1]', vehicle: 'fk' }, ['fk_walk']);
   step('fk_pick', 'forklift_pick', { operator: '$crew[1]', item: 's2' }, ['fk_mount'], 'forklift picks plywood s2 off its dunnage');
   const [r4, r5] = L.s2Receivers.map((q) => to(q.x, q.z));
-  step('onto_s1_4', 'beam_walk', { actor: '$crew[4]', x: r4.x, z: r4.z }, ['deck_s1'], 'crew[4] steps off beam b3 onto s1');
-  step('onto_s1_5', 'beam_walk', { actor: '$crew[5]', x: r5.x, z: r5.z }, ['deck_s1'], 'crew[5] steps off beam b4 onto s1');
+  const off5 = to(L.s2StepOff.x, L.s2StepOff.z);
+  step('onto_s1_4', 'beam_walk', { actor: '$crew[4]', x: r4.x, z: r4.z }, ['deck_s1'], 'crew[4] walks b3 to its north end, past where s2 goes');
+  step('onto_s1_5', 'beam_walk', { actor: '$crew[5]', x: off5.x, z: off5.z }, ['deck_s1'], 'crew[5] steps off beam b4 onto s1');
   const s2 = V3_SHEETS.s2;
   const pres = to(-(COL + BEAM_T + 0.08 + PW / 2), s2.z, s2.yaw);
   step('fk_present', 'forklift_present', { operator: '$crew[1]', at: { x: pres.x, z: pres.z, y: (site.groundY ?? 0) + L.presentY, yaw: pres.yaw } }, ['fk_pick', 'up_s1'], 'forks raise s2 to deck height beside the west beam');
@@ -193,6 +198,8 @@ export function buildBayV3Template(site: Site): SequenceTemplate {
   step('up_s2', 'hand_up', { part: 's2', via: 'forklift', operator: '$crew[1]', receivers: ['$crew[4]', '$crew[5]'], to: xzYaw(s2to), edge: 'b3', stations: [xz(r4), xz(r5)] },
     ['fk_present', 'onto_s1_4', 'onto_s1_5'], 'crew[4] and crew[5] take s2 off the forks and lay it');
   step('deck_s2', 'install_plywood', { crew: ['$crew[4]', '$crew[5]'], sheet: 's2', ...xzYaw(s2to) }, ['up_s2'], 'crew[4] and crew[5] fasten s2');
+  const off4 = to(L.s2Off.x, L.s2Off.z);
+  step('onto_s2_4', 'beam_walk', { actor: '$crew[4]', x: off4.x, z: off4.z }, ['deck_s2'], 'crew[4] steps off beam b3 onto s2');
   step('fk_back', 'forklift_back', { operator: '$crew[1]', d: L.back }, ['up_s2'], 'the empty forklift backs out');
   step('fk_dismount', 'dismount', { actor: '$crew[1]' }, ['fk_back']);
   // 5. stair (crew[4]/crew[5] are up on the deck; crew[2] fits the treads)
@@ -202,7 +209,7 @@ export function buildBayV3Template(site: Site): SequenceTemplate {
     return `muster${i}`;
   });
   const sp = to(0.94 + def('stair-flight-10').size[0], 0.75, Math.PI);
-  step('stair', 'install_stair_flight', { crew: ['$crew[0]', '$crew[1]'], stair: 'st', x: sp.x, z: sp.z, heading: sp.yaw }, [...muster, 'fk_dismount', 'deck_s2', joistsDone]);
+  step('stair', 'install_stair_flight', { crew: ['$crew[0]', '$crew[1]'], stair: 'st', x: sp.x, z: sp.z, heading: sp.yaw }, [...muster, 'fk_dismount', 'deck_s2', 'onto_s2_4', joistsDone]);
   prev = ['stair'];
   for (let i = 1; i <= 10; i++) {
     step(`tread${i}`, 'install_tread', { crew: ['$crew[2]'], stair: 'st', tread: `t${i}`, index: i }, prev);

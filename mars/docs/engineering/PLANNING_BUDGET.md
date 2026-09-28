@@ -183,6 +183,17 @@ Cost: stress-30 mean tick 0.41–0.63 → 0.71–0.85 ms (look-ahead + 0.5 s dec
 exact 99–113 ms (tick 5), corridor 83–95 ms (a failing `routeAround` decision, ~90 ms, falls back to the exact planner);
 the test's bounds (≤ 250 / ≤ 120 ms) hold. Flagship rehearsal compute +10–25 % (loaded host).
 
+**Re-pinned 2026-09-28 (kneel rule at the edge (W8 patch), 2026-09-28 — not the budget; W10):** at the hand-off a
+receiver's hands are ≤ 0.8 m horizontally from their feet (`EDGE_REACH` 0.5 + `KNEEL_BACK` 0.3; plan-time station choice in
+`hand_up` and per tick in `lift.hands-out-of-reach` at `reach_down` / `take`). v3's s2 receivers moved: crew[4] kneels on b3
+just north of s2, crew[5] at s1's north-west corner; crew[4] steps onto s2 once it is fastened (new step `onto_s2_4`,
+87 → 88 steps). 0 violations; same outcome (every joist / sheet handed and received by the same people). Rules
+`mars-assembly/3`.
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| build-bay v3 (`build-bay-v3.test.ts`) | `e121377dd6d7…a75924b9` | `0870c58386cc…caef946a` | 16191 → 16248 |
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner. The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).
