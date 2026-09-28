@@ -108,6 +108,14 @@ Routes (whole campus, 0.1 m, `HUMAN_PROFILE`), all ok: staging → west rack bui
 - Crop: pile → staging takes 3–5 ms. The staging area fits a 4-person 19 ft carry formation at 16 headings,
   at its centre and its four inset corners (tested).
 
+**Crop vs whole campus (`engine/test/campus-full.test.ts`, 2026-09-27).** The flagship on the uncropped scene
+(7,578 obstacles) completes with 0 violations in ~15 s of compute vs ~5 s cropped (2,696 obstacles). It ends
+physically identical (components bit-identical, people within 1e-12 m) but not bit-identical: final hash
+`3a01328f…` vs `b159317e…`, 599.3 s vs 597.5 s simulated. Cause: route vertices snapped to cell centres are
+`x0 + (i + 0.5)·cell` from the grid origin (−12 cropped, −162 full), so they differ in the last ulps (17.05 vs
+17.05000000000001, first in carryA's gather routes), and the ulps later flip tick-level choices. Free cells match;
+only clearance beyond the crop edge differs (the edge counts as blocked). Hashes are therefore pinned per crop.
+
 ## Known gaps
 - Prisms are OBBs fitted to render geometry. Sloped or curved pieces are over-approximated, and parts of one
   component within 0.5 m of each other merge into one prism (conservative).

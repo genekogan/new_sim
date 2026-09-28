@@ -1,5 +1,5 @@
 {
-  "about": "Hand-curated map from SPEC.md §28 rows and §30 milestones to the engine tests that prove them. Consumed by deploy/evidence-report.mjs, which runs engine/test/*.test.ts and writes docs/engineering/EVIDENCE.md + evidence.json. `title` is a substring of the exact test(...) title in `file`; it must match exactly one test in that file or the report fails. Keep `approximate` honest: say what the tests do NOT show. A row with no test keeps `tests: []` and says so in `untested`.",
+  "about": "Hand-curated map from SPEC.md §28 rows and §30 milestones to the engine tests that prove them. Consumed by deploy/evidence-report.mjs, which runs engine/test/*.test.ts and writes docs/engineering/EVIDENCE.md + evidence.json. `title` is a substring of the exact test(...) title in `file`; it must match exactly one test in that file or the report fails. Keep `approximate` honest: say what the tests do NOT show. Rows = SPEC §28; capabilities = engine capabilities beyond §28 (same shape); milestones = §30. A row with no test keeps `tests: []` and says so in `untested`.",
   "spec": "docs/engineering/SPEC.md",
   "rows": [
     {
@@ -73,7 +73,7 @@
         { "file": "carry.test.ts", "title": "carry invariant: detects grip drift, a load inside a wall, and a wrong holder" },
         { "file": "review.test.ts", "title": "C1: a mid-carry replan never flips the formation" }
       ],
-      "approximate": "Rigid formation, load held level, ground level only (no carrying on stairs or between levels), no re-grip. Collision is exact OBB vs prisms every tick; carriers have no carry/lift poses in the renderer."
+      "approximate": "Rigid formation, load held level, no re-grip. Crews carry on one level only; only a single carrier may take a load up a flight (see capability 'Loads on stairs'). Collision is exact OBB vs prisms every tick; carriers have no carry/lift poses in the renderer."
     },
     {
       "id": "raise-tall-frame",
@@ -104,7 +104,7 @@
         { "file": "progressive.test.ts", "title": "full sequence: uprights → beams → release → joists → plywood → stairs → a person walks up" },
         { "file": "planning.test.ts", "title": "replan budget: construction replans are staggered deterministically" }
       ],
-      "approximate": "Every construction epoch rebuilds the affected grids (no incremental navmesh); proven on the proving ground and the progressive fixture, not on the full campus."
+      "approximate": "Each construction epoch patches the affected grid region (bit-identical to a rebuild; no navmesh); proven on the proving ground and the progressive fixture, not on the full campus."
     },
     {
       "id": "incomplete-floor-stairs",
@@ -196,7 +196,7 @@
         { "file": "api.test.ts", "title": "fork isolation (room): a fork executes without touching canonical or a sibling fork" }
       ],
       "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
-      "approximate": "Forks start only from quiescent checkpoints (no mid-action resume); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run."
+      "approximate": "Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run."
     },
     {
       "id": "plan-invalidation",
@@ -224,6 +224,182 @@
       ],
       "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
       "approximate": "Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, which this report does not run. A camera track needs the control capability (MCP) and is stored beside the take."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "carry-stairs",
+      "name": "Loads on stairs (single carrier)",
+      "required": "One person carries a component up or down a completed stair flight between levels: tilted load with step-profile clearance, exclusive flight, refusals that name the stair or missing treads.",
+      "tests": [
+        { "file": "carry-stairs.test.ts", "title": "one person carries a stair tread from the ground up stairs A" },
+        { "file": "carry-stairs.test.ts", "title": "an 8 ft 2x4 goes up too (tilted along the flight)" },
+        { "file": "carry-stairs.test.ts", "title": "a 4x6 plywood panel on the 1.0 m stairs is refused" },
+        { "file": "carry-stairs.test.ts", "title": "carry-stairs invariant: a load pushed into the steps mid-climb is reported" },
+        { "file": "carry-stairs.test.ts", "title": "carry-stairs: determinism" },
+        { "file": "carry-stairs.test.ts", "title": "someone on the flight or at its top makes the carrier wait" },
+        { "file": "carry-stairs.test.ts", "title": "a walker heading up behind the carrier waits at the foot" }
+      ],
+      "approximate": "Single carrier only: no crews on a flight, no ladders, no turning flights or more than one flight per carry, no loads whose carry pose has a pitch (plywood on edge), no mid-flight replanning, and cancel on the flight is refused rather than modelled. One straight flight on the proving ground; the set-down check is distance only (CARRY.md 'Between levels')."
+    },
+    {
+      "id": "social-slots",
+      "name": "Social vocabulary + slots (reservation semantics)",
+      "required": "sit/stand/take_slot/face/converse/gather/campfire_circle/ambient_wander over claimable slots: one person per slot, refusals name the slot and its holder, seat fixtures block walking and are entered through approach points.",
+      "tests": [
+        { "file": "social.test.ts", "title": "social verbs are registered in the one engine registry" },
+        { "file": "social.test.ts", "title": "catalog slots: campfire has 8 fire-circle places" },
+        { "file": "social.test.ts", "title": "sit: two people cannot hold one camp-chair" },
+        { "file": "social.test.ts", "title": "converse: 4 people form a circle" },
+        { "file": "social.test.ts", "title": "converse refusals" },
+        { "file": "social.test.ts", "title": "campfire_circle with 10 people" },
+        { "file": "social.test.ts", "title": "gather onto a place region with an audience layout" },
+        { "file": "social.test.ts", "title": "ambient_wander: 6 people for 60 s" },
+        { "file": "social.test.ts", "title": "determinism: gather + converse + ambient twice" },
+        { "file": "social.test.ts", "title": "seat fixtures and the campfire block walking" },
+        { "file": "social.test.ts", "title": "sitters walk around other chairs/benches" },
+        { "file": "social.test.ts", "title": "a seat whose approach point is walled in front and behind is refused" },
+        { "file": "api.test.ts", "title": "api: seeds carry regions and a campfire + benches" }
+      ],
+      "approximate": "Seats have no armrest or leg geometry: each fixture is one catalog box (a chair's includes its back), and the seated exemption is by activity, not per fixture. Approach points are not reserved (a person standing on one makes the sitter yield/replan). No turn-taking, gaze, gestures, group re-forming or automatic pre-emption; ambient never re-adopts a released person (SOCIAL.md)."
+    },
+    {
+      "id": "vehicles",
+      "name": "EUC / bicycle riding",
+      "required": "mount/ride_to/ride_loop/dismount on curvature- and acceleration-limited curves; stop short of and ask people to step aside; never use links; a parked vehicle is an obstacle; vehicle invariants catch close passes and teleports.",
+      "tests": [
+        { "file": "vehicles.test.ts", "title": "EUC rides around the proving-ground wall" },
+        { "file": "vehicles.test.ts", "title": "refused: a target on the deck (vehicles never use links)" },
+        { "file": "vehicles.test.ts", "title": "person on the path: the EUC slows, stops" },
+        { "file": "vehicles.test.ts", "title": "dismount: the rider steps off beside it" },
+        { "file": "vehicles.test.ts", "title": "ride_loop: a closed 2-lap perimeter" },
+        { "file": "vehicles.test.ts", "title": "bicycle in the 1.0 m passage is refused" },
+        { "file": "vehicles.test.ts", "title": "kerbs: a 12 cm kerb a walker steps over blocks the EUC" },
+        { "file": "vehicles.test.ts", "title": "vehicle invariants fire on deliberately invalid states" }
+      ],
+      "approximate": "No vehicle-vehicle collision or traffic rules (each sees the other's rider as a person). Vehicles are discs (the bicycle's 1.75 m length is not swept), with no lean, wheel or balance kinematics and no reversing; one level only (no links). Walkers see a rider as a 0.28 m person, not the vehicle disc. Proving ground only, not the campus (VEHICLES.md)."
+    },
+    {
+      "id": "forklift",
+      "name": "Forklift to deck edges (rule-based)",
+      "required": "forklift_pick / forklift_deliver move a sheet from the ground onto a deck edge within lift range and fork reach, refusing unreachable placements and blocked lanes by name, stopping for people.",
+      "tests": [
+        { "file": "forklift.test.ts", "title": "forklift picks plywood off the ground and stages it on the 3 m deck" },
+        { "file": "forklift.test.ts", "title": "refused: a placement deeper than fork reach" },
+        { "file": "forklift.test.ts", "title": "refused: a 3.5 m surface is above the 3.2 m lift range" },
+        { "file": "forklift.test.ts", "title": "refused: an overhead beam lower than mast + load" },
+        { "file": "forklift.test.ts", "title": "refused: both fork-side approach lanes blocked" },
+        { "file": "forklift.test.ts", "title": "a person walking into the lane stops the truck" },
+        { "file": "forklift.test.ts", "title": "determinism: two identical runs of pick + deliver" }
+      ],
+      "approximate": "Rule-based, not dynamics: no tilt, pallets or dunnage, flat 1000 kg capacity (no load-moment chart), final alignment by standstill pivot + side-shift (no three-point turns); the truck body is not swept against people beyond the 1.5 m stop rule. Proving ground only (VEHICLES.md)."
+    },
+    {
+      "id": "historical-years",
+      "name": "Historical years as protected states (2020–2025)",
+      "required": "Each year 2020–2025 loads as a canonical, protected campus state with provenance on every obstacle; people route through that year's geometry; edits happen only in forks; a year room seeds it without touching 2026.",
+      "tests": [
+        { "file": "campus-history.test.ts", "title": "each year 2020–2025 loads as a ground-only scene" },
+        { "file": "campus-history.test.ts", "title": "grids build for every year" },
+        { "file": "campus-history.test.ts", "title": "2022: a walker routes around the courtyard buildings" },
+        { "file": "campus-history.test.ts", "title": "2021: a walker goes straight through the corridor" },
+        { "file": "campus-history.test.ts", "title": "building interiors are not walkable" },
+        { "file": "campus-history.test.ts", "title": "canonical mars-<year> is protected" },
+        { "file": "campus-history.test.ts", "title": "extraction is deterministic: two --check runs" },
+        { "file": "api.test.ts", "title": "api: a historical year room (2022) seeds protected canonical mars-2022" }
+      ],
+      "approximate": "The years are the procedural reconstructions from app/history (hypothesis-grade geometry, not surveys), ground-only (decks block; no upper floors or stairs). Routes are proven in 2021 and 2022 only; no build or carry has been run in a historical year."
+    },
+    {
+      "id": "camera-render-parity",
+      "name": "Camera occlusion parity with the render",
+      "required": "The planner's readability (prisms + per-tick take-part occluders + person capsules) agrees with ray casts against the rendered mesh.",
+      "tests": [
+        { "file": "camera-occluders.test.ts", "title": "part occluders: full boxes match entityCorners at any pose" },
+        { "file": "camera-occluders.test.ts", "title": "a subject behind a rack-upright post is partly occluded" },
+        { "file": "camera-occluders.test.ts", "title": "a person under a seated deck slab is occluded from a high wide" },
+        { "file": "camera-occluders.test.ts", "title": "crew is see-through only within 0.6 m of its grip" },
+        { "file": "camera-framing.test.ts", "title": "a bystander between camera and subject occludes" }
+      ],
+      "outsideSuite": ["viewer/e2e/camera-verify.spec.ts", "docs/engineering/CAMERA_VERIFY.md"],
+      "approximate": "The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15."
+    },
+    {
+      "id": "grid-incremental",
+      "name": "Incremental grids bit-identical",
+      "required": "Region-local grid updates on construction sync (and patched carry grids) equal a from-scratch buildGrids bit for bit: free cells, clearance and blocker names.",
+      "tests": [
+        { "file": "grid-incremental.test.ts", "title": "updateGrids === buildGrids over 240 seeded random scenes" },
+        { "file": "grid-incremental.test.ts", "title": "updateGrids: reordered or duplicate obstacles fall back" },
+        { "file": "grid-incremental.test.ts", "title": "BlockerMap behaves as a Map<number, string>" },
+        { "file": "grid-incremental.test.ts", "title": "build-bay on open ground (probe) + lab construction" },
+        { "file": "grid-incremental.test.ts", "title": "campus flagship (staging-east crop)" },
+        { "file": "grid-incremental.test.ts", "title": "Spatial.gridsFor === buildGrids for every carry plan" }
+      ],
+      "approximate": "Equality is checked on 240 random scenes and on every sync of the build-bay probe, the lab construction and the cropped campus flagship, not on the uncropped campus. Reordered or duplicate obstacle lists fall back to a full rebuild. Grids stay 0.1 m rasters with an exact EDT (no navmesh)."
+    },
+    {
+      "id": "stable-ids",
+      "name": "Stable historical ids + migration",
+      "required": "Historical components keep `${assembly}-${kind}-${hash}` ids across unrelated scene edits; pinned names survive; legacy serial ids in saved layouts migrate through a frozen table.",
+      "tests": [
+        { "file": "campus-history.test.ts", "title": "obstacle ids are the stable Kit ids (pinned names survive)" }
+      ],
+      "outsideSuite": ["viewer/deploy/history-ids.test.mjs", "docs/engineering/HISTORY_IDS.md"],
+      "approximate": "The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), which this report does not run. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly."
+    },
+    {
+      "id": "room-storage",
+      "name": "DO storage caps + isolation through the room",
+      "required": "EngineRoom (the Durable Object's code over SQLite) stores content-addressed state blobs, caps stored plans/takes per room without evicting referenced takes, and keeps replay, forks, plan staleness and year rooms isolated.",
+      "tests": [
+        { "file": "api.test.ts", "title": "api: EngineRoom stores states as content-addressed blobs" },
+        { "file": "api.test.ts", "title": "api: EngineRoom caps stored plans/takes per room" },
+        { "file": "api.test.ts", "title": "replay isolation (room)" },
+        { "file": "api.test.ts", "title": "fork isolation (room)" },
+        { "file": "api.test.ts", "title": "plan invalidation (room)" },
+        { "file": "api.test.ts", "title": "api: list (plans/takes/workspaces/cameras ledger) and delete_workspace" }
+      ],
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised."
+    },
+    {
+      "id": "deterministic-trig",
+      "name": "Deterministic trig across hosts",
+      "required": "Engine math uses pure IEEE-754 d* functions (never host Math.sin…), so Node, browsers and workerd produce the same state hashes.",
+      "tests": [
+        { "file": "core.test.ts", "title": "deterministic trig: <= 2 ulp of Math.*" },
+        { "file": "core.test.ts", "title": "deterministic trig: edge cases" },
+        { "file": "core.test.ts", "title": "datan2: quadrants, signed zeros" },
+        { "file": "core.test.ts", "title": "deterministic trig: golden bit patterns" },
+        { "file": "core.test.ts", "title": "engine source never calls the host transcendentals" }
+      ],
+      "outsideSuite": ["viewer/deploy/determinism-probe.mjs", "docs/engineering/RELEASE_CHECKLIST.md"],
+      "approximate": "This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified."
+    },
+    {
+      "id": "resumable",
+      "name": "Mid-action resumability (walking/social subset)",
+      "required": "Runtime.snapshot/restore mid-action: a restored runtime steps tick-for-tick like an unpaused one; forks from a pause diverge deterministically; unsupported actions are refused by name.",
+      "tests": [
+        { "file": "resume.test.ts", "title": "pause mid stair climb: restore continues identically" },
+        { "file": "resume.test.ts", "title": "converse circle paused mid-formation resumes identically" },
+        { "file": "resume.test.ts", "title": "gather paused mid-approach resumes identically" },
+        { "file": "resume.test.ts", "title": "a sequence paused between steps" },
+        { "file": "resume.test.ts", "title": "a snapshot during a carry is refused naming the action" },
+        { "file": "resume.test.ts", "title": "an exec holding a closure is refused naming the path" }
+      ],
+      "approximate": "Walking, stairs and social verbs only: carry, construction lifts, vehicles and ambient_wander are not resumable (a snapshot is refused naming the action). Each restored runtime needs its own Spatial; the teleport check has no prior poses on the first restored tick (TAKES_AND_PLANS.md)."
+    },
+    {
+      "id": "campus-full",
+      "name": "Flagship on the full uncropped 2026 campus",
+      "required": "The campus flagship runs on the whole campus scene (7.6k obstacles, no crop) with 0 violations and the same final state as the ±40 m staging-east crop.",
+      "tests": [
+        { "file": "campus-full.test.ts", "title": "ends physically identical to the cropped run" },
+        { "file": "campus-full.test.ts", "title": "final-state hash === the cropped run (bit-identical)" }
+      ],
+      "approximate": "Completes with 0 violations; components end bit-identical and people within 1e-12 m, but the final-state hash differs and the build takes 36 ticks longer (the bit-identity test is a todo). Route vertices are cell centres computed from the grid origin (x0 + (i + 0.5)·cell), so the crop's origin (−12 vs −162) changes them by ulps; no route leaves the crop and the free cells match. About 2.5–3× the compute of the crop."
     }
   ],
   "milestones": [
@@ -280,7 +456,7 @@
         { "file": "carry.test.ts", "title": "carry invariant: detects grip drift" },
         { "file": "review.test.ts", "title": "C1: a mid-carry replan never flips the formation" }
       ],
-      "approximate": "Grips are fixed points on a rigid, level load; carriers play Walk/Idle beside it (no hand IK or carry pose). No carrying on stairs; simultaneous formations are not co-planned."
+      "approximate": "Grips are fixed points on a rigid, level load; carriers play Walk/Idle with a procedural carry lean (no hand IK). Crews do not carry on stairs (one carrier may); simultaneous formations are not co-planned."
     },
     {
       "id": "D",
@@ -313,7 +489,7 @@
         { "file": "progressive.test.ts", "title": "lift crew: a plywood lift-over keeps both holders" },
         { "file": "build-bay.test.ts", "title": "flagship: rehearse the full build from material piles, then execute it" }
       ],
-      "approximate": "One bay, not an extended multi-bay run. No forklift, ladders or scaffold (anything above 2.1 m from a floor fails reach.too-high). Deck/stair/tread dimensions and the plywood span rule are provisional."
+      "approximate": "One bay, not an extended multi-bay run. The forklift (capability row) is proven on its own, not inside a build sequence; no ladders or scaffold (anything above 2.1 m from a floor fails reach.too-high). Deck/stair/tread dimensions and the plywood span rule are provisional."
     },
     {
       "id": "F",
@@ -346,7 +522,7 @@
         { "file": "rehearsal.test.ts", "title": "fork isolation: canonical refuses execution" },
         { "file": "core.test.ts", "title": "fork isolation: canonical protected" }
       ],
-      "approximate": "Forks resume only from quiescent checkpoints (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video."
+      "approximate": "Forks resume from quiescent checkpoints, or mid-action for walking/social only (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video."
     },
     {
       "id": "H",
@@ -363,7 +539,7 @@
         { "file": "social.test.ts", "title": "ambient_wander: 6 people for 60 s" },
         { "file": "social.test.ts", "title": "determinism: gather + converse + ambient twice" }
       ],
-      "approximate": "Campfire, class/audience gather, conversation, sitting and ambient wandering only: no party, dance or riding verbs in the engine. No seat collision, turn-taking, gaze, gestures or automatic pre-emption (SOCIAL.md)."
+      "approximate": "Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze, gestures or automatic pre-emption (SOCIAL.md)."
     }
   ]
 }
