@@ -5,18 +5,19 @@
 // smootherstep (C²) under documented motion caps. The keys become an existing `path` shot per window and
 // the existing planner (planShotList, alternates off by default) validates collision, sweeps and
 // readability — so the report is the planner's truth about the computed move, not a rescued one.
-// Phase 2 (self-correction) plugs in through `SynthOverrides` and `SynthShot.corrections`.
+// Phase 2 (self-correction, correct.ts) re-synthesizes through `SynthOverrides` and records `SynthShot.corrections`.
 import type { Diagnostic } from '../actions/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { datan, datan2, dcos, dsin, dtan, hypot, q6, type Vec3 } from '../core/math.ts';
-import { worldHeadingOfAzimuth } from '../env/sun.ts';
+import { solarPosition, worldHeadingOfAzimuth } from '../env/sun.ts';
 import { buildGrids, cellOf, latticeOf, type LevelGrid } from '../spatial/grid.ts';
-import type { SpatialScene } from '../spatial/types.ts';
+import type { Obstacle, SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { CameraWorld, nearestSolid, raycast, segmentPrism, solidName, type CameraPolicy } from './geom.ts';
 import { MIN_CLEARANCE, placement, readability } from './quality.ts';
 import { aimForSafeArea, DEFAULT_ASPECT, fitDistance, subjectPoints, type CameraPose, type Key, type Sampler, type ShotSpec, type SubjectPose } from './shots.ts';
 import { planShotList, type ShotListPlan, type ShotWindow } from './shotlist.ts';
+import { correctShot, type CorrectDeps, type DirectCorrection, type ShotSimulation } from './correct.ts';
 import { compileDirection, COMPASS, parseDirection, pointInPolygon, SemanticWorld, type CameraDirection, type Facts, type ResolvedSubject, type ShotIntent } from './direct.ts';
 
 const DEG = Math.PI / 180;
@@ -67,10 +68,13 @@ export const compassOf = (v: Vec3) => { const a = datan2(v[0], -v[2]) / DEG; ret
 
 // ---- types ---------------------------------------------------------------------------------------------
 
-/** A ranked phase-2 correction (raise, widen, swing, re-route, shorten, split, cut). Phase 1 never fills it. */
-export type DirectCorrection = { strategy: 'raise' | 'widen' | 'swing' | 'reroute' | 'shorten' | 'split' | 'cut'; t0: number; t1: number; reason: string; params?: Record<string, number> };
-/** Knobs a phase-2 corrector turns on a re-synthesis (all neutral by default). */
-export type SynthOverrides = { bearingOffset?: number; heightOffset?: number; distanceScale?: number; duration?: number; via?: Vec3[] };
+export type { DirectCorrection, ShotSimulation } from './correct.ts';
+/**
+ * Knobs the phase-2 corrector (correct.ts) turns on a re-synthesis (all neutral by default): raise → heightOffset (m),
+ * widen → distanceScale, swing → bearingOffset (rad), re-route → navRadius (camera radius of the navmesh, m) + avoid
+ * (extra collision prisms, e.g. the take's parts), shorten → duration (s).
+ */
+export type SynthOverrides = { bearingOffset?: number; heightOffset?: number; distanceScale?: number; duration?: number; via?: Vec3[]; navRadius?: number; avoid?: Obstacle[] };
 export type SynthValidation = { samples: number; invalidSamples: number; sweptCrossings: number; minClearance: number; firstProblem?: string };
 export type SynthShot = {
   index: number;
@@ -88,6 +92,8 @@ export type SynthShot = {
   notes: string[];
   validation: SynthValidation;
   corrections: DirectCorrection[];
+  /** Phase 2: the simulation of this (final) shot against the take. */
+  simulation?: ShotSimulation;
 };
 export type SynthContext = {
   world: CameraWorld;
@@ -100,6 +106,9 @@ export type SynthContext = {
   /** Take length (s). */
   duration: number;
   navmeshes?: Map<string, CameraNavmesh>;
+  /** The sun when above the horizon at the take's datetime (phase-2 flare check, sun-behind band). */
+  sun?: { direction: Vec3; datetime: string } | null;
+  policy?: CameraPolicy;
 };
 export type PrevPose = { position: Vec3; target: Vec3 };
 export type SynthResult = { ok: true; shot: SynthShot } | { ok: false; diagnostic: Diagnostic };
@@ -359,17 +368,17 @@ export class CameraNavmesh {
   }
 }
 
-function navmeshFor(ctx: SynthContext, a: Vec3, b: Vec3, margin = 8): CameraNavmesh {
+function navmeshFor(ctx: SynthContext, a: Vec3, b: Vec3, margin = 8, radius = MIN_CLEARANCE): CameraNavmesh {
   const sb = ctx.scene.bounds;
   const q = (v: number, f: (x: number) => number) => f(v / 2) * 2; // 2 m-aligned crop so nearby requests share a mesh
   const bounds: [number, number, number, number] = [
     Math.max(sb[0], q(Math.min(a[0], b[0]) - margin, Math.floor)), Math.max(sb[1], q(Math.min(a[2], b[2]) - margin, Math.floor)),
     Math.min(sb[2], q(Math.max(a[0], b[0]) + margin, Math.ceil)), Math.min(sb[3], q(Math.max(a[2], b[2]) + margin, Math.ceil)),
   ];
-  const key = bounds.join(',');
+  const key = `${bounds.join(',')}@${radius}`;
   ctx.navmeshes ??= new Map();
   let m = ctx.navmeshes.get(key);
-  if (!m) { m = new CameraNavmesh(ctx.world, bounds, ctx.groundY); ctx.navmeshes.set(key, m); }
+  if (!m) { m = new CameraNavmesh(ctx.world, bounds, ctx.groundY, radius); ctx.navmeshes.set(key, m); }
   return m;
 }
 
@@ -758,8 +767,11 @@ function areaCentroid(poly: [number, number][], y: number): Vec3 {
 }
 
 type FlyOk = { ok: true; keys: Key[]; params: Record<string, unknown>; notes: string[]; focus?: Vec3[] };
-function synthFly(intent: ShotIntent, ctx: SynthContext, prev: PrevPose | undefined, over: SynthOverrides, geo0: Geo, fr: Framed): FlyOk | { ok: false; diagnostic: Diagnostic } {
+function synthFly(intent: ShotIntent, ctx0: SynthContext, prev: PrevPose | undefined, over: SynthOverrides, geo0: Geo, fr: Framed): FlyOk | { ok: false; diagnostic: Diagnostic } {
   const d = intent.direction;
+  // re-route (phase 2): the route is searched with a wider camera radius and / or extra obstacles (the take's parts)
+  const navR = over.navRadius ?? MIN_CLEARANCE;
+  const ctx: SynthContext = over.avoid?.length ? { ...ctx0, world: new CameraWorld({ ...ctx0.scene, obstacles: [...ctx0.scene.obstacles, ...over.avoid] }, ctx0.policy), navmeshes: new Map() } : ctx0;
   const eyeY = ctx.groundY + EYE_HEIGHT;
   const room = intent.interior ?? (intent.subject.kind === 'region' ? intent.subject : undefined);
   const poly = room?.polygon;
@@ -821,12 +833,12 @@ function synthFly(intent: ShotIntent, ctx: SynthContext, prev: PrevPose | undefi
   if (!intent.lookAt && poly) { const a = norm([goal[0] - start[0], 0, goal[2] - start[2]]); finalTarget = [goal[0] + a[0] * 3, eyeY, goal[2] + a[2] * 3]; }
   const sp = placement(ctx.world, start);
   if (!sp.valid) return { ok: false, diagnostic: { code: 'camera.nav.start-blocked', message: `direction ${intent.index}: fly_through start (${r3v(start).join(', ')}) is not a valid camera position: ${sp.reason}`, at: r3v(start) } };
-  const mesh = navmeshFor(ctx, start, goal);
+  const mesh = navmeshFor(ctx, start, goal, 8, navR);
   const straight = raycast(ctx.world, start, goal, 'collide');
   const route = mesh.route(start, goal);
   if (!route.ok) return { ok: false, diagnostic: { ...route.diagnostic, message: `direction ${intent.index}: ${route.diagnostic.message}` } };
   const pts = [start, ...route.points, goal];
-  const sm = smoothRoute(pts, ctx.world);
+  const sm = smoothRoute(pts, ctx.world, navR);
   if (!sm.ok) return { ok: false, diagnostic: { ...sm.diagnostic, message: `direction ${intent.index}: ${sm.diagnostic.message}` } };
   const dense = sm.dense;
   const cum = [0];
@@ -977,6 +989,8 @@ export type DirectInput = {
   policy?: CameraPolicy;
   /** Planner alternates (solve.ts VARIANTS keys). Default [] = validate the computed move as is (phase 1). */
   variants?: string[];
+  /** Phase 2 self-correction (correct.ts): simulate every shot against the take and apply ranked corrections. Default true; false = phase 1 (the computed move as is). */
+  correct?: boolean;
 };
 export type DirectShotReport = {
   index: number;
@@ -991,8 +1005,10 @@ export type DirectShotReport = {
   notes: string[];
   validation: SynthValidation;
   planner?: { invalidSamples: number; sweptCrossings: number; minReadability: number; meanReadability: number; readableFraction: number; cuts: number; rejected: boolean; reasons: string[] };
-  /** Phase 2: ranked self-corrections applied to this shot, with reasons. Always empty in phase 1. */
+  /** Phase 2: the ranked self-correction applied to this shot (failure, samples, strategy, before / after, reason, what was tried). */
   corrections: DirectCorrection[];
+  /** Phase 2: the final shot simulated against the take (every sample scored; `valid` = no failure). Absent with `correct: false`. */
+  simulation?: ShotSimulation;
 };
 export type DirectReport = { shots: DirectShotReport[]; duration: number; samples: number; rejected: boolean; trackHash: string; caps: typeof MOTION_CAPS };
 export type DirectResult = { ok: true; plan: ShotListPlan; shots: SynthShot[]; report: DirectReport } | { ok: false; diagnostics: Diagnostic[]; shots: DirectShotReport[] };
@@ -1005,6 +1021,7 @@ function shotReport(intent: ShotIntent, shot: SynthShot): DirectShotReport {
     ...(intent.interior ? { interior: { id: intent.interior.id, label: intent.interior.label } } : {}),
     ...(intent.lookAt ? { lookAt: { id: intent.lookAt.id, label: intent.lookAt.label, members: intent.lookAt.members?.length ?? 1 } } : {}),
     params: shot.params, notes: shot.notes, validation: shot.validation, corrections: shot.corrections,
+    ...(shot.simulation ? { simulation: shot.simulation } : {}),
   };
 }
 
@@ -1018,7 +1035,10 @@ export function directCamera(directions: unknown[], input: DirectInput): DirectR
   const world = new CameraWorld(input.scene, input.policy);
   const groundY = input.scene.levels.find((l) => l.id === 0)?.y ?? 0;
   const semantic = new SemanticWorld(input.scene, input.world, input.facts);
-  const ctx: SynthContext = { world, scene: input.scene, sampler: input.sampler, hz, aspect: input.aspect ?? DEFAULT_ASPECT, safeBottom: input.safeBottom ?? 0, groundY, duration: input.duration };
+  const sp = solarPosition(input.world.env.datetime);
+  const sun = sp.elevationDeg > 0 ? { direction: sp.direction as Vec3, datetime: input.world.env.datetime } : null;
+  const ctx: SynthContext = { world, scene: input.scene, sampler: input.sampler, hz, aspect: input.aspect ?? DEFAULT_ASPECT, safeBottom: input.safeBottom ?? 0, groundY, duration: input.duration, sun, policy: input.policy };
+  const deps: CorrectDeps = { synthesize: synthesizeShot, validate: validateKeys, caps: { viewOmegaDeg: MOTION_CAPS.viewOmegaDeg, viewAlphaDeg: MOTION_CAPS.viewAlphaDeg, speedExterior: MOTION_CAPS.speedExterior, speedInterior: MOTION_CAPS.speedInterior, accel: MOTION_CAPS.accel } };
   const diagnostics: Diagnostic[] = [];
   const parsed: CameraDirection[] = [];
   directions.forEach((x, i) => { const r = parseDirection(x, i); if (r.ok) parsed.push(r.direction); else diagnostics.push(r.diagnostic); });
@@ -1033,11 +1053,12 @@ export function directCamera(directions: unknown[], input: DirectInput): DirectR
     if (t0 + 1e-9 < tEnd) { diagnostics.push({ code: 'camera.direct.overlap', message: `direction ${i}: starts at ${t0} s, before direction ${i - 1} ends (${tEnd} s)` }); break; }
     const c = compileDirection(d, i, t0, { semantic, datetime: input.world.env.datetime, duration: input.duration, sampler: input.sampler });
     if (!c.ok) { diagnostics.push(...c.diagnostics); break; }
-    const sres = synthesizeShot(c.intent, ctx, prev);
-    if (!sres.ok) { diagnostics.push(sres.diagnostic); break; }
-    intents.push(c.intent); shots.push(sres.shot); reports.push(shotReport(c.intent, sres.shot));
-    tEnd = sres.shot.t1;
-    const last = sres.shot.keys[sres.shot.keys.length - 1];
+    const cres = input.correct === false ? (() => { const r = synthesizeShot(c.intent, ctx, prev); return r.ok ? { ok: true as const, shots: [r.shot] } : r; })() : correctShot(c.intent, ctx, prev, deps);
+    if (!cres.ok) { diagnostics.push(cres.diagnostic); break; }
+    for (const sh of cres.shots) { intents.push(c.intent); shots.push(sh); reports.push(shotReport(c.intent, sh)); }
+    const lastShot = cres.shots[cres.shots.length - 1];
+    tEnd = lastShot.t1;
+    const last = lastShot.keys[lastShot.keys.length - 1];
     prev = { position: last.position, target: last.target };
   }
   if (diagnostics.length) return { ok: false, diagnostics, shots: reports };

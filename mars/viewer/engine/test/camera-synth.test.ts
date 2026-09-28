@@ -112,7 +112,9 @@ test('(b) 2026: pan across Chiba with the sunset behind — every sample in the 
 test('(c) 2024: go inside the kitchen and face the sink — routed through the opening, never through a wall', () => {
   const { scene, world } = campus2024();
   const from: Vec3 = [8, 1.6, 36];
-  const r = ok(directCamera([{ subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through', from }, context: { interior: 'kitchen-interior', lookAt: 'sink' } }], { scene, world, sampler: () => ({}), duration: 120 }));
+  const dir = { subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through', from }, context: { interior: 'kitchen-interior', lookAt: 'sink' } };
+  // phase 1 (the computed move as is): one continuous route over the half wall
+  const r = ok(directCamera([dir], { scene, world, sampler: () => ({}), duration: 120, correct: false }));
   const shot = r.shots[0], rep = r.report.shots[0], p = rep.params as any;
   const cw = new CameraWorld(scene);
   const hit = raycast(cw, from, p.goal, 'collide');
@@ -137,6 +139,23 @@ test('(c) 2024: go inside the kitchen and face the sink — routed through the o
   assert.ok(rep.t1 - rep.t0 < 30, `a ${p.routeLength} m move in ${rep.t1 - rep.t0} s`);
   const end = inWindow(r.plan, rep.t1 - 2, rep.t1);
   assert.ok(end.every((s) => s.readability >= 0.6), 'the sink is readable at the end of the move');
+  // phase 2 finds a genuine issue: "over the half wall" threads the 0.79 m serving hatch between the half wall
+  // (top 1.26 m) and the wall panel above (from 2.05 m). Raise finds no viewpoint / exceeds the caps, re-route with the
+  // hatch blocked finds no other camera-sized way in, shorten would keep < 50 % → split: a cut at the hatch.
+  const c = ok(directCamera([dir], { scene, world, sampler: () => ({}), duration: 120 }));
+  assert.equal(c.shots.length, 2);
+  const fix = c.report.shots[0].corrections[0];
+  assert.equal(fix.failure, 'squeeze');
+  assert.match(fix.reason, /free height 0\.78 m between 'plywood wall/);
+  assert.equal(fix.strategy, 'split');
+  assert.deepEqual(fix.tried.map((x) => [x.strategy, x.outcome]), [['raise', 'failed'], ['widen', 'n/a'], ['swing', 'n/a'], ['reroute', 'failed'], ['shorten', 'n/a']]);
+  assert.ok(fix.tried[3].attempts!.every((a) => a.result === 'refused: camera.nav.unreachable'), 'the hatch is the only camera-sized way into the 2024 kitchen');
+  assert.equal(c.plan.report.cuts.filter((x) => Math.abs(x.t - c.shots[1].t0) < 1e-6).length, 1, 'the cut is at the hatch');
+  assert.ok(c.shots.every((s) => s.simulation!.valid));
+  assert.equal(c.shots[1].t1, shot.t1 + 0, 'the move still ends on time');
+  const lastC = c.shots[1].keys[c.shots[1].keys.length - 1];
+  assert.ok(pointInPolygon(lastC.position[0], lastC.position[2], room) && angleDeg(sub(lastC.target, lastC.position), sub(sinkTop, lastC.position)) < 1, 'ends inside, facing the sink');
+  assert.equal(c.plan.report.invalidSamples + c.plan.report.sweptCrossings, 0);
 });
 
 test('group: the carry crew is orbited with the orbit centre following the group', () => {

@@ -203,7 +203,18 @@ test('api: engine_direct_camera plans + stores a directed track beside the take;
   const orbit = r.report.shots[1];
   assert.equal(orbit.subject.id, 'n1');
   assert.ok(orbit.params.orbitRadius > 1);
-  assert.deepEqual(orbit.corrections, []);
+  // phase 2 found a genuine issue: the computed orbit of n1 passes through the passage west wall (phase 1 left it to
+  // the planner, which cut away from it); the self-correction raises it 1 m and records why
+  assert.equal(orbit.corrections.length, 1);
+  const fix = orbit.corrections[0];
+  assert.equal(fix.failure, 'collision');
+  assert.equal(fix.strategy, 'raise');
+  assert.equal(fix.params.heightOffset, 1);
+  assert.match(fix.reason, /passage west wall/);
+  assert.equal(fix.after.failingSamples, 0);
+  assert.ok(orbit.simulation.valid);
+  assert.equal(orbit.validation.invalidSamples, 0);
+  assert.equal(orbit.planner.cuts, 0, 'no planner rescue cut any more');
   const stored = (c.call('get_take', { take_id: ex.take_id, include: ['cameras'] }) as any).cameras;
   assert.deepEqual(stored.map((t: any) => [t.id, t.kind]), [[r.track_id, 'directed']]);
   // same directions → same track id and samples
@@ -220,5 +231,9 @@ test('api: engine_direct_camera plans + stores a directed track beside the take;
   const fast = c.call('direct_camera', { take_id: ex.take_id, directions: [{ subject: { kind: 'entity', ref: 'n1' }, motion: { verb: 'orbit', degrees: 90 }, duration: 8 }] }) as any;
   assert.equal(fast.code, 'camera.direct.motion-cap');
   assert.match(fast.message, /needs ≥ 8\.44 s/);
+  const raw = c.call('direct_camera', { take_id: ex.take_id, directions: dirs, correct: false }) as any;
+  assert.ok(raw.ok && raw.track_id !== r.track_id);
+  assert.ok(raw.report.shots[1].validation.invalidSamples > 0 && raw.report.shots[1].planner.cuts > 0, 'correct: false = the phase-1 move (inside the wall, rescued by a planner cut)');
+  assert.deepEqual(raw.report.shots[1].corrections, []);
   assert.equal(c.call('direct_camera', { take_id: 'nope', directions: dirs }).code, 'take.unknown');
 });

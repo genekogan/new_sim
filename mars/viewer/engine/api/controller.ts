@@ -699,14 +699,14 @@ export class EngineController {
     const scene = this.scenes[take.finalState.base.campus];
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
     const hz = q.hz ?? 10;
-    const r = directCamera(q.directions, { scene, world: take.finalState, sampler: takeSampler(take), facts: takeFacts(take), duration: takeDuration(take), hz });
+    const r = directCamera(q.directions, { scene, world: take.finalState, sampler: takeSampler(take), facts: takeFacts(take), duration: takeDuration(take), hz, ...(q.correct === false ? { correct: false } : {}) });
     if (!r.ok) {
       const d = r.diagnostics[0];
       return fail(d.code, uniqueMessage(r.diagnostics.map((x) => x.message).join('; ')), { diagnostics: r.diagnostics, shots: r.shots });
     }
     if (this.unkept.has(take.id)) this.keepTake(take);
     const before = this.takes.takeHash(take.id);
-    const trackId = q.track_id ?? `dir-${hashOf({ take: take.id, directions: q.directions, hz }).slice(0, 12)}`;
+    const trackId = q.track_id ?? `dir-${hashOf({ take: take.id, directions: q.directions, hz, ...(q.correct === false ? { correct: false } : {}) }).slice(0, 12)}`;
     this.cameras(take.id);
     this.takes.attachCamera(toCameraTrack(trackId, take.id, r.plan, 'directed'));
     if (!this.changes.cameras.includes(take.id)) this.changes.cameras.push(take.id);
