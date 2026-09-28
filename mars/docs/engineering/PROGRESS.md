@@ -265,3 +265,22 @@ Then: gate → release 5; HANDOFF refresh.
 - **W14 landed** `8aedc3d`, `2408cb1`, `87ed562`, `6b5d971`, `c9ce960`, `90b59ce` (≈520k tokens, 100 min): renders solar panels/rails/equipment (labelled), paint bands (texture = colour+stripe until textures exist), strapped bundles/stacks shrinking with `contents.count`, cutting station; climb-frame ladder cycle, beam-walk, stance turn-on-the-rod; lab presets `year-build-2022` (first bay, 41 182 ticks = node rehearsal) and `year-build-2022-house` (117 125 ticks, 33 s wall, 66/66) + `solar-paint`; year-build spec compares live stepping with a node rehearsal (not hard pins). v3 hand points 92.5 % reached, 0 rig-reachable misses; year-build stance soles 44 682/44 682 on bracing nodes. Playwright 53/53 on HEAD after two inspected refreshes. Lead LOOKED at year-build-skeleton, year-build-handup-248, solar-paint-mounted-equipment: accepted. Skeleton vs the evidence photo: same vocabulary (face-on braced frames, three beam levels, open bays), missing the 2x4 top framing + stair ramp (phase B) and the photo's green frames.
 - Engine findings from W14 → W17 after W13 lands (all in `construction/stance.ts`/`sequence`): (1) rear `hang_beam` lifter faces travel and carries the beam behind its back — must face the beam or walk backwards; (2) stance holders' hands 0.73–0.79 m beside the body point with the yaw facing the frame — needs a `human.facing`/turn for stance holders in takes and a climb pose on `climb:`/stance links; (3) whole house submits 67 `makeWay` walks for people already reserved by a waiting step → `reservation.conflict` FAILED banners (outcome unchanged) — `makeWay` should skip reserved people; (4) no foot/hand holds for frames (which bracing node a climber is on).
 - W17 spawned (consolidation in a worktree at HEAD): regenerate the flagship take, full `npm run gate`, `npm run evidence`, HANDOFF numbers.
+- **W16 (engine camera, OWNER_FEEDBACK §11 phase 1)** `649bc72` + docs/tests commit. Details in `CAMERA_DIRECT.md`.
+  - `camera/direct.ts`: typed `CameraDirection` vocabulary (zod) and a `SemanticWorld` resolver. Entities, take
+    structures from the connection graph ("rack bay"), scene assemblies, regions, fixtures clustered by contact
+    (sink bowl + rim = one sink), and groups by action/activity. Ambiguity is a `camera.direct.ambiguous` question
+    with candidates; unknown names are refused with what is known.
+  - `camera/synth.ts`: computed trajectories.
+    - Framing by `fitDistance`; smootherstep timing under motion caps (20°/s, 30°/s², 6 / 1.5 m/s, 2 m/s²).
+    - Sun-behind heading/pitch window from `env/sun.ts` (new `sunBehindWindow`), verified at every sample.
+    - Camera navmesh: band rasters via `buildGrids`, layered A* with a flight layer from 2.2 m, clamped cubic
+      B-spline (C²), curvature-aware speed profile.
+    - Program = dense `path` shots, validated by `planShotList` with alternates off.
+    - Report per shot with `corrections: []` for phase 2.
+  - `engine_direct_camera` tool (`api/schemas.ts` + `controller.ts`, additive).
+  - Results:
+    - Flagship bay orbit, 270° in 120 s: radius 13.86 m, 0 invalid, readability min 0.67.
+    - Chiba sunset pan (2026): 90 / 90 samples in the sun window.
+    - 2024 kitchen → sink (2026 has no kitchen or sink): 9.1 m over the half wall, not through the east wall,
+      18 s.
+  - Tests: +16 (camera-direct 8, camera-synth 8).

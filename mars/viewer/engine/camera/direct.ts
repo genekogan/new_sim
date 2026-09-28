@@ -123,7 +123,6 @@ export function pointInPolygon(x: number, z: number, poly: [number, number][]): 
 /** Scene obstacles may carry manifest identity (CampusObstacle): assembly + component. */
 type SceneObstacle = Obstacle & { assembly?: string; component?: string };
 const shortLabel = (l: string) => l.split(' · ')[0].trim();
-const RACK_DEFS = /^(upright|beam)-/;
 
 /**
  * Index of everything a direction may name, built once per (scene, world). Deterministic: every list is in
@@ -158,7 +157,7 @@ export class SemanticWorld {
     for (const id of parent.keys()) { const r = find(id); const l = sets.get(r); if (l) l.push(id); else sets.set(r, [id]); }
     for (const members of [...sets.values()].filter((m) => m.length > 1).map((m) => m.sort()).sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
       const defs = members.map((id) => world.entities[id].def ?? '');
-      const rack = defs.some((d) => d.startsWith('upright-')) && defs.some((d) => RACK_DEFS.test(d) && d.startsWith('beam-'));
+      const rack = defs.some((d) => d.startsWith('upright-')) && defs.some((d) => d.startsWith('beam-'));
       const base = rack ? 'rack bay' : 'structure';
       let box: Box | undefined;
       for (const id of members) box = boxUnion(box, entityBox(world.entities[id]));

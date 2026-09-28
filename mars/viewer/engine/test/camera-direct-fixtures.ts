@@ -82,3 +82,18 @@ export function roomScene(opts: { door: boolean; roof: boolean }): { scene: Spat
   world.regions.room = { id: 'room', label: 'the room', kind: 'place', polygon: [[-2.95, -2.95], [2.95, -2.95], [2.95, 2.95], [-2.95, 2.95]], provenance: FIXTURE };
   return { scene, world };
 }
+
+/** Step start / end times (s) from a take's own lifecycle events (as deploy/record-campus-take.mjs does). */
+export function stepTimes(take: Take): Map<string, { start: number; end: number }> {
+  const m = new Map<string, { start: number; end: number }>();
+  for (const e of take.events as { type: string; id?: string; status?: string; t: number }[]) {
+    if (e.type !== 'action' || !e.id?.startsWith('step:')) continue;
+    const id = e.id.slice(5);
+    const s = m.get(id) ?? { start: NaN, end: NaN };
+    if (e.status === 'executing' && Number.isNaN(s.start)) s.start = e.t * take.dt;
+    if (e.status === 'completed' || e.status === 'failed' || e.status === 'cancelled') s.end = e.t * take.dt;
+    m.set(id, s);
+  }
+  return m;
+}
+export const onGrid = (t: number) => Math.round(t * 10) / 10;

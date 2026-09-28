@@ -13,11 +13,11 @@ import { worldHeadingOfAzimuth } from '../env/sun.ts';
 import { buildGrids, cellOf, latticeOf, type LevelGrid } from '../spatial/grid.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
-import { CameraWorld, nearestSolid, raycast, solidName, type CameraPolicy } from './geom.ts';
+import { CameraWorld, nearestSolid, raycast, segmentPrism, solidName, type CameraPolicy } from './geom.ts';
 import { MIN_CLEARANCE, placement, readability } from './quality.ts';
 import { aimForSafeArea, DEFAULT_ASPECT, fitDistance, subjectPoints, type CameraPose, type Key, type Sampler, type ShotSpec, type SubjectPose } from './shots.ts';
 import { planShotList, type ShotListPlan, type ShotWindow } from './shotlist.ts';
-import { boxCentre, compileDirection, COMPASS, parseDirection, pointInPolygon, SemanticWorld, type CameraDirection, type Facts, type ResolvedSubject, type ShotIntent } from './direct.ts';
+import { compileDirection, COMPASS, parseDirection, pointInPolygon, SemanticWorld, type CameraDirection, type Facts, type ResolvedSubject, type ShotIntent } from './direct.ts';
 
 const DEG = Math.PI / 180;
 const TAU = 2 * Math.PI;
@@ -639,7 +639,9 @@ export function synthesizeShot(intent: ShotIntent, ctx: SynthContext, prev?: Pre
       if (intent.sun) {
         const sw = intent.sun;
         const pref = datan2(lookY - camY, dist);
-        const pitch = clampN(pref, sw.pitch.min + 1 * DEG, sw.pitch.max - 1 * DEG);
+        // upper 65% of the window: near its low end the sun sits by the top edge, and perspective lifts it out
+        // of frame at the ends of a sweep
+        const pitch = clampN(pref, sw.pitch.min + 0.35 * (sw.pitch.max - sw.pitch.min), sw.pitch.max - 1 * DEG);
         if (sw.pitch.min + 1 * DEG > sw.pitch.max - 1 * DEG) return { ok: false, diagnostic: { code: 'camera.direct.sun-window', message: `direction ${intent.index}: fov ${fov}° leaves no pitch that keeps the sun in frame and ≥ ${sw.flareDeg}° off axis` } };
         if (pitch !== pref) {
           camY = lookY - dist * dtan(pitch);
@@ -916,25 +918,31 @@ function synthFly(intent: ShotIntent, ctx: SynthContext, prev: PrevPose | undefi
     keys.push({ t: q6(i / ctx.hz), position: pose.position, target: pose.target });
   }
   params.speedProfile = { capSpeed: vcap, minimumDuration: r2(Tprof), slowestCruise: r2(Math.min(...vel.slice(Math.floor(n * 0.1), Math.ceil(n * 0.9)))) };
-  // where the route enters the room: what it passes over (a half wall / counter) or between, in the last 2 m
+  // where the route enters the room: what it passes over near the boundary (a half wall / counter; walls first,
+  // then the highest), else the solids beside the opening at camera height
   if (poly) {
     const inIdx = dense.findIndex((q) => pointInPolygon(q[0], q[2], poly));
     if (inIdx > 0) {
       const at = dense[inIdx];
       const hDist = (q: { cx: number; cz: number; c: number; s: number; hx: number; hz: number }, x: number, z: number) => hypot(Math.max(0, Math.abs((x - q.cx) * q.c + (z - q.cz) * q.s) - q.hx), Math.max(0, Math.abs(-(x - q.cx) * q.s + (z - q.cz) * q.c) - q.hz));
       const tall = (q: { collide: boolean; y1: number }) => q.collide && q.y1 > ctx.groundY + 0.5; // floor-level parts are not the opening
-      let over: { label: string; top: number } | null = null;
-      for (let j = Math.max(0, inIdx - 40); j <= inIdx && !over; j++) {
-        const pj = dense[j];
-        for (const i of ctx.world.candidates(pj[0], pj[2], pj[0], pj[2], 0.05)) {
+      let over: { label: string; top: number; wall: boolean } | null = null;
+      for (let j = 1; j < dense.length; j++) {
+        if (cum[j] < cum[inIdx] - 2 || cum[j - 1] > cum[inIdx] + 0.5) continue; // 2 m before the boundary to 0.5 m after
+        const a = dense[j - 1], b = dense[j];
+        for (const i of ctx.world.candidates(a[0], a[2], b[0], b[2], 0.05)) {
           const q = ctx.world.solids[i];
-          if (tall(q) && q.y1 < pj[1] && hDist(q, pj[0], pj[2]) < 0.02) { over = { label: q.o.label ?? q.o.id, top: q.y1 }; break; }
+          if (!tall(q) || q.y1 >= Math.min(a[1], b[1])) continue;
+          const ym = (q.y0 + q.y1) / 2;
+          if (!segmentPrism([a[0], ym, a[2]], [b[0], ym, b[2]], q)) continue; // the path passes over its footprint
+          const cand = { label: q.o.label ?? q.o.id, top: q.y1, wall: q.o.kind === 'wall' };
+          if (!over || (cand.wall && !over.wall) || (cand.wall === over.wall && cand.top > over.top + 1e-9)) over = cand;
         }
       }
       const near: { label: string; d: number }[] = [];
       for (const i of ctx.world.candidates(at[0], at[2], at[0], at[2], 1.5)) {
         const q = ctx.world.solids[i];
-        if (!tall(q) || q.y0 > at[1] + 1) continue;
+        if (!tall(q) || q.y0 > at[1] + 0.3 || q.y1 < at[1] - 0.5) continue; // beside the camera, not overhead / underfoot
         const dd = hDist(q, at[0], at[2]);
         if (dd <= 1.5) near.push({ label: q.o.label ?? q.o.id, d: dd });
       }

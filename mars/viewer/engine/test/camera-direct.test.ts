@@ -11,7 +11,7 @@ import { crossBindings, crossTemplate } from './sequence-fixtures.ts';
 import { datan, dtan } from '../core/math.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
-import { beforeSunset, campus2024, campus2026, flagship, withTime } from './camera-direct-fixtures.ts';
+import { beforeSunset, campus2024, campus2026, flagship, onGrid, stepTimes, withTime } from './camera-direct-fixtures.ts';
 
 const DEG = Math.PI / 180;
 const wrapDiff = (a: number, b: number) => Math.abs(((a - b + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
@@ -46,17 +46,19 @@ test('vocabulary: invalid verbs, a revolution without an angle, duration + speed
 test('sentence: "do a 270° revolution around the main pallet racks over 2 minutes" → orbit of the take\'s rack bay', () => {
   const { take, input } = flagship();
   const ctx: DirectContext = { semantic: new SemanticWorld(input.scene, take.finalState, input.facts), datetime: take.finalState.env.datetime, duration: input.duration, sampler: input.sampler };
-  const c = compile({ subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120, at: 230 }, ctx, 230);
+  const at = onGrid(stepTimes(take).get('seat_b1')!.start); // both uprights raised, beams about to be seated
+  const c = compile({ subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120, at }, ctx, at);
   assert.ok(c.ok, JSON.stringify(c));
   const it = c.intent;
   assert.equal(it.verb, 'orbit');
-  assert.equal(it.t0, 230);
+  assert.equal(it.t0, at);
   assert.equal(it.subject.kind, 'assembly');
   assert.equal(it.subject.id, 'structure:A', 'the connected rack structure (uprights + beams + joists + deck + stair)');
   assert.match(it.subject.label, /^rack bay \(24 parts/);
-  assert.deepEqual(it.subject.ids, ['A', 'B'], 'scored members = the parts already in place at 230 s (beams are still being seated)');
+  assert.ok(it.subject.ids.includes('A') && it.subject.ids.includes('B'), 'scored members = the parts already in place (both uprights)');
+  assert.ok(!it.subject.ids.some((id) => /^j\d|^s\d|^t\d/.test(id)), 'joists, sheets and treads are still on the piles');
   // "pallet rack" names the same structure; the static campus racks are buildings named differently
-  const c2 = compile({ subject: { kind: 'assembly', ref: 'pallet racks' }, motion: { verb: 'orbit', degrees: 270 } }, ctx, 230);
+  const c2 = compile({ subject: { kind: 'assembly', ref: 'pallet racks' }, motion: { verb: 'orbit', degrees: 270 } }, ctx, at);
   assert.ok(c2.ok && c2.intent.subject.id === 'structure:A');
 });
 
@@ -113,20 +115,28 @@ test('sentence: "go inside the kitchen and face the sink" (2024) → interior ro
 test('sentence: "look at this crowd of people having this activity" → the group in that action at that time', () => {
   const { take, input } = flagship();
   const ctx: DirectContext = { semantic: new SemanticWorld(input.scene, take.finalState, input.facts), datetime: take.finalState.env.datetime, duration: input.duration, sampler: input.sampler };
-  const byAction = compile({ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' } }, ctx, 30);
+  const t30 = onGrid(stepTimes(take).get('carryA')!.start + 20); // p1 + p2 carrying upright A
+  const byAction = compile({ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' } }, ctx, t30);
   assert.ok(byAction.ok && byAction.intent.subject.id === 'step:carryA');
   assert.deepEqual(byAction.intent.subject.ids, ['p1', 'p2']);
   assert.equal(byAction.intent.subject.dynamic, true);
-  const byActivity = compile({ subject: { kind: 'group', ref: 'carry' }, motion: { verb: 'hold' } }, ctx, 30);
-  assert.ok(byActivity.ok && byActivity.intent.subject.id === 'step:carryA', 'one carry going on at 30 s');
-  // at 260 s two crews walk for two different carries: ask which
-  const two = compile({ subject: { kind: 'group', ref: 'walk' }, motion: { verb: 'hold' } }, ctx, 260);
-  assert.ok(!two.ok);
-  assert.equal(two.diagnostics[0].code, 'camera.direct.ambiguous');
-  assert.deepEqual((two.diagnostics[0].details as any).candidates.map((c: any) => c.id), ['step:carry_j1', 'step:carry_s1']);
-  const none = compile({ subject: { kind: 'group', ref: 'dancing' }, motion: { verb: 'hold' } }, ctx, 260);
+  const byActivity = compile({ subject: { kind: 'group', ref: 'carry' }, motion: { verb: 'hold' } }, ctx, t30);
+  assert.ok(byActivity.ok && byActivity.intent.subject.id === 'step:carryA', 'one carry going on');
+  // a moment when two crews share an activity for two different actions: the director is asked which
+  let two: { t: number; act: string; tasks: string[] } | null = null;
+  for (let t = 0; t < input.duration && !two; t += 1) {
+    const by = new Map<string, Set<string>>();
+    for (const f of Object.values(input.facts!(t))) if (f.task?.startsWith('step:') && f.activity) (by.get(f.activity) ?? by.set(f.activity, new Set()).get(f.activity)!).add(f.task);
+    for (const [act, tasks] of [...by.entries()].sort()) if (tasks.size > 1) { two = { t, act, tasks: [...tasks].sort() }; break; }
+  }
+  assert.ok(two, 'the flagship has overlapping crews');
+  const amb = compile({ subject: { kind: 'group', ref: two.act }, motion: { verb: 'hold' } }, ctx, two.t);
+  assert.ok(!amb.ok);
+  assert.equal(amb.diagnostics[0].code, 'camera.direct.ambiguous');
+  assert.deepEqual((amb.diagnostics[0].details as any).candidates.map((c: any) => c.id), two.tasks);
+  const none = compile({ subject: { kind: 'group', ref: 'dancing' }, motion: { verb: 'hold' } }, ctx, two.t);
   assert.ok(!none.ok && none.diagnostics[0].code === 'camera.direct.unknown');
-  assert.match(none.diagnostics[0].message, /actions now: step:carry_j1, step:carry_s1/);
+  assert.match(none.diagnostics[0].message, /actions now: .*step:/);
 });
 
 test('resolver: ambiguous and unknown names are refused with candidates / what is known, never guessed', () => {
