@@ -3,12 +3,12 @@
 // circle facing inward, seated people on their seats, the conversing pair facing each other,
 // pre-emption keeps the circle, the full-circle conflict is an EXPECTED diagnostic, zero
 // violations, nobody overlapping), replays deterministically, and captures oblique + top views
-// with overlays off/on at 20 s and 60 s.
+// with overlays off/on at 20 s and 65 s.
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { captureView, collectConsoleErrors } from './helpers';
 import { labFrames, openLab, type LabState } from './lab-helpers';
 
-const BASELINES = new Set(['lab-social-t20-oblique', 'lab-social-t60-top-debug']);
+const BASELINES = new Set(['lab-social-t20-oblique', 'lab-social-t65-top-debug']);
 const FIRE = [-22, -22.5];
 const DEBUG = ['agents', 'labels', 'slots', 'routes'];
 
@@ -86,13 +86,18 @@ test('lab campfire-evening: social verbs, expected conflict, pre-emption, zero v
   await labFrames(page);
   await shots(page, 'lab-social-t20', testInfo);
 
-  // 60 s: s1 joined, x1 took the last place, x2 was refused (expected) and sits on the bench, g1 pulled away
-  const t60 = await step(page, 800);
-  expect(await arrangement(page, t60)).toEqual({ warm: 7, sit: 2, talk: 2 });
-  expect(t60.humans.find((h) => h.id === 'g1')!.activity).toBe('idle');
+  // 65 s: s1 joined, x1 took the last place, x2 was refused (expected) and sits on the bench, g1 pulled away.
+  // (Was 60 s. Since W4's walk timing (9e1c2f4: immediate block reaction, splined turns) x1 — submitted at
+  // 42 s — reaches its fire place at tick 1266 = 63.3 s: its walk_to waits 3.5 s (ticks 1030–1100,
+  // `traffic.person: x1 is waiting for g3 to move out of the way` — g3 stands warm in the ring), replans
+  // at 1109 (12.3 → 5.6 m), waits briefly for g2, and arrives; everyone else is in place by 60 s. The
+  // arrival is late, not missing, so the check moved to 65 s. W9 investigation, POSES.md / PROGRESS.)
+  const t65 = await step(page, 900);
+  expect(await arrangement(page, t65)).toEqual({ warm: 7, sit: 2, talk: 2 });
+  expect(t65.humans.find((h) => h.id === 'g1')!.activity).toBe('idle');
   await expect(page.getByRole('alert').filter({ hasText: 'EXPECTED CONFLICT' })).toHaveCount(2);
   await labFrames(page);
-  await shots(page, 'lab-social-t60', testInfo);
+  await shots(page, 'lab-social-t65', testInfo);
   // close-ups (capture only): the pair in profile from the south, the circle from the west, the chairs from the north-east
   const close: [string, number[], number[]][] = [
     ['pair', [-16.5, 1.6, -30.2], [-16.5, 1.0, -26.5]],
@@ -103,7 +108,7 @@ test('lab campfire-evening: social verbs, expected conflict, pre-emption, zero v
   for (const [name, pos, target] of close) {
     await page.evaluate(([p, t]) => window.__marsEngine!.camera(p, t), [pos, target]);
     await labFrames(page);
-    await captureView(page, `lab-social-t60-close-${name}`, { testInfo, compare: false });
+    await captureView(page, `lab-social-t65-close-${name}`, { testInfo, compare: false });
   }
 
   const end = await page.evaluate(() => window.__marsEngine!.runToEnd());

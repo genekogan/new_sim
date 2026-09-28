@@ -57,7 +57,7 @@ The production Worker (`deploy/configure.mjs`) does not route `/lab` yet.
 
 Baselines: `lab-stairs-mid-oblique`, `lab-narrow-passage-mid-top-debug`.
 
-`e2e/lab-social.spec.ts` covers campfire-evening: all expectations, zero violations, the arrangement at 20 s and 60 s (fire circle on the 1.6 m ring facing the fire, sitters on claimed seats facing the seat heading, c1/c2 facing each other, no two people closer than 2r), the two EXPECTED conflict banners and no FAILED banner, deterministic replay. Captures `lab-social-t{20,60}-{oblique,top}[-debug].png` (debug = agents, labels, slots, routes) and close-ups `lab-social-t60-close-{pair,circle,chairs,chairs-top}.png`. Baselines: `lab-social-t20-oblique`, `lab-social-t60-top-debug`.
+`e2e/lab-social.spec.ts` covers campfire-evening: all expectations, zero violations, the arrangement at 20 s and 65 s (was 60 s: x1 reaches the last place at 63.3 s since W4's walk timing — a 3.5 s traffic wait behind g3, who stands warm in the ring) (fire circle on the 1.6 m ring facing the fire, sitters on claimed seats facing the seat heading, c1/c2 facing each other, no two people closer than 2r), the two EXPECTED conflict banners and no FAILED banner, deterministic replay. Captures `lab-social-t{20,65}-{oblique,top}[-debug].png` (debug = agents, labels, slots, routes) and close-ups `lab-social-t65-close-{pair,circle,chairs,chairs-top}.png`. Baselines: `lab-social-t20-oblique`, `lab-social-t65-top-debug`.
 
 `e2e/fire.spec.ts` covers the animated campfire (campfire-evening at dusk, t 25.0 / 25.3 s): the flame region changes while a still standing person does not, the same tick replayed draws the identical fire, draw calls within +3 of the old cone, no console errors. Baselines: `fire-dusk-oblique`, `fire-dusk-close`.
 
