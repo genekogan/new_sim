@@ -53,7 +53,7 @@ button{font:inherit;font-weight:600;padding:10px 18px;border-radius:8px;border:0
 <body>
 <main>
 <h1>Questions for Gene</h1>
-<p class="lede">15 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
+<p class="lede">17 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
 <section><h2>Worth answering first</h2>
 <article class="card" id="Q3" data-id="Q3" data-plain="On this map of 2022, is north really straight up, with the east house on the right and the kitchen at the bottom?">
 <div class="qid">Q3</div>
@@ -408,6 +408,37 @@ stations, and the A+B pin.
 
 Gene:</pre></details>
 </article>
+<article class="card" id="Q20" data-id="Q20" data-plain="In 2024, was Chiba's front six rack bays wide (about 22 m, as the model has it) or seven bays (about 25.6 m)?">
+<div class="qid">Q20</div>
+<h3>In 2024, was Chiba's front six rack <abbr title="one 12 ft (3.66 m) span of rack beams; the model's Chiba 2024 is 6 bays wide and 3 deep">bays</abbr> wide (about 22 m, as the model has it) or seven bays (about 25.6 m)?</h3>
+<p class="context">We rebuilt the 2024 front from your photo (vertical inset around the stairs, flaps leaning back on both sides), keeping the model's 6-<abbr title="one 12 ft (3.66 m) span of rack beams; the model's Chiba 2024 is 6 bays wide and 3 deep">bay</abbr> width. But if the doors in the photo are ordinary 2 m doors and the landing sits at the upper floor, the whole front measures about 25–27 m wide, which is closer to 7 bays.</p>
+<div class="pics">
+<figure><a href="photos/2024-chiba-front.jpg" target="_blank" rel="noopener"><img src="photos/2024-chiba-front.jpg" alt="Real photo, 2024: the front with the inset, the stairs, solar on the left and plexiglass on the right." loading="lazy"></a><figcaption>Real photo, 2024: the front with the inset, the stairs, solar on the left and plexiglass on the right.</figcaption></figure>
+<figure><a href="q20-2024-front-eye.jpg" target="_blank" rel="noopener"><img src="q20-2024-front-eye.jpg" alt="The model after the edit, from eye height on the door axis (6 bays wide)." loading="lazy"></a><figcaption>The model after the edit, from eye height on the door axis (6 bays wide).</figcaption></figure>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q20" value="Six bays (about 22 m), as modelled"> <span>Six bays (about 22 m), as modelled</span></label>
+<label class="opt"><input type="radio" name="Q20" value="Seven bays (about 25.6 m)"> <span>Seven bays (about 25.6 m)</span></label>
+<label class="opt"><input type="radio" name="Q20" value="Something else (say below)"> <span>Something else (say below)</span></label>
+<label class="opt"><input type="radio" name="Q20" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> If seven <abbr title="one 12 ft (3.66 m) span of rack beams; the model's Chiba 2024 is 6 bays wide and 3 deep">bays</abbr>, Chiba 2024 grows by one bay (the flaps and the solarium get wider) in another reconstruction edit of the protected 2024 state; if six, nothing changes.</p>
+<p class="terms"><b>bay</b>: one 12 ft (3.66 m) span of rack beams; the model's Chiba 2024 is 6 bays wide and 3 deep</p><details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(Parked; non-blocking. Added by W43.)
+
+**What the engine sees.** `app/history/photographic-corrections.ts frontage2024` keeps the hall at 6 × 3 bays (21.95 m × 10.97 m).
+Measured in the 1000 × 497 px photo: the facade spans x ≈ 25–978 px at the ground (953 px), so at the flap bottoms 6 bays gives
+≈ 43.4 px/m. The door leaves are 70 px tall and the landing (the upper-floor level, 2.46–2.55 m in the model) is 88 px above
+the ground, which gives ≈ 35–36 px/m at the inset. The flaps' outer edges converge by about 10 % from bottom to top, so the
+camera is roughly 25 m away and the inset should read only about 10 % smaller than the flap bottoms (≈ 39 px/m), not 18 %.
+With 6 bays the door would be about 1.8 m tall and the landing 2.2 m; with 7 bays they would be 2.1 m and 2.6 m. The lens and
+the crop are unknown, so this does not settle it. **Default:** keep 6 bays.
+**What the answer changes.** A 7-bay answer widens the hall frame, the decks and both flaps by one bay (a new
+`reconstruction-edit` of `mars-2024`, HISTORY_IDS.md). Every Chiba 2024 hashed id then changes, and the pins stay.
+Gene:</pre></details>
+</article>
 <article class="card" id="Q7" data-id="Q7" data-plain="When the materials were on site, how were they piled: how many plywood sheets per stack, and were the rack frames and beams stacked flat or bundled?">
 <div class="qid">Q7</div>
 <h3>When the materials were on site, how were they piled: how many plywood sheets per stack, and were the rack frames and beams stacked flat or bundled?</h3>
@@ -532,6 +563,37 @@ as is. If it is a frame, it needs a depth and a seat pattern (catalog entry, `ma
 The provisional flag goes either way.
 
 Gene:</pre></details>
+</article>
+<article class="card" id="Q21" data-id="Q21" data-plain="The right-hand end of the 2024 solarium was a clear plastic wall with a door. Where in that wall was the door, and did it swing out, swing in, or slide?">
+<div class="qid">Q21</div>
+<h3>The right-hand end of the 2024 <abbr title="the glazed lean-to under Chiba's right-hand front flap (your second 2024 photo)">solarium</abbr> was a clear plastic wall with a door. Where in that wall was the door, and did it swing out, swing in, or slide?</h3>
+<p class="context">Neither photo shows that end wall. The model puts a 1.2 m wide door next to the building (the only place a 2 m door fits under the sloping flap), standing open outwards, so people and the camera can go through it.</p>
+<div class="pics">
+<figure><a href="q21-2024-solarium-door.jpg" target="_blank" rel="noopener"><img src="q21-2024-solarium-door.jpg" alt="The model: the plexiglass end wall on 2x4 studs, with the door standing open (right)." loading="lazy"></a><figcaption>The model: the plexiglass end wall on 2x4 studs, with the door standing open (right).</figcaption></figure>
+<figure><a href="photos/2024-chiba-solarium-interior.jpg" target="_blank" rel="noopener"><img src="photos/2024-chiba-solarium-interior.jpg" alt="Real photo, 2024: inside the solarium, with the 2x4 lattice roof, clear panels and rack frames." loading="lazy"></a><figcaption>Real photo, 2024: inside the solarium, with the 2x4 lattice roof, clear panels and rack frames.</figcaption></figure>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q21" value="Next to the building, swinging out (as modelled)"> <span>Next to the building, swinging out (as modelled)</span></label>
+<label class="opt"><input type="radio" name="Q21" value="Next to the building, swinging in"> <span>Next to the building, swinging in</span></label>
+<label class="opt"><input type="radio" name="Q21" value="A sliding door"> <span>A sliding door</span></label>
+<label class="opt"><input type="radio" name="Q21" value="Somewhere else (say below)"> <span>Somewhere else (say below)</span></label>
+<label class="opt"><input type="radio" name="Q21" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> The door moves, or is shown closed or sliding. Walking and camera routes into the <abbr title="the glazed lean-to under Chiba's right-hand front flap (your second 2024 photo)">solarium</abbr> follow the door.</p>
+<p class="terms"><b>solarium</b>: the glazed lean-to under Chiba's right-hand front flap (your second 2024 photo)</p><details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(Parked; non-blocking. Added by W43.)
+
+**What the engine sees.** The end wall is at x = +w/2 under the right flap (`frontage2024`). The door opening is at
+dz 0.145–1.355 m in front of the frame and 0.22–2.22 m high, where the flap underside is still above 2.3 m. The leaf is the
+pinned `chiba-solarium-door` (kind `plexiglass door` → engine `glass`), standing open 90° outwards, with `userData.door`
+describing the opening. **Default:** as modelled.
+**What the answer changes.** Only the door pieces move (new hashed ids for the jambs and header; the leaf keeps its pinned id).
+A closed door would need a camera/walk rule for door objects (CAMERA_DIRECT.md: today openings are gaps).
+Gene:
+
+---</pre></details>
 </article></section>
 <section><h2>Already answered</h2><ul class="record"><li><b>A1.</b> How were the long top beams (about 4.76 m up) hung?<br><span class="rec">You said: two people climb the upright on its cross braces, and each holds one side of the beam while setting it. The `hang_beam` / stance mechanism is the real method (OWNER_DECISIONS.md; OWNER_FEEDBACK §14).</span></li>
 <li><b>A2.</b> When someone on a floor takes a load from below, may they only kneel (reach down 0.5 m), or also lie on their stomach at the edge?<br><span class="rec">You said: the 0.5 m kneel rule stays the default. Add a prone receiver (lying on the stomach at the deck edge, then rising to knees and feet holding the load) as a further posture (OWNER_FEEDBACK §13). W28 and W29 landed it.</span></li></ul></section>

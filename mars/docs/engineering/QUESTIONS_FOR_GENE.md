@@ -23,7 +23,7 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status: **15 open blocks** (Q1–Q14 and Q19; 16 + 1 questions, two pairs were duplicates and are merged) and **2 answered**.
+Status: **17 open blocks** (Q1–Q14, Q19, Q20 and Q21; 16 + 3 questions, two pairs were duplicates and are merged) and **2 answered**.
 
 **Gene's page.** `questions/index.html` shows every open block as a card Gene can read and answer (plain question,
 pictures, options, export button); it is served at `/questions/` after a deploy. It is generated from this file:
@@ -542,6 +542,74 @@ photo (`evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg`) 
 **What the answer changes.** if 2022 had framing, the replays would sequence `install_top_plate`/`install_rafter` before the roof
 deck and the protected `mars-2022` state would need a reconstruction-edit adding the members (roof deck rises ≈ 13 cm). If not,
 nothing changes — the framing verbs wait for 2026.
+Gene:
+
+---
+
+## Chiba 2024 front (W43 reconstruction edit, 2026-09-29)
+
+### Q20. 2024: was Chiba six bays wide (about 22 m), or seven (about 25.6 m)?
+
+```question
+id: Q20
+urgency: fidelity
+order: 7
+plain: In 2024, was Chiba's front six rack bays wide (about 22 m, as the model has it) or seven bays (about 25.6 m)?
+terms:
+  - bay | one 12 ft (3.66 m) span of rack beams; the model's Chiba 2024 is 6 bays wide and 3 deep
+context: We rebuilt the 2024 front from your photo (vertical inset around the stairs, flaps leaning back on both sides), keeping the model's 6-bay width. But if the doors in the photo are ordinary 2 m doors and the landing sits at the upper floor, the whole front measures about 25–27 m wide, which is closer to 7 bays.
+changes: If seven bays, Chiba 2024 grows by one bay (the flaps and the solarium get wider) in another reconstruction edit of the protected 2024 state; if six, nothing changes.
+options:
+  - Six bays (about 22 m), as modelled
+  - Seven bays (about 25.6 m)
+  - Something else (say below)
+images:
+  - questions/photos/2024-chiba-front.jpg | Real photo, 2024: the front with the inset, the stairs, solar on the left and plexiglass on the right.
+  - questions/q20-2024-front-eye.jpg | The model after the edit, from eye height on the door axis (6 bays wide).
+```
+
+(Parked; non-blocking. Added by W43.)
+
+**What the engine sees.** `app/history/photographic-corrections.ts frontage2024` keeps the hall at 6 × 3 bays (21.95 m × 10.97 m).
+Measured in the 1000 × 497 px photo: the facade spans x ≈ 25–978 px at the ground (953 px), so at the flap bottoms 6 bays gives
+≈ 43.4 px/m. The door leaves are 70 px tall and the landing (the upper-floor level, 2.46–2.55 m in the model) is 88 px above
+the ground, which gives ≈ 35–36 px/m at the inset. The flaps' outer edges converge by about 10 % from bottom to top, so the
+camera is roughly 25 m away and the inset should read only about 10 % smaller than the flap bottoms (≈ 39 px/m), not 18 %.
+With 6 bays the door would be about 1.8 m tall and the landing 2.2 m; with 7 bays they would be 2.1 m and 2.6 m. The lens and
+the crop are unknown, so this does not settle it. **Default:** keep 6 bays.
+**What the answer changes.** A 7-bay answer widens the hall frame, the decks and both flaps by one bay (a new
+`reconstruction-edit` of `mars-2024`, HISTORY_IDS.md). Every Chiba 2024 hashed id then changes, and the pins stay.
+Gene:
+
+### Q21. 2024: where was the solarium's side door, and which way did it open?
+
+```question
+id: Q21
+urgency: none
+order: 8
+plain: The right-hand end of the 2024 solarium was a clear plastic wall with a door. Where in that wall was the door, and did it swing out, swing in, or slide?
+terms:
+  - solarium | the glazed lean-to under Chiba's right-hand front flap (your second 2024 photo)
+context: Neither photo shows that end wall. The model puts a 1.2 m wide door next to the building (the only place a 2 m door fits under the sloping flap), standing open outwards, so people and the camera can go through it.
+changes: The door moves, or is shown closed or sliding. Walking and camera routes into the solarium follow the door.
+options:
+  - Next to the building, swinging out (as modelled)
+  - Next to the building, swinging in
+  - A sliding door
+  - Somewhere else (say below)
+images:
+  - questions/q21-2024-solarium-door.jpg | The model: the plexiglass end wall on 2x4 studs, with the door standing open (right).
+  - questions/photos/2024-chiba-solarium-interior.jpg | Real photo, 2024: inside the solarium, with the 2x4 lattice roof, clear panels and rack frames.
+```
+
+(Parked; non-blocking. Added by W43.)
+
+**What the engine sees.** The end wall is at x = +w/2 under the right flap (`frontage2024`). The door opening is at
+dz 0.145–1.355 m in front of the frame and 0.22–2.22 m high, where the flap underside is still above 2.3 m. The leaf is the
+pinned `chiba-solarium-door` (kind `plexiglass door` → engine `glass`), standing open 90° outwards, with `userData.door`
+describing the opening. **Default:** as modelled.
+**What the answer changes.** Only the door pieces move (new hashed ids for the jambs and header; the leaf keeps its pinned id).
+A closed door would need a camera/walk rule for door objects (CAMERA_DIRECT.md: today openings are gaps).
 Gene:
 
 ---
