@@ -147,6 +147,17 @@ prints the flagship build-bay/open-ground `finalStateHash`, take id and math fin
   the profiler are not carried; `maxStepPerTick` has no previous-pose baseline on the first tick after a restore
   (a teleport in exactly that tick would go unflagged); a restored `SequenceRunner.run(maxTicks)` budget counts
   from the resume. `sampleTake(take, t)` is still a **visual** frame, never a resumable state.
+- **Control plane (ops, `engine/api/pause.ts`):** `engine_execute { pauseAt: seconds | {step, event}, allowDrop? }`
+  drives the plan with the same Runtime/SequenceRunner/TakeRecorder as `runPlan` until the point, then commits
+  `{ ...rt.snapshot(), pause: { plan, runStart, runner: runner.serialize(), maxTicks, takes, commands } }` as a
+  `pause` checkpoint (cause `{ kind: 'pause', note, take, plan }` — the take so far and plan count as referenced).
+  `engine_resume { workspace, until?, commands? }` restores both from the head (`resume.not-resumable` otherwise),
+  appends `commands` as unconditioned steps, and finishes with `runner.run(rest)` under the run's shared tick budget,
+  so a no-command resume ends in the unpaused `finalStateHash` (tested, incl. a pause chain and a room restart). Each
+  segment records its own take (`run.takes`). Paused heads refuse bind/execute/edit (`workspace.paused`). In the DO
+  the blob is stored like a state: `y<year>/state/resume.<hash>` (optional `StateStore.getResume/putResume`; the
+  history index omits it), counted in the room's `state` storage; it embeds its world, so it costs about one state
+  plus the live action state (6.5 kB for the 3-walker cross at 5 s; 8.0 kB for two walkers in the director demo).
 - Sizes (JSON, printed by `resume.test.ts`): walk_to mid-climb, 2 people: 3.5 kB; converse gathering (4 people
   + 4 child walks) + face: 9.7 kB; sequence between steps: 1.8 kB (records grow with the take's action count).
 

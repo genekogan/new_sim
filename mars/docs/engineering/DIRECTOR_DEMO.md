@@ -4,7 +4,7 @@
 against the real MCP endpoint. An external agent that wants to direct the engine should copy
 this sequence: discover → design-edit the world → bind → rehearse → read the diagnostic →
 revise → rehearse clean → execute → shoot → fork → handle staleness → read the ledger and clean
-up. Every expectation in the script is asserted, so if the engine's behaviour changes, the demo
+up → pause a run mid-action, fork the pause and resume both branches differently. Every expectation in the script is asserted, so if the engine's behaviour changes, the demo
 fails loudly and doesn't just print something else.
 
 ```sh
@@ -313,23 +313,77 @@ workspace is refused while another live workspace was forked from it, and the re
 forks. After a delete, that workspace's runs count as unreferenced, which is how a long session
 frees storage without starting a new room.
 
+### 9. Pause mid-action, fork the pause, resume both branches
+
+```
+# a carry cannot be paused: its live state is not resumable (the refusal names it; nothing is committed)
+→ engine_log {"workspace":"scene-1"}                                          [4 ms · 0 ms]
+→ engine_execute {"plan_id":"ba45ebb432be7070fb20f3a9","workspace":"scene-1","pauseAt":8}  [30 ms · 25 ms · isError]
+← refused: snapshot.non-resumable: "pause at t = 8 s: cannot take a resumable snapshot at tick 820: actio…
+→ engine_log {"workspace":"scene-1"}                                          [4 ms · 0 ms]
+→ engine_bind_plan {"template":{"schema":"mars-sequence/1","id":"to-the-fire","params":{"a":{"kind":"act…  [5 ms · 0 ms]
+→ engine_rehearse {"plan_id":"f78166bfc8063546b7666687"}                      [30 ms · 26 ms]
+← rehearsal (unpaused reference): completed, 23.9 s, finalStateHash 88c332c38fd3d898…
+# q1 and q2 walk from yard B through the 1.5 m corridor B to the fire; pause 10 s in
+→ engine_execute {"plan_id":"f78166bfc8063546b7666687","workspace":"scene-1","pauseAt":10}  [28 ms · 23 ms]
+← pause checkpoint: 61c2cc92844ecd8f617f0e75 resumable true, cause {"kind":"pause","note":"paused at t = …
+← live: step:lead walk_to executing/walk, step:follow walk_to executing/walk
+← sizes: pause blob 7989 B (snapshot + runner state, stored as state/resume.<hash>); take so far d61554d6…
+→ engine_query_world {"workspace":"scene-1","ids":["q1"]}                     [4 ms · 0 ms]
+← q1 at the pause: (11.99, 22.15) yaw 0.04, walk, task step:lead
+→ engine_bind_plan {"template":{"schema":"mars-sequence/1","id":"q3-idle","params":{"a":{"kind":"actor"}…  [4 ms · 0 ms · isError]
+← refused: workspace.paused: "scene-1 is a mid-action pause checkpoint (live actions are part of its stat…
+→ engine_fork {"from":"scene-1","name":"scene-1-b","label":"same pause, more people"}  [4 ms · 0 ms]
+← fork at the pause: scene-1-b head 61c2cc92844ecd8f617f0e75 (resumable: forks share the snapshot blob)
+→ engine_resume {"workspace":"scene-1"}                                       [24 ms · 20 ms]
+← resume scene-1: completed, checkpoint 7e75cbde04171d968cbe1264 (parent 61c2cc92844ecd8f617f0e75), segme…
+← same final state as unpaused: 88c332c38fd3d898… === rehearsal 88c332c38fd3d898…; run takes d61554d6f56f…
+→ engine_resume {"workspace":"scene-1-b","commands":[{"id":"join","verb":"walk_to","params":{"actor":"q4…  [34 ms · 29 ms]
+← resume scene-1-b + q4 joins: completed, 46.15 s, step join completed, finalStateHash a6cba7f4f2dd21c7… …
+→ engine_resume {"workspace":"scene-1"}                                       [4 ms · 0 ms · isError]
+← refused: resume.not-resumable: "workspace scene-1 head 7e75cbde04171d968cbe1264 is a simulation-run che…
+→ engine_log {"workspace":"scene-1-b","limit":3}                              [4 ms · 0 ms]
+← scene-1-b HEAD: fc54ead38959cf36972cfc0a simulation-run take 8eb0f749de2ed0162aaaf7b5
+← scene-1-b     : 61c2cc92844ecd8f617f0e75 pause (resumable) take d61554d6f56f92e89919613c
+← scene-1-b     : 30d2630b2b8ded760f19a4ab simulation-run take 9f39574db9d0e070921166a6
+→ engine_delete_workspace {"workspace":"scene-1-b"}                           [4 ms · 0 ms]
+← deleted: scene-1-b
+```
+
+`engine_execute { pauseAt }` stops a run at a time (seconds from the plan's start, the clock `at`
+cues use) or at a step event (`{step, event: 'started'|'completed'}`) and commits a `pause`
+checkpoint instead of finishing. Its cause names the take so far and the plan; the runtime
+snapshot plus the sequence-runner state are one content-addressed blob stored beside the states
+(`state/resume.<hash>`, here 8.0 kB for two walkers mid-corridor). Only a defined subset of verbs
+can be paused: a live carry is refused naming the action (`snapshot.non-resumable`), and nothing is
+committed. A paused head is not a resting state, so binding, executing or design-editing there is
+refused (`workspace.paused`). `engine_resume` continues it to completion (a normal
+`simulation-run` checkpoint and a segment take) or to another pause (`until`). Without extra
+commands the resumed run ends in exactly the state the unpaused run reaches (the rehearsal's
+`finalStateHash`). A fork at the pause shares the blob and resumes independently: here it adds a
+`commands` step (q4 walks to the fire too), so its future differs.
+
 ## Timings
 
 These come from a local `wrangler dev` (workerd) on a Mac laptop, fresh room, against an
-already-running server (`--base`). The whole script took 0.89 s.
+already-running server (`--base`). The whole script took 0.92 s.
 
 | Step | Calls | Wall ms | In-DO ms |
 | --- | ---: | ---: | ---: |
-| 1. Create a room, list verbs, query the world | 6 | 93 | 14 |
-| 2. Design-edit, bind an impossible plan, read the diagnostic | 6 | 191 | 154 |
-| 3. Revise, rehearse clean | 3 | 116 | 99 |
-| 4. Execute | 2 | 108 | 97 |
-| 5. Take slice + camera track | 4 | 90 | 67 |
-| 6. Fork + alternative plan + logs | 7 | 141 | 103 |
-| 7. Staleness | 7 | 103 | 61 |
-| 8. Ledger + cleanup | 4 | 25 | 1 |
+| 1. Create a room, list verbs, query the world | 6 | 84 | 14 |
+| 2. Design-edit, bind an impossible plan, read the diagnostic | 6 | 191 | 160 |
+| 3. Revise, rehearse clean | 3 | 83 | 71 |
+| 4. Execute | 2 | 69 | 60 |
+| 5. Take slice + camera track | 4 | 101 | 80 |
+| 6. Fork + alternative plan + logs | 7 | 92 | 60 |
+| 7. Staleness | 7 | 83 | 47 |
+| 8. Ledger + cleanup | 4 | 18 | 2 |
+| 9. Pause, fork the pause, resume both | 14 | 183 | 123 |
 
-The slowest call is the infeasible upright rehearsal: 111 ms in-DO, because the planner searches
+A pause costs what running to that point costs (23 ms in-DO for 10 s of two walkers), a resume
+what the rest costs (20 ms), and a fork at a pause nothing (the blob is shared).
+
+The slowest call is the infeasible upright rehearsal: 110–120 ms in-DO, because the planner searches
 5,315 poses before it can say the formation can't leave yard B. A feasible 33 s carry rehearses
 or executes in about 100 ms, and a camera track plans in about 65 ms. A design edit costs about
 15 ms in-DO (it builds the spatial grids once to check placements). Everything else costs under
@@ -348,6 +402,8 @@ Closed after the first run of this demo (the rows it used to list):
 - **Error shapes.** There is one JSON refusal envelope, including for zod input failures.
 - **Units.** `engine_get_take` takes and returns seconds; ticks are extra fields.
 - **Ledger and deletion.** `engine_list` and `engine_delete_workspace` (step 8).
+- **Mid-take states.** `engine_execute { pauseAt }` / `engine_resume` pause and continue a run
+  mid-action (step 9), for walks and the social verbs; carries, lifts and vehicles are refused.
 
 Still open:
 

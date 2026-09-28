@@ -2,7 +2,8 @@
 // through the real MCP endpoint — discover, design-edit the world (spawn a 19 ft
 // upright + crew), bind an impossible plan, read the diagnostic, revise, rehearse
 // clean, execute, shoot a camera track, fork an alternative future, hit plan
-// staleness, then read the ledger and clean up. Prints an annotated transcript
+// staleness, read the ledger and clean up, then pause a run mid-action, fork the
+// pause and resume both branches differently. Prints an annotated transcript
 // with per-call and per-step timings. Reference write-up: docs/engineering/DIRECTOR_DEMO.md.
 //
 //   node deploy/director-demo.mjs                  # starts + stops its own `wrangler dev` on :8907
@@ -284,6 +285,56 @@ try {
   const freed = led2.takes.filter((t) => t.referencedByCheckpoint.length === 0).map((t) => t.take_id);
   show('now unreferenced (evictable)', freed.join(', '));
   assert.ok(freed.includes(exAlt.take_id));
+
+  // 9 ────────────────────────────────────────────────────────────────
+  section('9. Pause mid-action, fork the pause, resume both branches');
+  note('a carry cannot be paused: its live state is not resumable (the refusal names it; nothing is committed)');
+  const headNow = (await call('engine_log', { workspace: 'scene-1' })).head;
+  const carryPause = await call('engine_execute', { plan_id: back.plan_id, workspace: 'scene-1', pauseAt: 8 }, { expectError: true });
+  assert.equal(carryPause.code, 'snapshot.non-resumable');
+  assert.deepEqual(carryPause.details.subjects, ['step:deliver']);
+  show('refused', `${carryPause.code}: "${clip(carryPause.message, 150)}"`);
+  assert.equal((await call('engine_log', { workspace: 'scene-1' })).head, headNow);
+  const fire = {
+    schema: 'mars-sequence/1', id: 'to-the-fire',
+    params: { a: { kind: 'actor' }, b: { kind: 'actor' } },
+    steps: [
+      { id: 'lead', verb: 'walk_to', params: { actor: '$a', x: 18, z: 34 } },
+      { id: 'follow', verb: 'walk_to', params: { actor: '$b', x: 20, z: 35 }, when: { event: 'started', step: 'lead' }, at: 2 },
+    ],
+  };
+  const fp = await call('engine_bind_plan', { template: fire, bindings: { a: 'q1', b: 'q2' }, workspace: 'scene-1' });
+  const ref = await call('engine_rehearse', { plan_id: fp.plan_id });
+  show('rehearsal (unpaused reference)', `${ref.report.status}, ${ref.report.metrics.duration} s, finalStateHash ${ref.report.finalStateHash.slice(0, 16)}…`);
+  note('q1 and q2 walk from yard B through the 1.5 m corridor B to the fire; pause 10 s in');
+  const paused = await call('engine_execute', { plan_id: fp.plan_id, workspace: 'scene-1', pauseAt: 10 });
+  assert.equal(paused.paused, true);
+  assert.deepEqual(paused.live.map((a) => a.id), ['step:lead', 'step:follow']);
+  show('pause checkpoint', `${paused.checkpoint.id} resumable ${paused.checkpoint.resumable}, cause ${JSON.stringify(paused.checkpoint.cause)}`);
+  show('live', paused.live.map((a) => `${a.id} ${a.verb} ${a.status}/${a.phase}`).join(', '));
+  show('sizes', `pause blob ${paused.snapshotBytes} B (snapshot + runner state, stored as state/resume.<hash>); take so far ${paused.take_id} ${paused.take.ticks} ticks ${paused.take.bytes} B`);
+  const q1mid = await entity('scene-1', 'q1');
+  show('q1 at the pause', `${pose(q1mid)}, ${q1mid.human.activity}, task ${q1mid.human.task}`);
+  const badBind = await call('engine_bind_plan', { template: walk('q3-idle', 2, 21), bindings: { a: 'q3' }, workspace: 'scene-1' }, { expectError: true });
+  assert.equal(badBind.code, 'workspace.paused');
+  show('refused', `${badBind.code}: "${badBind.message}"`);
+  const pf = await call('engine_fork', { from: 'scene-1', name: 'scene-1-b', label: 'same pause, more people' });
+  assert.equal(pf.workspace.head, paused.checkpoint.id);
+  show('fork at the pause', `${pf.workspace.id} head ${pf.workspace.head} (resumable: forks share the snapshot blob)`);
+  const res = await call('engine_resume', { workspace: 'scene-1' });
+  assert.equal(res.report.finalStateHash, ref.report.finalStateHash, 'resume without commands = the unpaused run');
+  show('resume scene-1', `${res.report.status}, checkpoint ${res.checkpoint.id} (parent ${res.checkpoint.parent}), segment take ${res.take_id} ${res.take.ticks} ticks`);
+  show('same final state as unpaused', `${res.report.finalStateHash.slice(0, 16)}… === rehearsal ${ref.report.finalStateHash.slice(0, 16)}…; run takes ${res.run.takes.join(' + ')}`);
+  const resB = await call('engine_resume', { workspace: 'scene-1-b', commands: [{ id: 'join', verb: 'walk_to', params: { actor: 'q4', x: 16, z: 33 } }] });
+  assert.notEqual(resB.report.finalStateHash, res.report.finalStateHash);
+  show('resume scene-1-b + q4 joins', `${resB.report.status}, ${resB.report.metrics.duration} s, step join ${resB.report.steps.find((x) => x.id === 'join').status}, finalStateHash ${resB.report.finalStateHash.slice(0, 16)}… (a different future)`);
+  const again = await call('engine_resume', { workspace: 'scene-1' }, { expectError: true });
+  assert.equal(again.code, 'resume.not-resumable');
+  show('refused', `${again.code}: "${again.message}"`);
+  const plog = await call('engine_log', { workspace: 'scene-1-b', limit: 3 });
+  for (const c of plog.checkpoints) show(`scene-1-b ${c.id === plog.head ? 'HEAD' : '    '}`, `${c.id} ${c.cause.kind}${c.resumable ? ' (resumable)' : ''}${c.cause.take ? ` take ${c.cause.take}` : ''}`);
+  const delB = await call('engine_delete_workspace', { workspace: 'scene-1-b' });
+  show('deleted', delB.deleted);
   await client.close();
 } finally {
   stopServer();
