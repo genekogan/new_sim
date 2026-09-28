@@ -76,7 +76,34 @@ Proof: flagship v3 builds the deck this way (two people on the beams receive she
 the ground; forklift variant for the second sheet), 0 violations, reach/hand invariants extended
 (`lift.hands-out-of-reach` covers both ends of a hand-up), captures at the hand-up moment.
 
+## 6. Body motions for handling: kneel, crouch, reach up, reach down
+Observed: people handle parts from a standing Idle/Walk pose; hands reach only when the part happens
+to be near shoulder height.
+Target: a small vocabulary of procedural body motions, driven by the engine's activity + grip data
+and blended over ~0.4 s (only Idle/Walk/Wave clips exist, so these are pose layers on the rig's
+hip/knee/spine/shoulder bones):
+- **crouch / kneel** to grip a part lying on the ground (beam, 2x4, tread, sheet), then **stand with
+  the load** — lift from the knees, torso upright; used at every pickup and set-down, in carry and in
+  construction lifts.
+- **reach up**: arms extended overhead to pass a part above head height; **reach down**: bending at
+  the hips (or kneeling at a deck edge) with arms extended below the feet to receive a part from
+  below. The hand-up in item 5 is exactly these two: two people on the ground crouch → stand → reach
+  up with a beam or sheet; two people on the level above reach down, take it, then stand and lay it.
+- **hold high / hold low** for footers and lifters during a raise (hands where the engine's grip slot
+  is, at whatever height that is — crouching when it is low, reaching when it is high).
+Engine side: the hand-up verb (item 5) must publish per-tick hand points for all four people so the
+renderer can pose them; reach envelopes (max overhead reach ≈ 2.1 m, max reach-down from a deck edge
+≈ 1.0 m below the feet, load must be within ≈ 0.5 m horizontally of the edge) are engine rules —
+the action is refused if the geometry doesn't allow a genuine hand-off (deck too high for a sheet:
+use the forklift).
+Where: renderer `app/engine-view/humans.ts` (pose layers; keep the existing reach-honesty rule —
+arms hang if the hand point is truly out of reach); engine `construction/handup.ts` (hand points,
+reach rules), `carry/actions.ts` (pickup/set-down phases expose crouch), `raise.ts` (slot heights).
+Proof: close-up captures of a pickup (crouch → stand), a hand-up (reach up below, reach down above),
+a raise footer holding low; a per-tick test that every gripping hand is within 0.1 m of its engine
+hand point when the engine says it is reachable, and that no arm exceeds its length.
+
 ## Priority
-5 (it changes how the flagship builds and is the most Mars-specific), then 3 and 2 (movement
-quality, spec §10), then 4, then 1 (visual only). Items 2–4 change pinned hashes; do them early in a
+5 with 6 (they are one feature: the hand-up is the reach-up/reach-down motion pair, and pickups need
+the crouch), then 3 and 2 (movement quality, spec §10), then 4, then 1 (visual only). Items 2–4 change pinned hashes; do them early in a
 session and re-pin once, with the reason recorded in PLANNING_BUDGET.md.

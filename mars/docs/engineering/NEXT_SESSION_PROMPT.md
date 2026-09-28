@@ -36,7 +36,7 @@ small tool calls and early commits, and forbid host `Math.sin/cos/atan2…` in `
 **Gene's product feedback after release 5 — read `docs/engineering/OWNER_FEEDBACK_2026-09-28.md` first;
 it outranks the list below.** In short: (5) materials go up by hand-up between a ground crew and two
 receivers standing on the beams/uprights (builders climb and stand on the rack structure while staging —
-that is how Martian floors are made), or by forklift; nothing levitates; (3) walkers must notice an
+that is how Martian floors are made), or by forklift; nothing levitates; (6) handling motions — crouch/kneel to pick up, stand with the load, reach up to pass, reach down to receive — so the hand-up is two people below reaching up and two above reaching down; (3) walkers must notice an
 obstacle the tick it happens and never push into it for strides; (2) turns are gradual splined paths,
 not straight–pivot–straight; (4) real stair climbing with feet on the treads (leg IK); (1) an animated
 fire instead of the static cone. Items 2–4 move pinned hashes: do them early and re-pin once.
