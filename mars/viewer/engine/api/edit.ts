@@ -67,9 +67,9 @@ export function applyEdits(start: WorldState, edits: WorldEdit[], spatialFor: (w
       continue;
     }
     if ((edit.pose ? 1 : 0) + (edit.lying ? 1 : 0) !== 1) return refuse('edit.invalid', 'give exactly one of pose, lying');
-    const s = spatial();
     let e: Entity;
     let level: number;
+    let s: Spatial;
     if (edit.op === 'spawn') {
       if (w.inventory !== 'unlimited')
         return refuse('edit.inventory-finite', `workspace inventory is finite, so nothing can be spawned; fork with inventory: 'unlimited' (engine_fork) to design with catalog stock`);
@@ -79,6 +79,7 @@ export function applyEdits(start: WorldState, edits: WorldEdit[], spatialFor: (w
       const isComponent = COMPONENTS.has(d.category);
       if (!isComponent && d.category !== 'fixture' && d.category !== 'human') return refuse('edit.not-spawnable', `${edit.def} is a ${d.category}; only components, fixtures and people can be spawned`);
       if (edit.phase && !isComponent) return refuse('edit.invalid', `phase applies to components only; ${edit.def} is a ${d.category}`);
+      s = spatial();
       level = edit.level ?? 0;
       const y = levelY(s, level);
       if (y === undefined) return refuse('route.unknown-level', `level ${level} does not exist`);
@@ -92,6 +93,7 @@ export function applyEdits(start: WorldState, edits: WorldEdit[], spatialFor: (w
       if (!cur) return refuse('entity.unknown', `no entity "${edit.id}"`, [edit.id]);
       const why = moveIssue(w, cur);
       if (why) return refuse('edit.immovable', why, [edit.id]);
+      s = spatial();
       level = edit.level ?? currentLevel(s, cur);
       const y = levelY(s, level);
       if (y === undefined) return refuse('route.unknown-level', `level ${level} does not exist`);
