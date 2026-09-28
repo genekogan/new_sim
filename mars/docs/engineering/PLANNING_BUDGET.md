@@ -331,6 +331,41 @@ host gave stress-30 a 0.35 ms mean and 29 ms max tick, against W11's 0.48 ms / 9
 than V8's `Math.hypot`, but that is not a controlled measurement. New cost: a failing people-replan whose failure names
 a person pays for one squeezed search (~ the same as the first, with `proveUnreachable`).
 
+**Re-pinned 2026-09-28 (no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 — not the
+budget; W21, `MOVEMENT.md` §7).** `walk_to` moves a body at most min(speed, 1.4 m/s)·DT per tick. Forward progress,
+sidestep and pull-back share that budget, so walkers slow down on the outside of a bend with a sidestep and step back
+into line before a gap. The offset is reverted with the body when the hard layer cancels a step. A frame climb starts
+from the body. `motion.teleport` is 0.15 m/tick for people on foot, and `motion.overspeed` is new. Every pin moves once.
+
+Verified against HEAD `e8fb08a` with a scratch outcome diff (W15's, plus the year build), run in a pristine worktree
+and in the change's:
+- every run ends with 0 violations and the same discrete outcome: step statuses, component phase / support, and each
+  person's level, final activity, task and grip;
+- v3 also keeps the same grip sets and level changes;
+- the meal differs only in action ids.
+
+Only durations move:
+
+| pin | before | after | ticks |
+| --- | --- | --- | --- |
+| probe / flagship build-bay | `0147f8f12a99…fd30d5` | `b746b0947e65…7f0c3` | 10729 → 10901 |
+| campus flagship (staging-east crop) = full uncropped | `fee92ee0a94f…40c56` | `c56ea8da9b03…47157` (crop == full still asserted) | 11316 → 11459 |
+| lab stress-30 (60 s) | `1298e2e57b62…5ee6b` | `5c3a33552578…a194e` | fixed 1200 |
+| meal (`meal.test.ts`) | `035e8c3949b7…baba5` | `3c28879fa21e…090eb` | 626 → 608 |
+| build-bay v3 (`build-bay-v3.test.ts`) | `66800edc569a…af8d5` | `a2f782ad96a0…36e38` | 16230 → 16401 |
+| year-build first bay (`year-build.test.ts`) | `695d2dcb001b…080a81` | `251a44c54229…4c96f` (24/24 at the canonical pose) | 41182 → 41317 |
+| year-build whole house (`YEAR_BUILD_FULL=1`) | `35d128861c53…86e11da` | `d382e4614e8a…40617` (66/66, max 0.57 mm / 0°) | 117125 → 117277 |
+| carry gather routes (`G`, `grid-incremental.test.ts`) | `9ba1037c…0133f` | unchanged (routes are planned, not walked) | — |
+| build-bay v2 (not hash-pinned; outcome checked) | `7d9b34cde6e4…` | `f911675c…` | 12812 → 12999 |
+
+Runs are 1–2 % longer. The flagship is +143 ticks (7 s): walkers slow on the outside of their sidesteps instead of
+sweeping round at 2–3 m/s, and step back into line before a gap. `deploy/perf-walk.mjs` reports PIN-OK ×5. One run on a
+shared host had stress-30 at a 0.30 ms mean and 27 ms max tick. The limiter's bisection runs only when a step is over
+budget.
+
+Not re-recorded (lead): `public/engine/takes/*.json` and `deploy/record-campus-take.mjs --check` still name the old final
+states; the studio-take e2e baselines follow the re-record.
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

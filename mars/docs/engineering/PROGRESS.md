@@ -375,3 +375,49 @@ Then: gate → release 5; HANDOFF refresh.
     the take, so the replay cannot draw it (`info().undrawable`).
 - **W19 landed** `0ab2e6f`, `b0af6c7`, `8393e9f`, `6374b60` (≈330k tokens, 105 min): **"Watch it being built"** in the studio year picker (manifest-driven over `takes` + `otherYears` filtered by year; take host per year; datum from `campus-<year>.json groundY − take site.groundY`; refusal/blocked log live; final check = recorded hash + parts at canonical pose from the take report); Direct-camera panel in the replay bar (typed form + JSON → in-browser `direct/synth/correct` → shot list with corrections + reasons → play directed track); `verifyCamera({track})` + `e2e/camera-verify.spec.ts` over the bay orbit / carryA hold / Chiba pan / 2024 kitchen: 0 hidden samples, 0 planner-vs-render disagreements; `TakePeople` reads hands via `sampleTake` (/3-ready), retired the metre fixture; fixed two replay bugs (mm hands unconverted; piles drawn as people). 23/23 specs. Lead LOOKED at studio-build-final + studio-direct-shots: accepted. Weak: rebuilt racks draw 0.16 m below the Kit's (datum applied to the take copy); directed tracks live in the page, not beside the take; take lacks initial state for entities removed mid-take (emptied piles undrawable) → W22.
 - W22 spawned (engine take + re-record): `entities0` (initial def/kind/pose for every tracked id), thin tracks/events, re-record flagship + 2022 bay-1 (+ whole house if < 6 MB) as /3, studio specs green.
+- **W21 (no walker jumps)** `3674124` + docs (`MOVEMENT.md` §7, `PLANNING_BUDGET.md`):
+  - **Diagnosis.** A scratch spy over the six pinned runs looked at every person-tick and what `walk_to` was doing.
+    Three `walk_to` classes (counts in `MOVEMENT.md` §7):
+    - **A. release after a hold:** while the hard layer cancelled steps, the lateral offset drifted to its sidestep
+      target, and the body jumped up to 0.55 m on release. This is W20's p6 @1092 at 11 m/s.
+    - **B. offset collapse:** `place()` halved an offset that had no clearance in one step (0.1–0.55 m).
+    - **C. swept offset / sidestep at full speed:** 1.5–3.7 m/s. There were 3115 such ticks in the whole house.
+    - Replan / crowded-start snaps were **not** a class: routes already begin at the body, so the snap is walked.
+  - **Also found:**
+    - `climb_stance` jumped up to 0.37 m onto the frame from `walk_to`'s snapped goal;
+    - a dropped / failed task left idle people publishing `human.speed` 0.3–0.6 m/s.
+  - **Fix** (`walk.ts`):
+    - one per-tick budget of min(speed, 1.4 m/s)·DT;
+    - largest fitting fraction of the tick's progress, else pull the offset in first, else walk back to the corridor
+      point;
+    - the offset is reverted with a cancelled step;
+    - offsets narrow by bisection;
+    - the stair entry is stepped onto;
+    - `speed` param ≤ 1.4.
+  - **Changes outside `locomotion/`:**
+    - shared `runtime.ts` cleanup deletes `human.speed` (1 line);
+    - W13's `stance.ts`: the climb path starts at the body (3 lines).
+  - **Invariants:**
+    - `motion.teleport` is 0.15 m/tick for people on foot; riders and carried loads keep 0.6 m;
+    - new `motion.overspeed` (published speed ≤ activity cap + 5 %: walk 1.4, climb 0.45, idle / wait / climb-wait
+      0.08; an uncapped activity with a speed fails).
+  - **After:** max one-tick walker distance 0.0675 m in every run; 0 violations everywhere; the walk-stall metric 0;
+    pushes asserts unchanged.
+  - **Re-pin, once, same discrete outcomes:**
+
+    | run | before → after |
+    | --- | --- |
+    | probe | 10729 → 10901 |
+    | campus | 11316 → 11459 |
+    | meal | 626 → 608 |
+    | v3 | 16230 → 16401 |
+    | bay 1 | 41182 → 41317 (24/24) |
+    | whole house | 117125 → 117277 (66/66) |
+    | stress-30 | new hash |
+
+  - **Tests:** 342 / 339 pass / 0 fail / 3 skip at `3674124`; `perf-walk` PIN-OK ×5.
+  - **For the lead / W22:**
+    - `public/engine/takes/manifest.json` and `deploy/record-campus-take.mjs` (bay-1 pin 41182 / 695d2dcb) still name
+      the old final states; the re-record picks up the new ones.
+    - HEAD `f58e527` (W13, after W21) has 1 red test: `year-build-b` plan expects `riser: 2`, but the new parts list has
+      none. That is W13's parts-b change, unrelated to walking.

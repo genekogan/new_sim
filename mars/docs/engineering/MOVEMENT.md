@@ -160,7 +160,9 @@ for people itself).
 
 - **`human.speed`** (`world/types.ts` `HumanState.speed`, additive, optional): horizontal ground speed
   in m/s over the last tick, rounded to mm/s. Published by `walk_to` every tick it owns the person,
-  including stairs, settle and step-aside; deleted when the walk completes, fails or is cancelled.
+  including stairs, settle and step-aside; deleted when the walk completes, fails or is cancelled, and by the
+  runtime's cleanup whenever a task ends by failing, cancel or snapshot drop (W21: a dropped carry left idle
+  people publishing 0.3–0.6 m/s). It is honest: never above the activity's cap (§7, `motion.overspeed`).
 - **`human.activity === 'walk'`** is set only while speed ≥ `WALK_MIN` = 0.08 m/s. A blocked walker
   is `'wait'` with speed 0. A walker turning in place, or at rest between states, is `'idle'`.
 - **Walk clip rule.** Play Walk iff (live) `human.speed ≥ 0.08`, or (take replay) the track's ground
@@ -231,3 +233,101 @@ people-replans from ~90 ms to ~9 ms. The +10–25 % rehearsal figure did not rep
   With 0.1 m cells, a gap of 1.08–1.5 m between two people (enough for a body, e.g. neighbours on an
   8-place fire ring 1.22 m apart) cannot be planned through at some angles. The look-ahead and sidestep can
   still walk it, but a replan cannot.
+
+## 7. No jumps (W21, 2026-09-28)
+
+W20 found `walk_to` publishing one-tick speeds of 4–11 m/s: bodies moved 0.2–0.55 m in a tick. That passed the old
+0.6 m `motion.teleport` bound, which was 12 m/s. A walker's top speed is 1.35 m/s, 0.0675 m per tick.
+
+**The rule.** A `walk_to` body moves at most `min(speed, WALK_SPEED_CAP) × DT` per tick, with `WALK_SPEED_CAP` = 1.4 m/s
+(`walk.ts`). `walk_to`'s `speed` param is capped at 1.4 too (it was 3). Forward progress along the corridor, the lateral
+sidestep / passing offset and any pull back into line all come out of this one budget, never on top of it. Each tick:
+1. **Fits.** If the full step fits (normal walking), it is taken.
+2. **Largest fraction.** Otherwise the walker takes the largest fraction t of this tick's corridor progress and offset
+   change that fits (bisection, 10 steps). It slows: `ex.v` drops to the progress actually made. Two cases need this:
+   - an offset swept round the outside of a bend: a 0.8 m sidestep on a 0.6 m fillet sweeps 2.3× faster than the
+     corridor point;
+   - a sidestep taken while walking at full speed: 1.35 m/s forward + 0.9 m/s lateral = 1.62 m/s.
+3. **Pull in first.** If less than half the progress fits because the offset must narrow ahead (the sidestep does not
+   fit through the gap), the walker first pulls its offset in where it stands, by ≤ the budget. It moves straight
+   towards its corridor point, on the segment its body was placed on, so it stays inside the clearance it already has.
+   It walks on once the offset fits. With no progress at all it pulls in towards the corridor itself (no deadlock).
+4. **Walk back.** A body away from its corridor point walks straight back to it at the budget, holding its progress.
+   This happens only when a walk starts off its route. Routes already begin at the body: a crowded start's snap (≤ 1 m,
+   W15) is the route's first segment, walked.
+
+**Supporting fixes.**
+- **Hold.** When the hard separation layer cancels a step (`pushes`), the offset stays with the body. Before, it kept
+  moving towards the sidestep target while the body was held.
+- **Narrowing.** An offset spot without clearance narrows the offset to the largest fraction that has room (bisection),
+  instead of halving it in one step.
+- **Stair entry.** A walk leg ends within 5 cm of a flight's standing entry point (its settle tolerance). The walker steps
+  onto the entry point at walking pace before the climb starts.
+- **Frame climb.** `climb_stance` (`construction/stance.ts`) starts its climb path from the body, stepping in at the
+  frame's climb speed of 0.35 m/s. The walk to the stance foot may end up to 0.35 m off it: `walk_to`'s goal snap,
+  because the foot beside the column has no standing room.
+
+**Invariants** (`runtime/invariants.ts`, in `DEFAULT_INVARIANTS`, end of tick):
+- **`motion.teleport`.** A person on foot moves ≤ `MAX_HUMAN_STEP_PER_TICK` = 0.15 m per tick (3 m/s, 3D).
+  - That is twice the fastest walk.
+  - It is above every carry / climb / sit / stance transition measured: ≤ 0.091 m after W21. The largest was a frame
+    climb's first step, 0.121 m; it is now walked.
+  - A rider (`human.riding`) moves with its vehicle and keeps `MAX_STEP_PER_TICK` = 0.6 m. EUC ≤ 5 m/s = 0.25 m/tick;
+    the forklift rider measured 0.075 m/tick. Carried components keep 0.6 m, farthest point, rotation included.
+- **`motion.overspeed`.** The published `human.speed` must be ≤ its activity's cap + 5 % (`SPEED_CAPS`):
+
+  | activity | cap |
+  | --- | --- |
+  | `walk` | 1.4 m/s |
+  | `climb-up` / `climb-down` | 0.45 m/s (`CLIMB_SPEED`) |
+  | `idle` / `wait` / `climb-wait` | `WALK_MIN` = 0.08 m/s |
+
+  An activity that publishes a speed but has no cap is a violation too.
+
+Tests:
+- `review.test.ts`: the bounds (0.20 m on foot is a teleport, 0.14 m is not, a rider's 0.5 m is not, 0.7 m is), and
+  overspeed per activity.
+- `movement.test.ts` "no jumps": max one-tick walker distance ≤ 1.4·DT with honest speeds over stress-30 (60 s) and the
+  campfire evening. The measured maximum is 0.0675 m.
+- Every rehearsal test now runs under both invariants with 0 violations.
+
+**Spike classes found** (scratch spy over the pinned runs at `e8fb08a`: every person-tick, what `walk_to` was doing).
+Each cell is *ticks faster than 1.47 m/s / of which > 0.1 m / max m per tick*:
+
+| class | flagship | stress-30 | meal | v3 | 2022 bay 1 | 2022 whole house |
+| --- | --- | --- | --- | --- | --- | --- |
+| A. release after a hold ¹ | 8 / 8 / 0.550 | 1 / 1 / 0.550 | 1 / 1 / 0.180 | — | 2 / 2 / 0.540 | 8 / 8 / 0.550 |
+| B. offset collapse ² | 7 / 3 / 0.211 | 13 / 11 / 0.292 | — | 6 / 6 / 0.360 | 38 / 21 / 0.315 | 260 / 132 / 0.550 |
+| C. offset swept / sidestep at full speed ³ | 326 / 46 / 0.215 | 222 / 1 / 0.305 | 2 / 0 / 0.076 | 297 / 48 / 0.144 | 1092 / 140 / 0.186 | 3115 / 766 / 0.186 |
+| stance climb entry ⁴ (not `walk_to`) | — | — | — | — | 22 / 5 / 0.121 | 37 / 14 / 0.121 |
+| **max one-tick distance, before → after** | 0.550 → 0.0675 | 0.550 → 0.0675 | 0.180 → 0.0675 | 0.360 → 0.0675 | 0.540 → 0.0675 | 0.550 → 0.0675 |
+
+¹ The step was cancelled by the hard layer while the offset drifted up to 0.8 m. The flagship count includes one walk
+that completed on the release tick (0.17 m). Before this change, W20's "11 m/s" p6 @1092 and "6.3 m/s" p5 @2290 were
+this class.
+² `place()` halved the offset in one step when the offset spot lacked clearance. A 0.5–0.55 m case continued at the
+old `MAX_CORRECTION`.
+³ Mostly 1.5–1.6 m/s. The > 0.1 m ticks are 0.8 m offsets on tight fillets, and the stress-30 0.305 m is the catch-up
+tick after a class-A release.
+⁴ One whole-house run during this work hit 0.37 m (a goal snap), now walked.
+
+After: 0 walker ticks faster than 1.47 m/s in all six runs. The maximum is 0.0675 m = 1.35 m/s, the walk speed. The
+only person-ticks above 0.0735 m are other actions, all under 0.15 m:
+- a sit-down transition: 0.087 m (meal);
+- the forklift rider: 0.075 m;
+- `climb_frame`'s first tick: 0.091 m (v3).
+
+Pins moved once, with the same discrete outcomes (`PLANNING_BUDGET.md`).
+
+**What is approximate.**
+- **Pull-in path.** The pull-in / walk-back is a straight line: towards the corridor point, or towards the route's
+  point. Both ends have clearance, and the pull-in lies on the segment the body was placed on. The walk-back (a walk
+  started off its route) is not clearance-checked along the way; the static-clearance invariant would name it.
+- **Honest but abrupt.** Sidestepping while walking at full speed now slows the forward speed for the ticks the offset
+  changes. That is honest, but the look-ahead does not anticipate it: it predicts the offset at 0.9 m/s lateral, not the
+  shared budget.
+- **Other movers.** The 0.15 m bound and the overspeed caps cover `walk_to` exactly. Other movers publish no speed:
+  carry formations, frame climbs, stance / sit transitions. They are bounded only by the 0.15 m teleport limit. Their own
+  speeds are not asserted per activity: carry `CARRY_SPEED` 0.9 m/s, frame climb 0.35 m/s (`construction/frame.ts`).
+  The exception is beam walking, which has its own `frame.beam-overspeed` (0.4 m/s).
+
