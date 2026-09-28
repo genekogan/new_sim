@@ -123,6 +123,10 @@ export function installHook(view: LabView, notify: () => void) {
     },
     info: () => view.info(),
     perf: () => sim.stats(),
+    /** Pose readout per person for the current tick (feet / soles, stair gait, posture, arms vs targets): docs/engineering/POSES.md. */
+    bones: (id?: string) => view.poseNow().bones(id),
+    /** Stair flights the renderer uses (tread centres along the axis and tread-top heights). */
+    stairs: () => view.humans.stairs(),
   };
   (window as { __marsEngine?: unknown }).__marsEngine = hook;
   return hook;

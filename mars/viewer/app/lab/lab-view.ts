@@ -29,7 +29,7 @@ export class LabView {
   readonly scene = new THREE.Scene();
   private css = new CSS2DRenderer();
   private orbit: OrbitControls;
-  private humans = new HumanViews();
+  readonly humans = new HumanViews();
   readonly components = new ComponentViews();
   readonly fixtures = new FixtureViews();
   private hemi = new THREE.HemisphereLight('#dfefff', '#8a7355', 1.3);
@@ -46,6 +46,7 @@ export class LabView {
   private epoch = -1;
   private violationCount = -1;
   private routeTick = -1;
+  private stairEpoch = -1;
   private reach = (id: string, from: THREE.Vector3, out: THREE.Vector3) => this.components.nearestPoint(id, from, out);
   overlays = new Set<OverlayName>();
   frames = 0;
@@ -111,6 +112,7 @@ export class LabView {
     this.agents.clear();
     this.epoch = -1;
     this.violationCount = -1;
+    this.stairEpoch = -1;
     this.preset('oblique');
   }
 
@@ -191,9 +193,27 @@ export class LabView {
     this.agents.update(rt, this.humans.positions(), now, on.has('agents'), on.has('labels'));
   }
 
+  /** People's stair flights follow the Spatial scene's usable stairs links (construction adds them). */
+  private syncStairs() {
+    const sp = this.sim.rt.services.spatial as Spatial;
+    sp.sync(this.sim.rt.world);
+    if (sp.epoch === this.stairEpoch) return;
+    this.stairEpoch = sp.epoch;
+    this.humans.setStairs(sp.scene.links);
+  }
+
+  /** Pose everyone for the current tick without drawing (test hook `bones()`): same as a paused frame. */
+  poseNow() {
+    this.syncStairs();
+    this.components.render(1);
+    this.humans.render(1, this.reach);
+    return this.humans;
+  }
+
   /** Render one frame; `dt` real seconds since the previous frame (0 = no sim advance). */
   frame(dt: number) {
     const alpha = this.sim.advance(dt);
+    this.syncStairs();
     this.components.render(alpha);
     this.fixtures.render(this.sim.rt.time);
     this.humans.render(alpha, this.reach);
