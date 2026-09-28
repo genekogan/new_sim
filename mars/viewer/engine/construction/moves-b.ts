@@ -184,7 +184,8 @@ export const stepOntoBeam: ActionDef<BP, BProg, BExec> = {
   start: (rt, p, prog, id) => ({ p, prog, id, tr: track([[...rt.world.entities[p.actor].pose.p] as Vec3, prog.to]) }),
   step(rt, ex, dt): StepResult {
     const a = rt.world.entities[ex.p.actor];
-    Object.assign(a.human!, { activity: 'step-off', task: ex.id });
+    // on the beam's link from the first step (as beam_walk's step-off keeps it until the foot lands on the deck)
+    Object.assign(a.human!, { activity: 'step-off', task: ex.id, on: ex.prog.walkway });
     if (!stepTrack(a, ex.tr, 0.4, dt)) return { status: 'running', phase: 'step' };
     const l = beamWalkways(rt.world).find((x) => x.id === ex.prog.walkway)!;
     Object.assign(a.human!, { activity: 'idle', on: ex.prog.walkway, level: l.from.level, task: undefined });

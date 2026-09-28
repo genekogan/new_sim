@@ -312,7 +312,8 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   for (const b of beams) if (!seqIds.has(b.node.id) && !unplaced.some((u) => u.node === b.node.id)) unplaced.push({ node: b.node.id, kind: 'beam', reason: outside(b.k + 1) ?? 'not reached by the generator' });
   for (const nd of nodes) {
     if (seqIds.has(nd.id) || unplaced.some((u) => u.node === nd.id)) continue;
-    if (nd.kind === 'feature') unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: nd.feature === 'stair-part' ? 'phase A: Kit stairs have no stringers and no catalog flight of their width (4.45 m, 8 treads, 2.22 m rise); stair verbs for them are phase B' : `phase A builds the skeleton only; ${nd.feature} is phase B` });
+    if (nd.kind === 'feature' && partsB) unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: bom.unresolved.find((u) => u.feature === nd.feature)?.reason ?? `no phase B rule sequences this ${nd.feature}` });
+    else if (nd.kind === 'feature') unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: nd.feature === 'stair-part' ? 'phase A: Kit stairs have no stringers and no catalog flight of their width (4.45 m, 8 treads, 2.22 m rise); stair verbs for them are phase B' : `phase A builds the skeleton only; ${nd.feature} is phase B` });
     else unplaced.push({ node: nd.id, kind: nd.kind, reason: 'not reached by the generator' });
   }
   for (const [id, ids] of done) { const nd = nodes.find((x) => x.id === id)!; seq.push({ node: id, kind: nd.kind === 'feature' ? `feature:${nd.feature}` : nd.kind, steps: ids }); }

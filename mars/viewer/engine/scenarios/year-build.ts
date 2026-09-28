@@ -27,6 +27,8 @@ import { MOVES_B } from '../construction/moves-b.ts';
 import { SOLAR_ACTIONS } from '../construction/solar.ts';
 import { progressiveContributor, progressiveSupported } from '../construction/contributor.ts';
 import type { Section } from '../campus/sequence-b.ts';
+import { entityCorners, type Contributor, type SceneContribution } from '../spatial/service.ts';
+import type { Entity } from '../world/types.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import type { EngineConfig } from '../rehearsal/rehearse.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
@@ -50,7 +52,9 @@ export function yearBuildRegistryB(): Map<string, ActionDef> {
   for (const a of [passUp, installStringer, installStairPart, installWall, ...MOVES_B, ...SOLAR_ACTIONS] as ActionDef[]) r.set(a.verb, a);
   return r;
 }
-export const YEAR_BUILD_B_INVARIANTS: Invariant[] = [...YEAR_BUILD_INVARIANTS, progressiveSupported, kitPartHandsInReach, kitPartsSupported];
+/** Phase B invariants; the support-chain checks re-run only when rack / deck / stair state changed (supportKey). */
+export const yearBuildBInvariants = (): Invariant[] => [...YEAR_BUILD_INVARIANTS, cachedInvariant(progressiveSupported), kitPartHandsInReach, cachedInvariant(kitPartsSupported)];
+export const YEAR_BUILD_B_INVARIANTS: Invariant[] = yearBuildBInvariants();
 
 export type YearBuildSetup = {
   history: WorldHistory;
@@ -83,15 +87,88 @@ export function yearBuildSetup(year: number, assembly: string, file: CampusYearF
   const registry = opts.phaseB ? yearBuildRegistryB() : yearBuildRegistry();
   const plan = bindTemplate(build.template, build.bindings, { history, baseline: workspace, registry });
   // phase B: decks become walkable floors and the Kit stair a link (usable once complete) as they are built
-  const contributors = opts.phaseB ? [progressiveContributor, kitStairContributor(build.partsB?.stairs ?? [])] : undefined;
+  // (cached on the state they depend on: re-deriving support chains on every sync while a load is carried is slow)
+  const contributors = opts.phaseB ? [cachedContributor(progressiveContributor), cachedContributor(kitStairContributor(build.partsB?.stairs ?? []))] : undefined;
   const cfg: EngineConfig = {
-    registry, invariants: opts.phaseB ? YEAR_BUILD_B_INVARIANTS : YEAR_BUILD_INVARIANTS,
+    registry, invariants: opts.phaseB ? yearBuildBInvariants() : YEAR_BUILD_INVARIANTS,
     services: () => ({ spatial: new Spatial(scene, { baseId: staticHash, ...(contributors ? { contributors } : {}) }) }), maxTicks: 20 * 60 * 60 * (opts.phaseB ? 16 : 4),
   };
   return { history, canonical: canonical.id, workspace, graph, scene, build, plan, cfg };
 }
 
+/**
+ * A contributor re-run only when what it reads changed: every rack frame / beam (phase, support, pose, connections),
+ * every installed or staged plywood sheet and every Kit stair part. Same output as calling it every sync.
+ */
+/** What the phase-B support chains read: every rack frame / beam, installed or staged plywood, Kit stair parts (phase, support, holders, connections, pose). */
+export function supportKey(world: WorldState): string {
+  const parts: string[] = [];
+  for (const e of Object.values(world.entities)) {
+    if (e.kind !== 'component') continue;
+    const cat = def(e.def).category;
+    if (!(cat === 'rack-upright' || cat === 'rack-beam' || (cat === 'plywood' && (e.phase === 'installed' || e.phase === 'staged')) || e.def.startsWith('stair-'))) continue;
+    const s = e.support;
+    parts.push(`${e.id}|${e.phase}|${s?.kind}|${s?.kind === 'held' ? s.by.length : ''}|${(e.connections ?? []).map((x) => x.to).join(',')}|${e.pose.p.join(',')}|${e.pose.yaw}|${e.pose.pitch ?? 0}|${e.pose.roll ?? 0}`);
+  }
+  return parts.join(';');
+}
+/** A contributor re-run only when supportKey changed: same output as calling it every sync. */
+export function cachedContributor(c: Contributor): Contributor {
+  let key = '';
+  let last: SceneContribution | null = null;
+  return (world, base) => {
+    const k = supportKey(world);
+    if (last === null || k !== key) { key = k; last = c(world, base); }
+    return last;
+  };
+}
+/** An invariant over support chains only, re-run when supportKey changed (one instance per run: yearBuildBInvariants()). */
+export function cachedInvariant(inv: Invariant): Invariant {
+  let key = '';
+  let last: ReturnType<Invariant> | null = null;
+  return (rt) => {
+    const k = supportKey(rt.world);
+    if (last === null || k !== key) { key = k; last = inv(rt); }
+    return last;
+  };
+}
+
 export type Comparison = { node: string; kind: 'upright' | 'beam'; ok: boolean; phase?: string; dist: number; dyaw: number };
+
+export type ComparisonB = { part: string; node: string; kind: string; role: string; ok: boolean; phase?: string; dist: number; dang: number };
+/**
+ * Phase B: every sequenced part installed at its target pose (the material rule's physical placement, parts-b.ts)
+ * within `tolM` (pose origin) and `tolRad` (yaw mod π, pitch, roll). The Kit-drawing offsets of those placements
+ * are reported by `kitOffsets`, not hidden.
+ */
+export function compareB(final: WorldState, build: YearBuildPlan, tolM = 0.01, tolRad = Math.PI / 180): ComparisonB[] {
+  const parts = build.partsB?.parts ?? [];
+  const done = new Set(build.doneB ?? []);
+  return parts.filter((p) => done.has(p.id)).map((p) => {
+    const e = final.entities[p.id];
+    if (!e) return { part: p.id, node: p.nodes[0], kind: p.kind, role: p.role, ok: false, dist: Infinity, dang: Infinity };
+    const dx = e.pose.p[0] - p.pose.p[0], dy = e.pose.p[1] - p.pose.p[1], dz = e.pose.p[2] - p.pose.p[2];
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    let dyaw = Math.abs(wrapAngle(e.pose.yaw - p.pose.yaw));
+    dyaw = Math.min(dyaw, Math.abs(Math.PI - dyaw));
+    const dang = Math.max(dyaw, Math.abs((e.pose.pitch ?? 0) - (p.pose.pitch ?? 0)), Math.abs((e.pose.roll ?? 0) - (p.pose.roll ?? 0)));
+    return { part: p.id, node: p.nodes[0], kind: p.kind, role: p.role, ok: e.phase === 'installed' && dist <= tolM && dang <= tolRad, phase: e.phase, dist, dang };
+  });
+}
+
+/** Per Kit node: the box of its installed parts vs the Kit's box (centre offset, extent difference), with the rule's stated offset. */
+export function kitOffsets(final: WorldState, build: YearBuildPlan): { node: string; kind: string; parts: number; installed: number; dc: [number, number, number]; offset: string }[] {
+  const parts = build.partsB?.parts ?? [];
+  return (build.partsB?.kit ?? []).map((k) => {
+    const ps = parts.filter((p) => p.nodes.includes(k.node) && (p.role !== 'panel-rail'));
+    const es = ps.map((p) => final.entities[p.id]).filter((e) => e && e.phase === 'installed');
+    if (!es.length) return { node: k.node, kind: k.kind, parts: ps.length, installed: 0, dc: [NaN, NaN, NaN] as [number, number, number], offset: k.offset };
+    const cs = es.flatMap((e) => entityCorners(e!));
+    const lo = [0, 1, 2].map((i) => Math.min(...cs.map((c) => c[i]))), hi = [0, 1, 2].map((i) => Math.max(...cs.map((c) => c[i])));
+    const c = [0, 1, 2].map((i) => (lo[i] + hi[i]) / 2);
+    return { node: k.node, kind: k.kind, parts: ps.length, installed: es.length, dc: [c[0] - k.c[0], c[1] - k.c[1], c[2] - k.c[2]] as [number, number, number], offset: k.offset };
+  });
+}
 
 /**
  * Final state vs the canonical checkpoint: each sequenced frame / beam must be `installed` with its box

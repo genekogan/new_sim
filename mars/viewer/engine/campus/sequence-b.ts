@@ -67,11 +67,20 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   const uMin = Math.min(...fr.map((f) => Lc(f.c)[0])) - depth / 2, uMax = Math.max(...fr.map((f) => Lc(f.c)[0])) + depth / 2;
   const K = Math.max(...fr.map((f) => f.k)) + 1;
   const lineV = (k: number) => Lc(fr.find((f) => f.k === k)!.c)[1];
+  const safeV = (v: number, u: number) => {
+    // a spot on a deck at local (u, v) clear of the frame planes (0.36 m) and of the deck edges
+    const lines = [...new Set(fr.map((f) => r3(Lc(f.c)[1])))];
+    const inRow = fr.some((f) => Math.abs(Lc(f.c)[0] - u) < depth / 2 + 0.3);
+    let vv = v;
+    if (inRow) for (const L of lines) if (Math.abs(vv - L) < 0.4) vv = L + (vv >= L ? 0.4 : -0.4);
+    return Math.min(Math.max(vv, lineV(0) + 0.4), lineV(K - 1) - 0.4);
+  };
   const done: string[] = [];
   const sectionStarts: PhaseBResult['sectionStarts'] = [];
   const begin = (sec: Section) => sectionStarts.push({ section: sec, at: ctx.count() });
   const seqd = new Map<string, string[]>();
-  const mark = (p: PartB, ...ids: string[]) => { for (const n of p.nodes) { const a = seqd.get(n) ?? []; a.push(...ids); seqd.set(n, a); } done.push(p.id); };
+  // (a panel rail serves two panels: it is not a Kit component and does not make its panels "sequenced")
+  const mark = (p: PartB, ...ids: string[]) => { if (p.role !== 'panel-rail') for (const n of p.nodes) { const a = seqd.get(n) ?? []; a.push(...ids); seqd.set(n, a); } if (!done.includes(p.id)) done.push(p.id); };
   const unplaced: UnplacedB[] = [];
   const P = (role: string) => parts.parts.filter((p) => p.role === role);
   const yawW = (localYaw: number) => localYaw + ctx.Y; // a local-frame heading → world yaw
@@ -221,7 +230,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     return true;
   };
   /** Down: from a deck onto a walkway of the frame line `k` bay, along it to the end frame, down its bracing. */
-  const climbDown = (k: number, seat: number, who: number[], uAt: number[]) => {
+  const climbDown = (k: number, seat: number, who: number[], uAt: number[], after: string[] = []) => {
     for (const [i, m] of who.entries()) {
       const col = [uMin, uMin + depth, uMax - depth, uMax].sort((a, b) => Math.abs(a - uAt[i]) - Math.abs(b - uAt[i]))[0];
       const c = climbAt(k, col, seat);
@@ -229,7 +238,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const vOn = k === 0 ? lineV(0) + 1.2 : lineV(k) - 1.2;
       const q = W(col, vOn);
       const d = W(Math.min(Math.max(col, uMin + 0.44), uMax - 0.44), vOn);
-      step('walk_to', { actor: C(m), x: d[0], z: d[1], level: levelId(seat + def('beam-12ft').size[1] / 2 + PLY_T) }, [m], [], `${C(m)} walks to the end of the deck`);
+      step('walk_to', { actor: C(m), x: d[0], z: d[1], level: levelId(seat + def('beam-12ft').size[1] / 2 + PLY_T) }, [m], after, `${C(m)} walks to the end of the deck`);
       step('step_onto_beam', { actor: C(m), beam: c.beam, x: q[0], z: q[1] }, [m], []);
       step('climb_frame', { actor: C(m), link: c.link, dir: 'down' }, [m], [], `${C(m)} climbs down the end frame`);
     }
@@ -251,72 +260,181 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const deckLv = levelId(yTop + PLY_T);
     const up = cfg.up;
     const first = strips[0];
-    if (!climbUp(seat, up, uWalk.slice(0, up.length), vWalk(first))) { for (const p of decks.filter((x) => x.meta.level === lv)) skip(p, `no climbable end frame onto the ${seat.toFixed(2)} m beams`); return; }
-    const uNow = new Map(up.map((m, i) => [m, uWalk[i]]));
-    const later: PartB[] = []; // first-strip pieces nobody up there could fasten from the beams: fastened from the deck
-    let onDeck = false;
-    for (const s of strips) {
-      const vPlus = s + 0.6096;
-      for (const p of order(piecesOf(lv, s))) {
-        const side = sideOf(p);
-        const L = lenOf(p);
-        const edge = side < 0 ? uMin - BEAM_HALF : uMax + BEAM_HALF;
-        const Rc = side < 0 ? edge - 0.08 - L / 2 : edge + 0.08 + L / 2;
-        const narrow = side < 0 && ctx.narrowMinusU(vc(p));
-        const lw = W(Rc + side * (narrow ? 0.3 : 0.6), vc(p));
-        const outV = W(side, 0);
-        let recv: number, recvAt: { x: number; z: number; level: number } | undefined, fz: number | null, fzAt: { x: number; z: number; level: number } | undefined;
-        const pre: string[] = [];
-        if (!onDeck) {
-          recv = side < 0 ? up[0] : up[1];
-          fz = up.length > 3 ? (side < 0 ? up[2] : up[3]) : side < 0 && up.length > 2 ? up[2] : null;
-          const uR = side < 0 ? uMin : (p.meta.piece === (p.meta.of as number) || L < 1.2 ? uMax : uMax - 0.09);
-          if (Math.abs((uNow.get(recv) ?? uR) - uR) > 0.005) { const q = W(uR, vWalk(first)); pre.push(step('beam_walk', { actor: C(recv), x: q[0], z: q[1] }, [recv], [])); uNow.set(recv, uR); }
-        } else {
-          // kneeling on the strip laid before it (on its stair side)
-          recv = side < 0 ? up[0] : up[1];
-          fz = side < 0 ? up[1] : up[0];
-          const uR = side < 0 ? uMin + 0.44 : uMax - 0.44;
-          const q = W(uR, vPlus + 0.35);
-          recvAt = { x: q[0], z: q[1], level: deckLv };
-          const uF = Math.min(Math.max(uc(p), uMin + 0.44), uMax - 0.44) + (Math.abs(uc(p) - uR) < 0.62 ? (side < 0 ? 0.62 : -0.62) : 0);
-          const q2 = W(uF, vPlus + 0.35);
+    const all: string[] = [];
+    if (!climbUp(seat, up, uWalk.slice(0, up.length), vWalk(first))) { for (const p of decks.filter((x) => x.meta.level === lv)) skip(p, `no climbable end frame onto the ${seat.toFixed(2)} m beams`); return { seat, deckLv, last: [] as string[], down: [] as number[] }; }
+    const laid = new Map<number, [number, number][]>(); // strip → laid u-intervals (people kneel only on laid sheets)
+    const ivOf = (st: number, u: number) => (laid.get(st) ?? []).find(([x, y]) => u >= x + 0.34 - 1e-9 && u <= y - 0.34 + 1e-9);
+    /** The u nearest `want` on the laid part of strip `st` (0.3 m in from its sheets' ends), ≥ `away` from `not`, optionally within interval `iv`. */
+    const standU = (st: number, want: number, not?: number, iv?: [number, number], away = 0.62) => {
+      const cands: number[] = [];
+      // 0.34 m in from a deck's edge: walk_to routes a 0.34 m disc to its destination
+      for (const [x, y] of iv ? [iv] : laid.get(st) ?? []) { for (let u = x + 0.36; u <= y - 0.36 + 1e-9; u += 0.05) cands.push(r3(u)); if (y - x >= 0.72) cands.push(r3(y - 0.36)); }
+      return cands.filter((u) => not === undefined || Math.abs(u - not) >= away).sort((m, n) => Math.abs(m - want) - Math.abs(n - want) || m - n)[0] as number | undefined;
+    };
+    const pending: { p: PartB; st: number; step: string }[] = []; // placed, still to be fastened (no second person could reach it yet)
+    // where the deck crew stands; until a second strip is complete, the first strip's laid pieces are separate islands
+    const posOf = new Map<number, { st: number; u: number; v: number }>();
+    let joined = false;
+    const island = (m: number): [number, number] | 'all' | null => {
+      const q = posOf.get(m);
+      if (!q) return null;
+      if (joined) return 'all';
+      return ivOf(q.st, q.u) ?? null;
+    };
+    const canStand = (m: number, st: number, u: number) => { const is = island(m); if (is === null) return false; if (is === 'all') return true; return st === first && u >= is[0] + 0.34 - 1e-9 && u <= is[1] - 0.34 + 1e-9; };
+    const addLaid = (p: PartB) => {
+      const st = p.meta.strip as number, L = lenOf(p);
+      laid.set(st, [...(laid.get(st) ?? []), [uc(p) - L / 2, uc(p) + L / 2] as [number, number]].sort((x, y) => x[0] - y[0]).reduce<[number, number][]>((acc, iv) => { const l = acc[acc.length - 1]; if (l && iv[0] <= l[1] + 1e-6) l[1] = Math.max(l[1], iv[1]); else acc.push([iv[0], iv[1]]); return acc; }, []));
+    };
+    /** Pass one piece up; receivers on the walkways (`from` null: fastener given) or kneeling on laid strip `from`. */
+    const one = (p: PartB, from: number | null, walkFz?: number | null) => {
+      const side = sideOf(p);
+      const L = lenOf(p);
+      const edge = side < 0 ? uMin - BEAM_HALF : uMax + BEAM_HALF;
+      const Rc = side < 0 ? edge - 0.08 - L / 2 : edge + 0.08 + L / 2;
+      const narrow = side < 0 && ctx.narrowMinusU(vc(p));
+      const lw = W(Rc + side * (narrow ? 0.3 : 0.6), vc(p));
+      const outV = W(side, 0);
+      let recv = side < 0 ? up[0] : up[1];
+      let recvAt: { x: number; z: number; level: number; kneel?: { x: number; z: number } } | undefined, fz: number | null = null, fzAt: { x: number; z: number; level: number } | undefined;
+      let follow = false;
+      const pre: string[] = [];
+      if (from === null) fz = walkFz ?? null;
+      else {
+        const vK = from > vc(p) ? from - 0.6096 + 0.305 : from + 0.6096 - 0.305; // kneeling 0.305 m in from the laid strip's edge toward the piece
+        const uR = standU(from, side < 0 ? uMin + 0.36 : uMax - 0.36)!; // right at the deck edge it comes over (a deck is 2 cm above the beams)
+        // the receiver: the deck worker nearer the station (their walks never cross)
+        const deckCrew = up.filter((m) => posOf.has(m) && canStand(m, from, uR));
+        recv = [...deckCrew].sort((a, b) => Math.abs(posOf.get(a)!.u - uR) - Math.abs(posOf.get(b)!.u - uR) || a - b)[0] ?? recv;
+        const q = W(uR, vK);
+        // at the house's edge they shuffle forward to kneel 0.29 m from the deck edge (walk_to stops 0.36 m in)
+        const atEdge = Math.abs(uR - (side < 0 ? uMin + 0.36 : uMax - 0.36)) < 0.01;
+        const kq = W(side < 0 ? uMin + 0.29 : uMax - 0.29, vK);
+        recvAt = { x: q[0], z: q[1], level: deckLv, ...(atEdge ? { kneel: { x: kq[0], z: kq[1] } } : {}) } as typeof recvAt;
+        follow = Math.max(0, side > 0 ? uR - (uc(p) + L / 2) : (uc(p) - L / 2) - uR) > 0.8; // out of reach at its place from there: walk alongside
+        // where the receiver ends: walking alongside, they move with it from the transfer (outside the edge) to its place
+        const slide = side > 0 ? edge + 0.08 - (uc(p) - L / 2) : (uc(p) + L / 2) - (edge + 0.08 * -1);
+        const uStart = atEdge ? (side < 0 ? uMin + 0.29 : uMax - 0.29) : uR;
+        const uEnd = follow ? uStart - side * slide : uStart;
+        posOf.set(recv, { st: from, u: uEnd, v: vK });
+        // the second fastener: someone else who can stand within reach of the piece, clear of the receiver's whole path
+        const want = Math.min(Math.max(uc(p), uMin + 0.44), uMax - 0.44);
+        const lo = Math.min(uStart, uEnd) - 0.62, hi = Math.max(uStart, uEnd) + 0.62;
+        for (const m of up.filter((x) => x !== recv)) {
+          const is = island(m);
+          const cands: number[] = [];
+          for (const [x, y] of is === 'all' || is === null ? laid.get(from) ?? [] : [is]) { for (let u = x + 0.36; u <= y - 0.36 + 1e-9; u += 0.05) cands.push(r3(u)); if (y - x >= 0.72) cands.push(r3(y - 0.36)); }
+          const uF = cands.filter((u) => u < lo || u > hi).sort((a, b) => Math.abs(a - want) - Math.abs(b - want) || a - b)[0];
+          if (is === null || uF === undefined || Math.max(0, uc(p) - L / 2 - uF, uF - uc(p) - L / 2) > 0.6) continue;
+          fz = m;
+          const q2 = W(uF, vK);
           fzAt = { x: q2[0], z: q2[1], level: deckLv };
+          posOf.set(m, { st: from, u: uF, v: vK });
+          break;
         }
-        const f = fetch(p, { x: lw[0], z: lw[1], yaw: r3(yawW(0)) }, G);
-        if (!f) continue;
-        let relayAt: { x: number; z: number; level: number }[] | undefined;
-        if (cfg.relay !== null) { const q = W(side < 0 ? uMin + 0.31 : uMax - 0.31, vc(p)); relayAt = [{ x: q[0], z: q[1], level: levelId(cfg.relayY!) }]; }
-        const pu = step('pass_up', {
-          part: p.id, to: { x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(yTop) }, edge: r3(side < 0 ? -edge : edge), out: { x: outV[0], z: outV[1] },
-          givers: G.map(C), ...(cfg.relay !== null ? { relay: [C(cfg.relay)], relayAt } : {}), receivers: [C(recv)], ...(recvAt ? { receiverAt: [recvAt], follow: true } : {}),
-          ...(fz !== null ? { fasten: [{ actor: C(fz), ...(fzAt ? { at: fzAt } : {}) }] } : {}),
-        }, [...G, recv, ...(fz !== null ? [fz] : []), ...(cfg.relay !== null ? [cfg.relay] : [])], [f, ...pre], `pass ${p.id} up${cfg.relay !== null ? ' through the relay' : ''} to ${yTop.toFixed(2)} m${fz !== null ? '; fastened' : ''}`);
-        mark(p, pu);
-        if (fz === null) later.push(p);
+        // anyone else up here near the receiver's path steps back from the kneel line: to the strip beyond when it is
+        // laid, else to the far side of this strip at an aisle (a frame line bounds it elsewhere)
+        for (const m of up.filter((x) => x !== recv && x !== fz && posOf.has(x))) {
+          const q0 = posOf.get(m)!;
+          if (Math.abs(q0.v - vK) >= 0.58 || q0.u < lo || q0.u > hi) continue;
+          const away = from > vc(p) ? 1 : -1; // from the piece, across `from`
+          const beyond = strips.find((x) => Math.abs(x - (from + away * 1.2192)) < 0.05 && (laid.get(x) ?? []).length);
+          let uP = q0.u, vP: number;
+          if (beyond !== undefined) vP = vK + away * 0.8;
+          else {
+            vP = from + away * (0.6096 - 0.345);
+            const aisles2 = (() => { const us = [...new Set(fr.map((f) => r3(Lc(f.c)[0])))].sort((a, b) => a - b); const o: number[] = []; for (let i = 1; i < us.length; i++) o.push(r3((us[i - 1] + us[i]) / 2)); return o; })();
+            uP = [...aisles2].sort((a, b) => Math.abs(a - q0.u) - Math.abs(b - q0.u))[0];
+          }
+          const qq = W(uP, vP);
+          pre.push(step('walk_to', { actor: C(m), x: qq[0], z: qq[1], level: deckLv }, [m], [], `${C(m)} steps back for ${p.id}`));
+          posOf.set(m, { st: from, u: uP, v: vP });
+        }
       }
-      if (!onDeck) {
-        // off the beams onto the strip just laid; fasten what was left staged
-        for (const m of up) { const u0 = uNow.get(m)!; const q = W(Math.min(Math.max(u0, uMin + 0.44), uMax - 0.44), first - 0.6096 + 0.35); step('beam_walk', { actor: C(m), x: q[0], z: q[1] }, [m], [], `${C(m)} steps off the beam onto the new deck`); }
-        onDeck = true;
-        for (const p of later) {
-          const a = W(Math.min(Math.max(uc(p) - 0.35, uMin + 0.44), uMax - 0.44), s - 0.6096 - 0.35), b = W(Math.min(Math.max(uc(p) + 0.35, uMin + 0.44), uMax - 0.44), s - 0.6096 - 0.35);
-          // (the next strip is not laid yet: they kneel at the new strip's −v edge… on the strip itself)
-          const a2 = W(Math.min(Math.max(uc(p) - 0.35, uMin + 0.44), uMax - 0.44), s - 0.2), b2 = W(Math.min(Math.max(uc(p) + 0.35, uMin + 0.44), uMax - 0.44), s - 0.2);
-          void a; void b;
-          const w1 = step('walk_to', { actor: C(up[0]), x: a2[0], z: a2[1], level: deckLv }, [up[0]], []);
-          const w2 = step('walk_to', { actor: C(up[1]), x: b2[0], z: b2[1], level: deckLv }, [up[1]], []);
-          const inst = step('install_plywood', { crew: [C(up[0]), C(up[1])], sheet: p.id, x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(yTop) }, [up[0], up[1]], [w1, w2], `fasten ${p.id}`);
-          mark(p, inst);
+      const f = fetch(p, { x: lw[0], z: lw[1], yaw: r3(yawW(0)) }, G);
+      if (!f) return;
+      let relayAt: { x: number; z: number; level: number }[] | undefined;
+      if (cfg.relay !== null) { const uq = side < 0 ? uMin + 0.31 : uMax - 0.31; const q = W(uq, safeV(vc(p), uq)); relayAt = [{ x: q[0], z: q[1], level: levelId(cfg.relayY!) }]; }
+      const pu = step('pass_up', {
+        part: p.id, to: { x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(yTop) }, edge: r3(side < 0 ? -edge : edge), out: { x: outV[0], z: outV[1] },
+        givers: G.map(C), ...(cfg.relay !== null ? { relay: [C(cfg.relay)], relayAt } : {}), receivers: [C(recv)], ...(recvAt ? { receiverAt: [recvAt], ...(follow ? { follow: true } : {}) } : {}),
+        // screwed down where it lies: by the receiver and a second person, or by the receiver alone when nobody else reaches it
+        fasten: fz !== null ? [{ actor: C(fz), ...(fzAt ? { at: fzAt } : {}) }] : [],
+      }, [...G, recv, ...(fz !== null ? [fz] : []), ...(cfg.relay !== null ? [cfg.relay] : [])], [f, ...pre], `pass ${p.id} up${cfg.relay !== null ? ' through the relay' : ''} to ${yTop.toFixed(2)} m; screwed down${fz !== null ? '' : ' by the receiver alone'}`);
+      mark(p, pu);
+      all.push(pu);
+      addLaid(p); // only fastened (installed) sheets are a floor to kneel on
+    };
+    /** Fasten the pending pieces now reachable: two deck people kneeling on laid sheets next to each (same or any strip). */
+    const fastenPending = (standOn: number[]) => {
+      for (const it of [...pending]) {
+        const p = it.p, L = lenOf(p);
+        let spot: { st: number; a: number; b: number } | null = null;
+        for (const st of standOn) {
+          if (!(laid.get(st) ?? []).length) continue;
+          const want = Math.min(Math.max(uc(p), uMin + 0.44), uMax - 0.44);
+          const a = standU(st, want); if (a === undefined) continue;
+          const b = standU(st, want, a, ivOf(st, a)); if (b === undefined) continue;
+          if (Math.max(0, uc(p) - L / 2 - a, a - uc(p) - L / 2) <= 0.6 && Math.max(0, uc(p) - L / 2 - b, b - uc(p) - L / 2) <= 0.6) { spot = { st, a, b }; break; }
         }
+        if (!spot) continue;
+        const v = spot.st === (p.meta.strip as number) ? vc(p) + (vc(p) < first ? 0.25 : -0.25) : spot.st > vc(p) ? spot.st - 0.6096 + 0.35 : spot.st + 0.6096 - 0.35;
+        const qa = W(spot.a, v), qb = W(spot.b, v);
+        const [ma, mb] = up.filter((m) => posOf.has(m));
+        if (mb === undefined) continue;
+        const w1 = step('walk_to', { actor: C(ma), x: qa[0], z: qa[1], level: deckLv }, [ma], [it.step]);
+        const w2 = step('walk_to', { actor: C(mb), x: qb[0], z: qb[1], level: deckLv }, [mb], [it.step]);
+        posOf.set(ma, { st: spot.st, u: spot.a, v }); posOf.set(mb, { st: spot.st, u: spot.b, v });
+        const inst = step('install_plywood', { crew: [C(ma), C(mb)], sheet: p.id, x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(yTop) }, [ma, mb], [w1, w2], `fasten ${p.id}`);
+        mark(p, inst);
+        all.push(inst);
+        pending.splice(pending.indexOf(it), 1);
+        addLaid(p);
+      }
+    };
+    // first strip: its end pieces from the walkways (its middle piece is out of every walkway's reach: after the next strip)
+    const ps0 = order(piecesOf(lv, first));
+    const mid0 = ps0.filter((p) => (p.meta.piece as number) !== 1 && (p.meta.piece as number) !== (p.meta.of as number));
+    for (const p of ps0.filter((x) => !mid0.includes(x))) one(p, null, up.length > 3 ? (sideOf(p) < 0 ? up[2] : up[3]) : sideOf(p) < 0 && up.length > 2 ? up[2] : null);
+    // off the beams onto the sheets just laid, as many as fit (0.6 m apart); the rest climb back down
+    const taken: number[] = [];
+    const stayed: number[] = [];
+    for (const [i, m] of up.entries()) {
+      const u0 = uWalk[i];
+      const cands: number[] = [];
+      for (const [x, y] of laid.get(first) ?? []) for (let u = x + 0.3; u <= y - 0.3 + 1e-9; u += 0.05) cands.push(r3(u));
+      const u1 = cands.filter((u) => Math.abs(u - u0) <= 0.95 && Math.abs(u - u0) >= 0.2 && taken.every((t) => Math.abs(t - u) >= 0.62)).sort((x, y) => Math.abs(x - u0 - (u0 < (uMin + uMax) / 2 ? 0.4 : -0.4)) - Math.abs(y - u0 - (u0 < (uMin + uMax) / 2 ? 0.4 : -0.4)) || x - y)[0];
+      // only the two deck workers stay up (receiver + fastener); an idle third would stand where they need to go
+      if (u1 === undefined || i >= 2) {
+        const c = climbAt(KE, [uMin, uMin + depth, uMax - depth, uMax].sort((x, y) => Math.abs(x - u0) - Math.abs(y - u0))[0], seat);
+        if (c) all.push(step('climb_frame', { actor: C(m), link: c.link, dir: 'down' }, [m], [], `${C(m)} climbs back down (no room on the new sheets)`));
+        continue;
+      }
+      taken.push(u1);
+      stayed.push(m);
+      posOf.set(m, { st: first, u: u1, v: first - 0.6096 + 0.35 });
+      const q = W(u1, first - 0.6096 + 0.35);
+      all.push(step('beam_walk', { actor: C(m), x: q[0], z: q[1] }, [m], [], `${C(m)} steps off the beam onto the new deck`));
+    }
+    for (const [i, st] of strips.entries()) {
+      if (i === 0) continue;
+      for (const p of order(piecesOf(lv, st))) one(p, strips[i - 1]);
+      joined = true; // a complete strip joins the first strip's pieces
+      // fasten what could not be fastened as it came up (only installed sheets can be stood on)
+      fastenPending([st, strips[i - 1]]);
+      if (i === 1) {
+        // the first strip's middle piece, received from the strip just laid
+        for (const p of mid0) one(p, st);
+        fastenPending([first, st]);
       }
     }
-    return { seat, deckLv };
+    for (const it of pending) skip(it.p, 'placed but nobody could reach it to fasten');
+    return { seat, deckLv, last: all.slice(-1), down: stayed };
   };
   if (secs.has('D1') && levels.length > 1) {
     begin('D1');
-    upperDeck({ lv: levels[1], relay: null, up: [2, 3, 4, 5] });
-    climbDown(KE, seatOf(levels[1]), [2, 3, 4, 5], uWalk);
+    const r = upperDeck({ lv: levels[1], relay: null, up: [2, 3, 4, 5] });
+    if (r) climbDown(KE, r.seat, r.down, r.down.map((m) => uWalk[[2, 3, 4, 5].indexOf(m)]), r.last);
   }
   const relayY = levels.length > 1 ? piecesOf(levels[1], stripsOf(levels[1])[0])[0].y + PLY_T : 0;
   if (secs.has('D2') && levels.length > 2) {
@@ -324,9 +442,8 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     // the relay kneels on the first-floor deck (up the end frame and off its beam); the roof crew climbs to the roof beams
     const s1 = seatOf(levels[1]);
     upOnto(KE, s1, 2, uMin + depth, lineV(KE) - 1.0);
-    upperDeck({ lv: levels[2], relay: 2, relayY, up: [3, 4, 5] });
-    climbDown(KE, seatOf(levels[2]), [3, 4, 5], [uMin, uMax, uMax - depth]);
-    climbDown(KE, s1, [2], [uMin + depth]);
+    const r = upperDeck({ lv: levels[2], relay: 2, relayY, up: [3, 4, 5] });
+    if (r) { climbDown(KE, r.seat, r.down, r.down.map((m) => uWalk[[3, 4, 5].indexOf(m)]), r.last); climbDown(KE, s1, [2], [uMin + depth], r.last); }
   }
   // ---------------------------------------------------------------- stair
   if (secs.has('S')) { begin('S'); stairSection(); }
@@ -442,14 +559,6 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   // ---------------------------------------------------------------- W: plywood walls (after the decks they are fastened from)
   const l1Top = levels.length > 1 ? piecesOf(levels[1], stripsOf(levels[1])[0])[0].y + PLY_T : 0;
   const l2Top = levels.length > 2 ? piecesOf(levels[2], stripsOf(levels[2])[0])[0].y + PLY_T : 0;
-  const safeV = (v: number, u: number) => {
-    // a spot on a deck at local (u, v) clear of the frame planes (0.36 m) and of the deck edges
-    const lines = [...new Set(fr.map((f) => r3(Lc(f.c)[1])))];
-    const inRow = fr.some((f) => Math.abs(Lc(f.c)[0] - u) < depth / 2 + 0.3);
-    let vv = v;
-    if (inRow) for (const L of lines) if (Math.abs(vv - L) < 0.4) vv = L + (vv >= L ? 0.4 : -0.4);
-    return Math.min(Math.max(vv, lineV(0) + 0.4), lineV(K - 1) - 0.4);
-  };
   if (secs.has('W')) {
     begin('W');
     const panels = P('wall-panel');

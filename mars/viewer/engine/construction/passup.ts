@@ -69,8 +69,9 @@ type PP = {
   follow?: boolean;
   /** Stations (on a floor: ground / deck) the relay / receivers walk to first (aligned with them; omitted = where they stand, e.g. on a beam). */
   relayAt?: { x: number; z: number; level: number }[];
-  receiverAt?: { x: number; z: number; level: number }[];
-  /** Plywood only: set down AND fastened (screwed to its supports) by the receivers plus these (walking to `at` first). */
+  receiverAt?: { x: number; z: number; level: number; kneel?: { x: number; z: number } }[];
+  /** Plywood only: set down AND fastened (screwed to its supports) by the receivers plus these (walking to `at` first);
+   *  `[]` = the receivers alone (provisional: one person may screw a sheet down where it lies). */
   fasten?: { actor: string; at?: { x: number; z: number; level: number } }[];
 };
 type Seg = { phase: string; who: 'givers' | 'relay' | 'receivers'; from: Pose; to: Pose; dur: number };
@@ -89,6 +90,7 @@ export type PassUpProgram = {
   walks: { actor: string; p: Vec2; yaw: number; level: number }[];
   fasten: string[];
   follow: boolean;
+  kneels: { actor: string; from: Vec2; to: Vec2 }[];
 };
 
 // ---- rest: what the part will lie on at `height` ----
@@ -233,17 +235,19 @@ export function planPassUp(rt: Runtime, p: PP): { ok: true; program: PassUpProgr
   };
   // relay / receivers / fasteners: where they will stand (their station, walked to by this action, or where they are)
   const sp0 = spatialOf(rt);
-  const stationOf = (id: string, at?: { x: number; z: number; level: number }): Entity => {
+  const stationOf = (id: string, at?: { x: number; z: number; level: number; kneel?: { x: number; z: number } }): Entity => {
     const h = w.entities[id];
     if (!at) return h;
     const lv = sp0.scene.levels.find((l) => l.id === at.level);
-    return { ...h, pose: { ...h.pose, p: [at.x, lv ? lv.y : h.pose.p[1], at.z] }, human: { ...h.human!, level: at.level, on: undefined } };
+    if (at.kneel && dist2([at.kneel.x, at.kneel.z], [at.x, at.z]) > 0.15 + 1e-9) throw new Error('kneel point more than 0.15 m from the station');
+    const k = at.kneel ?? at; // they walk to `at` and shuffle forward to kneel at the edge
+    return { ...h, pose: { ...h.pose, p: [k.x, lv ? lv.y : h.pose.p[1], k.z] }, human: { ...h.human!, level: at.level, on: undefined } };
   };
   if ((p.relayAt && p.relayAt.length !== relay.length) || (p.receiverAt && p.receiverAt.length !== p.receivers.length)) return fail('passup.stations', 'give one station per relay / receiver', [...relay, ...p.receivers]);
   const rl = relay.map((r, i) => stationOf(r, p.relayAt?.[i]));
   const rc = p.receivers.map((r, i) => stationOf(r, p.receiverAt?.[i]));
   for (const h of [...rl, ...rc]) if (w.entities[h.id].human!.task) return fail('passup.not-at-station', `${h.id} is busy (${w.entities[h.id].human!.task})`, [h.id]);
-  if (p.fasten?.length && !isPlywood(e)) return fail('passup.fasten', `pass_up fastens plywood only (${e.id}: use install_rail / install_panel)`, [e.id]);
+  if (p.fasten && !isPlywood(e)) return fail('passup.fasten', `pass_up fastens plywood only (${e.id}: use install_rail / install_panel)`, [e.id]);
   let relayTop: number | null = null;
   const relayGrips: Grip[] = [];
   const segs: Seg[] = [];
@@ -314,7 +318,7 @@ export function planPassUp(rt: Runtime, p: PP): { ok: true; program: PassUpProgr
   // a giver who also fastens stays where the push left them
   const giverAtEnd = (id: string): Entity => { const i = p.givers.indexOf(id); const f = giverFeet(i, tr); const h = w.entities[id]; return { ...h, pose: { ...h.pose, p: f } }; };
   const fasteners = [...rc.map((h) => moved(h, final)), ...(p.fasten ?? []).map((f) => (p.givers.includes(f.actor) && !f.at ? giverAtEnd(f.actor) : stationOf(f.actor, f.at)))];
-  if (p.fasten?.length) {
+  if (p.fasten) {
     const fo = flatObb(final, e);
     for (const h of fasteners) {
       const dh = dist2(nearestOnRect(fo, at(h.pose)).q, at(h.pose)), up = final.p[1] - h.pose.p[1];
@@ -369,7 +373,8 @@ export function planPassUp(rt: Runtime, p: PP): { ok: true; program: PassUpProgr
     const ph = k === recv.length - 1 ? 'set_down' : k === 1 && handAt < ySlide ? 'stand_with_load' : 'lay';
     segs.push({ phase: ph, who: 'receivers', from: recv[k - 1], to: recv[k], dur: ph === 'set_down' ? T.setDown : segDur(recv[k - 1], recv[k], ph === 'lay' ? SPEED.slide : SPEED.raise, ph === 'stand_with_load' ? T.stand : 0.2) });
   }
-  return { ok: true, program: { yaw, rest, final, giverGrips, giverOut: out, pickup, segs, relayGrips, heights: { give, relay: relayTop, slide: ySlide, push: sPush }, raisePhase, walks, fasten: p.fasten?.length ? [...p.receivers, ...p.fasten.map((f) => f.actor)] : [], follow: !!p.follow } };
+  return { ok: true, program: { yaw, rest, final, giverGrips, giverOut: out, pickup, segs, relayGrips, heights: { give, relay: relayTop, slide: ySlide, push: sPush }, raisePhase, walks, fasten: p.fasten ? [...new Set([...p.receivers, ...p.fasten.map((f) => f.actor)])] : [], follow: !!p.follow,
+    kneels: p.receivers.map((a, i) => ({ a, at: p.receiverAt?.[i] })).filter((x) => x.at?.kneel).map((x) => ({ actor: x.a, from: [x.at!.x, x.at!.z] as Vec2, to: [x.at!.kneel!.x, x.at!.kneel!.z] as Vec2 })) } };
 }
 
 type Exec = { id: string; p: PP; prog: PassUpProgram; walk?: Children; si: number; t: number; t2?: number; holders: 'givers' | 'relay' | 'receivers' | null; feet0?: Record<string, Vec3> };
@@ -447,6 +452,10 @@ function stepPassUp(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (ex.holders && ex.holders !== seg.who) hold(rt, ex, ex.holders, ex.holders === 'givers' ? ex.prog.raisePhase : 'hold', e.pose, { give: ex.holders === 'relay' });
     if (seg.phase === 'reach_down' && e.support?.kind === 'held' && !e.support.by.includes((seg.who === 'relay' ? ex.p.relay! : ex.p.receivers)[0]))
       e.support = { kind: 'held', by: [...e.support.by, ...(seg.who === 'relay' ? ex.p.relay! : ex.p.receivers)] };
+    if (seg.who === 'receivers' && seg.phase === 'reach_down') for (const kn of prog.kneels) {
+      const h = w.entities[kn.actor], kk = Math.min(1, ex.t / seg.dur);
+      h.pose.p = [kn.from[0] + (kn.to[0] - kn.from[0]) * kk, h.pose.p[1], kn.from[1] + (kn.to[1] - kn.from[1]) * kk];
+    }
     if (seg.who === 'receivers' && prog.follow && seg.phase !== 'reach_down' && seg.phase !== 'take') {
       // walking alongside: the receivers keep their offset from it
       const tr0 = prog.segs.find((x) => x.who === 'receivers' && x.phase === 'take')!.from;
@@ -509,7 +518,7 @@ export const passUp: ActionDef<PP, PassUpProgram, Exec> = {
     side: z.boolean().optional(),
     follow: z.boolean().optional(),
     relayAt: z.array(z.strictObject({ x: z.number().min(-1e4).max(1e4), z: z.number().min(-1e4).max(1e4), level: z.number().int().min(0).max(40) })).min(1).max(2).optional(),
-    receiverAt: z.array(z.strictObject({ x: z.number().min(-1e4).max(1e4), z: z.number().min(-1e4).max(1e4), level: z.number().int().min(0).max(40) })).min(1).max(2).optional(),
+    receiverAt: z.array(z.strictObject({ x: z.number().min(-1e4).max(1e4), z: z.number().min(-1e4).max(1e4), level: z.number().int().min(0).max(40), kneel: z.strictObject({ x: z.number().min(-1e4).max(1e4), z: z.number().min(-1e4).max(1e4) }).optional() })).min(1).max(2).optional(),
     fasten: z.array(z.strictObject({ actor: z.string().max(80), at: z.strictObject({ x: z.number().min(-1e4).max(1e4), z: z.number().min(-1e4).max(1e4), level: z.number().int().min(0).max(40) }).optional() })).max(2).optional(),
   }),
   reservations: (_w, p) => [...[...new Set([...p.givers, ...(p.relay ?? []), ...p.receivers, ...(p.fasten ?? []).map((f) => f.actor)])].map((c) => ({ resource: `actor:${c}`, mode: 'exclusive' as const })), { resource: `entity:${p.part}`, mode: 'exclusive' }],
