@@ -349,3 +349,27 @@ Then: gate → release 5; HANDOFF refresh.
 - **W20 (take thinning, mars-take/3)** `0fe78aa`, `860dcaf`: `hands` / `speed` changes are keyframes now (`INTERP_FIELDS` hands 5 mm Euclidean, speed 1 cm/s; `thinChanges` in `TakeRecorder.finish()`, greedy like pose tracks, holds keep their last tick, releases / shape changes exact; linear between keyframes of one shape via `interpChange`). `sampleTake` interpolates them and indexes `changes` once per take (binary search, no full scan per call); `sliceTake` (api/controller.ts, shared file: +bracketing keyframes of thinned fields) still samples like the take. Proven: re-recorded flagship / 2022 bay 1 / 2022 whole house (YEAR_BUILD_FULL) with the new recorder → final states = pins (fee92ee0 @11316, 695d2dcb @41182, 35d12886 @117125), take ids = the offline projection (79c19511…, 81c47592…, f3e27e28…); every tick checked vs the /2 step signal: worst hand 4.93 mm, speed 1.00 cm/s, all releases exact. Sizes (take JSON, raw): flagship 539 → 468 KB, bay 1 2.51 → 1.35 MB, whole house 8.32 → 3.94 MB (gz 1.35 → 0.76 MB; hands 3.83 MB → 100 KB, speed 1.06 MB → 414 KB). sampleTake over the whole house ≈ 114 s → 14 s. Tests: engine 340 / 337 pass / 0 fail / 3 skip at d44c601 + W20 (worktree); tsc clean (also on the shared tree with W19's edits). **Not re-recorded**: `public/engine/takes/*.json` are still /2 (a /2 take still samples; holds between ticks only) — `--check` will mismatch take ids after the re-record the lead schedules. **Renderer (W19)**: `TakePeople.handsAt` must interpolate between consecutive `hands` keyframes of the same shape at any gap (today: only when 1 tick apart → a /3 take would step), or read `sampleTake(...).entities[id].hands` (metres, interpolated). The lab/e2e hands FIXTURE (take-fixture.ts, hook.ts) is obsolete since /2.
 - **W20 landed** `0fe78aa`, `860dcaf`, `579afd1` (≈190k tokens, 40 min): `mars-take/3` — `hands`/`speed` thinned to keyframes in `TakeRecorder.finish()` (5 mm / 1 cm/s; linear between same-shape keyframes, exact releases), `sampleTake` indexed by binary search (whole house 972 → 122 µs/tick), `sliceTake` keeps bracketing keyframes. Whole-house take 8.32 → 3.94 MB (gz 1.35 → 0.76); first bay 2.51 → 1.35 MB; flagship 539 → 468 KB. All three pins unchanged; re-recorded takes match offline thinning byte-for-byte. 340 / 337 / 3 skip. Lead review: accepted. Committed takes still /2 → re-record with the next consolidation. Next to thin: tracks (2.0 MB) + events (0.9 MB). Finding → W21: `walk_to` publishes one-tick speeds of 4–11 m/s (9 in the flagship, 88 in the whole house) — positions jumping ≈ 0.2–0.55 m in a tick under the 0.6 m `motion.teleport` limit.
 - W21 spawned (engine walk.ts): diagnose/fix the speed spikes (snaps on replan/reposition), tighten `motion.teleport`, re-pin once if it moves.
+- **W19 (studio replay: watch it being built, direct camera, verify directed tracks)** `0ab2e6f`, `b0af6c7`, `8393e9f` + docs (`STUDIO_REPLAY.md`):
+  - **Picker.** Manifest-driven: `takes` + `otherYears` filtered by `year`. Year-build entries (`kind: 'year-build'`, else
+    `rulesVersion` ~ `year-build`) also appear as **Watch it being built** under the year picker. There is a take host
+    per year.
+  - **Datum.** `campus-<year>.json groundY − site.groundY` (2022: −0.16 m), applied to a shifted render copy so the arm
+    IK stays in scene coordinates.
+  - **Replay behaviour.** The rebuilt building is hidden while its take is open; speeds go up to 64×; the take log
+    (blocked / refused) is shown live.
+  - **Final checks.** Replayed hash = recorded = manifest; last frame = final state; `compareToCanonical` over the year
+    file's graph. 2022 first bay: ✓ 24/24, max 0.2 mm.
+  - **Direct camera** in the replay bar: a typed form or the JSON list, compiled in the browser (`directCamera`, the
+    recorder's camera scene), shot list with corrections, play the directed track. The flagship carryA close hold
+    gives foreground → raise 1 m.
+  - **`verifyCamera { track }`** over the bay orbit, the corrected hold, the Chiba sunset pan and the 2024 kitchen:
+    240/11/18/37 samples, 0 hidden, 0 with |Δ| ≥ 0.2.
+  - **Replay bugs fixed** (`take-replay.ts`):
+    1. recorded `hands` (integer mm) reached the arm IK unconverted; they are now read through `sampleTake` (metres,
+       `/3` keyframes interpolated);
+    2. fixture entities (piles, the cutting station) were drawn as people; they now go through `FixtureViews`, with
+       piles shrinking.
+  - **Retired** the metre-valued hands fixture (`e2e/take-fixture.ts`); meal/stairs replay the recorder's own fields,
+    and the meal hand-target tolerance is 6 mm for `/3`.
+  - **Take gap for W17 / engine:** an entity removed mid-take (the emptied `pile-upright-16ft-kit-1`) has no record in
+    the take, so the replay cannot draw it (`info().undrawable`).

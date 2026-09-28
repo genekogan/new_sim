@@ -98,6 +98,30 @@ sampled entity count and the final-state hash against the manifest, identical en
 HYPOTHETICAL banner, and no console errors. Captures `studio-take-{carry,held,deck,visitor,user-camera}.png`; baselines
 `studio-take-held`, `studio-take-visitor`. `window.__marsStudio.take()` returns the replay readout (null when closed).
 
+## Watch it being built, direct camera (`studio-build.spec.ts`, `studio-direct.spec.ts`)
+
+See `docs/engineering/STUDIO_REPLAY.md`.
+
+- **`studio-build.spec.ts`** uses the manifest's first year-build take (skipped when there is none). It:
+  - opens `/studio/<year>` and picks the take from **Watch it being built**;
+  - checks the hash (replayed = recorded = manifest), the datum offset (year file `groundY` − take `site.groundY`) and
+    that the rebuilt building is hidden;
+  - plays at 64×;
+  - scrubs to the yard (t 0.5 s), the half-way skeleton and the final frame, capturing `studio-build-{yard,skeleton,final}.png`
+    (no baselines, because W17 regenerates the take);
+  - checks the take log and the final-frame checks (✓ n / n frames + beams at the canonical pose);
+  - compares rendered palms with recorded hand points at 12 hand-up moments (median < 5 cm; measured < 0.5 mm).
+- **`studio-direct.spec.ts`**, on the flagship take:
+  - the direction form writes the typed JSON;
+  - **Compute camera** shows the shot list with `foreground → raise`;
+  - **Play directed track** drives the engine camera with the take hash and poses unchanged;
+  - an unknown group is refused.
+
+  Captures `studio-direct-{shots,playing}.png`.
+- **`camera-verify.spec.ts`**, test "directed tracks", uses `verifyCamera { track }` on the flagship bay orbit, the
+  corrected hold, the Chiba sunset pan (take-less) and the 2024 kitchen move (take-less, `/studio/2024`). It writes
+  `camera-verify-directed.json` plus a capture of each track's worst sample.
+
 ## Tests (`studio-years.spec.ts`)
 
 - For `/studio` and `/studio/2020` … `/studio/2025`: load, wait until ready,
