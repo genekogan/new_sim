@@ -13,20 +13,21 @@
 //   * a frame that is only held (not beam-stable) may be climbed to feet ≤ 1.0 m (a step up, its
 //     base held); higher needs a stable frame. One column face carries several people only ≥ 1.9 m
 //     apart vertically. The body (r 0.22 m, 1.75 m tall) may not intersect any other component.
-//   * hands: ≤ feet + 2.1 m, ≥ feet − 0.5 m (one hand stays on the frame), ≤ 0.9 m horizontally from
-//     the body centre.
+//   * hands (body/model.ts): ≤ feet + 2.06 m, ≥ feet − 0.5 m (one hand stays on the frame), ≤ 0.8 m
+//     horizontally from the feet.
 // hold_frame / let_go — a person takes hold of a standing held upright from any spot within reach
 //   (typically behind it, clear of the bay being built); a holder lets go while ≥ holdCrew others
 //   (or a stable assembly) keep it up.
-// hang_beam — a beam lying staged 0.40 m outside its seat line (in the aisle between rows, or outside
-//   the rack) goes up beside the line and is slid onto the two column seats and hooked:
+// hang_beam — a beam lying on its stage axis LOAD_OUT (0.457 m) outside its seat line (the centre of the
+//   aisle between rows, or as far outside the rack) — beside the bay or further along the axis, then the
+//   lifters walk it in single file — goes up beside the line and is slid onto the two column seats and hooked:
 //   * ground mode (seat ≤ 1.2 m): two installers on the ground at its ends lift it (crouch) and hook it;
-//   * aloft: two ground givers under it lift it to ≤ 2.1 m; the two installers on stances of the two
+//   * aloft: two ground givers under it lift it to ≤ 2.06 m (body model); the two installers on stances of the two
 //     frames (the same column, the faces toward each other) take it and hook it; optionally two relay
 //     people on the same column faces lower down take it from the givers first and raise it to where
 //     the installers can reach down to it. Every hand-off height must be inside both parties' reach
 //     (`hang.gap` names the heights otherwise).
-//   Loads rise vertically at the aisle offset, then slide 0.40 m sideways onto the line at the seat
+//   Loads rise vertically at the aisle offset, then slide sideways onto the line at the seat
 //   height (swept against everything but the two frames); hands published every tick (human.hands).
 import { z } from 'zod';
 import { angleDelta, datan2, rot2, wrapAngle, type Vec2, type Vec3 } from '../core/math.ts';
@@ -34,19 +35,26 @@ import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Invariant, Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import { def, HUMAN_RADIUS } from '../world/catalog.ts';
-import { entityFootprint } from '../spatial/service.ts';
+import { entityFootprint, type Spatial } from '../spatial/service.ts';
+import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { obbOverlap } from '../core/math.ts';
 import { groupStability, holdingDiagnostic, isBeam, isStanding, isSupported, isUpright, seatPoint, snapSeat } from './rules.ts';
 import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 import { levelFor, sweepPoses } from './access.ts';
 import { CLIMB_SPEED, frameAccessOk } from './frame.ts';
+import { BODY_MODEL } from '../body/model.ts';
+import { makeWay } from '../locomotion/walk.ts';
 
 export const STANCE_IN = 0.3, STANCE_OFF = 0.36, FOOT_OUT = 0.35, FOOT_BACK = 0.25;
 export const HELD_STANCE_MAX = 1.0;
-export const STANCE_UP = 2.1, STANCE_DOWN = 0.5, STANCE_ARM = 0.9, STANCE_SEP = 1.9;
+// reach from body/model.ts (overhead 2.06 m, hands ≤ 0.8 m horizontally from the feet); reaching down while
+// clinging to a frame is limited to 0.5 m below the feet (one hand stays on the bracing)
+export const STANCE_UP = BODY_MODEL.overheadMax, STANCE_DOWN = 0.5, STANCE_ARM = BODY_MODEL.maxHorizontalFromFeet, STANCE_SEP = 1.9;
 export const BODY_R = 0.22, BODY_H = 1.75;
-export const GIVE_MAX = 2.1, GROUND_ARM = 0.8, GROUND_HANG_MAX = 1.2;
-export const LOAD_OUT = 0.4;
+export const GIVE_MAX = BODY_MODEL.overheadMax, GROUND_ARM = BODY_MODEL.maxHorizontalFromFeet, GROUND_HANG_MAX = 1.2;
+const ARM_TOL = 0.01;
+export const GROUND_BAND = 1.0; // m: a climber whose feet are lower than this is on level 0 (among the people on the ground)
+export const LOAD_OUT = 0.457; // m: the stage axis — the centre of the 3 ft gap between rows of 3 ft frames (and as far outside an outer line)
 const CROUCH_S = 0.6, LIFT_S = 0.6, TAKE_S = 0.5, HOOK_S = 1.0;
 const RAISE_GIVE = 0.4, RAISE_ALOFT = 0.3, SLIDE = 0.2;
 const TOL = 1e-6;
@@ -176,8 +184,10 @@ export const climbStance: ActionDef<CP, null, CE> = {
     const s = Math.min(ex.len, ex.t * CLIMB_SPEED);
     const q = along(ex.path, s);
     a.pose = { p: q, yaw: stanceGeo(w.entities[ex.p.upright], ex.s).facing };
+    // below GROUND_BAND a climber is still among the people on the ground (they route round them)
+    a.human!.level = q[1] - ex.path[0][1] < GROUND_BAND ? 0 : levelFor(q[1]);
     if (s < ex.len - 1e-9) return { status: 'running', phase: 'climb' };
-    Object.assign(a.human!, { level: levelFor(q[1]), activity: 'stance', task: undefined });
+    Object.assign(a.human!, { level: q[1] - ex.path[0][1] < GROUND_BAND ? 0 : levelFor(q[1]), activity: 'stance', task: undefined });
     return { status: 'completed', outputs: { stance: stanceId(ex.s) } };
   },
   cancel(rt, ex) {
@@ -225,15 +235,21 @@ export const leaveStance: ActionDef<LP, null, LE> = {
       return { status: 'completed' };
     }
     const foot = ex.path[ex.path.length - 1];
-    if (ex.t === 0) {
-      // the foot must be free before stepping down onto it
-      const other = Object.values(rt.world.entities).find((e) => e.id !== a.id && e.kind === 'human' && e.human!.level === 0 && !e.human!.on && dist(xz(e), [foot[0], foot[2]]) < 2 * HUMAN_RADIUS);
-      if (other) return { status: 'blocked', diagnostic: { code: 'stance.foot-occupied', message: `${other.id} stands at the foot of ${ex.s.upright} where ${a.id} would step down`, subjects: [other.id, a.id] } };
-      a.human!.activity = 'climb-down';
+    if (ex.t === 0) a.human!.activity = 'climb-down';
+    const s = Math.min(ex.len, (ex.t + dt) * CLIMB_SPEED);
+    const q = along(ex.path, s);
+    // a low stance is already among the people on the ground (level 0): check the foot before moving to it;
+    // a higher one when about to come down into the ground band. Wait on the frame until the foot is clear.
+    if (a.human!.level !== 0 ? q[1] - foot[1] < GROUND_BAND : ex.t === 0) {
+      const other = Object.values(rt.world.entities).find((e) => e.id !== a.id && e.kind === 'human' && e.human!.level === 0 && dist(xz(e), [foot[0], foot[2]]) < 2 * HUMAN_RADIUS + 0.05);
+      if (other) {
+        makeWay(rt, other.id, [foot[0], foot[2]]); // an idle person is asked to step aside (as walk_to does)
+        return { status: 'blocked', diagnostic: { code: 'stance.foot-occupied', message: `${other.id} stands at the foot of ${ex.s.upright} where ${a.id} would climb down; ${a.id} waits on the frame`, subjects: [other.id, a.id] } };
+      }
+      a.human!.level = 0;
     }
     ex.t += dt;
-    const s = Math.min(ex.len, ex.t * CLIMB_SPEED);
-    a.pose = { p: along(ex.path, s), yaw: a.pose.yaw };
+    a.pose = { p: q, yaw: a.pose.yaw };
     if (s < ex.len - 1e-9) return { status: 'running', phase: 'climb-down' };
     Object.assign(a.human!, { on: undefined, level: 0, activity: 'idle', task: undefined });
     if (!ex.p.to) return { status: 'completed' };
@@ -342,27 +358,32 @@ type Geo = {
   /** hand-off load-centre heights: givers → first aloft receiver, relay → installers. */
   hg: number; hr: number;
   mode: 'ground' | 'aloft';
+  /** Where the beam lies, along the stage axis from its stage point (0 = beside its seat line), and the carry height walking it in. */
+  s0: number; walkY: number;
   giveSt: Vec2[]; hookSt: Vec2[];
 };
 type BE = {
-  p: BP; id: string; g: Geo; phase: 'approach' | 'crouch' | 'lift' | 'raise-give' | 'take-relay' | 'raise-relay' | 'take-hook' | 'raise-hook' | 'slide' | 'hook';
-  t: number; yc: number; off: number; holders: { id: string; role: Role; i: number }[]; children?: Children;
+  p: BP; id: string; g: Geo; phase: 'approach' | 'crouch' | 'lift' | 'walk' | 'raise-give' | 'take-relay' | 'raise-relay' | 'take-hook' | 'raise-hook' | 'slide' | 'hook';
+  t: number; yc: number; off: number; s: number; holders: { id: string; role: Role; i: number }[]; children?: Children;
 };
+export const WALK_IN = 0.6; // m/s: lifters walking a beam in along an aisle, in single file
+export const WALK_IN_MAX = 25; // m along the aisle axis
 
-/** Beam pose with centre height `yc` and lateral offset `off` from the seat line (m). */
-function beamPose(g: Geo, yc: number, off: number): Pose {
-  return { p: [g.line[0] + g.out[0] * off, yc - g.H / 2, g.line[1] + g.out[1] * off], yaw: g.yaw };
+/** Beam pose: centre height `yc`, lateral offset `off` from the seat line, `s` along it from the bay (m). */
+function beamPose(g: Geo, yc: number, off: number, s = 0): Pose {
+  return { p: [g.line[0] + g.out[0] * off + g.axis[0] * s, yc - g.H / 2, g.line[1] + g.out[1] * off + g.axis[1] * s], yaw: g.yaw };
 }
 /** Grip point (world) of a holder: givers at ∓0.2 L from the middle, relay / installers 0.3 m in from the ends. */
-function gripPoint(g: Geo, role: Role, i: number, yc: number, off: number): Vec3 {
+function gripPoint(g: Geo, role: Role, i: number, yc: number, off: number, s = 0): Vec3 {
   const aSide = g.endA === 'end-r' ? 1 : -1; // local x sign of the beam end at frame a (installer / relay 0)
-  const loc = role === 'give' ? (i ? 0.2 : -0.2) * g.L : (i === 0 ? aSide : -aSide) * (g.L / 2 - 0.3);
-  const c = beamPose(g, yc, off);
+  const inset = g.mode === 'ground' ? 0.15 : 0.3; // from the ground at the ends: hands at the end and 0.3 m in
+  const loc = role === 'give' ? (i ? 0.2 : -0.2) * g.L : (i === 0 ? aSide : -aSide) * (g.L / 2 - inset);
+  const c = beamPose(g, yc, off, s);
   const d = rot2([loc, 0], g.yaw);
   return [c.p[0] + d[0], yc, c.p[2] + d[1]];
 }
-function handsAt(g: Geo, role: Role, i: number, yc: number, off: number): { left: Vec3; right: Vec3 } {
-  const p = gripPoint(g, role, i, yc, off);
+function handsAt(g: Geo, role: Role, i: number, yc: number, off: number, s = 0): { left: Vec3; right: Vec3 } {
+  const p = gripPoint(g, role, i, yc, off, s);
   const d = rot2([0.15, 0], g.yaw);
   return { left: [p[0] - d[0], p[1], p[2] - d[1]], right: [p[0] + d[0], p[1], p[2] + d[1]] };
 }
@@ -393,11 +414,14 @@ function planHang(rt: Runtime, p: BP): { ok: true; program: Geo } | { ok: false;
   const axis = rot2([1, 0], yaw);
   const endA = axis[0] * (sa[0] - line[0]) + axis[1] * (sa[2] - line[1]) > 0 ? 'end-r' : 'end-l';
   const groundY = a.pose.p[1];
-  // staged beside the line
+  // staged on the stage axis: the line LOAD_OUT outside the seat line, anywhere along it (an aisle is open end to end)
   const stage: Vec2 = [line[0] + out[0] * LOAD_OUT, line[1] + out[1] * LOAD_OUT];
   const bp: Vec2 = [beam.pose.p[0], beam.pose.p[2]];
-  if (beam.support?.kind !== 'ground' || (beam.phase !== 'stored' && beam.phase !== 'staged' && beam.phase !== 'reserved') || dist(bp, stage) > 0.25 || Math.abs(Math.abs(angleDelta(beam.pose.yaw, yaw)) - 0) > 0.06 && Math.abs(Math.abs(angleDelta(beam.pose.yaw, yaw)) - Math.PI) > 0.06)
-    return fail('hang.not-staged', `${beam.id} must lie on the ground along its seat line, ${LOAD_OUT} m outside it, at (${f2(stage[0])}, ${f2(stage[1])}) (it is at (${f2(bp[0])}, ${f2(bp[1])}), ${beam.phase}); carry it there first`, [beam.id]);
+  const s0 = (bp[0] - stage[0]) * axis[0] + (bp[1] - stage[1]) * axis[1];
+  const lat = Math.abs((bp[0] - stage[0]) * axis[1] - (bp[1] - stage[1]) * axis[0]);
+  const par = Math.min(Math.abs(angleDelta(beam.pose.yaw, yaw)), Math.abs(Math.abs(angleDelta(beam.pose.yaw, yaw)) - Math.PI));
+  if (beam.support?.kind !== 'ground' || (beam.phase !== 'stored' && beam.phase !== 'staged' && beam.phase !== 'reserved') || lat > 0.25 || par > 0.06 || Math.abs(s0) > WALK_IN_MAX)
+    return fail('hang.not-staged', `${beam.id} must lie on the ground along the axis ${LOAD_OUT} m outside its seat line (through (${f2(stage[0])}, ${f2(stage[1])}), within ${WALK_IN_MAX} m of the bay; it is at (${f2(bp[0])}, ${f2(bp[1])}), ${f2(lat)} m off the axis, ${beam.phase}); carry it there first`, [beam.id]);
   const seatY = groundY + h;
   const givers = p.givers ?? [], relay = p.relay ?? [];
   const all = [...p.installers, ...givers, ...relay];
@@ -409,20 +433,35 @@ function planHang(rt: Runtime, p: BP): { ok: true; program: Geo } | { ok: false;
     const hd = holdingDiagnostic(w, c);
     if (hd) return { ok: false, diagnostic: hd };
   }
-  const endPt = (s: number): Vec2 => [stage[0] + axis[0] * s, stage[1] + axis[1] * s];
+  const ground = h <= GROUND_HANG_MAX;
+  const endPt = (s: number): Vec2 => [stage[0] + axis[0] * (s0 + s), stage[1] + axis[1] * (s0 + s)];
   const aSide = endA === 'end-r' ? 1 : -1;
   const hookSt: Vec2[] = [endPt(aSide * (L / 2 + 0.35)), endPt(-aSide * (L / 2 + 0.35))];
   const giveSt: Vec2[] = [endPt(-0.2 * L), endPt(0.2 * L)];
-  const base = { h, colB: (colB < 0 ? 'l' : 'r') as 'l' | 'r', yaw, L, H, line, out, axis, groundY, endA: endA as 'end-l' | 'end-r', giveSt, hookSt };
-  // swept path: rise at the aisle offset, slide onto the line (the two frames it hooks into are exempt)
-  const lying = beam.pose;
-  const poses = [lying, beamPose({ ...base, hg: 0, hr: 0, mode: 'ground' }, seatY, LOAD_OUT), beamPose({ ...base, hg: 0, hr: 0, mode: 'ground' }, seatY, 0)];
+  const walkY = groundY + (ground ? 0.8 : 1.0);
+  const base = { h, colB: (colB < 0 ? 'l' : 'r') as 'l' | 'r', yaw, L, H, line, out, axis, groundY, endA: endA as 'end-l' | 'end-r', giveSt, hookSt, s0, walkY, hg: 0, hr: 0, mode: 'ground' as const };
+  // swept path: [lift to waist, walk in along the axis,] rise at the aisle offset, slide onto the line (the two frames it hooks into are exempt)
+  const poses = Math.abs(s0) > 1e-6
+    ? [beam.pose, beamPose(base, walkY, LOAD_OUT, s0), beamPose(base, walkY, LOAD_OUT, 0), beamPose(base, seatY, LOAD_OUT, 0), beamPose(base, seatY, 0, 0)]
+    : [beam.pose, beamPose(base, seatY, LOAD_OUT, 0), beamPose(base, seatY, 0, 0)];
   const hit = sweepPoses(rt, beam, poses, [a.id, b.id]);
   if (hit) return fail('hang.path-blocked', `${beam.id} cannot go up beside its seat line: it would pass through ${hit.o.id} at (${f2(hit.q.p[0])}, ${f2(hit.q.p[1])}, ${f2(hit.q.p[2])})`, [beam.id, hit.o.id]);
-  if (h <= GROUND_HANG_MAX) {
+  // the lifters walk it in: their bodies must fit along the way (static geometry, level 0)
+  const lifters = ground ? hookSt : giveSt;
+  if (Math.abs(s0) > 1e-6) {
+    const sp = rt.services.spatial as Spatial;
+    sp.sync(w);
+    const gr = sp.level(0);
+    if (gr) for (let d = 0; d <= Math.abs(s0) + 1e-9; d += 0.1) for (const [i, st] of lifters.entries()) {
+      const q: Vec2 = [st[0] - axis[0] * Math.sign(s0) * d, st[1] - axis[1] * Math.sign(s0) * d];
+      if (clearanceAt(gr, q) < HUMAN_RADIUS - 1e-6)
+        return fail('hang.walk-blocked', `walking ${beam.id} in along its aisle, ${(ground ? p.installers : givers)[i] ?? 'a lifter'} would not fit at (${f2(q[0])}, ${f2(q[1])}) (next to ${nearestBlocker(gr, q) ?? 'the edge'})`, [beam.id]);
+    }
+  }
+  if (ground) {
     if (givers.length || relay.length) return fail('hang.crew', `a beam at ${f2(h)} m is hung by the two installers from the ground; no givers or relay`, all);
     for (const c of p.installers) if (w.entities[c].human!.on || w.entities[c].human!.level !== 0) return fail('hang.installer-not-on-ground', `${c} must be on the ground to hang a beam at ${f2(h)} m`, [c]);
-    return { ok: true, program: { ...base, hg: 0, hr: 0, mode: 'ground' } };
+    return { ok: true, program: base };
   }
   // aloft: installers on stances of a (installer 0) and b (installer 1), same column, faces toward each other
   const feetOf = (c: string, u: Entity, col: 'l' | 'r', what: string): number | Diagnostic => {
@@ -469,20 +508,21 @@ function planHang(rt: Runtime, p: BP): { ok: true; program: Geo } | { ok: false;
   // reach checks at the hand-off points (horizontal)
   const bodies = p.installers.map((c) => xz(w.entities[c])), rbodies = relay.map((c) => xz(w.entities[c]));
   const g: Geo = { ...base, hg, hr, mode: 'aloft' };
+  const far = (body: Vec2, role: Role, k: number, y: number) => { const hs = handsAt(g, role, k, y, LOAD_OUT); return Math.max(dist(body, [hs.left[0], hs.left[2]]), dist(body, [hs.right[0], hs.right[2]])); };
   for (const [k, c] of p.installers.entries()) {
-    const gp = gripPoint(g, 'hook', k, seatY, LOAD_OUT);
-    if (dist(bodies[k], [gp[0], gp[2]]) > STANCE_ARM + TOL) return fail('hang.too-far', `${c} cannot reach ${beam.id} rising ${LOAD_OUT} m outside the line (${f2(dist(bodies[k], [gp[0], gp[2]]))} m, arm ${STANCE_ARM} m)`, [c, beam.id]);
+    const d = far(bodies[k], 'hook', k, seatY);
+    if (d > STANCE_ARM + TOL) return fail('hang.too-far', `${c} cannot reach ${beam.id} rising ${LOAD_OUT} m outside the line (a hand ${f2(d)} m out, max ${STANCE_ARM} m)`, [c, beam.id]);
   }
   for (const [k, c] of relay.entries()) {
-    const gp = gripPoint(g, 'relay', k, hr, LOAD_OUT);
-    if (dist(rbodies[k], [gp[0], gp[2]]) > STANCE_ARM + TOL) return fail('hang.too-far', `${c} (relay) cannot reach ${beam.id} (${f2(dist(rbodies[k], [gp[0], gp[2]]))} m)`, [c, beam.id]);
+    const d = far(rbodies[k], 'relay', k, hr);
+    if (d > STANCE_ARM + TOL) return fail('hang.too-far', `${c} (relay) cannot reach ${beam.id} (a hand ${f2(d)} m out, max ${STANCE_ARM} m)`, [c, beam.id]);
   }
   return { ok: true, program: g };
 }
 
 export const hangBeam: ActionDef<BP, Geo, BE> = {
   verb: 'hang_beam',
-  description: 'Hang a beam staged beside its seat line on the same column of two standing uprights: from the ground (seat ≤ 1.2 m), or handed up by two givers to two installers on the frames\' bracing (optionally through two relay people lower on the frames).',
+  description: 'Hang a beam lying on the axis 0.4 m outside its seat line (beside the bay, or further along an aisle: it is walked in) on the same column of two standing uprights: from the ground (seat ≤ 1.2 m), or handed up by two givers to two installers on the frames\' bracing (optionally through two relay people lower on the frames).',
   schema: z.strictObject({
     beam: z.string().max(80), a: z.string().max(80), b: z.string().max(80), column: z.enum(['l', 'r']), height: z.number().min(0.1).max(8),
     installers: z.array(z.string().max(80)).length(2), givers: z.array(z.string().max(80)).max(2).optional(), relay: z.array(z.string().max(80)).max(2).optional(),
@@ -500,7 +540,7 @@ export const hangBeam: ActionDef<BP, Geo, BE> = {
   start(rt, p, g, id) {
     const beam = rt.world.entities[p.beam];
     beam.phase = 'reserved';
-    return { p, id, g, phase: 'approach', t: 0, yc: beam.pose.p[1] + g.H / 2, off: LOAD_OUT, holders: [] };
+    return { p, id, g, phase: 'approach', t: 0, yc: beam.pose.p[1] + g.H / 2, off: LOAD_OUT, s: g.s0, holders: [] };
   },
   step(rt, ex, dt) {
     const w = rt.world;
@@ -517,8 +557,8 @@ export const hangBeam: ActionDef<BP, Geo, BE> = {
       for (const x of hs) Object.assign(w.entities[x.id].human!, { activity, grip: { entity: beam.id, slot: `hang-${x.role}-${x.i}` } });
     };
     const publish = () => {
-      beam.pose = beamPose(g, ex.yc, ex.off);
-      for (const x of ex.holders) w.entities[x.id].human!.hands = handsAt(g, x.role, x.i, ex.yc, ex.off);
+      beam.pose = beamPose(g, ex.yc, ex.off, ex.s);
+      for (const x of ex.holders) w.entities[x.id].human!.hands = handsAt(g, x.role, x.i, ex.yc, ex.off, ex.s);
     };
     const move = (target: number, speed: number) => {
       const d = target - ex.yc;
@@ -530,6 +570,7 @@ export const hangBeam: ActionDef<BP, Geo, BE> = {
     const wait = (secs: number) => { ex.t += dt; return ex.t + 1e-9 >= secs; };
     const next = (ph: BE['phase']) => { ex.phase = ph; ex.t = 0; };
     const lifters = g.mode === 'ground' ? p.installers.map((id, i) => ({ id, role: 'hook' as Role, i })) : (p.givers ?? []).map((id, i) => ({ id, role: 'give' as Role, i }));
+    const afterLift = (): BE['phase'] => (Math.abs(ex.s) > 1e-9 ? 'walk' : g.mode === 'ground' ? 'raise-hook' : 'raise-give');
     switch (ex.phase) {
       case 'approach': {
         if (!ex.children) {
@@ -552,11 +593,30 @@ export const hangBeam: ActionDef<BP, Geo, BE> = {
       }
       case 'crouch':
         publish();
-        if (wait(CROUCH_S)) { setHolders(ex.holders, 'lift'); next(g.mode === 'ground' ? 'raise-hook' : 'lift'); }
+        if (wait(CROUCH_S)) {
+          setHolders(ex.holders, 'lift');
+          next(Math.abs(ex.s) > 1e-9 || g.mode !== 'ground' ? 'lift' : 'raise-hook');
+        }
         return { status: 'running', phase: ex.phase };
       case 'lift':
-        if (move(g.groundY + 1.0, 1.0 / LIFT_S)) { setHolders(ex.holders, 'reach_up'); next('raise-give'); }
+        if (move(Math.abs(ex.s) > 1e-9 ? g.walkY : g.groundY + 1.0, 1.0 / LIFT_S)) { setHolders(ex.holders, Math.abs(ex.s) > 1e-9 ? 'walk-load' : 'reach_up'); next(afterLift()); }
         return { status: 'running', phase: 'lift' };
+      case 'walk': {
+        // the lifters carry it in single file along the aisle axis, their bodies moving with their grips
+        const d = Math.min(Math.abs(ex.s), WALK_IN * dt) * Math.sign(-ex.s);
+        ex.s += d;
+        if (Math.abs(ex.s) < 1e-9) ex.s = 0;
+        const st = g.mode === 'ground' ? g.hookSt : g.giveSt;
+        const heading = datan2(g.axis[1] * Math.sign(d || 1), g.axis[0] * Math.sign(d || 1));
+        for (const [i, x] of ex.holders.entries()) {
+          const e = w.entities[x.id];
+          const moved = ex.s - g.s0;
+          e.pose = { p: [st[i][0] + g.axis[0] * moved, g.groundY, st[i][1] + g.axis[1] * moved], yaw: heading };
+        }
+        publish();
+        if (ex.s === 0) { setHolders(ex.holders, g.mode === 'ground' ? 'lift' : 'reach_up'); next(g.mode === 'ground' ? 'raise-hook' : 'raise-give'); }
+        return { status: 'running', phase: 'walk' };
+      }
       case 'raise-give':
         if (move(g.hg, RAISE_GIVE)) next(p.relay?.length ? 'take-relay' : 'take-hook');
         return { status: 'running', phase: 'raise-give' };
@@ -586,7 +646,7 @@ export const hangBeam: ActionDef<BP, Geo, BE> = {
         if (!wait(HOOK_S)) return { status: 'running', phase: 'hook' };
         const key = `col${p.column}@${g.h.toFixed(3)}`, keyB = `col${g.colB}@${g.h.toFixed(3)}`;
         const endB = g.endA === 'end-l' ? 'end-r' : 'end-l';
-        beam.pose = beamPose(g, seatY, 0);
+        beam.pose = beamPose(g, seatY, 0, 0);
         beam.phase = 'installed';
         beam.support = { kind: 'connected', to: [p.a, p.b] };
         beam.connections = [{ socket: g.endA, to: p.a, toSocket: key }, { socket: endB, to: p.b, toSocket: keyB }];
@@ -616,7 +676,10 @@ export const hangBeam: ActionDef<BP, Geo, BE> = {
  * (its `frame.link-gone` for stance ids is replaced by these checks).
  */
 export const stanceAccessOk: Invariant = (rt) => {
-  const out = frameAccessOk(rt).filter((d) => !(d.code === 'frame.link-gone' && (d.subjects ?? []).some((s) => parseStance(rt.world.entities[s]?.human?.on))));
+  // W2's links (climb:* / beam:*) are checked by frameAccessOk — only when someone is on one (it rebuilds
+  // every frame link, which a year build with dozens of frames cannot afford every tick)
+  const w2 = Object.values(rt.world.entities).some((e) => e.human?.on && !parseStance(e.human.on));
+  const out = w2 ? frameAccessOk(rt).filter((d) => !(d.code === 'frame.link-gone' && (d.subjects ?? []).some((s) => parseStance(rt.world.entities[s]?.human?.on)))) : [];
   for (const h of Object.values(rt.world.entities)) {
     const s = parseStance(h.human?.on);
     if (!s) continue;
@@ -647,10 +710,10 @@ export const hangHandsInReach: Invariant = (rt) => {
       const up = q[1] - feet, horiz = dist(xz(h), [q[0], q[2]]);
       if (aloft) {
         if (up > STANCE_UP + 1e-6 || up < -STANCE_DOWN - 1e-6) bad(`hands ${f2(up)} m from their feet (stance reach −${STANCE_DOWN} … +${STANCE_UP} m)`, q);
-        if (horiz > STANCE_ARM + 0.15 + 1e-6) bad(`hands ${f2(horiz)} m out from the body (stance arm ${STANCE_ARM} m)`, q);
+        if (horiz > STANCE_ARM + ARM_TOL + 1e-6) bad(`hands ${f2(horiz)} m out from the feet (max ${STANCE_ARM} m)`, q);
       } else {
         if (up > GIVE_MAX + 1e-6) bad(`hands ${f2(up)} m above their floor (max ${GIVE_MAX} m)`, q);
-        if (horiz > GROUND_ARM + 0.2 + 1e-6) bad(`hands ${f2(horiz)} m out from the body (arm ${GROUND_ARM} m)`, q);
+        if (horiz > GROUND_ARM + ARM_TOL + 1e-6) bad(`hands ${f2(horiz)} m out from the feet (max ${GROUND_ARM} m)`, q);
       }
     }
   }

@@ -75,6 +75,7 @@ export type RunnerState = {
 };
 
 const DONE: ReadonlySet<StepStatus> = new Set(['completed', 'failed', 'skipped', 'cancelled']);
+const MAKE_WAY = /:make-way:\d+$/;
 
 export class SequenceRunner {
   readonly rt: Runtime;
@@ -309,6 +310,14 @@ export class SequenceRunner {
       }
     }
     if (r.cueTick !== undefined && this.rt.tick < r.cueTick) return 'wait';
+    // an idle person nudged aside by a walker (locomotion/walk.ts makeWay: an ambient walk_to with id
+    // `<person>:make-way:<tick>`) is busy for a second or two: a directed step waits for that instead of
+    // failing with reservation.conflict
+    const def = this.rt.registry.get(s.verb);
+    const parsed = def?.schema.safeParse(s.params);
+    if (def && parsed?.success)
+      for (const res of def.reservations(this.rt.world, parsed.data))
+        if (this.rt.holder(res.resource).some((a) => MAKE_WAY.test(a) && this.rt.isActive(a))) return 'wait';
     return 'ready';
   }
 

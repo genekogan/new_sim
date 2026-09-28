@@ -10,7 +10,7 @@ import { Spatial } from '../spatial/service.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { carry } from '../carry/actions.ts';
 import { CONSTRUCTION_ACTIONS, liftHandsInReach, uprightsSupported } from '../construction/index.ts';
-import { hangHandsInReach, rungs, stanceAccessOk, STANCE_ACTIONS } from '../construction/stance.ts';
+import { hangHandsInReach, LOAD_OUT, rungs, stanceAccessOk, STANCE_ACTIONS } from '../construction/stance.ts';
 import { lyingPose } from '../construction/bundle.ts';
 import { seatPoint } from '../construction/rules.ts';
 import { addAll, emptyWorld, human } from '../world/factory.ts';
@@ -42,12 +42,12 @@ function run(rt: Runtime, verb: string, params: unknown) {
   assert.deepEqual(rt.violations, [], `${verb}: ${JSON.stringify(rt.violations.slice(0, 2))}`);
   return r;
 }
-/** Stage beam `id` lying 0.40 m outside the seat line of column `col` of A (by state). */
+/** Stage beam `id` lying LOAD_OUT outside the seat line of column `col` of A (by state). */
 function stage(rt: Runtime, id: string, col: 'l' | 'r') {
   const A = rt.world.entities.A;
   const cs = col === 'l' ? -1 : 1;
   const s = seatPoint(A, cs, 0), out = rot2([cs, 0], A.pose.yaw);
-  rt.world.entities[id] = comp(id, 'beam-12ft', { p: [s[0] + out[0] * 0.4, 0, L / 2], yaw: Math.PI / 2 });
+  rt.world.entities[id] = comp(id, 'beam-12ft', { p: [s[0] + out[0] * LOAD_OUT, 0, L / 2], yaw: Math.PI / 2 });
 }
 const faceToward = (rt: Runtime, u: string, other: string) => {
   const e = rt.world.entities[u], o = rt.world.entities[other];
