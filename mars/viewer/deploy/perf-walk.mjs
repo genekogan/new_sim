@@ -23,13 +23,15 @@ import { CAMPUS_ID, loadCampus2026 } from '../engine/campus/world.ts';
 import { mealRuntime, runMeal } from '../engine/scenarios/meal.ts';
 
 /** The pins asserted by the engine tests (planning / grid-incremental / campus-full / meal / build-bay-v3); re-pinned: walker fallback + hypot + encounters on the smoothed path, 2026-09-28;
- *  re-pinned: no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 (PLANNING_BUDGET.md). */
+ *  re-pinned: no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 (PLANNING_BUDGET.md);
+ *  v3 brought up to the engine test's pin (W27's re-pin a2f782ad → 39a0fb3f @16374 had not reached this file; the kneeling-rise
+ *  sweep, W30 2026-09-29, leaves it unchanged). */
 export const PINS = {
   stress: '5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e',
   probe: 'b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3',
   campus: 'c56ea8da9b0382a785680e2d70850632ae577cc88901817ef63f332e23247157',
   meal: '3c28879fa21e485e910eef10f0266ced8562534d3c83623232b00a94e26090eb',
-  v3: 'a2f782ad96a039c0d7f064f90359f8b52ea62ba8452f3b5fac84a1ccfd036e38',
+  v3: '39a0fb3f4d24d07786be3059ab806cd39de138a35ef3f9d02e291229b087c2ba',
 };
 
 // ---- measurement harness (bench only) ----

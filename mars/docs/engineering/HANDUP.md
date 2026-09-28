@@ -53,6 +53,27 @@ outside it (clear of anything sticking out, e.g. joist cantilevers), and fed in 
 without turning. With the members' top ≤ givers' floor + 2.01 m (GIVE_MAX − the 5 cm slide clearance) the givers push it partway in
 themselves ("direct"); else they hand it up below the beam and the receivers lift it the rest.
 
+**Kneeling rise (W30, 2026-09-29).** In the second case the receivers kneeling at the edge lift the load straight up
+from the hand-off to slide height (members' top + 5 cm) — through the band where the members it will rest on stick
+out past the edge beam (joist ends). That rise is now swept like the prone one: against **everything**, the resting
+members included, at plan time (the corridor search below) and per tick in the tests. The hand-off corridor is
+searched outward from just outside the edge beam, every 5 cm up to 1 m: the first offset where both the givers' raise
+(carry height → hand-off) and the receivers' rise (hand-off → slide height) are clear is where the givers present it.
+So the load goes **straight up outside the joist ends, then comes in over them** at slide height (the prone path's
+corridor). If the receivers kneeling on the beams cannot reach it there (hands ≤ 0.5 m beyond their edge, ≤ 0.8 m from
+their feet), the hand-up is refused `handup.rise-blocked`, naming the member: "s1 cannot rise past the edge beam b3 in
+the hands of receivers kneeling at it: 6 ft 2x4 (j1) is in the way of its rise at (1.97, 2.34, 1.83) close to the
+edge, and clear of it nobody kneeling on the beams reaches it (at the hand-off the receivers' hands would be 0.71 m
+beyond the edge of beam b3 they kneel at (max 0.5 m); …)". Off the forks the load cannot be moved out, so a rise
+blocked where the forks hold it is refused "…where the forks hold it (present it clear of it)". After the rise the
+feed-in (`lay`) at slide height is also swept against everything; only `set_down` may touch the resting members.
+Where the givers raise it to slide height themselves ("direct") there is no receiver rise and nothing changes.
+Tests (`handup.test.ts`): every hand-up there sweeps the load each `reach_down` / `take` / `stand_with_load` / `lay`
+tick (the 2.4 m green test: 0 intersections, was 4 ticks through j1, handed off with its inner edge outside the joist
+ends; +10 ticks); joists overhanging b3 by 0.78 m → `handup.rise-blocked` naming the joist, by 0.48 m → green, handed
+off outside them; a sheet on the forks under the joist ends → `handup.rise-blocked` "…where the forks hold it". All
+three fail on the pre-W30 code.
+
 ### Reach rules (engine rules; plan time and every tick)
 - givers' hands (the load's underside) ≤ their floor + **2.06 m** (`BODY_MODEL.overheadMax`; was 2.1) — and no
   higher than the `reach_up` envelope reaches at their grips: hands 0.3 m ahead and ±0.15 m apart top out at
@@ -82,7 +103,7 @@ Refusals: `handup.receiver-reach`, `handup.unbalanced`, `handup.too-high` ("…u
 `handup.receiver-not-aloft`, `handup.giver-aloft` (a giver on a beam: nobody walks a beam with a
 sheet), `handup.no-receiver-station`, `handup.path-blocked`, `handup.giver-blocked`, `handup.giver-reach`,
 `handup.not-staged`, `handup.not-on-forks`, `handup.forklift-orientation`, `handup.occupied`,
-`handup.no-support`, `handup.cancel-unsafe` (in the air), `crew.size`, `handup.rise-blocked` (prone, below).
+`handup.no-support`, `handup.cancel-unsafe` (in the air), `crew.size`, `handup.rise-blocked` (kneeling: above; prone: below).
 
 Invariant `lift.hands-out-of-reach` now covers both ends: holders with slot `handup-*` must publish
 both hands, inside their envelope (+0.1 m), givers ≤ floor + 2.06 m, receivers ≥ feet − 0.5 m and (kneel rule)
@@ -127,7 +148,7 @@ below the deck and ≤ **0.45 m** beyond the deck outline. Otherwise `handup.no-
 
 **The load's way up.** The givers raise it as before; with prone receivers the whole vertical corridor beside the edge,
 from the carry height up to slide height, must be clear before the edge offset is chosen — so it comes up outside the
-joist ends (a kneeling hand-up only checks the givers' part, below). During `take` and the rise it goes **straight up**
+joist ends (since W30 the same corridor search serves kneeling receivers: "Kneeling rise" above). During `take` and the rise it goes **straight up**
 outside the edge, level (no tilt, so the fragile-panel tilt limit holds trivially), and every sample of that path is
 swept against everything, the members it will rest on included. If something outside the edge (a wall panel, a
 cantilever) pushes the corridor out of prone reach, or blocks the rise where the forks hold it, the hand-up is refused
@@ -184,8 +205,10 @@ v2's build, deck handed up: 7 joists handed over b3 to crew[4] (on the beam), s1
 crew[4]/crew[5] on the beams, s2 off the forks (west side) to crew[4] kneeling on b3 just north of s2 and
 crew[5] at s1's north-west corner (kneel rule; crew[4] steps onto s2 once it is fastened), then v2's
 stair, spare tread, visitor, campfire. 12 ft bay (forks present a 4x6 long side first; s2 lies along
-the bay). 88 steps, 16219 ticks (811 s simulated), 0 violations, ~6 s wall, pinned hash `339cf310…`
-(body model unification, 2026-09-28; history of re-pins in PLANNING_BUDGET.md).
+the bay). 88 steps, 16374 ticks (819 s simulated), 0 violations, ~10 s wall, pinned hash `39a0fb3f…`
+(W27, 2026-09-29; history of re-pins in PLANNING_BUDGET.md). v3 has no kneeling rise through members: the joists and s1
+are "direct" (the deck is at 1.99 m, the givers raise them to slide height), and s2 rises only 3 cm off the forks; a
+per-tick sweep of all 937 receiver-held ticks finds 0 intersections, and W30 leaves the pin and the take unchanged.
 
 ## Approximate / not modelled
 - Receivers feed a load hand over hand from a fixed station (their grip slides along the nearest edge);
@@ -196,9 +219,9 @@ the bay). 88 steps, 16219 ticks (811 s simulated), 0 violations, ~6 s wall, pinn
 - Balance is checked for a single giver only (lever grip, free end ≤ 1.5 m); a single receiver feeding
   a joist in end-first is assumed to slide it over the edge beam (not checked), and sheets are not checked.
 - Reach-down: 0.5 m below the feet kneeling (measured rig); lying prone at a deck edge 0.94 m below the deck (§13, above).
-- A kneeling hand-up sweeps the load's rise from the hand-off to slide height ignoring the members it will rest on, so
-  a sheet raised just outside the edge beam can pass through its own joists' cantilevers (the 2.4 m green test does);
-  the prone path sweeps that corridor with everything. Left as is to keep the pinned scenarios (W28). The kneeling
+- Kneeling and prone rises are swept against everything at plan time (samples every 5 cm of motion) and per tick in
+  the tests; the corridor is searched only outward along the edge normal (5 cm steps, ≤ 1 m), never sideways along the
+  edge or with a tilt, and the load always comes straight up (W30). The kneeling
   envelope reaches 0.54 m at 0.45 m out, so the 0.5 m cap binds (`handup.too-high`), not station choice. Decks
   whose receivers stand > 2.05 + 0.5 ≈ 2.55 m above the givers' floor (plus the load's thickness) need the forklift.
 - Fork height is not state after the load leaves the forks (the truck just parks); `forklift_back` is

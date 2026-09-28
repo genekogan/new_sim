@@ -7,6 +7,7 @@ import { component } from '../world/factory.ts';
 import { def } from '../world/catalog.ts';
 import { ENVELOPE_TOL, envelopeGap, GIVE_MAX, handsOf, REACH_DOWN } from '../construction/handup.ts';
 import { deckSurfaces } from '../construction/contributor.ts';
+import { sweepPoses } from '../construction/access.ts';
 import { bay, run } from './frame-fixtures.ts';
 import { HAND_STEP_MAX, HandupHandsCheck } from './hands-check.ts';
 import { restHands } from '../body/model.ts';
@@ -26,10 +27,14 @@ function sheetBay(seat: number, extra: Parameters<typeof bay>[1] = []) {
   return { ...b, to: { x: 0, z: L / 2, yaw: Math.PI / 2 } };
 }
 
-/** Step until the action ends; check every hand-up holder's hand points each tick. */
+/** Receiver phases in which the load must clear everything (the members it will rest on included: W30); set_down may touch them. */
+const SWEPT = new Set(['reach_down', 'take', 'stand_with_load', 'lay']);
+
+/** Step until the action ends; check every hand-up holder's hand points each tick, and that the load the receivers
+ *  hold (reach_down … lay) overlaps nothing — deck edge, beams, joist ends, walls — except the forks it sits on. */
 function watch(rt: Runtime, id: string, max = 20 * 400) {
   const r = rt.records.get(id)!;
-  let ticks = 0, worst = -Infinity, holders = new Set<string>();
+  let ticks = 0, worst = -Infinity, holders = new Set<string>(), swept = 0;
   const roles = new Map<string, string>();
   const hc = new HandupHandsCheck();
   while (r.status !== 'completed' && r.status !== 'failed' && ticks < max) {
@@ -51,8 +56,16 @@ function watch(rt: Runtime, id: string, max = 20 * 400) {
         else assert.ok(h.pose.p[1] - p[1] <= REACH_DOWN + 1e-9, `${h.id} hands more than ${REACH_DOWN} m below feet`);
       }
     }
+    const rec = Object.values(rt.world.entities).find((h) => h.human?.grip?.slot.startsWith('handup-take') && SWEPT.has(h.human.activity));
+    if (rec) {
+      const part = rt.world.entities[rec.human!.grip!.entity];
+      const forks = part.support?.kind === 'forks' ? [part.support.vehicle] : [];
+      const hit = sweepPoses(rt, part, [part.pose, part.pose], forks);
+      assert.equal(hit, null, `${part.id} intersects ${hit?.o.id} at tick ${rt.tick} (${rec.human!.activity}, y ${part.pose.p[1].toFixed(3)})`);
+      swept++;
+    }
   }
-  return { r, ticks, worst, holders, roles, hc };
+  return { r, ticks, worst, holders, roles, hc, swept };
 }
 
 test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two givers, two receivers on the beams), 0 violations, hands in reach every tick', () => {
@@ -62,6 +75,7 @@ test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two give
   const r = rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
   assert.notEqual(r.status, 'failed', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
   const acts = new Map<string, Set<string>>();
+  let handoff: number[] | null = null; // s1's centre at the first tick a receiver takes it
   // §6: hands travel — the first tick of a crouch / reach_down has them just below the hips, not on the part
   const firstApproach = new Map<string, number>();
   const orig = rt.step.bind(rt);
@@ -70,6 +84,7 @@ test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two give
     for (const id of ['p1', 'p2', 'p3', 'p4']) {
       const a = E[id].human!.activity;
       (acts.get(id) ?? acts.set(id, new Set()).get(id)!).add(a);
+      if (a === 'take' && !handoff) handoff = [...E.s1.pose.p];
       if ((a === 'crouch' || a === 'reach_down') && !firstApproach.has(`${id}:${a}`)) {
         const hs = handsOf(E[id])!, rest = restHands(E[id]);
         firstApproach.set(`${id}:${a}`, Math.max(...[0, 1].map((i) => Math.sqrt((hs[i][0] - rest[i][0]) ** 2 + (hs[i][1] - rest[i][1]) ** 2 + (hs[i][2] - rest[i][2]) ** 2))));
@@ -84,6 +99,13 @@ test('hand_up green: a sheet from the ground to staged on a 2.4 m deck (two give
   assert.ok(w.hc.approachTicks >= 4 * 12 && w.hc.worstStep <= HAND_STEP_MAX, `approach ticks ${w.hc.approachTicks}, worst hand step ${w.hc.worstStep.toFixed(3)} m/tick`);
   assert.deepEqual([...w.holders].sort(), ['p1', 'p2', 'p3', 'p4'], 'all four held it');
   assert.deepEqual(rt.violations, [], JSON.stringify(rt.violations.slice(0, 3)));
+  // W30: the kneeling rise is swept against the members it will rest on — watch() found s1 clear of everything on every
+  // reach_down / take / stand_with_load / lay tick (it used to pass through j1's end for 4 ticks), because it is handed
+  // off outside the joists' cantilevered ends (6 ft joists centred on the 1.22 m bay: ends 0.28 m past b3's face)
+  const jEnd = def('2x4-6ft').size[0] / 2;
+  assert.ok(w.swept >= 60, `swept ${w.swept} ticks`);
+  assert.ok(handoff![0] - W / 2 >= jEnd, `s1 handed off with its inner edge at x ${(handoff![0] - W / 2).toFixed(3)}, inside the joist ends at ${jEnd.toFixed(3)}`);
+  assert.ok(handoff![1] < E.j1.pose.p[1], 'handed off below the joists (a genuine rise past their ends)');
   const s1 = E.s1;
   assert.equal(s1.phase, 'staged');
   assert.equal(s1.support?.kind, 'resting-on');
@@ -198,4 +220,38 @@ test('hand_up via forklift is refused when the forks hold it too low, or it is n
   const b2 = sheetBay(2.29);
   const none = b2.rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'p5', receivers: ['p3', 'p4'], to: b2.to });
   assert.equal(none.diagnostic?.code, 'forklift.no-operator');
+});
+
+/** The 2.4 m sheet bay with its joists shifted `dx` east, so their ends stick out `dx` farther past b3. */
+function cantileverBay(dx: number) {
+  const b = sheetBay(2.29);
+  for (const j of ['j1', 'j2', 'j3', 'j4']) b.E[j].pose.p = [b.E[j].pose.p[0] + dx, b.E[j].pose.p[1], b.E[j].pose.p[2]];
+  return b;
+}
+
+test('kneeling rise (W30): joist ends 0.78 m past the edge beam push the corridor out of kneeling reach → handup.rise-blocked naming the joist (the old rise went through them)', () => {
+  const { rt, to } = cantileverBay(0.5);
+  const r = rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to });
+  assert.equal(r.status, 'failed', 'planned a rise through the joist ends');
+  assert.equal(r.diagnostic?.code, 'handup.rise-blocked', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
+  assert.match(r.diagnostic!.message, /^s1 cannot rise past the edge beam b3 in the hands of receivers kneeling at it: 6 ft 2x4 \(j\d\) is in the way of its rise at \(.*\) close to the edge, and clear of it nobody kneeling on the beams reaches it \(.*beyond the edge of beam b3/);
+  assert.ok(r.diagnostic!.subjects!.some((x) => /^j\d$/.test(x)) && r.diagnostic!.subjects!.includes('b3'), JSON.stringify(r.diagnostic!.subjects));
+  // a smaller overhang (0.48 m past b3's face) still has a corridor within reach: handed off outside it, swept clean
+  const ok = cantileverBay(0.2);
+  const g = ok.rt.submit('hand_up', { part: 's1', givers: ['p1', 'p2'], receivers: ['p3', 'p4'], to: ok.to });
+  assert.notEqual(g.status, 'failed', `${g.diagnostic?.code} ${g.diagnostic?.message}`);
+  const w = watch(ok.rt, g.id);
+  assert.equal(w.r.status, 'completed', `${w.r.diagnostic?.code} ${w.r.diagnostic?.message}`);
+  assert.deepEqual(ok.rt.violations, []);
+  assert.ok(w.swept >= 60);
+});
+
+test('kneeling rise (W30): a sheet presented on the forks under the joist ends cannot rise there → handup.rise-blocked "where the forks hold it"', () => {
+  const b = forkBay();
+  const { rt, to } = b;
+  run(rt, 'forklift_present', { operator: 'op', at: { ...presentAt(b), y: b.top - 0.2 } });
+  const r = rt.submit('hand_up', { part: 's1', via: 'forklift', operator: 'op', receivers: ['p3', 'p4'], to });
+  assert.equal(r.status, 'failed', 'planned a rise through the joist ends');
+  assert.equal(r.diagnostic?.code, 'handup.rise-blocked', `${r.diagnostic?.code} ${r.diagnostic?.message}`);
+  assert.match(r.diagnostic!.message, /^s1 cannot rise past the edge beam b3 in the hands of receivers kneeling at it: .*j\d.* is in the way of its rise at \(.*\) where the forks hold it \(present it clear of it\)$/);
 });

@@ -719,3 +719,27 @@ Then: gate → release 5; HANDOFF refresh.
 ## 2026-09-29 ~09:45 EDT — Codex split (Gene)
 - Ownership map + merge rule recorded in OWNER_DECISIONS.md. W33 spawned (docs only, ≤ 1 h): CODEX.md, `briefs/` (five Codex briefs), QUESTIONS_FOR_GENE.md with images, HANDOFF/NEXT_SESSION_PROMPT with the split + ETAs. A.1: W13's YEAR_BUILD.md already landed in `97957ca` (tree clean) — W33 verifies only.
 - In flight: W30 (kneel-rise sweep, v3), W31 (W27 docs + A+B chapter takes). Next toward checkpoint 1: W32 prone model = rig (after W30), then the other three 2022 houses + 2x4 framing (after W31).
+## W30 — kneeling rise swept against the resting members (2026-09-29)
+- **Finding (W28):** a kneeling receiver's `stand_with_load` rise was swept with the load's supports ignored. In the
+  2.4 m green test the sheet was handed off just outside b3's face. It then rose through j1's cantilevered end (6 ft
+  joists overhang b3 by 0.28 m) for 4 ticks.
+- **Fix (`construction/handup.ts`):** the hand-off corridor search (outward from the edge beam, 5 cm steps, ≤ 1 m)
+  now also sweeps the receivers' rise, hand-off → slide height, against everything whenever the givers do not
+  raise the load to slide height themselves. Previously only prone receivers had this. So the load goes straight up
+  outside the joist ends and comes in over them. If the kneelers cannot reach it there, the hand-up is refused
+  `handup.rise-blocked`, naming the member ("…in the hands of receivers kneeling at it: 6 ft 2x4 (j1) is in the way
+  of its rise…"). A kneeling rise off the forks is checked where the forks hold it. `finishPlan` sweeps the take, the
+  rise and the feed-in against everything; only `set_down` may touch the supports.
+- **Tests (`handup.test.ts`, +2, 9 total):** `watch()` sweeps the received load on every reach_down / take /
+  stand_with_load / lay tick. The 2.4 m green test now has 0 intersections (≥ 60 swept ticks), is handed off
+  outside the joist ends, and takes 528 ticks (was 518). Joists overhanging by 0.78 m → rise-blocked naming the
+  joist; 0.48 m → green. A sheet on the forks under the joist ends → rise-blocked "…where the forks hold it". All
+  three fail on the pre-W30 handup.ts (checked).
+- **Pins:** none move (PLANNING_BUDGET "No re-pin 2026-09-29"). v3 stays `39a0fb3f…` @16374 with 0 intersections.
+  Its take `--check` is OK against the manifest (`64c3331c…`), so nothing was re-recorded. The year builds (pass_up)
+  pass unchanged: bay-1 in the suite, and A+B `ddb634d6…` @600599 in a full `YEAR_BUILD_FULL=1` run. The
+  perf-walk v3 pin was stale (`a2f782ad…`) and is fixed. Suite: 373 tests, 370 pass, 3 skipped, 0 fail; tsc clean.
+- **Weak spots:** the corridor moves only outward along the edge normal, never sideways, never tilted. The load
+  always comes straight up. The plan-time sweep samples every 5 cm of motion (the per-tick test sweep covers the
+  ticks). No pinned scenario exercises a kneeling rise past joist ends, so the change is covered only by the
+  handup.test.ts fixtures.
