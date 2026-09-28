@@ -2,10 +2,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGrids, segmentClearance } from '../spatial/grid.ts';
-import { findRoute, type Route, type WalkLeg } from '../spatial/path.ts';
+import { findRoute, linkApproach, type Route, type WalkLeg } from '../spatial/path.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
-import { dist2, heading, sub2, angleDelta, type Vec2 } from '../core/math.ts';
+import { dist2, heading, sub2, angleDelta, dcos, dsin, type Vec2 } from '../core/math.ts';
+import type { Obstacle } from '../spatial/types.ts';
 
 const R = HUMAN_PROFILE.radius;
 const scene = provingGround();
@@ -124,3 +125,57 @@ test('perf: grid build + long route budget', () => {
   assert.ok(t1 - t0 < 1500 && t2 - t1 < 1500);
 });
 void ([] as Vec2[]);
+
+// nameObstacles (RouteOpts, used by Spatial.routeAround for the walker's fewer-obstacles fallback):
+// a failure names the temporary obstacles (people, loads) behind it, and a structural one names none.
+test('a failed route names the people walling it in (nameObstacles); a structural failure names none', () => {
+  const person = (id: string, p: Vec2): Obstacle => ({ id, obb: { c: p, half: [0.3, 0.3], yaw: 0 }, y0: 0, y1: 1.8, kind: 'solid' });
+  const G: Vec2 = [-5, 0];
+  const ring = Array.from({ length: 8 }, (_, k) => person(`p${k}`, [G[0] + 0.9 * dcos((k * Math.PI) / 4), G[1] + 0.9 * dsin((k * Math.PI) / 4)]));
+  const far = person('far', [-20, 20]);
+  const want = (id: string) => /^(p\d|far|foot|s\d)$/.test(id);
+  const route = (extra: Obstacle[], start: { level: number; p: Vec2 }, goal: { level: number; p: Vec2 }, opts = {}) => {
+    const sc = provingGround({ extra });
+    return findRoute(buildGrids(sc, 0.1), sc, HUMAN_PROFILE, start, goal, { nameObstacles: want, ...opts });
+  };
+  assert.ok(route([far], { level: 0, p: [0, 0] }, { level: 0, p: G }).ok, 'the goal is reachable without the ring');
+  const ids = ring.map((o) => o.id).sort();
+  for (const proveUnreachable of [false, true]) {
+    // goal inside a closed ring of 8 people (the goal's side runs out first with the proof, the start's without)
+    const r = route([...ring, far], { level: 0, p: [0, 0] }, { level: 0, p: G }, { proveUnreachable });
+    assert.ok(!r.ok && r.diagnostic.code === 'route.unreachable', !r.ok ? r.diagnostic.code : 'routed');
+    assert.deepEqual(r.diagnostic.subjects, ids, `walled in by the ring, not by 'far' (proof ${proveUnreachable})`);
+    assert.match(r.diagnostic.message, /walled in by p0, p1/);
+    // the walker walled in from the start's side
+    const r2 = route([...ring, far], { level: 0, p: G }, { level: 0, p: [0, 0] }, { proveUnreachable });
+    assert.ok(!r2.ok && r2.diagnostic.code === 'route.unreachable');
+    assert.deepEqual(r2.diagnostic.subjects, ids);
+    // a person at the foot of the only usable stair cuts the deck off: named although the deck pocket's own
+    // boundary is all geometry (stairs-b is unfinished; explainUnusable keeps it 'unreachable')
+    const sa = provingGround().links.find((l) => l.id === 'stairs-a')!;
+    const foot = person('foot', linkApproach(sa, true).approach);
+    const r3 = route([foot, far], { level: 0, p: [0, 0] }, { level: 1, p: [10, 10] }, { proveUnreachable, explainUnusable: () => false });
+    assert.ok(!r3.ok && r3.diagnostic.code === 'route.unreachable');
+    assert.deepEqual(r3.diagnostic.subjects, ['foot']);
+    // explained: the unfinished stair it would need, then the person
+    const r4 = route([foot, far], { level: 0, p: [0, 0] }, { level: 1, p: [10, 10] }, { proveUnreachable });
+    assert.ok(!r4.ok && r4.diagnostic.code === 'route.link-unusable');
+    assert.deepEqual(r4.diagnostic.subjects, ['stairs-b', 'foot']);
+  }
+  // crowded start / goal: the people within the snap distance
+  const crowd = [person('s0', [0.45, 0]), person('s1', [-0.45, 0]), person('s2', [0, 0.45]), person('s3', [0, -0.45])];
+  const r5 = route([...crowd, far], { level: 0, p: [0, 0] }, { level: 0, p: G });
+  assert.ok(!r5.ok && r5.diagnostic.code === 'route.start-blocked');
+  assert.deepEqual(r5.diagnostic.subjects, ['s0', 's1', 's2', 's3']);
+  const r6 = route([...crowd, far], { level: 0, p: G }, { level: 0, p: [0, 0] });
+  assert.ok(!r6.ok && r6.diagnostic.code === 'route.goal-blocked');
+  assert.deepEqual(r6.diagnostic.subjects, ['s0', 's1', 's2', 's3']);
+  // structural: both stairs unfinished, nobody near them — no person is named
+  const s2 = provingGround({ stairsAUsable: false, extra: [far, ...ring] });
+  const r7 = findRoute(buildGrids(s2, 0.1), s2, HUMAN_PROFILE, { level: 0, p: [0, 0] }, { level: 1, p: [10, 10] }, { nameObstacles: want, explainUnusable: () => false, proveUnreachable: true });
+  assert.ok(!r7.ok && r7.diagnostic.code === 'route.unreachable');
+  assert.equal(r7.diagnostic.subjects, undefined);
+  // without the option nothing changes
+  const r8 = findRoute(buildGrids(provingGround({ extra: ring }), 0.1), provingGround({ extra: ring }), HUMAN_PROFILE, { level: 0, p: [0, 0] }, { level: 0, p: G });
+  assert.ok(!r8.ok && r8.diagnostic.subjects === undefined && !/walled/.test(r8.diagnostic.message));
+});

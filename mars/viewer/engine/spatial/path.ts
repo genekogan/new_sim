@@ -3,7 +3,7 @@
 // connection" pattern expressed on rasters. Routes are corridors: polylines
 // whose every segment has a guaranteed clearance ≥ agent radius, so the mover
 // can smooth inside them and never needs collision sliding to make progress.
-import { add2, dist2, rot2, sub2, type Vec2 } from '../core/math.ts';
+import { add2, dist2, pointInObb, rot2, sub2, type Vec2 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { cellOf, centreOf, latticeCentre, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from './grid.ts';
 import type { AgentProfile, Link, SpatialScene } from './types.ts';
@@ -57,13 +57,26 @@ export type RouteOpts = {
    * replan compares them with its obstacle ids): pass the ids they compare against.
    */
   explainUnusable?: (linkId: string) => boolean;
+  /**
+   * Name the temporary obstacles behind a failure (`Spatial.routeAround` passes its people / load ids):
+   * scene obstacles passing this predicate are added, sorted, to the diagnostic's `subjects` when they
+   * - crowd the start (route.start-blocked) or the goal (route.goal-blocked) within the snap distance;
+   * - border the region the failed search exhausted (route.unreachable / route.link-unusable): the start's
+   *   side, or the goal's side when `proveUnreachable` ran out first, i.e. the people walling it in;
+   * - stand at the foot of a stair whose far end lies in that region (the link was dropped because its
+   *   approach had no room).
+   * A structural failure (geometry, an unfinished stair) names none of them. Routes are unaffected.
+   */
+  nameObstacles?: (id: string) => boolean;
 };
 
 /** Corridor planner: coarse cell size (m) and fine-search halo around the coarse path (m). */
 export const CORRIDOR_CELL = 0.5;
 export const CORRIDOR_HALO = 1.5;
 
-type Prep = { r: number; lvIds: number[]; idxOf: Map<number, number>; N: number; gs: LevelGrid; gg: LevelGrid; sLv: number; gLv: number; s: number; gt: number; edges: Map<number, LinkEdge[]> };
+/** A link direction prepare() dropped for lack of room at its approach (recorded only with `nameObstacles`). */
+type Dropped = { level: number; at: Vec2[]; farLevel: number; far: Vec2 };
+type Prep = { r: number; lvIds: number[]; idxOf: Map<number, number>; N: number; gs: LevelGrid; gg: LevelGrid; sLv: number; gLv: number; s: number; gt: number; edges: Map<number, LinkEdge[]>; dropped?: Dropped[] };
 type Found = { goalId: number; chain: number[]; viaLink: Map<number, LinkEdge>; expanded: number };
 
 export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts = {}): RouteResult {
@@ -76,6 +89,8 @@ export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentPro
   const found = search(grids, prep, opts, null);
   if (!found) {
     const { r } = prep;
+    // (before any other search reuses the scratch the failed one left its region in)
+    const named = opts.nameObstacles ? regionObstacles(grids, scene, prep, opts.nameObstacles) : [];
     if (!opts.allowUnusableLinks && scene.links.some((l) => !l.usable && (!opts.explainUnusable || opts.explainUnusable(l.id)))) {
       const alt = findRoute(grids, scene, profile, start, goal, { ...opts, allowUnusableLinks: true, planner: 'exact' });
       if (alt.ok) {
@@ -84,11 +99,12 @@ export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentPro
           'route.link-unusable',
           `no usable route: it would require ${needed.map((l) => `${l.kind} ${l.id} (${l.reason ?? 'not usable'})`).join(', ')}`,
           goal,
-          needed.map((l) => l.id),
+          [...needed.map((l) => l.id), ...named],
         );
       }
     }
-    return fail('route.unreachable', `no route from level ${start.level} (${fmt(start.p)}) to level ${goal.level} (${fmt(goal.p)}) for a ${r} m-radius agent`, goal);
+    const by = named.length ? ` (walled in by ${named.join(', ')})` : '';
+    return fail('route.unreachable', `no route from level ${start.level} (${fmt(start.p)}) to level ${goal.level} (${fmt(goal.p)}) for a ${r} m-radius agent${by}`, goal, named.length ? named : undefined);
   }
   if ('ok' in found) return found;
   return assemble(grids, prep, start, goal, found, found.expanded);
@@ -107,14 +123,16 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
   if (!gs || !gg) return fail('route.unknown-level', `level ${!gs ? start.level : goal.level} does not exist`);
   const passable = (g: LevelGrid, c: number) => c >= 0 && g.clearance[c] >= r;
   const s = snap(gs, start.p, r, 0.5);
+  const near = (g: LevelGrid, p: Vec2, tol: number) => (opts.nameObstacles ? obstaclesNear(scene, g, p, r + tol + grids.cell, opts.nameObstacles) : undefined);
   if (s < 0)
-    return fail('route.start-blocked', `start (${fmt(start.p)}) on level ${start.level} is not standable${blk(gs, start.p)}`, start);
+    return fail('route.start-blocked', `start (${fmt(start.p)}) on level ${start.level} is not standable${blk(gs, start.p)}`, start, near(gs, start.p, 0.5));
   const gt = snap(gg, goal.p, r, opts.goalTolerance ?? 0.35);
   if (gt < 0)
-    return fail('route.goal-blocked', `destination (${fmt(goal.p)}) on level ${goal.level} has no standing room for a ${r} m-radius agent${blk(gg, goal.p)}`, goal);
+    return fail('route.goal-blocked', `destination (${fmt(goal.p)}) on level ${goal.level} has no standing room for a ${r} m-radius agent${blk(gg, goal.p)}`, goal, near(gg, goal.p, opts.goalTolerance ?? 0.35));
 
   // contextual link edges
   const edges = new Map<number, LinkEdge[]>();
+  const dropped: Dropped[] | undefined = opts.nameObstacles ? [] : undefined;
   for (const link of scene.links) {
     if (!link.usable && !opts.allowUnusableLinks) continue;
     if (link.width < 2 * r) continue;
@@ -122,9 +140,12 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
       const { entry, approach, exit } = linkApproach(link, ascending);
       const ge = grids.levels.get(entry.level), gx = grids.levels.get(exit.level);
       if (!ge || !gx) continue;
-      const ca = cellOf(ge, approach), cx = snap(gx, linkApproach(link, !ascending).approach, r, 0.4);
-      if (!passable(ge, ca) || cx < 0) continue;
-      if (segmentClearance(ge, approach, entry.p) < r * 0.9) continue;
+      const far = linkApproach(link, !ascending).approach;
+      const ca = cellOf(ge, approach), cx = snap(gx, far, r, 0.4);
+      if (!passable(ge, ca) || cx < 0 || segmentClearance(ge, approach, entry.p) < r * 0.9) {
+        dropped?.push({ level: entry.level, at: [approach, entry.p], farLevel: exit.level, far });
+        continue;
+      }
       const len = dist2(approach, entry.p) + pathLen(link.path) + dist2(exit.p, centreOf(gx, cx));
       const id = idxOf.get(entry.level)! * N + ca;
       const list = edges.get(id) ?? [];
@@ -132,7 +153,7 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
       edges.set(id, list);
     }
   }
-  return { r, lvIds, idxOf, N, gs, gg, sLv: idxOf.get(start.level)!, gLv: idxOf.get(goal.level)!, s, gt, edges };
+  return { r, lvIds, idxOf, N, gs, gg, sLv: idxOf.get(start.level)!, gLv: idxOf.get(goal.level)!, s, gt, edges, dropped };
 }
 
 /**
@@ -177,7 +198,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   while (heap.size) {
     if (rev) {
       const st = rev.step();
-      if (st < 0) return null; // the goal's side ran out of cells: the A* could only exhaust the start's side
+      if (st < 0) { failRegion = { cells: S.rseen!, gen }; return null; } // the goal's side ran out of cells: the A* could only exhaust the start's side
       if (st > 0) rev = null; // the start can reach the goal: the A* decides as always
     }
     const cur = heap.pop();
@@ -231,11 +252,74 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
       }
     }
   }
-  if (shut[goalId] !== gen) return null;
+  if (shut[goalId] !== gen) { failRegion = { cells: shut, gen }; return null; }
   const chain: number[] = [];
   for (let id = goalId; id !== -1; id = came[id]) chain.push(id);
   chain.reverse();
   return { goalId, chain, viaLink, expanded };
+}
+
+/** The region the last failed `search` exhausted: cells with cells[id] === gen (the start's side, or the goal's side). */
+let failRegion: { cells: Uint32Array; gen: number } | null = null;
+
+/** Obstacles passing `want` whose footprint grown by `grow` covers p, at the height of level grid g (the gridsAround rule). */
+function obstaclesNear(scene: SpatialScene, g: LevelGrid, p: Vec2, grow: number, want: (id: string) => boolean): string[] | undefined {
+  const out = new Set<string>();
+  for (const o of scene.obstacles) if (want(o.id) && atHeight(o, g) && pointInObb(p, o.obb, grow)) out.add(o.id);
+  return out.size ? [...out].sort() : undefined;
+}
+const atHeight = (o: { y0: number; y1: number }, g: LevelGrid) => g.y >= o.y0 - 0.3 && g.y < o.y1;
+
+/**
+ * `nameObstacles` for a failed search (see RouteOpts). An obstacle is named when it separates the
+ * exhausted region from other free space: its footprint grown by a body radius + 0.5 m covers, on
+ * a level at its height, both a cell of the region and a passable cell outside it (a person standing in
+ * open ground next to the region is not named). A dropped stair is named by the obstacles at its
+ * approach when exactly one of its ends is in the region. Cost: the obstacles' footprints, not the grid.
+ */
+function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: (id: string) => boolean): string[] {
+  const reg = failRegion;
+  failRegion = null;
+  if (!reg) return [];
+  const { lvIds, N, r } = prep;
+  // (+ 0.5 m: a small pocket's passable cells can sit ~0.9 m from an obstacle that closes it, e.g. the
+  // people level with a goal in a ring, whose diagonal neighbours are nearer)
+  const grow = r + 0.5;
+  /** Visit the cells of level lv whose centres lie in the obstacle box / disc; stop when `f` returns true. */
+  const cells = (g: LevelGrid, c: Vec2, ext: number, inside: (q: Vec2) => boolean, f: (n: number) => boolean) => {
+    const cl = g.cell;
+    const i0 = Math.max(0, Math.floor((c[0] - ext) / cl) - g.ox), i1 = Math.min(g.nx - 1, Math.floor((c[0] + ext) / cl) - g.ox);
+    const j0 = Math.max(0, Math.floor((c[1] - ext) / cl) - g.oz), j1 = Math.min(g.nz - 1, Math.floor((c[1] + ext) / cl) - g.oz);
+    for (let j = j0; j <= j1; j++)
+      for (let i = i0; i <= i1; i++) if (inside([latticeCentre(g.ox + i, cl), latticeCentre(g.oz + j, cl)]) && f(j * g.nx + i)) return true;
+    return false;
+  };
+  const out = new Set<string>();
+  for (const o of scene.obstacles) {
+    if (!want(o.id) || out.has(o.id)) continue;
+    const ext = Math.abs(o.obb.half[0]) + Math.abs(o.obb.half[1]) + grow; // bounds the grown box at any yaw
+    let inR = false, outside = false;
+    for (let lv = 0; lv < lvIds.length && !(inR && outside); lv++) {
+      const g = grids.levels.get(lvIds[lv])!;
+      if (!atHeight(o, g)) continue;
+      cells(g, o.obb.c, ext, (q) => pointInObb(q, o.obb, grow), (n) => {
+        if (reg.cells[lv * N + n] === reg.gen) inR = true;
+        else if (g.clearance[n] >= r) outside = true;
+        return inR && outside;
+      });
+    }
+    if (inR && outside) out.add(o.id);
+  }
+  const touches = (level: number, p: Vec2) => {
+    const lv = prep.idxOf.get(level), g = grids.levels.get(level);
+    return lv !== undefined && !!g && cells(g, p, r + 0.6, (q) => dist2(q, p) <= r + 0.6, (n) => reg.cells[lv * N + n] === reg.gen);
+  };
+  for (const d of prep.dropped ?? []) {
+    if (touches(d.level, d.at[0]) === touches(d.farLevel, d.far)) continue;
+    const g = grids.levels.get(d.level)!;
+    for (const p of d.at) for (const id of obstaclesNear(scene, g, p, r + 0.5, want) ?? []) out.add(id);
+  }
+  return [...out].sort();
 }
 
 /**
