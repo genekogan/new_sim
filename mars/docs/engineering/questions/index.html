@@ -53,110 +53,8 @@ button{font:inherit;font-weight:600;padding:10px 18px;border-radius:8px;border:0
 <body>
 <main>
 <h1>Questions for Gene</h1>
-<p class="lede">22 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
+<p class="lede">12 open questions about how the campus was really built. Nothing is waiting on them: each has a default the model uses today. Answer any you like, in any order, over as many days as you want. Your answers stay in this browser; when you are done, press <b>Export answers</b> and paste the result to Claude. Red outlines in the pictures mark the thing being asked about; captions say which pictures are real photos, which are the model, and which are diagrams.</p>
 <section><h2>Worth answering first</h2>
-<article class="card" id="Q2" data-id="Q2" data-plain="In 2023 and 2024 the model has two trailers parked inside Chiba, under its roof (red outlines). Was that real?">
-<div class="qid">Q2</div>
-<h3>In 2023 and 2024 the model has two trailers parked inside Chiba, under its roof (red outlines). Was that real?</h3>
-<p class="context">The model puts the trailers on a neat circle, and that circle clips the back of Chiba, so two trailers each year end up under its roof. In the photos below the trailers ring the open ground outside Chiba; if none stood inside, they move out and the inside of Chiba becomes open floor you can walk through.</p>
-<div class="pics">
-<figure><a href="q02-2023-eye.jpg" target="_blank" rel="noopener"><img src="q02-2023-eye.jpg" alt="The model, 2023, from the front of Chiba: the red boxes are the two trailers hidden under the roof; blue is Chiba." loading="lazy"></a><figcaption>The model, 2023, from the front of Chiba: the red boxes are the two trailers hidden under the roof; blue is Chiba.</figcaption></figure>
-<figure><a href="q02-2023-top.jpg" target="_blank" rel="noopener"><img src="q02-2023-top.jpg" alt="The model, 2023, from above: two trailers (red) inside Chiba's outline (blue); the rest of the circle is outside." loading="lazy"></a><figcaption>The model, 2023, from above: two trailers (red) inside Chiba's outline (blue); the rest of the circle is outside.</figcaption></figure>
-<figure><a href="photos/2023-aerial-09.jpg" target="_blank" rel="noopener"><img src="photos/2023-aerial-09.jpg" alt="Real drone photo, 2023: Chiba on the left, the trailers around the open ground." loading="lazy"></a><figcaption>Real drone photo, 2023: Chiba on the left, the trailers around the open ground.</figcaption></figure>
-<figure><a href="q02-2024-eye.jpg" target="_blank" rel="noopener"><img src="q02-2024-eye.jpg" alt="The model, 2024, from the front of Chiba: again two trailers (red) under the roof." loading="lazy"></a><figcaption>The model, 2024, from the front of Chiba: again two trailers (red) under the roof.</figcaption></figure>
-<figure><a href="q02-2024-top.jpg" target="_blank" rel="noopener"><img src="q02-2024-top.jpg" alt="The model, 2024, from above." loading="lazy"></a><figcaption>The model, 2024, from above.</figcaption></figure>
-<figure><a href="photos/2024-aerial-20.jpg" target="_blank" rel="noopener"><img src="photos/2024-aerial-20.jpg" alt="Real drone photo, 2024: Chiba is the white building on the right." loading="lazy"></a><figcaption>Real drone photo, 2024: Chiba is the white building on the right.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q2" value="No: no trailers under Chiba (move them out)"> <span>No: no trailers under Chiba (move them out)</span></label>
-<label class="opt"><input type="radio" name="Q2" value="Yes: trailers really were parked under Chiba's roof"> <span>Yes: trailers really were parked under Chiba's roof</span></label>
-<label class="opt"><input type="radio" name="Q2" value="Only in one of the two years (say which below)"> <span>Only in one of the two years (say which below)</span></label>
-<label class="opt"><input type="radio" name="Q2" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag first">worth answering first</span> <strong>What changes if you answer:</strong> Two trailers per year move out of Chiba and Chiba's floor opens up for walking; nothing else moves.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**What the engine sees.** In both years, two trailers of the trailer circle sit under Chiba's roof, inside
-its footprint. These are the tilted orange-brown boxes inside the pink roof area at the top of each picture.
-
-![2023 top-down, engine prisms](questions/lab-year-2023-top-prisms.png)
-![2024 top-down, engine prisms](../../viewer/e2e/baselines/lab-year-2024-top-prisms.png)
-
-**What the answer changes.** If this is a scene error, the trailers move out in `scenes.ts`, and
-`mars-2023` / `mars-2024` are re-seeded (`reconstruction-edit`, id aliases). Chiba's interior becomes walkable
-where they stood. If it is real (the trailers parked under the roof), nothing changes.
-
-Gene:</pre></details>
-</article>
-<article class="card" id="Q1" data-id="Q1" data-plain="In 2022, could you walk out of the courtyard at its south-west corner (between the west house and the kitchen), or did a table block the gap?">
-<div class="qid">Q1</div>
-<h3>In 2022, could you walk out of the courtyard at its south-west corner (between the west house and the kitchen), or did a table block the gap?</h3>
-<p class="context">The model's 2022 drawing has a table standing in that gap, tucked under the kitchen stair, so people in the replay cannot leave the courtyard at that corner (the other three corners are open). We ask because it decides whether that corner is a way in and out when you walk the 2022 scene.</p>
-<div class="pics">
-<figure><a href="q01-2022-eye.jpg" target="_blank" rel="noopener"><img src="q01-2022-eye.jpg" alt="The model, 2022, at eye height from outside the corner: the red outline is the table, under the kitchen stair." loading="lazy"></a><figcaption>The model, 2022, at eye height from outside the corner: the red outline is the table, under the kitchen stair.</figcaption></figure>
-<figure><a href="q01-2022-top.jpg" target="_blank" rel="noopener"><img src="q01-2022-top.jpg" alt="The model from above: the red box is the table in the gap between the west house and the kitchen." loading="lazy"></a><figcaption>The model from above: the red box is the table in the gap between the west house and the kitchen.</figcaption></figure>
-<figure><a href="photos/2022-aerial-03.jpg" target="_blank" rel="noopener"><img src="photos/2022-aerial-03.jpg" alt="Real drone photo, 2022, almost straight down: the four buildings round the courtyard and their corner gaps." loading="lazy"></a><figcaption>Real drone photo, 2022, almost straight down: the four buildings round the courtyard and their corner gaps.</figcaption></figure>
-<figure><a href="photos/2022-courtyard-orbit.jpg" target="_blank" rel="noopener"><img src="photos/2022-courtyard-orbit.jpg" alt="Real drone photo, 2022, from another side." loading="lazy"></a><figcaption>Real drone photo, 2022, from another side.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q1" value="Open: people walked through there (move the table)"> <span>Open: people walked through there (move the table)</span></label>
-<label class="opt"><input type="radio" name="Q1" value="Blocked: a table or something similar really stood in the gap"> <span>Blocked: a table or something similar really stood in the gap</span></label>
-<label class="opt"><input type="radio" name="Q1" value="Open, but something else stood near there (describe below)"> <span>Open, but something else stood near there (describe below)</span></label>
-<label class="opt"><input type="radio" name="Q1" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag first">worth answering first</span> <strong>What changes if you answer:</strong> If it was open, the table moves and people can walk through that corner; if a table really stood there, nothing changes.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**What the engine sees.** The 2022 Kit scene has four corner passages out of the courtyard. NE, SE and NW are
-open. At the SW corner, between the west house and Chiba, a table stands in the gap: the long purple prism left
-of centre. A walker cannot get through it. In the year walkabout, the walkers bound for that corner end
-2–3 m from the passage point.
-
-![2022 top-down, engine prisms](../../viewer/e2e/baselines/lab-year-2022-top-prisms.png)
-
-**What the answer changes.** If the passage was open, the table moves in `app/history/scenes.ts`, and the
-protected `mars-2022` state is re-seeded with a `reconstruction-edit` cause. The table's stable id changes, and
-`id-migration.json` gets an alias for it (HISTORY_IDS.md). Walkabout expectations and the year-build campus crop
-are re-checked. If the table really stood there, nothing changes, and the walkabout's &quot;known blocked&quot; entry
-becomes a documented fact.
-
-Gene:</pre></details>
-</article>
-<article class="card" id="Q9" data-id="Q9" data-plain="How were the floors built: plywood strips laid on top of the beams, sheets set into a ledge on the beams, or 4x8 sheets on joists?">
-<div class="qid">Q9</div>
-<h3>How were the floors built: plywood strips laid on top of the beams, sheets set into a ledge on the beams, or 4x8 sheets on <abbr title="A smaller board (here a 2x4) laid across the main beams to hold up the plywood.">joists</abbr>?</h3>
-<p class="context">The model's 2022 drawing shows each floor as long 4 ft × 15 ft plywood strips resting on the beams with nothing in between, and the build replay copies that. We are about to add wooden 2x4 framing to the replay, so this answer decides whether floors get <abbr title="A smaller board (here a 2x4) laid across the main beams to hold up the plywood.">joists</abbr>.</p>
-<div class="pics">
-<figure><a href="q09-2022-deck-eye.jpg" target="_blank" rel="noopener"><img src="q09-2022-deck-eye.jpg" alt="The model, 2022 east house: one floor strip (red) resting on two beams (blue)." loading="lazy"></a><figcaption>The model, 2022 east house: one floor strip (red) resting on two beams (blue).</figcaption></figure>
-<figure class="wide"><a href="diagrams/q09-deck-options.svg" target="_blank" rel="noopener"><img src="diagrams/q09-deck-options.svg" alt="Diagram, not a 3D render: the three options seen end-on. They could not be staged in the lab, which only has the model's current version." loading="lazy"></a><figcaption>Diagram, not a 3D render: the three options seen end-on. They could not be staged in the lab, which only has the model's current version.</figcaption></figure>
-<figure><a href="photos/2022-exterior-24.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-24.jpg" alt="Real photo, 2022: look at the ceiling. Are those wooden boards between the orange beams joists?" loading="lazy"></a><figcaption>Real photo, 2022: look at the ceiling. Are those wooden boards between the orange beams joists?</figcaption></figure>
-<figure><a href="photos/2022-interior-01.jpg" target="_blank" rel="noopener"><img src="photos/2022-interior-01.jpg" alt="Real photo, 2022: the underside of a floor, orange beams and plywood." loading="lazy"></a><figcaption>Real photo, 2022: the underside of a floor, orange beams and plywood.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q9" value="A. Strips on top of the beams (as the model does now)"> <span>A. Strips on top of the beams (as the model does now)</span></label>
-<label class="opt"><input type="radio" name="Q9" value="B. Sheets set into a ledge on the beams"> <span>B. Sheets set into a ledge on the beams</span></label>
-<label class="opt"><input type="radio" name="Q9" value="C. 4x8 sheets on 2x4 joists"> <span>C. 4x8 sheets on 2x4 joists</span></label>
-<label class="opt"><input type="radio" name="Q9" value="A mix (say where below)"> <span>A mix (say where below)</span></label>
-<label class="opt"><input type="radio" name="Q9" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag first">worth answering first</span> <strong>What changes if you answer:</strong> How every floor is built in the build replay and how many pieces it needs; the finished houses look almost the same.</p>
-<p class="terms"><b>joist</b>: A smaller board (here a 2x4) laid across the main beams to hold up the plywood.</p><details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(Merges HANDOFF Q10 and W13 Q1.)
-
-**What the engine sees.** The Kit draws each deck as 4 ft × 15 ft plywood strips laid at beam height,
-centred on the beam centreline (through the frame planes), with no joists. The engine lays them on top of the
-beams, 5.7 cm above the Kit's surface.
-
-**What the answer changes.** On the beams: nothing changes. A ledge: a new seat rule. Sheets on joists:
-the deck section gains a 2x4 joist layer, and 2x4 framing is Claude's checkpoint-1 work, so this answer shapes
-it directly. See also Q8.
-
-Gene:</pre></details>
-</article>
 <article class="card" id="Q20" data-id="Q20" data-plain="The model's four 2022 houses spin one way (counter-clockwise from above); the drone photo shows them spinning the other way. Which is right — or is the model's map flipped left-to-right?">
 <div class="qid">Q20</div>
 <h3>The model's four 2022 houses spin one way (counter-clockwise from above); the drone photo shows them spinning the other way. Which is right — or is the model's map flipped left-to-right?</h3>
@@ -188,6 +86,12 @@ X → −X or Z → −Z; which one depends on which photo building is which), `
 year build (first bay, whole skeleton, A+B `ddb634d6…`) and its 7 chapter takes are re-planned and re-recorded, so
 their pins move once. Q1 (the south-west corner table) is re-read on the mirrored plan. If the model is right,
 nothing changes and A3's 2022 row becomes &quot;mirror checked: model right&quot;.
+
+**W49 note (2026-09-29 evening, not an answer).** Gene's names put the same building in each quadrant of the model
+and of both drone photos: Ba Sing Se = the model's Chiba (up), Cahuilla = east house (right, south), Chatsubo = kitchen
+(down), Huaqiangbei = west house (left). So the photo can be matched without mirroring the whole scene: each house
+keeps its quadrant and stair end, and only its offset along its own length flips (`make2022` `shift = 3` → ≈ −2).
+Plan: RECONCILIATION_2022.md §a. Left open for Gene to confirm the photo is right.
 
 Gene:</pre></details>
 </article>
@@ -257,223 +161,6 @@ Gene:
 ---</pre></details>
 </article></section>
 <section><h2>Improves fidelity</h2>
-<article class="card" id="Q8" data-id="Q8" data-plain="Could a plywood sheet lie straight across beams 4 ft apart with nothing under the middle, or did it need support about every 2 ft?">
-<div class="qid">Q8</div>
-<h3>Could a plywood sheet lie straight across beams 4 ft apart with nothing under the middle, or did it need support about every 2 ft?</h3>
-<p class="context">Standard 3/4 in plywood is rated for 2 ft between supports, so the model refuses to lay plywood across a 4 ft gap and puts <abbr title="A smaller board (here a 2x4) laid across the main beams to hold up the plywood.">joists</abbr> in first. Your earlier brief said 4 ft was fine; if so, floors can be built without joists.</p>
-<div class="pics">
-<figure class="wide"><a href="diagrams/q08-span-options.svg" target="_blank" rel="noopener"><img src="diagrams/q08-span-options.svg" alt="Diagram, not a 3D render: the two options side by side." loading="lazy"></a><figcaption>Diagram, not a 3D render: the two options side by side.</figcaption></figure>
-<figure><a href="q09-2022-deck-eye.jpg" target="_blank" rel="noopener"><img src="q09-2022-deck-eye.jpg" alt="The model, 2022: a floor strip (red) spanning between two beams (blue) with nothing underneath." loading="lazy"></a><figcaption>The model, 2022: a floor strip (red) spanning between two beams (blue) with nothing underneath.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q8" value="4 ft was fine: plywood straight on the beams"> <span>4 ft was fine: plywood straight on the beams</span></label>
-<label class="opt"><input type="radio" name="Q8" value="It needed support about every 2 ft"> <span>It needed support about every 2 ft</span></label>
-<label class="opt"><input type="radio" name="Q8" value="It depends (explain below)"> <span>It depends (explain below)</span></label>
-<label class="opt"><input type="radio" name="Q8" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> One rule: if 4 ft was fine, floors without <abbr title="A smaller board (here a 2x4) laid across the main beams to hold up the plywood.">joists</abbr> are allowed in the build replay. Goes with the floors question.</p>
-<p class="terms"><b>joist</b>: A smaller board (here a 2x4) laid across the main beams to hold up the plywood.</p><details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**What the engine sees.** The brief said 4 ft. The engine says ≤ 24 in centre gap, because 3/4 in ply is rated
-24 in o.c. Every Mars frame is 3–4 ft deep, so the 4 ft rule would make joists optional on every bay. The
-refusal reads &quot;cannot span 1.22 m between b3 and b4 (max 0.62 m / 24 in); install 2x4 joists first&quot;
-(`plywood.span`, PROGRESSIVE.md). It is marked &quot;owner may overrule&quot;. No image: this is a rule, not a scene.
-
-**What the answer changes.** One constant plus a rules-version bump. At 4 ft, plans without joists become
-valid. The flagship still installs joists, but its bound plans would report `plan.stale`. Relates to Q9.
-
-Gene:
-
----</pre></details>
-</article>
-<article class="card" id="Q10" data-id="Q10" data-plain="A floor strip is 15 ft long but plywood comes in 8 ft sheets. How was a strip pieced together?">
-<div class="qid">Q10</div>
-<h3>A floor strip is 15 ft long but plywood comes in 8 ft sheets. How was a strip pieced together?</h3>
-<p class="context">The model cuts each strip from 6 ft + 6 ft + 3 ft pieces, joined where they sit on beams. That sets how many cuts and pieces the build replay needs (81 pieces for 27 strips).</p>
-<div class="pics">
-<figure class="wide"><a href="diagrams/q10-strip-options.svg" target="_blank" rel="noopener"><img src="diagrams/q10-strip-options.svg" alt="Diagram, not a 3D render: one 15 ft strip seen from above." loading="lazy"></a><figcaption>Diagram, not a 3D render: one 15 ft strip seen from above.</figcaption></figure>
-<figure><a href="q09-2022-deck-eye.jpg" target="_blank" rel="noopener"><img src="q09-2022-deck-eye.jpg" alt="The model, 2022: one 15 ft floor strip (red) between two beams (blue)." loading="lazy"></a><figcaption>The model, 2022: one 15 ft floor strip (red) between two beams (blue).</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q10" value="6 ft + 6 ft + 3 ft (as the model does now)"> <span>6 ft + 6 ft + 3 ft (as the model does now)</span></label>
-<label class="opt"><input type="radio" name="Q10" value="8 ft + 7 ft, with a block under the joint"> <span>8 ft + 7 ft, with a block under the joint</span></label>
-<label class="opt"><input type="radio" name="Q10" value="Something else (describe below)"> <span>Something else (describe below)</span></label>
-<label class="opt"><input type="radio" name="Q10" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> Only the cutting and the piece count in the build replay.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(W13 Q2.)
-
-**What the engine sees.** Each strip is made as 6 + 6 + 3 ft pieces, jointed on beams (`cut` at the cutting
-station, 81 deck pieces for 27 strips).
-
-**What the answer changes.** For example 8 + 7 with blocking: different cuts, piece counts and blocking parts
-in `parts-b.ts`.
-
-Gene:</pre></details>
-</article>
-<article class="card" id="Q12" data-id="Q12" data-plain="What was the stair up to the east house's first floor like: how wide, how many stringers under the steps, and where did its bottom step land?">
-<div class="qid">Q12</div>
-<h3>What was the stair up to the east house's first floor like: how wide, how many <abbr title="The sloped board along the side (or middle) of a stair that the steps rest on.">stringers</abbr> under the steps, and where did its bottom step land?</h3>
-<p class="context">The model's drawing has an 8-step stair 4.45 m wide with no <abbr title="The sloped board along the side (or middle) of a stair that the steps rest on.">stringers</abbr>, and its first step floats 55 cm above the ground. The replay builds it with 6 stringers and cannot place 5 parts (2 rail posts that would stand inside the rack and 3 step fronts).</p>
-<div class="pics">
-<figure><a href="q12-2022-stair-eye.jpg" target="_blank" rel="noopener"><img src="q12-2022-stair-eye.jpg" alt="The model, 2022 east house stair from the courtyard: 8 steps (red); the orange step floats 55 cm up." loading="lazy"></a><figcaption>The model, 2022 east house stair from the courtyard: 8 steps (red); the orange step floats 55 cm up.</figcaption></figure>
-<figure class="wide"><a href="diagrams/q12-stair-options.svg" target="_blank" rel="noopener"><img src="diagrams/q12-stair-options.svg" alt="Diagram, not a 3D render: the options seen from the front." loading="lazy"></a><figcaption>Diagram, not a 3D render: the options seen from the front.</figcaption></figure>
-<figure><a href="photos/2022-exterior-09.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-09.jpg" alt="Real photo, 2022: a rack house with a stair at its right end." loading="lazy"></a><figcaption>Real photo, 2022: a rack house with a stair at its right end.</figcaption></figure>
-<figure><a href="photos/2026-skeleton-2x4-frame.jpg" target="_blank" rel="noopener"><img src="photos/2026-skeleton-2x4-frame.jpg" alt="Real photo, 2026 (a later year): the long stair on the right." loading="lazy"></a><figcaption>Real photo, 2026 (a later year): the long stair on the right.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q12" value="Two stringers (one each side)"> <span>Two stringers (one each side)</span></label>
-<label class="opt"><input type="radio" name="Q12" value="Four or more stringers"> <span>Four or more stringers</span></label>
-<label class="opt"><input type="radio" name="Q12" value="It was a ramp, not a stair"> <span>It was a ramp, not a stair</span></label>
-<label class="opt"><input type="radio" name="Q12" value="Not sure about stringers (answer the width and the bottom step below)"> <span>Not sure about stringers (answer the width and the bottom step below)</span></label>
-<label class="opt"><input type="radio" name="Q12" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> The stair's parts and where its foot stands in the build replay; the 5 unplaced parts get placed or dropped.</p>
-<p class="terms"><b>stringer</b>: The sloped board along the side (or middle) of a stair that the steps rest on.</p><details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(Merges HANDOFF Q9 and W13 Q4.)
-
-**What the engine sees.** The Kit draws a 4.45 m-wide, 8-tread end stair with no stringers (first picture
-above). Its first step is 0.55 m above the ground datum, and its top posts stand inside the end frame. The
-engine builds it after both upper decks (crews climb the end frames). It places 16 of 21 parts: 6 stringers,
-16 tread boards, 6 posts and 2 handrails. It leaves unplaced 2 rail posts (inside the end frame) and
-3 risers.
-
-**What the answer changes.** Stringer count and lumber, tread boards, width, and whether it was a ramp. The
-foot position decides the 0.55 m first step and the 5 unplaced parts.
-
-Gene:</pre></details>
-</article>
-<article class="card" id="Q13" data-id="Q13" data-plain="What held up the solar panels on the roof: two rails, or a frame of wood or metal? And which side did people work from to install them?">
-<div class="qid">Q13</div>
-<h3>What held up the solar panels on the roof: two rails, or a frame of wood or metal? And which side did people work from to install them?</h3>
-<p class="context">The model shows the panels in one continuous row over posts rising above the roof, and the replay mounts them on two rails. With no gap between panels there is nowhere to stand beside them, so 14 of the 20 solar parts cannot be placed yet.</p>
-<div class="pics">
-<figure><a href="q13-2022-solar-eye.jpg" target="_blank" rel="noopener"><img src="q13-2022-solar-eye.jpg" alt="The model, 2022 east house: the row of solar panels (red) above the roof." loading="lazy"></a><figcaption>The model, 2022 east house: the row of solar panels (red) above the roof.</figcaption></figure>
-<figure class="wide"><a href="diagrams/q13-solar-options.svg" target="_blank" rel="noopener"><img src="diagrams/q13-solar-options.svg" alt="Diagram, not a 3D render: the two options seen from the side." loading="lazy"></a><figcaption>Diagram, not a 3D render: the two options seen from the side.</figcaption></figure>
-<figure><a href="photos/2022-exterior-20.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-20.jpg" alt="Real photo, 2022: the solar row above a mural wall." loading="lazy"></a><figcaption>Real photo, 2022: the solar row above a mural wall.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q13" value="Two rails (as the model does now)"> <span>Two rails (as the model does now)</span></label>
-<label class="opt"><input type="radio" name="Q13" value="A frame of wood or metal under them"> <span>A frame of wood or metal under them</span></label>
-<label class="opt"><input type="radio" name="Q13" value="Something else (describe below)"> <span>Something else (describe below)</span></label>
-<label class="opt"><input type="radio" name="Q13" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> What sits under the panels and where the installers stand; it decides whether the 14 unplaced parts get placed.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(W13 Q5.)
-
-**What the engine sees.** The Kit's modules sit over the frame columns that stand above the roof deck, in one
-contiguous row (second picture above). The engine mounts panels on two rails (`install_panel`, SOLAR_PAINT.md).
-It places 6 of 20 solar parts. The other 14 need side stations, because a contiguous row leaves no room to stand
-beside a module.
-
-**What the answer changes.** A frame under the modules, or access from a particular side, sets the
-mount parts and where installers stand in `construction/solar.ts`. It decides whether the 14 unplaced parts
-can be placed.
-
-Gene:</pre></details>
-</article>
-<article class="card" id="Q11" data-id="Q11" data-plain="Were the plywood walls fixed on the outside of the rack beams or on the inside, and what were they fixed to where a walkway runs through?">
-<div class="qid">Q11</div>
-<h3>Were the plywood walls fixed on the outside of the rack beams or on the inside, and what were they fixed to where a walkway runs through?</h3>
-<p class="context">The model hangs the wall panels just outside the beams, and the 2022 murals are painted on those panels. Where a walkway opens the rack, a panel has no beam behind it, so the replay needs to know what it was fixed to.</p>
-<div class="pics">
-<figure><a href="q11-2022-wall-eye.jpg" target="_blank" rel="noopener"><img src="q11-2022-wall-eye.jpg" alt="The model, 2022 east house: wall panels (red) and the beam line (blue)." loading="lazy"></a><figcaption>The model, 2022 east house: wall panels (red) and the beam line (blue).</figcaption></figure>
-<figure class="wide"><a href="diagrams/q11-wall-options.svg" target="_blank" rel="noopener"><img src="diagrams/q11-wall-options.svg" alt="Diagram, not a 3D render: the few centimetres involved do not show in 3D." loading="lazy"></a><figcaption>Diagram, not a 3D render: the few centimetres involved do not show in 3D.</figcaption></figure>
-<figure><a href="photos/2022-exterior-10.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-10.jpg" alt="Real photo, 2022: plywood wall panels going up on a rack house." loading="lazy"></a><figcaption>Real photo, 2022: plywood wall panels going up on a rack house.</figcaption></figure>
-<figure><a href="photos/2022-exterior-20.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-20.jpg" alt="Real photo, 2022: a mural wall." loading="lazy"></a><figcaption>Real photo, 2022: a mural wall.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q11" value="Outside the beams (as the model does now)"> <span>Outside the beams (as the model does now)</span></label>
-<label class="opt"><input type="radio" name="Q11" value="Inside the beams"> <span>Inside the beams</span></label>
-<label class="opt"><input type="radio" name="Q11" value="Mixed (describe below, with how they were fixed at the walkways)"> <span>Mixed (describe below, with how they were fixed at the walkways)</span></label>
-<label class="opt"><input type="radio" name="Q11" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> Where the wall panels sit (a few centimetres) and where the builders stand to fix them; the murals stay.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(W13 Q3.)
-
-**What the engine sees.** The engine hangs panels outside the beam line, 3.5–4.8 cm off the Kit's drawing
-(25 panels on 4 walls, `construction/wall.ts`). The Kit's murals are painted on these panels (second picture
-above).
-
-**What the answer changes.** Inside the beam line means a different panel plane and different fastening
-stations. At the aisles, the fastening rule decides what a panel bears on.
-
-Gene:</pre></details>
-</article>
-<article class="card" id="Q19" data-id="Q19" data-plain="In 2022, did the roofs have 2x4 framing under the plywood (as in the 2026 photo), or did the plywood lie straight on the top beams?">
-<div class="qid">Q19</div>
-<h3>In 2022, did the roofs have 2x4 framing under the plywood (as in the 2026 photo), or did the plywood lie straight on the top beams?</h3>
-<p class="context">The model's 2022 houses have no roof framing: every roof sheet lies straight on the top beams. The 2026 photo shows 2x4 framing going on before the plywood, so we want to know whether 2022 was built the same way.</p>
-<div class="pics">
-<figure><a href="q19-2022-roof-eye.jpg" target="_blank" rel="noopener"><img src="q19-2022-roof-eye.jpg" alt="The model, 2022 east house: roof sheets (red) lying straight on the top beam (blue)." loading="lazy"></a><figcaption>The model, 2022 east house: roof sheets (red) lying straight on the top beam (blue).</figcaption></figure>
-<figure class="wide"><a href="diagrams/q19-roof-options.svg" target="_blank" rel="noopener"><img src="diagrams/q19-roof-options.svg" alt="Diagram, not a 3D render: the two options seen end-on." loading="lazy"></a><figcaption>Diagram, not a 3D render: the two options seen end-on.</figcaption></figure>
-<figure><a href="photos/2026-skeleton-2x4-frame.jpg" target="_blank" rel="noopener"><img src="photos/2026-skeleton-2x4-frame.jpg" alt="Real photo, 2026: 2x4 framing on the racks before the plywood." loading="lazy"></a><figcaption>Real photo, 2026: 2x4 framing on the racks before the plywood.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q19" value="No framing in 2022: plywood straight on the beams"> <span>No framing in 2022: plywood straight on the beams</span></label>
-<label class="opt"><input type="radio" name="Q19" value="Yes, 2x4 framing as in 2026"> <span>Yes, 2x4 framing as in 2026</span></label>
-<label class="opt"><input type="radio" name="Q19" value="Only on some buildings (say which below)"> <span>Only on some buildings (say which below)</span></label>
-<label class="opt"><input type="radio" name="Q19" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> If yes, the 2022 roofs gain framing, sit about 13 cm higher, and the replay builds the framing first; if no, nothing changes.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(Parked; non-blocking. Added after W33.)
-
-**What the engine sees.** the 2022 Kit scenes have no top plates, rafters or ceiling joists; every roof sheet lies straight on the
-rack's top beams (0.22 / 2.48 / 4.757 m). The only &quot;roof&quot; features are the kitchen's 8 rail posts + 2 railings. The 2026 skeleton
-photo (`evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg`) shows 2x4 top framing before plywood.
-**What the answer changes.** if 2022 had framing, the replays would sequence `install_top_plate`/`install_rafter` before the roof
-deck and the protected `mars-2022` state would need a reconstruction-edit adding the members (roof deck rises ≈ 13 cm). If not,
-nothing changes — the framing verbs wait for 2026.
-Gene:
-
----</pre></details>
-</article>
-<article class="card" id="Q14" data-id="Q14" data-plain="How did plywood and beams get up to the upper floors: handed up by people standing on the lower floor, or with a forklift or a ladder?">
-<div class="qid">Q14</div>
-<h3>How did plywood and beams get up to the upper floors: handed up by people standing on the lower floor, or with a forklift or a ladder?</h3>
-<p class="context">In the replay, people stand on the first floor and pass material up hand to hand, and top beams go up with people climbing the rack's braces (you confirmed that part). If a forklift or ladder did the lifting, the replay's crew and steps for the upper floors change.</p>
-<div class="pics">
-<figure><a href="q14-relay.jpg" target="_blank" rel="noopener"><img src="q14-relay.jpg" alt="The build replay, 2022: a top beam (red) handed up by people standing on the frame's braces." loading="lazy"></a><figcaption>The build replay, 2022: a top beam (red) handed up by people standing on the frame's braces.</figcaption></figure>
-<figure><a href="photos/2026-material-piles-loader.jpg" target="_blank" rel="noopener"><img src="photos/2026-material-piles-loader.jpg" alt="Real photo, 2026: a loader on site." loading="lazy"></a><figcaption>Real photo, 2026: a loader on site.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q14" value="Hand to hand, people on the lower floor (as now)"> <span>Hand to hand, people on the lower floor (as now)</span></label>
-<label class="opt"><input type="radio" name="Q14" value="Forklift or telehandler"> <span>Forklift or telehandler</span></label>
-<label class="opt"><input type="radio" name="Q14" value="Ladder"> <span>Ladder</span></label>
-<label class="opt"><input type="radio" name="Q14" value="A mix (describe below)"> <span>A mix (describe below)</span></label>
-<label class="opt"><input type="radio" name="Q14" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> Only the upper-floor steps of the build replay: who stands where and how long it takes.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>(W13 Q6.)
-
-**What the engine sees.** Upper-deck material goes up by `pass_up`, a relay through people standing on the
-first-floor deck. Top beams go up by the relay on the bracing (picture).
-
-![Top beam (4.76 m) relayed up the frame bracing](questions/yb2022-top-beam-relay.png)
-
-**What the answer changes.** A forklift or ladder route changes the upper-deck section's verbs and crew
-stations, and the A+B pin.
-
-Gene:</pre></details>
-</article>
 <article class="card" id="Q23" data-id="Q23" data-plain="In 2024, was Chiba's front six rack bays wide (about 22 m, as the model has it) or seven bays (about 25.6 m)?">
 <div class="qid">Q23</div>
 <h3>In 2024, was Chiba's front six rack <abbr title="one 12 ft (3.66 m) span of rack beams; the model's Chiba 2024 is 6 bays wide and 3 deep">bays</abbr> wide (about 22 m, as the model has it) or seven bays (about 25.6 m)?</h3>
@@ -505,163 +192,95 @@ the crop are unknown, so this does not settle it. **Default:** keep 6 bays.
 `reconstruction-edit` of `mars-2024`, HISTORY_IDS.md). Every Chiba 2024 hashed id then changes, and the pins stay.
 Gene:</pre></details>
 </article>
-<article class="card" id="Q7" data-id="Q7" data-plain="When the materials were on site, how were they piled: how many plywood sheets per stack, and were the rack frames and beams stacked flat or bundled?">
-<div class="qid">Q7</div>
-<h3>When the materials were on site, how were they piled: how many plywood sheets per stack, and were the rack frames and beams stacked flat or bundled?</h3>
-<p class="context">The replay's material yard is a guess made to look like the photos: plywood in strapped stacks of about 24 sheets, frames lying flat, beams in strapped bundles, and a cutting table. The size of the yard sets how many trips the crew makes and how long a build takes.</p>
+<article class="card" id="Q28" data-id="Q28" data-plain="You said one row of panels on two buildings and staggered on another. In the drone photos Huaqiangbei has one long row, Ba Sing Se has three short rows stepped along it, and Cahuilla has one long row plus a short group beside it. Is Ba Sing Se the staggered one, and was Cahuilla's short group real?">
+<div class="qid">Q28</div>
+<h3>You said one row of panels on two buildings and staggered on another. In the drone photos Huaqiangbei has one long row, Ba Sing Se has three short rows stepped along it, and Cahuilla has one long row plus a short group beside it. Is Ba Sing Se the staggered one, and was Cahuilla's short group real?</h3>
+<p class="context">The photos are small, so the short group on Cahuilla could be a second row, loose panels or something else on the roof. We will draw what the photo shows unless you say otherwise.</p>
 <div class="pics">
-<figure><a href="q07-yard.jpg" target="_blank" rel="noopener"><img src="q07-yard.jpg" alt="The replay's 2022 yard at the start. Colours match the labels; outlines show through other objects." loading="lazy"></a><figcaption>The replay's 2022 yard at the start. Colours match the labels; outlines show through other objects.</figcaption></figure>
-<figure><a href="photos/2026-material-piles.jpg" target="_blank" rel="noopener"><img src="photos/2026-material-piles.jpg" alt="Real photo, 2026: plywood, 2x4, 2x6 and timbers in piles." loading="lazy"></a><figcaption>Real photo, 2026: plywood, 2x4, 2x6 and timbers in piles.</figcaption></figure>
-<figure><a href="photos/2026-material-piles-loader.jpg" target="_blank" rel="noopener"><img src="photos/2026-material-piles-loader.jpg" alt="Real photo, 2026: the piles with a loader." loading="lazy"></a><figcaption>Real photo, 2026: the piles with a loader.</figcaption></figure>
+<figure><a href="r2022-aerial-annotated.jpg" target="_blank" rel="noopener"><img src="r2022-aerial-annotated.jpg" alt="Drone photo, 2022, with the names: green boxes are the panel rows as we read them." loading="lazy"></a><figcaption>Drone photo, 2022, with the names: green boxes are the panel rows as we read them.</figcaption></figure>
+<figure><a href="q20-2022-model-vs-drone.jpg" target="_blank" rel="noopener"><img src="q20-2022-model-vs-drone.jpg" alt="Right: drone photo DJI_0829 turned north-up; the same panels from another angle." loading="lazy"></a><figcaption>Right: drone photo DJI_0829 turned north-up; the same panels from another angle.</figcaption></figure>
 </div>
 <fieldset class="answer">
 <legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q7" value="Looks about right"> <span>Looks about right</span></label>
-<label class="opt"><input type="radio" name="Q7" value="Different (describe below: sheets per stack, how frames and beams were stacked)"> <span>Different (describe below: sheets per stack, how frames and beams were stacked)</span></label>
-<label class="opt"><input type="radio" name="Q7" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="opt"><input type="radio" name="Q28" value="Yes: Ba Sing Se staggered; Cahuilla one row, the short group was something else"> <span>Yes: Ba Sing Se staggered; Cahuilla one row, the short group was something else</span></label>
+<label class="opt"><input type="radio" name="Q28" value="Ba Sing Se staggered, and Cahuilla really had a second short row"> <span>Ba Sing Se staggered, and Cahuilla really had a second short row</span></label>
+<label class="opt"><input type="radio" name="Q28" value="Cahuilla was the staggered one (say what Ba Sing Se had below)"> <span>Cahuilla was the staggered one (say what Ba Sing Se had below)</span></label>
+<label class="opt"><input type="radio" name="Q28" value="Don't know / skip"> <span>Don't know / skip</span></label>
 <label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
 <textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
 </fieldset>
-<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> The yard's size, the number of trips and the length of the build replay; the finished houses do not change.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**What the engine sees.** The pile yard is chosen to look like the evidence photos. None of it is documented:
-- plywood in strapped stacks of about 24 sheets;
-- lumber in strapped units;
-- frames lying flat in stacks, beams in strapped bundles;
-- a cutting station (`campus/bom.ts`, `world/catalog-stock.ts`).
+<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> Only where the panel frames stand on Ba Sing Se and Cahuilla.</p>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**Default (RECONCILIATION_2022.md §d):** Huaqiangbei and Cahuilla one row each, Ba Sing Se three short rows, one per
+bay, stepped; Cahuilla's short group left out. Chatsubo has no panels (as the model already has for the kitchen).
 
-![2022 east-house pile yard at t = 0](questions/yb2022-pile-yard.png)
-![Showcase: every bundle / stack kind](../../viewer/e2e/baselines/solar-paint-mounted-equipment.png)
+Gene:</pre></details>
+</article>
+<article class="card" id="Q29" data-id="Q29" data-plain="Each building's wide stair filled one end of the building, with its steps running along the building. Did you start up it from the courtyard side or from the outside?">
+<div class="qid">Q29</div>
+<h3>Each building's wide stair filled one end of the building, with its steps running along the building. Did you start up it from the courtyard side or from the outside?</h3>
+<p class="context">A photo from straight above shows which way the steps run but not which end is the bottom. We assume you started from the courtyard, the side people walked on.</p>
+<div class="pics">
+<figure><a href="r2022-aerial-annotated.jpg" target="_blank" rel="noopener"><img src="r2022-aerial-annotated.jpg" alt="Orange boxes: the four stairs; the orange lines show which way the steps run." loading="lazy"></a><figcaption>Orange boxes: the four stairs; the orange lines show which way the steps run.</figcaption></figure>
+<figure><a href="photos/2022-exterior-09.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-09.jpg" alt="Real photo, 2022: a building with a stair at its end." loading="lazy"></a><figcaption>Real photo, 2022: a building with a stair at its end.</figcaption></figure>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q29" value="From the courtyard side, on all four"> <span>From the courtyard side, on all four</span></label>
+<label class="opt"><input type="radio" name="Q29" value="From the outside, on all four"> <span>From the outside, on all four</span></label>
+<label class="opt"><input type="radio" name="Q29" value="It differed (say which below)"> <span>It differed (say which below)</span></label>
+<label class="opt"><input type="radio" name="Q29" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> Where the bottom step lands for each of the four buildings.</p>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**Default (RECONCILIATION_2022.md §b):** foot on the courtyard side, top at the outer long wall's end frame.
 
-**What the answer changes.** Bundle counts and stack shapes in `catalog-stock.ts` / `bom.ts`: yard size, the
-number of `take_from_bundle` trips, and how long a year build runs. The material rules stay the same.
-Year-build pins move.
+Gene:</pre></details>
+</article>
+<article class="card" id="Q30" data-id="Q30" data-plain="Under each floor the 2x4s crossed the orange beams. Were the 2x4s standing on their narrow edge or lying flat, about how far apart, and did the plywood sheets run across the 2x4s or along them?">
+<div class="qid">Q30</div>
+<h3>Under each floor the 2x4s crossed the orange beams. Were the 2x4s standing on their narrow edge or lying flat, about how far apart, and did the plywood sheets run across the 2x4s or along them?</h3>
+<p class="context">This sets how high every floor sits (a 2x4 on edge adds 9 cm, lying flat 4 cm) and how the sheets are cut. We assume on edge, about 2 ft apart, with the long 15 ft strips kept as they are.</p>
+<div class="pics">
+<figure class="wide"><a href="diagrams/q09-deck-options.svg" target="_blank" rel="noopener"><img src="diagrams/q09-deck-options.svg" alt="Diagram: option C is the floor on 2x4s." loading="lazy"></a><figcaption>Diagram: option C is the floor on 2x4s.</figcaption></figure>
+<figure><a href="photos/2022-exterior-24.jpg" target="_blank" rel="noopener"><img src="photos/2022-exterior-24.jpg" alt="Real photo, 2022: the boards between the orange beams in the ceiling." loading="lazy"></a><figcaption>Real photo, 2022: the boards between the orange beams in the ceiling.</figcaption></figure>
+</div>
+<fieldset class="answer">
+<legend>Your answer</legend>
+<label class="opt"><input type="radio" name="Q30" value="On edge, about 2 ft apart, sheets along the long strips (as we assume)"> <span>On edge, about 2 ft apart, sheets along the long strips (as we assume)</span></label>
+<label class="opt"><input type="radio" name="Q30" value="On edge, sheets across the 2x4s (long side of each sheet crossing them)"> <span>On edge, sheets across the 2x4s (long side of each sheet crossing them)</span></label>
+<label class="opt"><input type="radio" name="Q30" value="Lying flat"> <span>Lying flat</span></label>
+<label class="opt"><input type="radio" name="Q30" value="Don't remember"> <span>Don't remember</span></label>
+<label class="opt"><input type="radio" name="Q30" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
+<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
+</fieldset>
+<p class="changes"><span class="tag fidelity">improves fidelity</span> <strong>What changes if you answer:</strong> The height of every floor by a few centimetres and the cutting list; the houses look the same.</p>
+<p class="terms"><b>joist</b>: A 2x4 laid across the orange beams to carry the plywood.</p><details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**Default (RECONCILIATION_2022.md §g):** joists on edge (3.5 in), 24 in apart, running across the beams (along the
+15 ft depth); the Q10 strips on top, with 2x4 blocking under the cross joints.
 
 Gene:</pre></details>
 </article></section>
 <section><h2>Blocks nothing (housekeeping)</h2>
-<article class="card" id="Q4" data-id="Q4" data-plain="Did the rack posts stand directly on the sand?">
-<div class="qid">Q4</div>
-<h3>Did the rack posts stand directly on the sand?</h3>
-<p class="context">Two parts of the model disagree by 16 cm about where the ground is, so in the studio the rebuilt racks sit 16 cm lower than the original drawing. We need one ground level; it only matters beyond housekeeping if the posts stood on blocks or pads.</p>
+<article class="card" id="Q31" data-id="Q31" data-plain="The model calls the four 2022 buildings a classroom (now Ba Sing Se), a painted-arches house (Cahuilla), a kitchen (Chatsubo) and a painted house (Huaqiangbei). Is that what each one held?">
+<div class="qid">Q31</div>
+<h3>The model calls the four 2022 buildings a classroom (now Ba Sing Se), a painted-arches house (Cahuilla), a kitchen (Chatsubo) and a painted house (Huaqiangbei). Is that what each one held?</h3>
+<p class="context">The names are fixed now, but what we put inside each building came from guesses about a different set of names. It only changes furniture and signs, not the buildings.</p>
 <div class="pics">
-<figure class="wide"><a href="diagrams/q04-ground-options.svg" target="_blank" rel="noopener"><img src="diagrams/q04-ground-options.svg" alt="Diagram, not a 3D render: a 16 cm difference does not show clearly in a 3D view." loading="lazy"></a><figcaption>Diagram, not a 3D render: a 16 cm difference does not show clearly in a 3D view.</figcaption></figure>
-<figure><a href="photos/2026-skeleton-2x4-frame.jpg" target="_blank" rel="noopener"><img src="photos/2026-skeleton-2x4-frame.jpg" alt="Real photo, 2026 (a later year): rack posts at ground level." loading="lazy"></a><figcaption>Real photo, 2026 (a later year): rack posts at ground level.</figcaption></figure>
+<figure><a href="r2022-names-model-vs-photo.jpg" target="_blank" rel="noopener"><img src="r2022-names-model-vs-photo.jpg" alt="Left: the model with its old labels and the new names. Right: the drone photo with the same names." loading="lazy"></a><figcaption>Left: the model with its old labels and the new names. Right: the drone photo with the same names.</figcaption></figure>
 </div>
 <fieldset class="answer">
 <legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q4" value="Posts stood directly on the sand"> <span>Posts stood directly on the sand</span></label>
-<label class="opt"><input type="radio" name="Q4" value="Posts stood on blocks or pads (how high? below)"> <span>Posts stood on blocks or pads (how high? below)</span></label>
-<label class="opt"><input type="radio" name="Q4" value="Don't mind: pick one"> <span>Don't mind: pick one</span></label>
-<label class="opt"><input type="radio" name="Q4" value="Don't know / skip"> <span>Don't know / skip</span></label>
+<label class="opt"><input type="radio" name="Q31" value="Yes, that is right"> <span>Yes, that is right</span></label>
+<label class="opt"><input type="radio" name="Q31" value="Some are wrong (say which below)"> <span>Some are wrong (say which below)</span></label>
+<label class="opt"><input type="radio" name="Q31" value="Don't know / skip"> <span>Don't know / skip</span></label>
 <label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
 <textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
 </fieldset>
-<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> Everything shifts by 16 cm once and the saved build replays are re-recorded; you would not notice it by eye.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**What the engine sees.** The Kit stands every piece on y = 0. The published year scenes and the studio put the
-ground at −0.16 m (`GROUND_Y`, `engine/campus/extract.ts`), so rack posts start 16 cm above the drawn ground.
-The year build runs on the Kit datum (y = 0). The studio draws rebuilt racks 0.16 m below the Kit's.
-
-![Finished first bay, frame feet at the Kit datum](questions/yb2022-frame-feet.png)
-
-**W42 survey (§15 &quot;levitating tires&quot;; measured by ray-casting down from every near-ground mesh of each built scene).**
-Every Kit piece standing on the ground floats by the datum (+0.16 m), and some props add their own lift. The 2020 ring
-tires (+0.175/0.189 m) and the ballast tires (tarp +0.13–0.19 m, container roof −0.03 m) are fixed in `studio-2020/scene.ts`.
-They now rest on the ground and on their surfaces. Everything else waits for this answer:
-
-| Scene | Prop (ids) | Gap above what it stands on | Where |
-| --- | --- | --- | --- |
-| 2020 | RV wheels `rv-1…rv-6-component-*` (4 each) | +0.089 | `studio-2020/scene.ts` makeRV (datum; not moved) |
-| 2020 | portable toilets `site-portable-toilet-body-*` (4) | +0.19 | same; the whole 2020 scene stands on y = 0 (uprights, container, trees +0.16) |
-| 2020 | workshop table legs `canopy-table-leg-*` (4) | +0.20 | same |
-| 2021–2025 | table legs `*-table-leg-*` (classroom 24, library 4, kitchens 12, chiba 8–12, cafe 4, west-house 4) | +0.26 = 0.16 datum + 0.10 (`Kit.table` legs start at y = 0.1) | `app/history/kit.ts` table() |
-| 2021–2022 | bench feet `classroom-bench-foot-*` (12), `chiba-bench-foot-*` (4) | +0.21 (datum + 0.05) | `app/history/scenes.ts` |
-| 2021–2025 | stored food crates `*-stored-food-crate-*` (12 per kitchen) | +0.38 (datum + 0.22, under the counter, no shelf) | `kit.ts` kitchen() |
-| 2021–2025 | white refrigerator `*-white-refrigerator-*` | +0.18 (datum + 0.02) | `kit.ts` kitchen() |
-| 2023–2025 | café painted counter `cafe-cafe-painted-counter-fa10f6cc` | +0.26 | `scenes.ts` |
-| 2021–2025 | trailer wheels `rv-N-trailer-wheel-*` | +0.16 (datum only) | `kit.ts` rv() |
-| 2026 studio | campfire ring (`scenery.ts`): rocks embedded 0–4 cm, lowest log +0.05 (thick end) | ≈ on the ground | studio ambience (datum −0.16, correct) |
-
-**W46 (props seated, 2026-09-29): which floats were the datum and which were Kit bugs.** Re-measured from above (structure
-only), the table above mixes two things. **Kit bugs, fixed:** most Kit furniture stands on the ground-floor deck (top
-0.2525), and its legs, feet, crates, fridge and café counter started *inside* that deck (legs at 0.1, feet at 0.05, fridge
-at 0.02) — the &quot;+0.26 / +0.38&quot; figures were rays from inside the deck down to the ground; the 2020 worktable legs started
-inside their platform; the 2020 RV wheels were also turned 90°. These now stand on the deck, platform or beam under
-them. **Datum floats, fixed only for props:** trailers (+0.16), 2020 RVs (+0.089), toilets (+0.19) and the 2022
-west-house table (+0.26, held with all of 2022 for the year-build pins) stood on the Kit's y = 0 over the −0.16 ground;
-the props now stand on −0.16, like W42's tires. **Still open here:** the racks, decks and every other structure stay on
-the Kit datum (y = 0, 16 cm over the drawn ground), and furniture tops keep heights authored for y = 0, so tables sit
-0.53–0.66 m and benches 0.19 m above the deck. Answering Q4 moves the structure; the props will follow their surfaces.
-
-The lab (engine datum y = 0, ground at 0) and the year walk-about (ground at the file's `groundY`) draw props on their own
-ground, with no offset. Answering &quot;ground at −0.16&quot; would move every Kit row above by −0.16 in one place (the Kit's
-datum). The intrinsic lifts (tables +0.10, crates +0.22, benches +0.05) are separate Kit fixes.
-
-**What the answer changes.** One datum for build takes and the studio. The studio's 16 cm offset disappears.
-Re-basing moves every year-build pin once (first bay, whole skeleton, A+B `ddb634d6…`), and the takes are
-re-recorded.
-
-Gene:
+<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> The furniture and the labels inside each building.</p>
+<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>Gene:
 
 ---</pre></details>
-</article>
-<article class="card" id="Q6" data-id="Q6" data-plain="The model hangs the beams at 22 cm, 2.48 m and 4.76 m, as measured from photos. Keep those heights, or move each beam to the nearest real hole in the posts (at most 2.5 cm away)?">
-<div class="qid">Q6</div>
-<h3>The model hangs the beams at 22 cm, 2.48 m and 4.76 m, as measured from photos. Keep those heights, or move each beam to the nearest real hole in the posts (at most 2.5 cm away)?</h3>
-<p class="context">The heights were estimated from photos, while the real posts have holes every 2 inches, so each real beam sat in one of those holes. The lowest height (22 cm) is also lower than the first hole could plausibly be.</p>
-<div class="pics">
-<figure><a href="q06-2022-beams-eye.jpg" target="_blank" rel="noopener"><img src="q06-2022-beams-eye.jpg" alt="The model, 2022 east house: the three beam heights on one frame." loading="lazy"></a><figcaption>The model, 2022 east house: the three beam heights on one frame.</figcaption></figure>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q6" value="Keep the heights as they are"> <span>Keep the heights as they are</span></label>
-<label class="opt"><input type="radio" name="Q6" value="Snap to the real holes"> <span>Snap to the real holes</span></label>
-<label class="opt"><input type="radio" name="Q6" value="The lowest beam was higher (give the height below)"> <span>The lowest beam was higher (give the height below)</span></label>
-<label class="opt"><input type="radio" name="Q6" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> Beams move by up to 2.5 cm and the saved build replays are re-recorded once; invisible by eye.</p>
-<details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**What the engine sees.** The Kit hangs beams at 0.22, 2.48 and h − 0.12 m (4.757 m on a 16 ft frame). These
-come from photo estimates, and 0.22 m is below any plausible first hole. The engine reproduces them exactly with
-`upright-16ft-kit` seats (`world/catalog-stock.ts` `kitSeatLevels`), so the year build matches the protected
-checkpoint to 1 cm. Snapping to a 2 in hole pitch would move beams by up to ±2.5 cm.
-
-![First bay: the low beam at 0.22 m](questions/yb2022-frame-feet.png)
-![Whole first bay, three beam levels](../../viewer/e2e/baselines/year-build-skeleton.png)
-
-**What the answer changes.** Snapping edits every Kit year's beam placements. The protected `mars-2021..2025`
-states are re-seeded (`reconstruction-edit`), beam stable ids move (aliases), and every year-build pin moves
-once. Keeping the Kit heights changes nothing.
-
-Gene:</pre></details>
-</article>
-<article class="card" id="Q5" data-id="Q5" data-plain="Your list of rack sizes included a 9 ft piece. Was it a frame or a beam, and what size was it?">
-<div class="qid">Q5</div>
-<h3>Your list of rack sizes included a 9 ft piece. Was it a <abbr title="The ladder-like end of a rack: two posts joined by diagonal braces.">frame</abbr> or a <abbr title="The horizontal orange bar that hangs between two frames.">beam</abbr>, and what size was it?</h3>
-<p class="context">The model has <abbr title="The ladder-like end of a rack: two posts joined by diagonal braces.">frames</abbr> of 8, 12, 16 and 19 ft and <abbr title="The horizontal orange bar that hangs between two frames.">beams</abbr> of 12 ft, but nothing 9 ft, so it carries a placeholder 9 ft frame, guessed at 4 ft deep. Nothing in any scene uses it yet, so this only tidies the parts list.</p>
-<div class="pics">
-<div class="noimg"><strong>No picture for this one.</strong> Cannot be illustrated: no 9 ft part appears in any scene or photo we have. Picture a rack frame (two posts joined by diagonal braces, like a ladder) only 9 ft tall; or a single orange beam 9 ft long, the kind that hangs between two frames.</div>
-</div>
-<fieldset class="answer">
-<legend>Your answer</legend>
-<label class="opt"><input type="radio" name="Q5" value="A beam"> <span>A beam</span></label>
-<label class="opt"><input type="radio" name="Q5" value="A frame (how deep? below)"> <span>A frame (how deep? below)</span></label>
-<label class="opt"><input type="radio" name="Q5" value="Don't remember"> <span>Don't remember</span></label>
-<label class="opt"><input type="radio" name="Q5" value="Don't know / skip"> <span>Don't know / skip</span></label>
-<label class="angle"><input type="checkbox" data-k="angle"> Show me a different angle</label>
-<textarea data-k="note" rows="2" placeholder="Anything to add (optional): a number, a correction, a memory"></textarea>
-</fieldset>
-<p class="changes"><span class="tag none">blocks nothing</span> <strong>What changes if you answer:</strong> One placeholder part is removed or completed; no scene changes.</p>
-<p class="terms"><b>frame</b>: The ladder-like end of a rack: two posts joined by diagonal braces.<br><b>beam</b>: The horizontal orange bar that hangs between two frames.</p><details class="eng"><summary>Engineer's notes (not needed to answer)</summary><pre>**What the engine sees.** Gene's size list was 8 / 9 / 12 / 19 ft. The model library has 8, 12, 16 and 19 ft
-frames and 12 ft beams, and nothing that is 9 ft. `world/catalog.ts` carries `upright-9ft` marked `provisional`,
-with an assumed 4 ft depth. The flagship builds with `beam-9ft`. No image: nothing 9 ft exists in any scene
-to show.
-
-**What the answer changes.** If it is a beam, the provisional `upright-9ft` is removed and the flagship stands
-as is. If it is a frame, it needs a depth and a seat pattern (catalog entry, `mars-assembly` rules version).
-The provisional flag goes either way.
-
-Gene:</pre></details>
 </article>
 <article class="card" id="Q24" data-id="Q24" data-plain="The right-hand end of the 2024 solarium was a clear plastic wall with a door. Where in that wall was the door, and did it swing out, swing in, or slide?">
 <div class="qid">Q24</div>
@@ -764,7 +383,21 @@ Gene:
 
 ---</pre></details>
 </article></section>
-<section><h2>Already answered</h2><ul class="record"><li><b>Q3.</b> On this map of 2022, is north really straight up, with the east house on the right and the kitchen at the bottom?<br><span class="rec">You said: (2026-09-29) the long axis of the 2020 tire ring runs north–south; W42 fixed the sign from the DJI_0079 shadows → world −X is north in 2020 (`NORTH_AZIMUTH_OFFSET = −90`). See A3 below for the per-year caveat.</span></li>
+<section><h2>Already answered</h2><ul class="record"><li><b>Q1.</b> In 2022, could you walk out of the courtyard at its south-west corner (between the west house and the kitchen), or did a table block the gap?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) no table at the SW corner (tables are incidental). → Open: the table goes (RECONCILIATION_2022.md §e).</span></li>
+<li><b>Q2.</b> In 2023 and 2024 the model has two trailers parked inside Chiba, under its roof (red outlines). Was that real?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) no trailers under Chiba in 2023/2024, and side trailers must not touch the walls. → Move them out (RECONCILIATION_2022.md §i).</span></li>
+<li><b>Q3.</b> On this map of 2022, is north really straight up, with the east house on the right and the kitchen at the bottom?<br><span class="rec">You said: (2026-09-29) the long axis of the 2020 tire ring runs north–south; W42 fixed the sign from the DJI_0079 shadows → world −X is north in 2020 (`NORTH_AZIMUTH_OFFSET = −90`). See A3 below for the per-year caveat. **Correction (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md):** north ≈ 8 o'clock of the render, not straight up; derive exactly from the south-facing panels. The per-year bearing stays open (Q22); 2022 estimate in RECONCILIATION_2022.md §f.</span></li>
+<li><b>Q4.</b> Did the rack posts stand directly on the sand?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) posts stood directly on the sand → ground datum y = 0; the drawn −0.16 ground is wrong (RECONCILIATION_2022.md §j).</span></li>
+<li><b>Q5.</b> Your list of rack sizes included a 9 ft piece. Was it a frame or a beam, and what size was it?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) unknown (skip). → The provisional `upright-9ft` stays provisional; nothing uses it.</span></li>
+<li><b>Q6.</b> The model hangs the beams at 22 cm, 2.48 m and 4.76 m, as measured from photos. Keep those heights, or move each beam to the nearest real hole in the posts (at most 2.5 cm away)?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) beam hole pitch unknown (skip). → Keep the Kit heights 0.22 / 2.48 / 4.757 m.</span></li>
+<li><b>Q7.</b> When the materials were on site, how were they piled: how many plywood sheets per stack, and were the rack frames and beams stacked flat or bundled?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) piles look right. → Yard unchanged.</span></li>
+<li><b>Q8.</b> Could a plywood sheet lie straight across beams 4 ft apart with nothing under the middle, or did it need support about every 2 ft?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) floors = orange beams → 2x4 joists laid across several beams perpendicularly → plywood on the joists (criss-cross; plywood never directly on beams). → The 24 in span rule stands; `beamDeckRule` is retired (RECONCILIATION_2022.md §g).</span></li>
+<li><b>Q9.</b> How were the floors built: plywood strips laid on top of the beams, sheets set into a ledge on the beams, or 4x8 sheets on joists?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) C: floors = orange beams → 2x4 joists laid across several beams perpendicularly → plywood on the joists (criss-cross; plywood never directly on beams) (RECONCILIATION_2022.md §g).</span></li>
+<li><b>Q10.</b> A floor strip is 15 ft long but plywood comes in 8 ft sheets. How was a strip pieced together?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) strips sometimes get a sideways third row (3 ft). → ≈ the current 6 + 6 + 3 ft rule, whose 3 ft piece is cross-cut (RECONCILIATION_2022.md §k).</span></li>
+<li><b>Q11.</b> Were the plywood walls fixed on the outside of the rack beams or on the inside, and what were they fixed to where a walkway runs through?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) walls outside the beams (as now). → No change.</span></li>
+<li><b>Q12.</b> What was the stair up to the east house's first floor like: how wide, how many stringers under the steps, and where did its bottom step land?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) each building's stairs run PARALLEL to the building (wide), not perpendicular (RECONCILIATION_2022.md §b; foot side open, Q29).</span></li>
+<li><b>Q13.</b> What held up the solar panels on the roof: two rails, or a frame of wood or metal? And which side did people work from to install them?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) one row on two buildings, staggered on another, all facing south, on triangular wood frames ≈ 45° propped on one side with the low edge on the SOUTH roof edge (not a table in the middle) (RECONCILIATION_2022.md §d; which building is which, Q28).</span></li>
+<li><b>Q14.</b> How did plywood and beams get up to the upper floors: handed up by people standing on the lower floor, or with a forklift or a ladder?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) materials hand-to-hand (as now), but the forklift must stay supported. → Relay unchanged.</span></li>
+<li><b>Q19.</b> In 2022, did the roofs have 2x4 framing under the plywood (as in the 2026 photo), or did the plywood lie straight on the top beams?<br><span class="rec">You said: (2026-09-29 evening, questionnaire; OWNER_DECISIONS.md) Yes: roofs had 2x4 framing as in 2026 (RECONCILIATION_2022.md §h).</span></li>
 <li><b>A1.</b> How were the long top beams (about 4.76 m up) hung?<br><span class="rec">You said: two people climb the upright on its cross braces, and each holds one side of the beam while setting it. The `hang_beam` / stance mechanism is the real method (OWNER_DECISIONS.md; OWNER_FEEDBACK §14).</span></li>
 <li><b>A2.</b> When someone on a floor takes a load from below, may they only kneel (reach down 0.5 m), or also lie on their stomach at the edge?<br><span class="rec">You said: the 0.5 m kneel rule stays the default. Add a prone receiver (lying on the stomach at the deck edge, then rising to knees and feet holding the load) as a further posture (OWNER_FEEDBACK §13). W28 and W29 landed it.</span></li></ul></section>
 </main>
