@@ -57,7 +57,7 @@ test('solar-paint: paint bands as drawn = engine coverage, panel carried flat, s
       mid = true;
       await page.evaluate(() => (window.__marsEngine as unknown as H).camera([-5.5, 2.6, 4.5], [0, 1.2, 0.2]));
       await labFrames(page, 4);
-      await captureView(page, 'solar-paint-mid-paint', { testInfo, compare: false });
+      await captureView(page, 'solar-paint-mid-paint', { testInfo });
       const pv = r.pv.pose.p;
       await page.evaluate((p) => (window.__marsEngine as unknown as H).camera([p[0] - 3.2, 2.2, p[2] + 2.6], [p[0], 0.7, p[2]]), pv);
       await labFrames(page, 4);
@@ -80,7 +80,7 @@ test('solar-paint: paint bands as drawn = engine coverage, panel carried flat, s
   expect(pv2.rendered!.max[1] - pv2.rendered!.min[1]).toBeGreaterThan(0.3);
   await page.evaluate(() => (window.__marsEngine as unknown as H).camera([-10.5, 3.2, 12.5], [-5, 0.4, 7.5]));
   await labFrames(page, 4);
-  await captureView(page, 'solar-paint-mounted-equipment', { testInfo, compare: false });
+  await captureView(page, 'solar-paint-mounted-equipment', { testInfo });
   await page.evaluate(() => (window.__marsEngine as unknown as H).cameraPreset('oblique'));
   await labFrames(page, 4);
   await captureView(page, 'solar-paint-end-oblique', { testInfo, compare: false });

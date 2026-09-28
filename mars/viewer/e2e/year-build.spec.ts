@@ -196,7 +196,7 @@ test('year-build 2022 east-house (first bay): live = rehearsal pin, rack poses o
   console.log(`[year-build] hand-up ${mid.id} beam ${mid.beam} at y ${beam.pose.p[1].toFixed(2)}: ${hs.filter((q) => q.activity !== 'idle').map((q) => `${q.id}:${q.activity}@${q.p[1].toFixed(2)}`).join(' ')}`);
   await hud(page, false);
   await look(page, ...around(beam.pose.p, beam.pose.yaw + Math.PI / 2 + 0.35, 7.5, 2.4, 1.6));
-  await captureView(page, 'year-build-handup-248', { testInfo, compare: false });
+  await captureView(page, 'year-build-handup-248', { testInfo });
   await hud(page, true);
 
   // a top beam (4.76 m) through the relay: givers → relay (take-relay), relay → installers (take-hook)
@@ -244,17 +244,17 @@ test('year-build 2022 east-house (first bay): live = rehearsal pin, rack poses o
   const bc = [building.reduce((a, q) => a + q.pose.p[0], 0) / building.length, 0, building.reduce((a, q) => a + q.pose.p[2], 0) / building.length];
   const fyaw = building.find((q) => q.def.startsWith('upright'))!.pose.yaw;
   await look(page, ...around(bc, fyaw + Math.PI / 2 + 0.5, 16, 7, 2.2));
-  await captureView(page, 'year-build-skeleton', { testInfo, compare: false });
-  // eye level from the pile-yard side, ~24 m out (the photo's framing: piles in the foreground)
+  await captureView(page, 'year-build-skeleton', { testInfo });
+  // eye level from the pile-yard side, facing the frames (the photo's framing: piles in the foreground)
   const side = Math.cos(away - (fyaw + Math.PI / 2)) >= 0 ? fyaw + Math.PI / 2 : fyaw - Math.PI / 2;
   await hud(page, false);
-  await look(page, ...around(bc, side, 24, 1.6, 2.6));
+  await look(page, ...around(bc, side + 0.25, 15, 1.6, 2.6));
   await captureView(page, 'year-build-skeleton-eye', { testInfo, compare: false });
   fs.writeFileSync(path.join(ARTIFACTS, 'year-build.json'), JSON.stringify({ loadMs, runMs, tick: fin.tick, hash, info: { ...info, steps: info.steps.length }, end: { ...end, steps: end.steps.length }, poses: acc }, null, 2));
   expect(errors).toEqual([]);
 });
 
-test('year-build 2022 east-house, whole house (YEAR_BUILD_FULL=1): live = rehearsal pin, timed', async ({ page }) => {
+test('year-build 2022 east-house, whole house (YEAR_BUILD_FULL=1): live = rehearsal pin, timed, skeleton captures', async ({ page }, testInfo) => {
   test.skip(process.env.YEAR_BUILD_FULL !== '1', 'whole house: set YEAR_BUILD_FULL=1');
   test.setTimeout(900_000);
   await openLab(page, 'year-build-2022-house');
@@ -267,7 +267,26 @@ test('year-build 2022 east-house, whole house (YEAR_BUILD_FULL=1): live = rehear
     const s = h.runToEnd(20 * 60 * 240);
     return { tick: s.tick, ms: performance.now() - t, hash: h.stateHash(), yb: h.yearBuild()!, checks: h.state().checks };
   });
-  console.log(`[year-build full] load ${loadMs} ms (setup ${r.yb.setupMs} ms), ${r.yb.steps.length} steps, ${r.tick} ticks in ${(r.ms / 1000).toFixed(1)} s wall (${((r.tick / 20) / (r.ms / 1000)).toFixed(0)}× real time); canonical ${r.yb.compare.ok}/${r.yb.compare.n} (max ${r.yb.compare.maxMm} mm)`);
+  console.log(`[year-build full] load ${loadMs} ms (setup ${r.yb.setupMs} ms), ${r.yb.steps.length} steps, ${r.tick} ticks in ${(r.ms / 1000).toFixed(1)} s wall (${((r.tick / 20) / (r.ms / 1000)).toFixed(0)}× real time); canonical ${r.yb.compare.ok}/${r.yb.compare.n} (max ${r.yb.compare.maxMm} mm); blocked / refused ${JSON.stringify(r.yb.blocked.map((b) => [b.code, b.n]))}`);
+  // ambient make-way walks the engine submits for a person already reserved by a waiting step fail (reservation.conflict,
+  // a red banner each); the sequence is unaffected (same hash as the rehearsal). Reported to the engine (PROGRESS W14).
+  const failed = r.yb.blocked.filter((b) => b.code.startsWith('FAILED'));
+  if (failed.length) console.log(`[year-build full] FAILED ambient actions: ${failed.map((b) => `${b.code} ×${b.n} (first: ${b.first})`).join('; ')}`);
   for (const ch of r.checks) expect(ch.ok, ch.message).toBe(true);
   expect({ ticks: r.tick, hash: r.hash }, 'live stepping = the node rehearsal').toEqual(rehearsal());
+  // the finished skeleton: oblique, and eye level from the yard side (compare with the skeleton-stage photo)
+  const building = (await comps(page)).filter((q) => q.phase === 'installed');
+  const bc = [building.reduce((a, q) => a + q.pose.p[0], 0) / building.length, 0, building.reduce((a, q) => a + q.pose.p[2], 0) / building.length];
+  const fyaw = building.find((q) => q.def.startsWith('upright'))!.pose.yaw;
+  const ps = r.yb.piles.map((p) => p.p);
+  const away = Math.atan2(ps.reduce((a, p) => a + p[2], 0) / Math.max(1, ps.length) - bc[2], ps.reduce((a, p) => a + p[0], 0) / Math.max(1, ps.length) - bc[0]);
+  const side = Math.cos(away - (fyaw + Math.PI / 2)) >= 0 ? fyaw + Math.PI / 2 : fyaw - Math.PI / 2;
+  await page.addStyleTag({ content: '.lab-perf, .lab-hud, .lab-banners { visibility: hidden }' });
+  await look(page, ...around(bc, side + 0.6, 20, 9, 2.4));
+  await captureView(page, 'year-build-house-oblique', { testInfo, compare: false });
+  // eye level: the yard side is shut in by the neighbouring 2022 house, so also the other long side and the end
+  for (const [name, yaw, d] of [['year-build-house-eye', side + 0.25, 19], ['year-build-house-eye-far', side + Math.PI - 0.25, 17], ['year-build-house-eye-end', fyaw + 0.2, 17]] as const) {
+    await look(page, ...around(bc, yaw, d, 1.6, 2.8));
+    await captureView(page, name, { testInfo, compare: false });
+  }
 });
