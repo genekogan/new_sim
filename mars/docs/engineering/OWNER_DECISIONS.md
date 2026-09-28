@@ -77,3 +77,23 @@
   sometimes get a sideways third row (3 ft); **roofs had 2x4 framing as in 2026**; walls outside the beams (as now); materials
   hand-to-hand (as now) but the forklift must stay supported; piles look right; **posts stood directly on the sand → ground datum
   y = 0** (the drawn −0.16 ground is wrong); beam hole pitch and the 9 ft part: unknown (skip).
+- (2026-09-29 evening, Gene) **Historical content is Gene's separate job.** In-flight reconstruction workers land at their next natural
+  green checkpoint (complete if close; else land green with tests + an explicit "next step" in the area doc) and stop; no new
+  reconstruction workers (W52/W53 not started); pins/takes green at that point stay; nothing is re-pinned or re-recorded purely for
+  content from here on. `HISTORICAL_CONTENT.md` (per-year state, what each year needs from Gene, the exact re-run recipe, open
+  questions) + "Content is parked" banners in RECONCILIATION_2022.md, YEAR_BUILD.md, NEXT_SESSION_PROMPT.md.
+- (same) **New goal: last mile to 100 % of SPEC.md + OWNER_FEEDBACK §1–§15, no new features.** Definition of done: every known
+  shortcoming / approximate / weak spot / not-done line (HANDOFF, EVIDENCE notes, PROGRESS entries, per-area docs) is FIXED with a test
+  or RE-CLASSIFIED as "content" (Gene) or "out of scope by spec" (scanned Martians, electrical) with one sentence why. `LAST_MILE.md`
+  lists every item (source, category engine / simulation / controller / renderer / tooling / content / out-of-scope, effort, moves
+  pins?), ordered by the lead; run 2–3 workers at a time. Priority: controller (auto replan/rebind on stale, static geometry over MCP
+  + region edits stale plans, NL parser → `engine_direct_camera` + studio, directed tracks beside the take via an op, one control path
+  for the 20 legacy tools, integration covers every tool) → engine (space-time reservations or a proven ordering, deadlock detector,
+  pre-empted social resumes, stand-on-top-beams, solar side stations, mid-raise cancel, install-lift cancel tests, crews on stairs,
+  forklift swerve/reverse + 3-vehicle cycles, look-ahead on the shared budget, all movers publish speed, combined camera corrections +
+  scene occlusion, per-person body variants, lint to 0 and in the gate) → renderer (talk/watch poses, carry/lift/hold gaps, beam-flange
+  feet, item–item collision + lap support, prone phaseK replay exactness) → evidence (every row PROVEN, notes shrunk, HANDOFF
+  shortcomings only re-classified).
+- (same) **All tests passing, always:** full `npm run gate` GREEN (unit, engine 0 fail + skips → 0 or documented, tsc, e2e, probe,
+  lint once green, simulation-integration vs wrangler dev) before EVERY merge to main; pins move only with a PLANNING_BUDGET reason;
+  deploy at each green milestone with the release number reported. 2–3 workers, ≤ 50 % of a 5-h window, Codex owns its paths.

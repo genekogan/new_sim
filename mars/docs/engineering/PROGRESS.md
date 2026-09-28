@@ -1331,3 +1331,6 @@ Then: gate → release 5; HANDOFF refresh.
   description still say textures are hashed stripes.
 - **W50 landed** `4999421`, `cb671fa`, `8ef5e39` (≈80k tokens, 40 min; merged): `panel-rail` → `solarRailMesh()`, `solarTiltLegs()` only for installed tilted modules (plumb legs under the high edge, span·sin(tilt)), `mount` view key; Kit posts use `RACK_FRAME_GREEN` from `palette.ts` (9 studio/lab baselines inspected + refreshed). 29/29 specs. Lead review: accepted. Notes: the stale stripes text is in `app/lab/solar-paint.ts` (Claude-owned lab file, not Codex's) lines 4–5/79; `scenes.ts:113` 2021 central upright still `#293c45`; lab pv2 rolled about the wrong axis, low edge 0.34 m in the ground (lab scenario fix). → fold into W53.
 - W54 spawned (engine camera perf, output-identical): `directCamera` on a chapter take takes ≈ 5.6 s on the main thread (D2: 5 367 s, 220 entities).
+
+## 2026-09-29 ~20:40 EDT — Gene: content parked, last-mile goal
+- Decisions recorded in OWNER_DECISIONS.md. W47/W51 told to land at their next green checkpoint with a full gate and stop; W52/W53 cancelled before start. W55 spawned: `LAST_MILE.md` inventory. W56 (HISTORICAL_CONTENT.md + banners) after W47/W51 land. Merge protocol from now: the worker runs a full `npm run gate` on its rebased branch and reports the table; the lead merges only green.
