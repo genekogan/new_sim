@@ -26,22 +26,22 @@ export const BOMBAY_BEACH = { lat: 33.3506, lon: -115.7295 };
 export const DEFAULT_SCENE_DATE = '2026-03-15';
 
 /**
- * North axis assumption. The audit (AUDIT.md §7) and engine conventions
- * (ENGINE_GUIDE.md: "Metres, Y up, ground plane (x, z)") do not record which
- * studio world axis is geographic north — the previous `daylightAt(hour)` sun
- * was a fixed, uncalibrated sinusoid with no compass reference at all (see
- * ambience-math.ts:4-17, unchanged by this work). No compass rose, site plan
- * bearing or "true north" note was found anywhere in docs/ or the studio code.
- *
- * ASSUMPTION (stated loudly; adjust here if a real site bearing surfaces):
- * world **-Z is geographic north**, **+X is east**, **+Z is south**, **-X is
- * west** — azimuth (clockwise from north, standard compass convention) maps
- * onto the ground plane the way it would on a north-up map viewed from above
- * with Y up. `NORTH_AZIMUTH_OFFSET` (degrees, added to azimuth before
- * projecting to x/z) exists to correct that mapping if the true campus
- * bearing is ever established; 0 means "no correction applied yet".
+ * North axis — established (Gene, OWNER_FEEDBACK_2026-09-28 §15; OWNER_DECISIONS 2026-09-29 "North bearing").
+ * Gene: the long axis of the 2020 tire ring (world X, app/studio-2020/scene.ts) runs north–south. The sign
+ * comes from the March 4 2020 aerial DJI_0079 (EXIF 2020-03-04 10:10:34 PST, FlightYawDegree +99.4, i.e. the
+ * camera faces ~east). The 2020 scene is laid out as that photo sees it (Portal → container → canopy →
+ * Forest runs left→right = +X; the geodesic sphere, z = +17, is nearest the camera; the RV camp, z ≈ −50,
+ * is far), so the camera looks along −Z with +X on its right. solarPosition() gives azimuth 143°,
+ * elevation 43° at that instant; shadows therefore fall toward 323° (NW) = behind-left of an east-facing
+ * camera, which is what the photo shows (the sphere's and the Forest racks' shadows fall left and slightly
+ * toward the camera). Hence **world −X is geographic north**, **−Z is east**, **+X is south**, **+Z is
+ * west**. `NORTH_AZIMUTH_OFFSET` (degrees, added to the compass azimuth before projecting to x/z with
+ * x = sin, z = −cos) is −90: azimuth 0 → −X, 90 → −Z. It is ONE global constant, exact for the 2020 scene;
+ * the other year frames were measured against drone stills (QUESTIONS_FOR_GENE Q3 note, W42): the 2026 CAD's
+ * north is ≈ −X turned 33° toward −Z (≈ −57° here), the 2025 Kit's ≈ −Z (0°), the 2022 Kit is mirrored and
+ * the 2024 Kit's kitchen / RV ring sit on the wrong side of Chiba. A per-year bearing is an open follow-up.
  */
-export const NORTH_AZIMUTH_OFFSET = 0;
+export const NORTH_AZIMUTH_OFFSET = -90;
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -224,8 +224,8 @@ export type SolarPosition = {
   trueElevationDeg: number;
   /** Azimuth, degrees clockwise from north. */
   azimuthDeg: number;
-  /** Unit vector from a ground point toward the sun, studio frame (x east, y up,
-   * z south under the NORTH_AZIMUTH_OFFSET=0 assumption — see the doc comment above). */
+  /** Unit vector from a ground point toward the sun, studio frame (y up; x, z
+   * as in NORTH_AZIMUTH_OFFSET above: −X north, −Z east). */
   direction: [number, number, number];
 };
 
@@ -316,7 +316,7 @@ export function sunTimes(
 
 /**
  * Project elevation/azimuth to a unit direction vector in the studio's (x, y, z)
- * frame — see NORTH_AZIMUTH_OFFSET above for the north-axis assumption this bakes in.
+ * frame — see NORTH_AZIMUTH_OFFSET above for the site bearing this bakes in.
  */
 export function sunDirectionVector(elevationDeg: number, azimuthDeg: number): [number, number, number] {
   const azRad = (azimuthDeg + NORTH_AZIMUTH_OFFSET) * DEG2RAD;
@@ -332,7 +332,7 @@ export function sunDirectionVector(elevationDeg: number, azimuthDeg: number): [n
 
 /**
  * World heading (radians, `datan2(z, x)` — the camera's `dirFrom` azimuth convention) of a compass
- * azimuth (degrees clockwise from north), under the NORTH_AZIMUTH_OFFSET assumption above.
+ * azimuth (degrees clockwise from north), under the NORTH_AZIMUTH_OFFSET bearing above.
  */
 export function worldHeadingOfAzimuth(azimuthDeg: number): number {
   const d = sunDirectionVector(0, azimuthDeg);

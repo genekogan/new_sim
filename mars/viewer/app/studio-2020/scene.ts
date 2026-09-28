@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GROUND } from '../studio/ambience-math';
 
 // Late-March 2020 evidence model. Coordinates are a photographic fit, not a survey.
 // One unit is one metre. The observed racks used dark frames and red beams.
@@ -89,9 +90,16 @@ function flowerMural() {
     c.fillStyle = gradient; c.beginPath(); c.arc(0, 0, 45, 0, Math.PI * 2); c.fill();
   });
 }
-function tire(g: THREE.Object3D, x: number, z: number, y = 0.18, radius = 0.32) {
-  const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.105, 6, 12), rubber);
-  mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh);
+const TIRE_TUBE = 0.105, TIRE_SIDES = 6;
+// The 6-sided tube's flat underside lies r·cos(30°) below the torus plane: a tire lying flat rests with its centre that high.
+const TIRE_REST = TIRE_TUBE * Math.cos(Math.PI / TIRE_SIDES);
+const UP = new THREE.Vector3(0, 1, 0);
+/** A tire lying on a surface: `contact` is the surface point under its centre, `normal` the surface normal there
+ *  (both in `g`'s frame). The torus axis follows the normal and the tread's underside touches the surface. */
+function tire(g: THREE.Object3D, contact: THREE.Vector3, radius: number, normal = UP) {
+  const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, TIRE_TUBE, TIRE_SIDES, 12), rubber);
+  mesh.quaternion.setFromUnitVectors(UP, normal).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2));
+  mesh.position.copy(contact).addScaledVector(normal, TIRE_REST); mesh.castShadow = true; g.add(mesh);
 }
 function fabricWall(g: THREE.Object3D, name: string, x: number, z0: number, z1: number, top: number, material: THREE.Material) {
   const geometry = new THREE.BufferGeometry();
@@ -197,7 +205,8 @@ function makeContainer(root: THREE.Object3D) {
     box(g, 'solar panel frame', [1.3, 0.045, 0.76], [-2.05 + i * 1.38, 2.77, -0.5], steel);
     box(g, 'solar panel', [1.22, 0.015, 0.68], [-2.05 + i * 1.38, 2.8, -0.5], glass);
   }
-  for (let x = -2.3; x <= 2.3; x += 1.15) tire(g, x, 0.75, 2.71, 0.25);
+  // ballast on the roof beside the panels: resting on the roof box's top face
+  for (let x = -2.3; x <= 2.3; x += 1.15) tire(g, new THREE.Vector3(x, H + 0.09 / 2, 0.75), 0.25);
   return g;
 }
 function makeCanopy(root: THREE.Object3D) {
@@ -205,9 +214,10 @@ function makeCanopy(root: THREE.Object3D) {
   const near = -3.82, far = 3.75, front = 3.15, back = -3.15;
   // A low lean-to tied to the container, with its outer edge guyed down near ground level.
   const positions: number[] = [], indices: number[] = [], rows = 12;
+  const tarpY = (u: number, v: number) => 3.02 - u * 1.95 - Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * 0.19;
   for (let j = 0; j <= rows; j++) for (let i = 0; i <= rows; i++) {
     const u = i / rows, v = j / rows;
-    positions.push(near + (far - near) * u, 3.02 - u * 1.95 - Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * 0.19, back + (front - back) * v);
+    positions.push(near + (far - near) * u, tarpY(u, v), back + (front - back) * v);
   }
   for (let j = 0; j < rows; j++) for (let i = 0; i < rows; i++) {
     const a = j * (rows + 1) + i, b = a + 1, c = a + rows + 1;
@@ -224,7 +234,13 @@ function makeCanopy(root: THREE.Object3D) {
   panel(g, 'rear workshop plywood wall', 5.8, 2.38, -0.43, back + 0.09, 1.28);
   box(g, 'worktable', [2.0, 0.08, 0.85], [-0.8, 0.78, 0.9], plywood);
   for (const x of [-1.6, 0]) for (const z of [0.58, 1.22]) box(g, 'table leg', [0.08, 0.72, 0.08], [x, 0.4, z], plywoodDark);
-  for (let i = 0; i < 8; i++) tire(g, near + 0.5 + i * 0.88, back + 0.4, 3.12 - i * 0.22, 0.2);
+  // ballast tires down the sloping tarp's back edge, lying on (and tilted with) the tarp surface
+  const tarpAt = (x: number, z: number) => tarpY((x - near) / (far - near), (z - back) / (front - back));
+  for (let i = 0; i < 8; i++) {
+    const x = near + 0.5 + i * 0.88, z = back + 0.4, e = 0.01;
+    const normal = new THREE.Vector3(-(tarpAt(x + e, z) - tarpAt(x - e, z)) / (2 * e), 1, -(tarpAt(x, z + e) - tarpAt(x, z - e)) / (2 * e)).normalize();
+    tire(g, new THREE.Vector3(x, tarpAt(x, z), z), 0.2, normal);
+  }
   // Ground photos IMG_3864 and 9-2 show an open workshop/cooking counter.
   box(g, 'rear work counter', [4.8, 0.06, 0.66], [-.45, .91, back+.58], plywood);
   for(const x of [-2.5,-.5,1.5])box(g, 'counter leg', [.07,.82,.07],[x,.48,back+.58],steel);
@@ -328,7 +344,7 @@ function makeBoundary(root: THREE.Object3D) {
   for (let i = 0; i < 66; i++) {
     const a = i * Math.PI * 2 / 66;
     if (i > 47 && i < 54) continue;
-    tire(g, Math.cos(a) * 47 + 4, Math.sin(a) * 32 - 8, 0.12, 0.28);
+    tire(g, new THREE.Vector3(Math.cos(a) * 47 + 4, GROUND, Math.sin(a) * 32 - 8), 0.28); // lying on the studio ground (y = GROUND)
   }
   for (let i = 0; i < 4; i++) {
     const booth = group(g, 'toilet-' + i, 'Blue portable toilet', [37 + i * 1.12, 0, -35], 'high', 'March 4 DJI_0079 aerial');

@@ -143,7 +143,9 @@ test('fixture "the group outgrows the frame": one of two people walks 5 m away m
   const { scene, world } = yardScene();
   const facts = () => ({ s1: { task: 'talk', activity: 'idle' }, s2: { task: 'talk', activity: 'idle' } });
   const sampler = (t: number) => ({ s1: personAt([-0.4, 0, 0]), s2: personAt([0.4 + 5 * Math.max(0, Math.min(1, (t - 2) / 4)), 0, 0]) });
-  const dir = { subject: { kind: 'group', ref: 'talk' }, motion: { verb: 'hold' }, framing: { side: 'south' }, duration: 8 };
+  // Camera on the +Z side so s2's +X walk crosses the frame. Site bearing (sun.ts NORTH_AZIMUTH_OFFSET = −90):
+  // +Z is west (this was 'south' under the old −Z-north assumption; same geometry, same 1.15 widen).
+  const dir = { subject: { kind: 'group', ref: 'talk' }, motion: { verb: 'hold' }, framing: { side: 'west' }, duration: 8 };
   const r = ok(directCamera([dir], { scene, world, sampler, facts, duration: 30 }));
   const c = r.report.shots[0].corrections[0];
   assert.equal(c.failure, 'frame');

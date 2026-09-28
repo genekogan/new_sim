@@ -1067,3 +1067,13 @@ Then: gate → release 5; HANDOFF refresh.
   - The moment "up the frame" at 6 s (D1, D2, W, P) is a weak jump point.
   - W31 counted 5 idle stretches by eye; this audit's stricter definition counts 3–33 per chapter before.
 - **W39 landed** `167bee6`, `6c2d65d`, `0064c63`, `4bc4d98` (≈300k tokens, 80 min; merged from `w39-take-polish`): `bindLabel` fills `$crew[n]` at record time (labels never entered `planHash`, so take ids are unchanged); `engine/camera/chapter-shots.ts` — event-driven shot lists (raises, hand-ups, relays, pass-ups, cuts, stringers, treads, walls, rails, panels), frames only the people working, ends 12 s after they go idle / at 90 s, a yard wide every 5 min, moments = first of each event; all 7 chapters re-recorded (same ids, same final states, set unchanged; idle stretches 3–33 → 0 per chapter; cuts ×2.5–4; min readability ≥ 0.60); bay-1 + skeleton re-recorded for labels only. 390 / 387 / 3 skip; 5 pins + A+B pin unchanged; `--check` byte-identical. Lead review: accepted. Follow-ups: STUDIO_REPLAY moments text + YEAR_BUILD camera table (next consolidation); set player may hold sub-second shots at 64×; bay-1/skeleton cameras still 77 % readable (predates).
+- **W42 north + tires** (branch `w42-north-tires`): (1) `NORTH_AZIMUTH_OFFSET = −90` (world −X north, −Z east) from DJI_0079
+  (2020-03-04 10:10:34 PST, FlightYaw +99.4, sun az 143°, shadows NW = behind-left, as photographed). env-sun tests pin
+  bearing, evidence and the import-graph isolation; perf-walk 5 pins PIN-OK, year-build pins green; camera fixtures
+  relabelled to keep geometry (correct "outgrows": south→west; studio-direct: east→south); 19 studio baselines refreshed
+  (shadows rotate; also picks up current UI). Other years' frames differ (2026 CAD ≈ −57°, 2025 ≈ 0°, 2022 mirrored,
+  2024 kitchen/RV side) — QUESTIONS A3, per-year bearing open. (2) 2020 tires rest on their surfaces: ring on the −0.16
+  ground (was +0.175 m, 6-sided tube → centre at ground + 0.091), tarp ballast on the analytic tarp and tilted with it
+  (was +0.13–0.19), roof ballast on the roof top (was −0.03). 73 tire ids moved → aliased in id-migration.json (2020
+  site/container/canopy lines); campus-2020.json regenerated (tire obstacles only). New baseline `studio-2020-ring-edge`.
+  Prop-float survey for 2020–2026 in QUESTIONS Q4 (Kit datum +0.16 plus table +0.10 / crates +0.22 / benches +0.05).

@@ -55,3 +55,14 @@
   or ceiling joists (roof sheets lie on the top beams; its 10 "roof" features are the kitchen guard rail), so the 2022 replays do not
   sequence framing — adding it would put members in the take that the protected checkpoint lacks and lift the roof deck 13 cm
   (breaking the 1 cm acceptance). Whether the real 2022 roofs had 2x4s under the plywood is parked in QUESTIONS_FOR_GENE.md.
+- (2026-09-29 afternoon, Gene §15; sign from evidence by W42) **North bearing.** The 2020 tire ring's long axis (world X)
+  runs N–S; the March 4 2020 aerial DJI_0079 (10:10:34 PST, FlightYaw +99.4, sun az 143° / el 43°, shadows NW =
+  behind-left of the east-facing camera) fixes the sign: **world −X is north, −Z east** → `NORTH_AZIMUTH_OFFSET = −90`
+  (`engine/env/sun.ts`). Construction is untouched by construction of the import graph (only `camera/` and `api/` see
+  the sun; `physicalView` excludes env) — tested in `env-sun.test.ts`; perf-walk's 5 pins and all year-build pins green.
+  Camera fixtures that named a compass side for a fixed geometry were relabelled to keep their geometry
+  (`camera-correct` "group outgrows the frame": south → west; `studio-direct.spec`: east → south); the synth tests now
+  derive bearings from the constant. Studio year / take baselines refreshed (shadows rotate; geometry identical). The lab
+  uses a fixed key light, not the solar model, so its shadow baselines (2022/2024 top prisms) do not move. **Caveat:** the
+  other year frames differ (2026 CAD ≈ −57°, 2025 Kit ≈ 0°, 2022 Kit mirrored, 2024 kitchen/RV side) — QUESTIONS_FOR_GENE
+  A3; a per-year bearing is an open follow-up.
