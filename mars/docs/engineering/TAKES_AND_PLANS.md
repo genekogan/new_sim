@@ -28,6 +28,16 @@ A step is `{ id, verb, params, after?, when?, at?, onFail? }`:
 literal `$x`; any other string is left alone. Unknown names/indices fail with `plan.unbound-reference` /
 `plan.bad-reference`.
 
+**Step labels (W39).** A step's `label` is display text and may carry the same references *inside* the text
+("`$crew[2]` climbs below"). `bindTemplate` keeps `BoundStep.label` exactly as the template wrote it: a filled label
+would change `planHash`, and with it every recorded take's `planHash` / id. Readers that show a label fill it with
+`bindLabel(label, plan.bindings)` (`sequence/bind.ts`): any inline `$name`, `$name[i]`, `$name.field` is replaced by the
+bound value ("m3 climbs below"; a list is joined with ", "), a `.word` that is no field ends the reference (sentence
+text), `$$` is a literal `$`, and an unbound name or a missing index is left as written. The take recorder's step
+timeline (`deploy/record-campus-take.mjs` `timeline()`, the take file's `steps[].label`, which the studio shows as the
+current step and in the log) is filled this way; `engine/test/take-labels.test.ts` checks that no shipped chapter
+take's step label or event message still holds a reference.
+
 **Binding** (`bindTemplate(template, bindings, { history, baseline, registry })`) validates the template with
 zod (unknown keys rejected), the step graph (duplicate ids, unknown refs, cycles), every binding against the
 baseline world, then parses each step's params with the verb's registry schema. All problems are returned at

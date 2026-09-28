@@ -187,3 +187,34 @@ over-conservative (bystander capsules). The gaps are take parts (not occluders h
 "wide on the deck" (475–478 s: p3/p4 under the seated sheets, upright A's posts). Static campus never disagrees on
 this take. After per-tick part occluders, contact-only crew exemption and 0.2 m capsules: meanReal 0.963, maxAbsDiff 0.20,
 1 sample differing by ≥ 0.2 (was 40).
+
+## Chapter shot lists (W39, `chapter-shots.ts`)
+The long year-build chapter takes (the 2022 east-house A+B: 13–98 min each) get their shot list from the take itself,
+not from a fixed rhythm. `chapterShots(opts)` is pure and deterministic (core/math, sorted iteration); the recorder
+(`deploy/record-campus-take.mjs` `chapterSpec`) calls it with the take, its step timeline, the plan steps (for each
+step's actors: the crew ids in its bound params), the house footprint, the yard region and a `rate` function.
+- **Activity grid** (`activityGrid`): per person, per camera sample (0.5 Hz), working = a recorded `activity` other than
+  `idle` / `wait` at any tick of the sample; plus the feet position.
+- **Telling steps** (`STEP_INTEREST`): work at the house (raise, pass-up, wall, stringer, tread, rail, panel) 5, beams
+  4, climbing / holding 3, a cut at the station 3, carries and fetching 1; the first of each kind in the chapter +2.
+- **Shots.** At each cut: the most telling step in progress (or starting within 6 s) whose actors work now; its working
+  actors plus anyone working within 6 m of them. The shot ends at the next telling step after 40 s (`event`), after 90 s
+  (`long`), when one of them is 9 m from the group's centre (`apart`; a group that parts within 12 s drops its farthest
+  member instead), or 12 s after all of them went idle while someone else works (`idle`). Nobody working anywhere: a
+  wide of the house. Every 5 min the next cut is a **wide from the yard side** (establishing over the piles, the
+  cutting station and the house, alternately ±25° off the house→yard line), 12 s.
+- **Angles.** The group is framed from outside the house on its side (the line from the house centre to the group),
+  low for people on the ground (10°), higher on the decks. Candidates: ±30°, 0°, ±65°, ±105°, ±145°, 180° off that line
+  (a repeat of the same group starts at ±65°: no jump cut) at the preferred height, 10°, 5°, 22° and +15°. With `rate`
+  (`shotRater`: the desired pose every sample of the shot, 0 if the camera position is invalid, else `readability` of
+  the subjects; the minimum) the first candidate rated ≥ 0.8 wins, else the best. A shot whose best is < 0.6 is split in
+  two (≥ 12 s each) and each half chooses again; if a piece still reads < 0.6, the most readable one of its people (or
+  someone working elsewhere) who works ≥ half the piece is framed alone, else the house wide. Identical consecutive
+  shots merge (no cut to the same frame). `planShotList` then plans the list as for every take.
+- **Moments** (the studio's jump buttons): the first of each named telling step — "first raise", "first beam",
+  "first hand-up", "first relay" (a beam by its label), "first cut", "first pass-up", "first stringer", "first tread",
+  "first post", "first wall", "first rail", "first panel", "up the frame" — at most four, plus `done`. They replace
+  W31's generic `work` / `middle` / `done`.
+- **Audit** (`shotActivityReport`, any shot list, also W31's): mid-chapter wides and the longest gap between them,
+  frameGroup mean / max length, stretches > 20 s in which every framed person is idle while someone else works.
+  `camera-chapter-shots.test.ts` checks the mechanism on a hand-made take and the shipped chapter cameras.

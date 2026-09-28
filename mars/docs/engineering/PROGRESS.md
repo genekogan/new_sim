@@ -981,3 +981,55 @@ Then: gate → release 5; HANDOFF refresh.
   (recorder side).
 - **W37 landed** `295632c`, `c283820`, `bb23a25` (≈310k tokens, 75 min; merged from `w37-chapters-ui`): **studio "Watch it being built · 2022"** — one picker entry for the A+B chapter set (8 h 20 min · 7 chapters), `ChapterSetReplay` swaps chapter takes without rebuilding rigs, hash guard at every boundary, prefetch next / keep 3 in memory, per-chapter engine camera, continuous log on the set clock, whole-set checks in a Web Worker (2.9 s): "✓ continuity 7/7 · ✓ final state ddb634d6… = A+B pin · last frame = final state (0.64 mm) · ✓ 66 frames + beams + 145 parts at the canonical pose (max 0.57 mm)"; 64× across the A→D0 seam: 17.7 fps, max frame 66.8 ms (swap redraw 2.6 ms). `take-replay.ts` carries `proneYaw`/`phaseK` (replay turn within 0.0005 rad of live). studio-build 8/8, studio-take-prone 1/1, studio-take, studio-direct green. Lead LOOKED at set-final + set-roof-relay: accepted. Weak: one-frame leg-phase jump for a walker crossing a boundary; no Direct camera for a set; `$crew[n]` placeholders in step labels (recorder side — to fix).
 - 14:35 EDT: W39 spawned (take/camera, hash-identical: `$crew[n]` step labels, chapter camera quality + re-record chapters); W40 spawned (release 7: gate + deploy of the studio milestone). W38 (houses) in flight. Checkpoint 1 remaining after W38: per-house chapter takes, gate, release 8.
+
+## 2026-09-28 — W39: filled step labels; event-driven cameras for the A+B chapter takes
+- **`$crew[n]` labels.**
+  - Where from: the step labels written by `engine/campus/sequence.ts` (`$crew[${i}] steps out of the aisle`, …).
+  - Why they stayed raw: `bindTemplate` substitutes step params only. The recorder's `timeline()` copied `plan.steps[].label`
+    as written into the take file's `steps`, which the studio shows as the current step and in the log.
+  - Fix: `bindLabel(label, plan.bindings)` (`sequence/bind.ts`; inline `$name[i]` / `.field`, `$$`, an unbound ref stays).
+    It is applied in `timeline()`. `bindTemplate` still keeps labels as written: filling them there would move `planHash`
+    and every year-build take id.
+  - W38 needs no change. `take-labels.test.ts` checks that no shipped chapter step label or event message holds a
+    reference.
+- **Chapter cameras** (`engine/camera/chapter-shots.ts`, CAMERA.md "Chapter shot lists"; replaces W31's `workShots`):
+  - Shots come from an activity grid (recorded activity, idle/wait = idle) and the step timeline plus actors.
+  - Cuts at telling events (raises, hand-ups, relays, pass-ups, cuts at the station, stringers, treads, walls, rails,
+    panels), 40–90 s. Only the working people are framed, and a shot cuts 12 s after they all went idle while someone
+    else works. A wide from the yard side comes every 5 min.
+  - Candidate angles are rated by `shotRater` (desired-pose readability over the whole shot). An unreadable shot is split,
+    else the one who works is framed alone, else the house wide.
+  - Moments are the first of each event ("first raise", "first relay", "first cut", "first tread", "first wall", …) +
+    `done` (was work / middle / done).
+  - Audit: `shotActivityReport`. Tests: `camera-chapter-shots.test.ts` (mechanism on a hand-made take + the shipped
+    cameras).
+- **Re-recorded** the 7 chapters (`--scenario year-build-2022-ab-chapters`):
+  - Same take ids, same set `8ce33bee…`, final `ddb634d6…` = A+B pin (take bodies unchanged).
+  - New camera tracks, moments and labels; the manifest changes only the chapter entries (camera, moments, bytes) and the
+    set's bytes.
+  - Per chapter, before → after (idle = frameGroup stretches > 20 s in which every framed person is idle/wait while
+    someone else works; wides = mid-chapter wides):
+
+  | ch | cuts | min read | mean read | idle stretches (longest) | wides (longest gap) | longest shot |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | A | 52 → 123 | 0.70 → 0.70 | 0.983 → 0.977 | 3 (32 s) → 0 (10 s) | 0 → 17 (352 s) | 180 → 90 s |
+  | D0 | 28 → 115 | 0.70 → 0.60 | 0.989 → 0.979 | 33 (186 s) → 0 (10 s) | 0 → 14 (340 s) | 218 → 90 s |
+  | D1 | 28 → 120 | 0.80 → 0.60 | 0.997 → 0.979 | 33 (176 s) → 0 (10 s) | 0 → 15 (376 s) | 222 → 90 s |
+  | D2 | 28 → 131 | 0.67 → 0.67 | 0.997 → 0.976 | 32 (186 s) → 0 (10 s) | 0 → 16 (364 s) | 246 → 90 s |
+  | S | 31 → 91 | 0.80 → 0.60 | 0.999 → 0.977 | 31 (202 s) → 0 (10 s) | 0 → 12 (352 s) | 218 → 90 s |
+  | W | 27 → 88 | 0.60 → 0.70 | 0.944 → 0.981 | 25 (154 s) → 0 (6 s) | 0 → 10 (368 s) | 164 → 82 s |
+  | P | 9 → 24 | 0.60 → 0.78 | 0.963 → 0.981 | 8 (58 s) → 0 (10 s) | 0 → 4 (274 s) | 144 → 58 s |
+
+  Every chapter is still 100 % readable with 0 invalid / 0 crossings.
+- **Bay-1 and whole-skeleton takes** were re-recorded for the labels only: same take ids, pins and camera tracks; only
+  bytes changed (separate commit).
+- **Pins:** perf-walk stress / probe / campus / meal / v3 PIN-OK. Suite 390 / 387 pass / 0 fail / 3 skip; tsc clean.
+  `--check` OK for flagship and v3; the chapters' `--check` is in the final report.
+- **Weak spots:**
+  - Cuts rose 2.5–4× (mean frameGroup shot 45–54 s; P 38 s). At 64× a shot lasts under a second. The set player could
+    hold or skip shots under ~2 wall-s.
+  - Mean readability dropped ~0.01–0.02 on A / D0–S: moving workers are harder to read than people standing still.
+  - The rater scores the desired pose only; the planner's own corrections decide the final sample. Min 0.60 on D0 / D1 / S
+    sits exactly at the readable line.
+  - The moment "up the frame" at 6 s (D1, D2, W, P) is a weak jump point.
+  - W31 counted 5 idle stretches by eye; this audit's stricter definition counts 3–33 per chapter before.
