@@ -93,9 +93,41 @@ that is ~34 ms per sync: ~19 ms rasterising the ground surface, ~15 ms EDT, plus
 Hashes unchanged: probe `79447f750779…96129`, stress-30 `e55d3ee17dd5…8e989`, campus flagship
 `b159317e2937…c0bda`. The `f60e10b4…` campus hash below predates the walk.ts re-pin: the tree before this
 change already printed `b159317e…`, the manifest hash in `RELEASE_CHECKLIST.md`.
-**Remaining sync cost:** the navigation key itself (`hashOf` over the static entities on each of ~35k sync calls):
-~2 s per flagship or probe run, now larger than the grid work. `carry/validate.ts` still does a whole-grid
-`buildGrids` of the scene minus the carried item.
+**Remaining sync cost** after this section (the sha256 navigation key; the whole-grid builds in `carry/validate.ts`) is handled in §5.
+
+## 5. Cheap sync change test; carry grids patched (`spatial/service.ts`, `carry/validate.ts`)
+- **Sync change test:** `Spatial.sync` used to sha256 `[id, def, phase, pose, connections, support kind]` of every
+  static entity on each call (~32–35k calls per run, ~2 s). It now keeps a flat snapshot of those fields per static
+  entity, in world order, and compares with `===`. That allocates nothing when nothing changed.
+  Values are copied, not referenced, because actions mutate `pose.p` in place and push onto `connections`.
+  `===` agrees with the old key's JSON text: -0 = 0, `pitch: undefined` ≠ 0, `connections` [] = undefined.
+  So it rebuilds exactly when the old key changed; there is no quantisation and no hash collision.
+- **Proof (`planning.test.ts`):** a directed test edits each relevant field and asserts a rebuild. The fields: p[0..2] in
+  place, yaw, pitch set / cleared, roll, phase in / out of the static set, def, support kind, connection push /
+  in-place field / pop, entity added / removed / re-inserted, twins swapping order, human ↔ component.
+  It also edits the irrelevant fields and asserts no rebuild: label, provenance, assembly, support detail,
+  equal connection copies, -0, deep clones, walking humans, carried components.
+  A 1,500-edit seeded fuzz checks that `sync()` rebuilds iff the verbatim old `hashOf` key changes.
+  Dropping the id, pitch, connection or set-size comparison fails it.
+- **Carry grids:** `planCarryAction` built whole grids twice per plan: the gather-approach grid (the item as a 1 m
+  obstacle) and the pickup grid of a tall item (the item left out). `Spatial.gridsFor(scene)` now patches them from the
+  synced grids with `updateGrids` and the base raster, falling back to `buildGrids`. The item's obstacle is a pure
+  remove + append, so every call patches: 16/16 in the test.
+- **Proof (`grid-incremental.test.ts`):** every `gridsFor` call is compared with a from-scratch `buildGrids`. That covers the
+  carry corner runs, a standing-upright pickup and the probe's 13 carries (free, clearance bits, blockers). The gather routes are pinned to those
+  planned on the old path (`8b5ab468…125f8`).
+
+| per run, node 26, M3 Max, loaded host (scratch bench over `rehearse`) | before | after |
+| --- | ---: | ---: |
+| build-bay probe: sync without rebuild (31,617 calls) | 1.82 s | 0.06–0.12 s |
+| build-bay probe: carry.plan (13 plans) | 0.59 s | 0.57–0.58 s (small grid; noise) |
+| build-bay probe: rehearsal compute | 4.3 s | 2.6–2.7 s (5.0 s once, host load) |
+| campus flagship: sync without rebuild (34,683 calls) | 2.04 s | 0.08–0.09 s |
+| campus flagship: carry.plan (13 plans) | 4.0–4.2 s | 1.2–1.3 s |
+| campus flagship: rehearsal compute | 9.6 s | 5.0–5.6 s |
+
+Rebuild counts are unchanged (378 per run), and so are the hashes: probe `79447f750779…96129`, stress-30 `e55d3ee17dd5…8e989`,
+campus flagship `b159317e2937…c0bda`. Grid rebuilds (~0.2 s probe, ~0.9–1.0 s flagship) are now the largest sync cost.
 
 ## Hashes: before = after, no changes
 Probe / flagship build-bay `d54eca7c402a…0f610`; campus flagship `f60e10b461dd…4c182`; lab stress-30
