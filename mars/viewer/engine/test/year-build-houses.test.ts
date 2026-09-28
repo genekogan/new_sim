@@ -92,8 +92,9 @@ test('year build 2022, all four houses A+B: plans through the same rules — cou
 });
 
 /** Rehearse a house setup: 0 violations, settled, every sequenced part at its canonical pose / target (1 cm / 1°). */
-function runHouse(h: string, tranche: boolean) {
+function runHouse(h: string, tranche: boolean, maxTicks?: number) {
   const s = yearBuildHouseSetup(2022, h, FILE, { tranche });
+  if (maxTicks) s.cfg.maxTicks = maxTicks;
   const t0 = performance.now();
   const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
   const ms = performance.now() - t0;
@@ -125,7 +126,7 @@ const PIN_TRANCHE: Record<string, { ticks: number; hash: string }> = {
  *  still stops at a refusal with 0 violations before it (`todo`, YEAR_BUILD.md "Checkpoint 1b … Next step"). */
 const FULL_RED: Record<string, string> = {
   'west-house': 'S s1328-carry: carry.gather-stuck — m1 and m2 meet head-on in the take-out strip of pile-2x4-16ft-1 gathering round the handrail stock (the gather sends each carrier to the end the other stands at); needs a crossing-free gather assignment',
-  kitchen: 'S s0996-install-stair-part: stair-part.no-room — the lift crew setting tread board 42ee66fc-b2 from its lying spot (moved clear of west-house\'s table) passes the table; needs a two-leg lift path in set-part',
+  kitchen: 'S s0995-carry: carry.path-occupied without end — idle m4, nudged onto the stair foot by make-ways, has no room to step aside (parking clear of the carry corridors moves east-house\'s A+B pin: held back)',
 };
 /** First full pins 2026-09-29 (W47). */
 const PIN_FULL: Record<string, { ticks: number; hash: string }> = {
@@ -133,6 +134,8 @@ const PIN_FULL: Record<string, { ticks: number; hash: string }> = {
   kitchen: { ticks: 0, hash: '' },
   'west-house': { ticks: 0, hash: '' },
 };
+/** A red run is cut just past where it stops (kitchen would otherwise wait out the 16 h tick budget). */
+const FULL_RED_CAP: Record<string, number> = { kitchen: 340000 };
 
 for (const h of ['chiba', 'kitchen', 'west-house']) {
   test(`year build 2022 ${h}, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned`, () => {
@@ -147,7 +150,7 @@ for (const h of ['chiba', 'kitchen', 'west-house']) {
     assert.equal(reh.report.finalStateHash, PIN_TRANCHE[h].hash);
   });
   test(`year build 2022 ${h} A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)`, { skip: process.env.YEAR_BUILD_FULL !== '1', todo: FULL_RED[h] }, () => {
-    const { reh, cmpA } = runHouse(h, false);
+    const { reh, cmpA } = runHouse(h, false, FULL_RED_CAP[h]);
     assert.equal(cmpA.length, 66);
     if (PIN_FULL[h].ticks) {
       assert.equal(reh.report.metrics.ticks, PIN_FULL[h].ticks);

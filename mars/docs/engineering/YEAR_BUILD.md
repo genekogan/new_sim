@@ -481,8 +481,8 @@ are skipped and will be redone after the reconstruction edits). East-house stays
 | house | run | steps | ticks | sim h | violations | at the canonical pose / target (1 cm / 1°) | unplaced (reasons in the plan) | result |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | chiba | A+B | 1460 | 564 548 | 7.84 | 0 | skeleton 66 / 66 (max 0.49 mm); phase B 133 / 133 (max 0.25 mm): 81 deck pieces (27 strips), 13 wall panels (2 walls), 6 stringers, 16 tread boards, 6 posts, 2 handrails, 6 panel rails, 3 panels | fixtures 16, solar 14 (install_panel end stations, frame-line panels), stair 5 (rail posts in the end frame, risers), walls 5 (screens + bezels, the 2.30 m wall) | **green, pinned `0ee1da11…` @ 564 548** |
-| east-house (v1 yard, `year-build-b.test.ts`) | A+B | 1552 | 600 204 | 8.34 | 0 | skeleton 66 / 66; phase B 145 / 145 (81 deck pieces, 25 wall panels, 6 + 16 + 6 + 2 stair, 6 rails, 3 panels) | solar 14, stair 5 | **green, re-pinned `2cd6af11…` @ 600 204** (rule 15) |
-| kitchen | A+B | 1240 | red at 320 812 (S) | 4.46 | 0 | skeleton 66 / 66; D0 + D1 (54 deck pieces), all 6 stringers | deck 3 (roof over bay 0, rule 9), door 1, fixtures 79, roof 10, stair 5, wall 1 (0.90 m) | `s0996-install-stair-part` `stair-part.no-room`: "m1 has no room to stand at (−5.00, 6.59) holding kitchen-stair-tread-42ee66fc-b2 (set)" — west-house's table |
+| east-house (v1 yard, `year-build-b.test.ts`) | A+B | 1552 | 600 599 | 8.34 | 0 | skeleton 66 / 66; phase B 145 / 145 | solar 14, stair 5 | **green, pin unchanged `ddb634d6…` @ 600 599** (plan byte-identical) |
+| kitchen | A+B | 1240 | stuck from 320 140 (S) | 4.45 | 0 | skeleton 66 / 66; D0 + D1 (54 deck pieces), all 6 stringers | deck 3 (roof over bay 0, rule 9), door 1, fixtures 79, roof 10, stair 5, wall 1 (0.90 m) | `s0995-carry` `carry.path-occupied` without end: "the crew carrying kitchen-stair-tread-42ee66fc-b2 waits for m4 to move out of its way"; the full test is cut at 340 000 ticks |
 | west-house | A+B | 1478 | red at 520 579 (S) | 7.23 | 0 | skeleton 66 / 66; D0–D2 (81 deck pieces), stringers, tread boards, posts (110 / 136 phase-B parts) | fixtures 5, solar 14, stair 5, wall 1 (1.00 m) | `s1328-carry` `carry.gather-stuck`: "the crew did not assemble around west-house-stair-rail-11c8e101-stock within 120 s" |
 
 Tranches (default suite) unchanged: chiba `940e9f64…` @ 60 997, kitchen `4862adfc…` @ 55 293, west-house `b4c42210…` @ 54 322.
@@ -514,8 +514,13 @@ posts, handrails, panel rails and panels.
    of stair stock, the station and the scrap pile to the zone, ± 1.5 m). Otherwise the idle crew takes the nearest
    such point of a 0.5 m lattice 1.6–4 m outside the house, 1.1 m apart. END's closing spots use the standing-room
    test. Chiba and west-house: their old spot lies on the neighbouring house's stair (`route.goal-blocked`). Kitchen: in
-   the corridors, make-way nudges walked m4 onto a stringer's place and later into a tread carry's way. **East-house's
-   S parking moves too**, so its A+B pin moved (below).
+   the corridors, make-way nudges walked m4 onto a stringer's place and later into a tread carry's way.
+   **Landed: the standing-room test only** (chiba, west-house, END). The zone and corridor test is written (`ok` in
+   `stairSection`) but applied to the old spot only when that spot has no standing room. Applied to every old spot, it
+   gets kitchen through that carry (next stop `s0996-install-stair-part`, `stair-part.no-room` at west-house's table)
+   and keeps east-house green (0 violations, 66 + 145 parts, `2cd6af11…` @ 600 204, phase A and D0–D2 bit-identical).
+   But it moves east-house's A+B pin, which the shipped chapter set and `e2e/studio-build.spec.ts` ("the set ends at the
+   engine's A+B pin") assert, and re-recording is parked. Held back for the lead.
 16. **Set-part site** (`construction/setpart.ts`, additive): an idle person standing where a part goes (nobody's task,
    holding nothing, on the ground, or only stepping aside) no longer refuses the step. The crew waits
    (`setpart.site-occupied`, blocked) and asks them to step off the part's long axis (`makeWay`). This is W27's
@@ -543,20 +548,17 @@ posts, handrails, panel rails and panels.
 23. **Solar side** (`sequence-b.ts` `PS`): rails and panels go up over the long side nearer the panels. East-house is
    +u; chiba is −u. From +u, chiba's roof receiver walked alongside a rail to the far edge (`passup.receiver-blocked`).
 
-East-house's and kitchen's plans are byte-identical through rules 12–14 and 16–23, which only apply where their
-conditions hold. Rule 15 moves east-house's and kitchen's S parking.
+East-house's plans (v1, and v2 report-only) are byte-identical to main's. Rules 12–23 apply only where their conditions
+hold. Kitchen's plan changes only through rules 17, 18 and 21.
 
 ## Pins
-- **New:** chiba whole-house A+B `0ee1da11d34c…af84ee6` @ 564 548 (`year-build-houses.test.ts` `PIN_FULL`, `YEAR_BUILD_FULL=1`).
-- **Moved (rule 15):** east-house A+B `ddb634d6…` @ 600 599 → `2cd6af11d946…70ff135d` @ 600 204 (`year-build-b.test.ts`
-  `PIN_FULL_AB`). Phase A and D0–D2 are bit-identical: the section boundaries are ticks 117 277 / 216 284 / 317 115 /
-  424 456, as in W31's chapter table. The stair section's idle crew park elsewhere from S on. 0 violations; 66 + 145 parts
-  at target, as before. The shipped east A+B chapter set (W31 / W39) is the pre-W47 run: `take-chapters.test.ts` and
-  `record-campus-take.mjs` keep `ddb634d6…` until the takes are re-recorded, which is skipped by the lead (content parked).
-- **Unchanged:** every default-suite pin, including the four houses' tranches, east-house's first bay `251a44c5…` and
-  bay 1 + strip `94db263e…`, and perf-walk (engine suite 409 / 403 / 0 fail / 6 skip). The east skeleton `d382e461…` was
-  not re-run: its plan and phase-A runtime are unchanged, and the A+B run reaches D0 at the same tick and hash as main's.
-- Kitchen and west-house stay `todo` in the full test with the refusals above (`FULL_RED`).
+- **New:** chiba whole-house A+B `0ee1da11d34c…af84ee6` @ 564 548 (`year-build-houses.test.ts` `PIN_FULL`, `YEAR_BUILD_FULL=1`,
+  run in the test: phase A max 0.49 mm, phase B max 0.25 mm).
+- **Unchanged:** east-house A+B `ddb634d6…` @ 600 599 (its plan is byte-identical, and the walker rule 14 only fires after
+  3 s of mutual waiting; phase A reaches D0 at the same tick and hash as main's). Every default-suite pin is unchanged,
+  including the four houses' tranches, east-house's first bay `251a44c5…` and bay 1 + strip `94db263e…`, and perf-walk.
+- Kitchen and west-house stay `todo` in the full test with the refusals above (`FULL_RED`; kitchen is cut at 340 000
+  ticks, `FULL_RED_CAP`).
 
 ## Next step (the two red houses)
 - **West-house** stops in S at `s1328-carry`. m1 and m2 take the handrail's 16 ft 2x4 off `pile-2x4-16ft-1`, and the
@@ -566,10 +568,17 @@ conditions hold. Rule 15 moves east-house's and kitchen's S parking.
   by distance (`carry/actions.ts`, shared: it would move every pin with a two-person carry), or the generator orders a
   carry's crew by where the take left them. That is a lead decision. After it: W, P and END, which went green on chiba
   (its mirror) with rules 20–23.
-- **Kitchen** stops in S at `s0996-install-stair-part`. The first tread board lies clear of west-house's table (rule
-  21), but the lift crew's straight walk from there to its place passes the table corner. Needed: a two-leg lift path in
-  set-part (along the stair first, then sideways), or a lying spot inside the stair zone after the stringers. Then the
-  treads, posts, handrails, W and END. Kitchen has no solar, so P is empty and END-only.
+- **Kitchen** waits without end in S at `s0995-carry`, the first tread board's carry. The idle m4 was parked beside the
+  +u side in the carry corridors, and earlier carries' make-ways walked it onto the stair foot, where it has no room to
+  step aside. Needed, in order:
+  1. The lead's decision on rule 15's corridor part: park every house's stair-section crew clear of the stair zone and
+     carry corridors. It is written and verified: east-house stays green at `2cd6af11…` @ 600 204.
+     It needs east's A+B pin moved and its chapter set re-recorded (studio-build.spec asserts the set ends at the pin).
+  2. Then kitchen stops at `s0996-install-stair-part` (`stair-part.no-room` at (−5.00, 6.59)). The board lies clear of
+     west-house's table (rule 21), but the lift crew's straight walk from there to its place passes the table corner.
+     This needs a two-leg lift path in set-part (along the stair first, then sideways), or a lying spot inside the stair
+     zone after the stringers.
+  3. Then the treads, posts, handrails, W and END. Kitchen has no solar, so P is empty and END-only.
 - Also open: kitchen's roof deck (3 strips over bay 0, rule 9). Rule 12 can now start a level at line 0, but only when
   the stair end's second strip would need a walk-alongside over the gap. Starting an unreachable level from line 0 is
   the same mechanism and is untested.

@@ -434,12 +434,11 @@ taken stringer spot, a reversed build), or they wait / hold where the east-house
 static near-miss.
 
 ## 7. Year-build whole-house runs, checkpoint 1b (W47, 2026-09-29; rules, not the budget)
-Wall times on a shared machine (2–3 runs in parallel), `SequenceRunner` directly: chiba A+B 564 548 ticks in 539 s; east-house
-A+B 600 204 ticks in 619 s; kitchen stops at 320 812 ticks (251 s); west-house stops at 520 579 ticks (552 s). The walker
-change of W47 (`locomotion/walk.ts`: a mutual single-file wait is released once both sides have waited ≥ 3 s,
-`RELEASE_AFTER`) costs nothing measurable. It fires only in deadlocks, so every walker pin is unchanged (engine suite
-green; east-house phase A reaches D0 at the same tick and hash as before). One pin moved, for a rule in `campus/sequence-b.ts`:
-east-house A+B `ddb634d6…` @ 600 599 → `2cd6af11…` @ 600 204 (YEAR_BUILD.md "Checkpoint 1b", rule 15). New: chiba A+B
+Wall times on a shared machine (2–3 runs in parallel), `SequenceRunner` directly: chiba A+B 564 548 ticks in 539 s
+(803 s in the test); west-house stops at 520 579 ticks (552 s); kitchen waits without end from tick 320 140 (the full
+test is cut at 340 000). The walker change of W47 (`locomotion/walk.ts`: a mutual single-file wait is released once both
+sides have waited ≥ 3 s, `RELEASE_AFTER`) costs nothing measurable. It fires only in deadlocks, so every walker pin is
+unchanged (engine suite green; east-house phase A reaches D0 at the same tick and hash as before). New pin: chiba A+B
 `0ee1da11…` @ 564 548.
 
 ## Limits

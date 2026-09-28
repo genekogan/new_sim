@@ -1341,8 +1341,9 @@ Then: gate → release 5; HANDOFF refresh.
   2022 in `SEAT_HELD_YEARS`. YEAR_BUILD.md "Checkpoint 1b" has the per-house table, rules 12–23 and the next steps.
 - **Chiba A+B green end to end, pinned `0ee1da11…` @ 564 548** (7.8 h simulated, 0 violations, 66 + 133 parts at target).
   West-house now passes all three decks, the stringers, the treads and the posts, and stops in S at `carry.gather-stuck`:
-  two carriers meet head-on in a pile's take-out strip. Kitchen passes all six stringers and stops in S at
-  `stair-part.no-room`: the lift crew's walk passes west-house's table. Both are `todo` with the refusal named.
+  two carriers meet head-on in a pile's take-out strip. Kitchen passes all six stringers, then waits without end at a
+  tread carry blocked by an idle crew member with no room to step aside. Both are `todo` with the refusal named; the
+  kitchen run is cut at 340 000 ticks.
 - W38's D1 refusal on chiba / west-house was not about frame planes. On those houses the second strip's middle piece
   goes in from −u (rule 8), so its receiver would walk alongside over the first strip's unlaid middle, and the bystander
   was sent to an unlaid aisle. Fix: those levels start at line 0 (rule 12). Other general rules: the step-back spot is
@@ -1351,7 +1352,11 @@ Then: gate → release 5; HANDOFF refresh.
   (setpart.ts, additive); stringer lay-down after a −lat neighbour, order after a shifted one, and end margin; stair
   parts by where they are (grips, lower end, side by lat); a tread-board lying-spot search; the far end for the roof
   crews; the solar side nearer the panels.
-- **Pin moved:** east-house A+B `ddb634d6…` @ 600 599 → `2cd6af11…` @ 600 204 (rule 15, S onward; phase A and D0–D2
-  bit-identical). The shipped east chapter set keeps the old hash until re-recorded. All default-suite pins unchanged.
+- **No pin moved.** East-house's plans are byte-identical. The corridor part of the parking rule (verified: east green at
+  `2cd6af11…` @ 600 204; it gets kitchen one step further) would move east's A+B pin, which the shipped chapter set and
+  studio-build.spec assert. It is held back for the lead (YEAR_BUILD.md "Next step").
+- Gate on `eb14de2` (with that re-pin): test, test-engine and tsc pass. e2e hit the gate's 20 min step timeout after
+  about 60 of 85 specs, with 2 failures: studio-build "final A+B checks" (the re-pin, now reverted) and "chapter set at
+  64×" (load-flaky, W50). A full gate did not fit the hand-over window.
 - Shared files touched additively: `locomotion/walk.ts` (yield table in `services.walkYields`, release after 3 s),
   `construction/setpart.ts` (site rule), `campus/sequence.ts` (`standFree` ctx hook).

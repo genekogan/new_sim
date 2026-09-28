@@ -522,7 +522,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const taken: Vec2[] = [];
     for (const old of olds) {
       const far = (q: Vec2) => taken.every((t) => hypot(q[0] - t[0], q[1] - t[1]) >= 1.1 - 1e-9);
-      let q: Vec2 | undefined = stand(old) && ok(old) && far(old) ? old : undefined;
+      let q: Vec2 | undefined = stand(old) && far(old) ? old : undefined;
       if (!q) {
         if (!lattice) { lattice = []; for (let u = r3(uMin - 4); u <= uMax + 4 + 1e-9; u = r3(u + 0.5)) for (let v = r3(vA - 4); v <= vB + 4 + 1e-9; v = r3(v + 0.5)) { const d = out(u, v); if (d >= 1.6 && d <= 4.0) lattice.push(W(u, v)); } }
         q = lattice.filter((x) => stand(x) && ok(x) && far(x)).sort((x, y) => hypot(x[0] - old[0], x[1] - old[1]) - hypot(y[0] - old[0], y[1] - old[1]) || x[0] - y[0] || x[1] - y[1])[0];
