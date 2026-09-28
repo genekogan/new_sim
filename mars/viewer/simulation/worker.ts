@@ -259,13 +259,13 @@ export async function handleSimulation(
       const q = url.searchParams;
       const num = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
       // RPC typing can't express the open-ended JSON result; it is plain JSON (OpResult).
-      const r = (await stub.engineCall('get_take', {
+      const r = await (stub.engineCall('get_take', {
         take_id: q.get('id') ?? '',
         from: num('from'),
         to: num('to'),
         ...(q.has('entities') ? { entities: q.get('entities')!.split(',') } : {}),
         ...(q.has('include') ? { include: q.get('include')!.split(',') } : {}),
-      }, year)) as unknown as { ok: boolean; code?: string };
+      }, year) as unknown as Promise<{ ok: boolean; code?: string }>);
       return json(r, r.ok ? 200 : r.code === 'take.unknown' ? 404 : 400);
     }
     if (url.pathname === '/mcp') {
@@ -380,7 +380,7 @@ export async function handleSimulation(
                 }
               },
             );
-          registerEngineTools(server, async (op, args) => (await stub.engineCall(op, args, year)) as unknown as { ok: boolean });
+          registerEngineTools(server, async (op, args) => await (stub.engineCall(op, args, year) as unknown as Promise<{ ok: boolean }>));
           return server;
         },
         {
