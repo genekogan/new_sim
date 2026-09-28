@@ -949,3 +949,33 @@ Then: gate → release 5; HANDOFF refresh.
   - No runtime make-way for the givers.
   - Sloped framing only plan-tested.
 - 13:55 EDT lead: merged head `c27c2d4` (W31 + W35 + W36 on main) — tsc clean, engine 383 / 380 / 0 fail / 3 skip on a clean run (one wall-clock flake under worker load on the first run, not reproduced). In flight: W37 (studio chapter-set playback), W38 (chiba/kitchen/west-house A+B). Next: per-house chapter takes → gate → release 7 (checkpoint 1).
+
+## 2026-09-28 — W37: studio "Watch it being built · 2022" plays the A+B chapter set back to back
+- **One entry.** The 2022 pickers offer the chapter set once: "2022 east-house: skeleton, decks, stair, walls, solar —
+  from the piles · 8 h 20 min · 7 chapters" (derived from the manifest; 30 029.95 s = 8 h 20.499 min, so 20 not 21). The
+  bay-1 and whole-skeleton takes stay; the 7 chapter takes are in neither picker (`isChapter`).
+- **Playback** (`app/studio/chapter-set.ts` ChapterSetReplay, `chapter-panel.tsx`, `take-host.ts openSet`): one set clock
+  (h:mm:ss) and scrubber, 0.5–64×; chapter bar A · D0 · D1 · D2 · S · W · P with the chapter on screen highlighted and a
+  continuity mark at every seam; one `TakePeople` for the whole set, the next chapter swapped in with `setTake` (no rig /
+  mesh rebuild); a hash guard before every swap (baseline = previous manifest final = `chapter.startHash`, else the clock
+  stops with a continuity error); chapter k + 1 prefetched while k plays, k − 1 … k + 1 kept; engine camera = each
+  chapter's planned track; the log on the set clock (merged waits' "until" too; `takeLog(…, { at, clock })`).
+- **Whole-set checks in a worker** (`chapter-set.worker.ts`, 2.9 s after opening): per chapter hash + start
+  (`chapterContinuity`) + log; final: ✓ 7 / 7 chapter starts · ✓ final state ddb634d6… = A+B pin (spec reads
+  `PIN_FULL_AB`) · last frame = final state 0.64 mm · ✓ 66 frames + beams + 145 parts at the mars-2022 canonical pose
+  (`compareToCanonical` + `compareB` on `yearBuildPlan(…, { phaseB: {} })`, max 0.57 mm). `vite build` emits the worker
+  as its own chunk (267 kB).
+- **64× across the A → D0 seam** (10 s, SwiftShader): 17.7 fps, frame mean 56.8 / p95 66.7 / **max 66.8 ms** (no stall;
+  limit 250 ms), frames around the seam 50–66.7 ms, the swap redraw 2.6 ms, prefetch 20–36 ms fetch + parse, 64.6 take-s
+  per wall-s.
+- **Prone fields in replay** (`take-replay.ts`): `proneYaw` (mrad → rad) and `phaseK` (% → 0–1) into `SampledHuman`.
+  `studio-take-prone.spec.ts` (lab `prone`, 708 receiver samples): engine numbers identical, turn within 0.0005 rad,
+  prone-wait hips / head within 0.6 mm; getting up the replay rises exactly on smooth(phaseK) and the live body is never
+  ahead (it waits for the load, up to 0.79 behind — random access cannot know). Without the fields: turn off 0.35 rad
+  every prone-wait tick.
+- **Specs:** studio-build 8/8 (3 new), studio-take-prone 1/1 (new), studio-take 1/1, studio-direct 2/2; tsc clean.
+  Captures looked at: `studio-build-set-{yard,roof-relay,stair,walls,final}.png` (STUDIO_REPLAY.md "Chapter sets:
+  playback").
+- **Weak spots:** STUDIO_REPLAY.md §5 "Chapter sets (W37)": gait phase restarts at a seam, heuristic chapter words,
+  no Direct camera for sets, the panel covers the bottom of the frame; unbound `$crew[n]` labels still in the log
+  (recorder side).
