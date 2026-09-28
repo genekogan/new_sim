@@ -358,37 +358,45 @@ function solarParts(nodes: AsmNode[], decks: AsmNode[], beams: AsmNode[], byId: 
     ok.push({ n, d: hit.d, tilt: hit.t, u, axis, high: lean < 0 ? 1 : -1, deckTop, deck });
   }
   for (const c of cells) if (![...cellOf.values()].includes(c)) un(c, 'cell overlay of a panel that is not placed');
-  // rows of panels along the tilt axis (same u), paired for rails
-  const rows = new Map<string, P[]>();
-  for (const p of ok) { const k = `${dot2(xz(p.n), p.u).toFixed(2)}|${p.deckTop.toFixed(3)}`; rows.set(k, [...(rows.get(k) ?? []), p]); }
+  // one rail pair per panel (∥ the tilt axis, under its low and high sides), shifted along the row to clear the frame
+  // columns that stand above the roof deck at every frame line (the 16 ft frames top out 5 cm above a deck on the top beams)
   const railL = def('panel-rail').size[0];
   const railH = def('panel-rail').size[1];
+  const frames = nodes.filter((n) => n.kind === 'upright');
   let ri = 0;
-  for (const [, row] of [...rows.entries()].sort()) {
-    row.sort((a, b) => dot2(xz(a.n), a.axis) - dot2(xz(b.n), b.axis));
-    for (let i = 0; i < row.length; i += 2) {
-      const grp = row.slice(i, i + 2);
-      const p0 = grp[0];
-      const [L, Th] = def(p0.d).size;
-      const cu = dot2(xz(p0.n), p0.u);
-      const half = (L * dcos(p0.tilt)) / 2;
-      const lo = Math.max(p0.deck.half[0] + 0.03, cu - half + 0.12), hi = Math.min(p0.deck.half[1] - 0.03, cu + half - 0.12);
-      if (hi - lo < 0.6) { for (const q of grp) un(q.n, `its rails would not fit on the deck under it (${(hi - lo).toFixed(2)} m between them)`); continue; }
-      const ca = grp.reduce((s, q) => s + dot2(xz(q.n), q.axis), 0) / grp.length;
-      const span = grp.length === 2 ? Math.abs(dot2(xz(grp[1].n), p0.axis) - dot2(xz(grp[0].n), p0.axis)) + def(p0.d).size[2] : def(p0.d).size[2];
-      if (span > railL + 0.3) { for (const q of grp) un(q.n, `two neighbouring panels span ${span.toFixed(2)} m, more than a rail pair can carry`); continue; }
-      const cv0 = ca;
-      const railIds: string[] = [];
-      for (const lu of [lo, hi]) {
-        const id = `${p0.n.assembly}-panel-rail-${String(++ri).padStart(2, '0')}`;
-        railIds.push(id);
-        const c: Vec2 = [p0.u[0] * lu + p0.axis[0] * cv0, p0.u[1] * lu + p0.axis[1] * cv0];
-        parts.push({
-          id, nodes: grp.map((q) => q.n.id), kind: 'solar', role: 'panel-rail', def: 'panel-rail', stock: 'panel-rail', cut: false,
-          pose: { p: [r4(c[0]), r4(p0.deckTop), r4(c[1])], yaw: r4(datan2(p0.axis[1], p0.axis[0])) }, y: r4(p0.deckTop), key: [ri], meta: { u: r4(lu) },
-        });
-      }
-      for (const q of grp) {
+  const sorted = [...ok].sort((a, b) => dot2(xz(a.n), a.u) - dot2(xz(b.n), b.u) || dot2(xz(a.n), a.axis) - dot2(xz(b.n), b.axis));
+  for (const q of sorted) {
+    const [L, Th, Wd] = def(q.d).size;
+    const cu = dot2(xz(q.n), q.u);
+    const half = (L * dcos(q.tilt)) / 2;
+    const lo = Math.max(q.deck.half[0] + 0.03, cu - half + 0.12), hi = Math.min(q.deck.half[1] - 0.03, cu + half - 0.12);
+    if (hi - lo < 0.6) { un(q.n, `its rails would not fit on the deck under it (${(hi - lo).toFixed(2)} m between them)`); continue; }
+    const cv = dot2(xz(q.n), q.axis);
+    // frame planes across the axis whose columns stand under the rails' lines
+    const planes = frames.filter((f) => Math.abs(dot2(axisU(f.box.yaw), q.u)) > 0.98 && [lo, hi].some((lu) => Math.abs(dot2(xz(f), q.u) - lu) <= f.box.size[0] / 2 + 0.02)).map((f) => ({ v: dot2(xz(f), q.axis), t: f.box.size[2] / 2 + 0.01 }));
+    let shift: number | null = null;
+    for (let k = 0; k <= 100; k++) for (const sgn of k ? [1, -1] : [1]) {
+      if (shift !== null) break;
+      const sh = sgn * k * 0.01;
+      const r0 = cv + sh - railL / 2, r1 = cv + sh + railL / 2;
+      const overlap = Math.min(r1, cv + Wd / 2) - Math.max(r0, cv - Wd / 2);
+      if (overlap < 0.3) continue;
+      if (planes.some((pl) => r1 > pl.v - pl.t && r0 < pl.v + pl.t)) continue;
+      shift = sh;
+    }
+    if (shift === null) { un(q.n, `a 2.1 m rail under it would cross a frame line whose columns stand above the roof deck`); continue; }
+    const railIds: string[] = [];
+    for (const lu of [lo, hi]) {
+      const id = `${q.n.assembly}-panel-rail-${String(++ri).padStart(2, '0')}`;
+      railIds.push(id);
+      const c: Vec2 = [q.u[0] * lu + q.axis[0] * (cv + shift), q.u[1] * lu + q.axis[1] * (cv + shift)];
+      parts.push({
+        id, nodes: [q.n.id], kind: 'solar', role: 'panel-rail', def: 'panel-rail', stock: 'panel-rail', cut: false,
+        pose: { p: [r4(c[0]), r4(q.deckTop), r4(c[1])], yaw: r4(datan2(q.axis[1], q.axis[0])) }, y: r4(q.deckTop), key: [ri], meta: { u: r4(lu), shift: r4(shift) },
+      });
+    }
+    {
+      {
         const yr = q.deckTop + railH;
         // flat on the rails with local x toward the high edge, then rolled +tilt about the rails (solar.ts tiltedPose):
         // box centre = pose origin + rotated (0, T/2, 0) → origin x = Kit centre + (T/2) sin t toward the high side

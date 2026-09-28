@@ -265,15 +265,16 @@ export function planPassUp(rt: Runtime, p: PP): { ok: true; program: PassUpProgr
     }
     const rfloor = rl[0].pose.p[1];
     if (rl.some((h) => Math.abs(h.pose.p[1] - rfloor) > 0.02)) return fail('passup.relay-level', 'the relay kneels on one deck', relay);
-    let top = rfloor + GIVE_MAX;
+    // (the relay keeps the grip it took it by — the top face at its nearest edge — while it stands up with it)
+    let top = rfloor + GIVE_MAX - th;
     for (const [i, h] of rl.entries()) {
-      const hands = handsFor(e, R(top), h, giveSlot(i, relayGrips[i]));
-      for (const hh of hands) top = Math.min(top, rfloor + postureTop(POSTURE.stand_with_load, dist2([hh[0], hh[2]], at(h.pose))));
+      const hands = handupHands(e, R(top), h, takeSlot(i))!;
+      for (const hh of hands) top = Math.min(top, rfloor + postureTop(POSTURE.stand_with_load, dist2([hh[0], hh[2]], at(h.pose))) - th);
     }
     if (top <= give) return fail('passup.too-high', `the relay on the deck at ${f2(rfloor)} m cannot raise ${e.id} above the givers' ${f2(give)} m`, relay);
     for (const q2 of samples(e, R(give), R(top)))
       for (const [i, h] of rl.entries()) {
-        const why = holderOk(h, q2, 'stand_with_load', giveSlot(i, relayGrips[i]), false); // from kneeling at the edge up to overhead
+        const why = holderOk(h, q2, 'stand_with_load', takeSlot(i), false); // from kneeling at the edge up to overhead
         if (why) return fail('passup.relay-reach', `relay ${h.id} cannot raise ${e.id} to ${f2(top)} m: at ${f2(q2.p[1])} m ${why}`, [e.id, h.id], h.pose.p);
       }
     relayTop = top;
@@ -449,7 +450,7 @@ function stepPassUp(rt: Runtime, ex: Exec, dt: number): StepResult {
   if (seg.who === 'givers') hold(rt, ex, 'givers', seg.phase === 'push' ? ex.prog.raisePhase : seg.phase, e.pose, { move: seg.phase === 'walk-load' || seg.phase === 'push', k });
   else {
     // whoever holds it keeps holding while the next pair reaches for it
-    if (ex.holders && ex.holders !== seg.who) hold(rt, ex, ex.holders, ex.holders === 'givers' ? ex.prog.raisePhase : 'hold', e.pose, { give: ex.holders === 'relay' });
+    if (ex.holders && ex.holders !== seg.who) hold(rt, ex, ex.holders, ex.holders === 'givers' ? ex.prog.raisePhase : 'stand_with_load', e.pose, {});
     if (seg.phase === 'reach_down' && e.support?.kind === 'held' && !e.support.by.includes((seg.who === 'relay' ? ex.p.relay! : ex.p.receivers)[0]))
       e.support = { kind: 'held', by: [...e.support.by, ...(seg.who === 'relay' ? ex.p.relay! : ex.p.receivers)] };
     if (seg.who === 'receivers' && seg.phase === 'reach_down') for (const kn of prog.kneels) {
@@ -462,7 +463,7 @@ function stepPassUp(rt: Runtime, ex: Exec, dt: number): StepResult {
       ex.feet0 ??= Object.fromEntries(ex.p.receivers.map((a) => [a, [...w.entities[a].pose.p] as Vec3]));
       for (const a of ex.p.receivers) { const f0 = ex.feet0[a]; w.entities[a].pose.p = [f0[0] + e.pose.p[0] - tr0.p[0], f0[1], f0[2] + e.pose.p[2] - tr0.p[2]]; }
     }
-    hold(rt, ex, seg.who, seg.phase, e.pose, { k, give: seg.who === 'relay' && seg.phase === 'stand_with_load' });
+    hold(rt, ex, seg.who, seg.phase, e.pose, { k });
   }
   if (ex.t < seg.dur - 1e-9) return { status: 'running', phase: `${seg.who}:${seg.phase}` };
   if (seg.phase === 'take') {
@@ -475,14 +476,14 @@ function stepPassUp(rt: Runtime, ex: Exec, dt: number): StepResult {
   ex.si++;
   ex.t = 0;
   if (ex.si < prog.segs.length) return { status: 'running', phase: `${seg.who}:${seg.phase}` };
-  e.pose = { ...prog.final, p: [...prog.final.p] as Vec3 };
+  e.pose = { ...prog.final, p: [...prog.final.p] as Vec3, yaw: ex.p.to.yaw }; // (the same box: set down with the heading asked for)
   }
   if (prog.fasten.length) {
     // screwed down where it lies (install_plywood's aloft fastening: 3 s, everyone within reach)
     if (ex.t2 === undefined) {
       ex.t2 = 0;
       release(rt, ex.p.receivers);
-      e.pose = { ...prog.final, p: [...prog.final.p] as Vec3 };
+      e.pose = { ...prog.final, p: [...prog.final.p] as Vec3, yaw: ex.p.to.yaw }; // (the same box: set down with the heading asked for)
       e.phase = 'staged';
       e.support = { kind: 'resting-on', on: prog.rest.on };
     }

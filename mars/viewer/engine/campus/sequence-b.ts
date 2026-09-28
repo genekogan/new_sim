@@ -230,12 +230,12 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     return true;
   };
   /** Down: from a deck onto a walkway of the frame line `k` bay, along it to the end frame, down its bracing. */
-  const climbDown = (k: number, seat: number, who: number[], uAt: number[], after: string[] = []) => {
+  const climbDown = (k: number, seat: number, who: number[], uAt: number[], after: string[] = [], vIn = 1.2) => {
     for (const [i, m] of who.entries()) {
       const col = [uMin, uMin + depth, uMax - depth, uMax].sort((a, b) => Math.abs(a - uAt[i]) - Math.abs(b - uAt[i]))[0];
       const c = climbAt(k, col, seat);
       if (!c) continue;
-      const vOn = k === 0 ? lineV(0) + 1.2 : lineV(k) - 1.2;
+      const vOn = k === 0 ? lineV(0) + vIn : lineV(k) - vIn;
       const q = W(col, vOn);
       const d = W(Math.min(Math.max(col, uMin + 0.44), uMax - 0.44), vOn);
       step('walk_to', { actor: C(m), x: d[0], z: d[1], level: levelId(seat + def('beam-12ft').size[1] / 2 + PLY_T) }, [m], after, `${C(m)} walks to the end of the deck`);
@@ -244,10 +244,10 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     }
   };
   /** Up onto a deck: climb frame line k onto its bay's walkway at `seat`, step off onto the deck at (u, v). */
-  const upOnto = (k: number, seat: number, m: number, u: number, v: number) => {
+  const upOnto = (k: number, seat: number, m: number, u: number, v: number, after: string[] = []) => {
     const c = climbAt(k, u, seat);
     if (!c) return false;
-    step('climb_frame', { actor: C(m), link: c.link, dir: 'up' }, [m], [], `${C(m)} climbs the end frame to the ${seat.toFixed(2)} m deck`);
+    step('climb_frame', { actor: C(m), link: c.link, dir: 'up' }, [m], after, `${C(m)} climbs the end frame to the ${seat.toFixed(2)} m deck`);
     // step off 0.45 m into the deck, toward the middle of the house (never onto the beam line itself)
     const q = W(u + (u < (uMin + uMax) / 2 ? 0.45 : -0.45), v);
     step('beam_walk', { actor: C(m), x: q[0], z: q[1] }, [m], [], `${C(m)} steps onto the deck`);
@@ -667,22 +667,29 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const rails = P('panel-rail'), panels = P('panel');
     const wallFace = uMax + BEAM_HALF + (P('wall-panel').some((w) => Lc([w.pose.p[0], w.pose.p[2]])[0] > uMax - 0.1) ? PLY_T : 0);
     // the roof crew (4, 5) climbs to the roof deck; the relay (2, 3) kneels on the first-floor deck (up the stair)
-    if (levels.length > 2) { upOnto(0, seatOf(levels[2]), 4, uMax, lineV(0) + 1.2); upOnto(0, seatOf(levels[2]), 5, uMax - depth, lineV(0) + 1.2); }
+    let w5: string[] = [];
+    if (levels.length > 2) {
+      // up the far end frame one after the other (inner column first, then the outer), the second one waits at the far end
+      upOnto(0, seatOf(levels[2]), 5, uMax - depth, lineV(0) + 1.2);
+      const q5 = W(uMin + 0.6, lineV(K - 1) - 0.6);
+      w5 = [step('walk_to', { actor: C(5), x: q5[0], z: q5[1], level: levelId(l2Top) }, [5], [], `${C(5)} waits at the far end of the roof`)];
+      upOnto(0, seatOf(levels[2]), 4, uMax, lineV(0) + 1.2, w5);
+    }
     const l2Lv = levelId(l2Top), l1Lv = levelId(l1Top);
-    for (const r of rails) {
+    const railUp = (r: PartB) => {
       const vr = Lc([r.pose.p[0], r.pose.p[2]])[1];
       const lw = W(wallFace + 0.08 + 0.6, vr);
       const f = fetch(r, { x: lw[0], z: lw[1], yaw: r3(r.pose.yaw) }, [G[0]]);
-      if (!f) continue;
+      if (!f) return;
       const ra = W(uMax - 0.31, safeV(vr, uMax - 0.31)), rv = W(uMax - 0.44, safeV(vr + 1.05 + 0.33, uMax - 0.44));
       const pu = step('pass_up', {
         part: r.id, to: { x: r.pose.p[0], z: r.pose.p[2], yaw: r.pose.yaw, height: r3(l2Top) }, edge: r3(wallFace), out: { x: W(1, 0)[0], z: W(1, 0)[1] },
         givers: [C(G[0])], relay: [C(2)], relayAt: [{ x: ra[0], z: ra[1], level: l1Lv }], receivers: [C(4)], receiverAt: [{ x: rv[0], z: rv[1], level: l2Lv }], follow: true,
-      }, [G[0], 2, 4], [f], `pass rail ${r.id} up through the relay to the roof deck`);
+      }, [G[0], 2, 4], [f, ...w5], `pass rail ${r.id} up through the relay to the roof deck`);
       const under = decks.filter((d) => d.meta.level === levels[levels.length - 1]).sort((a, b) => Math.abs(uc(a) - Lc([r.pose.p[0], r.pose.p[2]])[0]) + Math.abs(vc(a) - vr) - (Math.abs(uc(b) - Lc([r.pose.p[0], r.pose.p[2]])[0]) + Math.abs(vc(b) - vr)))[0];
       const ir = step('install_rail', { actor: C(4), rail: r.id, onto: under.id, at: { x: r.pose.p[0], z: r.pose.p[2], yaw: r.pose.yaw } }, [4], [pu], `fasten rail ${r.id} to the roof deck`);
       mark(r, pu, ir);
-    }
+    };
     // panels: install_panel's crew stands beyond both ends of the tilt axis, so a panel is mounted only while both
     // neighbours in its row are still off (not tilted): every other panel of a row
     const rows = new Map<string, PartB[]>();
@@ -694,23 +701,41 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const reachEnd = def(row[0].def).size[2] / 2 + 0.45;
       const vLo = lineV(0) - 0.0381 + 0.3, vHi = lineV(K - 1) + 0.0381 - 0.3; // (the deck spans frame centre to frame centre)
       const chosen = new Set<number>();
-      for (let i = 0; i < row.length; i++) if (vOf(row[i]) - reachEnd >= vLo && vOf(row[i]) + reachEnd <= vHi && !chosen.has(i - 1)) chosen.add(i);
+      // (and its rail pair clear of the rails of the panel chosen before it)
+      const railSpan = (q: PartB) => { const rs = (q.meta.rails as string).split(',').map((id) => rails.find((r) => r.id === id)!); const v = Lc([rs[0].pose.p[0], rs[0].pose.p[2]])[1]; return [v - 1.05, v + 1.05]; };
+      let lastSpan: number[] | null = null;
+      const flinesP = [...new Set(fr.map((f) => r3(Lc(f.c)[1])))];
+      const overFrame = (q: PartB) => flinesP.some((L) => Math.abs(vOf(q) - L) < def(q.def).size[2] / 2 + fh + 0.01);
+      for (let i = 0; i < row.length; i++) {
+        if (vOf(row[i]) - reachEnd < vLo || vOf(row[i]) + reachEnd > vHi || chosen.has(i - 1) || overFrame(row[i])) continue;
+        const sp = railSpan(row[i]);
+        if (lastSpan && sp[0] < lastSpan[1] + 0.02) continue;
+        chosen.add(i);
+        lastSpan = sp;
+      }
       const pitch = row.length > 1 ? vOf(row[1]) - vOf(row[0]) : 0;
       for (const [i, p] of row.entries()) {
         if (!chosen.has(i)) {
-          const why = vOf(p) - reachEnd < vLo || vOf(p) + reachEnd > vHi
+          const why = overFrame(p)
+            ? `it spans a frame line whose columns stand 5 cm above the roof deck (16 ft frames top out above a deck laid on the top beams; the Kit draws its roof deck above them): flat on its rails it would sit on the column tops`
+            : vOf(p) - reachEnd < vLo || vOf(p) + reachEnd > vHi
             ? `install_panel (solar.ts) stands its crew beyond both ends of the tilt axis (${reachEnd.toFixed(2)} m from the centre): one end falls off the roof deck at the end of the row`
-            : `install_panel (solar.ts) stands its crew beyond both ends of the tilt axis, inside the neighbouring panels' places (${reachEnd.toFixed(2)} m from its centre vs a ${pitch.toFixed(2)} m pitch): a tilted neighbour leaves no station, so only every other panel of the row is mounted`;
+            : chosen.has(i - 1) || chosen.has(i + 1)
+              ? `install_panel (solar.ts) stands its crew beyond both ends of the tilt axis, inside the neighbouring panels' places (${reachEnd.toFixed(2)} m from its centre vs a ${pitch.toFixed(2)} m pitch): a tilted neighbour leaves no station, so only every other panel of the row is mounted`
+              : `its rail pair (shifted clear of the frame columns above the roof deck) would overlap the rails of the panel mounted before it; with install_panel's end stations only every other panel can be mounted anyway`;
           for (const n of p.nodes) unplaced.push({ node: n, kind: 'feature:solar', reason: `not mounted: ${why} — needs side stations in install_panel` });
           continue;
         }
+        // its own rail pair first
+        for (const rid of (p.meta.rails as string).split(',')) railUp(rails.find((r) => r.id === rid)!);
         const vp = Lc([p.pose.p[0], p.pose.p[2]])[1];
         const flat = { x: p.meta.flatX as number, z: p.meta.flatZ as number };
         const lw = W(wallFace + 0.08 + def(p.def).size[0] / 2 + 0.6, vp);
         const f = fetch(p, { x: lw[0], z: lw[1], yaw: r3(p.pose.yaw) }, G);
         if (!f) continue;
-        const rl = [W(uMax - 0.31, safeV(vp - 0.3, uMax - 0.31)), W(uMax - 0.31, safeV(vp + 0.3, uMax - 0.31))];
-        if (dot2([rl[0][0] - rl[1][0], rl[0][1] - rl[1][1]], [rl[0][0] - rl[1][0], rl[0][1] - rl[1][1]]) < 0.36) rl[1] = W(uMax - 0.31, safeV(vp + 0.9, uMax - 0.31));
+        const uR = uMax - 0.27; // the relay kneels right at the deck edge (the panel goes up outside the wall)
+        const rl = [W(uR, safeV(vp - 0.3, uR)), W(uR, safeV(vp + 0.3, uR))];
+        if (dot2([rl[0][0] - rl[1][0], rl[0][1] - rl[1][1]], [rl[0][0] - rl[1][0], rl[0][1] - rl[1][1]]) < 0.36) rl[1] = W(uR, safeV(vp + 0.9, uR));
         const rv = [W(uMax - 0.44, safeV(vp - 0.84, uMax - 0.44)), W(uMax - 0.44, safeV(vp + 0.84, uMax - 0.44))];
         const pu = step('pass_up', {
           part: p.id, to: { x: flat.x, z: flat.z, yaw: p.pose.yaw, height: r3(p.meta.flatY as number) }, edge: r3(wallFace), out: { x: W(1, 0)[0], z: W(1, 0)[1] },
@@ -720,7 +745,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         mark(p, pu, ip);
       }
     }
-    if (levels.length > 2) climbDown(0, seatOf(levels[2]), [4, 5], [uMax, uMax - depth]);
+    if (levels.length > 2) climbDown(0, seatOf(levels[2]), [4, 5], [uMax, uMax - depth], [], 0.55); // (clear of the panels near the end)
   }
   // ---------------------------------------------------------------- END: everyone on the ground, clear of the house
   if (secs.has('END')) {
