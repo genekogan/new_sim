@@ -35,8 +35,14 @@ const CORRECTIONS: { year: number; name: string; position: number[]; target: num
   { year: 2021, name: 'corridor-aluminet', position: [2, 13, 30], target: [0, 2.5, 0] },
   // Four rotated buildings around the courtyard: high oblique shows the open corners.
   { year: 2022, name: 'courtyard', position: [20, 34, 24], target: [0, 0, 0] },
-  // Raked frontage: stepped PV left, salvaged glazing + eye right, mural between.
+  // Front (2026-09-29 edit): vertical inset with straight stairs, leaning PV (left) / plexiglass (right) flaps.
   { year: 2024, name: 'frontage', position: [0, 6.5, 30], target: [0, 3.2, 6] },
+  // Eye level on the door axis, framed like evidence/2024-chiba-facade-front-vertical-inset-stairs-plexiglass.webp.
+  { year: 2024, name: 'front-eye', position: [0, 1.6, 24], target: [0, 2.4, 5.5] },
+  // Through the right flap's plexiglass panes into the solarium (2x4 lattice, rack frames, end wall + open door).
+  { year: 2024, name: 'solarium', position: [7.2, 2.9, 9.6], target: [9.0, 1.1, 5.0] },
+  // The solarium's end: plexiglass wall on 2x4 studs with its door standing open (the first door object).
+  { year: 2024, name: 'solarium-door', position: [16.5, 1.8, 10.5], target: [10.9, 1.5, 6.0] },
 ];
 
 for (const c of CORRECTIONS) {

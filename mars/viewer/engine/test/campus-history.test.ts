@@ -19,6 +19,11 @@ import { loadCampusFile } from '../campus/history-node.ts';
 import type { Region } from '../world/types.ts';
 import { RULES_VERSION } from '../construction/rules.ts';
 import { hypot } from '../core/math.ts';
+import type { Vec3 } from '../core/math.ts';
+import { DatabaseSync } from 'node:sqlite';
+import type { WorldState } from '../world/types.ts';
+import { CameraWorld } from '../camera/geom.ts';
+import { CameraNavmesh } from '../camera/synth.ts';
 
 const years = new Map<number, CampusYear>(HISTORY_YEARS.map((y) => [y, loadCampusYear(y, loadCampusFile(y))]));
 const Y = (y: number) => years.get(y)!;
@@ -32,7 +37,7 @@ const box = (r: Region) => {
   return { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs), z1: Math.max(...zs) };
 };
 const asScene = (y: number) => Y(y).base as unknown as SpatialScene;
-const ID_RE = /^([a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign))$/;
+const ID_RE = /^([a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign|solarium-door))$/;
 
 test('each year 2020–2025 loads as a ground-only scene with provenance on every obstacle', () => {
   for (const [y, { base, world }] of years) {
@@ -192,4 +197,108 @@ test('extraction is deterministic: two --check runs match the committed hashes',
     const out = execFileSync('node', ['deploy/history-scenes.mjs', '--check'], { cwd: viewer, encoding: 'utf8' });
     for (const y of HISTORY_YEARS) assert.match(out, new RegExp(`${y} deterministic: contentHash matches`), out);
   }
+});
+
+// ---- Chiba 2024 front, reconstruction edit of 2026-09-29 (OWNER_FEEDBACK §15; HISTORY_IDS.md "Reconstruction edits") ----
+const PRE_EDIT_2024 = 'c542f3fe6c6199d31f0fb5d1f7dcb1937bc7f41b4de990d068d17bcdf0f2bfcc'; // campus-2024.json contentHash before the edit
+const EDIT_EVIDENCE = ['docs/engineering/evidence/2024-chiba-facade-front-vertical-inset-stairs-plexiglass.webp', 'docs/engineering/evidence/2024-chiba-solarium-interior-plexiglass-roof.jpg'];
+const W2 = (6 * 3.6576) / 2, D2 = (3 * 3.6576) / 2; // Chiba 2024 half-width / half-depth (6 × 3 bays)
+const door2024 = () => {
+  const jambs = Y(2024).base.obstacles.filter((o) => /^chiba-solarium-door-jamb-[0-9a-f]{8}$/.test(o.id)).map((o) => o.obb.c[1]).sort((a, b) => a - b);
+  assert.equal(jambs.length, 2, 'two door jambs');
+  return { x: Y(2024).base.obstacles.find((o) => o.id.startsWith('chiba-solarium-door-jamb'))!.obb.c[0], z0: jambs[0] + 0.02, z1: jambs[1] - 0.02 };
+};
+
+test('Chiba 2024 edit: untouched pieces keep their ids; replaced pieces are gone; the solarium door is the first door object', () => {
+  const comps = new Set(Y(2024).base.obstacles.map((o) => o.component));
+  // untouched (same kind + placement): PV on the left flap, the left clear strip, the yellow sliding leaf, pins
+  for (const id of ['chiba-photovoltaic-cells-1be2efca', 'chiba-photovoltaic-cells-3ca6e19e', 'chiba-photovoltaic-cells-52b80fd2', 'chiba-salvaged-glazing-bb28cbfd', 'chiba-flower-mural', 'chiba-entry-sign'])
+    assert.ok(comps.has(id), `kept ${id}`);
+  // replaced by the edit: the leaning frontage sides and the old eye insert
+  for (const id of ['chiba-painted-frontage-side-61f2d8e8', 'chiba-painted-frontage-side-6bfae4e1', 'chiba-painted-eye-window-insert-67f917bd']) assert.ok(!comps.has(id), `removed ${id}`);
+  const door = Y(2024).base.obstacles.filter((o) => o.component === 'chiba-solarium-door');
+  assert.ok(door.length && door.every((o) => o.kind === 'glass' && /plexiglass door/.test(o.label ?? '')));
+  const { x, z0, z1 } = door2024();
+  assert.ok(Math.abs(x - (W2 + 0.045)) < 0.01 && z1 - z0 > 1.15, `door opening ${z0.toFixed(2)}–${z1.toFixed(2)} at x ${x}`);
+  // nothing stands in the opening between the floor and the header (a real gap, for walkers and the camera)
+  const inGap = (o: (typeof door)[number]) => o.y0 < 2.1 && o.y1 > 0.3 && Math.abs(o.obb.c[0] - x) < 0.15 + hypot(o.obb.half[0], o.obb.half[1]) && o.obb.c[1] + hypot(o.obb.half[0], o.obb.half[1]) > z0 + 0.05 && o.obb.c[1] - hypot(o.obb.half[0], o.obb.half[1]) < z1 - 0.05;
+  const blockers = Y(2024).base.obstacles.filter((o) => inGap(o) && !/^chiba-solarium-door-jamb/.test(o.id)).filter((o) => {
+    const scene = { ...asScene(2024), obstacles: [o] } as SpatialScene;
+    const g = buildGrids(scene, 0.05).levels.get(0)!;
+    return [0.2, 0.4, 0.6, 0.8].some((f) => !g.free[g.nx * Math.round((z0 + f * (z1 - z0) - g.z0) / g.cell) + Math.round((x - g.x0) / g.cell)]);
+  });
+  assert.deepEqual(blockers.map((o) => o.id), [], 'the solarium doorway is open');
+});
+
+test('Chiba 2024 edit: mars-2024 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical', () => {
+  const f = loadCampusFile(2024);
+  assert.notEqual(f.contentHash, PRE_EDIT_2024, 'the edit changed the 2024 static scene');
+  const now = loadCampusYear(2024, f).world;
+  const pre: WorldState = { ...structuredClone(now), base: { ...now.base, staticHash: PRE_EDIT_2024 } };
+  const h = new WorldHistory(RULES_VERSION);
+  h.publishCanonical('mars-2024', 'Mars 2024 (before the 2026-09-29 front edit)', pre, 'campus-2024.json before the Chiba front edit');
+  assert.throws(() => h.commit('mars-2024', now, { kind: 'reconstruction-edit', note: 'x' }), (e: unknown) => e instanceof HistoryError && e.code === 'protected');
+  h.fork('mars-2024', 'mars-2024-chiba-front', 'Chiba 2024 front as photographed');
+  const cp = h.commit('mars-2024-chiba-front', now, {
+    kind: 'reconstruction-edit',
+    note: 'Chiba 2024 front as photographed (2026-09-29): vertical inset with straight stairs, leaning flaps proud of it, plexiglass solarium + end wall with a door',
+    evidence: EDIT_EVIDENCE,
+  }, 'reconstruction-edit 2026-09-29');
+  assert.deepEqual(h.log('mars-2024-chiba-front').map((c) => c.cause.kind), ['reconstruction-edit', 'canonical-publish']);
+  // re-seed: publishing the regenerated file gives exactly the edited state, protected again
+  const h2 = new WorldHistory(RULES_VERSION);
+  const { canonical } = publishCampusYear(h2, 2024, f);
+  assert.ok(canonical.protected);
+  assert.equal(h2.head('mars-2024').physicalHash, cp.physicalHash);
+  assert.equal(hashOf(h2.read('mars-2024')), hashOf(h.read(cp.id)));
+});
+
+test('Chiba 2024 edit: the 2024 year room seeds protected mars-2024 from the edited file', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const db = new DatabaseSync(':memory:');
+  const storage = {
+    sql: { exec(q: string, ...args: (string | number)[]) { const st = db.prepare(q); const out = /^\s*SELECT/i.test(q) ? st.all(...args) : (st.run(...args), []); return { toArray: () => out }; } },
+    transactionSync<T>(fn: () => T): T { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } },
+  };
+  // oxlint-disable-next-line typescript/no-explicit-any -- tool results are untyped JSON
+  const room = new EngineRoom(storage as never, {}, loadCampusFile) as unknown as { call(y: number, t: string, a: object): any };
+  const q = room.call(2024, 'query_world', { workspace: 'mars-2024', include: ['regions'] });
+  assert.equal(q.protected, true);
+  assert.equal(q.entityCount, 0);
+  assert.ok((room.call(2024, 'query_world', {}).workspaces as { id: string }[]).some((w) => w.id === 'mars-2024'));
+});
+
+test('Chiba 2024 edit: walkers and the camera navmesh pass the solarium door; the hall interior still blocks', () => {
+  const { x, z0, z1 } = door2024();
+  const zm = (z0 + z1) / 2;
+  // walkers: outside → solarium floor (sand, ground level) through the door
+  const w = route(2024, [x + 3, zm], [x - 2.5, zm]);
+  const crossing = samples(w.pts, 0.05).filter((p) => Math.abs(p[0] - x) < 0.05);
+  assert.ok(crossing.length && crossing.every((p) => p[1] > z0 && p[1] < z1), 'walker crosses the end wall only in the doorway');
+  // the hall's ground-floor deck footprint (behind the frame front) still blocks: unknown interiors stay non-walkable
+  const g = buildGrids(asScene(2024), 0.25).levels.get(0)!;
+  let n = 0, blocked = 0;
+  for (let c = 0; c < g.nx * g.nz; c++) {
+    const [px, pz] = centreOf(g, c);
+    if (Math.abs(px) > W2 - 0.3 || Math.abs(pz) > D2 - 0.3) continue;
+    n++;
+    if (!g.free[c]) blocked++;
+  }
+  assert.ok(blocked / n > 0.6, `2024 hall: only ${((100 * blocked) / n).toFixed(0)}% blocks`);
+  // camera navmesh (CAMERA_DIRECT.md): eye-level flight from outside into the solarium goes through the door
+  const f = loadCampusFile(2024);
+  const nav = (scene: SpatialScene) => new CameraNavmesh(new CameraWorld(scene), [x - 9, z0 - 7, x + 7, z1 + 6], f.groundY);
+  const eye = f.groundY + 1.6;
+  const a: Vec3 = [x + 3, eye, zm], b: Vec3 = [x - 2.0, eye, zm];
+  const r = nav(asScene(2024)).route(a, b);
+  assert.ok(r.ok, `camera route: ${r.ok ? '' : r.diagnostic.message}`);
+  const cam = r.points;
+  const len = cam.slice(1).reduce((s2, p, i) => s2 + hypot(p[0] - cam[i][0], p[2] - cam[i][2]), 0);
+  assert.ok(len < 8, `camera goes straight through the door (${len.toFixed(1)} m)`);
+  // counterfactual: the same wall with the door closed → no short route
+  const closed = { ...asScene(2024), obstacles: [...asScene(2024).obstacles, { id: 'closed-door', kind: 'glass' as const, obb: { c: [x, zm] as Vec2, half: [0.02, (z1 - z0) / 2 + 0.02] as Vec2, yaw: 0 }, y0: 0.2, y1: 2.3 }] };
+  const rc = nav(closed).route(a, b);
+  const lenC = rc.ok ? rc.points.slice(1).reduce((s2, p, i) => s2 + hypot(p[0] - rc.points[i][0], p[2] - rc.points[i][2]), 0) : Infinity;
+  assert.ok(lenC > len + 3, `closed door: ${rc.ok ? `${lenC.toFixed(1)} m detour` : 'no route'}`);
+  console.log(`  2024 solarium door: walker ${w.len.toFixed(1)} m (clearance ${w.clearance.toFixed(2)}); camera ${len.toFixed(1)} m at eye level; closed door → ${rc.ok ? `${lenC.toFixed(1)} m` : 'no route'}; hall ${((100 * blocked) / n).toFixed(0)}% blocked`);
 });
