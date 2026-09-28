@@ -1312,3 +1312,4 @@ Then: gate → release 5; HANDOFF refresh.
   - Direct compile blocks the page for ≈ 6 s on a chapter take.
   - No Camera picker for sets.
   - The parser gets no world vocabulary; names are checked by the compiler.
+- **W48 landed** `40002d0`, `1c090b7` (≈250k tokens, 41 min; merged): shot hold ≥ 1.5 s on screen (deterministic chain from the anchor; 64×/60 s: 89 shots @0.67 s → 41 @1.50 s; toggle), walked metres carried across chapter seams (`take-walk.ts`; leg-phase jump 0.45 → 0 at A→D0 and D0→D1), Direct camera on the chapter on screen (label + Save into that chapter's file), "Say it" sentence box on Codex's `parse.ts` (Gene's four: three compile, "this crowd…" refused `camera.parse.deictic` with a question). 15/15 studio specs. Lead review: accepted. Weak: locked-off holds can lose their people; walk weight steps at a seam; `directCamera` on a chapter take freezes the page ≈ 6 s (to profile); single takes get no hold.
