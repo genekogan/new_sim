@@ -66,3 +66,14 @@
   uses a fixed key light, not the solar model, so its shadow baselines (2022/2024 top prisms) do not move. **Caveat:** the
   other year frames differ (2026 CAD ≈ −57°, 2025 Kit ≈ 0°, 2022 Kit mirrored, 2024 kitchen/RV side) — QUESTIONS_FOR_GENE
   A3; a per-year bearing is an open follow-up.
+- (2026-09-29 evening, Gene — questionnaire answers, verbatim in QUESTIONS_FOR_GENE.md) **2022 reconciliation + build rules:**
+  north in the 2022 model is roughly "8 o'clock" of the top-down render (left and slightly down; exact rotation from the solar panels,
+  which all face south); the four 2022 buildings are **Huaqiangbei, Cahuilla (right / south), Chatsubo (down), Ba Sing Se (up)** — no
+  "Chiba" in 2022; each building's stairs run PARALLEL to the building (wide), not perpendicular; trailers on the left are parked
+  nose-to-tail in a train; solar: one row on two buildings, staggered on another, all facing south, on **triangular wood frames ≈ 45°**
+  propped on one side with the low edge on the SOUTH roof edge (not a table in the middle); no table at the SW corner (tables are
+  incidental); **no trailers under Chiba in 2023/2024** and side trailers must not touch the walls; **floors = orange beams → 2x4
+  joists laid across several beams perpendicularly → plywood on the joists** (criss-cross; plywood never directly on beams); strips
+  sometimes get a sideways third row (3 ft); **roofs had 2x4 framing as in 2026**; walls outside the beams (as now); materials
+  hand-to-hand (as now) but the forklift must stay supported; piles look right; **posts stood directly on the sand → ground datum
+  y = 0** (the drawn −0.16 ground is wrong); beam hole pitch and the 9 ft part: unknown (skip).
