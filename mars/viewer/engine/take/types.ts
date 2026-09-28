@@ -29,7 +29,9 @@ export type TakeHands = { left?: [number, number, number]; right?: [number, numb
 /**
  * Discrete state change: [tick, entityId, field, value]. Fields: present, activity, level, task, grip, phase,
  * support, reservedBy, connections, equipment, paint; since mars-take/2 also hands (TakeHands, mm), baseActivity,
- * on, speed (cm/s), contents. A null value = the field was cleared.
+ * on, speed (cm/s), contents; since W32 (still mars-take/4, additive: absent unless a prone receiver lies down) proneYaw
+ * (integer mrad, the lying body's world heading) and phaseK (integer %, progress within the prone hand-up phase).
+ * A null value = the field was cleared.
  */
 export type ChangeEvent = [number, string, string, unknown];
 
