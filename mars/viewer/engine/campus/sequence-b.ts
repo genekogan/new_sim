@@ -21,10 +21,11 @@
 //   END everyone down: the deck crews by the stair, the roof crew along the roof beams to the far frame.
 // Every rule is re-checked by the verbs at run time; what the generator cannot do is returned in `unplaced` with
 // the reason (e.g. panels whose neighbours leave install_panel no station).
-import { datan2, dot2, rot2, type Vec2 } from '../core/math.ts';
+import { datan2, dot2, hypot, rot2, type Vec2 } from '../core/math.ts';
 import { def } from '../world/catalog.ts';
 import { cutPlan } from '../construction/cut.ts';
 import { localToWorld } from '../construction/setpart.ts';
+import { carrierSpots, formationFor } from '../carry/formation.ts';
 import type { PartB, PartsB, UnplacedB } from './parts-b.ts';
 import type { Yard } from './bom.ts';
 
@@ -57,6 +58,8 @@ export type PhaseBCtx = {
   narrowPlusU?: (v: number) => boolean;
   /** W38: is this ground plot clear of the build scene's obstacles (0.05–1.3 m tall)? */
   groundFree?: (o: { c: Vec2; half: Vec2; yaw: number }, minTop?: number) => boolean;
+  /** W47: is there standing room at world `c` (nothing 0.05–2.0 m tall of the build scene within `r` m, square)? */
+  standFree?: (c: Vec2, r: number) => boolean;
   /** Crew positions at the start of phase B when run from a snapshot (sections only). */
 };
 export type PhaseBResult = { sequenced: { node: string; kind: string; steps: string[] }[]; unplaced: UnplacedB[]; done: string[]; sectionStarts: { section: Section; at: number }[] };
@@ -242,13 +245,14 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   // ---------------------------------------------------------------- D1 / D2: upper decks by pass_up
   // Both start at the stair end (the last frame line, K−1): its end frames are climbable until the stair is built there.
   const KE = K - 1;
-  type Up = { lv: number; relay: number | null; relayY?: number; up: number[] };
+  // W47: `E` = the end frame line an upper deck starts from (the stair end K−1, or line 0: "Upper-deck start end" below)
+  type Up = { lv: number; relay: number | null; relayY?: number; up: number[]; E?: number };
   const uWalk = [uMin, uMax - 0.09, uMin + depth, uMax - depth];
-  const vWalk = (first: number) => first - 0.6096 - 0.3; // on the stair-end bay's walkways, beyond the first strip
-  const climbUp = (seat: number, who: number[], uAt: number[], vAt: number) => {
+  const vWalk = (first: number, E = KE) => (E === 0 ? first + 0.6096 + 0.3 : first - 0.6096 - 0.3); // on the end bay's walkways, beyond the first strip
+  const climbUp = (seat: number, who: number[], uAt: number[], vAt: number, E = KE) => {
     for (const [i, m] of who.entries()) {
       const col = [uMin, uMin + depth, uMax - depth, uMax].sort((a, b) => Math.abs(a - uAt[i]) - Math.abs(b - uAt[i]))[0];
-      const c = climbAt(KE, col, seat);
+      const c = climbAt(E, col, seat);
       if (!c) return false;
       const a = step('climb_frame', { actor: C(m), link: c.link, dir: 'up' }, [m], [], `${C(m)} climbs the end frame onto the ${seat.toFixed(2)} m beams`);
       const q = W(uAt[i], vAt);
@@ -282,14 +286,15 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   };
   const upperDeck = (cfg: Up) => {
     const { lv } = cfg;
-    const strips = [...stripsOf(lv)].reverse(); // from the stair end
+    const E = cfg.E ?? KE;
+    const strips = E === 0 ? [...stripsOf(lv)] : [...stripsOf(lv)].reverse(); // from the start end
     const seat = seatOf(lv);
     const yTop = beamTopOf(piecesOf(lv, strips[0])[0]);
     const deckLv = levelId(yTop + PLY_T);
     const up = cfg.up;
     const first = strips[0];
     const all: string[] = [];
-    if (!climbUp(seat, up, uWalk.slice(0, up.length), vWalk(first))) { for (const p of decks.filter((x) => x.meta.level === lv)) skip(p, `no climbable end frame onto the ${seat.toFixed(2)} m beams`); return { seat, deckLv, last: [] as string[], down: [] as number[] }; }
+    if (!climbUp(seat, up, uWalk.slice(0, up.length), vWalk(first, E), E)) { for (const p of decks.filter((x) => x.meta.level === lv)) skip(p, `no climbable end frame onto the ${seat.toFixed(2)} m beams`); return { seat, deckLv, last: [] as string[], down: [] as number[] }; }
     const laid = new Map<number, [number, number][]>(); // strip → laid u-intervals (people kneel only on laid sheets)
     const ivOf = (st: number, u: number) => (laid.get(st) ?? []).find(([x, y]) => u >= x + 0.34 - 1e-9 && u <= y - 0.34 + 1e-9);
     /** The u nearest `want` on the laid part of strip `st` (0.3 m in from its sheets' ends), ≥ `away` from `not`, optionally within interval `iv`. */
@@ -373,7 +378,11 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
           else {
             vP = from + away * (0.6096 - 0.345);
             const aisles2 = (() => { const us = [...new Set(fr.map((f) => r3(Lc(f.c)[0])))].sort((a, b) => a - b); const o: number[] = []; for (let i = 1; i < us.length; i++) o.push(r3((us[i - 1] + us[i]) / 2)); return o; })();
-            uP = [...aisles2].sort((a, b) => Math.abs(a - q0.u) - Math.abs(b - q0.u))[0];
+            // W47 (PROVISIONAL): only an aisle whose standing disc lies on laid sheets of this strip that the bystander can walk to
+            const is = island(m);
+            const onLaid = (u: number) => (is === 'all' || is === null ? laid.get(from) ?? [] : [is]).some(([x, y]) => u >= x + 0.36 - 1e-9 && u <= y - 0.36 + 1e-9);
+            const byDist = [...aisles2].sort((a, b) => Math.abs(a - q0.u) - Math.abs(b - q0.u));
+            uP = byDist.find(onLaid) ?? byDist[0];
           }
           const qq = W(uP, vP);
           pre.push(step('walk_to', { actor: C(m), x: qq[0], z: qq[1], level: deckLv }, [m], [], `${C(m)} steps back for ${p.id}`));
@@ -407,7 +416,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
           if (Math.max(0, uc(p) - L / 2 - a, a - uc(p) - L / 2) <= 0.6 && Math.max(0, uc(p) - L / 2 - b, b - uc(p) - L / 2) <= 0.6) { spot = { st, a, b }; break; }
         }
         if (!spot) continue;
-        const v = spot.st === (p.meta.strip as number) ? vc(p) + (vc(p) < first ? 0.25 : -0.25) : spot.st > vc(p) ? spot.st - 0.6096 + 0.35 : spot.st + 0.6096 - 0.35;
+        const v = spot.st === (p.meta.strip as number) ? vc(p) + (E === 0 ? (vc(p) > first ? -0.25 : 0.25) : vc(p) < first ? 0.25 : -0.25) : spot.st > vc(p) ? spot.st - 0.6096 + 0.35 : spot.st + 0.6096 - 0.35;
         const qa = W(spot.a, v), qb = W(spot.b, v);
         const [ma, mb] = up.filter((m) => posOf.has(m));
         if (mb === undefined) continue;
@@ -435,14 +444,15 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const u1 = cands.filter((u) => Math.abs(u - u0) <= 0.95 && Math.abs(u - u0) >= 0.2 && taken.every((t) => Math.abs(t - u) >= 0.62)).sort((x, y) => Math.abs(x - u0 - (u0 < (uMin + uMax) / 2 ? 0.4 : -0.4)) - Math.abs(y - u0 - (u0 < (uMin + uMax) / 2 ? 0.4 : -0.4)) || x - y)[0];
       // only the two deck workers stay up (receiver + fastener); an idle third would stand where they need to go
       if (u1 === undefined || i >= 2) {
-        const c = climbAt(KE, [uMin, uMin + depth, uMax - depth, uMax].sort((x, y) => Math.abs(x - u0) - Math.abs(y - u0))[0], seat);
+        const c = climbAt(E, [uMin, uMin + depth, uMax - depth, uMax].sort((x, y) => Math.abs(x - u0) - Math.abs(y - u0))[0], seat);
         if (c) all.push(step('climb_frame', { actor: C(m), link: c.link, dir: 'down' }, [m], [], `${C(m)} climbs back down (no room on the new sheets)`));
         continue;
       }
       taken.push(u1);
       stayed.push(m);
-      posOf.set(m, { st: first, u: u1, v: first - 0.6096 + 0.35 });
-      const q = W(u1, first - 0.6096 + 0.35);
+      const vOff = E === 0 ? first + 0.6096 - 0.35 : first - 0.6096 + 0.35;
+      posOf.set(m, { st: first, u: u1, v: vOff });
+      const q = W(u1, vOff);
       all.push(step('beam_walk', { actor: C(m), x: q[0], z: q[1] }, [m], [], `${C(m)} steps off the beam onto the new deck`));
     }
     for (const [i, st] of strips.entries()) {
@@ -465,12 +475,29 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   // not reachable that way — every piece of it is reported unplaced (starting a level from the other end is not modelled)
   const reachable = (lv: number) => Math.max(...stripsOf(lv)) + SHEET_HALF >= lineV(K - 2) - 1e-6;
   const unreachable = (lv: number) => { for (const p of decks.filter((x) => x.meta.level === lv)) unplaced.push({ node: p.nodes[0], kind: 'feature:deck-sheet', reason: `this deck level's strips cover only frame lines up to v ${r3(Math.max(...stripsOf(lv)) + SHEET_HALF)} m, short of the stair-end bay (from ${r3(lineV(K - 2))} m): the upper-deck crews climb only the stair-end frames and walk one beam's walkway, so nobody reaches it (a level laid from the other end is not modelled)` }); };
+  // W47 (PROVISIONAL) — upper-deck start end: a level starts at the stair end unless the middle piece of its second strip
+  // would go in over the side of that strip's long pieces (the other side narrow: rule 8) — its receiver would then have to
+  // walk alongside it across the first strip's middle, which is laid only after the second strip (chiba / west-house:
+  // `s0770-walk-to` "no standing room", then `passup.receiver-blocked`). Then it starts at line 0 when that end has no such
+  // strip and its strips reach the bay there; otherwise at the stair end as before (and the run refuses there).
+  const walksOverGap = (lv: number, E: number) => {
+    const ss = E === 0 ? stripsOf(lv) : [...stripsOf(lv)].reverse();
+    if (ss.length < 2) return false;
+    return piecesOf(lv, ss[1]).some((p) => {
+      if ((p.meta.piece as number) === 1 || (p.meta.piece as number) === (p.meta.of as number)) return false;
+      const side = sideOf(p), L = lenOf(p), uR = side < 0 ? uMin + 0.36 : uMax - 0.36;
+      return Math.max(0, side > 0 ? uR - (uc(p) + L / 2) : (uc(p) - L / 2) - uR) > 0.8;
+    });
+  };
+  const reachable0 = (lv: number) => Math.min(...stripsOf(lv)) - SHEET_HALF <= lineV(1) + 1e-6;
+  const startEnd = (lv: number) => (walksOverGap(lv, KE) && reachable0(lv) && !walksOverGap(lv, 0) ? 0 : KE);
   if (secs.has('D1') && levels.length > 1 && !reachable(levels[1])) unreachable(levels[1]);
   if (secs.has('D2') && levels.length > 2 && !reachable(levels[2])) unreachable(levels[2]);
   if (secs.has('D1') && levels.length > 1 && reachable(levels[1])) {
     begin('D1');
-    const r = upperDeck({ lv: levels[1], relay: null, up: [2, 3, 4, 5] });
-    if (r) climbDown(KE, r.seat, r.down, r.down.map((m) => uWalk[[2, 3, 4, 5].indexOf(m)]), r.last);
+    const E1 = startEnd(levels[1]);
+    const r = upperDeck({ lv: levels[1], relay: null, up: [2, 3, 4, 5], E: E1 });
+    if (r) climbDown(E1, r.seat, r.down, r.down.map((m) => uWalk[[2, 3, 4, 5].indexOf(m)]), r.last);
   }
   const relayY = levels.length > 1 ? piecesOf(levels[1], stripsOf(levels[1])[0])[0].y + PLY_T : 0;
   if (secs.has('D2') && levels.length > 2 && reachable(levels[2]) && reachable(levels[1])) {
@@ -478,8 +505,32 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     // the relay kneels on the first-floor deck (up the end frame and off its beam); the roof crew climbs to the roof beams
     const s1 = seatOf(levels[1]);
     upOnto(KE, s1, 2, uMax - depth, lineV(KE) - 1.0); // a column none of the roof crew climbs
-    const r = upperDeck({ lv: levels[2], relay: 2, relayY, up: [3, 4, 5] });
-    if (r) { climbDown(KE, r.seat, r.down, r.down.map((m) => uWalk[[3, 4, 5].indexOf(m)]), r.last); climbDown(KE, s1, [2], [uMax - depth], r.last); }
+    const E2 = startEnd(levels[2]);
+    const r = upperDeck({ lv: levels[2], relay: 2, relayY, up: [3, 4, 5], E: E2 });
+    if (r) { climbDown(E2, r.seat, r.down, r.down.map((m) => uWalk[[3, 4, 5].indexOf(m)]), r.last); climbDown(KE, s1, [2], [uMax - depth], r.last); }
+  }
+  /** W47 (PROVISIONAL): ground spots for idle crew: each the old spot when it has standing room (nothing 0.05–2.0 m tall
+   *  within 0.45 m), passes `ok` and is ≥ 1.1 m from the spots before it, else the nearest point of a 0.5 m lattice 1.6–4 m
+   *  outside the house that does (a spot beside chiba's / west-house's +u side lies on the neighbouring house's stair:
+   *  `route.goal-blocked`; beside kitchen's it lies in the carry corridors, where make-way nudges walked the crew onto the
+   *  stair's work: `stringer.site-occupied`, then a tread carry blocked by an idle person with nowhere to step). */
+  function parkSpots(olds: Vec2[], ok: (q: Vec2) => boolean, what: string): Vec2[] {
+    const vA = lineV(0) - fh, vB = lineV(K - 1) + fh;
+    const out = (u: number, v: number) => hypot(Math.max(0, uMin - u, u - uMax), Math.max(0, vA - v, v - vB));
+    const stand = (q: Vec2) => ctx.standFree?.(q, 0.45) ?? true;
+    let lattice: Vec2[] | null = null;
+    const taken: Vec2[] = [];
+    for (const old of olds) {
+      const far = (q: Vec2) => taken.every((t) => hypot(q[0] - t[0], q[1] - t[1]) >= 1.1 - 1e-9);
+      let q: Vec2 | undefined = stand(old) && far(old) ? old : undefined;
+      if (!q) {
+        if (!lattice) { lattice = []; for (let u = r3(uMin - 4); u <= uMax + 4 + 1e-9; u = r3(u + 0.5)) for (let v = r3(vA - 4); v <= vB + 4 + 1e-9; v = r3(v + 0.5)) { const d = out(u, v); if (d >= 1.6 && d <= 4.0) lattice.push(W(u, v)); } }
+        q = lattice.filter((x) => stand(x) && ok(x) && far(x)).sort((x, y) => hypot(x[0] - old[0], x[1] - old[1]) - hypot(y[0] - old[0], y[1] - old[1]) || x[0] - y[0] || x[1] - y[1])[0];
+      }
+      if (!q) throw new Error(`phaseB ${ctx.assembly}: no free ground near the house to stand clear of ${what}`);
+      taken.push(q);
+    }
+    return taken;
   }
   // ---------------------------------------------------------------- stair
   if (secs.has('S')) { begin('S'); stairSection(); }
@@ -498,8 +549,26 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const halfW = sd.width / 2;
     const lo = lat0 - halfW, hi = lat0 + halfW;
     const yawDir = datan2(dir[1], dir[0]);
-    // everyone not building the stair stands clear of its site (beside the house, off the stair's side)
-    for (const [i, m] of [2, 3, 4, 5].entries()) { const q = W(uMax + 2.2, lineV(K - 1) - 1.0 - i * 1.1); step('walk_to', { actor: C(m), x: q[0], z: q[1], level: 0 }, [m], [], `${C(m)} stands clear of the stair site`); }
+    // everyone not building the stair stands clear of its site: beside the house's +u side at the stair end. W47
+    // (PROVISIONAL): clear of the section's work — the stair zone (every stair part's place and lying spot, + 1 m) and the
+    // carry corridors (straight from each pile holding stair stock, the cutting station and the scrap pile to the zone,
+    // ± 1.5 m) — with standing room, ≥ 1.1 m apart: the old spot if it is, else the nearest such (parkSpots)
+    {
+      const sp = [...stringers, ...boards, ...risers, ...posts, ...rails];
+      const ext = (p: PartB) => Math.max(...def(p.def).size) / 2;
+      let s0 = Math.min(-0.9 - 0.3, -0.6 - 0.5), s1 = 1.5 + 2.5, l0 = lo - 1.3 - 0.3, l1 = hi + 1.3 + 0.3;
+      for (const p of sp) { const sc = sOf(p.pose.p[0], p.pose.p[2]), la = latOf(p.pose.p[0], p.pose.p[2]), e = ext(p); s0 = Math.min(s0, sc - e); s1 = Math.max(s1, sc + e); l0 = Math.min(l0, la - e); l1 = Math.max(l1, la + e); }
+      for (const p of stringers) s0 = Math.min(s0, sOf(p.pose.p[0], p.pose.p[2]) - 1.6 - ext(p));
+      const zone = { s0: s0 - 1.0, s1: s1 + 1.0, l0: l0 - 1.0, l1: l1 + 1.0 };
+      const inZone = (q: Vec2) => { const sq = sOf(q[0], q[1]), lq = latOf(q[0], q[1]); return sq >= zone.s0 && sq <= zone.s1 && lq >= zone.l0 && lq <= zone.l1; };
+      const zc = S((zone.s0 + zone.s1) / 2, (zone.l0 + zone.l1) / 2);
+      const stocks = new Set(sp.map((p) => p.stock));
+      const srcs: Vec2[] = [...ctx.yard.piles.filter((p) => stocks.has(p.piece)).map((p) => [p.x, p.z] as Vec2), ...(ctx.yard.station ? [[ctx.yard.station.x, ctx.yard.station.z] as Vec2] : []), ...(ctx.scrap ? [[ctx.scrap.x, ctx.scrap.z] as Vec2] : [])];
+      const segD = (q: Vec2, a: Vec2, b: Vec2) => { const ab: Vec2 = [b[0] - a[0], b[1] - a[1]], L2 = dot2(ab, ab); const t = L2 > 0 ? Math.min(1, Math.max(0, dot2([q[0] - a[0], q[1] - a[1]], ab) / L2)) : 0; return hypot(q[0] - a[0] - ab[0] * t, q[1] - a[1] - ab[1] * t); };
+      const ok = (q: Vec2) => !inZone(q) && srcs.every((a) => segD(q, a, zc) >= 1.5);
+      const spots = parkSpots([2, 3, 4, 5].map((_, i) => W(uMax + 2.2, lineV(K - 1) - 1.0 - i * 1.1)), ok, 'the stair zone and its carry corridors');
+      for (const [i, m] of [2, 3, 4, 5].entries()) step('walk_to', { actor: C(m), x: spots[i][0], z: spots[i][1], level: 0 }, [m], [], `${C(m)} stands clear of the stair site`);
+    }
     // stringers: lying along the stair at their lateral position, lifted and walked up against the end frame
     // from the +lat end: the crews stand on the −lat side, where no stringer is in yet
     // W38 (PROVISIONAL): a stringer that must lie shifted off its line (layBack) is set FIRST, while the ground beside its
@@ -509,7 +578,9 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const lat = latOf(p.pose.p[0], p.pose.p[2]), L = lenOf(p), sc = sOf(p.pose.p[0], p.pose.p[2]), inward = lat < lat0 ? 1 : -1;
       // the standard spot unless something 0.5–1.3 m tall (a table, a wall) takes its footprint; then the nearest spot clear of
       // everything 0.05–1.3 m tall with 0.25 m at the ends (it is set down end-on), shifted inward ≤ 1 m
-      if (ctx.groundFree?.({ c: S(sc - 1.6, lat), half: [L / 2, 0.15], yaw: yawDir }, 0.5) ?? true) return { x: 1.6, dl: 0 };
+      // W47 (PROVISIONAL): …or within 0.2 m beyond its ends, where its end carriers stand (west-house 2022: chiba's screen,
+      // 1.14–2.10 m, 0.14 m past stringer 6's foot end — the formation could not turn in: `carry.clearance`)
+      if (ctx.groundFree?.({ c: S(sc - 1.6, lat), half: [L / 2 + 0.2, 0.15], yaw: yawDir }, 0.5) ?? true) return { x: 1.6, dl: 0 };
       // (the carry formation straddles it: 0.95 m each side clear too; it is set first, so the ground inward is still free)
       for (let d = 0; d <= 10; d++) for (let k = 16; k >= 4; k--) {
         const x = k / 10, dl = inward * d / 10;
@@ -519,7 +590,12 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     };
     const byLat = [...stringers].sort((a, b) => latOf(b.pose.p[0], b.pose.p[2]) - latOf(a.pose.p[0], a.pose.p[2]));
     const shifted = (p: PartB) => { const b = layBack(p); return !!b && b.dl !== 0; };
-    for (const [i, p] of [...byLat.filter(shifted), ...byLat.filter((q) => !shifted(q))].entries()) {
+    const setLats: number[] = []; // W47: lines of the stringers set so far
+    // W47 (PROVISIONAL): after a shifted stringer the rest go in from its side outward, each with open ground beyond it (kitchen
+    // 2022: from the +lat end, stringer 2 came last, into the slot between the set stringers 1 and 3: `carry.clearance`)
+    const sh = byLat.filter(shifted), rest = byLat.filter((q) => !shifted(q));
+    if (sh.length && latOf(sh[0].pose.p[0], sh[0].pose.p[2]) < lat0) rest.reverse();
+    for (const [i, p] of [...sh, ...rest].entries()) {
       const lat = latOf(p.pose.p[0], p.pose.p[2]);
       const nextFree0 = -0.37; // the crew's side: where no stringer is in yet (see the order above)
       const L = lenOf(p);
@@ -532,11 +608,20 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       // where its top end would pass its installed top end; none clear → unplaced with the reason
       // and, where even that is taken, shifted up to 0.4 m inward (toward the stair's centre line: ground still free, the
       // stringers go in from the +lat side first) — the lift crew carries it the rest of the way sideways
-      const back = layBack(p);
-      if (back === null) { unplaced.push({ node: p.nodes[0], kind: 'feature:stair-part', reason: `no clear ground to lay stringer ${p.id} near its line before it is set (the ground beyond the stair foot is taken)` }); continue; }
+      const back0 = layBack(p);
+      if (back0 === null) { unplaced.push({ node: p.nodes[0], kind: 'feature:stair-part', reason: `no clear ground to lay stringer ${p.id} near its line before it is set (the ground beyond the stair foot is taken)` }); continue; }
+      // W47 (PROVISIONAL): a stringer set after its −lat neighbour (kitchen 2022: stringer 2, after the shifted stringer 1;
+      // the others go in from the +lat end, so their set neighbours are on the +lat side) lies shifted +lat until its carriers
+      // stand ≥ 0.96 m off that neighbour's line (0.55 m out + a body + 5 cm; the neighbour stands ~1 m high there —
+      // `carry.target-blocked`); and a lift crew stands on the side with no set stringer within 1.2 m
+      const minus = setLats.filter((l) => l < lat - 1e-6 && lat - l < 1.0).sort((a, b) => b - a)[0];
+      const back = back0.dl === 0 && minus !== undefined ? { x: back0.x, dl: r3(Math.ceil((minus + 0.96 - lat) / 0.05 - 1e-9) * 0.05) } : back0;
+      const sideSet = (sgn: number) => setLats.some((l) => sgn * (l - lat) > 1e-6 && sgn * (l - lat) < 1.2);
+      const crewPlus = back.dl === 0 && sideSet(-1) && !sideSet(1); // the lift crew on the side with no set stringer
+      setLats.push(lat);
       const lie = S(sc - back.x, lat + back.dl);
       // a shifted stringer is set first: its crew stands on the inward side (its outer side is what is taken)
-      const nextFree = back.dl !== 0 ? Math.sign(back.dl) * -nextFree0 : nextFree0;
+      const nextFree = back.dl !== 0 ? Math.sign(back.dl) * -nextFree0 : crewPlus ? -nextFree0 : nextFree0;
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(yawDir) }, G);
       if (!f) continue;
       const at = (q: number[]) => { const o = [q[0] + axis[0] * nextFree, q[2] + axis[1] * nextFree]; return { x: r3(o[0]), z: r3(o[1]) }; };
@@ -576,15 +661,40 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const L = lenOf(p);
       const bottom = p.pose.p[1];
       const g1: [number, number, number] = [-(L / 2) + 0.02, def(p.def).size[1] / 2, 0], g2: [number, number, number] = [L / 2 - 0.02, def(p.def).size[1] / 2, 0];
-      const e1 = S(sc, lo - 0.45), e2 = S(sc, hi + 0.45); // beyond its ends (clear of the rack's low beams at the end frame)
-      const lie = S(-0.9, lat0); // where the tread boards lie too (the kitchen house is 1.5 m beyond the foot)
+      // beyond its ends (clear of the rack's low beams at the end frame); W47: each lifter beyond the end its grip is at (the
+      // Kit draws some stairs' boards the other way round: chiba 2022, `stair-part.out-of-reach` "a hand 3.76 m beyond reach")
+      const w1 = localToWorld(p.pose, g1), w2 = localToWorld(p.pose, g2);
+      const [e1, e2] = latOf(w1[0], w1[2]) <= latOf(w2[0], w2[2]) ? [S(sc, lo - 0.45), S(sc, hi + 0.45)] : [S(sc, hi + 0.45), S(sc, lo - 0.45)];
+      // where the tread boards lie too (the kitchen house is 1.5 m beyond the foot). W47 (PROVISIONAL): unless something
+      // 0.05–1.3 m tall is within 0.1 m of that footprint (0.6 m beyond its ends, where its carriers stand; kitchen 2022:
+      // west-house's table top, `carry.clearance`) or its carriers would have no standing room (both headings, the carry's
+      // own formation); then the nearest such clear spot 0.5–1.4 m before the foot, ≤ 1 m sideways, where its two lifters
+      // have standing room to pick it up (`stair-part.no-room` beside the table); lifted in from there
+      const lieAt = ((): { s: number; dl: number } | null => {
+        const w = def(p.def).size[2];
+        const fm = formationFor(p.def, 2);
+        // …and its two carriers have standing room beside it (either heading, as the carry's set-down check)
+        const carriersOk = (c: Vec2) => [p.pose.yaw, p.pose.yaw + Math.PI].some((th) => carrierSpots(fm, { x: c[0], z: c[1], th }, w / 2).every((q) => ctx.standFree?.(q, 0.36) ?? true));
+        const free = (sv: number, dl: number, m: number, me: number) => (ctx.groundFree?.({ c: S(sv, lat0 + dl), half: [w / 2 + m, L / 2 + me], yaw: yawDir }) ?? true) && carriersOk(S(sv, lat0 + dl));
+        if (free(-0.9, 0, 0.1, 0.6)) return { s: -0.9, dl: 0 };
+        const c: { s: number; dl: number; k: number }[] = [];
+        // (and its two lifters have standing room where they pick it up, 0.45 m beyond its ends)
+        const lifters = (sv: number, dl: number) => [-1, 1].every((e) => ctx.standFree?.(S(sv, lat0 + dl + e * (L / 2 + 0.45)), 0.36) ?? true);
+        for (let i = -5; i <= 4; i++) for (let j = -10; j <= 10; j++) { const sv = r3(-0.9 + i / 10), dl = r3(j / 10); if (free(sv, dl, 0.1, 0.6) && lifters(sv, dl)) c.push({ s: sv, dl, k: Math.abs(i) + Math.abs(j) }); }
+        return c.sort((a, b) => a.k - b.k || a.s - b.s || a.dl - b.dl)[0] ?? null;
+      })();
+      if (!lieAt) { unplaced.push({ node: p.nodes[0], kind: 'feature:stair-part', reason: `no clear ground to lay ${p.id} before the stair foot (0.5–1.4 m out, ≤ 1 m sideways)` }); return; }
+      const lie = S(lieAt.s, lat0 + lieAt.dl);
+      const moved = lieAt.s !== -0.9 || lieAt.dl !== 0;
+      const fromXZ = (dz: number) => (moved ? { x: r3(lie[0] - p.pose.p[0]), z: r3(lie[1] - p.pose.p[2]) } : { x: r3(dir[0] * dz), z: r3(dir[1] * dz) });
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(p.pose.yaw) }, G);
       if (!f) return;
       const gripY = bottom + def(p.def).size[1] / 2; // the crew holds it by its centre line
       const lift = Math.min(0.08, reachTop - gripY);
       if (lift >= 0.02) {
         const dz = -(sc - -0.9);
-        const s1 = step('install_stair_part', { part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: g1, at: { x: e1[0], z: e1[1] } }, { actor: C(G[1]), grip: g2, at: { x: e2[0], z: e2[1] } }], from: { x: r3(dir[0] * dz), y: r3(lift), z: r3(dir[1] * dz) }, fasten: G.map(C) }, G, [f], `set ${p.id} ${isRiser ? 'on the tread below' : 'on the stringers'}`);
+        const fx = fromXZ(dz);
+        const s1 = step('install_stair_part', { part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: g1, at: { x: e1[0], z: e1[1] } }, { actor: C(G[1]), grip: g2, at: { x: e2[0], z: e2[1] } }], from: { x: fx.x, y: r3(lift), z: fx.z }, fasten: G.map(C) }, G, [f], `set ${p.id} ${isRiser ? 'on the tread below' : 'on the stringers'}`);
         mark(p, s1);
         treadStep.set(p.id, s1);
         return;
@@ -595,7 +705,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       const handoff = r3(Math.max(0.05, gripY - (reachTop - 0.03)));
       const s1 = step('install_stair_part', {
         part: p.id, to: pose(p), lift: [{ actor: C(G[0]), grip: g1, at: { x: e1[0], z: e1[1] } }, { actor: C(G[1]), grip: g2, at: { x: e2[0], z: e2[1] } }],
-        take: [{ actor: C(helper), grip: [0, isRiser ? 0.05 : 0, 0] }], handoff, from: { x: r3(dir[0] * -(sc + 0.9)), y: r3(-handoff), z: r3(dir[1] * -(sc + 0.9)) }, fasten: [C(helper)],
+        take: [{ actor: C(helper), grip: [0, isRiser ? 0.05 : 0, 0] }], handoff, from: { x: fromXZ(-(sc + 0.9)).x, y: r3(-handoff), z: fromXZ(-(sc + 0.9)).z }, fasten: [C(helper)],
       }, [...G, helper], [f, ...pre], `${C(helper)} on tread ${k} takes ${p.id} from the ground crew and sets it`);
       mark(p, s1);
         treadStep.set(p.id, s1);
@@ -603,8 +713,11 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     const last = ur.v;
     if (last) step('leave_stair', { actor: C(last.who), boards: sd.treads.slice(0, last.tread).flat(), to: { x: S(-0.9, lat0 - halfW - 0.6)[0], z: S(-0.9, lat0 - halfW - 0.6)[1] } }, [last.who], [], `${C(last.who)} climbs down the new treads`);
     // posts: one person, stood up beside the tread ends
+    // W47: a post's / handrail's side is where it stands across the stair (its lat), not the Kit's own side flag, which
+    // runs the other way on some stairs (chiba / west-house 2022: the station at the far end, `stair-part.out-of-reach`)
+    const sideOfLat = (p: PartB) => (latOf(p.pose.p[0], p.pose.p[2]) < lat0 ? -1 : 1);
     for (const p of posts) {
-      const side = (p.meta.side as number);
+      const side = sideOfLat(p);
       const sp = p.meta.s as number;
       const lie = S(-0.6, side < 0 ? lo - 0.9 : hi + 0.9);
       const f = fetch(p, { x: lie[0], z: lie[1], yaw: r3(yawDir) }, [G[0]]);
@@ -615,8 +728,10 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     }
     // handrails: two on the ground at its lower half, laid on the post tops from outside
     for (const p of rails) {
-      const side = p.meta.side as number;
-      const g1: [number, number, number] = [-2.0, def(p.def).size[1] / 2, 0], g2: [number, number, number] = [-1.0, def(p.def).size[1] / 2, 0]; // its lower half (the upper end is above reach)
+      const side = sideOfLat(p);
+      // its lower half (the upper end is above reach); W47: whichever local end the Kit draws lower
+      const lowNeg = localToWorld(p.pose, [-1, 0, 0])[1] <= localToWorld(p.pose, [1, 0, 0])[1];
+      const g1: [number, number, number] = [lowNeg ? -2.0 : 2.0, def(p.def).size[1] / 2, 0], g2: [number, number, number] = [lowNeg ? -1.0 : 1.0, def(p.def).size[1] / 2, 0];
       const a = localToWorld(p.pose, g1), b = localToWorld(p.pose, g2);
       const o = (q: number[]) => { const l = latOf(q[0], q[2]) + side * 0.45; const w = S(sOf(q[0], q[2]), l); return { x: w[0], z: w[1] }; };
       const lie = S(1.5, side < 0 ? lo - 1.3 : hi + 1.3);
@@ -627,6 +742,9 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     }
   }
   // ---------------------------------------------------------------- W: plywood walls (after the decks they are fastened from)
+  // W47 (PROVISIONAL): the end frame line away from the stair, which the roof crews climb (walls, solar, end): line 0 unless
+  // the stair stands beyond line 0 (chiba / west-house 2022: `climb.unreachable` "blocked by chiba-stair-stringer-5")
+  const FE = (() => { const sd = parts.stairs[0]; if (!sd) return 0; const fv = Lc(sd.foot)[1]; return Math.abs(fv - lineV(0)) < Math.abs(fv - lineV(K - 1)) ? K - 1 : 0; })();
   const l1Top = levels.length > 1 ? piecesOf(levels[1], stripsOf(levels[1])[0])[0].y + PLY_T : 0;
   const l2Top = levels.length > 2 ? piecesOf(levels[2], stripsOf(levels[2])[0])[0].y + PLY_T : 0;
   if (secs.has('W')) {
@@ -706,7 +824,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         // upper wall: raised by the ground crew to two kneeling on the first-floor deck, screwed from both decks
         const d3 = W(uIn, vs[2]);
         pre.push(step('walk_to', { actor: C(3), x: d3[0], z: d3[1], level: levelId(l1Top) }, [3], []));
-        if (!onDeck.has(4)) { upOnto(0, seatOf(levels[2]), 4, uIn < (uMin + uMax) / 2 ? uMin : uMax, lineV(0) + 1.2); onDeck.set(4, l2Top); }
+        if (!onDeck.has(4)) { upOnto(FE, seatOf(levels[2]), 4, uIn < (uMin + uMax) / 2 ? uMin : uMax, FE === 0 ? lineV(0) + 1.2 : lineV(K - 1) - 1.2); onDeck.set(4, l2Top); }
         const d5 = W(uIn, vs[1]);
         pre.push(step('walk_to', { actor: C(4), x: d5[0], z: d5[1], level: levelId(l2Top) }, [4], []));
         const st = step('install_wall', {
@@ -716,9 +834,9 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
       }
     }
     if (onDeck.has(4)) {
-      climbDown(0, seatOf(levels[2]), [4], [uMin]);
+      climbDown(FE, seatOf(levels[2]), [4], [uMin]);
       // off the ground crew's way (they walk the −x panels in along the wall from the far end)
-      const q = W(uMax + 2.2, lineV(0) - 1.5);
+      const q = W(uMax + 2.2, FE === 0 ? lineV(0) - 1.5 : lineV(K - 1) + 1.5);
       step('walk_to', { actor: C(4), x: q[0], z: q[1], level: 0 }, [4], [], `${C(4)} stands clear`);
     }
   }
@@ -726,25 +844,30 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
   if (secs.has('P')) {
     begin('P');
     const rails = P('panel-rail'), panels = P('panel');
-    const wallFace = uMax + BEAM_HALF + (P('wall-panel').some((w) => Lc([w.pose.p[0], w.pose.p[2]])[0] > uMax - 0.1) ? PLY_T : 0);
+    // W47 (PROVISIONAL): everything goes up over the long side nearer the panels (east-house 2022: +u; chiba: −u — from +u
+    // the roof receiver walked alongside a rail to the far edge, `passup.receiver-blocked`); PS = that side, uE its edge column
+    const PS = panels.length && panels.reduce((a, q) => a + uc(q), 0) / panels.length < (uMin + uMax) / 2 ? -1 : 1;
+    const uE = (d: number) => (PS > 0 ? uMax - d : uMin + d); // d in from that edge
+    const wallFace = PS > 0 ? uMax + BEAM_HALF + (P('wall-panel').some((w) => Lc([w.pose.p[0], w.pose.p[2]])[0] > uMax - 0.1) ? PLY_T : 0) : uMin - BEAM_HALF - (P('wall-panel').some((w) => Lc([w.pose.p[0], w.pose.p[2]])[0] < uMin + 0.1) ? PLY_T : 0);
+    const edgeP = r3(PS > 0 ? wallFace : -wallFace), outP = { x: W(PS, 0)[0], z: W(PS, 0)[1] };
     // the roof crew (4, 5) climbs to the roof deck; the relay (2, 3) kneels on the first-floor deck (up the stair)
     let w5: string[] = [];
     if (levels.length > 2) {
       // up the far end frame one after the other (inner column first, then the outer), the second one waits at the far end
-      upOnto(0, seatOf(levels[2]), 5, uMax - depth, lineV(0) + 1.2);
-      const q5 = W(uMin + 0.6, lineV(K - 1) - 0.6);
+      upOnto(FE, seatOf(levels[2]), 5, uE(depth), FE === 0 ? lineV(0) + 1.2 : lineV(K - 1) - 1.2);
+      const q5 = W(PS > 0 ? uMin + 0.6 : uMax - 0.6, FE === 0 ? lineV(K - 1) - 0.6 : lineV(0) + 0.6);
       w5 = [step('walk_to', { actor: C(5), x: q5[0], z: q5[1], level: levelId(l2Top) }, [5], [], `${C(5)} waits at the far end of the roof`)];
-      upOnto(0, seatOf(levels[2]), 4, uMax, lineV(0) + 1.2, w5);
+      upOnto(FE, seatOf(levels[2]), 4, uE(0), FE === 0 ? lineV(0) + 1.2 : lineV(K - 1) - 1.2, w5);
     }
     const l2Lv = levelId(l2Top), l1Lv = levelId(l1Top);
     const railUp = (r: PartB) => {
       const vr = Lc([r.pose.p[0], r.pose.p[2]])[1];
-      const lw = W(wallFace + 0.08 + 0.6, vr);
+      const lw = W(PS > 0 ? wallFace + 0.08 + 0.6 : wallFace - 0.08 - 0.6, vr);
       const f = fetch(r, { x: lw[0], z: lw[1], yaw: r3(r.pose.yaw) }, [G[0]]);
       if (!f) return;
-      const ra = W(uMax - 0.31, safeV(vr, uMax - 0.31)), rv = W(uMax - 0.44, safeV(vr + 1.05 + 0.33, uMax - 0.44));
+      const ra = W(uE(0.31), safeV(vr, uE(0.31))), rv = W(uE(0.44), safeV(vr + 1.05 + 0.33, uE(0.44)));
       const pu = step('pass_up', {
-        part: r.id, to: { x: r.pose.p[0], z: r.pose.p[2], yaw: r.pose.yaw, height: r3(l2Top) }, edge: r3(wallFace), out: { x: W(1, 0)[0], z: W(1, 0)[1] },
+        part: r.id, to: { x: r.pose.p[0], z: r.pose.p[2], yaw: r.pose.yaw, height: r3(l2Top) }, edge: edgeP, out: outP,
         givers: [C(G[0])], relay: [C(2)], relayAt: [{ x: ra[0], z: ra[1], level: l1Lv }], receivers: [C(4)], receiverAt: [{ x: rv[0], z: rv[1], level: l2Lv }], follow: true,
       }, [G[0], 2, 4], [f, ...w5], `pass rail ${r.id} up through the relay to the roof deck`);
       const under = decks.filter((d) => d.meta.level === levels[levels.length - 1]).sort((a, b) => Math.abs(uc(a) - Lc([r.pose.p[0], r.pose.p[2]])[0]) + Math.abs(vc(a) - vr) - (Math.abs(uc(b) - Lc([r.pose.p[0], r.pose.p[2]])[0]) + Math.abs(vc(b) - vr)))[0];
@@ -791,27 +914,28 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         for (const rid of (p.meta.rails as string).split(',')) railUp(rails.find((r) => r.id === rid)!);
         const vp = Lc([p.pose.p[0], p.pose.p[2]])[1];
         const flat = { x: p.meta.flatX as number, z: p.meta.flatZ as number };
-        const lw = W(wallFace + 0.08 + def(p.def).size[0] / 2 + 0.6, vp);
+        const lw = W(PS > 0 ? wallFace + 0.08 + def(p.def).size[0] / 2 + 0.6 : wallFace - 0.08 - def(p.def).size[0] / 2 - 0.6, vp);
         const f = fetch(p, { x: lw[0], z: lw[1], yaw: r3(p.pose.yaw) }, G);
         if (!f) continue;
-        const uR = uMax - 0.27; // the relay kneels right at the deck edge (the panel goes up outside the wall)
+        const uR = uE(0.27); // the relay kneels right at the deck edge (the panel goes up outside the wall)
         const rl = [W(uR, safeV(vp - 0.3, uR)), W(uR, safeV(vp + 0.3, uR))];
         if (dot2([rl[0][0] - rl[1][0], rl[0][1] - rl[1][1]], [rl[0][0] - rl[1][0], rl[0][1] - rl[1][1]]) < 0.36) rl[1] = W(uR, safeV(vp + 0.9, uR));
-        const rv = [W(uMax - 0.44, safeV(vp - 0.84, uMax - 0.44)), W(uMax - 0.44, safeV(vp + 0.84, uMax - 0.44))];
+        const rv = [W(uE(0.44), safeV(vp - 0.84, uE(0.44))), W(uE(0.44), safeV(vp + 0.84, uE(0.44)))];
         const pu = step('pass_up', {
-          part: p.id, to: { x: flat.x, z: flat.z, yaw: p.pose.yaw, height: r3(p.meta.flatY as number) }, edge: r3(wallFace), out: { x: W(1, 0)[0], z: W(1, 0)[1] },
+          part: p.id, to: { x: flat.x, z: flat.z, yaw: p.pose.yaw, height: r3(p.meta.flatY as number) }, edge: edgeP, out: outP,
           givers: G.map(C), relay: [C(2), C(3)], relayAt: rl.map((q) => ({ x: q[0], z: q[1], level: l1Lv })), receivers: [C(4), C(5)], receiverAt: rv.map((q) => ({ x: q[0], z: q[1], level: l2Lv })), follow: true,
         }, [...G, 2, 3, 4, 5], [f], `pass panel ${p.id} up through the relay onto its rails`);
         const ip = step('install_panel', { crew: [C(4), C(5)], panel: p.id, rails: (p.meta.rails as string).split(','), tilt: p.meta.tilt }, [4, 5], [pu], `tilt panel ${p.id} to ${(p.meta.tilt as number).toFixed(1)}° and fasten it`);
         mark(p, pu, ip);
       }
     }
-    if (levels.length > 2) climbDown(0, seatOf(levels[2]), [4, 5], [uMax, uMax - depth], [], 0.55); // (clear of the panels near the end)
+    if (levels.length > 2) climbDown(FE, seatOf(levels[2]), [4, 5], [uE(0), uE(depth)], [], 0.55); // (clear of the panels near the end)
   }
   // ---------------------------------------------------------------- END: everyone on the ground, clear of the house
   if (secs.has('END')) {
     begin('END');
-    for (const [i, m] of [0, 1, 2, 3, 4, 5].entries()) { const q = W(uMax + 2.2, lineV(0) + 1.0 + i * 1.1); step('walk_to', { actor: C(m), x: q[0], z: q[1], level: 0 }, [m], [], `${C(m)} steps back from the finished house`); }
+    const spots = parkSpots([0, 1, 2, 3, 4, 5].map((i) => W(uMax + 2.2, FE === 0 ? lineV(0) + 1.0 + i * 1.1 : lineV(K - 1) - 1.0 - i * 1.1)), () => true, 'the finished house');
+    for (const [i, m] of [0, 1, 2, 3, 4, 5].entries()) { const q = spots[i]; step('walk_to', { actor: C(m), x: q[0], z: q[1], level: 0 }, [m], [], `${C(m)} steps back from the finished house`); }
   }
   void K; void lineV; void fh; void skip;
   const seq: PhaseBResult['sequenced'] = [...seqd.entries()].map(([node, steps]) => ({ node, kind: `feature:${parts.kit.find((k) => k.node === node)?.kind ?? 'part'}`, steps })).sort((a, b) => (a.node < b.node ? -1 : 1));

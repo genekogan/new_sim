@@ -185,7 +185,7 @@ export type SP = {
   fasten: string[];
 };
 type Seg = { phase: string; who: 'lift' | 'take'; from: Pose; to: Pose; dur: number; follow: boolean };
-export type SetProgram = { final: Pose; support: Support; segs: Seg[]; pickup: { actor: string; p: Vec2; yaw: number; level: number }[]; delta: Vec2[]; fasten: string[]; floor: number };
+export type SetProgram = { final: Pose; support: Support; segs: Seg[]; pickup: { actor: string; p: Vec2; yaw: number; level: number }[]; delta: Vec2[]; fasten: string[]; floor: number; /** W47: idle people on the part's place at plan time (asked to step aside first) */ siteIdle?: string[] };
 
 export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string, prefix: string): { ok: true; program: SetProgram } | Fail {
   const w = rt.world;
@@ -317,17 +317,13 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
     if (dh > BODY_MODEL.maxHorizontalFromFeet + 1e-9 || up > GIVE_MAX + 1e-9 || up < -REACH_DOWN - 1e-9)
       return fail(`${prefix}.fasten-reach`, `${a} cannot fasten ${e.id} from (${f2(feet[0])}, ${f2(feet[1])}, ${f2(feet[2])}): its nearest point is ${f2(dh)} m away and ${f2(up)} m above their feet (≤ ${BODY_MODEL.maxHorizontalFromFeet} m, −${REACH_DOWN}…${GIVE_MAX} m)`, [e.id, a], q);
   }
-  // nobody else stands where it goes (in its body band)
-  {
-    const f = entityFootprint({ ...e, pose: final });
-    const everyone = new Set(everyoneIds(p));
-    for (const h of Object.values(w.entities).sort((a, b) => (a.id < b.id ? -1 : 1))) {
-      if (h.kind !== 'human' || everyone.has(h.id) || h.human?.on) continue;
-      if (f.y1 <= h.pose.p[1] + 0.22 || f.y0 >= h.pose.p[1] + HUMAN_PROFILE.height) continue;
-      const lp = rot2([h.pose.p[0] - f.obb.c[0], h.pose.p[2] - f.obb.c[1]], -f.obb.yaw);
-      const dx = Math.max(0, Math.abs(lp[0]) - f.obb.half[0]), dz = Math.max(0, Math.abs(lp[1]) - f.obb.half[1]);
-      if (Math.sqrt(dx * dx + dz * dz) < HUMAN_PROFILE.radius) return fail(`${prefix}.site-occupied`, `${h.id} stands where ${e.id} goes (at (${f2(h.pose.p[0])}, ${f2(h.pose.p[2])}))`, [e.id, h.id], h.pose.p);
-    }
+  // nobody else stands where it goes (in its body band). W47 (PROVISIONAL): an idle person there (nobody's task, holding
+  // nothing, on the ground) is asked to step aside before the crew sets out (kitchen 2022: make-way nudges had walked m4
+  // onto stringer 3's place) — the W27 bystander rule, for the part's place; anyone busy there still refuses it
+  const siteIdle: string[] = [];
+  for (const h of onSite(w, e, final, new Set(everyoneIds(p)))) {
+    if (!movable(h)) return fail(`${prefix}.site-occupied`, `${h.id} stands where ${e.id} goes (at (${f2(h.pose.p[0])}, ${f2(h.pose.p[2])}))`, [e.id, h.id], h.pose.p);
+    siteIdle.push(h.id);
   }
   // ---- swept path (supports may be touched at the end; the part's own lying spot is skipped)
   const path = [C, ...(Up ? [Up] : []), P, ...(H ? [H] : []), final];
@@ -338,8 +334,24 @@ export function planSetPart(rt: Runtime, p: SP, rule: SupportRule, what: string,
   const pk = checkStations(rt, pickup.map((m) => ({ actor: m.actor, p: m.p, level: m.level })));
   if (pk) return { ok: false, diagnostic: { ...pk, code: `${prefix}.unreachable` } };
   void th;
-  return { ok: true, program: { final, support: sup, segs, pickup, delta, fasten: p.fasten, floor } };
+  return { ok: true, program: { final, support: sup, segs, pickup, delta, fasten: p.fasten, floor, ...(siteIdle.length ? { siteIdle } : {}) } };
 }
+
+/** People (not in `except`, on the ground) whose body stands where part `e` goes at pose `final` (in its body band). */
+function onSite(w: WorldState, e: Entity, final: Pose, except: Set<string>): Entity[] {
+  const f = entityFootprint({ ...e, pose: final });
+  const out: Entity[] = [];
+  for (const h of Object.values(w.entities).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    if (h.kind !== 'human' || except.has(h.id) || h.human?.on) continue;
+    if (f.y1 <= h.pose.p[1] + 0.22 || f.y0 >= h.pose.p[1] + HUMAN_PROFILE.height) continue;
+    const lp = rot2([h.pose.p[0] - f.obb.c[0], h.pose.p[2] - f.obb.c[1]], -f.obb.yaw);
+    const dx = Math.max(0, Math.abs(lp[0]) - f.obb.half[0]), dz = Math.max(0, Math.abs(lp[1]) - f.obb.half[1]);
+    if (Math.sqrt(dx * dx + dz * dz) < HUMAN_PROFILE.radius) out.push(h);
+  }
+  return out;
+}
+/** Idle, or only stepping aside for someone (an ambient make-way walk): may be asked to make way. */
+const movable = (h: Entity) => !h.human!.grip && !h.human!.on && (!h.human!.task || /:make-way:\d+$/.test(h.human!.task));
 
 const everyoneIds = (p: SP) => [...p.lift.map((l) => l.actor), ...(p.take ?? []).map((t) => t.actor), ...p.fasten];
 
@@ -356,7 +368,7 @@ function nearestPoint(e: Entity, q: Pose, feet: Vec3): Vec3 {
 }
 
 // ---- execution ----
-type Exec = { id: string; p: SP; prog: SetProgram; walk?: Children; si: number; t: number; holders: 'lift' | 'take'; fastened: number };
+type Exec = { id: string; p: SP; prog: SetProgram; walk?: Children; si: number; t: number; holders: 'lift' | 'take'; fastened: number; siteClear?: boolean };
 
 function approachHands(h: Entity, grip: [Vec3, Vec3], k: number | undefined): [Vec3, Vec3] {
   if (k === undefined || k >= 1) return grip;
@@ -448,6 +460,19 @@ export function stepSetPart(rt: Runtime, ex: Exec, dt: number): StepResult {
   const w = rt.world;
   const e = w.entities[ex.p.part];
   const prog = ex.prog;
+  if (prog.siteIdle && !ex.siteClear) {
+    // W47: wait until nobody stands where the part goes; an idle person there is asked to step off its line
+    const [h] = onSite(w, e, prog.final, new Set(everyoneIds(ex.p)));
+    if (h) {
+      if (!movable(h)) return { status: 'failed', diagnostic: { code: 'setpart.site-occupied', message: `${h.id} stands where ${e.id} goes (at (${f2(h.pose.p[0])}, ${f2(h.pose.p[2])})) and is busy`, subjects: [e.id, h.id], at: h.pose.p } };
+      const f = entityFootprint({ ...e, pose: prog.final }).obb;
+      const ax = rot2([1, 0], f.yaw), lp = rot2([h.pose.p[0] - f.c[0], h.pose.p[2] - f.c[1]], -f.yaw);
+      const t = Math.max(-f.half[0], Math.min(f.half[0], lp[0]));
+      makeWay(rt, h.id, [f.c[0] + ax[0] * t, f.c[1] + ax[1] * t]); // off the part's long axis, at least 1 m
+      return { status: 'blocked', diagnostic: { code: 'setpart.site-occupied', message: `the crew setting ${e.id} waits for ${h.id} to step off its place`, subjects: [e.id, h.id], at: h.pose.p } };
+    }
+    ex.siteClear = true;
+  }
   if (!ex.walk) {
     const r = walkCrew(rt, ex.id, prog.pickup.map((m) => ({ actor: m.actor, p: m.p, yaw: m.yaw, level: m.level })));
     if ('code' in r) return { status: 'failed', diagnostic: { ...r, code: 'setpart.unreachable' } };
