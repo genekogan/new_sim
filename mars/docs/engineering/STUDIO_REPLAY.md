@@ -32,7 +32,10 @@ From the take file, the studio also reads `campus`, `site { origin, yaw, groundY
 
 **As of the W19 run**, the manifest had the flagship `969c8bf9…` (2026, `takes`) and the 2022 east-house first bay
 `9970e93e…` (2022, `otherYears`, 41 182 ticks, `rulesVersion` `mars-rules/year-build-phase-a`, no `kind`). Both takes are
-still `mars-take/2`; the replay also reads `/3` (§2).
+still `mars-take/2`; the replay also reads `/3` (§2). **Since W22** the 2022 first bay and the 2022 whole skeleton
+(`year-build-2022-east-house.json`, `otherYears`, recorded with `--full`) are `mars-take/4` (TAKES_AND_PLANS.md "Compact
+tracks, events and entities0"), both with `kind: 'year-build'`. The flagship is still the /2 file: its re-record is
+held back by a camera-synth test (see there).
 
 ## 2. The take host per year
 
@@ -70,6 +73,8 @@ drawn at t.
 
 The two newest entries up to the current time are always shown (`role="log"`, "Take log"), and the last 12 are in the
 Diagnostics drop-down with the whole-take totals. The 2022 take has 101 blocked waits, 0 failed and 0 violations.
+Since mars-take/4, repeated identical waits are one line "(×n until t s)", and the totals count each wait (the /4 first
+bay: 106 waits, whole skeleton: 242).
 
 ### Final-frame checks (`take-checks.ts`)
 
@@ -155,9 +160,10 @@ regression fixture.
 
 - **Datum.** A year-build take renders 0.16 m below the Kit's own racks (§2). The parts are exact in engine coordinates;
   the picture is feet-true, not rack-true.
-- **Entities removed mid-take are not drawn.** The first upright stack (`pile-upright-16ft-kit-1`) is emptied and
-  removed. A take stores no record of an entity absent from `finalState` (no def, no kind), so the replay cannot draw it
-  before it goes. `info().undrawable` lists such ids.
+- ~~Entities removed mid-take are not drawn.~~ Fixed in mars-take/4 (W22): the take's `entities0` holds each entity as
+  first recorded, and the replay draws from it when the final state lacks the entity. The emptied
+  `pile-upright-16ft-kit-1` is drawn, shrinking, until tick 29 588, when it is removed. `info().undrawable` is now empty
+  for /4 takes and lists such ids only for older ones.
 - **Year-build takes have no dedicated "watch" camera.** They use the recorder's planned shot list (0.5 Hz; readability
   mean 0.81). A directed track can be computed and played instead.
 - **Direction in the studio compiles in the page.** The directed track lives only in the page and is not stored beside

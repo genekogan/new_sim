@@ -41,19 +41,23 @@ diagnostics, startTick, endTick, finalStateHash }`. A refused cancel is recorded
 never forced.
 
 **Take.** `{ schema, id, planHash?, baselineCheckpoint?, baselineStateHash, rulesVersion, dt, startTick, ticks,
-keyframeEvery, tracks, changes, events, finalStateHash, finalState }`.
+keyframeEvery, tracks, changes, events, finalStateHash, finalState, entities0?, removed? }` (the last two since mars-take/4).
 - `tracks[entity]`: samples `[tick, x_mm, y_mm, z_mm, yaw_mrad(, pitch_mrad, roll_mrad)]`, integers.
   Recorded online by `TakeRecorder` (a `RuntimeObserver`): a sample is dropped when linear
   interpolation (shortest arc for angles — the same `interpSample` replay uses) between its neighbours
-  reproduces every dropped sample within 1 quantum. Static entities cost one sample; while an entity moves a
-  sample is forced at least every `keyframeEvery` (20) ticks. Before motion resumes after a hold, the hold
-  point is committed, so interpolation never smears a pause.
+  reproduces every dropped sample within `TRACK_TOL` (since mars-take/4: 4 mm per axis, 8 mrad; before: 1 quantum).
+  Static entities cost one sample; while an entity moves a sample is forced at least every `keyframeEvery` (20) ticks.
+  A position hold is exact at both ends: its first still sample (arrival) and its last (departure) are committed, so
+  interpolation never smears a pause (angles may turn during the hold).
 - `changes`: `[tick, entity, field, value]` for `present`, `activity`, `level`, `task`, `grip`, `phase`,
   `support`, `reservedBy`, `connections`, `equipment`, `paint`, and since mars-take/2 `hands` (integer mm),
   `baseActivity`, `on`, `speed` (integer cm/s), `contents` (initial values at tick 0; entities may appear/disappear).
   Every field is a step (last value ≤ t) except the mars-take/3 thinned fields `hands` / `speed` (below).
-- `events`: runtime action lifecycle (message kept only for failed/blocked), violations, marks, relative ticks.
+- `events`: runtime action lifecycle (message kept only for failed/blocked), violations, marks, relative ticks;
+  compacted since mars-take/4 (below). Read them through `takeEvents` / `expandEvents`.
 - `finalState`: the full successor state, so replay never needs the planner or runtime.
+- `entities0` (mars-take/4): every tracked entity as first recorded, minus provenance / label / tags; `removed`:
+  `[{ id, t }]` for each `present: false` change.
 
 ## Thinned fields (mars-take/3)
 
@@ -109,7 +113,80 @@ every 20th–1000th tick. The new cost scales with entities, not with take lengt
 
 What now dominates a long take: `tracks` (2.0 MB whole house) and `events` (0.9 MB, the action lifecycle incl. phase
 changes). A 2020–2026 set of whole-year takes at ≈ 4 MB each is feasible. The next lever would be the events
-(phase-change lifecycle lines) or a coarser pose tolerance for people standing still. Neither is done.
+(phase-change lifecycle lines) or a coarser pose tolerance for people standing still. Both are done in mars-take/4.
+
+## Compact tracks, events and entities0 (mars-take/4)
+
+W22, 2026-09-28. `TAKE_SCHEMA = 'mars-take/4'`. Bumped (not /3) because the `events` field changed meaning for a reader
+that counts statuses. The studio loader checks only the `mars-take-replay/1` wrapper and the final-state hash, so it
+reads /4 files. A /3 reader still samples a /4 take correctly (tracks and changes keep their format).
+
+**entities0 / removed.** A take used to store nothing about an entity absent from `finalState`: an emptied pile
+(`pile-upright-16ft-kit-1` in the 2022 takes) has tracks and changes but no def or kind, so the replay could not draw it.
+`entities0[id]` is the entity as first recorded (tick 0, or the tick it appeared): def, kind, pose, phase, support,
+connections, contents, human state … minus provenance / label / tags. `removed` lists `{ id, t }` per `present: false`
+change. The studio (`take-replay.ts`) draws an entity from the final state, else from `entities0`. Pose, phase, support
+and contents still come from the frame (`sampleTake`), so the pile shrinks and disappears at its removal tick. Cost:
+5 KB flagship, 8 KB first bay, 18 KB whole house.
+
+**Tracks at TRACK_TOL.** Position 4 mm per axis, angles 8 mrad (`TRACK_TOL`, `take/types.ts`; `RecorderOptions.tol` /
+`EngineConfig.trackTol` override, a number applies to both). The guarantee is `sampleTake` vs the live world at every
+tick: ≤ 4.5 mm / 8.5 mrad (tolerance + ½ quantum), so inside 5 mm / 0.5°. The measured worst over the meal, hand-up and
+yard takes (`take-fields.test.ts`) is 4.50 mm / 8.31 mrad, at the bound. Two rules keep the coarser line honest:
+- **Holds are exact at both ends.** Before /4 only the end of a *static* hold (every value unchanged) was committed. At
+  4 mm, a line smeared a stop over the next ticks and a start over the previous ones (a turn in place masks a position
+  hold), so the take's per-tick speed showed 0.004–0.047 m/s "walk stalls" that the live meter never saw (35 in the
+  flagship on open ground, `movement.test.ts`). Now the first still sample (arrival) and the last still sample
+  (departure) of a *position* hold are committed. Stalls from the take are back to 0.
+- **4 mm, not 5.** At 5 mm the proving-ground cross take moved a directed orbit's searched start heading (0° → 147°) and
+  its raise correction (1 → 2.5 m) in `camera-direct.test.ts`. 1–4 mm keep them. It is a marginal search, so it may flip
+  again with any change to the motion.
+
+**Events.** `compactEvents` (`take/recorder.ts`, run by `finish()`; `RecorderOptions.compactEvents: false` keeps the raw
+stream):
+1. **Lifecycle runs.** An action's `requested` event, followed in the stream on the same tick by `validated`,
+   `reserved`, `executing` (a prefix of `LIFECYCLE`, ≥ 2 events, only the last one with phase / code / message), becomes
+   the last event with `from: 'requested'`. Lossless: `expandEvents` (take/replay.ts; `takeEvents` uses it) rebuilds the
+   runtime's events exactly.
+2. **Repeated blocked waits.** Per action, a `blocked` event with the same code, message and phase as that action's
+   previous one, with at most one `executing` resume of that phase in between, is merged into the first. The first keeps
+   its tick exact and gains `n` (waits merged) and `until` (the last one's tick). The resumes in between are dropped; the
+   one after the last wait is kept. This is lossy only in the dropped wait / resume ticks. `blockedWaits(events)` counts
+   each merged wait `n` times, i.e. the raw stream's number of `blocked` events (the manifest's `blockedWaits`, the studio
+   Diagnostics total). A log line shows "(×n until t s)".
+
+**Unchanged.** `finalState`, `finalStateHash`, `changes` and `replayFinalState`: the final state is not a track, and a
+recording with the raw stream has identical changes and tracks (`take-fields.test.ts`). Every final-state pin passed
+before and after. Recording the /4 takes reproduced each pin: flagship `c56ea8da…` @ 11 459, 2022 first bay `251a44c5…`
+@ 41 317, whole skeleton `d382e461…` @ 117 277. The take `id` changes (tracks / events / schema are in it).
+
+**Camera.** The camera planner reads `present` / `grip` / `task` / `reservedBy` and the tracks, so thinned tracks move
+it. Planned from the 4 mm tracks against the same motion planned from 1 mm tracks, the camera differed as follows:
+flagship ≤ 1.1 cm, 0 key changes; first bay ≤ 1.2 cm; whole house: 99 of 2 933 samples took another correction (up to
+26.7 m apart, 50 → 48 cuts, readability deltas ≤ 0.196, all valid). That last one is too close to the 0.2 verify
+threshold. So `record-campus-take.mjs` **plans every camera from an exact re-run** (`EngineConfig.trackTol: 1`; same
+ticks and final state, checked) and attaches the track to the shipped take's id. The shipped `camera.data` is
+byte-identical to a plan from 1 mm tracks. The in-engine director (`direct_camera` on a stored take, the studio's Direct
+camera) plans from the stored, thinned tracks.
+
+Sizes (raw JSON of the studio file; the take alone in brackets; gzip -9). Before = the committed files at the start of W22
+(mars-take/2, recorded before W21's re-pin, so the motion differs slightly). The whole house had no file; W20's /3
+measurement of its take is given.
+
+| Take | ticks | file before → after | take before → after | take gzip before → after | tracks | events | changes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| flagship (campus) | 11 459 | 1.75 → 1.54 MB | 540 → 314 KB | 117 → 67 KB | 277 → 153 KB | 86 → 54 KB | 157 → 82 KB |
+| 2022 first bay | 41 317 | 2.88 → 1.34 MB | 2.51 MB → 938 KB | 421 → 169 KB | 695 → 412 KB | 319 → 203 KB | 1.46 MB → 282 KB |
+| 2022 whole skeleton (`--full`) | 117 277 | — → 3.85 MB | 3.94 (W20 /3) → 2.71 MB | 0.76 → 0.48 MB | 2.00 → 1.19 MB | 0.90 → 0.59 MB | 0.84 MB |
+
+The 1 mm column for the same /4 run: tracks 276 / 687 / 2 001 KB. Camera tracks are unchanged by all this: 1.19 MB
+flagship (10 Hz), 337 KB first bay, 976 KB whole house (0.5 Hz). In the flagship file they are now the bulk.
+
+**The flagship file is not re-recorded yet (still /2, take `969c8bf9…`, pre-W21 motion).** Re-recorded at W21's re-pin
+(`c56ea8da…` @ 11 459, take `d2f16bd3…`), it makes `camera-synth.test.ts` (a) fail: the directed 270° bay orbit from
+`seat_b1` reaches min readability 0.56, under the planner's 0.6. The same happens with a 1 mm-track re-record of the same
+motion, so the new motion causes it, not mars-take/4. `record-campus-take.mjs --scenario flagship` reproduces the file
+(deterministic) once the camera side accepts it. Until then `--check` reports the flagship as a mismatch.
 
 ## Replay (`take/replay.ts`)
 
@@ -154,7 +231,8 @@ state at all, so camera edits cannot invalidate a plan.
 - Rehearsal and replay never mutate history, workspace heads or the take (takes in `TakeLibrary` are frozen).
 - Executing in a fork leaves canonical and sibling workspaces untouched; canonical refuses execution.
 - A relevant physical edit after rehearsal ⇒ `plan.stale`; env / label / provenance edits ⇒ still valid.
-- Sampling a take at every tick reproduces true poses within 2 mm / 2 mrad and exact activity/level; hands within
+- Sampling a take at every tick reproduces true poses within TRACK_TOL + ½ quantum (4.5 mm / 8.5 mrad since mars-take/4;
+  2 mm / 2 mrad before) and exact activity/level; hands within
   5.5 mm, speed within 1.5 cm/s, releases exact (`take-fields.test.ts`).
 
 ## Cross-host determinism
@@ -231,6 +309,9 @@ prints the flagship build-bay/open-ground `finalStateHash`, take id and math fin
 | **total** | **44 800** (gzip 9 127) |
 
 <sub>Measured 2026-09-27 with `cd viewer && node --test --test-name-pattern="payload" engine/test/take.test.ts`.</sub>
+
+mars-take/4 (2026-09-28, W22; the scenario now runs 58.8 s): total 21 365 B (gzip 5 791): tracks 9 640 (378 samples),
+events 4 268, changes 5 178 (the /2 fields), finalState 1 250.
 
 `finalState` grows with the world (a full campus will dominate); if that matters, store it as a
 content-addressed state in the history store and keep only the hash in the take.

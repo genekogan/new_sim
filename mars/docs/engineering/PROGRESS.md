@@ -421,3 +421,40 @@ Then: gate → release 5; HANDOFF refresh.
       the old final states; the re-record picks up the new ones.
     - HEAD `f58e527` (W13, after W21) has 1 red test: `year-build-b` plan expects `riser: 2`, but the new parts list has
       none. That is W13's parts-b change, unrelated to walking.
+- **W22 (takes mars-take/4: entities0, thinner tracks / events, re-record)** `5976c6b`, `15991b1` + docs (`TAKES_AND_PLANS.md` "Compact tracks, events and entities0"):
+  - **Schema bumped to `mars-take/4`.** Compacted `events` change meaning for a reader that counts statuses. The studio
+    loader checks only the wrapper and the hash.
+  - **`entities0` + `removed`.** Every tracked entity is stored as first recorded (minus provenance / label / tags), and
+    removals are listed as `[{ id, t }]`. The studio draws from `entities0` when the final state lacks the entity. The
+    emptied `pile-upright-16ft-kit-1` is drawn until tick 29 588. `info().undrawable` is `[]` at every studio-build
+    moment (asserted), and the yard capture shows both upright stacks.
+  - **Tracks at `TRACK_TOL` 4 mm / 8 mrad** (replay ≤ 4.5 mm / 8.5 mrad; measured 4.50 / 8.31). Position holds are now
+    exact at both ends: at 4–5 mm a stop or start smeared into 0.004–0.047 m/s take "walk stalls" (movement.test). 5 mm
+    flipped a marginal directed-orbit heading search in camera-direct.test, so 4 mm is used.
+  - **`compactEvents`.** Same-tick lifecycle runs fold to one event with `from` (lossless via `expandEvents` /
+    `takeEvents`). A repeated blocked wait becomes one event with `n` and `until`. `blockedWaits` counts `n`, and the
+    studio log shows "×n until t".
+  - **What is unchanged.** Final state, changes and every pin are unchanged.
+  - **Cameras** are planned from an exact re-run (`EngineConfig.trackTol: 1`; additive in rehearse.ts), so the shipped
+    `camera.data` is byte-identical to a 1 mm plan. Planned from the thinned tracks, the whole-house camera changed on
+    99 of 2 933 samples, which was too close to the 0.2 threshold.
+  - **Recorded.** The 2022 first bay (1.34 MB file, take 938 KB) and, via `--full`, the whole skeleton
+    (`year-build-2022-east-house.json`, 3.85 MB, take 2.71 MB) were recorded. `kind: 'year-build'` is on both, and
+    `--check` is deterministic.
+  - **Before and after.** File sizes: first bay 2.88 → 1.34 MB. Take gzip: flagship 117 → 67 KB, first bay
+    421 → 169 KB.
+  - **Tests.** Engine 344 tests, 340 pass, 3 skip, 1 fail: W13's `year-build-b` A+B plan (`riser: 2` missing). It is
+    pre-existing at `f58e527`. Studio specs: studio-take, studio-build, studio-direct, camera-verify (2), stairs (4)
+    and meal (2 of 3) pass. `meal: captures` fails with `meal-legs-crossed` 2.92 % off its baseline; it fails
+    identically at `main` (a live-lab pose after W21, not a take). Its baseline was not refreshed.
+  - **Open 1: the flagship is not re-recorded** (still /2, `969c8bf9…`). Re-recorded at W21's motion (`c56ea8da…`,
+    take `d2f16bd3…`), `camera-synth.test.ts` (a)'s directed 270° bay orbit reaches min readability 0.56 < 0.6. The
+    same happens with 1 mm tracks, so the motion causes it, not /4. The camera owner needs to accept or fix it; then
+    run `record-campus-take.mjs --scenario flagship`.
+  - **Open 2: v3** is still refused: `beam.no-room` at `onto_s2_4` (tick 11 009), "no room to stand at (27.80, -6.20)
+    on deck 1.83 m (clearance 0.25 m < 0.28 m)".
+  - **Open 3: phase A + B** is not recordable. It aborted on a `beam_walk` (0.45 m off a walkway), and its take is
+    ≈ 8 MB.
+  - **Open 4: the camera sampler** (`take-sampler.ts`) still takes the kind of an entity absent from `finalState` as
+    `human`. The emptied pile counts as a bystander for camera scoring. It is left as is to keep the planner's inputs
+    unchanged.
