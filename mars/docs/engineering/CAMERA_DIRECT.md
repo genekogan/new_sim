@@ -214,6 +214,10 @@ Default speeds: pan 8°/s, tilt 6°/s, orbit 6°/s, dolly 1 m/s, crane 0.8 m/s, 
 - Stores the track beside the take (`kind: 'directed'`, id `dir-<hash>`). The take and its hash are untouched.
 - Returns `track_id`, 1 Hz keyframes and the report.
 - Refusals are `{ok:false, code, message, diagnostics}`. The ambiguity code carries the candidates.
+- (W58, LM-007) `sentences[]` instead of `directions[]` (exactly one of the two): parsed and resolved exactly as
+  `engine_parse_camera` does (§8.3); any refused sentence refuses the call with `refusals[]` and compiles nothing;
+  otherwise the parsed directions are compiled and the result adds `parsed[]`. The track id hashes the parsed
+  directions, so `{ sentences }` and `{ directions: <the parsed ones> }` give the same `track_id`.
 
 ## 5. Results (2026-09-28)
 
@@ -424,3 +428,43 @@ the controller's take store, or the one the studio's Direct-camera panel compile
   file track needs one more choice (e.g. `{ track: { file: id } }`) resolved through `fileCamera`. Tested in
   `camera-take-file.test.ts` (a directed carry-crew orbit added to the flagship file, JSON round trip, poses equal,
   take hash unchanged, foreign / clashing / malformed tracks refused).
+
+### 8.3 Sentences and stored tracks over the op API (W58: LM-007, LM-008, LM-013)
+- **`engine_parse_camera { take_id | workspace, sentences[] (1–24) }`** → `{ ok, source, directions: [{ index,
+  sentence, direction, notes, subject: { kind, id, label, said } }], refusals: [{ index, sentence, code, message,
+  question?, candidates?, span?, details? }] }`. Read-only. The grammar is Codex's `camera/parse.ts`
+  (`parseSentence`, imported unchanged; `camera/index.ts` now exports it). Its `ParseVocab` is built from the
+  `SemanticWorld` of the take's final state (facts from the take) or of the workspace state (`api/camera-vocab.ts`):
+  regions (ids + short labels), scene assemblies (ids + short labels; one whose id is a region's is named once, as
+  the region), fixtures, and the activities people do in the take (the group vocabulary). Every parsed subject,
+  `context.interior` and `context.lookAt` is then resolved with `resolveSubject` / `resolveFixture`; the returned
+  direction carries the resolved id as its `ref` (the phrase stays in `subject.said`). Any refusal → `ok: false`,
+  `code` = the first refusal's code, and every refusal listed; parsed sentences are still returned.
+- **Alias table (LM-008):** the rack phrases (`rack bay`, `main pallet racks`, `pallet racks`, `racks`, …; the parser
+  maps them all to assembly `rack bay`) target the take's rack bay structures (raised uprights + beams); with none,
+  the scene assemblies whose name contains "rack". One target → resolved to it (on the flagship take: the take's
+  `structure:<id>`); several → `camera.direct.ambiguous` with the candidates (bare 2026: `north-rack-building`,
+  `west-rack-building`, …) — a question, never a guess; none → the ordinary `camera.direct.unknown`.
+- **Gene's four sentences through the op** (`api.test.ts`): the Chiba sunset pan → `region chiba`; the 270°
+  revolution → the take's rack bay; "go inside the kitchen and face the sink" → `camera.direct.unknown` on 2026 (no
+  kitchen) and resolved on 2024; "look at this crowd … this activity" → `camera.parse.deictic` with its question.
+  Untested paraphrases stay refusals by design (LM-010): "zoom in" → `camera.parse.unknown-verb`, an orbit with no
+  angle → `camera.parse.missing`, "wide lens" → a note; a group activity nobody does in the take →
+  `camera.direct.unknown` listing the activities.
+- **Not done — LM-009 (fixture subject kind):** "the sink" is still only reachable as `context.lookAt`. A
+  `subject.kind: 'fixture'` needs a change to the frozen `cameraDirectionSchema` (CODEX.md §7), so W58 left it for
+  the lead / Codex.
+- **`engine_store_camera_track { take_id, track }` (LM-013):** stores an already-compiled `CameraTrack` (e.g. the
+  studio Direct panel's `toCameraTrack(id, take.id, plan, 'directed')`) beside its take — the sibling of
+  `attach_camera_track` / `direct_camera`, which store tracks they compute. Validated with the take-file rules
+  (`withFileCamera`: `mars-camera-track/1` data, hz, duration, samples, `track.takeId === take_id`), plus: duration
+  within the take (+1 sample), samples ≤ ⌈duration·hz⌉ + 2. Refusals: `camera.track-take-mismatch`,
+  `camera.track-exists` (a different track already has the id — also beside another loaded take; re-storing the
+  identical track is a no-op, `stored: false`), `camera.track-invalid`, `camera.store-full`. The take and its hash
+  never change; `get_take` lists it under `cameras` (`{ id, kind, hz, duration, samples }` by default, the whole
+  track with `include: ['cameras']`), `engine_list { take_id }` too.
+- **Byte cap, not a count (LM-018's issue, for camera tracks):** a take's camera tracks together may hold at most
+  `MAX_TAKE_CAMERA_BYTES` = 4 MiB of JSON (the room chunks the `cams/<take>` value, so this bounds one blob); this op
+  accepts inputs up to that size (other ops keep the 256 KiB input bound). The room's plan/take caps are still counts
+  (64 / 32, LM-018 open).
+- Integration (W57, LM-011/015): the two new tool names are `engine_parse_camera` and `engine_store_camera_track`.

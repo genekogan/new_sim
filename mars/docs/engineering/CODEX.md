@@ -152,8 +152,15 @@ Reading anything is fine. If your task seems to need a Claude-owned edit, stop a
   line 73) is frozen for Codex as of `be0f66a` (2026-09-29). `parse.ts` produces values of this schema and must
   not change it. **If it ever changes, the lead records it here** (date, commit, what changed) and the parse brief
   is updated.
-  - Change log: *(none)*.
+  - Change log: *(none)*. W58 (2026-09-29, branch `w58-controller`) left it unchanged: the parser op
+    `engine_parse_camera` and `engine_direct_camera { sentences }` consume `parse.ts` as is. **Pending request
+    (LM-009):** a fixture subject kind (`subject.kind: 'fixture'`, "hold on the sink") needs this schema to change —
+    not made; the lead decides, then logs it here and updates the parse brief.
+  - Contract notes for Codex from W58 (no change needed now): `ParseVocab.fixtures` is accepted but unused by
+    `subjectOf`; there is no entity slot and no alias slot, so W58's alias table lives outside the parser
+    (`api/camera-vocab.ts`, applied to the parsed `assembly: 'rack bay'`).
 - The take schema (`mars-take/4`), `physicalView()` and `RULES_VERSION` are Claude-owned. Codex never bumps them.
+  W58 (LM-003) made `physicalView()` include a region's `layout` (only when present, so no existing hash moved).
 
 ## 8. Reports
 
