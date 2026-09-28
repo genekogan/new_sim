@@ -216,6 +216,47 @@ piles to the canonical campus, with the engine camera, at any speed, with the lo
 and wait — and the final frame equal to the reconstruction. Together with items 1–6 this is the next
 tranche's headline.
 
+## 12. Chairs, tables with food, and eating together (Gene, 2026-09-28 late)
+Observed/asked: chairs; a person walks up to a chair, turns so their back is to it, sits down exactly on it
+and rests (stretch: crosses one leg over the other); tables with things on them, e.g. food; people go to a
+table, take a bowl and a spoon in their hands, walk to a chair among other people, sit, and eat together —
+bowl held in front of the chest, spoon dips into the bowl, comes up to the mouth, back down, repeat — while
+socialising. Gene: pick the 80/20 version (no chewing, no food leaving the plate, no spill physics); keep it
+renderable; more detail later.
+What exists: `sit` / `take_slot` / `stand` (SOCIAL.md: approach point → turn to seat yaw (back to the
+chair) → `sit-down` 0.6 s → `sit`; renderer sit pose). What is new:
+- **Catalog**: `table-6ft` (top height 0.75 m, `surfaceSlots` on the top for items), `camp-chair` stays;
+  **small items** `bowl`, `spoon`, `plate`, `cup`, `pot` (hand-held, ≤ 1 kg, `handling.smallLoad`), with a
+  `contents` field (`food: 'stew'|…, fraction 0..1`) so a bowl can be emptied over a meal.
+- **Items on surfaces**: an item rests on a `surfaceSlot` of a table (support `resting-on`), or in a hand
+  (support `held`, a named hand `left|right`), or on a lap/knee while seated. Placed items are part of the
+  world state and the take; provenance as usual.
+- **Verbs** (`engine/social/` or a new `engine/items/`): `take_item {actor, item, hand}` (walk to the table
+  edge within reach ≤ 0.6 m of the item, reach, grasp; refused with a diagnostic if out of reach, item held
+  by someone else, or the hand is full), `put_item {actor, item, surfaceSlot|ground}`, `serve {actor, from:
+  pot, into: bowl}` (optional, fills a bowl at the pot), `eat {actor, bowl, spoon, until?}`: requires the
+  actor seated (or standing still), bowl in one hand, spoon in the other; a deterministic eat cycle
+  (≈ 2.4 s: dip 0.6 → lift to mouth 0.6 → pause 0.4 → return 0.8) publishing per-tick **hand points** (bowl
+  hand ≈ 0.25 m in front of the chest; spoon hand from the bowl rim to the mouth point of the rig) and
+  decrementing `contents.fraction` per cycle until empty or `until`; `eat` can run inside a `converse` /
+  `gather` so people eat and socialise together (social pre-emption rules as today).
+- **Approach/sit naturalness**: keep the present approach → turn → sit-down, but the turn must use the
+  splined-turn rules (§2, shorter direction) and the seat point must match the chair's seat exactly (renderer
+  pelvis on the seat surface, feet on the ground). Stretch: `sit` variant `legs-crossed` (renderer pose layer
+  only, chosen deterministically per person/seat).
+- **Renderer**: small items attach to the hand bones with a per-item grip offset; eat cycle as a pose layer
+  on the arms driven by the engine hand points (same reach-honesty rule: arms hang if the hand point is
+  out of reach); items resting on tables rendered from world state.
+- **Proof**: a `meal` scenario (Lab + a test): pot and bowls on a table, four chairs around a fire or in a
+  circle; four people take a bowl and spoon each, walk to chairs, sit (back to the chair, then down), eat
+  together while conversing, bowls empty over ~5 cycles, 0 violations; invalid cases: bowl out of reach,
+  hand already full, eating while walking (refused), sitting on an occupied chair (existing conflict).
+  Playwright captures of the approach+sit and of a spoon-to-mouth moment, inspected by the lead.
+Where: catalog (`world/catalog.ts`), `engine/items/` (new), `engine/social/actions.ts` (eat inside groups),
+renderer `app/engine-view/humans.ts` (pose layer, hand props) + `components.ts`/`fixtures.ts` (items).
+Priority: after the hand-up/handling work; it shares the crouch/reach vocabulary of §6 and the hand-point
+schema, so it should reuse them rather than invent a second one.
+
 ## Priority
 5 with 6 (they are one feature: the hand-up is the reach-up/reach-down motion pair, and pickups need
 the crouch) — these are prerequisites for 7; then 7 (the headline: full-year construction replays, start
@@ -224,3 +265,4 @@ verbs inside it; 3 and 2 (movement quality, spec §10) and 4 alongside because e
 shows them; 1 (fire) last. Item 11 (autonomous camera direction) is its own tranche once the first
 year replay exists to point it at. Items 2–4 change pinned hashes; do them early in a
 session and re-pin once, with the reason recorded in PLANNING_BUDGET.md.
+12 (chairs/tables/eating) comes after 5+6 and reuses their hand-point schema; engine first, renderer with the §4/§6 pose track.
