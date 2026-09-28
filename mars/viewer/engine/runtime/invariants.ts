@@ -12,9 +12,10 @@ const TOL = 0.03;
 /**
  * Activities exempt from `collision.human-static` besides climb-*: a person sitting on a seat
  * fixture (engine/social) is inside that chair/bench's footprint by design, and moves between the
- * seat's approach point and the seat during the 0.6 s sit-down / stand-up transitions.
+ * seat's approach point and the seat during the 0.6 s sit-down / stand-up transitions. `eat` / `serve`
+ * (engine/items) are overlays a seated person runs without leaving the seat (they never move the body).
  */
-export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up']);
+export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up', 'eat', 'serve']);
 
 export const humanStaticClearance: Invariant = (rt: Runtime) => {
   const sp = rt.services.spatial as Spatial;

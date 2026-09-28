@@ -212,7 +212,7 @@ function edgeDistance(s: Vec2, u: Vec2, half: Vec2): number {
 }
 
 /** Nearest blocker id around `p` other than `except` (the seat's own fixture). */
-function blockerNear(g: LevelGrid, p: Vec2, except: string, radius = 1.5): string | undefined {
+export function blockerNear(g: LevelGrid, p: Vec2, except: string, radius = 1.5): string | undefined {
   const c = cellOf(g, p);
   if (c < 0) return undefined;
   const r = Math.ceil(radius / g.cell), ci = c % g.nx, cj = Math.floor(c / g.nx);
