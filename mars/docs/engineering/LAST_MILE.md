@@ -72,10 +72,20 @@ Priority keys from Gene's list (OWNER_DECISIONS, last entry) appear in brackets:
 | LM-010 | [C3] Bounded NL grammar: untested paraphrases refused ("zoom in", orbit without angle, "wide lens") | CX-nl:106,109 | controller | fix | S | no | LM-007 | **W58 PARTIAL** (op-level: `api.test.ts` "parse_camera (LM-007/008/010) …" asserts 'zoom in' → unknown-verb, orbit w/o angle → missing, 'wide lens' → note). Next step [Codex]: the refusal list written as a contract with fixtures in `camera-parse.test.ts`. — [Codex] refusal list written as a contract with fixtures, so refusals are by design and tested |
 | LM-011 | [C3] Director demo never calls `engine_direct_camera` or a sentence; DD/LG tool lists lag the registry (12/13 vs 14 engine tools) | DD:82-84,61; LG:49-57 | controller | fix | S | no | LM-007 | director-demo.mjs adds an asserted sentence → direct_camera step; doc lists are generated from `engineTools()` |
 | LM-012 | [C3] Direct compile blocks the page ≈ 5.6 s on a chapter take (D2) | SR:474-476; PR W48, lead 1333 | controller | fix | M | no — must be output-identical | — | **W54 landed on `w54-direct-perf`** (output-identical: `camera-direct-identity.test.ts`, 17 fixtures + the D2 hold vs the pre-W54 golden; `--check` OK for all takes + chapters): D2 hold 7.3 s → 0.25–0.35 s warm in node, flagship orbit 0.32–0.40 → 0.16–0.21 s (CAMERA_DIRECT §9). **Next steps:** (1) timing test as a deterministic proxy — assert the D2 case's sampler-call count (2 424 now, 29 713 before) rather than wall time; (2) move `directForTake` into a worker (removes the remaining ≈ 0.3 s freeze); (3) `trackHash` is half of D2's time — faster identical sha256 in `core/hash.ts`; (4) `centreAt` per-id sampling (≈ 60 ms on D2) |
+| LM-007 | [C3] NL camera parser not wired into the controller: not exported from camera/index.ts, no ParseVocab from SemanticWorld, used only by app/studio/direct-panel.tsx | HO:712; PR W45,W48; CX-nl:108; SR:343-353 | controller | fix | M | no | — | `engine_direct_camera` accepts `sentences` → structured parse refusals + compiled directions, with an integration test; parse.ts itself is [Codex] |
+| LM-008 | [C3] "main pallet racks" only resolves through the take's "rack bay" structure (no alias / named asset) | EV:316,700; PR W16 | controller | fix | S | no | LM-007 | SemanticWorld alias plus a direct-camera test resolving the phrase |
+| LM-009 | [C3] Camera direction schema has no fixture subject kind ("the sink" only via `context.lookAt`) | CX-nl:107 | controller | fix | M | maybe — camera ids | LM-007 | schema change logged in CODEX.md §7 (frozen schema) plus parse and direct tests |
+| LM-010 | [C3] Bounded NL grammar: untested paraphrases refused ("zoom in", orbit without angle, "wide lens") | CX-nl:106,109 | controller | fix | S | no | LM-007 | [Codex] refusal list written as a contract with fixtures, so refusals are by design and tested |
+| LM-011 | [C3] Director demo never calls `engine_direct_camera` or a sentence; DD/LG tool lists lag the registry (12/13 vs 14 engine tools) | DD:82-84,61; LG:49-57 | controller | fix | S | no | LM-007 | **W57 DONE (16d7308, branch w57-lint-zero):** director-demo step 5b calls `engine_direct_camera` (hold on yard A + crane over the carried beam; asserts per-shot report, a recorded correction on the opening hold — occluded → raise — and that the head never moves); both scripts assert the MCP engine listing equals `engineTools()` (no literal list). The *sentence* step waits for LM-007 (`engine_parse_camera`); DD/LG prose lists left to lane V (LM-174). director-demo.mjs adds an asserted sentence → direct_camera step; doc lists are generated from `engineTools()` |
+| LM-012 | [C3] Direct compile blocks the page ≈ 5.6 s on a chapter take (D2) | SR:474-476; PR W48, lead 1333 | controller | fix | M | no — must be output-identical | — | fixed by W54 (output-identical; next steps in CAMERA_DIRECT §9); a timing test (worker or cropped sampler) with byte-identical output |
 | LM-013 | [C4] Directed tracks are download-only; no room op stores a directed track beside its take | EV:318,737; HO:630-631; CD:413-415; SR:383-397,444-445; PR W19,W22,W24 | controller | fix | M | no | — | op (sibling of `attach_camera_track`) saves a compiled directed track next to a take; test: take hash unchanged and the track is listed and replayable |
 | LM-014 | [C5] Two control paths: 20 legacy tools (18 in simulation/commands.ts + get_state, get_capabilities) sit beside the 14 `engine_*` tools | LG:49; OWNER_DECISIONS last entry | controller | fix | L | no — legacy room state only; integration transcript changes | LM-015 | legacy tools route through the engine controller op path (one registry); integration asserts each legacy tool via the new path |
 | LM-016 | Sequence steps have no step-level timeout and no cancel/mark step verbs; `at` cues only apply to registry verbs | TP:334 | controller | fix | M | no | — | runner test: step timeout fires with a named reason; cancel/mark steps work |
 | LM-017 | Deleting a workspace leaves checkpoints addressable whose takes may be evicted → `take.unknown` | DD:420-422 | controller | fix | S | no | — | get_take gives a named `take.evicted` refusal (or eviction is blocked while reachable), with a test |
+| LM-013 | [C4] Directed tracks are download-only; no room op stores a directed track beside its take | EV:318,737; HO:630-631; CD:413-415; SR:383-397,444-445; PR W19,W22,W24 | controller | fix | M | no | — | **W58 FIXED** (`api.test.ts` "store_camera_track (LM-013) …"): op `engine_store_camera_track`; per-take camera byte cap `MAX_TAKE_CAMERA_BYTES` 4 MiB (see CAMERA_DIRECT §8.3). Studio call: lane S. — op (sibling of `attach_camera_track`) saves a compiled directed track next to a take; test: take hash unchanged and the track is listed and replayable |
+| LM-014 | [C5] Two control paths: 20 legacy tools (18 in simulation/commands.ts + get_state, get_capabilities) sit beside the 14 `engine_*` tools | LG:49; OWNER_DECISIONS last entry | controller | fix | L | no — legacy room state only; integration transcript changes | LM-015 | **W58 PARTIAL (honest minimum)** (`api.test.ts` "one control path (LM-014) …"): `simulation/legacy.ts` classifies all 20 legacy tools (engine equivalent that exists, or viewer-only + reason), descriptions prefixed, one refusal envelope `legacy.command-failed`. Routing them through the registry needs LM-202 (ruled out-of-scope). Next step: W57's integration asserts one legacy failure's envelope (`JSON.parse(content[0].text).code === 'legacy.command-failed'`). — legacy tools route through the engine controller op path (one registry); integration asserts each legacy tool via the new path |
+| LM-016 | Sequence steps have no step-level timeout and no cancel/mark step verbs; `at` cues only apply to registry verbs | TP:334 | controller | fix | M | no | — | **W58 FIXED** (`sequence.test.ts` "runner (LM-016): a step timeout …", "… cancel stops a live step …", "bind (LM-016) …"; `api.test.ts` "sequence built-ins over the op API (LM-016) …"). — runner test: step timeout fires with a named reason; cancel/mark steps work |
+| LM-017 | Deleting a workspace leaves checkpoints addressable whose takes may be evicted → `take.unknown` | DD:420-422 | controller | fix | S | no | — | **W58 FIXED** (`api.test.ts` "get_take (LM-017): a take evicted after its workspace was deleted is take.evicted …"). — get_take gives a named `take.evicted` refusal (or eviction is blocked while reachable), with a test |
 | LM-018 | DO storage: chunking splits UTF-16 surrogates; 512 Ki chars of 3-byte text exceed 2 MB; caps are counts (64 plans / 32 takes), not bytes (REVIEW L8) | RV:277-282; EV:302,469; HO:286-287 | controller | fix | M | no | — | engine-room test: emoji straddling a chunk boundary round-trips; byte-based cap refuses the largest take over the limit |
 | LM-019 | Year-build-sized takes in a DO room are untested against the 30 s CPU limit | HO:284-286 | controller | fix | M | no | LM-015 | integration rehearses one chapter in a room under the limit, or refuses with a named code |
 | LM-202 | [C5] Not one world model: the Studio component editor / saved layouts don't create engine design-edit checkpoints; the legacy people/EUC simulation is a parallel sim layer | SP:23,175,264 | controller | fix | L | no | LM-014 | Studio edits go through `engine_edit_world` (e2e + api test); legacy people commands become engine verbs — lead may de-scope as a new feature (§9) |
@@ -379,6 +389,55 @@ Estimated fix work ≈ **400.5 worker-hours** (S = 1, M = 2.5, L = 5). Re-classi
 
 | id | what moves |
 |---|---|
+| LM-020 | every walker/carry pin if behaviour changes; a pure ordering proof may be pin-neutral |
+| LM-021 | perf-walk |
+| LM-033 | yb-AB `ddb634d6`, P chapter take |
+| LM-208 | takes, baselines, carry pins if timing changes |
+| LM-049 | all walker pins (perf-walk 5, year-build, takes) |
+| LM-050 | stress-30 and every pin if submit planning is spread |
+| LM-051 | perf-walk |
+| LM-054 | takes with a speed field (take bytes/ids); state hash if speed is in state |
+| LM-055 | perf-walk, takes |
+| LM-061 | take camera ids (re-record) |
+| LM-069 | takes (camera track re-record) |
+| LM-070 | v3, handup tests, year-build maybe |
+| LM-081 | meal, any take with held items |
+| LM-084 | year-build pins, chapter takes |
+| LM-085 | year-build takes |
+| LM-086 | year-build |
+| LM-090 | takes (hands field) |
+| LM-205 | stored plans go stale; take rulesVersion fields |
+| LM-105 | yb-skel, yb-AB, chapter takes (events) |
+| LM-106 | yb-AB, chapter takes |
+| LM-107 | adds full-house pins |
+| LM-113 | adds a campus v3 pin; takes |
+| LM-119 | baselines |
+| LM-120 | baselines (lab-social, campfire) |
+| LM-121 | baselines |
+| LM-122 | baselines (poses-*, year-build) |
+| LM-123 | baselines (poses-raise-footer) |
+| LM-124 | baselines |
+| LM-125 | baselines |
+| LM-126 | baselines |
+| LM-128 | baselines (poses-beam-walk) |
+| LM-129 | baselines |
+| LM-130 | baselines (stairs) |
+| LM-132 | baselines |
+| LM-136 | baselines (prone-*) |
+| LM-141 | baselines (studio-build) |
+| LM-143 | baselines (studio-2021-*, solar-paint-*) |
+| LM-144 | baselines (fire-*) |
+| LM-145 | baselines (render-polish, solar-paint) |
+| LM-210 | new baselines |
+| LM-156 | adds pins |
+| LM-160 | baselines |
+| LM-161 | camera-verify captures |
+| LM-162 | campus `c56ea8da`, contentHash |
+| LM-166 | new baselines |
+| LM-180 | if changed — year-build, flagship |
+| LM-181 | if changed — year-build, chapter takes |
+| LM-182 | mars-2022/23/24 contentHash, every 2022 year-build pin, chapter takes |
+| LM-183 | studio/lab year baselines; perf-walk if 2026 GROUND_Y moves |
 
 **Maybe move pins** (60 rows): LM-001, LM-002, LM-003, LM-006, LM-009, LM-023, LM-024, LM-025, LM-027, LM-030, LM-031, LM-032, LM-034, LM-035, LM-039, LM-042, LM-045, LM-047, LM-056, LM-057, LM-058, LM-060, LM-062, LM-066, LM-068, LM-071, LM-072, LM-073, LM-074, LM-076, LM-077, LM-078, LM-080, LM-082, LM-083, LM-087, LM-088, LM-089, LM-091, LM-092, LM-093, LM-094, LM-095, LM-096, LM-097, LM-098, LM-099, LM-103, LM-109, LM-110, LM-111, LM-114, LM-115, LM-118, LM-133, LM-134, LM-135, LM-149, LM-213, LM-170. These are expected to be hash-neutral if done carefully. Each brief must run perf-walk + year-build pins and report; any movement joins the re-pin batch.
 
