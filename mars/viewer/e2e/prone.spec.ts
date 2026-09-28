@@ -26,6 +26,8 @@ type Acc = {
   points: number;
   reached: number;
   byAct: Record<string, [number, number]>;
+  /** per receiver and activity: points, reached, missed points' ratio range (shoulder → point / arm) */
+  byWho: Record<string, [number, number, number, number]>;
   misses: string[];
   unreachable: string[];
   over: string[];
@@ -54,7 +56,7 @@ async function boxes(page: Page) {
 
 /** Run the scenario to the end in the page, checking the receivers every tick. */
 async function runChecked(page: Page, B: Record<string, Box>) {
-  const acc: Acc = { ticks: 0, points: 0, reached: 0, byAct: {}, misses: [], unreachable: [], over: [], shoulders: [], chest: { n: 0, worst: 0, bad: [] }, sink: { n: 0, worst: 0, where: '', by: {} }, sinkAfter: { n: 0, worst: 0, where: '', by: {} }, members: {}, sheet: { minGap: Infinity, at: '' }, acts: {}, trace: [], prone: {}, done: false, tick: 0 };
+  const acc: Acc = { ticks: 0, points: 0, reached: 0, byAct: {}, byWho: {}, misses: [], unreachable: [], over: [], shoulders: [], chest: { n: 0, worst: 0, bad: [] }, sink: { n: 0, worst: 0, where: '', by: {} }, sinkAfter: { n: 0, worst: 0, where: '', by: {} }, members: {}, sheet: { minGap: Infinity, at: '' }, acts: {}, trace: [], prone: {}, done: false, tick: 0 };
   while (!acc.done && acc.ticks < 20 * 120) {
     Object.assign(
       acc,
@@ -86,6 +88,10 @@ async function runChecked(page: Page, B: Record<string, Box>) {
                 if (ok) acc.reached++;
                 (acc.byAct[a] ??= [0, 0])[0]++;
                 if (ok) acc.byAct[a][1]++;
+                const pk = `${id} ${a}`;
+                (acc.byWho[pk] ??= [0, 0, 9, 0])[0]++;
+                if (ok) acc.byWho[pk][1]++;
+                else [acc.byWho[pk][2], acc.byWho[pk][3]] = [Math.min(acc.byWho[pk][2], arm.ratio!), Math.max(acc.byWho[pk][3], arm.ratio!)];
                 if (!ok && arm.ratio! <= 1.0 && acc.misses.length < 40) acc.misses.push(`${st.tick} ${id} ${a} ${arm.side} err ${arm.err!.toFixed(3)} ratio ${arm.ratio!.toFixed(2)}`);
                 if (!ok && arm.ratio! > 1.0 && acc.unreachable.length < 40) acc.unreachable.push(`${st.tick} ${id} ${a} ${arm.side} ratio ${arm.ratio!.toFixed(2)} target ${arm.target.map((x) => x.toFixed(2)).join(',')}`);
               }
@@ -158,6 +164,7 @@ async function runChecked(page: Page, B: Record<string, Box>) {
 function report(name: string, acc: Acc) {
   const acts = Object.entries(acc.byAct).map(([k, [n, ok]]) => `${k} ${ok}/${n}`).join(', ');
   console.log(`[prone] ${name}: ${acc.ticks} ticks, receiver hand points ${acc.points}, reached ≤ 0.1 m ${acc.reached}; by activity: ${acts}`);
+  console.log(`[prone] ${name}: per receiver (reached / points, misses' shoulder→point ratio): ${Object.entries(acc.byWho).filter(([k]) => /(reach|push|kneel|stand)/.test(k)).map(([k, [n, ok, lo, hi]]) => `${k} ${ok}/${n}${ok < n ? ` (${lo.toFixed(2)}–${hi.toFixed(2)})` : ''}`).join(', ')}`);
   console.log(`[prone] ${name}: activities ${Object.entries(acc.acts).map(([k, l]) => `${k}: ${l.join(' → ')}`).join(' | ')}`);
   console.log(`[prone] ${name}: prone layer ${Object.entries(acc.prone).map(([k, s]) => `${k} bend ≤ ${((s.bendMax * 180) / Math.PI).toFixed(0)}° turn ${((s.turnMin * 180) / Math.PI).toFixed(0)}…${((s.turnMax * 180) / Math.PI).toFixed(0)}°`).join(', ')}`);
   console.log(`[prone] ${name}: lying chest ${acc.chest.n} ticks, worst |shoulders − (deck + chest depth)| ${acc.chest.worst.toFixed(3)} m; surface over the deck below its top: worst ${acc.sink.worst.toFixed(3)} m at ${acc.sink.where || '-'} (${acc.sink.n} vertices > 1.5 cm)`);

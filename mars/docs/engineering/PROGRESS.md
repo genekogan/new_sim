@@ -649,3 +649,26 @@ Then: gate → release 5; HANDOFF refresh.
   has not been posed prone (renderer track).
 - **W27 landed** `82e00c0`, `81ce663`, `f97d5db` (≈300k tokens, 105 min): A+B overlap root cause = `setpart.ts` moved lifters' feet without checking people (the carry was fine) → lift crews hold the part and wait (`setpart.path-occupied`), idle people make way; **east-house A+B green and pinned `ddb634d6…` @600599 (8.3 h simulated), 0 violations, 66 + 145 parts at 1 cm/1° (max 0.25 mm), 19 unplaced (solar 14, stair 5)**; v3: `deckAt` clearance is read at lattice cell centres so a 0.35 m spot read 0.25 m at staging-east → `beam_walk` `stepOffSpot` (nearest spot with room ≤ 0.15 m), spare tread moved; 17/17 origins + staging-east green (was 10/17); v3 re-pinned a2f782ad → 39a0fb3f @16374; **v3 take recorded** `64c3331c…` at staging-east (2.09 MB / 238 KB gz) in the manifest. 371 / 368 / 3 skip. Lead review: accepted. Unlanded (its Bash checks failed 9×): recorder `year-build-2022-ab` scenario + YEAR_BUILD/PLANNING_BUDGET/PROGRESS docs in `scratchpad/w27-wt` (branch `w27-ab`), to land once `scratchpad/w27/fulltest2.log` shows ✔ → W31. **Lead decision:** the A+B take (12.0 MB) is split per section (A, D0, D1, D2, S, W, P) as chapters, each with its own camera plan → W31.
 - W30 spawned (engine handup.ts): kneeling rise sweeps the members the load rests on (W28's finding), v3 re-pin + re-record. W31 spawned (recorder/manifest): land W27's files, per-section A+B takes with chapter metadata.
+
+## 2026-09-29 — W29: the prone receiver posed (renderer half of §13)
+- **Pose layer** `viewer/app/engine-view/prone.ts` + `humans.ts` (POSES.md "Prone receiver"): one rise coordinate
+  (lying → on the knees → kneeling up → standing) on the engine's phase clocks, the body waiting for the load it holds;
+  a per-tick solve of rise / torso pitch (flat … the engine's 60° tip; kneeling to 150°) / body turn about S (≤ 45°, only
+  while the body lies on an installed sheet: ±20° here) keeping the shoulders in reach and the spine / head off the deck
+  slab and edge beam; lying depth and chest height measured from the skinned rig (hips 0.15 m up, shoulders 0.10 m);
+  tip joint 8 cm past the lip; knees on the deck, feet pointed; the girdle reaching ≤ 0.1 m (the engine's 2 × shrug);
+  flat hands on the deck; feet / hands lifted by whatever of their skinned surface dips below the deck; a 0.4 s bone
+  blend into the posture layer at `stand_with_load`.
+- **Lab** presets `prone` ("Prone hand-up (2.9 m deck)") and `prone-forks` from `handup-prone.test.ts`'s fixture; hook
+  `meshPoints(id)`. **Spec** `e2e/prone.spec.ts` 3/3 (per-tick hands, shoulders past the lip, chest height, skinned
+  surface vs deck; captures, 3 baselines). poses / lab-poses / stairs / meal 13/13 unchanged (hand-up v3 92.5 %).
+- **Numbers:** 0 rig-reachable misses; engine hand points reached by hand / off the forks: prone-reach 45/80 · 60/80,
+  push-up 73/80 · 82/84, kneel-up 64/64 · 48/48, everything else all but stand_with_load 30/32 · 25/32. The misses are
+  beyond the arm (1.06–1.37): this rig lying at the lip reaches 0.80 m (punk) / 0.73 m (woman) below the deck, not
+  0.94, and the grips lie 0.31–0.47 m to the side of S.
+- **For the engine** (not changed here): (1) prone reach from the rendered rigs — chest 0.10 m, Torso joint → shoulders
+  0.27 / 0.19 m → reachDown ≈ 0.73–0.80 m, not 0.94; (2) the prone envelope is a cylinder about S, but a body lying
+  perpendicular to the edge has its shoulders ±0.15 m across: place S with the body's axis through the grips, or
+  publish the lying heading (`human.proneYaw`, footprint checked at it); (3) check the body beyond the lip (chest tipped
+  60°, head, arms to the grips) against members there — p3 / p4's chests pass through joist tails j2 / j7; (4) a phase
+  fraction (`human.phaseK`) would make the rise timing exact and take replay mid-phase.

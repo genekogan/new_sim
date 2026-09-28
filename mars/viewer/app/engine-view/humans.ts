@@ -817,8 +817,9 @@ const _vp = new THREE.Vector3();
 /**
  * Front depths of the body in the Idle pose (holder at the origin facing +x): `body` = how far the front of the
  * torso is ahead of the hip joints, or a leg's surface (above the shoes) from its bones, whichever is more (lying on
- * the stomach with the pelvis pitched 90° and the legs straight, the hip joints are this high above the floor); `chest` = how far the front of the chest (torso vertices within 0.25 m below the
- * shoulders) is ahead of the shoulder joints (lying flat, the shoulder joints this high).
+ * the stomach with the pelvis pitched 90° and the legs straight, the hip joints are this high above the floor);
+ * `chest` = how far the front of the chest (torso vertices within 0.25 m below the shoulders) is ahead of the shoulder
+ * joints (lying flat, the shoulder joints this high); `foot` = a sample of the foot's surface about its ankle.
  */
 function frontDepths(rig: Rig, hipX: number, shX: number, shY: number, ankle: THREE.Vector3, legBones: [THREE.Vector3, THREE.Vector3][]) {
   const seg = new THREE.Line3(), q = V();
