@@ -20,3 +20,9 @@
   up last onto roofs. Photos: docs/engineering/evidence/. Headline milestone: replay each year's construction
   from piles to the canonical state (OWNER_FEEDBACK_2026-09-28.md §7–10).
 
+- (2026-09-28 02:20 EDT, **lead decision, overnight — Gene may veto**) **One body model.** The engine's reach envelope (arm 0.75 m,
+  overhead 2.1 m, reach-down 1.0 m) and the Quaternius rig (arm 0.44–0.50 m from 1.33 m shoulders, ≈ 1.9 m overhead) disagreed,
+  so hand-ups rendered with hanging arms under a sheet nobody could reach. Resolution: a single `engine/body/model.ts`
+  (shoulder height, arm length 0.62 m, overhead reach ≈ 2.0 m, reach-down, lean limits) is the source of truth; the rig's arm
+  bones are scaled to it once per template; hand-up/items/paint constants import it; a Playwright test pins measured rig reach
+  to the model within 2 cm. Anything the model cannot reach is refused by the engine, never interpolated (feedback §5/§6).
