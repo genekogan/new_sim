@@ -62,8 +62,21 @@ const { canonical, flagship } = publishCampus2026(history, file); // 'mars-2026'
 6. `contentHash = hashOf(file minus contentHash)`. `node deploy/engine-scene.mjs --check` re-extracts and
    compares; it matched on repeated runs. The extractor takes ~5 s: 0.5 s GLB load and 4.5 s extraction.
 
-Frame: metres, Y up. North = −z (the north assemblies sit at z ≈ −60…−105) and east = +x, with the CAD
-origin at X=177, Y=66. Bounds: x −162…96, z −147…69 (outermost object + 10 m).
+Frame: metres, Y up, with the CAD origin at X=177, Y=66. The assembly names ("north workshops" at z ≈ −60…−105)
+suggest north = −z, but that is **about 57° off** the drone photos (W42, QUESTIONS_FOR_GENE A3 / Q22). Site bearing
+per scene (A3), all one parcel:
+
+| Scene | North in world | Confidence |
+| --- | --- | --- |
+| 2020 (studio-2020) | −X (`NORTH_AZIMUTH_OFFSET = −90`, `engine/env/sun.ts`; DJI_0079 shadows) | high |
+| 2026 CAD (this file) | −X turned ~33° toward −Z (offset ≈ −57° ± 8°; DJI_0005, DJI_0098) | high |
+| 2025 Kit | −Z (offset 0°) | medium (±20°) |
+| 2024 Kit | Chiba fits −Z; kitchen + trailer ring on the wrong side of Chiba (Q21) | medium-high |
+| 2022 Kit | authored −Z, but mirrored (Q20) | high on the mirror |
+| 2021 / 2023 Kit | authored −Z, unverified | low |
+
+The engine uses the one constant −90 for every scene, so the 2026 sun and shadows are ~33° off until a per-year
+bearing lands (Q22). The site bearing never moves a construction pin (`physicalView()` excludes env). Bounds: x −162…96, z −147…69 (outermost object + 10 m).
 
 ## What is walkable, and why — LOUDLY
 - **Only the flat ground (level 0, y = −0.16) is walkable.** There are no other levels, no links and no stairs.

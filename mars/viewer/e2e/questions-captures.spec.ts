@@ -130,6 +130,25 @@ const SHOTS: Shot[] = [
   { name: 'q07-yard', scenario: 'year-build-2022', marks: [{ ids: ['@piles'] }], cam: { eye: [1, 10, 14], look: [-6, 0, -1] } },
   // Q14 upper floors: the top beam passed up the frame bracing
   { name: 'q14-relay', scenario: 'year-build-2022', ticks: 11912, marks: [{ ids: ['@held'], label: 'top beam passed up by hand' }], cam: { eye: [-7, 3.5, 7], look: [0, 3, 0] } },
+  // W44 site-axis cards (A3 follow-ups). Top-downs: screen up = world −Z, right = +X; the side-by-side with the
+  // drone still and the north arrows is drawn afterwards by ../docs/engineering/questions/tools/axis.py.
+  // Q20 2022 mirrored: the four houses' pinwheel
+  { name: 'q20-2022-top', scenario: 'year-2022', marks: HOUSES_2022(0.14), cam: { top: 34, centre: [0, 0, 0] } },
+  { name: 'q20-2022-eye', scenario: 'year-2022', marks: HOUSES_2022(0.08), cam: { at: [[20, 11, 24], [0, 0.5, 0]] } },
+  // Q21 2024: kitchen and trailer ring south of Chiba in the model
+  ...(['top', 'eye'] as const).map((k): Shot => ({
+    name: `q21-2024-${k}`,
+    scenario: 'year-2024',
+    marks: [
+      { ids: ['chiba'], label: 'Chiba', opts: { color: '#1f6fff', height: 5.2, width: k === 'top' ? 0.14 : 0.06 } },
+      { ids: ['kitchen'], label: 'kitchen', opts: { color: ORANGE, height: 4, width: k === 'top' ? 0.14 : 0.06 } },
+      { ids: Array.from({ length: 18 }, (_, i) => `rv-${i + 1}`), label: 'trailer ring', opts: { single: true, width: k === 'top' ? 0.12 : 0.05, height: 3 } },
+    ],
+    cam: k === 'top' ? { top: 74, centre: [0, 0, 20] } : { at: [[-78, 16, 21], [0, 1.5, 20]] },
+  })),
+  // Q22 2026: which way is north (Chiba outlined; the arrows are drawn by axis.py)
+  { name: 'q22-2026-top', scenario: 'year-2026', marks: [{ ids: ['chiba'], label: 'Chiba', opts: { color: '#1f6fff', height: 6, width: 0.2 } }], cam: { top: 96, centre: [12, 0, -4] } },
+  { name: 'q22-2026-eye', scenario: 'year-2026', marks: [{ ids: ['chiba'], label: 'Chiba', opts: { color: '#1f6fff', height: 6, width: 0.07 } }], cam: { eye: [34, 3.5, 30], look: [0, 3, 0] } },
 ];
 
 type Hook = {

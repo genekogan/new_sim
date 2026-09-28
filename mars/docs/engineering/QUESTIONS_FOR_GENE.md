@@ -23,7 +23,7 @@ Everything on screen is the engine's reconstruction. The Kit is the procedural y
 `app/history/**`. The year build is a HYPOTHETICAL order, run in a fork of the protected `mars-<year>`
 state.
 
-Status: **14 open blocks** (Q1, Q2, Q4–Q14 and Q19; two pairs were duplicates and are merged) and **3 answered** (A3 north, §13 reach-down, §14 top beams).
+Status: **17 open blocks** (Q1, Q2, Q4–Q14, Q19 and W44's site-axis Q20–Q22; two pairs were duplicates and are merged) and **3 answered** (A3 north, §13 reach-down, §14 top beams).
 
 **Gene's page.** `questions/index.html` shows every open block as a card Gene can read and answer (plain question,
 pictures, options, export button); it is served at `/questions/` after a deploy. It is generated from this file:
@@ -201,6 +201,119 @@ datum). The intrinsic lifts (tables +0.10, crates +0.22, benches +0.05) are sepa
 **What the answer changes.** One datum for build takes and the studio. The studio's 16 cm offset disappears.
 Re-basing moves every year-build pin once (first bay, whole skeleton, A+B `ddb634d6…`), and the takes are
 re-recorded.
+
+Gene:
+
+---
+
+## Site axis per year (A3 follow-ups, W44)
+
+W42 checked every year's scene against drone stills with a logged camera heading (A3's table). Two years show
+layouts that no rotation can fix (2022 mirrored, 2024 kitchen / trailer ring on the other side of Chiba), and
+2026 needs its own bearing. The pictures put the model's top-down capture (screen up = world −Z) next to the
+still turned north-up. They are drawn by `questions/tools/axis.py` from the captures `q20/q21/q22-*-top.jpg`
+(`e2e/questions-captures.spec.ts`) and the stills copied into `questions/photos/`.
+
+### Q20. 2022: is the model's layout a mirror image of the real one?
+
+```question
+id: Q20
+urgency: first
+order: 5
+plain: The model's four 2022 houses spin one way (counter-clockwise from above); the drone photo shows them spinning the other way. Which is right — or is the model's map flipped left-to-right?
+terms:
+  - north-up | A photo turned so that north points to the top of the page.
+context: In the model each house sticks out past the end of the next one like the blades of a pinwheel, and seen from above that pinwheel turns counter-clockwise. In the 2022 drone photo (turned north-up from the heading the drone logged) the same four houses overlap the other way round, so it turns clockwise: that is a mirror image, which no turning of the map can fix.
+changes: If the photo is right, the 2022 layout is redrawn as its mirror image and the 2022 building replay is recorded again on it; if the model is right, nothing changes.
+options:
+  - The photo is right: flip the model (if you can, say below which house is which in the photo)
+  - The model is right: the houses really turned counter-clockwise
+  - Not sure
+images:
+  - questions/q20-2022-model-vs-drone.jpg | Left: the model from above, north (as its house names have it) up; it turns counter-clockwise. Right: drone photo DJI_0829, 2022, turned north-up; the same four houses turn clockwise.
+  - questions/q20-2022-eye.jpg | The model's 2022 courtyard from the south-east, with the four houses named.
+  - questions/photos/2022-DJI_0829.jpg | The drone photo as taken (the top of the frame faces east-south-east).
+```
+
+**What the engine sees.** `app/history/scenes.ts` draws the 2022 Kit with Chiba north (z −10.9 … −6.2, offset
+toward −X), the east house at +X (offset toward −Z), the kitchen south (offset toward +X) and the west house at −X
+(offset toward +Z): a counter-clockwise pinwheel seen from +Y. DJI_0829 (FlightYaw 110.2°, pitch −86.4°, rotated
+north-up by −110.2°; the afternoon shadows fall north-east, as they must in February) shows the four buildings
+overlapping clockwise. Handedness is rotation-invariant, so no `NORTH_AZIMUTH_OFFSET` fixes it (A3; W42).
+
+**What the answer changes.** A reconstruction edit: the 2022 scene is mirrored in `scenes.ts` (either
+X → −X or Z → −Z; which one depends on which photo building is which), `mars-2022` is re-seeded with a
+`reconstruction-edit` cause and every moved id is aliased in `id-migration.json` (HISTORY_IDS.md). The east-house
+year build (first bay, whole skeleton, A+B `ddb634d6…`) and its 7 chapter takes are re-planned and re-recorded, so
+their pins move once. Q1 (the south-west corner table) is re-read on the mirrored plan. If the model is right,
+nothing changes and A3's 2022 row becomes "mirror checked: model right".
+
+Gene:
+
+### Q21. 2024: were the kitchen and the trailer ring north or south of Chiba?
+
+```question
+id: Q21
+urgency: first
+order: 6
+plain: In 2024, did the kitchen and the ring of trailers sit north of Chiba, as the drone photo shows, or south of it, as the model has them?
+terms:
+  - north-up | A photo turned so that north points to the top of the page.
+context: The model's 2024 drawing puts Chiba at the north end, with the ring of trailers and the kitchen spread out to its south. The one straight-down drone photo from that winter, turned north-up by the old tire ring (which runs north–south on the west side of the site), shows Chiba at the south end with the ring and the kitchen to its north.
+changes: If the photo is right, the kitchen and all the trailers move to Chiba's other side (Chiba itself stays), which also clears the two trailers now standing under Chiba's roof; if the model is right, nothing changes.
+options:
+  - The photo is right: kitchen and trailers were north of Chiba (move them)
+  - The model is right: they were south of Chiba
+  - Not sure
+images:
+  - questions/q21-2024-model-vs-drone.jpg | Left: the model from above, north up: Chiba (blue) at the top, the trailer ring (red) and the kitchen (orange) below it. Right: the drone photo of 22 January 2024, north-up: Chiba at the bottom, the kitchen and the ring above it.
+  - questions/q21-2024-eye.jpg | The model's 2024 camp seen from the west: Chiba on the left (north), the kitchen on the right (south), the trailers between them.
+```
+
+**What the engine sees.** The 2024 Kit puts Chiba at z −5.5 … 9.2, the kitchen at z 35 … 47 and the 18 trailers
+(`rv-1` … `rv-18`) on a circle between them, all on Chiba's +Z side. DJI_20240122144543_0335_D (nadir, north-up by
+the 2020 tire ring on the west edge) has the big building with the solarium (Chiba, W42's `d2024_chiba` crop) at
+the south and the long kitchen with the solar panels at the north, the ring between. Chiba alone fits −Z = north
+(A3, "medium-high").
+
+**What the answer changes.** A reconstruction edit in `scenes.ts`: the kitchen, kitchen-interior, cafe and the
+trailer circle mirror across Chiba (z → −z about Chiba's centre, or the circle is re-centred north of it);
+`mars-2024` re-seeded, ids aliased. It also answers Q2 for 2024: rv-9 / rv-10 no longer stand under the roof.
+Coordinate with W43's 2024 Chiba facade edit (same file). If the model is right, nothing changes.
+
+Gene:
+
+### Q22. Which way is north in 2026 (and in each year)?
+
+```question
+id: Q22
+urgency: first
+order: 7
+plain: Your 2020 answer set one north for every year, but the 2026 model is turned about 33° from what the 2026 drone photos show. Should 2026 use the drones' north?
+terms:
+  - north-up | A photo turned so that north points to the top of the page.
+context: The tire ring running north–south fixed north exactly for 2020, and the model now uses that one north for every year. The 2026 model was drawn separately, and next to two 2026 drone photos turned north-up it sits about 33° off (Chiba's long side, the container row and the trailer arc all agree), so the 2026 sun, shadows and sunset shots are off by that much.
+changes: The sun, the shadows and the sunset camera shots for that year turn; nothing is rebuilt.
+options:
+  - Use the drones' north for 2026 (turn only the sun and shadows for that year)
+  - Use each year's own north wherever a drone photo shows it
+  - Keep one north for all years
+  - Not sure
+images:
+  - questions/q22-2026-model-vs-drone.jpg | Left: the 2026 model from above. Grey: north as the model uses it now. Red: north from the drone photos, about 33° round. Right: drone photo DJI_0005, 2026, turned north-up: turn the left picture until the red arrow points up and the two match.
+  - questions/q3-2026-cad-vs-drone-north-up.jpg | The earlier comparison: the model's 2026 plan and two drone photos (DJI_0098, DJI_0005), each turned north-up.
+  - questions/q22-2026-eye.jpg | The model's Chiba, 2026, at eye height; its shadows and the sunset shots around it are what would turn.
+```
+
+**What the engine sees.** One global `NORTH_AZIMUTH_OFFSET = −90` (`engine/env/sun.ts`, world −X north), exact for
+2020 (DJI_0079). For the 2026 CAD, DJI_0005 (FlightYaw −91.7°, near-nadir, 2026-03-19 14:31, rotated north-up by
++91.7°) and DJI_0098 (nadir) put north at −X turned ~33° toward −Z (offset ≈ −57° ± 8°; A3 table). 2025 fits 0°
+(±20°); 2021 and 2023 are unverified.
+
+**What the answer changes.** A per-year bearing (e.g. `northOffset(year)` beside the constant). Only `camera/` and
+`api/` read `env/sun.ts`, and `physicalView()` excludes env, so no construction pin moves; the sun, shadows,
+studio lighting and "sunset behind" camera windows for that year rotate, and directed tracks for that year
+re-plan. CAMPUS_SCENE.md's "North" note follows the answer.
 
 Gene:
 

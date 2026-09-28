@@ -1080,3 +1080,30 @@ Then: gate → release 5; HANDOFF refresh.
 - **W42 landed** `ece387d`, `a109499` (≈450k tokens incl. a subagent, 110 min; merged `50e805d`): `NORTH_AZIMUTH_OFFSET = −90` (world −X north) from DJI_0079 EXIF 2020-03-04 10:10:34 PST, yaw +99.4°, sun az 143° / el 43° → shadows NW behind-left of an east-facing camera, holds ±1 h; import-graph test proves only `camera/`/`api/` see `env/sun.ts`; 5 pins + year-build pins unchanged; camera fixtures derive bearings from the constant (no tolerance loosened); 19 studio baselines refreshed (shadows rotated, inspected). **Years don't share the frame:** 2026 CAD ≈ −57° (33° still off), 2025 −Z (±20°), 2024 Chiba fits −Z but kitchen + RV ring on the wrong side, **2022 mirrored** (pinwheel turns the other way), 2021/2023 unverified. Tires: ring floated 17.5 cm (6-sided tube) → seated on ground/tarp/roof (73 ids aliased in `id-migration.json`, campus-2020.json regenerated); eye-level baseline `studio-2020-ring-edge` inspected. Props survey: 2020 RVs/toilets/workshop table + Kit tables (+0.26: 0.16 datum + legs at y 0.1), benches, crates, fridge, cafe counter, trailer wheels still float — Q4 + a Kit bug. Q3 → answered (A3). Lead review: accepted. Follow-ups: per-year bearing + the 2022 mirror / 2024 side as reconstruction edits → cards for Gene (W44); Kit prop datum fixes after W43 releases scenes.ts.
 - W44 spawned (docs): Q20 (2022 mirror), Q21 (2024 kitchen/RV side), Q22 (2026 bearing) cards with annotated captures; STUDIO_REPLAY moments, YEAR_BUILD camera table, CAMPUS_SCENE north note.
 - 16:10 EDT: all four `codex/*` branches carry REPORT files (+2 commits each). W45 spawned (merge worker): tooling → camera-nl-parse → 2026-frame-grouping → fire-v2-render-polish, each re-gated on `w45-codex-merge` (engine, tsc, unit, 5 pins, own specs; lint only if green; fire baseline drift inspected), then a full gate; lead fast-forwards. In flight: W38, W43, W44, W45.
+
+## 2026-09-28 — W44: site-axis cards for Gene (Q20–Q22) + doc touch-ups
+- **Three `first` cards** (QUESTIONS_FOR_GENE.md, new section "Site axis per year", orders 5–7), from W42's A3 table:
+  - **Q20 2022 mirrored:** "The model's four 2022 houses spin one way (counter-clockwise from above); the drone photo
+    shows them spinning the other way. Which is right — or is the model's map flipped left-to-right?"
+  - **Q21 2024 side:** "In 2024, did the kitchen and the ring of trailers sit north of Chiba, as the drone photo shows,
+    or south of it, as the model has them?" (answering "photo" also settles Q2 for 2024).
+  - **Q22 2026 north:** "Your 2020 answer set one north for every year, but the 2026 model is turned about 33° from what
+    the 2026 drone photos show. Should 2026 use the drones' north?" (+ "each year's own north" option).
+- **Pictures:** 6 new outlined + labelled lab captures (`e2e/questions-captures.spec.ts`, additive shots
+  `q20-2022-{top,eye}`, `q21-2024-{top,eye}`, `q22-2026-{top,eye}`) and 3 side-by-sides drawn by the new
+  `questions/tools/axis.py`: model top-down next to the drone still turned north-up from its logged heading, a north
+  arrow on each side — `q20-2022-model-vs-drone.jpg` (DJI_0829 rotated −110.2°; spin arrows: model counter-clockwise,
+  photo clockwise), `q21-2024-model-vs-drone.jpg` (DJI_20240122144543_0335_D, north-up by the tire ring; Chiba /
+  kitchen / trailer ring labelled on both), `q22-2026-model-vs-drone.jpg` (grey = north the engine uses now, −X; red =
+  drone north, −X turned 33° toward −Z; DJI_0005 rotated +91.7°). Stills copied from W42's scratch into
+  `questions/photos/` (`2022-DJI_0829`, `2024-DJI_20240122144543_0335_D`, `2026-DJI_0005`). All captures looked at;
+  the rotated DJI_0829 matches W42's north-up frame (afternoon shadows NE). Page regenerated: 17 open + 3 answered,
+  72 KB; `questions-html.test.mjs` 3/3.
+- **Docs:** STUDIO_REPLAY "Chapter sets" moments = first of each event + `done` (real keys from the manifest);
+  YEAR_BUILD "A+B as chapter takes" table → W39's cuts / min / mean readability / idle stretches 0 and the re-recorded
+  bytes (set 17 023 471 raw / 2 668 326 gzip), W31 camera bullet marked replaced; CAMPUS_SCENE "North = −z" → A3's
+  per-year table (−90 constant, 2026 ≈ −57°, caveat that −z is ~57° off); CAMERA.md already points at
+  `chapter-shots.ts` (no change).
+- **Weak spots:** the 2022 photo buildings are not named (which house is which decides X- vs Z-mirror; asked on the
+  card). Q21 rests on one wet-day nadir whose north comes from the tire ring, not EXIF. The eye-level 2026 capture only
+  identifies Chiba.
