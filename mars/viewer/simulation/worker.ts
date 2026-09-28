@@ -13,6 +13,7 @@ import {
 } from './shared';
 import { definitions } from './commands';
 import { EngineRoom } from './engine-room';
+import { campusYearFile } from './campus-years';
 import { registerEngineTools } from './engine-tools';
 
 const json = (data: unknown, status = 200) =>
@@ -49,7 +50,7 @@ export class MarsSimulation extends DurableObject<Env> {
   /** Engine controller ops (preview): same op registry as engine/api; state lives in engine_blobs. */
   engineCall(op: string, args: unknown, year = 2026) {
     this.selectYear(year);
-    this.engineRoom ??= new EngineRoom(this.ctx.storage);
+    this.engineRoom ??= new EngineRoom(this.ctx.storage, {}, campusYearFile);
     return this.engineRoom.call(year, op, args);
   }
   private year = 2026;

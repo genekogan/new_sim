@@ -5,6 +5,7 @@
 // regions and a campfire + benches so the social verbs (gather, take_slot,
 // campfire_circle, ambient_wander) have targets over MCP.
 import { WorldHistory } from '../history/store.ts';
+import { campusYearId, HISTORY_YEARS, publishCampusYear, sceneFromYearFile, type CampusYearFile } from '../campus/history.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { carryCorridors } from '../carry/scenes.ts';
 import type { SpatialScene } from '../spatial/types.ts';
@@ -68,9 +69,32 @@ export function carryYardWorld(): WorldState {
   );
 }
 
-export function seedHistory(rulesVersion = ENGINE_RULES_VERSION): WorldHistory {
+/**
+ * A room's seed history: the synthetic proving ground and carry yard, plus — for a historical
+ * year room (2020–2025) given that year's generated scene file — protected canonical
+ * `mars-<year>` (static campus + regions, no people, finite inventory; fork it, then
+ * engine_edit_world with inventory 'unlimited' to add people/materials).
+ */
+export function seedHistory(rulesVersion = ENGINE_RULES_VERSION, campus?: { year: number; file: CampusYearFile }): WorldHistory {
   const h = new WorldHistory(rulesVersion);
   h.publishCanonical('proving-ground', 'Proving ground (canonical, synthetic)', provingGroundWorld(), 'engine preview seed');
   h.publishCanonical('carry-yard', 'Carry corridors (canonical, synthetic)', carryYardWorld(), 'engine preview seed');
+  if (campus) publishCampusYear(h, campus.year, campus.file);
   return h;
+}
+
+/** Years whose rooms also seed a canonical campus scene (`mars-<year>`). 2026 rooms stay synthetic-only. */
+export const CAMPUS_SEED_YEARS: readonly number[] = HISTORY_YEARS;
+
+/** Static scenes a room needs: the synthetic ones, plus `mars-<year>` when a year file is given. */
+export function roomScenes(campus?: { year: number; file: CampusYearFile }): Record<string, SpatialScene> {
+  if (!campus) return ENGINE_SCENES;
+  return { ...ENGINE_SCENES, [campusYearId(campus.year)]: sceneFromYearFile(campus.year, campus.file) as unknown as SpatialScene };
+}
+
+/** Add canonical `mars-<year>` to a room history seeded before campus years existed. Returns whether it did. */
+export function ensureCampusYear(h: WorldHistory, campus: { year: number; file: CampusYearFile }): boolean {
+  if (h.workspaces.has(campusYearId(campus.year))) return false;
+  publishCampusYear(h, campus.year, campus.file);
+  return true;
 }

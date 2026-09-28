@@ -15,13 +15,17 @@
 // cap evicts the oldest ones no checkpoint's `simulation-run` cause references (take + its camera
 // tracks, or plan); if every stored one is referenced the whole call is refused with
 // `room.storage-full` (nothing persisted, in-memory state reloaded) — continue in a new room.
+// Year rooms 2020–2025 also seed protected canonical `mars-<year>` from that year's generated
+// campus scene (the `campusFile` loader: bundled JSON in the Worker, loadCampusFile in Node); a
+// room seeded before that gets it added on first load. 2026 rooms stay synthetic-only.
 // Loaded lazily: the index on the first engine call, states/takes/plans/cameras on use.
 // An old-format history blob (states inline) is migrated on first load: each state
 // becomes its own blob and the index is rewritten without them (review M5).
 // Rehearsal runs on a private clone inside the controller and never touches the
 // room head; it stores nothing unless called with `keep: true`. Nothing here uses
 // engine time (wall-clock is metadata only).
-import { createController, ENGINE_RULES_VERSION, ENGINE_SCENES, seedHistory, type EngineController, type OpResult, type StoredPlan } from '../engine/api/index.ts';
+import { CAMPUS_SEED_YEARS, createController, ENGINE_RULES_VERSION, ensureCampusYear, roomScenes, seedHistory, type EngineController, type OpResult, type StoredPlan } from '../engine/api/index.ts';
+import type { CampusYearFile } from '../engine/campus/history.ts';
 import { WorldHistory, type HistoryJSON } from '../engine/history/store.ts';
 import type { WorldState } from '../engine/world/types.ts';
 import type { CameraTrack, Take } from '../engine/take/types.ts';
@@ -38,9 +42,11 @@ export class EngineRoom {
   private storage: DurableObjectStorage;
   private controllers = new Map<number, EngineController>();
   private limits: { plans: number; takes: number };
+  private campusFile: (year: number) => CampusYearFile | undefined;
 
-  constructor(storage: DurableObjectStorage, limits: { plans?: number; takes?: number } = {}) {
+  constructor(storage: DurableObjectStorage, limits: { plans?: number; takes?: number } = {}, campusFile: (year: number) => CampusYearFile | undefined = () => undefined) {
     this.storage = storage;
+    this.campusFile = campusFile;
     this.limits = { plans: limits.plans ?? MAX_PLANS, takes: limits.takes ?? MAX_TAKES };
     storage.sql.exec('CREATE TABLE IF NOT EXISTS engine_blobs (key TEXT NOT NULL, chunk INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (key, chunk))');
   }
@@ -71,7 +77,9 @@ export class EngineRoom {
     const t0 = performance.now();
     const p = `y${year}/`;
     const saved = this.readJSON<HistoryJSON>(`${p}history`);
-    const history = saved ? WorldHistory.fromJSON(saved) : seedHistory();
+    const file = CAMPUS_SEED_YEARS.includes(year) ? this.campusFile(year) : undefined;
+    const campus = file ? { year, file } : undefined;
+    const history = saved ? WorldHistory.fromJSON(saved) : seedHistory(undefined, campus);
     // a rules change makes every plan bound under the old rules stale (checkPlan)
     history.rulesVersion = ENGINE_RULES_VERSION;
     // states written by an op wait here until call() commits them with the index in one transaction
@@ -84,11 +92,12 @@ export class EngineRoom {
         get: (h) => pending.get(h) ?? this.readJSON<WorldState>(`${p}state/${h}`),
         put: (h, s) => void pending.set(h, s),
       });
-      if (fresh) this.flush(year, history);
+      const added = !!saved && !!campus && ensureCampusYear(history, campus);
+      if (fresh || added) this.flush(year, history);
     });
     const ctl = createController({
       history,
-      scenes: ENGINE_SCENES,
+      scenes: roomScenes(campus),
       store: {
         loadTake: (id) => this.readJSON<Take>(`${p}take/${id}`),
         loadPlan: (id) => this.readJSON<StoredPlan>(`${p}plan/${id}`),

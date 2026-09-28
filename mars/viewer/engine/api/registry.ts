@@ -36,7 +36,9 @@ export function servicesFor(scenes: Record<string, SpatialScene>) {
   return (world: WorldState) => {
     const scene = scenes[world.base.campus];
     if (!scene) throw new Error(`no spatial scene registered for campus "${world.base.campus}"`);
-    return { spatial: new Spatial(scene, { contributors: [progressiveContributor] }) };
+    // campus scenes (mars-<year>) are identified by their file's content hash (world.base.staticHash)
+    const baseId = (scene as SpatialScene & { meta?: { contentHash?: string } }).meta?.contentHash;
+    return { spatial: new Spatial(scene, { contributors: [progressiveContributor], ...(baseId ? { baseId } : {}) }) };
   };
 }
 

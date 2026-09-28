@@ -395,6 +395,36 @@ const st = refused('execute A (stale)', await ecall('engine_execute', { plan_id:
 assert.deepEqual(st.diff.changed, [{ id: 's1', fields: ['pose'] }]);
 assert.match(st.message, /s1 changed \(pose\)/);
 assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, headB, 'a stale plan never commits');
+// ---- historical year room (2022): canonical mars-2022 seeded from public/engine/campus-2022.json ----
+{
+  const c22 = new Client({ name: 'mars-verification-2022', version: '1.0.0' });
+  await c22.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp?year=2022`), { requestInit: { headers } }));
+  const y = async (name, args) => {
+    const t0 = performance.now();
+    const r = await c22.callTool({ name, arguments: args });
+    const body = JSON.parse(r.content[0].text);
+    body._wallMs = performance.now() - t0;
+    return { isError: !!r.isError, body };
+  };
+  const spaces = ok('2022 workspaces', await y('engine_query_world', {})).workspaces;
+  assert.deepEqual(spaces.map((w) => w.id).sort(), ['carry-yard', 'mars-2022', 'proving-ground']);
+  assert.ok(spaces.find((w) => w.id === 'mars-2022').protected);
+  const q22 = ok('2022 regions', await y('engine_query_world', { workspace: 'mars-2022', include: ['regions'] }));
+  for (const r of ['chiba', 'kitchen']) assert.ok(q22.regions.some((g) => g.id === r), `2022 region ${r}`);
+  const bb = (id) => {
+    const pts = q22.regions.find((g) => g.id === id).polygon;
+    return { x0: Math.min(...pts.map((p) => p[0])), x1: Math.max(...pts.map((p) => p[0])), z0: Math.min(...pts.map((p) => p[1])), z1: Math.max(...pts.map((p) => p[1])) };
+  };
+  const n = bb('chiba'), k = bb('kitchen');
+  const a = [(n.x0 + n.x1) / 2, n.z0 - 3], b = [(k.x0 + k.x1) / 2, k.z1 + 3];
+  ok('2022 fork', await y('engine_fork', { from: 'mars-2022', name: 'court', inventory: 'unlimited' }));
+  ok('2022 spawn walker', await y('engine_edit_world', { workspace: 'court', note: 'a walker north of chiba', edits: [{ op: 'spawn', id: 'w1', def: 'human', pose: { p: [a[0], 0, a[1]], yaw: 0 } }] }));
+  const cp = ok('2022 bind', await y('engine_bind_plan', { template: walkPlan('court-walk', b[0], b[1]), bindings: { a: 'w1' }, workspace: 'court' }));
+  const cr = ok('2022 rehearse courtyard walk', await y('engine_rehearse', { plan_id: cp.plan_id }));
+  assert.ok(cr.report.metrics.pathLength > Math.hypot(b[0] - a[0], b[1] - a[1]) + 0.5, 'the walk detours around the courtyard buildings');
+  refused('2022 execute canonical', await y('engine_execute', { plan_id: cp.plan_id, workspace: 'mars-2022' }), 'workspace.protected');
+  await c22.close();
+}
 console.log(`ENGINE ISOLATION (wall ms / in-DO ms): ${T.join('; ')}`);
 console.log('PASS: §28 replay isolation (view fetches + camera track leave heads/logs/poses/bytes unchanged; view capability refused MCP/commands; rooms isolated), fork isolation, plan invalidation (stale diff names s1; camera tracks do not stale) through the DO room.');
 await writeFile(

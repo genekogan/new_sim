@@ -646,3 +646,43 @@ test('api: seeds carry regions and a campfire + benches, so social verbs have ta
   // the fixtures in yard B2 keep the beam delivery along corridor A feasible
   assert.ok((c.call('query_world', { workspace: 'cy', carry: { crew: ['p1', 'p2'], item: 'b1', to: { x: 18, z: 11, yaw: Math.PI / 2 } } }) as any).carry.ok);
 });
+
+test('api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 rooms unchanged', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const { loadCampusFile } = await import('../campus/history-node.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage, {}, loadCampusFile);
+  const ws = (year: number) => (room.call(year, 'query_world', {}) as any).workspaces.map((w: any) => w.id).sort();
+  assert.deepEqual(ws(2026), ['carry-yard', 'proving-ground'], '2026 room behaviour unchanged');
+  assert.deepEqual(ws(2022), ['carry-yard', 'mars-2022', 'proving-ground']);
+  const q = room.call(2022, 'query_world', { workspace: 'mars-2022', include: ['regions'] }) as any;
+  assert.equal(q.protected, true);
+  assert.equal(q.entityCount, 0, 'canonical year: no people, no inventory');
+  const ids = q.regions.map((r: any) => r.id);
+  for (const id of ['chiba', 'kitchen']) assert.ok(ids.includes(id), id);
+  const bbox = (id: string) => {
+    const pts = q.regions.find((r: any) => r.id === id).polygon;
+    return { x0: Math.min(...pts.map((p: any) => p[0])), x1: Math.max(...pts.map((p: any) => p[0])), z0: Math.min(...pts.map((p: any) => p[1])), z1: Math.max(...pts.map((p: any) => p[1])) };
+  };
+  const n = bbox('chiba'), k = bbox('kitchen');
+  const a = [(n.x0 + n.x1) / 2, n.z0 - 3], b = [(k.x0 + k.x1) / 2, k.z1 + 3];
+  assert.ok((room.call(2022, 'fork', { from: 'mars-2022', name: 'court', inventory: 'unlimited' }) as any).ok);
+  const sp = room.call(2022, 'edit_world', { workspace: 'court', note: 'a walker north of chiba', edits: [{ op: 'spawn', id: 'w1', def: 'human', pose: { p: [a[0], 0, a[1]], yaw: 0 } }] }) as any;
+  assert.ok(sp.ok, JSON.stringify(sp));
+  const plan = room.call(2022, 'bind_plan', { template: walkPlan('court-walk', b[0], b[1]), bindings: { a: 'w1' }, workspace: 'court' }) as any;
+  const reh = room.call(2022, 'rehearse', { plan_id: plan.plan_id }) as any;
+  assert.ok(reh.ok, JSON.stringify(reh.report?.steps));
+  assert.ok(reh.report.metrics.pathLength > Math.hypot(b[0] - a[0], b[1] - a[1]) + 0.5, 'the walk detours around the courtyard buildings');
+  assert.equal((room.call(2022, 'execute', { plan_id: plan.plan_id, workspace: 'mars-2022' }) as any).code, 'workspace.protected');
+  assert.equal((room.call(2022, 'edit_world', { workspace: 'mars-2022', note: 'x', edits: [{ op: 'remove', id: 'w1' }] }) as any).code, 'workspace.protected');
+  assert.ok((room.call(2022, 'execute', { plan_id: plan.plan_id, workspace: 'court' }) as any).ok);
+  // a 2023 room seeded before campus years existed gets canonical mars-2023 on its next load, keeping its work
+  const old = sqliteStorage();
+  const before = new EngineRoom(old.storage);
+  assert.ok((before.call(2023, 'fork', { from: 'proving-ground', name: 'mine' }) as any).ok);
+  assert.deepEqual((before.call(2023, 'query_world', {}) as any).workspaces.map((w: any) => w.id).sort(), ['carry-yard', 'mine', 'proving-ground']);
+  const after = new EngineRoom(old.storage, {}, loadCampusFile);
+  assert.deepEqual((after.call(2023, 'query_world', {}) as any).workspaces.map((w: any) => w.id).sort(), ['carry-yard', 'mars-2023', 'mine', 'proving-ground']);
+  const reload = new EngineRoom(old.storage, {}, loadCampusFile);
+  assert.equal((reload.call(2023, 'log', { workspace: 'mars-2023' }) as any).checkpoints.length, 1, 'persisted once');
+});
