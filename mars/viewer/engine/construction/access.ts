@@ -273,7 +273,7 @@ export const LIFT_PACE = 1.0; // m/s: pace of a multi-segment lift (the straight
 /** floor: height of the floor the lifting crew stands on (lift-over apex rule; default: where the part lies). */
 export type SweepOpts = { ignore: string[]; liftOver?: boolean; what?: string; floor?: number };
 export type LiftPath = { poses: Pose[]; via: 'straight' | 'lift-over' };
-type Hit = { o: Obstacle; q: Pose };
+export type Hit = { o: Obstacle; q: Pose };
 
 const partExtent = (e: Entity) => Math.hypot(...def(e.def).size) / 2;
 
@@ -335,6 +335,11 @@ function pathHit(sp: Spatial, e: Entity, ps: Pose[], skip: Set<string>): Hit | n
     if (h) return h;
   }
   return null;
+}
+
+/** First obstacle the part's box meets along the pose polyline `ps` (except itself and `ignore`), or null. */
+export function sweepPoses(rt: Runtime, e: Entity, ps: Pose[], ignore: string[]): Hit | null {
+  return pathHit(spatialOf(rt), e, ps, new Set(ignore));
 }
 
 /**

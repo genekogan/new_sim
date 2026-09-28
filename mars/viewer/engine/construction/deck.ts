@@ -21,6 +21,7 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { beamLinks, isBeam, isStanding, isSupported, isUpright, snapSeat } from './rules.ts';
+import { aloftCheck, fastenStep, isAloft } from './aloft.ts';
 import {
   approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, liftStep, releaseCrew, spatialOf, stagedCheck, stationFloor, sweptLiftPath, symmetricYaw,
   type Fail, type LiftExec, type Station, type SweepOpts,
@@ -86,7 +87,7 @@ export function supportProblems(w: WorldState, e: Entity, depth = 0): string[] {
 // ---------------------------------------------------------------- install_joist
 
 type JP = { crew: string[]; joist: string; bay: { a: string; b: string }; height: number; at: number };
-type JProg = { to: Pose; beams: [string, string]; stations: Station[]; height: number; sweep: SweepOpts };
+type JProg = { to: Pose; beams: [string, string]; stations: Station[]; height: number; sweep: SweepOpts; aloft?: true };
 
 export function planJoist(rt: Runtime, p: JP): { ok: true; program: JProg } | Fail {
   const w = rt.world;
@@ -120,6 +121,15 @@ export function planJoist(rt: Runtime, p: JP): { ok: true; program: JProg } | Fa
       return fail('joist.occupied', `joist ${o.id} already sits at ${f2(p.at)} m in bay ${a.id}–${b.id}`, [j.id, o.id]);
   const y = Math.max(...beams.map((id) => memberTop(w.entities[id])));
   const c: Vec2 = [pa[0] + n[0] * p.at, pa[1] + n[1] * p.at];
+  if (isAloft(j)) {
+    // handed up and laid in place (handup.ts): the crew up there fastens it, nobody lifts it again
+    const cc = crewCheck(rt, p.crew, 1, 2, `fastening a ${def(j.def).label}`);
+    if (cc) return cc;
+    const toA: Pose = { p: [c[0], y, c[1]], yaw: symmetricYaw(j.pose.yaw, a.pose.yaw) };
+    const al = aloftCheck(rt, j, toA, p.crew, 'joist.not-staged');
+    if (al) return al;
+    return { ok: true, program: { to: toA, beams, stations: [], height: h, sweep: { ignore: [] }, aloft: true } };
+  }
   const staged = stagedCheck(j, c, 'joist.not-staged');
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 1, 2, `setting a ${def(j.def).label}`);
@@ -156,6 +166,10 @@ export const installJoist: ActionDef<JP, JProg, JExec> = {
     return { p, prog, id, crew: p.crew, item: p.joist, phase: 'approach', t: 0, from, to: prog.to, duration: 2.0 };
   },
   step(rt, ex, dt) {
+    if (ex.prog.aloft) {
+      const r = fastenStep(rt, ex, dt);
+      if (r) return r;
+    } else {
     if (ex.phase === 'approach') {
       const s = approach(rt, ex, ex.prog.stations, 'joist.station-unreachable');
       if (s === 'running') return { status: 'running', phase: 'approach' };
@@ -170,6 +184,7 @@ export const installJoist: ActionDef<JP, JProg, JExec> = {
     }
     const ls = liftStep(rt, ex, dt);
     if (ls !== true) return ls ? { status: 'blocked', diagnostic: ls } : { status: 'running', phase: 'place' };
+    }
     const j = rt.world.entities[ex.item];
     j.phase = 'installed';
     j.support = { kind: 'resting-on', on: ex.prog.beams[0] };
@@ -180,6 +195,7 @@ export const installJoist: ActionDef<JP, JProg, JExec> = {
   cancel(rt, ex) {
     const r = cancelLift(rt, ex, 'joist.cancel-unsafe');
     if (r.ok) rt.world.entities[ex.item].phase = 'staged';
+    if (r.ok && ex.prog.aloft) releaseCrew(rt, ex.crew);
     return r;
   },
 };
@@ -187,7 +203,7 @@ export const installJoist: ActionDef<JP, JProg, JExec> = {
 // ---------------------------------------------------------------- install_plywood
 
 type PP = { crew: string[]; sheet: string; x: number; z: number; yaw: number; height?: number };
-type PProg = { to: Pose; supports: string[]; stations: Station[]; sweep: SweepOpts };
+type PProg = { to: Pose; supports: string[]; stations: Station[]; sweep: SweepOpts; aloft?: true };
 
 /** Support analysis for a sheet footprint (used by install and by tests/diagnostics). */
 export function sheetSupports(w: WorldState, sheet: Entity, obb: OBB2, height?: number): { ok: true; y: number; supports: string[] } | Fail {
@@ -238,6 +254,15 @@ export function planPlywood(rt: Runtime, p: PP): { ok: true; program: PProg } | 
   for (const o of Object.values(w.entities))
     if (isPlywood(o) && o.id !== sh.id && o.phase === 'installed' && Math.abs(memberTop(o) - top) < 0.05 && obbOverlap(obb, flatObb(o.pose, o), -0.01))
       return fail('plywood.overlap', `${sh.id} would overlap installed sheet ${o.id}`, [sh.id, o.id]);
+  if (isAloft(sh)) {
+    // handed up and laid in place (handup.ts): the two up there fasten it
+    const cc = crewCheck(rt, p.crew, 2, 2, `fastening a ${def(sh.def).label}`);
+    if (cc) return cc;
+    const toA: Pose = { p: [p.x, s.y, p.z], yaw: symmetricYaw(sh.pose.yaw, p.yaw) };
+    const al = aloftCheck(rt, sh, toA, p.crew, 'plywood.not-staged');
+    if (al) return al;
+    return { ok: true, program: { to: toA, supports: s.supports, stations: [], sweep: { ignore: [] }, aloft: true } };
+  }
   const staged = stagedCheck(sh, obb.c, 'plywood.not-staged');
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 2, 2, `setting a ${def(sh.def).label}`);
@@ -273,6 +298,10 @@ export const installPlywood: ActionDef<PP, PProg, PExec> = {
     return { p, prog, id, crew: p.crew, item: p.sheet, phase: 'approach', t: 0, from: rt.world.entities[p.sheet].pose, to: prog.to, duration: 3.0 };
   },
   step(rt, ex, dt) {
+    if (ex.prog.aloft) {
+      const r = fastenStep(rt, ex, dt);
+      if (r) return r;
+    } else {
     if (ex.phase === 'approach') {
       const s = approach(rt, ex, ex.prog.stations, 'plywood.station-unreachable');
       if (s === 'running') return { status: 'running', phase: 'approach' };
@@ -286,6 +315,7 @@ export const installPlywood: ActionDef<PP, PProg, PExec> = {
     }
     const ls = liftStep(rt, ex, dt);
     if (ls !== true) return ls ? { status: 'blocked', diagnostic: ls } : { status: 'running', phase: 'place' };
+    }
     const sh = rt.world.entities[ex.item];
     sh.phase = 'installed';
     sh.support = { kind: 'resting-on', on: ex.prog.supports[0] };
@@ -297,6 +327,7 @@ export const installPlywood: ActionDef<PP, PProg, PExec> = {
   cancel(rt, ex) {
     const r = cancelLift(rt, ex, 'plywood.cancel-unsafe');
     if (r.ok) rt.world.entities[ex.item].phase = 'staged';
+    if (r.ok && ex.prog.aloft) releaseCrew(rt, ex.crew);
     return r;
   },
 };
