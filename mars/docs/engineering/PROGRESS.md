@@ -1329,3 +1329,5 @@ Then: gate → release 5; HANDOFF refresh.
   `solar-paint` pv2 is rolled 20° with its x ∥ the rails and its origin unlifted, so its low edge sinks 0.34 m into
   the ground (the engine's `tiltedPose` would pitch it and lift it span/2·sin); `app/lab/solar-paint.ts` header and
   description still say textures are hashed stripes.
+- **W50 landed** `4999421`, `cb671fa`, `8ef5e39` (≈80k tokens, 40 min; merged): `panel-rail` → `solarRailMesh()`, `solarTiltLegs()` only for installed tilted modules (plumb legs under the high edge, span·sin(tilt)), `mount` view key; Kit posts use `RACK_FRAME_GREEN` from `palette.ts` (9 studio/lab baselines inspected + refreshed). 29/29 specs. Lead review: accepted. Notes: the stale stripes text is in `app/lab/solar-paint.ts` (Claude-owned lab file, not Codex's) lines 4–5/79; `scenes.ts:113` 2021 central upright still `#293c45`; lab pv2 rolled about the wrong axis, low edge 0.34 m in the ground (lab scenario fix). → fold into W53.
+- W54 spawned (engine camera perf, output-identical): `directCamera` on a chapter take takes ≈ 5.6 s on the main thread (D2: 5 367 s, 220 entities).
