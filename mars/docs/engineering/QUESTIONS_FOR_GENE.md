@@ -68,6 +68,28 @@ The year build runs on the Kit datum (y = 0). The studio draws rebuilt racks 0.1
 
 ![Finished first bay, frame feet at the Kit datum](questions/yb2022-frame-feet.png)
 
+**W42 survey (§15 "levitating tires"; measured by ray-casting down from every near-ground mesh of each built scene).**
+Every Kit piece standing on the ground floats by the datum (+0.16 m), and some props add their own lift. The 2020 ring
+tires (+0.175/0.189 m) and the ballast tires (tarp +0.13–0.19 m, container roof −0.03 m) are fixed in `studio-2020/scene.ts`.
+They now rest on the ground and on their surfaces. Everything else waits for this answer:
+
+| Scene | Prop (ids) | Gap above what it stands on | Where |
+| --- | --- | --- | --- |
+| 2020 | RV wheels `rv-1…rv-6-component-*` (4 each) | +0.089 | `studio-2020/scene.ts` makeRV (datum; not moved) |
+| 2020 | portable toilets `site-portable-toilet-body-*` (4) | +0.19 | same; the whole 2020 scene stands on y = 0 (uprights, container, trees +0.16) |
+| 2020 | workshop table legs `canopy-table-leg-*` (4) | +0.20 | same |
+| 2021–2025 | table legs `*-table-leg-*` (classroom 24, library 4, kitchens 12, chiba 8–12, cafe 4, west-house 4) | +0.26 = 0.16 datum + 0.10 (`Kit.table` legs start at y = 0.1) | `app/history/kit.ts` table() |
+| 2021–2022 | bench feet `classroom-bench-foot-*` (12), `chiba-bench-foot-*` (4) | +0.21 (datum + 0.05) | `app/history/scenes.ts` |
+| 2021–2025 | stored food crates `*-stored-food-crate-*` (12 per kitchen) | +0.38 (datum + 0.22, under the counter, no shelf) | `kit.ts` kitchen() |
+| 2021–2025 | white refrigerator `*-white-refrigerator-*` | +0.18 (datum + 0.02) | `kit.ts` kitchen() |
+| 2023–2025 | café painted counter `cafe-cafe-painted-counter-fa10f6cc` | +0.26 | `scenes.ts` |
+| 2021–2025 | trailer wheels `rv-N-trailer-wheel-*` | +0.16 (datum only) | `kit.ts` rv() |
+| 2026 studio | campfire ring (`scenery.ts`): rocks embedded 0–4 cm, lowest log +0.05 (thick end) | ≈ on the ground | studio ambience (datum −0.16, correct) |
+
+The lab (engine datum y = 0, ground at 0) and the year walk-about (ground at the file's `groundY`) draw props on their own
+ground, with no offset. Answering "ground at −0.16" would move every Kit row above by −0.16 in one place (the Kit's
+datum). The intrinsic lifts (tables +0.10, crates +0.22, benches +0.05) are separate Kit fixes.
+
 **What the answer changes.** One datum for build takes and the studio. The studio's 16 cm offset disappears.
 Re-basing moves every year-build pin once (first bay, whole skeleton, A+B `ddb634d6…`), and the takes are
 re-recorded.

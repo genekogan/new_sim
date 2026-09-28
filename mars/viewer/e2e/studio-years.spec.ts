@@ -37,6 +37,8 @@ const CORRECTIONS: { year: number; name: string; position: number[]; target: num
   { year: 2022, name: 'courtyard', position: [20, 34, 24], target: [0, 0, 0] },
   // Raked frontage: stepped PV left, salvaged glazing + eye right, mural between.
   { year: 2024, name: 'frontage', position: [0, 6.5, 30], target: [0, 3.2, 6] },
+  // Eye level (1.6 m above the −0.16 ground) inside the 2020 tire ring, looking at its east-end arc: the tires lie on the ground (§15).
+  { year: 2020, name: 'ring-edge', position: [46.5, 1.44, -4.5], target: [51, -0.1, -9] },
 ];
 
 for (const c of CORRECTIONS) {
