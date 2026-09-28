@@ -49,6 +49,14 @@ export type RouteOpts = {
    * with or without it (engine/test/walk-perf.test.ts).
    */
   proveUnreachable?: boolean;
+  /**
+   * A failure is normally explained by a second, successful search with unusable links allowed
+   * ('route.link-unusable' naming the unfinished stairs it would need). With this predicate, that
+   * search runs only if some unusable link of the scene passes it; otherwise the failure stays
+   * 'route.unreachable'. For callers that only read the named links (the walker's people-avoidance
+   * replan compares them with its obstacle ids): pass the ids they compare against.
+   */
+  explainUnusable?: (linkId: string) => boolean;
 };
 
 /** Corridor planner: coarse cell size (m) and fine-search halo around the coarse path (m). */
@@ -68,7 +76,7 @@ export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentPro
   const found = search(grids, prep, opts, null);
   if (!found) {
     const { r } = prep;
-    if (!opts.allowUnusableLinks && scene.links.some((l) => !l.usable)) {
+    if (!opts.allowUnusableLinks && scene.links.some((l) => !l.usable && (!opts.explainUnusable || opts.explainUnusable(l.id)))) {
       const alt = findRoute(grids, scene, profile, start, goal, { ...opts, allowUnusableLinks: true, planner: 'exact' });
       if (alt.ok) {
         const needed = alt.route.legs.filter((l): l is LinkLeg => l.kind === 'link' && !l.link.usable).map((l) => l.link);

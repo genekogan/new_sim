@@ -136,7 +136,7 @@ const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
  */
 let stepScope: { entities: Entity[]; discs?: LoadDiscView[] } | null = null;
 /** Pure-performance switches (PLANNING_BUDGET.md §6). Each leaves every result bit-identical; tests turn them off to prove it. */
-export const WALK_PERF = { stepSnapshot: true };
+export const WALK_PERF = { stepSnapshot: true, lazyLinkDiagnostics: true };
 const entitiesOf = (rt: Runtime): Entity[] => stepScope?.entities ?? entityList(rt);
 /** `Object.values(world.entities)`, same order (both follow OrdinaryOwnPropertyKeys), ~4× cheaper on a dictionary-mode map. */
 function entityList(rt: Runtime): Entity[] {
@@ -666,12 +666,15 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     let others = [...standingPeople(rt, a), ...loads];
     for (const b of blockers) if (!others.some((o) => o.id === b.id)) others.push(b);
     const from = { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] as Vec2 };
-    let rr = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), others);
+    // a failure's diagnostic is only read below, for subjects among `others`: an unfinished-stairs
+    // explanation (a second, successful search naming links) can matter only for a link with such an id
+    const lazy = WALK_PERF.lazyLinkDiagnostics;
+    let rr = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), others, lazy ? (id) => others.some((o) => o.id === id) : undefined);
     // (only when the failure names someone we added: a structural failure, e.g. an unfinished stair,
     // is not helped by fewer people, and a second failing search would double the cost)
     if (!rr.ok && blockers.length && (rr.diagnostic.subjects ?? []).some((id) => others.some((o) => o.id === id) && !blockers.some((b) => b.id === id))) {
       const fewer = [...blockers, ...loads];
-      const r2 = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), fewer);
+      const r2 = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), fewer, lazy ? () => false : undefined); // only r2.ok is read
       if (r2.ok) { rr = r2; others = fewer; }
     }
     ex.plannedAround = Object.fromEntries(others.map((o) => [o.id, o.p]));

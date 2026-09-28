@@ -266,11 +266,13 @@ export class Spatial {
   }
 
   /** One-off route treating standing people as temporary obstacles (a walker blocked by someone not moving). */
-  routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[]): RouteResult {
+  routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[], explainUnusable?: (linkId: string) => boolean): RouteResult {
     const run = () => {
       const { scene, grids } = this.gridsAround(world, people);
       // a people-avoidance replan fails often (walled in, a pocket cut off): prove it early (path.ts proveUnreachable)
-      return findRoute(grids, scene, profile, start, goal, this.planner === 'exact' ? { proveUnreachable: this.proveUnreachable } : { planner: this.planner, proveUnreachable: this.proveUnreachable });
+      const opts: RouteOpts = { proveUnreachable: this.proveUnreachable, explainUnusable };
+      if (this.planner !== 'exact') opts.planner = this.planner;
+      return findRoute(grids, scene, profile, start, goal, opts);
     };
     return this.prof ? this.prof.time('spatial.routeAround', run) : run();
   }

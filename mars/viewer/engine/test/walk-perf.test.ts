@@ -62,6 +62,12 @@ test('proveUnreachable: routeAround-style searches === frozen reference A*, wall
     assert.deepEqual(fast, want, `route ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
     // corridor planner: identical with and without the proof (its fallback is the exact search)
     if (i % 3 === 0) assert.deepEqual(findRoute(g, s, HUMAN_PROFILE, a, b, { planner: 'corridor', proveUnreachable: true }), findRoute(g, s, HUMAN_PROFILE, a, b, { planner: 'corridor' }));
+    // explainUnusable: a predicate every link passes changes nothing; one no link passes leaves a
+    // link-unusable failure 'route.unreachable' (same ok, no link subjects) and changes nothing else
+    assert.deepEqual(findRoute(g, s, HUMAN_PROFILE, a, b, { proveUnreachable: true, explainUnusable: () => true }), want);
+    const lazy = findRoute(g, s, HUMAN_PROFILE, a, b, { proveUnreachable: true, explainUnusable: () => false });
+    if (!want.ok && want.diagnostic.code === 'route.link-unusable') assert.equal((lazy as Extract<RouteResult, { ok: false }>).diagnostic.code, 'route.unreachable');
+    else assert.deepEqual(lazy, want);
     if (fast.ok) ok++;
     else { failed++; codes.add(fast.diagnostic.code); }
   }
@@ -81,6 +87,7 @@ test('proveUnreachable: routeAround-style searches === frozen reference A*, wall
 
 function stressHash(fast: boolean, planner: 'exact' | 'corridor', ticks: number) {
   WALK_PERF.stepSnapshot = fast;
+  WALK_PERF.lazyLinkDiagnostics = fast;
   try {
     const s = stress(30);
     const rt = buildRuntime(s);
@@ -96,16 +103,18 @@ function stressHash(fast: boolean, planner: 'exact' | 'corridor', ticks: number)
     return rt.stateHash();
   } finally {
     WALK_PERF.stepSnapshot = true;
+    WALK_PERF.lazyLinkDiagnostics = true;
   }
 }
 
-test('walker fast paths off === on: stress-30 (exact: the pin; corridor: its failing replan at tick 1126) and the meal', () => {
+test('walker fast paths off === on: stress-30 (exact: the pin; corridor: its failing people-replan at tick 1126) and the meal', () => {
   const on = stressHash(true, 'exact', 1200);
   assert.equal(on, '093779fd18f0a1c1875c7cbe41347a967f4ea6da06b21b29113ab28b55fcac55');
   assert.equal(stressHash(false, 'exact', 1200), on);
   assert.equal(stressHash(true, 'corridor', 1200), stressHash(false, 'corridor', 1200));
   const meal = (fast: boolean) => {
     WALK_PERF.stepSnapshot = fast;
+    WALK_PERF.lazyLinkDiagnostics = fast;
     try {
       const rt = mealRuntime();
       (rt.services.spatial as Spatial).proveUnreachable = fast;
@@ -113,6 +122,7 @@ test('walker fast paths off === on: stress-30 (exact: the pin; corridor: its fai
       return rt.stateHash();
     } finally {
       WALK_PERF.stepSnapshot = true;
+      WALK_PERF.lazyLinkDiagnostics = true;
     }
   };
   assert.equal(meal(true), '9dae86bfd31ef8331c5930d345c7ceace5bd2f7a8a247ab02462c262f4a70f87');

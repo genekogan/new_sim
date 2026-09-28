@@ -28,7 +28,7 @@ export const PINS = {
   probe: '93fa2a0a7900de3d2f9464d88ccd3bf24fa61fd35802eebbfaf68038924ac67b',
   campus: 'ecb424c74d8797c5940ea5d2b3332c37e5efe4be4a1251d9ebd4b259f9dcbb3a',
   meal: '9dae86bfd31ef8331c5930d345c7ceace5bd2f7a8a247ab02462c262f4a70f87',
-  v3: '339cf310d7cc59f3bff7cb49d4bcf77829bb4b0198cc54a2ceec19ce9f36ad1e',
+  v3: '5f32379db672beaed823d46a367e5f11b2557f4cf2fa94b140cd9535715d0c73',
 };
 
 // ---- measurement harness (bench only) ----
