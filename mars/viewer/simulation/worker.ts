@@ -12,6 +12,7 @@ import {
   type SimState,
 } from './shared';
 import { definitions } from './commands';
+import { LEGACY_TOOLS, legacyDescription, legacyRefusal } from './legacy';
 import { EngineRoom } from './engine-room';
 import { campusYearFile } from './campus-years';
 import { registerEngineTools } from './engine-tools';
@@ -280,8 +281,10 @@ export async function handleSimulation(
           server.registerTool(
             'get_state',
             {
-              description:
+              description: legacyDescription(
+                'get_state',
                 'Inspect room state, current positions, person IDs, walking capabilities, units and limitations.',
+              ),
               inputSchema: z.object({}),
               annotations: { readOnlyHint: true },
             },
@@ -297,8 +300,10 @@ export async function handleSimulation(
           server.registerTool(
             'get_capabilities',
             {
-              description:
+              description: legacyDescription(
+                'get_capabilities',
                 'Discover all tools, full JSON schemas, stable entity/screen/rider IDs, landmarks, units, clock semantics and limitations. Call this before composing scene commands.',
+              ),
               inputSchema: z.object({}),
               annotations: { readOnlyHint: true },
             },
@@ -343,6 +348,7 @@ export async function handleSimulation(
                         {
                           description: def.description,
                           schema: z.toJSONSchema(def.schema),
+                          legacy: LEGACY_TOOLS[name],
                         },
                       ]),
                     ),
@@ -354,7 +360,7 @@ export async function handleSimulation(
           for (const [name, def] of Object.entries(definitions))
             server.registerTool(
               name,
-              { description: def.description, inputSchema: def.schema },
+              { description: legacyDescription(name, def.description), inputSchema: def.schema },
               async (args: unknown) => {
                 try {
                   return {
@@ -368,12 +374,13 @@ export async function handleSimulation(
                     ],
                   };
                 } catch (e) {
+                  // LM-014: one refusal envelope for every legacy failure (simulation/legacy.ts)
                   return {
                     isError: true,
                     content: [
                       {
                         type: 'text' as const,
-                        text: e instanceof Error ? e.message : 'Command failed',
+                        text: JSON.stringify(legacyRefusal(name, e)),
                       },
                     ],
                   };

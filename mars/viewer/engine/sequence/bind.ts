@@ -6,6 +6,7 @@ import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf } from '../core/hash.ts';
 import type { WorldHistory } from '../history/store.ts';
 import type { WorldState } from '../world/types.ts';
+import { SEQUENCE_VERBS } from './runner.ts';
 import { PLAN_SCHEMA, templateSchema, type BoundPlan, type BoundStep, type ParamKind, type SequenceTemplate, type StepSpec } from './types.ts';
 
 export class PlanError extends Error {
@@ -194,7 +195,7 @@ export function bindTemplate(template: SequenceTemplate, bindings: Record<string
     if (!Object.prototype.hasOwnProperty.call(t.params, name)) errors.push(d('plan.unknown-binding', `binding "${name}" is not a parameter of template ${t.id}`));
   const steps: BoundStep[] = [];
   for (const s of t.steps) {
-    const def = ctx.registry.get(s.verb);
+    const def = ctx.registry.get(s.verb) ?? (Object.hasOwn(SEQUENCE_VERBS, s.verb) ? SEQUENCE_VERBS[s.verb] : undefined);
     if (!def) {
       errors.push(d('action.unknown-verb', `step "${s.id}": no action verb "${s.verb}" in the registry`, [s.id]));
       continue;
@@ -212,6 +213,14 @@ export function bindTemplate(template: SequenceTemplate, bindings: Record<string
         d('action.invalid-params', `step "${s.id}" (${s.verb}): ${r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`, [s.id]),
       );
       continue;
+    }
+    // the runner's `cancel` names another step of this template (LM-016)
+    if (s.verb === 'cancel' && !ctx.registry.has('cancel')) {
+      const target = (r.data as { step: string }).step;
+      if (target === s.id || !t.steps.some((x) => x.id === target)) {
+        errors.push(d('sequence.unknown-step', `step "${s.id}" (cancel): ${target === s.id ? 'cannot cancel itself' : `no step "${target}" in template ${t.id}`}`, [s.id]));
+        continue;
+      }
     }
     steps.push({ ...s, params: r.data as Record<string, unknown> });
   }

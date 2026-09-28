@@ -222,16 +222,54 @@ static scene hash differs from `world.base.staticHash` (`services.base-mismatch`
 - `execute(history, ws, plan, cfg, { takes?, commitOnFailure?, label? })`:
   1. protected workspace → `workspace.protected` (fork first);
   2. plan hash / baseline integrity → `plan.corrupt`;
-  3. `checkPlan`: rules version and `head.physicalHash === plan.baselinePhysicalHash`, else `plan.stale`
-     with a `PhysicalDiff` (`changed: [{ id, fields }]`, added, removed, regions, base, other) and a message
-     such as "panel changed (pose)";
-  4. runs from the workspace **head** (physically identical to the baseline; env/labels are carried forward);
+  3. `checkPlan`: rules version, then `head.physicalHash === plan.baselinePhysicalHash`; if they differ, the
+     change is **region-scoped** (below): outside every step's envelope → valid (`outsideEnvelope`), inside →
+     `plan.stale` with a `PhysicalDiff` (`changed: [{ id, fields }]`, added, removed, regions, base, other),
+     `affected: [{ step, causes }]` and a message such as "panel changed (pose); inside the plan's
+     route/footprint: step s ← panel (pose)";
+  4. runs from the workspace **head** (physically identical to the baseline, or different only outside every
+     step's envelope; env/labels are carried forward);
   5. commits the final state with cause `simulation-run { take, plan }` only if the run completed with zero
      violations (else `execution.failed`, take still returned/stored; `commitOnFailure` overrides).
 
-`physicalView` (world/types.ts) now also includes `inventory` and `rng`: both change what a run produces.
-Excluded on purpose: `tick`, `env` (visual per §19), labels/tags/provenance. Camera tracks are not world
-state at all, so camera edits cannot invalidate a plan.
+`physicalView` (world/types.ts) now also includes `inventory` and `rng`: both change what a run produces, and
+(W58, LM-003) a `place` region's audience `layout` (`{ focus, spacing?, rowGap?, kind? }`): it decides where
+gather / take_slot send people. A region without a layout hashes exactly as before (the perf-walk and year-build
+pins do not move). Excluded on purpose: `tick`, `env` (visual per §19), labels/tags/provenance. Camera tracks
+are not world state at all, so camera edits cannot invalidate a plan.
+
+### Staleness is region-scoped (W58, LM-004; `rehearsal/envelope.ts`)
+
+A plan's **envelope** is measured on a run of the plan from its own baseline checkpoint (the rehearsal): per
+step, the entities and regions its params name, every other entity that moves or changes while the step is
+live (a load on forks, a person stepping aside), and the ground boxes those entities sweep (tracks resampled
+every ≤ 1 m, merged to ≤ 3 m boxes, padded by the entity's half-diagonal + 0.75 m; `[x, z]` / `{x, z}` params get
+a 0.75 m box). A physical change reaches a step when it changes an entity or region the step names, or when
+the changed entity's footprint (before or after) or the region's polygon box overlaps one of the step's boxes.
+A change of the static base, the inventory mode or the RNG state reaches every step. Levels are ignored (a
+change on the deck above a ground route counts): conservative on purpose.
+
+- No step reached → the plan stays valid. `execute` runs it from the head and reports `outsideEnvelope:
+  { summary, diff }`; `rehearse` reports the same instead of `stale`. The equality "rehearsal take = execution
+  take" then holds only for an unchanged head: a planner may pick a different route through the changed
+  far-away geometry, and the execution's own report is what gets committed.
+- The envelope is a pure function of (plan, baseline state): the controller caches it per plan
+  (`ENVELOPES` = 16, in memory, never persisted) — from the rehearse op's own run, or, the first time an
+  `execute` / `checkPlan` needs it, from one extra run from the baseline (so an unrehearsed plan is scoped too;
+  cost: one run). A baseline run that does not complete cleanly has no envelope: then any physical change stales
+  the plan, as before W58.
+
+### Auto rebind (W58, LM-001)
+
+`engine_execute` and `engine_rehearse` take `rebind: 'auto' | 'refuse'` (default `'refuse'` = the refusal
+above). With `'auto'`, a plan that is stale against the workspace head (region-scoped as above, or bound under
+older rules) is bound again — same template, same bindings, the head as baseline — giving a new `plan_id`
+(stored, with `StoredPlan.reboundFrom`), and the op returns `plan_id` and `rebound: { type: 'plan.rebound',
+from, to, workspace, fromBaseline, toBaseline, reason, diff, summary, affected }`; execute then runs the new
+plan (identical to rehearsing it), rehearse rehearses it. A binding that no longer holds (a bound person
+removed, a step's params no longer valid) is refused with `plan.rebind-failed`, `details.steps` naming the steps
+whose params use the failing binding, `details.diagnostics` and `details.stale`. A plan that is not stale is run
+unchanged (no `rebound`).
 
 ## Invariants (tested)
 
@@ -331,4 +369,10 @@ content-addressed state in the history store and keep only the hash in the take.
 - Two walkers approaching head-on off a single-file passage can wait on each other forever while reporting
   `executing`, not `blocked` (seen when a panel closes the proving-ground passage and both detour around the same
   wall end). The runner's tick budget turns this into `timeout`. The fix belongs in `locomotion/walk.ts`.
-- There is no step-level timeout and no `cancel`/`mark` step verbs yet; `at` cues apply only to registry verbs.
+- (Closed by W58, LM-016.) Steps take `timeout` (seconds after the step starts; still live then → cancelled
+  with `sequence.step-timeout`, a controlled stop, handled by `onFail`), and the runner has two built-in
+  verbs, validated at bind and listed by `list_verbs` as `sequenceVerbs`: `mark { name, data? }` puts a mark
+  event in the run and its take; `cancel { step }` stops another step of the plan (live → cancelled, pending →
+  skipped, both `sequence.step-cancelled`; a step the plan cancels ran as directed, so the sequence can still be
+  `completed`). `at`, `after` and `when` apply to built-ins like to any step. A registry verb may not use a
+  built-in's name.

@@ -275,6 +275,21 @@ execution is refused, and the `diff` (`added` / `removed` / `changed[{id, fields
 names what moved. You can still rehearse a stale plan: it replays against its own baseline and
 reports `stale`. The fix is always to bind again.
 
+Since W58 (LM-001/003/004) staleness is **region-scoped**: only a change inside a step's route /
+footprint envelope (or to an entity or region the step names) stales the plan, and the refusal lists
+`affected: [{ step, causes }]` ("step s ← p1 (pose)"). A change elsewhere — a bench moved on the far side
+of the yard — keeps the plan valid: execute runs it and reports `outsideEnvelope`. A place region's
+audience `layout` now counts as physical. And the re-bind above is one flag:
+
+```
+→ engine_execute {"plan_id":"8bc70adc…","workspace":"scene-1-alt","rebind":"auto"}
+← executed; plan_id <new>, rebound {type:'plan.rebound', from:'8bc70adc…', to:<new>, diff, affected:[{step:'s', causes:['p1 (pose)']}]}
+```
+
+`rebind: 'auto'` also works on `engine_rehearse` (it rehearses the re-bound plan). When a binding no
+longer holds (a bound person was removed), it refuses with `plan.rebind-failed` naming the step. The
+director demo's transcript step for it is W57's (LM-011).
+
 ### 8. Read the ledger, clean up
 
 ```
@@ -404,6 +419,18 @@ Closed after the first run of this demo (the rows it used to list):
 - **Ledger and deletion.** `engine_list` and `engine_delete_workspace` (step 8).
 - **Mid-take states.** `engine_execute { pauseAt }` / `engine_resume` pause and continue a run
   mid-action (step 9), for walks and the social verbs; carries, lifts and vehicles are refused.
+- **Region layout and staleness (W58).** A region's audience `layout` is part of the physical view, and
+  staleness is scoped to each step's route/footprint; `rebind: 'auto'` re-binds a stale plan (step 7).
+- **Evicted takes (W58).** `engine_get_take` on a take a checkpoint still names but the room evicted
+  (its workspace was deleted) answers `take.evicted` with those checkpoint ids, not `take.unknown`.
+- **Camera sentences and stored tracks (W58).** `engine_parse_camera` turns sentences into directions
+  (or refusals with candidates); `engine_direct_camera { sentences }` parses and compiles in one call;
+  `engine_store_camera_track` stores a track compiled elsewhere (the studio) beside its take
+  (CAMERA_DIRECT.md §8.3).
+- **Parked vehicles (W58).** `engine_edit_world` moves a parked vehicle; a ridden one is
+  `edit.vehicle-ridden`.
+- **Ending steps (W58).** A step takes `timeout` (seconds), and a plan can stop a step with the
+  built-in `cancel { step }` (and mark a moment with `mark { name }`); see TAKES_AND_PLANS.md.
 
 Still open:
 
@@ -415,10 +442,8 @@ Still open:
   `{verb:'stand', params:{actor:'n1'}, at:60}` per person), or the rehearsal runs to the tick budget
   and fails `sequence.timeout` after 1,800 s. `ambient_wander` and `converse` take a `duration`.
   A `sit` step ended by `stand` is reported `cancelled`, so the plan status is `partial`.
-- **A region's audience `layout` isn't part of the physical view.** Changing only a region's layout
-  doesn't make a bound plan stale (`world/types.ts` `physicalView`).
 - **Deleting a workspace doesn't delete its checkpoints.** They stay addressable by id (forking
-  `at` one still works), but a take or plan they reference may since have been evicted, so
-  `engine_get_take` on it can return `take.unknown`.
+  `at` one still works), but a take or plan they reference may since have been evicted; a take then
+  answers `take.evicted` naming the checkpoints (re-record it from the checkpoint's parent).
 - **2026 rooms stay synthetic.** A 2026 room has only `proving-ground` and `carry-yard`; the
   reconstructed `mars-2026` scene isn't seeded into rooms yet.

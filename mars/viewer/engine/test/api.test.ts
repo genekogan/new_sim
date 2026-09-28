@@ -946,3 +946,360 @@ test('pause/resume: pauseAt during a carry is refused naming the carry (allowDro
   assert.equal((room.call(2026, 'resume', { workspace: 'nope' }) as any).code, 'unknown-workspace');
   assert.equal((room.call(2026, 'execute', { plan_id: wb.plan_id, workspace: 'w', pauseAt: { step: 'zz', event: 'started' } }) as any).code, 'plan.stale', 'stale is checked first');
 });
+
+// ---- LM-003 / LM-004 region-scoped staleness, LM-001 auto rebind (W58) ----------------------------
+
+const edit = (c: EngineController, workspace: string, edits: unknown[]) => {
+  const r = c.call('edit_world', { workspace, edits, note: 'staleness test' }) as any;
+  assert.ok(r.ok, JSON.stringify(r));
+  return r;
+};
+const box4 = (x0: number, z0: number, x1: number, z1: number) => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+
+test('staleness (LM-004): an edit far from every step keeps the plan valid; one on the route stales it naming the step', () => {
+  const c = fresh();
+  const plan = bind(c, walkPlan('p1-walk', -5, 5), { a: 'p1' });
+  const reh = c.call('rehearse', { plan_id: plan }) as any;
+  assert.ok(reh.ok);
+  // far: a no-go region 40 m away and the north bench nudged 0.3 m, both outside p1's walk (3.5, 12.5) → (-5, 5)
+  edit(c, 'ws', [{ op: 'region', id: 'far', kind: 'no-go', polygon: box4(40, 40, 45, 45) }, { op: 'move', id: 'bench-n', pose: { p: [-24, 0, 1.5], yaw: Math.PI } }]);
+  const r2 = c.call('rehearse', { plan_id: plan }) as any;
+  assert.equal(r2.stale, undefined, 'a far edit does not stale');
+  assert.match(r2.outsideEnvelope.summary, /bench-n changed \(pose\)/);
+  assert.deepEqual(r2.outsideEnvelope.diff.regions, ['far']);
+  const ex = c.call('execute', { plan_id: plan, workspace: 'ws' }) as any;
+  assert.ok(ex.ok, ex.message);
+  assert.match(ex.outsideEnvelope.summary, /regions changed: far/);
+  // near: a second fork, the same walk, and the panel laid down across the route
+  assert.ok(c.call('fork', { from: 'proving-ground', name: 'ws2' }).ok);
+  const plan2 = bind(c, walkPlan('p1-walk', -5, 5), { a: 'p1' }, 'ws2');
+  assert.equal(plan2, plan, 'same template, bindings and baseline → the same plan');
+  edit(c, 'ws2', [{ op: 'move', id: 'panel', lying: { x: -1, z: 8, yaw: 0 } }]);
+  const st = c.call('execute', { plan_id: plan, workspace: 'ws2' }) as any;
+  assert.equal(st.code, 'plan.stale');
+  assert.deepEqual(st.affected, [{ step: 's', causes: ['panel (pose)'] }]);
+  assert.match(st.message, /step s ← panel \(pose\)/);
+  const head = c.history.head('ws2').id;
+  assert.equal((c.call('rehearse', { plan_id: plan, workspace: 'ws2' }) as any).stale.affected[0].step, 's');
+  assert.equal(c.history.head('ws2').id, head, 'a stale plan never commits');
+});
+
+test('staleness (LM-004): an unrehearsed plan is scoped too (envelope from a run at its baseline); a changed bound entity always stales', () => {
+  const c = fresh();
+  const plan = bind(c, walkPlan('p1-walk', -5, 5), { a: 'p1' });
+  edit(c, 'ws', [{ op: 'region', id: 'far', kind: 'no-go', polygon: box4(40, 40, 45, 45) }]);
+  const ex = c.call('execute', { plan_id: plan, workspace: 'ws' }) as any;
+  assert.ok(ex.ok, ex.message);
+  assert.deepEqual(ex.outsideEnvelope.diff.regions, ['far']);
+  // p1 is a bound actor: moving it (even 30 m away from the old route) stales the step that names it
+  assert.ok(c.call('fork', { from: 'proving-ground', name: 'ws2' }).ok);
+  edit(c, 'ws2', [{ op: 'move', id: 'p1', pose: { p: [3.5, 0, 14], yaw: 0 } }]);
+  const st = c.call('execute', { plan_id: plan, workspace: 'ws2' }) as any;
+  assert.equal(st.code, 'plan.stale');
+  assert.deepEqual(st.affected, [{ step: 's', causes: ['p1 (pose)'] }]);
+});
+
+test('staleness (LM-003): a layout-only region edit stales a gather into that region (layout is physical); physicalHash moves', () => {
+  const c = fresh();
+  const tpl = { schema: 'mars-sequence/1', id: 'lawn-gather', params: { a: { kind: 'actors' } }, steps: [{ id: 'g', verb: 'gather', params: { actors: '$a', region: 'lawn' } }, { id: 'up', verb: 'stand', params: { actor: 'n1' }, at: 40 }] };
+  const plan = bind(c, tpl, { a: ['n1'] });
+  const reh = c.call('rehearse', { plan_id: plan }) as any;
+  assert.ok(reh.ok, reh.message);
+  const lawn = (c.call('query_world', { workspace: 'ws', include: ['regions'] }) as any).regions.find((r: any) => r.id === 'lawn');
+  const before = c.history.head('ws').physicalHash;
+  const e = edit(c, 'ws', [{ op: 'region', id: 'lawn', kind: 'place', polygon: lawn.polygon, label: lawn.label, layout: { focus: [-24, -20] } }]);
+  assert.deepEqual(e.diff.regions, ['lawn'], 'the layout alone is a physical difference');
+  assert.notEqual(c.history.head('ws').physicalHash, before);
+  const st = c.call('execute', { plan_id: plan, workspace: 'ws' }) as any;
+  assert.equal(st.code, 'plan.stale');
+  assert.deepEqual(st.diff.regions, ['lawn']);
+  assert.deepEqual(st.affected.find((a: any) => a.step === 'g'), { step: 'g', causes: ['region lawn'] });
+  // a label-only region edit stays non-physical
+  const e2 = edit(c, 'ws', [{ op: 'region', id: 'lawn', kind: 'place', polygon: lawn.polygon, label: 'renamed', layout: { focus: [-24, -20] } }]);
+  assert.deepEqual(e2.diff.regions, []);
+});
+
+test('rebind (LM-001): execute/rehearse rebind:auto re-binds a stale plan against the head (plan.rebound + diff); a broken binding is plan.rebind-failed naming the step', () => {
+  const c = fresh();
+  const plan = bind(c, walkPlan('p1-walk', -5, 5), { a: 'p1' });
+  assert.ok((c.call('rehearse', { plan_id: plan }) as any).ok);
+  edit(c, 'ws', [{ op: 'move', id: 'panel', lying: { x: -1, z: 8, yaw: 0 } }]);
+  assert.equal(c.call('execute', { plan_id: plan, workspace: 'ws' }).code, 'plan.stale', 'opt-out (default) keeps the refusal');
+  assert.equal(c.call('execute', { plan_id: plan, workspace: 'ws', rebind: 'refuse' }).code, 'plan.stale');
+  assert.equal(c.call('execute', { plan_id: plan, workspace: 'ws', rebind: 'always' }).code, 'op.invalid-input');
+  const rr = c.call('rehearse', { plan_id: plan, rebind: 'auto' }) as any;
+  assert.ok(rr.ok, rr.message);
+  assert.equal(rr.stale, undefined, 'the re-bound plan is rehearsed from the head');
+  assert.equal(rr.rebound.type, 'plan.rebound');
+  assert.equal(rr.rebound.from, plan);
+  assert.notEqual(rr.plan_id, plan);
+  assert.equal(rr.rebound.to, rr.plan_id);
+  assert.deepEqual(rr.rebound.affected, [{ step: 's', causes: ['panel (pose)'] }]);
+  assert.equal(rr.rebound.toBaseline, c.history.head('ws').id);
+  const ex = c.call('execute', { plan_id: plan, workspace: 'ws', rebind: 'auto' }) as any;
+  assert.ok(ex.ok, ex.message);
+  assert.equal(ex.plan_id, rr.plan_id, 'same template + bindings + head → the same re-bound plan');
+  assert.equal(ex.take_id, rr.take.take_id, 'execution reproduces the re-bound rehearsal');
+  assert.deepEqual(ex.checkpoint.cause, { kind: 'simulation-run', take: ex.take_id, plan: rr.plan_id });
+  const listed = (c.call('list', { include: ['plans'] }) as any).plans.map((p: any) => p.plan_id);
+  assert.ok(listed.includes(rr.plan_id));
+  assert.equal(c.plan(rr.plan_id)!.reboundFrom, plan);
+  // not stale → rebind:auto is a no-op (no rebound event, same plan)
+  const plan2 = bind(c, walkPlan('p1-back', 3.5, 12.5), { a: 'p1' });
+  const ok2 = c.call('execute', { plan_id: plan2, workspace: 'ws', rebind: 'auto' }) as any;
+  assert.ok(ok2.ok, ok2.message);
+  assert.equal(ok2.rebound, undefined);
+  // a bound actor removed by a design edit cannot re-bind: refused, naming the step and the diagnostic
+  assert.ok(c.call('fork', { from: 'proving-ground', name: 'free', inventory: 'unlimited' }).ok);
+  edit(c, 'free', [{ op: 'spawn', id: 'x1', def: 'human', pose: { p: [0, 0, 0], yaw: 0 } }]);
+  const px = bind(c, walkPlan('x1-walk', 2, 2), { a: 'x1' }, 'free');
+  edit(c, 'free', [{ op: 'remove', id: 'x1' }]);
+  const rf = c.call('execute', { plan_id: px, workspace: 'free', rebind: 'auto' }) as any;
+  assert.equal(rf.code, 'plan.rebind-failed');
+  assert.deepEqual(rf.details.steps, ['s']);
+  assert.match(rf.message, /step s: parameter "a": no entity "x1"/);
+  assert.deepEqual(rf.details.stale.affected, [{ step: 's', causes: ['x1 (removed)'] }]);
+});
+
+test('store_camera_track (LM-013): a compiled directed track is stored beside its take — hash unchanged, listed, replayable; refusals', async () => {
+  const { sampleTrack, trackData } = await import('../camera/track.ts');
+  const { MAX_TAKE_CAMERA_BYTES } = await import('../api/controller.ts');
+  const c = fresh();
+  const plan = bind(c, walkPlan('p1-walk', -5, 5), { a: 'p1' });
+  const reh = c.call('rehearse', { plan_id: plan }) as any;
+  const take = reh.take.take_id as string;
+  const other = c.call('rehearse', { plan_id: bind(c, walkPlan('p1-other', 0, 0), { a: 'p1' }) }) as any;
+  // compile a track the way the studio does (here: planned by the engine, then relabelled as a downloaded directed track)
+  const at = c.call('attach_camera_track', { take_id: take, shot: { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] }, track_id: 'src' }) as any;
+  assert.ok(at.ok, at.message);
+  const src = (c.call('get_take', { take_id: take, include: ['cameras'] }) as any).cameras[0];
+  const hash = c.takes.takeHash(take);
+  const track = { ...src, id: 'dir-studio-1', kind: 'directed' };
+  const r = c.call('store_camera_track', { take_id: take, track }) as any;
+  assert.ok(r.ok, r.message);
+  assert.equal(r.stored, true);
+  assert.equal(r.takeHashUnchanged, true);
+  assert.equal(c.takes.takeHash(take), hash);
+  const listed = (c.call('get_take', { take_id: take }) as any).cameras;
+  assert.deepEqual(listed.map((x: any) => [x.id, x.kind]), [['dir-studio-1', 'directed'], ['src', 'planned']]);
+  assert.equal(listed[0].samples, src.data.samples.length);
+  const back = (c.call('get_take', { take_id: take, include: ['cameras'] }) as any).cameras.find((x: any) => x.id === 'dir-studio-1');
+  for (const t of [0, 1.23, 5]) assert.deepEqual(sampleTrack(trackData(back), t), sampleTrack(trackData(src), t), `replay t=${t}`);
+  assert.ok((c.call('list', { take_id: take }) as any).cameras.some((x: any) => x.id === 'dir-studio-1'));
+  // identical re-store is a no-op; a clash / other take / bad payload / oversize are named refusals
+  assert.equal((c.call('store_camera_track', { take_id: take, track }) as any).stored, false);
+  const clash = c.call('store_camera_track', { take_id: take, track: { ...track, kind: 'directed-v2' } }) as any;
+  assert.equal(clash.code, 'camera.track-exists');
+  assert.equal(c.call('store_camera_track', { take_id: other.take.take_id, track }).code, 'camera.track-take-mismatch');
+  assert.equal(c.call('store_camera_track', { take_id: take, track: { ...track, id: 'x2', data: { ...track.data, schema: 'nope' } } }).code, 'camera.track-invalid');
+  assert.equal(c.call('store_camera_track', { take_id: take, track: { ...track, id: 'x3', data: { ...track.data, samples: [] } } }).code, 'camera.track-invalid');
+  const long = c.call('store_camera_track', { take_id: take, track: { ...track, id: 'x4', data: { ...track.data, duration: track.data.duration + 60 } } }) as any;
+  assert.equal(long.code, 'camera.track-invalid');
+  assert.match(long.message, /lasts .* but take/);
+  assert.equal(c.call('store_camera_track', { take_id: 'nope', track }).code, 'take.unknown');
+  assert.equal(c.call('store_camera_track', { take_id: take, track: { ...track, id: 'bad id!' } }).code, 'op.invalid-input');
+  // byte cap per take (not a count): two ~60 %-of-cap tracks — the first fits, the second is camera.store-full
+  const per = JSON.stringify(track.data.samples[0]).length + 1;
+  const n = Math.ceil((0.6 * MAX_TAKE_CAMERA_BYTES) / per);
+  const bigTrack = (id: string) => ({ ...track, id, data: { ...track.data, hz: (n - 1) / track.data.duration, samples: Array.from({ length: n }, (_, i) => ({ ...track.data.samples[0], t: (i * track.data.duration) / (n - 1) })) } });
+  const b1 = c.call('store_camera_track', { take_id: take, track: bigTrack('x5') }) as any;
+  assert.ok(b1.ok, b1.message);
+  const b2 = c.call('store_camera_track', { take_id: take, track: bigTrack('x6') }) as any;
+  assert.equal(b2.code, 'camera.store-full');
+  assert.ok(b2.details.bytes > MAX_TAKE_CAMERA_BYTES);
+  assert.equal(c.call('store_camera_track', { take_id: take, track: bigTrack('x7'), extra: 1 }).code, 'op.invalid-input');
+});
+
+test('edit_world (LM-005): a parked vehicle moves with the same footprint checks; a ridden one is edit.vehicle-ridden', async () => {
+  const { provingGroundWorld } = await import('../api/seeds.ts');
+  const { vehicle } = await import('../vehicles/actions.ts');
+  const history = seedHistory();
+  const w = provingGroundWorld();
+  w.entities.bike = vehicle('bike', 'bicycle', 1, 12.5);
+  history.publishCanonical('pg-bike', 'proving ground with a bicycle', w, 'LM-005 test');
+  const c = createController({ history, scenes: ENGINE_SCENES });
+  assert.ok(c.call('fork', { from: 'pg-bike', name: 'v' }).ok);
+  const mv = c.call('edit_world', { workspace: 'v', edits: [{ op: 'move', id: 'bike', pose: { p: [-3, 0, 12.5], yaw: 0 } }], note: 'park it west' }) as any;
+  assert.ok(mv.ok, mv.message);
+  assert.deepEqual(mv.diff.changed, [{ id: 'bike', fields: ['pose'] }]);
+  // footprint checks still apply: into the test wall / onto a person / off the floor
+  const blocked = c.call('edit_world', { workspace: 'v', edits: [{ op: 'move', id: 'bike', pose: { p: [3.5, 0, 12.5], yaw: 0 } }], note: 'onto p1' }) as any;
+  assert.equal(blocked.code, 'edit.blocked');
+  assert.deepEqual(blocked.details.subjects, ['bike', 'p1']);
+  assert.equal(c.call('edit_world', { workspace: 'v', edits: [{ op: 'move', id: 'bike', pose: { p: [400, 0, 400], yaw: 0 } }], note: 'off' }).code, 'edit.off-floor');
+  // p1 mounts it (a simulated run); a design edit may not move it from under the rider
+  const mount = bind(c, { schema: 'mars-sequence/1', id: 'mount', params: { a: { kind: 'actor' } }, steps: [{ id: 'go', verb: 'walk_to', params: { actor: '$a', x: -2.6, z: 11.7 } }, { id: 'm', verb: 'mount', params: { actor: '$a', vehicle: 'bike' }, after: ['go'] }] }, { a: 'p1' }, 'v');
+  const ex = c.call('execute', { plan_id: mount, workspace: 'v' }) as any;
+  assert.ok(ex.ok, ex.message);
+  const ridden = c.call('edit_world', { workspace: 'v', edits: [{ op: 'move', id: 'bike', pose: { p: [-3, 0, 10], yaw: 0 } }], note: 'move ridden' }) as any;
+  assert.equal(ridden.code, 'edit.vehicle-ridden');
+  assert.deepEqual(ridden.details.subjects, ['bike', 'p1']);
+  assert.match(ridden.message, /ridden by p1; dismount first/);
+  assert.equal(c.call('edit_world', { workspace: 'v', edits: [{ op: 'remove', id: 'bike' }], note: 'remove ridden' }).code, 'edit.vehicle-ridden');
+});
+
+// ---- LM-007 / 008 / 010: camera sentences over the op API (W58) --------------------------------------
+
+test('parse_camera (LM-007/008): Gene’s four sentences through the op — racks alias → the take’s rack bay, kitchen unknown in 2026, deictic question', async () => {
+  const { flagship } = await import('./camera-direct-fixtures.ts');
+  const { take, input } = flagship();
+  const c = createController({ history: seedHistory(), scenes: { ...ENGINE_SCENES, [take.finalState.base.campus]: input.scene } });
+  c.takes.put(take);
+  const four = [
+    'do a pan across Chiba with the sunset in the background',
+    'do a 270° revolution around the main pallet racks over 2 minutes',
+    'go inside the kitchen and face the sink',
+    'look at this crowd of people having this activity',
+  ];
+  const r = c.call('parse_camera', { take_id: take.id, sentences: four }) as any;
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'camera.direct.unknown', 'first refusal (sentence 3) names the code');
+  assert.deepEqual(r.directions.map((d: any) => d.index), [0, 1]);
+  assert.deepEqual(r.directions[0].direction, { subject: { kind: 'region', ref: 'chiba' }, motion: { verb: 'pan' }, context: { sunBehind: { sunset: true } } });
+  const racks = r.directions[1];
+  assert.equal(racks.subject.said, 'rack bay');
+  assert.match(racks.subject.id, /^structure:/, 'the alias resolves to the take’s rack bay structure');
+  assert.deepEqual(racks.direction, { subject: { kind: 'assembly', ref: racks.subject.id }, motion: { verb: 'orbit', degrees: 270 }, duration: 120 });
+  assert.deepEqual(r.refusals.map((x: any) => [x.index, x.code]), [[2, 'camera.direct.unknown'], [3, 'camera.parse.deictic']]);
+  assert.match(r.refusals[0].message, /no region named 'kitchen-interior'/);
+  assert.match(r.refusals[1].question, /which activity/i);
+  assert.deepEqual(r.refusals[1].span, [8, 12]);
+  // determinism + read-only
+  assert.deepEqual(c.call('parse_camera', { take_id: take.id, sentences: four }), r);
+  assert.equal(c.cameras(take.id).length, 0);
+  // input refusals
+  assert.equal(c.call('parse_camera', { sentences: four }).code, 'op.invalid-input');
+  assert.equal(c.call('parse_camera', { take_id: take.id, workspace: 'proving-ground', sentences: four }).code, 'op.invalid-input');
+  assert.equal(c.call('parse_camera', { take_id: take.id, sentences: [] }).code, 'op.invalid-input');
+  assert.equal(c.call('parse_camera', { take_id: 'nope', sentences: four }).code, 'take.unknown');
+});
+
+test('parse_camera (LM-007/008/010): 2024 kitchen + sink resolve; bare 2026 racks are a question with candidates; unknown names and unsupported phrasing are refusals', async () => {
+  const { campus2024, campus2026 } = await import('./camera-direct-fixtures.ts');
+  const y24 = campus2024(), y26 = campus2026();
+  const history = seedHistory();
+  history.publishCanonical('y24', 'Mars 2024', y24.world, 'test');
+  history.publishCanonical('y26', 'Mars 2026', y26.world, 'test');
+  const c = createController({ history, scenes: { ...ENGINE_SCENES, [y24.world.base.campus]: y24.scene, [y26.world.base.campus]: y26.scene } });
+  const k = c.call('parse_camera', { workspace: 'y24', sentences: ['go inside the kitchen and face the sink'] }) as any;
+  assert.ok(k.ok, k.message);
+  assert.deepEqual(k.directions[0].direction, { subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through' }, context: { interior: 'kitchen-interior', lookAt: 'sink' } });
+  assert.equal(k.source.campus, y24.world.base.campus);
+  // no built bay in the bare 2026 campus: the rack alias falls back to the scene's rack buildings — a question, not a guess
+  const amb = c.call('parse_camera', { workspace: 'y26', sentences: ['do a 270° revolution around the main pallet racks over 2 minutes'] }) as any;
+  assert.equal(amb.code, 'camera.direct.ambiguous');
+  assert.ok(['north-rack-building', 'west-rack-building'].every((id) => amb.refusals[0].candidates.includes(id)), JSON.stringify(amb.refusals[0].candidates));
+  assert.match(amb.refusals[0].question, /Which assembly/);
+  // a named rack building resolves directly
+  const north = c.call('parse_camera', { workspace: 'y26', sentences: ['pan across the north rack building'] }) as any;
+  assert.ok(north.ok, north.message);
+  assert.deepEqual([north.directions[0].subject.kind, north.directions[0].subject.id], ['region', 'north-rack-building'], 'a building region is named once, as the region');
+  // unknown: lists what is known
+  const venus = c.call('parse_camera', { workspace: 'y26', sentences: ['hold on Venus'] }) as any;
+  assert.equal(venus.code, 'camera.direct.unknown');
+  assert.ok(venus.refusals[0].details.known.some((x: any) => x.id === 'chiba'));
+  // LM-010: untested paraphrases are refusals / notes by design, through the op too
+  const para = c.call('parse_camera', { workspace: 'y26', sentences: ['zoom in on Chiba', 'orbit around Chiba', 'hold on Chiba with a wide lens', 'watch the crowd of people eating'] }) as any;
+  assert.deepEqual(para.refusals.map((x: any) => [x.index, x.code]), [[0, 'camera.parse.unknown-verb'], [1, 'camera.parse.missing'], [3, 'camera.direct.unknown']]);
+  assert.deepEqual(para.directions.map((d: any) => [d.index, d.notes]), [[2, ['wide lens has no numeric fov; lens choice left to the engine']]]);
+  assert.match(para.refusals[2].message, /nobody is doing 'eat'/);
+});
+
+test('direct_camera (LM-007): `sentences` are parsed then compiled in one call — the same track as the parsed directions; refusals compile nothing', async () => {
+  const { flagship } = await import('./camera-direct-fixtures.ts');
+  const { take, input } = flagship();
+  const c = createController({ history: seedHistory(), scenes: { ...ENGINE_SCENES, [take.finalState.base.campus]: input.scene } });
+  c.takes.put(take);
+  const sentence = 'do a 270° revolution around the main pallet racks over 2 minutes';
+  const parsed = (c.call('parse_camera', { take_id: take.id, sentences: [sentence] }) as any).directions.map((d: any) => d.direction);
+  const r = c.call('direct_camera', { take_id: take.id, sentences: [sentence] }) as any;
+  assert.ok(r.ok, r.message);
+  assert.equal(r.track_id, `dir-${hashOf({ take: take.id, directions: parsed, hz: 10 }).slice(0, 12)}`, 'same id as direct_camera { directions: parsed }');
+  assert.equal(r.parsed[0].subject.said, 'rack bay');
+  assert.equal(r.takeHashUnchanged, true);
+  assert.deepEqual(c.cameras(take.id).map((x) => x.id), [r.track_id]);
+  const bad = c.call('direct_camera', { take_id: take.id, sentences: [sentence, 'zoom in on Chiba'] }) as any;
+  assert.equal(bad.code, 'camera.parse.unknown-verb');
+  assert.deepEqual(bad.refusals.map((x: any) => x.index), [1]);
+  assert.equal(c.cameras(take.id).length, 1, 'a refused sentence compiles and stores nothing');
+  assert.equal(c.call('direct_camera', { take_id: take.id }).code, 'op.invalid-input');
+  assert.equal(c.call('direct_camera', { take_id: take.id, sentences: [sentence], directions: parsed }).code, 'op.invalid-input');
+});
+
+test('get_take (LM-017): a take evicted after its workspace was deleted is take.evicted naming the checkpoint; a never-stored one stays take.unknown', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage, { takes: 1, plans: 8 });
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'w1' }) as any).ok);
+  const a = room.call(2026, 'bind_plan', { template: walkPlan('a', -5, 5), bindings: { a: 'p1' }, workspace: 'w1' }) as any;
+  const ea = room.call(2026, 'execute', { plan_id: a.plan_id, workspace: 'w1' }) as any;
+  assert.ok(ea.ok, ea.message);
+  assert.ok((room.call(2026, 'delete_workspace', { workspace: 'w1' }) as any).ok);
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'w2' }) as any).ok);
+  const b = room.call(2026, 'bind_plan', { template: walkPlan('b', -4, 5), bindings: { a: 'p1' }, workspace: 'w2' }) as any;
+  const eb = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'w2' }) as any;
+  assert.ok(eb.ok, eb.message);
+  assert.ok(!s.keys().includes(`y2026/take/${ea.take_id}`), 'take A was evicted (cap 1, unreferenced)');
+  const g = room.call(2026, 'get_take', { take_id: ea.take_id }) as any;
+  assert.equal(g.code, 'take.evicted');
+  assert.deepEqual(g.details.checkpoints, [ea.checkpoint.id]);
+  assert.match(g.message, /no live workspace reaches it .* engine_fork at the checkpoint's parent/);
+  assert.equal((room.call(2026, 'attach_camera_track', { take_id: ea.take_id, shot: { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] } }) as any).code, 'take.evicted');
+  assert.equal((room.call(2026, 'get_take', { take_id: 'never-stored' }) as any).code, 'take.unknown');
+  assert.ok((room.call(2026, 'get_take', { take_id: eb.take_id }) as any).ok);
+});
+
+test('sequence built-ins over the op API (LM-016): list_verbs describes mark/cancel; a plan cancels a walk at 2 s and marks the take', () => {
+  const c = fresh();
+  const lv = c.call('list_verbs', {}) as any;
+  assert.deepEqual(lv.sequenceVerbs.map((v: any) => v.verb), ['mark', 'cancel']);
+  assert.ok(lv.templateJsonSchema.properties.steps.items.properties.timeout, 'step timeout is in the template schema');
+  const tpl = {
+    schema: 'mars-sequence/1', id: 'cut-walk', params: { a: { kind: 'actor' } },
+    steps: [
+      { id: 'w', verb: 'walk_to', params: { actor: '$a', x: -20, z: 5 }, timeout: 60 },
+      { id: 'stop', verb: 'cancel', params: { step: 'w' }, at: 2 },
+      { id: 'm', verb: 'mark', params: { name: 'walk-cut' }, after: ['stop'] },
+    ],
+  };
+  const r = c.call('rehearse', { plan_id: bind(c, tpl, { a: 'p1' }) }) as any;
+  assert.ok(r.ok, r.message);
+  assert.equal(r.report.status, 'completed');
+  const s = Object.fromEntries(r.report.steps.map((x: any) => [x.id, x]));
+  assert.equal(s.w.status, 'cancelled');
+  assert.equal(s.w.diagnostic.code, 'sequence.step-cancelled');
+  assert.equal(s.m.status, 'completed');
+  const ev = (c.call('get_take', { take_id: r.take.take_id }) as any).events.filter((e: any) => e.type === 'mark');
+  assert.deepEqual(ev.map((e: any) => e.name), ['walk-cut']);
+  assert.equal(c.call('bind_plan', { template: { ...tpl, steps: [{ id: 'x', verb: 'cancel', params: { step: 'nope' } }] }, bindings: { a: 'p1' }, workspace: 'ws' }).code, 'plan.invalid');
+});
+
+test('one control path (LM-014): every legacy tool is classified — an engine equivalent that exists, or viewer-only with a reason — and fails in one envelope', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { LEGACY_TOOLS, legacyDescription, legacyRefusal } = await import('../../simulation/legacy.ts');
+  const { createRegistry } = await import('../api/registry.ts');
+  const { SEQUENCE_VERBS } = await import('../sequence/runner.ts');
+  const src = (f: string) => readFileSync(new URL(`../../simulation/${f}`, import.meta.url), 'utf8');
+  const commands = [...src('commands.ts').matchAll(/^  ([a-z_]+): \{$/gm)].map((m) => m[1]);
+  assert.equal(commands.length, 18, 'commands.ts defines 18 legacy command tools');
+  const legacy = [...commands, 'get_state', 'get_capabilities'].sort();
+  assert.deepEqual(Object.keys(LEGACY_TOOLS).sort(), legacy, 'exactly the 20 legacy tools are classified');
+  const tools = new Set(engineTools().map((t) => t.name));
+  const verbs = new Set([...createRegistry().keys(), ...Object.keys(SEQUENCE_VERBS)]);
+  for (const [name, r] of Object.entries(LEGACY_TOOLS)) {
+    assert.ok(r.reason.length > 20, `${name}: a reason`);
+    if (r.scope === 'engine-equivalent') assert.ok(r.engine.length > 0, `${name}: names its engine path`);
+    for (const e of r.engine) assert.ok(e.startsWith('verb:') ? verbs.has(e.slice(5)) : tools.has(e), `${name}: engine equivalent ${e} exists`);
+    assert.match(legacyDescription(name, 'x'), /^\[legacy viewer control/);
+  }
+  assert.ok(Object.values(LEGACY_TOOLS).filter((r) => r.scope === 'engine-equivalent').length >= 8);
+  const env = legacyRefusal('move_person', new Error('no route'));
+  assert.deepEqual(env, { ok: false, code: 'legacy.command-failed', message: 'move_person: no route', legacy: true, tool: 'move_person', engine: ['engine_bind_plan', 'engine_execute', 'verb:walk_to'] });
+  // the worker registers every legacy tool with the classified description and answers failures with the envelope
+  const worker = src('worker.ts');
+  assert.match(worker, /legacyDescription\(name, def\.description\)/);
+  assert.match(worker, /legacyDescription\(\s*'get_state'/);
+  assert.match(worker, /legacyDescription\(\s*'get_capabilities'/);
+  assert.match(worker, /JSON\.stringify\(legacyRefusal\(name, e\)\)/);
+  assert.doesNotMatch(worker, /'Command failed'/);
+});
