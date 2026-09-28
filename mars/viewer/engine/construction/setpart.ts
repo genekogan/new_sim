@@ -35,6 +35,8 @@ import { isKitUpright, isStanding, isSupported } from './rules.ts';
 import { envelopeGap, GIVE_MAX, REACH_DOWN, setHands, T } from './handup.ts';
 import { BODY_MODEL, restHands } from '../body/model.ts';
 import { flatObb, isPlywood } from './deck.ts';
+import { deckSurfaces } from './contributor.ts';
+import type { Contributor } from '../spatial/service.ts';
 
 export const SETPART_SLOT = 'setpart-';
 const HAND_SPREAD = 0.15;
@@ -464,7 +466,7 @@ export const installStairPart = setPartVerb('install_stair_part', 'stair part (t
   'Set a Kit-stair part: a 2x10 tread board on two installed stringers, a riser on the tread below, a rail post bolted to a tread end, a handrail on two posts. Refused when what it bears on is not installed.');
 
 // ---- the Kit stair as a walkable link (usable only when every stringer and tread board is in and the landing deck exists) ----
-export type KitStair = { id: string; stringers: string[]; treads: string[][]; foot: Vec2; dir: Vec2; width: number; topY: number; baseY: number; going: number; heading: number };
+export type KitStair = { id: string; stringers: string[]; treads: string[][]; tops: number[]; foot: Vec2; dir: Vec2; width: number; topY: number; baseY: number; going: number; heading: number };
 
 /** Walkable link of a Kit stair given the installed parts and the walkable surfaces (reason when not usable). */
 export function kitStairLink(w: WorldState, st: KitStair, surfaces: Surface[]): Link {
@@ -482,9 +484,8 @@ export function kitStairLink(w: WorldState, st: KitStair, surfaces: Surface[]): 
   if (!landing) reasons.push('no landing at top');
   const bottom = surfaces.find((s) => Math.abs(s.y - st.baseY) <= 0.08 && pointIn(from, s));
   if (!bottom) reasons.push('no floor at the foot');
-  const riser = (st.topY - st.baseY) / n;
   const path: Vec3[] = [[from[0], st.baseY, from[1]], [st.foot[0], st.baseY, st.foot[1]]];
-  for (let i = 1; i <= n; i++) path.push([st.foot[0] + st.dir[0] * (i - 0.5) * st.going, st.baseY + i * riser, st.foot[1] + st.dir[1] * (i - 0.5) * st.going]);
+  for (let i = 1; i <= n; i++) path.push([st.foot[0] + st.dir[0] * (i - 0.5) * st.going, st.tops[i - 1], st.foot[1] + st.dir[1] * (i - 0.5) * st.going]);
   const ly = landing?.y ?? st.topY;
   path.push([st.foot[0] + st.dir[0] * run, ly, st.foot[1] + st.dir[1] * run], [to[0], ly, to[1]]);
   return {
@@ -527,3 +528,12 @@ export const kitPartsSupported: Invariant = (rt) => {
   }
   return out;
 };
+
+/** Spatial contributor: the walkable links of the scenario's Kit stairs (usable once complete, with a landing). */
+export function kitStairContributor(stairs: KitStair[]): Contributor {
+  return (world, base) => {
+    if (!stairs.length) return {};
+    const surfaces = [...base.surfaces, ...deckSurfaces(world)];
+    return { links: stairs.map((st) => kitStairLink(world, st, surfaces)) };
+  };
+}

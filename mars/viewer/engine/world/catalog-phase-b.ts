@@ -152,6 +152,9 @@ export function phaseBAssets(make: PhaseBMake): AssetDef[] {
   out.push(make.bundle('bundle-2x12-14ft', 'strapped 2x12 unit (12 × 14 ft)', [14 * FT, 0.1 + 3 * 1.5 * IN, 4 * 11.25 * IN], '2x12-14ft', 12, 12 * 23, '4 wide × 3 high; a site-sized unit'));
   out.push(make.bundle('bundle-2x12-16ft', 'strapped 2x12 unit (12 × 16 ft)', [16 * FT, 0.1 + 3 * 1.5 * IN, 4 * 11.25 * IN], '2x12-16ft', 12, 12 * 26, '4 wide × 3 high; a site-sized unit'));
   out.push(make.bundle('bundle-2x10-16ft', 'strapped 2x10 unit (24 × 16 ft)', [16 * FT, 0.1 + 4 * 1.5 * IN, 6 * 9.25 * IN], '2x10-16ft', 24, 24 * 21, '6 wide × 4 high; a site-sized unit'));
+  // offcuts are stacked on a scrap pile by the station (moves-b.ts stack_offcut): one pile of mixed 1–5 ft pieces
+  out.push(make.bundle('scrap-pile', 'offcut pile (plywood / lumber offcuts on dunnage)', [1.8, 0.1 + 0.6, 1.3], 'offcut', 200, 20,
+    'offcuts from the cutting station stacked on dunnage beside it; not documented'));
   out.push(make.bundle('bundle-2x4-8ft', 'strapped 2x4 unit (48 × 8 ft)', [8 * FT, 0.1 + 6 * 1.5 * IN, 8 * 3.5 * IN], '2x4-8ft', 48, 48 * 5, '8 wide × 6 high, flat, strapped'));
   for (const d of out) if (!stock.has(d.id) && (d.category === 'timber' || d.category === 'plywood')) CUT_TO_ORDER.add(d.id);
   return out;

@@ -23,6 +23,7 @@ import { CATALOG, def } from '../world/catalog.ts';
 import { KIT_STAIR_2022, kitStringerGeometry, BOARD_T, TREAD_BOARD_W } from '../world/catalog-phase-b.ts';
 import type { Pose } from '../world/types.ts';
 import type { AsmNode, AssemblyGraph } from './assembly.ts';
+import type { KitStair } from '../construction/setpart.ts';
 
 export const PARTS_B_VERSION = 'mars-year-build-parts/b1';
 const FT = 0.3048;
@@ -53,7 +54,7 @@ export type PartB = {
 };
 export type KitRef = { node: string; kind: PartKind; feature: string; c: [number, number, number]; yaw: number; size: [number, number, number]; offset: string };
 export type UnplacedB = { node: string; kind: string; reason: string };
-export type PartsB = { version: typeof PARTS_B_VERSION; assembly: string; parts: PartB[]; kit: KitRef[]; unplaced: UnplacedB[] };
+export type PartsB = { version: typeof PARTS_B_VERSION; assembly: string; parts: PartB[]; kit: KitRef[]; unplaced: UnplacedB[]; stairs: KitStair[] };
 
 const axisU = (yaw: number): Vec2 => rot2([1, 0], yaw);
 const axisV = (yaw: number): Vec2 => rot2([0, 1], yaw);
@@ -64,7 +65,11 @@ const plan = (n: AsmNode): OBB2 => ({ c: xz(n), half: [n.box.size[0] / 2, n.box.
 export const beamTop = (b: AsmNode) => r4(b.box.c[1] + def(b.def!).size[1] / 2);
 
 /** Map every phase-B feature of `assembly` to engine parts (deterministic, sorted). */
-export function phaseBParts(g: AssemblyGraph, assembly: string): PartsB {
+/**
+ * `opts.flip(strip)`: split this deck strip from its +u end (its short piece on the −u side) — the generator asks for
+ * it where there is no room beside the house on the −u side to raise the long pieces (e.g. a neighbour's stair).
+ */
+export function phaseBParts(g: AssemblyGraph, assembly: string, opts: { flip?: (strip: AsmNode) => boolean } = {}): PartsB {
   const nodes = g.nodes.filter((n) => n.assembly === assembly);
   const byId = new Map(g.nodes.map((n) => [n.id, n]));
   const frames = nodes.filter((n) => n.kind === 'upright');
@@ -72,6 +77,7 @@ export function phaseBParts(g: AssemblyGraph, assembly: string): PartsB {
   const parts: PartB[] = [];
   const kit: KitRef[] = [];
   const unplaced: UnplacedB[] = [];
+  const stairs: KitStair[] = [];
   const un = (n: AsmNode, reason: string) => unplaced.push({ node: n.id, kind: `feature:${n.feature}`, reason });
   const centre: Vec2 = frames.length ? [frames.reduce((s, f) => s + f.box.c[0], 0) / frames.length, frames.reduce((s, f) => s + f.box.c[2], 0) / frames.length] : [0, 0];
   const deckSheets = nodes.filter((n) => n.feature === 'deck-sheet');
@@ -89,14 +95,26 @@ export function phaseBParts(g: AssemblyGraph, assembly: string): PartsB {
     const top = Math.max(...under.map(beamTop));
     if (under.some((b) => Math.abs(beamTop(b) - top) > 0.005)) { un(n, 'its beams are not level'); continue; }
     if (Math.abs(pos[0] - s0) > 0.01 || Math.abs(pos[pos.length - 1] - s1) > 0.01) { un(n, `strip ends (${s0.toFixed(3)} / ${s1.toFixed(3)} along it) are not on beams (${pos[0].toFixed(3)} / ${pos[pos.length - 1].toFixed(3)})`); continue; }
-    // greedy: from one end, the farthest beam ≤ 8 ft away at a whole-foot distance (joints on beams)
+    // greedy: from one end, the farthest beam ≤ 8 ft away at a whole-foot distance (joints on beams); from the +u end when flipped
     const pieces: [number, number, number][] = [];
-    let s = pos[0], bad = '';
-    while (s < pos[pos.length - 1] - 0.01) {
-      const c = pos.filter((b) => b > s + 0.01 && b - s <= 8 * FT + 0.01 && Math.abs((b - s) / FT - Math.round((b - s) / FT)) * FT <= 0.01).pop();
-      if (c === undefined) { bad = `no beam within 8 ft of ${s.toFixed(3)} at a whole-foot distance: the strip cannot be cut into 4 ft sheets jointed on its beams`; break; }
-      pieces.push([s, c, Math.round((c - s) / FT)]);
-      s = c;
+    const whole = (d: number) => d <= 8 * FT + 0.01 && Math.abs(d / FT - Math.round(d / FT)) * FT <= 0.01;
+    let bad = '';
+    if (opts.flip?.(n)) {
+      let s = pos[pos.length - 1];
+      while (s > pos[0] + 0.01) {
+        const c = pos.filter((b) => b < s - 0.01 && whole(s - b))[0];
+        if (c === undefined) { bad = `no beam within 8 ft of ${s.toFixed(3)} at a whole-foot distance: the strip cannot be cut into 4 ft sheets jointed on its beams`; break; }
+        pieces.unshift([c, s, Math.round((s - c) / FT)]);
+        s = c;
+      }
+    } else {
+      let s = pos[0];
+      while (s < pos[pos.length - 1] - 0.01) {
+        const c = pos.filter((b) => b > s + 0.01 && whole(b - s)).pop();
+        if (c === undefined) { bad = `no beam within 8 ft of ${s.toFixed(3)} at a whole-foot distance: the strip cannot be cut into 4 ft sheets jointed on its beams`; break; }
+        pieces.push([s, c, Math.round((c - s) / FT)]);
+        s = c;
+      }
     }
     if (bad) { un(n, bad); continue; }
     const level = r4(n.box.c[1]);
@@ -162,16 +180,16 @@ export function phaseBParts(g: AssemblyGraph, assembly: string): PartsB {
     kit.push({ node: n.id, kind: 'wall', feature: n.kitDef, c: n.box.c, yaw: n.box.yaw, size: n.box.size, offset: `${(half + PLY_T / 2).toFixed(4)} m outward: against the outer face of the ${onBeam ? 'beam line' : 'frame plane'} the Kit centres the wall on` });
   }
   // ---------------- stair
-  stairParts(nodes, frames, parts, kit, unplaced);
+  stairParts(nodes, frames, parts, kit, unplaced, stairs);
   // ---------------- solar
   solarParts(nodes, deckSheets, beams, byId, g, parts, kit, unplaced);
   parts.sort((a, b) => (a.id < b.id ? -1 : 1));
   kit.sort((a, b) => (a.node < b.node ? -1 : 1));
   unplaced.sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.node < b.node ? -1 : 1));
-  return { version: PARTS_B_VERSION, assembly, parts, kit, unplaced };
+  return { version: PARTS_B_VERSION, assembly, parts, kit, unplaced, stairs };
 }
 
-function stairParts(nodes: AsmNode[], frames: AsmNode[], parts: PartB[], kit: KitRef[], unplaced: UnplacedB[]) {
+function stairParts(nodes: AsmNode[], frames: AsmNode[], parts: PartB[], kit: KitRef[], unplaced: UnplacedB[], stairs: KitStair[]) {
   const st = nodes.filter((n) => n.feature === 'stair-part');
   if (!st.length) return;
   const un = (n: AsmNode, reason: string) => unplaced.push({ node: n.id, kind: 'feature:stair-part', reason });
@@ -229,6 +247,10 @@ function stairParts(nodes: AsmNode[], frames: AsmNode[], parts: PartB[], kit: Ki
       pose: { p: [r4(c[0]), r4(baseY + (G.L / 2) * G.sin), r4(c[1])], yaw: r4(yawUp), roll: theta }, y: baseY, key: [0, i], meta: { lat: l, n: stringerLat.length },
     });
   }
+  stairs.push({
+    id: stairId, stringers: stringerLat.map((_, i) => `${stairId}-stringer-${i + 1}`), treads: treads.map((t) => [`${t.id}-b1`, `${t.id}-b2`]), tops: treads.map((t) => r4(t.box.y1)),
+    foot: [r4(front[0]), r4(front[1])], dir: [r4(dir[0]), r4(dir[1])], width: tw, topY: r4(tn.box.y1), baseY: r4(baseY), going, heading: r4(yawUp),
+  });
   // tread boards: two per Kit tread, centred on it, tops at the Kit tread top; the top tread's back board notched
   for (const [i, t] of treads.entries()) {
     const sc = sOf(xz(t));

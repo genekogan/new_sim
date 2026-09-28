@@ -20,6 +20,13 @@ import { takeFromBundle } from '../construction/bundle.ts';
 import { cutStock } from '../construction/cut.ts';
 import { hangHandsInReach, stanceAccessOk, STANCE_ACTIONS } from '../construction/stance.ts';
 import { WorldHistory } from '../history/store.ts';
+import { passUp } from '../construction/passup.ts';
+import { installStairPart, installStringer, kitPartHandsInReach, kitPartsSupported, kitStairContributor } from '../construction/setpart.ts';
+import { installWall } from '../construction/wall.ts';
+import { MOVES_B } from '../construction/moves-b.ts';
+import { SOLAR_ACTIONS } from '../construction/solar.ts';
+import { progressiveContributor, progressiveSupported } from '../construction/contributor.ts';
+import type { Section } from '../campus/sequence-b.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import type { EngineConfig } from '../rehearsal/rehearse.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
@@ -37,6 +44,14 @@ export function yearBuildRegistry(): Map<string, ActionDef> {
 }
 export const YEAR_BUILD_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, liftHandsInReach, stanceAccessOk, hangHandsInReach];
 
+// ---- phase B (W13): decks, stair, walls, solar ----
+export function yearBuildRegistryB(): Map<string, ActionDef> {
+  const r = yearBuildRegistry();
+  for (const a of [passUp, installStringer, installStairPart, installWall, ...MOVES_B, ...SOLAR_ACTIONS] as ActionDef[]) r.set(a.verb, a);
+  return r;
+}
+export const YEAR_BUILD_B_INVARIANTS: Invariant[] = [...YEAR_BUILD_INVARIANTS, progressiveSupported, kitPartHandsInReach, kitPartsSupported];
+
 export type YearBuildSetup = {
   history: WorldHistory;
   /** Protected canonical workspace `mars-<year>` and the build fork. */
@@ -50,13 +65,13 @@ export type YearBuildSetup = {
 };
 
 /** Publish `mars-<year>` (protected), fork it, commit the piles + crew, bind the skeleton template. */
-export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number } = {}): YearBuildSetup {
+export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[] } } = {}): YearBuildSetup {
   const history = new WorldHistory(YEAR_BUILD_RULES);
   const { canonical, base } = publishCampusYear(history, year, file);
   const graph = assemblyGraph(year, base);
   const fp = buildingFootprint(graph.nodes.filter((n) => n.assembly === assembly));
   const scene = yearBuildScene(base, assembly, fp.c, opts.radius ?? 35);
-  const build = yearBuildPlan(graph, scene, assembly, { bays: opts.bays });
+  const build = yearBuildPlan(graph, scene, assembly, { bays: opts.bays, ...(opts.phaseB ? { phaseB: opts.phaseB } : {}) });
   const workspace = `mars-${year}-build-${assembly}`;
   history.fork(canonical.id, workspace, `Mars ${year}: ${assembly} skeleton from the piles (hypothetical)`);
   const w = history.read(workspace);
@@ -64,9 +79,15 @@ export function yearBuildSetup(year: number, assembly: string, file: CampusYearF
   const staticHash = hashOf(scene);
   w.base = { campus: `mars-${year}:build:${assembly}`, staticHash };
   for (const e of build.entities) w.entities[e.id] = e;
-  history.commit(workspace, w, { kind: 'design-edit', note: `year build phase A: ${assembly} piles, cutting station and crew (hypothetical)` });
-  const plan = bindTemplate(build.template, build.bindings, { history, baseline: workspace, registry: yearBuildRegistry() });
-  const cfg: EngineConfig = { registry: yearBuildRegistry(), invariants: YEAR_BUILD_INVARIANTS, services: () => ({ spatial: new Spatial(scene, { baseId: staticHash }) }), maxTicks: 20 * 60 * 240 };
+  history.commit(workspace, w, { kind: 'design-edit', note: `year build phase ${opts.phaseB ? 'A+B' : 'A'}: ${assembly} piles, cutting station and crew (hypothetical)` });
+  const registry = opts.phaseB ? yearBuildRegistryB() : yearBuildRegistry();
+  const plan = bindTemplate(build.template, build.bindings, { history, baseline: workspace, registry });
+  // phase B: decks become walkable floors and the Kit stair a link (usable once complete) as they are built
+  const contributors = opts.phaseB ? [progressiveContributor, kitStairContributor(build.partsB?.stairs ?? [])] : undefined;
+  const cfg: EngineConfig = {
+    registry, invariants: opts.phaseB ? YEAR_BUILD_B_INVARIANTS : YEAR_BUILD_INVARIANTS,
+    services: () => ({ spatial: new Spatial(scene, { baseId: staticHash, ...(contributors ? { contributors } : {}) }) }), maxTicks: 20 * 60 * 60 * (opts.phaseB ? 16 : 4),
+  };
   return { history, canonical: canonical.id, workspace, graph, scene, build, plan, cfg };
 }
 

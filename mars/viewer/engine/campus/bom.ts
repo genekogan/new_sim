@@ -19,6 +19,8 @@ import { CATALOG, def } from '../world/catalog.ts';
 import { BUNDLES } from '../world/catalog-stock.ts';
 import type { AsmNode, AssemblyGraph, CompBox, FeatureClass } from './assembly.ts';
 import type { CampusObstacle } from './types.ts';
+import type { PartsB } from './parts-b.ts';
+import { cutPlan } from '../construction/cut.ts';
 
 const SHEET_L = 8 * 0.3048, SHEET_W = 4 * 0.3048;
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
@@ -139,7 +141,7 @@ export type PilePlacement = PileSpec & {
   /** Where a piece taken from it is laid (centre, long-axis heading): the take-out strip beside it. */
   out: { x: number; z: number; yaw: number };
 };
-export type Yard = { piles: PilePlacement[]; station: { x: number; z: number; yaw: number } | null; workZone: OBB2; refused: { id: string; reason: string }[] };
+export type Yard = { piles: PilePlacement[]; station: { x: number; z: number; yaw: number } | null; workZone: OBB2; refused: { id: string; reason: string }[]; extra?: { id: string; def: string; x: number; z: number; yaw: number }[] };
 
 /** Room around the building for laying frames out and raising them (m, beyond the footprint). */
 export const WORK_MARGIN = { ends: 6.0, sides: 3.0 };
@@ -169,7 +171,7 @@ export function buildingFootprint(nodes: AsmNode[]): OBB2 {
  * (≤ `radius` m from the building) is searched nearest-to-that-side's-anchor first (ties by x, z);
  * the side where everything fits with the least total distance to the building wins (ties: side order).
  */
-export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean } = {}): Yard {
+export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: CampusObstacle[], groundY: number, opts: { radius?: number; station?: boolean; extra?: { id: string; def: string }[]; more?: PileSpec[] } = {}): Yard {
   const fp = buildingFootprint(nodes);
   // frames stand in lines along the frames' normal (local z): the ends are where frames are laid out
   const workZone: OBB2 = { c: fp.c, half: [fp.half[0] + WORK_MARGIN.sides, fp.half[1] + WORK_MARGIN.ends], yaw: fp.yaw };
@@ -186,14 +188,14 @@ export function placePiles(piles: PileSpec[], nodes: AsmNode[], obstacles: Campu
     const a = rot2([sd[0] * (workZone.half[0] + 4), sd[1] * (workZone.half[1] + 4)], fp.yaw);
     const anchor: Vec2 = [fp.c[0] + a[0], fp.c[1] + a[1]];
     const cands = lattice.map((p) => ({ p, d: dist(p, anchor) })).sort((x, y) => x.d - y.d || x.p[0] - y.p[0] || x.p[1] - y.p[1]).map((x) => x.p);
-    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false);
+    const yard = placeOn(cands, piles, workZone, near, fp, R, opts.station !== false, opts.extra ?? [], opts.more ?? []);
     const cost = yard.refused.length * 1e6 + yard.piles.reduce((s, p) => s + dist([p.x, p.z], fp.c), 0) + (yard.station ? dist([yard.station.x, yard.station.z], fp.c) : 0);
     if (cost < bestCost - 1e-9) { best = yard; bestCost = cost; }
   }
   return best!;
 }
 
-function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean): Yard {
+function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusObstacle[], fp: OBB2, R: number, withStation: boolean, extra: { id: string; def: string }[] = [], more: PileSpec[] = []): Yard {
   const placed: OBB2[] = [];
   const out: PilePlacement[] = [];
   const refused: Yard['refused'] = [];
@@ -201,7 +203,7 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
   const yaw = fp.yaw + Math.PI / 2;
   const fits = (plot: OBB2) => !obbOverlap(plot, workZone) && !placed.some((q) => obbOverlap(q, plot)) && !near.some((o) => obbOverlap(o.obb, plot));
   const order = [...piles].sort((a, b) => def(b.def).size[0] * def(b.def).size[2] - def(a.def).size[0] * def(a.def).size[2] || (a.id < b.id ? -1 : 1));
-  for (const pile of order) {
+  const placePile = (pile: PileSpec) => {
     const d = def(pile.def), pc = def(pile.piece);
     const upright = pc.category === 'rack-upright';
     const L = Math.max(d.size[0], upright ? pc.size[1] : pc.size[0]);
@@ -210,11 +212,12 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
     const D = d.size[2], z0 = -D / 2 - PILE_ACCESS, z1 = D / 2 + OUT_GAP + pieceW + PILE_ACCESS;
     const mid = rot2([0, (z0 + z1) / 2], yaw);
     const c = cands.find((p) => fits({ c: [p[0] + mid[0], p[1] + mid[1]], half: [L / 2 + PILE_ACCESS, (z1 - z0) / 2], yaw }));
-    if (!c) { refused.push({ id: pile.id, reason: `no free ${(L + 2 * PILE_ACCESS).toFixed(1)} × ${(z1 - z0).toFixed(1)} m plot within ${R} m of the building outside its work zone` }); continue; }
+    if (!c) { refused.push({ id: pile.id, reason: `no free ${(L + 2 * PILE_ACCESS).toFixed(1)} × ${(z1 - z0).toFixed(1)} m plot within ${R} m of the building outside its work zone` }); return; }
     placed.push({ c: [c[0] + mid[0], c[1] + mid[1]], half: [L / 2 + PILE_ACCESS, (z1 - z0) / 2], yaw });
     const o = rot2([0, D / 2 + OUT_GAP + pieceW / 2], yaw);
     out.push({ ...pile, x: r3(c[0]), z: r3(c[1]), yaw, out: { x: r3(c[0] + o[0]), z: r3(c[1] + o[1]), yaw } });
-  }
+  };
+  for (const pile of order) placePile(pile);
   let station: Yard['station'] = null;
   if (withStation) {
     const s = def('cutting-station').size;
@@ -222,8 +225,20 @@ function placeOn(cands: Vec2[], piles: PileSpec[], workZone: OBB2, near: CampusO
     if (c) { placed.push({ c, half: [s[0] / 2 + 1.5, s[2] / 2 + 1.5], yaw }); station = { x: r3(c[0]), z: r3(c[1]), yaw }; }
     else refused.push({ id: 'cutting-station', reason: `no free plot within ${R} m for the cutting station` });
   }
+  // phase B: more piles after the phase-A yard and its station (so the skeleton's yard is unchanged), largest first
+  for (const pile of [...more].sort((a, b) => def(b.def).size[0] * def(b.def).size[2] - def(a.def).size[0] * def(a.def).size[2] || (a.id < b.id ? -1 : 1))) placePile(pile);
+  // extra plots (phase B: the scrap pile), nearest the station when there is one
+  const ex: NonNullable<Yard['extra']> = [];
+  for (const x of extra) {
+    const s = def(x.def).size;
+    const half: Vec2 = [s[0] / 2 + 1.5, s[2] / 2 + 1.5];
+    const byStation = station ? [...cands].sort((a, b) => dist(a, [station!.x, station!.z]) - dist(b, [station!.x, station!.z]) || a[0] - b[0] || a[1] - b[1]) : cands;
+    const c = byStation.find((p) => fits({ c: p, half, yaw }));
+    if (c) { placed.push({ c, half, yaw }); ex.push({ id: x.id, def: x.def, x: r3(c[0]), z: r3(c[1]), yaw }); }
+    else refused.push({ id: x.id, reason: `no free plot within ${R} m for ${x.id}` });
+  }
   out.sort((a, b) => (a.id < b.id ? -1 : 1));
-  return { piles: out, station, workZone, refused };
+  return { piles: out, station, workZone, refused, ...(extra.length ? { extra: ex } : {}) };
 }
 
 const dist = (a: Vec2, b: Vec2) => { const dx = a[0] - b[0], dz = a[1] - b[1]; return Math.sqrt(dx * dx + dz * dz); };
@@ -235,4 +250,55 @@ export function bomTotals(bom: Bom, piles: PileSpec[]) {
   const bundles: Record<string, number> = {};
   for (const p of piles) bundles[p.def] = (bundles[p.def] ?? 0) + 1;
   return { items, cuts: bom.cuts.reduce((s, c) => s + c.count, 0), bundles, unresolved: Object.fromEntries(bom.unresolved.map((u) => [u.feature, u.count])) };
+}
+
+/**
+ * Phase B bill of materials (W13): the phase-A skeleton lines plus one stock piece per phase-B part (deck pieces,
+ * wall panels, stair lumber, rails, panels; parts-b.ts material rules), the cut list (stock → part + offcut or
+ * waste, cut.ts cutPlan) and, as unresolved, every feature the rules could not place (with the first reason).
+ */
+export function billOfMaterialsB(g: AssemblyGraph, assemblies: string[], parts: PartsB): Bom {
+  const a = billOfMaterials(g, assemblies);
+  const lines = new Map<string, BomLine>();
+  for (const l of a.lines.filter((x) => x.phase === 'A')) lines.set(`A|${l.item}|${l.for}`, { ...l });
+  const cuts = new Map<string, CutLine>();
+  for (const p of parts.parts) {
+    const what = p.kind === 'deck' ? 'decks' : p.kind === 'wall' ? 'plywood walls' : p.kind === 'stair' ? 'Kit stair' : 'solar (own piles, §9)';
+    const k = `B|${p.stock}|${what}`;
+    const l = lines.get(k);
+    if (l) l.count++; else lines.set(k, { item: p.stock, count: 1, phase: 'B', source: 'kit', for: what });
+    if (p.cut) {
+      const plan = cutPlan(p.stock, [p.def]);
+      const off = plan.ok && plan.offcut ? plan.offcut.id : 'waste';
+      const ck = `${p.stock}|${p.def}|${off}|${what}`;
+      const c = cuts.get(ck);
+      if (c) c.count++; else cuts.set(ck, { stock: p.stock, to: p.def, offcut: off, count: 1, for: what, def: p.def });
+    }
+  }
+  const un = new Map<string, { count: number; reason: string }>();
+  for (const u of parts.unplaced) { const f = u.kind.replace(/^feature:/, ''); const x = un.get(f); if (x) x.count++; else un.set(f, { count: 1, reason: u.reason }); }
+  const covered = new Set(['deck-sheet', 'wall', 'stair-part', 'solar']);
+  for (const r of a.unresolved.filter((x) => !covered.has(x.feature))) { const x = un.get(r.feature); if (x) x.count += r.count; else un.set(r.feature, { count: r.count, reason: r.reason }); }
+  const sortL = (x: BomLine, y: BomLine) => (x.phase < y.phase ? -1 : x.phase > y.phase ? 1 : x.item < y.item ? -1 : x.item > y.item ? 1 : x.for < y.for ? -1 : 1);
+  return {
+    year: g.year, assemblies: a.assemblies, lines: [...lines.values()].sort(sortL),
+    cuts: [...cuts.values()].sort((x, y) => (x.for + x.to + x.offcut < y.for + y.to + y.offcut ? -1 : 1)),
+    unresolved: [...un.entries()].map(([feature, v]) => ({ feature: feature as FeatureClass, count: v.count, reason: v.reason })).sort((x, y) => (x.feature < y.feature ? -1 : 1)),
+  };
+}
+
+/** Phase B: bundles for the stock `bom` needs beyond what `have` already holds (ids continue each piece's numbering). */
+export function morePiles(bom: Bom, have: PileSpec[]): PileSpec[] {
+  const want = stockPiles(bom);
+  const need = new Map<string, number>();
+  for (const p of want) need.set(p.piece, (need.get(p.piece) ?? 0) + p.count);
+  for (const p of have) need.set(p.piece, (need.get(p.piece) ?? 0) - p.count);
+  const out: PileSpec[] = [];
+  for (const [piece, n] of [...need.entries()].sort()) {
+    if (n <= 0) continue;
+    const [bid, spec] = Object.entries(BUNDLES).filter(([, s]) => s.piece === piece).sort()[0];
+    const k0 = have.filter((p) => p.piece === piece).length;
+    for (let k = 0, left = n; left > 0; k++, left -= spec.capacity) out.push({ id: `pile-${piece}-${k0 + k + 1}`, def: bid, piece, count: Math.min(spec.capacity, left), capacity: spec.capacity, phase: 'B' });
+  }
+  return out;
 }

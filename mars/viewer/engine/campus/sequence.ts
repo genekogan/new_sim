@@ -29,7 +29,7 @@
 // from the floor / stance, relay when the gap is too big), crew sizes (catalog carry / raise crews),
 // material availability (one piece per take, the take-out spot cleared by its carry before the next).
 // No cutting is needed for the skeleton (frames and beams are used as stocked); cuts belong to phase B.
-import { datan2, rot2, type Vec2 } from '../core/math.ts';
+import { datan2, obbOverlap, rot2, type Vec2 } from '../core/math.ts';
 import type { Entity, Provenance } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
 import { human } from '../world/factory.ts';
@@ -38,10 +38,14 @@ import { layTargetForStanding } from '../construction/lying.ts';
 import { bundleEntity } from '../construction/bundle.ts';
 import { GIVE_MAX, GROUND_HANG_MAX, LOAD_OUT, rungs, STANCE_DOWN, STANCE_SEP, STANCE_UP } from '../construction/stance.ts';
 import type { AsmNode, AssemblyGraph } from './assembly.ts';
-import { billOfMaterials, placePiles, stockPiles, type Bom, type Yard } from './bom.ts';
+import { billOfMaterials, billOfMaterialsB, morePiles, placePiles, stockPiles, type Bom, type Yard } from './bom.ts';
+import { phaseBParts, type PartsB } from './parts-b.ts';
+import { phaseB, type Section } from './sequence-b.ts';
+import { bundleContents } from '../construction/bundle.ts';
 import type { CampusObstacle, CampusScene } from './types.ts';
 
 export const YEAR_BUILD_VERSION = 'mars-year-build/phase-a-1';
+export const YEAR_BUILD_B_VERSION = 'mars-year-build/phase-b-1';
 const HYPO: Provenance = { origin: 'design-edit', confidence: 'hypothetical', note: 'year build phase A (skeleton) — hypothetical piles, crew and order, not historical' };
 const AISLE_END = 1.5; // m beyond frame line 0 where an aisle beam's near end lies before it is walked in
 const HOOK_MAX = 1.8; // m: installers hook a beam at most this far above their feet (margin under the 2.06 m reach, body/model.ts)
@@ -51,7 +55,7 @@ const dot = (a: Vec2, b: Vec2) => a[0] * b[0] + a[1] * b[1];
 export type Unplaced = { node: string; kind: string; reason: string };
 export type Target = { node: string; def: string; kind: 'upright' | 'beam'; c: [number, number, number]; yaw: number };
 export type YearBuildPlan = {
-  version: typeof YEAR_BUILD_VERSION;
+  version: typeof YEAR_BUILD_VERSION | typeof YEAR_BUILD_B_VERSION;
   year: number;
   assembly: string;
   template: SequenceTemplate;
@@ -63,6 +67,11 @@ export type YearBuildPlan = {
   bom: Bom;
   yard: Yard;
   groundY: number;
+  /** Phase B (W13): the part map (material rules) and how many template steps are phase A's. */
+  partsB?: PartsB;
+  phaseAStepCount?: number;
+  doneB?: string[];
+  sectionStarts?: { section: string; at: number }[];
 };
 
 /**
@@ -95,16 +104,20 @@ type Frame = { node: AsmNode; k: number; r: number; c: Vec2 };
 
 /** Generate the skeleton-stage plan for one building of a year. */
 /** `bays`: build only the first N bays (frame lines 0…N) — a tranche; the rest is reported as outside it. */
-export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number } = {}): YearBuildPlan {
+export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: string, opts: { crew?: string[]; bays?: number; phaseB?: { sections?: readonly Section[] } } = {}): YearBuildPlan {
   const crew = opts.crew ?? ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'];
   if (crew.length !== 6) throw new Error('yearBuildPlan: phase A uses a crew of six');
   const nodes = g.nodes.filter((n) => n.assembly === assembly);
   const frameNodes = nodes.filter((n) => n.kind === 'upright');
   if (!frameNodes.length) throw new Error(`yearBuildPlan: ${assembly} has no classified frames`);
   const unplaced: Unplaced[] = [];
-  const bom = billOfMaterials(g, [assembly]);
-  const piles = stockPiles(bom);
-  const yard = placePiles(piles, nodes, scene.obstacles, 0);
+  // phase B (W13): the material rules decide the stock, and the yard gets a scrap pile by the station
+  // (the phase-A yard is placed first, exactly as without phase B; the extra bundles go in after it)
+  const partsB = opts.phaseB ? phaseBParts(g, assembly, { flip: (strip) => noRoomMinusU(strip, scene) }) : undefined;
+  const bomA = billOfMaterials(g, [assembly]);
+  const bom = partsB ? billOfMaterialsB(g, [assembly], partsB) : bomA;
+  const piles = stockPiles(bomA);
+  const yard = placePiles(piles, nodes, scene.obstacles, 0, partsB ? { extra: [{ id: 'scrap-pile', def: 'scrap-pile' }], more: morePiles(bom, piles) } : {});
   for (const r of yard.refused) unplaced.push({ node: r.id, kind: 'pile', reason: r.reason });
   // ---- grid of frame lines × rows
   const Y = frameNodes[0].box.yaw;
@@ -278,6 +291,20 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
       for (const lv of levels.slice(need)) for (const b of bay.filter((x) => x.seat.toFixed(3) === lv)) hang(b, fa, fb);
     }
   }
+  // ---- phase B: decks, stair, walls, solar (sequence-b.ts)
+  const phaseAStepCount = S.length;
+  let resB: ReturnType<typeof phaseB> | undefined;
+  if (partsB && opts.phaseB) {
+    const scrap = yard.extra?.find((x) => x.id === 'scrap-pile');
+    resB = phaseB({
+      assembly, parts: partsB, step, C, yard, scrap: scrap ? { id: scrap.id, x: scrap.x, z: scrap.z, yaw: scrap.yaw } : null, left, spotClear,
+      frames: frames.map((f) => ({ id: f.node.id, k: f.k, r: f.r, c: f.c, def: f.node.def! })), beams: beams.map((b) => ({ id: b.node.id, k: b.k, r: b.r, col: b.col, seat: b.seat })),
+      engCol, Y, sections: opts.phaseB.sections, count: () => S.length,
+      narrowMinusU: (v) => { const nd = partsB.kit.find((k) => k.kind === 'deck' && Math.abs(dot([k.c[0], k.c[2]], rot2([0, 1], Y)) - v) < 0.3); return !!nd && noRoomMinusU(nodes.find((x) => x.id === nd.node)!, scene); },
+    });
+    for (const x of resB.sequenced) done.set(x.node, x.steps);
+    for (const u of [...partsB.unplaced, ...resB.unplaced]) if (!unplaced.some((v) => v.node === u.node)) unplaced.push(u);
+  }
   // ---- everything not sequenced
   const seqIds = new Set(done.keys());
   const outside = (k: number) => (k > bays ? `outside the requested tranche (bays 0–${bays - 1}, frame lines 0–${bays})` : null);
@@ -288,7 +315,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     if (nd.kind === 'feature') unplaced.push({ node: nd.id, kind: `feature:${nd.feature}`, reason: nd.feature === 'stair-part' ? 'phase A: Kit stairs have no stringers and no catalog flight of their width (4.45 m, 8 treads, 2.22 m rise); stair verbs for them are phase B' : `phase A builds the skeleton only; ${nd.feature} is phase B` });
     else unplaced.push({ node: nd.id, kind: nd.kind, reason: 'not reached by the generator' });
   }
-  for (const [id, ids] of done) seq.push({ node: id, kind: nodes.find((x) => x.id === id)!.kind, steps: ids });
+  for (const [id, ids] of done) { const nd = nodes.find((x) => x.id === id)!; seq.push({ node: id, kind: nd.kind === 'feature' ? `feature:${nd.feature}` : nd.kind, steps: ids }); }
   seq.sort((a, b) => (a.node < b.node ? -1 : 1));
   unplaced.sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.node < b.node ? -1 : 1));
   const targets: Target[] = seq.filter((s) => s.kind === 'upright' || s.kind === 'beam').map((s) => {
@@ -299,15 +326,16 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   const entities: Entity[] = [];
   for (const p of yard.piles) entities.push(bundleEntity(p.id, p.def, p.x, p.z, p.yaw, p.count, 0, HYPO));
   if (yard.station) entities.push({ id: 'cutting-station', def: 'cutting-station', kind: 'fixture', label: 'cutting station', pose: { p: [yard.station.x, 0, yard.station.z], yaw: yard.station.yaw }, provenance: HYPO });
+  for (const x of yard.extra ?? []) entities.push({ id: x.id, def: x.def, kind: 'fixture', label: def(x.def).label, pose: { p: [x.x, 0, x.z], yaw: x.yaw }, provenance: HYPO, contents: bundleContents(x.def, 0) });
   crew.forEach((id, i) => { const w = waitAt(0, i); entities.push(human(id, w.x, w.z, { provenance: HYPO, label: `builder ${i + 1}` })); });
   const template: SequenceTemplate = {
     schema: SEQUENCE_SCHEMA,
-    id: `year-build-${g.year}-${assembly}-skeleton${bays < K - 1 ? `-bays${bays}` : ''}`,
-    label: `Mars ${g.year} ${assembly}: skeleton stage from the piles (hypothetical order; phase A)`,
+    id: `year-build-${g.year}-${assembly}-${partsB ? 'phase-ab' : 'skeleton'}${bays < K - 1 ? `-bays${bays}` : ''}`,
+    label: `Mars ${g.year} ${assembly}: ${partsB ? 'skeleton, floors, stair, walls and solar' : 'skeleton stage'} from the piles (hypothetical order; phase ${partsB ? 'A+B' : 'A'})`,
     params: { crew: { kind: 'actors', description: 'six builders: 0–1 carry / give, 2 and 5 hold / relay, 3–4 install on the bracing' } },
     steps: S,
   };
-  return { version: YEAR_BUILD_VERSION, year: g.year, assembly, template, bindings: { crew }, entities, targets, sequenced: seq, unplaced, bom, yard, groundY: 0 };
+  return { version: partsB ? YEAR_BUILD_B_VERSION : YEAR_BUILD_VERSION, year: g.year, assembly, template, bindings: { crew }, entities, targets, sequenced: seq, unplaced, bom, yard, groundY: 0, ...(partsB ? { partsB, phaseAStepCount, doneB: resB?.done ?? [], sectionStarts: resB?.sectionStarts ?? [] } : {}) };
 }
 
 function lineCoord(frames: Frame[], k: number): number {
@@ -322,4 +350,15 @@ function sideOfYard(yard: Yard, frames: Frame[], across: Vec2): 1 | -1 {
   const cx = yard.piles.reduce((s, p) => s + p.x, 0) / yard.piles.length, cz = yard.piles.reduce((s, p) => s + p.z, 0) / yard.piles.length;
   const mid = frames.reduce((s, f) => s + dot(f.c, across), 0) / frames.length;
   return dot([cx, cz], across) >= mid ? 1 : -1;
+}
+
+/**
+ * Phase B: is the ground beside a deck strip's −u end (its long axis) taken — something 0.22–2.2 m tall within 2.3 m of
+ * the house there (a neighbour's stair, a wall)? Then its long pieces go up on the +u side (parts-b.ts flip).
+ */
+function noRoomMinusU(strip: AsmNode, scene: CampusScene): boolean {
+  const u = rot2([1, 0], strip.box.yaw);
+  const c: Vec2 = [strip.box.c[0] - u[0] * (strip.box.size[0] / 2 + 1.2), strip.box.c[2] - u[1] * (strip.box.size[0] / 2 + 1.2)];
+  const band = { c, half: [1.1, strip.box.size[2] / 2] as Vec2, yaw: strip.box.yaw };
+  return scene.obstacles.some((o) => o.y1 > 0.22 && o.y0 < 2.2 && obbOverlap(o.obb, band));
 }
