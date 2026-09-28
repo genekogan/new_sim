@@ -61,7 +61,7 @@ assert.equal(legacy.length, 20);
 const engineToolNames = list.tools.filter((t) => t.name.startsWith('engine_')).map((t) => t.name).sort();
 assert.deepEqual(engineToolNames, [
   'engine_attach_camera_track', 'engine_bind_plan', 'engine_delete_workspace', 'engine_edit_world', 'engine_execute', 'engine_fork', 'engine_get_take',
-  'engine_list', 'engine_list_verbs', 'engine_log', 'engine_query_world', 'engine_rehearse',
+  'engine_list', 'engine_list_verbs', 'engine_log', 'engine_query_world', 'engine_rehearse', 'engine_resume',
 ]);
 const call = async (name, args) => {
   const r = await client.callTool({ name, arguments: args });
@@ -459,6 +459,50 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
   const gt = ok('get_take seconds', await ecall('engine_get_take', { take_id: ex.body.take_id, from: 10, to: 20, entities: ['n1'] }));
   assert.deepEqual(gt.range, { from: 10, to: 20, fromTick: 200, toTick: 400 });
 }
+// ---- mid-action pause / resume (engine_execute pauseAt, engine_resume, engine_fork at a pause) ----
+// Mirrors the node:sqlite EngineRoom tests "pause/resume (room)" in engine/test/api.test.ts.
+{
+  const P = [];
+  const pt = (label, body) => (P.push(`${label} ${Math.round(body._wallMs)}/${body._meta?.elapsedMs ?? '-'}`), body);
+  const cross = {
+    schema: 'mars-sequence/1', id: 'cross-and-climb', params: { crew: { kind: 'actors' }, deck: { kind: 'point' } },
+    steps: [
+      { id: 'north', verb: 'walk_to', params: { actor: '$crew[0]', x: 15, z: -10.5 } },
+      { id: 'south', verb: 'walk_to', params: { actor: '$crew[1]', x: 15, z: -19.5 } },
+      { id: 'climb', verb: 'walk_to', params: { actor: '$crew[2]', x: '$deck[0]', z: '$deck[1]', level: 1 }, after: ['north', 'south'] },
+    ],
+  };
+  for (const w of ['pz-full', 'pz']) ok(`fork ${w}`, await ecall('engine_fork', { from: 'proving-ground', name: w }));
+  const pb = ok('bind cross', await ecall('engine_bind_plan', { template: cross, bindings: { crew: ['n1', 's1', 'p1'], deck: [10, 10] }, workspace: 'pz-full' }));
+  const full = pt('execute unpaused', ok('execute unpaused', await ecall('engine_execute', { plan_id: pb.plan_id, workspace: 'pz-full' })));
+  const pp = pt('execute pauseAt 5 s', ok('execute pauseAt', await ecall('engine_execute', { plan_id: pb.plan_id, workspace: 'pz', pauseAt: 5 })));
+  assert.equal(pp.paused, true);
+  assert.equal(pp.checkpoint.resumable, true);
+  assert.deepEqual(pp.live.map((a) => a.id), ['step:north', 'step:south']);
+  const blobKey = Object.keys(pp._meta.stored).find((k) => k.includes('/state/resume.'));
+  assert.ok(blobKey, `pause snapshot stored as a state blob: ${JSON.stringify(pp._meta.stored)}`);
+  refused('edit a paused workspace', await ecall('engine_edit_world', { workspace: 'pz', note: 'x', edits: [{ op: 'move', id: 'panel', lying: { x: 0, z: 0, yaw: 0 } }] }), 'workspace.paused');
+  const pr = pt('resume', ok('resume', await ecall('engine_resume', { workspace: 'pz' })));
+  assert.equal(pr.report.finalStateHash, full.report.finalStateHash, 'resume without commands = unpaused final state');
+  assert.equal(pr.checkpoint.stateHash, full.checkpoint.stateHash);
+  refused('resume a resting head', await ecall('engine_resume', { workspace: 'pz' }), 'resume.not-resumable');
+  // fork at a pause; resume both branches with different commands
+  ok('fork pf', await ecall('engine_fork', { from: 'proving-ground', name: 'pf' }));
+  const fb = ok('bind n1-far', await ecall('engine_bind_plan', { template: walkPlan('n1-far', -8, -22), bindings: { a: 'n1' }, workspace: 'pf' }));
+  const fp = ok('pause n1-far at 3 s', await ecall('engine_execute', { plan_id: fb.plan_id, workspace: 'pf', pauseAt: 3 }));
+  assert.equal(pt('fork at pause', ok('fork at pause', await ecall('engine_fork', { from: 'pf', name: 'pf-alt' }))).workspace.head, fp.checkpoint.id);
+  const ra = pt('resume + command', ok('resume pf', await ecall('engine_resume', { workspace: 'pf', commands: [{ verb: 'walk_to', params: { actor: 's1', x: -5, z: 5 } }] })));
+  const rb = ok('resume pf-alt', await ecall('engine_resume', { workspace: 'pf-alt', commands: [{ verb: 'walk_to', params: { actor: 's1', x: 0, z: -5 } }] }));
+  assert.notEqual(ra.report.finalStateHash, rb.report.finalStateHash, 'different commands → different futures');
+  // a carry is not resumable: the refusal names it, nothing is committed
+  ok('fork pz-cy', await ecall('engine_fork', { from: 'carry-yard', name: 'pz-cy' }));
+  const cb = ok('bind delivery', await ecall('engine_bind_plan', { template: { schema: 'mars-sequence/1', id: 'beam-delivery', params: { crew: { kind: 'actors' }, beam: { kind: 'entity' } }, steps: [{ id: 'deliver', verb: 'carry', params: { crew: '$crew', item: '$beam', to: { x: 18, z: 11, yaw: Math.PI / 2 } } }] }, bindings: { crew: ['p1', 'p2'], beam: 'b1' }, workspace: 'pz-cy' }));
+  const cyHead = (await ecall('engine_log', { workspace: 'pz-cy' })).body.head;
+  const cr = refused('pause mid-carry', await ecall('engine_execute', { plan_id: cb.plan_id, workspace: 'pz-cy', pauseAt: 5 }), 'snapshot.non-resumable');
+  assert.match(cr.message, /action step:deliver \(carry\) is not resumable/);
+  assert.equal((await ecall('engine_log', { workspace: 'pz-cy' })).body.head, cyHead);
+  console.log(`ENGINE PAUSE/RESUME (wall ms / in-DO ms): ${P.join('; ')}; pause blob ${pp.snapshotBytes} B (${blobKey.split('/').pop().slice(0, 19)}…), take so far ${pp.take.bytes} B, state storage ${JSON.stringify(pp._meta.storage.state)}`);
+}
 // ---- historical year room (2022): canonical mars-2022 seeded from public/engine/campus-2022.json ----
 {
   const c22 = new Client({ name: 'mars-verification-2022', version: '1.0.0' });
@@ -498,7 +542,7 @@ await writeFile(
 );
 await client.close();
 console.log(
-  'PASS: MCP handshake + 20 legacy tools + 12 engine tools (bind/rehearse/execute/take/camera/edit/list/delete, one refusal envelope); room isolation, read-only access, invalid camera, idempotency, walking, activities, pause and persisted state; 2022 year room.',
+  'PASS: MCP handshake + 20 legacy tools + 13 engine tools (bind/rehearse/execute/pause/resume/take/camera/edit/list/delete, one refusal envelope); room isolation, read-only access, invalid camera, idempotency, walking, activities, pause and persisted state; 2022 year room.',
 );
 
 assert.equal(

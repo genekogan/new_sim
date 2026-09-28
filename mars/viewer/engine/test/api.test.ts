@@ -784,3 +784,164 @@ test('api: every refusal is one JSON envelope { ok:false, code, message, details
     assert.deepEqual(ls.validate({ junk: [1] }), { value: { junk: [1] } });
   }
 });
+
+// ---- mid-action pause / resume through the control plane (engine_execute pauseAt, engine_resume) ----
+
+const deliveryPlan = (to: { x: number; z: number; yaw: number }) => ({
+  schema: 'mars-sequence/1', id: 'beam-delivery', params: { crew: { kind: 'actors' }, beam: { kind: 'entity' } },
+  steps: [{ id: 'deliver', verb: 'carry', params: { crew: '$crew', item: '$beam', to } }],
+});
+
+test('pause/resume (room): execute pauseAt mid-walk → resume ends in the unpaused final state; snapshots are state blobs; survives a room restart', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  let room = new EngineRoom(s.storage);
+  for (const w of ['full', 'paused', 'chain']) assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: w }) as any).ok);
+  const b = room.call(2026, 'bind_plan', { template: crossTemplate, bindings: crossBindings, workspace: 'full' }) as any;
+  const full = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'full' }) as any;
+  assert.ok(full.ok, full.message);
+  // pause 5 s in: n1 is walking north through the passage, s1 is held at its south end (single-file)
+  const p = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'paused', pauseAt: 5 }) as any;
+  assert.ok(p.ok, p.message);
+  assert.equal(p.paused, true);
+  assert.equal(p.resumable, true);
+  assert.deepEqual(p.at, { t: 5, tick: 100 });
+  assert.deepEqual(p.live.map((a: any) => [a.id, a.verb]), [['step:north', 'walk_to'], ['step:south', 'walk_to']]);
+  assert.deepEqual(p.steps.map((x: any) => x.status), ['executing', 'blocked', 'pending']);
+  assert.equal(p.checkpoint.resumable, true);
+  assert.deepEqual(p.checkpoint.cause, { kind: 'pause', note: 'paused at t = 5 s (t = 5 s)', take: p.take_id, plan: b.plan_id });
+  assert.equal(p.take.ticks, 100, 'the take so far covers 0–5 s');
+  // the snapshot is a content-addressed blob next to the states, never inline in the index
+  const resumeKeys = Object.keys(p._meta.stored).filter((k) => k.startsWith('y2026/state/resume.'));
+  assert.equal(resumeKeys.length, 1);
+  assert.equal(JSON.parse(s.blob('y2026/history')).resumes, undefined, 'index carries no snapshots');
+  assert.equal(p._meta.stored[resumeKeys[0]], s.blob(resumeKeys[0]).length);
+  console.log(`  pause blob ${p.snapshotBytes} B (stable JSON), stored ${s.blob(resumeKeys[0]).length} B; state storage ${JSON.stringify(p._meta.storage.state)}; pause ${p._meta.elapsedMs} ms`);
+  assert.equal((room.call(2026, 'query_world', {}) as any).workspaces.find((w: any) => w.id === 'paused').paused, true);
+  // a paused head is not a resting state: no other plan, bind or edit on it
+  const other = room.call(2026, 'bind_plan', { template: walkPlan('x', 0, -5), bindings: { a: 'p1' }, workspace: 'full' }) as any;
+  assert.equal((room.call(2026, 'execute', { plan_id: other.plan_id, workspace: 'paused' }) as any).code, 'workspace.paused');
+  assert.equal((room.call(2026, 'bind_plan', { template: walkPlan('x', 0, -5), bindings: { a: 'p1' }, workspace: 'paused' }) as any).code, 'workspace.paused');
+  assert.equal((room.call(2026, 'edit_world', { workspace: 'paused', note: 'x', edits: [{ op: 'move', id: 'panel', lying: { x: 0, z: 0, yaw: 0 } }] }) as any).code, 'workspace.paused');
+  // a restarted room (DO eviction) loads the snapshot blob lazily and resumes to the unpaused final state
+  room = new EngineRoom(s.storage);
+  const r = room.call(2026, 'resume', { workspace: 'paused' }) as any;
+  assert.ok(r.ok, r.message);
+  assert.equal(r.report.finalStateHash, full.report.finalStateHash, 'resumed run ends in exactly the unpaused state');
+  assert.equal(r.checkpoint.stateHash, full.checkpoint.stateHash);
+  assert.equal(r.report.metrics.ticks, full.report.metrics.ticks, 'report spans the whole run');
+  assert.equal(r.report.status, 'completed');
+  assert.deepEqual(r.run, { start: b.baselineCheckpoint, takes: [p.take_id, r.take_id] });
+  assert.equal(r.take.ticks, full.take.ticks - 100, 'the segment take covers 5 s → end');
+  assert.deepEqual(r.checkpoint.cause, { kind: 'simulation-run', take: r.take_id, plan: b.plan_id });
+  assert.equal(r.checkpoint.parent, p.checkpoint.id);
+  console.log(`  resume ${r._meta.elapsedMs} ms (+ load ${r._meta.loadMs} ms) vs unpaused execute ${full._meta.elapsedMs} ms`);
+  // both segment takes stay referenced (pause cause + simulation-run cause)
+  const refs = (room.call(2026, 'list', { include: ['takes'] }) as any).takes;
+  assert.deepEqual(refs.find((t: any) => t.take_id === p.take_id).referencedByCheckpoint, [p.checkpoint.id]);
+  // a chain: pause when north completes, again when climb starts, then finish — same final state
+  const c1 = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'chain', pauseAt: { step: 'north', event: 'completed' } }) as any;
+  assert.ok(c1.ok, c1.message);
+  assert.equal(c1.steps[0].status, 'completed');
+  assert.equal((room.call(2026, 'resume', { workspace: 'chain', until: 1 }) as any).code, 'resume.bad-until');
+  assert.equal((room.call(2026, 'resume', { workspace: 'chain', until: { step: 'nope', event: 'started' } }) as any).code, 'pause.unknown-step');
+  const c2 = room.call(2026, 'resume', { workspace: 'chain', until: { step: 'climb', event: 'started' } }) as any;
+  assert.ok(c2.ok && c2.paused, c2.message);
+  assert.deepEqual(c2.live.map((a: any) => a.id), ['step:climb']);
+  const c3 = room.call(2026, 'resume', { workspace: 'chain' }) as any;
+  assert.ok(c3.ok, c3.message);
+  assert.equal(c3.report.finalStateHash, full.report.finalStateHash);
+  assert.equal(c3.run.takes.length, 3);
+  assert.deepEqual((room.call(2026, 'log', { workspace: 'chain' }) as any).checkpoints.map((x: any) => x.cause.kind), ['simulation-run', 'pause', 'pause', 'canonical-publish']);
+  // a pause point the run never reaches: an ordinary execute that says so
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'late' }) as any).ok);
+  const late = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'late', pauseAt: 999 }) as any;
+  assert.ok(late.ok, late.message);
+  assert.equal(late.paused, false);
+  assert.equal(late.report.finalStateHash, full.report.finalStateHash);
+});
+
+test('pause/resume (room): fork at a pause, resume both with different commands → distinct states; the pause checkpoint stays resumable', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage);
+  const canon = roomSnapshot(room);
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'p' }) as any).ok);
+  const b = room.call(2026, 'bind_plan', { template: walkPlan('n1-far', -8, -22), bindings: { a: 'n1' }, workspace: 'p' }) as any;
+  const p = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'p', pauseAt: 3 }) as any;
+  assert.ok(p.ok, p.message);
+  for (const name of ['p-alt', 'p-plain']) {
+    const f = room.call(2026, 'fork', { from: 'p', name }) as any;
+    assert.ok(f.ok, f.message);
+    assert.equal(f.workspace.head, p.checkpoint.id);
+  }
+  assert.equal((room.call(2026, 'fork', { from: 'p', name: 'p-inv', inventory: 'unlimited' }) as any).code, 'workspace.paused');
+  const ws = (room.call(2026, 'query_world', {}) as any).workspaces;
+  assert.deepEqual(ws.filter((w: any) => w.paused).map((w: any) => w.id).sort(), ['p', 'p-alt', 'p-plain']);
+  const bad = room.call(2026, 'resume', { workspace: 'p', commands: [{ verb: 'walk_to', params: { actor: 's1', x: 'far' } }] }) as any;
+  assert.equal(bad.code, 'resume.invalid-command');
+  assert.match(bad.message, /commands\[0\] \(walk_to\)/);
+  assert.equal((room.call(2026, 'resume', { workspace: 'p', commands: [{ verb: 'fly', params: {} }] }) as any).code, 'resume.invalid-command');
+  const a = room.call(2026, 'resume', { workspace: 'p', commands: [{ verb: 'walk_to', params: { actor: 's1', x: -5, z: 5 } }] }) as any;
+  assert.ok(a.ok, a.message);
+  assert.deepEqual(a.commands, ['resume1-1']);
+  assert.equal(a.report.steps.find((x: any) => x.id === 'resume1-1').status, 'completed');
+  const alt = room.call(2026, 'resume', { workspace: 'p-alt', commands: [{ id: 'aside', verb: 'walk_to', params: { actor: 's1', x: 0, z: -5 } }] }) as any;
+  assert.ok(alt.ok, alt.message);
+  assert.notEqual(a.report.finalStateHash, alt.report.finalStateHash, 'different commands → different futures');
+  const s1 = (w: string) => (room.call(2026, 'query_world', { workspace: w, ids: ['s1'] }) as any).entities[0].pose.p;
+  assert.ok(Math.hypot(s1('p')[0] + 5, s1('p')[2] - 5) < 0.3 && Math.hypot(s1('p-alt')[0], s1('p-alt')[2] + 5) < 0.3, `${s1('p')} / ${s1('p-alt')}`);
+  // the parent pause checkpoint is untouched: p-plain still sits on it, resumable, and resumes to the unpaused state
+  assert.equal((room.call(2026, 'log', { workspace: 'p-plain' }) as any).head, p.checkpoint.id);
+  const plain = room.call(2026, 'resume', { workspace: 'p-plain' }) as any;
+  assert.ok(plain.ok, plain.message);
+  assert.ok((room.call(2026, 'fork', { from: 'proving-ground', name: 'unpaused' }) as any).ok);
+  const un = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'unpaused' }) as any;
+  assert.equal(plain.report.finalStateHash, un.report.finalStateHash);
+  assert.notEqual(plain.report.finalStateHash, a.report.finalStateHash);
+  const again = roomSnapshot(room);
+  assert.equal(again.heads['proving-ground'], canon.heads['proving-ground'], 'canonical untouched');
+  assert.deepEqual(again.poses['proving-ground'], canon.poses['proving-ground']);
+  // one snapshot blob serves the checkpoint and all three forks
+  assert.equal(s.keys().filter((k) => k.startsWith('y2026/state/resume.')).length, 1);
+});
+
+test('pause/resume: pauseAt during a carry is refused naming the carry (allowDrop only before the lift); resume on a resting head is resume.not-resumable', async () => {
+  const { EngineRoom } = await import('../../simulation/engine-room.ts');
+  const s = sqliteStorage();
+  const room = new EngineRoom(s.storage);
+  room.call(2026, 'fork', { from: 'carry-yard', name: 'cy' });
+  const b = room.call(2026, 'bind_plan', { template: deliveryPlan({ x: 18, z: 11, yaw: Math.PI / 2 }), bindings: { crew: ['p1', 'p2'], beam: 'b1' }, workspace: 'cy' }) as any;
+  const head = (room.call(2026, 'log', { workspace: 'cy' }) as any).head;
+  const rows = dumpRows(s.db);
+  const r = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'cy', pauseAt: 5 }) as any;
+  assert.equal(r.code, 'snapshot.non-resumable');
+  assert.match(r.message, /action step:deliver \(carry\) is not resumable: carry drives in-process walk sub-execs/);
+  assert.deepEqual(r.details.subjects, ['step:deliver']);
+  assert.deepEqual(r.details.live.map((a: any) => [a.id, a.verb]), [['step:deliver', 'carry']]);
+  assert.equal((room.call(2026, 'log', { workspace: 'cy' }) as any).head, head, 'nothing committed');
+  assert.equal(dumpRows(s.db), rows, 'nothing stored');
+  // mid-carry the beam is held: dropping the carry is refused too
+  const held = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'cy', pauseAt: 5, allowDrop: true }) as any;
+  assert.equal(held.code, 'snapshot.drop-unsafe');
+  assert.match(held.message, /b1 is carried by it/);
+  // before the lift the carry can be dropped: the resumed run cancels it, so it fails and commits nothing
+  const early = room.call(2026, 'execute', { plan_id: b.plan_id, workspace: 'cy', pauseAt: 0.5, allowDrop: true }) as any;
+  assert.ok(early.ok, early.message);
+  assert.deepEqual(early.dropped.map((d: any) => d.id), ['step:deliver']);
+  const res = room.call(2026, 'resume', { workspace: 'cy' }) as any;
+  assert.equal(res.code, 'execution.failed');
+  assert.match(res.message, /step deliver cancelled: .*dropped when the runtime was snapshotted/);
+  assert.equal((room.call(2026, 'log', { workspace: 'cy' }) as any).head, early.checkpoint.id, 'a failed resume leaves the pause head');
+  // resting heads: nothing to resume
+  room.call(2026, 'fork', { from: 'proving-ground', name: 'w' });
+  const nr = room.call(2026, 'resume', { workspace: 'w' }) as any;
+  assert.equal(nr.code, 'resume.not-resumable');
+  assert.match(nr.message, /canonical-publish checkpoint, not a mid-action pause/);
+  const wb = room.call(2026, 'bind_plan', { template: walkPlan('w-walk', -5, 5), bindings: { a: 'p1' }, workspace: 'w' }) as any;
+  assert.ok((room.call(2026, 'execute', { plan_id: wb.plan_id, workspace: 'w' }) as any).ok);
+  assert.equal((room.call(2026, 'resume', { workspace: 'w' }) as any).code, 'resume.not-resumable', 'a simulation-run head is not resumable either');
+  assert.equal((room.call(2026, 'resume', { workspace: 'proving-ground' }) as any).code, 'workspace.protected');
+  assert.equal((room.call(2026, 'resume', { workspace: 'nope' }) as any).code, 'unknown-workspace');
+  assert.equal((room.call(2026, 'execute', { plan_id: wb.plan_id, workspace: 'w', pauseAt: { step: 'zz', event: 'started' } }) as any).code, 'plan.stale', 'stale is checked first');
+});

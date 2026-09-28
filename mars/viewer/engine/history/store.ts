@@ -16,7 +16,7 @@ export type Cause =
   | { kind: 'simulation-run'; take: string; plan?: string } // "three people moved it"
   | { kind: 'fork'; note?: string }
   /** A mid-action pause: the checkpoint also stores a resumable runtime snapshot (runtime/snapshot.ts). */
-  | { kind: 'pause'; note: string };
+  | { kind: 'pause'; note: string; take?: string; plan?: string };
 
 export type Checkpoint = {
   id: string; // hash of {state, parent, cause}
@@ -46,7 +46,14 @@ export class HistoryError extends Error {
  * as its own content-addressed blob `state/<stateHash>`). `get` may return undefined for an unknown
  * hash; `put` is only called for a state hash this history has not stored before.
  */
-export type StateStore = { get(stateHash: string): WorldState | undefined; put(stateHash: string, state: WorldState): void; has?(stateHash: string): boolean };
+export type StateStore = {
+  get(stateHash: string): WorldState | undefined;
+  put(stateHash: string, state: WorldState): void;
+  has?(stateHash: string): boolean;
+  /** Optional: pause checkpoints' runtime snapshots as content-addressed blobs too (then `toJSON({ states: false })` omits them). */
+  getResume?(hash: string): RuntimeSnapshot | undefined;
+  putResume?(hash: string, snap: RuntimeSnapshot): void;
+};
 
 /** Serialised history. `states` is omitted by `toJSON({ states: false })` (states live in a StateStore). */
 export type HistoryJSON = {
@@ -97,7 +104,11 @@ export class WorldHistory {
     };
     if (snap && resume) {
       cp.resume = resume;
-      if (!this.resumes.has(resume)) this.resumes.set(resume, deepFreeze(structuredClone(snap)));
+      if (!this.resumes.has(resume)) {
+        const frozenSnap = deepFreeze(structuredClone(snap));
+        this.resumes.set(resume, frozenSnap);
+        this.store?.putResume?.(resume, frozenSnap);
+      }
     }
     this.checkpoints.set(id, cp);
     return cp;
@@ -160,7 +171,11 @@ export class WorldHistory {
     const cp = this.checkpoint(ws ? ws.head : checkpointOrWorkspace);
     const world = structuredClone(this.state(cp.stateHash)) as WorldState;
     if (!o?.resume) return world;
-    const snap = cp.resume ? this.resumes.get(cp.resume) : undefined;
+    let snap = cp.resume ? this.resumes.get(cp.resume) : undefined;
+    if (cp.resume && !snap) {
+      const got = this.store?.getResume?.(cp.resume);
+      if (got) this.resumes.set(cp.resume, (snap = deepFreeze(got)));
+    }
     if (cp.resume && !snap) throw new HistoryError('missing-state', `runtime snapshot ${cp.resume.slice(0, 16)}… of pause checkpoint ${cp.id} is not stored`);
     return { world, snapshot: snap ? (structuredClone(snap) as RuntimeSnapshot) : null };
   }
@@ -187,7 +202,8 @@ export class WorldHistory {
    * Keep states in `store` instead of the serialised history: `read()` loads a state on demand and
    * `commit()`/`publishCanonical()` put only the new one. States already in memory (a seeded or
    * old-format history) are written through now, so `toJSON({ states: false })` is complete
-   * together with the store. Returns the number of states written.
+   * together with the store. Returns the number of states written. A store with `putResume` also
+   * receives every pause snapshot (in memory now, and each new one), and the index then omits them.
    */
   attachStateStore(store: StateStore): number {
     this.store = store;
@@ -197,6 +213,7 @@ export class WorldHistory {
         store.put(hash, s);
         n++;
       }
+    if (store.putResume) for (const [hash, snap] of this.resumes) store.putResume(hash, snap);
     return n;
   }
 
@@ -238,7 +255,7 @@ export class WorldHistory {
       ...(o.states === false ? {} : { states: [...this.states.entries()] }),
       checkpoints: [...this.checkpoints.values()],
       workspaces: [...this.workspaces.values()],
-      ...(this.resumes.size ? { resumes: [...this.resumes.entries()] } : {}),
+      ...(this.resumes.size && !(o.states === false && this.store?.putResume) ? { resumes: [...this.resumes.entries()] } : {}),
     };
   }
 

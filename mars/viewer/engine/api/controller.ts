@@ -6,9 +6,12 @@
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
-import { describeDiff, execute as executePlan, physicalDiff, rehearse as rehearsePlan, type EngineConfig, type RunReport } from '../rehearsal/rehearse.ts';
+import { checkPlan, describeDiff, execute as executePlan, integrity, physicalDiff, rehearse as rehearsePlan, runReport, runServices, type EngineConfig, type RunReport } from '../rehearsal/rehearse.ts';
 import { DT, Runtime, type Invariant } from '../runtime/runtime.ts';
+import { SnapshotError } from '../runtime/snapshot.ts';
 import { bindTemplate, PlanError } from '../sequence/bind.ts';
+import { DEFAULT_MAX_TICKS, SequenceRunner } from '../sequence/runner.ts';
+import { TakeRecorder } from '../take/recorder.ts';
 import { PLAN_SCHEMA, SEQUENCE_SCHEMA, templateSchema, type BoundPlan, type SequenceTemplate } from '../sequence/types.ts';
 import { sampleTake, takeDuration } from '../take/replay.ts';
 import { TakeLibrary } from '../take/store.ts';
@@ -24,6 +27,7 @@ import type { Sampler, ShotSpec, SubjectPose } from '../camera/shots.ts';
 import { createRegistry, describeVerbs, engineConfig, ENGINE_INVARIANTS, jsonSchemaOf } from './registry.ts';
 import { opSchemas, type OpInput, type OpName } from './schemas.ts';
 import { applyEdits } from './edit.ts';
+import { appendCommands, describePoint, drive, isPauseSnapshot, liveActions, PAUSE_FORMAT, reached, stepProgress, type PauseContext, type PausePoint, type PauseSnapshot } from './pause.ts';
 
 export type StoredPlan = { plan: BoundPlan; workspace: string };
 
@@ -229,6 +233,7 @@ export class EngineController {
         case 'bind_plan': return this.bindPlan(parsed.data as OpInput<'bind_plan'>);
         case 'rehearse': return this.rehearse(parsed.data as OpInput<'rehearse'>);
         case 'execute': return this.execute(parsed.data as OpInput<'execute'>);
+        case 'resume': return this.resume(parsed.data as OpInput<'resume'>);
         case 'fork': return this.fork(parsed.data as OpInput<'fork'>);
         case 'edit_world': return this.editWorld(parsed.data as OpInput<'edit_world'>);
         case 'log': return this.log(parsed.data as OpInput<'log'>);
@@ -267,7 +272,15 @@ export class EngineController {
   }
 
   workspaces() {
-    return [...this.history.workspaces.values()].map((w) => ({ id: w.id, label: w.label, protected: w.protected, head: w.head, forkedFrom: w.forkedFrom, campus: this.history.read(w.head).base.campus }));
+    return [...this.history.workspaces.values()].map((w) => ({
+      id: w.id,
+      label: w.label,
+      protected: w.protected,
+      head: w.head,
+      forkedFrom: w.forkedFrom,
+      campus: this.history.read(w.head).base.campus,
+      ...(this.history.checkpoint(w.head).resume ? { paused: true } : {}),
+    }));
   }
 
   /**
@@ -286,8 +299,8 @@ export class EngineController {
       for (let id: string | null = ws.head; id && !seen.has(id); id = this.history.checkpoint(id).parent) {
         seen.add(id);
         const c = this.history.checkpoint(id).cause;
-        if (c.kind !== 'simulation-run') continue;
-        add(takes, c.take, id);
+        if (c.kind !== 'simulation-run' && c.kind !== 'pause') continue;
+        if (c.take) add(takes, c.take, id);
         if (c.plan) add(plans, c.plan, id);
       }
     return { takes, plans };
@@ -445,6 +458,8 @@ export class EngineController {
   // ---- plans, runs, workspaces ----------------------------------------------------------------
 
   bindPlan(q: OpInput<'bind_plan'>): OpResult {
+    if ((this.history.workspaces.has(q.workspace) || this.history.checkpoints.has(q.workspace)) && this.history.resumable(q.workspace))
+      return fail('workspace.paused', `${q.workspace} is a mid-action pause checkpoint (live actions are part of its state); engine_resume it first, or fork at its parent to bind against a resting state`);
     const plan = bindTemplate(q.template as SequenceTemplate, q.bindings, { history: this.history, baseline: q.workspace, registry: this.registry });
     const ws = this.history.workspaces.has(q.workspace) ? q.workspace : '';
     if (!this.plans.has(plan.planHash)) {
@@ -472,6 +487,10 @@ export class EngineController {
   execute(q: OpInput<'execute'>): OpResult {
     const sp = this.plan(q.plan_id);
     if (!sp) return fail('plan.unknown', `no plan ${q.plan_id} (bind_plan first)`);
+    const ws = this.history.workspaces.get(q.workspace);
+    if (ws && !ws.protected && this.history.resumable(ws.id))
+      return fail('workspace.paused', `workspace ${ws.id} is paused mid-run at ${ws.head}; engine_resume it (or fork at its parent) before executing another plan there`);
+    if (q.pauseAt !== undefined) return this.executePausable(q, sp.plan);
     const r = executePlan(this.history, q.workspace, sp.plan, this.cfg, { takes: this.takes, label: q.label });
     if ('take' in r) {
       this.unkept.delete(r.take.id);
@@ -485,7 +504,130 @@ export class EngineController {
     return { ok: false, code: r.code, message: r.message, ...(r.diff ? { diff: r.diff } : {}) };
   }
 
+  /** execute with `pauseAt`: the same checks and runtime as execute, driven to the pause point (pause.ts). */
+  private executePausable(q: OpInput<'execute'>, plan: BoundPlan): OpResult {
+    const ws = this.history.workspaces.get(q.workspace);
+    if (!ws) return fail('unknown-workspace', `no workspace ${q.workspace}`);
+    if (ws.protected) return fail('workspace.protected', `workspace "${ws.label}" is a protected canonical state; fork it and execute in the fork`);
+    const bad = integrity(this.history, plan);
+    if (bad) return fail('plan.corrupt', bad);
+    const chk = checkPlan(this.history, q.workspace, plan);
+    if (!chk.ok) return fail(chk.code, chk.message, chk.diff ? { diff: chk.diff } : {});
+    const p = q.pauseAt as PausePoint;
+    if (typeof p === 'object' && !plan.steps.some((s) => s.id === p.step)) return fail('pause.unknown-step', `pauseAt: plan ${plan.planHash} has no step "${p.step}" (steps: ${plan.steps.map((s) => s.id).join(', ')})`);
+    const world = this.history.read(chk.head.id);
+    const rt = new Runtime(world, this.registry, runServices(world, this.cfg), this.cfg.invariants);
+    const rec = new TakeRecorder(rt, { planHash: plan.planHash, baselineCheckpoint: chk.head.id, rulesVersion: this.history.rulesVersion, keyframeEvery: this.cfg.keyframeEvery });
+    const runner = new SequenceRunner(rt, plan.steps);
+    const maxTicks = this.cfg.maxTicks ?? DEFAULT_MAX_TICKS;
+    return this.segment(q.workspace, chk.head.id, rt, rec, runner, p, maxTicks, { plan: plan.planHash, runStart: chk.head.id, maxTicks, takes: [], commands: [] }, q.allowDrop, q.label);
+  }
+
+  /** engine_resume: restore the head pause checkpoint's runtime + runner, add commands, drive on. */
+  resume(q: OpInput<'resume'>): OpResult {
+    const ws = this.history.workspaces.get(q.workspace);
+    if (!ws) return fail('unknown-workspace', `no workspace ${q.workspace}`);
+    if (ws.protected) return fail('workspace.protected', `workspace "${ws.label}" is a protected canonical state; fork it first`);
+    const head = this.history.checkpoint(ws.head);
+    if (!head.resume)
+      return fail('resume.not-resumable', `workspace ${ws.id} head ${head.id} is a ${head.cause.kind} checkpoint, not a mid-action pause: there is nothing to resume (engine_execute a plan, with pauseAt to pause it)`);
+    if (head.rulesVersion !== this.history.rulesVersion)
+      return fail('resume.stale-rules', `pause checkpoint ${head.id} was taken under rules ${head.rulesVersion}; the engine is now ${this.history.rulesVersion}, so its live actions cannot be continued — fork at its parent and execute again`);
+    const { world, snapshot } = this.history.read(head.id, { resume: true });
+    if (!isPauseSnapshot(snapshot))
+      return fail('resume.not-resumable', `pause checkpoint ${head.id} carries a runtime snapshot but no sequence state (it was not made by engine_execute pauseAt), so there is no run to continue here`);
+    const ctx = snapshot.pause;
+    let rt: Runtime;
+    try {
+      rt = Runtime.restore(snapshot, this.registry, runServices(world, this.cfg), this.cfg.invariants);
+    } catch (e) {
+      if (e instanceof SnapshotError) return fail(e.code, e.message, { details: { subjects: e.subjects } });
+      throw e;
+    }
+    const state = structuredClone(ctx.runner);
+    const added = appendCommands(state, (q.commands ?? []) as { verb: string; params: Record<string, unknown>; id?: string }[], this.registry, ctx.takes.length);
+    if (!added.ok) return fail(added.code, added.message, added.details ? { details: added.details } : {});
+    const runner = SequenceRunner.restore(rt, state);
+    const until = q.until as PausePoint | undefined;
+    const t = sec((rt.tick - runner.t0) * DT);
+    if (typeof until === 'object' && !runner.reports.some((r) => r.id === until.step))
+      return fail('pause.unknown-step', `until: this run has no step "${until.step}" (steps: ${runner.reports.map((r) => r.id).join(', ')})`);
+    if (until !== undefined && reached(runner, until)) return fail('resume.bad-until', `until: ${describePoint(until)} is already reached (the run is paused at t = ${t} s)`);
+    const rec = new TakeRecorder(rt, { planHash: ctx.plan, baselineCheckpoint: head.id, rulesVersion: this.history.rulesVersion, keyframeEvery: this.cfg.keyframeEvery });
+    const budget = ctx.maxTicks - (rt.tick - runner.t0);
+    const out = this.segment(ws.id, head.id, rt, rec, runner, until, budget, { ...ctx, commands: [...ctx.commands, ...added.ids] }, q.allowDrop, q.label);
+    return { ...out, resumedFrom: { checkpoint: head.id, t }, ...(added.ids.length ? { commands: added.ids } : {}) };
+  }
+
+  /**
+   * Drive one segment (start → pause, pause → pause, or pause/start → end) and commit it: a `pause`
+   * checkpoint holding snapshot + runner state, or — at the end — `simulation-run` under execute's rules.
+   */
+  private segment(workspace: string, start: string, rt: Runtime, rec: TakeRecorder, runner: SequenceRunner, until: PausePoint | undefined, budget: number, ctx: Omit<PauseContext, 'format' | 'runner'>, allowDrop: boolean | undefined, label: string | undefined): OpResult {
+    const d = drive(runner, until, budget);
+    const t = sec((rt.tick - runner.t0) * DT);
+    if (d.paused) {
+      let snap;
+      try {
+        snap = rt.snapshot({ allowDrop });
+      } catch (e) {
+        if (!(e instanceof SnapshotError)) throw e;
+        const hint = e.code === 'snapshot.drop-unsafe' ? 'pause before the load is picked up or after it is set down' : 'pause while no such action is live, or pass allowDrop (only while it holds no load)';
+        return fail(e.code, `${e.message} — nothing was committed; ${hint}`, { details: { subjects: e.subjects, at: t, live: liveActions(rt) } });
+      }
+      const take = rec.finish();
+      this.keepTake(take);
+      const pause: PauseContext = { format: PAUSE_FORMAT, ...ctx, runner: runner.serialize(), takes: [...ctx.takes, take.id] };
+      const blob: PauseSnapshot = { ...snap, pause };
+      const cp = this.history.commit(workspace, blob, { kind: 'pause', note: `paused at ${describePoint(until!)} (t = ${t} s)`, take: take.id, plan: ctx.plan }, label);
+      this.changes.history = true;
+      return {
+        ok: true,
+        paused: true,
+        resumable: true,
+        workspace,
+        checkpoint: compactCheckpoint(cp),
+        at: { t, tick: rt.tick - runner.t0 },
+        live: liveActions(rt),
+        ...(snap.dropped.length ? { dropped: snap.dropped } : {}),
+        take_id: take.id,
+        take: takeSummary(take),
+        run: { start: ctx.runStart, takes: pause.takes },
+        steps: stepProgress(runner.reports),
+        snapshotBytes: stableStringify(blob).length,
+      };
+    }
+    const take = rec.finish();
+    this.keepTake(take);
+    const report = runReport(d.result, take, ctx.plan, start);
+    const run = { start: ctx.runStart, takes: [...ctx.takes, take.id] };
+    const notReached = until !== undefined ? { paused: false, note: `the run ended before ${describePoint(until)} was reached` } : {};
+    if (!report.ok)
+      return {
+        ok: false,
+        code: 'execution.failed',
+        message: uniqueMessage(
+          `plan ${ctx.plan} did not complete cleanly (${report.status}, ${report.violations.length} violations): ${
+            report.diagnostics.map((x) => x.message).join('; ') ||
+            report.violations.map((v) => v.message).join('; ') ||
+            report.steps.filter((x) => x.status !== 'completed' && x.diagnostic).map((x) => `step ${x.id} ${x.status}: ${x.diagnostic!.message}`).join('; ')
+          }`,
+        ),
+        take_id: take.id,
+        take: takeSummary(take),
+        report: compactReport(report),
+        run,
+        ...notReached,
+      };
+    const cp = this.history.commit(workspace, rt.world, { kind: 'simulation-run', take: take.id, plan: ctx.plan }, label);
+    this.changes.history = true;
+    return { ok: true, workspace, checkpoint: compactCheckpoint(cp), take_id: take.id, take: takeSummary(take), report: compactReport(report), ...(ctx.takes.length ? { run } : {}), ...notReached };
+  }
+
   fork(q: OpInput<'fork'>): OpResult {
+    const at = q.at ?? this.history.workspaces.get(q.from)?.head;
+    if (q.inventory && at && this.history.checkpoints.has(at) && this.history.resumable(at) && this.history.read(at).inventory !== q.inventory)
+      return fail('workspace.paused', `cannot change inventory when forking at pause checkpoint ${at}: the change would be a design edit on top of a mid-action state (fork without inventory, resume, then edit)`);
     const w = this.history.fork(q.from, q.name, q.label ?? q.name, q.at);
     this.changes.history = true;
     if (q.inventory) {
@@ -503,6 +645,7 @@ export class EngineController {
     const ws = this.history.workspaces.get(q.workspace);
     if (!ws) return fail('unknown-workspace', `no workspace ${q.workspace}`);
     if (ws.protected) return fail('workspace.protected', `workspace "${ws.label}" is a protected canonical state; fork it (engine_fork) before editing`);
+    if (this.history.resumable(ws.id)) return fail('workspace.paused', `workspace ${ws.id} is paused mid-run at ${ws.head}; engine_resume it before design-editing (an edit would strand its live actions)`);
     const before = this.history.read(q.workspace);
     const r = applyEdits(before, q.edits, (w) => this.cfg.services(w).spatial as Spatial, q.note);
     if (!r.ok) return r;
@@ -606,7 +749,7 @@ function uniqueMessage(m: string, max = 800) {
 }
 
 function compactCheckpoint(c: Checkpoint) {
-  return { id: c.id, parent: c.parent, cause: c.cause, label: c.label, stateHash: c.stateHash.slice(0, 16), physicalHash: c.physicalHash.slice(0, 16), rulesVersion: c.rulesVersion, seq: c.created };
+  return { id: c.id, parent: c.parent, cause: c.cause, label: c.label, stateHash: c.stateHash.slice(0, 16), physicalHash: c.physicalHash.slice(0, 16), rulesVersion: c.rulesVersion, seq: c.created, ...(c.resume ? { resumable: true } : {}) };
 }
 
 export function createController(o: ControllerOptions): EngineController {

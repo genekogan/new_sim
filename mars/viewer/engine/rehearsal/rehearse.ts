@@ -7,7 +7,7 @@ import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
 import { Runtime, type Invariant, type Violation } from '../runtime/runtime.ts';
-import { SequenceRunner, type SequenceStatus, type StepReport } from '../sequence/runner.ts';
+import { SequenceRunner, type SequenceResult, type SequenceStatus, type StepReport } from '../sequence/runner.ts';
 import type { BoundPlan } from '../sequence/types.ts';
 import { planHashOf } from '../sequence/bind.ts';
 import { TakeRecorder } from '../take/recorder.ts';
@@ -69,9 +69,8 @@ export type ExecuteResult =
   | { ok: false; code: 'plan.stale' | 'workspace.protected' | 'plan.corrupt'; message: string; diff?: PhysicalDiff }
   | { ok: false; code: 'execution.failed'; message: string; report: RunReport; take: Take };
 
-/** The one execution path. Pure w.r.t. history: takes a private copy of the start state. */
-export function runPlan(start: WorldState, startCheckpoint: string, plan: BoundPlan, cfg: EngineConfig, rulesVersion: string) {
-  const world = structuredClone(start);
+/** Fresh services for `world` from the factory; refuses a spatial service built for another static base. */
+export function runServices(world: WorldState, cfg: EngineConfig): Record<string, any> {
   const services = cfg.services(world);
   const sp = services.spatial as { base?: unknown; baseId?: string } | undefined;
   if (sp && sp.base !== undefined && (sp.baseId ?? hashOf(sp.base)) !== world.base.staticHash)
@@ -79,21 +78,32 @@ export function runPlan(start: WorldState, startCheckpoint: string, plan: BoundP
       'services.base-mismatch',
       `the spatial service's static scene does not match the world's base (${world.base.campus}, staticHash ${world.base.staticHash.slice(0, 12)})`,
     );
-  const rt = new Runtime(world, cfg.registry, services, cfg.invariants);
+  return services;
+}
+
+/** The one execution path. Pure w.r.t. history: takes a private copy of the start state. */
+export function runPlan(start: WorldState, startCheckpoint: string, plan: BoundPlan, cfg: EngineConfig, rulesVersion: string) {
+  const world = structuredClone(start);
+  const rt = new Runtime(world, cfg.registry, runServices(world, cfg), cfg.invariants);
   const rec = new TakeRecorder(rt, { planHash: plan.planHash, baselineCheckpoint: startCheckpoint, rulesVersion, keyframeEvery: cfg.keyframeEvery });
   const res = new SequenceRunner(rt, plan.steps).run(cfg.maxTicks);
   const take = rec.finish();
+  return { report: runReport(res, take, plan.planHash, startCheckpoint), take, finalState: rt.world };
+}
+
+/** RunReport of a sequence result (a whole run, or a resumed run's last segment: its runner spans the whole run). */
+export function runReport(res: SequenceResult, take: Take, planHash: string, baselineCheckpoint: string): RunReport {
   let replans = 0, pathLength = 0, blockedTicks = 0;
   for (const s of res.steps) {
     blockedTicks += s.blockedTicks;
     if (typeof s.outputs?.replans === 'number') replans += s.outputs.replans;
     if (typeof s.outputs?.length === 'number') pathLength += s.outputs.length;
   }
-  const report: RunReport = {
+  return {
     status: res.status,
     ok: res.status === 'completed' && res.violations.length === 0,
-    planHash: plan.planHash,
-    baselineCheckpoint: startCheckpoint,
+    planHash,
+    baselineCheckpoint,
     steps: res.steps,
     diagnostics: res.diagnostics,
     violations: res.violations,
@@ -103,7 +113,6 @@ export function runPlan(start: WorldState, startCheckpoint: string, plan: BoundP
     settled: res.settled,
     unsettled: res.unsettled,
   };
-  return { report, take, finalState: rt.world };
 }
 
 /** Which physically relevant parts of two states differ (entities by id and field). */
@@ -156,7 +165,7 @@ export function checkPlan(history: WorldHistory, workspaceId: string, plan: Boun
   };
 }
 
-function integrity(history: WorldHistory, plan: BoundPlan): string | null {
+export function integrity(history: WorldHistory, plan: BoundPlan): string | null {
   if (planHashOf(plan) !== plan.planHash) return `plan content does not match its planHash ${plan.planHash}`;
   const cp = history.checkpoint(plan.baselineCheckpoint);
   if (cp.physicalHash !== plan.baselinePhysicalHash) return `baseline checkpoint ${cp.id} physical hash ${cp.physicalHash.slice(0, 12)} ≠ plan's ${plan.baselinePhysicalHash.slice(0, 12)}`;

@@ -7,6 +7,9 @@
 //     y<year>/history            WorldHistory.toJSON({ states: false }) — checkpoint +
 //                                workspace index only (rewritten on fork/execute)
 //     y<year>/state/<stateHash>  WorldState  (immutable, content-addressed; written once)
+//     y<year>/state/resume.<hash> pause checkpoint's RuntimeSnapshot + run state (engine_execute
+//                                pauseAt / engine_resume until; immutable, content-addressed; counted
+//                                with the states — it embeds its world, so ≈ state size + live action state)
 //     y<year>/plan/<planHash>    StoredPlan  (immutable)
 //     y<year>/take/<takeId>      Take        (immutable, content-addressed)
 //     y<year>/cams/<takeId>      CameraTrack[] (rewritten on attach)
@@ -28,6 +31,7 @@ import { CAMPUS_SEED_YEARS, createController, ENGINE_RULES_VERSION, ensureCampus
 import type { CampusYearFile } from '../engine/campus/history.ts';
 import { WorldHistory, type HistoryJSON } from '../engine/history/store.ts';
 import type { WorldState } from '../engine/world/types.ts';
+import type { RuntimeSnapshot } from '../engine/runtime/snapshot.ts';
 import type { CameraTrack, Take } from '../engine/take/types.ts';
 
 const CHUNK = 512 * 1024; // characters per row; DO SQLite caps a value at 2 MB
@@ -82,15 +86,18 @@ export class EngineRoom {
     const history = saved ? WorldHistory.fromJSON(saved) : seedHistory(undefined, campus);
     // a rules change makes every plan bound under the old rules stale (checkPlan)
     history.rulesVersion = ENGINE_RULES_VERSION;
-    // states written by an op wait here until call() commits them with the index in one transaction
-    const pending = new Map<string, WorldState>();
+    // states (and pause snapshots, key resume.<hash>) written by an op wait here until call() commits
+    // them with the index in one transaction
+    const pending = new Map<string, WorldState | RuntimeSnapshot>();
     this.pending.set(year, pending);
     const fresh = !saved || saved.states !== undefined; // seeded, or an old-format blob to migrate
     this.storage.transactionSync(() => {
       history.attachStateStore({
         has: (h) => pending.has(h) || this.exists(`${p}state/${h}`),
-        get: (h) => pending.get(h) ?? this.readJSON<WorldState>(`${p}state/${h}`),
+        get: (h) => (pending.get(h) as WorldState | undefined) ?? this.readJSON<WorldState>(`${p}state/${h}`),
         put: (h, s) => void pending.set(h, s),
+        getResume: (h) => (pending.get(`resume.${h}`) as RuntimeSnapshot | undefined) ?? this.readJSON<RuntimeSnapshot>(`${p}state/resume.${h}`),
+        putResume: (h, s) => void pending.set(`resume.${h}`, s),
       });
       const added = !!saved && !!campus && ensureCampusYear(history, campus);
       if (fresh || added) this.flush(year, history);
@@ -121,9 +128,9 @@ export class EngineRoom {
     return { ctl, loadMs: performance.now() - t0 };
   }
 
-  private pending = new Map<number, Map<string, WorldState>>();
+  private pending = new Map<number, Map<string, WorldState | RuntimeSnapshot>>();
 
-  /** Write pending states and the (state-free) index. Call inside a transaction. */
+  /** Write pending states / pause snapshots and the (state-free) index. Call inside a transaction. */
   private flush(year: number, history: WorldHistory, stored?: Record<string, number>) {
     const p = `y${year}/`;
     const put = (key: string, value: unknown) => {

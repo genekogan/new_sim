@@ -67,6 +67,17 @@ export const shotSpecSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('establishing'), region: z.strictObject({ min: vec2, max: vec2, y: z.number().optional() }), azimuth: z.number().optional(), elevation: z.number().optional(), aspect: z.number().optional(), ...shotCommon }),
 ]);
 
+const stepId = z.string().regex(/^[A-Za-z0-9][\w.-]{0,63}$/, 'step ids: letters, digits, _ . - (≤ 64)');
+/** Where a run pauses: seconds from the plan's start (the clock `at` cues use), or a step lifecycle event. */
+export const pausePointSchema = z.union([
+  z.number().positive().max(3600).describe("seconds from the plan's start (same clock as `at` cues; rounded to the 1/20 s tick)"),
+  z.strictObject({ step: stepId, event: z.enum(['started', 'completed']) }).describe('pause on the tick a step starts / right after it completes'),
+]);
+const allowDrop = z
+  .boolean()
+  .describe('leave non-resumable live actions (carry, lifts, vehicles, ambient_wander) out of the pause; they finish as cancelled (snapshot.dropped) on resume. Still refused while one holds a load.')
+  .optional();
+
 export const opSchemas = {
   list_verbs: z.strictObject({}),
   query_world: z.strictObject({
@@ -93,7 +104,24 @@ export const opSchemas = {
     workspace: wsId.describe('staleness is reported against this workspace (default: the one bound)').optional(),
     keep: z.boolean().describe('store the take durably (default false: held in memory only, playable via get_take until evicted)').optional(),
   }),
-  execute: z.strictObject({ plan_id: id, workspace: wsId, label: z.string().max(200).optional() }),
+  execute: z.strictObject({
+    plan_id: id,
+    workspace: wsId,
+    label: z.string().max(200).optional(),
+    pauseAt: pausePointSchema.describe('stop mid-run there and commit a resumable `pause` checkpoint instead of finishing (engine_resume continues it)').optional(),
+    allowDrop,
+  }),
+  resume: z.strictObject({
+    workspace: wsId,
+    until: pausePointSchema.describe("pause again there (another `pause` checkpoint); seconds count from the plan's start, not from the resume").optional(),
+    commands: z
+      .array(z.strictObject({ verb: id, params: z.record(z.string(), z.unknown()), id: stepId.describe('step id (default resume<n>-<i>); usable as a later `until` step').optional() }))
+      .max(16)
+      .describe('extra verb calls submitted on the resume tick as new steps of the run (params validated with the verb schema; a failing one aborts the run like any plan step)')
+      .optional(),
+    allowDrop,
+    label: z.string().max(200).optional(),
+  }),
   fork: z.strictObject({
     from: z.string().max(120),
     name: wsId,
@@ -147,9 +175,14 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
   execute: {
     readOnly: false,
     description:
-      'Officially run a bound plan in an editable workspace and commit the successor checkpoint (cause simulation-run). Refuses protected canonical workspaces (fork first), stale plans (physical change since binding — returns a diff) and runs with violations (take still stored).',
+      'Officially run a bound plan in an editable workspace and commit the successor checkpoint (cause simulation-run). Refuses protected canonical workspaces (fork first), stale plans (physical change since binding — returns a diff) and runs with violations (take still stored). With `pauseAt` (seconds or {step, event}) it stops there and commits a resumable `pause` checkpoint (returns checkpoint, live actions, the take so far); refused with snapshot.non-resumable naming the action if a carry / lift / vehicle is live then, unless `allowDrop`.',
   },
-  fork: { readOnly: false, description: "Create an editable workspace from another workspace head or a checkpoint. Canonical workspaces are protected: fork before executing or editing. `inventory: 'unlimited'` lets engine_edit_world spawn catalog items there." },
+  resume: {
+    readOnly: false,
+    description:
+      "Continue a paused run from the workspace head (a `pause` checkpoint; else resume.not-resumable), optionally submitting extra `commands` [{verb, params}] on the resume tick, to completion (commits simulation-run, same rules as execute) or to `until` (another pause). Records a take for the segment. Resuming without commands ends in exactly the state an unpaused execute reaches.",
+  },
+  fork: { readOnly: false, description: "Create an editable workspace from another workspace head or a checkpoint. Canonical workspaces are protected: fork before executing or editing. `inventory: 'unlimited'` lets engine_edit_world spawn catalog items there. Forking at a `pause` checkpoint gives an independent, resumable copy of the paused run (engine_resume each branch with different commands)." },
   edit_world: {
     readOnly: false,
     description:

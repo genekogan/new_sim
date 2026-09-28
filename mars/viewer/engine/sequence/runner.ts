@@ -47,6 +47,8 @@ export type SequenceResult = {
   settleTicks: number;
 };
 
+/** Default tick budget of `run()` (30 simulated minutes). */
+export const DEFAULT_MAX_TICKS = 20 * 60 * 30;
 /** Sim-time budget after a timeout for deferred cancels to finish (review M4). */
 export const SETTLE_S = 20;
 /** While settling, refused cancels are retried this often (a carry may refuse until the ground is clear). */
@@ -198,7 +200,7 @@ export class SequenceRunner {
   }
 
   /** Step the runtime until the sequence is done or the tick budget is exhausted. */
-  run(maxTicks = 20 * 60 * 30): SequenceResult {
+  run(maxTicks = DEFAULT_MAX_TICKS): SequenceResult {
     this.advance();
     let n = 0;
     while (!this.done && n < maxTicks) {
