@@ -1,6 +1,7 @@
 import { clearWeather, type Weather } from '../../simulation/shared';
 import * as THREE from 'three';
 import { CampusPaths, GROUND, campfireClearing } from './ambience-math';
+import { createFire, seedOf } from '../engine-view/fire.ts';
 
 /** Atmospheric set dressing, deliberately separate from the editable replica. */
 export function createScenery(scene: THREE.Scene, paths: CampusPaths) {
@@ -38,46 +39,12 @@ export function createScenery(scene: THREE.Scene, paths: CampusPaths) {
     log.position.set(0, 0.15 + i * 0.025, 0);
     fire.add(log);
   }
-  const flameMat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    uniforms: { time: { value: 0 }, strength: { value: 1 } },
-    vertexShader: `attribute float seed; varying float age; varying float salt; uniform float time;
-   void main(){age=fract(seed+time*.65);salt=seed;vec3 p=position;p.x+=sin(time*2.+seed*49.+age*5.)*.12*age;p.z+=age*age*.3;p.y+=age*1.4;
-   vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;gl_PointSize=min(100.,(1.-age)*170./max(1.,-mv.z));}`,
-    fragmentShader: `varying float age; varying float salt; uniform float strength;
-   void main(){float r=length(gl_PointCoord-.5)*2.;float a=pow(max(0.,1.-r),2.)*(1.-age)*strength;
-   gl_FragColor=vec4(mix(vec3(1.,.62,.12),vec3(1.,.12,.015),age),a);}`,
-  });
-  const flameGeo = new THREE.BufferGeometry(),
-    pos = [],
-    seeds = [];
-  for (let i = 0; i < 95; i++) {
-    const a = random() * 6.28,
-      r = random() * 0.28;
-    pos.push(Math.sin(a) * r, 0.24, Math.cos(a) * r);
-    seeds.push(random());
-  }
-  flameGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  flameGeo.setAttribute('seed', new THREE.Float32BufferAttribute(seeds, 1));
-  const flame = new THREE.Points(flameGeo, flameMat);
-  flame.frustumCulled = false;
-  fire.add(flame);
-  const light = new THREE.PointLight(0xff872e, 35, 13, 2);
-  light.position.y = 0.75;
-  fire.add(light);
-  const emberMat = new THREE.PointsMaterial({
-    color: 0xffad50,
-    size: 0.035,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const emberGeo = new THREE.BufferGeometry(),
-    embers = new Float32Array(24 * 3);
-  emberGeo.setAttribute('position', new THREE.BufferAttribute(embers, 3));
-  fire.add(new THREE.Points(emberGeo, emberMat));
+  // Animated flames, embers, smoke and flickering light: the shared engine-view fire (same module
+  // as the Engine Lab campfire), a pure function of (seed, simulation time).
+  const fx = createFire(seedOf('studio-campfire'), 0.5, { color: 0xff872e, intensity: 32, distance: 13, decay: 2, y: 0.75 });
+  fire.add(fx.group);
+  // The old particle flame drew 95 × 3 values here; keep the sequence so the grass/shrub layout is unchanged.
+  for (let i = 0; i < 95 * 3; i++) random();
   // Sparse, straw-coloured desert grass outside the busy central footprint.
   const grassGeometry = new THREE.BufferGeometry(),
     blades: number[] = [];
@@ -176,18 +143,7 @@ export function createScenery(scene: THREE.Scene, paths: CampusPaths) {
             ? 0
             : THREE.MathUtils.smoothstep(night, 0.04, 0.65);
       fire.visible = site >= 0 && strength > 0;
-      flameMat.uniforms.time.value = time;
-      flameMat.uniforms.strength.value = strength;
-      light.intensity =
-        strength * (32 + Math.sin(time * 13) * 5 + Math.sin(time * 23.7) * 3);
-      for (let i = 0; i < 24; i++) {
-        const age = (time * 0.24 + i * 0.618) % 1;
-        embers[i * 3] = Math.sin(i * 4 + age * 3) * 0.18 + age * age * 0.6;
-        embers[i * 3 + 1] = 0.3 + age * 2.5;
-        embers[i * 3 + 2] = Math.cos(i * 3) * 0.2 + age * 0.15;
-      }
-      emberGeo.attributes.position.needsUpdate = true;
-      emberMat.opacity = strength * 0.75;
+      fx.update(time, strength, strength);
     },
     dispose() {
       group.traverse((o) => {

@@ -1,13 +1,15 @@
 // World fixtures (kind 'fixture': benches, camp chairs, campfires; engine/world/catalog.ts
 // SOCIAL_FIXTURES) → simple meshes inside each catalog box, local origin at the base centre,
 // seats facing local +z (rotation.y = −yaw, as for components). Renderers only read the world.
-// A campfire gets a flame and ember glow; after dusk (`setDusk(true)`) the flame brightens and a
-// warm point light comes on. Fixtures do not move, so there is no tick interpolation.
+// A campfire gets the animated fire of fire.ts (seeded by the entity id, driven by sim time); after
+// dusk (`setDusk(true)`) the flames brighten and its flickering warm point light comes on. Fixtures do
+// not move, so there is no tick interpolation.
 import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { CATALOG } from '../../engine/world/catalog.ts';
+import { createFire, seedOf, type Fire } from './fire.ts';
 
-type View = { obj: THREE.Object3D; key: string; flame?: THREE.Mesh; light?: THREE.PointLight };
+type View = { obj: THREE.Object3D; key: string; fire?: Fire };
 
 /** Top of the camp chair's fabric seat (m), as built by `chair()`. */
 const CHAIR_SEAT = 0.44;
@@ -75,8 +77,8 @@ export class FixtureViews {
     return g;
   }
 
-  /** Stone ring, crossed logs, a flame cone and an ember disc; the point light is lit after dusk. */
-  private campfire(sx: number, sy: number, v: Partial<View>) {
+  /** Stone ring, crossed logs and the animated fire (coal bed, flames, embers, smoke, flickering light). */
+  private campfire(id: string, sx: number, v: Partial<View>) {
     const g = new THREE.Group();
     const r = sx / 2 - 0.1, n = 11;
     const stone = this.keep(new THREE.DodecahedronGeometry(0.1, 0));
@@ -97,21 +99,9 @@ export class FixtureViews {
       m.castShadow = true;
       g.add(m);
     }
-    const embers = new THREE.Mesh(this.keep(new THREE.CircleGeometry(r * 0.8, 20).rotateX(-Math.PI / 2)), this.mat('embers', () => new THREE.MeshBasicMaterial({ color: '#ff5a1a', transparent: true, opacity: 0.85 })));
-    embers.position.y = 0.02;
-    g.add(embers);
-    const flame = new THREE.Mesh(
-      this.keep(new THREE.ConeGeometry(0.2, Math.max(0.5, sy * 1.8), 9, 1, true).translate(0, Math.max(0.5, sy * 1.8) / 2, 0)),
-      new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
-    );
-    flame.position.y = 0.06;
-    flame.name = 'flame';
-    g.add(flame);
-    const light = new THREE.PointLight('#ff9a4a', 0, 11, 1.6);
-    light.position.y = 0.7;
-    g.add(light);
-    v.flame = flame;
-    v.light = light;
+    const fire = createFire(seedOf(id), r * 0.85, { intensity: 9, distance: 11, decay: 1.6, y: 0.7 });
+    g.add(fire.group);
+    v.fire = fire;
     return g;
   }
 
@@ -123,22 +113,16 @@ export class FixtureViews {
     let obj: THREE.Object3D;
     if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
-    else if (e.def === 'campfire') obj = this.campfire(sx, sy, v);
+    else if (e.def === 'campfire') obj = this.campfire(e.id, sx, v);
     else obj = this.box(color, 0, 0, 0, sx, sy, sz);
     obj.name = e.id;
     v.obj = obj;
     return v as View;
   }
 
-  /** Dusk: the fire's light comes on and its flame brightens. */
+  /** Dusk: the fire's light comes on and its flames brighten (applied on the next `render`). */
   setDusk(on: boolean) {
     this.dusk = on;
-    for (const v of this.views.values()) this.applyDusk(v);
-  }
-
-  private applyDusk(v: View) {
-    if (v.light) v.light.intensity = this.dusk ? 9 : 0;
-    if (v.flame) (v.flame.material as THREE.MeshBasicMaterial).opacity = this.dusk ? 0.95 : 0.55;
   }
 
   reset(world: Pick<WorldState, 'entities'>) {
@@ -147,7 +131,7 @@ export class FixtureViews {
   }
 
   clear() {
-    for (const v of this.views.values()) (v.flame?.material as THREE.Material | undefined)?.dispose();
+    for (const v of this.views.values()) v.fire?.dispose();
     this.group.clear();
     this.views.clear();
   }
@@ -158,11 +142,13 @@ export class FixtureViews {
       if (e.kind !== 'fixture') continue;
       let v = this.views.get(e.id);
       if (!v || v.key !== e.def) {
-        if (v) this.group.remove(v.obj);
+        if (v) {
+          this.group.remove(v.obj);
+          v.fire?.dispose();
+        }
         v = this.build(e);
         this.views.set(e.id, v);
         this.group.add(v.obj);
-        this.applyDusk(v);
       }
       v.obj.position.set(e.pose.p[0], e.pose.p[1], e.pose.p[2]);
       v.obj.rotation.set(0, -e.pose.yaw, 0);
@@ -170,18 +156,14 @@ export class FixtureViews {
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
         this.group.remove(v.obj);
+        v.fire?.dispose();
         this.views.delete(id);
       }
   }
 
-  /** Flicker the flames (deterministic in `t`, seconds of sim time). */
+  /** Animate the fires: a pure function of (entity id, `t` = seconds of sim time). */
   render(t: number) {
-    for (const v of this.views.values()) {
-      if (!v.flame) continue;
-      const f = 1 + 0.12 * Math.sin(t * 11.3) + 0.07 * Math.sin(t * 23.7 + 1.3);
-      v.flame.scale.set(1 / Math.sqrt(f), f, 1 / Math.sqrt(f));
-      if (v.light && this.dusk) v.light.intensity = 9 * (0.9 + 0.1 * f);
-    }
+    for (const v of this.views.values()) v.fire?.update(t, this.dusk ? 1 : 0.6, this.dusk ? 1 : 0);
   }
 
   dispose() {
