@@ -538,3 +538,8 @@ its partial commits, read its area doc, and re-brief from PROGRESS.md's last ent
 - **Evidence** (`f4d6738`): §28 rows 17/17 PROVEN; capabilities 21 PROVEN / 0 PARTIAL / 1 UNPROVEN of 22 (new rows: hand-up,
   rack access, items/eating, solar, paint, year build A, year build B = UNPROVEN (no engine test yet), movement, body model +
   take fields, composite v2; campus-full is bit-identical now); milestones 8/8 PROVEN; 86 tests added since `6ad36f0`.
+
+**06:45 EDT milestone:** the studio's 2022 year picker offers **"Watch it being built"** — a take from empty site + strapped piles to
+the canonical first bay (24/24 frames + beams at the mars-2022 pose, max 0.2 mm), engine camera, refusal/blocked log, any speed
+(W7 + W17 + W19). Phase B (decks, stair, solar, walls) is landing in W13. Camera direction (§11) phases 1+2 are in the engine and
+the studio replay bar (W16, W18, W19). Full log in PROGRESS.md.
