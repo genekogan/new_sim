@@ -2,8 +2,7 @@
 // at dusk. Between 20 s and 40 s of the script nobody but the two lawn wanderers moves (6 warm at the
 // fire, 2 seated, the talking pair), so two ticks there must differ inside the fire's screen box and
 // not on a standing person; the same tick rendered twice (after a fresh replay) must draw the identical
-// fire. Also: no console errors, draw calls within +3 of the old static cone. Baselines
-// fire-dusk-{oblique,close}; captures fire-t{25,25.3}-close, fire-top.
+// fire. Also: no console errors, draw calls within +2 of the W3 reference.
 import { test, expect, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
 import { captureView, collectConsoleErrors } from './helpers';
@@ -11,11 +10,12 @@ import { labFrames, openLab, type LabState } from './lab-helpers';
 
 const FIRE = [-22, -22.5];
 const CLOSE: [number[], number[]] = [[-24.6, 1.7, -25.2], [-22, 0.55, -22.5]];
+const TOP_CLOSE: [number[], number[]] = [[-21.75, 5.2, -22.3], [-22, 0.45, -22.5]];
 /** lab-view `preset('oblique')` for the scenario focus [-19.8, -22, r 8.5, az 180°]. */
 const OBLIQUE: [number[], number[]] = [[-19.8 - 8.5 * 1.4, 8.5 * 0.9, -22 + 8.5 * 1.4 * Math.sin(Math.PI)], [-19.8, 0.8, -22]];
 const T0 = 500, T1 = 506; // 25.0 s and 25.3 s
-/** renderer.info.render.calls with the old cone fire (commit 1a8d14f), campfire-evening tick 500. */
-const OLD_CALLS = { oblique: 430, top: 428, close: 465 };
+/** Measured W3 animated fire on this branch before v2, campfire-evening tick 500. */
+const REFERENCE_CALLS = { oblique: 431, top: 429, close: 466 };
 type Box = { x0: number; y0: number; x1: number; y1: number };
 type V = number[];
 
@@ -53,6 +53,16 @@ function changed(a: Buffer, b: Buffer, box: Box, level: number) {
       if (Math.max(...[0, 1, 2].map((c) => Math.abs(mean(pa, x, y, c) - mean(pb, x, y, c)))) > level) n++;
   return n / total;
 }
+function pixelShare(png: Buffer, box: Box, match: (r: number, g: number, b: number) => boolean) {
+  const p = PNG.sync.read(png);
+  let count = 0, total = 0;
+  for (let y = box.y0; y < box.y1; y++) for (let x = box.x0; x < box.x1; x++) {
+    const i = (y * p.width + x) * 4;
+    if (match(p.data[i], p.data[i + 1], p.data[i + 2])) count++;
+    total++;
+  }
+  return count / total;
+}
 
 const step = (page: Page, n: number): Promise<LabState> => page.evaluate((k) => window.__marsEngine!.step(k), n);
 const calls = (page: Page) => page.evaluate(() => window.__marsEngine!.info().calls);
@@ -76,15 +86,19 @@ test('lab campfire: animated, deterministic fire; people still; draw calls; dusk
     await page.evaluate((c) => window.__marsEngine!.cameraPreset(c), cam);
     await labFrames(page, 4);
     const n = await calls(page);
-    console.log(`[fire] ${cam}: ${n} draw calls (old cone ${OLD_CALLS[cam]})`);
-    expect(n, `${cam} draw calls within +3 of the old fire`).toBeLessThanOrEqual(OLD_CALLS[cam] + 3);
-    await captureView(page, cam === 'top' ? 'fire-top' : 'fire-dusk-oblique', { testInfo, compare: cam === 'oblique' });
+    console.log(`[fire] ${cam}: ${n} draw calls (W3 reference ${REFERENCE_CALLS[cam]})`);
+    expect(n, `${cam} draw calls within +2 of W3`).toBeLessThanOrEqual(REFERENCE_CALLS[cam] + 2);
+    await captureView(page, cam === 'top' ? 'fire-top' : 'fire-dusk-oblique', { testInfo });
   }
   await view(page, ...CLOSE);
   const nClose = await calls(page);
-  expect(nClose, 'close-up draw calls within +3 of the old fire').toBeLessThanOrEqual(OLD_CALLS.close + 3);
+  console.log(`[fire] close: ${nClose} draw calls (W3 reference ${REFERENCE_CALLS.close})`);
+  expect(nClose, 'close-up draw calls within +2 of W3').toBeLessThanOrEqual(REFERENCE_CALLS.close + 2);
   await captureView(page, 'fire-dusk-close', { testInfo });
   const a = { close: await shot(page), oblique: Buffer.alloc(0) };
+  await view(page, ...TOP_CLOSE);
+  await captureView(page, 'fire-top-close', { testInfo });
+  const topA = await shot(page);
   await view(page, ...OBLIQUE);
   a.oblique = await shot(page);
 
@@ -93,6 +107,8 @@ test('lab campfire: animated, deterministic fire; people still; draw calls; dusk
   const canvas = (await page.locator('.lab-canvas canvas').boundingBox())!;
   const flame = [[FIRE[0] - 0.3, 0.15, FIRE[1] - 0.3], [FIRE[0] + 0.3, 1.1, FIRE[1] + 0.3]] as const;
   const fireBox = project(...CLOSE, [...flame[0]], [...flame[1]], canvas);
+  const topBox = project(...TOP_CLOSE, [FIRE[0] - 0.4, 0.10, FIRE[1] - 0.4], [FIRE[0] + 0.4, 1.1, FIRE[1] + 0.4], canvas);
+  const smokeBox = project(...CLOSE, [FIRE[0] - 0.28, 1.5, FIRE[1] - 0.28], [FIRE[0] + 0.28, 2.7, FIRE[1] + 0.28], canvas);
   const fireObl = project(...OBLIQUE, [...flame[0]], [...flame[1]], canvas);
   const column = project(...OBLIQUE, [FIRE[0] - 0.55, 0, FIRE[1] - 0.55], [FIRE[0] + 0.55, 3.0, FIRE[1] + 0.55], canvas);
   const hud = (await page.getByTestId('social-hud').boundingBox())!;
@@ -118,10 +134,21 @@ test('lab campfire: animated, deterministic fire; people still; draw calls; dusk
   await view(page, ...CLOSE);
   await captureView(page, 'fire-t25.3-close', { testInfo, compare: false });
   b.close = await shot(page);
+  await view(page, ...TOP_CLOSE);
+  const topB = await shot(page);
   const fireDiff = changed(a.close, b.close, fireBox, 32), fireOblDiff = changed(a.oblique, b.oblique, fireObl, 32);
+  const topDiff = changed(topA, topB, topBox, 24);
+  const warmTop = pixelShare(topA, topBox, (r, g, b) => r > 120 && r > g * 1.25 && g > b * 1.15);
+  const smokeDiff = changed(a.close, b.close, smokeBox, 12);
+  const whiteCore = pixelShare(a.close, fireBox, (r, g, b) => r >= 250 && g >= 250 && b >= 250);
   const personDiff = changed(a.oblique, b.oblique, person.box, 32);
   console.log(`[fire] t25.0→t25.3 changed 2×2 blocks (> 32/255): close fire ${JSON.stringify(fireBox)} ${(fireDiff * 100).toFixed(1)} %; oblique fire ${JSON.stringify(fireObl)} ${(fireOblDiff * 100).toFixed(1)} %, person ${person.id} ${JSON.stringify(person.box)} ${(personDiff * 100).toFixed(2)} %`);
+  console.log(`[fire] top-close warm ${(warmTop * 100).toFixed(2)} %, temporal silhouette ${(topDiff * 100).toFixed(2)} %; smoke column motion ${(smokeDiff * 100).toFixed(2)} %; pure-white core ${(whiteCore * 100).toFixed(3)} %`);
   expect(fireDiff, 'the flame animates between take times (close-up)').toBeGreaterThan(0.02);
+  expect(topDiff, 'overhead flame silhouette changes; a flat coal disc would not').toBeGreaterThan(0.01);
+  expect(warmTop, 'overhead tongues remain visibly warm').toBeGreaterThan(0.005);
+  expect(smokeDiff, 'the smoke column changes above the fire at dusk').toBeGreaterThan(0.002);
+  expect(whiteCore, 'less than 1% of the fire box clips to pure white').toBeLessThan(0.01);
   expect(personDiff, `${person.id} stays still`).toBeLessThan(0.005);
 
   // determinism: a fresh replay to the same tick draws the identical fire

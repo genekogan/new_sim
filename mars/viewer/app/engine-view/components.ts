@@ -10,6 +10,9 @@ import { def } from '../../engine/world/catalog.ts';
 import { isPanel } from '../../engine/world/catalog-solar.ts';
 import { itemObject, setFill, type ItemObject } from './items.ts';
 import { PaintOverlay } from './paint.ts';
+import { rendererColor } from './palette.ts';
+import { solarPanelMesh } from './solar-mesh.ts';
+import { equipmentMesh } from './equipment-mesh.ts';
 
 type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: number };
 type View = { obj: THREE.Object3D; prev: Pose; cur: Pose; key: string; item?: ItemObject; inHand?: { by: string; hand: 'left' | 'right' }; paint?: PaintOverlay; label?: string };
@@ -59,7 +62,7 @@ export class ComponentViews {
   private build(e: Entity, v?: Partial<View>): THREE.Object3D {
     const d = def(e.def);
     const [sx, sy, sz] = d.size;
-    const color = d.color ?? FALLBACK;
+    const color = rendererColor(d, FALLBACK);
     if (d.category === 'item') {
       const it = itemObject(e.def, [sx, sy, sz], color, this.kit);
       if (it && v) v.item = it;
@@ -127,36 +130,7 @@ export class ComponentViews {
    * inside an aluminium frame, faint cell rows. Tilt is the engine pose (pitch / roll), like any part.
    */
   private panel(id: string, l: number, t: number, w: number) {
-    const g = new THREE.Group();
-    const f = 0.03; // frame width
-    const glass = new THREE.Mesh(this.geo(`pv-glass:${id}`, () => new THREE.BoxGeometry(l - 2 * f, t * 0.6, w - 2 * f).translate(0, t * 0.6, 0)), this.glass());
-    glass.castShadow = glass.receiveShadow = true;
-    g.add(glass);
-    const along = this.geo(`pv-frame-x:${id}`, () => new THREE.BoxGeometry(l, t, f).translate(0, t / 2, 0));
-    const across = this.geo(`pv-frame-z:${id}`, () => new THREE.BoxGeometry(f, t, w - 2 * f).translate(0, t / 2, 0));
-    for (const s of [-1, 1]) {
-      const a = this.mesh(along, FRAME);
-      a.position.z = (s * (w - f)) / 2;
-      const b = this.mesh(across, FRAME);
-      b.position.x = (s * (l - f)) / 2;
-      g.add(a, b);
-    }
-    // cell grid: thin light lines on the glass (6 cells across, ~10 along)
-    const n = Math.max(2, Math.round((l - 2 * f) / 0.166)), m = 6;
-    const line = this.mat('#3a4a6e');
-    const lx = this.geo(`pv-line-x:${id}`, () => new THREE.BoxGeometry(l - 2 * f, 0.002, 0.004));
-    const lz = this.geo(`pv-line-z:${id}`, () => new THREE.BoxGeometry(0.004, 0.002, w - 2 * f));
-    for (let k = 1; k < m; k++) {
-      const q = new THREE.Mesh(lx, line);
-      q.position.set(0, t * 1.2 + 0.001, -w / 2 + f + ((w - 2 * f) * k) / m);
-      g.add(q);
-    }
-    for (let k = 1; k < n; k++) {
-      const q = new THREE.Mesh(lz, line);
-      q.position.set(-l / 2 + f + ((l - 2 * f) * k) / n, t * 1.2 + 0.001, 0);
-      g.add(q);
-    }
-    return g;
+    return solarPanelMesh(id, l, t, w, this.kit);
   }
 
   private glassMat?: THREE.MeshStandardMaterial;
@@ -166,19 +140,7 @@ export class ComponentViews {
 
   /** Battery / charge controller / inverter: its box plus a label plate on the top and the front (local +z). */
   private equipment(e: Entity, sx: number, sy: number, sz: number, color: string) {
-    const g = new THREE.Group();
-    g.add(this.mesh(this.geo(`box:${e.def}`, () => new THREE.BoxGeometry(sx, sy, sz).translate(0, sy / 2, 0)), color));
-    const tex = labelTexture(labelText(e));
-    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
-    const w = sx * 0.9, h = Math.min(sz * 0.9, w * 0.42);
-    const top = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-    top.rotation.x = -Math.PI / 2;
-    top.position.y = sy + 0.002;
-    const front = new THREE.Mesh(new THREE.PlaneGeometry(w, Math.min(sy * 0.8, h)), mat);
-    front.position.set(0, sy / 2, sz / 2 + 0.002);
-    top.name = front.name = 'label';
-    g.add(top, front);
-    return g;
+    return equipmentMesh(e, sx, sy, sz, color, this.kit, labelTexture(labelText(e)));
   }
 
   /**
