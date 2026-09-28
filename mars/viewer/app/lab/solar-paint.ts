@@ -1,8 +1,7 @@
 // Engine Lab preset `solar-paint` (SOLAR_PAINT.md, YEAR_BUILD.md stock): the renderer's view of the
 // W8 / W7 things on open ground, live where the engine can drive them:
-//   * two painters paint two standing 4x8 sheets — one a colour, one a texture (drawn as a hashed colour
-//     with a stripe, textures do not exist yet): the per-band paint overlay grows with the engine's
-//     `paint.bands[].coverage`;
+//   * two painters paint two standing 4x8 sheets — one a colour, one the named flower-mural-2024
+//     image texture: the per-band paint overlay grows with the engine's `paint.bands[].coverage`;
 //   * two people carry a solar panel flat (fragile: ≤ 30° tilt, `carry/fragile.ts` checks it every tick);
 //   * set pieces: a panel mounted at 20° on two rails, rails, a battery / charge controller / inverter with
 //     their configuration on a label, every bundle / stack kind at a few counts (the drawn stack shrinks
@@ -76,7 +75,7 @@ export const solarPaint: Scenario = {
   name: 'solar-paint',
   title: 'Solar, paint and stock (renderer showcase)',
   description:
-    'HYPOTHETICAL showcase (SOLAR_PAINT.md, YEAR_BUILD.md): p1 paints sheet w1 yellow and p2 paints w2 with a texture (drawn as a colour with a stripe — no textures yet), band by band from the top down, as far as they reach (the top 0.38 m of a standing 4x8 is out of reach from the ground); c1 and c2 carry solar panel pv1 flat (fragile, ≤ 30° tilt). Set pieces: panel pv2 mounted at 20° on two rails, a battery / charge controller / inverter labelled with their configuration, every bundle / stack kind at a few counts, the cutting station.',
+    'HYPOTHETICAL showcase (SOLAR_PAINT.md, YEAR_BUILD.md): p1 paints sheet w1 yellow and p2 paints w2 with the flower-mural-2024 image texture, band by band from the top down, as far as they reach (the top 0.38 m of a standing 4x8 is out of reach from the ground); c1 and c2 carry solar panel pv1 flat (fragile, ≤ 30° tilt). Set pieces: panel pv2 mounted at 20° on two rails, a battery / charge controller / inverter labelled with their configuration, every bundle / stack kind at a few counts, the cutting station.',
   scene: buildBayGround,
   humans: () => [],
   build: solarPaintRuntime,
