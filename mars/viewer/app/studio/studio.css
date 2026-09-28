@@ -1167,6 +1167,28 @@
   color: #cfe3b0;
   margin: 6px 0 0;
 }
+.direct-say {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 6px;
+}
+.direct-say input {
+  flex: 1;
+  min-width: 0;
+}
+.direct-said {
+  margin: 0 0 6px;
+  color: #cfe3b0;
+  overflow-wrap: anywhere;
+}
+.direct-span mark {
+  background: #f0d9a0;
+  color: #1c2622;
+}
+.direct-scope {
+  margin: 4px 0 6px;
+  color: #f0d9a0;
+}
 .take-camera-track select {
   max-width: 230px;
 }

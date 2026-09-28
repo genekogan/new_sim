@@ -5,6 +5,7 @@
 //   `chapter.startHash` = chapter k − 1's `finalStateHash`, plus the engine's own `chapterContinuity` (entities0 = the
 //   previous final entities, the replayed first frame within ½ mm / ½ mrad, same phase / activity / level). Chapter 0
 //   starts from the set's `startStateHash`;
+// - the metres each walker walks in it (take-walk.ts), so the player can carry the leg phase across a seam after a jump;
 // - its refusal / blocked log on the set clock (take-log.ts, shifted by `from · dt`), so the log runs on across chapters
 //   and the totals cover the whole set.
 // Then the final checks on the last chapter's replayed last frame: the final state = the set's (the A+B pin), last frame
@@ -22,6 +23,7 @@ import { compareB, compareToCanonical } from '../../engine/scenarios/year-build.
 import type { Take } from '../../engine/take/types.ts';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { setClockTenths, takeLog, type TakeStep } from '../engine-view/take-log.ts';
+import { walkTotals } from '../engine-view/take-walk.ts';
 import type { ChapterCheck, SetCheckIn, SetFinalCheck, SetWorkerOut } from './chapter-set.ts';
 
 const post = (m: SetWorkerOut) => (self as unknown as { postMessage(m: unknown): void }).postMessage(m);
@@ -98,6 +100,7 @@ async function run({ set, entries }: SetCheckIn) {
       hash: { ok: final === take.finalStateHash && (entries[k]?.finalStateHash ?? final) === final, final },
       start: { ok: !problems.length, expected, baseline: take.baselineStateHash, manifest, problems: problems.slice(0, 6) },
       log: takeLog(take, f.steps, { at, clock: setClockTenths }),
+      walked: walkTotals(take),
       ms: 0,
     };
     msg.ms = Math.round(performance.now() - t0);

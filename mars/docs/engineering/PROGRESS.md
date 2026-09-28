@@ -1264,3 +1264,51 @@ Then: gate → release 5; HANDOFF refresh.
 - **W49 (docs) landed** on `w49-answers`: Gene's questionnaire answers are on the `Gene:` lines of QUESTIONS_FOR_GENE.md (Q1–Q14, Q19 answered; Q3 carries the 2022 north correction, Q22 stays open); new open follow-ups Q28 (which house is "staggered"), Q29 (stair foot side), Q30 (joist orientation / depth), Q31 (what each house held); page regenerated: **12 open, 17 answered**. **Work plan: `docs/engineering/RECONCILIATION_2022.md`** — sections (a)–(k) in dependency order (datum → one `mars-2022` reconstruction edit → north / 2023-24 → engine rules → re-pins → takes), ≈ 50–58 worker-hours (estimate), pins/takes each step invalidates. Key findings from aerial-03 + DJI_0829: model ids map quadrant-for-quadrant (chiba = Ba Sing Se, east-house = Cahuilla, kitchen = Chatsubo, west-house = Huaqiangbei); the pinwheel handedness is fixed by flipping `make2022`'s `shift` (3 → ≈ −2), no mirror; stairs fill the end slot with treads parallel to the house (≈ 1 bay × ≈ house depth); 5-trailer train on −X + 4 scattered (9, not 12); 2022 north ≈ world −X turned ≈ 11° toward +Z (DJI_0829 yaw; Gene ≈ 30°). Pictures: `questions/r2022-aerial-annotated.jpg`, `questions/r2022-names-model-vs-photo.jpg` (`questions/tools/reconcile2022.py`).
 - **W49 landed** `b772682`, `e62f904` (≈230k tokens, 40 min; merged): answers in the fenced blocks (12 open / 17 answered), Q28–Q31 follow-ups with defaults; `RECONCILIATION_2022.md` (sections a–k, ≈ 50–58 worker-h, 12 h critical path; all seven 2022 pins + the chapter set replaced). Names: Ba Sing Se = `chiba` (up/east), Cahuilla = `east-house` (right/south), Chatsubo = `kitchen` (down/west, no panels), Huaqiangbei = `west-house` (left/north). Findings: no mirror — `make2022` `shift` 3 → ≈ −2 reverses the overlap; stairs ≈ one bay wide, treads parallel, rising to 2.638 m with joists; trailers 5 nose-to-tail + 4 scattered (9, not 12); solar rows: Huaqiangbei 1, Cahuilla 1, Ba Sing Se 3 stepped, Chatsubo 0; 2022 north = −X turned ≈ 11° toward +Z (≈ 8:40 on the render); joists on edge 24 in → deck +8.9 cm, roof framing → +13 cm; ≈ 75 more 16 ft 2x4 per building. Lead review: accepted. Ids stay (`chiba` etc.), display names change.
 - W51 spawned (2022 scene, sections a–f + i): names, pinwheel shift, stairs parallel, trailer train, solar south on 45° frames, SW table, per-year north field; 2023/24 trailers out of Chiba + off the walls. W52 (floors/roofs Kit + build rules) after W47 lands; W53 (datum y = 0) after W50 lands.
+
+## 2026-09-28 — W48: set player — shot hold at 64×, leg phase across seams, Direct camera on a chapter, sentences
+- **Shot hold** (`chapter-set.ts` `HOLD_S` = 1.5 s, `holdNext`; STUDIO_REPLAY.md "Chapter sets: shot hold, gait across
+  seams, Direct camera"):
+  - The rule: a chain of displayed shots from the anchor (the last seek or speed change). Shot at d → on screen until
+    r = max(planned end, d + 1.5 s × speed). Held past its end, the camera keeps that shot's last pose (the world goes on).
+    The next shot is the planned one at r, so shots wholly inside a hold are skipped.
+  - Deterministic in (anchor, speed, T), and identical to the planned camera up to 8×. A checkbox "Hold shots ≥ 1.5 s"
+    is on by default. A hold may run ≤ 1.5 wall-s into the next chapter on the previous chapter's last pose.
+  - **64× for 60 s wall** (from 384 set-s before A → D0): **89 → 41 shots**, mean on screen **0.67 → 1.50 s**, min
+    0.17 → 1.47 s (p10 0.20 → 1.47, max 1.43 → 1.57). The shots on screen equal the rule's chain, which the spec
+    recomputes from the files.
+  - Wall times depend on the frame rate, so the spec also reports the load-independent set-s ÷ 64. Under load (4 fps in
+    one run) held shots stretched to 8 wall-s; the nominal mean stayed at 1.50 s.
+- **Leg phase across seams** (`take-walk.ts` `walkTotals`, `TakePeople.setTake(take, walkOffsets)`, the worker posts
+  per-chapter `walked`):
+  - Each walker's metres are carried from the chapters before, so the Walk phase continues. The clock holds after a jump
+    until the earlier chapters' totals are known (≈ 3 s after opening, from the worker).
+  - At each seam, every person on the last frame of k − 1 vs the first of k: **A → D0 max jump 0.447 → 0; D0 → D1 0.471
+    → 0** (6 people each; m2 / m4 walking; metres equal to the mm).
+- **Direct camera for a set:**
+  - The panel sits under the set transport and acts on the chapter on screen. "Direct camera · chapter D2" plus a note
+    saying what compiles against D2's take (its own times), what plays while D2 is on screen, and what Save track adds
+    to `year-build-2022-east-house-ab-d2.json`.
+  - Tested: a medium hold on m1 at the D2 relay (local 2728.8 s, 20 s) → 1 shot, readability 1, simulated valid → Play
+    ("Directed (D2): …"; other chapters keep their own camera) → Save = D2's shipped file byte-for-byte + `cameras`.
+  - `directCamera` took 5.6 s on the main thread for that chapter take.
+- **Sentences** (lead addition, on Codex's `parse.ts`, not edited): a "Say it" box in the Direct panel. `parseSentences`
+  → all-or-nothing append to the JSON list; refusals are shown with the parser's question, candidates and the marked
+  words.
+  - Gene's four sentences give CAMERA_DIRECT.md §1's objects: three appended, "look at this crowd …" refused
+    (`camera.parse.deictic`, "Which activity are the people doing?").
+  - "pan across the shed" shows candidates region / assembly / entity; "… then …" appends two.
+  - The 270° rack-bay orbit sentence → Compute (139 ms, readability min 0.63 / mean 0.96, simulated valid) → Play.
+  - Against the flagship the compiler (not the parser) refuses the sunset pan (sun 19.1° up at 16:00) and the kitchen
+    (no `kitchen-interior` in 2026). **No parser failures to report to Codex.**
+- **Specs:** studio-build 11/11 (3 new: hold, seams, Direct in D2), studio-direct 2/2, studio-direct-sentences 1/1
+  (new file), studio-take 1/1; tsc clean.
+- **Captures looked at:** `studio-build-set-hold-held.png` (D0, 16 set-s into a hold, m1 still in frame at the left
+  edge), `studio-build-set-direct-{panel,hold}.png`, `studio-direct-sentences-{refused,orbit}.png`.
+- **Weak spots:**
+  - Hold tails are locked off, so workers can leave the frame (≤ 84 set-s at 64×; seen in a capture: one of two
+    carriers gone 12 set-s into a hold).
+  - The Walk *weight* still steps at a seam: the ±0.15 s speed window is clamped at each take's edge (m2 0 → 0.96).
+  - Single takes have no hold.
+  - Direct compile blocks the page for ≈ 6 s on a chapter take.
+  - No Camera picker for sets.
+  - The parser gets no world vocabulary; names are checked by the compiler.

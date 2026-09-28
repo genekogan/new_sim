@@ -1184,6 +1184,17 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       take: () => takeHost?.info() ?? null,
       // the chapter set open (STUDIO_REPLAY.md "Chapter sets: playback"): set clock, chapter, loads, swaps, whole-set checks
       takeSet: () => takeHost?.setInfo() ?? null,
+      // chapter set switches (W48): the shot hold and the gait carry across seams (off = the W37 behaviour, for before/after)
+      takeSetControl: (o: { hold?: boolean; gaitCarry?: boolean }) => {
+        const r = takeHost?.setReplay();
+        if (!r) return null;
+        if (o.hold !== undefined) r.hold = o.hold;
+        if (o.gaitCarry !== undefined) r.gaitCarry = o.gaitCarry;
+        r.seek(r.t);
+        return { hold: r.hold, gaitCarry: r.gaitCarry };
+      },
+      // every person's walked metres, Walk weight and leg phase at set time T (redrawn now; null if not ready there)
+      setGaitAt: (T: number) => takeHost?.setReplay()?.gaitAt(T) ?? null,
       // Engine camera vs render mesh (docs/engineering/CAMERA_VERIFY.md); lazy, off the main chunk.
       // `track`: 'take' (the take's own camera, default), 'directed' (the last directed track of the open take) or
       // 'year' (the last take-less track from directOnYear: verified with no replay, ambient people hidden), or
@@ -1213,7 +1224,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       // camera direction (direct-camera.ts): against the open take, or the year's campus with nobody in it
       direct: async (directions: unknown[], o: { correct?: boolean; datetime?: string } = {}) => {
         const d = await takeHost.direct(directions, o);
-        return d && directedSummary(d);
+        return d && { ...directedSummary(d), chapter: takeHost.directedChapter()?.id ?? null };
       },
       playDirected: (on: boolean) => takeHost.playDirected(on),
       // the replay bar's camera picker (planned + the file's `cameras` + an unsaved directed track) and redraw timing

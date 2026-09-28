@@ -171,7 +171,7 @@ export function TakePanel({ host, year }: { host: () => TakeHost | null; year: n
           </details>
         )}
       </div>
-      {setReplay && set && <SetTransport r={setReplay} onChange={bump} />}
+      {setReplay && set && <SetTransport r={setReplay} host={h!} onChange={bump} />}
       {replay && entry && (
         <>
           <div className="take-row take-transport">
@@ -260,7 +260,7 @@ export function TakePanel({ host, year }: { host: () => TakeHost | null; year: n
               </>
             )}
           </div>
-          <DirectPanel host={h!} replay={replay} onChange={bump} />
+          <DirectPanel host={h!} clock={{ t: replay.t, playing: replay.playing, directedOn: !replay.trackInfo().own, setPlaying: (on) => { replay.playing = on; } }} onChange={bump} />
         </>
       )}
     </div>

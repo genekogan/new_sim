@@ -413,3 +413,260 @@ for (const s of sets) test(`chapter set at 64× (${s.id.slice(0, 8)}): 10 s acro
   expect(tB - tA, 'the set advanced at ≈ 64×').toBeGreaterThan(400);
   expect(errors, 'console/page errors').toEqual([]);
 });
+
+// ---- W48: the set player at high speed (STUDIO_REPLAY.md "Chapter sets: shot hold, gait across seams, Direct camera") ----
+type HoldSeg = { k: number; i: number; d: number; r: number; end: number; label: string };
+type SetInfo48 = SetInfo & {
+  shotKey: string; hold: { on: boolean; holdS: number; span: number; anchor: number; seg: HoldSeg | null };
+  gaitCarry: boolean; gaitWaiting: boolean; directed: { k: number; chapter: string; id: string } | null; track: { id: string; kind: string; own: boolean };
+};
+type Gait = { t: number; k: number; chapter: string; local: number; gait: Record<string, { dist: number; walk: number; stride: number | null; phase: number | null }> };
+type Hook48 = SetHook & {
+  takeSet: () => SetInfo48 | null;
+  takeSetControl: (o: { hold?: boolean; gaitCarry?: boolean }) => { hold: boolean; gaitCarry: boolean } | null;
+  setGaitAt: (T: number) => Gait | null;
+};
+const setInfo48 = (page: Page) => page.evaluate(() => (window.__marsStudio as unknown as Hook48).takeSet());
+/** Planned shot windows per chapter (chapter seconds) and the take dt, from the shipped chapter files. */
+function setShots(s: SetEntry) {
+  const files = s.chapters.map((c) => JSON.parse(fs.readFileSync(path.join(PUBLIC, c.file), 'utf8')) as { take: { dt: number }; camera: { data: { shots: { t0: number; t1: number; label: string }[] } } });
+  return { dt: files[0].take.dt, shots: files.map((f) => f.camera.data.shots) };
+}
+/** The hold rule, restated from STUDIO_REPLAY.md (not imported): the chain of displayed shots from `anchor`. */
+function expectedHolds(s: SetEntry, anchor: number, span: number, until: number) {
+  const { dt, shots } = setShots(s);
+  const duration = s.ticks * dt;
+  const chapterAt = (T: number) => { for (let k = 0; k < s.chapters.length; k++) if (T < s.chapters[k].to * dt) return k; return s.chapters.length - 1; };
+  const out: { k: number; i: number; d: number; r: number }[] = [];
+  for (let d = anchor; d < until && d < duration;) {
+    const k = chapterAt(d), at = s.chapters[k].from * dt, l = d - at, w = shots[k];
+    let i = w.findIndex((x) => l >= x.t0 && l < x.t1);
+    if (i < 0) i = l < w[0].t0 ? 0 : w.length - 1;
+    const end = Math.min(at + w[i].t1, s.chapters[k].to * dt);
+    const r = Math.min(duration, Math.max(end, d + span));
+    out.push({ k, i, d, r });
+    d = r;
+  }
+  return out;
+}
+
+// 64× for 60 s wall from 384 set-s before the A → D0 seam: the planned camera (hold off) against the shot hold. Counts the
+// shots on screen (rAF, by the player's shot key) and their on-screen time; the chain seen must be the rule's chain.
+for (const s of sets) test(`chapter set at 64× (${s.id.slice(0, 8)}): shot hold — every shot ≥ 1.5 s on screen, 60 s before → after`, async ({ page }, testInfo) => {
+  test.setTimeout(420_000);
+  const errors = collectConsoleErrors(page);
+  await openStudio(page, s.year);
+  await page.getByRole('combobox', { name: 'Watch it being built' }).selectOption(`set:${s.id}`);
+  await page.waitForFunction(() => !!(window.__marsStudio as unknown as Hook48).takeSet()?.checks.final, null, { timeout: 240_000 });
+  await page.getByRole('combobox', { name: 'Take speed' }).selectOption('64');
+  const { dt } = setShots(s);
+  const from = Math.round(s.chapters[1].from * dt - 384);
+  const WALL = 60_000;
+  const runs: Record<string, unknown> = {};
+  for (const hold of [false, true]) {
+    await page.evaluate((h) => (window.__marsStudio as unknown as Hook48).takeSetControl({ hold: h }), hold);
+    await expect(page.getByRole('checkbox', { name: 'Hold shots' })).toBeChecked({ checked: hold });
+    await scrubSet(page, from);
+    await page.waitForFunction(() => (window.__marsStudio as unknown as Hook48).takeSet()!.loaded.includes(1), null, { timeout: 60_000 });
+    const anchor = (await setInfo48(page))!.hold.anchor;
+    await page.getByRole('button', { name: 'Play take' }).click();
+    const res = await page.evaluate((ms) => new Promise<{ w: number[]; key: string[]; t: number[]; label: string[] }>((done) => {
+      const w: number[] = [], key: string[] = [], t: number[] = [], label: string[] = [];
+      const t0 = performance.now();
+      const f = (now: number) => {
+        const i = (window.__marsStudio as unknown as Hook48).takeSet()!;
+        w.push(now - t0); key.push(i.shotKey); t.push(i.t); label.push(i.shot);
+        if (now - t0 < ms) requestAnimationFrame(f);
+        else done({ w, key, t, label });
+      };
+      requestAnimationFrame(f);
+    }), WALL);
+    if (hold) {
+      // pause inside a hold tail (the shot on screen past its planned end) and look at it
+      // clicked in the same frame the condition is seen (a Playwright click can land after the hold's release under load)
+      await page.evaluate(() => new Promise<void>((done) => {
+        const f = () => {
+          const h = (window.__marsStudio as unknown as Hook48).takeSet()!;
+          if (h.hold.seg && h.t > h.hold.seg.end + 5 && h.t < h.hold.seg.r - 5) {
+            (document.querySelector('button[aria-label="Pause take"]') as HTMLButtonElement).click();
+            done();
+          } else requestAnimationFrame(f);
+        };
+        requestAnimationFrame(f);
+      }));
+      await expect(page.getByRole('button', { name: 'Play take' })).toBeVisible();
+      await expect(page.getByLabel('Shot now')).toContainText('· held');
+      await waitFrames(page, 4);
+      await captureView(page, 'studio-build-set-hold-held', { testInfo, compare: false });
+      runs.held = { info: await page.getByLabel('Shot now').innerText(), seg: (await setInfo48(page))!.hold.seg, t: (await setInfo48(page))!.t };
+    } else await page.getByRole('button', { name: 'Pause take' }).click();
+    // segments: runs of the same shot key; on-screen time = wall between the first frame of one and of the next
+    const segs: { key: string; w0: number; w1: number; t0: number; t1: number; label: string }[] = [];
+    res.key.forEach((k, j) => {
+      if (!segs.length || segs[segs.length - 1].key !== k) segs.push({ key: k, w0: res.w[j], w1: res.w[j], t0: res.t[j], t1: res.t[j], label: res.label[j] });
+      const g = segs[segs.length - 1];
+      g.w1 = res.w[j + 1] ?? res.w[j];
+      g.t1 = res.t[j];
+    });
+    const inner = segs.slice(1, -1).map((g) => (g.w1 - g.w0) / 1000); // complete shots only
+    const r2 = (x: number) => Math.round(x * 100) / 100;
+    const sorted = [...inner].sort((a, b) => a - b);
+    const setSeconds = res.t[res.t.length - 1] - res.t[0];
+    runs[hold ? 'hold' : 'planned'] = {
+      anchor, frames: res.w.length, setSeconds: r2(setSeconds), setPerWall: r2(setSeconds / (WALL / 1000)),
+      // on-screen set seconds per complete shot ÷ 64: the wall time at a true 64× (independent of the frame rate / load)
+      nominalS: (() => { const x = segs.slice(1, -1).map((g, j) => (segs[j + 2].t0 - g.t0) / 64); return { mean: r2(x.reduce((a, b) => a + b, 0) / x.length), min: r2(Math.min(...x)), max: r2(Math.max(...x)) }; })(),
+      shots: segs.length, complete: inner.length, meanS: r2(inner.reduce((a, b) => a + b, 0) / inner.length), minS: r2(sorted[0]), p10S: r2(sorted[Math.floor(sorted.length * 0.1)]), maxS: r2(sorted[sorted.length - 1]),
+      chapters: [...new Set(res.key.map((k) => k.split(':')[0]))],
+      firstShots: segs.slice(0, 6).map((g) => `${g.key} ${r2((g.w1 - g.w0) / 1000)} s · ${g.label.slice(0, 50)}`),
+    };
+    if (hold) {
+      // the chain on screen is exactly the rule's chain from the anchor (deterministic given speed and start)
+      const want = expectedHolds(s, anchor, 1.5 * 64, res.t[res.t.length - 1] + 1e-6).map((x) => `${x.k}:${x.i}@${x.d.toFixed(3)}`);
+      expect(segs.map((g) => g.key), 'the shots on screen are the hold chain from the anchor').toEqual(want.slice(0, segs.length));
+      // held shots: every complete shot ≥ 1.5 s wall (a 5 % allowance for the frame the cut lands on)
+      expect(Math.min(...inner), 'no complete shot under 1.5 s on screen').toBeGreaterThanOrEqual(1.5 * 0.95);
+      expect(res.label.some((l, j) => res.key[j] !== res.key[j - 1] && j > 0), 'cuts happen').toBe(true);
+    } else expect(Math.min(...inner), 'without the hold some planned shots flash by').toBeLessThan(1.5);
+  }
+  const out = { set: s.id, speed: 64, wallS: WALL / 1000, from, ...runs };
+  writeArtifact('studio-build-set-hold.json', out);
+  console.log(`studio-build set hold: ${JSON.stringify(out)}`);
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+// Leg phase at the seams: every person's walked metres and leg phase on the last frame of chapter k − 1 (set time
+// seam − 0.1 ms) against the first frame of chapter k (the seam). With the carry (W48) no phase may jump > 0.1; without
+// it (the W37 behaviour, every chapter counting from 0) the jumps are reported as the before.
+for (const s of sets) test(`chapter set seams (${s.id.slice(0, 8)}): no walker's leg phase jumps > 0.1 at A → D0 and D0 → D1`, async ({ page }) => {
+  test.setTimeout(300_000);
+  const errors = collectConsoleErrors(page);
+  await openStudio(page, s.year);
+  await page.getByRole('combobox', { name: 'Watch it being built' }).selectOption(`set:${s.id}`);
+  await page.waitForFunction(() => !!(window.__marsStudio as unknown as Hook48).takeSet()?.checks.final, null, { timeout: 240_000 });
+  const { dt } = setShots(s);
+  const gaitAt = async (T: number) => {
+    await page.waitForFunction((x) => !!(window.__marsStudio as unknown as Hook48).setGaitAt(x), T, { timeout: 60_000, polling: 250 });
+    return (await page.evaluate((x) => (window.__marsStudio as unknown as Hook48).setGaitAt(x), T))!;
+  };
+  const circ = (a: number, b: number) => { const d = Math.abs(a - b) % 1; return Math.min(d, 1 - d); };
+  const report: Record<string, unknown> = { set: s.id };
+  for (const carry of [false, true]) {
+    await page.evaluate((c) => (window.__marsStudio as unknown as Hook48).takeSetControl({ gaitCarry: c }), carry);
+    for (const k of [1, 2]) {
+      const seam = s.chapters[k].from * dt;
+      const a = await gaitAt(seam - 1e-4), b = await gaitAt(seam);
+      expect(a.chapter).toBe(s.chapters[k - 1].id);
+      expect(b.chapter).toBe(s.chapters[k].id);
+      const rows = Object.keys(b.gait).filter((id) => a.gait[id]).map((id) => {
+        const x = a.gait[id], y = b.gait[id];
+        return { id, before: { dist: Math.round(x.dist * 1000) / 1000, walk: x.walk, phase: x.phase }, after: { dist: Math.round(y.dist * 1000) / 1000, walk: y.walk, phase: y.phase }, jump: x.phase !== null && y.phase !== null ? Math.round(circ(x.phase, y.phase) * 1000) / 1000 : null };
+      });
+      expect(rows.length, 'people on both sides of the seam').toBeGreaterThan(0);
+      expect(rows.every((r) => r.jump !== null), 'every person has a stride (templates loaded)').toBe(true);
+      const max = Math.max(...rows.map((r) => r.jump!));
+      const walking = rows.filter((r) => r.before.walk > 0 || r.after.walk > 0).map((r) => r.id);
+      report[`${carry ? 'carry' : 'restart'} ${s.chapters[k - 1].id}→${s.chapters[k].id}`] = { seam, people: rows.length, walking, maxJump: max, rows };
+      if (carry) {
+        for (const r of rows) {
+          expect(r.jump!, `${r.id}: leg phase jump at ${s.chapters[k - 1].id} → ${s.chapters[k].id}`).toBeLessThanOrEqual(0.1);
+          expect(Math.abs(r.after.dist - r.before.dist), `${r.id}: walked metres continue across the seam`).toBeLessThan(0.01);
+        }
+      } else expect(max, 'restarting at 0 makes some leg phase jump (the W37 weak spot)').toBeGreaterThan(0.1);
+    }
+  }
+  writeArtifact('studio-build-set-gait.json', report);
+  console.log(`studio-build set gait: ${JSON.stringify(Object.fromEntries(Object.entries(report).map(([k, v]) => [k, typeof v === 'object' && v ? { people: (v as { people: number }).people, walking: (v as { walking: string[] }).walking, maxJump: (v as { maxJump: number }).maxJump } : v])))}`);
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+// Direct camera on a set: a hold on a crew member inside D2 (the roof-deck relay), compiled against D2's take from the
+// panel; the panel names D2; the shot list; Play drives the camera with the directed track inside D2; Save track adds it
+// to D2's file only (the take and its planned camera untouched); Back restores the planned / held camera.
+for (const s of sets) test(`chapter set Direct camera (${s.id.slice(0, 8)}): a hold on a crew member inside D2 → shot list, play, save into D2's file`, async ({ page }, testInfo) => {
+  test.setTimeout(400_000);
+  const errors = collectConsoleErrors(page);
+  await openStudio(page, s.year);
+  await page.getByRole('combobox', { name: 'Watch it being built' }).selectOption(`set:${s.id}`);
+  await page.waitForFunction(() => !!(window.__marsStudio as unknown as Hook48).takeSet(), null, { timeout: 90_000 });
+  const d2 = s.chapters.findIndex((c) => c.id === 'D2');
+  expect(d2).toBeGreaterThan(0);
+  const c = s.chapters[d2];
+  const relay = stepMoment(s, 'D2', 'pass_up', 0.3);
+  await scrubSet(page, relay.t);
+  const at = (await setInfo48(page))!;
+  expect(at.chapter.id).toBe('D2');
+  // the crew member: the first person the planned shot at that moment frames ("… — m1 m2")
+  const file = JSON.parse(fs.readFileSync(path.join(PUBLIC, c.file), 'utf8')) as { take: { id: string; dt: number }; camera: { id: string; data: { shots: { t0: number; t1: number; label: string }[] } }; cameras?: unknown };
+  const local = at.chapter.local;
+  const planned = file.camera.data.shots.find((x) => local >= x.t0 && local < x.t1)!;
+  const crew = / — (m\d+)/.exec(planned.label)?.[1] ?? 'm1';
+  const panel = page.locator('details.take-direct');
+  await expect(panel.locator('summary')).toContainText('Direct camera · chapter D2');
+  await panel.locator('summary').click();
+  const scope = page.getByRole('note', { name: 'Direct camera applies to' });
+  await expect(scope).toContainText('Applies to chapter 4/7 · D2:');
+  await expect(scope).toContainText(`Save track adds it to D2's file (${path.basename(c.file)})`);
+  await page.getByRole('combobox', { name: 'Subject kind' }).selectOption('entity');
+  await page.getByRole('textbox', { name: 'Subject', exact: true }).fill(crew);
+  await page.getByRole('combobox', { name: 'Verb' }).selectOption('hold');
+  await page.getByRole('spinbutton', { name: 'Duration' }).fill('20');
+  await page.getByRole('combobox', { name: 'Framing' }).selectOption('medium');
+  await page.getByRole('button', { name: 'Replace' }).click();
+  const dirs = JSON.parse(await page.getByRole('textbox', { name: 'Directions JSON' }).inputValue()) as { at: number }[];
+  expect(dirs[0].at, 'the direction starts at D2\'s own (local) time').toBeCloseTo(Math.round(local * 10) / 10, 5);
+  const t0 = Date.now();
+  await page.getByRole('button', { name: 'Compute camera' }).click();
+  const shots = page.getByRole('list', { name: 'Shot list' });
+  await expect(shots).toBeVisible({ timeout: 120_000 });
+  const computeMs = Date.now() - t0;
+  const shotText = await shots.innerText();
+  expect(shotText).toContain('hold');
+  const meta = await panel.locator('.direct-meta').innerText();
+  expect(meta).toMatch(/^dir-[0-9a-f]{12} · /);
+  const trackId = meta.split(' · ')[0];
+  await captureView(page, 'studio-build-set-direct-panel', { testInfo, compare: false });
+  // play: the directed track drives the camera inside D2, from its first shot
+  await page.getByRole('button', { name: 'Play directed track' }).click();
+  await page.getByRole('button', { name: 'Pause take' }).click();
+  let i = (await setInfo48(page))!;
+  expect(i.directed).toMatchObject({ chapter: 'D2', id: trackId });
+  expect(i.track).toMatchObject({ id: trackId, kind: 'directed', own: false });
+  expect(i.chapter.id).toBe('D2');
+  expect(i.chapter.local, 'Play starts at the first directed shot (then ran until Pause)').toBeGreaterThanOrEqual(dirs[0].at - 1e-6);
+  expect(i.chapter.local).toBeLessThan(dirs[0].at + 2);
+  await scrubSet(page, Math.round((i.t + 8) * 10) / 10);
+  i = (await setInfo48(page))!;
+  expect(i.track.own).toBe(false);
+  await expect(page.getByLabel('Shot now')).toContainText('Directed (D2):');
+  await captureView(page, 'studio-build-set-direct-hold', { testInfo, compare: false });
+  const shown = await page.getByLabel('Shot now').innerText();
+  // outside D2 the chapter's own (held) camera is back; inside D2 again the directed one
+  await scrubSet(page, Math.round((s.chapters[d2 + 1].from * file.take.dt + 30) * 10) / 10);
+  i = (await setInfo48(page))!;
+  expect(i.chapter.id).not.toBe('D2');
+  expect(i.track.own, 'another chapter plays its own camera').toBe(true);
+  await scrubSet(page, Math.round((relay.t + 8) * 10) / 10);
+  expect((await setInfo48(page))!.track.own).toBe(false);
+  // save: the D2 file + cameras[trackId], downloaded under D2's file name; nothing else changes
+  await panel.locator('summary').click();
+  if (!(await page.getByRole('button', { name: 'Save track' }).isVisible())) await panel.locator('summary').click();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save track' }).click()]);
+  expect(dl.suggestedFilename()).toBe(path.basename(c.file));
+  const saved = JSON.parse(fs.readFileSync((await dl.path())!, 'utf8')) as typeof file & { cameras: Record<string, { id: string; takeId: string; kind: string }> };
+  expect(Object.keys(saved.cameras)).toEqual([trackId]);
+  expect(saved.cameras[trackId]).toMatchObject({ id: trackId, takeId: file.take.id, kind: 'directed' });
+  const { cameras: _drop, ...rest } = saved;
+  expect(file.cameras, 'the shipped D2 file carries no extra cameras').toBeUndefined();
+  expect(JSON.stringify(rest), 'the downloaded file is D2\'s shipped file plus cameras').toBe(JSON.stringify(file));
+  await expect(page.getByRole('status', { name: 'Saved track' })).toContainText(`Saved ${trackId} into ${path.basename(c.file)}`);
+  // back to the planned / held camera
+  await page.getByRole('button', { name: "Back to the take's camera" }).click();
+  i = (await setInfo48(page))!;
+  expect(i.directed).toBeNull();
+  expect(i.track.own).toBe(true);
+  const report = { set: s.id, chapter: 'D2', t: relay.t, local, crew, plannedShot: planned.label, directions: dirs, computeMs, trackId, shotList: shotText, shown, saved: { name: dl.suggestedFilename(), cameras: Object.keys(saved.cameras) } };
+  writeArtifact('studio-build-set-direct.json', report);
+  console.log(`studio-build set direct: ${JSON.stringify({ ...report, shotList: shotText.slice(0, 300) })}`);
+  expect(errors, 'console/page errors').toEqual([]);
+});

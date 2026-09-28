@@ -20,6 +20,7 @@ import { FixtureViews } from './fixtures.ts';
 import { HumanViews, type Hands, type SampledHuman } from './humans.ts';
 import { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 import type { Template } from './people.ts';
+import { walkCum } from './take-walk.ts';
 
 export { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 export type TakeManifestEntry = {
@@ -148,6 +149,11 @@ export class TakePeople {
   private walks = new Map<string, Walk>();
   private base: SpatialScene;
   private stairKey = '';
+  /** Metres each walker had already walked before this take began (a chapter set: Σ over the earlier chapters). */
+  private walkOffsets: Record<string, number> = {};
+  /** Per person at the last show(): metres walked (offset included) and the Walk weight. */
+  private lastGait = new Map<string, { dist: number; walk: number }>();
+  private templates: Template[] = [];
   frame: TakeFrame | null = null;
   /** Wall ms of the last show()'s `sampleTake` (the rest of show() is posing the three.js views). */
   sampleMs = 0;
@@ -164,9 +170,7 @@ export class TakePeople {
     this.walks.clear();
     for (const [id, s] of Object.entries(this.take.tracks)) {
       if (recordOf(this.take, id)?.kind !== 'human') continue;
-      const cum = [0];
-      for (let i = 1; i < s.length; i++) cum.push(cum[i - 1] + Math.hypot(s[i][1] - s[i - 1][1], s[i][3] - s[i - 1][3]) / POS_Q);
-      this.walks.set(id, { ticks: s.map((x) => x[0]), cum, track: s });
+      this.walks.set(id, { ticks: s.map((x) => x[0]), cum: walkCum(s), track: s });
     }
   }
 
@@ -175,7 +179,8 @@ export class TakePeople {
    * frame is chapter k's final state, same ids). People, parts and piles keep their three.js objects, so the swap costs
    * no rig or mesh rebuild. The next show() poses the new take.
    */
-  setTake(take: Take) {
+  setTake(take: Take, walkOffsets: Record<string, number> = {}) {
+    this.walkOffsets = walkOffsets;
     if (take === this.take) return;
     this.take = take;
     this.indexWalks();
@@ -184,7 +189,25 @@ export class TakePeople {
   }
 
   setTemplates(ts: Template[]) {
+    this.templates = ts;
     this.humans.setTemplates(ts);
+  }
+
+  /**
+   * Gait readout of the last show() (tests): per person the metres walked (the chapter offset included), the Walk
+   * weight, and the leg phase 0–1 the renderer derives from them (humans.ts: clip s = metres / walkSpeed, mod the clip
+   * length), with the person's template stride (walkSpeed × Walk clip length). `phase` is null before templates load.
+   */
+  gait(): Record<string, { dist: number; walk: number; stride: number | null; phase: number | null }> {
+    const bones = this.humans.bones();
+    const out: Record<string, { dist: number; walk: number; stride: number | null; phase: number | null }> = {};
+    for (const [id, g] of this.lastGait) {
+      const tpl = this.templates.find((x) => x.name === bones[id]?.template);
+      const dur = tpl ? THREE.AnimationClip.findByName(tpl.gltf.animations, 'Walk')?.duration : undefined;
+      const stride = tpl && dur ? tpl.walkSpeed * dur : null;
+      out[id] = { dist: g.dist, walk: g.walk, stride, phase: stride ? ((g.dist / tpl!.walkSpeed) % dur!) / dur! : null };
+    }
+    return out;
   }
 
   /** Metres walked by `id` up to `tick` along its recorded track (horizontal). */
@@ -223,6 +246,7 @@ export class TakePeople {
     const comps: Record<string, Entity> = {};
     const fixtures: Record<string, Entity> = {};
     const people: SampledHuman[] = [];
+    this.lastGait.clear();
     const dt = this.take.dt, span = 0.15 / dt; // ±0.15 s speed window
     for (const [id, e] of Object.entries(frame.entities)) {
       const src = recordOf(this.take, id) as Entity | undefined; // pose / phase / contents below come from the frame
@@ -240,14 +264,16 @@ export class TakePeople {
       }
       if (src.kind !== 'human') continue;
       const w = this.walks.get(id);
-      const dist = w ? this.walked(w, frame.tick) : 0;
+      const dist = (w ? this.walked(w, frame.tick) : 0) + (this.walkOffsets[id] ?? 0);
       const speed = w ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
       const g = st.grip;
+      const walk = climbing ? 1 : clamp01((speed - 0.06) / 0.25);
+      this.lastGait.set(id, { dist, walk });
       // prone receiver (mars-take/4, W32): the lying heading in integer mrad and the phase progress in integer % → rad, 0–1
       const proneYaw = typeof st.proneYaw === 'number' ? st.proneYaw / ANG_Q : undefined;
       const phaseK = typeof st.phaseK === 'number' ? st.phaseK / 100 : undefined;
-      people.push({ id, p: e.p, yaw: e.yaw, walk: climbing ? 1 : clamp01((speed - 0.06) / 0.25), walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}) });
+      people.push({ id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}) });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });

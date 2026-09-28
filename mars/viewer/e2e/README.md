@@ -114,13 +114,24 @@ See `docs/engineering/STUDIO_REPLAY.md`.
   - compares rendered palms with recorded hand points at 12 hand-up moments (median < 5 cm; measured < 0.5 mm).
   A second test per take plays it at 64× for 10 s and writes the frame intervals and the replay's redraw cost to
   `studio-build-perf.json` (STUDIO_REPLAY.md §6).
+  Per chapter set (W37 / W48, STUDIO_REPLAY.md "Chapter sets"): the walk through the set
+  (`studio-build-set-{yard,roof-relay,stair,walls,final}.png`, `studio-build-set.json`); 64× across the A → D0 seam
+  (`studio-build-set-perf.json`); the **shot hold** at 64× for 60 s, planned camera against the hold (shots on screen,
+  on-screen time, the chain = the rule's; `studio-build-set-hold.json`, `studio-build-set-hold-held.png`); the **leg
+  phase at the A → D0 and D0 → D1 seams** (≤ 0.1 carried, the W37 restart reported; `studio-build-set-gait.json`); and
+  **Direct camera** on chapter D2 (a hold on a crew member → shot list, play, save into D2's file;
+  `studio-build-set-direct-{panel,hold}.png`, `studio-build-set-direct.json`).
 - **`studio-direct.spec.ts`**, on the flagship take:
   - the direction form writes the typed JSON;
   - **Compute camera** shows the shot list with `foreground → raise`;
   - **Play directed track** drives the engine camera with the take hash and poses unchanged;
   - an unknown group is refused.
 
-  Captures `studio-direct-{shots,playing}.png`. The "save track" test (W24) saves the directed track into the take
+  Captures `studio-direct-{shots,playing}.png`.
+- **`studio-direct-sentences.spec.ts`** (W48), on the flagship take: Gene's four sentences through the panel's **Say it**
+  box (three appended as CAMERA_DIRECT.md §1's objects, the deictic one refused with its question); an ambiguous word
+  with its candidates; "… then …" appending two; the 270° rack-bay orbit sentence computed and played. Captures
+  `studio-direct-sentences-{refused,orbit}.png`, report `studio-direct-sentences.json`. The "save track" test (W24) saves the directed track into the take
   file (a download), serves it back in place of the shipped file, picks it from the **Camera** picker and verifies it by
   file id; captures `studio-direct-file-track.png`.
 - **`lab.spec.ts`** "Oblique yard" (W24): the year-build preset's yard view equals the whole-skeleton take's first

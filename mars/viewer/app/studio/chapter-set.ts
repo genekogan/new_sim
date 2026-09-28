@@ -10,6 +10,14 @@
 //   chapter that is not loaded yet, it holds at the boundary until it is.
 // - Engine camera per chapter (each chapter file's planned `camera`), the log on the set clock (every chapter's log shifted
 //   by its start), and the whole-set checks from chapter-set.worker.ts.
+// - Gait across a seam (W48): each walker's leg phase continues across a swap. Chapter k's walked distance starts from
+//   the walker's total over chapters 0 … k − 1 (take-walk.ts; totals from the loaded chapters or the worker), so the
+//   Walk clip does not restart at a seam. Until the totals of every earlier chapter are known (a jump), the clock holds.
+// - Shot hold (W48): at high speed a planned shot can be under a second on screen. The engine camera shows each shot for
+//   at least HOLD_S wall seconds (see holdNext). Deterministic given the speed and the anchor (the set time of the last
+//   seek or speed change); identical to the planned camera whenever every shot lasts ≥ HOLD_S on screen.
+// - Direct camera (W48): directions compile against the chapter on screen; the directed track drives the camera while
+//   that chapter is on screen, and "Save track" adds it to that chapter's file `cameras`.
 // Poses depend only on T (random access), exactly as for a single take.
 import * as THREE from 'three';
 import { sampleTrack, trackData, type CameraTrackData } from '../../engine/camera/track.ts';
@@ -18,7 +26,9 @@ import { ANG_Q, type Take } from '../../engine/take/types.ts';
 import { sampleTake, type TakeFrame } from '../../engine/take/replay.ts';
 import { hashOf } from '../../engine/core/hash.ts';
 import { setClockTenths } from '../engine-view/take-log.ts';
-import { loadTakeFile, shiftTake, takeLog, TakePeople, type ChapterSetEntry, type LogLine, type TakeManifestEntry, type TakeReplayFile, type TakeStep } from '../engine-view/take-replay.ts';
+import { walkTotals } from '../engine-view/take-walk.ts';
+import { withFileCamera } from '../../engine/camera/track.ts';
+import { loadTakeFile, shiftTake, takeLog, TakePeople, type ActiveTrack, type ChapterSetEntry, type LogLine, type TakeManifestEntry, type TakeReplayFile, type TakeStep } from '../engine-view/take-replay.ts';
 import type { Template } from '../engine-view/people.ts';
 
 // ---- worker protocol (chapter-set.worker.ts) ----
@@ -31,6 +41,8 @@ export type ChapterCheck = {
   hash: { ok: boolean; final: string };
   start: { ok: boolean; expected: string; baseline: string; manifest: string | null; problems: string[] };
   log: LogLine[];
+  /** Metres each walker walks in this chapter (take-walk.ts walkTotals): the gait offsets of the chapters after it. */
+  walked: Record<string, number>;
   ms: number;
 };
 export type SetFinalCheck = {
@@ -48,6 +60,26 @@ export type SetFinalCheck = {
   ms: number;
 };
 export type SetWorkerOut = ChapterCheck | SetFinalCheck | { type: 'error'; message: string };
+
+/** Minimum on-screen (wall) seconds of a shot of the engine camera (the shot hold). */
+export const HOLD_S = 1.5;
+/** One displayed shot of the hold chain, in set seconds: planned shot `i` of chapter `k`, on screen over [d, r); `end` =
+ *  its planned end (clamped to the chapter's end). While held past `end` the camera stays on the shot's last pose. */
+export type HoldSeg = { k: number; i: number; d: number; r: number; end: number; label: string };
+/** The planned shot at set time T: chapter, index, planned end (set s), label; null when that chapter's shots are unknown. */
+export type ShotAt = (T: number) => { k: number; i: number; end: number; label: string } | null;
+/**
+ * The shot-hold rule (pure). A displayed shot starts at d with the planned shot there and lasts until
+ * r = min(duration, max(planned end, d + span)), span = HOLD_S × speed (set seconds per HOLD_S wall seconds). The next one
+ * starts at r with the planned shot at r — entered at its own time, so the shots that fall wholly inside a hold are
+ * skipped. A shot at least `span` long is shown exactly as planned.
+ */
+export function holdNext(shotAt: ShotAt, d: number, span: number, duration: number): HoldSeg | null {
+  const s = shotAt(d);
+  if (!s) return null;
+  return { k: s.k, i: s.i, d, r: Math.min(duration, Math.max(s.end, d + span)), end: s.end, label: s.label };
+}
+type ShotWin = { t0: number; t1: number; label: string };
 
 type Loaded = {
   k: number;
@@ -109,8 +141,25 @@ export class ChapterSetReplay {
   readonly offsetY: number;
   t = 0;
   playing = false;
-  speed = 1;
   engineCamera = true;
+  /** Shot hold on (HOLD_S): the engine camera shows each shot ≥ HOLD_S wall seconds. */
+  hold = true;
+  /** Carry each walker's walked distance across seams (off: every chapter counts from 0, the W37 behaviour). */
+  gaitCarry = true;
+  /** Set time the hold chain starts from: the last seek or speed change (not play / pause, not the clock advancing). */
+  anchor = 0;
+  /** A directed track compiled against chapter `k` (Direct camera): drives the camera while chapter k is on screen. */
+  directed: { k: number; track: ActiveTrack } | null = null;
+  /** Clock held until the walked totals of every earlier chapter are known (after a jump, from the worker). */
+  gaitWaiting = false;
+  private _speed = 1;
+  /** Planned shot windows per chapter (chapter seconds), kept for every chapter once read (the hold chain spans seams). */
+  private shotWins = new Map<number, ShotWin[]>();
+  /** Metres each walker walks per chapter (loaded chapters or the worker). */
+  private walked: (Record<string, number> | null)[];
+  /** Directed tracks saved into a chapter's file on this page (re-applied if the chapter is dropped and read again). */
+  private saved = new Map<number, TakeReplayFile['cameras']>();
+  private chain: { anchor: number; span: number; segs: HoldSeg[] } | null = null;
   /** Chapter on screen (-1 before the first frame). */
   k = -1;
   /** Chapter the clock waits for (not loaded yet), else null. */
@@ -144,6 +193,7 @@ export class ChapterSetReplay {
     this.dt = dt;
     this.duration = set.ticks * dt;
     this.checks = set.chapters.map(() => null);
+    this.walked = set.chapters.map(() => null);
     this.group.name = 'Chapter set replay · HYPOTHETICAL build scenario (not historical)';
   }
 
@@ -183,6 +233,11 @@ export class ChapterSetReplay {
     const ok = !!expected && f.take.baselineStateHash === expected && manifest === expected;
     const guard = { ok, text: ok ? '' : `continuity ✗: chapter ${c.id} starts from ${f.take.baselineStateHash.slice(0, 8)}…, ${k ? `chapter ${this.set.chapters[k - 1].id} ended at` : 'the set starts from'} ${expected.slice(0, 8)}…${manifest !== expected ? ` (manifest ${manifest.slice(0, 8)}…)` : ''}` };
     const at = this.startOf(k);
+    const extra = this.saved.get(k);
+    if (extra) f.cameras = { ...(f.cameras ?? {}), ...extra };
+    this.walked[k] ??= walkTotals(f.take);
+    const shots = (trackData(f.camera) as CameraTrackData & { shots?: ShotWin[] }).shots ?? [];
+    this.shotWins.set(k, shots.map((x) => ({ t0: x.t0, t1: x.t1, label: x.label })));
     const L: Loaded = {
       k, file: f, render: shiftTake(f.take, this.offsetY), track: trackData(f.camera), trackId: f.camera.id, trackKind: f.camera.kind,
       log: takeLog(f.take, f.steps, { at, clock: setClockTenths }), at, duration: c.ticks * this.dt, guard,
@@ -231,22 +286,56 @@ export class ChapterSetReplay {
     this.dirty = true;
   }
 
+  get speed() {
+    return this._speed;
+  }
+  /** A speed change re-anchors the hold chain at the current time. */
+  set speed(v: number) {
+    if (v === this._speed) return;
+    this._speed = v;
+    this.anchor = this.t;
+  }
+
+  /** Jump to set time T (scrubber, chapter bar, hooks): also re-anchors the hold chain there. */
   seek(T: number) {
+    this.moveTo(T);
+    this.anchor = this.t;
+  }
+  private moveTo(T: number) {
     this.t = Math.max(0, Math.min(this.duration, T));
     this.dirty = true;
   }
 
-  /** Advance the set clock (only while playing) and redraw. Holds at a boundary whose chapter is not loaded yet. */
+  /**
+   * Gait offsets of chapter k: per walker the metres walked in chapters 0 … k − 1 (null while one of them is unknown).
+   * Summed in chapter order, so the value is the same however the chapters were reached.
+   */
+  walkOffsets(k: number): Record<string, number> | null {
+    const out: Record<string, number> = {};
+    if (!this.gaitCarry) return out;
+    for (let j = 0; j < k; j++) {
+      const w = this.walked[j];
+      if (!w) return null;
+      for (const [id, m] of Object.entries(w)) out[id] = (out[id] ?? 0) + m;
+    }
+    return out;
+  }
+  /** Chapter k can be shown: loaded and its gait offsets known. */
+  private ready(k: number) {
+    return this.loaded.has(k) && !!this.walkOffsets(k);
+  }
+
+  /** Advance the set clock (only while playing) and redraw. Holds at a boundary whose chapter is not ready yet. */
   update(dt: number) {
     if (this.playing && !this.error) {
       let T = Math.min(this.duration, this.t + dt * this.speed);
       const k = this.chapterAt(T);
-      if (k !== this.k && !this.loaded.has(k)) {
+      if (k !== this.k && !this.ready(k)) {
         this.waiting = k;
         void this.load(k);
         if (k > this.k && this.k >= 0) T = Math.min(T, this.startOf(k) - 1e-6);
       }
-      this.seek(T);
+      this.moveTo(T);
       if (this.t >= this.duration) this.playing = false;
     }
     if (this.dirty) this.apply();
@@ -259,6 +348,12 @@ export class ChapterSetReplay {
       this.waiting = k;
       void this.load(k);
       return; // dirty stays set: redraw once it is in
+    }
+    const off = this.walkOffsets(k);
+    this.gaitWaiting = !off;
+    if (!off) {
+      this.waiting = k; // an earlier chapter's walks are still being read (worker); dirty stays set
+      return;
     }
     if (!L.guard.ok) {
       this.error = L.guard.text;
@@ -276,8 +371,8 @@ export class ChapterSetReplay {
       if (this.templates) this.people.setTemplates(this.templates);
       this.group.add(this.people.group);
     }
+    this.people.setTake(L.render, off); // same take: only the offsets (gaitCarry may have changed)
     if (k !== this.k) {
-      this.people.setTake(L.render);
       swapped = this.k >= 0;
       this.k = k;
       this.evict();
@@ -303,7 +398,11 @@ export class ChapterSetReplay {
 
   /** The worker's result for one message. */
   onCheck(m: SetWorkerOut) {
-    if (m.type === 'chapter') this.checks[m.k] = m;
+    if (m.type === 'chapter') {
+      this.checks[m.k] = m;
+      this.walked[m.k] ??= m.walked;
+      if (this.gaitWaiting) this.dirty = true;
+    }
     else if (m.type === 'final') this.final = m;
     else this.error ??= `set check failed: ${m.message}`;
   }
@@ -315,22 +414,122 @@ export class ChapterSetReplay {
     return { k, id: c.id, label: c.label, at: this.startOf(k), end: c.to * this.dt, local: this.local() };
   }
 
+  /** The planned shot at set time T (see ShotAt). */
+  private shotAt: ShotAt = (T) => {
+    const k = this.chapterAt(T);
+    const w = this.shotWins.get(k);
+    if (!w?.length) return null;
+    const at = this.startOf(k), local = T - at;
+    let i = w.findIndex((x) => local >= x.t0 && local < x.t1);
+    if (i < 0) i = local < w[0].t0 ? 0 : w.length - 1;
+    return { k, i, end: Math.min(at + w[i].t1, this.set.chapters[k].to * this.dt), label: w[i].label };
+  };
+  /** The displayed shot of the hold chain at the current time (null: hold off, or the shots there are not read yet). */
+  holdSeg(): HoldSeg | null {
+    if (!this.hold) return null;
+    const span = HOLD_S * this.speed;
+    if (!this.chain || this.chain.anchor !== this.anchor || this.chain.span !== span) this.chain = { anchor: this.anchor, span, segs: [] };
+    const segs = this.chain.segs;
+    if (this.t < this.anchor) return null;
+    while (!segs.length || (segs[segs.length - 1].r <= this.t && segs[segs.length - 1].r < this.duration)) {
+      const next = holdNext(this.shotAt, segs.length ? segs[segs.length - 1].r : this.anchor, span, this.duration);
+      if (!next) return null;
+      segs.push(next);
+    }
+    for (let j = segs.length - 1; j >= 0; j--) if (segs[j].d <= this.t) return segs[j];
+    return null;
+  }
+
+  /** The directed track of the chapter on screen, if any. */
+  private directedNow(): ActiveTrack | null {
+    return this.directed && this.directed.k === this.k ? this.directed.track : null;
+  }
+
   cameraPose(): CameraPose {
     const L = this.cur();
     if (!L) return this.lastPose ?? { position: [0, 20, 20], target: [0, 0, 0], fov: 50 };
-    const p = sampleTrack(L.track, this.t - L.at);
+    let data = L.track, local = this.t - L.at;
+    const dir = this.directedNow();
+    const seg = dir ? null : this.holdSeg();
+    const H = seg ? this.loaded.get(seg.k) : null;
+    if (dir) data = dir.data;
+    else if (seg && H) {
+      // held past its planned end: the shot's last pose (locked off; the world goes on)
+      data = H.track;
+      local = Math.min(this.t, Math.max(seg.d, seg.end - 1e-3)) - H.at;
+    }
+    const p = sampleTrack(data, local);
     this.lastPose = this.offsetY ? { ...p, position: [p.position[0], p.position[1] + this.offsetY, p.position[2]], target: [p.target[0], p.target[1] + this.offsetY, p.target[2]] } : p;
     return this.lastPose;
   }
   trackInfo(): { id: string; kind: string; own: boolean } {
+    const dir = this.directedNow();
+    if (dir) return { id: dir.id, kind: dir.kind, own: false };
     const L = this.cur();
     return { id: L?.trackId ?? '', kind: L?.trackKind ?? '', own: true };
   }
+  /** Planned shot index of the chapter on screen at the current time (-1: none). */
+  private plannedIndex(): number {
+    const L = this.cur();
+    const shots = (L?.track as (CameraTrackData & { shots?: ShotWin[] }) | undefined)?.shots ?? [];
+    const t = this.local();
+    const i = shots.findIndex((s) => t >= s.t0 && t < s.t1);
+    return i >= 0 ? i : shots.length - 1;
+  }
   shotLabel(): string {
     const L = this.cur();
-    const shots = (L?.track as (CameraTrackData & { shots?: { label: string; t0: number; t1: number }[] }) | undefined)?.shots ?? [];
+    const dir = this.directedNow();
+    const track = (dir?.data ?? L?.track) as (CameraTrackData & { shots?: ShotWin[] }) | undefined;
+    if (!dir) {
+      const seg = this.holdSeg();
+      if (seg) return seg.label;
+    }
+    const shots = track?.shots ?? [];
     const t = this.local();
     return shots.find((s) => t >= s.t0 && t < s.t1)?.label ?? shots.at(-1)?.label ?? '';
+  }
+  /** Identity of the shot on screen (tests count cuts): the hold segment, else chapter:planned index. */
+  shotKey(): string {
+    const dir = this.directedNow();
+    if (dir) return `dir:${dir.id}`;
+    const seg = this.holdSeg();
+    return seg ? `${seg.k}:${seg.i}@${seg.d.toFixed(3)}` : `${this.k}:${this.plannedIndex()}`;
+  }
+
+  /** The chapter on screen: its take file (Direct camera compiles against it), index, id and label. */
+  chapterFile(): { k: number; id: string; label: string; file: TakeReplayFile; url: string } | null {
+    const L = this.cur();
+    if (!L) return null;
+    const c = this.set.chapters[L.k];
+    return { k: L.k, id: c.id, label: c.label, file: L.file, url: c.file };
+  }
+  /** Drive the camera with a directed track of chapter k (default: the one on screen) while k is on screen; null: back to
+   *  the planned / held camera. */
+  setDirected(track: ActiveTrack | null, k = this.k) {
+    this.directed = track && k >= 0 ? { k, track } : null;
+  }
+  /**
+   * "Save track" for a set: the chapter's file with `track` added to its `cameras` (withFileCamera: checked against that
+   * chapter's take id; the take and its planned camera untouched). The loaded chapter carries it from now on.
+   */
+  withTrack(k: number, track: ActiveTrack): TakeReplayFile {
+    const L = this.loaded.get(k);
+    if (!L) throw new Error(`chapter ${this.set.chapters[k]?.id ?? k} is not loaded`);
+    const f = withFileCamera(L.file, { id: track.id, takeId: L.file.take.id, kind: track.kind, data: track.data });
+    L.file.cameras = f.cameras;
+    this.saved.set(k, f.cameras);
+    return f;
+  }
+
+  /**
+   * Gait at set time T (tests): seek there, redraw now, and read every person's walked metres, Walk weight and leg phase
+   * (TakePeople.gait). Null when the chapter there is not ready (not loaded, or earlier walks unknown).
+   */
+  gaitAt(T: number) {
+    this.seek(T);
+    this.apply();
+    if (this.dirty || !this.people) return null;
+    return { t: this.t, k: this.k, chapter: this.set.chapters[this.k].id, local: this.local(), gait: this.people.gait() };
   }
   activeSteps(): TakeStep[] {
     const L = this.cur();
@@ -394,7 +593,13 @@ export class ChapterSetReplay {
       rendered: { components: this.people?.componentCount() ?? 0, humans: this.people?.humanCount() ?? 0 },
       poseHash: hashOf(poses),
       shot: this.shotLabel(),
+      shotKey: this.shotKey(),
       track: this.trackInfo(),
+      hold: { on: this.hold, holdS: HOLD_S, span: HOLD_S * this.speed, anchor: this.anchor, seg: this.holdSeg() },
+      gaitCarry: this.gaitCarry,
+      gaitWaiting: this.gaitWaiting,
+      walked: this.walked.map((w) => (w ? Object.keys(w).length : null)),
+      directed: this.directed ? { k: this.directed.k, chapter: this.set.chapters[this.directed.k].id, id: this.directed.track.id } : null,
       offsetY: this.offsetY,
       checks: { chapters: this.checks.map((c) => (c ? { id: c.id, hash: c.hash, start: c.start, lines: c.log.length } : null)), final: this.final },
       swaps: [...this.swaps],
