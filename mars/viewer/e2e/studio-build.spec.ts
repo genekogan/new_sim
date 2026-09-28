@@ -483,8 +483,18 @@ for (const s of sets) test(`chapter set at 64× (${s.id.slice(0, 8)}): shot hold
     }), WALL);
     if (hold) {
       // pause inside a hold tail (the shot on screen past its planned end) and look at it
-      await page.waitForFunction(() => { const h = (window.__marsStudio as unknown as Hook48).takeSet()!; return !!h.hold.seg && h.t > h.hold.seg.end + 5; }, null, { timeout: 30_000, polling: 'raf' });
-      await page.getByRole('button', { name: 'Pause take' }).click();
+      // clicked in the same frame the condition is seen (a Playwright click can land after the hold's release under load)
+      await page.evaluate(() => new Promise<void>((done) => {
+        const f = () => {
+          const h = (window.__marsStudio as unknown as Hook48).takeSet()!;
+          if (h.hold.seg && h.t > h.hold.seg.end + 5 && h.t < h.hold.seg.r - 5) {
+            (document.querySelector('button[aria-label="Pause take"]') as HTMLButtonElement).click();
+            done();
+          } else requestAnimationFrame(f);
+        };
+        requestAnimationFrame(f);
+      }));
+      await expect(page.getByRole('button', { name: 'Play take' })).toBeVisible();
       await expect(page.getByLabel('Shot now')).toContainText('· held');
       await waitFrames(page, 4);
       await captureView(page, 'studio-build-set-hold-held', { testInfo, compare: false });
@@ -504,6 +514,8 @@ for (const s of sets) test(`chapter set at 64× (${s.id.slice(0, 8)}): shot hold
     const setSeconds = res.t[res.t.length - 1] - res.t[0];
     runs[hold ? 'hold' : 'planned'] = {
       anchor, frames: res.w.length, setSeconds: r2(setSeconds), setPerWall: r2(setSeconds / (WALL / 1000)),
+      // on-screen set seconds per complete shot ÷ 64: the wall time at a true 64× (independent of the frame rate / load)
+      nominalS: (() => { const x = segs.slice(1, -1).map((g, j) => (segs[j + 2].t0 - g.t0) / 64); return { mean: r2(x.reduce((a, b) => a + b, 0) / x.length), min: r2(Math.min(...x)), max: r2(Math.max(...x)) }; })(),
       shots: segs.length, complete: inner.length, meanS: r2(inner.reduce((a, b) => a + b, 0) / inner.length), minS: r2(sorted[0]), p10S: r2(sorted[Math.floor(sorted.length * 0.1)]), maxS: r2(sorted[sorted.length - 1]),
       chapters: [...new Set(res.key.map((k) => k.split(':')[0]))],
       firstShots: segs.slice(0, 6).map((g) => `${g.key} ${r2((g.w1 - g.w0) / 1000)} s · ${g.label.slice(0, 50)}`),

@@ -127,7 +127,11 @@ See `docs/engineering/STUDIO_REPLAY.md`.
   - **Play directed track** drives the engine camera with the take hash and poses unchanged;
   - an unknown group is refused.
 
-  Captures `studio-direct-{shots,playing}.png`. The "save track" test (W24) saves the directed track into the take
+  Captures `studio-direct-{shots,playing}.png`.
+- **`studio-direct-sentences.spec.ts`** (W48), on the flagship take: Gene's four sentences through the panel's **Say it**
+  box (three appended as CAMERA_DIRECT.md §1's objects, the deictic one refused with its question); an ambiguous word
+  with its candidates; "… then …" appending two; the 270° rack-bay orbit sentence computed and played. Captures
+  `studio-direct-sentences-{refused,orbit}.png`, report `studio-direct-sentences.json`. The "save track" test (W24) saves the directed track into the take
   file (a download), serves it back in place of the shipped file, picks it from the **Camera** picker and verifies it by
   file id; captures `studio-direct-file-track.png`.
 - **`lab.spec.ts`** "Oblique yard" (W24): the year-build preset's yard view equals the whole-skeleton take's first

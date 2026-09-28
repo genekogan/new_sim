@@ -181,10 +181,14 @@ SwiftShader, 63–64 set-s per wall-s):
 | planned camera (hold off) | 89 | 0.67 s | 0.17 s | 0.20 s | 1.43 s |
 | shot hold | **41** | **1.50 s** | **1.47 s** | 1.47 s | 1.57 s |
 
-(The gated run; a first run gave 89 / 0.68 / 0.15 and 40 / 1.50 / 1.47 / max 1.68: the count and the extremes move by a frame
-with the frame timing.) The sequence of shots on screen equals the chain the spec computes from the anchor with the rule restated in the spec
+(A first run gave 89 / 0.68 / 0.15 and 40 / 1.50 / 1.47 / max 1.68: the count and the extremes move by a frame with the
+frame timing. On-screen wall time depends on the frame rate. Under a machine load average of 23–47, one run managed
+only 4 fps and 24.5 set-s per wall-s, and held shots then lasted up to 8.45 wall-s. The spec therefore also reports each
+shot's set seconds ÷ 64: in a loaded run, 88 → 39 shots, nominal mean 0.67 → **1.50 s**, nominal min 0.14 → 1.42 s.
+The 1.42 is frame quantisation of the shot start, ≈ 5 set-s per frame.) The sequence of shots on screen equals the chain the spec computes from the anchor with the rule restated in the spec
 (not imported). The spec also pauses inside a hold tail and captures it (`studio-build-set-hold-held.png`: D0, 16 set-s past the planned end of "carry …-e87192d2-p1-stock to the cutting
-station — m1 m2"; m1 is still in frame, at its left edge, by the cutting table).
+station — m1 m2"; m1 is still in frame, at its left edge, by the cutting table). A later run's capture, 12 set-s into a
+hold of the next carry, shows the weakness: one of the two carriers has already walked out of the locked-off frame.
 
 **Leg phase across a seam.** The Walk clip's phase is a pure function of the metres walked (`walkT = metres /
 walkSpeed mod clip length`, humans.ts). W37 counted each chapter from 0, so a walker's legs jumped at a seam. Now
@@ -311,7 +315,8 @@ first bay has none.
 - **The form builder** writes one typed `CameraDirection` (CAMERA_DIRECT.md §1). Fields: subject kind + ref, verb,
   degrees and direction (for verbs that take them), duration, "at the current time", framing size, side, sun behind
   (+ sunset), interior and look at. **Add** appends to the list; **Replace** starts a new one.
-- **The JSON list** is editable. It is exactly what the compiler takes; there is no natural-language parsing.
+- **Say it** (W48) parses sentences into typed directions (below, "Sentences").
+- **The JSON list** is editable. It is exactly what the compiler takes.
 - **Compute camera** compiles the list.
 - **The result** shows the shot list: label, verb, window, the resolved subject, the planner's readability / invalid
   samples and the phase-2 simulation verdict. Under each shot are its corrections
@@ -334,6 +339,37 @@ compiler itself (`direct-camera.ts` → `engine/camera/synth.ts directCamera`, p
   - in both cases the installed parts are added as collision-only prisms.
 
 The track id is named as the op names it (`dir-<hash>`).
+
+### Sentences (W48)
+
+The "Say it" box above the form runs Codex's `engine/camera/parse.ts` (`parseSentences`) in the page. It is lazy-loaded,
+so it is not in the main chunk.
+- Several sentences may be given at once ("… then …", or full stops). **All or nothing:** when every clause parses, its
+  directions are appended to the JSON list ("Added 2 directions: {…} · {…}", with the parser's notes). Otherwise nothing
+  is appended and each refusal is shown: code, message, the parser's question and its **candidates**. For a single
+  sentence, the words it points at are marked.
+- **No world vocabulary is passed.** The parser only reads the words (its lexical rules: "racks" → assembly `rack bay`,
+  "kitchen" in a fly-through → region `kitchen-interior`, Chiba → region `chiba`). Whether that name exists in the open
+  take is the compiler's answer (`camera.direct.unknown`, with the known names), exactly as for the form.
+- "at the current time" is not added to a parsed direction; the sentence states its own constraints ("at 1:30").
+
+Tested (`e2e/studio-direct-sentences.spec.ts`, flagship take). Gene's four sentences through the box give exactly
+CAMERA_DIRECT.md §1's objects:
+- the Chiba sunset pan, the 270° revolution around the main pallet racks over 2 minutes, and the kitchen fly-through
+  facing the sink are appended in turn;
+- "look at this crowd of people having this activity" is refused (`camera.parse.deictic`, "Which activity are the
+  people doing?", "this" marked) and appends nothing;
+- "pan across the shed" is refused with "Candidates: region:shed, assembly:shed, entity:shed.";
+- "pan across Chiba then orbit 90° around the racks" appends two directions;
+- "do a 270° revolution around the rack bay over 2 minutes" → Compute: one orbit shot on `rack bay` (24 parts), 0–120
+  s, readability min 0.63 / mean 0.96, simulated valid, 139 ms → Play; the take hash is unchanged.
+
+Compiled against the flagship take (reported, not asserted), the other two stated sentences are refused **by the
+compiler**, correctly:
+- the sunset pan: `camera.direct.not-sunset`, the take is lit at 16:00 with the sun 19.1° up;
+- the kitchen: `camera.direct.unknown`, the 2026 scene has no `kitchen-interior` region and no `sink` fixture.
+
+No sentence failed in the parser. Captures `studio-direct-sentences-{refused,orbit}.png`.
 
 ### Camera picker and saved tracks (W24)
 

@@ -1261,3 +1261,51 @@ Then: gate → release 5; HANDOFF refresh.
     `#293c45` vs engine green; `components.ts` upright comment still says blue; `app/lab/solar-paint.ts` text says
     hashed stripes; RELEASE_CHECKLIST once lint is gated; `npm ci` for `oxlint-tsgolint`.
 - **W45 landed** (≈180k tokens, 75 min; main ff to `7a00405`): all four Codex branches ACCEPTED — tooling (`oxlint-tsgolint` 7.0.2003, lint runs type-aware but is red: 114 errors → not in the gate; `source-scan.test.ts` bans host transcendentals + `**` with a 14-line allowlist), camera-nl-parse (`parse.ts`, 55 sentences + 21 structured refusals, schema frozen; not wired into the app), 2026-frame-grouping (81 frames / 12 beams / 92 unclassified; every frame `catalogDef: null` — posts ≈ 1.02 m deep, not a stock size; `--check` byte-identical), fire-v2-render-polish (green uprights, fire draw calls unchanged; 9 baselines refreshed after inspection — green/firelight drift only). Full gate GREEN at `a7b0da2`: unit 73, engine 403/0/6, tsc, e2e 79 pass + 2 skip, probe = pin. Lead review: accepted. Follow-ups (Claude-owned): `components.ts` route `panel-rail` → `solarRailMesh()`, tilt legs for installed panels, `kit.ts:84` post colour, stale comments; lint findings (26 unused vars, 10 `any`, 3 template exprs, `setpart.ts:241` erasing-op — may move a pin); wire the parser into the Direct panel (→ W48); grouping → `assembly.ts` (2026 year build, later).
+
+## 2026-09-28 — W48: set player — shot hold at 64×, leg phase across seams, Direct camera on a chapter, sentences
+- **Shot hold** (`chapter-set.ts` `HOLD_S` = 1.5 s, `holdNext`; STUDIO_REPLAY.md "Chapter sets: shot hold, gait across
+  seams, Direct camera"):
+  - The rule: a chain of displayed shots from the anchor (the last seek or speed change). Shot at d → on screen until
+    r = max(planned end, d + 1.5 s × speed). Held past its end, the camera keeps that shot's last pose (the world goes on).
+    The next shot is the planned one at r, so shots wholly inside a hold are skipped.
+  - Deterministic in (anchor, speed, T), and identical to the planned camera up to 8×. A checkbox "Hold shots ≥ 1.5 s"
+    is on by default. A hold may run ≤ 1.5 wall-s into the next chapter on the previous chapter's last pose.
+  - **64× for 60 s wall** (from 384 set-s before A → D0): **89 → 41 shots**, mean on screen **0.67 → 1.50 s**, min
+    0.17 → 1.47 s (p10 0.20 → 1.47, max 1.43 → 1.57). The shots on screen equal the rule's chain, which the spec
+    recomputes from the files.
+  - Wall times depend on the frame rate, so the spec also reports the load-independent set-s ÷ 64. Under load (4 fps in
+    one run) held shots stretched to 8 wall-s; the nominal mean stayed at 1.50 s.
+- **Leg phase across seams** (`take-walk.ts` `walkTotals`, `TakePeople.setTake(take, walkOffsets)`, the worker posts
+  per-chapter `walked`):
+  - Each walker's metres are carried from the chapters before, so the Walk phase continues. The clock holds after a jump
+    until the earlier chapters' totals are known (≈ 3 s after opening, from the worker).
+  - At each seam, every person on the last frame of k − 1 vs the first of k: **A → D0 max jump 0.447 → 0; D0 → D1 0.471
+    → 0** (6 people each; m2 / m4 walking; metres equal to the mm).
+- **Direct camera for a set:**
+  - The panel sits under the set transport and acts on the chapter on screen. "Direct camera · chapter D2" plus a note
+    saying what compiles against D2's take (its own times), what plays while D2 is on screen, and what Save track adds
+    to `year-build-2022-east-house-ab-d2.json`.
+  - Tested: a medium hold on m1 at the D2 relay (local 2728.8 s, 20 s) → 1 shot, readability 1, simulated valid → Play
+    ("Directed (D2): …"; other chapters keep their own camera) → Save = D2's shipped file byte-for-byte + `cameras`.
+  - `directCamera` took 5.6 s on the main thread for that chapter take.
+- **Sentences** (lead addition, on Codex's `parse.ts`, not edited): a "Say it" box in the Direct panel. `parseSentences`
+  → all-or-nothing append to the JSON list; refusals are shown with the parser's question, candidates and the marked
+  words.
+  - Gene's four sentences give CAMERA_DIRECT.md §1's objects: three appended, "look at this crowd …" refused
+    (`camera.parse.deictic`, "Which activity are the people doing?").
+  - "pan across the shed" shows candidates region / assembly / entity; "… then …" appends two.
+  - The 270° rack-bay orbit sentence → Compute (139 ms, readability min 0.63 / mean 0.96, simulated valid) → Play.
+  - Against the flagship the compiler (not the parser) refuses the sunset pan (sun 19.1° up at 16:00) and the kitchen
+    (no `kitchen-interior` in 2026). **No parser failures to report to Codex.**
+- **Specs:** studio-build 11/11 (3 new: hold, seams, Direct in D2), studio-direct 2/2, studio-direct-sentences 1/1
+  (new file), studio-take 1/1; tsc clean.
+- **Captures looked at:** `studio-build-set-hold-held.png` (D0, 16 set-s into a hold, m1 still in frame at the left
+  edge), `studio-build-set-direct-{panel,hold}.png`, `studio-direct-sentences-{refused,orbit}.png`.
+- **Weak spots:**
+  - Hold tails are locked off, so workers can leave the frame (≤ 84 set-s at 64×; seen in a capture: one of two
+    carriers gone 12 set-s into a hold).
+  - The Walk *weight* still steps at a seam: the ±0.15 s speed window is clamped at each take's edge (m2 0 → 0.96).
+  - Single takes have no hold.
+  - Direct compile blocks the page for ≈ 6 s on a chapter take.
+  - No Camera picker for sets.
+  - The parser gets no world vocabulary; names are checked by the compiler.
