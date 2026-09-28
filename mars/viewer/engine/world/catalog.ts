@@ -295,6 +295,8 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     // blocks walking at its box; while ridden its phase is `carried`, which lifts it out (spatial/service.ts).
     { id: 'euc', label: 'electric unicycle (EUC)', category: 'vehicle', size: [0.5, 0.55, 0.22], massKg: 25, color: '#222222', obstacle: true, dims: provisional('generic 18 in EUC; riding disc radius 0.35 m (vehicles/profiles.ts)') } satisfies AssetDef,
     { id: 'bicycle', label: 'bicycle', category: 'vehicle', size: [1.75, 1.05, 0.6], massKg: 14, color: '#3a6ea5', obstacle: true, dims: provisional('generic adult bicycle; riding disc radius 0.4 m (vehicles/profiles.ts)') } satisfies AssetDef,
+    // Forklift (engine/vehicles/forklift.ts): x = 2.6 m length (forks at +x), y = 2.2 m lowered mast, z = 1.2 m width.
+    { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
     {
       id: 'test-wall',

@@ -589,7 +589,8 @@ test('api: edit_world — design edits spawn/move/remove/region, all-or-nothing,
   refuse([{ op: 'spawn', id: 'q5', def: 'human', pose: { p: [12, 0, 12], yaw: 0 } }], 'edit.off-floor');
   refuse([{ op: 'spawn', id: 'box', def: 'plywood-4x8', pose: { p: [4, 1.5, 6], yaw: 0 } }], 'edit.unsupported');
   refuse([{ op: 'spawn', id: 'u1', def: 'upright-8ft', lying: { x: 4, z: 6, yaw: 0 } }], 'edit.id-taken');
-  refuse([{ op: 'spawn', id: 'v1', def: 'forklift', lying: { x: 4, z: 6, yaw: 0 } }], 'edit.unknown-def');
+  refuse([{ op: 'spawn', id: 'v1', def: 'tower-crane', lying: { x: 4, z: 6, yaw: 0 } }], 'edit.unknown-def');
+  refuse([{ op: 'spawn', id: 'v1', def: 'forklift', pose: { p: [4, 0, 6], yaw: 0 } }], 'edit.not-spawnable');
   refuse([{ op: 'spawn', id: 'v1', def: 'test-wall', pose: { p: [4, 0, 6], yaw: 0 } }], 'edit.not-spawnable');
   refuse([{ op: 'spawn', id: 'f1', def: 'campfire', lying: { x: 4, z: 6, yaw: 0 } }], 'edit.invalid', /lying/);
   refuse([{ op: 'move', id: 'b1' }], 'edit.invalid', /exactly one of pose, lying/);

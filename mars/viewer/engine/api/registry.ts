@@ -9,6 +9,7 @@ import { carry } from '../carry/actions.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
 import { SOCIAL_ACTIONS } from '../social/actions.ts';
 import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
+import { FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
 import { CONSTRUCTION_ACTIONS, liftHandsInReach, RULES_VERSION as ASSEMBLY_RULES, progressiveContributor, progressiveSupported, uprightsSupported } from '../construction/index.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import type { Invariant } from '../runtime/runtime.ts';
@@ -20,8 +21,8 @@ import type { WorldState } from '../world/types.ts';
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
 export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}`;
 
-export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...VEHICLE_ACTIONS];
-export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, ...VEHICLE_INVARIANTS];
+export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS];
+export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS];
 
 export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> {
   const m = new Map<string, ActionDef>();
