@@ -200,11 +200,12 @@ export function correctShot(intent: ShotIntent, ctx: SynthContext, prev: PrevPos
     const addressed = ADDRESSES[strategy].filter((k) => kinds.has(k));
     if (!addressed.length) { tried.push({ strategy, outcome: 'n/a', why: `does not address ${[...kinds].join(' / ')}` }); continue; }
     const attempts: { magnitude?: number; result: string }[] = [];
-    const resynth = (over: SynthOverrides, c2: SynthContext = ctx): { shot: SynthShot; sc: ShotScore } | null => {
-      const r = deps.synthesize(intent, c2, prev, over);
-      if (!r.ok) { attempts.push({ magnitude: Object.values(over).find((v) => typeof v === 'number') as number | undefined, result: `refused: ${r.diagnostic.code}` }); return null; }
+    const resynth = (over: SynthOverrides, magnitude?: number): { shot: SynthShot; sc: ShotScore } | null => {
+      const mag = magnitude ?? (Object.values(over).find((v) => typeof v === 'number') as number | undefined);
+      const r = deps.synthesize(intent, ctx, prev, over);
+      if (!r.ok) { attempts.push({ magnitude: mag, result: `refused: ${r.diagnostic.code}` }); return null; }
       const sc = simulate(r.shot, intent, ctx, deps);
-      attempts.push({ magnitude: Object.values(over).find((v) => typeof v === 'number') as number | undefined, result: resultText(sc) });
+      attempts.push({ magnitude: mag, result: resultText(sc) });
       return { shot: r.shot, sc };
     };
     if (strategy === 'raise') {
@@ -218,7 +219,7 @@ export function correctShot(intent: ShotIntent, ctx: SynthContext, prev: PrevPos
       const inBand = band && Math.abs(wrap(band.heading - band.centre)) <= band.half + 1e-9;
       const ladder = LADDERS.swing.filter((d) => !(kinds.has('flare') && inBand && band && Math.abs(wrap(band.heading + d * DEG - band.centre)) > band.half + 1e-9));
       for (const d of ladder) {
-        const c = resynth({ bearingOffset: d * DEG });
+        const c = resynth({ bearingOffset: d * DEG }, d);
         if (c?.sc.valid) return done(strategy, [c.shot], c.sc, { bearingOffsetDeg: d }, `swung the bearing ${d > 0 ? '+' : ''}${d}° (ladder ±10…±90°${inBand && kinds.has('flare') ? `, limited to the sun-behind band ±${r2(band!.half / DEG)}° about ${r2(band!.centre / DEG)}° so the sun stays in frame` : ''}; first valid)`, attempts);
       }
     } else if (strategy === 'reroute') {

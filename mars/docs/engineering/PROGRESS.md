@@ -286,3 +286,25 @@ Then: gate → release 5; HANDOFF refresh.
   - Tests: +16 (camera-direct 8, camera-synth 8).
 - **W16 landed** `649bc72`, `37a0d1d` (≈500k tokens, ~2 h): §11 phase 1 — `camera/direct.ts` (zod `CameraDirection`: subject entity/assembly/region/group, verbs pan/tilt/dolly/orbit/crane/push_in/pull_out/fly_through/hold, framing, `sunBehind{sunset}`, `interior`, `lookAt`; ambiguity → `camera.direct.ambiguous` with candidates), `camera/synth.ts` (orbit radius from extent+lens, view-rate/accel caps, sun-behind window from `env/sun.ts`, camera navmesh = clearance grids + flight layer, C² path, continuous look-at), op `engine_direct_camera {take_id, directions[]}` with per-shot report + `corrections: []`. Proven: 270° orbit of the flagship bay over 120 s (r 13.86 m, 0 invalid, readability min 0.67); sunset pan across Chiba at 17:18 (90/90 samples in the window, sun ≥ 7° off axis; `not-sunset` refused at 16:00); "inside the kitchen, face the sink" on 2024 (2026 has no kitchen/sink; route enters over the 1.26 m half wall — no year scene has door objects); group orbit follows carryA. 328 / 326 / 2 skip. Lead review: accepted. Weak: alternates off (problems reported, not fixed — phase 2), collision static-only, "main pallet racks" needs "rack bay", navmesh rebuilt per call (100–250 ms), north offset 0.
 - W18 spawned (engine camera, §11 phase 2): simulate every shot against the take, score failure modes, ranked explicit corrections recorded with reasons, CAMERA_VERIFY regression feed.
+- **W18 (engine camera, OWNER_FEEDBACK §11 phase 2 — self-correction)** `b554592`, `bc8dd33` + docs. Details in `CAMERA_DIRECT.md` §6.
+  - `camera/solve.ts` (additive) `scoreShot`: every sample of a directed shot simulated against the take (people and
+    parts per tick, the sun, the caps) — collision; squeeze (free width across the camera < 1.2 m against solids and
+    take-part boxes, free height < 1.0 m by an exact footprint column test, part clearance < 0.3 m; sustained ≥ 0.3 m /
+    0.5 s); foreground (a non-subject person ≤ 1.5 m from the lens covering ≥ 25 % of the subject's frame region);
+    flare (visible sun < 6° off axis); frame (< 75 % of the subject's points framed, incl. a structure's members as
+    they arrive in its final box); horizon (|pitch| > 75°, roll > 1°); motion (per-sample `MOTION_CAPS`).
+  - `camera/correct.ts` `correctShot`: raise → widen → swing (flare: only inside the sun-behind band) → re-route (the
+    squeezed slot blocked, take parts as obstacles) → shorten → split (two shots with a cut) → cut; fixed ladders,
+    first candidate valid on every sample wins; recorded `{ failure, samples, strategy, before, after, reason, params,
+    tried, attempts }`; nothing works → refused with every strategy listed (refusals keep their code).
+  - `synth.ts`: `directCamera` runs it by default (`DirectInput.correct`), SynthOverrides `navRadius` / `avoid`, the
+    sun in the context, per-shot `simulation`; `engine_direct_camera` gains `correct?` (additive).
+  - Fixtures (`camera-correct.test.ts`, synthetic yard takes): plywood 0.8 m → raise +1 m; head at the lens → raise
+    +0.5 m; group outgrows the frame → widen ×1.15; crew walks 6 m in a 270° orbit → no correction (a fixed centre fails
+    `frame` on 91 samples); pan across the 1.8° sun → swing +20° inside the band; sealed room → refused, 7 listed.
+  - Phase-1 shots: flagship bay orbit, carry orbit, Chiba sunset pan valid as computed (`[]`). Two genuine issues:
+    the 2024 kitchen move threads a 0.79 m serving hatch (the only camera-sized way in) → split at the hatch; the
+    proving-ground orbit of n1 went inside the passage west wall (phase 1: a planner rescue cut) → raise +1 m.
+  - CAMERA_VERIFY cannot run on directed tracks from node (browser + the take file's own `camera`); needs a
+    `verifyCamera(…, { track })` option in `app/studio` — reported, not touched.
+  - Tests: +8 (camera-correct), camera-synth / camera-direct updated for the two genuine issues.

@@ -138,6 +138,26 @@ test('fixture "behind a head": a bystander walks past the lens during a hold →
   assert.ok(r.shots[0].keys.every((k) => Math.abs(k.position[1] - (P[1] + 0.5)) < 1e-9), 'the whole hold is lifted 0.5 m (a hold does not jump mid-shot)');
 });
 
+test('fixture "the group outgrows the frame": one of two people walks 5 m away mid-hold → widen (raise does not address framing)', () => {
+  const { scene, world } = yardScene();
+  const facts = () => ({ s1: { task: 'talk', activity: 'idle' }, s2: { task: 'talk', activity: 'idle' } });
+  const sampler = (t: number) => ({ s1: personAt([-0.4, 0, 0]), s2: personAt([0.4 + 5 * Math.max(0, Math.min(1, (t - 2) / 4)), 0, 0]) });
+  const dir = { subject: { kind: 'group', ref: 'talk' }, motion: { verb: 'hold' }, framing: { side: 'south' }, duration: 8 };
+  const r = ok(directCamera([dir], { scene, world, sampler, facts, duration: 30 }));
+  const c = r.report.shots[0].corrections[0];
+  assert.equal(c.failure, 'frame');
+  assert.equal(c.strategy, 'widen');
+  assert.equal(c.params.distanceScale, 1.15);
+  assert.deepEqual(c.tried.map((x) => [x.strategy, x.outcome]), [['raise', 'n/a']]);
+  assert.ok(c.samples.t0 > 4 && c.samples.t1 === 8, `once s2 has walked off: ${c.samples.t0}–${c.samples.t1} s`);
+  assert.ok('failures' in c.before && c.before.failures[0].worst === 0.5, 'at worst half the pair is out of frame');
+  assert.equal(r.report.shots[0].simulation!.worst.minFramed, 1);
+  const raw = ok(directCamera([dir], { scene, world, sampler, facts, duration: 30, correct: false }));
+  const d0 = hypot(raw.shots[0].keys[0].position[0] - raw.shots[0].keys[0].target[0], raw.shots[0].keys[0].position[2] - raw.shots[0].keys[0].target[2]);
+  const d1 = hypot(r.shots[0].keys[0].position[0] - r.shots[0].keys[0].target[0], r.shots[0].keys[0].position[2] - r.shots[0].keys[0].target[2]);
+  assert.ok(Math.abs(d1 / d0 - 1.15) < 0.01, `distance ${d0.toFixed(2)} → ${d1.toFixed(2)} m`);
+});
+
 test('fixture "subject leaves frame": a 270° orbit of a crew that walks 6 m — the orbit centre follows, no correction; a fixed centre would fail', () => {
   const { scene, world } = yardScene();
   const crew = (t: number): Record<string, SubjectPose> => { const x = -3 + 6 * Math.max(0, Math.min(1, t / 45)); return { p1: personAt([x, 0, 0]), p2: personAt([x + 0.8, 0, 0.5]), p3: personAt([x - 0.6, 0, -0.6]) }; };
@@ -172,8 +192,8 @@ test('fixture "flare": a pan across the sun low in the west → swing within the
   assert.equal(c.strategy, 'swing');
   assert.deepEqual(c.tried.map((x) => [x.strategy, x.outcome]), [['raise', 'n/a'], ['widen', 'n/a']], 'raise / widen do not address flare');
   assert.equal(c.params.bearingOffsetDeg, 20);
-  assert.equal(c.attempts[0].magnitude, 10 * DEG);
-  assert.match(c.attempts[0].result, /^flare ×\d+$/, '+10° still crosses the sun');
+  assert.deepEqual(c.attempts, [{ magnitude: 10, result: 'flare ×16' }, { magnitude: -10, result: 'flare ×10' }, { magnitude: 20, result: 'valid' }], '±10° still cross the sun');
+  assert.ok('failures' in c.before && c.before.failures[0].worst < 4, `the phase-1 pan passes ${'failures' in c.before ? c.before.failures[0].worst : '?'}° from the sun`);
   assert.match(c.reason, /limited to the sun-behind band/);
   const band = sunBehindWindow(dt, { vfovDeg: r.shots[0].fov, aspect: 16 / 9 }).cameraHeading;
   for (const k of r.shots[0].keys) {

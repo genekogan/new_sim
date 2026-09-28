@@ -1,14 +1,16 @@
-# Camera direction: words → shot program → computed trajectory (`viewer/engine/camera/{direct,synth}.ts`)
+# Camera direction: words → shot program → computed trajectory → self-correction (`viewer/engine/camera/{direct,synth,solve,correct}.ts`)
 
-OWNER_FEEDBACK_2026-09-28 §11, **phase 1** (layers 1 and 2). A director (an LLM or a person) writes typed
-`CameraDirection`s. The engine:
+OWNER_FEEDBACK_2026-09-28 §11, **phase 1** (layers 1 and 2, W16) and **phase 2** (layer 3, W18). A director (an LLM
+or a person) writes typed `CameraDirection`s. The engine:
 1. resolves every name through the semantic world, or asks a structured question;
 2. **computes** the move: orbit radius from the subject's extent and the lens, sun-behind geometry from the sun
    model, interior routes through a camera navmesh, and eased timing under motion caps;
-3. hands the result to the existing planner (`CAMERA.md`), which validates it.
+3. **simulates the move against the take** — people and parts per tick, the sun, the caps — scores every sample
+   against named failure modes, and applies the first of seven ranked corrections that makes every sample valid,
+   recording why (§6); or refuses the direction with everything it tried;
+4. hands the result to the existing planner (`CAMERA.md`), which validates it.
 
-It is deterministic, pure TypeScript, read-only over the world, and it fails loudly with a `Diagnostic`. Phase 2
-(self-correction) plugs in where marked below.
+It is deterministic, pure TypeScript, read-only over the world, and it fails loudly with a `Diagnostic`.
 
 ## 1. Vocabulary (`direct.ts`, zod; the MCP schema is generated from it)
 
@@ -200,10 +202,12 @@ Default speeds: pan 8°/s, tilt 6°/s, orbit 6°/s, dolly 1 m/s, crane 0.8 m/s, 
 - Static subjects are scored through injected `focus:<i>` subject points.
 
 **Report (per shot):** resolved subject (kind, ref, id, label, scored ids), interior, lookAt, the computed
-`params`, notes, the synthesiser's own `validation`, the planner summary, and **`corrections: []`**.
-`trackHash = hashOf(samples)`.
+`params`, notes, the synthesiser's own `validation`, the planner summary, the phase-2 **`simulation`** and
+**`corrections`** (§6). `trackHash = hashOf(samples)`. A split shot reports as two shots (the second labelled
+`… (after the cut)`).
 
-## 4. Tool: `engine_direct_camera { take_id, directions[], track_id?, hz? }`
+## 4. Tool: `engine_direct_camera { take_id, directions[], track_id?, hz?, correct? }`
+- `correct` (default true) runs phase 2; `false` returns the computed move as is (phase 1) — a different `track_id`.
 - Resolves against `take.finalState` (entities, regions, light), the take's sampler and `takeFacts`, and the
   campus scene of the take.
 - Stores the track beside the take (`kind: 'directed'`, id `dir-<hash>`). The take and its hash are untouched.
@@ -216,41 +220,137 @@ Default speeds: pan 8°/s, tilt 6°/s, orbit 6°/s, dolly 1 m/s, crane 0.8 m/s, 
 | --- | --- | --- |
 | Flagship take, bay orbit from `seat_b1` start (≈226 s) | 270° over 120 s, wide | Structure `structure:A` (24 parts), scored A + B. R 3.47 m → distance 14.94 m, orbit radius 13.86 m, height 7.27 m. Start heading searched (north). View ≤ 3.9°/s. Planner: 0 invalid, 0 crossings, readability min 0.67 / mean 0.94, readable 100 %. At least two crew members move more than 1 m inside the bay's footprint during the orbit (tested). |
 | 2026 Chiba, 17:18 (20 min before sunset) | Pan | Sun az 258.3°, el 3.72°. Camera heading window compass 41.6–114.9°, pitch window −18.3…−2.3°. Distance raised to 31.07 m, camera 5.35 m up. 71.3° sweep in 8.9 s. 90 / 90 samples in the window with the sun in frame, min 7.05° off axis. Readability 1.0. At the take's own 16:00 light (sun ~19° up) the same pan works looking up. |
-| 2024 kitchen (the 2026 scene has neither) | Fly-through from (8, 1.6, 36) outside, lookAt sink | Straight line blocked by the east plywood wall. 9.1 m route over the 1.26 m half wall (entry at z 39.84). Clustered sink (bowl + rim) at (5.07, 1.01, 43.0). Viewpoint 1.8 m in front at eye height. 18 s (profile minimum 15.7 s); ≤ 16.7°/s, ≤ 29°/s², ≤ 0.87 m/s. 0 invalid, 0 crossings. The sink is readable for the last part of the move (it is behind the wall before). From the east (9, 1.6, 43) the route hairpins round the half wall's end: 26 s. |
+| 2024 kitchen (the 2026 scene has neither) | Fly-through from (8, 1.6, 36) outside, lookAt sink | Straight line blocked by the east plywood wall. 9.1 m route over the 1.26 m half wall (entry at z 39.84) — in fact through the 0.79 m hatch above it, which phase 2 flags and splits (§6.4). Clustered sink (bowl + rim) at (5.07, 1.01, 43.0). Viewpoint 1.8 m in front at eye height. 18 s (profile minimum 15.7 s); ≤ 16.7°/s, ≤ 29°/s², ≤ 0.87 m/s. 0 invalid, 0 crossings. The sink is readable for the last part of the move (it is behind the wall before). From the east (9, 1.6, 43) the route hairpins round the half wall's end: 26 s. |
 
-## 6. What phase 2 adds (the data is ready for it)
-- **New failure checks**, scored on every sample of the simulated shot:
-  - stuck between plywood sheets or inside a rack bay (free-space radius below a minimum);
-  - a person's head in the foreground (a "foreground blob" on top of the capsules);
-  - the sun on the optical axis (sun-behind already refuses this; generalise it);
-  - a subject leaving frame during an orbit;
-  - horizon tilt;
-  - the caps above;
-  - the render-side raycast (CAMERA_VERIFY), with disagreements fed back as regressions.
-- **Ranked corrections**, re-synthesised through `synthesizeShot(intent, ctx, prev, overrides)`:
-  - *raise* → `heightOffset`
-  - *widen* → `distanceScale`
-  - *swing* → `bearingOffset`
-  - *re-route* → `via` (navmesh waypoints)
-  - *shorten* → `duration`
-  - *split* / *cut* → two programs
-- Each applied fix goes into `SynthShot.corrections` / the report's `corrections[]` (`DirectCorrection
-  {strategy, t0, t1, reason, params}`), so a director can read why a shot changed.
-- The motion-cap diagnostic already reports the peak times (`peaks.at`), which is the input *shorten* / *split*
-  need.
+## 6. Phase 2: self-correction (`solve.ts` `scoreShot`, `correct.ts` `correctShot`)
+
+Every synthesized shot is **simulated against the take** before it is committed: every sample (1/hz) is scored
+against the take's people and parts *at that tick* (`takeSampler`), the static scene, the sun at the take's datetime
+and the motion caps. A shot is **valid** when no sample fails. An invalid shot goes through **ranked, explicit
+corrections**, each candidate re-synthesized (`synthesizeShot(intent, ctx, prev, overrides)`) and re-simulated; the
+first candidate valid on every sample wins and is recorded. If nothing works the direction is refused with the list
+of everything tried. Deterministic (fixed ladders, fixed order, sorted ids); the camera never mutates the world.
+
+### 6.1 Failure modes (`FAILURE_LIMITS`, `FAILURE_ORDER`)
+
+| Kind | Per-sample check | Threshold | Counts when |
+| --- | --- | --- | --- |
+| `collision` | the planner's own placement (≥ 0.3 m from static solids) and swept move | `MIN_CLEARANCE` | 1 sample |
+| `squeeze` | **free width** across the camera: 4 horizontal axes, both opposite rays (3 m probe) hit a static solid or a take-part box → width = the sum; **free height** over the camera body's 0.6 m square footprint (exact column test: every solid / part whose footprint overlaps bounds it above or below; only when something is above); **part clearance**: distance to the nearest take-part box (parts do not collide in the planner) | width < 1.2 m (a 0.6 m rig + 0.3 m each side: a 1.6 m door passes, two sheets 0.8 m apart do not); height < 1.0 m; part < 0.3 m | sustained: ≥ 0.3 m of camera travel or ≥ 0.5 s — crossing a door's jambs (one sample) is not a squeeze |
+| `foreground` | a person (not a subject) within 1.5 m of the camera (to the capsule axis) whose projected capsule (r 0.2 m, five axis points) covers the subject's frame region (NDC box of the subject / focus points, ≥ 0.1 NDC) and is in front of the subject | cover ≥ 25 % | ≥ 3 samples (0.3 s) |
+| `flare` | the sun (above the horizon, not hidden by an occluding solid within 80 m) off the optical axis | < 6° (`sunBehindWindow`'s flare) | 1 sample |
+| `frame` | fraction of the subject's points inside the frame (5 % margin, UI band): people's points, focus points, and for a take structure under construction **every member whose points lie inside the structure's final box (±0.25 m) at that tick** — the extent grows during the shot | < 75 % | ≥ 3 samples; off for `fly_through` (it looks along its route) |
+| `horizon` | view pitch (a look-at camera's roll is undefined near vertical); explicit key `roll` | \|pitch\| > 75°; roll > 1° | 1 sample |
+| `motion` | per-sample view ω, α and camera v, a (as `motionPeaks`) | the `MOTION_CAPS` (+0.5°/s, +1°/s², +0.05 m/s, +0.1 m/s²) | 1 sample |
+
+Each failure is a run `{ kind, t0, t1, samples, worst, detail, subjects }` (detail names what: *"free width 0.8 m
+between 'part s2' and 'part s1'"*, *"person w1 0.97 m from the camera covers 73% of the subject's frame region"*,
+*"sun 5.54° off the optical axis; worst 3.62°"*). The scalar `penalty` (collision 100, squeeze 10, foreground /
+flare / frame 5, horizon / motion 3 per failing sample) is only for before/after reporting.
+
+### 6.2 Ranked corrections (`STRATEGY_ORDER`, `LADDERS`, `ADDRESSES`)
+
+Tried in this order; a strategy is tried only when it addresses a failure present; its ladder is tried in order and
+the first valid magnitude wins.
+
+| Rank | Strategy | Knob (re-synthesis) | Ladder | Addresses | n/a when |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `raise` | `heightOffset` (camera / orbit / fixture viewpoint) | +0.5, 1, 1.5, 2.5, 4 m | collision, squeeze, foreground | — |
+| 2 | `widen` | `distanceScale` (subject distance) | ×1.15, 1.3, 1.5, 1.8 | collision, squeeze, foreground, frame, horizon, motion | fly_through (fixture distance) |
+| 3 | `swing` | `bearingOffset` (orbit start / hold / sweep bearing) | ±10, ±20, ±30, ±45, ±60, ±90° | collision, squeeze, foreground, flare | fly_through; for flare with a backlit shot only offsets that keep the camera heading inside the **sun-behind band** (`sunBehindWindow` heading ± (hfov/2 − 3°)), so the sun stays in frame |
+| 4 | `reroute` | `navRadius` + `avoid`: the navmesh re-searched with the squeezed stretch **blocked** (a vertical slot between two static solids is blocked whole — their footprint overlap from the lower top to the upper bottom; otherwise a 0.6 m cell per failing sample) and the take's part boxes (1 Hz over the shot) as obstacles | camera radius 0.3, 0.45 m | collision, squeeze | not a routed move |
+| 5 | `shorten` | `duration` = up to the first failing sample (the whole move, faster, under the caps) | one | all but motion | it would keep < 50 % of the shot (that is a cut) |
+| 6 | `split` | two shots with a cut: A = the valid lead, B = the path after the failing interval re-timed to end on time (take time runs on; every window boundary is a planner cut) | one | all | < 1 s valid on either side |
+| 7 | `cut` | keep the longest valid run (≥ 2 s); a dropped lead is held on the previous frame, which must be valid too | one | all | — |
+
+A **refused synthesis** (`camera.nav.*`, `camera.direct.no-viewpoint`) is corrected the same way (raise, re-route);
+the director's own constraints (explicit durations over the caps, the sun window, `beyond-take`, ambiguity) are never
+changed. The refusal keeps its code and gains `details.corrections.tried`.
+
+### 6.3 The record (`DirectShotReport.corrections[]`, `simulation`)
+
+```ts
+corrections: [{
+  failure: 'collision'|'squeeze'|'foreground'|'flare'|'frame'|'horizon'|'motion'|'refused',  // the first failure in FAILURE_ORDER
+  samples: { count, t0, t1 },                 // its failing samples (take s)
+  strategy: 'raise'|'widen'|'swing'|'reroute'|'shorten'|'split'|'cut',
+  before: { valid, failingSamples, penalty, failures: [{ kind, samples, t0, t1, worst, detail }] } | { refused, message },
+  after:  { valid: true, failingSamples: 0, penalty: 0, failures: [] },
+  reason: string,                             // "squeeze on 9 samples (…free width 0.8 m between 'part s2' and 'part s1'…); raised the camera 1 m (…first valid)"
+  params: Record<string, number>,             // heightOffset | distanceScale | bearingOffsetDeg | cameraRadius | duration | cutAt | kept0/kept1
+  t0, t1,                                     // the corrected shot
+  tried:    [{ strategy, outcome: 'failed'|'n/a', why, attempts?: [{ magnitude?, result }] }],  // everything before it
+  attempts: [{ magnitude?, result }],         // the chosen ladder up to the winner ("flare ×16", "flare ×10", "valid")
+}]
+simulation: { valid, samples, failingSamples, penalty, failures, worst: { minFreeWidth, minPartClearance,
+  maxForegroundCover, minSunOffAxisDeg, minFramed, maxAbsPitchDeg, maxOmegaDeg, maxAlphaDeg, maxSpeed, maxAccel } }
+```
+An uncorrectable shot: `camera.direct.uncorrectable` with `details: { before, corrections: { failure, tried } }`.
+
+### 6.4 Results (2026-09-28, `camera-correct.test.ts`, `camera-synth.test.ts`, `camera-direct.test.ts`)
+
+| Fixture | Failure detected | Chosen |
+| --- | --- | --- |
+| **Stuck between plywood**: a dolly (6 m, eye level 1.7 m) across the yard plot, two 4x8 sheets standing on their short edge 0.8 m apart as take parts around its path (the planner sees nothing: parts do not collide) | squeeze on 9 samples (t 3.6–4.4 s), free width 0.80 m between `s1` and `s2` | **raise +1 m** (+0.5 m: still squeeze ×9; +1 m: over the 2.44 m tops, part clearance 0.47 m) |
+| **Behind a head**: an eye-level hold (camera 1.83 m) on two people talking; `w1` walks 6 m across 0.9 m in front of the lens between 2 and 6 s | foreground on 3 samples (t 3.9–4.1 s): `w1` 0.97 m from the camera covers 73 % of the pair | **raise +0.5 m**, the whole hold (no mid-shot jump) |
+| **Group outgrows the frame**: the same hold; `s2` walks 5 m away mid-shot | frame on 22 samples (t 5.9–8 s), worst half the points framed | **widen ×1.15** (raise does not address framing) |
+| **Subject leaves frame**: a 270° orbit (45 s) of a crew of three walking 6 m | none: the orbit centre follows the crew (target moves 6 m), min framed 1.0 | **no correction** (`corrections: []`); the same orbit about the crew's *starting* centre fails `frame` on 91 samples (t 36–45 s, worst 0 framed) |
+| **Flare**: a 30° pan from the east of the plot at 18:43 on 2026-03-20 (sun az 268.6°, el 1.8°) | flare on 7 samples (t 1.6–2.2 s), worst 3.62° off axis | **swing +20°** inside the sun-behind band (±36.66°): +10° flare ×16, −10° flare ×10, +20° valid; min 7.25° off axis, the sun in frame on most samples (a backlit pan); raise / widen n/a |
+| **Impossible**: fly-through into the sealed synthetic room | `camera.nav.unreachable` | **refused**, all seven listed: raise failed (5 × unreachable), widen / swing n/a (routed), re-route failed (2 × unreachable), shorten / split / cut n/a (no track) |
+
+**Phase-1 shots re-scored:**
+- Flagship bay orbit (270° / 120 s from `seat_b1`): **valid as computed, `corrections: []`**. The structure grows
+  during the orbit (members inside its final box: 5 → 7) and every in-place member is framed on every sample; min
+  sun off axis 41°; ω ≤ 3.9°/s. Carry-crew orbit (90° / 20 s): valid, `[]`. Chiba sunset pan: valid, `[]`.
+- **Genuine issue — 2024 kitchen move.** "Over the 1.26 m half wall" in fact threads a **0.79 m serving hatch**
+  between the half wall (0.23–1.26 m) and the wall panel above (from 2.05 m) at z 39.34: free height 0.78 m on 10
+  samples (0.9 s) — "stuck between two sheets of plywood". Raise: +0.5 m exceeds the caps, ≥ +1 m finds no
+  eye-level viewpoint; re-route with the hatch blocked: `camera.nav.unreachable` at both radii — **the hatch is the
+  only camera-sized way into the 2024 kitchen model**; shorten would keep < 50 %. → **split**: a cut at the hatch
+  (5.6 s from (8, 1.6, 36); 14.1 s from the east), the move still ends on time inside, facing the sink.
+- **Genuine issue — proving-ground orbit of `n1`** (the API test): the computed 90° orbit passed *inside* the
+  passage west wall (8 invalid samples, 4 swept crossings, clearance −0.12 m); phase 1 left it to the planner, which
+  cut away from it. Phase 2: **raise +1 m**, 0 invalid, no planner cut.
+
+### 6.5 Render-side verification (CAMERA_VERIFY)
+The render pass cannot run from node: `app/studio/camera-verify.ts verifyCamera(scene, replay)` needs the studio's
+THREE scene (the GLB, skinned bodies, instanced parts) and verifies `replay.file.camera` — the camera track *inside
+a take file* the studio fetches from `public/engine/takes`. A directed track lives in the controller's take store
+(`attachCamera`), so no directed track can reach the pass today. What it needs (app / e2e owners): either
+`verifyCamera(…, { track })` (verify any stored track of the open take, e.g. from `get_take { include: ['cameras'] }`),
+or a take file written with the directed track as its `camera`. The e2e spec (`e2e/camera-verify.spec.ts`) would then
+run W16's three shots and the fixtures above; any planner-vs-render gap ≥ 0.2 becomes a `camera-*.test.ts` fixture.
+The last run on the recorder's track (CAMERA_VERIFY "After the fix") left one |planner − real| ≥ 0.2 sample (skinned
+body vs capsule, b1 close-up) — not a directed track, so no regression is added from it.
 
 ## 7. Limits (honest)
-- **No door objects in any scene:** openings are just gaps. In 2024 the kitchen is entered over a counter-height
-  half wall, which is correct for that geometry but is not a "door".
+- **No door objects in any scene:** openings are just gaps. In 2024 the only camera-sized way into the kitchen is
+  the 0.79 m serving hatch above the counter-height half wall; phase 2 flags it as a squeeze and splits the move at
+  it (§6.4).
 - **The 2026 campus has no kitchen region and no sink fixture.** Its interiors are blocked `interior:*` prisms by
   rule (CAMPUS_SCENE.md), so interior moves are tested on 2024.
-- **Take people and parts do not collide with the camera** (existing policy: occlude only). The navmesh is
-  static-scene only. A route through a moving crowd is phase 2 ("foreground blob").
+- **Take people and parts do not collide with the camera in the planner** (existing policy: occlude only). Phase 2
+  checks the camera against them per tick (squeeze / part clearance, foreground people) and re-route adds the take's
+  part boxes (sampled at 1 Hz, as axis-aligned prisms) to the navmesh; people are never navmesh obstacles.
 - **Readability of static subjects uses box points:** bounding-box corners or face points, not the mesh
   (CAMERA_VERIFY covers the mesh).
 - **The navmesh is built per call** on a crop around start and goal (plus a probe mesh around the room), at about
   100–250 ms. It is cached per `SynthContext`, not across calls.
-- **Look-ahead fly-throughs over hairpins are slow by design:** the view-rate cap dominates. Phase 2 *re-route*
-  or a smarter look policy (looking at the destination once it is visible) would shorten them.
+- **Look-ahead fly-throughs over hairpins are slow by design:** the view-rate cap dominates. A smarter look policy
+  (looking at the destination once it is visible) would shorten them; phase 2's re-route only avoids failures.
+- **Phase 2, honestly:**
+  - one correction per shot: the winning candidate must fix *every* failure at once; strategies are never combined
+    (raise + swing), so a shot needing two fixes is refused rather than half-fixed;
+  - static-subject readability (occlusion by the scene) is still the planner's score, not a phase-2 failure: a brief
+    wall wipe in a fly-through is allowed, a subject hidden for the whole shot is only reported (`planner.minReadability`);
+  - `shorten` and `cut` have no fixture where they win (raise / widen / swing fix every synthetic case first); their
+    mechanics are exercised only through the refusal lists;
+  - split re-times the rest of the path: for a *moving* subject its targets were computed for the original times —
+    the re-simulation catches a subject that leaves the frame, but the look-at is not recomputed;
+  - the squeeze thresholds (1.2 m width, 1.0 m height, 0.3 m / 0.5 s sustained) are engineering judgement (a
+    steadicam-sized rig), not measured; a rack bay is only a squeeze where it is that narrow;
+  - flare ignores lens-specific ghosts and haze: it is the sun direction vs the optical axis, occluded by the scene's
+    prisms (not by take parts or people);
+  - the render-side verification of directed tracks needs the browser and a studio change (§6.5).
 - **Region subjects without an assembly** get a box height from obstacles whose centres lie inside the polygon,
   or 3 m.
