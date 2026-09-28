@@ -392,6 +392,25 @@ open-ground target has room, so the step-off search never runs there. The pin mo
 No other pin moves. The engine suite is otherwise unchanged. New regression tests: v3 at (28, −9, −0.16) and
 (0.07, 0.03), and a `beam_walk` step-off unit test (lands within 0.15 m; still refused at 0.12 m from an edge).
 
+**No re-pin 2026-09-29 (kneeling rise swept against resting members, 2026-09-29 — not the budget; W30, HANDUP.md
+"Kneeling rise").** The kneeling receivers' rise from the hand-off to slide height is now swept against everything,
+including the members the load will rest on. It gets the same outward corridor search the prone path uses, else
+`handup.rise-blocked`. The forklift kneeling rise is checked where the forks hold it. The feed-in is swept against
+everything; only the set-down may touch the resting members. The 2.4 m green test moves (518 → 528 ticks, 0
+intersections per tick; it had 4 ticks through j1). It has no pin. **No pinned scenario moves**, and no re-pin was
+needed:
+- build-bay v3: `39a0fb3f…` @16374 before and after. In v3 the joists and s1 are "direct", so the givers raise them to
+  slide height and there is no receiver rise. s2 rises only 3 cm off the forks at slide height. A per-tick sweep of all
+  937 receiver-held ticks (reach_down / take / stand_with_load / lay) finds 0 intersections. The take re-records to
+  the manifest's entry byte for byte (`record-campus-take.mjs --scenario build-bay-v3 --check`: OK, id `64c3331c…`),
+  so the take and the manifest are unchanged.
+- year builds use `pass_up`, never `hand_up`. They import only constants and `handupHands` from handup.ts, and W30
+  did not change those. In the suite: bay-1 `251a44c5…` @41317 and B bay-1 + first strip `94db263e…` @53604 are
+  green. With `YEAR_BUILD_FULL=1` (run in full, 13 min 45 s): skeleton @117277 and A+B `ddb634d6…` @600599 are
+  green, 0 violations.
+- `deploy/perf-walk.mjs` still pinned v3 at `a2f782ad…`, W27's predecessor, so it was reporting v3 as unpinned. It
+  is now `39a0fb3f…` (`--only v3`: PIN-OK).
+
 ## Limits
 The tick-5 spike is 30 synchronous plans, so exact stays at ~30 × route cost (80–120 ms); < 60 ms needs the
 corridor planner (§6: an exact inner-loop rewrite gained ≤ 5 %; corridor max tick is 53 ms once failing replans are cheap). The stress test (warm, parallel runner) asserts max tick ≤ 150 ms exact (measured 84–91), ≤ 60 ms corridor (42–45).

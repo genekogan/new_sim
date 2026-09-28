@@ -649,3 +649,28 @@ Then: gate → release 5; HANDOFF refresh.
   has not been posed prone (renderer track).
 - **W27 landed** `82e00c0`, `81ce663`, `f97d5db` (≈300k tokens, 105 min): A+B overlap root cause = `setpart.ts` moved lifters' feet without checking people (the carry was fine) → lift crews hold the part and wait (`setpart.path-occupied`), idle people make way; **east-house A+B green and pinned `ddb634d6…` @600599 (8.3 h simulated), 0 violations, 66 + 145 parts at 1 cm/1° (max 0.25 mm), 19 unplaced (solar 14, stair 5)**; v3: `deckAt` clearance is read at lattice cell centres so a 0.35 m spot read 0.25 m at staging-east → `beam_walk` `stepOffSpot` (nearest spot with room ≤ 0.15 m), spare tread moved; 17/17 origins + staging-east green (was 10/17); v3 re-pinned a2f782ad → 39a0fb3f @16374; **v3 take recorded** `64c3331c…` at staging-east (2.09 MB / 238 KB gz) in the manifest. 371 / 368 / 3 skip. Lead review: accepted. Unlanded (its Bash checks failed 9×): recorder `year-build-2022-ab` scenario + YEAR_BUILD/PLANNING_BUDGET/PROGRESS docs in `scratchpad/w27-wt` (branch `w27-ab`), to land once `scratchpad/w27/fulltest2.log` shows ✔ → W31. **Lead decision:** the A+B take (12.0 MB) is split per section (A, D0, D1, D2, S, W, P) as chapters, each with its own camera plan → W31.
 - W30 spawned (engine handup.ts): kneeling rise sweeps the members the load rests on (W28's finding), v3 re-pin + re-record. W31 spawned (recorder/manifest): land W27's files, per-section A+B takes with chapter metadata.
+
+## W30 — kneeling rise swept against the resting members (2026-09-29)
+- **Finding (W28):** a kneeling receiver's `stand_with_load` rise was swept with the load's supports ignored. In the
+  2.4 m green test the sheet was handed off just outside b3's face. It then rose through j1's cantilevered end (6 ft
+  joists overhang b3 by 0.28 m) for 4 ticks.
+- **Fix (`construction/handup.ts`):** the hand-off corridor search (outward from the edge beam, 5 cm steps, ≤ 1 m)
+  now also sweeps the receivers' rise, hand-off → slide height, against everything whenever the givers do not
+  raise the load to slide height themselves. Previously only prone receivers had this. So the load goes straight up
+  outside the joist ends and comes in over them. If the kneelers cannot reach it there, the hand-up is refused
+  `handup.rise-blocked`, naming the member ("…in the hands of receivers kneeling at it: 6 ft 2x4 (j1) is in the way
+  of its rise…"). A kneeling rise off the forks is checked where the forks hold it. `finishPlan` sweeps the take, the
+  rise and the feed-in against everything; only `set_down` may touch the supports.
+- **Tests (`handup.test.ts`, +2, 9 total):** `watch()` sweeps the received load on every reach_down / take /
+  stand_with_load / lay tick. The 2.4 m green test now has 0 intersections (≥ 60 swept ticks), is handed off
+  outside the joist ends, and takes 528 ticks (was 518). Joists overhanging by 0.78 m → rise-blocked naming the
+  joist; 0.48 m → green. A sheet on the forks under the joist ends → rise-blocked "…where the forks hold it". All
+  three fail on the pre-W30 handup.ts (checked).
+- **Pins:** none move (PLANNING_BUDGET "No re-pin 2026-09-29"). v3 stays `39a0fb3f…` @16374 with 0 intersections.
+  Its take `--check` is OK against the manifest (`64c3331c…`), so nothing was re-recorded. The year builds (pass_up)
+  pass unchanged: bay-1 in the suite, and A+B `ddb634d6…` @600599 in a full `YEAR_BUILD_FULL=1` run. The
+  perf-walk v3 pin was stale (`a2f782ad…`) and is fixed. Suite: 373 tests, 370 pass, 3 skipped, 0 fail; tsc clean.
+- **Weak spots:** the corridor moves only outward along the edge normal, never sideways, never tilted. The load
+  always comes straight up. The plan-time sweep samples every 5 cm of motion (the per-tick test sweep covers the
+  ticks). No pinned scenario exercises a kneeling rise past joist ends, so the change is covered only by the
+  handup.test.ts fixtures.
