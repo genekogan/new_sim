@@ -18,6 +18,8 @@
 // cap evicts the oldest ones no live workspace's checkpoint `simulation-run` cause references (take +
 // its camera tracks, or plan; engine_delete_workspace frees a deleted workspace's runs); if every stored one is referenced the whole call is refused with
 // `room.storage-full` (nothing persisted, in-memory state reloaded) — continue in a new room.
+// Byte caps additionally bound each blob and the complete room/year, including state history;
+// `room.storage-bytes` rolls back the transaction and reloads the cached controller.
 // Year rooms 2020–2025 also seed protected canonical `mars-<year>` from that year's generated
 // campus scene (the `campusFile` loader: bundled JSON in the Worker, loadCampusFile in Node); a
 // room seeded before that gets it added on first load. 2026 rooms stay synthetic-only.
@@ -34,7 +36,10 @@ import type { WorldState } from '../engine/world/types.ts';
 import type { RuntimeSnapshot } from '../engine/runtime/snapshot.ts';
 import type { CameraTrack, Take } from '../engine/take/types.ts';
 
-const CHUNK = 512 * 1024; // characters per row; DO SQLite caps a value at 2 MB
+import { workloadRefusal } from './workload.ts';
+import { MAX_BLOB_BYTES, MAX_ROOM_BYTES, StorageCapacityError, utf8Bytes, utf8Chunks } from './storage-bytes.ts';
+export { MAX_BLOB_BYTES, MAX_ROOM_BYTES } from './storage-bytes.ts';
+export type RoomLimits = { plans?: number; takes?: number; blobBytes?: number; roomBytes?: number };
 export const MAX_PLANS = 64;
 export const MAX_TAKES = 32;
 
@@ -45,13 +50,13 @@ export type EngineCallMeta = { op: string; elapsedMs: number; loadMs?: number; s
 export class EngineRoom {
   private storage: DurableObjectStorage;
   private controllers = new Map<number, EngineController>();
-  private limits: { plans: number; takes: number };
+  private limits: Required<RoomLimits>;
   private campusFile: (year: number) => CampusYearFile | undefined;
 
-  constructor(storage: DurableObjectStorage, limits: { plans?: number; takes?: number } = {}, campusFile: (year: number) => CampusYearFile | undefined = () => undefined) {
+  constructor(storage: DurableObjectStorage, limits: RoomLimits = {}, campusFile: (year: number) => CampusYearFile | undefined = () => undefined) {
     this.storage = storage;
     this.campusFile = campusFile;
-    this.limits = { plans: limits.plans ?? MAX_PLANS, takes: limits.takes ?? MAX_TAKES };
+    this.limits = { plans: limits.plans ?? MAX_PLANS, takes: limits.takes ?? MAX_TAKES, blobBytes: limits.blobBytes ?? MAX_BLOB_BYTES, roomBytes: limits.roomBytes ?? MAX_ROOM_BYTES };
     storage.sql.exec('CREATE TABLE IF NOT EXISTS engine_blobs (key TEXT NOT NULL, chunk INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (key, chunk))');
   }
 
@@ -66,9 +71,11 @@ export class EngineRoom {
   }
 
   private write(key: string, text: string) {
+    const bytes = utf8Bytes(text);
+    if (bytes > this.limits.blobBytes) throw new StorageCapacityError(`${key} needs ${bytes} UTF-8 bytes (blob cap ${this.limits.blobBytes}); this call was not persisted — use a shorter take or a new room`);
     this.storage.sql.exec('DELETE FROM engine_blobs WHERE key=?', key);
-    for (let i = 0, n = 0; i < text.length || n === 0; i += CHUNK, n++)
-      this.storage.sql.exec('INSERT INTO engine_blobs (key, chunk, data) VALUES (?, ?, ?)', key, n, text.slice(i, i + CHUNK));
+    let n = 0;
+    for (const chunk of utf8Chunks(text)) this.storage.sql.exec('INSERT INTO engine_blobs (key, chunk, data) VALUES (?, ?, ?)', key, n++, chunk);
   }
 
   private exists(key: string) {
@@ -100,7 +107,7 @@ export class EngineRoom {
         putResume: (h, s) => void pending.set(`resume.${h}`, s),
       });
       const added = !!saved && !!campus && ensureCampusYear(history, campus);
-      if (fresh || added) this.flush(year, history);
+      if (fresh || added) { this.flush(year, history); this.checkRoomBytes(year); }
     });
     const ctl = createController({
       history,
@@ -113,7 +120,7 @@ export class EngineRoom {
           const index = this.storeIndex(year);
           const bytes = new Map(
             this.storage.sql
-              .exec<{ key: string; bytes: number }>("SELECT key, SUM(LENGTH(data)) AS bytes FROM engine_blobs WHERE key LIKE ? OR key LIKE ? OR key LIKE ? GROUP BY key", `${p}plan/%`, `${p}take/%`, `${p}cams/%`)
+              .exec<{ key: string; bytes: number }>("SELECT key, SUM(LENGTH(CAST(data AS BLOB))) AS bytes FROM engine_blobs WHERE key LIKE ? OR key LIKE ? OR key LIKE ? GROUP BY key", `${p}plan/%`, `${p}take/%`, `${p}cams/%`)
               .toArray()
               .map((r) => [r.key, r.bytes]),
           );
@@ -136,7 +143,7 @@ export class EngineRoom {
     const put = (key: string, value: unknown) => {
       const text = JSON.stringify(value);
       this.write(key, text);
-      if (stored) stored[key] = text.length;
+      if (stored) stored[key] = utf8Bytes(text);
     };
     const pending = this.pending.get(year)!;
     for (const [h, s] of pending) if (!this.exists(`${p}state/${h}`)) put(`${p}state/${h}`, s);
@@ -146,9 +153,16 @@ export class EngineRoom {
 
   /** Run one controller op and persist what it changed (one SQLite transaction). */
   call(year: number, op: string, input: unknown): OpResult & { _meta: EngineCallMeta } {
-    const { ctl, loadMs } = this.controller(year);
+    let loaded: ReturnType<EngineRoom['controller']>;
+    try { loaded = this.controller(year); } catch (e) {
+      this.controllers.delete(year);
+      this.pending.delete(year);
+      if (!(e instanceof StorageCapacityError)) throw e;
+      return { ok: false, code: e.code, message: e.message, _meta: { op, elapsedMs: 0, stored: {}, storage: this.sizes(year) } };
+    }
+    const { ctl, loadMs } = loaded;
     const t0 = performance.now();
-    const result = ctl.call(op, input);
+    const result = workloadRefusal(ctl, op, input) ?? ctl.call(op, input);
     const elapsedMs = performance.now() - t0;
     const changes = ctl.drainChanges();
     const stored: Record<string, number> = {};
@@ -161,7 +175,7 @@ export class EngineRoom {
         const put = (key: string, value: unknown) => {
           const text = JSON.stringify(value);
           this.write(key, text);
-          stored[key] = text.length;
+          stored[key] = utf8Bytes(text);
         };
         const newPlans = changes.plans.filter((id) => !this.exists(`${p}plan/${id}`));
         const newTakes = changes.takes.filter((id) => !this.exists(`${p}take/${id}`));
@@ -191,12 +205,15 @@ export class EngineRoom {
           };
           put(`${p}store-index`, next);
         }
+        if (Object.keys(stored).length) this.checkRoomBytes(year);
       });
     } catch (e) {
       // in-memory state may now be ahead of storage: drop it and reload lazily next call
       this.controllers.delete(year);
       this.pending.delete(year);
-      throw e;
+      if (!(e instanceof StorageCapacityError)) throw e;
+      for (const key of Object.keys(stored)) delete stored[key];
+      return { ok: false, code: e.code, message: e.message, _meta: meta() };
     }
     if (full) {
       // refused: nothing was persisted, so the op's in-memory effects (a commit, a take) are dropped too
@@ -254,10 +271,15 @@ export class EngineRoom {
     this.storage.sql.exec('DELETE FROM engine_blobs WHERE key=?', key);
   }
 
+  private checkRoomBytes(year: number) {
+    const bytes = Object.values(this.sizes(year)).reduce((sum, value) => sum + value.bytes, 0);
+    if (bytes > this.limits.roomBytes) throw new StorageCapacityError(`room y${year} needs ${bytes} UTF-8 bytes (room cap ${this.limits.roomBytes}); this call was not persisted — use shorter takes or continue in a new room`);
+  }
+
   /** Stored bytes per key class (for size measurements). */
   sizes(year: number) {
     const rows = this.storage.sql
-      .exec<{ key: string; bytes: number }>('SELECT key, SUM(LENGTH(data)) AS bytes FROM engine_blobs WHERE key LIKE ? GROUP BY key', `y${year}/%`)
+      .exec<{ key: string; bytes: number }>('SELECT key, SUM(LENGTH(CAST(data AS BLOB))) AS bytes FROM engine_blobs WHERE key LIKE ? GROUP BY key', `y${year}/%`)
       .toArray();
     const out: Record<string, { count: number; bytes: number }> = {};
     for (const r of rows) {
