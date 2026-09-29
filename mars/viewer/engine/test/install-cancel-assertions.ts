@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { hypot } from '../core/math.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import { entityFootprint } from '../spatial/service.ts';
@@ -28,6 +29,7 @@ export function checkInstallCancellation(rt: Runtime, verb: string, params: { cr
   for (const actor of params.crew) assert.equal(rt.world.entities[actor].human?.grip?.entity, item);
   const before = structuredClone(rt.world);
   const owners = resources.map((resource) => rt.holder(resource));
+  const capture = { verb, item, tick: rt.tick, phase: r.phase, groundTranslation, before: { pose: structuredClone(e.pose), support: structuredClone(e.support) }, after: {}, reservations: Object.fromEntries(resources.map((resource) => [resource, rt.holder(resource)])), final: {} };
   for (const holders of owners) assert.ok(holders.includes(r.id), 'lift owns every reserved resource');
   for (let attempt = 0; attempt < 2; attempt++) {
     const cancelled = rt.cancel(r.id);
@@ -37,6 +39,7 @@ export function checkInstallCancellation(rt: Runtime, verb: string, params: { cr
     assert.deepEqual(rt.world, before, 'refusal cannot move the load, release hands or change support');
     assert.deepEqual(resources.map((resource) => rt.holder(resource)), owners, 'refusal retains every resource');
   }
+  capture.after = { pose: structuredClone(e.pose), support: structuredClone(e.support), diagnostic: r.diagnostic, reservations: Object.fromEntries(resources.map((resource) => [resource, rt.holder(resource)])) };
   const competing = rt.submit('walk_to', { actor: params.crew[0], x: -6, z: -6 });
   assert.equal(competing.status, 'failed');
   assert.equal(competing.diagnostic?.code, 'actor.holding');
@@ -53,4 +56,12 @@ export function checkInstallCancellation(rt: Runtime, verb: string, params: { cr
   }
   for (const resource of resources) assert.ok(!rt.holder(resource).includes(r.id), `${resource} released at completion`);
   assert.deepEqual(rt.violations, []);
+  capture.final = { tick: rt.tick, status: r.status, pose: e.pose, support: e.support, reservations: Object.fromEntries(resources.map((resource) => [resource, rt.holder(resource)])), violations: rt.violations };
+  // Opt-in proof capture; run with --test-concurrency=1 when multiple files share this output.
+  const output = process.env.MARS_INSTALL_CANCEL_CAPTURE;
+  if (output) {
+    const captures = existsSync(output) ? JSON.parse(readFileSync(output, 'utf8')) : {};
+    captures[verb] = capture;
+    writeFileSync(output, JSON.stringify(captures, null, 2) + '\n');
+  }
 }
