@@ -1619,3 +1619,15 @@ LM076 lead candidate (id half): explicit duplicate ids refuse atomically via nam
 LM076 peer review caught two internal collision paths: same-tick failed make-way nudges now coalesce; an occupied voluntary-return id emits a named refusal instead of throwing after queue mutation. Four new id tests plus12social/1source tests pass,17total; tsc/lint clean. Four diagnostic records inspected. Link half remains pending.
 
 LM076 live-link candidate: current usability/replacement geometry checked before movement or deferred cancel; copied plan geometry prevents in-place alias edits; mid-flight invalidation blocks with ownership rather than dropping the body. Peer review also caught future-corridor replanning from between levels; now holds until valid. Three new link tests plus12navigation/source scan pass (16total); seven diagnostic captures personally inspected. Exact terminal failure applies before entry; mid-flight blocked refusal is deliberate safety behavior. No pins/history edits; integrated gate pending.
+### LM-026 conversation preservation candidate (2026-09-29)
+
+Storage worker: formed conversations release only directed members when at least two
+remain, retain others' poses/resources, then physically return through child walking
+and guarded actor reclaim after successful outer directives. Failed/cancelled/newer,
+ended/deleted/occupied/held controls and snapshot queue provenance covered. Eight new
+focused + twelve seat/snapshot + ten existing social + source scan tests pass (31),
+tsc/lint green. Three JSON states personally inspected, zero main-fixture violations.
+No pins/history values changed; integrated gate/browser proof pending. Parent-owned
+fixture seats and other social rows remain separate. Approximately 45 worker minutes,
+no helpers. See briefs/converse-return.REPORT.md. Root duplicate-id commit641741f
+must be preserved at integration; this candidate uses automatic return-walk ids.

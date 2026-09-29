@@ -218,6 +218,8 @@ export function applySnapshot(rt: Runtime, int: RuntimeInternals, snap: RuntimeS
     if (!def) throw new SnapshotError('snapshot.unknown-verb', `live action ${x.id} is a "${rec.verb}", which the restore registry does not have`, [x.id]);
     if (x.custom && !def.restoreExec) throw new SnapshotError('snapshot.unknown-verb', `live action ${x.id} (${rec.verb}) was serialised by serializeExec but its ActionDef has no restoreExec`, [x.id]);
     const exec = x.custom ? def.restoreExec!(rt, x.exec) : x.exec;
+    const invalid = def.validateSnapshot?.(rt, exec, rec);
+    if (invalid) throw new SnapshotError(invalid.code, invalid.message, invalid.subjects);
     int.live.set(x.id, { rec, def, exec, program: x.program, cancelling: x.cancelling || undefined, reason: x.reason, prior: x.prior });
   }
   if (g.waiting !== undefined && !Array.isArray(g.waiting)) throw new SnapshotError('snapshot.waiting-invalid', 'waiting directives must be an array');

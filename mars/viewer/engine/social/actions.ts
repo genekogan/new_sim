@@ -340,7 +340,8 @@ export const face: ActionDef<FaceParams, number, FaceExec> = {
 
 type ConverseParams = { actors: string[]; at?: [number, number]; duration?: number };
 type Circle = { centre: Vec2; r: number; moves: { actor: string; p: Vec2; yaw: number; level: number }[] };
-type ConverseExec = { id: string; actors: string[]; phase: 'gathering' | 'talking'; child?: Children; error?: Diagnostic; t: number; duration?: number; circle: Circle };
+type ConversationReturn = { actor: string; directive: string; station: Circle['moves'][number]; child?: string };
+type ConverseExec = { retired?: string[]; departures?: ConversationReturn[]; id: string; actors: string[]; phase: 'gathering' | 'talking'; child?: Children; error?: Diagnostic; t: number; duration?: number; circle: Circle };
 
 /** Circle radius: at least 0.8 m between neighbours, within 0.6–1.0 m. */
 export const circleRadius = (n: number) => clamp(0.4 / dsin(Math.PI / n), 0.6, 1.0);
@@ -381,6 +382,44 @@ function circleFit(rt: Runtime, c: Circle, members: Set<string>): Diagnostic | n
         return { code: 'converse.clearance', message: `a ${c.moves.length}-person circle around (${c.centre[0].toFixed(2)}, ${c.centre[1].toFixed(2)}) does not fit: ${o.id} is standing at ${m.actor}'s place (${m.p[0].toFixed(2)}, ${m.p[1].toFixed(2)})`, subjects: [m.actor, o.id], at: [m.p[0], 0, m.p[1]] };
   }
   return null;
+}
+
+function conversationReturnSkip(rt: Runtime, ex: ConverseExec, intent: ConversationReturn, reason: string) {
+  ex.departures!.splice(ex.departures!.indexOf(intent), 1);
+  (ex.retired ??= []).push(intent.actor);
+  rt.mark('converse.return-refused', { group: ex.id, actor: intent.actor, directive: intent.directive, reason });
+  if (!ex.departures!.length) delete ex.departures;
+}
+
+function stepConversationReturns(rt: Runtime, ex: ConverseExec) {
+  for (const intent of ex.departures?.slice() ?? []) {
+    if (rt.isActive(intent.directive)) continue;
+    if (rt.records.get(intent.directive)?.status !== 'completed') {
+      conversationReturnSkip(rt, ex, intent, rt.records.get(intent.directive)?.status ?? 'directive-missing'); continue;
+    }
+    if (intent.child && rt.isActive(intent.child)) continue;
+    const child = intent.child ? rt.records.get(intent.child) : undefined;
+    if (intent.child && child?.status !== 'completed') {
+      conversationReturnSkip(rt, ex, intent, child?.diagnostic?.code ?? child?.status ?? 'return-missing'); continue;
+    }
+    const actor = readyActor(rt, intent.actor);
+    if ('code' in actor) { conversationReturnSkip(rt, ex, intent, actor.code); continue; }
+    const fit = circleFit(rt, { ...ex.circle, moves: [intent.station] }, new Set([...ex.actors, intent.actor]));
+    if (fit) { conversationReturnSkip(rt, ex, intent, fit.code); continue; }
+    if (!child) {
+      const station = intent.station;
+      const walk = rt.submit('walk_to', { actor: intent.actor, x: station.p[0], z: station.p[1], level: station.level, face: station.yaw }, { parent: ex.id, preempt: false });
+      intent.child = walk.id;
+      rt.mark('converse.return-started', { group: ex.id, actor: intent.actor, action: walk.id });
+      continue;
+    }
+    const conflict = rt.reclaimSocialActor(ex.id, intent.actor);
+    if (conflict) { conversationReturnSkip(rt, ex, intent, conflict.code); continue; }
+    ex.actors = [...ex.actors, intent.actor];
+    ex.departures!.splice(ex.departures!.indexOf(intent), 1);
+    if (!ex.departures!.length) delete ex.departures;
+    rt.mark('converse.rejoined', { group: ex.id, actor: intent.actor });
+  }
 }
 
 export const converse: ActionDef<ConverseParams, Circle, ConverseExec> = {
@@ -429,9 +468,14 @@ export const converse: ActionDef<ConverseParams, Circle, ConverseExec> = {
       if (st !== 'done') return { status: 'failed', diagnostic: { ...st, message: `the conversation circle could not form: ${st.message}` } };
       ex.phase = 'talking';
     }
+    stepConversationReturns(rt, ex);
+    const missing = ex.actors.find((id) => !rt.world.entities[id]?.human);
+    if (missing) return { status: 'failed', diagnostic: { code: 'entity.unknown', message: `conversation member ${missing} disappeared`, subjects: [missing] } };
     setActivity(rt, ex.actors, ex.id, 'talk');
     ex.t += dt;
     if (ex.duration !== undefined && ex.t >= ex.duration - 1e-9) {
+      for (const q of ex.departures ?? []) if (q.child && rt.isActive(q.child)) rt.cancel(q.child);
+      delete ex.departures;
       idle(rt, ex.actors, ex.id);
       return { status: 'completed', outputs: { centre: ex.circle.centre, r: ex.circle.r, talked: ex.t } };
     }
@@ -441,8 +485,44 @@ export const converse: ActionDef<ConverseParams, Circle, ConverseExec> = {
     idle(rt, ex.actors, ex.id);
     return { ok: true };
   },
-  // pre-emption: the circle cannot re-form without a member, so the whole conversation ends (reason on its record)
-  yieldTo: (_rt, self, _h, _a, by) => (directive(by) ? [self.id] : []),
+  canYieldMembers: (_rt, ex, actors, by) => directive(by) && ex.phase === 'talking' && actors.every((a) => ex.actors.includes(a)) && ex.actors.length - actors.length >= 2,
+  releaseMembers(rt, ex, actors, by) {
+    let outer = by.id;
+    for (let parent = by.parent; parent; parent = rt.records.get(parent)?.parent) outer = parent;
+    for (const actor of actors) {
+      (ex.departures ??= []).push({ actor, directive: outer, station: ex.circle.moves.find((m) => m.actor === actor)! });
+      idle(rt, [actor], ex.id);
+      rt.mark('converse.member-left', { group: ex.id, actor, directive: outer });
+    }
+    ex.actors = ex.actors.filter((a) => !actors.includes(a));
+  },
+  onDirective(rt, ex, by, claims, ancestors) {
+    for (const intent of ex.departures?.slice() ?? []) {
+      if (ancestors.includes(intent.directive) || !claims.some((r) => r.resource === `actor:${intent.actor}`)) continue;
+      if (intent.child && rt.isActive(intent.child)) rt.cancel(intent.child, { code: 'social.pre-empted', message: `return superseded by ${by.id}`, subjects: [by.id] });
+      conversationReturnSkip(rt, ex, intent, 'newer-directive');
+    }
+  },
+  validateSnapshot(rt, ex, self) {
+    const bad = (): Diagnostic => ({ code: 'snapshot.converse-return-invalid', message: `conversation ${self.id} has invalid member return provenance`, subjects: [self.id] });
+    if (!Array.isArray(ex.actors) || !Array.isArray(ex.circle?.moves) || (ex.departures !== undefined && !Array.isArray(ex.departures)) || (ex.retired !== undefined && !Array.isArray(ex.retired))) return bad();
+    const originals = (self.params as ConverseParams).actors, seen = new Set<string>();
+    const partition = [...ex.actors, ...(ex.retired ?? []), ...(ex.departures ?? []).map((q) => q?.actor)];
+    if (partition.length !== originals.length || new Set(partition).size !== partition.length || partition.some((a) => !originals.includes(a))) return bad();
+    for (const q of ex.departures ?? []) {
+      if (!q || typeof q !== 'object' || seen.has(q.actor) || !originals.includes(q.actor) || ex.actors.includes(q.actor)) return bad();
+      const station = ex.circle.moves.find((m) => m.actor === q.actor), directive = rt.records.get(q.directive);
+      if (!station || !q.station || JSON.stringify(station) !== JSON.stringify(q.station) || !directive || directive.parent || q.directive === ex.id) return bad();
+      if (q.child) {
+        const child = rt.records.get(q.child), p = child?.params as { actor?: string; x?: number; z?: number; level?: number; face?: number } | undefined;
+        if (!child || child.parent !== ex.id || child.verb !== 'walk_to' || p?.actor !== q.actor || p.x !== station.p[0] || p.z !== station.p[1] || p.level !== station.level || p.face !== station.yaw) return bad();
+      }
+      seen.add(q.actor);
+    }
+    return null;
+  },
+  // Two-person or not-yet-formed conversations still cancel as a unit.
+  yieldTo: (_rt, self, holder, _a, by) => (directive(by) ? [self.phase === 'talking' && holder.id !== self.id ? holder.id : self.id] : []),
 };
 
 // ---------- gather / campfire_circle ----------

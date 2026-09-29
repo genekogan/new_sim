@@ -98,8 +98,9 @@ and `Runtime.submit` uses it:
   `reservation.conflict` stands — critical tasks are never abandoned for autonomy.
 - **What is released: the smallest social unit** — this person's own `sit` / `take_slot` (a `gather` /
   `campfire_circle` keeps its other members), their current ambient walk (ambient then lets them go for
-  good), or the whole `converse` / `face` (a circle cannot re-form without a member: a converse of two
-  ends for both). Each is cancelled with diagnostic `social.pre-empted`, message
+  good), or a member of a fully formed `converse` when at least two remain. Those
+  remaining members keep their positions and talk; a two-person or gathering converse
+  still ends as a unit, as does `face`. Cancelled units have diagnostic `social.pre-empted`, message
   **`pre-empted by <id> (<verb>)`** (`details.reason` = `pre-empted by <id>`), on the record and on its
   `cancelling` / `cancelled` take events.
 - **Timing.** A converse / face / standing slot / ambient walk releases at once, and the directive is
@@ -148,11 +149,11 @@ refused; determinism (hash + event log).
   walled off. Approach points are not reserved: another person standing on one makes the sitter's
   walk yield/replan, not fail at plan time.
 - The seated exemption is by activity (`SEATED_ACTIVITIES`), not per fixture.
-- No conversation turn-taking, gaze, gestures or group re-forming when a member leaves.
+- No conversation turn-taking, gaze or gestures. A formed group can now retain two members and rejoin a returning member (below).
 - **Resumption is staged:** occupied standalone `sit` / seated `take_slot` holds return to their exact
-  slot after a successful directive (see below). Talkers and group-owned seats do not yet resume;
-  ambient never re-adopts a released person. A converse
-  loses all its members when one is pre-empted (no re-forming). An `eat` / `serve` overlay (ITEMS.md)
+  slot after a successful directive (see below). Formed conversations retain remaining
+  members and return a directed member; group-owned fixture seats do not yet resume.
+  Ambient never re-adopts a released person. An `eat` / `serve` overlay (ITEMS.md)
   on a pre-empted sitter is not released by pre-emption (it holds hands, not the actor): it fails
   `eat.not-still` as soon as the stand-up moves them, and a directive that needs free hands is then
   refused at its plan (`actor.holding`) while they still hold the bowl.
@@ -189,8 +190,8 @@ and newer-directive controls (LM-029). Returned seats are
 ordinary indefinite social holds: `runUntilIdle` over all actions does not treat
 an occupied seat as idle; use the directive id when waiting only for its work.
 
-LM-026 remains partial: conversation member preservation/re-forming and return to
-parent-owned group seats remain separate. LM-027 ambient re-adoption and LM-028
+The LM-026 conversation acceptance now has focused proof below; return to
+parent-owned group fixture seats remains separate. Integrated gate/visual proof is pending. LM-027 ambient re-adoption and LM-028
 item-overlay release are unchanged. See `briefs/social-resume.REPORT.md`.
 
 
@@ -210,3 +211,32 @@ actor, slot/owner and activity, with occupied/pre-emption history and an existin
 top-level directive. Corrupt return queues fail `snapshot.return-invalid`; they
 cannot inject arbitrary registered verbs. This validates graph consistency, not
 snapshot authenticity (see the report for auto-selected local-slot limitations).
+
+
+## Conversation member return (LM-026)
+
+A directed instruction can release members of a formed conversation if at least two
+remain. The runtime previews every conflicting reservation before releasing any
+new member. Only the directed members' actor claims are removed; others keep talking
+at their original positions with their original ownership. No group movement or
+teleportation is needed. Two-person and still-gathering conversations retain their
+previous whole-group cancellation behavior. The manual `releaseForDirective` helper
+remains an explicit cancellation helper, without an automatic return directive.
+
+The group records a plain departure intent for each member and original circle
+station. After the outer directive completes successfully, a normal non-preempting
+child `walk_to` returns the person to that station. Only after that walk completes
+and clearance, held-load and ownership checks pass does the group reclaim the actor.
+Walk arrival tolerance remains unchanged (5 cm); no pose is assigned by rejoining.
+Failed/cancelled/newer directives, ended groups, missing actors, occupied stations,
+unreachable paths or held loads refuse/skip return with `converse.return-refused`.
+New explicit instructions supersede a pending or walking return even if the new
+instruction later refuses. Original directive child work does not supersede it.
+Finite group duration cancels unfinished return walks before completion.
+
+Departure and retired-member state lives in the conversation exec, not the world.
+Snapshot validation requires its member partition, original stations, directive and
+walk-child provenance; omitted/duplicate/corrupt entries refuse with
+`snapshot.converse-return-invalid`. Before-departure and during-return snapshots
+continue with identical world hashes every tick and identical event suffixes.
+See `briefs/converse-return.REPORT.md` for focused proof and remaining limitations.

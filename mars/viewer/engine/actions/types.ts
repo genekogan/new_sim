@@ -78,6 +78,13 @@ export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> 
    * reservation.conflict as before).
    */
   yieldTo?(rt: Runtime, self: ActionRecord, holder: ActionRecord, actor: string, by: ActionRecord): string[];
+  /** Pure preview and commit for releasing members while retaining a social group. */
+  canYieldMembers?(rt: Runtime, exec: Exec, actors: string[], by: ActionRecord): boolean;
+  releaseMembers?(rt: Runtime, exec: Exec, actors: string[], by: ActionRecord): void;
+  /** New explicit instructions supersede voluntary group returns; ancestors identify original child work. */
+  onDirective?(rt: Runtime, exec: Exec, by: ActionRecord, claims: Reservation[], ancestors: string[]): void;
+  /** Validate optional action-owned snapshot queues without changing the default graph format. */
+  validateSnapshot?(rt: Runtime, exec: Exec, self: ActionRecord): Diagnostic | null;
   /** Plain-data voluntary return after a successful directive. Normal admission may refuse it. */
   resumeIntent?(rt: Runtime, exec: Exec, self: ActionRecord): { actor: string; verb: string; params: unknown } | null;
   /**

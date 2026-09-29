@@ -127,20 +127,31 @@ export class Runtime {
     // Any newer explicit instruction supersedes a queued voluntary return, even if
     // its own plan later refuses. Child work of the original directive does not supersede it.
     const ancestors: string[] = [];
-    if (this.services.socialReturns?.length) for (let parent = opts.parent; parent; parent = this.records.get(parent)?.parent) ancestors.push(parent);
-    if (!/:make-way:\d+$/.test(id) && !ancestors.some((parent) => typeof this.registry.get(this.records.get(parent)?.verb ?? '')?.yieldTo === 'function') && this.services.socialReturns?.length) {
+    const hasReturns = this.services.socialReturns?.length || [...this.live.values()].some((l) => typeof l.def.onDirective === 'function');
+    if (hasReturns) for (let parent = opts.parent; parent; parent = this.records.get(parent)?.parent) ancestors.push(parent);
+    if (!/:make-way:\d+$/.test(id) && !ancestors.some((parent) => typeof this.registry.get(this.records.get(parent)?.verb ?? '')?.yieldTo === 'function') && hasReturns) {
       let claims: Reservation[] = [];
       try { claims = def.reservations(this.world, parsed.data); } catch { /* plan-dependent claims are not available yet */ }
       const explicitActor = (parsed.data as { actor?: unknown })?.actor;
       if (verb === 'stand' && typeof explicitActor === 'string' && !claims.some((r) => r.resource === `actor:${explicitActor}`)) claims.push({ resource: `actor:${explicitActor}`, mode: 'exclusive' });
-      const queue = this.services.socialReturns as SocialReturn[];
+      for (const l of this.live.values()) l.def.onDirective?.(this, l.exec, rec, claims, ancestors);
+      const queue = (this.services.socialReturns ?? []) as SocialReturn[];
       for (const intent of queue.slice()) if (!ancestors.includes(intent.directive) && claims.some((r) => r.resource === `actor:${intent.actor}`)) {
         queue.splice(queue.indexOf(intent), 1);
         this.mark('social.resume-skipped', { source: intent.source, directive: intent.directive, actor: intent.actor, reason: 'newer-directive', by: id });
       }
       if (!queue.length) delete this.services.socialReturns;
     }
-    const holds = preempt ? this.preemptible(def, parsed.data, rec, opts.parent) : null;
+    const yielding = preempt ? this.preemptible(def, parsed.data, rec, opts.parent) : null;
+    if (yielding) for (const { live, actors } of yielding.members) {
+      live.def.releaseMembers!(this, live.exec, actors, rec);
+      for (const actor of actors) {
+        const key = `actor:${actor}`, owners = this.owners.get(key) ?? [];
+        const kept = owners.filter((o) => o.action !== live.rec.id);
+        if (kept.length) this.owners.set(key, kept); else this.owners.delete(key);
+      }
+    }
+    const holds = yielding?.holds.length ? yielding.holds : null;
     if (holds) {
       const reason: Diagnostic = { code: 'social.pre-empted', message: `pre-empted by ${id} (${verb})`, subjects: [id], details: { reason: `pre-empted by ${id}`, by: id } };
       for (const h of holds) {
@@ -402,7 +413,7 @@ export class Runtime {
    * reservation.conflict stands). Reservations are read before plan() here, so a verb whose
    * reservations depend on its plan contributes only the ones its params name.
    */
-  private preemptible(def: ActionDef, params: unknown, by: ActionRecord, parent?: string): string[] | null {
+  private preemptible(def: ActionDef, params: unknown, by: ActionRecord, parent?: string): { holds: string[]; members: { live: Live; actors: string[] }[] } | null {
     if (def.yieldTo) return null;
     let social = false;
     for (const l of this.live.values()) if (l.def.yieldTo) { social = true; break; }
@@ -418,16 +429,32 @@ export class Runtime {
     } catch {
       return null;
     }
-    const out: string[] = [];
+    const out: string[] = [], members = new Map<Live, string[]>();
     for (const r of res)
       for (const o of this.owners.get(r.resource) ?? []) {
         if (ancestors.has(o.action) || (r.mode !== 'exclusive' && o.mode !== 'exclusive')) continue;
         if (!r.resource.startsWith('actor:')) return null;
+        const actor = r.resource.slice('actor:'.length);
+        const live = this.live.get(o.action);
+        if (live?.def.canYieldMembers && live.def.releaseMembers) {
+          const actors = members.get(live) ?? [];
+          if (!actors.includes(actor)) actors.push(actor);
+          members.set(live, actors);
+          continue;
+        }
         const unit = this.yieldUnit(o.action, r.resource.slice('actor:'.length), by);
         if (!unit) return null;
         for (const u of unit) if (!out.includes(u)) out.push(u);
       }
-    return out.length ? out : null;
+    for (const [live, actors] of members) {
+      if (!live.def.canYieldMembers!(this, live.exec, actors, by)) {
+        const unit = this.yieldUnit(live.rec.id, actors[0], by);
+        if (!unit) return null;
+        for (const id of unit) if (!out.includes(id)) out.push(id);
+        members.delete(live);
+      }
+    }
+    return out.length || members.size ? { holds: out, members: [...members].map(([live, actors]) => ({ live, actors })) } : null;
   }
 
   /** The nearest social action at or above `holderId` decides what to cancel to free `actor`. */
@@ -439,6 +466,17 @@ export class Runtime {
       const ids = l.def.yieldTo(this, r, holder, actor, by).filter((i) => this.live.has(i));
       return ids.length ? ids : null;
     }
+    return null;
+  }
+
+  /** A still-live social group may reclaim only an unowned actor through ordinary reservation checks. */
+  reclaimSocialActor(group: string, actor: string): Diagnostic | null {
+    const live = this.live.get(group);
+    if (!live?.def.canYieldMembers) return { code: 'social.group-ended', message: `group ${group} is not live`, subjects: [group, actor] };
+    const resource = `actor:${actor}`;
+    const conflict = this.reservationConflict([{ resource, mode: 'exclusive' }]);
+    if (conflict) return conflict;
+    this.owners.set(resource, [{ action: group, mode: 'exclusive' }]);
     return null;
   }
 
