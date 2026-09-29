@@ -193,7 +193,7 @@ export class LabView {
     const rt = this.sim.rt, sp = rt.services.spatial as Spatial, on = this.overlays;
     sp.sync(rt.world);
     for (const n of OVERLAYS) this.groups[n].visible = on.has(n);
-    const held = new Set([...traffic(rt).keys()]);
+    const held = new Set(traffic(rt).keys());
     if (on.has('grid') || on.has('traffic')) this.grids.sync(sp, held);
     if (on.has('routes') && (this.routeTick !== rt.tick || this.epoch !== sp.epoch)) {
       this.routeTick = rt.tick;

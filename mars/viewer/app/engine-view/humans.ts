@@ -497,7 +497,7 @@ export class HumanViews {
     idle.setEffectiveWeight(1 - w);
     // The mixer only writes a bone when its clip value changed since the last apply, so undo last
     // frame's pose layers first (back to that clip value) or they would accumulate while paused.
-    if (v.layered) for (const s of v.saved) s.o.position.copy(s.p), s.o.quaternion.copy(s.q);
+    if (v.layered) for (const s of v.saved) { s.o.position.copy(s.p); s.o.quaternion.copy(s.q); }
     v.layered = false;
     v.diag = undefined;
     mixer.update(0);
@@ -510,7 +510,7 @@ export class HumanViews {
     const gripping = !hasHands && !!((reach || part) && v.grip && v.arms.length);
     const gait = sitW > 0 ? null : this.gaitOf(h.position);
     if (!(sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0)) return;
-    for (const s of v.saved) s.p.copy(s.o.position), s.q.copy(s.o.quaternion);
+    for (const s of v.saved) { s.p.copy(s.o.position); s.q.copy(s.o.quaternion); }
     v.layered = true;
     h.updateMatrixWorld(true);
     _fwd.set(Math.cos(yaw), 0, Math.sin(yaw)); // engine yaw 0 faces +x; holder.rotation.y = -yaw
@@ -521,7 +521,7 @@ export class HumanViews {
       proneBody(v, pr!);
       if (proneW < 1) {
         keep = v.saved.map((s) => ({ p: s.o.position.clone(), q: s.o.quaternion.clone() }));
-        for (const s of v.saved) s.o.position.copy(s.p), s.o.quaternion.copy(s.q);
+        for (const s of v.saved) { s.o.position.copy(s.p); s.o.quaternion.copy(s.q); }
         h.updateMatrixWorld(true);
       }
     }

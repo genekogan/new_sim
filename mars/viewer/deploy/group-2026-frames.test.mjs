@@ -20,7 +20,8 @@ test('all real 2026 input components appear exactly once, with stable counts', (
   assert.equal(data.counts.rackMemberComponents, 667);
   assert.equal(data.counts.sceneRackMemberComponents, 660);
   assert.equal(data.counts.beamCandidates, 89);
-  assert.deepEqual(outputs.sort(), inputs.sort());
+  const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  assert.deepEqual(outputs.sort(compare), inputs.sort(compare));
   assert.equal(new Set(outputs).size, outputs.length);
 });
 

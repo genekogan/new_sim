@@ -185,7 +185,7 @@ export function groupRecords(records, source = {}) {
   unclassified.sort((a, b) => compare(a.component, b.component));
   const counts = { rackMemberComponents: sorted.filter((r) => r.kind === 'rack_member').length, sceneRackMemberComponents: sorted.filter((r) => r.kind === 'rack_member' && r.pos).length,
     beamCandidates: beamCandidates.length, frames: frames.length, beams: beams.length, unclassified: unclassified.length, byAssembly: {}, byCatalogDef: {}, byReason: {} };
-  for (const assembly of [...new Set(sorted.map((r) => r.assembly))].sort()) counts.byAssembly[assembly] = {
+  for (const assembly of [...new Set(sorted.map((r) => r.assembly))].sort(compare)) counts.byAssembly[assembly] = {
     frames: frames.filter((f) => f.assembly === assembly).length, beams: beams.filter((b) => b.assembly === assembly).length,
     unclassified: unclassified.filter((u) => u.assembly === assembly).length,
   };
@@ -198,7 +198,7 @@ export function groupRecords(records, source = {}) {
     fieldSources: { heightDepthAndVerticalBounds: 'manifest instances[].cad_bounds_m',
       worldXZAndYaw: 'scene obstacles[] prisms', componentAndAssembly: 'manifest instances[].id/assembly_id',
       nearestCatalogFit: 'viewer/engine/world/catalog.ts (dimensions and 6 in seat sequence)' }, tolerances,
-    frames: frames.map(({ _a, _b, _across, _centre, ...publicFrame }) => ({ ...publicFrame, members: publicFrame.members.sort() })),
+    frames: frames.map(({ _a, _b, _across, _centre, ...publicFrame }) => ({ ...publicFrame, members: publicFrame.members.sort(compare) })),
     beams, counts, unclassified };
 }
 
@@ -271,7 +271,8 @@ function svg(data, records, scene) {
       parts.push(`<rect x="${(x(row[2]) - w / 2).toFixed(2)}" y="${(y(row[3]) - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="#bbc5c5" opacity=".10" transform="rotate(${(-row[6] * 180 / Math.PI).toFixed(2)} ${x(row[2]).toFixed(2)} ${y(row[3]).toFixed(2)})"/>`);
     }
     for (const r of rs) {
-      const w = Math.max(1.2, r.half?.[0] * 2 * localScale ?? 2), h = Math.max(1.2, r.half?.[1] * 2 * localScale ?? 2);
+      const w = Math.max(1.2, r.half == null ? 2 : r.half[0] * 2 * localScale);
+      const h = Math.max(1.2, r.half == null ? 2 : r.half[1] * 2 * localScale);
       parts.push(`<rect x="${(x(r.pos[0]) - w / 2).toFixed(2)}" y="${(y(r.pos[1]) - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" fill="#b8c1c1" opacity=".48" transform="rotate(${(-r.yaw * 180 / Math.PI).toFixed(2)} ${x(r.pos[0]).toFixed(2)} ${y(r.pos[1]).toFixed(2)})"/>`);
     }
     for (const f of data.frames.filter((f) => f.assembly === assembly)) {

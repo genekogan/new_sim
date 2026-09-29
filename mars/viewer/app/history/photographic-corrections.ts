@@ -202,7 +202,7 @@ export function stair2022(k:Kit,g:T.Group,x:number,d:number,width:number,top=DEC
 export function solarRow2022(k:Kit,g:T.Object3D,along:[number,number],face:[number,number],low:[number,number],roof:number,count:number,width=1.05){
  const L=1.65,c=Math.SQRT1_2,p=L*c,rise=L*c,a=new T.Vector3(along[0],0,along[1]).normalize(),f=new T.Vector3(face[0],0,face[1]).normalize();
  const up=new T.Vector3(0,1,0),slope=f.clone().multiplyScalar(-c).addScaledVector(up,c); // up the module, toward the back
- let X=a.clone(),Y=new T.Vector3().crossVectors(slope,X);if(Y.y<0){X.negate();Y.negate();}
+ const X=a.clone(),Y=new T.Vector3().crossVectors(slope,X);if(Y.y<0){X.negate();Y.negate();}
  const q=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(X,Y,slope)),frame='#a8844f';
  const P=(t:number,back:number,y:number):[number,number,number]=>[low[0]+a.x*t-f.x*back,y,low[1]+a.z*t-f.z*back];
  const W=count*width,y0=roof+.045; // frame members 2x4 on edge: the rafter's top carries the module

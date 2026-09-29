@@ -234,7 +234,7 @@ export class ChapterSetReplay {
     const guard = { ok, text: ok ? '' : `continuity ✗: chapter ${c.id} starts from ${f.take.baselineStateHash.slice(0, 8)}…, ${k ? `chapter ${this.set.chapters[k - 1].id} ended at` : 'the set starts from'} ${expected.slice(0, 8)}…${manifest !== expected ? ` (manifest ${manifest.slice(0, 8)}…)` : ''}` };
     const at = this.startOf(k);
     const extra = this.saved.get(k);
-    if (extra) f.cameras = { ...(f.cameras ?? {}), ...extra };
+    if (extra) f.cameras = { ...f.cameras, ...extra };
     this.walked[k] ??= walkTotals(f.take);
     const shots = (trackData(f.camera) as CameraTrackData & { shots?: ShotWin[] }).shots ?? [];
     this.shotWins.set(k, shots.map((x) => ({ t0: x.t0, t1: x.t1, label: x.label })));
@@ -277,7 +277,7 @@ export class ChapterSetReplay {
 
   /** Keep chapters k − 1 … k + 1 parsed; drop the rest. */
   private evict() {
-    for (const j of [...this.loaded.keys()]) if (Math.abs(j - this.k) > 1) this.loaded.delete(j);
+    for (const j of Array.from(this.loaded.keys())) if (Math.abs(j - this.k) > 1) this.loaded.delete(j);
   }
 
   setTemplates(ts: Template[]) {

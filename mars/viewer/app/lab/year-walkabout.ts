@@ -79,7 +79,7 @@ type Box = { c: Vec2; min: Vec2; max: Vec2 };
 
 const centroid = (poly: [number, number][]): Vec2 => {
   let x = 0, z = 0;
-  for (const p of poly) (x += p[0]), (z += p[1]);
+  for (const p of poly) { x += p[0]; z += p[1]; }
   return [x / poly.length, z / poly.length];
 };
 function box(base: CampusScene, id: string): Box {
@@ -103,7 +103,7 @@ function gapBetween(base: CampusScene, a: string, b: string): Vec2 {
       for (let i = 0; i < Q.length; i++) {
         const q = seg(p, Q[i], Q[(i + 1) % Q.length]);
         const d = dist2(p, q);
-        if (d < best) (best = d), (mid = scale2(add2(p, q), 0.5));
+        if (d < best) { best = d; mid = scale2(add2(p, q), 0.5); }
       }
   return mid;
 }

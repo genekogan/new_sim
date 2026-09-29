@@ -22,7 +22,7 @@ export type Holders = { palmOf(id: string, hand: 'left' | 'right', out: THREE.Ve
 const FALLBACK = '#d8b98a';
 /** Catalog colours drawn slightly metallic: rack steel, stringers, aluminium (rails, panel frames). */
 const METAL = new Set(['#1f5fbf', '#e86a1a', '#b8b8b8', '#b8bcc2']);
-const GLASS = '#10182c', FRAME = '#b8bcc2';
+const GLASS = '#10182c';
 const _palm = new THREE.Vector3(), _mouth = new THREE.Vector3(), _bowl = new THREE.Vector3(), _aim = new THREE.Vector3(), _dir = new THREE.Vector3(), _grip = new THREE.Vector3(), _x = new THREE.Vector3(1, 0, 0);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
@@ -335,9 +335,9 @@ export class ComponentViews {
 function labelText(e: Entity): string[] {
   const d = def(e.def);
   const kind = e.equipment?.kind ?? d.equipment?.kind ?? e.def;
-  const c: Record<string, unknown> = { ...(d.equipment?.defaults ?? {}), ...(e.equipment?.config ?? {}) };
+  const c: Record<string, unknown> = { ...d.equipment?.defaults, ...e.equipment?.config };
   const unit: Record<string, string> = { voltage: 'V', capacityAh: 'Ah', maxPvVoltage: 'V PV', maxCurrentA: 'A', powerW: 'W', dcVoltage: 'V DC', acVoltage: 'V AC' };
-  const parts = Object.keys(c).sort().map((k) => (unit[k] ? `${c[k]} ${unit[k]}` : String(c[k])));
+  const parts = Object.keys(c).sort().map((k) => (unit[k] ? `${String(c[k])} ${unit[k]}` : String(c[k])));
   return [kind.toUpperCase().replace('-', ' '), parts.join(' · ')];
 }
 /** Installed tilted solar module: its tilt (so the view rebuilds with risers once fastened); '' otherwise. */

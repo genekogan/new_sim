@@ -37,3 +37,6 @@ next-env.d.ts
 /outputs/
 /work/
 /.cloudflare/
+
+# shared local Playwright browser cache (directory or worktree symlink)
+/.pw-browsers

@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
-import path from 'node:path';
 import { z } from 'zod';
 import { sha256, stableStringify, hashOf } from '../core/hash.ts';
 import { seedRng, nextRandom } from '../core/rng.ts';

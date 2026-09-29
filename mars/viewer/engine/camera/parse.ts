@@ -140,12 +140,12 @@ export function parseSentence(sentence: string, vocab?: ParseVocab): ParseResult
   const direction: CameraDirection = { subject: { kind: 'region', ref: '' }, motion: motion as CameraDirection['motion'] };
   if (speedMatch) {
     if (verb === 'hold') return fail('camera.parse.invalid', `"${speedMatch[0]}" cannot set speed for a hold`, { text: speedMatch[0], start: speedMatch.index, end: speedMatch.index + speedMatch[0].length }, 'Should this be a moving shot?');
-    const angular = /^(?:deg|°)/.test(speedMatch[2]);
+    const angular = speedMatch[2].startsWith('deg') || speedMatch[2].startsWith('°');
     if (angular !== ['pan', 'tilt', 'orbit'].includes(verb)) return fail('camera.parse.invalid', `"${speedMatch[0]}" has the wrong speed unit for ${verb}`,
       { text: speedMatch[0], start: speedMatch.index, end: speedMatch.index + speedMatch[0].length }, 'Use degrees per second for pan, tilt or orbit; metres per second for moves.');
     direction.speed = numeric(speedMatch[1]);
   }
-  if (durationMatch) direction.duration = numeric(durationMatch[1]) * (/^m/.test(durationMatch[2]) ? 60 : 1);
+  if (durationMatch) direction.duration = numeric(durationMatch[1]) * (durationMatch[2].startsWith('m') ? 60 : 1);
   const atMatch = /\bat\s+(\d+):(\d{2})\b/.exec(lower);
   if (atMatch) {
     if (Number(atMatch[2]) >= 60) return fail('camera.parse.invalid', `"${atMatch[0]}" has an invalid seconds field`, { text: atMatch[0], start: atMatch.index, end: atMatch.index + atMatch[0].length }, 'What start time in minutes:seconds did you mean?');

@@ -63,7 +63,7 @@ export class Highlights {
   }
 
   clear() {
-    for (const o of [...this.group.children]) {
+    for (const o of Array.from(this.group.children)) {
       this.group.remove(o);
       o.traverse((m) => {
         const mesh = m as THREE.Mesh;
@@ -129,7 +129,7 @@ export class Highlights {
 function anchor(ps: Prism[], lift: number) {
   let x = 0, z = 0, n = 0, top = -Infinity;
   for (const p of ps) {
-    for (const [px, pz] of p.ring) (x += px), (z += pz), n++;
+    for (const [px, pz] of p.ring) { x += px; z += pz; n++; }
     top = Math.max(top, p.y1);
   }
   return new THREE.Vector3(x / n, top + lift, z / n);

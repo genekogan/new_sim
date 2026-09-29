@@ -596,7 +596,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
     // 2022: from the +lat end, stringer 2 came last, into the slot between the set stringers 1 and 3: `carry.clearance`)
     const sh = byLat.filter(shifted), rest = byLat.filter((q) => !shifted(q));
     if (sh.length && latOf(sh[0].pose.p[0], sh[0].pose.p[2]) < lat0) rest.reverse();
-    for (const [i, p] of [...sh, ...rest].entries()) {
+    for (const p of [...sh, ...rest]) {
       const lat = latOf(p.pose.p[0], p.pose.p[2]);
       const nextFree0 = -0.37; // the crew's side: where no stringer is in yet (see the order above)
       const L = lenOf(p);

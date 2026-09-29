@@ -141,7 +141,7 @@ export const SCENARIOS: Scenario[] = [
       return [
         allCompleted(rt),
         noViolations(rt),
-        { ok: yields.some((y) => y >= 1), message: `someone yielded (blocked counts ${yields})` },
+        { ok: yields.some((y) => y >= 1), message: `someone yielded (blocked counts ${yields.join(',')})` },
         { ok: yields.every((y) => y <= 1), message: 'no yield/resume flip-flop' },
       ];
     },
@@ -210,7 +210,7 @@ SCENARIOS.push(
     capture: [0.15, 0.5],
     expect: (rt) => {
       const r = recs(rt)[0];
-      return [allCompleted(rt), noViolations(rt), { ok: r?.outputs?.replans === 1, message: `replanned once (replans=${r?.outputs?.replans})` }];
+      return [allCompleted(rt), noViolations(rt), { ok: r?.outputs?.replans === 1, message: `replanned once (replans=${String(r?.outputs?.replans)})` }];
     },
   },
   {
