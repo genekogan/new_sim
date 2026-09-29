@@ -1,5 +1,11 @@
 # LAST_MILE — inventory to 100 % of SPEC.md + OWNER_FEEDBACK §1–§15
 
+> **Current owner direction (2026-09-29):** prioritize playable activities under
+> [SIMULATION_VISION.md](SIMULATION_VISION.md) and [ACTIVE_ROADMAP.md](ACTIVE_ROADMAP.md).
+> The former mandatory completion/wave order is superseded. Original rows and
+> provenance remain below; [RAINY_DAY_BACKLOG.md](RAINY_DAY_BACKLOG.md) owns current
+> dispositions. Historical counts do not establish current implementation status.
+
 W55, 2026-09-29, from HEAD `78cd157`. **Inventory only, not an execution order**: the lead sets the order (OWNER_DECISIONS,
 "New goal: last mile"). Definition of done (Gene): every known shortcoming / approximate / weak spot / not-done / open /
 follow-up line is either **fixed with a test** or **re-classified** as *content* (historical reconstruction, Gene's job) or

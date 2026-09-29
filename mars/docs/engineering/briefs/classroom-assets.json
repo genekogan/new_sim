@@ -1,0 +1,87 @@
+{
+  "source_catalog": "<lm-3d-models>/sketchfab/catalog.json",
+  "source_docs": [
+    "<lm-3d-models>/README.md",
+    "<lm-3d-models>/sketchfab/README.md",
+    "<lm-3d-models>/sketchfab/INDEX.md",
+    "<lm-3d-models>/sketchfab/ATTRIBUTION.md"
+  ],
+  "shortlist": [
+    {
+      "catalog_id": "hologram-projector-2",
+      "title": "Hologram Projector",
+      "recommended_role": "Lecture focal prop / projector",
+      "why_useful": "A very compact display-adjacent object with a glowing holographic form; useful as a small visual focal point beside or above the existing classroom presentation wall. It is explicitly described only as a glowing sci-fi projector. The mesh does not establish projection, lighting, controls, or runtime behavior.",
+      "catalog_collection": "round2",
+      "catalog_path": "lore4/devices/hologram-projector-2.glb",
+      "absolute_path": "<lm-3d-models>/sketchfab/lore4/devices/hologram-projector-2.glb",
+      "format": "glb",
+      "catalog_bytes": 802552,
+      "filesystem_bytes": 802552,
+      "face_count": 2260,
+      "vertex_count": 1190,
+      "scale_or_bounds": null,
+      "scale_or_bounds_note": "Not recorded in this model row/catalog; do not infer world dimensions from GLB units.",
+      "thumbnail_path": "lore4/devices/thumbs/hologram-projector-2.jpg",
+      "absolute_thumbnail_path": "<lm-3d-models>/sketchfab/lore4/devices/thumbs/hologram-projector-2.jpg",
+      "thumbnail_bytes": 13321,
+      "author": "dasnymth",
+      "author_profile": "https://sketchfab.com/dasnymth",
+      "license": "CC Attribution",
+      "license_slug": "by",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "license_requirements": "Author must be credited. Commercial use is allowed.",
+      "attribution_line": "Hologram Projector by dasnymth — CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/); source: https://sketchfab.com/3d-models/hologram-projector-905823a25aa1457ba4087c09b0f312aa",
+      "sketchfab_source": "https://sketchfab.com/3d-models/hologram-projector-905823a25aa1457ba4087c09b0f312aa",
+      "catalog_description": "glowing sci-fi hologram projector",
+      "index_evidence": "sketchfab/INDEX.md entry for `hologram-projector-2`; includes per-row tier, face count, size, description and license",
+      "attribution_evidence": "sketchfab/ATTRIBUTION.md entry for `Hologram Projector` — dasnymth — `devices`",
+      "ip_or_platform_limit": "Uploader-provided CC BY metadata and archive attribution were verified; this audit does not independently verify uploader rights.",
+      "noai_limit": "Archive README says Sketchfab API does not expose the NoAI flag. Directly loading/composing a model in a 3D scene is documented as unaffected; do not feed renders to an image/video generation pipeline unless separately cleared."
+    },
+    {
+      "catalog_id": "bm86-portable-pc",
+      "title": "BM86 Portable PC",
+      "recommended_role": "Laptop / speaker workstation prop",
+      "why_useful": "A cream 1980s portable PC with a hinged amber screen and folding keyboard; reads as a compact presentation/workstation prop on a classroom table. Catalog recommends lid open toward camera and mid-ground use. Mesh does not imply functioning computer behavior.",
+      "catalog_collection": "round2",
+      "catalog_path": "lore2/devices/bm86-portable-pc.glb",
+      "absolute_path": "<lm-3d-models>/sketchfab/lore2/devices/bm86-portable-pc.glb",
+      "format": "glb",
+      "catalog_bytes": 3732344,
+      "filesystem_bytes": 3732344,
+      "face_count": 30627,
+      "vertex_count": 16653,
+      "scale_or_bounds": null,
+      "scale_or_bounds_note": "Not recorded in this model row/catalog; do not infer world dimensions from GLB units.",
+      "thumbnail_path": "lore2/devices/thumbs/bm86-portable-pc.jpg",
+      "absolute_thumbnail_path": "<lm-3d-models>/sketchfab/lore2/devices/thumbs/bm86-portable-pc.jpg",
+      "thumbnail_bytes": 24993,
+      "author": "HippoStance",
+      "author_profile": "https://sketchfab.com/hippostance",
+      "license": "CC Attribution",
+      "license_slug": "by",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "license_requirements": "Author must be credited. Commercial use is allowed.",
+      "attribution_line": "BM86 Portable PC by HippoStance — CC BY 4.0 (http://creativecommons.org/licenses/by/4.0/); source: https://sketchfab.com/3d-models/bm86-portable-pc-d6f9790446eb4ad5bdfb9c537be5d17c",
+      "sketchfab_source": "https://sketchfab.com/3d-models/bm86-portable-pc-d6f9790446eb4ad5bdfb9c537be5d17c",
+      "catalog_description": "Cream-white 80s portable PC, hinged lid up to reveal an amber text screen, with a wide integrated keyboard folding out in front. Flat plastic material with little grime; simple low-poly build.",
+      "index_evidence": "sketchfab/INDEX.md entry for `bm86-portable-pc`; includes per-row tier, face count, size, description and license",
+      "attribution_evidence": "sketchfab/ATTRIBUTION.md entry for `BM86 Portable PC` — HippoStance — `devices`",
+      "ip_or_platform_limit": "Uploader-provided CC BY metadata and archive attribution were verified; this audit does not independently verify uploader rights.",
+      "noai_limit": "Archive README says Sketchfab API does not expose the NoAI flag. Directly loading/composing a model in a 3D scene is documented as unaffected; do not feed renders to an image/video generation pipeline unless separately cleared."
+    }
+  ],
+  "not_shortlisted": [
+    {
+      "catalog_id": "baroque-chair",
+      "reason": "Only small standalone chair surfaced with CC BY in the curated lore collection (123 kB), but its ornate high-backed velvet/baroque styling is a poor match for the Mars classroom."
+    },
+    {
+      "catalog_id": "office-assets",
+      "reason": "Contains a plausible black office chair, desk and CRT, but it is a 32.1 MB office-corner scene with walls and a conventional office style, not a small modular classroom prop."
+    }
+  ],
+  "scope_note": "Metadata-only audit. Originals and thumbnails remain in place; no files imported, downloaded, copied or modified. The shortlist has two items because no small suitable chair was found. Each chosen row carries explicit per-model CC Attribution (CC BY 4.0) metadata and an ATTRIBUTION.md source entry. Catalog scale/bounds are absent; displayed size is the GLB file size, not physical dimensions.",
+  "attribution_placement": "The Sketchfab archive README says attribution must accompany models wherever they appear, including rendered scenes/embeds. Preserve the provided attribution_line and source link with any later integration."
+}
