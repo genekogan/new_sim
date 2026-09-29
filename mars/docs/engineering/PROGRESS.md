@@ -1541,3 +1541,13 @@ Gene explicitly removed the five-hour budget constraint and requested continued 
 Integrated prepared rafter35a6441 and dependent-tailf3ef307 plus design9a19bbf; focused17/17 passed. Docs append conflicts resolved preserving the release10 checkpoint. Added missing-file negative proof to existing LM137 saved-track verification browser test; existing positive case passed release10 gate and production. Candidate LM100/137 closures await complete clean-head gate, counts still30/36/150. Camera shared bounded cache, per-template measured body reach and realthree-vehicle cycles proceed in isolated worker checkouts; no repin yet.
 
 LM078 lead candidate: preflight and per-tick conservative load/carrier sweep against current bystanders; named unsafe refusal or held lowering pause, publicwalk-away recovery, no unsupported release.6new+3existingcancel+source-scan pass, tsc/lint clean;9statecaptures personallyinspected. Body cylinders remain existingengineapproximation; noarticulatedcollisionclaim. Independentreview foundno blocker; both requested additionalregressions pass. No pin/history/deploy. Report `briefs/carry-cancel-people.REPORT.md`.
+
+- **LM-043 physical cycle proof (storage worker):** three publicly mounted EUCs
+  form real v0 -> v2 -> v1 -> v0 footprint/lane waits, zero violations. Narrow
+  mid-pull-over quiescence hook reports blocked at tick 550 with rider support and
+  reservations retained. Endpoint/resume lifecycle excluded. Future cancel,
+  blocker movement, timeout/unknown work, boundary and snapshot-refusal controls
+  pass. New 4 + existing 23 focused tests green; tsc/scoped lint clean; inspected
+  `briefs/vehicle-deadlock.capture.json`. No pins, walker changes, broad suite or
+  deployment. General deadlock freedom and mixed forklift-load cycles unclaimed.
+  Estimate 25 min / 10k tokens; no extra helpers. Lead owns gated row closure.

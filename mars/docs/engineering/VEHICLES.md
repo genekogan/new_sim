@@ -130,9 +130,10 @@ obstacles in the grids, as before), so single-vehicle scenes run the old code pa
   other's braking); yield zones use the yielder's `reach` disc, so a long vehicle (a bicycle, a loaded
   forklift) keeps more than 1 m on its narrow side; the forklift's reach / side-shift / fork-raise
   steps are not checked against other vehicles (only its square-up and creep), and the empty fork
-  height is assumed ≤ 0.45 m; cycles of three or more vehicles each yielding to the next are not
-  detected; a forced overlap can only be staged by editing world state directly — `edit_world` refuses
-  to move vehicles at all (`api/edit.ts`).
+  height is assumed ≤ 0.45 m. A physical three-EUC cycle is now detected and safely reported
+  blocked (proof below); this is not a general deadlock-freedom guarantee. Invalid overlap tests
+  deliberately inject corruption after `edit_world` refuses it; legitimate parked vehicle setup
+  uses the public edit path (LM-005).
 
 ## Limits (not modelled yet)
 - Vehicles are discs (the bicycle's 1.75 m length is not swept); no lean, wheel or balance
@@ -201,9 +202,14 @@ Code: `viewer/engine/vehicles/forklift.ts` (verbs `forklift_pick`, `forklift_del
 Ride person/vehicle waits publish a vehicle mover with its rider as an alias.
 After the reporting grace period, a stopped ordinary ride may request one existing
 validated route retry within its existing replan cap and the shared per-tick
-budget. Active pull-over/resume recovery is explicitly unavailable to this hook
-and prevents early sequence termination; its existing retry/failure policy keeps
-running. No vehicle pose or resource is forced free by detection. See
+budget. Pull-over/resume recovery is explicitly unavailable to this hook. An
+exhausted, stationary mid-pull-over can nevertheless certify a stopped wait if it
+is in the ride phase, has no pending replan/cancel, and both remaining arc length
+and distance to the endpoint exceed 0.06 m (plus a conservative 1e-9 boundary
+guard). Endpoint/resume waits retain their independent retry/failure clock and
+prevent early termination. No vehicle pose or resource is forced free. See
 [MOVEMENT](MOVEMENT.md#persistent-waits-and-bounded-recovery-lm-024-staged).
-This does not supply LM-043's missing actual three-vehicle cycle proof or cover
-forklift-specific manipulation waits.
+The [physical three-EUC proof](briefs/vehicle-deadlock.REPORT.md) covers a real
+footprint/lane cycle, future cancel, external blocker movement, ownership and
+snapshot refusal. Forklift manipulation waits, mixed loaded-vehicle cycles and
+general deadlock freedom are not claimed.

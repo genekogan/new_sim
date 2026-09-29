@@ -688,7 +688,15 @@ function recoverRide(rt: Runtime, ex: RideExec, mover: string): WaitRecoveryResu
   const refusal = replan(rt, ex, rd, standing(rt, rd));
   return { status: 'attempted', diagnostic: { code: refusal ? 'deadlock.replan-refused' : 'deadlock.replanned', message: refusal?.message ?? 'existing ride planner found a route from the current pose', subjects: [mover] } };
 }
-const rideQuiescent = (_rt: Runtime, ex: RideExec, exhausted: ReadonlySet<string>) => exhausted.has(ex.vehicle) && ex.v < 0.02 && !ex.cancelling && !ex.yielding;
+export function rideQuiescent(rt: Runtime, ex: RideExec, exhausted: ReadonlySet<string>): boolean {
+  if (!exhausted.has(ex.vehicle) || ex.v >= 0.02 || ex.cancelling || ex.replan || ex.phase !== 'ride') return false;
+  if (!ex.yielding) return true;
+  // Mid-pull-over traffic can itself be in a closed wait cycle. It has no autonomous
+  // completion clock: preserve its route and rider while reporting the certified stop.
+  // At the endpoint, resume has independent retries/give-up timing; never stop those early.
+  const vehicle = rt.world.entities[ex.vehicle], sample = ex.curve.samples[ex.idx], end = ex.curve.samples.at(-1);
+  return !!vehicle && !!sample && !!end && ex.curve.length - sample.s > 0.06 + 1e-9 && dist2(xz(vehicle), end.p) > 0.06 + 1e-9;
+}
 
 const rideCancel = (_rt: Runtime, ex: RideExec) => {
   ex.cancelling = true; // brake to a stop, then the rider sits on the stopped vehicle
