@@ -1,3 +1,4 @@
+import { sceneForWorld } from '../spatial/edits.ts';
 // Engine controller facade (spec §13, §15, §16, §24). One object that the
 // browser, Node tests/scripts and the Durable Object all drive with the SAME
 // typed operations; MCP tools are generated from `opSchemas` + `call`.
@@ -408,9 +409,10 @@ export class EngineController {
     };
     const inc = new Set(q.include ?? []);
     if (inc.has('regions')) out.regions = Object.values(world.regions);
-    if (inc.has('levels') || inc.has('links')) {
+    if (inc.has('levels') || inc.has('links') || inc.has('obstacles')) {
       const sp = this.cfg.services(world).spatial as Spatial;
       sp.sync(world);
+      if (inc.has('obstacles')) out.obstacles = sp.scene.obstacles;
       if (inc.has('levels'))
         out.levels = sp.scene.levels.map((l) => ({ ...l, surfaces: sp.scene.surfaces.filter((s) => s.level === l.id).map((s) => ({ id: s.id, label: s.label, y: s.y, obb: s.obb })) }));
       if (inc.has('links'))
@@ -774,7 +776,8 @@ export class EngineController {
   attachCameraTrack(q: OpInput<'attach_camera_track'>): OpResult {
     const take = this.take(q.take_id);
     if (!take) return this.noTake(q.take_id);
-    const scene = this.scenes[take.finalState.base.campus];
+    const sourceScene = this.scenes[take.finalState.base.campus];
+    const scene = sourceScene && sceneForWorld(sourceScene, take.finalState);
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
     // a camera track is stored beside its take: an unkept rehearsal take is kept from now on
     if (this.unkept.has(take.id)) this.keepTake(take);
@@ -810,7 +813,8 @@ export class EngineController {
       if (!take) return this.noTake(q.take_id);
       world = take.finalState;
     } else world = this.history.read(q.workspace!);
-    const scene = this.scenes[world.base.campus];
+    const sourceScene = this.scenes[world.base.campus];
+    const scene = sourceScene && sceneForWorld(sourceScene, world);
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${world.base.campus}`);
     const p = this.parseSentencesIn(scene, world, take, q.sentences);
     const source = { ...(q.take_id ? { take_id: q.take_id } : { workspace: q.workspace }), campus: world.base.campus };
@@ -858,7 +862,8 @@ export class EngineController {
   directCameraOp(q: OpInput<'direct_camera'>): OpResult {
     const take = this.take(q.take_id);
     if (!take) return this.noTake(q.take_id);
-    const scene = this.scenes[take.finalState.base.campus];
+    const sourceScene = this.scenes[take.finalState.base.campus];
+    const scene = sourceScene && sceneForWorld(sourceScene, take.finalState);
     if (!scene) return fail('camera.no-scene', `no static scene for campus ${take.finalState.base.campus}`);
     if ((q.directions ? 1 : 0) + (q.sentences ? 1 : 0) !== 1) return fail('op.invalid-input', 'direct_camera: give exactly one of `directions`, `sentences`');
     let directions = q.directions as CameraDirection[] | undefined;

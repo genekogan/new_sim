@@ -1,3 +1,4 @@
+import type { Obstacle } from '../spatial/types.ts';
 // Semantic world model (spec §5, §21). Three layers are kept distinct:
 //   AssetDef   — reusable description of a kind of thing (catalog.ts)
 //   Entity     — a placement in one world state, with provenance
@@ -145,6 +146,8 @@ export type WorldState = {
   tick: number;
   entities: Record<string, Entity>;
   regions: Record<string, Region>;
+  /** Fork-local static obstacle overrides; null removes a source obstacle. Source base stays immutable. */
+  obstacleEdits?: Record<string, Obstacle | null>;
   env: Environment;
   inventory: 'finite' | 'unlimited';
   rng: RngState;
@@ -164,6 +167,7 @@ export function physicalView(w: WorldState) {
   // send people, so it is physical (LAST_MILE LM-003); a region without one hashes exactly as before.
   return {
     base: w.base,
+    ...(w.obstacleEdits ? { obstacleEdits: w.obstacleEdits } : {}),
     entities,
     regions: Object.values(w.regions).map((r) => {
       const layout = (r as { layout?: unknown }).layout;

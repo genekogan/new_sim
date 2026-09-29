@@ -15,6 +15,7 @@ import { CATALOG, HUMAN_RADIUS } from '../world/catalog.ts';
 import { component, human } from '../world/factory.ts';
 import type { Entity, Pose, Provenance, Region, WorldState } from '../world/types.ts';
 import type { worldEditSchema } from './schemas.ts';
+import { editStatic } from './edit-static.ts';
 
 export type WorldEdit = z.infer<typeof worldEditSchema>;
 export type EditRefusal = { ok: false; code: string; message: string; details: { index: number; edit: WorldEdit; subjects?: string[] } };
@@ -43,6 +44,13 @@ export function applyEdits(start: WorldState, edits: WorldEdit[], spatialFor: (w
   for (let index = 0; index < edits.length; index++) {
     const edit = edits[index];
     const refuse = (code: string, message: string, subjects?: string[]): EditRefusal => ({ ok: false, code, message: `edit ${index} (${edit.op} ${edit.id}): ${message}`, details: { index, edit, ...(subjects?.length ? { subjects } : {}) } });
+    if (edit.op === 'static_add' || edit.op === 'static_update' || edit.op === 'static_remove') {
+      const issue = editStatic(w, spatial(), edit);
+      if (issue) return refuse(issue.code, issue.message, issue.subjects);
+      sp = null;
+      applied.push(`${edit.op} ${edit.id}`);
+      continue;
+    }
     if (edit.op === 'region') {
       const region: Region & { layout?: unknown } = {
         id: edit.id,

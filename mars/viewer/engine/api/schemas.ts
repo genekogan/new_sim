@@ -18,8 +18,16 @@ const poseSchema = z.strictObject({ p: vec3, yaw: angle, pitch: angle.optional()
 const lyingSchema = z
   .strictObject({ x: coord, z: coord, yaw: angle })
   .describe('lay a carriable component flat on the level floor exactly as the carry verb sets loads down: box centre (x, z), long axis along yaw');
+const obstacleShape = {
+  obb: z.strictObject({ c: vec2, half: z.tuple([z.number().positive().max(500), z.number().positive().max(500)]), yaw: angle }),
+  y0: z.number().min(-50).max(300), y1: z.number().min(-50).max(300),
+  kind: z.enum(['wall', 'solid', 'glass']).optional(), label: z.string().max(80).optional(),
+};
 /** One design edit (spec §21 "design-edit"): validated in order against the progressively edited world; all-or-nothing. */
 export const worldEditSchema = z.discriminatedUnion('op', [
+  z.strictObject({ op: z.literal('static_add'), id: newId, ...obstacleShape }),
+  z.strictObject({ op: z.literal('static_update'), id, ...obstacleShape }),
+  z.strictObject({ op: z.literal('static_remove'), id }),
   z.strictObject({
     op: z.literal('spawn'),
     id: newId,
@@ -93,7 +101,7 @@ export const opSchemas = {
     kind: z.enum(['human', 'component', 'vehicle', 'fixture', 'marker']).optional(),
     label: z.string().max(80).describe('case-insensitive substring of id, label or def').optional(),
     region: z.strictObject({ min: vec2, max: vec2 }).describe('ground-plane box [x, z]').optional(),
-    include: z.array(z.enum(['regions', 'levels', 'stability', 'links'])).max(4).optional(),
+    include: z.array(z.enum(['regions', 'levels', 'stability', 'links', 'obstacles'])).max(5).optional(),
     route: z.strictObject({ actor: id, x: coord, z: coord, level: z.number().int().min(0).max(20).optional() }).describe('route preview for an actor → point (same planner walk_to uses)').optional(),
     carry: z
       .strictObject({ crew: z.array(id).min(1).max(8), item: id, to: z.strictObject({ x: coord, z: coord, yaw: z.number().min(-7).max(7), level: z.number().int().min(0).max(20).optional() }) })
@@ -224,7 +232,7 @@ export const opDescriptions: Record<OpName, { description: string; readOnly: boo
   edit_world: {
     readOnly: false,
     description:
-      "Design-edit an editable workspace (never a protected canonical one): spawn catalog items (only with inventory 'unlimited'; provenance design-edit/hypothetical), move idle people / loose components / fixtures / parked vehicles to a pose or `lying` set-down (refused when the footprint would overlap static geometry, components or people, or leave the floor), remove stored/staged components (or anything a design edit spawned), add/replace regions. A ridden vehicle is refused with edit.vehicle-ridden (dismount first). All-or-nothing; commits one checkpoint (cause design-edit + note) and returns the physical diff.",
+      "Design-edit an editable workspace (never a protected canonical one): spawn catalog items (only with inventory 'unlimited'; provenance design-edit/hypothetical), move idle people / loose components / fixtures / parked vehicles to a pose or `lying` set-down (refused when the footprint would overlap static geometry, components or people, or leave the floor), remove stored/staged components (or anything a design edit spawned), add/replace regions; static_add/static_update/static_remove edit fork-local wall/solid/glass prisms (query_world include obstacles lists ids). Invalid bounds, collisions and removal of supporting geometry are refused. Static edits invalidate bound plans. A ridden vehicle is refused with edit.vehicle-ridden (dismount first). All-or-nothing; commits one checkpoint (cause design-edit + note) and returns the physical diff.",
   },
   list: {
     readOnly: true,

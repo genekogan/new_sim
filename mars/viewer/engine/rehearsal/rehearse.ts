@@ -82,7 +82,8 @@ export type ExecuteResult =
 export function runServices(world: WorldState, cfg: EngineConfig): RuntimeServices {
   const services = cfg.services(world);
   const sp = services.spatial as { base?: unknown; baseId?: string } | undefined;
-  if (sp && sp.base !== undefined && (sp.baseId ?? hashOf(sp.base)) !== world.base.staticHash)
+  const expectedBase = world.obstacleEdits ? hashOf({ source: world.base.staticHash, obstacleEdits: world.obstacleEdits }) : world.base.staticHash;
+  if (sp && sp.base !== undefined && (sp.baseId ?? hashOf(sp.base)) !== expectedBase)
     throw new HistoryError(
       'services.base-mismatch',
       `the spatial service's static scene does not match the world's base (${world.base.campus}, staticHash ${world.base.staticHash.slice(0, 12)})`,
@@ -142,7 +143,7 @@ export function physicalDiff(a: WorldState, b: WorldState): PhysicalDiff {
   const ra = new Map(pa.regions.map((r) => [r[0] as string, stableStringify(r)]));
   const rb = new Map(pb.regions.map((r) => [r[0] as string, stableStringify(r)]));
   for (const id of [...new Set([...ra.keys(), ...rb.keys()])].sort()) if (ra.get(id) !== rb.get(id)) out.regions.push(id);
-  for (const k of Object.keys(pa).sort())
+  for (const k of [...new Set([...Object.keys(pa), ...Object.keys(pb)])].sort())
     if (!['base', 'entities', 'regions'].includes(k) && stableStringify(pa[k]) !== stableStringify(pb[k])) out.other.push(k);
   return out;
 }

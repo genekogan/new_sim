@@ -3,6 +3,8 @@
 // MCP tools, JSON Schemas and in-process calls are all generated from here;
 // there is no parallel control system.
 import { z } from 'zod';
+import { hashOf } from '../core/hash.ts';
+import { sceneForWorld } from '../spatial/edits.ts';
 import type { ActionDef } from '../actions/types.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { carry } from '../carry/actions.ts';
@@ -50,7 +52,9 @@ export function servicesFor(scenes: Record<string, SpatialScene>, opts: { frameA
     if (!scene) throw new Error(`no spatial scene registered for campus "${world.base.campus}"`);
     // campus scenes (mars-<year>) are identified by their file's content hash (world.base.staticHash)
     const baseId = (scene as SpatialScene & { meta?: { contentHash?: string } }).meta?.contentHash;
-    return { spatial: new Spatial(scene, { contributors, ...(baseId ? { baseId } : {}) }) };
+    const sourceId = baseId ?? hashOf(scene);
+    const effectiveId = world.obstacleEdits ? hashOf({ source: sourceId, obstacleEdits: world.obstacleEdits }) : sourceId;
+    return { spatial: new Spatial(sceneForWorld(scene, world), { contributors, baseId: effectiveId }) };
   };
 }
 
