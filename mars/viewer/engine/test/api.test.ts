@@ -1296,11 +1296,16 @@ test('one control path (LM-014): every legacy tool is classified — an engine e
   assert.ok(Object.values(LEGACY_TOOLS).filter((r) => r.scope === 'engine-equivalent').length >= 8);
   const env = legacyRefusal('move_person', new Error('no route'));
   assert.deepEqual(env, { ok: false, code: 'legacy.command-failed', message: 'move_person: no route', legacy: true, tool: 'move_person', engine: ['engine_bind_plan', 'engine_execute', 'verb:walk_to'] });
-  // the worker registers every legacy tool with the classified description and answers failures with the envelope
-  const worker = src('worker.ts');
-  assert.match(worker, /legacyDescription\(name, def\.description\)/);
-  assert.match(worker, /legacyDescription\(\s*'get_state'/);
-  assert.match(worker, /legacyDescription\(\s*'get_capabilities'/);
-  assert.match(worker, /JSON\.stringify\(legacyRefusal\(name, e\)\)/);
-  assert.doesNotMatch(worker, /'Command failed'/);
+  // Exercise the actual registry/dispatcher, independent of its source-file layout.
+  const { controlTools, dispatchControl } = await import('../../simulation/control.ts');
+  const registered = controlTools().filter((t) => t.target === 'viewer');
+  assert.deepEqual(registered.map((t) => t.name).sort(), legacy);
+  for (const t of registered) assert.match(t.description, /^\[legacy viewer control/);
+  const failure = await dispatchControl({
+    engine: async () => { throw new Error('wrong domain'); },
+    viewerCommand: async () => { throw new Error('no route'); },
+    snapshot: async () => ({}), capabilities: () => ({}),
+  }, 'move_person', { person_id: 'p1', x: 0, z: 0 });
+  assert.equal(failure.isError, true);
+  assert.deepEqual(failure.value, env);
 });
