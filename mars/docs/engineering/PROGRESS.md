@@ -1559,3 +1559,5 @@ LM078 lead candidate: preflight and per-tick conservative load/carrier sweep aga
   and explains unchanged deterministic planner inputs. No motion or pin change.
   Four focused tests pass; no broad suite or deployment. Review follow-up: about
   8 minutes / 3k tokens, no additional helpers.
+
+- Release11 preflight: clean source b457c6b passed full gate (494engine/0fail,84browser/7historicalskip,93unit,lint/tsc,unchanged recording/probe,all36tools) and merged. Separate idle performance passed original limits. Evidence refresh correctly failed on a renamed dependency-tail test (16/17rows PROVEN); failed output retained in `.cloudflare/failed-release-11-*`. Updated the map to the split executable proofs; no stale reference counted as proof. Reviewed carry bystander and three-vehicle-cycle candidates joined the replacement release11 candidate, pending a new full clean gate before their merge. Release10 remains live. Historical agent changes on main preserved; no pins changed.

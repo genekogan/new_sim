@@ -39,7 +39,10 @@
         { "file": "gaps.test.ts", "title": "2.0 m corridor: both walkers keep moving while passing" },
         { "file": "deadlock-recovery.test.ts", "title": "actual opposing stair-passage walkers stop as blocked" },
         { "file": "deadlock-recovery.test.ts", "title": "actual supported held carry stops blocked" },
-        { "file": "deadlock-recovery.test.ts", "title": "future cue, pending dependent tail and future timeout prevent" }
+        { "file": "deadlock-recovery.test.ts", "title": "future independent cue and future timeout prevent early blocked termination" },
+        { "file": "deadlock-recovery.test.ts", "title": "completion-dependent two-level tails preserve live ownership and snapshot identity" },
+        { "file": "deadlock-recovery.test.ts", "title": "independent future cancel can still release a certified wait with an inert tail" },
+        { "file": "vehicle-deadlock.test.ts", "title": "real three-EUC cycle is certified blocked while riders and vehicle ownership remain supported" }
       ],
       "approximate": "Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free."
     },
@@ -141,6 +144,8 @@
       "tests": [
         { "file": "carry.test.ts", "title": "carry: cancel mid-move performs a controlled set-down where the ground is clear" },
         { "file": "carry.test.ts", "title": "carry: cancel over an obstruction is refused (carry.cancel-unsafe)" },
+        { "file": "carry-cancel-people.test.ts", "title": "LM078: cancelling a moving sheet refuses a person in the future set-down sweep atomically" },
+        { "file": "carry-cancel-people.test.ts", "title": "LM078: a person clear of the load but on a carrier retreat segment prevents cancellation" },
         { "file": "carry.test.ts", "title": "carry: cancel during gather releases the crew immediately" },
         { "file": "construction.test.ts", "title": "cancel mid-raise continuously lowers to supported lying instead of abandoning the frame" },
         { "file": "raise-cancel.test.ts", "title": "lowering snapshots restore tick-exactly and normal phases still refuse" },
