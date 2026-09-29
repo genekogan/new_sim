@@ -161,6 +161,21 @@ export function climbLinks(w: WorldState): Link[] {
   return out;
 }
 
+/**
+ * Shared physical climbing lane: upright + column + outside face, independent
+ * of the destination beam seat. Derive the face in the upright's local frame
+ * from its ground entry, so different heights share a key and opposite faces
+ * remain independent. No field is added to the world or generated link.
+ */
+export function climbFaceResource(w: WorldState, link: Link): string | undefined {
+  if (link.kind !== 'climb') return undefined;
+  const column = /:([lr])@[^@]+$/.exec(link.id)?.[1];
+  const upright = link.members?.[0] ? w.entities[link.members[0]] : undefined;
+  if (!column || !upright) return undefined;
+  const localZ = dot2(sub2(link.from.p, xz(upright)), rot2([0, 1], upright.pose.yaw));
+  return `climb-face:${upright.id}:${column}:z${localZ < 0 ? '-' : '+'}`;
+}
+
 /** Every rack-structure link that exists right now (climbs, then walkways), deterministic order. */
 export function frameLinks(w: WorldState): Link[] {
   return [...climbLinks(w), ...beamWalkways(w)];

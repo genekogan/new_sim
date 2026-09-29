@@ -17,7 +17,7 @@ import { clearanceAt } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { checkStations, childrenState, walkCrew, type Children } from './children.ts';
 import { spatialOf } from './access.ts';
-import { BEAM_SPEED, bigLoad, CLIMB_SPEED, frameLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
+import { BEAM_SPEED, bigLoad, climbFaceResource, CLIMB_SPEED, frameLinks, offWalkway, onWalkway, walkwayAtExit } from './frame.ts';
 
 const f2 = (x: number) => x.toFixed(2);
 const bad = (code: string, message: string, subjects: string[], at?: Vec3) => ({ ok: false as const, diagnostic: { code, message, subjects, at } });
@@ -153,7 +153,11 @@ export const climbFrame: ActionDef<CP, CProg, CExec> = {
   verb: 'climb_frame',
   description: `Climb an installed upright's bracing like a ladder (${CLIMB_SPEED} m/s, one person at a time) onto a connected beam pair, or back down. Only small loads (≤ 10 kg) may be held.`,
   schema: z.strictObject({ actor: z.string().max(80), link: z.string().max(120), dir: z.enum(['up', 'down']) }),
-  reservations: (_w, p) => [{ resource: `actor:${p.actor}`, mode: 'exclusive' }],
+  reservations: (w, p) => {
+    const link = frameLinks(w).find((l) => l.id === p.link);
+    const face = link && climbFaceResource(w, link);
+    return [{ resource: `actor:${p.actor}`, mode: 'exclusive' }, ...(face ? [{ resource: face, mode: 'exclusive' as const }] : [])];
+  },
   resumable: FRAME_NOT_RESUMABLE,
   plan: planClimb,
   start(rt, p, prog, id) {

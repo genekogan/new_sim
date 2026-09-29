@@ -15,7 +15,7 @@ measured rig since W32: "Prone receiver" below).
 ## The rack structure is climbable / walkable (frame.ts, "only what exists is usable")
 | Link | Exists when | Rules |
 | --- | --- | --- |
-| `climb:<upright>:<l\|r>@<seat>` (kind `climb`) | upright `installed`, standing, supported; one per column and beam seat there (not on a middle frame with beams on both faces) | from the ground on the frame's outside face, up beside the column, round it onto the beam end; 0.35 m/s; one person at a time (`occupancy 1`); small loads only |
+| `climb:<upright>:<l\|r>@<seat>` (kind `climb`) | upright `installed`, standing, supported; one per column and beam seat there (not on a middle frame with beams on both faces) | from the ground on the frame's outside face, up beside the column, round it onto the beam end; 0.35 m/s; one person at a time across every seat on the same column face (exclusive reservation, plus `occupancy 1`); small loads only |
 | `beam:<beam>` (kind `beam`) | beam installed + supported **and** its partner (same two uprights, other column, same seat) installed | width = catalog `walkway.flange` 0.1 m + 2 × 0.05 m; ≤ 0.4 m/s (balance); no carrying except `handling.smallLoad` (≤ 10 kg: 2x4s, treads); never under a deck |
 
 Both are narrower than a routing disc (0.56 m), so `walk_to` never routes over them (path.ts skips
@@ -24,6 +24,15 @@ existing routes/pins are unchanged). Verbs: `climb_frame {actor, link, dir}` (wa
 step onto the beam / back down), `beam_walk {actor, x, z, speed?}` (along the beam you are on; may
 step off onto a deck at that level from an open spot). A person on the structure has
 `human.on = <link id>` and `human.level` = the beam's level.
+
+`climb_frame` reserves `climb-face:<upright>:<column>:z+|z-` in addition to its actor.
+The face sign is in the upright's local frame and is derived from the existing link's ground
+entry; seat height and up/down direction do not change the key. A second action on that face
+is refused before approach with `reservation.conflict`, naming the resource and holder action.
+Different columns/opposite faces stay independent. The face is held through approach and
+climbing and released by normal completion or safe cancellation; an unsafe cancellation
+mid-climb does not release it. Link/world schemas stay unchanged; nonconflicting traversals
+use the same paths and timing.
 
 Diagnostics: `climb.no-link`, `climb.no-carry`, `climb.no-walkway`, `climb.not-at-frame`,
 `climb.occupied` (blocked), `beam.not-on-beam`, `beam.too-fast`, `beam.no-carry` (names the beam),
@@ -269,7 +278,7 @@ per-tick sweep of all 937 receiver-held ticks finds 0 intersections, and W30 lea
   whose receivers stand > 2.05 + 0.5 ≈ 2.55 m above the givers' floor (plus the load's thickness) need the forklift.
 - Fork height is not state after the load leaves the forks (the truck just parks); `forklift_back` is
   a straight creep.
-- Climb paths are three straight segments; climbing is ≤ 1 person per link but two links on one
-  column face are not mutually exclusive; a person on a beam may stand next to a column / on a joist.
+- Climb paths remain piecewise straight; climb actions now reserve one physical column face across
+  all seat heights (LM-022). A person on a beam may still stand next to a column / on a joist.
 - Frame links are in the API spatial scene by default (`servicesFor(scenes, { frameAccess })`, W8;
   `frameAccess: false` opts out); `hand_up` computes them from the world, so it works everywhere.
