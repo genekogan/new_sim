@@ -149,8 +149,9 @@ refused; determinism (hash + event log).
   walk yield/replan, not fail at plan time.
 - The seated exemption is by activity (`SEATED_ACTIVITIES`), not per fixture.
 - No conversation turn-taking, gaze, gestures or group re-forming when a member leaves.
-- Pre-emption is automatic but there is no **resumption**: a pre-empted sitter / talker does not go back
-  to the seat or circle after the directed task; ambient never re-adopts a released person. A converse
+- **Resumption is staged:** occupied standalone `sit` / seated `take_slot` holds return to their exact
+  slot after a successful directive (see below). Talkers and group-owned seats do not yet resume;
+  ambient never re-adopts a released person. A converse
   loses all its members when one is pre-empted (no re-forming). An `eat` / `serve` overlay (ITEMS.md)
   on a pre-empted sitter is not released by pre-emption (it holds hands, not the actor): it fails
   `eat.not-still` as soon as the stand-up moves them, and a directive that needs free hands is then
@@ -160,3 +161,34 @@ refused; determinism (hash + event log).
   `sit-down` / `stand-up` lower the body onto the seat (leg IK, hands on thighs, 0.4 s blend) and
   `warm` holds the hands out toward the fire; `talk` / `watch` / `listen` are still the plain
   standing Idle pose (no gestures or gaze).
+
+
+## Exact-seat return after a directive (LM-026 stage 1)
+
+An occupied standalone `sit` or seated `take_slot` records its resolved slot and
+activity before yielding. Once the pre-empting directive completes successfully,
+the runtime submits a new social action for that exact slot with pre-emption
+disabled. The actor walks back through ordinary planning and seat reservations;
+the old cancelled action stays cancelled. If a child pre-empts the seat, return
+waits for the outer directive to finish, so it cannot interrupt sibling work.
+
+A failed or cancelled directive skips returning and leaves the actor at its
+stopping position. Any newer explicit actor-reserving command (including a
+refused command, or `stand`) supersedes the pending return; children of the
+original directive do not. Autonomous make-way and social-child activity do not
+supersede it. Occupied, deleted or unreachable seats and held actors are refused
+by normal admission; the runtime never steals a seat or releases a load to sit.
+One attempt is made, with `social.resume-started`, `social.resume-refused`, or
+`social.resume-skipped` marks recording the result and source/directive ids.
+
+Pending intents are plain-data `services.socialReturns`, captured by the existing
+snapshot graph and absent when unused. Queue-free version-1 snapshots restore
+without inventing any return. A pending return during a resumable walk survives
+pause/resume and emits exactly one identical continuation. The existing refusal
+while standing up for a waiting directive remains unchanged. Returned seats are
+ordinary indefinite social holds: `runUntilIdle` over all actions does not treat
+an occupied seat as idle; use the directive id when waiting only for its work.
+
+LM-026 remains partial: conversation member preservation/re-forming and return to
+parent-owned group seats remain separate. LM-027 ambient re-adoption and LM-028
+item-overlay release are unchanged. See `briefs/social-resume.REPORT.md`.

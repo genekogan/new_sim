@@ -1578,3 +1578,13 @@ Regenerated and personally inspected 23 captures (superseding the 12/15 intermed
 counts). Focused staged-support/carry-stairs/forklift tests 25/25 plus source scan,
 tsc and oxlint pass. No pins/history values changed; integrated gate remains pending.
 Approximately 15 additional worker minutes, no helpers. See staged-support.REPORT.md.
+- **LM-026 exact-seat return stage (storage worker):** occupied standalone sit /
+  seated take_slot now queue exact-slot return after successful directives; new
+  explicit work supersedes it, failed/cancelled directives explicitly skip, and
+  normal non-preempting admission refuses occupied/deleted/unreachable seats or
+  held actors. Outer directive completion controls child-triggered pre-emption.
+  Eight new + seven existing pre-emption tests pass; source scan/tsc/scoped lint
+  clean. Pending intent snapshot continuation is identical; eight captured
+  physical states inspected. LM-026 remains partial for converse/group returns;
+  LM-027/028 untouched. Isolated from corridor/vehicle stack at b457c6b; no pins,
+  broad gate or deployment. About 25 min / 10k tokens, no additional helpers.

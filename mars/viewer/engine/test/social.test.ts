@@ -370,7 +370,12 @@ test('pre-emption: a seated person given a directed carry stands up (0.6 s) firs
   assert.ok(rt.runUntilIdle(20 * 180, [c.id]));
   assert.equal(c.status, 'completed', c.diagnostic?.message);
   assert.deepEqual(msgs(rt), []);
-  assert.ok(noClaims(rt, ['p1', 'p2']));
+  assert.deepEqual(rt.holder('actor:p2'), []);
+  const resumed = [...rt.records.values()].find((r) => r.id === `${sit.id}:resume:${c.id}`)!;
+  assert.ok(resumed, 'the successful directive resumes the original exact seat');
+  assert.ok(runWhile(rt, () => resumed.phase !== 'occupied', 20 * 30));
+  assert.equal(H(rt, 'p1').activity, 'sit');
+  assert.deepEqual(msgs(rt), []);
 });
 
 test('pre-emption: cancelling a waiting directive ends it cancelled without starting it; the stand-up still finishes', () => {

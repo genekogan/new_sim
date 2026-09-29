@@ -78,6 +78,8 @@ export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> 
    * reservation.conflict as before).
    */
   yieldTo?(rt: Runtime, self: ActionRecord, holder: ActionRecord, actor: string, by: ActionRecord): string[];
+  /** Plain-data voluntary return after a successful directive. Normal admission may refuse it. */
+  resumeIntent?(rt: Runtime, exec: Exec, self: ActionRecord): { actor: string; verb: string; params: unknown } | null;
   /**
    * Resumable snapshots (runtime/snapshot.ts, spec §22). `true`: the exec is plain data (Maps, Sets,
    * aliasing and ActionRecord references are fine; closures and class instances are not) and resumes

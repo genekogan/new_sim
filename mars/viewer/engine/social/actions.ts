@@ -225,6 +225,9 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
       return { ok: true };
     },
     yieldTo: (_rt, self, _h, _a, by) => (directive(by) ? [self.id] : []), // pre-emption: this person's own seat / slot (a gather keeps its other members)
+    resumeIntent: (_rt, ex, self) => !self.parent && ex.slot.kind === 'seat' && ex.phase === 'occupied'
+      ? { actor: ex.actor, verb, params: verb === 'sit' ? { actor: ex.actor, slot: ex.slot.id } : { actor: ex.actor, slot: ex.slot.id, activity: ex.activity } }
+      : null,
   };
 }
 

@@ -34,6 +34,8 @@ export type RuntimeServices = Record<string, any>;
 /** `prior`: phase of each reserved entity before start(), restored if the action fails / is cancelled before using it. */
 type Phase = WorldState['entities'][string]['phase'];
 type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; prior: Map<string, Phase>; reason?: Diagnostic }; // = snapshot.ts LiveEntry
+/** Plain voluntary return intent; the existing snapshot graph preserves the service queue. */
+type SocialReturn = { source: string; directive: string; actor: string; verb: string; params: unknown };
 /** A directed submission parked until the social holds it pre-empted have ended (SOCIAL.md "Pre-emption"). */
 type Waiting = { rec: ActionRecord; def: ActionDef; params: unknown; parent?: string; holds: string[] };
 
@@ -109,10 +111,36 @@ export class Runtime {
         message: `invalid parameters for ${verb}: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
       });
     rec.params = parsed.data;
+    // Any newer explicit instruction supersedes a queued voluntary return, even if
+    // its own plan later refuses. Child work of the original directive does not supersede it.
+    const ancestors: string[] = [];
+    if (this.services.socialReturns?.length) for (let parent = opts.parent; parent; parent = this.records.get(parent)?.parent) ancestors.push(parent);
+    if (!/:make-way:\d+$/.test(id) && !ancestors.some((parent) => typeof this.registry.get(this.records.get(parent)?.verb ?? '')?.yieldTo === 'function') && this.services.socialReturns?.length) {
+      let claims: Reservation[] = [];
+      try { claims = def.reservations(this.world, parsed.data); } catch { /* plan-dependent claims are not available yet */ }
+      const explicitActor = (parsed.data as { actor?: unknown })?.actor;
+      if (verb === 'stand' && typeof explicitActor === 'string' && !claims.some((r) => r.resource === `actor:${explicitActor}`)) claims.push({ resource: `actor:${explicitActor}`, mode: 'exclusive' });
+      const queue = this.services.socialReturns as SocialReturn[];
+      for (const intent of queue.slice()) if (!ancestors.includes(intent.directive) && claims.some((r) => r.resource === `actor:${intent.actor}`)) {
+        queue.splice(queue.indexOf(intent), 1);
+        this.mark('social.resume-skipped', { source: intent.source, directive: intent.directive, actor: intent.actor, reason: 'newer-directive', by: id });
+      }
+      if (!queue.length) delete this.services.socialReturns;
+    }
     const holds = preempt ? this.preemptible(def, parsed.data, rec, opts.parent) : null;
     if (holds) {
       const reason: Diagnostic = { code: 'social.pre-empted', message: `pre-empted by ${id} (${verb})`, subjects: [id], details: { reason: `pre-empted by ${id}`, by: id } };
-      for (const h of holds) this.cancel(h, reason);
+      for (const h of holds) {
+        const held = this.live.get(h)!;
+        const intent = held.def.resumeIntent?.(this, held.exec, held.rec);
+        this.cancel(h, reason);
+        if (intent && (!this.live.has(h) || this.live.get(h)!.cancelling)) {
+          const queue = (this.services.socialReturns ??= []) as SocialReturn[];
+          let directive = id;
+          for (let parent = opts.parent; parent; parent = this.records.get(parent)?.parent) directive = parent;
+          queue.push({ ...intent, source: h, directive });
+        }
+      }
       const refused = holds.find((h) => this.live.has(h) && !this.live.get(h)!.cancelling);
       if (refused) {
         const other = this.records.get(refused)!;
@@ -245,6 +273,7 @@ export class Runtime {
       rec.diagnostic = diagnostic;
     }
     if (this.waiting.size) this.admitWaiting();
+    this.admitSocialReturns();
     const ti = this.prof ? this.prof.now() : 0;
     for (const inv of this.invariants)
       for (const d of inv(this)) {
@@ -269,7 +298,7 @@ export class Runtime {
 
   /** Step until all given (or all) actions are terminal, or a tick budget is exhausted. */
   runUntilIdle(maxTicks = 20 * 60 * 30, ids?: string[]) {
-    const pending = () => (ids ? ids.some((i) => this.isActive(i)) : this.live.size + this.waiting.size > 0);
+    const pending = () => (ids ? ids.some((i) => this.isActive(i)) : this.live.size + this.waiting.size + (this.services.socialReturns?.length ?? 0) > 0);
     let n = 0;
     while (pending() && n++ < maxTicks) this.step();
     return !pending();
@@ -401,6 +430,25 @@ export class Runtime {
       return ids.length ? ids : null;
     }
     return null;
+  }
+
+  /** Resume only successful directives. Failed/cancelled instructions leave the actor at their
+   * explicit stopping position; a return never steals a seat, hands, or another action's actor. */
+  private admitSocialReturns() {
+    const queue = this.services.socialReturns as SocialReturn[] | undefined;
+    if (!queue?.length) return;
+    for (const intent of queue.slice()) {
+      if (this.isActive(intent.directive) || this.isActive(intent.source)) continue;
+      queue.splice(queue.indexOf(intent), 1);
+      const directive = this.records.get(intent.directive);
+      if (directive?.status !== 'completed') {
+        this.mark('social.resume-skipped', { source: intent.source, directive: intent.directive, actor: intent.actor, reason: directive?.status ?? 'directive-missing' });
+        continue;
+      }
+      const resumed = this.submit(intent.verb, intent.params, { id: `${intent.source}:resume:${intent.directive}`, preempt: false });
+      this.mark(resumed.status === 'failed' ? 'social.resume-refused' : 'social.resume-started', { source: intent.source, directive: intent.directive, actor: intent.actor, action: resumed.id, ...(resumed.diagnostic ? { diagnostic: resumed.diagnostic } : {}) });
+    }
+    if (!queue.length) delete this.services.socialReturns;
   }
 
   /** End of tick: start (plan → reserve → start) every waiting directive whose pre-empted holds have ended, in submission order. */
