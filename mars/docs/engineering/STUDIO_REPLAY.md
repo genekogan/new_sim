@@ -517,3 +517,20 @@ crew at the frames, two blocked-wait lines), `-final.png` (97:43: all twelve fra
 (LAB_GUIDE-level detail in `app/lab/year-build.ts`: the establishing spec evaluated with `evaluateShot`, equal to the
 take's first camera sample).
 
+
+### Shot-hold frame sampling (2026-09-29)
+
+The release-13 gate exposed the old fixed 5% sampling allowance: one shot was
+observed for 1.4166 s, with its first observation following a 100 ms frame interval.
+The pure hold chain still assigns 1.5 nominal wall seconds; displayed cuts are
+quantized to frames, so the documentation's literal per-shot wall minimum is not
+a frame-independent guarantee. This change does not alter that playback behavior.
+
+The browser test retains the exact independently computed chain and checks each
+complete chain segment's nominal duration. Its wall-time check now adds only that
+shot's preceding first-observation interval, not a global maximum or arbitrary
+percentage. It also requires advancing clocks, complete samples and frame cadence
+≤375 ms (four samples per nominal hold), and writes raw samples before assertions.
+The failed trace had 1,196 held samples, max gap 100 ms, minimum bounded duration
+1.4999 s (timestamp precision); `briefs/shot-hold-sampling.capture.json` records all
+39 complete-shot bounds. LM-139's held-tail framing and single-take work is unchanged.

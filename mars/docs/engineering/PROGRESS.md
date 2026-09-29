@@ -1663,3 +1663,15 @@ LM076 integration review caught deferred cancellation bypassing a missing stair 
 Wave2 integration evaluation (not merged): isolated branch codex/wave2-assembly at feb3d7d combines reviewed camera/body/carry/staging/core/retreat work. First suite at7073159:582 pass/21 fail,6skip/11TODO; log viewer/.cloudflare/wave2-combined-engine-1.log. Expected old pins remain unchanged. Real v2/progressive fixture/dependency failures fixed and21/21 verified; camera safety/ranking assertions corrected separately; redundant link alignment sync removed and original stress-work ceiling passes. Further body/grip/movement work is required before the ONE wave2 pin window. No takes re-recorded.
 
 Pin-neutral social milestone candidate: conversation selective release/re-forming, ambient re-adoption and action-id/live-link guards, including the independent cancellation-landing review correction. New social captures show retained partners while one person walks away/back and ordinary ambient return; negative ownership/held-item/queue cases pass. Full gate pending; no row counted closed before it.
+
+### 2026-09-29 — release-13 browser sampling diagnosis
+
+- Gate at clean `cbb7689`: lint/unit/engine/tsc green; shot-hold browser test failed
+  its fixed 5% wall-time allowance (1.4166 s observed vs 1.425 s). Extracted actual
+  Playwright trace: that shot's first sample followed a 100 ms interval. All complete
+  shots satisfy 1.5 s within their own start-frame uncertainty (minimum 1.4999 s).
+- Root isolated `codex/shot-hold-sampling`; changed only test measurement/docs, keeping
+  exact chain and 1.5 nominal hold assertions, adding cadence/monotonicity checks and
+  pre-assertion raw artifacts. Tooling read-only review agreed with per-shot bound;
+  no product code, thresholds for physical simulation, pins or takes changed.
+- Focused browser and full clean-head gate pending. No new helper; root about 10 min.

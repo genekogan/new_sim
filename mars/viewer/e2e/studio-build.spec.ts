@@ -504,9 +504,9 @@ for (const s of sets) test(`chapter set at 64× (${s.id.slice(0, 8)}): shot hold
       runs.held = { info: await page.getByLabel('Shot now').innerText(), seg: (await setInfo48(page))!.hold.seg, t: (await setInfo48(page))!.t };
     } else await page.getByRole('button', { name: 'Pause take' }).click();
     // segments: runs of the same shot key; on-screen time = wall between the first frame of one and of the next
-    const segs: { key: string; w0: number; w1: number; t0: number; t1: number; label: string }[] = [];
+    const segs: { key: string; w0: number; w1: number; startGapMs: number; t0: number; t1: number; label: string }[] = [];
     res.key.forEach((k, j) => {
-      if (!segs.length || segs[segs.length - 1].key !== k) segs.push({ key: k, w0: res.w[j], w1: res.w[j], t0: res.t[j], t1: res.t[j], label: res.label[j] });
+      if (!segs.length || segs[segs.length - 1].key !== k) segs.push({ key: k, w0: res.w[j], w1: res.w[j], startGapMs: j ? res.w[j] - res.w[j - 1] : 0, t0: res.t[j], t1: res.t[j], label: res.label[j] });
       const g = segs[segs.length - 1];
       g.w1 = res.w[j + 1] ?? res.w[j];
       g.t1 = res.t[j];
@@ -515,6 +515,9 @@ for (const s of sets) test(`chapter set at 64× (${s.id.slice(0, 8)}): shot hold
     const r2 = (x: number) => Math.round(x * 100) / 100;
     const sorted = [...inner].sort((a, b) => a - b);
     const setSeconds = res.t[res.t.length - 1] - res.t[0];
+    const gaps = res.w.slice(1).map((w, j) => w - res.w[j]).sort((a, b) => a - b);
+    const bounds = segs.slice(1, -1).map((g) => ({ key: g.key, observedS: (g.w1 - g.w0) / 1000,
+      startGapS: g.startGapMs / 1000, upperDurationS: (g.w1 - g.w0 + g.startGapMs) / 1000 }));
     runs[hold ? 'hold' : 'planned'] = {
       anchor, frames: res.w.length, setSeconds: r2(setSeconds), setPerWall: r2(setSeconds / (WALL / 1000)),
       // on-screen set seconds per complete shot ÷ 64: the wall time at a true 64× (independent of the frame rate / load)
@@ -522,13 +525,26 @@ for (const s of sets) test(`chapter set at 64× (${s.id.slice(0, 8)}): shot hold
       shots: segs.length, complete: inner.length, meanS: r2(inner.reduce((a, b) => a + b, 0) / inner.length), minS: r2(sorted[0]), p10S: r2(sorted[Math.floor(sorted.length * 0.1)]), maxS: r2(sorted[sorted.length - 1]),
       chapters: [...new Set(res.key.map((k) => k.split(':')[0]))],
       firstShots: segs.slice(0, 6).map((g) => `${g.key} ${r2((g.w1 - g.w0) / 1000)} s · ${g.label.slice(0, 50)}`),
+      cadenceMs: { max: gaps.at(-1), p95: gaps[Math.floor(gaps.length * 0.95)] },
+      bounds,
     };
+    // Keep failed-run evidence too. The first observation can be one frame after a cut;
+    // using a fixed percentage (or a global worst frame) misstates that uncertainty.
+    writeArtifact(`studio-build-set-hold-${hold ? 'held' : 'planned'}-samples.json`, { anchor, res, segs, bounds });
+    writeArtifact('studio-build-set-hold.json', { set: s.id, speed: 64, wallS: WALL / 1000, from, ...runs });
     if (hold) {
       // the chain on screen is exactly the rule's chain from the anchor (deterministic given speed and start)
-      const want = expectedHolds(s, anchor, 1.5 * 64, res.t[res.t.length - 1] + 1e-6).map((x) => `${x.k}:${x.i}@${x.d.toFixed(3)}`);
+      const chain = expectedHolds(s, anchor, 1.5 * 64, res.t[res.t.length - 1] + 1e-6);
+      const want = chain.map((x) => `${x.k}:${x.i}@${x.d.toFixed(3)}`);
       expect(segs.map((g) => g.key), 'the shots on screen are the hold chain from the anchor').toEqual(want.slice(0, segs.length));
-      // held shots: every complete shot ≥ 1.5 s wall (a 5 % allowance for the frame the cut lands on)
-      expect(Math.min(...inner), 'no complete shot under 1.5 s on screen').toBeGreaterThanOrEqual(1.5 * 0.95);
+      expect(bounds.length, 'complete held shots were sampled').toBeGreaterThan(0);
+      expect(gaps[0], 'sample timestamps advance').toBeGreaterThan(0);
+      expect(gaps.at(-1), 'cadence resolves a 1.5 s hold in at least four samples').toBeLessThanOrEqual(375);
+      expect(res.t.every((t, j) => !j || t >= res.t[j - 1]), 'set clock never reverses').toBe(true);
+      for (const x of chain.slice(1, segs.length - 1))
+        expect((x.r - x.d) / 64, 'nominal held duration remains 1.5 s').toBeGreaterThanOrEqual(1.5 - 1e-9);
+      for (const b of bounds)
+        expect(b.upperDurationS, `${b.key}: ${b.observedS}s observed + its ${b.startGapS}s first-frame uncertainty`).toBeGreaterThanOrEqual(1.5 - 0.001);
       expect(res.label.some((l, j) => res.key[j] !== res.key[j - 1] && j > 0), 'cuts happen').toBe(true);
     } else expect(Math.min(...inner), 'without the hold some planned shots flash by').toBeLessThan(1.5);
   }
