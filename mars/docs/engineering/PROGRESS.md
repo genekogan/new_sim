@@ -1675,3 +1675,8 @@ Pin-neutral social milestone candidate: conversation selective release/re-formin
   pre-assertion raw artifacts. Tooling read-only review agreed with per-shot bound;
   no product code, thresholds for physical simulation, pins or takes changed.
 - Focused browser and full clean-head gate pending. No new helper; root about 10 min.
+
+Shot-hold focused browser proof on `3b4ab60`: 1/1 passed in 2.2 minutes.
+Raw planned/held timing artifacts are retained under
+`viewer/e2e/artifacts/shot-hold-sampling/`; no product or recording change.
+Full gate is being repeated at the resulting clean committed head.
