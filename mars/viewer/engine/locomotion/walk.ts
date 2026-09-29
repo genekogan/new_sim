@@ -1089,7 +1089,11 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
   }
   if (!best) return;
   if (ex) ex.detour = { spot: best, level: o.human.level, by: clearOf!.by, blockers: [...clearOf!.subjects], clearOf: clearOf!.test, stage: 'pending' };
-  else rt.submit('walk_to', { actor: who, x: best[0], z: best[1] }, { id: `${who}:make-way:${rt.tick}` });
+  else {
+    const id = `${who}:make-way:${rt.tick}`;
+    // Multiple blocked movers may nudge the same idle person in one tick, even after a refusal.
+    if (!rt.records.has(id)) rt.submit('walk_to', { actor: who, x: best[0], z: best[1] }, { id });
+  }
 }
 
 /** The straight way from `from` to `q` never brings `me` closer to a person or carried-load disc it is (or would be) touching. */

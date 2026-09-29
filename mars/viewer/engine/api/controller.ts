@@ -9,7 +9,7 @@ import { hashOf, stableStringify } from '../core/hash.ts';
 import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
 import { baselineEnvelope, checkPlan, describeDiff, execute as executePlan, integrity, physicalDiff, rehearse as rehearsePlan, runReport, runServices, type EngineConfig, type EnvelopeSource, type RunReport, type StaleInfo } from '../rehearsal/rehearse.ts';
 import type { PlanEnvelope } from '../rehearsal/envelope.ts';
-import { DT, Runtime, type Invariant } from '../runtime/runtime.ts';
+import { ActionAdmissionError, DT, Runtime, type Invariant } from '../runtime/runtime.ts';
 import { SnapshotError } from '../runtime/snapshot.ts';
 import { bindTemplate, PlanError } from '../sequence/bind.ts';
 import { DEFAULT_MAX_TICKS, SequenceRunner } from '../sequence/runner.ts';
@@ -277,6 +277,7 @@ export class EngineController {
     } catch (e) {
       if (e instanceof PlanError) return fail(e.code, e.message, { diagnostics: e.diagnostics });
       if (e instanceof HistoryError) return fail(e.code, e.message);
+      if (e instanceof ActionAdmissionError) return fail(e.diagnostic.code, e.message, { diagnostics: [e.diagnostic] });
       return fail('engine.error', e instanceof Error ? e.message : String(e));
     }
     return fail('op.unknown', name);

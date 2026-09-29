@@ -379,3 +379,5 @@ content-addressed state in the history store and keep only the hash in the take.
   skipped, both `sequence.step-cancelled`; a step the plan cancels ran as directed, so the sequence can still be
   `completed`). `at`, `after` and `when` apply to built-ins like to any step. A registry verb may not use a
   built-in's name.
+
+Action ids are unique across live and terminal records. Duplicate explicit ids throw `ActionAdmissionError` with `action.duplicate-id` before events, reservations or history change; the controller translates it to its named refusal envelope. Generated ids skip occupied explicit `aN` names, including after snapshot restore.

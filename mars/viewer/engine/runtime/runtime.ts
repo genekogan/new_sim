@@ -10,6 +10,16 @@ import { applySnapshot, decodeSnapshot, takeSnapshot, type RuntimeInternals, typ
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
 
+/** Admission failure before a record or event can overwrite an existing action. */
+export class ActionAdmissionError extends Error {
+  readonly diagnostic: Diagnostic;
+  constructor(id: string) {
+    super(`action id "${id}" already exists`);
+    this.name = 'ActionAdmissionError';
+    this.diagnostic = { code: 'action.duplicate-id', message: this.message, subjects: [id] };
+  }
+}
+
 export type Violation = Diagnostic & { tick: number };
 
 export interface RuntimeObserver {
@@ -92,6 +102,9 @@ export class Runtime {
    * the directive then fails `reservation.conflict` as before.
    */
   submit(verb: string, params: unknown, opts: { id?: string; parent?: string; preempt?: boolean } = {}): ActionRecord {
+    if (opts.id !== undefined && this.records.has(opts.id)) throw new ActionAdmissionError(opts.id);
+    // Explicit ids can occupy the generated namespace; skip them without replacing history.
+    if (opts.id === undefined) while (this.records.has(`a${this.nextId}`)) this.nextId++;
     const id = opts.id ?? `a${this.nextId++}`;
     const rec: ActionRecord = { id, verb, params, status: 'requested', history: [], requestedTick: this.tick, parent: opts.parent };
     this.records.set(id, rec);
@@ -442,7 +455,12 @@ export class Runtime {
         this.mark('social.resume-skipped', { source: intent.source, directive: intent.directive, actor: intent.actor, reason: directive?.status ?? 'directive-missing' });
         continue;
       }
-      const resumed = this.submit(intent.verb, intent.params, { id: `${intent.source}:resume:${intent.directive}`, preempt: false });
+      const id = `${intent.source}:resume:${intent.directive}`;
+      if (this.records.has(id)) {
+        this.mark('social.resume-refused', { source: intent.source, directive: intent.directive, actor: intent.actor, action: id, diagnostic: new ActionAdmissionError(id).diagnostic });
+        continue;
+      }
+      const resumed = this.submit(intent.verb, intent.params, { id, preempt: false });
       this.mark(resumed.status === 'failed' ? 'social.resume-refused' : 'social.resume-started', { source: intent.source, directive: intent.directive, actor: intent.actor, action: resumed.id, ...(resumed.diagnostic ? { diagnostic: resumed.diagnostic } : {}) });
     }
     if (!queue.length) delete this.services.socialReturns;
