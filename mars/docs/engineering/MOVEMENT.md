@@ -393,3 +393,5 @@ separate.
 ### Live stair-link changes (LM076)
 
 Routes copy planned link geometry. Every active link step checks the current scene link before movement, cancellation or replanning. A closed, missing or geometrically changed link returns `route.link-unusable`: before entry the action fails; between levels it remains blocked with actor and traffic ownership retained at the current pose. Deferred cancellation also waits for a usable original path. A future corridor invalidation cannot project the mid-flight body to its old floor; it waits until that route is valid. Recovery finishes by ordinary stair movement after the link/route is restored. These injected invalidation fixtures change navigation, not the physical stair mesh; the engine does not manufacture support after actual structure removal. Swept body collision on climb paths remains LM032.
+
+Deferred stair cancellation also checks the chosen landing's current supported floor and clearance. A missing landing blocks as `route.landing-unavailable` with the climber and claims held; restoring it permits ordinary cancellation movement.

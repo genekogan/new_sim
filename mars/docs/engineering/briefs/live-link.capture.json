@@ -197,5 +197,61 @@
     ],
     "final": "completed",
     "violations": []
+  },
+  {
+    "case": "cancel missing entry landing",
+    "pose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.landing-unavailable",
+      "message": "p1 waits on stairs-a: the cancellation entry landing has no supported clear floor",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ],
+      "at": [
+        1.55,
+        0,
+        10
+      ]
+    },
+    "violations": []
+  },
+  {
+    "case": "cancel missing exit landing",
+    "pose": {
+      "p": [
+        4.681999999999997,
+        2.011499999999997,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.landing-unavailable",
+      "message": "p1 waits on stairs-a: the cancellation exit landing has no supported clear floor",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ],
+      "at": [
+        6.4,
+        3,
+        10
+      ]
+    },
+    "violations": []
   }
 ]

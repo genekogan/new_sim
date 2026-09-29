@@ -77,3 +77,34 @@ test('an invalid future corridor cannot replan a climber onto its lower floor', 
   assert.deepEqual(rt.violations, []);
   captures.push({ case: 'future corridor invalidation', heldPose: pose, holders, final: action.status, violations: rt.violations });
 });
+
+
+test('deferred stair cancellation retains its pose and ownership when either chosen landing disappears', () => {
+  for (const endpoint of ['entry', 'exit'] as const) {
+    const { rt, sp, action } = setup();
+    const height = endpoint === 'entry' ? 0.5 : 2;
+    for (let i = 0; i < 600 && rt.world.entities.p1.pose.p[1] < height; i++) rt.step();
+    assert.equal(action.phase, 'climb');
+    const pose = structuredClone(rt.world.entities.p1.pose), holders = rt.holder('actor:p1');
+    const traffic = structuredClone(rt.services.traffic), surfaces = sp.scene.surfaces;
+    const level = endpoint === 'entry' ? 0 : 1;
+    sp.scene.surfaces = surfaces.filter((s) => s.level !== level);
+    sp.epoch++;
+    assert.equal(rt.cancel(action.id).phase, 'cancelling');
+    for (let i = 0; i < 20; i++) {
+      rt.step();
+      assert.equal(action.status, 'blocked');
+      assert.equal(action.diagnostic?.code, 'route.landing-unavailable');
+      assert.deepEqual(rt.world.entities.p1.pose, pose);
+      assert.deepEqual(rt.holder('actor:p1'), holders);
+      assert.deepEqual(rt.services.traffic, traffic);
+    }
+    assert.deepEqual(rt.violations, []);
+    captures.push({ case: `cancel missing ${endpoint} landing`, pose, holders, diagnostic: action.diagnostic, violations: rt.violations });
+    sp.scene.surfaces = surfaces; sp.epoch++;
+    assert.ok(rt.runUntilIdle(1000));
+    assert.equal(action.status, 'cancelled');
+    assert.equal(rt.world.entities.p1.human!.level, level);
+    assert.deepEqual(rt.violations, []);
+  }
+});

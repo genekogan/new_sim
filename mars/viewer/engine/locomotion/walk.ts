@@ -13,7 +13,7 @@
 //   animation : consumers read pose + human.activity; they never write positions
 import { blockedWait, publishedWaitsFor } from '../runtime/waits.ts';
 import { z } from 'zod';
-import { add2, angleDelta, clamp, cross2, dist2, dot2, heading, len2, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
+import { pointInObb, add2, angleDelta, clamp, cross2, dist2, dot2, heading, len2, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
@@ -534,8 +534,9 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     enterLeg(rt, ex);
     return { status: 'running', phase: 'replan' };
   }
-  // topology changed (construction)? replan only if the remaining corridor is no longer valid
-  sp.sync(rt.world);
+  // Link admission already synced above; avoid repeating the same scan while aligning.
+  // Topology changed (construction)? replan only if the remaining corridor is no longer valid.
+  if (activeLeg?.kind !== 'link') sp.sync(rt.world);
   let moved = false;
   if (sp.epoch !== ex.epoch) {
     ex.epoch = sp.epoch;
@@ -1426,6 +1427,15 @@ function pointOnLink(g: LinkGeometry, at: number): [number, number, number] {
 function stepLinkCancel(rt: Runtime, ex: Exec, a: Entity, leg: LinkLeg, dt: number): StepResult {
   const geo = linkGeometry(leg);
   const forward = ex.cancelTo === 'exit';
+  const landing = forward ? geo.exit : geo.entry;
+  const sp = spatial(rt), grid = sp.level(landing.level);
+  const supported = sp.scene.surfaces.some((s) => s.level === landing.level && Math.abs(s.y - landing.y) <= 1e-6 && pointInObb(landing.p, s.obb));
+  if (!supported || !grid || clearanceAt(grid, landing.p) < ex.profile.radius) {
+    a.human!.activity = 'climb-wait'; ex.v = 0;
+    return { status: 'blocked', diagnostic: { code: 'route.landing-unavailable',
+      message: `${ex.actor} waits on ${leg.link.id}: the cancellation ${forward ? 'exit' : 'entry'} landing has no supported clear floor`,
+      subjects: [ex.actor, leg.link.id], at: [landing.p[0], landing.y, landing.p[1]] } };
+  }
   const at = forward ? Math.min(geo.total, ex.climbT + CLIMB_SPEED * dt) : Math.max(0, ex.climbT - CLIMB_SPEED * dt);
   const next = pointOnLink(geo, at);
   const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);

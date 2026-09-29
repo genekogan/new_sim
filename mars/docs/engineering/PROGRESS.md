@@ -1657,3 +1657,5 @@ briefs/ambient-return.REPORT.md. Depends on converse hooks79f8ca7+c2ff10c.
 - Validation: 10 conversation-return tests, TypeScript and lint green. No pins,
   historical content, full suite or release changes. Follow-up to 79f8ca7 and
   c2ff10c; authored atop bcc514a but has no ambient implementation dependency.
+
+LM076 integration review caught deferred cancellation bypassing a missing stair landing. Added current surface/grid validation for both chosen endpoints, retaining pose/claims and ordinary recovery; four link tests and two new inspected states pass, tsc/lint clean. Removed a duplicate alignment sync introduced by early live-link checks rather than increasing the stress-work ceiling; broader verification pending. About15 lead minutes; no pins/history.
