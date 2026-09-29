@@ -292,9 +292,9 @@ prints the flagship build-bay/open-ground `finalStateHash`, take id and math fin
 ## What is resumable — and what is not
 
 - **Quiescent checkpoints:** any checkpoint between runs. A plan bound to it can be rehearsed or executed any
-  number of times; any workspace can fork from any checkpoint. `take.finalState` is one because runs end with
-  every action terminal (aborted/timed-out runs end with cancelled actions, so theirs are quiescent too; not
-  committed by default).
+  number of times; any workspace can fork from any checkpoint. A final take state is quiescent only when
+  every action is terminal. Certified `blocked` runs retain live actions and supported loads; unsafe
+  cancellation can also leave work unsettled. Execute refuses an unsettled result even with `commitOnFailure`.
 - **Mid-action pause checkpoints (spec §22), for a defined subset.** `rt.snapshot()` returns a
   `RuntimeSnapshot` (`runtime/snapshot.ts`, plain JSON): world, every `ActionRecord`, each live action's
   `exec` + `program`, reservations (`owners`), per-action prior phases, plain-data services (`traffic` holds,
@@ -312,10 +312,12 @@ prints the flagship build-bay/open-ground `finalStateHash`, take id and math fin
     single-file traffic holds; `take_slot`, `sit`, `stand`, `face`, `converse`, `gather`, `campfire_circle`;
     sequences — `SequenceRunner.serialize()` / `SequenceRunner.restore(rt, state)` carry pending/started steps,
     cues, cut/refused sets (pair with an `rt.snapshot()` at the same tick; `runner.tick()` steps one tick).
+    `raise_upright` is additionally verified only during controlled cancellation lowering
+    (`raise-cancel.test.ts`): reverse trail, holder ownership and the lowering cursor resume tick-exactly.
   - **Refused loudly** (`snapshot.non-resumable`, naming each action and why; `NON_RESUMABLE` in snapshot.ts):
     `carry` — its exec drives in-process walk sub-execs (not child actions) registered in `services.walkExecs`,
     publishes load discs through a services closure (`loadDiscs`), and holds planner trajectories + formation
-    transitions whose tick-exact restoration is unverified; construction lifts (`raise_upright`,
+    transitions whose tick-exact restoration is unverified; construction lifts (`raise_upright` outside lowering,
     `connect_beam`, `install_*`, `release_support`) — they hold loads and drive crew sub-walks + lift
     trajectories; vehicles (`mount`, `dismount`, `ride_to`, `ride_loop`) — controller state and the vehicle
     invariant's per-runtime memory are not serialised; `ambient_wander` and any other verb — not yet verified.
