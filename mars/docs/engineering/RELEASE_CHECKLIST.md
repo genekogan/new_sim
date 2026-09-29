@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 10 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 11 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -680,4 +680,31 @@ Rollback from viewer:
 
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 15c50c30-2e8e-4de5-a862-483abc1a9e47 --name mars-campus-2026 -m "rollback release 10: <reason>"
+```
+
+## Production deploy 11 (2026-09-29, staging camera verification and vehicle cycles)
+
+Clean source **1859a8c** passed the full gate before fast-forward merge. Live **4de6d265-4292-4e20-88c2-e85dda7a5488**, created04:22:15Z/deployed04:22:17Z, confirmed100%. Rollback **f7ea9962-0d5e-4af5-afc5-9b433e4c49da** (release10), confirmed100% before rollout. The documentation/evidence commit records that source; it is not a different deployed build. No remote/push, pins or historical values changed.
+
+LAST_MILE **33 fixed /36 reclassified /147 remaining**. LM100/137/043 close; LM024 tails improve but remain partial. Carry bystander safety is excluded after its two-tick probe change; retained for the single wave2 pin window. Earlier failed gate/evidence attempts remain documented in PROGRESS.
+
+| Check | Result |
+| --- | --- |
+| Full gate | GREEN `viewer/.cloudflare/gate/2026-09-29T03-56-35-186Z/report.json`;1859a8c,gitDirty:false,cleanupError:null |
+| Lint / TypeScript | clean,0warnings/errors |
+| Unit |93pass/0fail |
+| Engine |515total:498pass/0fail/6skip/11TODO |
+| Browser |84pass/7documented skips;916.6s |
+| Recording / determinism |byte-identical flagship;unchanged b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local MCP |all36tools pass |
+| Idle performance |original limits pass;exact peak108.766ms/mean0.544816ms;corridor peak49.2585ms/mean0.418019ms;grids81.6–141.0ms;zero violations,pinned outcomes |
+| Evidence |498/0;17rowsPROVEN,8milestonesPROVEN;capabilities25/2/1 |
+
+Historical skips/TODOs and capability exceptions remain explicit; no skipped case is claimed as executed proof. Generated evidence used the exact final green report. Build/dry-run passed:340publicfiles/821.1MiB,8largeobjects already uploaded,zeroR2writes;388buildassets,6831.50KiB/1223.92KiBgzip. Actual rollout uploaded14assets(350existing),startup100ms. Known chunk-size/dynamic-import warnings remain.
+
+Production verification all passed:340assets/19routes/GLBrange/auth;all36MCPtools;director demo all steps;Studio direct/refusal/play and save/download/reopen/file-track2/2(42.1s);Lab10901ticks,43/43steps,5/5checks,zero violations/errors and exact Node probe hash. Lead personally inspected all three production PNGs:directed playback,reopened file track with green hash,completed supported bay/stair. Captures/audit copied to main. Logs in integration `viewer/.cloudflare/*release-11*.log`; audit `http-smoke.json` and `prod-lab-11.json`.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback f7ea9962-0d5e-4af5-afc5-9b433e4c49da --name mars-campus-2026 -m "rollback release11: <reason>"
 ```
