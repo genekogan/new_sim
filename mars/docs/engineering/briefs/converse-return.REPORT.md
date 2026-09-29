@@ -35,3 +35,10 @@ re-forming is demonstrated; no general crowd choreography claim is made.
 Integration overlap: root 641741f owns duplicate-id handling at Runtime.submit entry
 and seat-return explicit-id refusal. This branch does not edit those lines and group
 return walks use automatic ids, covered by that root allocation rule.
+
+Review correction: selective member detachment now commits only after every other
+social hold has accepted cancellation, including the deferred stand-up path. A mixed
+request with a cancellation-refusing social holder proves the directed action fails
+while all conversation membership, actor ownership and world state remain unchanged.
+Nine focused converse tests now pass; tsc/lint pass. Existing behavior for partial
+cancellation among older whole-action social holds is not broadened by this change.

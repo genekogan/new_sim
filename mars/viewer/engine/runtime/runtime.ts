@@ -143,14 +143,6 @@ export class Runtime {
       if (!queue.length) delete this.services.socialReturns;
     }
     const yielding = preempt ? this.preemptible(def, parsed.data, rec, opts.parent) : null;
-    if (yielding) for (const { live, actors } of yielding.members) {
-      live.def.releaseMembers!(this, live.exec, actors, rec);
-      for (const actor of actors) {
-        const key = `actor:${actor}`, owners = this.owners.get(key) ?? [];
-        const kept = owners.filter((o) => o.action !== live.rec.id);
-        if (kept.length) this.owners.set(key, kept); else this.owners.delete(key);
-      }
-    }
     const holds = yielding?.holds.length ? yielding.holds : null;
     if (holds) {
       const reason: Diagnostic = { code: 'social.pre-empted', message: `pre-empted by ${id} (${verb})`, subjects: [id], details: { reason: `pre-empted by ${id}`, by: id } };
@@ -170,6 +162,7 @@ export class Runtime {
         const other = this.records.get(refused)!;
         return this.fail(rec, { code: 'reservation.conflict', message: `${other.verb} ${refused} refused to release its people for ${id}: ${other.diagnostic?.message ?? 'cancel refused'}`, subjects: [refused], details: { holder: refused } });
       }
+      this.commitMemberYields(yielding!, rec);
       const still = holds.filter((h) => this.live.has(h));
       if (still.length) {
         this.waiting.set(id, { rec, def, params: parsed.data, parent: opts.parent, holds: still });
@@ -177,7 +170,19 @@ export class Runtime {
         return rec;
       }
     }
+    if (yielding && !holds) this.commitMemberYields(yielding, rec);
     return this.admit(rec, def, parsed.data, opts.parent);
+  }
+
+  private commitMemberYields(yielding: { members: { live: Live; actors: string[] }[] }, rec: ActionRecord) {
+    for (const { live, actors } of yielding.members) {
+      live.def.releaseMembers!(this, live.exec, actors, rec);
+      for (const actor of actors) {
+        const key = `actor:${actor}`, owners = this.owners.get(key) ?? [];
+        const kept = owners.filter((o) => o.action !== live.rec.id);
+        if (kept.length) this.owners.set(key, kept); else this.owners.delete(key);
+      }
+    }
   }
 
   /** validated → reserved → executing (plan, reserve, start), or a diagnostic failure. */

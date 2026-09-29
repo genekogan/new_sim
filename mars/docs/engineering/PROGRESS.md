@@ -1631,3 +1631,8 @@ No pins/history values changed; integrated gate/browser proof pending. Parent-ow
 fixture seats and other social rows remain separate. Approximately 45 worker minutes,
 no helpers. See briefs/converse-return.REPORT.md. Root duplicate-id commit641741f
 must be preserved at integration; this candidate uses automatic return-walk ids.
+
+LM026 review correction: defer selective conversation release until other social
+cancellations accept. Mixed cancellation-refusal regression proves unchanged group,
+resources and world on failed admission. Converse focused 9/9, tsc/lint green.
+No pins or historical changes; approximately 10 worker minutes, no helpers.

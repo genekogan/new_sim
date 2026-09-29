@@ -166,3 +166,25 @@ test('member return waits for the outer directive and does not mistake its child
   wait(rt, () => rejoined(rt));
   assert.deepEqual(rt.violations, []);
 });
+
+
+test('a refusing social cancellation leaves selective conversation membership and ownership unchanged', () => {
+  const { rt, group } = setup();
+  rt.world.entities.busy = human('busy', -10, -8);
+  const refusal: ActionDef<{ actor: string }, null, null> = {
+    verb: 'refusal-hold', description: 'Explicit invariant fixture: cancellation refuses', schema: z.object({ actor: z.string() }),
+    reservations: (_w, p) => [{ resource: `actor:${p.actor}`, mode: 'exclusive' }],
+    plan: () => ({ ok: true, program: null }), start: () => null, step: () => ({ status: 'running' }),
+    cancel: () => ({ ok: false, diagnostic: { code: 'fixture.cancel-unsafe', message: 'held support cannot be released' } }),
+    yieldTo: (_r, self) => [self.id],
+  };
+  rt.registry.set(refusal.verb, refusal); rt.submit(refusal.verb, { actor: 'busy' });
+  rt.registry.set('mixed-directive', { ...walkTo, verb: 'mixed-directive', reservations: () => [{ resource: 'actor:a', mode: 'exclusive' }, { resource: 'actor:busy', mode: 'exclusive' }] });
+  const before = structuredClone(rt.world);
+  const action = rt.submit('mixed-directive', { actor: 'a', x: -9, z: -8 });
+  assert.equal(action.status, 'failed'); assert.equal(action.diagnostic?.code, 'reservation.conflict');
+  assert.deepEqual(rt.world, before);
+  assert.deepEqual(rt.holder('actor:a'), [group.id]);
+  assert.ok(!rt.events.some((e) => e.type === 'mark' && e.name === 'converse.member-left'));
+  assert.equal(rt.world.entities.a.human!.activity, 'talk');
+});
