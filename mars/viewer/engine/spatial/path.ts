@@ -405,10 +405,12 @@ function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: 
     const e = viaLink.get(id);
     const g = grids.levels.get(lvIds[Math.floor(id / N)])!;
     if (e) {
-      const { entry, exit } = linkApproach(e.link, e.ascending);
+      // A running route owns its geometry; scene contributors may replace or edit links later.
+      const link = structuredClone(e.link);
+      const { entry, exit } = linkApproach(link, e.ascending);
       pts.push(e.approach, entry.p);
       legs.push(walkLeg(grids.levels.get(curLv)!, pts, r));
-      legs.push({ kind: 'link', link: e.link, ascending: e.ascending });
+      legs.push({ kind: 'link', link, ascending: e.ascending });
       pts = [exit.p];
       curLv = e.toLevel;
     } else pts.push(centreOf(g, id % N));

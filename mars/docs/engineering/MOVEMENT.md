@@ -389,3 +389,7 @@ forklift-specific waits are not yet covered. The actual stairs-a closed wait and
 supported held carry are proven; the generic forced three-cycle is not LM-043's
 physical three-vehicle traffic proof. LM-020 co-planning and LM-025 back-out remain
 separate.
+
+### Live stair-link changes (LM076)
+
+Routes copy planned link geometry. Every active link step checks the current scene link before movement, cancellation or replanning. A closed, missing or geometrically changed link returns `route.link-unusable`: before entry the action fails; between levels it remains blocked with actor and traffic ownership retained at the current pose. Deferred cancellation also waits for a usable original path. A future corridor invalidation cannot project the mid-flight body to its old floor; it waits until that route is valid. Recovery finishes by ordinary stair movement after the link/route is restored. These injected invalidation fixtures change navigation, not the physical stair mesh; the engine does not manufacture support after actual structure removal. Swept body collision on climb paths remains LM032.

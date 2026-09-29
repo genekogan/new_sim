@@ -463,7 +463,42 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     releaseAll(rt, ex);
     return { status: 'failed', diagnostic: { code: 'actor.holding', message: `${ex.actor} is holding ${a.human!.grip.entity} and cannot walk away until it is set down or stable`, subjects: [ex.actor, a.human!.grip.entity] } };
   }
+  const activeLeg = ex.route.legs[ex.leg];
+  if (activeLeg?.kind === 'link') {
+    // The planned Link may be a stale object after construction replaces scene links.
+    // Check before replanning or deferred cancellation can move a body between levels.
+    sp.sync(rt.world);
+    const current = sp.scene.links.find((l) => l.id === activeLeg.link.id);
+    const planned = activeLeg.link;
+    const samePoint = (p: number[], q: number[]) => p.length === q.length && p.every((v, i) => v === q[i]);
+    const unchanged = current && current.kind === planned.kind && current.heading === planned.heading && current.width >= planned.width &&
+      current.from.level === planned.from.level && current.from.y === planned.from.y && samePoint(current.from.p, planned.from.p) &&
+      current.to.level === planned.to.level && current.to.y === planned.to.y && samePoint(current.to.p, planned.to.p) &&
+      current.path.length === planned.path.length && current.path.every((p, i) => samePoint(p, planned.path[i]));
+    if (!current?.usable || !unchanged) {
+      const diagnostic: Diagnostic = { code: 'route.link-unusable',
+        message: `${activeLeg.link.kind} ${activeLeg.link.id} became unusable: ${!current ? 'link removed' : !current.usable ? (current.reason ?? 'closed') : 'link geometry changed'}`,
+        subjects: [ex.actor, activeLeg.link.id] };
+      if (ex.phase === 'climb' && ex.climbT > 1e-9) {
+        a.human!.activity = 'climb-wait';
+        ex.v = 0;
+        // A climber cannot be dropped onto either floor; retain its actor/link claims.
+        return { status: 'blocked', diagnostic };
+      }
+      releaseAll(rt, ex);
+      return { status: 'failed', diagnostic };
+    }
+  }
   if (ex.cancelTo) return stepLinkCancel(rt, ex, a, ex.route.legs[ex.leg] as LinkLeg, dt);
+  if (activeLeg?.kind === 'link' && ex.phase === 'climb') {
+    // Replanning from a between-level pose would project it onto a floor. Hold until the
+    // remaining route is valid; only replan after reaching a supported landing.
+    if (sp.epoch !== ex.epoch && !remainingValid(rt, ex)) {
+      a.human!.activity = 'climb-wait'; ex.v = 0;
+      return { status: 'blocked', diagnostic: { code: 'route.invalidated', message: `${ex.actor} waits on ${activeLeg.link.id}: the remaining route changed before a safe landing`, subjects: [ex.actor, activeLeg.link.id] } };
+    }
+    return stepLink(rt, ex, a, activeLeg, dt);
+  }
   if (ex.detour?.stage === 'pending') {
     const r = planWalk(rt, a, { level: ex.detour.level, p: ex.detour.spot }, ex.profile);
     if (r.ok) {
@@ -1302,7 +1337,6 @@ function encounter(rt: Runtime, ex: Exec, a: Entity, track: () => Track): Encoun
 
 function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'link' }>, dt: number): StepResult {
   const link = leg.link;
-  if (!link.usable) return { status: 'failed', diagnostic: { code: 'route.link-unusable', message: `${link.kind} ${link.id} became unusable: ${link.reason ?? ''}`, subjects: [ex.actor, link.id] } };
   const face = leg.ascending ? link.heading : wrapAngle(link.heading + Math.PI);
   if (ex.phase === 'align') {
     // a walk leg ends within 5 cm of the flight's standing entry point (its settle tolerance): step onto
