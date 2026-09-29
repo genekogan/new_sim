@@ -89,19 +89,25 @@ test('obstacle ids are the stable Kit ids (pinned names survive)', () => {
   assert.ok([...comps(2022)].some((c) => /^kitchen-12-foot-orange-beam-[0-9a-f]{8}$/.test(c)));
 });
 
-test('grids build for every year (ms, cells)', () => {
-  const report: string[] = [];
+test('grids build for every year (bounded extent, free and blocked cells, valid clearance)', () => {
   for (const y of HISTORY_YEARS) {
-    buildGrids(asScene(y), 0.1); // warm
-    const t0 = performance.now();
-    const g = buildGrids(asScene(y), 0.1).levels.get(0)!;
-    const ms = performance.now() - t0;
-    let free = 0;
-    for (let i = 0; i < g.free.length; i++) if (g.free[i]) free++;
-    report.push(`${y}: ${ms.toFixed(0)} ms, ${(g.nx * g.nz / 1e6).toFixed(2)} M cells (${((100 * free) / (g.nx * g.nz)).toFixed(0)}% free)`);
-    assert.ok(ms < 1000, `${y} grid ${ms} ms`);
+    const scene = asScene(y), g = buildGrids(scene, 0.1).levels.get(0)!;
+    assert.equal(g.free.length, g.nx * g.nz);
+    assert.equal(g.clearance.length, g.free.length);
+    assert.equal(g.cell, 0.1);
+    const [x0, z0, x1, z1] = scene.bounds;
+    assert.ok(g.x0 <= x0 && g.x0 > x0 - g.cell - 1e-9, `${y}: grid starts at the scene boundary`);
+    assert.ok(g.z0 <= z0 && g.z0 > z0 - g.cell - 1e-9);
+    assert.ok(g.x0 + g.nx * g.cell >= x1 - 1e-9 && g.x0 + g.nx * g.cell < x1 + g.cell + 1e-9);
+    assert.ok(g.z0 + g.nz * g.cell >= z1 - 1e-9 && g.z0 + g.nz * g.cell < z1 + g.cell + 1e-9);
+    let free = 0, invalid = 0;
+    for (let i = 0; i < g.free.length; i++) {
+      if (g.free[i]) free++;
+      if (!Number.isFinite(g.clearance[i]) || g.clearance[i] < 0 || (!g.free[i] && g.clearance[i] !== 0)) invalid++;
+    }
+    assert.ok(free > 0 && free < g.free.length, `${y}: actual free ground and blocked geometry are represented`);
+    assert.equal(invalid, 0, `${y}: clearance finite, nonnegative and zero on blocked cells`);
   }
-  console.log(`  campus-history grids @0.1 m: ${report.join('; ')}`);
 });
 
 const routeLen = (pts: Vec2[]) => pts.slice(1).reduce((s, p, i) => s + hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);

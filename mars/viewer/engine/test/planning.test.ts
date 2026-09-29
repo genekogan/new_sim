@@ -14,7 +14,7 @@ import { findRoute, type Place } from '../spatial/path.ts';
 import { HUMAN_PROFILE, type AgentProfile, type SpatialScene } from '../spatial/types.ts';
 import { seedRng, nextRandom } from '../core/rng.ts';
 import { findRouteReference } from './path-reference.ts';
-import { stress, buildRuntime } from '../../app/lab/scenarios.ts';
+import { stressWork, assertStressWork } from './stress-work.ts';
 import { segmentClearance } from '../spatial/grid.ts';
 import { hashOf } from '../core/hash.ts';
 import { CATALOG } from '../world/catalog.ts';
@@ -154,26 +154,8 @@ test('corridor planner (opt-in): failures identical to exact, successes clear an
   assert.ok(ok > 100 && same / ok > 0.85, `${same}/${ok} identical`);
 });
 
-/** Lab stress-30 as the lab steps it (rt.step() + tick script), 60 s simulated. Bounds are loose for the
- *  parallel test runner; standalone numbers are in PLANNING_BUDGET.md (deploy/perf-stress.mjs). */
-function stressRun(planner: 'exact' | 'corridor') {
-  const s = stress(30);
-  const rt = buildRuntime(s);
-  (rt.services.spatial as Spatial).planner = planner;
-  s.start(rt);
-  const costs: number[] = [];
-  for (let i = 0; i < 20 * 60; i++) {
-    const t0 = performance.now();
-    rt.step();
-    s.tick!(rt);
-    costs.push(performance.now() - t0);
-  }
-  return { rt, max: Math.max(...costs), mean: costs.reduce((x, y) => x + y, 0) / costs.length };
-}
-
-test('stress-30: exact planner keeps the pinned result; per-tick cost bounded; zero violations', () => {
-  stressRun('corridor'); // JIT warm-up (a long-lived lab/DO process is warm)
-  const exact = stressRun('exact');
+test('stress-30: exact planner keeps the pinned result; deterministic work bounded; zero violations', () => {
+  const exact = stressWork('exact');
   assert.equal(exact.rt.violations.length, 0);
   // Re-pinned (was a6e42f5c…e26c) when head-on walkers with room to pass stopped giving way: both now slow
   // to PASS_SPEED on PASS_OFFSET instead of the later id standing still (walk.ts roomToPass), which changes
@@ -183,14 +165,28 @@ test('stress-30: exact planner keeps the pinned result; per-tick cost bounded; z
   // Re-pinned again (was 0ec4d884…ecf58): splined turns + immediate block reaction, 2026-09-28 (walk.ts; MOVEMENT.md).
   // Re-pinned again (was 1298e2e5…5ee6b): no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 (MOVEMENT.md "No jumps"); 0 violations.
   assert.equal(exact.rt.stateHash(), '5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e', 'stress-30 final state unchanged by the planning-budget work');
-  const corr = stressRun('corridor');
+  const corr = stressWork('corridor');
   assert.equal(corr.rt.violations.length, 0);
-  console.log(`stress-30 max tick: exact ${exact.max.toFixed(1)} ms (mean ${exact.mean.toFixed(2)}), corridor ${corr.max.toFixed(1)} ms (mean ${corr.mean.toFixed(2)})`);
-  // wall-clock bounds are deliberately loose (≈2× the measured 85 / 44 ms) so a loaded machine
-  // does not turn the release gate red; the measured numbers live in docs/engineering/PLANNING_BUDGET.md
-  assert.ok(exact.max <= 250, `exact max tick ${exact.max.toFixed(1)} ms`);
-  assert.ok(corr.max <= 120, `corridor max tick ${corr.max.toFixed(1)} ms`);
-  assert.ok(exact.mean <= 3 && corr.mean <= 3);
+  assert.equal(exact.rt.prof?.stats.get('invariants')?.calls, 1200, 'counter instrumentation covers every tick');
+  assertStressWork('exact', exact.work);
+  assertStressWork('corridor', corr.work);
+  const unprofiled = stressWork('exact', false);
+  assert.equal(unprofiled.rt.stateHash(), exact.rt.stateHash(), 'zero-clock profiling does not change the outcome');
+  assert.equal(unprofiled.rt.violations.length, 0);
+
+  // A redundant route/rebuild leaves the simulation unchanged but is still a genuine workload regression.
+  const spatial = exact.rt.services.spatial as Spatial;
+  const before = exact.rt.stateHash();
+  spatial.route(exact.rt.world, HUMAN_PROFILE, { level: 0, p: [-18, -15] }, { level: 0, p: [-12, -15] });
+  exact.sample();
+  assert.throws(() => assertStressWork('exact', exact.work), /spatial.route total/);
+  assert.equal(exact.rt.stateHash(), before);
+  const mirror = new Spatial(spatial.base);
+  mirror.prof = corr.rt.prof!;
+  mirror.sync(corr.rt.world);
+  corr.sample();
+  assert.throws(() => assertStressWork('corridor', corr.work), /spatial.sync.rebuild total/);
+  console.log('stress-30 deterministic planning-work ceilings passed; redundant route and grid rebuild detected');
 });
 
 // ---------------------------------------------------------------------------------------------
