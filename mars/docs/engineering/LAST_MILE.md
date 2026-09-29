@@ -719,10 +719,10 @@ one; the duplicates should be deleted (LM-173 doc hygiene).
 
 ## Wave 1 integration checkpoint (2026-09-29)
 
-This section supersedes §14's handoff counts once the integrated branch passes its full gate and merges. No row is closed merely because a helper reports success.
+This section supersedes the handoff counts: source `8decb07` passed the full clean-head gate, merged, and shipped as release 9. No row is closed merely because a helper reports success.
 
-Candidate counts: **28 fixed / 36 re-classified / 152 remaining**, of216 unique rows. Remaining partials: LM012 (camera compile worker/performance), LM106 and LM107 (content-gated construction details). No schema-blocked rows remain. LM007 Studio vocabulary wiring is included in the candidate; its engine half was already counted fixed at handoff.
+Merged counts: **28 fixed / 36 re-classified / 152 remaining**, of 216 unique rows. Remaining partials: LM012 (camera compile worker/performance), LM106 and LM107 (content-gated construction details). No schema-blocked rows remain. LM007 Studio vocabulary wiring is included in the candidate; its engine half was already counted fixed at handoff.
 
 LM014 acceptance is one registry and transport dispatcher with explicit engine/viewer domains. The historical request to route viewer state into engine world state is LM202, expressly out of scope; this does not silently add that feature. LM005 invalid overlap injection stays as invariant testing after the public edit path explicitly refuses it.
 
-Source validation and eventual release report: `briefs/wave1-integration.REPORT.md`. No pins or historical content values moved. The source gate must pass before main is updated.
+Source validation: `briefs/wave1-integration.REPORT.md`; production record: RELEASE_CHECKLIST deploy 9. No pins or historical content values moved. Gate `8decb07` was green before main was fast-forwarded.

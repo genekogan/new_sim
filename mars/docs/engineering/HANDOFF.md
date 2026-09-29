@@ -1,6 +1,8 @@
 # Handoff: Mars Studio simulation engine, tranche of 2026-09-27
 
-> **Current state (2026-09-29): read "Handoff 2026-09-29 — engine tranche" directly below.** The sections after it are
+> **Latest technical checkpoint: release 9 (2026-09-29), gated/deployed source `8decb07`.** Controller foundations are live as `15c50c30-2e8e-4de5-a862-483abc1a9e47`, rollback `79d424e3-a243-49ad-8b38-89f016673375`. Full gate clean: lint 0, unit 93/0, engine 447/0 (6 skips / 11 TODOs documented), browser 82 pass / 7 skip, tsc, unchanged flagship/probe, integration covering all 36 tools. Evidence: 17/17 rows and 8/8 milestones PROVEN. LAST_MILE: 28 fixed / 36 reclassified / 152 remaining. See RELEASE_CHECKLIST deploy 9 and latest PROGRESS entry. Historical content remains parked; older checkpoint sections below are retained as history.
+
+> **Previous state (2026-09-29): read "Handoff 2026-09-29 — engine tranche" directly below.** The sections after it are
 > the 2026-09-27 report and later addenda, kept as history ("Codex split and checkpoint 1" and "End of night" at the
 > bottom are the previous checkpoints).
 

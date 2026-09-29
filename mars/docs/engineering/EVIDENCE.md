@@ -8,23 +8,24 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `9bd481c` (1 uncommitted file(s) under `viewer/engine` at run time) |
-| Generated | 2026-09-29T00:03:05.367Z · Node v26.8.2 |
-| Engine suite | 433 tests in 64 files: 416 pass, 0 fail, 17 skipped · 49.0 s wall |
+| Git HEAD | `8decb07` (engine tree clean) |
+| Generated | 2026-09-29T01:47:05.244Z · Node v22.20.0 |
+| Engine suite | 464 tests in 72 files: 447 pass, 0 fail, 6 skipped, 11 TODO · 51.6 s wall |
+| External gate | `.cloudflare/gate/2026-09-29T01-28-33-861Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
-| Capabilities beyond §28 | 26 PROVEN · 1 PARTIAL · 1 UNPROVEN (of 28) |
+| Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 5558 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 8599 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 15464 ms compute (cropped 8616 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 5807 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 8936 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 14615 ms compute (cropped 8945 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
-**Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
+**Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
 PROVEN means only that the listed tests pass; the approximation notes say what they do not show.
 
 ## SPEC §28 behavioural regressions
 
-| Row | Status | Tests passed | What remains approximate |
+| Row | Status | Proofs passed | What remains approximate |
 | --- | --- | ---: | --- |
 | Wall avoidance | PROVEN | 3/3 | No explicit wall-contact-duration metric: 'no sliding' is inferred from the clearance invariant (zero violations), path length and a heading-flip bound on one synthetic wall. |
 | U-shaped trap | PROVEN | 2/2 | One synthetic U and one start/goal pair; oscillation is bounded by heading flips (≤ 6) and clearance is sampled per tick from the 0.1 m clearance grid (EDT), not continuously. |
@@ -40,9 +41,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Camera collision | PROVEN | 6/6 | The camera collides with obstacle prisms (OBBs fitted to geometry), not the render mesh; checked on 10 Hz samples plus swept segments, on the proving ground with synthetic subjects. |
 | Camera readability | PROVEN | 4/4 | Occlusion is ray-tested against obstacle prisms, not the render mesh (no GPU/pixel visibility check); subjects are synthetic walkers, and no camera track has been rendered to video and reviewed. |
 | Replay independence | PROVEN | 4/4 | Proven at the engine/API level (take hash and final state unchanged). The browser renderer's camera path is not part of this suite. |
-| Fork isolation | PROVEN | 5/5 | Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run. |
-| Plan invalidation | PROVEN | 6/6 | Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic. There is no design-edit engine op, so through the room the obstacle (walker s1 stepping into the 1 m passage) is moved by a second executed plan, not by editing a design entity; deploy/simulation-integration.mjs repeats this over real MCP, not run by this report. |
-| Replay isolation | PROVEN | 3/3 | Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, which this report does not run. A camera track needs the control capability (MCP) and is stored beside the take. |
+| Fork isolation | PROVEN | 6/6 | Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate. |
+| Plan invalidation | PROVEN | 11/11 | Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate. |
+| Replay isolation | PROVEN | 4/4 | Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take. |
 
 ### Wall avoidance — PROVEN
 
@@ -252,9 +253,11 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `campus.test.ts` | canonical mars-2026 is protected; flagship work happens in a fork |
 | pass | `api.test.ts` | fork isolation (room): a fork executes without touching canonical or a sibling fork; canonical execute refused |
 
-*Evidence outside this suite (not run here):* `viewer/deploy/simulation-integration.mjs`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
 
-*Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run.
+*Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
 ### Plan invalidation — PROVEN
 
@@ -268,10 +271,16 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `rehearsal.test.ts` | tampered plans and mismatched service scenes fail loudly |
 | pass | `api.test.ts` | api: stale plans and protected canonical workspaces are refused with diagnostics |
 | pass | `api.test.ts` | plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan; camera tracks do not |
+| pass | `api.test.ts` | staleness (LM-004): an edit far from every step keeps the plan valid; one on the route stales it naming the step |
+| pass | `api.test.ts` | staleness (LM-003): a layout-only region edit stales a gather into that region (layout is physical); physicalHash moves |
+| pass | `api.test.ts` | rebind (LM-001): execute/rehearse rebind:auto re-binds a stale plan against the head (plan.rebound + diff); a broken binding is plan.rebind-failed naming the step |
+| pass | `edit-static.test.ts` | static edits (LM-002): removing a wall stales a plan; auto-rebind routes through the opening, persists and leaves the canonical scene untouched |
 
-*Evidence outside this suite (not run here):* `viewer/deploy/simulation-integration.mjs`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
 
-*Approximate:* Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic. There is no design-edit engine op, so through the room the obstacle (walker s1 stepping into the 1 m passage) is moved by a second executed plan, not by editing a design entity; deploy/simulation-integration.mjs repeats this over real MCP, not run by this report.
+*Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
 ### Replay isolation — PROVEN
 
@@ -283,42 +292,44 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `take.test.ts` | tampered takes are rejected |
 | pass | `api.test.ts` | replay isolation (room): take fetches and camera tracks never change heads, logs, poses or stored bytes; rooms never see each other |
 
-*Evidence outside this suite (not run here):* `viewer/deploy/simulation-integration.mjs`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
 
-*Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, which this report does not run. A camera track needs the control capability (MCP) and is stored beside the take.
+*Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
 ## Capabilities beyond §28
 
-| Capability | Status | Tests passed | What remains approximate |
+| Capability | Status | Proofs passed | What remains approximate |
 | --- | --- | ---: | --- |
 | Loads on stairs (single carrier) | PROVEN | 7/7 | Single carrier only: no crews on a flight, no ladders, no turning flights or more than one flight per carry, no loads whose carry pose has a pitch (plywood on edge), no mid-flight replanning, and cancel on the flight is refused rather than modelled. One straight flight on the proving ground; the set-down check is distance only (CARRY.md 'Between levels'). |
 | Social vocabulary + slots (reservation semantics) | PROVEN | 13/13 | Seats have no armrest or leg geometry: each fixture is one catalog box (a chair's includes its back), and the seated exemption is by activity, not per fixture. Approach points are not reserved (a person standing on one makes the sitter yield/replan). No turn-taking, gaze, gestures or group re-forming; ambient never re-adopts a released person. Automatic pre-emption by directed tasks is its own row (social-preemption) (SOCIAL.md). |
 | EUC / bicycle riding | PROVEN | 8/8 | Vehicles are discs for walkers and for their own path planning (the bicycle's 1.75 m length is not swept), with no lean, wheel or balance kinematics and no reversing; one level only (no links). Walkers see a rider as a 0.28 m person, not the vehicle disc. Proving ground only, not the campus. Vehicle–vehicle collision and right of way are their own row (vehicle-traffic) (VEHICLES.md). |
 | Forklift to deck edges (rule-based) | PROVEN | 7/7 | Rule-based, not dynamics: no tilt, pallets or dunnage, flat 1000 kg capacity (no load-moment chart), final alignment by standstill pivot + side-shift (no three-point turns); the truck body is not swept against people beyond the 1.5 m stop rule. Proving ground only (VEHICLES.md). |
 | Historical years as protected states (2020–2025) | PROVEN | 8/8 | The years are the procedural reconstructions from app/history (hypothesis-grade geometry, not surveys), ground-only (decks block; no upper floors or stairs). Routes are proven in 2021 and 2022 only; no build or carry has been run in a historical year. |
-| Camera occlusion parity with the render | PROVEN | 5/5 | The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15. |
+| Camera occlusion parity with the render | PROVEN | 6/6 | The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15. |
 | Incremental grids bit-identical | PROVEN | 6/6 | Equality is checked on 240 random scenes and on every sync of the build-bay probe, the lab construction and the cropped campus flagship, not on the uncropped campus. Reordered or duplicate obstacle lists fall back to a full rebuild. Grids stay 0.1 m rasters with an exact EDT (no navmesh). |
-| Stable historical ids + migration | PROVEN | 1/1 | The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), which this report does not run. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly. |
-| DO storage caps + isolation through the room | PROVEN | 6/6 | Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised. |
-| Deterministic trig across hosts | PROVEN | 5/5 | This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified. |
+| Stable historical ids + migration | PROVEN | 2/2 | The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly. |
+| DO storage caps + isolation through the room | PROVEN | 13/13 | UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit. |
+| Deterministic trig across hosts | PROVEN | 6/6 | This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified. |
 | Mid-action resumability (walking/social subset) | PROVEN | 6/6 | Walking, stairs and social verbs only: carry, construction lifts, vehicles and ambient_wander are not resumable (a snapshot is refused naming the action). Each restored runtime needs its own Spatial; the teleport check has no prior poses on the first restored tick (TAKES_AND_PLANS.md). |
 | Flagship on the full uncropped 2026 campus | PROVEN | 2/2 | Bit-identical since W1's global grid lattice (cell coordinates on one world lattice, not the crop's origin): the former todo is an assertion. Proven for this one scenario at the staging-east site; the whole campus is still ground level 0 only, and it costs about 2.5–3× the compute of the crop. |
 | Hand-up to people on the rack (and off the forklift) | PROVEN | 11/11 | Reach is a cylinder + arm-length envelope (the body model), not IK; receivers feed hand over hand from a fixed station and a sheet is never turned over the bay; balance is checked for a single giver only (sheets and single receivers are not checked); reach-down is capped at 0.5 m below the feet, so receivers more than ~2.55 m above the givers need the forklift (HANDUP.md). The v3 build passes at its pinned open-ground site but its onto_s2_4 beam_walk fails beam.no-room (clearance 0.25 < 0.28 m on s2) at most other sites tried, including the 2026 staging-east clearing (W17, PROGRESS.md), so v3 is not a campus take. |
-| Standing on the rack: climb links and beam walkways | PROVEN | 7/7 | Climb paths are three straight segments with no body check; one person per link, but two links on one column face are not mutually exclusive; nobody clips on and frame load is not checked; there are no foot/hand holds (which bracing node a climber is on) (HANDUP.md, YEAR_BUILD.md). |
+| Standing on the rack: climb links and beam walkways | PROVEN | 10/10 | Climb paths are three straight segments with no body check; one exclusive reservation per physical column face across seat heights and directions; nobody clips on and frame load is not checked; there are no foot/hand holds (which bracing node a climber is on) (HANDUP.md, YEAR_BUILD.md). |
 | Items, serving and eating | PROVEN | 6/6 | Items do not collide with each other; reach over a table assumes a forward bend (only eating is checked against the 0.62 m arm envelope); a carried item trails its hand by one tick (≤ 7 cm) while walking; no drinking cycle, ladle, food geometry or spill, and `contents` is a number (ITEMS.md). |
 | Solar panels, rails and equipment | PROVEN | 4/4 | Tilt legs / rear risers are implied and the tilt direction is fixed (no azimuth choice); rails, equipment and low panels are set from ≤ 1 m; rails are assumed screwed to the sheets; sloped roofs are not modelled; no wiring (SOLAR_PAINT.md). Proven on a synthetic deck, not in a year build. |
 | Painting a wall | PROVEN | 3/3 | Flat upright faces only, one rectangular face per call, no drips, layers or drying; coverage is an area fraction, not a texture mask; the band below 0.5 m (crouching) is out of reach (SOLAR_PAINT.md). Renderer texture = colour + stripe until textures exist. |
 | Year build phase A: a historical skeleton from the piles | PARTIAL | 6/9 | The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md). |
 | Year build phase B: floors, stairs, walls, solar in the year sequence | UNPROVEN | 0/4 | PARTIAL by construction: the default suite executes only the plan (material rules for deck strips, the Kit stair, walls and solar; BOM; yard; unplaced reasons; determinism), the report-only plans of the other three 2022 houses, and ONE executed phase-B section — the first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pass_up, screwed; 0 violations, pinned 94db263e… @53604). The whole east-house A+B run (decks, stair, walls, solar) is gated YEAR_BUILD_FULL=1, is skipped here and has no pin yet (PIN_FULL_AB empty at HEAD); W13 reports each section (ground / first-floor / roof deck, Kit stair, walls, solar) running clean in its own runs (commits d44c601…c3405da), but no committed test executes the stair, wall or solar sections — in this suite they are proven only as plans. Kit geometry (deck strips at beam height without joists, an 8-tread stair without stringers) is a reconstruction guess — open questions for Gene (PROGRESS.md). |
 | Natural walking: splined turns, block reaction, stall metric | PROVEN | 17/17 | Walker–walker encounters use the smoothed path ahead and a 1 s chord of the other's path — no time-to-collision model; head-on round a tight corner falls to the single-file rule; the emergency stop is velocity to 0 in one tick; a walker walled in by a crowd that never moves waits with a named reason; 1.08–1.5 m gaps between people are walkable but not plannable at 0.1 m cells (MOVEMENT.md §6). Still heuristic, not ORCA, not proven deadlock-free. |
-| One body model (engine reach = the measured rig) and mars-take/2 fields | PROVEN | 5/5 | The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact). |
+| One body model (engine reach = the measured rig) and mars-take/2 fields | PROVEN | 6/6 | The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact). |
 | Composite flagship builds (v2: forklift + stairs carry + campfire) | PROVEN | 3/3 | Layouts were adjusted until refusals stopped (the forklift stages s2 beside the bay, benches use gather); the engine gap `carryIntegrity` flags fork loads is routed around in the scenario (HANDOFF flagship v2). v3 (hand-up) is in the hand-up row and has no campus variant. |
-| Camera direction, phase 1: directions compile to computed trajectories | PROVEN | 15/15 | Synthesis collides with static geometry only (people and parts per tick come from phase 2). No year scene has door objects: the 2024 'kitchen' route enters over a 1.26 m half wall / through a 0.79 m serving hatch, and 2026 has no kitchen or sink. 'Main pallet racks' resolves through the take's 'rack bay' structure, not a named asset. The sun model's north offset is 0 (unverified site bearing), so 'sunset behind' is only as right as that assumption. The camera navmesh is rebuilt per call (100–250 ms). Only the flagship take, the 2026 and 2024 year scenes and proving-ground fixtures are exercised. |
-| Camera direction, phase 2: every shot simulated and self-corrected (incl. occluded) | PROVEN | 11/11 | Ladders are fixed and the first candidate valid on every sample wins — not an optimiser (the flagship orbit needed raise +2.5 m after +0.5/+1/+1.5 m stayed occluded). Thresholds (squeeze 1.2 m wide / 1.0 m high / 0.3 m from a part for ≥ 0.3 m or 0.5 s; bystander ≤ 1.5 m covering ≥ 25 %; sun < 6°; < 75 % framed; readability 0.6) are chosen, not measured against footage. Occlusion and readability use the planner's prisms and per-tick people / part boxes, not the render mesh; the render comparison (verifyCamera over directed tracks) runs only in Playwright, not in this report. Fixtures are synthetic yards; the only real takes exercised are the flagship and the 2024 kitchen route. Readability of the year-build takes stays low (bay 1 min 0.42, whole house 0.31) — the planner's 0.5 Hz slow shots accept it. |
-| Takes mars-take/3 + /4: thinned hands / speed, entities0 + removed, compact events, file cameras | PROVEN | 4/4 | A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track. |
+| Camera direction, phase 1: directions compile to computed trajectories | PROVEN | 26/26 | Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups. |
+| Camera direction, phase 2: every shot simulated and self-corrected (incl. occluded) | PROVEN | 13/13 | Ladders are fixed and the first candidate valid on every sample wins — not an optimiser (the flagship orbit needed raise +2.5 m after +0.5/+1/+1.5 m stayed occluded). Thresholds (squeeze 1.2 m wide / 1.0 m high / 0.3 m from a part for ≥ 0.3 m or 0.5 s; bystander ≤ 1.5 m covering ≥ 25 %; sun < 6°; < 75 % framed; readability 0.6) are chosen, not measured against footage. Occlusion and readability use the planner's prisms and per-tick people / part boxes, not the render mesh; the render comparison (verifyCamera over directed tracks) runs only in Playwright, not in this report. Fixtures are synthetic yards; the only real takes exercised are the flagship and the 2024 kitchen route. Readability of the year-build takes stays low (bay 1 min 0.42, whole house 0.31) — the planner's 0.5 Hz slow shots accept it. |
+| Takes mars-take/3 + /4: thinned hands / speed, entities0 + removed, compact events, file cameras | PARTIAL | 6/7 | A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track. |
 | No walker jumps: per-tick step budget, teleport and overspeed invariants | PROVEN | 2/2 | The suite measures the per-tick bound on stress-30 and the campfire evening (max 0.0675 m); the six-run diagnosis (classes A–C) was a scratch spy, and the other pinned runs are covered only through the invariants during their own tests. Carry, climb, stance and sit publish no speed, so they are bounded only by motion.teleport. The look-ahead still assumes 0.9 m/s lateral, so walkers briefly slow while sidestepping. Runs got 1–2 % longer (MOVEMENT.md §7). |
 | Automatic pre-emption of social holds by directed tasks | PROVEN | 7/7 | No resumption: a pre-empted sit or conversation is not resumed after the task; a converse loses all its members, not only the directed one. Only actor claims under social actions are pre-emptible — any other conflict is still refused. snapshot() refuses while a directive waits for a stand-up. Proven on proving-ground fixtures, not on a campus scene. |
-| Vehicle–vehicle collision and right of way | PROVEN | 6/6 | Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world cannot move vehicles, so the forced overlaps in the tests are raw world edits. Proving ground only. |
+| Vehicle–vehicle collision and right of way | PROVEN | 6/6 | Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world moves parked vehicles with footprint and carried-load collision checks. Impossible overlaps remain explicit fault injections solely to test invariant diagnostics; they are refused by the public edit API. Proving ground only. |
 
 ### Loads on stairs (single carrier) — PROVEN
 
@@ -398,13 +409,13 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Result | File | Test |
 | --- | --- | --- |
 | pass | `campus-history.test.ts` | each year 2020–2025 loads as a ground-only scene with provenance on every obstacle |
-| pass | `campus-history.test.ts` | grids build for every year (ms, cells) |
+| pass | `campus-history.test.ts` | grids build for every year (bounded extent, free and blocked cells, valid clearance) |
 | pass | `campus-history.test.ts` | 2022: a walker routes around the courtyard buildings (N of chiba → S of kitchen) |
 | pass | `campus-history.test.ts` | 2021: a walker goes straight through the corridor between the two long buildings |
 | pass | `campus-history.test.ts` | building interiors are not walkable (ground-floor decks block) |
 | pass | `campus-history.test.ts` | canonical mars-<year> is protected; edits happen in forks |
 | pass | `campus-history.test.ts` | extraction is deterministic: two --check runs match the committed hashes |
-| pass | `api.test.ts` | api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 rooms unchanged |
+| pass | `api.test.ts` | api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 reconstruction also seeded |
 
 *Approximate:* The years are the procedural reconstructions from app/history (hypothesis-grade geometry, not surveys), ground-only (decks block; no upper floors or stairs). Routes are proven in 2021 and 2022 only; no build or carry has been run in a historical year.
 
@@ -420,7 +431,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `camera-occluders.test.ts` | camera readability: crew is see-through only within 0.6 m of its grip; elsewhere it occludes like a bystander |
 | pass | `camera-framing.test.ts` | camera readability: a bystander between camera and subject occludes; behind the subject or on the crew it does not |
 
-*Evidence outside this suite (not run here):* `viewer/e2e/camera-verify.spec.ts`, `docs/engineering/CAMERA_VERIFY.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
 
@@ -447,9 +461,12 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | --- | --- | --- |
 | pass | `campus-history.test.ts` | obstacle ids are the stable Kit ids (pinned names survive) |
 
-*Evidence outside this suite (not run here):* `viewer/deploy/history-ids.test.mjs`, `docs/engineering/HISTORY_IDS.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/test.log`) |
+| reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
-*Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), which this report does not run. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
+*Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
 
 ### DO storage caps + isolation through the room — PROVEN
 
@@ -463,10 +480,18 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `api.test.ts` | fork isolation (room): a fork executes without touching canonical or a sibling fork; canonical execute refused |
 | pass | `api.test.ts` | plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan; camera tracks do not |
 | pass | `api.test.ts` | api: list (plans/takes/workspaces/cameras ledger) and delete_workspace (refusals name what blocks it) |
+| pass | `room-storage.test.ts` | room storage: UTF-8 chunks round-trip surrogate boundaries and three-byte text through SQLite |
+| pass | `room-storage.test.ts` | room storage: oversized take refuses in bytes and rolls back checkpoint, states and in-memory take |
+| pass | `room-storage.test.ts` | room storage: aggregate byte cap rolls back writes and survives reload; seeded over-cap room refuses cleanly |
+| pass | `room-storage.test.ts` | room workload: real year-build chapter refuses before simulation or persistence, including old stored plans |
+| pass | `room-campus-2026.test.ts` | room 2026: canonical matches existing reconstruction, protected, fork editable, no flagship inventory |
+| pass | `room-campus-2026.test.ts` | room 2026: migration preserves old work and restart is idempotent; historical years stay isolated |
 
-*Evidence outside this suite (not run here):* `viewer/deploy/simulation-integration.mjs`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
 
-*Approximate:* Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised.
+*Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
 ### Deterministic trig across hosts — PROVEN
 
@@ -480,7 +505,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `core.test.ts` | deterministic trig: golden bit patterns (any engine / refactor drift fails here) |
 | pass | `source-scan.test.ts` | engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted |
 
-*Evidence outside this suite (not run here):* `viewer/deploy/determinism-probe.mjs`, `docs/engineering/RELEASE_CHECKLIST.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/determinism-probe.log`) |
+| reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
 
@@ -543,8 +571,11 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `frame.test.ts` | someone on a beam whose partner beam is removed is flagged (frame.link-gone) |
 | pass | `frame.test.ts` | nobody walks a beam under a deck; stepping off onto the deck goes from an open spot on the beam |
 | pass | `handup-rules.test.ts` | API spatial scene: frame climb links / beam walkways are in it by default, opt-out with frameAccess: false |
+| pass | `climb-reservation.test.ts` | climb reservations (LM-022): different seats on one column face are exclusive before approach; another column remains available |
+| pass | `climb-reservation.test.ts` | climb reservations (LM-022): safe cancellation and completed climb release the shared face |
+| pass | `climb-reservation.test.ts` | climb reservations (LM-022): missing links claim nothing; opposite physical faces have distinct keys |
 
-*Approximate:* Climb paths are three straight segments with no body check; one person per link, but two links on one column face are not mutually exclusive; nobody clips on and frame load is not checked; there are no foot/hand holds (which bracing node a climber is on) (HANDUP.md, YEAR_BUILD.md).
+*Approximate:* Climb paths are three straight segments with no body check; one exclusive reservation per physical column face across seat heights and directions; nobody clips on and frame load is not checked; there are no foot/hand holds (which bracing node a climber is on) (HANDUP.md, YEAR_BUILD.md).
 
 ### Items, serving and eating — PROVEN
 
@@ -615,7 +646,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | todo | `year-build-b.test.ts` | year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned — Expected values to be strictly equal: |
 | skip | `year-build-b.test.ts` | year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1) |
 
-*Evidence outside this suite (not run here):* `docs/engineering/YEAR_BUILD.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| reference | `docs/engineering/YEAR_BUILD.md` | supporting reference; not an executable proof |
 
 *Approximate:* PARTIAL by construction: the default suite executes only the plan (material rules for deck strips, the Kit stair, walls and solar; BOM; yard; unplaced reasons; determinism), the report-only plans of the other three 2022 houses, and ONE executed phase-B section — the first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pass_up, screwed; 0 violations, pinned 94db263e… @53604). The whole east-house A+B run (decks, stair, walls, solar) is gated YEAR_BUILD_FULL=1, is skipped here and has no pin yet (PIN_FULL_AB empty at HEAD); W13 reports each section (ground / first-floor / roof deck, Kit stair, walls, solar) running clean in its own runs (commits d44c601…c3405da), but no committed test executes the stair, wall or solar sections — in this suite they are proven only as plans. Kit geometry (deck strips at beam height without joists, an 8-tread stair without stringers) is a reconstruction guess — open questions for Gene (PROGRESS.md).
 
@@ -657,9 +690,12 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `take-fields.test.ts` | take fields (mars-take/2): a hand-up take carries every holder's hands (incl. the crouch / reach_down approach) and who stands on the beam |
 | pass | `take-fields.test.ts` | take fields (mars-take/3): thinChanges — keyframes reproduce every tick of the step signal within tolerance; holds, shape changes and releases exact |
 
-*Evidence outside this suite (not run here):* `viewer/e2e/poses.spec.ts`, `docs/engineering/BODY_MODEL.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
-*Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
+*Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
 
 ### Composite flagship builds (v2: forklift + stairs carry + campfire) — PROVEN
 
@@ -694,10 +730,23 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `camera-synth.test.ts` | motion caps: too-fast moves are refused with the minimum duration; defaults stay under the caps |
 | pass | `camera-synth.test.ts` | verbs: tilt / dolly / crane / pull_out / hold have the geometry their names promise, all valid |
 | pass | `camera-synth.test.ts` | determinism: the same directions give the identical track hash, and the track round-trips through JSON |
+| pass | `camera-parse-fixtures.test.ts` | LM-009: sentence fixture cluster compiles identically to typed direction without mutating world |
+| pass | `camera-parse-fixtures.test.ts` | LM-009: separate sinks and unknown fixtures refuse with concrete diagnostic evidence |
+| pass | `camera-parse-fixtures.test.ts` | LM-009: existing 2024 kitchen sink compiles with no invalid samples or world mutation |
+| pass | `camera-worker.test.ts` | camera worker kernel preserves the complete synchronous result and reads inputs only |
+| pass | `camera-worker.test.ts` | worker abort before start, while pending, and during construction has bounded cleanup |
+| pass | `camera-worker.test.ts` | creation, delivery, runtime, decoding and malformed-reply failures are named diagnostics |
+| pass | `camera-sampler-budget.test.ts` | synthetic long lead-in never samples take subjects before the directed shot |
 
-*Evidence outside this suite (not run here):* `viewer/e2e/studio-direct.spec.ts`, `docs/engineering/CAMERA_DIRECT.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
-*Approximate:* Synthesis collides with static geometry only (people and parts per tick come from phase 2). No year scene has door objects: the 2024 'kitchen' route enters over a 1.26 m half wall / through a 0.79 m serving hatch, and 2026 has no kitchen or sink. 'Main pallet racks' resolves through the take's 'rack bay' structure, not a named asset. The sun model's north offset is 0 (unverified site bearing), so 'sunset behind' is only as right as that assumption. The camera navmesh is rebuilt per call (100–250 ms). Only the flagship take, the 2026 and 2024 year scenes and proving-ground fixtures are exercised.
+*Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
 
 ### Camera direction, phase 2: every shot simulated and self-corrected (incl. occluded) — PROVEN
 
@@ -717,11 +766,16 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `camera-take-file.test.ts` | takeSampler: piles are boxes (kind from finalState / entities0), the emptied pile leaves at its removal tick; legacyKinds reproduces the old people-piles |
 | pass | `camera-take-file.test.ts` | takeSampler: the flagship has no piles — identical with and without legacyKinds, so its planned camera is unchanged |
 
-*Evidence outside this suite (not run here):* `viewer/e2e/camera-verify.spec.ts`, `viewer/e2e/studio-direct.spec.ts`, `docs/engineering/CAMERA_DIRECT.md`, `docs/engineering/CAMERA_VERIFY.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
+| reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* Ladders are fixed and the first candidate valid on every sample wins — not an optimiser (the flagship orbit needed raise +2.5 m after +0.5/+1/+1.5 m stayed occluded). Thresholds (squeeze 1.2 m wide / 1.0 m high / 0.3 m from a part for ≥ 0.3 m or 0.5 s; bystander ≤ 1.5 m covering ≥ 25 %; sun < 6°; < 75 % framed; readability 0.6) are chosen, not measured against footage. Occlusion and readability use the planner's prisms and per-tick people / part boxes, not the render mesh; the render comparison (verifyCamera over directed tracks) runs only in Playwright, not in this report. Fixtures are synthetic yards; the only real takes exercised are the flagship and the 2024 kitchen route. Readability of the year-build takes stays low (bay 1 min 0.42, whole house 0.31) — the planner's 0.5 Hz slow shots accept it.
 
-### Takes mars-take/3 + /4: thinned hands / speed, entities0 + removed, compact events, file cameras — PROVEN
+### Takes mars-take/3 + /4: thinned hands / speed, entities0 + removed, compact events, file cameras — PARTIAL
 
 *Required:* Long year-build takes stay small without changing what a replay shows: hands / speed thinned to keyframes (5 mm / 1 cm/s, releases exact), pose tracks at 4 mm / 8 mrad with exact hold ends, every tracked entity's initial state (entities0) and removal tick so emptied piles stay drawable, same-tick lifecycle runs and repeated blocked waits folded losslessly, and extra camera tracks carried beside the planned one in the take file; final state and every pin unchanged.
 
@@ -732,7 +786,12 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `take-fields.test.ts` | take events (mars-take/4): compactEvents folds same-tick lifecycles losslessly and merges repeated blocked waits; final state and tracks unchanged |
 | pass | `camera-take-file.test.ts` | take file: a directed track is carried beside the planned camera (`cameras`), round-trips through JSON, never changes the take; foreign / clashing tracks are refused |
 
-*Evidence outside this suite (not run here):* `viewer/deploy/record-campus-take.mjs`, `viewer/e2e/studio-build.spec.ts`, `viewer/e2e/studio-take.spec.ts`, `docs/engineering/TAKES_AND_PLANS.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
 
@@ -745,7 +804,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `movement.test.ts` | no jumps: a walker moves at most min(speed, 1.4 m/s)·DT per tick and publishes an honest speed — stress-30 (60 s), campfire evening (75 s) |
 | pass | `review.test.ts` | no jumps (W21): a person on foot moves ≤ 0.15 m per tick (riders and carried loads keep 0.6 m); a published speed above its activity cap + 5 % is motion.overspeed |
 
-*Evidence outside this suite (not run here):* `docs/engineering/MOVEMENT.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| reference | `docs/engineering/MOVEMENT.md` | supporting reference; not an executable proof |
 
 *Approximate:* The suite measures the per-tick bound on stress-30 and the campfire evening (max 0.0675 m); the six-run diagnosis (classes A–C) was a scratch spy, and the other pinned runs are covered only through the invariants during their own tests. Carry, climb, stance and sit publish no speed, so they are bounded only by motion.teleport. The look-ahead still assumes 0.9 m/s lateral, so walkers briefly slow while sidestepping. Runs got 1–2 % longer (MOVEMENT.md §7).
 
@@ -763,7 +824,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `social.test.ts` | pre-emption: an autonomous make-way nudge (walk.ts `<who>:make-way:<tick>`) is not a directive — refused as before, the conversation goes on |
 | pass | `social.test.ts` | pre-emption determinism: seated carry + converse pre-emption twice → same state hash and event log |
 
-*Evidence outside this suite (not run here):* `docs/engineering/SOCIAL.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| reference | `docs/engineering/SOCIAL.md` | supporting reference; not an executable proof |
 
 *Approximate:* No resumption: a pre-empted sit or conversation is not resumed after the task; a converse loses all its members, not only the directed one. Only actor claims under social actions are pre-emptible — any other conflict is still refused. snapshot() refuses while a directive waits for a stand-up. Proven on proving-ground fixtures, not on a campus scene.
 
@@ -777,23 +840,25 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `forklift.test.ts` | traffic: a rider stopped in the forklift's lane — the forklift stops ≥ 1 m short and waits with the rider named; once the rider rides off it carries on; 0 violations |
 | pass | `forklift.test.ts` | traffic: two forklifts crossing — f2 (same size, id after f1) stops clear of f1's lane with the reason named, then crosses; 0 violations |
 | pass | `forklift.test.ts` | traffic: plan-time vehicle.path-conflict — an EUC boxed against a wall inside a moving forklift's lane cannot yield, so its ride is refused naming both |
-| pass | `forklift.test.ts` | traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not |
+| pass | `forklift.test.ts` | traffic: forced overlaps fire collision.vehicle-vehicle after edit_world parks safely and refuses the invalid placement (including carried load) |
 | pass | `forklift.test.ts` | traffic determinism: the head-on run twice → same state hash and event log |
 
-*Evidence outside this suite (not run here):* `docs/engineering/VEHICLES.md`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| reference | `docs/engineering/VEHICLES.md` | supporting reference; not an executable proof |
 
-*Approximate:* Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world cannot move vehicles, so the forced overlaps in the tests are raw world edits. Proving ground only.
+*Approximate:* Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world moves parked vehicles with footprint and carried-load collision checks. Impossible overlaps remain explicit fault injections solely to test invariant diagnostics; they are refused by the public edit API. Proving ground only.
 
 ## SPEC §30 milestones
 
-| Milestone | Status | Tests passed | What remains approximate |
+| Milestone | Status | Proofs passed | What remains approximate |
 | --- | --- | ---: | --- |
-| A. Audited foundation | PROVEN | 11/11 | The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, which this report does not run. Full GLB re-extraction is skipped unless CAMPUS_FULL=1. |
+| A. Audited foundation | PROVEN | 11/11 | The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, whose result this report consumes from the current gate. Full GLB re-extraction is skipped unless CAMPUS_FULL=1. |
 | B. Natural individual movement | PROVEN | 12/12 | No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; a head-on wait-forever would show only as a runner timeout. |
 | C. Coordinated carry | PROVEN | 7/7 | Grips are fixed points on a rigid, level load; carriers play Walk/Idle with a procedural carry lean (no hand IK). Crews do not carry on stairs (one carrier may); simultaneous formations are not co-planned. |
 | D. Supported rack bay | PROVEN | 8/8 | The bay is raised from 12 ft uprights; 19 ft is only shown to be refused with too small a crew. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog. |
 | E. Progressive construction | PROVEN | 11/11 | One bay on the proving ground, not an extended multi-bay run; the 2022 first bay (capability 'Year build phase A') is the multi-frame case. The forklift is used inside the v2/v3 sequences (staging beside the bay, presenting s2 at deck height), and people now climb frames and stand on beams, but there are still no ladders or scaffold. Deck/stair/tread dimensions and the plywood span rule are provisional. |
-| F. Rehearsal + official execution | PROVEN | 8/8 | The engine detects failures and staleness; fixing them is the external director's job (rebind), with no automatic repair loop in the suite. The campus flagship is hypothetical (design-edit inventory and crew), not a documented historical build. |
+| F. Rehearsal + official execution | PROVEN | 8/8 | Automatic rebind is opt-in and reports its diff; execution still requires a clean rehearsal. The campus flagship is hypothetical design-edit inventory and crew, not a documented historical build. |
 | G. Replay + branching | PROVEN | 9/9 | Forks resume from quiescent checkpoints, or mid-action for walking/social only (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video. |
 | H. Inhabited Mars scenes | PROVEN | 9/9 | Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze or gestures; pre-emption by directed tasks exists (capability social-preemption) but a pre-empted sit / conversation is not resumed (SOCIAL.md). |
 
@@ -815,9 +880,13 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `campus.test.ts` | loading is deterministic |
 | pass | `campus-extract.test.ts` | extraction is deterministic and independent of input order |
 
-*Evidence outside this suite (not run here):* `docs/engineering/AUDIT.md`, `viewer/engine/scenes/proving-ground.ts`, `viewer/e2e/baselines`
+| External result | Source | Gate step / reason |
+| --- | --- | --- |
+| reference | `docs/engineering/AUDIT.md` | supporting reference; not an executable proof |
+| reference | `viewer/engine/scenes/proving-ground.ts` | supporting reference; not an executable proof |
+| reference | `viewer/e2e/baselines` | supporting reference; not an executable proof |
 
-*Approximate:* The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, which this report does not run. Full GLB re-extraction is skipped unless CAMPUS_FULL=1.
+*Approximate:* The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, whose result this report consumes from the current gate. Full GLB re-extraction is skipped unless CAMPUS_FULL=1.
 
 ### B. Natural individual movement — PROVEN
 
@@ -836,7 +905,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `walk.test.ts` | unreachable goal is rejected before any movement |
 | pass | `review.test.ts` | H2: a snapped walk_to goal ends at the snapped standable point, reports outputs.snapped, and fails beyond the tolerance |
 | pass | `planning.test.ts` | planner equality: production findRoute === frozen reference over test routes + 200 seeded proving-ground routes |
-| pass | `planning.test.ts` | stress-30: exact planner keeps the pinned result; per-tick cost bounded; zero violations |
+| pass | `planning.test.ts` | stress-30: exact planner keeps the pinned result; deterministic work bounded; zero violations |
 
 *Approximate:* No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; a head-on wait-forever would show only as a runner timeout.
 
@@ -908,7 +977,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `build-bay.test.ts` | flagship: rehearse the full build from material piles, then execute it |
 | pass | `campus-flagship.test.ts` | flagship on Mars 2026: fork canonical, build a rack bay at staging-east, canonical untouched |
 
-*Approximate:* The engine detects failures and staleness; fixing them is the external director's job (rebind), with no automatic repair loop in the suite. The campus flagship is hypothetical (design-edit inventory and crew), not a documented historical build.
+*Approximate:* Automatic rebind is opt-in and reports its diff; execution still requires a clean rehearsal. The campus flagship is hypothetical design-edit inventory and crew, not a documented historical build.
 
 ### G. Replay + branching — PROVEN
 
@@ -948,12 +1017,53 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `1a0b458` (2026-09-28T23:57:25.555Z): 0 added, 0 removed.
+Compared with the report at `9bd481c` (2026-09-29T00:03:05.367Z): 36 added, 5 removed.
 
+- added: api.test.ts :: api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 reconstruction also seeded
+- added: camera-parse-fixtures.test.ts :: LM-009: existing 2024 kitchen sink compiles with no invalid samples or world mutation
+- added: camera-parse-fixtures.test.ts :: LM-009: sentence fixture cluster compiles identically to typed direction without mutating world
+- added: camera-parse-fixtures.test.ts :: LM-009: separate sinks and unknown fixtures refuse with concrete diagnostic evidence
+- added: camera-parse-fixtures.test.ts :: LM-009: sink vocabulary parses a fixture subject and respects cross-kind ambiguity
+- added: camera-parse-studio.test.ts :: file camera scene and vocabulary reflect checkpoint obstacle edits without changing the shared source
+- added: camera-parse-studio.test.ts :: studio file sentences use the op parser, vocabulary and resolver without a simulation room
+- added: camera-parse.test.ts :: LM-010 refusal contract: unsupported or incomplete phrases ask instead of guessing
+- added: camera-parse.test.ts :: LM-010 wide lens is an explicit note, never an invented field of view
+- added: camera-sampler-budget.test.ts :: synthetic long lead-in never samples take subjects before the directed shot
+- added: camera-worker.test.ts :: camera worker kernel preserves the complete synchronous result and reads inputs only
+- added: camera-worker.test.ts :: creation, delivery, runtime, decoding and malformed-reply failures are named diagnostics
+- added: camera-worker.test.ts :: worker abort before start, while pending, and during construction has bounded cleanup
+- added: camera-worker.test.ts :: worker completion terminates once, detaches callbacks, and removes abort handling
+- added: campus-history.test.ts :: grids build for every year (bounded extent, free and blocked cells, valid clearance)
+- added: climb-reservation.test.ts :: climb reservations (LM-022): different seats on one column face are exclusive before approach; another column remains available
+- added: climb-reservation.test.ts :: climb reservations (LM-022): missing links claim nothing; opposite physical faces have distinct keys
+- added: climb-reservation.test.ts :: climb reservations (LM-022): safe cancellation and completed climb release the shared face
+- added: edit-static.test.ts :: static edits (LM-002): a post supporting a walkable deck cannot be removed or moved
+- added: edit-static.test.ts :: static edits (LM-002): geometry-supported people cannot be stranded by removing their platform
+- added: edit-static.test.ts :: static edits (LM-002): removing a wall stales a plan; auto-rebind routes through the opening, persists and leaves the canonical scene untouched
+- added: edit-static.test.ts :: static edits (LM-002): sequential add/update/remove; invalid bounds, support, overlaps and missing ids refuse atomically with named diagnostics
+- added: edit-static.test.ts :: static edits (LM-002): spawn shares the effective static namespace and collision batches are atomic in either order
+- added: edit-static.test.ts :: static edits (LM-002): supported corners across disconnected floors do not permit a floating span
+- added: forklift.test.ts :: traffic edit placement: held and fork loads block intersecting height bands but allow a parked EUC below a raised load
+- added: forklift.test.ts :: traffic: forced overlaps fire collision.vehicle-vehicle after edit_world parks safely and refuses the invalid placement (including carried load)
+- added: planning.test.ts :: stress-30: exact planner keeps the pinned result; deterministic work bounded; zero violations
+- added: room-campus-2026.test.ts :: room 2026: canonical matches existing reconstruction, protected, fork editable, no flagship inventory
+- added: room-campus-2026.test.ts :: room 2026: incompatible year/file pairs refuse; omitted loader preserves synthetic-only test setup
+- added: room-campus-2026.test.ts :: room 2026: legacy workspace id collision refuses without replacing user work
+- added: room-campus-2026.test.ts :: room 2026: migration preserves old work and restart is idempotent; historical years stay isolated
+- added: room-storage.test.ts :: room storage: UTF-8 chunks round-trip surrogate boundaries and three-byte text through SQLite
+- added: room-storage.test.ts :: room storage: aggregate byte cap rolls back writes and survives reload; seeded over-cap room refuses cleanly
+- added: room-storage.test.ts :: room storage: oversized take refuses in bytes and rolls back checkpoint, states and in-memory take
+- added: room-storage.test.ts :: room workload: real year-build chapter refuses before simulation or persistence, including old stored plans
+- added: room-storage.test.ts :: room workload: step and entity admission boundaries and malformed inputs preserve controller validation
+- removed: api.test.ts :: api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 rooms unchanged
+- removed: camera-parse.test.ts :: 20 deliberately bad sentences refuse with code, question or candidates, and span
+- removed: campus-history.test.ts :: grids build for every year (ms, cells)
+- removed: forklift.test.ts :: traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not
+- removed: planning.test.ts :: stress-30: exact planner keeps the pinned result; per-tick cost bounded; zero violations
 
 ## Tests not cited by any row or milestone
 
-140 of 433 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+151 of 464 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -967,10 +1077,7 @@ Compared with the report at `1a0b458` (2026-09-28T23:57:25.555Z): 0 added, 0 rem
 - `api.test.ts` pass: pause/resume (room): execute pauseAt mid-walk → resume ends in the unpaused final state; snapshots are state blobs; survives a room restart
 - `api.test.ts` pass: pause/resume (room): fork at a pause, resume both with different commands → distinct states; the pause checkpoint stays resumable
 - `api.test.ts` pass: pause/resume: pauseAt during a carry is refused naming the carry (allowDrop only before the lift); resume on a resting head is resume.not-resumable
-- `api.test.ts` pass: staleness (LM-004): an edit far from every step keeps the plan valid; one on the route stales it naming the step
 - `api.test.ts` pass: staleness (LM-004): an unrehearsed plan is scoped too (envelope from a run at its baseline); a changed bound entity always stales
-- `api.test.ts` pass: staleness (LM-003): a layout-only region edit stales a gather into that region (layout is physical); physicalHash moves
-- `api.test.ts` pass: rebind (LM-001): execute/rehearse rebind:auto re-binds a stale plan against the head (plan.rebound + diff); a broken binding is plan.rebind-failed naming the step
 - `api.test.ts` pass: store_camera_track (LM-013): a compiled directed track is stored beside its take — hash unchanged, listed, replayable; refusals
 - `api.test.ts` pass: edit_world (LM-005): a parked vehicle moves with the same footprint checks; a ridden one is edit.vehicle-ridden
 - `api.test.ts` pass: parse_camera (LM-007/008): Gene’s four sentences through the op — racks alias → the take’s rack bay, kitchen unknown in 2026, deictic question
@@ -993,12 +1100,17 @@ Compared with the report at `1a0b458` (2026-09-28T23:57:25.555Z): 0 added, 0 rem
 - `camera-framing.test.ts` pass: camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)
 - `camera-geom.test.ts` pass: camera geom: glass collides but does not occlude; policy is per kind
 - `camera-geom.test.ts` pass: camera shots: stateless evaluation (random access == sequential), Catmull-Rom through keys
+- `camera-parse-fixtures.test.ts` pass: LM-009: sink vocabulary parses a fixture subject and respects cross-kind ambiguity
+- `camera-parse-studio.test.ts` pass: studio file sentences use the op parser, vocabulary and resolver without a simulation room
+- `camera-parse-studio.test.ts` pass: file camera scene and vocabulary reflect checkpoint obstacle edits without changing the shared source
 - `camera-parse.test.ts` pass: Gene’s four sentences yield the exact documented objects or a deictic question
 - `camera-parse.test.ts` pass: 52 sentence → direction examples cover all verbs, units, framing, context and vocabulary
-- `camera-parse.test.ts` pass: 20 deliberately bad sentences refuse with code, question or candidates, and span
+- `camera-parse.test.ts` pass: LM-010 refusal contract: unsupported or incomplete phrases ask instead of guessing
 - `camera-parse.test.ts` pass: multi-direction text splits at then and sentence boundaries
+- `camera-parse.test.ts` pass: LM-010 wide lens is an explicit note, never an invented field of view
 - `camera-replay.test.ts` pass: camera perf: plan a 60 s track at 10 Hz with 3 subjects in < 1 s
 - `camera-synth.test.ts` pass: per-year bearing (W51): on mars-2022 (northAzimuthOffset −101) "side: south" and the sun window use the 2022 frame, not the global
+- `camera-worker.test.ts` pass: worker completion terminates once, detaches callbacks, and removes abort handling
 - `campus-extract.test.ts` pass: a 6 m post with vertices only at its ends is caught by band clipping
 - `campus-extract.test.ts` pass: a 10 m thin wall stays one prism (big triangles are not split into end posts)
 - `campus-extract.test.ts` pass: an L-shaped component is split so the inner corner stays open
@@ -1021,6 +1133,11 @@ Compared with the report at `1a0b458` (2026-09-28T23:57:25.555Z): 0 added, 0 rem
 - `campus.test.ts` pass: a walker can route from every pile to staging (±40 m crop)
 - `carry.test.ts` pass: carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives
 - `core.test.ts` pass: reconstruction edits and simulation events are distinct causes
+- `edit-static.test.ts` pass: static edits (LM-002): sequential add/update/remove; invalid bounds, support, overlaps and missing ids refuse atomically with named diagnostics
+- `edit-static.test.ts` pass: static edits (LM-002): a post supporting a walkable deck cannot be removed or moved
+- `edit-static.test.ts` pass: static edits (LM-002): supported corners across disconnected floors do not permit a floating span
+- `edit-static.test.ts` pass: static edits (LM-002): geometry-supported people cannot be stranded by removing their platform
+- `edit-static.test.ts` pass: static edits (LM-002): spawn shares the effective static namespace and collision batches are atomic in either order
 - `env-sun.test.ts` pass: elevation at true solar noon matches the equinox/solstice references
 - `env-sun.test.ts` pass: 2026-01-15 12:00 PST elevation matches the RESEARCH.md reference
 - `env-sun.test.ts` pass: 2026-03-15 sunrise/sunset within a few minutes of the RESEARCH.md reference
@@ -1035,6 +1152,7 @@ Compared with the report at `1a0b458` (2026-09-28T23:57:25.555Z): 0 added, 0 rem
 - `env-sun.test.ts` pass: the site bearing cannot move a construction pin: only camera/ and api/ (via camera) import env/sun.ts
 - `env-sun.test.ts` pass: per-year bearing: 2022 = −101 (world −X turned 11° toward +Z is north); the global stays −90 and is every other year's fallback
 - `env-sun.test.ts` pass: 2022 bearing sign: a February 16:15 PST sun throws the 2022 shadows toward screen up-left (−X, −Z), as in aerial-03
+- `forklift.test.ts` pass: traffic edit placement: held and fork loads block intersecting height bands but allow a parked EUC below a raised load
 - `framing.test.ts` pass: framing: a 16 ft bay gets 2 top plates, 4 rafters, 4 blocks by hand-up to the bracing — exact poses, 0 violations, refusals named, pinned
 - `framing.test.ts` pass: framing: determinism — the same scenario twice gives the same world hash
 - `framing.test.ts` pass: framing: catalog — plates / rafters / blocking are 2x4 sections cut to order from 16 ft stock; registry + invariants
@@ -1063,6 +1181,9 @@ Compared with the report at `1a0b458` (2026-09-28T23:57:25.555Z): 0 added, 0 rem
 - `progressive.test.ts` pass: swept lift: blocked straight and lifted over is refused with lift.path-blocked naming both obstacles
 - `progressive.test.ts` pass: lift crew: a joist lift keeps the holder beside its hand point (≤ 1.0 m, ≤ 2.4 m up) every tick
 - `progressive.test.ts` pass: lift crew: crates dropped on the holder's way block the lift (lift.crew-blocked, no clipping, part held)
+- `room-campus-2026.test.ts` pass: room 2026: incompatible year/file pairs refuse; omitted loader preserves synthetic-only test setup
+- `room-campus-2026.test.ts` pass: room 2026: legacy workspace id collision refuses without replacing user work
+- `room-storage.test.ts` pass: room workload: step and entity admission boundaries and malformed inputs preserve controller validation
 - `sequence.test.ts` pass: substitution: whole-string refs, indices, fields, $$ escape; no interpolation or eval
 - `sequence.test.ts` pass: bind: validated against registry + baseline; plan hash is content-addressed
 - `sequence.test.ts` pass: bind: invalid templates and bindings fail loudly with every problem listed
