@@ -20,7 +20,8 @@ import type { ActionDef } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
-import { BEAM_DECK_SPAN_MAX, beamDeckRule, beamLinks, isBeam, isStanding, isSupported, isUpright, snapSeat } from './rules.ts';
+import { framingRole } from '../world/catalog-framing.ts';
+import { BEAM_DECK_SPAN_MAX, RAFTER_SPACING_MAX, beamDeckRule, beamLinks, isBeam, isStanding, isSupported, isUpright, snapSeat } from './rules.ts';
 import { aloftCheck, fastenStep, isAloft } from './aloft.ts';
 import {
   approach, beginSweptLift, cancelLift, crewCheck, f2, fail, findStations, liftStep, releaseCrew, spatialOf, stagedCheck, stationFloor, sweptLiftPath, symmetricYaw,
@@ -233,10 +234,12 @@ export function sheetSupports(w: WorldState, sheet: Entity, obb: OBB2, height?: 
   const pos = bearing.map((s) => ({ id: s.id, v: dot2([s.pose.p[0], s.pose.p[2]], v) })).sort((a, b) => a.v - b.v);
   // Kit decks (rules.ts beamDeckRule, provisional): straight onto the beams of reconstruction frames at ≤ 4 ft
   const kit = beamDeckRule(w, bearing);
-  const spanMax = kit ? BEAM_DECK_SPAN_MAX : PLY_SPAN_MAX;
+  const rafters = bearing.some((s) => framingRole(s.def) === 'rafter');
+  const spanMax = rafters ? RAFTER_SPACING_MAX : kit ? BEAM_DECK_SPAN_MAX : PLY_SPAN_MAX;
+  const spanText = rafters ? (n: number) => n.toFixed(4) : f2;
   for (let i = 1; i < pos.length; i++)
-    if (pos[i].v - pos[i - 1].v > spanMax)
-      return fail('plywood.span', `3/4 in plywood ${sheet.id} cannot span ${f2(pos[i].v - pos[i - 1].v)} m between ${pos[i - 1].id} and ${pos[i].id} (max ${f2(spanMax)} m / ${kit ? '4 ft on reconstruction-frame beams' : '24 in'})${joists || kit ? '' : '; install 2x4 joists first'}`, [sheet.id, pos[i - 1].id, pos[i].id]);
+    if (pos[i].v - pos[i - 1].v > spanMax + (rafters ? 1e-9 : 0))
+      return fail('plywood.span', `3/4 in plywood ${sheet.id} cannot span ${spanText(pos[i].v - pos[i - 1].v)} m between ${pos[i - 1].id} and ${pos[i].id} (max ${spanText(spanMax)} m / ${kit ? '4 ft on reconstruction-frame beams' : '24 in'})${joists || kit ? '' : '; install 2x4 joists first'}`, [sheet.id, pos[i - 1].id, pos[i].id]);
   const over = Math.max(pos[0].v - s0, s1 - pos[pos.length - 1].v);
   if (over > PLY_OVERHANG_MAX) return fail('plywood.overhang', `${sheet.id} would overhang its outermost support by ${f2(over)} m (max ${f2(PLY_OVERHANG_MAX)} m / 12 in)`, [sheet.id]);
   for (const s of bearing) {

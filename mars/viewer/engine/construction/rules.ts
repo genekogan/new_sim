@@ -150,7 +150,7 @@ export function holdStations(u: Entity, n: number): { p: Vec2; yaw: number }[] {
 }
 
 // ---- 2x4 roof framing (W36, construction/framing.ts, FRAMING.md — PROVISIONAL, Mars assembly model v1) ----
-/** Roof / ceiling sheets need rafters at ≤ this centre spacing (the sheet rule itself is the year-build's; W36 exports the number). */
+/** Roof / ceiling sheets need rafters at ≤ this centre spacing (enforced by deck.ts sheetSupports, including mixed rafter supports). */
 export const RAFTER_SPACING_MAX = 24 * IN;
 /** A framing member bears at least this far onto each member under it (1.5 in). */
 export const FRAMING_BEARING_MIN = 1.5 * IN;

@@ -1,0 +1,214 @@
+[
+  {
+    "kind": "rafters",
+    "yaw": 0,
+    "spacing": 0.6095999999999999,
+    "support": {
+      "ok": true,
+      "y": 2.5654000000000003,
+      "supports": [
+        "support-1",
+        "support1"
+      ]
+    },
+    "atomicRefusalChecked": false
+  },
+  {
+    "kind": "rafters",
+    "yaw": 0,
+    "spacing": 0.6145999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.6146 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "rafters",
+    "yaw": 0,
+    "spacing": 0.7095999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.7096 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "rafters",
+    "yaw": 0.7853981633974483,
+    "spacing": 0.6095999999999999,
+    "support": {
+      "ok": true,
+      "y": 2.5654000000000003,
+      "supports": [
+        "support-1",
+        "support1"
+      ]
+    },
+    "atomicRefusalChecked": false
+  },
+  {
+    "kind": "rafters",
+    "yaw": 0.7853981633974483,
+    "spacing": 0.6145999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.6146 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "rafters",
+    "yaw": 0.7853981633974483,
+    "spacing": 0.7095999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.7096 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "mixed",
+    "yaw": 0,
+    "spacing": 0.6095999999999999,
+    "support": {
+      "ok": true,
+      "y": 2.5654000000000003,
+      "supports": [
+        "support-1",
+        "support1"
+      ]
+    },
+    "atomicRefusalChecked": false
+  },
+  {
+    "kind": "mixed",
+    "yaw": 0,
+    "spacing": 0.6145999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.6146 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "mixed",
+    "yaw": 0,
+    "spacing": 0.7095999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.7096 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "mixed",
+    "yaw": 0.7853981633974483,
+    "spacing": 0.6095999999999999,
+    "support": {
+      "ok": true,
+      "y": 2.5654000000000003,
+      "supports": [
+        "support-1",
+        "support1"
+      ]
+    },
+    "atomicRefusalChecked": false
+  },
+  {
+    "kind": "mixed",
+    "yaw": 0.7853981633974483,
+    "spacing": 0.6145999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.6146 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "mixed",
+    "yaw": 0.7853981633974483,
+    "spacing": 0.7095999999999999,
+    "support": {
+      "ok": false,
+      "diagnostic": {
+        "code": "plywood.span",
+        "message": "3/4 in plywood sheet cannot span 0.7096 m between support-1 and support1 (max 0.6096 m / 24 in)",
+        "subjects": [
+          "sheet",
+          "support-1",
+          "support1"
+        ]
+      }
+    },
+    "atomicRefusalChecked": true
+  },
+  {
+    "kind": "ordinary-joist-control",
+    "spacing": 0.6185999999999999,
+    "result": {
+      "ok": true,
+      "y": 2.5654000000000003,
+      "supports": [
+        "support-1",
+        "support1"
+      ]
+    }
+  }
+]

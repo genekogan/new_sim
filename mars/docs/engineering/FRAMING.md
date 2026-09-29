@@ -84,8 +84,10 @@ People on stances go back to `stance` afterwards.
   rafter there is 0.902–1.613 m long (≥ 1.5 in on each plate, a tail ≤ 12 in beyond each)".
 - **Blocking.** Both rafters must be installed and both must rest on `on`. It sits square to them (±1°), on the plate top,
   and must fit the gap between the rafters' faces with 0…2 cm of play (`framing.blocking-length` names the lengths).
-- **Sheets on rafters** need rafters at **≤ 24 in** centres: `RAFTER_SPACING_MAX` is exported. The sheet rule itself is
-  the year-build's to write, and was not written here.
+- **Sheets on rafters** need rafters at **≤ 24 in** centres: `deck.ts` enforces `RAFTER_SPACING_MAX` for any sheet bearing on rafters, including mixed supports.
+  The exact 24 in boundary is accepted (1e-9 m numerical tolerance); a larger gap returns `plywood.span` naming both members.
+  Ordinary joists retain their existing allowance; this rule does not introduce sloped-sheet installation.
+  Proof: `rafter-span.test.ts` (axis-aligned/45° layouts, exact boundary, +5 mm/+100 mm refusals, atomic install refusal).
 
 ## Stations and reach
 - **Reach per hand**, checked at plan time every 5 cm of every motion, and per tick by `framingHandsInReach` with a
