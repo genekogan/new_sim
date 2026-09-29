@@ -42,3 +42,12 @@ request with a cancellation-refusing social holder proves the directed action fa
 while all conversation membership, actor ownership and world state remain unchanged.
 Nine focused converse tests now pass; tsc/lint pass. Existing behavior for partial
 cancellation among older whole-action social holds is not broadened by this change.
+
+### Review follow-up: ordinary hand items
+
+Conversation re-entry now checks small-item `in-hand` support as well as the
+construction grip. A completed public `take_item` directive leaves the actor
+holding the bowl and emits `converse.return-refused` / `actor.holding`; it does
+not start a return walk or reclaim actor ownership. The other two members keep
+speaking. Ten focused conversation tests pass, including the actual pickup
+negative control, with zero invariant violations; TypeScript and lint pass.

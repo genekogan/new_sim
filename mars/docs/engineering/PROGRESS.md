@@ -1648,3 +1648,12 @@ inspected, zero violations. Original/candidate 600-tick no-interference comparis
 matches world/events/records exactly; no pins/history values changed. Integrated
 gate/browser proof pending. Approximately 35 worker minutes; no helpers. Report:
 briefs/ambient-return.REPORT.md. Depends on converse hooks79f8ca7+c2ff10c.
+
+## 2026-09-29 — LM026 review: refuse return with small hand items
+
+- Added the ordinary `in-hand` support check to conversation return eligibility,
+  matching ambient readoption. A real public `take_item` completes but the actor
+  remains away with the bowl supported; the other two keep their group claims.
+- Validation: 10 conversation-return tests, TypeScript and lint green. No pins,
+  historical content, full suite or release changes. Follow-up to 79f8ca7 and
+  c2ff10c; authored atop bcc514a but has no ambient implementation dependency.

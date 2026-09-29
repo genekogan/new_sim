@@ -7,6 +7,8 @@ import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { addAll, emptyWorld, human, component } from '../world/factory.ts';
+import { ITEM_ACTIONS } from '../items/actions.ts';
+import { itemEntity } from '../items/model.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { SOCIAL_ACTIONS } from '../social/actions.ts';
 import { decode, encode } from '../runtime/codec.ts';
@@ -187,4 +189,23 @@ test('a refusing social cancellation leaves selective conversation membership an
   assert.deepEqual(rt.holder('actor:a'), [group.id]);
   assert.ok(!rt.events.some((e) => e.type === 'mark' && e.name === 'converse.member-left'));
   assert.equal(rt.world.entities.a.human!.activity, 'talk');
+});
+
+
+test('completed small-item pickup refuses conversation return while retaining hand support', () => {
+  const { rt, group } = setup();
+  for (const action of ITEM_ACTIONS) rt.registry.set(action.verb, action);
+  rt.world.entities.bowl = itemEntity('bowl', 'bowl', [-9, 0, -8]);
+  const pickup = rt.submit('take_item', { actor: 'a', item: 'bowl', hand: 'left' });
+  wait(rt, () => !rt.isActive(pickup.id));
+  assert.equal(pickup.status, 'completed', pickup.diagnostic?.message);
+  const pose = structuredClone(rt.world.entities.a.pose);
+  for (let i = 0; i < 100; i++) rt.step();
+  assert.ok(!rejoined(rt));
+  assert.ok(rt.events.some((e) => e.type === 'mark' && e.name === 'converse.return-refused' && (e.data as { reason?: string }).reason === 'actor.holding'));
+  assert.deepEqual(rt.world.entities.a.pose, pose);
+  assert.deepEqual(rt.world.entities.bowl.support, { kind: 'in-hand', by: 'a', hand: 'left' });
+  assert.deepEqual(rt.holder('actor:a'), []);
+  assert.deepEqual(rt.holder('actor:b'), [group.id]);
+  assert.deepEqual(rt.violations, []);
 });

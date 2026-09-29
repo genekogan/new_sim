@@ -402,6 +402,10 @@ function stepConversationReturns(rt: Runtime, ex: ConverseExec) {
     if (intent.child && child?.status !== 'completed') {
       conversationReturnSkip(rt, ex, intent, child?.diagnostic?.code ?? child?.status ?? 'return-missing'); continue;
     }
+    // Small hand items use support provenance rather than the construction grip field.
+    if (Object.values(rt.world.entities).some((e) => e.support?.kind === 'in-hand' && e.support.by === intent.actor)) {
+      conversationReturnSkip(rt, ex, intent, 'actor.holding'); continue;
+    }
     const actor = readyActor(rt, intent.actor);
     if ('code' in actor) { conversationReturnSkip(rt, ex, intent, actor.code); continue; }
     const fit = circleFit(rt, { ...ex.circle, moves: [intent.station] }, new Set([...ex.actors, intent.actor]));
