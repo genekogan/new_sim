@@ -1568,3 +1568,13 @@ LM078 lead candidate: preflight and per-tick conservative load/carrier sweep aga
 
 Clean1859a8c full gate GREEN before main merge:93unit,498engine/0fail(6skip/11TODO),84browser/7documented skips,lint0/tsc,unchanged recording/probe,36MCP. Idle original perf limits and evidence17/17rows/8/8milestones PROVEN. Deployed4de6d265-4292-4e20-88c2-e85dda7a5488;rollbackf7ea9962-0d5e-4af5-afc5-9b433e4c49da. Productionassets/MCP/director/Studio2tests/Lab passed; three captures personally inspected. Counts33fixed/36reclassified/147remaining. Detailed table RELEASE_CHECKLIST. Historical agent dirty paths were excluded from clean integration build and this record commit. Pins unchanged; carryguard two-tick change retained isolated. Parallel tally:lead+3helpers maximum, heavy work serialized; user explicitly lifted5hbudget. Pendinghistory/staged/social next; camera/body measurements continue in isolation, no unmeasured performance claim.
 LM075 isolated lead candidate: defensive history views/serialization, atomic duplicate publication, validated persisted hashes/ancestry and lazy blob verification. Independent storage review closed fork-response identity, workspace cycles and cached-resume world mismatches; physical hash verification memoized per immutable loaded state. Five new integrity tests, existing API/resume/source scan, tsc/scoped lint; named-refusal capture inspected. Full gate/integration/performance pending, no pin/schema/history-content change. Approximate lead effort25min; one read-only peer review, within3helpers.
+LM041 isolated lead candidate: stagedCheck verifies full floor-union coverage/current OBB clearance, including interior holes and exact bottom height;12inspected state captures,23focused tests/tsc/lint green. Real stair/forklift staging remains accepted; no world/resource mutation on refusal. Independent review and fullgate pending; no pins/history-content edits. Approximate lead effort15min, one read-only peer review,3helpers total.
+
+
+LM041 candidate review completed by storage worker: corrected standing/prone/hand
+clearance is covered; added exact side/top contact and beyond-EPS penetration controls,
+plus public install_tread atomic refusal for half-off-floor and intersecting loads.
+Regenerated and personally inspected 23 captures (superseding the 12/15 intermediate
+counts). Focused staged-support/carry-stairs/forklift tests 25/25 plus source scan,
+tsc and oxlint pass. No pins/history values changed; integrated gate remains pending.
+Approximately 15 additional worker minutes, no helpers. See staged-support.REPORT.md.

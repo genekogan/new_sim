@@ -61,7 +61,7 @@ test('forklift picks plywood off the ground and stages it on the 3 m deck (level
   assert.ok(hypot(ply.pose.p[0] - 10, ply.pose.p[2] - 7.7) < 1e-6, `placed at ${xz(rt, 'ply1')}`);
   assert.equal((rt.services.spatial as Spatial).level(1)!.y, ply.pose.p[1]); // lying on level 1's floor
   // install_plywood's staged precondition accepts it where it now lies
-  assert.equal(stagedCheck(ply, [10, 9], 'plywood.not-staged'), null);
+  assert.equal(stagedCheck(rt, ply, [10, 9], 'plywood.not-staged'), null);
   const out = d.outputs as { surface: string; reach: number };
   assert.equal(out.surface, 'deck');
   assert.ok(out.reach >= 0 && out.reach < 0.2, `reach ${out.reach}`);
