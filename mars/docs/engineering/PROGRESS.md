@@ -1479,3 +1479,5 @@ Quota tally: account weekly meter36%→40%; API supplies no5hour window, so5hour
 
 
 Wave1 batching follow-up: LM022 climb-face reservations, LM152 deterministic work budgets, LM012 cancellable camera worker completed focused tests while gate was early in browser stage. Combined candidate28fixed/36re-classified/152remaining. Gate9923eb5 engine438/0, unit91, tsc/lint clean; interrupted to batch follow-ups and avoid two18minute browser runs. Cleanup exposed double-kill EPERM/orphan Vite; repair required before restarting. Explicit unchanged perf thresholds now release-checklisted; no pins moved. Weekly meter43% (start36%);5hour window still unavailable.
+
+Wave1 adversarial follow-up: spawn now rejects effective static obstacle/surface/link IDs with `edit.id-taken`, matching static_add in both batch orders. Refused batches leave the head unchanged; removed static IDs remain reusable. Focused static-edit 6/0, lint/tsc clean; report `briefs/edit-id-namespace.REPORT.md`. No pins or historical values changed; integrated gate remains lead-owned.

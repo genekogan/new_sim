@@ -84,6 +84,9 @@ export function applyEdits(start: WorldState, edits: WorldEdit[], spatialFor: (w
       if (w.inventory !== 'unlimited')
         return refuse('edit.inventory-finite', `workspace inventory is finite, so nothing can be spawned; fork with inventory: 'unlimited' (engine_fork) to design with catalog stock`);
       if (w.entities[edit.id]) return refuse('edit.id-taken', `an entity "${edit.id}" already exists`, [edit.id]);
+      const base = spatial().base;
+      if (base.obstacles.some((o) => o.id === edit.id) || base.surfaces.some((o) => o.id === edit.id) || base.links.some((o) => o.id === edit.id))
+        return refuse('edit.id-taken', `a static obstacle, surface or link "${edit.id}" already exists`, [edit.id]);
       const d = CATALOG[edit.def];
       if (!d) return refuse('edit.unknown-def', `no catalog def "${edit.def}" (see the def list in the tool schema)`);
       const isComponent = COMPONENTS.has(d.category);

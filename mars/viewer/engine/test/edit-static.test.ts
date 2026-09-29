@@ -114,3 +114,29 @@ test('static edits (LM-002): geometry-supported people cannot be stranded by rem
   assert.match(String(result.message), /standing/);
   assert.equal(c.history.head('ws').id, head);
 });
+
+
+test('static edits (LM-002): spawn shares the effective static namespace and collision batches are atomic in either order', () => {
+  const withLink = structuredClone(scene);
+  withLink.links.push({ id: 'passage', kind: 'ramp', from: { level: 0, p: [5, 5], y: 0 }, to: { level: 0, p: [6, 5], y: 0 }, width: 1, heading: 0, path: [[5, 0, 5], [6, 0, 5]], usable: true });
+  const history = new WorldHistory(ENGINE_RULES_VERSION);
+  history.publishCanonical('static-yard', 'static yard', emptyWorld('static-yard', withLink), 'test');
+  const c = createController({ history, scenes: { 'static-yard': withLink } });
+  assert.ok(c.call('fork', { from: 'static-yard', name: 'ws', inventory: 'unlimited' }).ok);
+  const spawn = (id: string) => ({ op: 'spawn', id, def: 'human', pose: { p: [-4, 0, 0], yaw: 0 } });
+  const add = { op: 'static_add', ...obstacle('shared', 4, 4) };
+  const head = c.history.head('ws').id;
+  for (const edits of [[add, spawn('shared')], [spawn('shared'), add], [spawn('wall')], ...['ground', 'passage'].map((id) => [{ op: 'static_remove', id: 'wall' }, spawn(id)])]) {
+    const r = edit(c, edits);
+    assert.equal(r.code, 'edit.id-taken', JSON.stringify(r));
+    assert.equal(c.history.head('ws').id, head, 'earlier edits in the failed batch must not commit');
+    assert.equal(c.history.read('ws').entities.shared, undefined);
+  }
+  // Removed obstacles are absent from the effective namespace; their IDs can be reused.
+  const reuse = edit(c, [{ op: 'static_remove', id: 'wall' }, spawn('wall')]);
+  assert.ok(reuse.ok, JSON.stringify(reuse));
+  assert.ok(c.history.read('ws').entities.wall);
+  const removed = edit(c, [{ op: 'remove', id: 'wall' }]);
+  assert.ok(removed.ok, JSON.stringify(removed));
+  assert.ok(edit(c, [{ op: 'static_add', ...obstacle('wall', 4, 4) }]).ok);
+});
