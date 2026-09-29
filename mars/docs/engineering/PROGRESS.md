@@ -1524,3 +1524,12 @@ Wave2 D4 worker — LM100 exact rafter sheet spans (`codex/rafter-span`, base6c5
   `briefs/deadlock-tails.REPORT.md`. LM-024 stays partial. No pins, broad suites or
   deployment. Estimate 20 min / 8k tokens; zero additional helpers. Separate
   movement-design docs commit `9a19bbf` still awaits integration.
+
+
+- **LM-049/053 design investigation (storage worker, 2026-09-29):** documentation only;
+  `briefs/walk-lookahead.DESIGN.md` records the analytical ~45mm prediction mismatch,
+  40-case bounded search with no push failure, exact control coordinates and measured
+  small-fixture profile. Deliberate encounter slowdown is not labeled a defect.
+  Shared pure transition proposed; physical regression and bounded forecast-cost
+  proof remain prerequisites. Cache deferred unless measured useful; no pins/code
+  changes or broad suites. Estimate 25 min / 10k tokens, zero additional helpers.
