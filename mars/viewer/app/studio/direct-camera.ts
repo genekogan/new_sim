@@ -5,6 +5,7 @@
 //   crop), or for a year-build fork the year scene without the building (`yearBuildScene`, checked against the
 //   take's `base.staticHash`) — plus the take's installed parts as collision-only prisms;
 // - world = take.finalState (names, regions, light), sampler = takeSampler(take), facts = takeFacts(take).
+// File-take compilation runs in a one-shot browser worker; loading remains shared with sentence parsing.
 // Lazy-imported: none of this is in the studio's main chunk.
 import { hashOf } from '../../engine/core/hash.ts';
 import { cropScene, sceneFromFile, CAMPUS_2026_URL } from '../../engine/campus/load.ts';
@@ -14,23 +15,20 @@ import { assemblyGraph } from '../../engine/campus/assembly.ts';
 import { buildingFootprint } from '../../engine/campus/bom.ts';
 import { yearBuildScene } from '../../engine/campus/sequence.ts';
 import { SemanticWorld, takeFacts } from '../../engine/camera/direct.ts';
-import { directCamera, type DirectResult } from '../../engine/camera/synth.ts';
-import { DEFAULT_CAMERA_POLICY, type CameraPolicy } from '../../engine/camera/geom.ts';
-import { takeSampler } from '../../engine/camera/take-sampler.ts';
-import { toCameraTrack, trackData } from '../../engine/camera/track.ts';
+import { directCamera } from '../../engine/camera/synth.ts';
 import { activitiesOf, cameraVocab, parseCameraSentences } from '../../engine/api/camera-vocab.ts';
 import { splitCameraSentences } from '../../engine/camera/parse.ts';
 import { sceneForWorld } from '../../engine/spatial/edits.ts';
 import { entityFootprint } from '../../engine/spatial/service.ts';
-import { takeDuration } from '../../engine/take/replay.ts';
 import type { CampusSceneFile } from '../../engine/campus/types.ts';
 import type { Obstacle, SpatialScene } from '../../engine/spatial/types.ts';
 import type { Take } from '../../engine/take/types.ts';
 import type { WorldState } from '../../engine/world/types.ts';
-import type { ActiveTrack, TakeReplayFile } from '../engine-view/take-replay.ts';
+import type { TakeReplayFile } from '../engine-view/take-replay.ts';
 
-/** Parts never occlude in the planner (they come per tick from the sampler); the finished build may not be crossed. */
-export const DIRECT_POLICY: CameraPolicy = { ...DEFAULT_CAMERA_POLICY, component: { collide: true, occlude: false } };
+import { compileTakeCamera, cameraWorkerFailure, trackOf, type CameraCompileOptions, type CompiledTakeCamera } from './direct-camera-compile.ts';
+import { compileInWorker } from './direct-camera-client.ts';
+export { DIRECT_POLICY } from './direct-camera-compile.ts';
 const BUILD = /^mars-(\d{4}):build:(.+)$/;
 
 const files = new Map<string, Promise<unknown>>();
@@ -84,20 +82,7 @@ export async function takeCameraScene(file: TakeReplayFile): Promise<TakeCameraS
   return { scene: { ...scene, obstacles: [...scene.obstacles, ...solids] }, source, baseHash: take.finalState.base.staticHash, sceneHash: hashOf(scene), matchesBase };
 }
 
-export type Directed = {
-  result: DirectResult;
-  /** Present when the compile succeeded: a track the replay can drive the engine camera with (take coordinates). */
-  track?: ActiveTrack;
-  ms: number;
-  scene: string;
-};
-
-const trackOf = (result: DirectResult, takeId: string, key: unknown, hz: number): ActiveTrack | undefined => {
-  if (!result.ok) return undefined;
-  const id = `dir-${hashOf({ take: takeId, directions: key, hz }).slice(0, 12)}`; // as the engine_direct_camera op names it
-  const t = toCameraTrack(id, takeId, result.plan, 'directed');
-  return { id, kind: 'directed', data: trackData(t) };
-};
+export type Directed = CompiledTakeCamera & { scene: string };
 
 const sceneCache = new WeakMap<Take, Promise<TakeCameraScene>>();
 const sceneForTake = (file: TakeReplayFile) => {
@@ -116,13 +101,14 @@ export async function parseForTake(file: TakeReplayFile, text: string) {
 }
 
 /** Directions against an open take (as `engine_direct_camera { take_id, directions, correct }`). */
-export async function directForTake(file: TakeReplayFile, directions: unknown[], opts: { correct?: boolean; hz?: number; datetime?: string } = {}): Promise<Directed> {
+export async function directForTake(file: TakeReplayFile, directions: unknown[], opts: CameraCompileOptions & { signal?: AbortSignal } = {}): Promise<Directed> {
   const { scene, source } = await sceneForTake(file);
-  const take = file.take, hz = opts.hz ?? 10;
-  const world: WorldState = opts.datetime ? { ...take.finalState, env: { ...take.finalState.env, datetime: opts.datetime } } : take.finalState;
-  const t0 = performance.now();
-  const result = directCamera(directions, { scene, world, sampler: takeSampler(take), facts: takeFacts(take), duration: takeDuration(take), hz, policy: DIRECT_POLICY, ...(opts.correct === false ? { correct: false } : {}) });
-  return { result, track: trackOf(result, take.id, { directions, correct: opts.correct, datetime: opts.datetime }, hz), ms: Math.round(performance.now() - t0), scene: source };
+  const { signal, ...compileOpts } = opts;
+  if (signal?.aborted) return { ...cameraWorkerFailure(file.take.id, 'camera.worker.cancelled', `Camera compilation for take ${file.take.id} was cancelled`), scene: source };
+  const job = { take: file.take, scene, directions, opts: compileOpts };
+  // Explicit Node callers/tests have no browser UI to block. A browser without Worker refuses instead.
+  const compiled = typeof window === 'undefined' ? compileTakeCamera(job) : await compileInWorker(job, signal);
+  return { ...compiled, scene: source };
 }
 
 /**

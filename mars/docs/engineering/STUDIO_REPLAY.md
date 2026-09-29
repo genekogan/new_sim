@@ -329,7 +329,9 @@ first bay has none.
   and its poses are untouched (tested).
 
 **Where it compiles.** The public takes are files, not takes stored in a simulation room, so the studio runs the pure-TS
-compiler itself (`direct-camera.ts` → `engine/camera/synth.ts directCamera`, phase 2 on). The inputs match what
+compiler in a one-shot module worker (`direct-camera.ts` → `direct-camera.worker.ts` → shared
+`direct-camera-compile.ts` → `engine/camera/synth.ts directCamera`, phase 2 on). Explicit Node callers use the
+same synchronous kernel. The inputs match what
 `engine_direct_camera` and the recorder use:
 - `world = take.finalState`, `sampler = takeSampler(take)`, `facts = takeFacts(take)`;
 - policy: parts collide and do not occlude;
@@ -339,6 +341,19 @@ compiler itself (`direct-camera.ts` → `engine/camera/synth.ts directCamera`, p
   - in both cases the installed parts are added as collision-only prisms.
 
 The track id is named as the op names it (`dir-<hash>`).
+
+File scene loading/caching stays on the caller; the worker receives resolved JSON and does not load the campus
+again. Completion, worker errors, decoding failures and cancellation all terminate it and remove abort listeners.
+Creation/communication/compile failures return named `camera.worker.*` diagnostics, never a blocking browser
+fallback. A new request, closed take, or changed active chapter aborts the pending worker; file identity and the
+request token prevent stale results from replacing a newer track. Lifecycle options never enter the track ID.
+Scene preparation and structured cloning still happen on the caller; take-less `directOnYear` is unchanged.
+
+`e2e/camera-worker.spec.ts` compiles a synthetic long file take, compares the entire result and track with the
+synchronous kernel, and observes animation frames after the worker begins compilation and before it replies.
+It also closes the take during a second request and proves cancellation/cleanup. No wall-clock performance
+threshold or stale historical chapter is used.
+
 
 ### Sentences (W48, world vocabulary W61)
 

@@ -483,7 +483,16 @@ Next steps (not needed for the targets; LAST_MILE LM-012 / LM-067):
   all 220 entities. A per-id sampling path would need the crew / contact logic split out of the tick sampler.
 - The navmesh is still rebuilt per `directCamera` call (fly-throughs only, 100–250 ms): a cache keyed by (scene,
   bounds, radius) across calls would help repeated fly-through edits; it is identical by construction but holds memory.
-- The studio still runs `directCamera` on the main thread; a worker would remove the remaining freeze entirely.
+- **File-take worker shipped (W61 follow-up, LM-012):** `directForTake` loads the existing cached scene once,
+  then a one-shot `direct-camera.worker.ts` runs the shared `compileTakeCamera` kernel. Node callers use that
+  kernel synchronously. Browser creation/failure/abort paths terminate and return named diagnostics; there is
+  no main-thread browser fallback. Host selection/request checks prevent stale take/chapter results.
+  `camera-worker.spec.ts` proves full result/track identity and rAF progress while the worker is compiling.
+  Scene preparation and JSON transfer remain on the main thread; take-less `directOnYear` remains synchronous.
+- **Synthetic sampler proxy shipped:** `camera-sampler-budget.test.ts` compares a 20 s dynamic-subject hold
+  at t=0 with the same hold after 2728.8 s. Counts are equal, no sampler calls precede the shot, and the output
+  still contains all >27k additional lead-in samples. This is a history-independent regression guard; it does
+  not claim the parked historical D2 case still has exactly 2,424 calls on a changed scene.
 ### 8.3 Sentences and stored tracks over the op API (W58: LM-007, LM-008, LM-013)
 - **`engine_parse_camera { take_id | workspace, sentences[] (1–24) }`** → `{ ok, source, directions: [{ index,
   sentence, direction, notes, subject: { kind, id, label, said } }], refusals: [{ index, sentence, code, message,

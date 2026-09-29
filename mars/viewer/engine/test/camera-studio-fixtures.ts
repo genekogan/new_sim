@@ -7,11 +7,11 @@ import { directCamera } from '../camera/synth.ts';
 import { toCameraTrack } from '../camera/track.ts';
 import type { TakeReplayFile } from '../../app/engine-view/take-replay.ts';
 
-export function kitchenCameraFile(): TakeReplayFile {
+export function kitchenCameraFile(duration = 6): TakeReplayFile {
   const { base, world } = loadCampusYear(2024, loadCampusFile(2024));
   const runtime = new Runtime(world, new Map(), {});
   const recorder = new TakeRecorder(runtime, { rulesVersion: 'camera-studio-test' });
-  for (let i = 0; i < 120; i++) runtime.step();
+  for (let i = 0; i < duration * 20; i++) runtime.step();
   const take = recorder.finish();
   const camera = directCamera([{ subject: { kind: 'fixture', ref: 'sink' }, motion: { verb: 'hold' }, duration: 6 }], { scene: base, world: take.finalState, sampler: () => ({}), duration: 6 });
   if (!camera.ok) throw new Error(JSON.stringify(camera.diagnostics));

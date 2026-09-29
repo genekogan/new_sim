@@ -37,7 +37,12 @@ export function createTakeHost(
   let setLoading: ChapterSetEntry | null = null;
   let worker: Worker | null = null;
   const listeners = new Set<() => void>();
-  const changed = () => listeners.forEach((f) => f());
+  let cameraJob: { file: TakeReplayFile; abort: AbortController } | null = null;
+  const activeCameraFile = () => replay?.file ?? setReplay?.chapterFile()?.file;
+  const changed = () => {
+    if (cameraJob && activeCameraFile() !== cameraJob.file) cameraJob.abort.abort();
+    listeners.forEach((f) => f());
+  };
 
   async function open(e: TakeManifestEntry | null) {
     close();
@@ -118,6 +123,8 @@ export function createTakeHost(
   }
 
   function close() {
+    cameraJob?.abort.abort();
+    cameraJob = null;
     setLoading = null;
     setEntry = null;
     worker?.terminate();
@@ -187,15 +194,21 @@ export function createTakeHost(
       const ch = !r && sr ? sr.chapterFile() : null;
       const file = r?.file ?? ch?.file;
       if (!file) return null;
-      const { directForTake } = await import('./direct-camera.ts');
-      const d = await directForTake(file, directions, o);
-      if (replay === r && setReplay === sr) {
+      cameraJob?.abort.abort();
+      const job = { file, abort: new AbortController() };
+      cameraJob = job;
+      try {
+        const { directForTake } = await import('./direct-camera.ts');
+        const d = await directForTake(file, directions, { ...o, signal: job.abort.signal });
+        if (cameraJob !== job || job.abort.signal.aborted || activeCameraFile() !== file) return null;
         directed = d;
         directedChapter = ch ? { k: ch.k, id: ch.id, label: ch.label, url: ch.url } : null;
         sr?.setDirected(null);
         changed();
+        return d;
+      } finally {
+        if (cameraJob === job) cameraJob = null;
       }
-      return d;
     },
     directed: () => directed,
     /** For a set: the chapter the directed track belongs to (compiled against its take), else null. */
