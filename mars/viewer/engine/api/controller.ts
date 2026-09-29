@@ -380,7 +380,7 @@ export class EngineController {
     const forks = [...this.history.workspaces.values()].filter((w) => w.forkedFrom === ws.id).map((w) => w.id).sort();
     if (forks.length)
       return fail('workspace.has-forks', `workspace ${ws.id} is the fork parent of ${forks.join(', ')}; delete ${forks.length > 1 ? 'those' : 'that'} first`, { details: { forks } });
-    this.history.workspaces.delete(ws.id);
+    this.history.deleteWorkspace(ws.id);
     this.changes.history = true;
     return { ok: true, deleted: ws.id, head: ws.head, note: 'its checkpoints stay addressable by id (engine_fork `at`); plans/takes referenced only from it are now evictable' };
   }
@@ -745,7 +745,7 @@ export class EngineController {
     const at = q.at ?? this.history.workspaces.get(q.from)?.head;
     if (q.inventory && at && this.history.checkpoints.has(at) && this.history.resumable(at) && this.history.read(at).inventory !== q.inventory)
       return fail('workspace.paused', `cannot change inventory when forking at pause checkpoint ${at}: the change would be a design edit on top of a mid-action state (fork without inventory, resume, then edit)`);
-    const w = this.history.fork(q.from, q.name, q.label ?? q.name, q.at);
+    this.history.fork(q.from, q.name, q.label ?? q.name, q.at);
     this.changes.history = true;
     if (q.inventory) {
       const world = this.history.read(q.name);
@@ -754,7 +754,7 @@ export class EngineController {
         this.history.commit(q.name, world, { kind: 'design-edit', note: `inventory: ${q.inventory}` }, `inventory ${q.inventory}`);
       }
     }
-    return { ok: true, workspace: { ...w }, inventory: this.history.read(q.name).inventory };
+    return { ok: true, workspace: this.history.workspaces.get(q.name)!, inventory: this.history.read(q.name).inventory };
   }
 
   /** Design edits on an editable workspace: all-or-nothing, one `design-edit` checkpoint, returns the physical diff. */

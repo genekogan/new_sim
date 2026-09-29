@@ -278,6 +278,7 @@ unchanged (no `rebound`).
 - Attaching/editing camera tracks never changes a take's hash or final state.
 - Rehearsal and replay never mutate history, workspace heads or the take (takes in `TakeLibrary` are frozen).
 - Executing in a fork leaves canonical and sibling workspaces untouched; canonical refuses execution.
+- History workspace/checkpoint views and `toJSON()` return independent values. Re-publishing an existing workspace refuses with `exists`; only unprotected leaf refs may be deleted. Persisted state/checkpoint/resume hashes and index ancestry are verified, with lazy state/snapshot checks at first read and per-checkpoint snapshot/world consistency. Corrupt storage refuses with `corrupt-history` (LM075; `history-integrity.test.ts`). Content hashes detect corruption, not an authenticated attacker who can rewrite every hash.
 - A relevant physical edit after rehearsal ⇒ `plan.stale`; env / label / provenance edits ⇒ still valid.
 - Sampling a take at every tick reproduces true poses within TRACK_TOL + ½ quantum (4.5 mm / 8.5 mrad since mars-take/4;
   2 mm / 2 mrad before) and exact activity/level; hands within

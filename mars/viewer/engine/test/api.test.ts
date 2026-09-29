@@ -540,6 +540,8 @@ test('api: edit_world — design edits spawn/move/remove/region, all-or-nothing,
   // fork with unlimited inventory: a design-edit checkpoint on the new workspace only
   const f = c.call('fork', { from: 'carry-yard', name: 'yard', inventory: 'unlimited' }) as any;
   assert.equal(f.inventory, 'unlimited');
+  assert.equal(f.workspace.head, c.history.head('yard').id, 'fork response names the inventory-edit head, not the pre-edit snapshot');
+  assert.equal(c.history.read(f.workspace.head).inventory, 'unlimited');
   assert.deepEqual(c.history.log('yard').map((cp) => cp.cause.kind), ['design-edit', 'canonical-publish']);
   assert.equal(c.history.read('carry-yard').inventory, 'finite');
   const early = bind(c, { schema: 'mars-sequence/1', id: 'w', params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x: 3, z: 3 } }] }, { a: 'p1' }, 'yard');

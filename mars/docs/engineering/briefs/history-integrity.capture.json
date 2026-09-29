@@ -1,0 +1,66 @@
+[
+  {
+    "case": "returned mutation",
+    "hash": "47bd80be89cd3b270bc6a2169fc1f697cba79b0e7594609af7c343c398a30d9f",
+    "unchanged": true
+  },
+  {
+    "case": "state hash",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "checkpoint hash",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "physical hash",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "duplicate checkpoint",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "duplicate state",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "duplicate workspace",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "sequence",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "head",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "protection",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "workspace self-cycle",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "canonical advanced head",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "parent cycle",
+    "diagnostic": "corrupt-history"
+  },
+  {
+    "case": "lazy blob verification",
+    "stateHash": "28c2610dc71a46a8205e7682ba1bf66c273361ed98a42420e9c25202f0c409d4",
+    "resumeHash": "125451299f47f8a65ccbd04958e70f804113bdd1e48121d8326cc9b823089a2f",
+    "diagnostic": "corrupt-history",
+    "recovered": true
+  },
+  {
+    "case": "cached resume referenced by another world",
+    "diagnostic": "corrupt-history"
+  }
+]
