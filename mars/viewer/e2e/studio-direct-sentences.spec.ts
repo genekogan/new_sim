@@ -1,11 +1,7 @@
-// Direct camera from sentences (W48; STUDIO_REPLAY.md §3 "Sentences", CAMERA_DIRECT.md §1, Codex's engine/camera/parse.ts):
-// on the flagship take, Gene's four sentences go through the panel's "Say it" box. The three stated ones become the
-// typed directions of CAMERA_DIRECT.md's table and are appended to the JSON list; "look at this crowd of people having
-// this activity" is refused (deictic) with its question and nothing is appended. An ambiguous word shows its
-// candidates; "… then …" appends two directions. The lead's sentence ("do a 270° revolution around the rack bay over 2
-// minutes") is then computed and played. Every parsed sentence is also compiled against the take (report only: whether
-// the compiler finds the named subject in this take's scene is not the parser's business).
-// Captures artifacts/<run>/studio-direct-sentences-{refused,orbit}.png.
+// The studio Say-it panel uses the same world vocabulary and semantic resolution as engine_parse_camera.
+// On the 2026 flagship, Chiba resolves directly, rack aliases become structure:A, the absent kitchen refuses
+// before appending, and unbound "this" refuses with its question. Mixed clauses append all or nothing.
+// The resolved rack orbit is compiled and played; captures show refusal feedback and the directed camera.
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,8 +17,8 @@ const info = (page: Page) => page.evaluate(() => (window.__marsStudio as unknown
 /** Gene's sentences and the directions CAMERA_DIRECT.md §1 gives for them (null: refused, with its code and question). */
 const GENE: { text: string; want: unknown; code?: string; question?: string }[] = [
   { text: 'do a pan across Chiba with the sunset in the background', want: { subject: { kind: 'region', ref: 'chiba' }, motion: { verb: 'pan' }, context: { sunBehind: { sunset: true } } } },
-  { text: 'do a 270° revolution around the main pallet racks over 2 minutes', want: { subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120 } },
-  { text: 'go inside the kitchen and face the sink', want: { subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through' }, context: { interior: 'kitchen-interior', lookAt: 'sink' } } },
+  { text: 'do a 270° revolution around the main pallet racks over 2 minutes', want: { subject: { kind: 'assembly', ref: 'structure:A' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120 } },
+  { text: 'go inside the kitchen and face the sink', want: null, code: 'camera.direct.unknown' },
   { text: 'look at this crowd of people having this activity', want: null, code: 'camera.parse.deictic', question: 'Which activity are the people doing?' },
 ];
 
@@ -62,8 +58,8 @@ test('direct camera from sentences: Gene\'s four through the panel, refusals wit
       const alert = page.getByRole('alert', { name: 'Sentence refused' });
       await expect(alert).toContainText('Nothing added.');
       await expect(alert).toContainText(g.code!);
-      await expect(alert).toContainText(g.question!);
-      await expect(alert.locator('mark'), 'the refusal points at the words').toHaveText('this');
+      if (g.question) await expect(alert).toContainText(g.question);
+      if (g.code === 'camera.parse.deictic') await expect(alert.locator('mark'), 'the refusal points at the words').toHaveText('this');
       expect(after, 'a refused sentence appends nothing').toEqual(before);
       (report.sentences as unknown[]).push({ text: g.text, refused: await alert.innerText() });
       await captureView(page, 'studio-direct-sentences-refused', { testInfo, compare: false });
@@ -80,7 +76,7 @@ test('direct camera from sentences: Gene\'s four through the panel, refusals wit
   await jsonBox.fill('');
   await say('pan across Chiba then orbit 90° around the racks', 'Added 2 directions:');
   await expect(page.getByRole('status', { name: 'Sentence parsed' })).toContainText('Added 2 directions:');
-  expect(await list()).toEqual([{ subject: { kind: 'region', ref: 'chiba' }, motion: { verb: 'pan' } }, { subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 90 } }]);
+  expect(await list()).toEqual([{ subject: { kind: 'region', ref: 'chiba' }, motion: { verb: 'pan' } }, { subject: { kind: 'assembly', ref: 'structure:A' }, motion: { verb: 'orbit', degrees: 90 } }]);
 
   // every parsed sentence against this take (report only)
   const compiled: Record<string, unknown> = {};
@@ -93,7 +89,7 @@ test('direct camera from sentences: Gene\'s four through the panel, refusals wit
   // the lead's sentence → Compute → shot list → Play
   await jsonBox.fill('');
   await say('do a 270° revolution around the rack bay over 2 minutes', '"duration":120');
-  expect(await list()).toEqual([{ subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120 }]);
+  expect(await list()).toEqual([{ subject: { kind: 'assembly', ref: 'structure:A' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120 }]);
   await page.getByRole('button', { name: 'Compute camera' }).click();
   const shots = page.getByRole('list', { name: 'Shot list' });
   await expect(shots).toBeVisible({ timeout: 120_000 });

@@ -166,6 +166,17 @@ export function createTakeHost(
       listeners.add(f);
       return () => void listeners.delete(f);
     },
+    /** Parse against the same active file/chapter as direct(); a changed selection discards the result. */
+    async parseDirections(text: string) {
+      const r = replay, sr = setReplay;
+      const ch = !r && sr ? sr.chapterFile() : null;
+      const file = r?.file ?? ch?.file;
+      if (!file) return null;
+      const { parseForTake } = await import('./direct-camera.ts');
+      const parsed = await parseForTake(file, text);
+      if (replay !== r || setReplay !== sr || (ch && sr?.chapterFile()?.id !== ch.id)) return null;
+      return parsed;
+    },
     /**
      * Compile directions against the open take in the browser (direct-camera.ts); the result is kept for the panel.
      * `play`: drive the engine camera with the directed track from its first shot.

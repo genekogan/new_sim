@@ -340,36 +340,33 @@ compiler itself (`direct-camera.ts` → `engine/camera/synth.ts directCamera`, p
 
 The track id is named as the op names it (`dir-<hash>`).
 
-### Sentences (W48)
+### Sentences (W48, world vocabulary W61)
 
-The "Say it" box above the form runs Codex's `engine/camera/parse.ts` (`parseSentences`) in the page. It is lazy-loaded,
-so it is not in the main chunk.
-- Several sentences may be given at once ("… then …", or full stops). **All or nothing:** when every clause parses, its
-  directions are appended to the JSON list ("Added 2 directions: {…} · {…}", with the parser's notes). Otherwise nothing
-  is appended and each refusal is shown: code, message, the parser's question and its **candidates**. For a single
-  sentence, the words it points at are marked.
-- **No world vocabulary is passed.** The parser only reads the words (its lexical rules: "racks" → assembly `rack bay`,
-  "kitchen" in a fly-through → region `kitchen-interior`, Chiba → region `chiba`). Whether that name exists in the open
-  take is the compiler's answer (`camera.direct.unknown`, with the known names), exactly as for the form.
-- "at the current time" is not added to a parsed direction; the sentence states its own constraints ("at 1:30").
+The "Say it" box lazy-loads `direct-camera.ts:parseForTake` for the active take or chapter. It uses the
+same `cameraVocab`, `activitiesOf` and `parseCameraSentences` functions as `engine_parse_camera`, with
+`SemanticWorld` built from the same scene and final state used to compile the file's camera. A shipped
+file take requires no simulation room. `takeCameraScene` applies checkpoint `obstacleEdits` through
+`sceneForWorld`, so both parsing and compilation see edited static geometry.
 
-Tested (`e2e/studio-direct-sentences.spec.ts`, flagship take). Gene's four sentences through the box give exactly
-CAMERA_DIRECT.md §1's objects:
-- the Chiba sunset pan, the 270° revolution around the main pallet racks over 2 minutes, and the kitchen fly-through
-  facing the sink are appended in turn;
-- "look at this crowd of people having this activity" is refused (`camera.parse.deictic`, "Which activity are the
-  people doing?", "this" marked) and appends nothing;
-- "pan across the shed" is refused with "Candidates: region:shed, assembly:shed, entity:shed.";
-- "pan across Chiba then orbit 90° around the racks" appends two directions;
-- "do a 270° revolution around the rack bay over 2 minutes" → Compute: one orbit shot on `rack bay` (24 parts), 0–120
-  s, readability min 0.63 / mean 0.96, simulated valid, 139 ms → Play; the take hash is unchanged.
+- Several sentences may be given at once ("… then …", or full stops), using the shared clause splitter.
+  **All or nothing:** every clause must parse and resolve before any direction is appended. Refusals show
+  their code, message, question and candidates; single-sentence parser spans mark the words at fault.
+- Rack aliases resolve to actual structure IDs; fixtures use the world vocabulary. A fixture query retains
+  its phrase to preserve touching component clusters on recompilation. The subject-kind form offers fixture.
+- Missing names refuse during parsing. On the 2026 flagship, the kitchen sentence is `camera.direct.unknown`;
+  on the 2024 kitchen test take, "hold on the sink" becomes a fixture hold and plays the computed shot.
+- Changes to the active take/chapter discard an in-flight parse. New text, JSON edits, form additions or
+  Compute invalidate older parse requests, so stale responses cannot overwrite more recent work.
+- "At the current time" is not added to a parsed direction; the sentence states its own constraints.
 
-Compiled against the flagship take (reported, not asserted), the other two stated sentences are refused **by the
-compiler**, correctly:
-- the sunset pan: `camera.direct.not-sunset`, the take is lit at 16:00 with the sun 19.1° up;
-- the kitchen: `camera.direct.unknown`, the 2026 scene has no `kitchen-interior` region and no `sink` fixture.
+`e2e/studio-direct-sentences.spec.ts` exercises Gene's four sentences: Chiba resolves, the rack phrase resolves
+as `structure:A`, the absent kitchen refuses, and unbound "this" asks which activity. The rack orbit compiles
+and plays with the take hash unchanged. The sunset constraint is still checked by compilation against the
+take's actual light. `e2e/studio-camera-vocab.spec.ts` records an action-free hypothetical 2024 file take,
+parses and plays "hold on the sink" without a room, and proves a mixed valid/invalid request appends nothing.
+No historical scene content is modified. Captures: `studio-direct-sentences-{refused,orbit}.png` and
+`studio-camera-vocab-{refused,sink}.png`.
 
-No sentence failed in the parser. Captures `studio-direct-sentences-{refused,orbit}.png`.
 
 ### Camera picker and saved tracks (W24)
 

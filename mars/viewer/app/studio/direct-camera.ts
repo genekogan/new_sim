@@ -13,11 +13,14 @@ import { campusYearUrl, loadCampusYear, sceneFromYearFile, type CampusYearFile }
 import { assemblyGraph } from '../../engine/campus/assembly.ts';
 import { buildingFootprint } from '../../engine/campus/bom.ts';
 import { yearBuildScene } from '../../engine/campus/sequence.ts';
-import { takeFacts } from '../../engine/camera/direct.ts';
+import { SemanticWorld, takeFacts } from '../../engine/camera/direct.ts';
 import { directCamera, type DirectResult } from '../../engine/camera/synth.ts';
 import { DEFAULT_CAMERA_POLICY, type CameraPolicy } from '../../engine/camera/geom.ts';
 import { takeSampler } from '../../engine/camera/take-sampler.ts';
 import { toCameraTrack, trackData } from '../../engine/camera/track.ts';
+import { activitiesOf, cameraVocab, parseCameraSentences } from '../../engine/api/camera-vocab.ts';
+import { splitCameraSentences } from '../../engine/camera/parse.ts';
+import { sceneForWorld } from '../../engine/spatial/edits.ts';
 import { entityFootprint } from '../../engine/spatial/service.ts';
 import { takeDuration } from '../../engine/take/replay.ts';
 import type { CampusSceneFile } from '../../engine/campus/types.ts';
@@ -74,6 +77,7 @@ export async function takeCameraScene(file: TakeReplayFile): Promise<TakeCameraS
     scene = sceneFromYearFile(year, await yearFile(year));
     source = `mars-${year}`;
   }
+  scene = sceneForWorld(scene, take.finalState);
   const solids: Obstacle[] = Object.values(take.finalState.entities)
     .filter((e) => e.kind === 'component' && e.phase === 'installed')
     .map((e) => ({ id: `take:${e.id}`, kind: 'component', label: `hypothetical ${e.def} ${e.id}`, ...entityFootprint(e) }));
@@ -96,11 +100,24 @@ const trackOf = (result: DirectResult, takeId: string, key: unknown, hz: number)
 };
 
 const sceneCache = new WeakMap<Take, Promise<TakeCameraScene>>();
-/** Directions against an open take (as `engine_direct_camera { take_id, directions, correct }`). */
-export async function directForTake(file: TakeReplayFile, directions: unknown[], opts: { correct?: boolean; hz?: number; datetime?: string } = {}): Promise<Directed> {
+const sceneForTake = (file: TakeReplayFile) => {
   let sc = sceneCache.get(file.take);
   if (!sc) sceneCache.set(file.take, (sc = takeCameraScene(file)));
-  const { scene, source } = await sc;
+  return sc;
+};
+
+/** Same world vocabulary, aliases and resolver as engine_parse_camera, for shipped file takes without a room. */
+export async function parseForTake(file: TakeReplayFile, text: string) {
+  const { scene } = await sceneForTake(file);
+  const take = file.take, world = take.finalState;
+  const semantic = new SemanticWorld(scene, world, takeFacts(take));
+  const sentences = splitCameraSentences(text);
+  return parseCameraSentences(semantic, sentences.length ? sentences : [''], cameraVocab(semantic, activitiesOf(world, take)));
+}
+
+/** Directions against an open take (as `engine_direct_camera { take_id, directions, correct }`). */
+export async function directForTake(file: TakeReplayFile, directions: unknown[], opts: { correct?: boolean; hz?: number; datetime?: string } = {}): Promise<Directed> {
+  const { scene, source } = await sceneForTake(file);
   const take = file.take, hz = opts.hz ?? 10;
   const world: WorldState = opts.datetime ? { ...take.finalState, env: { ...take.finalState.env, datetime: opts.datetime } } : take.finalState;
   const t0 = performance.now();

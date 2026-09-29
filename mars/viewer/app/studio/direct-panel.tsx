@@ -5,16 +5,16 @@
 // with their reasons (or the refusal with its candidates), and plays the directed track with the engine camera.
 // Sentences (W48, on Codex's engine/camera/parse.ts): "Say it" parses one or more sentences ("… then …") into typed
 // directions and appends them to the JSON list; a refusal (ambiguous / missing / deictic / unknown verb …) is shown with
-// its question, candidates and the words it points at, and nothing is appended. The parser only reads the words (no
-// world vocabulary is passed): names are resolved by the compiler, as for the form.
+// its question, candidates and the words it points at, and nothing is appended. The active take supplies the same
+// vocabulary, aliases and semantic resolution as engine_parse_camera; shipped files need no simulation room.
 // For a chapter set (W48) it acts on the chapter on screen: `scope` names that chapter, times are its own (local), the
 // directed track plays while that chapter is on screen and "Save track" adds it to that chapter's file.
 import { useRef, useState } from 'react';
 import type { TakeHost } from './take-host.ts';
-import type { ParseResult } from '../../engine/camera/parse.ts';
+import type { SentenceRefusal } from '../../engine/api/camera-vocab.ts';
 
 /** The last "Say it": the text, and either the directions appended or the refusals (by clause number, 1-based). */
-type Said = { text: string; added: unknown[]; notes: string[]; refused: { n: number; of: number; refusal: Extract<ParseResult, { ok: false }>['refusal'] }[] };
+type Said = { text: string; added: unknown[]; notes: string[]; refused: { n: number; of: number; refusal: Pick<SentenceRefusal, 'code' | 'message' | 'question' | 'candidates' | 'span'> }[] };
 
 /**
  * What the panel directs: the take time directions start at (a set: the chapter's local time), play state, whether the
@@ -28,7 +28,7 @@ export type DirectClock = {
   scope?: { chapter: string; text: string } | null;
 };
 
-const KINDS = ['entity', 'assembly', 'region', 'group'] as const;
+const KINDS = ['entity', 'assembly', 'region', 'group', 'fixture'] as const;
 const VERBS = ['orbit', 'pan', 'tilt', 'dolly', 'crane', 'push_in', 'pull_out', 'fly_through', 'hold'] as const;
 const DIRS: Record<string, string[]> = { pan: ['left', 'right'], tilt: ['up', 'down'], orbit: ['cw', 'ccw'], crane: ['up', 'down'], dolly: ['left', 'right'] };
 const SIDES = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
@@ -84,6 +84,7 @@ export function DirectPanel({ host, clock, onChange }: { host: TakeHost; clock: 
   const [say, setSay] = useState('');
   const [said, setSaid] = useState<Said | null>(null);
   const box = useRef<HTMLDetailsElement>(null);
+  const parseRequest = useRef(0);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const directed = host.directed();
   const playing = clock.directedOn;
@@ -94,6 +95,7 @@ export function DirectPanel({ host, clock, onChange }: { host: TakeHost; clock: 
     return Array.isArray(v) ? v : [v];
   };
   const add = (replace: boolean) => {
+    parseRequest.current++;
     try {
       const d = direction(form, clock.t);
       setJson(JSON.stringify(replace ? [d] : [...list(), d], null, 1));
@@ -112,16 +114,23 @@ export function DirectPanel({ host, clock, onChange }: { host: TakeHost; clock: 
     } catch (e) {
       return setError(`Directions JSON: ${(e as Error).message}`);
     }
-    const { parseSentences } = await import('../../engine/camera/parse.ts');
-    const rs = parseSentences(text);
-    const refused = rs.flatMap((r, i) => (r.ok ? [] : [{ n: i + 1, of: rs.length, refusal: r.refusal }]));
-    if (!rs.length) refused.push({ n: 1, of: 1, refusal: { code: 'camera.parse.missing', message: 'camera direction is empty', question: 'What should the camera do?' } });
-    const added = refused.length ? [] : rs.flatMap((r) => (r.ok ? [r.direction] : []));
-    if (added.length) setJson(JSON.stringify([...dirs, ...added], null, 1));
-    setSaid({ text, added, notes: rs.flatMap((r) => (r.ok ? r.notes : [])), refused });
-    setError('');
+    const request = ++parseRequest.current;
+    try {
+      const result = await host.parseDirections(text);
+      if (request !== parseRequest.current) return;
+      if (!result) return setError('The active take or chapter changed. Parse the sentence again.');
+      const total = result.directions.length + result.refusals.length;
+      const refused = result.refusals.map((refusal) => ({ n: refusal.index + 1, of: total, refusal }));
+      const added = refused.length ? [] : result.directions.map((r) => r.direction);
+      if (added.length) setJson(JSON.stringify([...dirs, ...added], null, 1));
+      setSaid({ text, added, notes: result.directions.flatMap((r) => r.notes), refused });
+      setError('');
+    } catch (e) {
+      if (request === parseRequest.current) setError(`Camera sentence: ${(e as Error).message}`);
+    }
   };
   const compute = async () => {
+    parseRequest.current++;
     let dirs: unknown[];
     try {
       dirs = list();
@@ -150,7 +159,7 @@ export function DirectPanel({ host, clock, onChange }: { host: TakeHost; clock: 
       <summary>Direct camera{clock.scope ? ` · chapter ${clock.scope.chapter}` : ''}{directed ? ` · ${res?.ok ? `${res.report.shots.length} shot${res.report.shots.length === 1 ? '' : 's'}` : 'refused'}` : ''}{playing ? ' · playing the directed track' : ''}</summary>
       {clock.scope && <p className="direct-scope" role="note" aria-label="Direct camera applies to">{clock.scope.text}</p>}
       <div className="direct-say" role="group" aria-label="Say it">
-        <input aria-label="Direction sentence" value={say} onChange={(e) => setSay(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void parse(); }} placeholder="do a 270° revolution around the rack bay over 2 minutes" />
+        <input aria-label="Direction sentence" value={say} onChange={(e) => { parseRequest.current++; setSay(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') void parse(); }} placeholder="do a 270° revolution around the rack bay over 2 minutes" />
         <button onClick={() => void parse()}>Parse &amp; add</button>
       </div>
       {said && !said.refused.length && (
@@ -191,7 +200,7 @@ export function DirectPanel({ host, clock, onChange }: { host: TakeHost; clock: 
         <button onClick={() => add(false)}>Add</button>
         <button onClick={() => add(true)}>Replace</button>
       </div>
-      <textarea aria-label="Directions JSON" value={json} spellCheck={false} onChange={(e) => setJson(e.target.value)} placeholder="[] — the typed CameraDirection list (CAMERA_DIRECT.md §1); empty = the form above" />
+      <textarea aria-label="Directions JSON" value={json} spellCheck={false} onChange={(e) => { parseRequest.current++; setJson(e.target.value); }} placeholder="[] — the typed CameraDirection list (CAMERA_DIRECT.md §1); empty = the form above" />
       <div className="direct-actions">
         <button onClick={() => void compute()} disabled={busy}>{busy ? 'Computing…' : 'Compute camera'}</button>
         {res?.ok && (

@@ -197,6 +197,11 @@ export function parseSentence(sentence: string, vocab?: ParseVocab): ParseResult
   return { ok: true, direction: parsed.data, notes };
 }
 
+/** Shared clause boundaries for the standalone parser and world-resolving callers. */
+export function splitCameraSentences(text: string): string[] {
+  return text.split(/\s*,?\s*\bthen\b\s*|[.!?]\s+/i).map((s) => s.trim()).filter(Boolean);
+}
+
 export function parseSentences(text: string, vocab?: ParseVocab): ParseResult[] {
-  return text.split(/\s*,?\s*\bthen\b\s*|[.!?]\s+/i).map((s) => s.trim()).filter(Boolean).map((s) => parseSentence(s, vocab));
+  return splitCameraSentences(text).map((s) => parseSentence(s, vocab));
 }
