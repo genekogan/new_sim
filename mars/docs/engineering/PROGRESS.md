@@ -1608,3 +1608,9 @@ Approximate additional worker time 15 minutes, no helpers. Auto-selected local-s
 provenance/authenticity limitation is explicit in preempt-snapshot.REPORT.md.
 
 Release12 first candidate0540b02 failed engine gate:497pass/23fail,6skip/11TODO; report2026-09-29T04-27-39-986Z. New LM041 staging clearance refuses existing flagship j1 near p1 and aborts dependent scenarios. Retained4abb117 isolated for exact geometry diagnosis, not weakened or repinned. Removed from release12; history integrity/social resume remain pending a fresh full gate.
+
+### Release12 — verified history and resumable waiting directives (2026-09-29)
+
+Clean7e5ff0a passed the full gate and fast-forwarded to main:93 unit,516 engine pass/0 fail (6 skips/11 TODO),84 browser pass/7 documented skips,lint0/tsc,unchanged recording/probe,all36 MCP tools. Idle original performance limits and evidence17/17 rows +8/8 milestones passed. Deployed as f63d5e1a-556b-4379-b61c-2f7fa60a42e4 at04:53Z; rollback release11 4de6d265-4292-4e20-88c2-e85dda7a5488. Full production assets/routes/MCP/director,Studio2/2 and Lab10901/43/5/0 passed; lead inspected three screenshots and six snapshot records. See RELEASE_CHECKLIST deploy12 for table and exact report.
+
+Counts35 fixed /36 reclassified /145 remaining; LM075/029 close,LM026 remains partial. No pins/historical values changed. The single wave2 pin window remains pending camera/body/carry/staging/math integration. Other-agent dirty historical files were excluded by building the clean gated checkout. Up to3 helpers; roughly55 minutes elapsed since release11, including the serialized gate/evidence/release; user explicitly removed the5-hour quota cap. Worker effort remains recorded in individual entries; this is elapsed time, not a token or summed worker-time claim.
