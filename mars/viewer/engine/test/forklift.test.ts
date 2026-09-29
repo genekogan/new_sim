@@ -12,6 +12,9 @@ import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import type { ActionDef } from '../actions/types.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { hashOf } from '../core/hash.ts';
+import { createController } from '../api/controller.ts';
+import { placementIssue } from '../api/edit.ts';
+import { WorldHistory } from '../history/store.ts';
 import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
 import { forklift, FORKLIFT, FORKLIFT_ACTIONS, FORKLIFT_INVARIANTS } from '../vehicles/forklift.ts';
 import { stagedCheck } from '../construction/access.ts';
@@ -289,14 +292,35 @@ test('traffic: plan-time vehicle.path-conflict — an EUC boxed against a wall i
   assert.deepEqual(msgsOf(rt), []);
 });
 
-test('traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not', () => {
+test('traffic: forced overlaps fire collision.vehicle-vehicle after edit_world parks safely and refuses the invalid placement (including carried load)', () => {
   const rt = setup({ ents: [human('r1', 3, 3)] });
   addAll(rt.world, vehicle('e1', 'euc', 3, 2, 0));
   mountAndPick(rt); // ply1 on f1's forks at travel height
+  // Legitimate parking goes through the public controller, with the same scene
+  // and a quiescent snapshot after the truck has picked its load.
+  const history = new WorldHistory('traffic-design-edit-test');
+  history.publishCanonical('before', 'traffic before parking', rt.world, 'test fixture');
+  history.fork('before', 'parking', 'checked vehicle parking');
+  const ctl = createController({ history, scenes: { 'proving-ground': (rt.services.spatial as Spatial).base } });
+  const move = (p: [number, number, number]) => ctl.call('edit_world', { workspace: 'parking', edits: [{ op: 'move', id: 'e1', pose: { p, yaw: 0 } }], note: 'park the riderless EUC' });
+  const parked = move([4, 0, 2]);
+  assert.ok(parked.ok, String(parked.message));
+  rt.world = history.read('parking');
+  assert.deepEqual(rt.world.entities.e1.pose.p, [4, 0, 2]);
   const load = rt.world.entities.ply1;
   assert.equal(load.support?.kind, 'forks');
   assert.deepEqual(msgsOf(rt), []);
-  // forced (direct world edit — edit_world itself refuses to move vehicles): park e1 under the load
+  const before = hashOf(history.read('parking'));
+  const head = history.workspaces.get('parking')!.head;
+  const blocked = move([load.pose.p[0], 0, load.pose.p[2]]);
+  assert.equal(blocked.code, 'edit.blocked', JSON.stringify(blocked));
+  assert.deepEqual((blocked.details as { subjects: string[] }).subjects, ['e1', 'ply1', 'f1']);
+  assert.equal(hashOf(history.read('parking')), before, 'refused move leaves every pose unchanged');
+  assert.equal(history.workspaces.get('parking')!.head, head, 'refused move creates no checkpoint');
+  // Fault injection ONLY: bypass the rejected design edit to prove the runtime
+  // collision invariant catches an externally corrupted state. This is not a
+  // supported placement, parking operation, or simulated movement.
+  // Deliberately park e1 under the carried load.
   const e1 = rt.world.entities.e1;
   e1.pose.p = [load.pose.p[0], 0, load.pose.p[2]];
   rt.step();
@@ -304,13 +328,13 @@ test('traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a
   assert.equal(v.length, 1, msgsOf(rt).join('\n'));
   assert.ok(['e1', 'f1', 'ply1'].every((id) => v[0].subjects!.includes(id)), v[0].message);
   assert.match(v[0].message, /f1's ply1 overlaps e1 \(euc\)|e1 \(euc\) overlaps f1's ply1/);
-  // the load 2.5 m up is clear of a parked (riderless) EUC's 0.55 m box
+  // Independent invalid-state fixture: the load 2.5 m up is clear of a parked (riderless) EUC's 0.55 m box
   const n0 = rt.violations.length;
   load.pose.p = [load.pose.p[0], 2.5, load.pose.p[2]];
   rt.world.entities.e1.pose.p = [load.pose.p[0] + 0, 0, load.pose.p[2]];
   const col = vehicleCollision;
   assert.deepEqual(col(rt).map((d) => d.code), []);
-  // truck body on truck body
+  // Independent invalid-state fixture: truck body on truck body.
   addAll(rt.world, forklift('f2', xz(rt, 'f1')[0] + 1, xz(rt, 'f1')[1], H));
   const d = col(rt);
   assert.equal(d.length, 1);
@@ -322,4 +346,21 @@ test('traffic determinism: the head-on run twice → same state hash and event l
   const a = headOn(), b = headOn();
   assert.equal(a.rt.stateHash(), b.rt.stateHash());
   assert.equal(JSON.stringify(a.rt.events), JSON.stringify(b.rt.events));
+});
+
+
+test('traffic edit placement: held and fork loads block intersecting height bands but allow a parked EUC below a raised load', () => {
+  const base = provingGround();
+  const candidate = vehicle('parked', 'euc', 10, 0, 0);
+  for (const support of [{ kind: 'held' as const, by: ['crew'] }, { kind: 'forks' as const, vehicle: 'truck' }]) {
+    const low = component('load', 'plywood-4x6', [10, 0.3, 0], 0, { phase: 'carried', support });
+    const world = addAll(emptyWorld('proving-ground', base), low);
+    const issue = placementIssue(new Spatial(base), world, candidate, 0);
+    assert.equal(issue?.code, 'edit.blocked');
+    assert.ok(issue.subjects.includes('load'));
+    // Geometry fixture only: the same load's vertical band now clears the EUC.
+    const high = structuredClone(world);
+    high.entities.load.pose.p[1] = 2.5;
+    assert.equal(placementIssue(new Spatial(base), high, candidate, 0), null);
+  }
 });

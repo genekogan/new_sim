@@ -226,6 +226,15 @@ export function placementIssue(sp: Spatial, w: WorldState, e: Entity, level: num
     if (o.y1 <= fp.y0 + 1e-3 || o.y0 >= fp.y1 - 1e-3) continue;
     if (obbOverlap(fp.obb, o.obb)) return { code: 'edit.blocked', reason: `its footprint would overlap '${o.label ?? o.id}'`, subjects: [o.id] };
   }
+  // Carried/fork loads are deliberately absent from the static navigation grid.
+  // A design edit still cannot place a parked vehicle or loose item through one.
+  for (const other of Object.values(w.entities)) {
+    if (other.support?.kind !== 'held' && other.support?.kind !== 'forks') continue;
+    const load = entityFootprint(other);
+    if (load.y1 <= fp.y0 + 1e-3 || load.y0 >= fp.y1 - 1e-3 || !obbOverlap(fp.obb, load.obb)) continue;
+    const carrier = other.support.kind === 'forks' ? [other.support.vehicle] : [];
+    return { code: 'edit.blocked', reason: `its footprint would overlap carried load '${other.id}'${carrier.length ? ` on ${carrier[0]}'s forks` : ''}`, subjects: [other.id, ...carrier] };
+  }
   for (const c of obbCorners(fp.obb))
     if (!floors.some((s) => pointInObb(c, s.obb, 1e-6))) return { code: 'edit.off-floor', reason: `its footprint would leave the floor of level ${level} at ${at(c)}`, subjects: [] };
   for (const o of people)
