@@ -1,11 +1,11 @@
-// Seed worlds for a fresh engine room (preview). Campus-year SpatialScenes are
-// not extracted yet (ENGINEERING.md §6.3), so every room/year starts with the
-// synthetic proving ground and the carry corridors as protected canonical
-// workspaces. Agents fork them before executing. Each seed carries a few
-// regions and a campfire + benches so the social verbs (gather, take_slot,
-// campfire_circle, ambient_wander) have targets over MCP.
+// Each room keeps the synthetic proving ground and carry yard; when a campus
+// file is supplied it also publishes that year's protected reconstruction.
+// Callers must fork canonical workspaces before editing or executing.
 import { WorldHistory } from '../history/store.ts';
 import { campusYearId, HISTORY_YEARS, publishCampusYear, sceneFromYearFile, type CampusYearFile } from '../campus/history.ts';
+import { loadCampus2026 } from '../campus/world.ts';
+import { sceneFromFile } from '../campus/load.ts';
+import type { CampusSceneFile } from '../campus/types.ts';
 import { provingGround } from '../scenes/proving-ground.ts';
 import { carryCorridors } from '../carry/scenes.ts';
 import type { SpatialScene } from '../spatial/types.ts';
@@ -69,32 +69,63 @@ export function carryYardWorld(): WorldState {
   );
 }
 
+export type RoomCampusFile = CampusYearFile | CampusSceneFile;
+export type RoomCampusSeed = { year: number; file: RoomCampusFile };
+
+/** A legacy workspace uses the new canonical id; never overwrite user work. */
+export class CampusSeedConflict extends Error {
+  code = 'room.campus-conflict';
+}
+
+/** Validate the requested year's file without inventing historical defaults. */
+function validateCampusSeed(campus: RoomCampusSeed): void {
+  const reconstructed = !('year' in campus.file);
+  if (campus.file.campus !== campusYearId(campus.year) || reconstructed !== (campus.year === 2026))
+    throw new Error(`room campus ${campus.year}: incompatible scene file ${campus.file.campus}`);
+}
+
+function publishRoomCampus(h: WorldHistory, campus: RoomCampusSeed) {
+  validateCampusSeed(campus);
+  if ('year' in campus.file) return publishCampusYear(h, campus.year, campus.file);
+  const { world } = loadCampus2026(campus.file, { flagshipInventory: false });
+  return h.publishCanonical('mars-2026', 'Mars 2026 (reconstructed campus, canonical)', world, 'CAD-derived reconstruction; see docs/engineering/CAMPUS_SCENE.md');
+}
+
 /**
  * A room's seed history: the synthetic proving ground and carry yard, plus — for a historical
- * year room (2020–2025) given that year's generated scene file — protected canonical
- * `mars-<year>` (static campus + regions, no people, finite inventory; fork it, then
+ * year room (2020–2026) given that year's generated scene file — protected canonical
+ * `mars-<year>` (static campus + regions, finite inventory; reconstructed 2026
+ * includes its existing generic context people, no flagship inventory; fork it, then
  * engine_edit_world with inventory 'unlimited' to add people/materials).
  */
-export function seedHistory(rulesVersion = ENGINE_RULES_VERSION, campus?: { year: number; file: CampusYearFile }): WorldHistory {
+export function seedHistory(rulesVersion = ENGINE_RULES_VERSION, campus?: RoomCampusSeed): WorldHistory {
   const h = new WorldHistory(rulesVersion);
   h.publishCanonical('proving-ground', 'Proving ground (canonical, synthetic)', provingGroundWorld(), 'engine preview seed');
   h.publishCanonical('carry-yard', 'Carry corridors (canonical, synthetic)', carryYardWorld(), 'engine preview seed');
-  if (campus) publishCampusYear(h, campus.year, campus.file);
+  if (campus) publishRoomCampus(h, campus);
   return h;
 }
 
-/** Years whose rooms also seed a canonical campus scene (`mars-<year>`). 2026 rooms stay synthetic-only. */
-export const CAMPUS_SEED_YEARS: readonly number[] = HISTORY_YEARS;
+/** Years whose rooms also seed a canonical campus scene (`mars-<year>`). */
+export const CAMPUS_SEED_YEARS: readonly number[] = [...HISTORY_YEARS, 2026];
 
 /** Static scenes a room needs: the synthetic ones, plus `mars-<year>` when a year file is given. */
-export function roomScenes(campus?: { year: number; file: CampusYearFile }): Record<string, SpatialScene> {
+export function roomScenes(campus?: RoomCampusSeed): Record<string, SpatialScene> {
   if (!campus) return ENGINE_SCENES;
-  return { ...ENGINE_SCENES, [campusYearId(campus.year)]: sceneFromYearFile(campus.year, campus.file) as unknown as SpatialScene };
+  validateCampusSeed(campus);
+  const scene = 'year' in campus.file ? sceneFromYearFile(campus.year, campus.file) : sceneFromFile(campus.file);
+  return { ...ENGINE_SCENES, [campusYearId(campus.year)]: scene };
 }
 
 /** Add canonical `mars-<year>` to a room history seeded before campus years existed. Returns whether it did. */
-export function ensureCampusYear(h: WorldHistory, campus: { year: number; file: CampusYearFile }): boolean {
-  if (h.workspaces.has(campusYearId(campus.year))) return false;
-  publishCampusYear(h, campus.year, campus.file);
+export function ensureCampusYear(h: WorldHistory, campus: RoomCampusSeed): boolean {
+  const id = campusYearId(campus.year);
+  const existing = h.workspaces.get(id);
+  if (existing) {
+    if (!existing.protected || h.read(id).base.campus !== id)
+      throw new CampusSeedConflict(`cannot seed canonical ${id}: an existing workspace with that id is not its protected campus reconstruction; existing work was preserved. Use a new room or resolve the conflicting workspace before retrying`);
+    return false;
+  }
+  publishRoomCampus(h, campus);
   return true;
 }

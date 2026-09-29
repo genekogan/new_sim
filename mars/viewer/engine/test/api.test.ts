@@ -650,13 +650,13 @@ test('api: seeds carry regions and a campfire + benches, so social verbs have ta
   assert.ok((c.call('query_world', { workspace: 'cy', carry: { crew: ['p1', 'p2'], item: 'b1', to: { x: 18, z: 11, yaw: Math.PI / 2 } } }) as any).carry.ok);
 });
 
-test('api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 rooms unchanged', async () => {
+test('api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 reconstruction also seeded', async () => {
   const { EngineRoom } = await import('../../simulation/engine-room.ts');
   const { loadCampusFile } = await import('../campus/history-node.ts');
   const s = sqliteStorage();
   const room = new EngineRoom(s.storage, {}, loadCampusFile);
   const ws = (year: number) => (room.call(year, 'query_world', {}) as any).workspaces.map((w: any) => w.id).sort();
-  assert.deepEqual(ws(2026), ['carry-yard', 'proving-ground'], '2026 room behaviour unchanged');
+  assert.deepEqual(ws(2026), ['carry-yard', 'mars-2026', 'proving-ground'], 'reconstructed 2026 room is also seeded');
   assert.deepEqual(ws(2022), ['carry-yard', 'mars-2022', 'proving-ground']);
   const q = room.call(2022, 'query_world', { workspace: 'mars-2022', include: ['regions'] }) as any;
   assert.equal(q.protected, true);

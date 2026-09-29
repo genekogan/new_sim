@@ -20,17 +20,16 @@
 // `room.storage-full` (nothing persisted, in-memory state reloaded) — continue in a new room.
 // Byte caps additionally bound each blob and the complete room/year, including state history;
 // `room.storage-bytes` rolls back the transaction and reloads the cached controller.
-// Year rooms 2020–2025 also seed protected canonical `mars-<year>` from that year's generated
+// Year rooms 2020–2026 also seed protected canonical `mars-<year>` from that year's generated
 // campus scene (the `campusFile` loader: bundled JSON in the Worker, loadCampusFile in Node); a
-// room seeded before that gets it added on first load. 2026 rooms stay synthetic-only.
+// room seeded before that gets it added on first load. 2026 uses the CAD reconstruction.
 // Loaded lazily: the index on the first engine call, states/takes/plans/cameras on use.
 // An old-format history blob (states inline) is migrated on first load: each state
 // becomes its own blob and the index is rewritten without them (review M5).
 // Rehearsal runs on a private clone inside the controller and never touches the
 // room head; it stores nothing unless called with `keep: true`. Nothing here uses
 // engine time (wall-clock is metadata only).
-import { CAMPUS_SEED_YEARS, createController, ENGINE_RULES_VERSION, ensureCampusYear, roomScenes, seedHistory, type EngineController, type OpResult, type StoredPlan } from '../engine/api/index.ts';
-import type { CampusYearFile } from '../engine/campus/history.ts';
+import { CampusSeedConflict, CAMPUS_SEED_YEARS, createController, ENGINE_RULES_VERSION, ensureCampusYear, roomScenes, seedHistory, type EngineController, type OpResult, type StoredPlan, type RoomCampusFile } from '../engine/api/index.ts';
 import { WorldHistory, type HistoryJSON } from '../engine/history/store.ts';
 import type { WorldState } from '../engine/world/types.ts';
 import type { RuntimeSnapshot } from '../engine/runtime/snapshot.ts';
@@ -51,9 +50,9 @@ export class EngineRoom {
   private storage: DurableObjectStorage;
   private controllers = new Map<number, EngineController>();
   private limits: Required<RoomLimits>;
-  private campusFile: (year: number) => CampusYearFile | undefined;
+  private campusFile: (year: number) => RoomCampusFile | undefined;
 
-  constructor(storage: DurableObjectStorage, limits: RoomLimits = {}, campusFile: (year: number) => CampusYearFile | undefined = () => undefined) {
+  constructor(storage: DurableObjectStorage, limits: RoomLimits = {}, campusFile: (year: number) => RoomCampusFile | undefined = () => undefined) {
     this.storage = storage;
     this.campusFile = campusFile;
     this.limits = { plans: limits.plans ?? MAX_PLANS, takes: limits.takes ?? MAX_TAKES, blobBytes: limits.blobBytes ?? MAX_BLOB_BYTES, roomBytes: limits.roomBytes ?? MAX_ROOM_BYTES };
@@ -157,7 +156,7 @@ export class EngineRoom {
     try { loaded = this.controller(year); } catch (e) {
       this.controllers.delete(year);
       this.pending.delete(year);
-      if (!(e instanceof StorageCapacityError)) throw e;
+      if (!(e instanceof StorageCapacityError) && !(e instanceof CampusSeedConflict)) throw e;
       return { ok: false, code: e.code, message: e.message, _meta: { op, elapsedMs: 0, stored: {}, storage: this.sizes(year) } };
     }
     const { ctl, loadMs } = loaded;
