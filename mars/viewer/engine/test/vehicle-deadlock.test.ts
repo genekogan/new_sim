@@ -38,7 +38,7 @@ function junction(extra: StepSpec[] = []) {
 }
 
 test('real three-EUC cycle is certified blocked while riders and vehicle ownership remain supported', () => {
-  const { rt, runner } = junction();
+  const { rt, runner, execs } = junction();
   const result = runner.run(1000);
   assert.equal(result.status, 'blocked'); assert.equal(result.settled, false);
   assert.equal(result.settleTicks, 0); assert.deepEqual(result.cut, []);
@@ -55,9 +55,22 @@ test('real three-EUC cycle is certified blocked while riders and vehicle ownersh
   const hash = rt.stateHash();
   assert.throws(() => rt.snapshot(), /not resumable|cannot take a resumable snapshot/);
   assert.equal(rt.stateHash(), hash, 'unsupported ride snapshot refuses without mutation');
-  for (let i = 0; i < 5; i++) runner.tick();
-  assert.deepEqual(rt.world.entities, stopped); assert.deepEqual(rt.violations, []);
-  if (process.env.VEHICLE_DEADLOCK_CAPTURE) writeFileSync(process.env.VEHICLE_DEADLOCK_CAPTURE, JSON.stringify({ result, vehicles: [0, 1, 2].map((i) => ({ vehicle: rt.world.entities[`v${i}`], rider: rt.world.entities[`p${i}`], owners: rt.holder(`entity:v${i}`) })), snapshotRefusedWithoutMutation: true }, null, 2) + '\n');
+  const continuation = [];
+  for (let i = 0; i < 240; i++) {
+    const prior = [...execs].map(([id, ex]) => ({ id, stuck: ex.stuck, replans: ex.replans }));
+    runner.tick();
+    assert.deepEqual(rt.world.entities, stopped, `continuation tick ${i + 1} preserves poses and support`);
+    for (const prev of prior) {
+      const ex = execs.get(prev.id)!;
+      assert.equal(ex.replans, prev.replans, 'no autonomous retry finds a new route');
+      assert.deepEqual(rt.holder(`entity:${prev.id}`), [`step:ride${prev.id.slice(1)}`]);
+      assert.deepEqual(rt.holder(`actor:p${prev.id.slice(1)}`), [`step:ride${prev.id.slice(1)}`]);
+      if (ex.stuck < prev.stuck) continuation.push({ tick: rt.tick, vehicle: prev.id, stuckBefore: prev.stuck, stuckAfter: ex.stuck, replans: ex.replans });
+    }
+  }
+  assert.ok(continuation.length >= 3, 'continuation crosses multiple autonomous stuck-retry boundaries');
+  assert.deepEqual(rt.violations, []);
+  if (process.env.VEHICLE_DEADLOCK_CAPTURE) writeFileSync(process.env.VEHICLE_DEADLOCK_CAPTURE, JSON.stringify({ result, continuationTicks: 240, autonomousRetryBoundaries: continuation, vehicles: [0, 1, 2].map((i) => ({ vehicle: rt.world.entities[`v${i}`], rider: rt.world.entities[`p${i}`], owners: rt.holder(`entity:v${i}`) })), snapshotRefusedWithoutMutation: true }, null, 2) + '\n');
 });
 
 test('mid-pull-over certification excludes endpoint/resume boundaries, active progress and pending replan/cancel', () => {

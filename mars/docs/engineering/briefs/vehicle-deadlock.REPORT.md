@@ -27,11 +27,24 @@ endpoint tests (1e-9 conservative numerical boundary guard). Endpoint/resume
 waits still have independent retry/give-up timing and cannot certify. No attempt
 is invented, no pose is moved, and no resource/support is released by this hook.
 The real fixture returns **blocked at tick 550**, retaining all rider supports and
-actor/vehicle ownership. Five continuation ticks leave every entity unchanged.
+actor/vehicle ownership. A 240-tick continuation (550 through 790) checks every
+entity and actor/vehicle reservation on every tick; all remain unchanged.
+
+The generic follower still has autonomous stuck-route retries after 60 ticks;
+this patch does not disable or pretend to exhaust that clock. The capture records
+v0's actual retries at ticks 573, 634, 695 and 756 (`stuck` 60 -> 0, successful
+`replans` stays 0). All refuse. v2's lane-yield wait does not trigger that branch.
+`replan` deterministically uses current rider pose/profile, remaining targets,
+static grids, standing people and other vehicle boxes. Those inputs are unchanged
+in this closed fixture; elapsed time is not a planner input, and a failed call
+does not replace the route. Repeating those calls therefore cannot clear this
+fixture without external change. The 200-tick episode policy exceeds the
+61-tick retry interval. This evidence is specific to the certified unchanged
+physical episode, not a claim that every yielding vehicle has no retry clock.
 
 ## Proof and scope
 
-- New focused vehicle-deadlock suite: **4 passed**, 0 failures/skips/TODO (2.56 s).
+- New focused vehicle-deadlock suite: **4 passed**, 0 failures/skips/TODO (extended continuation: 2.92 s).
 - Existing vehicles + forklift + source-scan: **23 passed**, 0 failures/skips/TODO
   (3.04 s). Typecheck and scoped lint clean.
 - Independent future cancel prevents early termination and executes. A subsequent

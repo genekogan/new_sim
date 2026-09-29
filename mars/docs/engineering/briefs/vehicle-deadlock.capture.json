@@ -647,6 +647,37 @@
     ],
     "settleTicks": 0
   },
+  "continuationTicks": 240,
+  "autonomousRetryBoundaries": [
+    {
+      "tick": 573,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    },
+    {
+      "tick": 634,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    },
+    {
+      "tick": 695,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    },
+    {
+      "tick": 756,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    }
+  ],
   "vehicles": [
     {
       "vehicle": {

@@ -1551,3 +1551,11 @@ LM078 lead candidate: preflight and per-tick conservative load/carrier sweep aga
   `briefs/vehicle-deadlock.capture.json`. No pins, walker changes, broad suite or
   deployment. General deadlock freedom and mixed forklift-load cycles unclaimed.
   Estimate 25 min / 10k tokens; no extra helpers. Lead owns gated row closure.
+
+- **LM-043 review follow-up (storage worker):** extended physical cycle proof to
+  240 continuation ticks, asserting all entities and rider/vehicle reservations
+  unchanged on each tick. Capture records four real failed autonomous stuck
+  replans; report now distinguishes that retry clock from endpoint resume timing
+  and explains unchanged deterministic planner inputs. No motion or pin change.
+  Four focused tests pass; no broad suite or deployment. Review follow-up: about
+  8 minutes / 3k tokens, no additional helpers.
