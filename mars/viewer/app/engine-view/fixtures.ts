@@ -13,7 +13,8 @@ import { tableObject } from './items.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
 type Stack = { group: THREE.Group; count: number };
-type View = { obj: THREE.Object3D; key: string; fire?: Fire; stack?: Stack };
+type Screen = { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; key: string };
+type View = { obj: THREE.Object3D; key: string; fire?: Fire; stack?: Stack; screen?: Screen };
 
 /** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
 const DUNNAGE = 0.1;
@@ -121,6 +122,60 @@ export class FixtureViews {
     return g;
   }
 
+  /** Freestanding frame with a front (+z) screen inside its catalog box. */
+  private standingDisplay(sx: number, sy: number, sz: number, v: Partial<View>) {
+    const g = new THREE.Group();
+    g.add(this.box('#343a40', 0, 0, 0, sx * 0.48, 0.06, sz));
+    g.add(this.box('#565d62', 0, 0, 0, 0.06, sy * 0.35, 0.06, 0.5));
+    g.add(this.box('#1a222d', 0, sy * 0.36, 0, sx, sy * 0.64, sz * 0.55, 0.2));
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 288;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+    const panel = new THREE.Mesh(this.keep(new THREE.PlaneGeometry(sx - 0.12, sy * 0.64 - 0.1)), material);
+    panel.position.set(0, sy * 0.68, sz * 0.29);
+    g.add(panel);
+    v.screen = { canvas, texture, material, key: '' };
+    return g;
+  }
+
+  private drawScreen(e: Entity, screen: Screen) {
+    const c = e.equipment?.kind === 'display' ? e.equipment.config : {};
+    const on = c.mode === 'on' && c.available !== false;
+    const content = typeof c.content === 'string' ? c.content : '';
+    const key = `${on}:${content}`;
+    if (key === screen.key) return;
+    screen.key = key;
+    const ctx = screen.canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = on ? '#d9e6e3' : '#15212a';
+    ctx.fillRect(0, 0, 512, 288);
+    if (on) {
+      ctx.fillStyle = '#183c4d';
+      ctx.font = 'bold 29px sans-serif';
+      const words = content.split(/\s+/).filter(Boolean);
+      let line = '', y = 75;
+      for (const word of words) {
+        const next = line ? `${line} ${word}` : word;
+        if (ctx.measureText(next).width > 450 && line) { ctx.fillText(line, 30, y); y += 38; line = word; }
+        else line = next;
+        if (y > 245) break;
+      }
+      if (line && y <= 245) ctx.fillText(line, 30, y);
+      if (!content) { ctx.fillStyle = '#4d918d'; ctx.fillRect(30, 136, 450, 8); }
+    }
+    screen.texture.needsUpdate = true;
+  }
+
+  private lectern(sx: number, sy: number, sz: number) {
+    const g = new THREE.Group();
+    g.add(this.box('#73583f', 0, 0, 0, sx * 0.85, sy * 0.77, sz * 0.65));
+    g.add(this.box('#a57b4e', 0, sy * 0.77, 0, sx, sy * 0.06, sz));
+    g.add(this.box('#6a4c36', 0, sy * 0.83, sz * 0.42, sx, sy * 0.17, sz * 0.12));
+    return g;
+  }
+
   /**
    * A strapped bundle / stack (catalog-stock.ts BUNDLES): two dunnage runners, the pieces left and dark
    * straps round them. The catalog box is the full stack; what is drawn is `count` pieces, so the
@@ -212,6 +267,8 @@ export class FixtureViews {
     if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
     else if (e.def === 'campfire') obj = this.campfire(e.id, sx, v);
+    else if (e.def === 'standing-display') obj = this.standingDisplay(sx, sy, sz, v);
+    else if (e.def === 'speaker-lectern') obj = this.lectern(sx, sy, sz);
     else if (e.def === 'table-6ft') obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
     else if (BUNDLES[e.def]) obj = this.stack(e, sx, sy, sz, v);
     else if (e.def === 'cutting-station') obj = this.cutting(sx, sy, sz, color);
@@ -232,7 +289,7 @@ export class FixtureViews {
   }
 
   clear() {
-    for (const v of this.views.values()) v.fire?.dispose();
+    for (const v of this.views.values()) { v.fire?.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); }
     this.group.clear();
     this.views.clear();
   }
@@ -246,6 +303,7 @@ export class FixtureViews {
         if (v) {
           this.group.remove(v.obj);
           v.fire?.dispose();
+          v.screen?.texture.dispose(); v.screen?.material.dispose();
         }
         v = this.build(e);
         this.views.set(e.id, v);
@@ -257,11 +315,13 @@ export class FixtureViews {
         const [sx, sy, sz] = CATALOG[e.def].size;
         this.fillStack(e, v.stack, sx, sy, sz);
       }
+      if (v.screen) this.drawScreen(e, v.screen);
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
         this.group.remove(v.obj);
         v.fire?.dispose();
+        v.screen?.texture.dispose(); v.screen?.material.dispose();
         this.views.delete(id);
       }
   }

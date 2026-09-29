@@ -9,6 +9,7 @@ import { ITEM_ASSETS, type SurfaceSlotDef } from './catalog-items.ts';
 import { stockAssets } from './catalog-stock.ts';
 import { SOLAR_ASSETS, type EquipmentKind } from './catalog-solar.ts';
 import { framingAssets } from './catalog-framing.ts';
+import { ACTIVITY_ASSETS } from './catalog-activities.ts';
 
 export type GripSlot = { id: string; local: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
@@ -79,6 +80,8 @@ export type AssetDef = {
   paintable?: { faces: PaintFace[] };
   /** Placed electrical equipment (catalog-solar.ts, spec §19): its kind and default configuration. */
   equipment?: { kind: EquipmentKind; defaults: Record<string, number | string> };
+  /** Usable activity affordances, independent of mesh appearance and per-entity state. */
+  capabilities?: { display?: { accepts: 'text'; maxChars: number }; presenterStation?: true };
   dims: { confidence: Confidence; note: string };
 };
 
@@ -331,6 +334,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     // Forklift (engine/vehicles/forklift.ts): x = 2.6 m length (forks at +x), y = 2.2 m lowered mast, z = 1.2 m width.
     { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
+    ...ACTIVITY_ASSETS,
     ...ITEM_ASSETS,
     ...SOLAR_ASSETS,
     ...stockAssets({ upright }),
