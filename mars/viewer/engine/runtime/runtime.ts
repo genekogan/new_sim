@@ -179,6 +179,8 @@ export class Runtime {
       this.emit(rec, rec.status, r.diagnostic);
       return rec;
     }
+    // A successful retry supersedes any earlier unsafe-cancel diagnostic.
+    rec.diagnostic = reason;
     if (r.deferred) {
       // controlled stop in progress (e.g. set-down); the action finishes as 'cancelled'
       l.cancelling = true;

@@ -27,6 +27,8 @@ import { checkStations, childrenState, walkCrew, type Children } from './childre
 import { canonicalLying, isLying } from './lying.ts';
 import { entityCorners } from '../spatial/service.ts';
 import { makeWay } from '../locomotion/walk.ts';
+import { CodecError } from '../runtime/codec.ts';
+import { loweringIssue, putRaiseFrame, raiseFrame, recordRaise, type RaiseTrail } from './raise-lower.ts';
 
 const RAISE_RATE = Math.PI / 2 / 5; // rad/s: upper bound (~5 s for a full raise)
 export const LIFT_HAND = 1.9; // m above the ground: where lifters hold the frame (≤ 2.0 m overhead reach)
@@ -41,7 +43,8 @@ type Role = { actor: string; lifter: boolean; station: number; side: -1 | 1; ste
 type Geo = { base: Vec2; yaw: number; H: number; d: number; groundY: number; y0: number };
 type Step = { paths: Map<string, Vec2[]>; d: number };
 type Exec = {
-  p: P; id: string; phase: 'approach' | 'grip' | 'raise' | 'step' | 'set'; children?: Children; t: number;
+  p: P; id: string; phase: 'approach' | 'grip' | 'raise' | 'step' | 'set' | 'lower'; children?: Children; t: number;
+  trail?: RaiseTrail; lowerIndex?: number;
   groundY: number; y0: number; roles: Role[]; geo: Geo; thT: number; step?: Step;
 };
 
@@ -243,7 +246,7 @@ function startStations(u: Entity, g: Geo, roles: Role[]) {
 export const raiseUpright: ActionDef<P, null, Exec> = {
   verb: 'raise_upright',
   description:
-    'A crew raises a lying upright about its base to standing and keeps holding it: footers brace the base columns while lifters start at the top end and walk it up (hands ≤ 2 m, ≤ 0.6 m/s), then step to the base. The crew stays committed until release_support succeeds.',
+    'A crew raises a lying upright about its base to standing and keeps holding it: footers brace the base columns while lifters start at the top end and walk it up (hands ≤ 2 m, ≤ 0.6 m/s), then step to the base. Mid-raise cancellation safely retraces the lift to lying, or refuses if its reverse path is obstructed. The standing crew stays committed until release_support succeeds.',
   schema: z.strictObject({
     crew: z.array(z.string().max(80)).min(1).max(4),
     item: z.string().max(80),
@@ -287,103 +290,140 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
     const roles = raiseRoles(p.crew), geo = geoOf(u, groundY);
     return { p, id, phase: 'approach', t: 0, groundY, y0: u.pose.p[1], roles, geo, thT: transitionPitch(geo, roles) };
   },
+  serializeExec(_rt, ex) {
+    if (ex.phase !== 'lower') throw new CodecError(`raise action ${ex.id}`, 'an unverified non-lowering construction phase');
+    return ex;
+  },
+  restoreExec(_rt, data) { return data as Exec; },
   step(rt, ex, dt) {
     const w = rt.world;
     const u = w.entities[ex.p.item];
     const g = ex.geo;
-    if (ex.phase === 'approach') {
-      if (!ex.children) {
-        const r = walkCrew(rt, ex.id, startStations(u, g, ex.roles));
-        if ('code' in r) return { status: 'failed', diagnostic: { ...r, code: 'raise.station-unreachable' } };
-        ex.children = r;
-      }
-      const s = childrenState(ex.children);
-      if (s === 'running') return { status: 'running', phase: 'approach' };
-      if (s !== 'done') return { status: 'failed', diagnostic: s };
-      ex.phase = 'grip';
-      ex.t = 0;
+    if (ex.phase === 'lower') {
+      const target = ex.trail!.frames[ex.lowerIndex!];
+      const issue = loweringIssue(rt, u.id, raiseFrame(rt, u.id, ex.p.crew), target, ex.groundY);
+      if (issue) return { status: 'blocked', diagnostic: issue };
+      putRaiseFrame(rt, u.id, target);
+      ex.lowerIndex = ex.lowerIndex! - 1;
+      if (ex.lowerIndex! >= 0) return { status: 'running', phase: 'lower' };
+      u.support = { kind: 'ground' };
+      u.phase = 'staged';
+      u.reservedBy = undefined;
+      for (const actor of ex.p.crew) Object.assign(w.entities[actor].human!, { grip: undefined, task: undefined, activity: 'idle' });
+      return { status: 'completed', outputs: { lowered: u.id } };
     }
-    if (ex.phase === 'grip') {
-      ex.t += dt;
-      for (const r of ex.roles) {
-        const h = w.entities[r.actor].human!;
-        h.activity = 'support';
-        h.grip = { entity: u.id, slot: r.lifter ? 'lift-far' : r.side < 0 ? 'foot-l' : 'foot-r' };
-        h.task = ex.id;
+    try {
+      if (ex.phase === 'approach') {
+        if (!ex.children) {
+          const r = walkCrew(rt, ex.id, startStations(u, g, ex.roles));
+          if ('code' in r) return { status: 'failed', diagnostic: { ...r, code: 'raise.station-unreachable' } };
+          ex.children = r;
+        }
+        const s = childrenState(ex.children);
+        if (s === 'running') return { status: 'running', phase: 'approach' };
+        if (s !== 'done') return { status: 'failed', diagnostic: s };
+        ex.phase = 'grip';
+        ex.t = 0;
       }
-      if (ex.t < 1.0) return { status: 'running', phase: 'grip' };
-      u.support = { kind: 'held', by: [...ex.p.crew] };
-      u.phase = 'raising';
-      ex.phase = 'raise';
-    }
-    const put = (actor: string, p: Vec2, yaw: number) => {
-      const h = w.entities[actor];
-      h.pose = { ...h.pose, p: [p[0], h.pose.p[1], p[1]], yaw };
-    };
-    if (ex.phase === 'step') {
-      const st = ex.step!;
-      const nd = st.d + LIFT_SPEED * dt;
-      let done = true;
+      if (ex.phase === 'grip') {
+        ex.t += dt;
+        for (const r of ex.roles) {
+          const h = w.entities[r.actor].human!;
+          h.activity = 'support';
+          h.grip = { entity: u.id, slot: r.lifter ? 'lift-far' : r.side < 0 ? 'foot-l' : 'foot-r' };
+          h.task = ex.id;
+        }
+        if (ex.t < 1.0) return { status: 'running', phase: 'grip' };
+        u.support = { kind: 'held', by: [...ex.p.crew] };
+        u.phase = 'raising';
+        ex.phase = 'raise';
+        ex.trail = { frames: [raiseFrame(rt, u.id, ex.p.crew)], overflow: false };
+      }
+      const put = (actor: string, p: Vec2, yaw: number) => {
+        const h = w.entities[actor];
+        h.pose = { ...h.pose, p: [p[0], h.pose.p[1], p[1]], yaw };
+      };
+      if (ex.phase === 'step') {
+        const st = ex.step!;
+        const nd = st.d + LIFT_SPEED * dt;
+        let done = true;
+        const moves: [string, Vec2, number][] = [];
+        for (const r of ex.roles) {
+          const ps = st.paths.get(r.actor);
+          if (!ps) continue;
+          const L = pathLen(ps);
+          const q = along(ps, Math.min(nd, L));
+          if (nd < L) done = false;
+          const b = standBlocked(rt, u, r.actor, q, HUMAN_RADIUS - 0.01);
+          if (b) return { status: 'blocked', diagnostic: b };
+          moves.push([r.actor, q, faceCol(g, q, r.side, 0)]);
+        }
+        const wait = raiseWait(rt, ex, u, moves);
+        if (wait) return wait;
+        for (const [a, q, yaw] of moves) put(a, q, yaw);
+        st.d = nd;
+        if (!done) return { status: 'running', phase: 'step' };
+        ex.phase = 'set';
+      }
+      // raise / set: rotate pitch toward 0 about the base line (origin at base centre), paced by the lifters
+      const th = u.pose.pitch ?? 0;
+      const lo = ex.phase === 'raise' ? ex.thT : 0;
+      const followers = ex.roles.filter((r) => r.lifter && (ex.phase === 'raise' || !r.steps));
+      const next = followers.length ? nextPitch(g, th, lo, dt) : Math.max(lo, th - RAISE_RATE * dt);
       const moves: [string, Vec2, number][] = [];
-      for (const r of ex.roles) {
-        const ps = st.paths.get(r.actor);
-        if (!ps) continue;
-        const L = pathLen(ps);
-        const q = along(ps, Math.min(nd, L));
-        if (nd < L) done = false;
+      for (const r of followers) {
+        const q = lifterAt(g, r.side, next);
         const b = standBlocked(rt, u, r.actor, q, HUMAN_RADIUS - 0.01);
         if (b) return { status: 'blocked', diagnostic: b };
-        moves.push([r.actor, q, faceCol(g, q, r.side, 0)]);
+        moves.push([r.actor, q, faceCol(g, q, r.side, reachR(g, next))]);
       }
       const wait = raiseWait(rt, ex, u, moves);
       if (wait) return wait;
       for (const [a, q, yaw] of moves) put(a, q, yaw);
-      st.d = nd;
-      if (!done) return { status: 'running', phase: 'step' };
-      ex.phase = 'set';
-    }
-    // raise / set: rotate pitch toward 0 about the base line (origin at base centre), paced by the lifters
-    const th = u.pose.pitch ?? 0;
-    const lo = ex.phase === 'raise' ? ex.thT : 0;
-    const followers = ex.roles.filter((r) => r.lifter && (ex.phase === 'raise' || !r.steps));
-    const next = followers.length ? nextPitch(g, th, lo, dt) : Math.max(lo, th - RAISE_RATE * dt);
-    const moves: [string, Vec2, number][] = [];
-    for (const r of followers) {
-      const q = lifterAt(g, r.side, next);
-      const b = standBlocked(rt, u, r.actor, q, HUMAN_RADIUS - 0.01);
-      if (b) return { status: 'blocked', diagnostic: b };
-      moves.push([r.actor, q, faceCol(g, q, r.side, reachR(g, next))]);
-    }
-    const wait = raiseWait(rt, ex, u, moves);
-    if (wait) return wait;
-    for (const [a, q, yaw] of moves) put(a, q, yaw);
-    u.pose.pitch = next;
-    // the base settles from resting-on-its-face height to standing on the ground
-    u.pose.p[1] = ex.groundY + (ex.y0 - ex.groundY) * (next / (Math.PI / 2));
-    if (ex.phase === 'raise') {
-      if (next > ex.thT + 1e-12) return { status: 'running', phase: 'raise' };
-      // ~75°: everyone takes their holding station
-      for (const r of ex.roles) w.entities[r.actor].human!.grip = { entity: u.id, slot: `hold-${r.station}` };
-      const steppers = ex.roles.filter((r) => r.steps);
-      if (steppers.length) {
-        ex.step = { paths: new Map(steppers.map((r) => [r.actor, stepPath(g, r, ex.thT)])), d: 0 };
-        ex.phase = 'step';
-        return { status: 'running', phase: 'step' };
+      u.pose.pitch = next;
+      // the base settles from resting-on-its-face height to standing on the ground
+      u.pose.p[1] = ex.groundY + (ex.y0 - ex.groundY) * (next / (Math.PI / 2));
+      if (ex.phase === 'raise') {
+        if (next > ex.thT + 1e-12) return { status: 'running', phase: 'raise' };
+        // ~75°: everyone takes their holding station
+        for (const r of ex.roles) w.entities[r.actor].human!.grip = { entity: u.id, slot: `hold-${r.station}` };
+        const steppers = ex.roles.filter((r) => r.steps);
+        if (steppers.length) {
+          ex.step = { paths: new Map(steppers.map((r) => [r.actor, stepPath(g, r, ex.thT)])), d: 0 };
+          ex.phase = 'step';
+          return { status: 'running', phase: 'step' };
+        }
+        ex.phase = 'set';
       }
-      ex.phase = 'set';
+      if (next > 0) return { status: 'running', phase: 'set' };
+      // exact final stations (the followers' path ends there; this only removes rounding)
+      const st = holdStations(u, ex.roles.length);
+      for (const r of ex.roles) if (r.lifter) put(r.actor, st[r.station].p, st[r.station].yaw);
+      u.phase = 'placed';
+      u.reservedBy = undefined;
+      return { status: 'completed', outputs: { holding: ex.p.crew } };
+    } finally {
+      // Capture any partial physical progress even when a future implementation returns blocked.
+      if (ex.trail) recordRaise(ex.trail, raiseFrame(rt, u.id, ex.p.crew));
     }
-    if (next > 0) return { status: 'running', phase: 'set' };
-    // exact final stations (the followers' path ends there; this only removes rounding)
-    const st = holdStations(u, ex.roles.length);
-    for (const r of ex.roles) if (r.lifter) put(r.actor, st[r.station].p, st[r.station].yaw);
-    u.phase = 'placed';
-    u.reservedBy = undefined;
-    return { status: 'completed', outputs: { holding: ex.p.crew } };
   },
   cancel(rt, ex) {
     const u = rt.world.entities[ex.p.item];
-    if (ex.phase !== 'approach' && ex.phase !== 'grip' && (u.pose.pitch ?? 0) < Math.PI / 2 - 1e-6)
-      return { ok: false, diagnostic: { code: 'raise.cancel-unsafe', message: `${u.id} is partly raised; cancelling now would leave it unsupported (lowering is not yet modelled)`, subjects: [u.id] } };
+    if (ex.phase === 'lower') return { ok: true, deferred: true };
+    if (ex.phase !== 'approach' && ex.phase !== 'grip' && (u.pose.pitch ?? 0) < Math.PI / 2 - 1e-6) {
+      if (!ex.trail || ex.trail.overflow)
+        return { ok: false, diagnostic: { code: 'raise.cancel-unsafe', message: `${u.id}'s reverse choreography exceeded its deterministic trail bound; keep holding it`, subjects: [u.id] } };
+      let from = raiseFrame(rt, u.id, ex.p.crew);
+      for (let i = ex.trail.frames.length - 2; i >= 0; i--) {
+        const target = ex.trail.frames[i];
+        const issue = loweringIssue(rt, u.id, from, target, ex.groundY);
+        if (issue) return { ok: false, diagnostic: issue };
+        from = target;
+      }
+      ex.lowerIndex = ex.trail.frames.length - 2;
+      ex.phase = 'lower';
+      return { ok: true, deferred: true };
+    }
     for (const c of ex.p.crew) {
       const h = rt.world.entities[c].human!;
       h.grip = undefined;

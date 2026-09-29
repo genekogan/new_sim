@@ -153,16 +153,18 @@ test('crew too small for a 19 ft upright; misaligned bay; unreachable seat heigh
   assert.equal(rt.submit('connect_beam', { crew: ['p5', 'p6'], beam: 'b1', a: 'A', b: 'B', column: 'r', height: 3.0 }).diagnostic?.code, 'reach.too-high');
 });
 
-test('cancel mid-raise is refused (would leave the frame unsupported)', () => {
+test('cancel mid-raise continuously lowers to supported lying instead of abandoning the frame', () => {
   const rt = setup();
   const r = rt.submit('raise_upright', { crew: ['p1', 'p2'], item: 'A' });
   while (r.phase !== 'raise' && rt.isActive(r.id)) rt.step();
   for (let i = 0; i < 20; i++) rt.step();
   const c = rt.cancel(r.id);
-  assert.equal(c.diagnostic?.code, 'raise.cancel-unsafe');
+  assert.equal(c.diagnostic, undefined);
   assert.ok(rt.isActive(r.id));
   rt.runUntilIdle(2000, [r.id]);
-  assert.equal(r.status, 'completed');
+  assert.equal(r.status, 'cancelled');
+  assert.equal(rt.world.entities.A.pose.pitch, Math.PI / 2);
+  assert.deepEqual(rt.world.entities.A.support, { kind: 'ground' });
   assert.deepEqual(rt.violations, []);
 });
 

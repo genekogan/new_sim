@@ -162,6 +162,12 @@ export function installHook(view: LabView, notify: () => void) {
     state,
     violations: () => sim.rt.violations.map((v) => ({ ...v })),
     records: () => [...sim.rt.records.values()].map((r) => JSON.parse(JSON.stringify(r))),
+    /** Cancel through the runtime's normal safety/deferred-stop contract (no pose mutation). */
+    cancelAction(id: string) {
+      const result = sim.rt.cancel(id);
+      notify();
+      return JSON.parse(JSON.stringify(result));
+    },
     log: () => sim.log.slice(),
     setOverlay(name: OverlayName, on: boolean) {
       view.setOverlay(name, on);

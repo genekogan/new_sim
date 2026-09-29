@@ -3,7 +3,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { LabView, OVERLAYS, type OverlayName } from './lab-view.ts';
 import { installHook, removeHook } from './hook.ts';
-import { SCENARIOS, dropPanel, PANEL_ID } from './scenarios.ts';
+import { SCENARIOS, scenarioByName, dropPanel, PANEL_ID } from './scenarios.ts';
 import { LabPanel } from './panel.tsx';
 import { SequenceHud } from './sequence-hud.tsx';
 import { SocialHud } from './social-hud.tsx';
@@ -18,7 +18,7 @@ export default function Lab() {
     const v = new LabView(host.current!);
     const initial =
       new URLSearchParams(location.search).get('scenario') ?? SCENARIOS[0].name;
-    const first = SCENARIOS.find((s) => s.name === initial) ?? SCENARIOS[0];
+    const first = scenarioByName(initial) ?? SCENARIOS[0];
     let live = true;
     // scenarios with async data (year walkabouts) start on the default preset until it arrives
     v.sim.load(first.prepare ? SCENARIOS[0].name : first.name);

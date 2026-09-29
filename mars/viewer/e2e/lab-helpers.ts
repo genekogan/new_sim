@@ -12,6 +12,7 @@ type Hook = {
   state(): LabState;
   violations(): { code: string; message: string; tick: number }[];
   records(): { id: string; status: string; phase?: string; diagnostic?: { code: string; message: string }; history: { status: string; phase?: string }[] }[];
+  cancelAction(id: string): { id: string; status: string; phase?: string; diagnostic?: { code: string; message: string } };
   setOverlay(name: string, on: boolean): void;
   camera(pos: number[], target: number[]): void;
   cameraPreset(kind: 'top' | 'oblique'): void;

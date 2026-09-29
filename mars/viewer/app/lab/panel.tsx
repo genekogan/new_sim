@@ -42,6 +42,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <label className="lab-field">
         Scenario
         <select value={s.name} onChange={(e) => onScenario(e.target.value)} aria-label="Scenario">
+          {!SCENARIOS.some((x) => x.name === s.name) && <option value={s.name}>{s.title}</option>}
           {SCENARIOS.map((x) => (
             <option key={x.name} value={x.name}>
               {x.title}

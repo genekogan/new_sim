@@ -14,6 +14,7 @@ import type { SpatialScene } from '../../engine/spatial/types.ts';
 import type { CameraPose } from '../../engine/camera/shots.ts';
 import { body } from './body.ts';
 import { buildBay } from './build-bay.ts';
+import { raiseCancel } from './raise-cancel.ts';
 import { campfireEvening } from './campfire-evening.ts';
 import { handUp } from './hand-up.ts';
 import { meal } from './meal.ts';
@@ -292,4 +293,5 @@ export function stress(n: number): Scenario {
   };
 }
 
-export const scenarioByName = (name: string) => SCENARIOS.find((s) => s.name === name);
+// Explicit proof fixture: available by name/URL without changing the established probe scenario set.
+export const scenarioByName = (name: string) => name === raiseCancel.name ? raiseCancel : SCENARIOS.find((s) => s.name === name);

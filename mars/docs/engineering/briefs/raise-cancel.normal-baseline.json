@@ -1,0 +1,165 @@
+{
+  "source": "8decb07",
+  "cases": [
+    {
+      "ft": 8,
+      "count": 1,
+      "status": "completed",
+      "tick": 298,
+      "world": "55131705e0bed1993b6eee9c403fbb7a06157dd2763433bdeb37000f1aea927e",
+      "events": "baabe40ea150dd347f063185d24e92e04f61438db0237e404e61ae9a0b078fe1",
+      "take": "eb2f1aa86085f915340118bcd323f5b79376e8833b2aa0e31113590872de356c",
+      "violations": []
+    },
+    {
+      "ft": 8,
+      "count": 2,
+      "status": "completed",
+      "tick": 310,
+      "world": "eeb38d7bc4e1d539b44802ecf604b2246f37fd7941d462b3228077557ab0d679",
+      "events": "c7514fd466d2cfd20ca0b6f6f8f03dc653807d2e4fc08fd4c4f178300b6f3c7c",
+      "take": "cb11e913b50f98b992ea84db25f9012fa9a1c30d2e6e5b32725c11712f74835c",
+      "violations": []
+    },
+    {
+      "ft": 8,
+      "count": 3,
+      "status": "completed",
+      "tick": 460,
+      "world": "3bbedf8150b457389799ed67525aea082adfe3ba28679fc6730aaafc12779bf3",
+      "events": "0cb792999db8d6aba833b17692b418700a2a39938d74d0f987655ae9b263b967",
+      "take": "630db7c131dea6ca6aee3ba49257e42be4f3dd41f2667375cc2ab03bd73c96a3",
+      "violations": []
+    },
+    {
+      "ft": 8,
+      "count": 4,
+      "status": "completed",
+      "tick": 379,
+      "world": "33b1ff57b2fc2aef108821c326acd35fe959dd810b0bbba09108cdbf2a48746e",
+      "events": "2177025da1d3fe5e426aafeb635e24ca43c079ca8c9d5ae66b9ed26b348d1cf9",
+      "take": "4076ff16e931b1e0ab9307820daf5d9aef1c002e17ebe9e43b48105da098e8c4",
+      "violations": []
+    },
+    {
+      "ft": 9,
+      "count": 1,
+      "status": "completed",
+      "tick": 309,
+      "world": "d4b2af391cd227b5ed9b52e126f8afc7f0af13bd0e87d46753b0591e610299aa",
+      "events": "46a5146c8095d77bbca70fe97c759d833d1397dc722b914883e81d34d23b2151",
+      "take": "7d401acff913ff5e2addc5724fa22282085051421f6f19ba023faef8d3ab8587",
+      "violations": []
+    },
+    {
+      "ft": 9,
+      "count": 2,
+      "status": "completed",
+      "tick": 321,
+      "world": "a4e780b43d8078da7934969a60d806acb627c7f8a1c89e88a3c06a2bf570589e",
+      "events": "e03717ca33e299ab3e49d96766701f38ca4ab1f1988b987526df5c4268599a71",
+      "take": "3d8bc788a844694710911e85548fc63bf98eb446fdac7df583e7d570d9fe3483",
+      "violations": []
+    },
+    {
+      "ft": 9,
+      "count": 3,
+      "status": "completed",
+      "tick": 472,
+      "world": "734ac3e6b60f7879e15a6cb9570e4376411bd9daaf2bfd100b3719935d5ec074",
+      "events": "284d02dd3c4bed71dbf79ddbdc89db999a35d721e71c0aa57cba0c37101f0660",
+      "take": "dccdc5c28c8892b1e1dfc0841f14b171c0fb37b70e0504d91ff7df37e8c62bef",
+      "violations": []
+    },
+    {
+      "ft": 9,
+      "count": 4,
+      "status": "completed",
+      "tick": 386,
+      "world": "f9a1c0a227ab5d2324217cb684645e472330703a15f1ccda0f9c11d0ebe0d72b",
+      "events": "535172d048a53ea91b4f033dfc787e2023744cd96e891a9f0f23ace326cebc18",
+      "take": "837d005eefe87ed8c8170a29d9f20a65c4c73ee67318267a6973470b769e7a5b",
+      "violations": []
+    },
+    {
+      "ft": 12,
+      "count": 2,
+      "status": "completed",
+      "tick": 357,
+      "world": "ef40d8666c864d37bb7386d2ff2187a5eb4b6710b418d1743b749a8f46a504e4",
+      "events": "e9164215544d265f2e8a645c55f7be9d38634b02d3ee80709f03171ee698d41c",
+      "take": "03f4e898a357f463b7240cceb6949094ce649f0b9099658d436a455338939193",
+      "violations": []
+    },
+    {
+      "ft": 12,
+      "count": 3,
+      "status": "completed",
+      "tick": 463,
+      "world": "0f3ea91d58f75fe6e814bc92df4ba561f0fb431b3b5b4b3a77af4daa758135b1",
+      "events": "cb5e8fbf3aea3f6fcb467916d9ac282ebd14d8bf117145acfbc8428270c7755d",
+      "take": "cc4a529aef61dcddcd7de7dc383a23df1f699c7e5b32e03d422abe4e5b3a6096",
+      "violations": []
+    },
+    {
+      "ft": 12,
+      "count": 4,
+      "status": "completed",
+      "tick": 416,
+      "world": "3edaf9619c8663d175db572bf1e20e9feb1c398cf9661515bb623e2793a2da0d",
+      "events": "a485a8068230829891261118821f66b648dc2ac6dd7170b25e20e8c3b115726a",
+      "take": "d7486a1393c767eb01c26170eb464faf4debdc201de50b8205a9f8ffb9b164c7",
+      "violations": []
+    },
+    {
+      "ft": 16,
+      "count": 2,
+      "status": "completed",
+      "tick": 408,
+      "world": "a3d4eea2f414b16a979968d7f83c5f2f6b8b5262e44cd02520613d18a101e9ed",
+      "events": "abed878c49cecd1144977d65f2abe982cede19f636cb73a80f219fbf0f7804bb",
+      "take": "305ae27a00009a6e4a214ab27134c314da6a6351c9313680352bb3b047bfcd42",
+      "violations": []
+    },
+    {
+      "ft": 16,
+      "count": 3,
+      "status": "completed",
+      "tick": 518,
+      "world": "ed9fa1756201bb98b93fd520be4c3bccb55789919a22476d8b7e7a1ff048ec0d",
+      "events": "fc84bf3a0647f60975b06861ae27c6c5472292d398fc7b66b249402e423b9102",
+      "take": "6459d6c0fec5b82a0171cc747a47eb0ca637f2e7fe2d8398d33f962f4f371122",
+      "violations": []
+    },
+    {
+      "ft": 16,
+      "count": 4,
+      "status": "completed",
+      "tick": 470,
+      "world": "780e1960af7da16a66d47ea4ea3d58b9e38c911404f946c6f5c84908e0590c82",
+      "events": "af6aa9495565283f3c2eb6702bbbc2a21faff244f23c80ee26dab6650e0aadf0",
+      "take": "3e9cd23f4fcfdf51cb485c84ba609d15ed354e4dafda7c9e85c2b014dfff0b87",
+      "violations": []
+    },
+    {
+      "ft": 19,
+      "count": 3,
+      "status": "completed",
+      "tick": 557,
+      "world": "c3567f0a66ec370b701b795bd1dfeca498dbce83979592a122f7a86680e736f8",
+      "events": "92f1d55f2929c246402f989463f4fc9e3f05b086f6914febb1509e2a28a31c68",
+      "take": "56d20102fce65363582ee96fc8d5f090ba7f93494fd3f0b499a7803c0560680f",
+      "violations": []
+    },
+    {
+      "ft": 19,
+      "count": 4,
+      "status": "completed",
+      "tick": 511,
+      "world": "fde074a5e79ede017c1b429e30ddc55467a9681657355193f75c5d8bb5700888",
+      "events": "ac7e26ae534d2ed6b9bde47fbf3b12c477d5ece1d4b31924e6417efa7f7aa710",
+      "take": "b1ec57266e1fd409024c4893c21d4ba949178c76cefee835e6ef6126013cfc9e",
+      "violations": []
+    }
+  ]
+}
