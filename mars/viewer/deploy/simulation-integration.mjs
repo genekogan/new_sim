@@ -6,6 +6,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { engineTools } from '../engine/api/index.ts';
+import { yearBuildSetup } from '../engine/scenarios/year-build.ts';
+import { loadCampusFile } from '../engine/campus/history-node.ts';
 const base = process.env.SIM_BASE || 'http://localhost:8797';
 const hash = (s) => createHash('sha256').update(s).digest('hex'),
   key = randomBytes(32).toString('hex'),
@@ -64,11 +66,16 @@ const engineToolNames = list.tools.filter((t) => t.name.startsWith('engine_')).m
 const ENGINE_TOOLS = engineTools().map((t) => t.name).sort();
 assert.deepEqual(engineToolNames, ENGINE_TOOLS);
 const calledEngineTools = new Set();
+const calledLegacyTools = new Set();
 const call = async (name, args) => {
+  calledLegacyTools.add(name);
   const r = await client.callTool({ name, arguments: args });
   if (r.isError) throw Error(r.content[0].text);
   return JSON.parse(r.content[0].text);
 };
+const legacyBad = await client.callTool({ name: 'move_person', arguments: { person_id: 'missing-person', x: 0, z: 0 } });
+assert.equal(legacyBad.isError, true);
+assert.equal(JSON.parse(legacyBad.content[0].text).code, 'legacy.command-failed');
 let s = await call('get_state', {});
 assert.equal(s.catalog.length, 18);
 s = await call('set_environment', { hour: 18, cycle: false });
@@ -289,6 +296,10 @@ const refused = (label, r, code) => {
   return r.body;
 };
 const walkPlan = (id, x, z) => ({ schema: 'mars-sequence/1', id, params: { a: { kind: 'actor' } }, steps: [{ id: 's', verb: 'walk_to', params: { actor: '$a', x, z } }] });
+// The reconstructed campus is protected; fork edits do not mutate it (LM-006).
+const campus2026 = ok('2026 canonical regions', await ecall('engine_query_world', { workspace: 'mars-2026', include: ['regions'] }));
+assert.ok(campus2026.regions.some((r) => r.id === 'chiba'));
+refused('2026 canonical edit', await ecall('engine_edit_world', { workspace: 'mars-2026', note: 'protected', edits: [{ op: 'region', id: 'test-region', kind: 'place', label: 'test', polygon: [[0, 0], [1, 0], [1, 1]] }] }), 'workspace.protected');
 // ---- engine_direct_camera (LM-011): a real direction on the room's executed take. p1's 90° orbit passes behind
 // stairs A, so the DO's self-correction must act and report it per shot; the take stays bit-identical.
 {
@@ -320,6 +331,12 @@ const walkPlan = (id, x, z) => ({ schema: 'mars-sequence/1', id, params: { a: { 
   // with the parser's question; the compile path for good sentences is the direct_camera call above.
   const pc = refused('parse camera: deictic sentence', await ecall('engine_parse_camera', { take_id: ex.body.take_id, sentences: ['look at this crowd of people having this activity'] }), 'camera.parse.deictic');
   assert.match(pc.message, /refused/);
+  const sentences = ['hold on the fire for 2 seconds'];
+  const parsed = ok('parse camera sentence', await ecall('engine_parse_camera', { take_id: ex.body.take_id, sentences }));
+  const typed = ok('direct parsed sentence', await ecall('engine_direct_camera', { take_id: ex.body.take_id, directions: parsed.directions.map((d) => d.direction) }));
+  const sentenceTrack = ok('direct camera sentence', await ecall('engine_direct_camera', { take_id: ex.body.take_id, sentences }));
+  assert.equal(sentenceTrack.track_id, typed.track_id);
+  assert.equal(sentenceTrack.takeHashUnchanged, true);
   const c0 = shot.corrections[0];
   console.log(`ENGINE DIRECT CAMERA: track ${dc.track_id} ${dc.track.samples} samples; p1 orbit corrected: ${c0.failure} → ${c0.strategy} (${c0.reason.slice(0, 100)}…)`);
 }
@@ -392,7 +409,7 @@ const ecall2 = async (name, args) => {
   body._wallMs = performance.now() - t0;
   return { isError: !!r.isError, body };
 };
-assert.deepEqual(ok('room2 query', await ecall2('engine_query_world', {})).workspaces.map((w) => w.id).sort(), ['carry-yard', 'proving-ground']);
+assert.deepEqual(ok('room2 query', await ecall2('engine_query_world', {})).workspaces.map((w) => w.id).sort(), ['carry-yard', 'mars-2026', 'proving-ground']);
 refused('room2 get R take', await ecall2('engine_get_take', { take_id: rex.take_id }), 'take.unknown');
 refused('room2 rehearse R plan', await ecall2('engine_rehearse', { plan_id: rb.plan_id }), 'plan.unknown');
 refused('room2 execute R plan', await ecall2('engine_execute', { plan_id: rb.plan_id, workspace: 'replay' }), 'plan.unknown');
@@ -424,7 +441,7 @@ assert.notDeepEqual(p1At('iso-w1'), p1At('iso-w2'));
 for (const ws of ['replay', 'itest']) assert.equal(fs.heads[ws], canon0.heads[ws], `sibling ${ws} untouched`);
 const flog = ok('log w1', await ecall('engine_log', { workspace: 'iso-w1' }));
 assert.deepEqual(flog.checkpoints[0].cause, { kind: 'simulation-run', take: fex.take_id, plan: fb.plan_id });
-// 3. Plan invalidation (there is no design-edit engine op: the obstacle is moved by a second executed plan)
+// 3. Plan invalidation after a second executed plan moves an actor into the route
 const pc = ok('bind cam-plan', await ecall('engine_bind_plan', { template: walkPlan('p1-back', 0, -5), bindings: { a: 'p1' }, workspace: 'iso-w1' }));
 const prc = ok('rehearse cam-plan', await ecall('engine_rehearse', { plan_id: pc.plan_id }));
 for (const shot of [{ kind: 'follow', subject: 'p1', offset: [-6, 2.5, 0], frame: 'world' }, { kind: 'fixed', position: [0, 10, 30], target: [0, 0, 0] }])
@@ -486,7 +503,7 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
   assert.deepEqual(led.takes.map((t) => t.order), led.takes.map((_, i) => i));
   assert.deepEqual(led.workspaces.find((w) => w.id === 'carry-yard').forks.sort(), ['ed', 'ed-fin']);
   const lc = ok('list cameras', await ecall('engine_list', { include: ['takes'], take_id: ex.body.take_id }));
-  assert.equal(lc.cameras.length, 3, 'the attached frameGroup track + the directed track + the stored dir-integration-1 copy');
+  assert.equal(lc.cameras.length, 4, 'the attached frameGroup track + orbit + stored copy + sentence track');
   refused('list unknown take', await ecall('engine_list', { take_id: 'nope' }), 'take.unknown');
   // deletion
   refused('delete canonical', await ecall('engine_delete_workspace', { workspace: 'carry-yard' }), 'workspace.protected');
@@ -573,11 +590,37 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
   const cr = ok('2022 rehearse courtyard walk', await y('engine_rehearse', { plan_id: cp.plan_id }));
   assert.ok(cr.report.metrics.pathLength > Math.hypot(b[0] - a[0], b[1] - a[1]) + 0.5, 'the walk detours around the courtyard buildings');
   refused('2022 execute canonical', await y('engine_execute', { plan_id: cp.plan_id, workspace: 'mars-2022' }), 'workspace.protected');
+  const chapter = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays: 1 });
+  const chapterHead = ok('chapter head before refusal', await y('engine_log', { workspace: 'court' })).head;
+  const oversized = await fetch(`${base}/mcp?year=2022`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'engine_bind_plan', arguments: { workspace: 'court', template: chapter.build.template, bindings: chapter.build.bindings } } }) });
+  assert.equal(oversized.status, 413);
+  assert.equal((await oversized.json()).code, 'room.request-too-large');
+  assert.equal(ok('chapter head after refusal', await y('engine_log', { workspace: 'court' })).head, chapterHead);
+  console.log(`ENGINE WORKLOAD: real 2022 east-house chapter (${chapter.plan.steps.length} steps) refused by the request byte cap before binding or simulation`);
   await c22.close();
+}
+// Static geometry edits use the same persisted controller path (LM-002).
+{
+  ok('fork static edits', await ecall('engine_fork', { from: 'proving-ground', name: 'static-edits' }));
+  const bound = ok('bind before static edit', await ecall('engine_bind_plan', { workspace: 'static-edits', template: walkPlan('wall-edit', 15, -12), bindings: { a: 'n1' } }));
+  const before = ok('route before static edit', await ecall('engine_query_world', { workspace: 'static-edits', route: { actor: 'n1', x: 15, z: -12 } }));
+  assert.equal(before.route.ok, true);
+  const patch = { op: 'static_add', id: 'gate-wall', obb: { c: [15, -15], half: [0.45, 0.1], yaw: 0 }, y0: 0, y1: 2.4, kind: 'wall' };
+  ok('close passage', await ecall('engine_edit_world', { workspace: 'static-edits', note: 'integration passage closure', edits: [patch] }));
+  refused('static edit invalidates plan', await ecall('engine_execute', { workspace: 'static-edits', plan_id: bound.plan_id }), 'plan.stale');
+  const detour = ok('route around closed passage', await ecall('engine_query_world', { workspace: 'static-edits', route: { actor: 'n1', x: 15, z: -12 } }));
+  assert.ok(detour.route.length > before.route.length + 5);
+  ok('reopen passage', await ecall('engine_edit_world', { workspace: 'static-edits', note: 'integration reopen', edits: [{ op: 'static_remove', id: 'gate-wall' }] }));
+  const run = ok('rebind and execute static edit', await ecall('engine_execute', { workspace: 'static-edits', plan_id: bound.plan_id, rebind: 'auto' }));
+  assert.ok(run.rebound);
+  const canonical = ok('canonical obstacles untouched', await ecall('engine_query_world', { workspace: 'proving-ground', include: ['obstacles'] }));
+  assert.ok(!canonical.obstacles.some((o) => o.id === 'gate-wall'));
+  ok('delete static edit workspace', await ecall('engine_delete_workspace', { workspace: 'static-edits' }));
 }
 console.log(`ENGINE ISOLATION (wall ms / in-DO ms): ${T.join('; ')}`);
 console.log('PASS: §28 replay isolation (view fetches + camera track leave heads/logs/poses/bytes unchanged; view capability refused MCP/commands; rooms isolated), fork isolation, plan invalidation (stale diff names s1; camera tracks do not stale) through the DO room.');
 assert.deepEqual(ENGINE_TOOLS.filter((n) => !calledEngineTools.has(n)), [], 'every registered engine tool is called through MCP');
+assert.deepEqual(legacy.map((t) => t.name).filter((n) => !calledLegacyTools.has(n)), [], 'every legacy tool is called through MCP');
 await writeFile(
   '.cloudflare/simulation-test-room.json',
   JSON.stringify({ room, key, view, base }),

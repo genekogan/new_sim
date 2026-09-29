@@ -198,3 +198,7 @@ commit it on your branch. **Never write it to PROGRESS.md or HANDOFF.md.** Appen
 | `briefs/codex-tooling.md` | `npm run lint` repaired, then gated; source scan extended to `**` | 2–4 h |
 
 The ETAs are W33's estimates, not measurements. They are uncalibrated for Codex and assume no pin trouble.
+
+## 2026-09-29 technical takeover rulings
+
+Gene's technical-takeover prompt supersedes §6 ownership and requires the full `npm run gate` on the integrated/rebased branch before every merge. Historical content values remain separately owned. Static edit schema extension (LM002) is approved: three bounded prism operations plus query obstacles; optional checkpoint obstacleEdits preserves hashes for unedited worlds. Invalid support/collision edits refuse named diagnostics. LM014 uses one transport registry with explicit engine/viewer domains; LM202 world-model unification remains out of scope.

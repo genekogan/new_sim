@@ -255,6 +255,14 @@ try {
   const unknown = await call('engine_direct_camera', { take_id: ex.take_id, directions: [{ subject: { kind: 'entity', ref: 'the forklift' }, motion: { verb: 'hold' } }] }, { expectError: true });
   assert.equal(unknown.code, 'camera.direct.unknown');
   show('unknown subject', `${unknown.code}: ${unknown.message}`);
+  const sentences = ['hold on yard A for 2 seconds'];
+  const parsed = await call('engine_parse_camera', { take_id: ex.take_id, sentences });
+  assert.equal(parsed.ok, true);
+  const sentenceTrack = await call('engine_direct_camera', { take_id: ex.take_id, sentences });
+  const typedTrack = await call('engine_direct_camera', { take_id: ex.take_id, directions: parsed.directions.map((d) => d.direction) });
+  assert.equal(sentenceTrack.track_id, typedTrack.track_id, 'sentence and parsed directions compile identically');
+  assert.equal(sentenceTrack.takeHashUnchanged, true);
+  show('sentence', `${sentences[0]} → ${sentenceTrack.track_id}; take unchanged`);
   const logDir = await call('engine_log', { workspace: 'scene-1' });
   assert.equal(logDir.head, ex.checkpoint.id, 'a directed track never moves a head');
 

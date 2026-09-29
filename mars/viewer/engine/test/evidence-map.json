@@ -196,7 +196,7 @@
         { "file": "api.test.ts", "title": "fork isolation (room): a fork executes without touching canonical or a sibling fork" }
       ],
       "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
-      "approximate": "Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), which this report does not run."
+      "approximate": "Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate."
     },
     {
       "id": "plan-invalidation",
@@ -208,10 +208,14 @@
         { "file": "rehearsal.test.ts", "title": "plan invalidation: inventory mode, RNG state and rules version are physical assumptions" },
         { "file": "rehearsal.test.ts", "title": "tampered plans and mismatched service scenes fail loudly" },
         { "file": "api.test.ts", "title": "api: stale plans and protected canonical workspaces are refused" },
-        { "file": "api.test.ts", "title": "plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan" }
+        { "file": "api.test.ts", "title": "plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan" },
+        { "file": "api.test.ts", "title": "staleness (LM-004): an edit far" },
+        { "file": "api.test.ts", "title": "staleness (LM-003):" },
+        { "file": "api.test.ts", "title": "rebind (LM-001):" },
+        { "file": "edit-static.test.ts", "title": "static edits (LM-002): removing a wall" }
       ],
       "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
-      "approximate": "Staleness is conservative: any physical diff (physicalHash) stales the plan, relevant to the route or not. The replan is a manual rebind by the director, not automatic. There is no design-edit engine op, so through the room the obstacle (walker s1 stepping into the 1 m passage) is moved by a second executed plan, not by editing a design entity; deploy/simulation-integration.mjs repeats this over real MCP, not run by this report."
+      "approximate": "Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate."
     },
     {
       "id": "replay-isolation",
@@ -223,7 +227,7 @@
         { "file": "api.test.ts", "title": "replay isolation (room): take fetches and camera tracks never change heads" }
       ],
       "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
-      "approximate": "Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, which this report does not run. A camera track needs the control capability (MCP) and is stored beside the take."
+      "approximate": "Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take."
     }
   ],
   "capabilities": [
@@ -346,7 +350,7 @@
         { "file": "campus-history.test.ts", "title": "obstacle ids are the stable Kit ids (pinned names survive)" }
       ],
       "outsideSuite": ["viewer/deploy/history-ids.test.mjs", "docs/engineering/HISTORY_IDS.md"],
-      "approximate": "The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), which this report does not run. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly."
+      "approximate": "The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly."
     },
     {
       "id": "room-storage",
@@ -358,10 +362,16 @@
         { "file": "api.test.ts", "title": "replay isolation (room)" },
         { "file": "api.test.ts", "title": "fork isolation (room)" },
         { "file": "api.test.ts", "title": "plan invalidation (room)" },
-        { "file": "api.test.ts", "title": "api: list (plans/takes/workspaces/cameras ledger) and delete_workspace" }
+        { "file": "api.test.ts", "title": "api: list (plans/takes/workspaces/cameras ledger) and delete_workspace" },
+        { "file": "room-storage.test.ts", "title": "room storage: UTF-8" },
+        { "file": "room-storage.test.ts", "title": "room storage: oversized" },
+        { "file": "room-storage.test.ts", "title": "room storage: aggregate" },
+        { "file": "room-storage.test.ts", "title": "room workload: real year-build" },
+        { "file": "room-campus-2026.test.ts", "title": "room 2026: canonical" },
+        { "file": "room-campus-2026.test.ts", "title": "room 2026: migration" }
       ],
       "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
-      "approximate": "Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised."
+      "approximate": "UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit."
     },
     {
       "id": "deterministic-trig",
@@ -539,7 +549,7 @@
         { "file": "take-fields.test.ts", "title": "take fields (mars-take/3): thinChanges" }
       ],
       "outsideSuite": ["viewer/e2e/poses.spec.ts", "docs/engineering/BODY_MODEL.md"],
-      "approximate": "The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact)."
+      "approximate": "The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact)."
     },
     {
       "id": "composite-flagships",
@@ -571,10 +581,13 @@
         { "file": "camera-synth.test.ts", "title": "navmesh: through the door" },
         { "file": "camera-synth.test.ts", "title": "motion caps: too-fast moves are refused" },
         { "file": "camera-synth.test.ts", "title": "verbs: tilt / dolly / crane / pull_out / hold" },
-        { "file": "camera-synth.test.ts", "title": "determinism: the same directions give the identical track hash" }
+        { "file": "camera-synth.test.ts", "title": "determinism: the same directions give the identical track hash" },
+        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: sentence fixture cluster" },
+        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: separate sinks" },
+        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: existing 2024 kitchen" }
       ],
-      "outsideSuite": ["viewer/e2e/studio-direct.spec.ts", "docs/engineering/CAMERA_DIRECT.md"],
-      "approximate": "Synthesis collides with static geometry only (people and parts per tick come from phase 2). No year scene has door objects: the 2024 'kitchen' route enters over a 1.26 m half wall / through a 0.79 m serving hatch, and 2026 has no kitchen or sink. 'Main pallet racks' resolves through the take's 'rack bay' structure, not a named asset. The sun model's north offset is 0 (unverified site bearing), so 'sunset behind' is only as right as that assumption. The camera navmesh is rebuilt per call (100–250 ms). Only the flagship take, the 2026 and 2024 year scenes and proving-ground fixtures are exercised."
+      "outsideSuite": ["viewer/e2e/studio-direct.spec.ts", "viewer/e2e/studio-camera-vocab.spec.ts", "viewer/e2e/camera-fixture.spec.ts", "docs/engineering/CAMERA_DIRECT.md"],
+      "approximate": "Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. Worker responsiveness is tracked separately in LM012."
     },
     {
       "id": "camera-correct",
@@ -649,7 +662,7 @@
         { "file": "forklift.test.ts", "title": "traffic determinism" }
       ],
       "outsideSuite": ["docs/engineering/VEHICLES.md"],
-      "approximate": "Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world cannot move vehicles, so the forced overlaps in the tests are raw world edits. Proving ground only."
+      "approximate": "Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world moves parked vehicles with footprint and carried-load collision checks. Impossible overlaps remain explicit fault injections solely to test invariant diagnostics; they are refused by the public edit API. Proving ground only."
     }
   ],
   "milestones": [
@@ -671,7 +684,7 @@
         { "file": "campus-extract.test.ts", "title": "extraction is deterministic and independent of input order" }
       ],
       "outsideSuite": ["docs/engineering/AUDIT.md", "viewer/engine/scenes/proving-ground.ts", "viewer/e2e/baselines"],
-      "approximate": "The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, which this report does not run. Full GLB re-extraction is skipped unless CAMPUS_FULL=1."
+      "approximate": "The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, whose result this report consumes from the current gate. Full GLB re-extraction is skipped unless CAMPUS_FULL=1."
     },
     {
       "id": "B",
@@ -757,7 +770,7 @@
         { "file": "build-bay.test.ts", "title": "flagship: rehearse the full build from material piles" },
         { "file": "campus-flagship.test.ts", "title": "flagship on Mars 2026: fork canonical" }
       ],
-      "approximate": "The engine detects failures and staleness; fixing them is the external director's job (rebind), with no automatic repair loop in the suite. The campus flagship is hypothetical (design-edit inventory and crew), not a documented historical build."
+      "approximate": "Automatic rebind is opt-in and reports its diff; execution still requires a clean rehearsal. The campus flagship is hypothetical design-edit inventory and crew, not a documented historical build."
     },
     {
       "id": "G",

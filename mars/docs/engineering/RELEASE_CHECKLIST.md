@@ -12,9 +12,10 @@ dry run and a local smoke of the built worker. The production deploy is left for
 ## Release gate (required before deploying)
 
 A deploy must start from a green `npm run gate` report (run from `viewer/`). The gate runs, in
-order: `npm test`, `npm run test:engine`, `npx tsc --noEmit -p .`,
-`npm run e2e -- --workers=1`, `node deploy/determinism-probe.mjs`, and
-`deploy/simulation-integration.mjs` too when `SIM_BASE` is set. It stops at the first failure
+order: zero-warning lint, `npm test`, `npm run test:engine`, `npx tsc --noEmit -p .`,
+`npm run e2e -- --workers=1`, `node deploy/record-campus-take.mjs --check` (flagship only; historical chapters remain parked),
+`node deploy/determinism-probe.mjs`, and `deploy/simulation-integration.mjs`.
+Without `SIM_BASE`, the gate starts an isolated local Wrangler server and cleans up its process group; an explicit `SIM_BASE` targets that server. It stops at the first failure
 (`npm run gate -- --continue` runs every step) and exits non-zero if any step fails.
 
 - Report: `viewer/.cloudflare/gate/<ISO timestamp>/report.json`, with one `<step>.log` per step
