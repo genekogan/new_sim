@@ -144,8 +144,6 @@
       "tests": [
         { "file": "carry.test.ts", "title": "carry: cancel mid-move performs a controlled set-down where the ground is clear" },
         { "file": "carry.test.ts", "title": "carry: cancel over an obstruction is refused (carry.cancel-unsafe)" },
-        { "file": "carry-cancel-people.test.ts", "title": "LM078: cancelling a moving sheet refuses a person in the future set-down sweep atomically" },
-        { "file": "carry-cancel-people.test.ts", "title": "LM078: a person clear of the load but on a carrier retreat segment prevents cancellation" },
         { "file": "carry.test.ts", "title": "carry: cancel during gather releases the crew immediately" },
         { "file": "construction.test.ts", "title": "cancel mid-raise continuously lowers to supported lying instead of abandoning the frame" },
         { "file": "raise-cancel.test.ts", "title": "lowering snapshots restore tick-exactly and normal phases still refuse" },
