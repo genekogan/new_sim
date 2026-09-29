@@ -3,15 +3,17 @@
 // idle and unclaimed whose pause has run out, submits a child walk_to to a random standable point
 // of the region (world.rng only: deterministic, checkpointed with the world), then pauses them
 // 2–8 s. It never touches a person with another task, and the moment anything else reserves one of
-// its people (or cancels their ambient walk) it lets that person go for good.
+// its people (or cancels their ambient walk) it yields; a recorded successful directive can later re-adopt an eligible person.
 import { z } from 'zod';
 import { dist2, type Vec2 } from '../core/math.ts';
+import { hashOf } from '../core/hash.ts';
 import { nextRandom } from '../core/rng.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
+import { holdingDiagnostic } from '../construction/rules.ts';
 import { pointInPolygon } from './slots.ts';
 
 export const WANDER_PAUSE: [number, number] = [2, 8]; // s between walks
@@ -20,7 +22,8 @@ const DRAWS_PER_TRY = 12;
 const TARGET_CLEARANCE = HUMAN_RADIUS + 0.25;
 const TARGET_SPACING = 1.2; // m from other people and other wanderers' targets
 
-type Who = { actor: string; until: number; child?: ActionRecord; released?: string };
+type WanderReturn = { directive: string; region: string; regionHash: string };
+type Who = { returnPending?: true; resume?: WanderReturn; actor: string; until: number; child?: ActionRecord; released?: string };
 type WanderParams = { actors: string[]; region: string; seed?: number; duration?: number };
 type WanderExec = {
   id: string;
@@ -61,10 +64,18 @@ function pickTarget(rt: Runtime, ex: WanderExec, me: string): Vec2 | null {
 
 const pauseTicks = (rt: Runtime, ex: WanderExec) => Math.round((WANDER_PAUSE[0] + (WANDER_PAUSE[1] - WANDER_PAUSE[0]) * draw(rt, ex)) / DT);
 
+function skipReturn(rt: Runtime, ex: WanderExec, w: Who, reason: string) {
+  rt.mark('ambient.return-skipped', { ambient: ex.id, actor: w.actor, directive: w.resume?.directive, reason });
+  delete w.resume;
+  delete w.returnPending;
+  w.released = reason;
+}
+
 export const ambientWander: ActionDef<WanderParams, WanderExec['poly'], WanderExec> = {
   verb: 'ambient_wander',
+  resumable: true,
   description:
-    'Background autonomy: idle people in `actors` stroll to random standable points of `region`, pausing 2–8 s between walks (deterministic from world.rng; `seed` varies the pattern). Reserves nothing: a person with another task is never touched, and anyone reserved by another action is released for good. Runs until cancelled (or `duration` s); cancel stops new walks.',
+    'Background autonomy: idle people in `actors` stroll to random standable points of `region`, pausing 2–8 s between walks (deterministic from world.rng; `seed` varies the pattern). Reserves nothing: a person with another task is never touched, and a directed participant may rejoin after successful completion if no newer work intervenes. Runs until cancelled (or `duration` s); cancel stops new walks.',
   schema: z.strictObject({
     actors: z.array(z.string().min(1).max(80)).min(1).max(40),
     region: z.string().min(1).max(80),
@@ -97,6 +108,23 @@ export const ambientWander: ActionDef<WanderParams, WanderExec['poly'], WanderEx
     const stopping = ex.endTick !== undefined && rt.tick >= ex.endTick;
     for (const w of ex.who) {
       if (w.released) continue;
+      let returning = false;
+      if (w.resume) {
+        if (stopping) { skipReturn(rt, ex, w, 'ambient-ended'); continue; }
+        if (rt.isActive(w.resume.directive)) continue;
+        const status = rt.records.get(w.resume.directive)?.status;
+        if (status !== 'completed') { skipReturn(rt, ex, w, status ?? 'directive-missing'); continue; }
+        if (w.child && rt.isActive(w.child.id)) continue;
+        const region = rt.world.regions[w.resume.region];
+        if (!region || hashOf(region) !== w.resume.regionHash) { skipReturn(rt, ex, w, 'region.changed-or-missing'); continue; }
+        const person = rt.world.entities[w.actor];
+        if (!person?.human) { skipReturn(rt, ex, w, 'entity.unknown'); continue; }
+        if (holdingDiagnostic(rt.world, w.actor) || Object.values(rt.world.entities).some((e) => e.support?.kind === 'in-hand' && e.support.by === w.actor)) { skipReturn(rt, ex, w, 'actor.holding'); continue; }
+        if (rt.holder(`actor:${w.actor}`).length || person.human.task) { skipReturn(rt, ex, w, 'actor.busy'); continue; }
+        w.child = undefined;
+        w.until = rt.tick;
+        returning = true;
+      }
       if (w.child) {
         if (rt.isActive(w.child.id)) continue; // our walk holds actor:<id>
         const c = w.child;
@@ -113,10 +141,13 @@ export const ambientWander: ActionDef<WanderParams, WanderExec['poly'], WanderEx
       if (e.human.grip || (e.human.task && !isNudge(rt, e.human.task))) { w.released = `busy with ${e.human.grip ? `holding ${e.human.grip.entity}` : e.human.task}`; continue; }
       if (hs.length || e.human.task || stopping || rt.tick < w.until) continue;
       const t = pickTarget(rt, ex, w.actor);
+      if (!t && returning) { skipReturn(rt, ex, w, 'ambient.no-return-target'); continue; }
       if (!t) { w.until = rt.tick + Math.round(1 / DT); continue; }
       const rec = rt.submit('walk_to', { actor: w.actor, x: t[0], z: t[1], level: ex.level, speed: WANDER_SPEED }, { parent: ex.id });
+      if (rec.status === 'failed' && returning) { skipReturn(rt, ex, w, rec.diagnostic?.code ?? 'ambient.return-refused'); continue; }
       if (rec.status === 'failed') { w.until = rt.tick + Math.round(1 / DT); continue; }
       w.child = rec;
+      if (returning) { rt.mark('ambient.readopted', { ambient: ex.id, actor: w.actor, directive: w.resume!.directive, walk: rec.id }); delete w.resume; delete w.returnPending; }
       ex.walks.push({ actor: w.actor, target: t, tick: rt.tick, id: rec.id });
     }
     const active = ex.who.some((w) => w.child && rt.isActive(w.child.id));
@@ -124,7 +155,41 @@ export const ambientWander: ActionDef<WanderParams, WanderExec['poly'], WanderEx
     if ((stopping || ex.who.every((w) => w.released)) && !active) return { status: 'completed', outputs: outputs() };
     return { status: 'running', phase: stopping ? 'stopping' : 'wandering' };
   },
+  onDirective(rt, ex, by, claims, ancestors) {
+    for (const w of ex.who) {
+      if (w.released || !claims.some((r) => r.resource === `actor:${w.actor}`)) continue;
+      if (w.resume) {
+        if (ancestors.includes(w.resume.directive)) continue;
+        skipReturn(rt, ex, w, 'newer-directive'); continue;
+      }
+      if (rt.registry.get(by.verb)?.yieldTo || w.child?.status === 'cancelled') continue;
+      const person = rt.world.entities[w.actor];
+      const foreign = rt.holder(`actor:${w.actor}`).some((id) => id !== w.child?.id && !isNudge(rt, id));
+      if (!person?.human || foreign || person.human.grip || (person.human.task && person.human.task !== w.child?.id && !isNudge(rt, person.human.task))) continue;
+      const regionId = (rt.records.get(ex.id)!.params as WanderParams).region;
+      const region = rt.world.regions[regionId];
+      if (!region) continue;
+      const directive = ancestors.at(-1) ?? by.id;
+      w.returnPending = true;
+      w.resume = { directive, region: regionId, regionHash: hashOf(region) };
+      rt.mark('ambient.return-pending', { ambient: ex.id, actor: w.actor, directive });
+    }
+  },
+  validateSnapshot(rt, ex, self) {
+    const bad = () => ({ code: 'snapshot.ambient-invalid', message: `ambient ${self.id} has invalid member/return provenance`, subjects: [self.id] });
+    const params = self.params as WanderParams;
+    if (!Array.isArray(ex.who) || ex.who.length !== params.actors.length || new Set(ex.who.map((w) => w?.actor)).size !== params.actors.length) return bad();
+    for (const w of ex.who) {
+      if (!w || !params.actors.includes(w.actor) || (w.returnPending === true) !== !!w.resume || (w.returnPending !== undefined && w.returnPending !== true)) return bad();
+      if (w.child && (rt.records.get(w.child.id) !== w.child || w.child.parent !== ex.id || w.child.verb !== 'walk_to' || (w.child.params as { actor?: string }).actor !== w.actor)) return bad();
+      if (w.resume) {
+        const q = w.resume, directive = rt.records.get(q.directive);
+        if (w.released || !directive || directive.parent || directive.id === ex.id || q.region !== params.region || typeof q.regionHash !== 'string' || !/^[a-f0-9]{64}$/.test(q.regionHash)) return bad();
+      }
+    }
+    return null;
+  },
   cancel: () => ({ ok: true }), // no new walks; the runtime cancels in-progress walks (people stop where they are)
-  // pre-emption (SOCIAL.md): a directed task cancels only that person's current walk; ambient then lets them go for good
+  // A directed task cancels only this person's walk; the pending intent can re-adopt later.
   yieldTo: (_rt, _self, holder, _a, by) => (/:make-way:\d+$/.test(by.id) ? [] : [holder.id]),
 };

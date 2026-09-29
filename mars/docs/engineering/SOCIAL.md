@@ -79,9 +79,13 @@ seated person, who first stands up to the approach point (0.6 s deferred stop, a
 pause is over gets a child `walk_to` (0.9 m/s) to a random point of the region: inside the
 polygon, ≥ 0.53 m clearance, ≥ 1.2 m from other people and other wanderers' targets. Draws come
 only from `world.rng` (`seed` offsets them), so runs are reproducible and fork-safe. Pauses are
-2–8 s (first walks staggered 0–2 s). A person is **released for good** the moment anything else
-reserves them, they get a task or grip, or their ambient walk is cancelled by someone else;
-`walk.ts` make-way nudges are transient and do not count. Cancel stops new walks; in-flight walks
+2–8 s (first walks staggered 0–2 s). An explicit directed task records a return intent
+before pre-empting an ambient walk (or while the person is paused). After the outer
+directive completes successfully, the still-live ambient action can adopt an eligible
+person through a normal walk to its original region. Failed/cancelled/newer commands,
+held loads or hand items, another group/task, or a missing/changed region refuse return.
+Manual cancellation of an ambient walk and unrecorded foreign ownership still release
+that person permanently; `walk.ts` make-way nudges are transient and do not count. Cancel stops new walks; in-flight walks
 are cancelled by the runtime (people stop in place).
 
 ## Pre-emption (spec §17): directed tasks release social holds automatically
@@ -97,8 +101,7 @@ and `Runtime.submit` uses it:
   claim under a social action (a carry, a slot, an item), nothing is pre-empted and the ordinary
   `reservation.conflict` stands — critical tasks are never abandoned for autonomy.
 - **What is released: the smallest social unit** — this person's own `sit` / `take_slot` (a `gather` /
-  `campfire_circle` keeps its other members), their current ambient walk (ambient then lets them go for
-  good), or a member of a fully formed `converse` when at least two remain. Those
+  `campfire_circle` keeps its other members), their current ambient walk (eligible members may later be re-adopted), or a member of a fully formed `converse` when at least two remain. Those
   remaining members keep their positions and talk; a two-person or gathering converse
   still ends as a unit, as does `face`. Cancelled units have diagnostic `social.pre-empted`, message
   **`pre-empted by <id> (<verb>)`** (`details.reason` = `pre-empted by <id>`), on the record and on its
@@ -153,7 +156,7 @@ refused; determinism (hash + event log).
 - **Resumption is staged:** occupied standalone `sit` / seated `take_slot` holds return to their exact
   slot after a successful directive (see below). Formed conversations retain remaining
   members and return a directed member; group-owned fixture seats do not yet resume.
-  Ambient never re-adopts a released person. An `eat` / `serve` overlay (ITEMS.md)
+  Ambient re-adoption follows the successful-directive rules above. An `eat` / `serve` overlay (ITEMS.md)
   on a pre-empted sitter is not released by pre-emption (it holds hands, not the actor): it fails
   `eat.not-still` as soon as the stand-up moves them, and a directive that needs free hands is then
   refused at its plan (`actor.holding`) while they still hold the bowl.
@@ -240,3 +243,15 @@ walk-child provenance; omitted/duplicate/corrupt entries refuse with
 `snapshot.converse-return-invalid`. Before-departure and during-return snapshots
 continue with identical world hashes every tick and identical event suffixes.
 See `briefs/converse-return.REPORT.md` for focused proof and remaining limitations.
+
+
+Ambient snapshots now use the verified default graph codec: per-member pauses,
+child-record aliases, deterministic RNG and optional return intents continue exactly.
+Four tested pause points cover ordinary walks, initial pause, waiting for directed work,
+and the accepted return walk. A pending-state marker makes an omitted return payload
+refuse rather than silently drop the intent; member/child/directive provenance checks
+use `snapshot.ambient-invalid`. No closures or new snapshot format are introduced.
+Target selection and RNG draws are unchanged without pre-emption. Return admission
+is bounded: no eligible target or a failed route gives a named `ambient.return-skipped`
+mark instead of forcing relocation. An admitted physical walk marks `ambient.readopted`;
+it still has to finish its normal collision-checked path. See `briefs/ambient-return.REPORT.md`.

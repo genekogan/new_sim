@@ -1,0 +1,302 @@
+{
+  "states": [
+    {
+      "label": "ambient",
+      "tick": 35,
+      "actor": {
+        "id": "person",
+        "def": "human",
+        "kind": "human",
+        "label": "person",
+        "pose": {
+          "p": [
+            -6,
+            0,
+            -6
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0,
+          "task": "a2"
+        }
+      }
+    },
+    {
+      "label": "directive-completed",
+      "tick": 134,
+      "actor": {
+        "id": "person",
+        "def": "human",
+        "kind": "human",
+        "label": "person",
+        "pose": {
+          "p": [
+            -11,
+            0,
+            -6
+          ],
+          "yaw": -3.141592653589793
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    {
+      "label": "physically-returned",
+      "tick": 250,
+      "actor": {
+        "id": "person",
+        "def": "human",
+        "kind": "human",
+        "label": "person",
+        "pose": {
+          "p": [
+            -6.718,
+            0,
+            -4.992
+          ],
+          "yaw": 0.2311947986093652
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    }
+  ],
+  "records": [
+    {
+      "id": "a1",
+      "verb": "ambient_wander",
+      "params": {
+        "actors": [
+          "person"
+        ],
+        "region": "lawn",
+        "seed": 7
+      },
+      "status": "executing",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "wandering"
+        }
+      ],
+      "requestedTick": 0,
+      "phase": "wandering"
+    },
+    {
+      "id": "a2",
+      "verb": "walk_to",
+      "params": {
+        "actor": "person",
+        "x": -9.838,
+        "z": -7.234,
+        "level": 0,
+        "speed": 0.9
+      },
+      "status": "cancelled",
+      "history": [
+        {
+          "tick": 35,
+          "status": "requested"
+        },
+        {
+          "tick": 35,
+          "status": "validated"
+        },
+        {
+          "tick": 35,
+          "status": "reserved"
+        },
+        {
+          "tick": 35,
+          "status": "executing"
+        },
+        {
+          "tick": 35,
+          "status": "cancelled",
+          "code": "social.pre-empted"
+        }
+      ],
+      "requestedTick": 35,
+      "parent": "a1",
+      "diagnostic": {
+        "code": "social.pre-empted",
+        "message": "pre-empted by a3 (walk_to)",
+        "subjects": [
+          "a3"
+        ],
+        "details": {
+          "reason": "pre-empted by a3",
+          "by": "a3"
+        }
+      },
+      "endedTick": 35
+    },
+    {
+      "id": "a3",
+      "verb": "walk_to",
+      "params": {
+        "actor": "person",
+        "x": -11,
+        "z": -6
+      },
+      "status": "completed",
+      "history": [
+        {
+          "tick": 35,
+          "status": "requested"
+        },
+        {
+          "tick": 35,
+          "status": "validated"
+        },
+        {
+          "tick": 35,
+          "status": "reserved"
+        },
+        {
+          "tick": 35,
+          "status": "executing"
+        },
+        {
+          "tick": 36,
+          "status": "executing",
+          "phase": "turn"
+        },
+        {
+          "tick": 42,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 134,
+          "status": "completed",
+          "phase": "walk"
+        }
+      ],
+      "requestedTick": 35,
+      "phase": "walk",
+      "outputs": {
+        "replans": 0,
+        "length": 5,
+        "snapped": 0,
+        "pushes": 0
+      },
+      "endedTick": 134
+    },
+    {
+      "id": "a4",
+      "verb": "walk_to",
+      "params": {
+        "actor": "person",
+        "x": -6.718,
+        "z": -4.992,
+        "level": 0,
+        "speed": 0.9
+      },
+      "status": "completed",
+      "history": [
+        {
+          "tick": 135,
+          "status": "requested"
+        },
+        {
+          "tick": 135,
+          "status": "validated"
+        },
+        {
+          "tick": 135,
+          "status": "reserved"
+        },
+        {
+          "tick": 135,
+          "status": "executing"
+        },
+        {
+          "tick": 136,
+          "status": "executing",
+          "phase": "turn"
+        },
+        {
+          "tick": 141,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 250,
+          "status": "completed",
+          "phase": "walk"
+        }
+      ],
+      "requestedTick": 135,
+      "parent": "a1",
+      "phase": "walk",
+      "outputs": {
+        "replans": 0,
+        "length": 4.399043987049914,
+        "snapped": 0,
+        "pushes": 0
+      },
+      "endedTick": 250
+    }
+  ],
+  "marks": [
+    {
+      "tick": 35,
+      "type": "mark",
+      "name": "ambient.return-pending",
+      "data": {
+        "ambient": "a1",
+        "actor": "person",
+        "directive": "a3"
+      }
+    },
+    {
+      "tick": 135,
+      "type": "mark",
+      "name": "ambient.readopted",
+      "data": {
+        "ambient": "a1",
+        "actor": "person",
+        "directive": "a3",
+        "walk": "a4"
+      }
+    }
+  ],
+  "violations": []
+}

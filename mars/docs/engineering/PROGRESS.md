@@ -1636,3 +1636,15 @@ LM026 review correction: defer selective conversation release until other social
 cancellations accept. Mixed cancellation-refusal regression proves unchanged group,
 resources and world on failed admission. Converse focused 9/9, tsc/lint green.
 No pins or historical changes; approximately 10 worker minutes, no helpers.
+
+### LM-027 ambient re-adoption candidate (2026-09-29)
+
+Storage worker: successful explicit directives may return eligible people to their
+still-live ambient group through normal child walking. Failed/cancelled/newer commands,
+held loads/items, groups and changed regions skip by name. Default ambient snapshots
+now have four-phase exact continuation and queue-provenance tests. Six new +three
+existing +source scan tests pass (10), tsc/lint green. Three JSON states personally
+inspected, zero violations. Original/candidate 600-tick no-interference comparison
+matches world/events/records exactly; no pins/history values changed. Integrated
+gate/browser proof pending. Approximately 35 worker minutes; no helpers. Report:
+briefs/ambient-return.REPORT.md. Depends on converse hooks79f8ca7+c2ff10c.

@@ -14,7 +14,7 @@ import { walkTo } from '../locomotion/walk.ts';
 import { add2, angleDelta, heading, pointInObb, rot2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, ActionRecord } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
-import { SOCIAL_ACTIONS, releaseForDirective } from '../social/actions.ts';
+import { SOCIAL_ACTIONS } from '../social/actions.ts';
 import { allSlots, fixtureSlots, pointInPolygon, slotsOf, type SocialRegion } from '../social/slots.ts';
 import { createRegistry } from '../api/registry.ts';
 import { component } from '../world/factory.ts';
@@ -184,7 +184,7 @@ test('gather onto a place region with an audience layout: rows face the focus, n
   assert.deepEqual(msgs(rt), []);
 });
 
-test('ambient_wander: 6 people for 60 s, every target inside the region, 0 violations; a directed task claims a person and ambient lets go', () => {
+test('ambient_wander: 6 people for 60 s, every target inside the region, 0 violations; a directed task claims a person and eligible ambient wandering resumes', () => {
   const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'];
   const rt = setup(...ids.map((id, i) => human(id, -9 + (i % 3) * 3, -8 + Math.floor(i / 3) * 4)));
   const amb = rt.submit('ambient_wander', { actors: ids, region: 'lawn', seed: 7 });
@@ -198,14 +198,14 @@ test('ambient_wander: 6 people for 60 s, every target inside the region, 0 viola
   }
   assert.ok(ids.every((id) => walks.some((w) => (w.params as { actor: string }).actor === id)), 'everyone wandered');
   assert.deepEqual(msgs(rt), []);
-  // directed task: free w1 (cancels only its ambient walk, if any), then walk it away
-  releaseForDirective(rt, 'w1');
+  // Directed task automatically yields the ambient member, then re-adopts after completion.
   const d = rt.submit('walk_to', { actor: 'w1', x: -6, z: 2 });
   assert.equal(d.status, 'executing', d.diagnostic?.message);
   const before = walks.length;
   for (let i = 0; i < 20 * 15; i++) rt.step();
   const after = [...rt.records.values()].filter((r) => r.parent === amb.id && r.verb === 'walk_to' && (r.params as { actor: string }).actor === 'w1' && r.requestedTick > d.requestedTick);
-  assert.equal(after.length, 0, 'ambient never touches w1 again');
+  assert.ok(after.length > 0, 'eligible member resumes after the directed task');
+  assert.ok(after.every((r) => r.requestedTick > d.endedTick!), 'ambient cannot run ahead of the directive');
   assert.ok([...rt.records.values()].filter((r) => r.parent === amb.id).length > before, 'the others keep wandering');
   rt.cancel(amb.id);
   assert.equal(amb.status, 'cancelled');
