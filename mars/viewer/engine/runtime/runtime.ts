@@ -33,7 +33,7 @@ export type RuntimeServices = Record<string, any>;
 
 /** `prior`: phase of each reserved entity before start(), restored if the action fails / is cancelled before using it. */
 type Phase = WorldState['entities'][string]['phase'];
-type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; prior: Map<string, Phase>; reason?: Diagnostic }; // = snapshot.ts LiveEntry (+ reason: why a deferred cancel was asked)
+type Live = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; prior: Map<string, Phase>; reason?: Diagnostic }; // = snapshot.ts LiveEntry
 /** A directed submission parked until the social holds it pre-empted have ended (SOCIAL.md "Pre-emption"). */
 type Waiting = { rec: ActionRecord; def: ActionDef; params: unknown; parent?: string; holds: string[] };
 

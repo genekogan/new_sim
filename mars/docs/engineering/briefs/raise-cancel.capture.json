@@ -2832,7 +2832,7 @@
     ]
   },
   "snapshot": {
-    "bytes": 111242,
+    "bytes": 111364,
     "tick": 428,
     "stateHash": "79d543ded8d873206ede4f798ac9163c00e7e0f05f26e50e094db3648efbe050",
     "finalHash": "2be29d4413b9314c28ed0112472486989836601a81340bf07009672c33e55003",
@@ -2845,5 +2845,36 @@
     "maxFrames": 282,
     "maxBytes": 150966,
     "limit": 1024
+  },
+  "refusal/carried-part": {
+    "tick": 341,
+    "diagnostic": {
+      "code": "raise.cancel-unsafe",
+      "message": "frame cannot be lowered: its reverse sweep intersects moving body blocker",
+      "subjects": [
+        "frame",
+        "blocker"
+      ]
+    },
+    "pose": {
+      "p": [
+        0,
+        0.005988984230408703,
+        0
+      ],
+      "yaw": 0,
+      "pitch": 0.24691533937948956
+    },
+    "support": {
+      "kind": "held",
+      "by": [
+        "p1",
+        "p2"
+      ]
+    },
+    "unchangedWorld": true,
+    "owners": [
+      "a1"
+    ]
   }
 }

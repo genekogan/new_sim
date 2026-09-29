@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { raiseFixture, normalRaiseProof } from './raise-cancel-fixtures.ts';
+import { forgetMotion } from '../runtime/invariants.ts';
 import { Runtime, DT } from '../runtime/runtime.ts';
 import { Spatial, entityCorners } from '../spatial/service.ts';
 import { human, component } from '../world/factory.ts';
 import { def } from '../world/catalog.ts';
 import { hypot } from '../core/math.ts';
 import { isLying } from '../construction/lying.ts';
-import { RAISE_REVERSE_LIMIT, recordRaise, type RaiseTrail } from '../construction/raise-lower.ts';
+import { RAISE_REVERSE_LIMIT, recordRaise, raiseFrame, loweringIssue, type RaiseTrail } from '../construction/raise-lower.ts';
 import { raiseUpright, LIFT_SPEED, liftHandPoint, raiseRoles } from '../construction/raise.ts';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { ActionRecord } from '../actions/types.ts';
@@ -86,16 +87,17 @@ for (const [ft, count, phase] of [[8, 1, 'raise'], [12, 2, 'raise'], [19, 3, 'st
 }
 
 test('raise cancel (LM-036): new static geometry and bystanders refuse the reverse sweep without changing support or owners', () => {
-  for (const kind of ['frame-obstacle', 'frame-person', 'holder-person']) {
+  for (const kind of ['frame-obstacle', 'carried-part', 'frame-person', 'holder-person']) {
     const { rt, crew } = raiseFixture();
     const r = rt.submit('raise_upright', { item: 'frame', crew });
     reach(rt, r, 'set', 1);
-    if (kind === 'frame-obstacle') rt.world.entities.blocker = component('blocker', 'plywood-4x6', [0, 0, 2.8], 0, { phase: 'staged' });
+    if (kind === 'frame-obstacle' || kind === 'carried-part') rt.world.entities.blocker = component('blocker', 'plywood-4x6', [0, 0, 2.8], 0, { phase: 'staged' });
     else rt.world.entities.bystander = human('bystander', kind === 'holder-person' ? 1.0296 : 0, 2.8);
+    if (kind === 'carried-part') { rt.world.entities.blocker.phase = 'carried'; rt.world.entities.blocker.support = { kind: 'held', by: ['other1', 'other2'] }; }
     const before = structuredClone(rt.world);
     const refused = rt.cancel(r.id);
     assert.equal(refused.diagnostic?.code, 'raise.cancel-unsafe', kind);
-    assert.ok(refused.diagnostic?.subjects?.includes(kind === 'frame-obstacle' ? 'blocker' : 'bystander'));
+    assert.ok(refused.diagnostic?.subjects?.includes(kind === 'frame-obstacle' || kind === 'carried-part' ? 'blocker' : 'bystander'));
     assert.deepEqual(rt.world, before);
     capture(`refusal/${kind}`, { tick: rt.tick, diagnostic: refused.diagnostic, pose: rt.world.entities.frame.pose, support: rt.world.entities.frame.support, unchangedWorld: true, owners: rt.holder('entity:frame') });
     assert.ok(rt.isActive(r.id));
@@ -127,12 +129,50 @@ test('raise cancel (LM-036): obstacles appearing during lowering block and retai
   assert.deepEqual(rt.violations, []);
 });
 
+
+test('raise cancel (LM-036): moving and rotating held bodies are rechecked during lowering', () => {
+  for (const variant of ['translated-load', 'rotated-load', 'vehicle']) {
+    const { rt, crew } = raiseFixture();
+    const r = rt.submit('raise_upright', { item: 'frame', crew });
+    reach(rt, r, 'set', 1);
+    const body = component('moving-body', variant === 'vehicle' ? 'bicycle' : 'plywood-4x6', [8, 0, 8], 0, { phase: 'carried', support: { kind: 'held', by: ['external-holder'] } });
+    if (variant === 'vehicle') body.kind = 'vehicle';
+    rt.world.entities[body.id] = body;
+    const holder = human('external-holder', 9.8, 8);
+    holder.human!.grip = { entity: body.id, slot: 'carry-l' };
+    rt.world.entities[holder.id] = holder;
+    assert.equal(rt.cancel(r.id).diagnostic, undefined);
+    for (let i = 0; i < 4; i++) rt.step();
+    // Another controller moves/rotates a held body after the full reverse preflight.
+    body.pose.p = [0, 0, 2.8];
+    holder.pose.p = [1.8, 0, 2.8];
+    forgetMotion(rt); // External scene edit under test; the lowering action must revalidate it.
+    if (variant === 'rotated-load') { body.pose.yaw = Math.PI / 3; body.pose.pitch = Math.PI / 4; }
+    for (let i = 0; i < 1000 && r.status !== 'blocked'; i++) rt.step();
+    assert.equal(r.status, 'blocked', variant);
+    assert.equal(r.diagnostic?.code, 'raise.cancel-unsafe');
+    assert.ok(r.diagnostic?.subjects?.includes(body.id));
+    const held = structuredClone(rt.world);
+    for (let i = 0; i < 3; i++) rt.step();
+    assert.deepEqual(rt.world.entities, held.entities, 'blocked lowering cannot mutate either load or holders');
+    assert.deepEqual(rt.world.entities.frame.support, { kind: 'held', by: crew });
+    assert.ok(rt.holder('entity:frame').includes(r.id));
+    delete rt.world.entities[body.id];
+    holder.human!.grip = undefined;
+    delete rt.world.entities[holder.id];
+    rt.runUntilIdle(2000, [r.id]);
+    assert.equal(r.status, 'cancelled');
+    assert.deepEqual(rt.violations, []);
+  }
+});
+
 test('raise cancel (LM-036): lowering snapshots restore tick-exactly and normal phases still refuse', () => {
   const { rt, crew, base } = raiseFixture(19, 4);
   const r = rt.submit('raise_upright', { item: 'frame', crew });
   reach(rt, r, 'step', 10);
   assert.throws(() => rt.snapshot(), /non-lowering/);
-  rt.cancel(r.id);
+  const reason = { code: 'test.requested-cancellation', message: 'requested cancellation', subjects: [r.id] };
+  rt.cancel(r.id, reason);
   for (let i = 0; i < 3; i++) rt.step();
   const snapshot = rt.snapshot();
   const bytes = Buffer.byteLength(JSON.stringify(snapshot));
@@ -145,6 +185,8 @@ test('raise cancel (LM-036): lowering snapshots restore tick-exactly and normal 
     assert.deepEqual(rt.holder('entity:frame'), clone.holder('entity:frame'));
   }
   assert.equal(r.status, 'cancelled');
+  assert.deepEqual(r.diagnostic, reason);
+  assert.deepEqual(clone.records.get(r.id)?.diagnostic, reason);
   assert.deepEqual(rt.events.slice(cursor), clone.events);
   assert.deepEqual(rt.violations, []);
   assert.deepEqual(clone.violations, []);
@@ -220,4 +262,18 @@ test('LM-036 hypothetical proof fixture is explicit and does not alter probe pre
   assert.throws(() => sim.load('raise-cancel-proo'), /unknown scenario/);
   sim.load('raise-cancel-proof');
   assert.equal(sim.rt.world.entities.A.kind, 'component');
+});
+
+
+test('raise cancel (LM-036): thin held sheets cannot penetrate the landing frame envelope', () => {
+  const { rt, crew } = raiseFixture();
+  const frame = raiseFrame(rt, 'frame', crew);
+  const sheet = component('thin-held-sheet', 'plywood-4x6', [0, 0, 2.8], 0, { phase: 'carried', support: { kind: 'held', by: ['sheet-holder'] } });
+  rt.world.entities[sheet.id] = sheet;
+  // The 19mm sheet lies in the final landing envelope: a 20mm floor clearance would miss it.
+  const issue = loweringIssue(rt, 'frame', frame, frame, 0);
+  assert.equal(issue?.code, 'raise.cancel-unsafe');
+  assert.ok(issue?.subjects?.includes(sheet.id));
+  sheet.pose.p[1] = -def(sheet.def).size[1];
+  assert.equal(loweringIssue(rt, 'frame', frame, frame, 0), null, 'exact vertical contact, without penetration, is permitted');
 });

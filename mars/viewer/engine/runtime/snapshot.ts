@@ -6,7 +6,8 @@
 // `Runtime.restore()` rebuilds a runtime that steps tick-for-tick identically (resume.test.ts).
 //
 // Resumable subset (verified): walk_to (all phases incl. stairs), take_slot / sit / stand / face /
-// converse / gather / campfire_circle, and sequence-runner state (sequence/runner.ts). Everything
+// converse / gather / campfire_circle, lowering-only raise_upright via its custom phase codec,
+// and sequence-runner state (sequence/runner.ts). Everything
 // else is refused loudly, naming the action and why (NON_RESUMABLE, or "not verified").
 import type { ActionDef, ActionRecord, Diagnostic } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
@@ -68,7 +69,7 @@ export type RuntimeSnapshot = {
 export type SnapshotOptions = { allowDrop?: boolean };
 
 /** What Runtime exposes to this module (its private live/owner maps and id counter). */
-export type LiveEntry = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; prior: Map<string, WorldState['entities'][string]['phase']> };
+export type LiveEntry = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; reason?: Diagnostic; prior: Map<string, WorldState['entities'][string]['phase']> };
 export type RuntimeInternals = {
   live: Map<string, LiveEntry>;
   owners: Map<string, { action: string; mode: 'exclusive' | 'shared' }[]>;
@@ -97,7 +98,7 @@ const isPlainObject = (v: object) => {
 type Graph = {
   world: WorldState;
   records: ActionRecord[];
-  live: { id: string; custom: boolean; exec: unknown; program: unknown; cancelling: boolean; prior: LiveEntry['prior'] }[];
+  live: { id: string; custom: boolean; exec: unknown; program: unknown; cancelling: boolean; reason?: Diagnostic; prior: LiveEntry['prior'] }[];
   dropped: { id: string; prior: LiveEntry['prior'] }[];
   owners: [string, { action: string; mode: 'exclusive' | 'shared' }[]][];
   services: Record<string, unknown>;
@@ -134,7 +135,7 @@ export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotO
       if (l.exec && typeof l.exec === 'object') skip.add(l.exec);
       continue;
     }
-    graph.live.push({ id, custom: !!l.def.serializeExec, exec, program: l.program, cancelling: !!l.cancelling, prior: l.prior });
+    graph.live.push({ id, custom: !!l.def.serializeExec, exec, program: l.program, cancelling: !!l.cancelling, ...(l.reason ? { reason: l.reason } : {}), prior: l.prior });
   }
   const list = () => refused.map((r) => `action ${r.id} (${r.verb}) is not resumable: ${r.reason}`).join('; ');
   if (refused.length && !opts.allowDrop)
@@ -207,7 +208,7 @@ export function applySnapshot(rt: Runtime, int: RuntimeInternals, snap: RuntimeS
     if (!def) throw new SnapshotError('snapshot.unknown-verb', `live action ${x.id} is a "${rec.verb}", which the restore registry does not have`, [x.id]);
     if (x.custom && !def.restoreExec) throw new SnapshotError('snapshot.unknown-verb', `live action ${x.id} (${rec.verb}) was serialised by serializeExec but its ActionDef has no restoreExec`, [x.id]);
     const exec = x.custom ? def.restoreExec!(rt, x.exec) : x.exec;
-    int.live.set(x.id, { rec, def, exec, program: x.program, cancelling: x.cancelling || undefined, prior: x.prior });
+    int.live.set(x.id, { rec, def, exec, program: x.program, cancelling: x.cancelling || undefined, reason: x.reason, prior: x.prior });
   }
   for (const [k, list] of g.owners) int.owners.set(k, list);
   int.nextId = snap.nextId;

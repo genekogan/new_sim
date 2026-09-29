@@ -31,11 +31,20 @@ export function loweringIssue(rt: Runtime, item: string, from: RaiseFrame, to: R
   const refuse = (message: string, subjects: string[]): Diagnostic => ({ code: 'raise.cancel-unsafe', message: `${item} cannot be lowered: ${message}`, subjects: [item, ...subjects] });
   const hit = sweepPoses(rt, u, [from.pose, to.pose], []);
   if (hit) return refuse(`its reverse sweep intersects ${hit.o.label ?? hit.o.id}`, [hit.o.id]);
+  // Navigation omits carried/raising parts and some vehicles. Physical lowering must still
+  // see their current envelopes; rebuild these on every preflight/step so motion is observed.
+  const staticIds = new Set(sp.scene.obstacles.map((o) => o.id));
+  const dynamic = Object.values(rt.world.entities)
+    .filter((e) => e.id !== item && e.kind !== 'human' && e.kind !== 'marker' && !staticIds.has(e.id))
+    .map((e) => ({ id: e.id, ...entityFootprint(e) }));
+  const bodies = [...sp.scene.obstacles, ...dynamic];
   const crew = new Set(to.crew.map((c) => c.id));
   const bystanders = Object.values(rt.world.entities).filter((e) => e.human && !crew.has(e.id));
-  for (let k = 0; k <= 8; k++) {
-    const t = k / 8, pose = lerpPose(from.pose, to.pose, t);
+  for (let k = 0; k <= 24; k++) {
+    const t = k / 24, pose = lerpPose(from.pose, to.pose, t);
     const fp = entityFootprint({ ...u, pose });
+    const load = dynamic.find((o) => o.y1 > fp.y0 + 1e-6 && o.y0 < fp.y1 - 1e-6 && obbOverlap(fp.obb, o.obb, -1e-6));
+    if (load) return refuse(`its reverse sweep intersects moving body ${load.id}`, [load.id]);
     if (Math.abs((pose.pitch ?? 0) - Math.PI / 2) < 1e-6) {
       const corners = obbCorners(fp.obb);
       if (!sp.scene.surfaces.some((s) => Math.abs(s.y - groundY) < 0.05 && corners.every((p) => pointInObb(p, s.obb, 1e-6))))
@@ -51,7 +60,7 @@ export function loweringIssue(rt: Runtime, item: string, from: RaiseFrame, to: R
       if (!sp.scene.surfaces.some((s) => Math.abs(s.y - q.p[1]) < 0.05 && pointInObb(p, s.obb, -HUMAN_RADIUS)))
         return refuse(`${next.id}'s reverse path has no floor support`, [next.id]);
       const body = { c: p, half: [HUMAN_RADIUS, HUMAN_RADIUS] as [number, number], yaw: 0 };
-      const obstruction = sp.scene.obstacles.find((o) => o.id !== item && o.y1 > q.p[1] + 0.02 && o.y0 < q.p[1] + 1.9 && obbOverlap(body, o.obb));
+      const obstruction = bodies.find((o) => o.id !== item && o.y1 > q.p[1] + 0.02 && o.y0 < q.p[1] + 1.9 && obbOverlap(body, o.obb));
       if (obstruction) return refuse(`${next.id}'s reverse path meets ${obstruction.id}`, [next.id, obstruction.id]);
       const person = bystanders.find((e) => Math.abs(e.pose.p[1] - q.p[1]) < 1 && hypot(e.pose.p[0] - p[0], e.pose.p[2] - p[1]) < 2 * HUMAN_RADIUS + 0.08);
       if (person) return refuse(`${next.id}'s reverse path meets ${person.id}`, [next.id, person.id]);
