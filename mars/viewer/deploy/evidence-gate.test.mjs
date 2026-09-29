@@ -77,3 +77,23 @@ test('green JSON without an execution log or completion record cannot prove a ci
   assert.equal(externalProof('viewer/deploy/determinism-probe.mjs', { gate: gate([step('determinism-probe')]), readLog: () => 'status completed\nfinalStateHash '+ 'a'.repeat(64) }).result, 'pass');
   assert.equal(externalProof('viewer/deploy/history-ids.test.mjs', { gate: gate([step('test')]), readLog: () => unitLog.replace('# skipped 0', '# skipped 1') }).result, 'unverified');
 });
+
+
+test('a newer report-less gate attempt blocks older green evidence at the same HEAD', () => {
+  const viewer = mkdtempSync(join(tmpdir(), 'mars-evidence-interrupted-'));
+  try {
+    const directory = join(viewer, '.cloudflare/gate');
+    mkdirSync(join(directory, '001'), { recursive: true });
+    writeFileSync(join(directory, '001/report.json'), JSON.stringify({ finishedAt: '2026-09-29', gitHead: 'abcd', gitDirty: false, steps: [step('simulation-integration')], ok: true }));
+    const git = (op) => op === 'status' ? '' : 'abcd';
+    assert.equal(latestGate(viewer, undefined, git).report.ok, true);
+    mkdirSync(join(directory, '002'));
+    writeFileSync(join(directory, '002/lint.log'), '$ npm run lint');
+    writeFileSync(join(directory, 'zzz-unrelated-file'), 'not a gate attempt');
+    const current = latestGate(viewer, undefined, git);
+    assert.equal(current.path, '.cloudflare/gate/002/report.json');
+    assert.equal(current.report, null);
+    assert.match(current.reason, /unreadable gate report/);
+    assert.equal(externalProof(integration, { gate: current, readLog: () => integrationLog }).result, 'missing');
+  } finally { rmSync(viewer, { recursive: true, force: true }); }
+});

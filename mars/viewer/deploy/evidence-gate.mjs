@@ -7,9 +7,9 @@ import { stripVTControlCharacters } from 'node:util';
 export function latestGate(viewer, explicitPath, git = (...args) => execFileSync('git', args, { cwd: viewer, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()) {
   const directory = join(viewer, '.cloudflare/gate');
   const candidates = explicitPath ? [resolve(explicitPath)] : existsSync(directory)
-    ? readdirSync(directory).sort().reverse().map((d) => join(directory, d, 'report.json')).filter(existsSync) : [];
+    ? readdirSync(directory, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort().reverse().map((d) => join(directory, d, 'report.json')) : [];
   if (!candidates.length) return { path: null, report: null, reason: 'no gate report found' };
-  // Never fall back to an older green gate when the latest attempt is red or malformed.
+  // Never fall back to an older green gate when the latest attempt is red, malformed, or interrupted before writing its report.
   const path = candidates[0];
   try {
     const report = JSON.parse(readFileSync(path, 'utf8'));
