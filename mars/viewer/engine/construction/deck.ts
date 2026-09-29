@@ -131,7 +131,7 @@ export function planJoist(rt: Runtime, p: JP): { ok: true; program: JProg } | Fa
     if (al) return al;
     return { ok: true, program: { to: toA, beams, stations: [], height: h, sweep: { ignore: [] }, aloft: true } };
   }
-  const staged = stagedCheck(rt, j, c, 'joist.not-staged');
+  const staged = stagedCheck(j, c, 'joist.not-staged');
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 1, 2, `setting a ${def(j.def).label}`);
   if (cc) return cc;
@@ -269,7 +269,7 @@ export function planPlywood(rt: Runtime, p: PP): { ok: true; program: PProg } | 
     if (al) return al;
     return { ok: true, program: { to: toA, supports: s.supports, stations: [], sweep: { ignore: [] }, aloft: true } };
   }
-  const staged = stagedCheck(rt, sh, obb.c, 'plywood.not-staged');
+  const staged = stagedCheck(sh, obb.c, 'plywood.not-staged');
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 2, 2, `setting a ${def(sh.def).label}`);
   if (cc) return cc;

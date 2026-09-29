@@ -86,7 +86,7 @@ test('carry-stairs: one person carries a stair tread from the ground up stairs A
   assert.ok(s.climbTicks > 100, `climbed for ${s.climbTicks} ticks`);
   assert.ok(s.minGap >= -0.02, `load above the steps (min gap ${s.minGap})`);
   // staged on the deck: install_* can take it (stagedCheck: lying on its support near the target)
-  assert.equal(stagedCheck(rt, t, [10.5, 10], 'x'), null);
+  assert.equal(stagedCheck(t, [10.5, 10], 'x'), null);
   // and back down (descending: the same traversal reversed)
   const d = rt.submit('carry', { crew: ['p1'], item: 't1', to: { x: -3, z: 6, yaw: 0, level: 0 } });
   assert.equal(d.status, 'executing', d.diagnostic?.message);

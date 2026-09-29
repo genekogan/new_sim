@@ -157,7 +157,7 @@ export function planStairFlight(rt: Runtime, p: SP): { ok: true; program: SProg 
   const obb = stairObb(g);
   const blk = siteBlocker(rt, st.id, obb, g.baseY + 0.02, g.topY - 0.02, [sup.id]);
   if (blk) return fail('stair.site-blocked', `${st.id} would intersect ${blk} in its installed position`, [st.id], [g.c[0], g.baseY, g.c[1]]);
-  const staged = stagedCheck(rt, st, g.c, 'stair.not-staged');
+  const staged = stagedCheck(st, g.c, 'stair.not-staged');
   if (staged) return staged;
   if (Math.abs(st.pose.pitch ?? 0) > 0.01 || Math.abs(st.pose.roll ?? 0) > 0.01) return fail('stair.not-staged', `${st.id} must be standing on its stringers before it is walked into place`, [st.id]);
   const cc = crewCheck(rt, p.crew, 2, 2, `setting a ${d.label}`);
@@ -262,7 +262,7 @@ export function planTread(rt: Runtime, p: TP): { ok: true; program: TProg } | Fa
   const s = -g.run / 2 + (p.index - 0.5) * g.going;
   const yTop = g.baseY + p.index * g.riser;
   const to: Pose = { p: [g.c[0] + g.dir[0] * s, yTop - def(tr.def).size[1], g.c[1] + g.dir[1] * s], yaw: symmetricYaw(tr.pose.yaw, g.yaw + Math.PI / 2) };
-  const staged = stagedCheck(rt, tr, [to.p[0], to.p[2]], 'tread.not-staged');
+  const staged = stagedCheck(tr, [to.p[0], to.p[2]], 'tread.not-staged');
   if (staged) return staged;
   const cc = crewCheck(rt, p.crew, 1, 2, 'installing a tread');
   if (cc) return cc;

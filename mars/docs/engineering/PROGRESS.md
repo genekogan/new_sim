@@ -1606,3 +1606,5 @@ arbitrary commands, duplicates and missing sources refuse. Twelve social tests p
 source scan pass, tsc/lint green; valid event/world identity preserved, no pins.
 Approximate additional worker time 15 minutes, no helpers. Auto-selected local-seat
 provenance/authenticity limitation is explicit in preempt-snapshot.REPORT.md.
+
+Release12 first candidate0540b02 failed engine gate:497pass/23fail,6skip/11TODO; report2026-09-29T04-27-39-986Z. New LM041 staging clearance refuses existing flagship j1 near p1 and aborts dependent scenarios. Retained4abb117 isolated for exact geometry diagnosis, not weakened or repinned. Removed from release12; history integrity/social resume remain pending a fresh full gate.

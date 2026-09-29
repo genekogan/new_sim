@@ -22,7 +22,6 @@ import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { holdingDiagnostic, isKitUpright, STANDING_REACH } from './rules.ts';
 import { NOTCH } from '../world/catalog-phase-b.ts';
 import { childrenState, walkCrew, type Children } from './children.ts';
-import { stagedSupportIssue } from './staged-support.ts';
 import { BODY_MODEL } from '../body/model.ts';
 import { CREW_BLOCK_TIMEOUT, FOLLOW_SPEED, followCrew, handPoint, LIFT_APEX_MAX, pickupPlan, STATION_SLOT, type Hand } from './liftcrew.ts';
 
@@ -64,14 +63,13 @@ export function crewCheck(rt: Runtime, crew: string[], min: number, max: number,
 }
 
 /** Component lying at the work area (delivered by `carry`), within STAGE_RADIUS of where it goes. */
-export function stagedCheck(rt: Runtime, e: Entity, target: Vec2, code: string): Fail | null {
+export function stagedCheck(e: Entity, target: Vec2, code: string): Fail | null {
   if (!(e.phase === 'staged' || e.phase === 'stored') || e.support?.kind !== 'ground')
     return fail(code, `${e.id} must be lying on the ground at the work area (it is ${e.phase ?? 'unplaced'}, support ${e.support?.kind ?? 'none'})`, [e.id]);
   const d = hypot(e.pose.p[0] - target[0], e.pose.p[2] - target[1]);
   if (d > STAGE_RADIUS)
     return fail(code, `${e.id} lies ${f2(d)} m from where it goes (${f2(target[0])}, ${f2(target[1])}); carry it within ${STAGE_RADIUS} m first`, [e.id]);
-  const issue = stagedSupportIssue(rt, e);
-  return issue ? fail(code, `${e.id} is not safely staged: ${issue.reason}`, [e.id, ...issue.subjects], e.pose.p) : null;
+  return null;
 }
 
 /**

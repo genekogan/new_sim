@@ -122,7 +122,7 @@ graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.te
 - Plan: SE(2) leg to a level line-up before the first step → climb along the link centreline at
   0.45 m/s (load ends carryHeight above C(s ± L/2): level on landings, tilted with the flight, e.g.
   37° on stairs A; load + carrier span centred on the flight) → SE(2) leg on the upper grid →
-  set-down at that level's y (`staged`, support `ground`: `stagedCheck` passes; it verifies distance, complete floor support and clearance).
+  set-down at that level's y (`staged`, support `ground`: `stagedCheck` passes; it checks distance only).
 - Checked per plan sample and per tick (`carryStairsClearance`): every box-edge point ≥ step height
   under it − 0.02 m (`carry.stairs-clearance`); plan-time also other obstacles, incl. overhead ones.
 - On the flight: exclusive traffic resource (walkers wait, `traffic.yield`); anyone the carrier or load
@@ -181,15 +181,3 @@ never certified quiescent while a gathering member is still approaching; early
 blocked results preserve live held support and cannot be committed by execute.
 The checked physical fixtures and conservative remaining cases are in
 [the recovery report](briefs/deadlock-recovery.REPORT.md).
-
-### Staged installation precondition (LM041 candidate)
-
-`stagedCheck` receives the runtime and verifies current geometry after synchronizing Spatial. A staged/stored label and `ground` support tag are insufficient: the complete projected footprint must be covered by the union of floor surfaces at the load's bottom height, and its vertical OBB band must clear scene obstacles, live carried/raising loads, vehicles and people. Polygon subtraction detects interior holes as well as off-edge corners; adjoining rotated floor tiles can jointly support a part. Geometric tolerances are round-off only (0.1µm height/edge, residual area 1e-10 m²), not permission for visible floating. More than 256 uncovered fragments refuses certification. Existing verb-specific `*.not-staged` diagnostics name the part and blocker; validation does not move the load or release resources. Current geometry uses engine proxy boxes, not mesh contact or bending physics.
-
-Standing people use the normal collision radius/height rather than the narrower
-catalog render box; prone/rising poses and published hands expand the conservative
-obstruction envelope. Exact side/top contact is allowed within 1e-7 m round-off;
-2e-7 m penetration is refused. Public `install_tread` invalid-staging tests verify
-that refusal occurs before reservations or world/support mutations. The 23 inspected
-captures and 26 passing focused checks (including source scan) are recorded in
-`briefs/staged-support.REPORT.md`; integrated gate remains pending.
