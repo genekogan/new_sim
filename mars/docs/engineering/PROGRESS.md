@@ -1533,3 +1533,9 @@ Wave2 D4 worker — LM100 exact rafter sheet spans (`codex/rafter-span`, base6c5
   Shared pure transition proposed; physical regression and bounded forecast-cost
   proof remain prerequisites. Cache deferred unless measured useful; no pins/code
   changes or broad suites. Estimate 25 min / 10k tokens, zero additional helpers.
+
+## 2026-09-29 — budget constraint lifted; next integration candidate
+
+Gene explicitly removed the five-hour budget constraint and requested continued LAST_MILE work. Maximum three helpers and serialized expensive validation remain. A deduplicated inventory audit confirms 150 open rows: subjective primary-purpose split97visible/53internal, original sizing313.5worker-hours. This is not150newfeatures or a calibrated remaining-work prediction. Provisional active elapsed estimate40–80hours for technical closure, lower confidence; two rowsLM106/107 remain content-gated. Estimate next verifiedrelease1–2hours and substantialvisibleimprovement8–16hours, to recalibrate after two releases.
+
+Integrated prepared rafter35a6441 and dependent-tailf3ef307 plus design9a19bbf; focused17/17 passed. Docs append conflicts resolved preserving the release10 checkpoint. Added missing-file negative proof to existing LM137 saved-track verification browser test; existing positive case passed release10 gate and production. Candidate LM100/137 closures await complete clean-head gate, counts still30/36/150. Camera shared bounded cache, per-template measured body reach and realthree-vehicle cycles proceed in isolated worker checkouts; no repin yet.

@@ -143,6 +143,10 @@ test('save track: directed track → take file with `cameras` → picker lists a
   expect(fromFile.track).toBe(trackId);
   expect(fromFile.samples).toBeGreaterThan(0);
   expect(fromFile.all, 'the file track verifies exactly as the in-page directed track').toEqual(inPage.all);
+  const beforeMissing = await info(page);
+  const missing = await page.evaluate(() => (window.__marsStudio as unknown as VHook).verifyCamera(1, 5, 2, { track: { file: 'missing-track' } }));
+  expect(missing, 'a missing file track cannot silently verify the active track').toBeNull();
+  expect(await info(page), 'failed file-track lookup changes neither camera selection nor replay pose').toEqual(beforeMissing);
   await camera.selectOption(entry.cameraTrack);
   expect((await info(page))!.track.own).toBe(true);
 
