@@ -19,3 +19,9 @@ Approximate effort 20 minutes / 9k tokens. Full report generation and full gate 
 ## LM-014 interpretation proposed to lead (approved)
 
 One transport-facing registry in simulation composes engine operations plus the 20 live viewer controls, with explicit `target: engine|viewer`, schema, read-only metadata and one dispatcher. MCP and REST consume it; engine delegates stay engine controller calls, viewer delegates retain the existing model/apply path. This consolidates routing without pretending the two world models are unified. LM-202 remains out-of-scope and the literal claim that live commands are engine-world operations must be reclassified. This work is separate from the evidence commit.
+
+## Follow-up: require execution logs (2026-09-29)
+
+A green gate JSON alone could mark unit/probe/integration citations PROVEN when their logs were missing. Fixed in a separate follow-on commit: every executable proof needs a nonempty gate log; integration must show its MCP-all-tools and final auth/body-limit completion lines, probe its completed status + full hash, unit its positive pass summary with fail/skip/TODO zero, take-check its OK check line and no MISMATCH. Playwright parsing now accepts only anchored runner result records, not diagnostic text merely mentioning a spec and “ok”; ANSI is stripped before matching skipped cases.
+
+Validation: six evidence-helper tests pass; focused oxlint clean. Tested matcher against actual baseline gate `2026-09-29T00-33-59-072Z` logs (freshness deliberately bypassed for this parser compatibility check only): unit/history-ids, poses.spec, determinism-probe all recognized as pass; absent integration step remained missing. Integration/check markers also checked against the scripts' exact emitted strings. No heavy suite, generated report or pin change.
