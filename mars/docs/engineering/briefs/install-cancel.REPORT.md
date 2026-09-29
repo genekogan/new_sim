@@ -17,3 +17,5 @@ MARS_INSTALL_CANCEL_CAPTURE=../docs/engineering/briefs/install-cancel.capture.js
 ```
 
 Opt-in capture writes only when requested; serialized files prevent competing writers. Capture run: 5 pass/0 fail/0 skip/0 TODO; lint/typecheck clean.
+
+Capture review follow-up: `stair.cancel-unsafe` now says the flight is being carried into its installation position and cannot safely be abandoned during movement. Regenerated and inspected the stair record; only diagnostic wording changed. Focused stair cancellation test passes, zero fail/skip/TODO; no normal-run behavior changed.

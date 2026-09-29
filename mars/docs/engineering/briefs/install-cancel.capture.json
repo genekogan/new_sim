@@ -332,7 +332,7 @@
       },
       "diagnostic": {
         "code": "stair.cancel-unsafe",
-        "message": "st is being lifted into place; it cannot be abandoned mid-air",
+        "message": "st is being carried into its installation position; the crew cannot safely abandon it during this movement",
         "subjects": [
           "st"
         ]

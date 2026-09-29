@@ -240,6 +240,7 @@ export const installStairFlight: ActionDef<SP, SProg, SExec> = {
   },
   cancel(rt, ex) {
     const r = cancelLift(rt, ex, 'stair.cancel-unsafe');
+    if (!r.ok) r.diagnostic.message = `${ex.item} is being carried into its installation position; the crew cannot safely abandon it during this movement`;
     if (r.ok) rt.world.entities[ex.item].phase = 'staged';
     return r;
   },
