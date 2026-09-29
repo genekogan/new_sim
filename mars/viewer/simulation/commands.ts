@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { screenIds } from './shared';
+import { screenIds } from './shared.ts';
 const coordinate = z.number().min(-300).max(300),
   vec = z.tuple([coordinate, z.number().min(0.05).max(200), coordinate]);
 export const definitions = {

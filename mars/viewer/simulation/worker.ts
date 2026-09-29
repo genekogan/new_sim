@@ -12,10 +12,10 @@ import {
   type SimState,
 } from './shared';
 import { definitions } from './commands';
-import { LEGACY_TOOLS, legacyDescription, legacyRefusal } from './legacy';
+import { LEGACY_TOOLS } from './legacy';
 import { EngineRoom } from './engine-room';
 import { campusYearFile } from './campus-years';
-import { registerEngineTools } from './engine-tools';
+import { dispatchControl, registerControlTools, type ControlContext } from './control';
 
 const json = (data: unknown, status = 200) =>
   Response.json(data, {
@@ -201,10 +201,57 @@ export async function handleSimulation(
   if (!Number.isInteger(year) || year < 2020 || year > 2026) return json({error:'Invalid campus year'},400);
   const {entities,riderDocks,firePosition,catalog} = modelForYear(year);
   const stub = env.SIMULATIONS.get(env.SIMULATIONS.idFromName(year === 2026 ? room : `${year}:${room}`));
+  const controls: ControlContext = {
+    engine: async (op, args) => await (stub.engineCall(op, args, year) as unknown as Promise<{ ok: boolean; [k: string]: unknown }>),
+    viewerCommand: async (name, args, commandId) => await stub.apply(name, args, commandId, year),
+    snapshot: async () => await stub.snapshot(undefined, year),
+    capabilities: () => ({
+      version: 2,
+      year,
+      units: 'metres; Y up; ground=-0.16',
+      people: entities,
+      riders: Array.from({ length: 6 }, (_, i) => ({
+        id: `euc-${i + 1}`,
+        dock: riderDocks[i],
+      })),
+      screens: screenIds,
+      landmarks: {
+        chiba: year === 2026 ? [0, 2, 8] : year === 2022 ? [-4.8288, 2, -8.6] : year === 2020 ? [-9,2,0] : [0, 2, 0],
+        hallProjector: year === 2026 ? [6.02, 2.65, 8.31] : year === 2022 ? [-4.8288, 1.65, -6.244] : year === 2020 ? [-9,1.3,0] : [0, 2.55, year === 2023 ? 4.17 : 5.37],
+        campfire: firePosition,
+        campusBounds: catalog.bounds,
+      },
+      weatherPresets: [
+        'clear',
+        'cloudy',
+        'rainy',
+        'windy',
+        'dusty',
+      ],
+      clock:
+        'All durations are virtual seconds. Default rate=1 and day_seconds=480. Paused state persists; commands do not resume it. Camera trajectory duration covers the entire path.',
+      limitations: [
+        ...limits,
+        'Weather and gallery art are illustrative. Screen locations are photo-informed estimates. No collision prevention for camera paths except ground clearance.',
+        'EUC dismount is a static standing pose beside the parked wheel, not a motion-captured transition.',
+        'Viewer Follow remote camera must be enabled. Spectators cannot edit state.',
+      ],
+      tools: Object.fromEntries(
+        Object.entries(definitions).map(([name, def]) => [
+          name,
+          {
+            description: def.description,
+            schema: z.toJSONSchema(def.schema),
+            legacy: LEGACY_TOOLS[name],
+          },
+        ]),
+      ),
+    }),
+  };
   try {
     if (request.method === 'POST') {
       if (Number(request.headers.get('Content-Length') || 0) > 32768)
-        return json({ error: 'Request too large' }, 413);
+        return json({ error: 'Request too large', code: 'room.request-too-large' }, 413);
       // Bound chunked bodies too; never log capability tokens or request bodies.
       const reader = request.body?.getReader();
       let size = 0;
@@ -216,7 +263,7 @@ export async function handleSimulation(
           size += value.length;
           if (size > 32768) {
             await reader.cancel();
-            return json({ error: 'Request too large' }, 413);
+            return json({ error: 'Request too large', code: 'room.request-too-large' }, 413);
           }
           chunks.push(value);
         }
@@ -251,7 +298,12 @@ export async function handleSimulation(
           id: z.uuid(),
         })
         .parse(await request.json());
-      return json(await stub.apply(input.name, input.args, input.id, year));
+      const result = await dispatchControl(controls, input.name, input.args, { commandId: input.id, viewerCommandsOnly: true });
+      if (result.isError) {
+        const refusal = result.value as { message: string };
+        return json({ ...refusal, error: refusal.message }, 400);
+      }
+      return json(result.value);
     }
     if (url.pathname === '/api/simulation/engine/take') {
       // Viewer-facing compact take fetch (read-only capabilities allowed).
@@ -278,116 +330,7 @@ export async function handleSimulation(
             name: 'mars-campus-simulation',
             version: '2.0.0',
           });
-          server.registerTool(
-            'get_state',
-            {
-              description: legacyDescription(
-                'get_state',
-                'Inspect room state, current positions, person IDs, walking capabilities, units and limitations.',
-              ),
-              inputSchema: z.object({}),
-              annotations: { readOnlyHint: true },
-            },
-            async () => ({
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(await stub.snapshot(undefined, year)),
-                },
-              ],
-            }),
-          );
-          server.registerTool(
-            'get_capabilities',
-            {
-              description: legacyDescription(
-                'get_capabilities',
-                'Discover all tools, full JSON schemas, stable entity/screen/rider IDs, landmarks, units, clock semantics and limitations. Call this before composing scene commands.',
-              ),
-              inputSchema: z.object({}),
-              annotations: { readOnlyHint: true },
-            },
-            async () => ({
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify({
-                    version: 2,
-                    year,
-                    units: 'metres; Y up; ground=-0.16',
-                    people: entities,
-                    riders: Array.from({ length: 6 }, (_, i) => ({
-                      id: `euc-${i + 1}`,
-                      dock: riderDocks[i],
-                    })),
-                    screens: screenIds,
-                    landmarks: {
-                      chiba: year === 2026 ? [0, 2, 8] : year === 2022 ? [-4.8288, 2, -8.6] : year === 2020 ? [-9,2,0] : [0, 2, 0],
-                      hallProjector: year === 2026 ? [6.02, 2.65, 8.31] : year === 2022 ? [-4.8288, 1.65, -6.244] : year === 2020 ? [-9,1.3,0] : [0, 2.55, year === 2023 ? 4.17 : 5.37],
-                      campfire: firePosition,
-                      campusBounds: catalog.bounds,
-                    },
-                    weatherPresets: [
-                      'clear',
-                      'cloudy',
-                      'rainy',
-                      'windy',
-                      'dusty',
-                    ],
-                    clock:
-                      'All durations are virtual seconds. Default rate=1 and day_seconds=480. Paused state persists; commands do not resume it. Camera trajectory duration covers the entire path.',
-                    limitations: [
-                      ...limits,
-                      'Weather and gallery art are illustrative. Screen locations are photo-informed estimates. No collision prevention for camera paths except ground clearance.',
-                      'EUC dismount is a static standing pose beside the parked wheel, not a motion-captured transition.',
-                      'Viewer Follow remote camera must be enabled. Spectators cannot edit state.',
-                    ],
-                    tools: Object.fromEntries(
-                      Object.entries(definitions).map(([name, def]) => [
-                        name,
-                        {
-                          description: def.description,
-                          schema: z.toJSONSchema(def.schema),
-                          legacy: LEGACY_TOOLS[name],
-                        },
-                      ]),
-                    ),
-                  }),
-                },
-              ],
-            }),
-          );
-          for (const [name, def] of Object.entries(definitions))
-            server.registerTool(
-              name,
-              { description: legacyDescription(name, def.description), inputSchema: def.schema },
-              async (args: unknown) => {
-                try {
-                  return {
-                    content: [
-                      {
-                        type: 'text' as const,
-                        text: JSON.stringify(
-                          await stub.apply(name, args, crypto.randomUUID(), year),
-                        ),
-                      },
-                    ],
-                  };
-                } catch (e) {
-                  // LM-014: one refusal envelope for every legacy failure (simulation/legacy.ts)
-                  return {
-                    isError: true,
-                    content: [
-                      {
-                        type: 'text' as const,
-                        text: JSON.stringify(legacyRefusal(name, e)),
-                      },
-                    ],
-                  };
-                }
-              },
-            );
-          registerEngineTools(server, async (op, args) => await (stub.engineCall(op, args, year) as unknown as Promise<{ ok: boolean }>));
+          registerControlTools(server, controls);
           return server;
         },
         {

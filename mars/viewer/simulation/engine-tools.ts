@@ -1,16 +1,5 @@
-// engine_* MCP tools, generated from the engine controller's op registry
-// (engine/api/schemas.ts) — no parallel control system (spec §13, §15).
-// Tool listings publish each op's zod JSON Schema, but input is validated once,
-// inside controller.call, so a bad argument comes back as the same JSON refusal
-// envelope as every other failure ({ ok:false, code:'op.invalid-input', message,
-// details.issues }, isError) instead of the SDK's plain-text validation error.
-import type { McpServer } from '@modelcontextprotocol/server';
+// Shared MCP listing adapter. Registration/dispatch lives only in simulation/control.ts.
 import type { z } from 'zod';
-import { engineTools } from '../engine/api/index.ts';
-
-export type EngineInvoke = (op: string, args: unknown) => Promise<{ ok: boolean; [k: string]: unknown }>;
-
-export const ENGINE_TOOL_NAMES = engineTools().map((t) => t.name);
 
 type JsonSchemaFn = (o: { target: string }) => Record<string, unknown>;
 
@@ -28,20 +17,4 @@ export function listedSchema(schema: z.ZodType) {
       jsonSchema: { input: (o: { target: string }) => std.jsonSchema.input(o), output: (o: { target: string }) => std.jsonSchema.output(o) },
     },
   };
-}
-
-export function registerEngineTools(server: McpServer, invoke: EngineInvoke) {
-  for (const t of engineTools())
-    server.registerTool(
-      t.name,
-      { description: t.description, inputSchema: listedSchema(t.inputSchema) as unknown as typeof t.inputSchema, annotations: { readOnlyHint: t.readOnly } },
-      async (args: unknown) => {
-        try {
-          const r = await invoke(t.op, args);
-          return { ...(r.ok === false ? { isError: true } : {}), content: [{ type: 'text' as const, text: JSON.stringify(r) }] };
-        } catch (e) {
-          return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, code: 'engine.error', message: e instanceof Error ? e.message : 'engine call failed' }) }] };
-        }
-      },
-    );
 }

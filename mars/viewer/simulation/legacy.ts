@@ -1,11 +1,8 @@
-// LM-014 "one control path": the 20 legacy MCP tools (18 in commands.ts + get_state, get_capabilities) drive the
-// live viewer's own people / EUC / camera / sky simulation, a separate layer from the engine's world model (LM-202:
-// unifying the two was ruled out-of-scope, LAST_MILE §13). They cannot route through the engine registry without
-// that unification, so the documented control path is: **engine_* tools for world state, plans, runs, takes and
-// cameras of takes**; the legacy tools are presentation controls of the shared live view, each classified here —
-// the engine tool or verb that does the same job on engine state, or `viewer-only` with the reason — and every
-// legacy failure answers in one shared JSON refusal envelope. `engine/test/api.test.ts` checks that every legacy
-// tool is classified and that every named engine equivalent exists. No imports: this file is data + two helpers.
+// LM-014: control.ts registers and dispatches every tool through one transport registry.
+// These classifications make the LM-202 boundary explicit: engine_* operations own engine
+// worlds/plans/takes; live viewer controls retain their existing separate presentation model.
+// Engine equivalents describe the analogous engine capability, not an ID/state translation.
+// All viewer failures (including schema errors) use the same legacyRefusal envelope.
 
 export type LegacyScope = 'engine-equivalent' | 'viewer-only';
 /** `engine`: engine tool names (`engine_<op>`) and registry / sequence verbs (`verb:<name>`) that do this job on engine state. */
