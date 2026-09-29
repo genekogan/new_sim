@@ -50,11 +50,17 @@ mkdirSync(outDir, { recursive: true });
 
 const processes = new GateProcesses();
 let interrupted;
+let cleanupError;
+let interruption = Promise.resolve();
+let interruptionStarted = false;
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
   interrupted = signal;
-  processes.cleanup();
+  if (!interruptionStarted) {
+    interruptionStarted = true;
+    interruption = processes.interrupt().catch((error) => { cleanupError = error.message; });
+  }
 });
-process.on('exit', () => processes.cleanup());
+process.on('exit', () => { try { processes.cleanup(); } catch (error) { console.error(`[gate] cleanup failed: ${error.message}`); } });
 
 function run(step, env = process.env) {
   return new Promise((resolve) => {
@@ -70,13 +76,13 @@ function run(step, env = process.env) {
     child.stderr.on('data', onData);
     const timer = setTimeout(() => {
       timedOut = true;
-      processes.kill(child);
+      try { processes.kill(child); } catch (error) { finish(null, error); }
     }, step.timeout);
     let finished = false;
     const finish = (code, error) => {
       if (finished) return;
       finished = true;
-      processes.kill(child); // clean descendants even after a parent exits normally
+      try { processes.kill(child); } catch (cleanup) { cleanupError = cleanup.message; error ??= cleanup; } // clean descendants even after a parent exits normally
       processes.children.delete(child);
       clearTimeout(timer);
       const durationMs = Date.now() - started;
@@ -118,17 +124,19 @@ for (const step of steps) {
     writeFileSync(logPath, `${error.stack}\n`);
     r = { step: step.name, status: 'fail', summary: error.message, durationMs: Date.now() - started, log: relative(root, logPath) };
   } finally {
-    await server?.stop();
+    try { await server?.stop(); } catch (error) { cleanupError = error.message; }
   }
   report.steps.push(r);
   console.log(`${r.status} (${(r.durationMs / 1000).toFixed(1)}s)`);
   if (interrupted || (r.status === 'fail' && !keepGoing)) break;
 }
+await interruption;
 const skipped = steps.slice(report.steps.length).map((s) => s.name);
 report.skipped = skipped;
 report.finishedAt = new Date().toISOString();
 report.interrupted = interrupted ?? null;
-report.ok = !interrupted && report.steps.every((s) => s.status === 'pass') && skipped.length === 0;
+report.cleanupError = cleanupError ?? null;
+report.ok = !interrupted && !cleanupError && report.steps.every((s) => s.status === 'pass') && skipped.length === 0;
 report.finalStateHash = report.steps.find((s) => s.step === 'determinism-probe')?.finalStateHash ?? null;
 const reportPath = join(outDir, 'report.json');
 writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');

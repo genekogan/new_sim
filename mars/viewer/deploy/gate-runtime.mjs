@@ -1,28 +1,75 @@
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 
-// All gate children get their own process group, including npm/wrangler descendants.
+// Playwright may detach webservers into separate process groups. Track only descendants of
+// our own children; process start times guard against sending a signal to a recycled PID.
 export class GateProcesses {
   children = new Set();
+  owned = new Map();
   closed = false;
+  tracker;
+  snapshot() {
+    const text = execFileSync('ps', ['-axo', 'pid=,ppid=,lstart='], { encoding: 'utf8' });
+    return new Map(text.trim().split('\n').flatMap((line) => {
+      const m = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line);
+      return m ? [[Number(m[1]), { parent: Number(m[2]), start: m[3] }]] : [];
+    }));
+  }
+  refresh() {
+    const rows = this.snapshot();
+    for (const child of this.children) {
+      const owned = this.owned.get(child);
+      const root = rows.get(child.pid);
+      if (root && !owned.has(child.pid) && child.exitCode === null && child.signalCode === null) owned.set(child.pid, root.start);
+      let added;
+      do {
+        added = false;
+        for (const [pid, row] of rows) if (!owned.has(pid) && owned.has(row.parent) && owned.get(row.parent) === rows.get(row.parent)?.start) {
+          owned.set(pid, row.start); added = true;
+        }
+      } while (added);
+    }
+    return rows;
+  }
   spawn(cmd, args, options) {
     if (this.closed) throw new Error('gate process scope was interrupted');
     const child = spawn(cmd, args, { ...options, detached: true });
     this.children.add(child);
+    this.owned.set(child, new Map());
+    this.refresh();
+    this.tracker ??= setInterval(() => this.refresh(), 1000);
+    this.tracker.unref();
     return child;
   }
-  kill(child, signal = 'SIGKILL') {
-    if (!child.pid) return;
-    try { process.kill(-child.pid, signal); } catch (error) {
-      if (error.code !== 'ESRCH') throw error;
+  signal(child, signal, rows) {
+    // Reverse discovery order stops leaves before their parent; each PID must still be the owned process.
+    for (const [pid, start] of [...this.owned.get(child)].reverse()) {
+      if (rows.get(pid)?.start !== start) continue;
+      try { process.kill(pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
     }
+  }
+  kill(child, signal = 'SIGKILL') {
+    if (!this.children.has(child)) return; // timeout, SIGINT and close callbacks may all release the same child
+    const rows = this.refresh();
+    this.children.delete(child); // release before signaling so repeated cleanup cannot hit recycled processes
+    try { this.signal(child, signal, rows); }
+    finally {
+      this.owned.delete(child);
+      if (!this.children.size) { clearInterval(this.tracker); this.tracker = undefined; }
+    }
+  }
+  async interrupt() {
+    this.closed = true;
+    const rows = this.refresh();
+    for (const child of this.children) this.signal(child, 'SIGTERM', rows);
+    await delay(250); // let Playwright tear down its own detached webservers before forcing known descendants
+    this.cleanup();
   }
   cleanup() {
     this.closed = true;
     for (const child of this.children) this.kill(child);
-    this.children.clear();
   }
 }
 

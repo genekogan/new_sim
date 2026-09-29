@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile, readdir, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { GateProcesses, nodeTestSummary, startLocalSimulation } from './gate-runtime.mjs';
+import { GateProcesses, nodeTestSummary, startLocalSimulation, unusedPort } from './gate-runtime.mjs';
 
 const fixture = async (fn) => {
   const outDir = await mkdtemp(join(tmpdir(), 'mars-gate-test-'));
@@ -43,6 +43,8 @@ test('gate cleanup terminates descendants as well as wrapper processes', () => f
   const descendant = await new Promise((resolve) => child.stdout.once('data', (data) => resolve(Number(data.toString().trim()))));
   const closed = new Promise((resolve) => child.once('close', resolve));
   options.processes.cleanup();
+  options.processes.kill(child); // late close/timeout cleanup is idempotent
+  options.processes.cleanup();
   await closed;
   // A killed descendant may briefly remain a zombie until init reaps it.
   const { execFileSync } = await import('node:child_process');
@@ -50,3 +52,46 @@ test('gate cleanup terminates descendants as well as wrapper processes', () => f
   try { state = execFileSync('ps', ['-o', 'stat=', '-p', String(descendant)], { encoding: 'utf8' }).trim(); } catch { /* already reaped */ }
   assert.ok(state === '' || state.startsWith('Z'), `descendant is still running: ${state}`);
 }));
+
+
+test('SIGINT writes an interrupted gate report and closes a detached descendant server', { timeout: 15000 }, async () => {
+  const { spawn } = await import('node:child_process');
+  const { setTimeout: delay } = await import('node:timers/promises');
+  const dir = await mkdtemp(join(tmpdir(), 'mars-gate-interrupt-'));
+  const port = await unusedPort();
+  let gate;
+  try {
+    await mkdir(join(dir, 'deploy'));
+    for (const file of ['gate.mjs', 'gate-runtime.mjs']) await copyFile(new URL(file, import.meta.url), join(dir, 'deploy', file));
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'gate-interrupt-fixture', scripts: { lint: 'node fixture.cjs' } }));
+    await writeFile(join(dir, 'fixture.cjs'), `const {spawn}=require('child_process');
+const code="process.on('SIGTERM',()=>{});require('http').createServer((q,r)=>r.end('ready')).listen(${port},'127.0.0.1',()=>require('fs').writeFileSync('ready',String(process.pid)))";
+spawn(process.execPath,['-e',code],{detached:true,stdio:'ignore'});setInterval(()=>{},1000);`);
+    gate = spawn(process.execPath, ['deploy/gate.mjs'], { cwd: dir, stdio: 'ignore' });
+    const closed = new Promise((resolve) => gate.once('close', (code) => resolve(code)));
+    let pid;
+    for (let i = 0; i < 100; i++) {
+      try { pid = Number(await readFile(join(dir, 'ready'), 'utf8')); break; } catch { await delay(25); }
+    }
+    assert.ok(pid, 'detached server became ready');
+    assert.equal((await fetch(`http://127.0.0.1:${port}`)).status, 200);
+    gate.kill('SIGINT');
+    assert.equal(await closed, 1);
+    const [stamp] = await readdir(join(dir, '.cloudflare/gate'));
+    const report = JSON.parse(await readFile(join(dir, '.cloudflare/gate', stamp, 'report.json'), 'utf8'));
+    assert.equal(report.interrupted, 'SIGINT');
+    assert.equal(report.cleanupError, null);
+    assert.equal(report.ok, false);
+    assert.equal(report.steps[0].status, 'fail');
+    assert.ok(report.finishedAt);
+    assert.ok(report.skipped.length > 0);
+    await assert.rejects(fetch(`http://127.0.0.1:${port}`));
+    const { execFileSync } = await import('node:child_process');
+    let state = '';
+    try { state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim(); } catch { /* reaped */ }
+    assert.ok(state === '' || state.startsWith('Z'), `detached descendant still running: ${state}`);
+  } finally {
+    gate?.kill('SIGKILL');
+    await rm(dir, { recursive: true, force: true });
+  }
+});
