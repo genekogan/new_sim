@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
+import { encode, decode } from '../runtime/codec.ts';
+import { SnapshotError } from '../runtime/snapshot.ts';
 import { Runtime } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
@@ -186,4 +188,56 @@ test('a pre-empting child returns only after its outer directive completes, not 
   finishReturn(rt, sit.id);
   assert.equal(returned(rt, sit.id)?.id, `${sit.id}:resume:${p.id}`);
   assert.deepEqual(rt.violations, []);
+});
+
+test('waiting snapshots resume tick-exact before/mid stand-up with cancel and newer-directive controls', () => {
+  const captures = [];
+  for (const ticks of [0, 5]) for (const control of ['continue', 'cancel', 'newer']) {
+    const { rt, sit, registry } = setup();
+    const w = rt.submit('walk_to', { actor: 'p1', x: -4, z: -7 });
+    for (let i = 0; i < ticks; i++) rt.step();
+    assert.equal(w.phase, 'pre-empting');
+    const snap = JSON.parse(JSON.stringify(rt.snapshot())), cursor = rt.events.length;
+    const restored = Runtime.restore(snap, registry, { spatial: new Spatial(base) }, DEFAULT_INVARIANTS);
+    assert.equal(restored.records.get(w.id)?.status, 'requested');
+    assert.deepEqual(restored.holder('actor:p1'), [sit.id]);
+    for (const r of [rt, restored]) {
+      if (control === 'cancel') r.cancel(w.id);
+      if (control === 'newer') r.submit('walk_to', { actor: 'p1', x: -8, z: -7 });
+    }
+    for (let i = 0; i < 420; i++) { rt.step(); restored.step(); assert.equal(restored.stateHash(), rt.stateHash()); }
+    assert.deepEqual(restored.events, rt.events.slice(cursor));
+    assert.deepEqual([...restored.records], [...rt.records]);
+    assert.deepEqual(restored.violations, []);
+    assert.equal(returned(restored, sit.id)?.phase, control === 'continue' ? 'occupied' : undefined);
+    if (control === 'cancel') assert.ok(!restored.records.get(w.id)!.history.some((h) => h.status === 'executing'));
+    captures.push({ ticks, control, pause: { tick: snap.tick, hash: snap.stateHash }, result: { world: restored.world, records: [...restored.records.values()], violations: restored.violations } });
+  }
+  if (process.env.PREEMPT_SNAPSHOT_CAPTURE) writeFileSync(process.env.PREEMPT_SNAPSHOT_CAPTURE, JSON.stringify(captures, null, 2) + '\n');
+});
+
+test('waiting snapshot rejects invalid provenance, unknown registry and discarded stand-up dependencies', () => {
+  const { rt, sit, registry } = setup();
+  const w = rt.submit('walk_to', { actor: 'p1', x: -4, z: -7 });
+  const snap = rt.snapshot();
+  const noWalk = new Map(registry); noWalk.delete('walk_to');
+  assert.throws(() => Runtime.restore(snap, noWalk, { spatial: new Spatial(base) }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.unknown-verb');
+  for (const mutation of ['missing-hold', 'self-parent', 'params', 'duplicate', 'reserved']) {
+    const bad = structuredClone(snap);
+    const graph = decode(bad.data) as { waiting: { id: string; holds: string[]; parent?: string; params: unknown }[]; records: { id: string; parent?: string }[]; owners: [string, { action: string; mode: string }[]][] };
+    const waiting = graph.waiting[0];
+    if (mutation === 'missing-hold') waiting.holds = ['missing'];
+    if (mutation === 'self-parent') { waiting.parent = w.id; graph.records.find((r) => r.id === w.id)!.parent = w.id; }
+    if (mutation === 'params') waiting.params = { actor: 'p1', x: 99, z: 99 };
+    if (mutation === 'duplicate') graph.waiting.push(waiting);
+    if (mutation === 'reserved') graph.owners.push(['extra', [{ action: w.id, mode: 'exclusive' }]]);
+    bad.data = encode(graph);
+    assert.throws(() => Runtime.restore(bad, registry, { spatial: new Spatial(base) }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.waiting-invalid', mutation);
+  }
+  const def = registry.get(sit.verb)!;
+  const original = def.resumable;
+  try {
+    def.resumable = 'test-only unsupported stand-up';
+    assert.throws(() => rt.snapshot({ allowDrop: true }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.waiting-dependency');
+  } finally { def.resumable = original; }
 });

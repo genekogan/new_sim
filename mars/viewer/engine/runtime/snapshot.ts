@@ -70,7 +70,9 @@ export type SnapshotOptions = { allowDrop?: boolean };
 
 /** What Runtime exposes to this module (its private live/owner maps and id counter). */
 export type LiveEntry = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; reason?: Diagnostic; prior: Map<string, WorldState['entities'][string]['phase']> };
+export type WaitingEntry = { rec: ActionRecord; def: ActionDef; params: unknown; parent?: string; holds: string[] };
 export type RuntimeInternals = {
+  waiting: Map<string, WaitingEntry>;
   live: Map<string, LiveEntry>;
   owners: Map<string, { action: string; mode: 'exclusive' | 'shared' }[]>;
   nextId: number;
@@ -99,6 +101,7 @@ type Graph = {
   world: WorldState;
   records: ActionRecord[];
   live: { id: string; custom: boolean; exec: unknown; program: unknown; cancelling: boolean; reason?: Diagnostic; prior: LiveEntry['prior'] }[];
+  waiting?: { id: string; params: unknown; parent?: string; holds: string[] }[];
   dropped: { id: string; prior: LiveEntry['prior'] }[];
   owners: [string, { action: string; mode: 'exclusive' | 'shared' }[]][];
   services: Record<string, unknown>;
@@ -116,6 +119,7 @@ function holdsLoad(rt: Runtime, id: string): string | null {
 export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotOptions = {}): RuntimeSnapshot {
   const refused: DroppedAction[] = [];
   const graph: Graph = { world: rt.world, records: [...rt.records.values()], live: [], dropped: [], owners: [...int.owners], services: {} };
+  if (int.waiting.size) graph.waiting = [...int.waiting.values()].map((w) => ({ id: w.rec.id, params: w.params, parent: w.parent, holds: w.holds }));
   const skip = new Set<object>();
   for (const l of int.live.values()) {
     const { id, verb } = l.rec;
@@ -143,6 +147,12 @@ export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotO
   for (const r of refused) {
     const load = holdsLoad(rt, r.id);
     if (load) throw new SnapshotError('snapshot.drop-unsafe', `cannot drop action ${r.id} (${r.verb}) from the snapshot at tick ${rt.tick}: ${load}, and dropping it would leave the load unsupported`, [r.id]);
+  }
+  for (const w of graph.waiting ?? []) {
+    const dependencies = new Set(w.holds);
+    for (let parent = w.parent; parent && !dependencies.has(parent); parent = rt.records.get(parent)?.parent) dependencies.add(parent);
+    const discarded = refused.filter((r) => dependencies.has(r.id));
+    if (discarded.length) throw new SnapshotError('snapshot.waiting-dependency', `cannot drop dependencies of waiting directive ${w.id}`, [w.id, ...discarded.map((r) => r.id)]);
   }
   // the navigation epoch keys walk replans and single-file traffic resources; syncing now is
   // behaviour-neutral (sync is idempotent on the same world) and makes the epoch final
@@ -209,6 +219,32 @@ export function applySnapshot(rt: Runtime, int: RuntimeInternals, snap: RuntimeS
     if (x.custom && !def.restoreExec) throw new SnapshotError('snapshot.unknown-verb', `live action ${x.id} (${rec.verb}) was serialised by serializeExec but its ActionDef has no restoreExec`, [x.id]);
     const exec = x.custom ? def.restoreExec!(rt, x.exec) : x.exec;
     int.live.set(x.id, { rec, def, exec, program: x.program, cancelling: x.cancelling || undefined, reason: x.reason, prior: x.prior });
+  }
+  if (g.waiting !== undefined && !Array.isArray(g.waiting)) throw new SnapshotError('snapshot.waiting-invalid', 'waiting directives must be an array');
+  const seenWaiting = new Set<string>();
+  for (const w of g.waiting ?? []) {
+    if (!w || typeof w.id !== 'string') throw new SnapshotError('snapshot.waiting-invalid', 'waiting directive must have an id');
+    const rec = rt.records.get(w.id);
+    const invalid = () => new SnapshotError('snapshot.waiting-invalid', `waiting directive ${w.id} has invalid graph provenance`, [w.id]);
+    if (!rec || seenWaiting.has(w.id) || int.live.has(w.id) || g.dropped.some((d) => d.id === w.id) ||
+      rec.status !== 'requested' || rec.phase !== 'pre-empting' || rec.parent !== w.parent ||
+      hashOf(rec.params) !== hashOf(w.params) || !Array.isArray(w.holds) || !w.holds.length ||
+      new Set(w.holds).size !== w.holds.length || w.holds.some((id) => id === w.id || !rt.records.has(id) || g.dropped.some((d) => d.id === id)) ||
+      g.owners.some(([, owners]) => owners.some((o) => o.action === w.id))) throw invalid();
+    for (const id of w.holds) {
+      const held = int.live.get(id), record = rt.records.get(id)!;
+      if (held ? !held.cancelling : !['completed', 'cancelled', 'failed'].includes(record.status)) throw invalid();
+    }
+    const ancestors = new Set([w.id]);
+    for (let parent = w.parent; parent; parent = rt.records.get(parent)?.parent) {
+      if (ancestors.has(parent) || !rt.records.has(parent) || g.dropped.some((d) => d.id === parent)) throw invalid();
+      ancestors.add(parent);
+    }
+    const def = rt.registry.get(rec.verb);
+    if (!def) throw new SnapshotError('snapshot.unknown-verb', `waiting action ${w.id} is a "${rec.verb}", which the restore registry does not have`, [w.id]);
+    if (!def.schema.safeParse(w.params).success) throw invalid();
+    seenWaiting.add(w.id);
+    int.waiting.set(w.id, { rec, def, params: w.params, parent: w.parent, holds: w.holds });
   }
   for (const [k, list] of g.owners) int.owners.set(k, list);
   int.nextId = snap.nextId;

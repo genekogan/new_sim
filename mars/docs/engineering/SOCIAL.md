@@ -108,8 +108,8 @@ and `Runtime.submit` uses it:
   phase `pre-empting`, `rt.isActive` true, `runUntilIdle` waits for it — and is planned, reserved and
   started at the end of the tick the hold ends (a plan failure then fails it with that diagnostic).
   Cancelling a waiting directive ends it `cancelled` without starting it (the stand-up still finishes); a
-  waiting child whose parent has ended fails `action.parent-ended`; `rt.snapshot()` refuses
-  (`snapshot.pre-empting`) while one waits.
+  waiting child whose parent has ended fails `action.parent-ended`. Snapshots preserve
+  waiting directives as unstarted intent; planning and reservation still wait for stand-up.
 - **Never social vs social.** A social verb (or a child of one) never pre-empts: `sit`, `take_slot`,
   `face`, `converse`, `gather` for a held person still fail `reservation.conflict` naming the holder (a
   converse that includes a seated person is refused even earlier, `route.start-blocked` from the chair).
@@ -134,7 +134,7 @@ refusals (holder, wall); campfire_circle with 10 → 8 warm on their claimed rin
 `slot.none-free`, cancel → no claims; audience-region gather; ambient 6 people × 60 s (targets in
 region, 0 violations, directed task takes one and ambient lets go); determinism hash. Pre-emption:
 seated person + directed carry (stand-up 0.6 s, carry starts the tick the seat is released, sit
-`pre-empted by <carry>` in the events, carry completes, 0 violations, snapshot refused while waiting);
+`pre-empted by <carry>` in the events, carry completes, 0 violations, waiting snapshot resumes exactly);
 cancelling a waiting directive; converse pair + one directed walk (both idle, reason on the converse);
 campfire gather of 4 + one directed (3 keep warming, gather runs on); social vs social stays
 `reservation.conflict`; `preempt: false` in params and as a submit option → refused; make-way nudge
@@ -184,11 +184,22 @@ One attempt is made, with `social.resume-started`, `social.resume-refused`, or
 Pending intents are plain-data `services.socialReturns`, captured by the existing
 snapshot graph and absent when unused. Queue-free version-1 snapshots restore
 without inventing any return. A pending return during a resumable walk survives
-pause/resume and emits exactly one identical continuation. The existing refusal
-while standing up for a waiting directive remains unchanged. Returned seats are
+pause/resume and emits exactly one identical continuation. A waiting directive during stand-up also survives pause/resume, including cancellation
+and newer-directive controls (LM-029). Returned seats are
 ordinary indefinite social holds: `runUntilIdle` over all actions does not treat
 an occupied seat as idle; use the directive id when waiting only for its work.
 
 LM-026 remains partial: conversation member preservation/re-forming and return to
 parent-owned group seats remain separate. LM-027 ambient re-adoption and LM-028
 item-overlay release are unchanged. See `briefs/social-resume.REPORT.md`.
+
+
+Waiting directives use an optional version-1 graph `waiting` array (id, params,
+parent, holds); an absent array restores the original empty queue. Definitions
+come from the restore registry, while action-record and parameter aliases remain
+in the graph. Restore refuses invalid/missing/cyclic provenance, unknown verbs,
+invalid parameters, duplicate wait ids and reservations already owned by a waiting
+intent. `allowDrop` cannot discard a waiting intent's hold or parent chain
+(`snapshot.waiting-dependency`). A pending carry is only plain, unstarted intent;
+once it starts, its existing live-state codec refusal still applies. No live verb
+was added to the resumable set. See `briefs/preempt-snapshot.REPORT.md`.

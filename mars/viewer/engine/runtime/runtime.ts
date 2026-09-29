@@ -6,7 +6,7 @@ import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { Profiler } from './profile.ts';
 import { deadlockDiagnostics, exhaustedWaitMovers, recoverPersistentWaits } from './waits.ts';
-import { applySnapshot, decodeSnapshot, SnapshotError, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
+import { applySnapshot, decodeSnapshot, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
 
@@ -326,10 +326,6 @@ export class Runtime {
    * action that is not resumable, unless `allowDrop` (then they are left out and reported).
    */
   snapshot(opts?: SnapshotOptions): RuntimeSnapshot {
-    if (this.waiting.size) {
-      const ids = [...this.waiting.keys()];
-      throw new SnapshotError('snapshot.pre-empting', `cannot snapshot while ${ids.join(', ')} ${ids.length > 1 ? 'wait' : 'waits'} for pre-empted social holds to end (${[...this.waiting.values()].flatMap((w) => w.holds).join(', ')}); step until they have started`, ids);
-    }
     return takeSnapshot(this, this.internals(), opts);
   }
 
@@ -349,6 +345,7 @@ export class Runtime {
     };
     return {
       live: this.live,
+      waiting: this.waiting,
       owners: this.owners,
       get nextId() {
         return getNextId();

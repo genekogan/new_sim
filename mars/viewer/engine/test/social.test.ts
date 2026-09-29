@@ -355,7 +355,7 @@ test('pre-emption: a seated person given a directed carry stands up (0.6 s) firs
   assert.equal(c.status, 'requested', 'waits for the stand-up');
   assert.equal(c.phase, 'pre-empting');
   assert.ok(rt.isActive(c.id));
-  assert.throws(() => rt.snapshot(), /pre-empted social holds/, 'no snapshot while a directive waits');
+  assert.doesNotThrow(() => rt.snapshot(), 'unstarted directive is plain intent while stand-up finishes');
   assert.equal(sit.phase, 'cancelling');
   const t0 = rt.tick;
   rt.step();
@@ -483,4 +483,14 @@ test('pre-emption determinism: seated carry + converse pre-emption twice → sam
   assert.equal(a.status, 'completed');
   assert.equal(a.hash, b.hash);
   assert.equal(a.ev, b.ev);
+});
+
+test('waiting carry restores exactly but a started carry remains non-resumable', () => {
+  const { rt } = runSeatedCarry();
+  const restored = Runtime.restore(JSON.parse(JSON.stringify(rt.snapshot())), rt.registry, { spatial: new Spatial(provingGround()) }, [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS]);
+  const cursor = rt.events.length;
+  for (let i = 0; i < 12; i++) { rt.step(); restored.step(); assert.equal(restored.stateHash(), rt.stateHash()); }
+  assert.deepEqual(restored.events, rt.events.slice(cursor));
+  assert.throws(() => restored.snapshot(), /not resumable/, 'a started carry still requires its unverified live codec');
+
 });

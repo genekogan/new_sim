@@ -1588,3 +1588,13 @@ Approximately 15 additional worker minutes, no helpers. See staged-support.REPOR
   physical states inspected. LM-026 remains partial for converse/group returns;
   LM-027/028 untouched. Isolated from corridor/vehicle stack at b457c6b; no pins,
   broad gate or deployment. About 25 min / 10k tokens, no additional helpers.
+
+### LM-029 — resumable directive waiting during stand-up (2026-09-29)
+
+Storage worker, building on 59dc505: optional plain graph waiting entries preserve
+unstarted directives and normal delayed admission. Exact before/mid-stand-up resume,
+cancel/newer-directive controls, malformed provenance and dependency-drop refusals
+covered; started carry remains non-resumable. Six JSON captures inspected, zero
+violations. Focused social-return 10/10, pre-emption 8/8, source scan, tsc and lint
+green; full gate deferred to lead. No pins or historical content changed. About
+20 minutes worker time, no helpers. See briefs/preempt-snapshot.REPORT.md.
