@@ -28,6 +28,8 @@ Without `SIM_BASE`, the gate starts an isolated local Wrangler server and cleans
   ~1 min) and commit `docs/engineering/EVIDENCE.md` + `evidence.json`; it exits non-zero if a test
   cited in `viewer/engine/test/evidence-map.json` was renamed or removed. It is not part of the gate.
 
+Before a performance-affecting release, also run `node deploy/perf-stress-budget.mjs` on an otherwise idle host. It retains the original timing limits outside the concurrent engine test runner; deterministic work ceilings remain inside the full gate. Record this result with the gate table.
+
 ## Rollback target (record before deploying)
 
 | Source | Version id |

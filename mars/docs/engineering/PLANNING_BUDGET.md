@@ -450,3 +450,9 @@ The 2022 scene was re-seeded (reconciliation a–f, i; content hash 8b88e6f0 →
 its test with the old hash kept (east: 251a44c5 @41317, d382e461 @117277, 94db263e @53604, ddb634d6 @600599; tranches 940e9f64 /
 4862adfc / b4c42210; chiba full 0ee1da11 @564548). Nothing is re-pinned for content; the content agent re-runs and re-pins per
 HISTORICAL_CONTENT.md. The five perf-walk pins and the hypothetical flagship/v3/meal/stress pins are unchanged.
+
+## 2026-09-29 — deterministic gate work budgets (LM152)
+
+**0 violations, same outcome.** Exact stress-30 remains `5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e`; profiled/unprofiled equality is asserted. No outcome, tick, take, camera or historical pin moves. `engine/test/stress-work.ts` adds reviewed method-call ceilings from unchanged base60deba6: exact route75total/27peak, routeAround9/1, gridsAround18/2, sync37097/58, rebuild1/1, grids1/1, walk plan75/27, step35724/30. Corridor routeAround5, gridsAround10, sync37087, step35722; other ceilings equal. Less work passes; added work needs deliberate review. Actual redundant route/rebuild operations prove these ceilings detect regressions.
+
+Counters use the existing profiler with a zero clock and cannot detect extra work inside a single call. Historical grid correctness checks likewise do not measure algorithmic cost. Therefore run `node deploy/perf-stress-budget.mjs` on an otherwise idle host before a performance-affecting release: original peak250/120ms, mean3ms and per-year grid<1000ms thresholds remain unchanged. Worker measurement: exact113.35ms/0.582msmean, corridor52.10ms/0.404msmean, grids90–152ms; all passed. No timing threshold was loosened. Details: `briefs/perf-gate.REPORT.md`.

@@ -441,9 +441,12 @@
         { "file": "frame.test.ts", "title": "no carrying a sheet on a beam or up a frame" },
         { "file": "frame.test.ts", "title": "someone on a beam whose partner beam is removed is flagged" },
         { "file": "frame.test.ts", "title": "nobody walks a beam under a deck" },
-        { "file": "handup-rules.test.ts", "title": "API spatial scene: frame climb links / beam walkways are in it by default" }
+        { "file": "handup-rules.test.ts", "title": "API spatial scene: frame climb links / beam walkways are in it by default" },
+        { "file": "climb-reservation.test.ts", "title": "climb reservations (LM-022): different seats" },
+        { "file": "climb-reservation.test.ts", "title": "climb reservations (LM-022): safe cancellation" },
+        { "file": "climb-reservation.test.ts", "title": "climb reservations (LM-022): missing links" }
       ],
-      "approximate": "Climb paths are three straight segments with no body check; one person per link, but two links on one column face are not mutually exclusive; nobody clips on and frame load is not checked; there are no foot/hand holds (which bracing node a climber is on) (HANDUP.md, YEAR_BUILD.md)."
+      "approximate": "Climb paths are three straight segments with no body check; one exclusive reservation per physical column face across seat heights and directions; nobody clips on and frame load is not checked; there are no foot/hand holds (which bracing node a climber is on) (HANDUP.md, YEAR_BUILD.md)."
     },
     {
       "id": "items-eat",
@@ -584,10 +587,14 @@
         { "file": "camera-synth.test.ts", "title": "determinism: the same directions give the identical track hash" },
         { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: sentence fixture cluster" },
         { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: separate sinks" },
-        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: existing 2024 kitchen" }
+        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: existing 2024 kitchen" },
+        { "file": "camera-worker.test.ts", "title": "camera worker kernel preserves" },
+        { "file": "camera-worker.test.ts", "title": "worker abort before start" },
+        { "file": "camera-worker.test.ts", "title": "creation, delivery, runtime" },
+        { "file": "camera-sampler-budget.test.ts", "title": "synthetic long lead-in" }
       ],
-      "outsideSuite": ["viewer/e2e/studio-direct.spec.ts", "viewer/e2e/studio-camera-vocab.spec.ts", "viewer/e2e/camera-fixture.spec.ts", "docs/engineering/CAMERA_DIRECT.md"],
-      "approximate": "Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. Worker responsiveness is tracked separately in LM012."
+      "outsideSuite": ["viewer/e2e/studio-direct.spec.ts", "viewer/e2e/studio-camera-vocab.spec.ts", "viewer/e2e/camera-fixture.spec.ts", "viewer/e2e/camera-worker.spec.ts", "docs/engineering/CAMERA_DIRECT.md"],
+      "approximate": "Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups."
     },
     {
       "id": "camera-correct",
