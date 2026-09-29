@@ -36,7 +36,10 @@
         { "file": "review.test.ts", "title": "C3: a walker crossing a carry waits for the load to pass" },
         { "file": "gaps.test.ts", "title": "2.0 m corridor: two walkers head-on pass side by side without yielding" },
         { "file": "gaps.test.ts", "title": "1.0 m gap (same scene): opposing walkers still take turns" },
-        { "file": "gaps.test.ts", "title": "2.0 m corridor: both walkers keep moving while passing" }
+        { "file": "gaps.test.ts", "title": "2.0 m corridor: both walkers keep moving while passing" },
+        { "file": "deadlock-recovery.test.ts", "title": "actual opposing stair-passage walkers stop as blocked" },
+        { "file": "deadlock-recovery.test.ts", "title": "actual supported held carry stops blocked" },
+        { "file": "deadlock-recovery.test.ts", "title": "future cue, pending dependent tail and future timeout prevent" }
       ],
       "approximate": "Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free."
     },
@@ -139,12 +142,20 @@
         { "file": "carry.test.ts", "title": "carry: cancel mid-move performs a controlled set-down where the ground is clear" },
         { "file": "carry.test.ts", "title": "carry: cancel over an obstruction is refused (carry.cancel-unsafe)" },
         { "file": "carry.test.ts", "title": "carry: cancel during gather releases the crew immediately" },
-        { "file": "construction.test.ts", "title": "cancel mid-raise is refused (would leave the frame unsupported)" },
+        { "file": "construction.test.ts", "title": "cancel mid-raise continuously lowers to supported lying instead of abandoning the frame" },
+        { "file": "raise-cancel.test.ts", "title": "lowering snapshots restore tick-exactly and normal phases still refuse" },
+        { "file": "raise-cancel.test.ts", "title": "obstacles appearing during lowering block and retain the load until cleared" },
+        { "file": "raise-cancel.test.ts", "title": "missing floor support refuses before motion" },
+        { "file": "construction.test.ts", "title": "connect_beam mid-lift cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_joist mid-install cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_plywood mid-install cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_stair_flight mid-install cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_tread mid-install cancellation retains" },
         { "file": "walk.test.ts", "title": "cancel mid-climb (review M2)" },
         { "file": "review.test.ts", "title": "H1: an unreachable hold station is refused at plan time" },
         { "file": "sequence.test.ts", "title": "runner: timeout settles deferred cancels" }
       ],
-      "approximate": "Covered for carry, raise and stairs (plus generic lifecycle cleanup). Mid-raise cancel is refused rather than modelled as a lower-back-down; install lifts (joist/plywood/beam) have no cancel test."
+      "approximate": "Mid-raise cancellation retraces bounded physical choreography to supported lying, with obstruction/floor refusals and lowering-only snapshot restore. Beam, joist, plywood, tread and flight cancellation tests prove named unsafe refusal and support/resource retention. A carry on a stair flight still refuses cancellation; other raise phases remain non-resumable."
     },
     {
       "id": "camera-collision",
@@ -711,7 +722,7 @@
         { "file": "planning.test.ts", "title": "planner equality: production findRoute === frozen reference" },
         { "file": "planning.test.ts", "title": "stress-30: exact planner keeps the pinned result" }
       ],
-      "approximate": "No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; a head-on wait-forever would show only as a runner timeout."
+      "approximate": "No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; persistent certified stationary waits receive bounded recovery and can stop as blocked without releasing loads. Oscillating corridor movement, pending sequence tails, unknown actions and vehicle-specific cycles remain conservatively unresolved."
     },
     {
       "id": "C",
@@ -737,12 +748,12 @@
         { "file": "construction.test.ts", "title": "connect_beam lifts a symmetric beam without spinning it" },
         { "file": "construction.test.ts", "title": "raising arc blocked by an overhead obstacle" },
         { "file": "construction.test.ts", "title": "crew too small for a 19 ft upright" },
-        { "file": "construction.test.ts", "title": "cancel mid-raise is refused" },
+        { "file": "construction.test.ts", "title": "cancel mid-raise continuously lowers" },
         { "file": "construction.test.ts", "title": "raise choreography (2 people)" },
         { "file": "construction.test.ts", "title": "raise choreography (4 people)" },
         { "file": "review.test.ts", "title": "C2: people holding up a frame cannot be assigned to carry" }
       ],
-      "approximate": "The bay is raised from 12 ft uprights; 19 ft is only shown to be refused with too small a crew. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog."
+      "approximate": "Both 12 ft and 19 ft supported bays are tested; normal raise compatibility covers every catalog frame/allowed crew size. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog."
     },
     {
       "id": "E",

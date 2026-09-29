@@ -726,3 +726,9 @@ Merged counts: **28 fixed / 36 re-classified / 152 remaining**, of 216 unique ro
 LM014 acceptance is one registry and transport dispatcher with explicit engine/viewer domains. The historical request to route viewer state into engine world state is LM202, expressly out of scope; this does not silently add that feature. LM005 invalid overlap injection stays as invariant testing after the public edit path explicitly refuses it.
 
 Source validation: `briefs/wave1-integration.REPORT.md`; production record: RELEASE_CHECKLIST deploy 9. No pins or historical content values moved. Gate `8decb07` was green before main was fast-forwarded.
+
+## Wave 2 construction and wait-recovery candidate (2026-09-29)
+
+LM036 and LM038 are implemented candidates, not yet counted fixed: controlled reverse lowering and all five install cancellation regressions. Independent review found carried-object collision and explicit cancellation-reason snapshot gaps; follow-up fixes and the integrated gate are required before merge. LM024 remains partial: persistent mover cycles/stalls get bounded recovery and certified blocked termination without support release, but oscillating ground corridors, pending tails and vehicle cycles remain unresolved. See `briefs/raise-cancel.REPORT.md`, `install-cancel.REPORT.md`, and `deadlock-recovery.REPORT.md`.
+
+Current merged counts remain **28 fixed / 36 re-classified / 152 remaining**. No pins or historical values changed in this candidate.
