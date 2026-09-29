@@ -1104,6 +1104,9 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
     // only a mutual wait: the walker is blocked by the requester itself (its load or one of its crew)
     if (!rec.diagnostic?.subjects?.some((s) => s !== who && clearOf.subjects.includes(s))) return;
   }
+  // A coordinator may hold an idle actor between physical children. Respect
+  // that claim instead of repeatedly submitting a conflicting ambient nudge.
+  if (!ex && rt.holder(`actor:${who}`).length) return;
   const sp = spatial(rt);
   const g = sp.level(o.human.level);
   if (!g) return;
