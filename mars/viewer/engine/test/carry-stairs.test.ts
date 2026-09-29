@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import { Runtime } from '../runtime/runtime.ts';
+import { DEADLOCK_TICKS } from '../runtime/waits.ts';
 import { DEFAULT_INVARIANTS, forgetMotion } from '../runtime/invariants.ts';
 import { Spatial } from '../spatial/service.ts';
 import { provingGround, DECK_Y } from '../scenes/proving-ground.ts';
@@ -195,16 +196,26 @@ test('carry-stairs: someone on the flight or at its top makes the carrier wait (
   const a = rt.submit('carry', { crew: ['p1'], item: 'b', to: { x: 10, z: 10, yaw: Math.PI / 2, level: 1 } });
   assert.equal(a.status, 'executing', a.diagnostic?.message);
   const s = audit(rt, 'b', 'p1', ['p2']);
-  let blocked = 0;
+  let blocked = 0, firstBlockedTick = -1, sawPersistentWait = false;
   for (let t = 0; t < 20 * 60; t++) {
     rt.step();
     if ((a.status as string) === 'blocked') {
       blocked++;
-      assert.equal(a.diagnostic!.code, 'traffic.person');
+      if (firstBlockedTick < 0) firstBlockedTick = rt.tick;
+      if (rt.tick - firstBlockedTick + 1 < DEADLOCK_TICKS) {
+        assert.equal(a.diagnostic!.code, 'traffic.person');
+      } else {
+        assert.equal(a.diagnostic!.code, 'deadlock.stalled');
+        assert.deepEqual(a.diagnostic!.details?.movers, [{ mover: 'b', action: a.id, blockedBy: ['p2'], code: 'traffic.person' }]);
+        sawPersistentWait = true;
+      }
+      assert.deepEqual(rt.world.entities.b.support, { kind: 'held', by: ['p1'] });
+      assert.ok(rt.holder('entity:b').includes(a.id));
       assert.equal(rt.world.entities.p1.human!.activity, 'climb-wait');
     }
   }
   assert.ok(blocked > 20 * 20, `carrier waited ${blocked} ticks`);
+  assert.ok(sawPersistentWait, 'long wait must identify the unchanged physical blocker');
   assert.equal(a.status, 'blocked');
   assert.ok(s.personGap > 0.28, `load kept ${s.personGap.toFixed(2)} m from p2`);
   // p2 leaves the flight (moved by hand onto the deck): the carrier goes on
