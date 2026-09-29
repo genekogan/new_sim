@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 9 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 10 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -638,4 +638,46 @@ Rollback from viewer:
 
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 79d424e3-a243-49ad-8b38-89f016673375 --name mars-campus-2026 -m "rollback release 9: <reason>"
+```
+
+## Production deploy 10 (2026-09-29, supported cancellation and wait recovery)
+
+Clean source **`3881c91`** passed the full gate before fast-forward merge to local main. The subsequent documentation/evidence/metadata commit only records that source; it is not a second source rollout. No remote/push, pins or historical values changed.
+
+- Live **`f7ea9962-0d5e-4af5-afc5-9b433e4c49da`**, created 02:33:33Z / deployed 02:33:35Z, confirmed 100%.
+- Rollback **`15c50c30-2e8e-4de5-a862-483abc1a9e47`** (release 9), confirmed 100% immediately before deploy. Code/assets rollback does not undo persisted room edits.
+- LAST_MILE **30 fixed / 36 reclassified / 150 remaining**: LM036/038 closed; LM024 remains partial. Isolated camera, tail and rafter follow-ups are not deployed.
+
+| Required check | Result |
+| --- | --- |
+| Full gate | GREEN, `viewer/.cloudflare/gate/2026-09-29T02-13-35-768Z/report.json`; head `3881c91`, gitDirty:false, cleanupError:null |
+| Lint / TypeScript | clean, zero lint warnings/errors |
+| Unit | 93 pass / 0 fail / 0 skip / 0 TODO |
+| Engine | 502 total: 485 pass / 0 fail / 6 skip / 11 TODO |
+| Browser | 84 passed / 7 documented skips; 904.1 s |
+| Flagship recording | byte-identical `--check` |
+| Determinism | `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3`, unchanged |
+| Local MCP integration | all 20 viewer + 16 engine tools passed |
+| Idle performance | original limits PASS: exact peak 107.863 ms / mean 0.536002 ms; corridor peak 49.901 ms / mean 0.390266 ms; grids 82.9–136.6 ms; 0 violations, pinned outcomes |
+| Regenerated evidence | 485/0; rows 17 PROVEN / 0 PARTIAL / 0 UNPROVEN; milestones 8/0/0; capabilities 25/2/1 |
+
+Six engine skips, eleven TODOs and seven browser skips retain the documented historical exceptions; no skipped case is claimed as executed proof. Capabilities 25/2/1 retain historical-build and take-schema exceptions. Evidence was regenerated against the explicit current green report after copying it to main. The earlier failed gate on `6c55285` is retained at `2026-09-29T02-09-55-146Z`: one long-wait test needed the new post-threshold named deadlock diagnostic; production code/pins/tolerances were not changed to fix it.
+
+Build: 340 public files / 821.1 MiB, eight large objects already uploaded, zero R2 writes. Release build/dry run passed: 388 assets, 6829.04 KiB / 1223.33 KiB gzip. Deploy uploaded 20 new assets (344 existing), startup 94 ms. Known chunk-size/dynamic-import warnings remain.
+
+Production verification all passed:
+
+- Full asset smoke: 340 assets, 19 routes, GLB range and anonymous-state denial.
+- MCP integration: all 36 tools including staleness/rebind, edits, camera parsing, persistence/resume and isolation.
+- Director demo: all steps including sentences and pause/fork/resume, 9.699 s.
+- Browser: 4/4 tests, 46.5 s; supported raise lowering, unsafe reverse-path refusal, Studio direct/refusal/play and save/download/reopen/file-track verification.
+- Lab: 10901 ticks, 43/43 steps, 5/5 checks, zero violations/errors, exact Node probe hash.
+- Lead personally inspected all six `viewer/e2e/artifacts/prod-smoke-10/` captures: lowering holders, grounded cancelled frame, clutter refusal retaining support, Studio directed playback and reopened track with green hashes, completed supported build bay/stair. Captures and audit JSON copied to main.
+
+Logs: `viewer/.cloudflare/*release-10.log`; audit `viewer/.cloudflare/audit/{http-smoke,prod-lab-10}.json`. Build/deploy source checkout remains `code/codex-wt/studio-integration`.
+
+Rollback from viewer:
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 15c50c30-2e8e-4de5-a862-483abc1a9e47 --name mars-campus-2026 -m "rollback release 10: <reason>"
 ```

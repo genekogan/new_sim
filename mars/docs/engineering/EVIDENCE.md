@@ -8,16 +8,16 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `8decb07` (engine tree clean) |
-| Generated | 2026-09-29T01:47:05.244Z · Node v22.20.0 |
-| Engine suite | 464 tests in 72 files: 447 pass, 0 fail, 6 skipped, 11 TODO · 51.6 s wall |
-| External gate | `.cloudflare/gate/2026-09-29T01-28-33-861Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `3881c91` (engine tree clean) |
+| Generated | 2026-09-29T02:33:08.861Z · Node v22.20.0 |
+| Engine suite | 502 tests in 75 files: 485 pass, 0 fail, 6 skipped, 11 TODO · 52.4 s wall |
+| External gate | `.cloudflare/gate/2026-09-29T02-13-35-768Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 5807 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 8936 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 14615 ms compute (cropped 8945 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 5919 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 8754 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 14785 ms compute (cropped 8815 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -29,7 +29,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | --- | --- | ---: | --- |
 | Wall avoidance | PROVEN | 3/3 | No explicit wall-contact-duration metric: 'no sliding' is inferred from the clearance invariant (zero violations), path length and a heading-flip bound on one synthetic wall. |
 | U-shaped trap | PROVEN | 2/2 | One synthetic U and one start/goal pair; oscillation is bounded by heading flips (≤ 6) and clearance is sampled per tick from the 0.1 m clearance grid (EDT), not continuously. |
-| Narrow passage / two agents | PROVEN | 9/9 | Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free. |
+| Narrow passage / two agents | PROVEN | 12/12 | Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free. |
 | Stair approach | PROVEN | 3/3 | Root-motion only: no foot IK, so rendered feet sink/hover by about 0.09 m on treads. Climb is a link traversal with an align phase; one straight flight on the proving ground, no landings or turns. |
 | Multiple floors | PROVEN | 3/3 | Two levels (ground + one deck) on the proving ground plus progressive decks. The 2026 campus has only ground level 0 walkable (interiors and upper floors are blocked by design). |
 | Long load around corner | PROVEN | 5/5 | Rigid formation, load held level, no re-grip. Crews carry on one level only; only a single carrier may take a load up a flight (see capability 'Loads on stairs'). Collision is exact OBB vs prisms every tick; carriers have no carry/lift poses in the renderer. |
@@ -37,7 +37,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Construction changes navigation | PROVEN | 6/6 | Each construction epoch patches the affected grid region (bit-identical to a rebuild; no navmesh); proven on the proving ground and the progressive fixture, not on the full campus. |
 | Incomplete floor/stairs | PROVEN | 4/4 | Holds for engine-built decks/stairs only. The 2026 campus has no decks or stairs at all (upper floors are blocked, not modelled), so the rule is untested against historical geometry. |
 | Reservation conflict | PROVEN | 5/5 | Reservations are per actor/object/slot. There are no space-time reservations: simultaneous carries are not co-planned, so sequences must order them with `after` dependencies. |
-| Graceful cancellation | PROVEN | 7/7 | Covered for carry, raise and stairs (plus generic lifecycle cleanup). Mid-raise cancel is refused rather than modelled as a lower-back-down; install lifts (joist/plywood/beam) have no cancel test. |
+| Graceful cancellation | PROVEN | 15/15 | Mid-raise cancellation retraces bounded physical choreography to supported lying, with obstruction/floor refusals and lowering-only snapshot restore. Beam, joist, plywood, tread and flight cancellation tests prove named unsafe refusal and support/resource retention. A carry on a stair flight still refuses cancellation; other raise phases remain non-resumable. |
 | Camera collision | PROVEN | 6/6 | The camera collides with obstacle prisms (OBBs fitted to geometry), not the render mesh; checked on 10 Hz samples plus swept segments, on the proving ground with synthetic subjects. |
 | Camera readability | PROVEN | 4/4 | Occlusion is ray-tested against obstacle prisms, not the render mesh (no GPU/pixel visibility check); subjects are synthetic walkers, and no camera track has been rendered to video and reviewed. |
 | Replay independence | PROVEN | 4/4 | Proven at the engine/API level (take hash and final state unchanged). The browser renderer's camera path is not part of this suite. |
@@ -83,6 +83,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `gaps.test.ts` | 2.0 m corridor: two walkers head-on pass side by side without yielding, < 1.4× the solo time |
 | pass | `gaps.test.ts` | 1.0 m gap (same scene): opposing walkers still take turns (someone yields) |
 | pass | `gaps.test.ts` | 2.0 m corridor: both walkers keep moving while passing (no traffic.person stop), >= 0.5 m/s through the pass |
+| pass | `deadlock-recovery.test.ts` | actual opposing stair-passage walkers stop as blocked after bounded recovery without cancelling or releasing |
+| pass | `deadlock-recovery.test.ts` | actual supported held carry stops blocked; execute with commitOnFailure still refuses and preserves history |
+| pass | `deadlock-recovery.test.ts` | future cue, pending dependent tail and future timeout prevent early blocked termination |
 
 *Approximate:* Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free.
 
@@ -193,12 +196,20 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `carry.test.ts` | carry: cancel mid-move performs a controlled set-down where the ground is clear |
 | pass | `carry.test.ts` | carry: cancel over an obstruction is refused (carry.cancel-unsafe) and the carry continues |
 | pass | `carry.test.ts` | carry: cancel during gather releases the crew immediately; target on an obstruction is rejected |
-| pass | `construction.test.ts` | cancel mid-raise is refused (would leave the frame unsupported) |
+| pass | `construction.test.ts` | cancel mid-raise continuously lowers to supported lying instead of abandoning the frame |
+| pass | `raise-cancel.test.ts` | raise cancel (LM-036): lowering snapshots restore tick-exactly and normal phases still refuse |
+| pass | `raise-cancel.test.ts` | raise cancel (LM-036): obstacles appearing during lowering block and retain the load until cleared |
+| pass | `raise-cancel.test.ts` | raise cancel (LM-036): missing floor support refuses before motion |
+| pass | `construction.test.ts` | connect_beam mid-lift cancellation retains the supported load, hands and reservations until installation (LM-038) |
+| pass | `progressive.test.ts` | install_joist mid-install cancellation retains the supported load, hands and reservations until installation (LM-038) |
+| pass | `progressive.test.ts` | install_plywood mid-install cancellation retains the supported load, hands and reservations until installation (LM-038) |
+| pass | `progressive.test.ts` | install_stair_flight mid-install cancellation retains the supported load, hands and reservations until installation (LM-038) |
+| pass | `progressive.test.ts` | install_tread mid-install cancellation retains the supported load, hands and reservations until installation (LM-038) |
 | pass | `walk.test.ts` | cancel mid-climb (review M2): the walker finishes at the nearer landing on its level, cancelled, no violations |
 | pass | `review.test.ts` | H1: an unreachable hold station is refused at plan time; a failed/cancelled action leaves no reservations, tasks, children or traffic behind |
 | pass | `sequence.test.ts` | runner: timeout settles deferred cancels, lists cut steps, reports refusals (review M4) |
 
-*Approximate:* Covered for carry, raise and stairs (plus generic lifecycle cleanup). Mid-raise cancel is refused rather than modelled as a lower-back-down; install lifts (joist/plywood/beam) have no cancel test.
+*Approximate:* Mid-raise cancellation retraces bounded physical choreography to supported lying, with obstruction/floor refusals and lowering-only snapshot restore. Beam, joist, plywood, tread and flight cancellation tests prove named unsafe refusal and support/resource retention. A carry on a stair flight still refuses cancellation; other raise phases remain non-resumable.
 
 ### Camera collision — PROVEN
 
@@ -255,7 +266,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -278,7 +289,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -294,7 +305,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -433,7 +444,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -463,7 +474,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -489,7 +500,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -507,7 +518,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -631,7 +642,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `year-stock.test.ts` | cut: 4x8 → 4x6 + a 4x2 offcut stored at the station, 16 ft 2x4 → two 8 ft; insufficient / wrong family / busy / not there are refused |
 | pass | `year-hang.test.ts` | hang_beam: a 16 ft reconstruction bay — 0.22 m from the ground, 2.48 m from the bracing, 4.757 m through a relay; exact seats, 0 violations |
 | todo | `year-build.test.ts` | year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic — Expected values to be strictly deep-equal: |
-| todo | `year-build.test.ts` | year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned — [{"id":"s0014-take-from-bundle","verb":"take_from_bundle","status":"cancelled","started":true,"blockedTicks":0,"actionId":"step:s0014-take-from-bundle","submittedTick":2535,"endedTick":2815,"diagnostic":{"code":"sequence.aborted","message":"aborted because step \"s0021-climb-stance\" (climb_stance)  |
+| todo | `year-build.test.ts` | year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned — [{"id":"s0014-take-from-bundle","verb":"take_from_bundle","status":"cancelled","started":true,"blockedTicks":0,"actionId":"step:s0014-take-from-bundle","submittedTick":2535,"diagnostic":{"code":"sequence.aborted","message":"aborted because step \"s0021-climb-stance\" (climb_stance) failed: m4 must s |
 
 *Approximate:* The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md).
 
@@ -692,7 +703,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -740,10 +751,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -768,8 +779,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -788,9 +799,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T01-28-33-861Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-29T02-13-35-768Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -854,9 +865,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Milestone | Status | Proofs passed | What remains approximate |
 | --- | --- | ---: | --- |
 | A. Audited foundation | PROVEN | 11/11 | The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, whose result this report consumes from the current gate. Full GLB re-extraction is skipped unless CAMPUS_FULL=1. |
-| B. Natural individual movement | PROVEN | 12/12 | No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; a head-on wait-forever would show only as a runner timeout. |
+| B. Natural individual movement | PROVEN | 12/12 | No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; persistent certified stationary waits receive bounded recovery and can stop as blocked without releasing loads. Oscillating corridor movement, pending sequence tails, unknown actions and vehicle-specific cycles remain conservatively unresolved. |
 | C. Coordinated carry | PROVEN | 7/7 | Grips are fixed points on a rigid, level load; carriers play Walk/Idle with a procedural carry lean (no hand IK). Crews do not carry on stairs (one carrier may); simultaneous formations are not co-planned. |
-| D. Supported rack bay | PROVEN | 8/8 | The bay is raised from 12 ft uprights; 19 ft is only shown to be refused with too small a crew. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog. |
+| D. Supported rack bay | PROVEN | 8/8 | Both 12 ft and 19 ft supported bays are tested; normal raise compatibility covers every catalog frame/allowed crew size. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog. |
 | E. Progressive construction | PROVEN | 11/11 | One bay on the proving ground, not an extended multi-bay run; the 2022 first bay (capability 'Year build phase A') is the multi-frame case. The forklift is used inside the v2/v3 sequences (staging beside the bay, presenting s2 at deck height), and people now climb frames and stand on beams, but there are still no ladders or scaffold. Deck/stair/tread dimensions and the plywood span rule are provisional. |
 | F. Rehearsal + official execution | PROVEN | 8/8 | Automatic rebind is opt-in and reports its diff; execution still requires a clean rehearsal. The campus flagship is hypothetical design-edit inventory and crew, not a documented historical build. |
 | G. Replay + branching | PROVEN | 9/9 | Forks resume from quiescent checkpoints, or mid-action for walking/social only (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video. |
@@ -907,7 +918,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `planning.test.ts` | planner equality: production findRoute === frozen reference over test routes + 200 seeded proving-ground routes |
 | pass | `planning.test.ts` | stress-30: exact planner keeps the pinned result; deterministic work bounded; zero violations |
 
-*Approximate:* No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; a head-on wait-forever would show only as a runner timeout.
+*Approximate:* No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; persistent certified stationary waits receive bounded recovery and can stop as blocked without releasing loads. Oscillating corridor movement, pending sequence tails, unknown actions and vehicle-specific cycles remain conservatively unresolved.
 
 ### C. Coordinated carry — PROVEN
 
@@ -935,12 +946,12 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `construction.test.ts` | connect_beam lifts a symmetric beam without spinning it end-for-end; ends map to a/b by geometry |
 | pass | `construction.test.ts` | raising arc blocked by an overhead obstacle is rejected and names it |
 | pass | `construction.test.ts` | crew too small for a 19 ft upright; misaligned bay; unreachable seat height |
-| pass | `construction.test.ts` | cancel mid-raise is refused (would leave the frame unsupported) |
+| pass | `construction.test.ts` | cancel mid-raise continuously lowers to supported lying instead of abandoning the frame |
 | pass | `construction.test.ts` | raise choreography (2 people): lifter walks the frame up, hands ≤ 2.0 m and within reach, ≤ 0.6 m/s; footer braces the base |
 | pass | `construction.test.ts` | raise choreography (4 people): two lifters step around the footers to the stations behind the base |
 | pass | `review.test.ts` | C2: people holding up a frame cannot be assigned to carry (nor walk off by any start path); absent holders are a violation |
 
-*Approximate:* The bay is raised from 12 ft uprights; 19 ft is only shown to be refused with too small a crew. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog.
+*Approximate:* Both 12 ft and 19 ft supported bays are tested; normal raise compatibility covers every catalog frame/allowed crew size. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog.
 
 ### E. Progressive construction — PROVEN
 
@@ -1017,53 +1028,52 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `9bd481c` (2026-09-29T00:03:05.367Z): 36 added, 5 removed.
+Compared with the report at `8decb07` (2026-09-29T01:47:05.244Z): 39 added, 1 removed.
 
-- added: api.test.ts :: api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 reconstruction also seeded
-- added: camera-parse-fixtures.test.ts :: LM-009: existing 2024 kitchen sink compiles with no invalid samples or world mutation
-- added: camera-parse-fixtures.test.ts :: LM-009: sentence fixture cluster compiles identically to typed direction without mutating world
-- added: camera-parse-fixtures.test.ts :: LM-009: separate sinks and unknown fixtures refuse with concrete diagnostic evidence
-- added: camera-parse-fixtures.test.ts :: LM-009: sink vocabulary parses a fixture subject and respects cross-kind ambiguity
-- added: camera-parse-studio.test.ts :: file camera scene and vocabulary reflect checkpoint obstacle edits without changing the shared source
-- added: camera-parse-studio.test.ts :: studio file sentences use the op parser, vocabulary and resolver without a simulation room
-- added: camera-parse.test.ts :: LM-010 refusal contract: unsupported or incomplete phrases ask instead of guessing
-- added: camera-parse.test.ts :: LM-010 wide lens is an explicit note, never an invented field of view
-- added: camera-sampler-budget.test.ts :: synthetic long lead-in never samples take subjects before the directed shot
-- added: camera-worker.test.ts :: camera worker kernel preserves the complete synchronous result and reads inputs only
-- added: camera-worker.test.ts :: creation, delivery, runtime, decoding and malformed-reply failures are named diagnostics
-- added: camera-worker.test.ts :: worker abort before start, while pending, and during construction has bounded cleanup
-- added: camera-worker.test.ts :: worker completion terminates once, detaches callbacks, and removes abort handling
-- added: campus-history.test.ts :: grids build for every year (bounded extent, free and blocked cells, valid clearance)
-- added: climb-reservation.test.ts :: climb reservations (LM-022): different seats on one column face are exclusive before approach; another column remains available
-- added: climb-reservation.test.ts :: climb reservations (LM-022): missing links claim nothing; opposite physical faces have distinct keys
-- added: climb-reservation.test.ts :: climb reservations (LM-022): safe cancellation and completed climb release the shared face
-- added: edit-static.test.ts :: static edits (LM-002): a post supporting a walkable deck cannot be removed or moved
-- added: edit-static.test.ts :: static edits (LM-002): geometry-supported people cannot be stranded by removing their platform
-- added: edit-static.test.ts :: static edits (LM-002): removing a wall stales a plan; auto-rebind routes through the opening, persists and leaves the canonical scene untouched
-- added: edit-static.test.ts :: static edits (LM-002): sequential add/update/remove; invalid bounds, support, overlaps and missing ids refuse atomically with named diagnostics
-- added: edit-static.test.ts :: static edits (LM-002): spawn shares the effective static namespace and collision batches are atomic in either order
-- added: edit-static.test.ts :: static edits (LM-002): supported corners across disconnected floors do not permit a floating span
-- added: forklift.test.ts :: traffic edit placement: held and fork loads block intersecting height bands but allow a parked EUC below a raised load
-- added: forklift.test.ts :: traffic: forced overlaps fire collision.vehicle-vehicle after edit_world parks safely and refuses the invalid placement (including carried load)
-- added: planning.test.ts :: stress-30: exact planner keeps the pinned result; deterministic work bounded; zero violations
-- added: room-campus-2026.test.ts :: room 2026: canonical matches existing reconstruction, protected, fork editable, no flagship inventory
-- added: room-campus-2026.test.ts :: room 2026: incompatible year/file pairs refuse; omitted loader preserves synthetic-only test setup
-- added: room-campus-2026.test.ts :: room 2026: legacy workspace id collision refuses without replacing user work
-- added: room-campus-2026.test.ts :: room 2026: migration preserves old work and restart is idempotent; historical years stay isolated
-- added: room-storage.test.ts :: room storage: UTF-8 chunks round-trip surrogate boundaries and three-byte text through SQLite
-- added: room-storage.test.ts :: room storage: aggregate byte cap rolls back writes and survives reload; seeded over-cap room refuses cleanly
-- added: room-storage.test.ts :: room storage: oversized take refuses in bytes and rolls back checkpoint, states and in-memory take
-- added: room-storage.test.ts :: room workload: real year-build chapter refuses before simulation or persistence, including old stored plans
-- added: room-storage.test.ts :: room workload: step and entity admission boundaries and malformed inputs preserve controller validation
-- removed: api.test.ts :: api: a historical year room (2022) seeds protected canonical mars-2022; walk across the courtyard; 2026 rooms unchanged
-- removed: camera-parse.test.ts :: 20 deliberately bad sentences refuse with code, question or candidates, and span
-- removed: campus-history.test.ts :: grids build for every year (ms, cells)
-- removed: forklift.test.ts :: traffic: forced overlaps fire collision.vehicle-vehicle naming both (and a carried load); a load raised clear above a parked EUC does not
-- removed: planning.test.ts :: stress-30: exact planner keeps the pinned result; per-tick cost bounded; zero violations
+- added: construction.test.ts :: cancel mid-raise continuously lowers to supported lying instead of abandoning the frame
+- added: construction.test.ts :: connect_beam mid-lift cancellation retains the supported load, hands and reservations until installation (LM-038)
+- added: deadlock-recovery.test.ts :: actual carry gather with one blocked walker and another still approaching cannot stop early
+- added: deadlock-recovery.test.ts :: actual opposing stair-passage walkers stop as blocked after bounded recovery without cancelling or releasing
+- added: deadlock-recovery.test.ts :: actual supported held carry stops blocked; execute with commitOnFailure still refuses and preserves history
+- added: deadlock-recovery.test.ts :: acyclic stationary sink, one recovery attempt, snapshot retains exhausted timer and cap
+- added: deadlock-recovery.test.ts :: anchored reporting tolerance ignores bounded jitter and code alternation, but resets for cumulative translation, rotation and changed blockers
+- added: deadlock-recovery.test.ts :: deferred planner budget is bounded and explicitly unavailable, never counted as an attempt
+- added: deadlock-recovery.test.ts :: future cue, pending dependent tail and future timeout prevent early blocked termination
+- added: deadlock-recovery.test.ts :: moving sink resets the cumulative progress anchor; stationary unknown actions prevent early stopping
+- added: deadlock.test.ts :: JSON snapshot preserves an in-progress wait episode and exact diagnostic tick
+- added: deadlock.test.ts :: actual held carry publishes its load and crew aliases; persistent reporting preserves support and leaves the result unsettled
+- added: deadlock.test.ts :: actual opposing passage walkers publish concrete dependencies and recover without a persistent cycle
+- added: deadlock.test.ts :: actual waiting walker snapshot resumes exactly; older snapshots without tracker start a fresh episode
+- added: deadlock.test.ts :: ambiguous mover aliases do not invent a cycle
+- added: deadlock.test.ts :: another action cancelling a reported cycle member in the same tick cannot resurrect its record
+- added: deadlock.test.ts :: forced three-cycle: deterministic threshold, stable diagnostic, resources retained and recovery on broken edge
+- added: deadlock.test.ts :: gather walkers remain separate mover nodes even when they share one running parent
+- added: deadlock.test.ts :: invalid cycle claims: external sinks, acyclic chains and self aliases never form a cycle
+- added: deadlock.test.ts :: sequence reports live diagnostic; a future cancellation cue remains eligible
+- added: deadlock.test.ts :: vehicle/load aliases resolve to mover identity; progress and changed edges reset the episode
+- added: progressive.test.ts :: install_joist mid-install cancellation retains the supported load, hands and reservations until installation (LM-038)
+- added: progressive.test.ts :: install_plywood mid-install cancellation retains the supported load, hands and reservations until installation (LM-038)
+- added: progressive.test.ts :: install_stair_flight mid-install cancellation retains the supported load, hands and reservations until installation (LM-038)
+- added: progressive.test.ts :: install_tread mid-install cancellation retains the supported load, hands and reservations until installation (LM-038)
+- added: raise-cancel.test.ts :: LM-036 hypothetical proof fixture is explicit and does not alter probe presets
+- added: raise-cancel.test.ts :: raise cancel (LM-036): 12ft/2 crew continuously retraces raise to supported lying
+- added: raise-cancel.test.ts :: raise cancel (LM-036): 19ft/3 crew continuously retraces step to supported lying
+- added: raise-cancel.test.ts :: raise cancel (LM-036): 19ft/4 crew continuously retraces set to supported lying
+- added: raise-cancel.test.ts :: raise cancel (LM-036): 19ft/4 crew continuously retraces step to supported lying
+- added: raise-cancel.test.ts :: raise cancel (LM-036): 8ft/1 crew continuously retraces raise to supported lying
+- added: raise-cancel.test.ts :: raise cancel (LM-036): lowering snapshots restore tick-exactly and normal phases still refuse
+- added: raise-cancel.test.ts :: raise cancel (LM-036): missing floor support refuses before motion
+- added: raise-cancel.test.ts :: raise cancel (LM-036): moving and rotating held bodies are rechecked during lowering
+- added: raise-cancel.test.ts :: raise cancel (LM-036): new static geometry and bystanders refuse the reverse sweep without changing support or owners
+- added: raise-cancel.test.ts :: raise cancel (LM-036): normal world, event and take outcomes match the pre-change action for every catalog frame and crew size
+- added: raise-cancel.test.ts :: raise cancel (LM-036): obstacles appearing during lowering block and retain the load until cleared
+- added: raise-cancel.test.ts :: raise cancel (LM-036): overflow refuses without truncating or releasing the held frame
+- added: raise-cancel.test.ts :: raise cancel (LM-036): thin held sheets cannot penetrate the landing frame envelope
+- removed: construction.test.ts :: cancel mid-raise is refused (would leave the frame unsupported)
 
 ## Tests not cited by any row or milestone
 
-151 of 464 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+178 of 502 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1133,6 +1143,22 @@ Compared with the report at `9bd481c` (2026-09-29T00:03:05.367Z): 36 added, 5 re
 - `campus.test.ts` pass: a walker can route from every pile to staging (±40 m crop)
 - `carry.test.ts` pass: carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives
 - `core.test.ts` pass: reconstruction edits and simulation events are distinct causes
+- `deadlock-recovery.test.ts` pass: acyclic stationary sink, one recovery attempt, snapshot retains exhausted timer and cap
+- `deadlock-recovery.test.ts` pass: moving sink resets the cumulative progress anchor; stationary unknown actions prevent early stopping
+- `deadlock-recovery.test.ts` pass: anchored reporting tolerance ignores bounded jitter and code alternation, but resets for cumulative translation, rotation and changed blockers
+- `deadlock-recovery.test.ts` pass: actual carry gather with one blocked walker and another still approaching cannot stop early
+- `deadlock-recovery.test.ts` pass: deferred planner budget is bounded and explicitly unavailable, never counted as an attempt
+- `deadlock.test.ts` pass: forced three-cycle: deterministic threshold, stable diagnostic, resources retained and recovery on broken edge
+- `deadlock.test.ts` pass: invalid cycle claims: external sinks, acyclic chains and self aliases never form a cycle
+- `deadlock.test.ts` pass: gather walkers remain separate mover nodes even when they share one running parent
+- `deadlock.test.ts` pass: vehicle/load aliases resolve to mover identity; progress and changed edges reset the episode
+- `deadlock.test.ts` pass: sequence reports live diagnostic; a future cancellation cue remains eligible
+- `deadlock.test.ts` pass: JSON snapshot preserves an in-progress wait episode and exact diagnostic tick
+- `deadlock.test.ts` pass: actual opposing passage walkers publish concrete dependencies and recover without a persistent cycle
+- `deadlock.test.ts` pass: actual held carry publishes its load and crew aliases; persistent reporting preserves support and leaves the result unsettled
+- `deadlock.test.ts` pass: actual waiting walker snapshot resumes exactly; older snapshots without tracker start a fresh episode
+- `deadlock.test.ts` pass: ambiguous mover aliases do not invent a cycle
+- `deadlock.test.ts` pass: another action cancelling a reported cycle member in the same tick cannot resurrect its record
 - `edit-static.test.ts` pass: static edits (LM-002): sequential add/update/remove; invalid bounds, support, overlaps and missing ids refuse atomically with named diagnostics
 - `edit-static.test.ts` pass: static edits (LM-002): a post supporting a walkable deck cannot be removed or moved
 - `edit-static.test.ts` pass: static edits (LM-002): supported corners across disconnected floors do not permit a floating span
@@ -1181,6 +1207,17 @@ Compared with the report at `9bd481c` (2026-09-29T00:03:05.367Z): 36 added, 5 re
 - `progressive.test.ts` pass: swept lift: blocked straight and lifted over is refused with lift.path-blocked naming both obstacles
 - `progressive.test.ts` pass: lift crew: a joist lift keeps the holder beside its hand point (≤ 1.0 m, ≤ 2.4 m up) every tick
 - `progressive.test.ts` pass: lift crew: crates dropped on the holder's way block the lift (lift.crew-blocked, no clipping, part held)
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): 8ft/1 crew continuously retraces raise to supported lying
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): 12ft/2 crew continuously retraces raise to supported lying
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): 19ft/3 crew continuously retraces step to supported lying
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): 19ft/4 crew continuously retraces step to supported lying
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): 19ft/4 crew continuously retraces set to supported lying
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): new static geometry and bystanders refuse the reverse sweep without changing support or owners
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): moving and rotating held bodies are rechecked during lowering
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): normal world, event and take outcomes match the pre-change action for every catalog frame and crew size
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): overflow refuses without truncating or releasing the held frame
+- `raise-cancel.test.ts` pass: LM-036 hypothetical proof fixture is explicit and does not alter probe presets
+- `raise-cancel.test.ts` pass: raise cancel (LM-036): thin held sheets cannot penetrate the landing frame envelope
 - `room-campus-2026.test.ts` pass: room 2026: incompatible year/file pairs refuse; omitted loader preserves synthetic-only test setup
 - `room-campus-2026.test.ts` pass: room 2026: legacy workspace id collision refuses without replacing user work
 - `room-storage.test.ts` pass: room workload: step and entity admission boundaries and malformed inputs preserve controller validation
