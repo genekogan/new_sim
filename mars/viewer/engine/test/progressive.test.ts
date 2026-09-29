@@ -2,6 +2,7 @@
 // navigation", "Incomplete floor/stairs"; milestone E): joists, plywood decks
 // and stairs are walkable only once actually built and supported.
 import { test } from 'node:test';
+import { checkInstallCancellation } from './install-cancel-assertions.ts';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS, forgetMotion } from '../runtime/invariants.ts';
@@ -431,3 +432,28 @@ test('lift crew: crates dropped on the holder\'s way block the lift (lift.crew-b
   assert.equal(rt.world.entities.j1.support?.kind, 'held');
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
 });
+
+
+for (const verb of ['install_joist', 'install_plywood', 'install_stair_flight', 'install_tread']) {
+  test(`${verb} mid-install cancellation retains the supported load, hands and reservations until installation (LM-038)`, () => {
+    const rt = setup();
+    buildBay(rt);
+    stageParts(rt);
+    if (verb === 'install_joist') {
+      checkInstallCancellation(rt, verb, { crew: ['p5'], joist: 'j1', bay: { a: 'A', b: 'B' }, height: 1.8, at: JOISTS[0][1] }, 'j1', 'joist.cancel-unsafe');
+      return;
+    }
+    joists(rt);
+    if (verb === 'install_plywood') {
+      checkInstallCancellation(rt, verb, { crew: ['p3', 'p4'], sheet: 's1', x: 0, z: PANELS[0][1], yaw: 0 }, 's1', 'plywood.cancel-unsafe');
+      return;
+    }
+    muster(rt);
+    if (verb === 'install_stair_flight') {
+      checkInstallCancellation(rt, verb, { crew: ['p1', 'p2'], stair: 'st', ...STAIR }, 'st', 'stair.cancel-unsafe', true);
+      return;
+    }
+    stair(rt);
+    checkInstallCancellation(rt, verb, { crew: ['p6'], stair: 'st', tread: 't1', index: 1 }, 't1', 'tread.cancel-unsafe');
+  });
+}

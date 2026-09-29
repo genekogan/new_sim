@@ -1,6 +1,7 @@
 // Supported rack bay (spec §28 "Raise tall frame", premature release) —
 // raise two 12 ft uprights, hold them, seat beams, release only when stable.
 import { test } from 'node:test';
+import { checkInstallCancellation } from './install-cancel-assertions.ts';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
 import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
@@ -376,4 +377,13 @@ test('19 ft bay: 3 people raise each 19 ft frame (hands ≤ 1.9 m, ≤ 0.6 m/s),
   assert.equal(rt.world.entities.A.phase, 'installed');
   assert.equal(rt.world.entities.B.phase, 'installed');
   assert.deepEqual(rt.violations.map((v) => `${v.code}: ${v.message}`), []);
+});
+
+
+test('connect_beam mid-lift cancellation retains the supported load, hands and reservations until installation (LM-038)', () => {
+  const rt = setup();
+  assert.equal(run(rt, 'raise_upright', { crew: ['p1', 'p2'], item: 'A' }).status, 'completed');
+  assert.equal(run(rt, 'raise_upright', { crew: ['p3', 'p4'], item: 'B' }).status, 'completed');
+  stageBeams(rt);
+  checkInstallCancellation(rt, 'connect_beam', { crew: ['p5', 'p6'], beam: 'b1', a: 'A', b: 'B', column: 'r', height: 0.5 }, 'b1', 'beam.cancel-unsafe');
 });
