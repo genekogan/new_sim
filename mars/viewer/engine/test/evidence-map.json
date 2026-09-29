@@ -372,7 +372,7 @@
         { "file": "core.test.ts", "title": "deterministic trig: edge cases" },
         { "file": "core.test.ts", "title": "datan2: quadrants, signed zeros" },
         { "file": "core.test.ts", "title": "deterministic trig: golden bit patterns" },
-        { "file": "core.test.ts", "title": "engine source never calls the host transcendentals" }
+        { "file": "source-scan.test.ts", "title": "engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted" }
       ],
       "outsideSuite": ["viewer/deploy/determinism-probe.mjs", "docs/engineering/RELEASE_CHECKLIST.md"],
       "approximate": "This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified."
@@ -662,7 +662,7 @@
         { "file": "core.test.ts", "title": "stableStringify is key-order independent" },
         { "file": "core.test.ts", "title": "rng is seeded, resumable and uniform-ish" },
         { "file": "core.test.ts", "title": "deterministic trig: golden bit patterns" },
-        { "file": "core.test.ts", "title": "engine source never calls the host transcendentals" },
+        { "file": "source-scan.test.ts", "title": "engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted" },
         { "file": "navigation.test.ts", "title": "deterministic: identical routes on repeat" },
         { "file": "walk.test.ts", "title": "entity insertion order does not change behaviour (review M6)" },
         { "file": "campus.test.ts", "title": "campus 2026 scene file loads with provenance on every obstacle" },

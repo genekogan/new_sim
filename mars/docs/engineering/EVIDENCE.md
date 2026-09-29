@@ -8,24 +8,19 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `1a0b458` (engine tree clean) |
-| Generated | 2026-09-28T23:57:25.555Z · Node v26.8.2 |
-| Engine suite | 433 tests in 64 files: 416 pass, 0 fail, 17 skipped · 44.3 s wall |
+| Git HEAD | `9bd481c` (1 uncommitted file(s) under `viewer/engine` at run time) |
+| Generated | 2026-09-29T00:03:05.367Z · Node v26.8.2 |
+| Engine suite | 433 tests in 64 files: 416 pass, 0 fail, 17 skipped · 49.0 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
-| Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
-| §30 milestones | 7 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 5261 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 7920 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 12769 ms compute (cropped 7939 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
+| Capabilities beyond §28 | 26 PROVEN · 1 PARTIAL · 1 UNPROVEN (of 28) |
+| §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 5558 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 8599 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 15464 ms compute (cropped 8616 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
 PROVEN means only that the listed tests pass; the approximation notes say what they do not show.
-
-## Problems in this run
-
-- Mapped test not found (renamed or removed?): capability Deterministic trig across hosts: core.test.ts :: "engine source never calls the host transcendentals"
-- Mapped test not found (renamed or removed?): §30 A: core.test.ts :: "engine source never calls the host transcendentals"
 
 ## SPEC §28 behavioural regressions
 
@@ -305,7 +300,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Incremental grids bit-identical | PROVEN | 6/6 | Equality is checked on 240 random scenes and on every sync of the build-bay probe, the lab construction and the cropped campus flagship, not on the uncropped campus. Reordered or duplicate obstacle lists fall back to a full rebuild. Grids stay 0.1 m rasters with an exact EDT (no navmesh). |
 | Stable historical ids + migration | PROVEN | 1/1 | The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), which this report does not run. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly. |
 | DO storage caps + isolation through the room | PROVEN | 6/6 | Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised. |
-| Deterministic trig across hosts | PARTIAL | 4/5 | This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified. |
+| Deterministic trig across hosts | PROVEN | 5/5 | This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified. |
 | Mid-action resumability (walking/social subset) | PROVEN | 6/6 | Walking, stairs and social verbs only: carry, construction lifts, vehicles and ambient_wander are not resumable (a snapshot is refused naming the action). Each restored runtime needs its own Spatial; the teleport check has no prior poses on the first restored tick (TAKES_AND_PLANS.md). |
 | Flagship on the full uncropped 2026 campus | PROVEN | 2/2 | Bit-identical since W1's global grid lattice (cell coordinates on one world lattice, not the crop's origin): the former todo is an assertion. Proven for this one scenario at the staging-east site; the whole campus is still ground level 0 only, and it costs about 2.5–3× the compute of the crop. |
 | Hand-up to people on the rack (and off the forklift) | PROVEN | 11/11 | Reach is a cylinder + arm-length envelope (the body model), not IK; receivers feed hand over hand from a fixed station and a sheet is never turned over the bay; balance is checked for a single giver only (sheets and single receivers are not checked); reach-down is capped at 0.5 m below the feet, so receivers more than ~2.55 m above the givers need the forklift (HANDUP.md). The v3 build passes at its pinned open-ground site but its onto_s2_4 beam_walk fails beam.no-room (clearance 0.25 < 0.28 m on s2) at most other sites tried, including the 2026 staging-east clearing (W17, PROGRESS.md), so v3 is not a campus take. |
@@ -473,7 +468,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 *Approximate:* Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised.
 
-### Deterministic trig across hosts — PARTIAL
+### Deterministic trig across hosts — PROVEN
 
 *Required:* Engine math uses pure IEEE-754 d* functions (never host Math.sin…), so Node, browsers and workerd produce the same state hashes.
 
@@ -483,7 +478,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `core.test.ts` | deterministic trig: edge cases (signed zeros, pi, tiny, huge, non-finite) |
 | pass | `core.test.ts` | datan2: quadrants, signed zeros, axes and infinities match ECMAScript |
 | pass | `core.test.ts` | deterministic trig: golden bit patterns (any engine / refactor drift fails here) |
-| **MISSING** | `core.test.ts` | engine source never calls the host transcendentals |
+| pass | `source-scan.test.ts` | engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted |
 
 *Evidence outside this suite (not run here):* `viewer/deploy/determinism-probe.mjs`, `docs/engineering/RELEASE_CHECKLIST.md`
 
@@ -793,7 +788,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | Milestone | Status | Tests passed | What remains approximate |
 | --- | --- | ---: | --- |
-| A. Audited foundation | PARTIAL | 10/11 | The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, which this report does not run. Full GLB re-extraction is skipped unless CAMPUS_FULL=1. |
+| A. Audited foundation | PROVEN | 11/11 | The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, which this report does not run. Full GLB re-extraction is skipped unless CAMPUS_FULL=1. |
 | B. Natural individual movement | PROVEN | 12/12 | No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; a head-on wait-forever would show only as a runner timeout. |
 | C. Coordinated carry | PROVEN | 7/7 | Grips are fixed points on a rigid, level load; carriers play Walk/Idle with a procedural carry lean (no hand IK). Crews do not carry on stairs (one carrier may); simultaneous formations are not co-planned. |
 | D. Supported rack bay | PROVEN | 8/8 | The bay is raised from 12 ft uprights; 19 ft is only shown to be refused with too small a crew. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog. |
@@ -802,7 +797,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | G. Replay + branching | PROVEN | 9/9 | Forks resume from quiescent checkpoints, or mid-action for walking/social only (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video. |
 | H. Inhabited Mars scenes | PROVEN | 9/9 | Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze or gestures; pre-emption by directed tasks exists (capability social-preemption) but a pre-empted sit / conversation is not resumed (SOCIAL.md). |
 
-### A. Audited foundation — PARTIAL
+### A. Audited foundation — PROVEN
 
 *Required:* Document current world/state/control architecture; establish Git/reproducible build; create proving-ground scene; preserve existing rendering and characters.
 
@@ -812,7 +807,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `core.test.ts` | stableStringify is key-order independent and rejects NaN |
 | pass | `core.test.ts` | rng is seeded, resumable and uniform-ish |
 | pass | `core.test.ts` | deterministic trig: golden bit patterns (any engine / refactor drift fails here) |
-| **MISSING** | `core.test.ts` | engine source never calls the host transcendentals |
+| pass | `source-scan.test.ts` | engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted |
 | pass | `navigation.test.ts` | deterministic: identical routes on repeat |
 | pass | `walk.test.ts` | entity insertion order does not change behaviour (review M6): same world, two orders, same final hash |
 | pass | `campus.test.ts` | campus 2026 scene file loads with provenance on every obstacle |
@@ -953,64 +948,12 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `d91057b` (2026-09-28T17:59:16.741Z): 51 added, 1 removed.
+Compared with the report at `1a0b458` (2026-09-28T23:57:25.555Z): 0 added, 0 removed.
 
-- added: api.test.ts :: direct_camera (LM-007): `sentences` are parsed then compiled in one call — the same track as the parsed directions; refusals compile nothing
-- added: api.test.ts :: edit_world (LM-005): a parked vehicle moves with the same footprint checks; a ridden one is edit.vehicle-ridden
-- added: api.test.ts :: get_take (LM-017): a take evicted after its workspace was deleted is take.evicted naming the checkpoint; a never-stored one stays take.unknown
-- added: api.test.ts :: one control path (LM-014): every legacy tool is classified — an engine equivalent that exists, or viewer-only with a reason — and fails in one envelope
-- added: api.test.ts :: parse_camera (LM-007/008): Gene’s four sentences through the op — racks alias → the take’s rack bay, kitchen unknown in 2026, deictic question
-- added: api.test.ts :: parse_camera (LM-007/008/010): 2024 kitchen + sink resolve; bare 2026 racks are a question with candidates; unknown names and unsupported phrasing are refusals
-- added: api.test.ts :: rebind (LM-001): execute/rehearse rebind:auto re-binds a stale plan against the head (plan.rebound + diff); a broken binding is plan.rebind-failed naming the step
-- added: api.test.ts :: sequence built-ins over the op API (LM-016): list_verbs describes mark/cancel; a plan cancels a walk at 2 s and marks the take
-- added: api.test.ts :: staleness (LM-003): a layout-only region edit stales a gather into that region (layout is physical); physicalHash moves
-- added: api.test.ts :: staleness (LM-004): an edit far from every step keeps the plan valid; one on the route stales it naming the step
-- added: api.test.ts :: staleness (LM-004): an unrehearsed plan is scoped too (envelope from a run at its baseline); a changed bound entity always stales
-- added: api.test.ts :: store_camera_track (LM-013): a compiled directed track is stored beside its take — hash unchanged, listed, replayable; refusals
-- added: camera-chapter-shots.test.ts :: activityGrid: working vs idle / wait per camera sample, positions
-- added: camera-chapter-shots.test.ts :: chapterShots: cuts to whoever works, a yard wide every wideEvery, contiguous on the grid, deterministic
-- added: camera-chapter-shots.test.ts :: chapterShots: rate picks the first readable angle, splits an unreadable window, else frames the one who works
-- added: camera-chapter-shots.test.ts :: shipped A+B chapter cameras: no idle framing > 20 s, a yard wide at least every 6.5 min, 100 % readable
-- added: camera-direct-identity.test.ts :: directCamera output identity: every CAMERA_DIRECT fixture and the W48 chapter case hash to the pre-W54 golden
-- added: camera-parse.test.ts :: 20 deliberately bad sentences refuse with code, question or candidates, and span
-- added: camera-parse.test.ts :: 52 sentence → direction examples cover all verbs, units, framing, context and vocabulary
-- added: camera-parse.test.ts :: Gene’s four sentences yield the exact documented objects or a deictic question
-- added: camera-parse.test.ts :: multi-direction text splits at then and sentence boundaries
-- added: camera-synth.test.ts :: per-year bearing (W51): on mars-2022 (northAzimuthOffset −101) "side: south" and the sun window use the 2022 frame, not the global
-- added: campus-history.test.ts :: Chiba 2024 edit: mars-2024 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
-- added: campus-history.test.ts :: Chiba 2024 edit: the 2024 year room seeds protected mars-2024 from the edited file
-- added: campus-history.test.ts :: Chiba 2024 edit: untouched pieces keep their ids; replaced pieces are gone; the solarium door is the first door object
-- added: campus-history.test.ts :: Chiba 2024 edit: walkers and the camera navmesh pass the solarium door; the hall interior still blocks
-- added: campus-history.test.ts :: W51 2022 edit: mars-2022 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
-- added: campus-history.test.ts :: W51 2022: ids kept (racks, decks, walls, rooms; rv-1…9), stairs / solar re-made, rv-10…12 and the corner table gone; names on the regions; north −101 on the scene
-- added: campus-history.test.ts :: W51 2023 edit: mars-2023 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
-- added: campus-history.test.ts :: W51 2023/2024: no trailer stands in or against Chiba — its footprint grid is exactly what it is without any trailer
-- added: campus-history.test.ts :: W51 2024 edit: mars-2024 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
-- added: env-sun.test.ts :: 2022 bearing sign: a February 16:15 PST sun throws the 2022 shadows toward screen up-left (−X, −Z), as in aerial-03
-- added: env-sun.test.ts :: per-year bearing: 2022 = −101 (world −X turned 11° toward +Z is north); the global stays −90 and is every other year's fallback
-- added: env-sun.test.ts :: site bearing evidence: DJI_0079 (2020-03-04 10:10:34 PST) — the sun stands on the +X/−Z side, shadows fall toward −X/+Z
-- added: env-sun.test.ts :: site bearing: world −X is north, −Z east, +X south, +Z west (the 2020 tire ring's long axis X runs N–S)
-- added: env-sun.test.ts :: the site bearing cannot move a construction pin: only camera/ and api/ (via camera) import env/sun.ts
-- added: sequence.test.ts :: bind (LM-016): cancel/mark are validated like verbs — unknown / self targets and bad params are refused; timeout in the schema
-- added: sequence.test.ts :: runner (LM-016): a step timeout cancels the live step with a named reason and applies onFail
-- added: sequence.test.ts :: runner (LM-016): cancel stops a live step (not a failure), skips a pending one; mark puts an event in the run; `at` applies
-- added: source-scan.test.ts :: engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted
-- added: take-labels.test.ts :: bindLabel fills inline references from the bindings
-- added: take-labels.test.ts :: bindLabel: sentence ends, literal $$, unbound and out-of-range references stay as written
-- added: take-labels.test.ts :: shipped chapter takes: no step label or event message holds a template reference
-- added: year-build-houses.test.ts :: year build 2022 chiba A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
-- added: year-build-houses.test.ts :: year build 2022 chiba, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
-- added: year-build-houses.test.ts :: year build 2022 kitchen A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
-- added: year-build-houses.test.ts :: year build 2022 kitchen, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
-- added: year-build-houses.test.ts :: year build 2022 west-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
-- added: year-build-houses.test.ts :: year build 2022 west-house, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
-- added: year-build-houses.test.ts :: year build 2022, all four houses A+B: plans through the same rules — counts by kind, unplaced with reasons, the yard clear of the neighbours' work zones, deterministic; report-only table
-- added: year-build-houses.test.ts :: year build 2022: the four rack houses are one template (12 frames of 16 ft × 3 ft in 4 lines × 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m) — phase B split rules apply unchanged
-- removed: core.test.ts :: engine source never calls the host transcendentals or hypot (use the core/math.ts d* versions and its hypot)
 
 ## Tests not cited by any row or milestone
 
-141 of 433 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+140 of 433 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1131,7 +1074,6 @@ Compared with the report at `d91057b` (2026-09-28T17:59:16.741Z): 51 added, 1 re
 - `sequence.test.ts` pass: runner (LM-016): a step timeout cancels the live step with a named reason and applies onFail
 - `sequence.test.ts` pass: runner (LM-016): cancel stops a live step (not a failure), skips a pending one; mark puts an event in the run; `at` applies
 - `sequence.test.ts` pass: bind (LM-016): cancel/mark are validated like verbs — unknown / self targets and bad params are refused; timeout in the schema
-- `source-scan.test.ts` pass: engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted
 - `take-chapters.test.ts` pass: chapter takes: the chaptered run is the unchaptered run cut at barriers — same ticks and final state, chapter k starts where k − 1 ended; a non-barrier bound is refused
 - `take-chapters.test.ts` pass: chapter sets in the manifest: the first frame of chapter k is the final state of chapter k − 1 (hash, entities0, replayed first frame); Σ ticks and the last final state are the set's; the 2022 east-house A+B ends at its pin
 - `take-labels.test.ts` pass: bindLabel fills inline references from the bindings

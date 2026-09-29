@@ -309,6 +309,17 @@ const walkPlan = (id, x, z) => ({ schema: 'mars-sequence/1', id, params: { a: { 
   const stored = ok('take cameras', await ecall('engine_get_take', { take_id: ex.body.take_id, from: 0, to: 1, include: ['cameras'] })).cameras;
   assert.ok(stored.some((t) => t.id === dc.track_id && t.kind === 'directed'), JSON.stringify(stored.map((t) => [t.id, t.kind])));
   refused('direct camera: unknown subject', await ecall('engine_direct_camera', { take_id: ex.body.take_id, directions: [{ subject: { kind: 'entity', ref: 'nobody-here' }, motion: { verb: 'hold' } }] }), 'camera.direct.unknown');
+  // W58 ops: a directed track stored beside the take under a new id (LM-013), and the sentence parser as its own op (LM-007).
+  const srcTrack = stored.find((t) => t.id === dc.track_id);
+  const st1 = ok('store camera track', await ecall('engine_store_camera_track', { take_id: ex.body.take_id, track: { ...srcTrack, id: 'dir-integration-1', kind: 'directed' } }));
+  assert.equal(st1.stored, true); assert.equal(st1.takeHashUnchanged, true);
+  const st2 = ok('store the identical track again (idempotent)', await ecall('engine_store_camera_track', { take_id: ex.body.take_id, track: { ...srcTrack, id: 'dir-integration-1', kind: 'directed' } }));
+  assert.equal(st2.stored, false, 'an identical track is not stored twice');
+  refused('store a track of another take', await ecall('engine_store_camera_track', { take_id: ex.body.take_id, track: { ...srcTrack, id: 'dir-integration-2', kind: 'directed', takeId: 'not-this-take' } }), 'camera.track-take-mismatch');
+  // parse_camera refuses the whole call when any sentence has no referent (nothing is compiled) — a structured refusal
+  // with the parser's question; the compile path for good sentences is the direct_camera call above.
+  const pc = refused('parse camera: deictic sentence', await ecall('engine_parse_camera', { take_id: ex.body.take_id, sentences: ['look at this crowd of people having this activity'] }), 'camera.parse.deictic');
+  assert.match(pc.message, /refused/);
   const c0 = shot.corrections[0];
   console.log(`ENGINE DIRECT CAMERA: track ${dc.track_id} ${dc.track.samples} samples; p1 orbit corrected: ${c0.failure} → ${c0.strategy} (${c0.reason.slice(0, 100)}…)`);
 }
@@ -456,7 +467,11 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
   assert.deepEqual(ed.diff.regions, ['yb-staging']);
   const u1 = (await ecall('engine_query_world', { workspace: 'ed', ids: ['u1'] })).body.entities[0];
   assert.equal(u1.provenance.origin, 'design-edit');
-  assert.equal(refused('execute plan bound before the edit', await ecall('engine_execute', { plan_id: early.plan_id, workspace: 'ed' }), 'plan.stale').diff.added.length, 5);
+  // Staleness is region-scoped (W58, LM-003/004): the yard-B edit is outside the early walk's envelope, so that plan stays valid
+  // (the near-edit / stale case is covered by engine/test/api.test.ts "staleness (LM-004)").
+  const still = await ecall('engine_rehearse', { plan_id: early.plan_id, workspace: 'ed' });
+  assert.notEqual(still.body?.code, 'plan.stale', 'a far edit must not stale the early walk (region-scoped staleness)');
+  ok('rehearse plan bound before a far edit (region-scoped staleness)', still);
   const up = ok('bind upright carry', await ecall('engine_bind_plan', { template: { schema: 'mars-sequence/1', id: 'upright-delivery', params: { crew: { kind: 'actors' }, item: { kind: 'entity' } }, steps: [{ id: 'deliver', verb: 'carry', params: { crew: '$crew', item: '$item', to: { x: 18, z: 36, yaw: Math.PI / 2 } } }] }, bindings: { crew: ['q1', 'q2', 'q3', 'q4'], item: 'u1' }, workspace: 'ed' }));
   const cl = refused('rehearse 19 ft upright through the 1.5 m corridor', await ecall('engine_rehearse', { plan_id: up.plan_id }), 'rehearsal.failed');
   assert.equal(cl.report.steps[0].diagnostic.code, 'carry.clearance');
@@ -471,7 +486,7 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
   assert.deepEqual(led.takes.map((t) => t.order), led.takes.map((_, i) => i));
   assert.deepEqual(led.workspaces.find((w) => w.id === 'carry-yard').forks.sort(), ['ed', 'ed-fin']);
   const lc = ok('list cameras', await ecall('engine_list', { include: ['takes'], take_id: ex.body.take_id }));
-  assert.equal(lc.cameras.length, 2, 'the attached frameGroup track + the directed track');
+  assert.equal(lc.cameras.length, 3, 'the attached frameGroup track + the directed track + the stored dir-integration-1 copy');
   refused('list unknown take', await ecall('engine_list', { take_id: 'nope' }), 'take.unknown');
   // deletion
   refused('delete canonical', await ecall('engine_delete_workspace', { workspace: 'carry-yard' }), 'workspace.protected');
