@@ -31,7 +31,7 @@ export function loweringIssue(rt: Runtime, item: string, from: RaiseFrame, to: R
   const refuse = (message: string, subjects: string[]): Diagnostic => ({ code: 'raise.cancel-unsafe', message: `${item} cannot be lowered: ${message}`, subjects: [item, ...subjects] });
   const hit = sweepPoses(rt, u, [from.pose, to.pose], []);
   if (hit) return refuse(`its reverse sweep intersects ${hit.o.label ?? hit.o.id}`, [hit.o.id]);
-  // Navigation omits carried/raising parts and some vehicles. Physical lowering must still
+  // Navigation omits carried parts and some vehicle states. Physical lowering must still
   // see their current envelopes; rebuild these on every preflight/step so motion is observed.
   const staticIds = new Set(sp.scene.obstacles.map((o) => o.id));
   const dynamic = Object.values(rt.world.entities)
