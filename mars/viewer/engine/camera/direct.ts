@@ -21,10 +21,10 @@ const ref = z.string().min(1).max(120);
 const coord = z.number().min(-500).max(500);
 const vec3 = z.tuple([coord, z.number().min(-50).max(300), coord]);
 
-export const SUBJECT_KINDS = ['entity', 'assembly', 'region', 'group'] as const;
+export const SUBJECT_KINDS = ['entity', 'assembly', 'region', 'group', 'fixture'] as const;
 export const directionSubjectSchema = z
   .strictObject({
-    kind: z.enum(SUBJECT_KINDS).describe("entity = one world entity; assembly = a building / structure (scene assembly or a take's connected rack structure); region = a campus region; group = the people currently in a named action / activity"),
+    kind: z.enum(SUBJECT_KINDS).describe("entity = one world entity; assembly = a building / structure (scene assembly or a take's connected rack structure); region = a campus region; fixture = a static fixture or touching fixture cluster; group = the people currently in a named action / activity"),
     ref: ref.describe('id, or words of its name/label (all words must match; an exact id always wins)'),
   })
   .describe('what the shot is about');
@@ -298,6 +298,7 @@ const presentIds = (sampler: ((t: number) => Record<string, unknown>) | undefine
  * (their poses then come from the take, not the final state).
  */
 export function resolveSubject(sw: SemanticWorld, s: { kind: string; ref: string }, t: number, sampler?: (t: number) => Record<string, unknown>, field = 'subject'): Resolution {
+  if (s.kind === 'fixture') return resolveFixture(sw, s.ref, undefined, field);
   const live = presentIds(sampler, t);
   if (s.kind === 'group') {
     if (!sw.facts) return { ok: false, diagnostic: { code: 'camera.direct.no-activity-data', message: `${field}: group '${s.ref}' needs who-does-what data (a take or a live world); none was given` } };

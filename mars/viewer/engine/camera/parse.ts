@@ -65,7 +65,7 @@ function subjectOf(sentence: string, lower: string, verb: MotionVerb, vocab?: Pa
     return { subject: { kind: 'region', ref: interior }, interior, ...(lookAt ? { lookAt } : {}) };
   }
   const matching: { kind: CameraDirection['subject']['kind']; ref: string }[] = [];
-  for (const [kind, names] of [['region', vocab?.regions], ['assembly', vocab?.assemblies], ['group', vocab?.groups]] as const) {
+  for (const [kind, names] of [['region', vocab?.regions], ['assembly', vocab?.assemblies], ['fixture', vocab?.fixtures], ['group', vocab?.groups]] as const) {
     for (const name of names ?? []) if (boundary(lower, norm(name))) matching.push({ kind, ref: name });
   }
   matching.sort((a, b) => b.ref.length - a.ref.length || compare(a.kind, b.kind) || compare(a.ref, b.ref));
@@ -84,13 +84,16 @@ function subjectOf(sentence: string, lower: string, verb: MotionVerb, vocab?: Pa
   if (chiba) return { subject: { kind: 'region', ref: 'chiba' } };
   const kitchen = hit(lower, /\bkitchen\b/);
   if (kitchen) return { subject: { kind: 'region', ref: 'kitchen-interior' } };
+  const target = hit(lower, /\b(?:across|around|over|past|on|at|from|inside|into|through|of)\s+(?:(?:the|a|an)\s+)?([a-z][a-z0-9-]*)\b/);
+  const word = target?.text.split(/\s+/).at(-1);
+  // A short fixture query may name several components (sink bowl + sink rim). The semantic
+  // resolver decides whether they touch or are ambiguous; explicit vocabulary precedes capitalised-place rules.
+  if (word && vocab?.fixtures?.some((name) => boundary(norm(name), word))) return { subject: { kind: 'fixture', ref: word } };
   const place = /\b(?:across|around|over|past|on|at|from|inside|into|through|of)\s+(?:(?:the|a|an)\s+)?([A-Z][a-zA-Z0-9-]*)\b/.exec(sentence);
   if (place) return { subject: { kind: 'region', ref: norm(place[1]) } };
-  const target = hit(lower, /\b(?:across|around|over|past|on|at|from|inside|into|through|of)\s+(?:(?:the|a|an)\s+)?([a-z][a-z0-9-]*)\b/);
-  if (target) {
-    const word = target.text.split(/\s+/).at(-1)!;
+  if (target && word) {
     if (/^(?:room|hall|courtyard|campus|house|garden|building)$/.test(word)) return { subject: { kind: 'region', ref: word } };
-    return fail('camera.parse.ambiguous', `"${word}" could name more than one kind of subject`, target, 'Is this a region, assembly, or entity?', [`region:${word}`, `assembly:${word}`, `entity:${word}`]);
+    return fail('camera.parse.ambiguous', `"${word}" could name more than one kind of subject`, target, 'Is this a region, assembly, fixture, or entity?', [`region:${word}`, `assembly:${word}`, `fixture:${word}`, `entity:${word}`]);
   }
   return fail('camera.parse.missing', `"${sentence}" does not name a subject`, hit(lower, verbs.find((v) => v.verb === verb)!.pattern), 'What should the camera frame?');
 }

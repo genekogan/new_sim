@@ -99,7 +99,10 @@ test('52 sentence → direction examples cover all verbs, units, framing, contex
   }
 });
 
-const bad = [
+// LM-010 public refusal contract: deliberate language boundaries, not pending synonyms.
+// unknown-verb: no zoom; missing: supply orbit angle / subject / activity; deictic: no implicit selection;
+// ambiguous: ask before choosing; conflict: contradictory constraints; invalid: unsupported units / ranges.
+const refusalContract = [
   ['orbit the racks', 'camera.parse.missing', 'question'],
   ['pan left across Chiba to the right', 'camera.parse.conflict', 'candidates'],
   ['orbit 90° around the racks over 2 minutes at 10 deg/s', 'camera.parse.conflict', 'candidates'],
@@ -122,8 +125,8 @@ const bad = [
   ['', 'camera.parse.missing', 'question'],
 ] as const;
 
-test('20 deliberately bad sentences refuse with code, question or candidates, and span', () => {
-  for (const [sentence, code, detail] of bad) {
+test('LM-010 refusal contract: unsupported or incomplete phrases ask instead of guessing', () => {
+  for (const [sentence, code, detail] of refusalContract) {
     const r = parseSentence(sentence);
     assert.equal(r.ok, false, sentence);
     if (r.ok) continue;
@@ -141,4 +144,15 @@ test('multi-direction text splits at then and sentence boundaries', () => {
   assert.ok(r.every((x) => x.ok));
   assert.deepEqual(r.map((x) => x.ok ? x.direction.motion.verb : 'refused'), ['pan', 'orbit', 'hold']);
   assert.deepEqual(parseSentences('Pan across Chiba, then orbit 90° around the racks. Hold on Chiba'), r);
+});
+
+test('LM-010 wide lens is an explicit note, never an invented field of view', () => {
+  const r = parseSentence('hold on Chiba with a wide lens');
+  assert.ok(r.ok);
+  assert.equal(r.direction.fov, undefined);
+  assert.deepEqual(r.notes, ['wide lens has no numeric fov; lens choice left to the engine']);
+  const explicit = parseSentence('hold on Chiba with a wide lens fov 70');
+  assert.ok(explicit.ok);
+  assert.equal(explicit.direction.fov, 70);
+  assert.deepEqual(explicit.notes, []);
 });

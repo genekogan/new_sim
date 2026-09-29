@@ -75,7 +75,7 @@ test('direct camera from sentences: Gene\'s four through the panel, refusals wit
   await say('pan across the shed', 'region:shed');
   const amb = page.getByRole('alert', { name: 'Sentence refused' });
   await expect(amb).toContainText('camera.parse.ambiguous');
-  await expect(amb).toContainText('Candidates: region:shed, assembly:shed, entity:shed.');
+  await expect(amb).toContainText('Candidates: region:shed, assembly:shed, fixture:shed, entity:shed.');
   report.ambiguous = await amb.innerText();
   await jsonBox.fill('');
   await say('pan across Chiba then orbit 90° around the racks', 'Added 2 directions:');

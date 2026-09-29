@@ -134,7 +134,9 @@ export function parseCameraSentences(sw: SemanticWorld, sentences: string[], cv:
       refusals.push(refusalOf(index, sentence, r.diagnostic));
       return;
     }
-    d.subject.ref = r.subject.id;
+    // A fixture phrase can resolve to touching components as one physical subject. Rewriting it to
+    // the first component's id would discard the rest when directCamera resolves it again.
+    d.subject.ref = d.subject.kind === 'fixture' ? said : r.subject.id;
     if (d.context?.interior) {
       const ri = resolveSubject(sw, { kind: 'region', ref: d.context.interior }, t, undefined, 'context.interior');
       if (!ri.ok) {

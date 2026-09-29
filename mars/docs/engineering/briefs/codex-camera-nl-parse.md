@@ -3,6 +3,22 @@
 Branch `codex/camera-nl-parse` · worktree per CODEX.md §1 (`TOPIC=camera-nl-parse`) · ETA (estimate): 4–6 h of Codex
 work · report: `docs/engineering/briefs/codex-camera-nl-parse.REPORT.md`.
 
+## W61 authorized extension (2026-09-29)
+
+The lead approved LM-009's schema extension, superseding the frozen-schema restrictions below for
+`codex/camera-fixtures`: `subject.kind: 'fixture'` is now supported end-to-end. `ParseVocab.fixtures` names
+static fixtures, including short queries such as "sink" that the semantic resolver clusters or refuses.
+Without fixture vocabulary, an unknown object remains ambiguous; no fixture is invented. A matching phrase
+across kinds remains ambiguous. Sentence-derived fixture directions retain their query so touching component
+clusters survive the API parse → direct round trip; the separate subject record carries the resolved ID.
+
+LM-010's executable refusal contract is `camera-parse.test.ts` (`refusalContract`). Unsupported "zoom in"
+is `camera.parse.unknown-verb`; an orbit without an angle is `missing`; deictic references are `deictic`;
+multiple motions / unknown kinds are `ambiguous`; contradictory constraints are `conflict`; wrong units,
+directions or numeric ranges are `invalid`. These deliberately bounded phrases ask questions instead of
+selecting an interpretation. "Wide lens" alone is accepted with a note and no numeric fov; an explicit
+numeric fov is honored. The contract does not claim arbitrary natural-language coverage.
+
 ## Why
 
 Owner feedback §11: Gene directs the camera in sentences, such as "pan across Chiba with the sunset in the
