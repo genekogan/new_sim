@@ -101,3 +101,16 @@ test('static edits (LM-002): supported corners across disconnected floors do not
   const r = edit(c, [{ op: 'static_add', ...obstacle('span', 0, 0), obb: { c: [0, 0], half: [3, 1], yaw: 0 } }]);
   assert.equal(r.code, 'edit.unsupported');
 });
+
+
+test('static edits (LM-002): geometry-supported people cannot be stranded by removing their platform', () => {
+  const history = new WorldHistory(ENGINE_RULES_VERSION);
+  history.publishCanonical('static-yard', 'platform', addAll(emptyWorld('static-yard', scene), human('standing', 0, 0, { y: 2.4 })), 'test');
+  const c = createController({ history, scenes: { 'static-yard': scene } });
+  c.call('fork', { from: 'static-yard', name: 'ws' });
+  const head = c.history.head('ws').id;
+  const result = edit(c, [{ op: 'static_remove', id: 'wall' }]);
+  assert.equal(result.code, 'edit.static-support');
+  assert.match(String(result.message), /standing/);
+  assert.equal(c.history.head('ws').id, head);
+});

@@ -22,6 +22,12 @@ export function editStatic(w: WorldState, sp: Spatial, edit: StaticEdit): Issue 
   if (old) {
     const dependent = Object.values(w.entities).find((e) => e.support?.kind === 'resting-on' && e.support.on === old.id);
     if (dependent) return fail('edit.static-support', `${dependent.id} rests on ${edit.id}; move it first`, dependent.id);
+    const resting = Object.values(w.entities).find((e) => {
+      if (e.kind === 'marker') return false;
+      const fp = entityFootprint(e);
+      return Math.abs(fp.y0 - old.y1) < 0.05 && obbOverlap(fp.obb, old.obb);
+    });
+    if (resting) return fail('edit.static-support', `${edit.id} supports entity ${resting.id}; move it first`, resting.id);
     const surface = sp.base.surfaces.find((s) => Math.abs(s.y - old.y1) < 0.05 && obbOverlap(s.obb, old.obb));
     if (surface) return fail('edit.static-support', `${edit.id} supports surface ${surface.id}; editing supporting geometry requires an assembly edit`, surface.id);
     const above = sp.base.obstacles.find((o) => o.id !== old.id && Math.abs(o.y0 - old.y1) < 0.05 && obbOverlap(o.obb, old.obb));

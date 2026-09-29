@@ -9,3 +9,5 @@ Four focused regressions cover removal + auto-rebind, restart persistence, seque
 Browser: `E2E_VITE_PORT=5497 E2E_RUN=static-edits-1 npx playwright test -c e2e/playwright.config.ts static-edits.spec.ts`, 1 pass. Lead inspected `e2e/artifacts/static-edits-1/static-closed.png` and `static-open.png`: visible gate wall forces the detour; its removal restores the passage. Both complete with zero violations; JSON proof beside captures.
 
 MCP integration for static edits is being added in a separate control-plane evidence change. This report does not claim a completed release gate or merge.
+
+Final review adds a fifth focused regression: a person standing directly on a static platform without an explicit resting-on support tag cannot be stranded by removing it. Support refusal now checks physical entity bottoms as well as recorded support references. Five focused tests and lint pass; full gate follows.
