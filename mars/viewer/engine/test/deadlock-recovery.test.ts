@@ -105,8 +105,8 @@ test('anchored reporting tolerance ignores bounded jitter and code alternation, 
   }
 });
 
-test('future cue, pending dependent tail and future timeout prevent early blocked termination', () => {
-  for (const mode of ['cue', 'dependent', 'timeout']) {
+test('future independent cue and future timeout prevent early blocked termination', () => {
+  for (const mode of ['cue', 'timeout']) {
     const { rt, runner: initial } = stationaryRunner();
     const steps = structuredClone(initial.steps);
     if (mode === 'timeout') steps[0].timeout = 30;
@@ -143,12 +143,15 @@ test('actual supported held carry stops blocked; execute with commitOnFailure st
   const plan = bindTemplate({ schema: 'mars-sequence/1', id: 'held', params: {}, steps: [
     { id: 'hold', verb: 'stationary', params: { actor: 'bystander', blocker: 'b1' } },
     { id: 'carry', verb: 'carry', params: { crew: ['p1', 'p2'], item: 'b1', to: { x: 18, z: 11, yaw: Math.PI / 2 } } },
+    { id: 'tail2', verb: 'mark', params: { name: 'tail2' }, when: { event: 'completed', step: 'tail1' } },
+    { id: 'tail1', verb: 'mark', params: { name: 'tail1' }, after: ['carry'], at: 100 },
   ] }, {}, { history, baseline: 'work', registry });
   const cfg = { registry, services: () => ({ spatial: new Spatial(base) }), invariants: [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS], maxTicks: 1800 };
   const rehearsal = rehearse(history, 'work', plan, cfg);
   assert.equal(rehearsal.report.status, 'blocked'); assert.equal(rehearsal.report.settled, false);
   assert.deepEqual(rehearsal.finalState.entities.b1.support, { kind: 'held', by: ['p1', 'p2'] });
   assert.deepEqual(rehearsal.report.violations, []); assert.deepEqual(rehearsal.report.cut, []);
+  assert.ok(rehearsal.report.steps.filter((s) => s.id.startsWith('tail')).every((s) => s.status === 'pending' && !s.started));
   const before = hashOf(history.toJSON()); const result = execute(history, 'work', plan, cfg, { commitOnFailure: true });
   assert.equal(result.ok, false); assert.ok(!result.ok && result.code === 'execution.failed');
   assert.equal(result.report?.status, 'blocked'); assert.equal(hashOf(history.toJSON()), before);
@@ -166,4 +169,40 @@ test('deferred planner budget is bounded and explicitly unavailable, never count
   const recovery = rt.services.moverWaits.samples.get('a').recovery;
   assert.equal(recovery.status, 'unavailable'); assert.equal(recovery.diagnostic.code, 'deadlock.recovery-budget');
   assert.equal(recovery.requestedTick, 200); assert.equal(recovery.completedTick, 400);
+});
+
+
+test('completion-dependent two-level tails preserve live ownership and snapshot identity', () => {
+  const { rt, runner: initial } = stationaryRunner();
+  const runner = new SequenceRunner(rt, [...initial.steps,
+    { id: 'tail2', verb: 'mark', params: { name: 'second' }, when: { event: 'completed', step: 'tail1' } },
+    { id: 'tail1', verb: 'mark', params: { name: 'first' }, after: ['a'], at: 100 },
+  ]);
+  runner.advance(); for (let i = 0; i < 250; i++) runner.tick();
+  const clone = Runtime.restore(JSON.parse(JSON.stringify(rt.snapshot())), rt.registry, {});
+  const resumed = SequenceRunner.restore(clone, JSON.parse(JSON.stringify(runner.serialize())));
+  const cursor = rt.events.length;
+  for (let i = 0; i < 150; i++) { runner.tick(); resumed.tick(); }
+  assert.equal(runner.result().status, 'blocked');
+  assert.deepEqual(resumed.result(), runner.result());
+  assert.deepEqual(clone.events, rt.events.slice(cursor));
+  assert.deepEqual(rt.holder('actor:a'), ['step:a']);
+  assert.ok(runner.reports.slice(1).every((r) => r.status === 'pending' && !r.started));
+  assert.deepEqual(runner.result().diagnostics.at(-1)?.details?.pendingTails, ['tail1', 'tail2']);
+  assert.deepEqual(runner.result().cut, []);
+});
+
+test('independent future cancel can still release a certified wait with an inert tail', () => {
+  const { rt, runner: initial } = stationaryRunner();
+  const runner = new SequenceRunner(rt, [...initial.steps,
+    { id: 'tail', verb: 'mark', params: { name: 'tail' }, after: ['a'] },
+    { id: 'release', verb: 'cancel', params: { step: 'a' }, at: 30 },
+  ]); runner.advance();
+  for (let i = 0; i < 500; i++) runner.tick();
+  assert.equal(runner.result().status, 'partial');
+  for (let i = 0; i < 101; i++) runner.tick();
+  assert.equal(runner.reports[0].status, 'cancelled');
+  assert.equal(runner.reports[1].status, 'skipped');
+  assert.equal(runner.reports[2].status, 'completed');
+  assert.deepEqual(rt.holder('actor:a'), []);
 });

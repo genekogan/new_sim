@@ -1,0 +1,351 @@
+{
+  "scenario": "held-carry-execute",
+  "report": {
+    "status": "blocked",
+    "ok": false,
+    "planHash": "34d521b8d24c1ed708d396e1",
+    "baselineCheckpoint": "701a71b415769986ad4e7db5",
+    "steps": [
+      {
+        "id": "hold",
+        "verb": "stationary",
+        "status": "blocked",
+        "started": true,
+        "blockedTicks": 942,
+        "actionId": "step:hold",
+        "submittedTick": 0,
+        "diagnostic": {
+          "code": "deadlock.cycle",
+          "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+          "subjects": [
+            "b1",
+            "bystander"
+          ],
+          "details": {
+            "sinceTick": 543,
+            "thresholdTicks": 200,
+            "movers": [
+              {
+                "mover": "b1",
+                "action": "step:carry",
+                "blockedBy": [
+                  "bystander"
+                ],
+                "code": "carry.path-occupied"
+              },
+              {
+                "mover": "bystander",
+                "action": "step:hold",
+                "blockedBy": [
+                  "b1"
+                ],
+                "code": "test.wait"
+              }
+            ],
+            "edges": [
+              {
+                "from": "b1",
+                "to": "bystander"
+              },
+              {
+                "from": "bystander",
+                "to": "b1"
+              }
+            ],
+            "exhausted": true,
+            "recovery": [
+              {
+                "mover": "b1",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "existing formation planner found no safe route",
+                  "subjects": [
+                    "b1"
+                  ]
+                },
+                "requestedTick": 742,
+                "completedTick": 742
+              },
+              {
+                "mover": "bystander",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "test stationary refusal"
+                },
+                "requestedTick": 742,
+                "completedTick": 742
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "carry",
+        "verb": "carry",
+        "status": "blocked",
+        "started": true,
+        "blockedTicks": 400,
+        "actionId": "step:carry",
+        "submittedTick": 0,
+        "diagnostic": {
+          "code": "deadlock.cycle",
+          "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+          "subjects": [
+            "b1",
+            "bystander"
+          ],
+          "details": {
+            "sinceTick": 543,
+            "thresholdTicks": 200,
+            "movers": [
+              {
+                "mover": "b1",
+                "action": "step:carry",
+                "blockedBy": [
+                  "bystander"
+                ],
+                "code": "carry.path-occupied"
+              },
+              {
+                "mover": "bystander",
+                "action": "step:hold",
+                "blockedBy": [
+                  "b1"
+                ],
+                "code": "test.wait"
+              }
+            ],
+            "edges": [
+              {
+                "from": "b1",
+                "to": "bystander"
+              },
+              {
+                "from": "bystander",
+                "to": "b1"
+              }
+            ],
+            "exhausted": true,
+            "recovery": [
+              {
+                "mover": "b1",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "existing formation planner found no safe route",
+                  "subjects": [
+                    "b1"
+                  ]
+                },
+                "requestedTick": 742,
+                "completedTick": 742
+              },
+              {
+                "mover": "bystander",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "test stationary refusal"
+                },
+                "requestedTick": 742,
+                "completedTick": 742
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "tail2",
+        "verb": "mark",
+        "status": "pending",
+        "started": false,
+        "blockedTicks": 0
+      },
+      {
+        "id": "tail1",
+        "verb": "mark",
+        "status": "pending",
+        "started": false,
+        "blockedTicks": 0,
+        "cueTick": 2000
+      }
+    ],
+    "diagnostics": [
+      {
+        "code": "sequence.blocked",
+        "message": "all live work remains blocked after bounded recovery; supports and reservations remain live",
+        "subjects": [
+          "b1",
+          "bystander"
+        ],
+        "details": {
+          "waits": [
+            {
+              "code": "deadlock.cycle",
+              "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+              "subjects": [
+                "b1",
+                "bystander"
+              ],
+              "details": {
+                "sinceTick": 543,
+                "thresholdTicks": 200,
+                "movers": [
+                  {
+                    "mover": "b1",
+                    "action": "step:carry",
+                    "blockedBy": [
+                      "bystander"
+                    ],
+                    "code": "carry.path-occupied"
+                  },
+                  {
+                    "mover": "bystander",
+                    "action": "step:hold",
+                    "blockedBy": [
+                      "b1"
+                    ],
+                    "code": "test.wait"
+                  }
+                ],
+                "edges": [
+                  {
+                    "from": "b1",
+                    "to": "bystander"
+                  },
+                  {
+                    "from": "bystander",
+                    "to": "b1"
+                  }
+                ],
+                "exhausted": true,
+                "recovery": [
+                  {
+                    "mover": "b1",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "existing formation planner found no safe route",
+                      "subjects": [
+                        "b1"
+                      ]
+                    },
+                    "requestedTick": 742,
+                    "completedTick": 742
+                  },
+                  {
+                    "mover": "bystander",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "test stationary refusal"
+                    },
+                    "requestedTick": 742,
+                    "completedTick": 742
+                  }
+                ]
+              }
+            },
+            {
+              "code": "deadlock.cycle",
+              "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+              "subjects": [
+                "b1",
+                "bystander"
+              ],
+              "details": {
+                "sinceTick": 543,
+                "thresholdTicks": 200,
+                "movers": [
+                  {
+                    "mover": "b1",
+                    "action": "step:carry",
+                    "blockedBy": [
+                      "bystander"
+                    ],
+                    "code": "carry.path-occupied"
+                  },
+                  {
+                    "mover": "bystander",
+                    "action": "step:hold",
+                    "blockedBy": [
+                      "b1"
+                    ],
+                    "code": "test.wait"
+                  }
+                ],
+                "edges": [
+                  {
+                    "from": "b1",
+                    "to": "bystander"
+                  },
+                  {
+                    "from": "bystander",
+                    "to": "b1"
+                  }
+                ],
+                "exhausted": true,
+                "recovery": [
+                  {
+                    "mover": "b1",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "existing formation planner found no safe route",
+                      "subjects": [
+                        "b1"
+                      ]
+                    },
+                    "requestedTick": 742,
+                    "completedTick": 742
+                  },
+                  {
+                    "mover": "bystander",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "test stationary refusal"
+                    },
+                    "requestedTick": 742,
+                    "completedTick": 742
+                  }
+                ]
+              }
+            }
+          ],
+          "pendingTails": [
+            "tail1",
+            "tail2"
+          ]
+        }
+      }
+    ],
+    "violations": [],
+    "metrics": {
+      "duration": 47.1,
+      "ticks": 942,
+      "replans": 0,
+      "pathLength": 0,
+      "blockedTicks": 1342,
+      "violations": 0
+    },
+    "finalStateHash": "b2488643e6563358028c310242c56546b22498a6fa1de9d53ca3596d93451829",
+    "cut": [],
+    "settled": false,
+    "unsettled": [
+      "action step:hold (stationary) is still blocked",
+      "action step:carry (carry) is still blocked (move)"
+    ]
+  },
+  "support": {
+    "kind": "held",
+    "by": [
+      "p1",
+      "p2"
+    ]
+  },
+  "historyUnchanged": true,
+  "executionCode": "execution.failed"
+}

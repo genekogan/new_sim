@@ -7,6 +7,7 @@ import type { ActionStatus, Diagnostic } from '../actions/types.ts';
 import { TERMINAL } from '../actions/types.ts';
 import { DT, type Runtime, type Violation } from '../runtime/runtime.ts';
 import type { StepSpec } from './types.ts';
+import { completionBlockedTails } from './blocked-tails.ts';
 
 export type StepStatus = 'pending' | 'executing' | 'blocked' | 'completed' | 'failed' | 'skipped' | 'cancelled';
 
@@ -185,14 +186,17 @@ export class SequenceRunner {
     return this.steps.some((s) => s.timeout !== undefined);
   }
 
-  /** Deliberately conservative: any pending cue/dependency, future timeout or independent work prevents stopping. */
+  /** Only completion-dependent tails may be inert; independent cues/timeouts/work prevent stopping. */
   private checkBlocked() {
-    if (this.aborted || this.timedOut || this.reports.some((r) => r.status === 'pending')) return;
+    if (this.aborted || this.timedOut) return;
     if (this.steps.some((s, i) => s.timeout !== undefined && ['executing', 'blocked'].includes(this.reports[i].status))) return;
     const waits = this.rt.exhaustedWaitDiagnostics();
     if (!waits) return;
+    const live = new Set(this.reports.flatMap((r) => r.actionId && this.rt.isActive(r.actionId) ? [r.actionId] : []));
+    const pendingTails = completionBlockedTails(this.steps, this.reports, live);
+    if (!pendingTails) return;
     this.blockedDiagnostic = { code: 'sequence.blocked', message: 'all live work remains blocked after bounded recovery; supports and reservations remain live',
-      subjects: [...new Set(waits.flatMap((d) => d.subjects ?? []))].sort(), details: { waits } };
+      subjects: [...new Set(waits.flatMap((d) => d.subjects ?? []))].sort(), details: { waits, ...(pendingTails.length ? { pendingTails } : {}) } };
   }
 
   /** LM-016: cancel steps live past their `timeout` (a controlled stop), then apply their onFail policy. */

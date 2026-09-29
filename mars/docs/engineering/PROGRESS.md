@@ -1497,4 +1497,30 @@ LM036 independent review follow-up: lowering now checks current carried/raising 
 
 Wave2 pre-gate review complete: 2d24de8 follow-up closes both independent LM036 findings; second review found no further blocker. Symmetric1e-6 dynamic vertical contact tolerance rejects a19mm held sheet rather than inheriting20mm holder floor allowance. Single informational19ft/4crew late-set cancel preflight17.864ms,0violations (open fixture, additional bodies add work). Camera stack remains isolated for the single wave2 pin window. Weekly usage52%; five-hour meter still unavailable. Starting clean integrated full gate; no candidate rows counted fixed yet.
 
+Wave 2 first full gate on `6c55285`: lint clean, unit 93/0; engine 484 passed / 1 failed with 6 skips and 11 TODOs. The existing stair-carry long-wait assertion expected `traffic.person` after 200 ticks, while the new detector correctly reported `deadlock.stalled`. The regression now requires `traffic.person` before the threshold, then exact mover/original-blocker metadata, held-load/reservation retention, and completion after the blocker leaves; all 7 focused stair cases pass. No production code, pin or tolerance changed. Later gate stages were not run. The full clean-head gate must pass before merge.
+
+
+## 2026-09-29 — release 10: supported cancellation and staged wait recovery
+
+Merged clean `3881c91` only after the complete gate passed: lint zero, unit93/0, engine485/0 (6skip/11TODO), tsc clean, browser84pass/7skip, unchanged flagship and probe, all36tools integration. Report `viewer/.cloudflare/gate/2026-09-29T02-13-35-768Z/report.json`. Idle original-threshold performance PASS with zero violations and pinned outcomes. Evidence regenerated against this report: all17rows and8milestones PROVEN, capability25/2/1 retains historical exceptions.
+
+Release10 `f7ea9962-0d5e-4af5-afc5-9b433e4c49da` live100%; rollback release9 `15c50c30-2e8e-4de5-a862-483abc1a9e47`. Production340assets/19routes, all36tools, director workflow, four browser tests and full Lab43steps passed; zero Lab violations/errors, browser/Node hashes identical. Six production captures personally inspected. Full table/commands in RELEASE_CHECKLIST deploy10. Subsequent docs-only record is not another source deployment.
+
+LAST_MILE30fixed/36reclassified/150remaining (+2 fixed: LM036/038). LM024 remains partial. No pins/history changed. Prepared isolated follow-ups are camera through 3a82ca0 (short screening passed; long-take cache/memory safety remains unproven), completion-dependent tails f3ef307, exact rafter spacing35a6441, walk-lookahead design9a19bbf. None counts fixed before integrated proof. LM049 bounded cases did not reproduce pushing; don't turn a suspected predictor mismatch into a claimed reproduced failure. LM089 remains dependent on LM070 body calibration.
+
+Quota tally: weekly36%→55% at last reading; API exposes no five-hour window, so the requested five-hour≤50% cannot be measured or asserted. Earlier clarification remains pending. At most3helpers, expensive validation serialized; camera permitted only one old/new bounded 37-body screening after production checks, not an unrestricted benchmark. Gate/source work is preserved at a clean release checkpoint; the full216-row program is not complete.
+
+Camera screening follow-up: docs-only isolated `3a82ca0`, one cold old/new 2-second real37-body case passed all unchanged guards, output/input identity preserved. Instrumented elapsed43.82/56.08ms, peakRSS154.70/163.27MiB; not a latency benchmark or saturated4096cache/220body proof. No expanded run; all helpers idle awaiting budget clarification.
+
+
 Wave2 D4 worker — LM100 exact rafter sheet spans (`codex/rafter-span`, base6c55285): enforce existing24in RAFTER_SPACING_MAX for bearing rafters/mixed supports; generic joist/reconstruction-beam policies unchanged. Focused5/0/0skip/0TODO, lint/tsc/source-scan clean;13state capture records inspected (exact-boundary/rotated/mixed/atomic-refusal cases). LM089 remains dependent on LM070 wave2F1, not falsely claimed as constant-only cleanup. `briefs/rafter-span.REPORT.md`; ~6k tokens/12min,0helpers. Heavy checks remain lead-serialized; no pins/history/deploy changes.
+
+
+- **LM-024 dependent-tail follow-up (storage worker):** completion-gated pending
+  tails now permit blocked reporting only after unchanged all-live-mover
+  quiescence proof. Independent cues/cancels/timeouts and invalid graphs remain
+  conservative; no cancellation, resource release or snapshot field added.
+  Focused 26 tests passed, tsc/scoped lint clean; inspected held-load JSON in
+  `briefs/deadlock-tails.REPORT.md`. LM-024 stays partial. No pins, broad suites or
+  deployment. Estimate 20 min / 8k tokens; zero additional helpers. Separate
+  movement-design docs commit `9a19bbf` still awaits integration.

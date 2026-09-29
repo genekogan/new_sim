@@ -365,14 +365,17 @@ forces a resource release; a successful validated replan follows its ordinary
 route-ownership behavior.
 
 SequenceRunner returns `blocked` early only if every live root, child and ambient
-action explicitly certifies all internal movers as exhausted, no step is pending,
-and no live step has a future timeout. Unknown verbs prevent early stopping. A
+action explicitly certifies all internal movers as exhausted, every pending step
+is completion-gated behind that work, and no live step has a future timeout. Unknown verbs prevent early stopping. A
 cue/cancellation/timeout gets a full subsequent runtime tick before certification.
 The runner does not cancel or settle the blocked actions: supports and
 reservations remain live, the result is unsettled, and execute refuses to commit
 it even with `commitOnFailure`. An explicit continuation can observe subsequent
-external progress. Pending dependent tails remain conservative: they prevent this
-early result and retain the ordinary timeout behavior.
+external progress. A fixed-point proof follows mandatory `after` / `when: completed`
+gates through pending tails; the tails remain pending, never skipped or cancelled.
+Independent future cues/cancels, started-only gates, invalid/unknown dependencies
+and dependency cycles prevent early stopping. See the
+[dependent-tail proof](briefs/deadlock-tails.REPORT.md).
 
 Episode anchors, recovery requests/results and the stopped runner diagnostic are
 plain snapshot state. Older snapshots without those optional fields remain
