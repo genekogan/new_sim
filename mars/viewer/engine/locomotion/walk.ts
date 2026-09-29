@@ -11,6 +11,7 @@
 //               (docs/engineering/MOVEMENT.md)
 //   traffic   : single-file passages are exclusive resources per direction (yield, never oscillate)
 //   animation : consumers read pose + human.activity; they never write positions
+import { blockedWait, publishedWaitsFor } from '../runtime/waits.ts';
 import { z } from 'zod';
 import { add2, angleDelta, clamp, cross2, dist2, dot2, heading, len2, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
@@ -134,7 +135,7 @@ type Exec = {
    * `makeWay` with `clearOf`): walk to `spot`, wait there until `clearOf(goal)` holds (the formation no
    * longer needs the goal), then replan to the goal.
    */
-  detour?: { spot: Vec2; level: number; by: string; clearOf: (q: Vec2) => boolean; stage: 'pending' | 'going' | 'waiting' };
+  detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf: (q: Vec2) => boolean; stage: 'pending' | 'going' | 'waiting' };
 };
 
 export const walkSchema = z.strictObject({
@@ -434,7 +435,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (r && !r.ok) return { status: 'failed', diagnostic: { ...r.diagnostic, code: 'route.invalidated', message: `${ex.actor} cannot walk on after stepping aside: ${r.diagnostic.message}` } };
     if (!r || !routeHeadClear(r.route, d.clearOf, 4)) {
       a.human!.activity = 'wait';
-      return { status: 'blocked', diagnostic: { code: 'traffic.stepped-aside', message: `${ex.actor} stepped aside for ${d.by} and waits for it to pass before walking on`, subjects: [ex.actor, d.by] } };
+      return blockedWait(rt, ex.id, ex.actor, d.blockers ?? [], { code: 'traffic.stepped-aside', message: `${ex.actor} stepped aside for ${d.by} and waits for it to pass before walking on`, subjects: [ex.actor, d.by] });
     }
     ex.detour = undefined;
     releaseAll(rt, ex);
@@ -812,15 +813,15 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   // was deferred): replan on the next tick, whatever the budget
   if (geoBlock) {
     ex.replanWait = REPLAN_MAX_WAIT;
-    return { status: 'blocked', diagnostic: { code: 'walk.obstacle', message: `${ex.actor} stops short of ${geoBlock} on its corridor and replans`, subjects: [ex.actor, geoBlock] } };
+    return blockedWait(rt, ex.id, ex.actor, [geoBlock], { code: 'walk.obstacle', message: `${ex.actor} stops short of ${geoBlock} on its corridor and replans`, subjects: [ex.actor, geoBlock] });
   }
   if (yieldTo && ex.v < 0.02) {
     const y0 = yieldsOf(rt)[ex.actor];
     yieldsOf(rt)[ex.actor] = { to: yieldTo, tick: rt.tick, since: y0 && y0.to === yieldTo && rt.tick - y0.tick <= 1 ? y0.since : rt.tick };
-    return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${ex.actor} is waiting for ${yieldTo} to clear a single-file passage`, subjects: [ex.actor, yieldTo] } };
+    return blockedWait(rt, ex.id, ex.actor, [yieldTo], { code: 'traffic.yield', message: `${ex.actor} is waiting for ${yieldTo} to clear a single-file passage`, subjects: [ex.actor, yieldTo] });
   }
   if (loadBlock && ex.v < 0.02)
-    return { status: 'blocked', diagnostic: { code: 'traffic.load', message: `${ex.actor} waits for the carried ${loadBlock} to pass`, subjects: [ex.actor, loadBlock] } };
+    return blockedWait(rt, ex.id, ex.actor, [loadBlock], { code: 'traffic.load', message: `${ex.actor} waits for the carried ${loadBlock} to pass`, subjects: [ex.actor, loadBlock] });
   if (personBlock && ex.v < 0.02) {
     // W47: the W38 passage release below, for a person in my way (not only on my destination) who waits for me to clear a
     // single-file passage I hold (west-house 2022, D1: m6 → its climb foot, m3 stopped on it yielding to m6 — deadlocked). Their yield is read from this tick or the last (walks inside a carry have no record of their own); only
@@ -828,7 +829,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     const y = yieldsOf(rt)[personBlock];
     if (ex.held.size && y && y.to === ex.actor && rt.tick - y.tick <= 1 && rt.tick - y.since >= RELEASE_AFTER && (ex.still ?? 0) >= RELEASE_AFTER) releaseAll(rt, ex);
     makeWay(rt, personBlock, pointAt(ex, ex.total));
-    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} is waiting for ${personBlock} to move out of the way`, subjects: [ex.actor, personBlock] } };
+    return blockedWait(rt, ex.id, ex.actor, [personBlock], { code: 'traffic.person', message: `${ex.actor} is waiting for ${personBlock} to move out of the way`, subjects: [ex.actor, personBlock] });
   }
   if (arrived) {
     if (lagging) return { status: 'running', phase: 'settle' }; // the body is still closing on the corridor point
@@ -838,9 +839,9 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
         // W38: the person on my destination waits for me to clear a single-file passage my destination lies in — I hold it
         // while I wait for them (chiba 2022, D1: m3 / m6 deadlocked for 16 h): let the passage go so they walk on through
         const ot = rt.world.entities[occ].human?.task, orec = ot ? rt.records.get(ot) : undefined;
-        if (ex.held.size && orec?.status === 'blocked' && orec.diagnostic?.code === 'traffic.yield' && orec.diagnostic.subjects?.includes(ex.actor)) releaseAll(rt, ex);
+        if (ex.held.size && orec?.status === 'blocked' && ((orec.diagnostic?.code === 'traffic.yield' && orec.diagnostic.subjects?.includes(ex.actor)) || (orec.diagnostic?.code === 'deadlock.cycle' && publishedWaitsFor(rt, occ, ex.actor, 'traffic.yield')))) releaseAll(rt, ex);
         makeWay(rt, occ, pointAt(ex, ex.total));
-        return { status: 'blocked', diagnostic: { code: 'walk.goal-occupied', message: `${ex.actor} cannot step onto its destination: ${occ} is standing there`, subjects: [ex.actor, occ] } };
+        return blockedWait(rt, ex.id, ex.actor, [occ], { code: 'walk.goal-occupied', message: `${ex.actor} cannot step onto its destination: ${occ} is standing there`, subjects: [ex.actor, occ] });
       }
       return { status: 'running', phase: 'settle' };
     }
@@ -1071,7 +1072,7 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
     }
   }
   if (!best) return;
-  if (ex) ex.detour = { spot: best, level: o.human.level, by: clearOf!.by, clearOf: clearOf!.test, stage: 'pending' };
+  if (ex) ex.detour = { spot: best, level: o.human.level, by: clearOf!.by, blockers: [...clearOf!.subjects], clearOf: clearOf!.test, stage: 'pending' };
   else rt.submit('walk_to', { actor: who, x: best[0], z: best[1] }, { id: `${who}:make-way:${rt.tick}` });
 }
 
@@ -1307,7 +1308,7 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     const t = traffic(rt).get(res);
     if (t && t.actors.size && !t.actors.has(ex.actor) && (t.exclusive || dist2(t.entry, leg.ascending ? link.from.p : link.to.p) > 0.5)) {
       ex.phase = 'align';
-      return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${ex.actor} waits for ${[...t.actors][0]} to finish using ${link.id}`, subjects: [ex.actor, link.id] } };
+      return blockedWait(rt, ex.id, ex.actor, [...t.actors], { code: 'traffic.yield', message: `${ex.actor} waits for ${[...t.actors][0]} to finish using ${link.id}`, subjects: [ex.actor, link.id] });
     }
     if (!t) traffic(rt).set(res, { actors: new Set([ex.actor]), entry: leg.ascending ? link.from.p : link.to.p, dir: rot2([1, 0], face) });
     else t.actors.add(ex.actor);
@@ -1322,7 +1323,7 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
   if (blocker) {
     ex.climbT = Math.max(0, ex.climbT - CLIMB_SPEED * dt);
     a.human!.activity = 'climb-wait'; // still on the stair: stair geometry, not the floor grid, applies
-    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} waits on ${link.id} for ${blocker} to move`, subjects: [ex.actor, blocker, link.id] } };
+    return blockedWait(rt, ex.id, ex.actor, [blocker], { code: 'traffic.person', message: `${ex.actor} waits on ${link.id} for ${blocker} to move`, subjects: [ex.actor, blocker, link.id] });
   }
   a.pose.p = next;
   a.pose.yaw = face;
@@ -1376,7 +1377,7 @@ function stepLinkCancel(rt: Runtime, ex: Exec, a: Entity, leg: LinkLeg, dt: numb
   const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);
   if (blocker) {
     a.human!.activity = 'climb-wait';
-    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} (cancelled) waits on ${leg.link.id} for ${blocker} to move before stepping off at the ${forward ? 'far' : 'near'} landing`, subjects: [ex.actor, blocker, leg.link.id] } };
+    return blockedWait(rt, ex.id, ex.actor, [blocker], { code: 'traffic.person', message: `${ex.actor} (cancelled) waits on ${leg.link.id} for ${blocker} to move before stepping off at the ${forward ? 'far' : 'near'} landing`, subjects: [ex.actor, blocker, leg.link.id] });
   }
   ex.climbT = at;
   a.pose.p = next;

@@ -4,6 +4,7 @@
 // derived from the load pose every tick, so grips never drift. Cancelling
 // never drops a load: it becomes a controlled set-down (deferred cancel) at
 // the current pose if that spot is clear, otherwise it is refused.
+import { blockedWait } from '../runtime/waits.ts';
 import { z } from 'zod';
 import { angleDelta, clamp, dcos, dsin, rot2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, CancelResult, StepResult } from '../actions/types.ts';
@@ -280,7 +281,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       const inWay = bystanderAt(rt, ex, carrierSpots(p.f, p.pickup), null);
       if (inWay) {
         makeWay(rt, inWay, [p.pickup.x, p.pickup.z]);
-        return { status: 'blocked', diagnostic: { code: 'carry.pickup-occupied', message: `the crew cannot take up ${p.item}: ${inWay} is standing at a grip position`, subjects: [p.item, inWay], at: [p.pickup.x, p.levelY, p.pickup.z] } };
+        return blockedWait(rt, ex.id, p.item, [inWay], { code: 'carry.pickup-occupied', message: `the crew cannot take up ${p.item}: ${inWay} is standing at a grip position`, subjects: [p.item, inWay], at: [p.pickup.x, p.levelY, p.pickup.z] }, p.crew);
       }
       // lift: the load leaves the ground, held by exactly the crew
       const item = itemOf(rt, ex);
@@ -355,7 +356,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
             return { status: 'running', phase: 'replan' };
           }
         }
-        if (ex.v < 0.02) return { status: 'blocked', diagnostic: { code: 'carry.path-occupied', message: `the crew carrying ${p.item} waits for ${ahead} to move out of its way`, subjects: [p.item, ahead], at: [c.x, p.levelY, c.z] } };
+        if (ex.v < 0.02) return blockedWait(rt, ex.id, p.item, [ahead], { code: 'carry.path-occupied', message: `the crew carrying ${p.item} waits for ${ahead} to move out of its way`, subjects: [p.item, ahead], at: [c.x, p.levelY, c.z] }, p.crew);
         return { status: 'running', phase: 'move' };
       }
       const vmax = Math.min(CARRY_SPEED, Math.sqrt(2 * ACCEL * Math.max(0, U - ex.u)) + 0.02);
@@ -376,7 +377,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         const bystander = bystanderAt(rt, ex, p.setdown, entityFrame({ ...itemOf(rt, ex), pose: p.laid }));
         if (bystander) {
           makeWay(rt, bystander, [p.target.x, p.target.z]);
-          return { status: 'blocked', diagnostic: { code: 'carry.setdown-occupied', message: `the crew holds ${p.item} at its destination: ${bystander} is standing where it must be set down`, subjects: [p.item, bystander], at: [p.target.x, p.levelY, p.target.z] } };
+          return blockedWait(rt, ex.id, p.item, [bystander], { code: 'carry.setdown-occupied', message: `the crew holds ${p.item} at its destination: ${bystander} is standing where it must be set down`, subjects: [p.item, bystander], at: [p.target.x, p.levelY, p.target.z] }, p.crew);
         }
         beginTransition(rt, ex, 'set-down', p.laid, p.setdown, wrapAngle(p.target.th), 'staged');
       }
@@ -529,7 +530,7 @@ function stepClimb(rt: Runtime, ex: Exec, dt: number): StepResult {
     const t = traffic(rt).get(res);
     if (t && t.actors.size && hypot(t.entry[0] - entry[0], t.entry[1] - entry[1]) > 0.5) {
       h.human!.activity = 'carry';
-      return { status: 'blocked', diagnostic: { code: 'traffic.yield', message: `${p.crew[0]} carrying ${p.item} waits for ${[...t.actors][0]} to finish using ${c.link.id}`, subjects: [p.crew[0], p.item, c.link.id] } };
+      return blockedWait(rt, ex.id, p.item, [...t.actors], { code: 'traffic.yield', message: `${p.crew[0]} carrying ${p.item} waits for ${[...t.actors][0]} to finish using ${c.link.id}`, subjects: [p.crew[0], p.item, c.link.id] }, p.crew);
     }
     if (t) { t.actors.add(p.crew[0]); t.exclusive = true; }
     else traffic(rt).set(res, { actors: new Set([p.crew[0]]), entry, dir: rot2([1, 0], face), exclusive: true });
@@ -542,7 +543,7 @@ function stepClimb(rt: Runtime, ex: Exec, dt: number): StepResult {
     h.human!.activity = 'climb-wait';
     const end = climbPose(p.f, c, c.s1).carrier;
     makeWay(rt, who, [end[0], end[2]]);
-    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${p.crew[0]} carrying ${p.item} waits on ${c.link.id} for ${who} to move`, subjects: [p.crew[0], who, p.item, c.link.id], at: next.carrier } };
+    return blockedWait(rt, ex.id, p.item, [who], { code: 'traffic.person', message: `${p.crew[0]} carrying ${p.item} waits on ${c.link.id} for ${who} to move`, subjects: [p.crew[0], who, p.item, c.link.id], at: next.carrier }, p.crew);
   }
   ex.s = s;
   itemOf(rt, ex).pose = next.load;

@@ -1,10 +1,11 @@
 // Fixed-step authoritative runtime. The same class runs rehearsals (in Node
 // tests or a forked room), official execution (Durable Object) and local
 // previews — there is no second "fast path" implementation (spec §16).
-import type { ActionDef, ActionRecord, ActionStatus, Diagnostic, Reservation } from '../actions/types.ts';
+import type { ActionDef, ActionRecord, ActionStatus, Diagnostic, Reservation, StepResult } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { Profiler } from './profile.ts';
+import { deadlockDiagnostics } from './waits.ts';
 import { applySnapshot, decodeSnapshot, SnapshotError, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
@@ -192,12 +193,18 @@ export class Runtime {
   /** Advance one fixed tick: step live actions in submission order, then check invariants. */
   step() {
     this.world.tick++;
+    const deferred = new Map<Live, StepResult>();
     for (const l of Array.from(this.live.values())) {
       if (!this.live.has(l.rec.id)) continue; // finished earlier this tick (e.g. cancelled with its failed parent)
       const prof = this.prof;
       const t0 = prof ? prof.now() : 0;
       const r = l.def.step(this, l.exec, DT);
       if (prof) prof.add(`${l.rec.verb}.step`, prof.now() - t0);
+      // Keep an existing persistent diagnostic stable until every mover has published this tick.
+      if (l.rec.diagnostic?.code === 'deadlock.cycle' && (r.status === 'running' || r.status === 'blocked')) {
+        deferred.set(l, r);
+        continue;
+      }
       if (r.status === 'running') {
         if (l.rec.status !== 'executing' || r.phase !== l.rec.phase) {
           l.rec.diagnostic = undefined;
@@ -213,6 +220,23 @@ export class Runtime {
         l.rec.diagnostic = r.diagnostic;
         this.finish(l, 'failed', r.diagnostic);
       }
+    }
+    const deadlocks = deadlockDiagnostics(this);
+    for (const [l, r] of deferred) {
+      if (!this.live.has(l.rec.id)) continue; // another action may have cancelled it later in this tick
+      if (deadlocks.has(l.rec.id)) continue;
+      if (r.status === 'running') {
+        l.rec.diagnostic = undefined;
+        this.emit(l.rec, 'executing', undefined, r.phase);
+      } else if (r.status === 'blocked') {
+        l.rec.diagnostic = r.diagnostic;
+        this.emit(l.rec, 'blocked', r.diagnostic);
+      }
+    }
+    for (const [id, diagnostic] of deadlocks) {
+      const rec = this.records.get(id)!;
+      if (rec.status !== 'blocked' || rec.diagnostic?.code !== diagnostic.code) this.emit(rec, 'blocked', diagnostic);
+      rec.diagnostic = diagnostic;
     }
     if (this.waiting.size) this.admitWaiting();
     const ti = this.prof ? this.prof.now() : 0;

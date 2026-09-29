@@ -269,6 +269,7 @@ export class SequenceRunner {
       if (rec.status === 'blocked') r.blockedTicks++;
       if (!TERMINAL.has(rec.status)) {
         r.status = rec.status === 'blocked' ? 'blocked' : 'executing';
+        r.diagnostic = rec.diagnostic;
         continue;
       }
       r.endedTick = rec.endedTick;

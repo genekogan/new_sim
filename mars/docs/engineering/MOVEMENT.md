@@ -331,3 +331,34 @@ Pins moved once, with the same discrete outcomes (`PLANNING_BUDGET.md`).
   speeds are not asserted per activity: carry `CARRY_SPEED` 0.9 m/s, frame climb 0.35 m/s (`construction/frame.ts`).
   The exception is beam walking, which has its own `frame.beam-overspeed` (0.4 m/s).
 
+
+## Persistent wait reporting (LM-024, reporting stage)
+
+`runtime/waits.ts` collects explicit dependencies by mover, not action id: a
+carry's gathering walkers remain separate nodes, moving carries alias their crew
+to the load, and rides alias their rider to the vehicle. Walk person/load/passage
+waits, carry person/stair waits and ride person/vehicle waits publish concrete
+identities. Static blockers and ambiguous aliases do not become invented mover
+edges. Forklift-specific manipulation waits and acyclic exhausted waits are not
+covered by this stage.
+
+A cycle with unchanged dependencies and poses for 200 consecutive ticks (10 s)
+gets `deadlock.cycle`, including sorted movers, owner actions and edges. This is an
+explicit reporting policy after existing local recovery windows, not proof that
+future movement can never clear the passage. Runtime keeps stepping the actions;
+it never releases support or reservations to resolve the report. Progress or a
+broken/stale edge clears the overlay. The overlay is stable, and live sequence
+step reports retain its diagnostic. Existing walking reciprocal-passage recovery
+still reads the underlying published wait.
+
+Episode state lives in the runtime service bag and is captured in resumable
+snapshots; no WorldState fields change. Older snapshots without it remain valid
+and begin fresh episodes. Waiting snapshot blob hashes change; ordinary transient
+passage world/event hashes remain unchanged. See
+[the focused report](briefs/deadlock-detection.REPORT.md).
+
+LM-024 remains **partial**: the one-per-episode explicit recovery request, safe
+early `blocked` sequence result, exhausted acyclic wait policy and an actual
+unresolvable passage/gather proof remain follow-up work. Scheduled future cues
+continue running. A generic forced three-cycle is not LM-043's physical
+three-vehicle traffic proof.

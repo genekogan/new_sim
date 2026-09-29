@@ -1,0 +1,170 @@
+{
+  "tick": 742,
+  "diagnostic": {
+    "code": "deadlock.cycle",
+    "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+    "subjects": [
+      "b1",
+      "bystander"
+    ],
+    "details": {
+      "sinceTick": 543,
+      "thresholdTicks": 200,
+      "movers": [
+        {
+          "mover": "b1",
+          "action": "step:carry",
+          "blockedBy": [
+            "bystander"
+          ],
+          "code": "carry.path-occupied"
+        },
+        {
+          "mover": "bystander",
+          "action": "step:hold",
+          "blockedBy": [
+            "b1"
+          ],
+          "code": "test.wait"
+        }
+      ],
+      "edges": [
+        {
+          "from": "b1",
+          "to": "bystander"
+        },
+        {
+          "from": "bystander",
+          "to": "b1"
+        }
+      ],
+      "recovery": "existing movement retries remain active; no resources released"
+    }
+  },
+  "support": {
+    "kind": "held",
+    "by": [
+      "p1",
+      "p2"
+    ]
+  },
+  "result": {
+    "status": "partial",
+    "steps": [
+      {
+        "id": "hold",
+        "verb": "forced_wait",
+        "status": "blocked",
+        "started": true,
+        "blockedTicks": 742,
+        "actionId": "step:hold",
+        "submittedTick": 0,
+        "diagnostic": {
+          "code": "deadlock.cycle",
+          "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+          "subjects": [
+            "b1",
+            "bystander"
+          ],
+          "details": {
+            "sinceTick": 543,
+            "thresholdTicks": 200,
+            "movers": [
+              {
+                "mover": "b1",
+                "action": "step:carry",
+                "blockedBy": [
+                  "bystander"
+                ],
+                "code": "carry.path-occupied"
+              },
+              {
+                "mover": "bystander",
+                "action": "step:hold",
+                "blockedBy": [
+                  "b1"
+                ],
+                "code": "test.wait"
+              }
+            ],
+            "edges": [
+              {
+                "from": "b1",
+                "to": "bystander"
+              },
+              {
+                "from": "bystander",
+                "to": "b1"
+              }
+            ],
+            "recovery": "existing movement retries remain active; no resources released"
+          }
+        }
+      },
+      {
+        "id": "carry",
+        "verb": "carry",
+        "status": "blocked",
+        "started": true,
+        "blockedTicks": 200,
+        "actionId": "step:carry",
+        "submittedTick": 0,
+        "diagnostic": {
+          "code": "deadlock.cycle",
+          "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+          "subjects": [
+            "b1",
+            "bystander"
+          ],
+          "details": {
+            "sinceTick": 543,
+            "thresholdTicks": 200,
+            "movers": [
+              {
+                "mover": "b1",
+                "action": "step:carry",
+                "blockedBy": [
+                  "bystander"
+                ],
+                "code": "carry.path-occupied"
+              },
+              {
+                "mover": "bystander",
+                "action": "step:hold",
+                "blockedBy": [
+                  "b1"
+                ],
+                "code": "test.wait"
+              }
+            ],
+            "edges": [
+              {
+                "from": "b1",
+                "to": "bystander"
+              },
+              {
+                "from": "bystander",
+                "to": "b1"
+              }
+            ],
+            "recovery": "existing movement retries remain active; no resources released"
+          }
+        }
+      }
+    ],
+    "violations": [],
+    "diagnostics": [],
+    "startTick": 0,
+    "endTick": 742,
+    "ticks": 742,
+    "finalStateHash": "8378e34e4f39d6827f412604de8f36b2b96d627963ea7f9e9b1469290013f768",
+    "cut": [],
+    "settled": false,
+    "unsettled": [
+      "action step:hold (forced_wait) is still blocked",
+      "action step:carry (carry) is still blocked (move)"
+    ],
+    "settleTicks": 0
+  },
+  "violations": []
+}

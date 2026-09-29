@@ -4,6 +4,7 @@
 // navigation grids), support { kind: 'ridden-by', by }, and the rider holds it (human.grip, so no
 // walking verb can take the rider off it) with human.riding = vehicle id and activity 'ride'.
 // Riding follows a curvature-limited reference curve (curve.ts) with pure pursuit.
+import { publishWait } from '../runtime/waits.ts';
 import { z } from 'zod';
 import { add2, angleDelta, clamp, dcos, dist2, dsin, heading, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
@@ -519,6 +520,13 @@ function vehicleWait(rd: Rider, o: Other, why: 'footprint' | 'lane', at: Vec2): 
 /** ride_to / ride_loop step: the follower (stepRideCore), then its lane in services.vehicleLanes (dropped when the ride ends). */
 function stepRide(rt: Runtime, ex: RideExec, dt: number): StepResult {
   const r = stepRideCore(rt, ex, dt);
+  if (r.status === 'blocked') {
+    // These two local diagnostic contracts name the blocking actor/vehicle explicitly.
+    // Corridor geometry is an external sink, never inferred as another active mover.
+    const d = r.diagnostic;
+    const blockers = d.code === 'traffic.vehicle' ? d.subjects?.slice(2) : d.code === 'traffic.person' ? d.subjects?.slice(1) : undefined;
+    if (blockers?.length) publishWait(rt, ex.id, ex.vehicle, blockers, d, [ex.actor]);
+  }
   const v = rt.world.entities[ex.vehicle];
   if (r.status === 'completed' || r.status === 'failed' || !v) dropLane(rt, ex.vehicle);
   else {
