@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "f709304d-fc55-45f2-a44b-200cfadf4ae1",
+  "version": "79d424e3-a243-49ad-8b38-89f016673375",
   "published": "2026-09-28",
   "verification": "../.cloudflare/audit/http-smoke.json",
   "updated": "2026-09-28",
-  "feature": "release 7: Watch it being built · 2022 east-house A+B chapter set, prone receiver, framing verbs, v3 take",
+  "feature": "release 8: handoff head — controller lane (region staleness, auto rebind, parse_camera, store_camera_track), lint 123→25, directCamera 25×, set player, Codex tranche, north −90/−101, 2022 reconciliation a–f+i (content parked), Chiba 2024 front, prone receiver, framing verbs, /questions page",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,7 +17,8 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "07dce638-2950-444f-823f-0e19b8f62320",
+  "rollback_version": "f709304d-fc55-45f2-a44b-200cfadf4ae1",
   "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab",
-  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-7-2026-09-28-watch-it-being-built"
+  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-8-2026-09-28-handoff-head",
+  "questions_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/questions/"
 }

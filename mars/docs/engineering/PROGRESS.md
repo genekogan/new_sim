@@ -1445,3 +1445,24 @@ Then: gate → release 5; HANDOFF refresh.
   - PLANNING_BUDGET.md has no W51 entry for the 2022 pins that are now `todo`.
   - LAST_MILE §1 rows LM-007…LM-017 are duplicated at lines 75–89, and two LM-012 copies still say "in flight".
   - The consolidated gate's `report.json` records `gitDirty: true`.
+
+## 2026-09-28 — release 8: `1a0b458` to production (`79d424e3`), rollback `f709304d`
+- Deployed the consolidated-gate head `1a0b458` from `final-gate-wt` (gate not re-run; report
+  `.cloudflare/gate/2026-09-28T23-33-14-786Z`, `ok: true`). Live `79d424e3-a243-49ad-8b38-89f016673375` (23:51:36Z);
+  rollback target `f709304d-fc55-45f2-a44b-200cfadf4ae1` (release 7, confirmed 100% before the deploy). Not in it: `bc9909e`, `7e799b3`, `5f3bc9b`, `11d1dbd`, `e87f732` (docs only) and `df0ef7f` (docs + one test line: chiba full A+B `todo`; no shipped code). Build 340 files / 821.1 MiB, 0 R2 uploads, 56 new assets, startup 91 ms.
+- Green: every route 200 incl. `/studio/2022`, `/studio/2024`, `/questions/` (21/21 images, screenshot reviewed);
+  manifest + 11 take files; R2 GLB; `smoke.mjs ALL_ASSETS=1`; director demo 9/9 (7.9 s); headless `/lab` 43/43, 0
+  violations, hash `b746b094…` = probe; `/studio` flagship "held" = recorded = manifest `c56ea8da…`; `/studio/2024` front
+  eye shows the red Chiba front (screenshot reviewed).
+- **Red (reported, not patched):**
+  - `simulation-integration.mjs:459` expects a plan bound before an edit to be `plan.stale`; production (W58's
+    region-scoped staleness, `ecce5f4`) executes it because the edit is in another region. The registry tool list
+    (16 engine tools) and the directed camera passed before it; the pause/resume, isolation and limits sections were not
+    reached. A scratch run with that one assert skipped was blocked by the permission classifier, so it was not done.
+  - `npm run evidence` exits 1: `evidence-map.json` cites the old `core.test.ts` transcendentals title (moved to
+    `source-scan.test.ts` in `05787d2`); capabilities 25 / 2 / 1, milestones 7 / 1 / 0 (rows 17/17 PROVEN; 433 tests,
+    416 pass / 0 fail / 17 skip). Committed as generated.
+  - `/studio/2022` chapter set: plays to the end, continuity 7/7 ✓, final `ddb634d6…` = A+B pin ✓, but "✗ 0 frames +
+    beams + 0 parts at the mars-2022 canonical pose (of 57 + 115, max 5082.94 mm)": the pre-W51 take against the
+    reconciled scene (content parked). The new 2022 scene (another house, trailers, "Ba Sing Se") shows around it.
+- Record: `RELEASE_CHECKLIST.md` "Production deploy 8"; HANDOFF "Deployment status"; `deployment.json`.

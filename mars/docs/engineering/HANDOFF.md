@@ -352,17 +352,17 @@ node deploy/simulation-integration.mjs                         # real MCP incl. 
 
 - **Production:** Worker `mars-campus-2026`, R2 bucket `mars-campus-2026-models`, at
   `https://mars-campus-2026.<workers-subdomain>.workers.dev` (`/studio`, `/mcp`, `/simulation-agent-guide.md`).
-- **Live:** `f709304d-fc55-45f2-a44b-200cfadf4ae1` (deploy 7, "Watch it being built", from `d91057b`).
-- **Rollback target:** `07dce638-2950-444f-823f-0e19b8f62320` (deploy 6, live before deploy 7, confirmed at
+- **Live:** `79d424e3-a243-49ad-8b38-89f016673375` (deploy 8, handoff head, from `1a0b458`).
+- **Rollback target:** `f709304d-fc55-45f2-a44b-200cfadf4ae1` (deploy 7, live before deploy 8, confirmed at
   100% with `wrangler deployments status`). `viewer/deploy/deployment.json` records it as
-  `rollback_version`; its `version` is the live `f709304d…`.
+  `rollback_version`; its `version` is the live `79d424e3…`.
 - **Release gate:** a deploy starts from a green `npm run gate` report (`ok: true`, `gitHead` = the
   deployed commit, `gitDirty: false`). See `RELEASE_CHECKLIST.md`.
 - **Release steps** (`viewer/deploy/README.md`): `browser-model.py` → `compress-browser.mjs` →
   `prepare.py` → `CLOUDFLARE_RELEASE=1 npm run build` → `deploy/upload.mjs` →
   `wrangler deploy --config dist/server/cloudflare.json`; then `SITE_BASE=… ALL_ASSETS=1 node
   deploy/smoke.mjs` and `SIM_BASE=… node deploy/simulation-integration.mjs`.
-- **Shipped to production 2026-09-27** (deploys 1–4) **and 2026-09-28** (deploys 5, 6 and 7; see below); before that, not live:
+- **Shipped to production 2026-09-27** (deploys 1–4) **and 2026-09-28** (deploys 5–8; see below); before that, not live:
   the engine, the `engine_*` tools,
   `/api/simulation/engine/take`, `/lab` (`5f02352`) and the NOAA sun.
 - Git is local only; nothing is pushed without Gene.
@@ -463,6 +463,26 @@ frame = final state (0.64 mm) · ✓ 66 frames + beams + 145 parts at the mars-2
 `/studio` at "held": 37/37, hash = recorded = manifest (`c56ea8da…`), banner, 0 errors. Details:
 `RELEASE_CHECKLIST.md` "Production deploy 7". Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
 ./node_modules/.bin/wrangler rollback 07dce638-2950-444f-823f-0e19b8f62320 --name mars-campus-2026 -m "rollback: <reason>"`
+
+**Production deploy 8 (2026-09-28, handoff head):** Worker version `79d424e3-a243-49ad-8b38-89f016673375`, built from
+`1a0b458` in the consolidated gate's worktree, replacing `f709304d-fc55-45f2-a44b-200cfadf4ae1` (now the rollback
+target). It ships everything since release 7 up to the handoff head: the W58 controller lane (region-scoped staleness,
+`rebind: 'auto'`, `engine_parse_camera`, `engine_store_camera_track`), lint 123 → 25, `directCamera` 25×, the set player,
+the Codex tranche, per-year north (−90 / 2022 −101), the 2022 reconciliation a–f + i (content parked), the 2024 Chiba
+front, the prone receiver, framing verbs and the `/questions/` page. Not in it: `bc9909e`, `7e799b3`, `5f3bc9b`, `11d1dbd`, `e87f732` (docs only) and `df0ef7f` (docs + one test line: chiba full A+B `todo`; no shipped code). Gate
+(not re-run): `.cloudflare/gate/2026-09-28T23-33-14-786Z`, `ok: true`: 77 unit, engine 416 pass / 6 skip, tsc, e2e 78
+passed / 7 skipped, probe `b746b094…f0c3` (unchanged); `gitDirty: true` from the untracked `.pw-browsers` symlink only.
+Evidence: rows 17/17 PROVEN, capabilities 25 / 2 / 1, milestones 7 / 1 / 0 (`npm run evidence` exits 1 on a stale
+`evidence-map.json` title for the transcendentals test, renamed in `05787d2`). Live smoke: every route 200 (incl.
+`/studio/2022`, `/studio/2024`, `/questions/` with all 21 images), manifest + 11 take files, the R2 GLB;
+`smoke.mjs ALL_ASSETS=1` OK. The director demo PASSED (9 steps, 7.9 s). **Integration is RED** at
+`simulation-integration.mjs:459` (a plan bound before an edit in another region is no longer `plan.stale`, by W58's
+design; the expectation is stale). The registry tool list (16 engine tools) and the directed camera passed before it.
+Headless production `/lab`: 43/43, 0 violations; **the production hash equals the probe hash.** `/studio/2022` chapter
+set plays to the end with continuity 7/7 and final = A+B pin, but its canonical-pose check is ✗ (0 of 57 + 115, max
+≈ 5.08 m) because the take predates W51's scene. `/studio` flagship at "held" = recorded = manifest (`c56ea8da…`). Details:
+`RELEASE_CHECKLIST.md` "Production deploy 8". Rollback, from `viewer/`: `WRANGLER_WRITE_LOGS=false
+./node_modules/.bin/wrangler rollback f709304d-fc55-45f2-a44b-200cfadf4ae1 --name mars-campus-2026 -m "rollback: <reason>"`
 
 ## Suggested next tranche (prioritised)
 

@@ -517,3 +517,84 @@ Rollback (from `viewer/`):
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 07dce638-2950-444f-823f-0e19b8f62320 \
   --name mars-campus-2026 -m "rollback: <reason>"
 ```
+
+## Production deploy 8 (2026-09-28, handoff head)
+
+Gene requires a deploy at each green milestone. Deployed by the release-8 worker from committed tree `1a0b458` in the
+detached worktree `scratchpad/final-gate-wt`, the same tree the consolidated gate ran in (`git -C <wt> rev-parse HEAD` =
+`1a0b458cfaf3…`; the only untracked entry is the `viewer/.pw-browsers` symlink). Contents since `d91057b`: the W58
+controller lane (region-scoped plan staleness, `rebind: 'auto'`, `engine_parse_camera`, `engine_store_camera_track`,
+parked vehicles), W57 lint 123 → 25 with the integration/director scripts reading the op registry, `directCamera` 25×,
+the W48 set player, the Codex tranche, per-year north (−90, 2022 −101), W51's 2022 reconciliation a–f + i (content
+parked: the 2022 takes and chapter set are stale against the new scene), W47's houses, the 2024 Chiba front, the prone
+receiver, framing verbs and the `/questions/` page. **Not in it:** `bc9909e`, `7e799b3`, `5f3bc9b`, `11d1dbd`, `e87f732` (docs only) and `df0ef7f` (docs + one test line: chiba full A+B `todo`; no shipped code).
+
+- **New version: `79d424e3-a243-49ad-8b38-89f016673375`** (created 23:51:36Z). It replaces
+  `f709304d-fc55-45f2-a44b-200cfadf4ae1` (release 7), which `wrangler deployments status` confirmed live at 100% twice
+  before the deploy. `f709304d…` is the new rollback target.
+- **Gate:** the consolidated run `viewer/.cloudflare/gate/2026-09-28T23-33-14-786Z/report.json` in `final-gate-wt`
+  (not re-run): `ok: true`, `gitHead` `1a0b458`, `gitDirty: true` (the untracked `.pw-browsers` symlink only; this
+  run did not use the `core.excludesFile` recipe). Results: `npm test` 77/77; `test:engine` 416 pass / 0 fail / 6 skip;
+  `tsc` clean; e2e 78 passed / 7 skipped; probe `finalStateHash` `b746b0947e65…62e7f0c3` (unchanged since release 6).
+- **Evidence (`1a0b458`):** `npm run evidence` exited **1**: 433 engine tests (416 pass / 0 fail / 17 skip); rows 17
+  PROVEN / 0 PARTIAL / 0 UNPROVEN; capabilities 25 / 2 / 1; milestones 7 / 1 / 0. The drop from 27 / 1 / 0 and 8 / 0 / 0
+  is a stale map entry, not a lost test: `evidence-map.json` still cites `core.test.ts :: "engine source never calls the
+  host transcendentals"` (capability "Deterministic trig across hosts" and §30 A), which `05787d2` replaced with
+  `source-scan.test.ts :: "engine production source excludes host Math transcendentals …"` (passes). **Follow-up for the
+  owner of `engine/test/evidence-map.json`:** point both entries at the new title.
+- **Build:** `prepare.py` staged 340 files (821.1 MiB, 8 large objects). `CLOUDFLARE_RELEASE=1 npm run build` exited 0
+  with the known chunk-size warning and `INEFFECTIVE_DYNAMIC_IMPORT` note. `dist/client/engine/takes/` holds the
+  manifest + 11 take files; `dist/client/questions/` holds `index.html` and its images. `upload.mjs` (main checkout's
+  `uploaded.json` copied in) made 0 uploads (8 × `Already uploaded`). The dry run exited 0 (386 assets, 5733.01 KiB /
+  1085.08 KiB gzip; bindings SIMULATIONS, MODELS, ASSETS). The deploy uploaded 56 new asset files (306 already present);
+  startup 91 ms.
+- **Live smoke:** `/`, `/studio`, `/studio/2020`, `/studio/2022`, `/studio/2024`, `/lab` and `/simulation-guide` 200
+  text/html; `/questions/` 200 (56,600 B) and `/questions` 301. `/simulation-agent-guide.md` 200 (28,275 B).
+  `/engine/campus-2026.json` (1,081,647 B) and `/engine/campus-2022.json` (255,547 B) 200 application/json.
+  `/engine/takes/manifest.json` 200 (15,373 B, byte-identical to the build) and all 11 take files it lists 200
+  application/json. `/nope` 404. `HEAD /browser/campus.glb` 200 model/gltf-binary from R2. `SITE_BASE=… ALL_ASSETS=1 node
+  deploy/smoke.mjs` exited 0 (19 routes 200, 340 assets, GLB range header verified, anonymous state denied).
+- **`/questions/` (browser):** "Questions for Gene", 21 images all decoded, no ≥ 400 responses, 0 console errors.
+  Screenshot `viewer/e2e/artifacts/prod-smoke-8/questions-top.png` (reviewed: intro "13 open questions…", Q20 pinwheel
+  handedness with its three pictures, "0 of 13 answered · Export answers" bar).
+- **Integration: RED.** `SIM_BASE=… node deploy/simulation-integration.mjs` exits 1 at line 459:
+  `execute plan bound before the edit must be refused` (production executed the early plan instead of returning
+  `plan.stale`). Before that it passed the MCP handshake, 20 legacy tools, **the registry tool list (16 engine tools, =
+  `engineTools()`)**, the engine section (rehearse 521 ms, execute 535 ms, camera 978 ms, take 22,918 B) and the directed
+  camera in the room (track `dir-61e7d8cef6fb`, 33 samples; p1 orbit occluded → cut). Cause: the script's expectation
+  predates W58's region-scoped staleness (`ecce5f4`): the edit touches yard B / `yb-staging` and the early plan walks p1 to
+  (3, 3), so the plan is no longer stale. The gate does not run this script (no `SIM_BASE`). The sections after line 459
+  (pause/resume, isolation, limits) were not reached. **Follow-up for the owner of `deploy/`:** make the early plan touch
+  the edited region, or assert the new region-scoped result.
+- **Director demo:** `node deploy/director-demo.mjs --base https://mars-campus-2026.<workers-subdomain>.workers.dev` exited 0: all 9
+  steps, including step 9 pause → fork → resume both branches; total 7.9 s.
+- **Browser `/lab`:** headless Chromium (SwiftShader) on production `/lab?scenario=build-bay`: tick 10901, done, 5/5
+  expectations (43/43 steps, 0 violations, visitor on level 4), 0 console errors. Screenshot
+  `viewer/e2e/artifacts/prod-smoke-8/build-bay-end.png`.
+- **Cross-host determinism:** the production `stateHash()` is
+  `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3`, the gate probe's value. **They match.**
+- **Browser `/studio/2022` chapter set (stale content, still plays):** the set entry is offered first (7 chapters,
+  8 h 20 min), then the bay-1 and whole-skeleton takes; whole-set checks done 8.6 s after load. Scrubbed to the end
+  (8:20:29): chapter 7/7 P, 221/221 drawn, shot "solar: done", every chapter hash + start ✓, and the checks line reads
+  "✓ continuity: 7 / 7 chapter starts · ✓ final state ddb634d6… = A+B pin · last frame = final state (0.64 mm) ·
+  **✗ 0 frames + beams + 0 parts at the mars-2022 canonical pose (of 57 + 115) (≤ 1 cm, 1°; max 5082.94 mm)**"; 0
+  console errors. The ✗ is the expected face of "content parked": the set replays the pre-W51 east-house while the
+  canonical pose is now W51's reconciled scene (beams ≈ 5 m away). Screenshot
+  `viewer/e2e/artifacts/prod-smoke-8/studio-2022-set-final.png` (reviewed: the finished east-house with deck, tan wall
+  panels and roof solar, crew stood down in front; the new 2022 scene around it — another reconciled house with a blue
+  wall and a large solar array behind, trailers, "Ba Sing Se" in the header; chapter bar all ✓).
+- **Browser `/studio`:** Replay take lists flagship and flagship v3; flagship `d2f16bd3…` scrubbed to "held" (t 209.6 s),
+  engine camera on (shot "orbit the raise"): 37/37 drawn, final-state hash = recorded = manifest (`c56ea8da…7157`),
+  HYPOTHETICAL banner visible, 0 console errors. Screenshot `viewer/e2e/artifacts/prod-smoke-8/studio-take-held.png`.
+- **Browser `/studio/2024` front eye** (`__marsStudio.look([0,1.6,24],[0,2.4,5.5])`, the `studio-years` e2e view):
+  0 console errors. Screenshot `viewer/e2e/artifacts/prod-smoke-8/studio-2024-front-eye.png` (reviewed: the red Chiba
+  front — vertical inset with straight central stairs to the "Chiba" door landing, leaning PV flaps with stepped panels
+  on the left, the plexiglass solarium on the right, a walker in front).
+- Compression audit: not required (the browser model was not rebuilt; 8 large objects all already in R2).
+
+Rollback (from `viewer/`):
+
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback f709304d-fc55-45f2-a44b-200cfadf4ae1 \
+  --name mars-campus-2026 -m "rollback: <reason>"
+```

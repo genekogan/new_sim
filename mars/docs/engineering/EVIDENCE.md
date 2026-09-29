@@ -8,19 +8,24 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `d91057b` (engine tree clean) |
-| Generated | 2026-09-28T17:59:16.741Z · Node v26.8.2 |
-| Engine suite | 383 tests in 58 files: 380 pass, 0 fail, 3 skipped · 43.7 s wall |
+| Git HEAD | `1a0b458` (engine tree clean) |
+| Generated | 2026-09-28T23:57:25.555Z · Node v26.8.2 |
+| Engine suite | 433 tests in 64 files: 416 pass, 0 fail, 17 skipped · 44.3 s wall |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
-| Capabilities beyond §28 | 27 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 28) |
-| §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 4732 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 7458 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 12549 ms compute (cropped 7642 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
+| Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
+| §30 milestones | 7 PROVEN · 1 PARTIAL · 0 UNPROVEN (of 8) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 5261 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 7920 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 12769 ms compute (cropped 7939 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test passed in this run. PARTIAL = some did. UNPROVEN = no mapped test, or none passed.
 PROVEN means only that the listed tests pass; the approximation notes say what they do not show.
+
+## Problems in this run
+
+- Mapped test not found (renamed or removed?): capability Deterministic trig across hosts: core.test.ts :: "engine source never calls the host transcendentals"
+- Mapped test not found (renamed or removed?): §30 A: core.test.ts :: "engine source never calls the host transcendentals"
 
 ## SPEC §28 behavioural regressions
 
@@ -300,7 +305,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Incremental grids bit-identical | PROVEN | 6/6 | Equality is checked on 240 random scenes and on every sync of the build-bay probe, the lab construction and the cropped campus flagship, not on the uncropped campus. Reordered or duplicate obstacle lists fall back to a full rebuild. Grids stay 0.1 m rasters with an exact EDT (no navmesh). |
 | Stable historical ids + migration | PROVEN | 1/1 | The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), which this report does not run. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly. |
 | DO storage caps + isolation through the room | PROVEN | 6/6 | Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised. |
-| Deterministic trig across hosts | PROVEN | 5/5 | This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified. |
+| Deterministic trig across hosts | PARTIAL | 4/5 | This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified. |
 | Mid-action resumability (walking/social subset) | PROVEN | 6/6 | Walking, stairs and social verbs only: carry, construction lifts, vehicles and ambient_wander are not resumable (a snapshot is refused naming the action). Each restored runtime needs its own Spatial; the teleport check has no prior poses on the first restored tick (TAKES_AND_PLANS.md). |
 | Flagship on the full uncropped 2026 campus | PROVEN | 2/2 | Bit-identical since W1's global grid lattice (cell coordinates on one world lattice, not the crop's origin): the former todo is an assertion. Proven for this one scenario at the staging-east site; the whole campus is still ground level 0 only, and it costs about 2.5–3× the compute of the crop. |
 | Hand-up to people on the rack (and off the forklift) | PROVEN | 11/11 | Reach is a cylinder + arm-length envelope (the body model), not IK; receivers feed hand over hand from a fixed station and a sheet is never turned over the bay; balance is checked for a single giver only (sheets and single receivers are not checked); reach-down is capped at 0.5 m below the feet, so receivers more than ~2.55 m above the givers need the forklift (HANDUP.md). The v3 build passes at its pinned open-ground site but its onto_s2_4 beam_walk fails beam.no-room (clearance 0.25 < 0.28 m on s2) at most other sites tried, including the 2026 staging-east clearing (W17, PROGRESS.md), so v3 is not a campus take. |
@@ -308,8 +313,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | Items, serving and eating | PROVEN | 6/6 | Items do not collide with each other; reach over a table assumes a forward bend (only eating is checked against the 0.62 m arm envelope); a carried item trails its hand by one tick (≤ 7 cm) while walking; no drinking cycle, ladle, food geometry or spill, and `contents` is a number (ITEMS.md). |
 | Solar panels, rails and equipment | PROVEN | 4/4 | Tilt legs / rear risers are implied and the tilt direction is fixed (no azimuth choice); rails, equipment and low panels are set from ≤ 1 m; rails are assumed screwed to the sheets; sloped roofs are not modelled; no wiring (SOLAR_PAINT.md). Proven on a synthetic deck, not in a year build. |
 | Painting a wall | PROVEN | 3/3 | Flat upright faces only, one rectangular face per call, no drips, layers or drying; coverage is an area fraction, not a texture mask; the band below 0.5 m (crouching) is out of reach (SOLAR_PAINT.md). Renderer texture = colour + stripe until textures exist. |
-| Year build phase A: a historical skeleton from the piles | PROVEN | 9/9 | The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md). |
-| Year build phase B: floors, stairs, walls, solar in the year sequence | PARTIAL | 3/4 | PARTIAL by construction: the default suite executes only the plan (material rules for deck strips, the Kit stair, walls and solar; BOM; yard; unplaced reasons; determinism), the report-only plans of the other three 2022 houses, and ONE executed phase-B section — the first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pass_up, screwed; 0 violations, pinned 94db263e… @53604). The whole east-house A+B run (decks, stair, walls, solar) is gated YEAR_BUILD_FULL=1, is skipped here and has no pin yet (PIN_FULL_AB empty at HEAD); W13 reports each section (ground / first-floor / roof deck, Kit stair, walls, solar) running clean in its own runs (commits d44c601…c3405da), but no committed test executes the stair, wall or solar sections — in this suite they are proven only as plans. Kit geometry (deck strips at beam height without joists, an 8-tread stair without stringers) is a reconstruction guess — open questions for Gene (PROGRESS.md). |
+| Year build phase A: a historical skeleton from the piles | PARTIAL | 6/9 | The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md). |
+| Year build phase B: floors, stairs, walls, solar in the year sequence | UNPROVEN | 0/4 | PARTIAL by construction: the default suite executes only the plan (material rules for deck strips, the Kit stair, walls and solar; BOM; yard; unplaced reasons; determinism), the report-only plans of the other three 2022 houses, and ONE executed phase-B section — the first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pass_up, screwed; 0 violations, pinned 94db263e… @53604). The whole east-house A+B run (decks, stair, walls, solar) is gated YEAR_BUILD_FULL=1, is skipped here and has no pin yet (PIN_FULL_AB empty at HEAD); W13 reports each section (ground / first-floor / roof deck, Kit stair, walls, solar) running clean in its own runs (commits d44c601…c3405da), but no committed test executes the stair, wall or solar sections — in this suite they are proven only as plans. Kit geometry (deck strips at beam height without joists, an 8-tread stair without stringers) is a reconstruction guess — open questions for Gene (PROGRESS.md). |
 | Natural walking: splined turns, block reaction, stall metric | PROVEN | 17/17 | Walker–walker encounters use the smoothed path ahead and a 1 s chord of the other's path — no time-to-collision model; head-on round a tight corner falls to the single-file rule; the emergency stop is velocity to 0 in one tick; a walker walled in by a crowd that never moves waits with a named reason; 1.08–1.5 m gaps between people are walkable but not plannable at 0.1 m cells (MOVEMENT.md §6). Still heuristic, not ORCA, not proven deadlock-free. |
 | One body model (engine reach = the measured rig) and mars-take/2 fields | PROVEN | 5/5 | The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), which this report does not run. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact). |
 | Composite flagship builds (v2: forklift + stairs carry + campfire) | PROVEN | 3/3 | Layouts were adjusted until refusals stopped (the forklift stages s2 beside the bay, benches use gather); the engine gap `carryIntegrity` flags fork loads is routed around in the scenario (HANDOFF flagship v2). v3 (hand-up) is in the hand-up row and has no campus variant. |
@@ -468,7 +473,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 *Approximate:* Run over node:sqlite, not a real Durable Object; deploy/simulation-integration.mjs repeats isolation over MCP against `wrangler dev`/SIM_BASE and is not run here. Caps are counts per room-year (64 plans, 32 takes), not bytes: real DO storage size limits are not exercised.
 
-### Deterministic trig across hosts — PROVEN
+### Deterministic trig across hosts — PARTIAL
 
 *Required:* Engine math uses pure IEEE-754 d* functions (never host Math.sin…), so Node, browsers and workerd produce the same state hashes.
 
@@ -478,7 +483,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `core.test.ts` | deterministic trig: edge cases (signed zeros, pi, tiny, huge, non-finite) |
 | pass | `core.test.ts` | datan2: quadrants, signed zeros, axes and infinities match ECMAScript |
 | pass | `core.test.ts` | deterministic trig: golden bit patterns (any engine / refactor drift fails here) |
-| pass | `core.test.ts` | engine source never calls the host transcendentals or hypot (use the core/math.ts d* versions and its hypot) |
+| **MISSING** | `core.test.ts` | engine source never calls the host transcendentals |
 
 *Evidence outside this suite (not run here):* `viewer/deploy/determinism-probe.mjs`, `docs/engineering/RELEASE_CHECKLIST.md`
 
@@ -586,7 +591,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 *Approximate:* Flat upright faces only, one rectangular face per call, no drips, layers or drying; coverage is an area fraction, not a texture mask; the band below 0.5 m (crouching) is out of reach (SOLAR_PAINT.md). Renderer texture = colour + stripe until textures exist.
 
-### Year build phase A: a historical skeleton from the piles — PROVEN
+### Year build phase A: a historical skeleton from the piles — PARTIAL
 
 *Required:* For Mars 2022's east-house: the assembly graph of every year, a bill of materials and pile yard, pieces taken off bundles and cut at a station, frames raised and beams hung by a crew from the piles in a fork of the protected year, every sequenced part ending at its canonical pose (≤ 1 cm / 1°), with 0 violations; what cannot be sequenced is reported, not faked (owner feedback §7).
 
@@ -595,24 +600,24 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `year-assembly.test.ts` | assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part classified, deterministic |
 | pass | `year-assembly.test.ts` | assembly graph: every year builds and orders; 2020 racks do not map onto catalog frames and are reported, not forced |
 | pass | `year-assembly.test.ts` | assembly graph: deliberately broken geometry is reported with a reason, never faked |
-| pass | `year-stock.test.ts` | bill of materials + piles, 2022 east-house: exact skeleton counts, bundles like the photos, one yard clear of everything |
+| todo | `year-stock.test.ts` | bill of materials + piles, 2022 east-house: exact skeleton counts, bundles like the photos, one yard clear of everything — Expected values to be strictly deep-equal: |
 | pass | `year-stock.test.ts` | take_from_bundle: pieces come off the stack one at a time onto the take-out spot, the stack empties and goes; refusals name the problem |
 | pass | `year-stock.test.ts` | cut: 4x8 → 4x6 + a 4x2 offcut stored at the station, 16 ft 2x4 → two 8 ft; insufficient / wrong family / busy / not there are refused |
 | pass | `year-hang.test.ts` | hang_beam: a 16 ft reconstruction bay — 0.22 m from the ground, 2.48 m from the bracing, 4.757 m through a relay; exact seats, 0 violations |
-| pass | `year-build.test.ts` | year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic |
-| pass | `year-build.test.ts` | year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned |
+| todo | `year-build.test.ts` | year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic — Expected values to be strictly deep-equal: |
+| todo | `year-build.test.ts` | year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned — [{"id":"s0014-take-from-bundle","verb":"take_from_bundle","status":"cancelled","started":true,"blockedTicks":0,"actionId":"step:s0014-take-from-bundle","submittedTick":2535,"endedTick":2815,"diagnostic":{"code":"sequence.aborted","message":"aborted because step \"s0021-climb-stance\" (climb_stance)  |
 
 *Approximate:* The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md).
 
-### Year build phase B: floors, stairs, walls, solar in the year sequence — PARTIAL
+### Year build phase B: floors, stairs, walls, solar in the year sequence — UNPROVEN
 
 *Required:* The skeleton is completed from the piles: deck sheets cut and handed up, the Kit stair built from stringers and treads, plywood walls, solar modules on rails — ending equal to the year's protected checkpoint (owner feedback §7–§9).
 
 | Result | File | Test |
 | --- | --- | --- |
-| pass | `year-build-b.test.ts` | year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged |
-| pass | `year-build-b.test.ts` | year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons) |
-| pass | `year-build-b.test.ts` | year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned |
+| todo | `year-build-b.test.ts` | year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged — Expected values to be strictly deep-equal: |
+| todo | `year-build-b.test.ts` | year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons) — Expected values to be strictly equal: |
+| todo | `year-build-b.test.ts` | year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned — Expected values to be strictly equal: |
 | skip | `year-build-b.test.ts` | year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1) |
 
 *Evidence outside this suite (not run here):* `docs/engineering/YEAR_BUILD.md`
@@ -788,7 +793,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | Milestone | Status | Tests passed | What remains approximate |
 | --- | --- | ---: | --- |
-| A. Audited foundation | PROVEN | 11/11 | The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, which this report does not run. Full GLB re-extraction is skipped unless CAMPUS_FULL=1. |
+| A. Audited foundation | PARTIAL | 10/11 | The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, which this report does not run. Full GLB re-extraction is skipped unless CAMPUS_FULL=1. |
 | B. Natural individual movement | PROVEN | 12/12 | No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; a head-on wait-forever would show only as a runner timeout. |
 | C. Coordinated carry | PROVEN | 7/7 | Grips are fixed points on a rigid, level load; carriers play Walk/Idle with a procedural carry lean (no hand IK). Crews do not carry on stairs (one carrier may); simultaneous formations are not co-planned. |
 | D. Supported rack bay | PROVEN | 8/8 | The bay is raised from 12 ft uprights; 19 ft is only shown to be refused with too small a crew. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog. |
@@ -797,7 +802,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | G. Replay + branching | PROVEN | 9/9 | Forks resume from quiescent checkpoints, or mid-action for walking/social only (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video. |
 | H. Inhabited Mars scenes | PROVEN | 9/9 | Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze or gestures; pre-emption by directed tasks exists (capability social-preemption) but a pre-empted sit / conversation is not resumed (SOCIAL.md). |
 
-### A. Audited foundation — PROVEN
+### A. Audited foundation — PARTIAL
 
 *Required:* Document current world/state/control architecture; establish Git/reproducible build; create proving-ground scene; preserve existing rendering and characters.
 
@@ -807,7 +812,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 | pass | `core.test.ts` | stableStringify is key-order independent and rejects NaN |
 | pass | `core.test.ts` | rng is seeded, resumable and uniform-ish |
 | pass | `core.test.ts` | deterministic trig: golden bit patterns (any engine / refactor drift fails here) |
-| pass | `core.test.ts` | engine source never calls the host transcendentals or hypot (use the core/math.ts d* versions and its hypot) |
+| **MISSING** | `core.test.ts` | engine source never calls the host transcendentals |
 | pass | `navigation.test.ts` | deterministic: identical routes on repeat |
 | pass | `walk.test.ts` | entity insertion order does not change behaviour (review M6): same world, two orders, same final hash |
 | pass | `campus.test.ts` | campus 2026 scene file loads with provenance on every obstacle |
@@ -948,34 +953,64 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `1395dd4` (2026-09-28T13:06:09.386Z): 22 added, 0 removed.
+Compared with the report at `d91057b` (2026-09-28T17:59:16.741Z): 51 added, 1 removed.
 
-- added: body-model.test.ts :: prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise
-- added: build-bay-v3.test.ts :: beam_walk step-off: a deck target whose cell reads < 0.28 m lands on the nearest spot with room within 0.15 m; a target truly at the edge is still refused (beam.no-room)
-- added: build-bay-v3.test.ts :: flagship v3 is origin-independent: completes with 0 violations at open-ground origins that used to fail (step-off target reading 0.25 m; spare tread at the s1/s2 corner)
-- added: framing.test.ts :: framing: a 16 ft bay gets 2 top plates, 4 rafters, 4 blocks by hand-up to the bracing — exact poses, 0 violations, refusals named, pinned
-- added: framing.test.ts :: framing: a sloped rafter — plates at different heights give the pitch; a wrong pitch is refused
-- added: framing.test.ts :: framing: catalog — plates / rafters / blocking are 2x4 sections cut to order from 16 ft stock; registry + invariants
-- added: framing.test.ts :: framing: determinism — the same scenario twice gives the same world hash
-- added: handup-prone.test.ts :: beyond the lip the lying body is swept (W29): joist tails 0.30 m past the lip under both decks put a chest / head / arm through a joist wherever they could lie — handup.rise-blocked naming it
-- added: handup-prone.test.ts :: one prone receiver takes a 4x6 sheet alone (carry crew 1–2); determinism: the same run twice is bit-identical
-- added: handup-prone.test.ts :: prone only where kneeling cannot reach: the same floor with no deck to lie on is refused handup.too-high, listing the three reaches
-- added: handup-prone.test.ts :: prone receivers at the tallest deck the rig reaches from (2.75 m): kneeling cannot reach (0.5 m), two people lying at the deck edge, turned toward the grips, take it ≈ 0.67 m below the deck and get up holding it; 0 violations, hands continuous
-- added: handup-prone.test.ts :: prone receivers take a sheet off the forks where kneeling cannot reach: at the limit at that presentation (0.70 m below the deck) green, 0 violations; deeper refused (0.72 m: no station reaches, 0.74 m: too-high "raise the forks")
-- added: handup-prone.test.ts :: the lying body is checked at its heading (toes 0.75 m behind S, half-width 0.20 m) against people and parts on the deck: where the only place a receiver can lie is taken, refused naming who / what is there
-- added: handup-prone.test.ts :: the next seat up (a 2.90 m deck: 0.83 m below it) is out of reach even lying prone: handup.too-high lists stand / kneel / prone reach
-- added: handup-prone.test.ts :: the rise is swept: a wall panel outside the deck edge in the way of the load coming up is refused handup.rise-blocked, naming it
-- added: handup.test.ts :: kneeling rise (W30): a sheet presented on the forks under the joist ends cannot rise there → handup.rise-blocked "where the forks hold it"
-- added: handup.test.ts :: kneeling rise (W30): joist ends 0.78 m past the edge beam push the corridor out of kneeling reach → handup.rise-blocked naming the joist (the old rise went through them)
-- added: take-chapters.test.ts :: chapter sets in the manifest: the first frame of chapter k is the final state of chapter k − 1 (hash, entities0, replayed first frame); Σ ticks and the last final state are the set's; the 2022 east-house A+B ends at its pin
-- added: take-chapters.test.ts :: chapter takes: the chaptered run is the unchaptered run cut at barriers — same ticks and final state, chapter k starts where k − 1 ended; a non-barrier bound is refused
-- added: take-prone-fields.test.ts :: take fields proneYaw (mrad) and phaseK (%): recorded when a prone receiver publishes them, cleared with null, replayed as state; nothing recorded when absent; still mars-take/4
-- added: year-build-b.test.ts :: set-part lift crews never walk through a bystander: the crew holds the part (setpart.path-occupied) and an idle person in the way is asked to step aside; 0 violations
-- added: year-build-b.test.ts :: year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)
+- added: api.test.ts :: direct_camera (LM-007): `sentences` are parsed then compiled in one call — the same track as the parsed directions; refusals compile nothing
+- added: api.test.ts :: edit_world (LM-005): a parked vehicle moves with the same footprint checks; a ridden one is edit.vehicle-ridden
+- added: api.test.ts :: get_take (LM-017): a take evicted after its workspace was deleted is take.evicted naming the checkpoint; a never-stored one stays take.unknown
+- added: api.test.ts :: one control path (LM-014): every legacy tool is classified — an engine equivalent that exists, or viewer-only with a reason — and fails in one envelope
+- added: api.test.ts :: parse_camera (LM-007/008): Gene’s four sentences through the op — racks alias → the take’s rack bay, kitchen unknown in 2026, deictic question
+- added: api.test.ts :: parse_camera (LM-007/008/010): 2024 kitchen + sink resolve; bare 2026 racks are a question with candidates; unknown names and unsupported phrasing are refusals
+- added: api.test.ts :: rebind (LM-001): execute/rehearse rebind:auto re-binds a stale plan against the head (plan.rebound + diff); a broken binding is plan.rebind-failed naming the step
+- added: api.test.ts :: sequence built-ins over the op API (LM-016): list_verbs describes mark/cancel; a plan cancels a walk at 2 s and marks the take
+- added: api.test.ts :: staleness (LM-003): a layout-only region edit stales a gather into that region (layout is physical); physicalHash moves
+- added: api.test.ts :: staleness (LM-004): an edit far from every step keeps the plan valid; one on the route stales it naming the step
+- added: api.test.ts :: staleness (LM-004): an unrehearsed plan is scoped too (envelope from a run at its baseline); a changed bound entity always stales
+- added: api.test.ts :: store_camera_track (LM-013): a compiled directed track is stored beside its take — hash unchanged, listed, replayable; refusals
+- added: camera-chapter-shots.test.ts :: activityGrid: working vs idle / wait per camera sample, positions
+- added: camera-chapter-shots.test.ts :: chapterShots: cuts to whoever works, a yard wide every wideEvery, contiguous on the grid, deterministic
+- added: camera-chapter-shots.test.ts :: chapterShots: rate picks the first readable angle, splits an unreadable window, else frames the one who works
+- added: camera-chapter-shots.test.ts :: shipped A+B chapter cameras: no idle framing > 20 s, a yard wide at least every 6.5 min, 100 % readable
+- added: camera-direct-identity.test.ts :: directCamera output identity: every CAMERA_DIRECT fixture and the W48 chapter case hash to the pre-W54 golden
+- added: camera-parse.test.ts :: 20 deliberately bad sentences refuse with code, question or candidates, and span
+- added: camera-parse.test.ts :: 52 sentence → direction examples cover all verbs, units, framing, context and vocabulary
+- added: camera-parse.test.ts :: Gene’s four sentences yield the exact documented objects or a deictic question
+- added: camera-parse.test.ts :: multi-direction text splits at then and sentence boundaries
+- added: camera-synth.test.ts :: per-year bearing (W51): on mars-2022 (northAzimuthOffset −101) "side: south" and the sun window use the 2022 frame, not the global
+- added: campus-history.test.ts :: Chiba 2024 edit: mars-2024 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- added: campus-history.test.ts :: Chiba 2024 edit: the 2024 year room seeds protected mars-2024 from the edited file
+- added: campus-history.test.ts :: Chiba 2024 edit: untouched pieces keep their ids; replaced pieces are gone; the solarium door is the first door object
+- added: campus-history.test.ts :: Chiba 2024 edit: walkers and the camera navmesh pass the solarium door; the hall interior still blocks
+- added: campus-history.test.ts :: W51 2022 edit: mars-2022 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- added: campus-history.test.ts :: W51 2022: ids kept (racks, decks, walls, rooms; rv-1…9), stairs / solar re-made, rv-10…12 and the corner table gone; names on the regions; north −101 on the scene
+- added: campus-history.test.ts :: W51 2023 edit: mars-2023 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- added: campus-history.test.ts :: W51 2023/2024: no trailer stands in or against Chiba — its footprint grid is exactly what it is without any trailer
+- added: campus-history.test.ts :: W51 2024 edit: mars-2024 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- added: env-sun.test.ts :: 2022 bearing sign: a February 16:15 PST sun throws the 2022 shadows toward screen up-left (−X, −Z), as in aerial-03
+- added: env-sun.test.ts :: per-year bearing: 2022 = −101 (world −X turned 11° toward +Z is north); the global stays −90 and is every other year's fallback
+- added: env-sun.test.ts :: site bearing evidence: DJI_0079 (2020-03-04 10:10:34 PST) — the sun stands on the +X/−Z side, shadows fall toward −X/+Z
+- added: env-sun.test.ts :: site bearing: world −X is north, −Z east, +X south, +Z west (the 2020 tire ring's long axis X runs N–S)
+- added: env-sun.test.ts :: the site bearing cannot move a construction pin: only camera/ and api/ (via camera) import env/sun.ts
+- added: sequence.test.ts :: bind (LM-016): cancel/mark are validated like verbs — unknown / self targets and bad params are refused; timeout in the schema
+- added: sequence.test.ts :: runner (LM-016): a step timeout cancels the live step with a named reason and applies onFail
+- added: sequence.test.ts :: runner (LM-016): cancel stops a live step (not a failure), skips a pending one; mark puts an event in the run; `at` applies
+- added: source-scan.test.ts :: engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted
+- added: take-labels.test.ts :: bindLabel fills inline references from the bindings
+- added: take-labels.test.ts :: bindLabel: sentence ends, literal $$, unbound and out-of-range references stay as written
+- added: take-labels.test.ts :: shipped chapter takes: no step label or event message holds a template reference
+- added: year-build-houses.test.ts :: year build 2022 chiba A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
+- added: year-build-houses.test.ts :: year build 2022 chiba, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
+- added: year-build-houses.test.ts :: year build 2022 kitchen A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
+- added: year-build-houses.test.ts :: year build 2022 kitchen, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
+- added: year-build-houses.test.ts :: year build 2022 west-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
+- added: year-build-houses.test.ts :: year build 2022 west-house, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
+- added: year-build-houses.test.ts :: year build 2022, all four houses A+B: plans through the same rules — counts by kind, unplaced with reasons, the yard clear of the neighbours' work zones, deterministic; report-only table
+- added: year-build-houses.test.ts :: year build 2022: the four rack houses are one template (12 frames of 16 ft × 3 ft in 4 lines × 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m) — phase B split rules apply unchanged
+- removed: core.test.ts :: engine source never calls the host transcendentals or hypot (use the core/math.ts d* versions and its hypot)
 
 ## Tests not cited by any row or milestone
 
-90 of 383 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+141 of 433 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -989,22 +1024,53 @@ Compared with the report at `1395dd4` (2026-09-28T13:06:09.386Z): 22 added, 0 re
 - `api.test.ts` pass: pause/resume (room): execute pauseAt mid-walk → resume ends in the unpaused final state; snapshots are state blobs; survives a room restart
 - `api.test.ts` pass: pause/resume (room): fork at a pause, resume both with different commands → distinct states; the pause checkpoint stays resumable
 - `api.test.ts` pass: pause/resume: pauseAt during a carry is refused naming the carry (allowDrop only before the lift); resume on a resting head is resume.not-resumable
+- `api.test.ts` pass: staleness (LM-004): an edit far from every step keeps the plan valid; one on the route stales it naming the step
+- `api.test.ts` pass: staleness (LM-004): an unrehearsed plan is scoped too (envelope from a run at its baseline); a changed bound entity always stales
+- `api.test.ts` pass: staleness (LM-003): a layout-only region edit stales a gather into that region (layout is physical); physicalHash moves
+- `api.test.ts` pass: rebind (LM-001): execute/rehearse rebind:auto re-binds a stale plan against the head (plan.rebound + diff); a broken binding is plan.rebind-failed naming the step
+- `api.test.ts` pass: store_camera_track (LM-013): a compiled directed track is stored beside its take — hash unchanged, listed, replayable; refusals
+- `api.test.ts` pass: edit_world (LM-005): a parked vehicle moves with the same footprint checks; a ridden one is edit.vehicle-ridden
+- `api.test.ts` pass: parse_camera (LM-007/008): Gene’s four sentences through the op — racks alias → the take’s rack bay, kitchen unknown in 2026, deictic question
+- `api.test.ts` pass: parse_camera (LM-007/008/010): 2024 kitchen + sink resolve; bare 2026 racks are a question with candidates; unknown names and unsupported phrasing are refusals
+- `api.test.ts` pass: direct_camera (LM-007): `sentences` are parsed then compiled in one call — the same track as the parsed directions; refusals compile nothing
+- `api.test.ts` pass: get_take (LM-017): a take evicted after its workspace was deleted is take.evicted naming the checkpoint; a never-stored one stays take.unknown
+- `api.test.ts` pass: sequence built-ins over the op API (LM-016): list_verbs describes mark/cancel; a plan cancels a walk at 2 s and marks the take
+- `api.test.ts` pass: one control path (LM-014): every legacy tool is classified — an engine equivalent that exists, or viewer-only with a reason — and fails in one envelope
 - `body-model.test.ts` pass: prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise
 - `build-bay-v3.test.ts` pass: flagship v3 is origin-independent: completes with 0 violations at open-ground origins that used to fail (step-off target reading 0.25 m; spare tread at the s1/s2 corner)
 - `build-bay-v3.test.ts` pass: beam_walk step-off: a deck target whose cell reads < 0.28 m lands on the nearest spot with room within 0.15 m; a target truly at the edge is still refused (beam.no-room)
+- `camera-chapter-shots.test.ts` pass: activityGrid: working vs idle / wait per camera sample, positions
+- `camera-chapter-shots.test.ts` pass: chapterShots: cuts to whoever works, a yard wide every wideEvery, contiguous on the grid, deterministic
+- `camera-chapter-shots.test.ts` pass: chapterShots: rate picks the first readable angle, splits an unreadable window, else frames the one who works
+- `camera-chapter-shots.test.ts` pass: shipped A+B chapter cameras: no idle framing > 20 s, a yard wide at least every 6.5 min, 100 % readable
+- `camera-direct-identity.test.ts` pass: directCamera output identity: every CAMERA_DIRECT fixture and the W48 chapter case hash to the pre-W54 golden
 - `camera-framing.test.ts` pass: camera planner: swings off a bystander standing in front of the subject, keeps the shot when it stands behind
 - `camera-framing.test.ts` pass: camera size: a lying 3.66 m frame is sized by its extent; orbiting it at 8 m keeps it whole and readable ≥ 0.8
 - `camera-framing.test.ts` pass: camera orbit/frameGroup: the framing radius includes component extents (orbit pulls out; group fits the corners)
 - `camera-framing.test.ts` pass: camera safe area: subject framing keeps points out of the bottom UI band (replay bar ≈ 130 of 800 px)
 - `camera-geom.test.ts` pass: camera geom: glass collides but does not occlude; policy is per kind
 - `camera-geom.test.ts` pass: camera shots: stateless evaluation (random access == sequential), Catmull-Rom through keys
+- `camera-parse.test.ts` pass: Gene’s four sentences yield the exact documented objects or a deictic question
+- `camera-parse.test.ts` pass: 52 sentence → direction examples cover all verbs, units, framing, context and vocabulary
+- `camera-parse.test.ts` pass: 20 deliberately bad sentences refuse with code, question or candidates, and span
+- `camera-parse.test.ts` pass: multi-direction text splits at then and sentence boundaries
 - `camera-replay.test.ts` pass: camera perf: plan a 60 s track at 10 Hz with 3 subjects in < 1 s
+- `camera-synth.test.ts` pass: per-year bearing (W51): on mars-2022 (northAzimuthOffset −101) "side: south" and the sun window use the 2022 frame, not the global
 - `campus-extract.test.ts` pass: a 6 m post with vertices only at its ends is caught by band clipping
 - `campus-extract.test.ts` pass: a 10 m thin wall stays one prism (big triangles are not split into end posts)
 - `campus-extract.test.ts` pass: an L-shaped component is split so the inner corner stays open
 - `campus-extract.test.ts` pass: roofs of buildings emit interior blockers from the ground to their underside
 - `campus-extract.test.ts` pass: vehicles and glazing are classified from source names/layers
 - `campus-extract.test.ts` skip: full re-extraction reproduces the committed contentHash (CAMPUS_FULL=1)
+- `campus-history.test.ts` pass: Chiba 2024 edit: untouched pieces keep their ids; replaced pieces are gone; the solarium door is the first door object
+- `campus-history.test.ts` pass: Chiba 2024 edit: mars-2024 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- `campus-history.test.ts` pass: Chiba 2024 edit: the 2024 year room seeds protected mars-2024 from the edited file
+- `campus-history.test.ts` pass: Chiba 2024 edit: walkers and the camera navmesh pass the solarium door; the hall interior still blocks
+- `campus-history.test.ts` pass: W51 2022 edit: mars-2022 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- `campus-history.test.ts` pass: W51 2023 edit: mars-2023 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- `campus-history.test.ts` pass: W51 2024 edit: mars-2024 re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical
+- `campus-history.test.ts` pass: W51 2022: ids kept (racks, decks, walls, rooms; rv-1…9), stairs / solar re-made, rv-10…12 and the corner table gone; names on the regions; north −101 on the scene
+- `campus-history.test.ts` pass: W51 2023/2024: no trailer stands in or against Chiba — its footprint grid is exactly what it is without any trailer
 - `campus.test.ts` pass: no obstacle id is duplicated
 - `campus.test.ts` pass: stored contentHash matches the data (extraction output is self-consistent)
 - `campus.test.ts` pass: staging-east is clear for a 4-person 19 ft upright carry at any heading
@@ -1021,6 +1087,11 @@ Compared with the report at `1395dd4` (2026-09-28T13:06:09.386Z): 22 added, 0 re
 - `env-sun.test.ts` pass: sunDirectionVector is a unit vector consistent with solarPosition()
 - `env-sun.test.ts` pass: daylightFactors: night at large negative elevation, day at high elevation
 - `env-sun.test.ts` pass: smoothstep matches known fixed points
+- `env-sun.test.ts` pass: site bearing: world −X is north, −Z east, +X south, +Z west (the 2020 tire ring's long axis X runs N–S)
+- `env-sun.test.ts` pass: site bearing evidence: DJI_0079 (2020-03-04 10:10:34 PST) — the sun stands on the +X/−Z side, shadows fall toward −X/+Z
+- `env-sun.test.ts` pass: the site bearing cannot move a construction pin: only camera/ and api/ (via camera) import env/sun.ts
+- `env-sun.test.ts` pass: per-year bearing: 2022 = −101 (world −X turned 11° toward +Z is north); the global stays −90 and is every other year's fallback
+- `env-sun.test.ts` pass: 2022 bearing sign: a February 16:15 PST sun throws the 2022 shadows toward screen up-left (−X, −Z), as in aerial-03
 - `framing.test.ts` pass: framing: a 16 ft bay gets 2 top plates, 4 rafters, 4 blocks by hand-up to the bracing — exact poses, 0 violations, refusals named, pinned
 - `framing.test.ts` pass: framing: determinism — the same scenario twice gives the same world hash
 - `framing.test.ts` pass: framing: catalog — plates / rafters / blocking are 2x4 sections cut to order from 16 ft stock; registry + invariants
@@ -1057,8 +1128,15 @@ Compared with the report at `1395dd4` (2026-09-28T13:06:09.386Z): 22 added, 0 re
 - `sequence.test.ts` pass: runner: onFail abort cancels live steps and skips pending ones
 - `sequence.test.ts` pass: runner: onFail continue keeps independent branches, skips dependents
 - `sequence.test.ts` pass: runner: tick budget → timeout, live actions cancelled
+- `sequence.test.ts` pass: runner (LM-016): a step timeout cancels the live step with a named reason and applies onFail
+- `sequence.test.ts` pass: runner (LM-016): cancel stops a live step (not a failure), skips a pending one; mark puts an event in the run; `at` applies
+- `sequence.test.ts` pass: bind (LM-016): cancel/mark are validated like verbs — unknown / self targets and bad params are refused; timeout in the schema
+- `source-scan.test.ts` pass: engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted
 - `take-chapters.test.ts` pass: chapter takes: the chaptered run is the unchaptered run cut at barriers — same ticks and final state, chapter k starts where k − 1 ended; a non-barrier bound is refused
 - `take-chapters.test.ts` pass: chapter sets in the manifest: the first frame of chapter k is the final state of chapter k − 1 (hash, entities0, replayed first frame); Σ ticks and the last final state are the set's; the 2022 east-house A+B ends at its pin
+- `take-labels.test.ts` pass: bindLabel fills inline references from the bindings
+- `take-labels.test.ts` pass: bindLabel: sentence ends, literal $$, unbound and out-of-range references stay as written
+- `take-labels.test.ts` pass: shipped chapter takes: no step label or event message holds a template reference
 - `take-prone-fields.test.ts` pass: take fields proneYaw (mrad) and phaseK (%): recorded when a prone receiver publishes them, cleared with null, replayed as state; nothing recorded when absent; still mars-take/4
 - `take.test.ts` pass: take payload: 3 walkers × 60 s stays compact (bytes measured)
 - `take.test.ts` pass: sampleTake: ends hold, shortest-arc yaw, entities appear/disappear
@@ -1067,7 +1145,15 @@ Compared with the report at `1395dd4` (2026-09-28T13:06:09.386Z): 22 added, 0 re
 - `walk-perf.test.ts` pass: narrow(): single-file component labels === the frozen reference (scenes, radii, and every call of the build-bay probe)
 - `walk.test.ts` pass: determinism: same inputs → same final state hash
 - `year-build-b.test.ts` pass: set-part lift crews never walk through a bystander: the crew holds the part (setpart.path-occupied) and an idle person in the way is asked to step aside; 0 violations
-- `year-build-b.test.ts` pass: year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)
+- `year-build-b.test.ts` todo: year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)
+- `year-build-houses.test.ts` pass: year build 2022: the four rack houses are one template (12 frames of 16 ft × 3 ft in 4 lines × 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m) — phase B split rules apply unchanged
+- `year-build-houses.test.ts` todo: year build 2022, all four houses A+B: plans through the same rules — counts by kind, unplaced with reasons, the yard clear of the neighbours' work zones, deterministic; report-only table
+- `year-build-houses.test.ts` todo: year build 2022 chiba, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
+- `year-build-houses.test.ts` skip: year build 2022 chiba A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
+- `year-build-houses.test.ts` todo: year build 2022 kitchen, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
+- `year-build-houses.test.ts` skip: year build 2022 kitchen A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
+- `year-build-houses.test.ts` todo: year build 2022 west-house, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned
+- `year-build-houses.test.ts` skip: year build 2022 west-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)
 - `year-build.test.ts` skip: year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)
 
 </details>
