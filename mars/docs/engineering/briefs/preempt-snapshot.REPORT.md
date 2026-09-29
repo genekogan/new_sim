@@ -24,3 +24,19 @@ normal continuation returns p1 to [0,0,-5] seated; cancellation finishes stand-u
 at [0,0,-4.375] idle without starting the cancelled walk; a newer refused directive
 suppresses return and leaves the completed original walk at [-4,0,-7] idle.
 All have zero invariant violations. These are nonvisual snapshot proofs.
+
+Review hardening: every requested/pre-empting record must appear exactly once in
+the waiting graph; deleting the field or an entry is now refused. Social returns
+are validated as a restricted seat-return queue, not arbitrary deferred commands:
+source verb/standalone status/occupied and pre-emption history, actor, original
+explicit slot (or original auto-selection owner), activity, top-level directive
+existence and unique source must agree. Already-created returns cannot be queued
+again. Invalid cases name snapshot.waiting-invalid or snapshot.return-invalid.
+Queue-free old snapshots remain supported. Valid take_slot and sit continuations
+remain exact. Twelve social tests plus source scan pass; tsc/lint pass.
+
+This is snapshot graph consistency, not cryptographic authentication. For an
+auto-selected seat after its source exec has ended, the original record identifies
+its owner, not the resolved local seat; that local slot remains stored intent.
+A caller who forges the entire matching action history is outside this validation
+claim. Normal admission still checks current seat availability and physical reach.

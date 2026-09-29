@@ -1598,3 +1598,11 @@ covered; started carry remains non-resumable. Six JSON captures inspected, zero
 violations. Focused social-return 10/10, pre-emption 8/8, source scan, tsc and lint
 green; full gate deferred to lead. No pins or historical content changed. About
 20 minutes worker time, no helpers. See briefs/preempt-snapshot.REPORT.md.
+
+LM029 review follow-up: omitted waiting entries now refuse instead of silently
+orphaning pre-empting directives. Seat-return service data validates restricted
+verbs, original source/person/slot owner/activity and directive provenance; crafted
+arbitrary commands, duplicates and missing sources refuse. Twelve social tests plus
+source scan pass, tsc/lint green; valid event/world identity preserved, no pins.
+Approximate additional worker time 15 minutes, no helpers. Auto-selected local-seat
+provenance/authenticity limitation is explicit in preempt-snapshot.REPORT.md.

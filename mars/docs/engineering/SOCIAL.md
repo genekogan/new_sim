@@ -203,3 +203,10 @@ intent. `allowDrop` cannot discard a waiting intent's hold or parent chain
 (`snapshot.waiting-dependency`). A pending carry is only plain, unstarted intent;
 once it starts, its existing live-state codec refusal still applies. No live verb
 was added to the resumable set. See `briefs/preempt-snapshot.REPORT.md`.
+
+Restore also requires every requested/pre-empting record to have its waiting entry.
+Social-return data is constrained to the original standalone sit/take_slot action,
+actor, slot/owner and activity, with occupied/pre-emption history and an existing
+top-level directive. Corrupt return queues fail `snapshot.return-invalid`; they
+cannot inject arbitrary registered verbs. This validates graph consistency, not
+snapshot authenticity (see the report for auto-selected local-slot limitations).

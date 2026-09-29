@@ -246,6 +246,50 @@ export function applySnapshot(rt: Runtime, int: RuntimeInternals, snap: RuntimeS
     seenWaiting.add(w.id);
     int.waiting.set(w.id, { rec, def, params: w.params, parent: w.parent, holds: w.holds });
   }
+  for (const rec of rt.records.values())
+    if (rec.status === 'requested' && rec.phase === 'pre-empting' && !seenWaiting.has(rec.id))
+      throw new SnapshotError('snapshot.waiting-invalid', `pre-empting directive ${rec.id} is missing its waiting intent`, [rec.id]);
+  // Return intents are restricted to the original standalone seat action. They are
+  // not a general deferred command queue, even if a supplied registry has more verbs.
+  const returns = g.services.socialReturns;
+  if (returns !== undefined) {
+    const invalid = () => new SnapshotError('snapshot.return-invalid', 'social return intent has invalid shape or source provenance');
+    if (!Array.isArray(returns)) throw invalid();
+    const seen = new Set<string>();
+    for (const value of returns) {
+      if (!value || typeof value !== 'object') throw invalid();
+      const q = value as { source: string; directive: string; actor: string; verb: string; params: { actor?: string; slot?: string; activity?: string } };
+      const source = rt.records.get(q.source), directive = rt.records.get(q.directive);
+      const original = source?.params as { actor?: string; slot?: string; owner?: string; fixture?: string; activity?: string } | undefined;
+      if (Object.keys(q).some((k) => !['source', 'directive', 'actor', 'verb', 'params'].includes(k)) ||
+        !source || !directive || source.parent || directive.parent || source.id === directive.id || seen.has(source.id) ||
+        !['sit', 'take_slot'].includes(q.verb) || source.verb !== q.verb || original?.actor !== q.actor ||
+        !source.history.some((h) => h.phase === 'occupied') || !source.history.some((h) => h.code === 'social.pre-empted') ||
+        !q.params || q.params.actor !== q.actor || typeof q.params.slot !== 'string' ||
+        !rt.registry.get(q.verb)?.schema.safeParse(q.params).success) throw invalid();
+      const reason = int.live.get(source.id)?.reason ?? source.diagnostic;
+      if (reason?.code === 'social.pre-empted') {
+        const initial = reason.details?.by;
+        if (typeof initial !== 'string') throw invalid();
+        let by: string = initial;
+        const chain = new Set<string>();
+        for (;;) {
+          if (chain.has(by)) throw invalid();
+          chain.add(by);
+          const record = rt.records.get(by);
+          if (!record) throw invalid();
+          if (!record.parent) break;
+          by = record.parent;
+        }
+        if (by !== directive.id) throw invalid();
+      }
+      const slotOwner = q.params.slot.slice(0, q.params.slot.lastIndexOf('#'));
+      if (original.slot ? q.params.slot !== original.slot : slotOwner !== (original.owner ?? original.fixture)) throw invalid();
+      if (q.verb === 'take_slot' && q.params.activity !== (original.activity ?? 'sit')) throw invalid();
+      if (rt.records.has(`${q.source}:resume:${q.directive}`)) throw invalid();
+      seen.add(source.id);
+    }
+  }
   for (const [k, list] of g.owners) int.owners.set(k, list);
   int.nextId = snap.nextId;
   rt.violations.push(...structuredClone(snap.violations));

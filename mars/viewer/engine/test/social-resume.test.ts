@@ -222,7 +222,7 @@ test('waiting snapshot rejects invalid provenance, unknown registry and discarde
   const snap = rt.snapshot();
   const noWalk = new Map(registry); noWalk.delete('walk_to');
   assert.throws(() => Runtime.restore(snap, noWalk, { spatial: new Spatial(base) }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.unknown-verb');
-  for (const mutation of ['missing-hold', 'self-parent', 'params', 'duplicate', 'reserved']) {
+  for (const mutation of ['missing-hold', 'self-parent', 'params', 'duplicate', 'reserved', 'omitted-array', 'omitted-entry']) {
     const bad = structuredClone(snap);
     const graph = decode(bad.data) as { waiting: { id: string; holds: string[]; parent?: string; params: unknown }[]; records: { id: string; parent?: string }[]; owners: [string, { action: string; mode: string }[]][] };
     const waiting = graph.waiting[0];
@@ -231,6 +231,8 @@ test('waiting snapshot rejects invalid provenance, unknown registry and discarde
     if (mutation === 'params') waiting.params = { actor: 'p1', x: 99, z: 99 };
     if (mutation === 'duplicate') graph.waiting.push(waiting);
     if (mutation === 'reserved') graph.owners.push(['extra', [{ action: w.id, mode: 'exclusive' }]]);
+    if (mutation === 'omitted-array') delete (graph as { waiting?: unknown }).waiting;
+    if (mutation === 'omitted-entry') graph.waiting = [];
     bad.data = encode(graph);
     assert.throws(() => Runtime.restore(bad, registry, { spatial: new Spatial(base) }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.waiting-invalid', mutation);
   }
@@ -240,4 +242,40 @@ test('waiting snapshot rejects invalid provenance, unknown registry and discarde
     def.resumable = 'test-only unsupported stand-up';
     assert.throws(() => rt.snapshot({ allowDrop: true }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.waiting-dependency');
   } finally { def.resumable = original; }
+});
+
+
+test('restored social return intents cannot become arbitrary deferred commands or change source seat/person', () => {
+  const { rt, registry } = setup();
+  rt.submit('walk_to', { actor: 'p1', x: -4, z: -7 });
+  const snap = rt.snapshot();
+  for (const mutation of ['shape', 'verb', 'actor', 'source', 'directive', 'slot', 'duplicate']) {
+    const bad = structuredClone(snap);
+    const graph = decode(bad.data) as { services: { socialReturns: { source: string; directive: string; actor: string; verb: string; params: { actor: string; slot: string } }[] | object } };
+    const queue = graph.services.socialReturns as { source: string; directive: string; actor: string; verb: string; params: { actor: string; slot: string } }[];
+    if (mutation === 'shape') graph.services.socialReturns = {};
+    if (mutation === 'verb') { queue[0].verb = 'walk_to'; queue[0].params = { actor: 'p1', x: 2, z: 2 } as unknown as typeof queue[0]['params']; }
+    if (mutation === 'actor') { queue[0].actor = 'p2'; queue[0].params.actor = 'p2'; }
+    if (mutation === 'source') queue[0].source = queue[0].directive;
+    if (mutation === 'directive') queue[0].directive = 'absent';
+    if (mutation === 'slot') queue[0].params.slot = 'different-chair#seat';
+    if (mutation === 'duplicate') queue.push(queue[0]);
+    bad.data = encode(graph);
+    assert.throws(() => Runtime.restore(bad, registry, { spatial: new Spatial(base) }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.return-invalid', mutation);
+  }
+});
+
+test('take_slot return snapshot preserves its original activity and rejects an altered activity', () => {
+  const { rt, registry } = setup('take_slot');
+  rt.submit('walk_to', { actor: 'p1', x: -4, z: -7 });
+  const snap = rt.snapshot(), cursor = rt.events.length;
+  const restored = Runtime.restore(snap, registry, { spatial: new Spatial(base) }, DEFAULT_INVARIANTS);
+  for (let i = 0; i < 360; i++) { rt.step(); restored.step(); }
+  assert.equal(restored.stateHash(), rt.stateHash());
+  assert.deepEqual(restored.events, rt.events.slice(cursor));
+  const bad = structuredClone(snap);
+  const graph = decode(bad.data) as { services: { socialReturns: { params: { activity: string } }[] } };
+  graph.services.socialReturns[0].params.activity = 'watch';
+  bad.data = encode(graph);
+  assert.throws(() => Runtime.restore(bad, registry, { spatial: new Spatial(base) }), (e: unknown) => e instanceof SnapshotError && e.code === 'snapshot.return-invalid');
 });
