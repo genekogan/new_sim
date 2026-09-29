@@ -4,6 +4,7 @@
 // derived from the load pose every tick, so grips never drift. Cancelling
 // never drops a load: it becomes a controlled set-down (deferred cancel) at
 // the current pose if that spot is clear, otherwise it is refused.
+import { def, HUMAN_RADIUS } from '../world/catalog.ts';
 import { blockedWait } from '../runtime/waits.ts';
 import { z } from 'zod';
 import { angleDelta, clamp, dcos, dsin, rot2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
@@ -209,6 +210,48 @@ function stepTransition(rt: Runtime, ex: Exec, dt: number, dur: number): boolean
   return ex.t >= dur - 1e-9;
 }
 
+/** Conservative swept check of a set-down's remaining load and carrier motion against people.
+ * Uniform pose interpolation has a Lipschitz bound: translation + pivot radius times total
+ * Euler rotation. Inflating every sample by one interval of that bound covers between samples.
+ * This is a refusal/hold margin, not permission to penetrate a person. Rechecked before each tick.
+ */
+function setDownBystander(rt: Runtime, ex: Exec, to: Pose, toSpots: Vec2[]): { id: string; path: 'load' | 'carrier' } | null {
+  const people = Object.values(rt.world.entities).filter((h) => h.kind === 'human' && !ex.p.crew.includes(h.id));
+  if (!people.length) return null;
+  const item = itemOf(rt, ex), from = item.pose;
+  const size = def(item.def).size;
+  const radius = hypot(hypot(size[0] / 2, size[1]), size[2] / 2);
+  const angles = Math.abs(angleDelta(from.yaw, to.yaw)) + Math.abs((to.pitch ?? 0) - (from.pitch ?? 0)) + Math.abs((to.roll ?? 0) - (from.roll ?? 0));
+  const shift = hypot(hypot(to.p[0] - from.p[0], to.p[1] - from.p[1]), to.p[2] - from.p[2]);
+  const intervals = 32;
+  const sweepPad = (shift + radius * angles) / intervals;
+  const footprints = Array.from({ length: intervals + 1 }, (_, i) => entityFootprint({ ...item, pose: lerpPose(from, to, i / intervals) }));
+  const fromSpots = crewOf(rt, ex).map((h) => [h.pose.p[0], h.pose.p[2]] as Vec2);
+  for (const h of people) {
+    const q: Vec2 = [h.pose.p[0], h.pose.p[2]], y = h.pose.p[1];
+    for (const fp of footprints) {
+      if (y >= fp.y1 + sweepPad || y + 1.8 <= fp.y0 - sweepPad) continue;
+      const local = sub2r(q, fp.obb.c, fp.obb.yaw);
+      const dx = Math.max(0, Math.abs(local[0]) - fp.obb.half[0]);
+      const dz = Math.max(0, Math.abs(local[1]) - fp.obb.half[1]);
+      if (hypot(dx, dz) < HUMAN_RADIUS + 0.12 + sweepPad) return { id: h.id, path: 'load' };
+    }
+    if (y >= ex.p.levelY + 1.8 || y + 1.8 <= ex.p.levelY) continue;
+    for (let i = 0; i < fromSpots.length; i++) {
+      const a = fromSpots[i], b = toSpots[i], dx = b[0] - a[0], dz = b[1] - a[1];
+      const d2 = dx * dx + dz * dz;
+      const u = d2 > 0 ? clamp(((q[0] - a[0]) * dx + (q[1] - a[1]) * dz) / d2, 0, 1) : 0;
+      if (hypot(q[0] - a[0] - u * dx, q[1] - a[1] - u * dz) < 2 * HUMAN_RADIUS + 0.12) return { id: h.id, path: 'carrier' };
+    }
+  }
+  return null;
+}
+
+function cancelPerson(rt: Runtime, ex: Exec, to: Pose, spots: Vec2[]): CancelResult | null {
+  const who = setDownBystander(rt, ex, to, spots);
+  return who ? { ok: false, diagnostic: { code: 'carry.cancel-unsafe', message: `cannot lower ${ex.p.item}: ${who.id} occupies the ${who.path} set-down sweep; the crew retains the load`, subjects: [ex.p.item, who.id], at: rt.world.entities[who.id].pose.p } } : null;
+}
+
 function startSetDown(rt: Runtime, ex: Exec, q: SE2) {
   const laid = laidPose(ex.p.f, q, ex.p.levelY);
   const halfW = entityFrame({ ...itemOf(rt, ex), pose: laid }).halfW;
@@ -392,6 +435,8 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
     }
     if (ex.phase === 'climb') return stepClimb(rt, ex, dt);
     if (ex.phase === 'set-down') {
+      const who = setDownBystander(rt, ex, ex.tr!.to, ex.tr!.toSpots);
+      if (who) return blockedWait(rt, ex.id, p.item, [who.id], { code: 'carry.setdown-occupied', message: `${p.item} remains held: ${who.id} occupies its remaining ${who.path} set-down sweep`, subjects: [p.item, who.id], at: rt.world.entities[who.id].pose.p }, p.crew);
       if (stepTransition(rt, ex, dt, SETDOWN_S)) {
         const item = itemOf(rt, ex);
         item.pose = ex.tr!.to;
@@ -454,7 +499,9 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       return { ok: true };
     }
     if (ex.phase === 'lift') {
-      // lower it back where it lay
+      // lower it back where it lay, only with the load and retreating crew clear of people
+      const refusal = cancelPerson(rt, ex, p.lying, p.approach);
+      if (refusal) return refusal;
       beginTransition(rt, ex, 'set-down', p.lying, p.approach, wrapAngle(p.pickup.th), 'stored');
       ex.cancelling = true;
       return { ok: true, deferred: true };
@@ -483,6 +530,10 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
             at: [ex.q.x, p.levelY, ex.q.z],
           },
         };
+      const laid = laidPose(p.f, ex.q, p.levelY);
+      const halfW = entityFrame({ ...itemOf(rt, ex), pose: laid }).halfW;
+      const refusal = cancelPerson(rt, ex, laid, carrierSpots(p.f, ex.q, halfW));
+      if (refusal) return refusal;
       startSetDown(rt, ex, ex.q);
       ex.cancelling = true;
       return { ok: true, deferred: true };

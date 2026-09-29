@@ -109,10 +109,10 @@ graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.te
   is re-checked; if blocked the action reports `blocked` / `carry.route-blocked`
   and the crew holds the load (no replan yet).
 - Cancellation: gather → immediate. Lift → deferred: the load is lowered back
-  onto its original pose. Move → if the laid footprint at the current pose is
+  onto its original pose if the load and carrier return sweep is clear of people. Move → if the laid footprint and the load/carrier sweep at the current pose are
   clear, deferred controlled set-down there (record ends `cancelled`), else
   refused with `carry.cancel-unsafe` and the carry continues. Set-down/release →
-  deferred (already stopping). Never drops or teleports a load.
+  deferred (already stopping). Every lowering tick rechecks the remaining sweep against current bystanders; `carry.setdown-occupied` holds the exact pose, grips and reservations until clear. A 32-interval pose envelope inflated by a translation/rotation bound covers between samples; carrier paths use continuous segment distance. Vertical body bands keep people on a clear upper deck independent. See `carry-cancel-people.test.ts` and its inspected state captures. This uses the engine person cylinder, not a new articulated-body collision solver. Never drops or teleports a load.
 
 ## Between levels (one carrier; `engine/test/carry-stairs.test.ts`)
 - `to.level` ≠ the crew's level, crew of 1: flight = `via` (a link id) or the one a person's route

@@ -1,0 +1,1666 @@
+[
+  {
+    "label": "move-refused",
+    "tick": 164,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "executing",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "move",
+          "code": "carry.cancel-unsafe"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "move",
+          "code": "carry.cancel-unsafe"
+        }
+      ],
+      "requestedTick": 0,
+      "diagnostic": {
+        "code": "carry.cancel-unsafe",
+        "message": "cannot lower sheet: visitor occupies the load set-down sweep; the crew retains the load",
+        "subjects": [
+          "sheet",
+          "visitor"
+        ],
+        "at": [
+          1.0125000000000004,
+          0,
+          0.86
+        ]
+      },
+      "phase": "move"
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.0125000000000004,
+            0,
+            0.35952500000000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "carry",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g0"
+          }
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            2.0125,
+            0,
+            -0.35952500000000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "carry",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g1"
+          }
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0.75,
+            0.009524999999999999
+          ],
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "carried",
+        "support": {
+          "kind": "held",
+          "by": [
+            "p1",
+            "p2"
+          ]
+        },
+        "reservedBy": "a1"
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            0.86
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "move-retry-grounded",
+    "tick": 233,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "cancelled",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "move",
+          "code": "carry.cancel-unsafe"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "move",
+          "code": "carry.cancel-unsafe"
+        },
+        {
+          "tick": 200,
+          "status": "executing",
+          "phase": "cancelling"
+        },
+        {
+          "tick": 201,
+          "status": "executing",
+          "phase": "set-down"
+        },
+        {
+          "tick": 224,
+          "status": "executing",
+          "phase": "release"
+        },
+        {
+          "tick": 233,
+          "status": "cancelled",
+          "phase": "release"
+        }
+      ],
+      "requestedTick": 0,
+      "phase": "release",
+      "outputs": {
+        "replans": 0,
+        "cancelled": true,
+        "x": 2.3287499999999994,
+        "z": 0,
+        "yaw": 0,
+        "length": 8,
+        "rotation": 0,
+        "reverse": 0,
+        "expanded": 15
+      },
+      "endedTick": 233
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            1.3287499999999994,
+            0,
+            0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            3.3287499999999994,
+            0,
+            -0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            2.3287499999999994,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "staged",
+        "support": {
+          "kind": "ground"
+        }
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            2
+          ],
+          "yaw": 1.5707963267948966
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "lift-refused",
+    "tick": 118,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "executing",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 118,
+          "status": "executing",
+          "phase": "lift",
+          "code": "carry.cancel-unsafe"
+        }
+      ],
+      "requestedTick": 0,
+      "diagnostic": {
+        "code": "carry.cancel-unsafe",
+        "message": "cannot lower sheet: visitor occupies the load set-down sweep; the crew retains the load",
+        "subjects": [
+          "sheet",
+          "visitor"
+        ],
+        "at": [
+          -4.6837533851373804e-17,
+          0,
+          0.858797171063322
+        ]
+      },
+      "phase": "lift"
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            -0.9921875,
+            0,
+            0.46741171875
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "lift",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g0"
+          }
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            1.0078125,
+            0,
+            -0.46741171875
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "lift",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g1"
+          }
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            -4.6837533851373804e-17,
+            0.6328125000000002,
+            0.008036718750000001
+          ],
+          "yaw": 0,
+          "pitch": -1.3253594007331944,
+          "roll": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "carried",
+        "support": {
+          "kind": "held",
+          "by": [
+            "p1",
+            "p2"
+          ]
+        },
+        "reservedBy": "a1"
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            -4.6837533851373804e-17,
+            0,
+            0.858797171063322
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "late-arrival-0-held",
+    "tick": 204,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "blocked",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "cancelling"
+        },
+        {
+          "tick": 165,
+          "status": "blocked",
+          "phase": "cancelling",
+          "code": "carry.setdown-occupied"
+        }
+      ],
+      "requestedTick": 0,
+      "diagnostic": {
+        "code": "carry.setdown-occupied",
+        "message": "sheet remains held: visitor occupies its remaining load set-down sweep",
+        "subjects": [
+          "sheet",
+          "visitor"
+        ],
+        "at": [
+          1.0125000000000004,
+          0,
+          0.86
+        ]
+      },
+      "phase": "cancelling"
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.0125000000000004,
+            0,
+            0.35952500000000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "set-down",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g0"
+          }
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            2.0125,
+            0,
+            -0.35952500000000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "set-down",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g1"
+          }
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0.75,
+            0.009524999999999999
+          ],
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "carried",
+        "support": {
+          "kind": "held",
+          "by": [
+            "p1",
+            "p2"
+          ]
+        },
+        "reservedBy": "a1"
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            0.86
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "late-arrival-0-cleared",
+    "tick": 250,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "cancelled",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "cancelling"
+        },
+        {
+          "tick": 165,
+          "status": "blocked",
+          "phase": "cancelling",
+          "code": "carry.setdown-occupied"
+        },
+        {
+          "tick": 218,
+          "status": "executing",
+          "phase": "set-down"
+        },
+        {
+          "tick": 241,
+          "status": "executing",
+          "phase": "release"
+        },
+        {
+          "tick": 250,
+          "status": "cancelled",
+          "phase": "release"
+        }
+      ],
+      "requestedTick": 0,
+      "phase": "release",
+      "outputs": {
+        "replans": 0,
+        "cancelled": true,
+        "x": 1.0125000000000004,
+        "z": 0,
+        "yaw": 0,
+        "length": 8,
+        "rotation": 0,
+        "reverse": 0,
+        "expanded": 15
+      },
+      "endedTick": 250
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.0125000000000004,
+            0,
+            0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            2.0125,
+            0,
+            -0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "staged",
+        "support": {
+          "kind": "ground"
+        }
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            2
+          ],
+          "yaw": 1.5707963267948966
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "late-arrival-6-held",
+    "tick": 210,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "blocked",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "cancelling"
+        },
+        {
+          "tick": 165,
+          "status": "executing",
+          "phase": "set-down"
+        },
+        {
+          "tick": 171,
+          "status": "blocked",
+          "phase": "set-down",
+          "code": "carry.setdown-occupied"
+        }
+      ],
+      "requestedTick": 0,
+      "diagnostic": {
+        "code": "carry.setdown-occupied",
+        "message": "sheet remains held: visitor occupies its remaining load set-down sweep",
+        "subjects": [
+          "sheet",
+          "visitor"
+        ],
+        "at": [
+          1.0125000000000004,
+          0,
+          0.858797171063322
+        ]
+      },
+      "phase": "set-down"
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.0125000000000004,
+            0,
+            0.45328671875000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "set-down",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g0"
+          }
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            2.0125,
+            0,
+            -0.45328671875000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "set-down",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g1"
+          }
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0.6328125,
+            0.00803671875
+          ],
+          "yaw": 0,
+          "pitch": -1.325359400733194,
+          "roll": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "carried",
+        "support": {
+          "kind": "held",
+          "by": [
+            "p1",
+            "p2"
+          ]
+        },
+        "reservedBy": "a1"
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            0.858797171063322
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "late-arrival-6-cleared",
+    "tick": 249,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "cancelled",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "cancelling"
+        },
+        {
+          "tick": 165,
+          "status": "executing",
+          "phase": "set-down"
+        },
+        {
+          "tick": 171,
+          "status": "blocked",
+          "phase": "set-down",
+          "code": "carry.setdown-occupied"
+        },
+        {
+          "tick": 223,
+          "status": "executing",
+          "phase": "set-down"
+        },
+        {
+          "tick": 240,
+          "status": "executing",
+          "phase": "release"
+        },
+        {
+          "tick": 249,
+          "status": "cancelled",
+          "phase": "release"
+        }
+      ],
+      "requestedTick": 0,
+      "phase": "release",
+      "outputs": {
+        "replans": 0,
+        "cancelled": true,
+        "x": 1.0125000000000004,
+        "z": 0,
+        "yaw": 0,
+        "length": 8,
+        "rotation": 0,
+        "reverse": 0,
+        "expanded": 15
+      },
+      "endedTick": 249
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.0125000000000004,
+            0,
+            0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            2.0125,
+            0,
+            -0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "staged",
+        "support": {
+          "kind": "ground"
+        }
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            2
+          ],
+          "yaw": 1.5707963267948966
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "carrier-retreat-refused",
+    "tick": 164,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "executing",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "move",
+          "code": "carry.cancel-unsafe"
+        }
+      ],
+      "requestedTick": 0,
+      "diagnostic": {
+        "code": "carry.cancel-unsafe",
+        "message": "cannot lower sheet: visitor occupies the carrier set-down sweep; the crew retains the load",
+        "subjects": [
+          "sheet",
+          "visitor"
+        ],
+        "at": [
+          -0.6574999999999995,
+          0,
+          0.84
+        ]
+      },
+      "phase": "move"
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.0125000000000004,
+            0,
+            0.35952500000000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "carry",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g0"
+          }
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            2.0125,
+            0,
+            -0.35952500000000004
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "carry",
+          "level": 0,
+          "task": "a1",
+          "grip": {
+            "entity": "sheet",
+            "slot": "g1"
+          }
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0.75,
+            0.009524999999999999
+          ],
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "carried",
+        "support": {
+          "kind": "held",
+          "by": [
+            "p1",
+            "p2"
+          ]
+        },
+        "reservedBy": "a1"
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            -0.6574999999999995,
+            0,
+            0.84
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      }
+    },
+    "violations": []
+  },
+  {
+    "label": "vertical-clearance-control",
+    "tick": 197,
+    "action": {
+      "id": "a1",
+      "verb": "carry",
+      "params": {
+        "crew": [
+          "p1",
+          "p2"
+        ],
+        "item": "sheet",
+        "to": {
+          "x": 8,
+          "z": 0,
+          "yaw": 0
+        }
+      },
+      "status": "cancelled",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gather"
+        },
+        {
+          "tick": 100,
+          "status": "executing",
+          "phase": "lift"
+        },
+        {
+          "tick": 124,
+          "status": "executing",
+          "phase": "move"
+        },
+        {
+          "tick": 164,
+          "status": "executing",
+          "phase": "cancelling"
+        },
+        {
+          "tick": 165,
+          "status": "executing",
+          "phase": "set-down"
+        },
+        {
+          "tick": 188,
+          "status": "executing",
+          "phase": "release"
+        },
+        {
+          "tick": 197,
+          "status": "cancelled",
+          "phase": "release"
+        }
+      ],
+      "requestedTick": 0,
+      "phase": "release",
+      "outputs": {
+        "replans": 0,
+        "cancelled": true,
+        "x": 1.0125000000000004,
+        "z": 0,
+        "yaw": 0,
+        "length": 8,
+        "rotation": 0,
+        "reverse": 0,
+        "expanded": 15
+      },
+      "endedTick": 197
+    },
+    "entities": {
+      "p1": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.0125000000000004,
+            0,
+            0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "p2": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            2.0125,
+            0,
+            -0.9596
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0
+        }
+      },
+      "sheet": {
+        "id": "sheet",
+        "def": "plywood-4x8",
+        "kind": "component",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "phase": "staged",
+        "support": {
+          "kind": "ground"
+        }
+      },
+      "visitor": {
+        "id": "visitor",
+        "def": "human",
+        "kind": "human",
+        "label": "visitor",
+        "pose": {
+          "p": [
+            1.0125000000000004,
+            4,
+            0.86
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 1
+        }
+      }
+    },
+    "violations": []
+  }
+]
