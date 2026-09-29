@@ -11,7 +11,7 @@ import type { ActionDef, CancelResult, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import type { Spatial } from '../spatial/service.ts';
-import { makeWay, stairBlocker, traffic, walkTo } from '../locomotion/walk.ts';
+import { makeWay, stairBlocker, traffic, walkTo, takeReplan } from '../locomotion/walk.ts';
 import { CARRY_CLIMB_SPEED, climbPose, type ClimbPose } from './climb.ts';
 import { entityFootprint } from '../spatial/service.ts';
 import { carriedPose, carrierSpots, entityFrame, formationFor, laidPose, worldDiscs, type SE2 } from './formation.ts';
@@ -215,6 +215,26 @@ function startSetDown(rt: Runtime, ex: Exec, q: SE2) {
   beginTransition(rt, ex, 'set-down', laid, carrierSpots(ex.p.f, q, halfW), q.th, 'staged');
 }
 
+/** Existing augmented-grid carry recovery, always starts at the current validated formation. */
+function retryCarryPeople(rt: Runtime, ex: Exec, c: SE2): boolean {
+  const p = ex.p, sp = rt.services.spatial as Spatial;
+  const others = Object.values(rt.world.entities)
+    .filter((o) => o.kind === 'human' && !p.crew.includes(o.id) && o.human?.level === p.level)
+    .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
+  const aug = sp.gridsAround(rt.world, others);
+  const ga = aug.grids.levels.get(p.level);
+  const r = ga ? planCarry({ g: ga, f: p.f, starts: replanStarts(rt, ex, c), goals: [p.target], labelOf: (id) => labelOf(sp, id), carrierNames: p.crew }) : null;
+  if (r?.ok) {
+    p.traj = r.traj;
+    ex.u = 0;
+    ex.i = 0;
+    ex.replans = (ex.replans ?? 0) + 1;
+    applyFormation(rt, ex, r.traj.poses[0]);
+    return true;
+  }
+  return false;
+}
+
 export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
   verb: 'carry',
   description:
@@ -341,20 +361,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         ex.waited = (ex.waited ?? 0) + 1;
         if (ex.waited > 120 && ex.v < 0.02) {
           ex.waited = 0;
-          const others = Object.values(rt.world.entities)
-            .filter((o) => o.kind === 'human' && !p.crew.includes(o.id) && o.human?.level === p.level)
-            .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
-          const aug = sp.gridsAround(rt.world, others);
-          const ga = aug.grids.levels.get(p.level);
-          const r = ga ? planCarry({ g: ga, f: p.f, starts: replanStarts(rt, ex, c), goals: [p.target], labelOf: (id) => labelOf(sp, id), carrierNames: p.crew }) : null;
-          if (r?.ok) {
-            p.traj = r.traj;
-            ex.u = 0;
-            ex.i = 0;
-            ex.replans = (ex.replans ?? 0) + 1;
-            applyFormation(rt, ex, r.traj.poses[0]);
-            return { status: 'running', phase: 'replan' };
-          }
+          if (retryCarryPeople(rt, ex, c)) return { status: 'running', phase: 'replan' };
         }
         if (ex.v < 0.02) return blockedWait(rt, ex.id, p.item, [ahead], { code: 'carry.path-occupied', message: `the crew carrying ${p.item} waits for ${ahead} to move out of its way`, subjects: [p.item, ahead], at: [c.x, p.levelY, c.z] }, p.crew);
         return { status: 'running', phase: 'move' };
@@ -411,6 +418,22 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         ...(p.climb ? { level: p.level, via: p.climb.link.id } : {}),
       },
     };
+  },
+  recoverWait(rt, ex, mover) {
+    if (ex.phase === 'gather') {
+      const index = ex.p.crew.indexOf(mover), walk = index >= 0 ? ex.walks[index] : null;
+      if (walk) return walkTo.recoverWait!(rt, walk, mover);
+    }
+    if (mover !== ex.p.item || ex.phase !== 'move' || ex.v >= 0.02 || ex.onStair || ex.cancelling)
+      return { status: 'unavailable', diagnostic: { code: 'deadlock.recovery-unavailable', message: 'carry recovery is unavailable outside a stopped floor formation or gathering walk', subjects: [mover] } };
+    if (!takeReplan(rt, false)) return { status: 'deferred', diagnostic: { code: 'deadlock.recovery-budget', message: 'carry recovery waits for existing planner budget', subjects: [mover] } };
+    const planned = retryCarryPeople(rt, ex, poseAtU(ex, ex.u));
+    return { status: 'attempted', diagnostic: { code: planned ? 'deadlock.replanned' : 'deadlock.replan-refused', message: planned ? 'existing formation planner found a route from the current pose' : 'existing formation planner found no safe route', subjects: [mover] } };
+  },
+  waitQuiescent(rt, ex, exhausted) {
+    if (ex.cancelling) return false;
+    if (ex.phase === 'gather') return ex.walks.every((walk, i) => !!walk && exhausted.has(ex.p.crew[i]) && walkTo.waitQuiescent!(rt, walk, exhausted));
+    return ex.phase === 'move' && ex.v < 0.02 && !ex.onStair && exhausted.has(ex.p.item);
   },
   cancel(rt, ex): CancelResult {
     const p = ex.p;

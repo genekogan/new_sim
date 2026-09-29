@@ -5,7 +5,7 @@ import type { ActionDef, ActionRecord, ActionStatus, Diagnostic, Reservation, St
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { Profiler } from './profile.ts';
-import { deadlockDiagnostics } from './waits.ts';
+import { deadlockDiagnostics, exhaustedWaitMovers, recoverPersistentWaits } from './waits.ts';
 import { applySnapshot, decodeSnapshot, SnapshotError, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
@@ -201,7 +201,7 @@ export class Runtime {
       const r = l.def.step(this, l.exec, DT);
       if (prof) prof.add(`${l.rec.verb}.step`, prof.now() - t0);
       // Keep an existing persistent diagnostic stable until every mover has published this tick.
-      if (l.rec.diagnostic?.code === 'deadlock.cycle' && (r.status === 'running' || r.status === 'blocked')) {
+      if (l.rec.diagnostic?.code.startsWith('deadlock.') && (r.status === 'running' || r.status === 'blocked')) {
         deferred.set(l, r);
         continue;
       }
@@ -221,6 +221,10 @@ export class Runtime {
         this.finish(l, 'failed', r.diagnostic);
       }
     }
+    recoverPersistentWaits(this, (owner, mover) => {
+      const l = this.live.get(owner);
+      return l?.def.recoverWait?.(this, l.exec, mover) ?? { status: 'unavailable', diagnostic: { code: 'deadlock.recovery-unavailable', message: `no safe recovery hook for ${owner}/${mover}`, subjects: [mover] } };
+    });
     const deadlocks = deadlockDiagnostics(this);
     for (const [l, r] of deferred) {
       if (!this.live.has(l.rec.id)) continue; // another action may have cancelled it later in this tick
@@ -247,6 +251,18 @@ export class Runtime {
       }
     if (this.prof) this.prof.add('invariants', this.prof.now() - ti);
     for (const o of this.observers) o.onTick?.(this);
+  }
+
+  /** Conservative early-stop proof: all live roots, children and ambient actions must certify every internal mover. */
+  exhaustedWaitDiagnostics(): Diagnostic[] | null {
+    if (!this.live.size || this.waiting.size) return null;
+    const movers = exhaustedWaitMovers(this);
+    const diagnostics: Diagnostic[] = [];
+    for (const l of this.live.values()) {
+      if (l.cancelling || !l.rec.diagnostic?.code.startsWith('deadlock.') || !l.def.waitQuiescent?.(this, l.exec, movers)) return null;
+      diagnostics.push(l.rec.diagnostic);
+    }
+    return diagnostics;
   }
 
   /** Step until all given (or all) actions are terminal, or a tick budget is exhausted. */

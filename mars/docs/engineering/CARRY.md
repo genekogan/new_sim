@@ -167,3 +167,17 @@ slot-derived spot (`carry.grip-drift`) and the load's disc cover clears static g
   from flat to edge); no ground-contact modelling during the tilt.
 - `walk_to` issues seen (not changed here): `face` oscillates with turn-in-place
   (gather turns carriers itself); two walkers arriving close can deadlock.
+
+
+### Persistent gather and formation waits (LM-024)
+
+Carry waits participate in the mover graph described in [MOVEMENT](MOVEMENT.md#persistent-waits-and-bounded-recovery-lm-024-staged).
+Each gathering walker remains a distinct node even though they share the carry
+action id. Recovery addresses that sub-walker directly; it never uses the
+shared-id `walkExecs` lookup to select a crew member. A stopped floor formation
+can request one existing augmented-grid retry per unchanged episode, with planner
+budget admission. Unsupported phases explicitly refuse recovery. A parent is
+never certified quiescent while a gathering member is still approaching; early
+blocked results preserve live held support and cannot be committed by execute.
+The checked physical fixtures and conservative remaining cases are in
+[the recovery report](briefs/deadlock-recovery.REPORT.md).

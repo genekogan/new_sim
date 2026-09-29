@@ -44,6 +44,9 @@ export type PlanResult<Program> = { ok: true; program: Program; notes?: string[]
  */
 export type CancelResult = { ok: true; deferred?: boolean } | { ok: false; diagnostic: Diagnostic };
 
+/** A bounded recovery attempt; unavailable is explicit and is never counted as a planner retry. */
+export type WaitRecoveryResult = { status: 'attempted' | 'unavailable' | 'deferred'; diagnostic: Diagnostic };
+
 export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> {
   verb: string;
   description: string;
@@ -61,6 +64,10 @@ export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> 
    * when stopping would leave an unsupported load (spec §13 `cancelled`).
    */
   cancel(rt: Runtime, exec: Exec): CancelResult;
+  /** Retry this specific mover through the action's existing validated planner; never force release or teleport. */
+  recoverWait?(rt: Runtime, exec: Exec, mover: string): WaitRecoveryResult;
+  /** Certify that every internal mover is quiescent; unknown actions cannot end a sequence early. */
+  waitQuiescent?(rt: Runtime, exec: Exec, exhaustedMovers: ReadonlySet<string>): boolean;
   /**
    * Pre-emptible hold (spec §17, SOCIAL.md "Pre-emption"); set by the social verbs. A *directed*
    * submission (neither its verb nor any ancestor has this hook, and `preempt` is not false) that

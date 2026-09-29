@@ -53,7 +53,7 @@ test('forced three-cycle: deterministic threshold, stable diagnostic, resources 
   rt.services.testEdges.c = [];
   rt.step();
   assert.equal(rt.records.get('c')?.status, 'completed');
-  assert.equal(rt.records.get('a')?.diagnostic?.code, 'test.wait');
+  assert.equal(rt.records.get('a')?.diagnostic?.code, 'deadlock.stalled');
   rt.services.testEdges.a = []; rt.services.testEdges.b = [];
   rt.step();
   assert.ok(records.every((r) => r.status === 'completed'));
@@ -88,7 +88,7 @@ test('vehicle/load aliases resolve to mover identity; progress and changed edges
   ticks(rt, DEADLOCK_TICKS - 1);
   assert.ok(records.every((r) => r.diagnostic?.code === 'deadlock.cycle'));
   rt.services.testEdges.a = ['wall']; rt.step();
-  assert.ok(records.every((r) => r.diagnostic?.code === 'test.wait'));
+  assert.ok(records.every((r) => r.diagnostic?.code !== 'deadlock.cycle'));
 });
 
 test('sequence reports live diagnostic; a future cancellation cue remains eligible', () => {
@@ -106,7 +106,7 @@ test('sequence reports live diagnostic; a future cancellation cue remains eligib
   assert.equal(runner.reports[0].status, 'cancelled');
   assert.equal(runner.reports[2].status, 'completed');
   runner.tick(); // cancellation is cued after the previous tick's coherent graph
-  assert.equal(runner.reports[1].diagnostic?.code, 'test.wait');
+  assert.equal(runner.reports[1].diagnostic?.code, 'deadlock.stalled');
 });
 
 test('JSON snapshot preserves an in-progress wait episode and exact diagnostic tick', () => {
@@ -208,5 +208,5 @@ test('another action cancelling a reported cycle member in the same tick cannot 
   rt.submit(cancel.verb, { movers: [] }); rt.step();
   assert.equal(rt.records.get('a')?.status, 'cancelled');
   assert.equal(rt.isActive('a'), false);
-  assert.equal(rt.records.get('b')?.diagnostic?.code, 'test.wait');
+  assert.equal(rt.records.get('b')?.diagnostic?.code, 'deadlock.stalled');
 });

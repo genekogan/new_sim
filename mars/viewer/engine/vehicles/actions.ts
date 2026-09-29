@@ -7,7 +7,7 @@
 import { publishWait } from '../runtime/waits.ts';
 import { z } from 'zod';
 import { add2, angleDelta, clamp, dcos, dist2, dsin, heading, norm2, rot2, scale2, sub2, wrapAngle, type OBB2, type Vec2, hypot } from '../core/math.ts';
-import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
+import type { ActionDef, WaitRecoveryResult, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import type { AroundPerson, Spatial } from '../spatial/service.ts';
@@ -15,7 +15,7 @@ import { entityFootprint } from '../spatial/service.ts';
 import { clearanceAt, cellOf, centreOf, nearestBlocker, segmentClearance, type LevelGrid } from '../spatial/grid.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import { FIXTURE } from '../world/factory.ts';
-import { makeWay } from '../locomotion/walk.ts';
+import { makeWay, takeReplan } from '../locomotion/walk.ts';
 import { turnRadiusAt, vehicleProfile, type VehicleProfile } from './profiles.ts';
 import { blockersNear, planCurve, vehicleGrids, type Curve } from './curve.ts';
 import { boxGap, describe, dropLane, footprintOf, outranks, othersOnLevel, pathConflict, place, publishLane, pullOverSpot, bandGap, vehicleAround, V_ON_PATH, V_STOP_GAP, YIELD_GAP, type Lane, type Other } from './traffic.ts';
@@ -680,6 +680,16 @@ function stepRideCore(rt: Runtime, ex: RideExec, dt: number): StepResult {
   return { status: 'running', phase: 'ride' };
 }
 
+function recoverRide(rt: Runtime, ex: RideExec, mover: string): WaitRecoveryResult {
+  const rd = riderOf(rt.world, ex.actor);
+  if (mover !== ex.vehicle || 'code' in rd || ex.v >= 0.02 || ex.cancelling || ex.yielding || ex.replans >= MAX_REPLANS)
+    return { status: 'unavailable', diagnostic: { code: 'deadlock.recovery-unavailable', message: 'ride recovery has no applicable stopped-route retry; pull-over/resume retains its own bounded retry policy', subjects: [mover] } };
+  if (!takeReplan(rt, false)) return { status: 'deferred', diagnostic: { code: 'deadlock.recovery-budget', message: 'ride recovery waits for existing planner budget', subjects: [mover] } };
+  const refusal = replan(rt, ex, rd, standing(rt, rd));
+  return { status: 'attempted', diagnostic: { code: refusal ? 'deadlock.replan-refused' : 'deadlock.replanned', message: refusal?.message ?? 'existing ride planner found a route from the current pose', subjects: [mover] } };
+}
+const rideQuiescent = (_rt: Runtime, ex: RideExec, exhausted: ReadonlySet<string>) => exhausted.has(ex.vehicle) && ex.v < 0.02 && !ex.cancelling && !ex.yielding;
+
 const rideCancel = (_rt: Runtime, ex: RideExec) => {
   ex.cancelling = true; // brake to a stop, then the rider sits on the stopped vehicle
   return { ok: true as const, deferred: true };
@@ -700,6 +710,8 @@ export const rideTo: ActionDef<RideParams, RideProgram, RideExec> = {
   start: (rt, p, prog, id) => startRide(rt, p.actor, prog, id),
   step: stepRide,
   cancel: rideCancel,
+  recoverWait: recoverRide,
+  waitQuiescent: rideQuiescent,
 };
 
 export const rideLoop: ActionDef<LoopParams, RideProgram, RideExec> = {
@@ -723,6 +735,8 @@ export const rideLoop: ActionDef<LoopParams, RideProgram, RideExec> = {
   start: (rt, p, prog, id) => startRide(rt, p.actor, prog, id),
   step: stepRide,
   cancel: rideCancel,
+  recoverWait: recoverRide,
+  waitQuiescent: rideQuiescent,
 };
 
 export const VEHICLE_ACTIONS: ActionDef[] = [mount, rideTo, rideLoop, dismount];

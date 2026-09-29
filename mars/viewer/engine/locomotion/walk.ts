@@ -238,6 +238,15 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     } else h.human!.speed = Math.round((dist2([x0, z0], [h.pose.p[0], h.pose.p[2]]) / dt) * 1000) / 1000;
     return r;
   },
+  recoverWait(rt, ex, mover) {
+    const unavailable = (message: string) => ({ status: 'unavailable' as const, diagnostic: { code: 'deadlock.recovery-unavailable', message, subjects: [mover] } });
+    if (mover !== ex.actor || ex.phase !== 'walk' || ex.v >= 0.02 || !ex.block || ex.peopleReplans >= MAX_PEOPLE_REPLANS || ex.detour || ex.cancelTo)
+      return unavailable('walker has no remaining applicable person/load replan; occupied goals and stairs require clearance');
+    if (!takeReplan(rt, false)) return { status: 'deferred', diagnostic: { code: 'deadlock.recovery-budget', message: 'walker recovery waits for existing planner budget', subjects: [mover] } };
+    const planned = retryPeople(rt, ex, rt.world.entities[ex.actor]);
+    return { status: 'attempted', diagnostic: { code: planned ? 'deadlock.replanned' : 'deadlock.replan-refused', message: planned ? 'existing person/load planner found a route from the current pose' : 'existing person/load planner found no safe route', subjects: [mover] } };
+  },
+  waitQuiescent(_rt, ex, exhausted) { return exhausted.has(ex.actor) && ((ex.v < 0.02 && ex.phase === 'walk') || ex.phase === 'align' || ex.phase === 'climb') && !ex.cancelTo && !ex.detour; },
   cancel(rt, ex) {
     // mid-flight on a stair: the body is between levels, so stopping here would leave it standing on
     // the flight. Defer: walk on to whichever landing is nearer along the path, then finish as cancelled.
@@ -400,6 +409,49 @@ function tryEnter(rt: Runtime, ex: Exec, n: Narrow): string | null {
     return null;
   }
   return [...e.actors][0];
+}
+
+/** Existing person/load recovery path, shared with the bounded persistent-wait request. */
+function retryPeople(rt: Runtime, ex: Exec, a: Entity): boolean {
+  const sp = spatial(rt);
+  ex.stuck = 0;
+  ex.still = 0;
+  ex.peopleReplans++;
+  // a carried load in the way counts as an obstacle too: route around where it is now. In a crowd
+  // (a fire ring filling up) every standing person as a comfortable obstacle (0.3 m half-width) can wall
+  // the walker in, crowd its start or its goal: then squeeze — route around the same people planned
+  // smaller (SQUEEZE_HALF), still keeping the body separation from every one of them
+  const loads = loadDiscsFor(rt, a).map((d, i) => ({ id: `${d.entity}#${i}`, p: d.p }));
+  const blockers = Object.entries(ex.block!.at).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).filter(([id]) => rt.world.entities[id]?.kind === 'human').map(([id, p]) => ({ id, p }));
+  let others = [...standingPeople(rt, a), ...loads];
+  for (const b of blockers) if (!others.some((o) => o.id === b.id)) others.push(b);
+  const from = { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] as Vec2 };
+  // a failure's diagnostic is only read below, for subjects among `others`: an unfinished-stairs
+  // explanation (a second, successful search naming links) can matter only for a link with such an id
+  const lazy = WALK_PERF.lazyLinkDiagnostics;
+  let rr = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), others, lazy ? (id) => others.some((o) => o.id === id) : undefined);
+  // (only when the failure names a person: `routeAround` names the people / loads that wall the walker
+  // in, crowd its start or goal, or stand at a stair it needs (path.ts nameObstacles); a structural
+  // failure, e.g. an unfinished stair, names nobody and is not searched twice. Routing round only the
+  // blockers, as before, walked the walker into the people it left out.)
+  const isPerson = (id: string) => rt.world.entities[id]?.kind === 'human';
+  if (!rr.ok && (rr.diagnostic.subjects ?? []).some((id) => isPerson(id) && others.some((o) => o.id === id))) {
+    const squeezed = others.map((o) => (isPerson(o.id) ? { ...o, half: SQUEEZE_HALF } : o));
+    const r2 = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), squeezed, lazy ? () => false : undefined); // only r2.ok is read
+    if (r2.ok) { rr = r2; others = squeezed; }
+  }
+  ex.plannedAround = Object.fromEntries(others.map((o) => [o.id, o.p]));
+  if (rr.ok) {
+    releaseAll(rt, ex);
+    ex.route = rr.route;
+    ex.around = others;
+    ex.leg = 0;
+    ex.replans++;
+    ex.block = undefined;
+    enterLeg(rt, ex);
+    return true;
+  }
+  return false;
 }
 
 function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
@@ -771,43 +823,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   // further attempt waits twice as long (0.5, 1, 2, 4 … s), so a crowd that clears is waited for
   const decideAfter = DECIDE_TICKS * (1 << Math.min(ex.peopleReplans, 5)); // (a shift: `**` is host pow)
   if (ex.block && !arrived && ex.peopleReplans < MAX_PEOPLE_REPLANS && ((ex.still ?? 0) >= decideAfter || ex.stuck >= Math.max(STUCK_TICKS, decideAfter))) {
-    ex.stuck = 0;
-    ex.still = 0;
-    ex.peopleReplans++;
-    // a carried load in the way counts as an obstacle too: route around where it is now. In a crowd
-    // (a fire ring filling up) every standing person as a comfortable obstacle (0.3 m half-width) can wall
-    // the walker in, crowd its start or its goal: then squeeze — route around the same people planned
-    // smaller (SQUEEZE_HALF), still keeping the body separation from every one of them
-    const loads = loadDiscsFor(rt, a).map((d, i) => ({ id: `${d.entity}#${i}`, p: d.p }));
-    const blockers = Object.entries(ex.block.at).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).filter(([id]) => rt.world.entities[id]?.kind === 'human').map(([id, p]) => ({ id, p }));
-    let others = [...standingPeople(rt, a), ...loads];
-    for (const b of blockers) if (!others.some((o) => o.id === b.id)) others.push(b);
-    const from = { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] as Vec2 };
-    // a failure's diagnostic is only read below, for subjects among `others`: an unfinished-stairs
-    // explanation (a second, successful search naming links) can matter only for a link with such an id
-    const lazy = WALK_PERF.lazyLinkDiagnostics;
-    let rr = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), others, lazy ? (id) => others.some((o) => o.id === id) : undefined);
-    // (only when the failure names a person: `routeAround` names the people / loads that wall the walker
-    // in, crowd its start or goal, or stand at a stair it needs (path.ts nameObstacles); a structural
-    // failure, e.g. an unfinished stair, names nobody and is not searched twice. Routing round only the
-    // blockers, as before, walked the walker into the people it left out.)
-    const isPerson = (id: string) => rt.world.entities[id]?.kind === 'human';
-    if (!rr.ok && (rr.diagnostic.subjects ?? []).some((id) => isPerson(id) && others.some((o) => o.id === id))) {
-      const squeezed = others.map((o) => (isPerson(o.id) ? { ...o, half: SQUEEZE_HALF } : o));
-      const r2 = sp.routeAround(rt.world, ex.profile, from, targetOf(ex), squeezed, lazy ? () => false : undefined); // only r2.ok is read
-      if (r2.ok) { rr = r2; others = squeezed; }
-    }
-    ex.plannedAround = Object.fromEntries(others.map((o) => [o.id, o.p]));
-    if (rr.ok) {
-      releaseAll(rt, ex);
-      ex.route = rr.route;
-      ex.around = others;
-      ex.leg = 0;
-      ex.replans++;
-      ex.block = undefined;
-      enterLeg(rt, ex);
-      return { status: 'running', phase: 'replan' };
-    }
+    if (retryPeople(rt, ex, a)) return { status: 'running', phase: 'replan' };
   }
   // the corridor ahead turned out blocked by geometry (a stale corridor while a construction replan
   // was deferred): replan on the next tick, whatever the budget
@@ -839,7 +855,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
         // W38: the person on my destination waits for me to clear a single-file passage my destination lies in — I hold it
         // while I wait for them (chiba 2022, D1: m3 / m6 deadlocked for 16 h): let the passage go so they walk on through
         const ot = rt.world.entities[occ].human?.task, orec = ot ? rt.records.get(ot) : undefined;
-        if (ex.held.size && orec?.status === 'blocked' && ((orec.diagnostic?.code === 'traffic.yield' && orec.diagnostic.subjects?.includes(ex.actor)) || (orec.diagnostic?.code === 'deadlock.cycle' && publishedWaitsFor(rt, occ, ex.actor, 'traffic.yield')))) releaseAll(rt, ex);
+        if (ex.held.size && orec?.status === 'blocked' && ((orec.diagnostic?.code === 'traffic.yield' && orec.diagnostic.subjects?.includes(ex.actor)) || (orec.diagnostic?.code.startsWith('deadlock.') && publishedWaitsFor(rt, occ, ex.actor, 'traffic.yield')))) releaseAll(rt, ex);
         makeWay(rt, occ, pointAt(ex, ex.total));
         return blockedWait(rt, ex.id, ex.actor, [occ], { code: 'walk.goal-occupied', message: `${ex.actor} cannot step onto its destination: ${occ} is standing there`, subjects: [ex.actor, occ] });
       }
@@ -1395,7 +1411,7 @@ function stepLinkCancel(rt: Runtime, ex: Exec, a: Entity, leg: LinkLeg, dt: numb
 /** Per-tick construction-replan budget (`services.planning.replansPerTick` overrides REPLANS_PER_TICK);
  *  `services.replanBudget` also keeps totals (replans, deferred walker-ticks, peak replans in one tick). */
 export type ReplanBudget = { tick: number; used: number; peak: number; deferred: number; replans: number };
-function takeReplan(rt: Runtime, forced: boolean): boolean {
+export function takeReplan(rt: Runtime, forced: boolean): boolean {
   const b = (rt.services.replanBudget ??= { tick: -1, used: 0, peak: 0, deferred: 0, replans: 0 }) as ReplanBudget;
   if (b.tick !== rt.tick) { b.tick = rt.tick; b.used = 0; }
   const max = (rt.services.planning as { replansPerTick?: number } | undefined)?.replansPerTick ?? REPLANS_PER_TICK;

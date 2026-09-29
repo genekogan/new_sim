@@ -332,33 +332,57 @@ Pins moved once, with the same discrete outcomes (`PLANNING_BUDGET.md`).
   The exception is beam walking, which has its own `frame.beam-overspeed` (0.4 m/s).
 
 
-## Persistent wait reporting (LM-024, reporting stage)
+## Persistent waits and bounded recovery (LM-024, staged)
 
 `runtime/waits.ts` collects explicit dependencies by mover, not action id: a
 carry's gathering walkers remain separate nodes, moving carries alias their crew
 to the load, and rides alias their rider to the vehicle. Walk person/load/passage
 waits, carry person/stair waits and ride person/vehicle waits publish concrete
 identities. Static blockers and ambiguous aliases do not become invented mover
-edges. Forklift-specific manipulation waits and acyclic exhausted waits are not
-covered by this stage.
+edges. Forklift-specific manipulation waits are not covered.
 
 A cycle with unchanged dependencies and poses for 200 consecutive ticks (10 s)
-gets `deadlock.cycle`, including sorted movers, owner actions and edges. This is an
-explicit reporting policy after existing local recovery windows, not proof that
-future movement can never clear the passage. Runtime keeps stepping the actions;
-it never releases support or reservations to resolve the report. Progress or a
-broken/stale edge clears the overlay. The overlay is stable, and live sequence
-step reports retain its diagnostic. Existing walking reciprocal-passage recovery
-still reads the underlying published wait.
+gets `deadlock.cycle`; persistent acyclic waits get `deadlock.stalled`. Pose
+progress uses a fixed anchor: translation over 1 mm or wrapped angular change
+over 0.001 rad resets the episode. This is a reporting-only tolerance; collision,
+support and movement rules are unchanged. Cumulative slow progress resets it;
+bounded sub-millimetre steering jitter and alternating original wait codes do
+not reset recovery caps. Changed blocker identity always starts a new episode.
+Only mover aliases and their concrete blockers contribute poses, not unrelated
+world entities.
 
-Episode state lives in the runtime service bag and is captured in resumable
-snapshots; no WorldState fields change. Older snapshots without it remain valid
-and begin fresh episodes. Waiting snapshot blob hashes change; ordinary transient
-passage world/event hashes remain unchanged. See
-[the focused report](briefs/deadlock-detection.REPORT.md).
+Each mover episode requests at most one additional existing validated planner
+attempt, within existing planner budgets/caps. Walker recovery shares the
+person/load route-and-squeeze path; gathering carries address their specific
+sub-walker; stopped floor carries share their augmented-grid formation planner;
+stopped rides share their existing route planner. Unsupported stairs, occupied
+goals, completed caps and active pull-over/resume phases explicitly report
+`deadlock.recovery-unavailable`. Planner admission may defer for at most 200
+ticks; budget starvation is named and never counted as an actual attempt.
+Another 200 unchanged ticks after the attempt/refusal exhaust the episode.
+Existing normal action retries remain active throughout. The detector never
+forces a resource release; a successful validated replan follows its ordinary
+route-ownership behavior.
 
-LM-024 remains **partial**: the one-per-episode explicit recovery request, safe
-early `blocked` sequence result, exhausted acyclic wait policy and an actual
-unresolvable passage/gather proof remain follow-up work. Scheduled future cues
-continue running. A generic forced three-cycle is not LM-043's physical
-three-vehicle traffic proof.
+SequenceRunner returns `blocked` early only if every live root, child and ambient
+action explicitly certifies all internal movers as exhausted, no step is pending,
+and no live step has a future timeout. Unknown verbs prevent early stopping. A
+cue/cancellation/timeout gets a full subsequent runtime tick before certification.
+The runner does not cancel or settle the blocked actions: supports and
+reservations remain live, the result is unsettled, and execute refuses to commit
+it even with `commitOnFailure`. An explicit continuation can observe subsequent
+external progress. Pending dependent tails remain conservative: they prevent this
+early result and retain the ordinary timeout behavior.
+
+Episode anchors, recovery requests/results and the stopped runner diagnostic are
+plain snapshot state. Older snapshots without those optional fields remain
+valid. Waiting snapshot blob hashes change; the ordinary opposing passage keeps
+its exact world/event hashes. See [stage 1](briefs/deadlock-detection.REPORT.md)
+and [stage 2](briefs/deadlock-recovery.REPORT.md) for proofs and inspected captures.
+
+LM-024 remains **partial**: genuine 0.1 m lateral oscillation in narrow ground
+corridors resets pose progress, full gather quiescence is conservative, and
+forklift-specific waits are not yet covered. The actual stairs-a closed wait and
+supported held carry are proven; the generic forced three-cycle is not LM-043's
+physical three-vehicle traffic proof. LM-020 co-planning and LM-025 back-out remain
+separate.

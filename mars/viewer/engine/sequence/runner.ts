@@ -27,7 +27,7 @@ export type StepReport = {
   outputs?: Record<string, unknown>;
 };
 
-export type SequenceStatus = 'completed' | 'partial' | 'aborted' | 'timeout';
+export type SequenceStatus = 'completed' | 'partial' | 'aborted' | 'timeout' | 'blocked';
 
 export type SequenceResult = {
   status: SequenceStatus;
@@ -69,6 +69,7 @@ export type RunnerState = {
   violationStart: number;
   aborted: boolean;
   timedOut: boolean;
+  blockedDiagnostic?: Diagnostic;
   cut: string[];
   cutReason: [string, Diagnostic][];
   refused: string[];
@@ -105,6 +106,7 @@ export class SequenceRunner {
   private violationStart: number;
   private aborted = false;
   private timedOut = false;
+  private blockedDiagnostic?: Diagnostic;
   private cut: string[] = [];
   /** Why each cut live step was stopped (applied when its deferred cancel finishes). */
   private cutReason = new Map<string, Diagnostic>();
@@ -138,6 +140,7 @@ export class SequenceRunner {
       violationStart: this.violationStart,
       aborted: this.aborted,
       timedOut: this.timedOut,
+      ...(this.blockedDiagnostic ? { blockedDiagnostic: this.blockedDiagnostic } : {}),
       cut: this.cut,
       cutReason: [...this.cutReason],
       refused: [...this.refused],
@@ -157,6 +160,7 @@ export class SequenceRunner {
     r.violationStart = s.violationStart;
     r.aborted = s.aborted;
     r.timedOut = s.timedOut;
+    r.blockedDiagnostic = s.blockedDiagnostic;
     r.cut = s.cut;
     r.cutReason = new Map(s.cutReason);
     r.refused = new Set(s.refused);
@@ -166,14 +170,29 @@ export class SequenceRunner {
 
   /** One tick of `run()`: step the runtime, mirror records into reports, submit newly ready steps. */
   tick() {
+    this.blockedDiagnostic = undefined;
     this.rt.step();
+    const eventCursor = this.rt.events.length;
     this.poll();
     if (this.hasTimeouts) this.checkTimeouts();
     this.advance();
+    // A cue/cancel/timeout changed the world or action graph after this tick's wait sample.
+    // Give its consequences a full tick before certifying quiescence.
+    if (this.rt.events.length === eventCursor) this.checkBlocked();
   }
 
   private get hasTimeouts() {
     return this.steps.some((s) => s.timeout !== undefined);
+  }
+
+  /** Deliberately conservative: any pending cue/dependency, future timeout or independent work prevents stopping. */
+  private checkBlocked() {
+    if (this.aborted || this.timedOut || this.reports.some((r) => r.status === 'pending')) return;
+    if (this.steps.some((s, i) => s.timeout !== undefined && ['executing', 'blocked'].includes(this.reports[i].status))) return;
+    const waits = this.rt.exhaustedWaitDiagnostics();
+    if (!waits) return;
+    this.blockedDiagnostic = { code: 'sequence.blocked', message: 'all live work remains blocked after bounded recovery; supports and reservations remain live',
+      subjects: [...new Set(waits.flatMap((d) => d.subjects ?? []))].sort(), details: { waits } };
   }
 
   /** LM-016: cancel steps live past their `timeout` (a controlled stop), then apply their onFail policy. */
@@ -235,6 +254,7 @@ export class SequenceRunner {
   }
 
   get done(): boolean {
+    if (this.blockedDiagnostic) return true;
     if (this.aborted || this.timedOut) return !this.reports.some((r) => r.status === 'executing' || r.status === 'blocked');
     return this.reports.every((r) => DONE.has(r.status));
   }
@@ -283,6 +303,7 @@ export class SequenceRunner {
 
   /** Step the runtime until the sequence is done or the tick budget is exhausted. */
   run(maxTicks = DEFAULT_MAX_TICKS): SequenceResult {
+    this.blockedDiagnostic = undefined; // an explicit continuation may observe changed external circumstances
     this.advance();
     let n = 0;
     while (!this.done && n < maxTicks) {
@@ -347,7 +368,7 @@ export class SequenceRunner {
 
   result(): SequenceResult {
     const unsettled = this.unsettledReasons();
-    const status: SequenceStatus = this.timedOut
+    const status: SequenceStatus = this.blockedDiagnostic ? 'blocked' : this.timedOut
       ? 'timeout'
       : this.aborted
         ? 'aborted'
@@ -358,7 +379,7 @@ export class SequenceRunner {
       status,
       steps: this.reports.map((r) => ({ ...r })),
       violations: this.rt.violations.slice(this.violationStart),
-      diagnostics: [...this.diagnostics],
+      diagnostics: [...this.diagnostics, ...(this.blockedDiagnostic ? [this.blockedDiagnostic] : [])],
       startTick: this.t0,
       endTick: this.rt.tick,
       ticks: this.rt.tick - this.t0,

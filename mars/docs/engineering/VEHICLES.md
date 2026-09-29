@@ -194,3 +194,16 @@ Code: `viewer/engine/vehicles/forklift.ts` (verbs `forklift_pick`, `forklift_del
   (capacity is flat 1000 kg), final alignment is a standstill pivot + side-shift (no three-point
   turns), the truck body is not swept against people other than the 1.5 m stop rule, and placements
   must be square to a deck edge. Other vehicles: see "Vehicle–vehicle collision" above.
+
+
+### Persistent ride waits (LM-024 staged)
+
+Ride person/vehicle waits publish a vehicle mover with its rider as an alias.
+After the reporting grace period, a stopped ordinary ride may request one existing
+validated route retry within its existing replan cap and the shared per-tick
+budget. Active pull-over/resume recovery is explicitly unavailable to this hook
+and prevents early sequence termination; its existing retry/failure policy keeps
+running. No vehicle pose or resource is forced free by detection. See
+[MOVEMENT](MOVEMENT.md#persistent-waits-and-bounded-recovery-lm-024-staged).
+This does not supply LM-043's missing actual three-vehicle cycle proof or cover
+forklift-specific manipulation waits.

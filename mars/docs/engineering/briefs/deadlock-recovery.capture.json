@@ -1,0 +1,662 @@
+[
+  {
+    "scenario": "trapped-passage",
+    "result": {
+      "status": "blocked",
+      "steps": [
+        {
+          "id": "a",
+          "verb": "walk_to",
+          "status": "blocked",
+          "started": true,
+          "blockedTicks": 400,
+          "actionId": "step:a",
+          "submittedTick": 0,
+          "diagnostic": {
+            "code": "deadlock.cycle",
+            "message": "persistent wait cycle: a, b; movement remains blocked pending recovery",
+            "subjects": [
+              "a",
+              "b"
+            ],
+            "details": {
+              "sinceTick": 236,
+              "thresholdTicks": 200,
+              "movers": [
+                {
+                  "mover": "a",
+                  "action": "step:a",
+                  "blockedBy": [
+                    "b"
+                  ],
+                  "code": "traffic.person"
+                },
+                {
+                  "mover": "b",
+                  "action": "step:b",
+                  "blockedBy": [
+                    "a"
+                  ],
+                  "code": "traffic.yield"
+                }
+              ],
+              "edges": [
+                {
+                  "from": "a",
+                  "to": "b"
+                },
+                {
+                  "from": "b",
+                  "to": "a"
+                }
+              ],
+              "exhausted": true,
+              "recovery": [
+                {
+                  "mover": "a",
+                  "status": "unavailable",
+                  "diagnostic": {
+                    "code": "deadlock.recovery-unavailable",
+                    "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                    "subjects": [
+                      "a"
+                    ]
+                  },
+                  "requestedTick": 435,
+                  "completedTick": 435
+                },
+                {
+                  "mover": "b",
+                  "status": "unavailable",
+                  "diagnostic": {
+                    "code": "deadlock.recovery-unavailable",
+                    "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                    "subjects": [
+                      "b"
+                    ]
+                  },
+                  "requestedTick": 434,
+                  "completedTick": 434
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "b",
+          "verb": "walk_to",
+          "status": "blocked",
+          "started": true,
+          "blockedTicks": 634,
+          "actionId": "step:b",
+          "submittedTick": 0,
+          "diagnostic": {
+            "code": "deadlock.cycle",
+            "message": "persistent wait cycle: a, b; movement remains blocked pending recovery",
+            "subjects": [
+              "a",
+              "b"
+            ],
+            "details": {
+              "sinceTick": 236,
+              "thresholdTicks": 200,
+              "movers": [
+                {
+                  "mover": "a",
+                  "action": "step:a",
+                  "blockedBy": [
+                    "b"
+                  ],
+                  "code": "traffic.person"
+                },
+                {
+                  "mover": "b",
+                  "action": "step:b",
+                  "blockedBy": [
+                    "a"
+                  ],
+                  "code": "traffic.yield"
+                }
+              ],
+              "edges": [
+                {
+                  "from": "a",
+                  "to": "b"
+                },
+                {
+                  "from": "b",
+                  "to": "a"
+                }
+              ],
+              "exhausted": true,
+              "recovery": [
+                {
+                  "mover": "a",
+                  "status": "unavailable",
+                  "diagnostic": {
+                    "code": "deadlock.recovery-unavailable",
+                    "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                    "subjects": [
+                      "a"
+                    ]
+                  },
+                  "requestedTick": 435,
+                  "completedTick": 435
+                },
+                {
+                  "mover": "b",
+                  "status": "unavailable",
+                  "diagnostic": {
+                    "code": "deadlock.recovery-unavailable",
+                    "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                    "subjects": [
+                      "b"
+                    ]
+                  },
+                  "requestedTick": 434,
+                  "completedTick": 434
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "violations": [],
+      "diagnostics": [
+        {
+          "code": "sequence.blocked",
+          "message": "all live work remains blocked after bounded recovery; supports and reservations remain live",
+          "subjects": [
+            "a",
+            "b"
+          ],
+          "details": {
+            "waits": [
+              {
+                "code": "deadlock.cycle",
+                "message": "persistent wait cycle: a, b; movement remains blocked pending recovery",
+                "subjects": [
+                  "a",
+                  "b"
+                ],
+                "details": {
+                  "sinceTick": 236,
+                  "thresholdTicks": 200,
+                  "movers": [
+                    {
+                      "mover": "a",
+                      "action": "step:a",
+                      "blockedBy": [
+                        "b"
+                      ],
+                      "code": "traffic.person"
+                    },
+                    {
+                      "mover": "b",
+                      "action": "step:b",
+                      "blockedBy": [
+                        "a"
+                      ],
+                      "code": "traffic.yield"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "a",
+                      "to": "b"
+                    },
+                    {
+                      "from": "b",
+                      "to": "a"
+                    }
+                  ],
+                  "exhausted": true,
+                  "recovery": [
+                    {
+                      "mover": "a",
+                      "status": "unavailable",
+                      "diagnostic": {
+                        "code": "deadlock.recovery-unavailable",
+                        "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                        "subjects": [
+                          "a"
+                        ]
+                      },
+                      "requestedTick": 435,
+                      "completedTick": 435
+                    },
+                    {
+                      "mover": "b",
+                      "status": "unavailable",
+                      "diagnostic": {
+                        "code": "deadlock.recovery-unavailable",
+                        "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                        "subjects": [
+                          "b"
+                        ]
+                      },
+                      "requestedTick": 434,
+                      "completedTick": 434
+                    }
+                  ]
+                }
+              },
+              {
+                "code": "deadlock.cycle",
+                "message": "persistent wait cycle: a, b; movement remains blocked pending recovery",
+                "subjects": [
+                  "a",
+                  "b"
+                ],
+                "details": {
+                  "sinceTick": 236,
+                  "thresholdTicks": 200,
+                  "movers": [
+                    {
+                      "mover": "a",
+                      "action": "step:a",
+                      "blockedBy": [
+                        "b"
+                      ],
+                      "code": "traffic.person"
+                    },
+                    {
+                      "mover": "b",
+                      "action": "step:b",
+                      "blockedBy": [
+                        "a"
+                      ],
+                      "code": "traffic.yield"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "a",
+                      "to": "b"
+                    },
+                    {
+                      "from": "b",
+                      "to": "a"
+                    }
+                  ],
+                  "exhausted": true,
+                  "recovery": [
+                    {
+                      "mover": "a",
+                      "status": "unavailable",
+                      "diagnostic": {
+                        "code": "deadlock.recovery-unavailable",
+                        "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                        "subjects": [
+                          "a"
+                        ]
+                      },
+                      "requestedTick": 435,
+                      "completedTick": 435
+                    },
+                    {
+                      "mover": "b",
+                      "status": "unavailable",
+                      "diagnostic": {
+                        "code": "deadlock.recovery-unavailable",
+                        "message": "walker has no remaining applicable person/load replan; occupied goals and stairs require clearance",
+                        "subjects": [
+                          "b"
+                        ]
+                      },
+                      "requestedTick": 434,
+                      "completedTick": 434
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "startTick": 0,
+      "endTick": 635,
+      "ticks": 635,
+      "finalStateHash": "48971c9586316a7da7f098f74c23d72e94cd36cc7fae3a0e6f95286472ee4110",
+      "cut": [],
+      "settled": false,
+      "unsettled": [
+        "action step:a (walk_to) is still blocked (climb)",
+        "action step:b (walk_to) is still blocked (align)"
+      ],
+      "settleTicks": 0
+    }
+  },
+  {
+    "scenario": "held-carry-execute",
+    "report": {
+      "status": "blocked",
+      "ok": false,
+      "planHash": "85d8d58f5d572949ce2cc871",
+      "baselineCheckpoint": "701a71b415769986ad4e7db5",
+      "steps": [
+        {
+          "id": "hold",
+          "verb": "stationary",
+          "status": "blocked",
+          "started": true,
+          "blockedTicks": 942,
+          "actionId": "step:hold",
+          "submittedTick": 0,
+          "diagnostic": {
+            "code": "deadlock.cycle",
+            "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+            "subjects": [
+              "b1",
+              "bystander"
+            ],
+            "details": {
+              "sinceTick": 543,
+              "thresholdTicks": 200,
+              "movers": [
+                {
+                  "mover": "b1",
+                  "action": "step:carry",
+                  "blockedBy": [
+                    "bystander"
+                  ],
+                  "code": "carry.path-occupied"
+                },
+                {
+                  "mover": "bystander",
+                  "action": "step:hold",
+                  "blockedBy": [
+                    "b1"
+                  ],
+                  "code": "test.wait"
+                }
+              ],
+              "edges": [
+                {
+                  "from": "b1",
+                  "to": "bystander"
+                },
+                {
+                  "from": "bystander",
+                  "to": "b1"
+                }
+              ],
+              "exhausted": true,
+              "recovery": [
+                {
+                  "mover": "b1",
+                  "status": "attempted",
+                  "diagnostic": {
+                    "code": "deadlock.replan-refused",
+                    "message": "existing formation planner found no safe route",
+                    "subjects": [
+                      "b1"
+                    ]
+                  },
+                  "requestedTick": 742,
+                  "completedTick": 742
+                },
+                {
+                  "mover": "bystander",
+                  "status": "attempted",
+                  "diagnostic": {
+                    "code": "deadlock.replan-refused",
+                    "message": "test stationary refusal"
+                  },
+                  "requestedTick": 742,
+                  "completedTick": 742
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "carry",
+          "verb": "carry",
+          "status": "blocked",
+          "started": true,
+          "blockedTicks": 400,
+          "actionId": "step:carry",
+          "submittedTick": 0,
+          "diagnostic": {
+            "code": "deadlock.cycle",
+            "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+            "subjects": [
+              "b1",
+              "bystander"
+            ],
+            "details": {
+              "sinceTick": 543,
+              "thresholdTicks": 200,
+              "movers": [
+                {
+                  "mover": "b1",
+                  "action": "step:carry",
+                  "blockedBy": [
+                    "bystander"
+                  ],
+                  "code": "carry.path-occupied"
+                },
+                {
+                  "mover": "bystander",
+                  "action": "step:hold",
+                  "blockedBy": [
+                    "b1"
+                  ],
+                  "code": "test.wait"
+                }
+              ],
+              "edges": [
+                {
+                  "from": "b1",
+                  "to": "bystander"
+                },
+                {
+                  "from": "bystander",
+                  "to": "b1"
+                }
+              ],
+              "exhausted": true,
+              "recovery": [
+                {
+                  "mover": "b1",
+                  "status": "attempted",
+                  "diagnostic": {
+                    "code": "deadlock.replan-refused",
+                    "message": "existing formation planner found no safe route",
+                    "subjects": [
+                      "b1"
+                    ]
+                  },
+                  "requestedTick": 742,
+                  "completedTick": 742
+                },
+                {
+                  "mover": "bystander",
+                  "status": "attempted",
+                  "diagnostic": {
+                    "code": "deadlock.replan-refused",
+                    "message": "test stationary refusal"
+                  },
+                  "requestedTick": 742,
+                  "completedTick": 742
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "sequence.blocked",
+          "message": "all live work remains blocked after bounded recovery; supports and reservations remain live",
+          "subjects": [
+            "b1",
+            "bystander"
+          ],
+          "details": {
+            "waits": [
+              {
+                "code": "deadlock.cycle",
+                "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+                "subjects": [
+                  "b1",
+                  "bystander"
+                ],
+                "details": {
+                  "sinceTick": 543,
+                  "thresholdTicks": 200,
+                  "movers": [
+                    {
+                      "mover": "b1",
+                      "action": "step:carry",
+                      "blockedBy": [
+                        "bystander"
+                      ],
+                      "code": "carry.path-occupied"
+                    },
+                    {
+                      "mover": "bystander",
+                      "action": "step:hold",
+                      "blockedBy": [
+                        "b1"
+                      ],
+                      "code": "test.wait"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "b1",
+                      "to": "bystander"
+                    },
+                    {
+                      "from": "bystander",
+                      "to": "b1"
+                    }
+                  ],
+                  "exhausted": true,
+                  "recovery": [
+                    {
+                      "mover": "b1",
+                      "status": "attempted",
+                      "diagnostic": {
+                        "code": "deadlock.replan-refused",
+                        "message": "existing formation planner found no safe route",
+                        "subjects": [
+                          "b1"
+                        ]
+                      },
+                      "requestedTick": 742,
+                      "completedTick": 742
+                    },
+                    {
+                      "mover": "bystander",
+                      "status": "attempted",
+                      "diagnostic": {
+                        "code": "deadlock.replan-refused",
+                        "message": "test stationary refusal"
+                      },
+                      "requestedTick": 742,
+                      "completedTick": 742
+                    }
+                  ]
+                }
+              },
+              {
+                "code": "deadlock.cycle",
+                "message": "persistent wait cycle: b1, bystander; movement remains blocked pending recovery",
+                "subjects": [
+                  "b1",
+                  "bystander"
+                ],
+                "details": {
+                  "sinceTick": 543,
+                  "thresholdTicks": 200,
+                  "movers": [
+                    {
+                      "mover": "b1",
+                      "action": "step:carry",
+                      "blockedBy": [
+                        "bystander"
+                      ],
+                      "code": "carry.path-occupied"
+                    },
+                    {
+                      "mover": "bystander",
+                      "action": "step:hold",
+                      "blockedBy": [
+                        "b1"
+                      ],
+                      "code": "test.wait"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "b1",
+                      "to": "bystander"
+                    },
+                    {
+                      "from": "bystander",
+                      "to": "b1"
+                    }
+                  ],
+                  "exhausted": true,
+                  "recovery": [
+                    {
+                      "mover": "b1",
+                      "status": "attempted",
+                      "diagnostic": {
+                        "code": "deadlock.replan-refused",
+                        "message": "existing formation planner found no safe route",
+                        "subjects": [
+                          "b1"
+                        ]
+                      },
+                      "requestedTick": 742,
+                      "completedTick": 742
+                    },
+                    {
+                      "mover": "bystander",
+                      "status": "attempted",
+                      "diagnostic": {
+                        "code": "deadlock.replan-refused",
+                        "message": "test stationary refusal"
+                      },
+                      "requestedTick": 742,
+                      "completedTick": 742
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "violations": [],
+      "metrics": {
+        "duration": 47.1,
+        "ticks": 942,
+        "replans": 0,
+        "pathLength": 0,
+        "blockedTicks": 1342,
+        "violations": 0
+      },
+      "finalStateHash": "b2488643e6563358028c310242c56546b22498a6fa1de9d53ca3596d93451829",
+      "cut": [],
+      "settled": false,
+      "unsettled": [
+        "action step:hold (stationary) is still blocked",
+        "action step:carry (carry) is still blocked (move)"
+      ]
+    },
+    "support": {
+      "kind": "held",
+      "by": [
+        "p1",
+        "p2"
+      ]
+    },
+    "historyUnchanged": true,
+    "executionCode": "execution.failed"
+  }
+]
