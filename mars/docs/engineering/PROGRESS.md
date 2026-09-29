@@ -1680,3 +1680,16 @@ Shot-hold focused browser proof on `3b4ab60`: 1/1 passed in 2.2 minutes.
 Raw planned/held timing artifacts are retained under
 `viewer/e2e/artifacts/shot-hold-sampling/`; no product or recording change.
 Full gate is being repeated at the resulting clean committed head.
+
+
+## 2026-09-29 — social milestone merged after full gate (release13 preparation)
+
+Source `b0f7419` fast-forwarded into local main after clean-head full gate `2026-09-29T05-36-51-650Z`: lint0, unit93/0, engine540/0 with6 documented skips/11 TODO, tsc0, browser84/0 with7 documented skips, byte-identical flagship recording, unchanged probe `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3`, all36 MCP tools. Main's unrelated historical-agent working changes preserved. No pins, remote or push. LM026/027/076 close; **38fixed/36reclassified/142remaining**.
+
+The first gate (`05-15-02-348Z`) failed one shot-hold measurement:1.4166s observed vs fixed1.425s allowance. Its own first frame interval was100ms. The corrected test retains the exact camera chain and nominal1.5s hold, measures each shot using its own first-observation interval, rejects poor sampling cadence, and saves raw timing evidence before assertions. Focused browser1/1 and full rerun84/84 pass; no product behavior or pin changed.
+
+Idle performance passes original ceilings and pinned outcomes, zero violations: exact peak105.226ms/mean0.671940ms; corridor54.6825ms/0.537779ms; historical grids103.2–176.3ms. Evidence regenerated against this exact gate:540pass/0fail,17rowsPROVEN,8milestonesPROVEN; capabilities25/2/1 retain historical exceptions. Release13 build/production verification follows this entry.
+
+Delegation tally:3 helpers (camera, tooling, storage), none spawned beyond the limit. User lifted5h quota cap. Broad suites/browser/build serialized; first runtime hand-contact browser overlapped evidence after a queue message arrived late, so its timing is explicitly not performance evidence. Root inspected new lookahead/encounter plots: reproduced abrupt stop is removed, while curved passing still yields and remains partial. Solar BOM/side-access/azimuth branches remain isolated; no wave2 re-pin window consumed.
+
+Release13 is live at100%: `3b93cbd2-bc84-4484-a3e8-21705a069b25`, sourceb0f7419, rollbackrelease12f63d5e1a. Production340assets/19routes,36tools,director,Studio2/2 and Lab10901ticks/43steps/5checks/0violations/errors all pass; probe unchanged. Lead viewed all3production PNGs and copied captures/audits to main. Full build/release measurements are in RELEASE_CHECKLIST deploy13. Continuing wave2; no extra helper or pin refresh.
