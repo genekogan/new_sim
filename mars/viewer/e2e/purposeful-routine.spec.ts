@@ -128,7 +128,29 @@ for (const count of [4, 8]) test(`purposeful gathering, meal, rest and same note
   await clean(page);
   expect(errors).toEqual([]);
   await capture(page, `purposeful-${count}-completed.png`, true);
-  writeFileSync(path.join(artifacts, `purposeful-${count}-proof.json`), JSON.stringify({ epoch, unfinished, question, conversation, meal, rest, completed, errors }, null, 2));
+  let reuse: { workstation: unknown; routine: unknown } | undefined;
+  if (count === 4) {
+    // A new task may reuse even the same labels. A finished intention stays historical.
+    await button(page, 'Start notes').click();
+    const repeatedStation = await page.evaluate(() => {
+      for (let i = 0; i < 6000; i++) {
+        const w = window.__marsEngine.workstation().state;
+        if (!('code' in w) && w.user === 'worker' && w.status === 'active' && w.phase === 'working' && w.elapsed >= 1) return w;
+        window.__marsEngine.step();
+      }
+      throw Error('worker never started a new task with the same labels');
+    });
+    const remembered = await page.evaluate(() => window.__marsEngine.purposefulRoutine());
+    expect(remembered?.bindings.actor).toBe('worker');
+    expect(remembered?.progress.workElapsed).toBe(30);
+    await capture(page, 'purposeful-4-computer-reused-same-labels.png', true);
+    expect((await finish(page, 'work_at')).status).toBe('completed');
+    await page.evaluate(() => window.__marsEngine.step(2));
+    await clean(page);
+    expect(errors).toEqual([]);
+    reuse = { workstation: repeatedStation, routine: remembered };
+  }
+  writeFileSync(path.join(artifacts, `purposeful-${count}-proof.json`), JSON.stringify({ epoch, unfinished, question, conversation, meal, rest, completed, reuse, errors }, null, 2));
 });
 test('routine pauses a partial meal without serving again, and reset releases stale UI identity', async ({ page }) => {
   await prepare(page, 4);
