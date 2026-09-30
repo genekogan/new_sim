@@ -29,3 +29,12 @@ read-only activity/camera interfaces, shared Lab hooks and integration timing.
 Coordinate the maximum three active helpers across both tasks; do not each allocate
 three independently. Shared Lab edits require agreement; camera observes authoritative
 activity/world state and must not move actors or own a second execution path.
+
+Camera readiness must not block playable engine milestones. Freeze agreed read-only
+interfaces where practical; coordinate in batches around blockers, interface changes
+and reviewed commits. Integrate camera at a convenient green boundary or release
+engine improvements independently. Camera implementation, experiments and MP4
+production stay with its owner; do not expand activity integration to absorb them.
+
+Gene's next confirmed playable priority (after release17): physical chair/table
+moving and usable room setup first. See ACTIVE_ROADMAP for bounded supported stages.

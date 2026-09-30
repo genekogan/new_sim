@@ -9,13 +9,16 @@ simple configurable maps; historical Studio remains the museum side.
 
 ## Small active queue
 
+Gene's next priority, confirmed after release17: **physical chair/table moving and usable room setup first**. Develop this alongside existing classroom continuity and visible social behavior; no universal furnishing language up front.
+
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Shared floor and small-item admission | GPT-6.1 Sol bounded implementation; lead release | Formed groups have stable turns; departures/cancellation clear attention; classroom/work refuse small held items without changing support | Release16 deployed and verified; retain regression coverage |
-| Frozen read-only camera interface | Lead hooks; camera task policies | Same-tick reset identity, detached cached geometry, atomic finite render pose/FOV | Release16 freezes hooks; camera readiness does not block engine releases |
-| Explicit preparation for the next activity | GPT-6.1 Sol ordinary implementation after current gate | Approved item destinations, physical put_item children, coherent cancellation, clear remaining hands | Surface-slot reservation prerequisite; bounded plan in briefs/stow-activity.PLAN.md |
-| Optional camera integration | Separate camera task; lead convenient integration boundary | Reviewed paused/aspect/provider corrections, same-world optional controls, offline and runtime proof | Preserved codex/classroom-social-camera; camera experiments/MP4 remain camera-owned |
+| Physical empty-chair relocation | Existing GPT-6.1 Sol medium engine worker; lead renderer/Lab/review | One free standing person lifts, carries and sets an upright camp-chair on ground; cancel safely; occupied/reserved/hands-full refuse; ordinary seating uses its new pose | Share validated carry execution and load invariants with unchanged construction defaults; stop if broad redesign or baseline change is required |
+| Visible usable room setup | Lead app mechanics after chair checkpoint | Explicit authored room target, credible grip/interpolation, actual runtime captures and reseating; explain unsupported interventions | First empty unreserved chair before event; active reserved-seat rebind is a separate increment |
+| Table movement and relational arrangement | Bounded follow-up after chair proof | Appropriate crew/support, explicit removal of tabletop contents, usable seats/display/aisle | Do not move occupied furniture or silently migrate supported objects; validate larger load envelope |
+| Camera independent continuation | Separate camera owner | Camera-only policies/tests/MP4 on its branch; small read-only interfaces remain stable | Never a dependency of physical room setup; select reviewed compatible commits at a convenient green boundary |
 
+Physical design/provenance: `briefs/fixture-mover.PLAN.md`. Alternative seat-withdrawal analysis remains recoverable in `briefs/classroom-furniture-feasibility.PLAN.md`; it is deferred in favor of Gene's physical-movement choice, not implemented or completed.
 
 ## First supported experience
 
@@ -39,7 +42,7 @@ captures to assess shared attention and pacing.
 
 ## Current baseline and preserved work
 
-Release16 source **3134294** passed the full clean-head gate and is merged/deployed as `7f910ca6-a3b6-4309-bb25-de9cb330fb56`; production checks passed. It adds stable group floors, correct questioner/presenter identity, small-item admission refusals and frozen read-only camera hooks. Rollback is release15 `284cdc8f-2d8c-4e73-a7f8-d058afe1727f`. Original accounting remains38 fixed /36 reclassified /142 remaining; unrelated historical-agent changes remain preserved.
+Release17 source **d04271d** passed the full clean-head gate and is merged/deployed as `7b809dd0-7655-4192-b968-5eb35d83df40`; production verification is recorded in RELEASE_CHECKLIST17. It adds explicit physical surface stow and optional same-world camera coverage to release16's stable group floors, admission and read-only hooks. Rollback is release16 `7f910ca6-a3b6-4309-bb25-de9cb330fb56`. Original accounting remains38 fixed /36 reclassified /142 remaining; unrelated historical-agent changes remain preserved.
 
 The old combined technical candidate remains on `codex/wave2-consolidation` at `ec3aa6f`, with unresolved baseline/construction failures; it is not a green release. The studio-integration checkout hosts the clean classroom branch. Useful compatible work is selected with explicit provenance rather than making specialized construction fidelity a classroom dependency.
 
@@ -66,19 +69,17 @@ needs/interests/relationships and additional assets only as those experiences de
 
 ## Current implementation checkpoint
 
-Release15 implements two hypothetical /lab arrangements, audience joining/return, presenter questions/rotation, conversation/departure, usable computer workstation state and explicit interrupted-task return. Same user/task/30-second total duration and elapsed progress persist across work → join → leave → resume. Full gate: unit93/0, engine586/0 (6 documented skips/11 TODO), browser89 pass/7 documented skips, lint/tsc clean, unchanged flagship/probe, all36 MCP tools. Idle performance passes original limits. Ground-only fixed furniture, held-object refusal and safe stand-up/cancellation remain the boundary. One spare classroom seat; unfinished station task belongs to its user. Quiet seated reading/work, no typing animation. Live active snapshots unsupported, no autonomous routine selection, and attention replay unvalidated.
+Two hypothetical /lab arrangements support audience joining/return, presenter questions/rotation, conversations/departure, usable computer work state and explicit interrupted-task return. Same user/task/30-second duration and elapsed progress persist. Actors physically return one or two held bowl/spoon items to approved table slots before explicitly resuming work or joining. Safe cancellation exposes remaining held objects; no automatic chaining, ground fallback or eating claim.
 
-Next combined branch `codex/classroom-social-camera` at b3cb81e (lab-camera-hooks checkout) selects tested group-turn31d995c/question-floor correctione82d243 and camera-hooks d98d9e5. Forty focused node checks and separate actual browser proofs pass; inspected clear work/turn/camera captures. Activities revision3 records new semantic floors; no physical goldens. This is not main/released. Autonomous-camera task implementation awaits its reviewed checkpoint and deliberate production entry integration.
+Release17 full gate: unit96/0, engine670/0 (6 documented skips/11 TODO), browser97 pass/7 documented skips, clean lint and both TypeScript configs, unchanged flagship/probe, all36 MCP tools. Original idle ceilings/outcomes pass. Production14 browser checks plus a separate public-entry camera runtime proof pass; the dev-source URL injection test's production failure is retained and explained in RELEASE_CHECKLIST17.
+
+Ground floor/fixed furniture is the released boundary; physical chair movement is an isolated candidate, not live. Max12 distinct lifetime audience members; quiet seated work, no typing animation. Active activity snapshots remain explicitly nonresumable, autonomy and take-replay gaze unvalidated. Previous refusals remain in the global failed-action banner after remedy. Optional Manual/Clear/Restrained camera affects the current world only as an observer; provider disabled in production. Conversation camera refinements stay camera-owned.
 
 ## Camera workstream coordination
 
 Gene launched a separate autonomous-camera task owning live cinematography/editor policies, bounded Typesafe/Jev experiments, camera tests and periodic MP4 demos. This activity task retains world-engine and default integration/deployment ownership. Cross-task messages are authorized. Initial allocation proposed: one active activity helper, up to two camera helpers (combined maximum three); camera allocation confirmed (currently zero active camera helpers). Activity browser/gate ports5495/5491; camera5591 e2e /5593 manual /7393 optional Jev bridge agreed. Shared Lab hook edits need agreement; prefer separate modules and small read-only phase/role/attention/participant/state interfaces. Live camera work is not a prerequisite for the next playable classroom/workstation increment.
 
-Camera brief (pending its own commit/integration): `<mars-worktrees>/autonomous-camera/docs/engineering/briefs/autonomous-camera.md`. Ownership: new `viewer/cinematography/**`, `viewer/app/camera-lab/**`, camera-specific spec/brief/report. Existing Lab hooks suffice for early demos; richer callback/FOV changes require a bounded shared agreement. Snapshot adapter/policy derivation stays camera-owned; activity task supplies small read-only hooks when needed.
+Camera brief/provenance: `<mars-worktrees>/autonomous-camera/docs/engineering/briefs/autonomous-camera.md`. Ownership: new `viewer/cinematography/**`, `viewer/app/camera-lab/**`, camera-specific spec/brief/report. Existing Lab hooks suffice for early demos; richer callback/FOV changes require a bounded shared agreement. Snapshot adapter/policy derivation stays camera-owned; activity task supplies small read-only hooks when needed.
 
-Release15 selects coordinator2fc68a6 + workstation2a3e90f + UI fb36339 with provenance. Three focused browser journeys pass; lead inspected unobscured seated/resumed work and late visitor seating. Activities revision2 invalidates old bound plans through normal rebind rules; no physical golden change.
 
-Current engine-only release candidate: `codex/classroom-floor-release`, based on verified
-release15 metadata cb5ff57. It selects group floors/questioner readout and frozen camera
-hooks without camera implementation/UI/build changes. Small held-item admission correction2835abb is selected and focused-tested; combined full gate is pending. Camera integration remains preserved separately
-and will join a convenient green boundary after review; it is not a release dependency.
+Release17 integrates reviewed camera corrections through a6cc661 and root entry wiring d04271d at a convenient green boundary. Subsequent camera work stays isolated; experimental provider and ignored recorded replay data are not production capabilities.

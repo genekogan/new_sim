@@ -858,3 +858,35 @@ Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 284cdc8f-2d8c-4e73-a7f8-d058afe1727f --name mars-campus-2026 -m "rollback release16: <reason>"
 ```
+
+
+## Production deploy 17 (2026-09-30, belongings and optional camera)
+
+Clean source **d04271d** passed the full gate before local-main fast-forward. Live **7b809dd0-7655-4192-b968-5eb35d83df40**, created02:30:58Z/deployed02:31:00Z, confirmed100%. Rollback **7f910ca6-a3b6-4309-bb25-de9cb330fb56** (release16), confirmed before deployment. Metadata/evidence records the deployed source. Historical-agent dirty main paths preserved; no remote/push, pins, goldens or historical values changed.
+
+What works: hypothetical four/eight-person classrooms have an authored table/bowl/spoon; take both, receive honest held-item admission refusal, cancel preparation safely, retry physical surface puts, explicitly resume the same unfinished notes or join the running class. HUD exposes returned/remaining/waits. Optional Manual/Clear/Restrained camera observes the existing world; separate review entry uses its own explicitly labeled classroom. Camera corrections through a6cc661 remain owner-owned. No eating, ground stow, automatic activity handoff, typing, physical furniture moving or active-snapshot resumption claim. Fine fingers remain unproved; previous refusal banner persists after remedy.
+
+| Required check | Result |
+| --- | --- |
+| Full gate | GREEN `.cloudflare/gate/2026-09-30T02-09-45-173Z/report.json`;d04271d,gitDirty:false,cleanupError:null |
+| Lint / both TypeScript configs | clean |
+| Unit |96 pass /0 fail |
+| Engine |687 total:670 pass /0 fail /6 documented skips /11 historical TODO |
+| Browser |97 pass /7 documented skips;964s |
+| Flagship / determinism |byte-identical; unchanged b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local MCP |all36 tools pass |
+| Idle performance |original ceilings/outcomes:exact peak117.163875ms/mean0.7351517075ms;corridor55.327583ms/0.5780176467ms;grids107.325333–180.74525ms;zero violations |
+| Regenerated evidence |670/0;17 rows PROVEN,8 milestones PROVEN;capabilities25/2/1 retain documented exceptions |
+
+Skipped/TODO cases are not executed proof. Original accounting **38fixed/36reclassified/142remaining**, all216 recoverable. Focused58 physical checks and22 camera offline checks pass; actual valid/refusal/cancel/retry/resume captures inspected. No tolerances/baselines changed.
+
+Prepare/build/dry-run passed:340public files/821.1MiB; eight existing large objects use verified receipts, zero R2 writes.392 build files; Worker6928.27KiB/1245.18KiB gzip;22new assets/345existing,startup209ms. Known chunk/import warnings remain; no new migration.
+
+Production assets340/19routes/GLB range/auth,all36MCPtools,director allsteps10.501s,build-bay10901ticks/43steps/5checks/zero violations/errors/exact probe hash pass. Browser attempt:14 pass/1 fail (2.1min). The failed camera test dynamically imports unbuilt `/cinematography/lab-driver.ts`, which the bundled production deployment does not serve; it passes locally in the full gate. Its failed log/trace is preserved, not counted as production proof. A separate ignored production harness verifies the actual published `/cinematography/review.html` runtime: follow/return unchanged paused-world hash, questioner, portrait actual aspect0.5232558139534884, same-tick resets, disposal, zero diagnostics/errors and hidden disabled Jev with no provider request. `.cloudflare/audit/prod-camera-17.json` and `public-camera-release-17.log` retain that proof. Provider failure injection remains local22/22 proof; production provider is disabled.
+
+Root personally inspected eight new production captures: held items, first reach, cancelled reach, returned surface, prepared visitor seating, public questioner/portrait and same-world optional camera. Captures show credible bounded interactions at the supported viewing distance; exact skin contact is not certified. Captures/audits copied to main; logs `viewer/.cloudflare/*release-17.log`, captures `viewer/e2e/artifacts/prod-smoke-17/`. Camera MP4 production remains with its owner.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 7f910ca6-a3b6-4309-bb25-de9cb330fb56 --name mars-campus-2026 -m "rollback release17: <reason>"
+```

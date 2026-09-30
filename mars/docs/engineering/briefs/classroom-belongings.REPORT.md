@@ -6,4 +6,4 @@ Two browser journeys: worker starts notes, interrupts, takes both objects, gets 
 
 Focused58/58:29 stow,5 driver,12 destination,6 meal,6 map. TypeScript/lint passed before final stow correction; repeat on combined candidate. Meal pin unchanged. Provenance:b25d3cd destination claims,68ed315 driver distinction,122de39 stow,ffc90e8 final support/snapshot readout fixes. Active snapshots explicitly nonresumable; quiescent supported records restore.
 
-Full rebased gate and release pending. Camera is optional and separately owned.
+Released17 from d04271d after clean full gate and production checks; see RELEASE_CHECKLIST17. Camera remains optional and separately owned.
