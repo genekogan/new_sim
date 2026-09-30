@@ -1,5 +1,10 @@
 # 16 — Hardening sprint (from overnight hack to a shell that can hold a few dozen people)
 
+> **Currency (2026-09-30, evening):** written as a proposal; partly carried out the same day.
+> **Done:** all of §1 (backup retention, database bloat, type check, fair brain scheduling, privacy scoping); from §2 Litestream replication with a tested restore, tick watchdog, release folders with staging and rollback, deferred snapshot write, jittered reconnect, build-id reload; from §3 inbound validation and connection limits, numbered migrations; from §4 indexed columns; from §5 the invite gate; from §7 debug scoping, MCP by URL token, the `wait` call, pairing by POST; from §8 immutable asset caching; from §9 CI.
+> **Not done:** topics and region subscriptions (§3; Gene wants to design the world ontology himself first: keep as an idea), version negotiation, hot/cold database split, audience-aware cadence, token diet, per-Soul budgets, world registry, canonical minds, rules epochs, signed events, the asset store, bundle split, structured metrics, and the Mars adapter dry run.
+> The measurements in §0 predate the fixes (the database is now ~65 MB and snapshots ~50 KB).
+
 Round 14, 2026-09-30. Status: **proposal; nothing here is built.** Scope is
 the app shell only (`<old-sim-repo>`), not the engine. Target: ~25 simultaneous
 people, one Soul each, on the public internet, for about a week of work.

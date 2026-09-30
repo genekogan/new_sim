@@ -1,40 +1,55 @@
 # Documentation map
 
-This repository is meant to be self-sufficient: everything needed to understand
-what is being built is here, including material whose working home is elsewhere.
+Everything needed to understand what is being built is in this repository,
+including mirrors of material whose working home is elsewhere.
 
 ## One project, two heads
 
-- **eden4 / Sim (the larger one).** One persistent, shared, server-simulated world
+- **eden4 / Sim (the larger head).** One persistent, shared, server-simulated world
   that people and their agents inhabit through owned **Souls**. `sim` (this repo)
   is its app shell: canonical state and log, sync, accounts, the three-tier brain,
   the agent interface, deployment. It wraps an engine.
-- **The Mars world simulator (the smaller one, inside).** A deterministic world and
-  activity engine being built first as a simulation of life at Mars College. It is
-  the engine Sim is designed to wrap. When Mars reaches its milestones, its
-  development stops as a separate effort, eden4 takes the codebase over and
-  generalizes it, and Mars becomes one world inside the larger one. Until then Sim
-  runs a toy engine behind the same contract.
+- **The Mars world simulator (the smaller head, inside).** A deterministic world
+  and activity engine being built first as a simulation of life at Mars College.
+  When it reaches its milestones, eden4 takes the codebase over, generalizes it,
+  and Mars becomes one world inside the larger one. Until then Sim runs a toy
+  engine behind the same contract. The Mars code is local to Gene's laptop; only
+  its documentation is mirrored here.
 
-The Mars code lives only on Gene's laptop (local Git, never pushed); what is here
-is a documentation snapshot of it, not the code.
+## Folders
 
-## Where things are
-
-| Folder | What | Working home |
+| Folder | What | Home |
 |---|---|---|
-| `../README.md`, `RUNBOOK.md` | What Sim is, how it is laid out, how it runs on the box | this repo |
-| `eden4/` | The eden4 strategy documents, numbered `01`–`17` plus the illustrated report: vision, bodies, neutrality and versioned rules, economy, state formalism, engine frontier, dials, MVP spec, scaffold spec as built, hardening sprint, agent interface | `<eden4>/` on Gene's laptop |
-| `frontier/` | The open design discussion on where the simulation goes next (lives, projects, commitments, places), its decision log, and `MARS-ENGINE-SNAPSHOT.md` | this repo |
-| `frontier/mars/` | Snapshot of the Mars engine's own docs: frontier, vision, roadmap, engineering guide, spec, handoff, takes and plans, camera, body, movement, social, items, vehicles, planning budget, lab and server guides. `SNAPSHOT.txt` records the Mars commit and date | `<mars-campus-repo>/docs/engineering/` |
-| `ONBOARDING-CLOUD.md` | Prompt for an agent taking over the frontier discussion from this repo alone | this repo |
+| [`STATUS.md`](STATUS.md) | What is built, live, measured, and not built, with dates | here |
+| [`GLOSSARY.md`](GLOSSARY.md) | Terms (Soul, mind, intent, activity, fold, governor, …) | here |
+| [`sim/`](sim/) | **How Sim works**: [architecture](sim/ARCHITECTURE.md), [engine contract](sim/ENGINE-CONTRACT.md), [protocol](sim/PROTOCOL.md), [API and MCP](sim/API.md), [brain](sim/BRAIN.md), [data](sim/DATA.md), [development](sim/DEVELOPMENT.md), [runbook](sim/RUNBOOK.md) | here |
+| [`mars/`](mars/README.md) | **The Mars engine**: Sim's survey ([ENGINE-SNAPSHOT](mars/ENGINE-SNAPSHOT.md)) plus mirrored engine docs (vision, roadmap, spec, subsystems, frontier) | mirror of `<mars-campus-repo>` |
+| [`eden4/`](eden4/README.md) | **Why and what**: the strategy notes `01`–`17` (vision, neutrality, economy, formalism, dials, specs, sprint, agent interface) and the decision ledger | mirror of `<eden4>` |
+| [`frontier/`](frontier/README.md) | The open design discussion on where the simulation goes next, and its decision log | here |
+| [`ONBOARDING-CLOUD.md`](ONBOARDING-CLOUD.md) | Prompt for an agent taking over the frontier discussion from this repo alone | here |
 
-Reading order for a newcomer: `../README.md` → `eden4/README.md` and `eden4/01`–`06`
-→ `frontier/MARS-ENGINE-SNAPSHOT.md` → `eden4/15` (what is built) → `frontier/README.md`.
+## Reading paths
 
-## Keeping the snapshots fresh
+| If you need to… | Read |
+|---|---|
+| Understand the project in ten minutes | this file → [`STATUS.md`](STATUS.md) → [`eden4/README.md`](eden4/README.md) |
+| Change or debug Sim | [`sim/ARCHITECTURE.md`](sim/ARCHITECTURE.md) → the specific `sim/` doc → [`sim/DEVELOPMENT.md`](sim/DEVELOPMENT.md) |
+| Deploy or operate | [`sim/RUNBOOK.md`](sim/RUNBOOK.md) |
+| Build an agent that steers a Soul | [`sim/API.md`](sim/API.md), and the live `/skill.md` |
+| Work on prompts or model cost | [`sim/BRAIN.md`](sim/BRAIN.md) |
+| Understand or adopt the Mars engine | [`mars/ENGINE-SNAPSHOT.md`](mars/ENGINE-SNAPSHOT.md) → [`sim/ENGINE-CONTRACT.md`](sim/ENGINE-CONTRACT.md) → [`mars/README.md`](mars/README.md) |
+| Know what has been decided | [`eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md`](eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md), [`frontier/DECISIONS.md`](frontier/DECISIONS.md) |
+| Join the design discussion | [`frontier/README.md`](frontier/README.md), [`eden4/17-AGENT-INTERFACE.md`](eden4/17-AGENT-INTERFACE.md) |
 
-`infra/sync-docs.sh` (run on Gene's laptop) re-copies `eden4/` and `frontier/mars/`
-from their working homes. The copies here are read-only mirrors: edit the
-originals, then sync. Documents whose home is this repo (`frontier/README.md`,
-`frontier/DECISIONS.md`, `frontier/MARS-ENGINE-SNAPSHOT.md`, this file) are edited here.
+## Which document wins
+
+For how Sim behaves: the code, then `sim/`. For current state: `STATUS.md`. For
+intent and decisions: `eden4/06`. The strategy notes `eden4/14`–`16` are specs and
+plans with a currency note at the top of each; where they differ from `sim/`, `sim/`
+is right. Mars docs describe Mars as of `mars/SNAPSHOT.txt`.
+
+## Keeping mirrors fresh
+
+`infra/sync-docs.sh` (run on Gene's laptop) re-copies `eden4/` and `mars/` from
+their working homes. Edit the originals, then sync and commit. Everything else
+under `docs/` is edited here.

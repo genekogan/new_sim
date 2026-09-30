@@ -19,19 +19,19 @@ relationships, shared things, places as activity systems, and what the shell,
 the engine and the owners' agents each need for that.
 
 Read, in this order (all in this repo):
-1. `docs/README.md` (the map: one project, two heads), `README.md` and `docs/RUNBOOK.md`.
+1. `docs/README.md` (the map: one project, two heads) and `docs/STATUS.md` (what is
+   built and what is not).
 2. `docs/frontier/README.md`: the discussion so far, the framing questions, and how to work.
-3. `docs/frontier/mars/SIMULATION_FRONTIER.md` and `SIMULATION_FRONTIER_APPLICATIONS.md`:
+3. `docs/mars/SIMULATION_FRONTIER.md` and `docs/mars/SIMULATION_FRONTIER_APPLICATIONS.md`:
    the Mars-side statement of the frontier (2026-09-30).
-4. `docs/frontier/MARS-ENGINE-SNAPSHOT.md`, then `docs/frontier/mars/SIMULATION_VISION.md`
-   and `ACTIVE_ROADMAP.md`: the engine's architecture, contracts and roadmap.
-5. `docs/eden4/README.md`, then `01`–`06` (vision, bodies, neutrality, economy,
-   creation, decisions), then `11` (state formalism), `15` (scaffold as built),
-   `16` (hardening sprint), `17` (agent interface and information asymmetry).
-6. Skim the code where a question turns on it: `packages/engine-contract`
-   (the engine contract), `packages/protocol` (events and messages),
-   `apps/server/src/world.ts` (the fold), `apps/server/src/brain.ts` (the three
-   tiers), `apps/server/src/souls.ts` and `skill.ts` (the agent interface).
+4. `docs/mars/ENGINE-SNAPSHOT.md`, then `docs/mars/SIMULATION_VISION.md` and
+   `docs/mars/ACTIVE_ROADMAP.md`: the engine's architecture, contracts and roadmap.
+5. `docs/eden4/README.md`, then `01`–`06` (vision, inhabitants, neutrality, economy,
+   creation, the decision ledger), `11` (state formalism) and `17` (agent interface
+   and information asymmetry). The older notes call Souls "bodies".
+6. `docs/sim/ARCHITECTURE.md`, `BRAIN.md` and `API.md` for how the shell works, and
+   the code where a question turns on it: `packages/engine-contract`,
+   `packages/protocol`, `apps/server/src/world.ts`, `brain.ts`, `souls.ts`.
 
 Ground rules:
 - Gene decides the world ontology and anything about topics/regions/subscriptions.

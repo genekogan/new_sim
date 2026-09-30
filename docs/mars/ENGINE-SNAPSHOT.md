@@ -3,7 +3,7 @@
 Surveyed 2026-09-30 from `<mars-campus-repo>`
 (local-only Git, HEAD `5c8672d`, release 21 deployed). This is what the Sim shell
 is built to wrap. The engine keeps moving at hundreds of commits a day, so treat
-numbers as a dated snapshot and re-read the copied docs in `mars/` for direction.
+numbers as a dated snapshot and re-read the mirrored docs in this folder for direction.
 Nothing in Sim modifies that repo.
 
 ## What it is
@@ -11,7 +11,7 @@ Nothing in Sim modifies that repo.
 Mars Studio: a deterministic world and activity engine plus a three.js viewer,
 built to simulate life at Mars College (building, classroom, food, social life),
 explicitly framed as "the first substantial application of a reusable world and
-activity framework" (`mars/SIMULATION_VISION.md`). Gene's plan: finish Mars, then
+activity framework" (`SIMULATION_VISION.md`). Gene's plan: finish Mars, then
 stop Mars development and let eden4 take the codebase over, generalize it, and
 make Mars one world inside it.
 
@@ -67,7 +67,7 @@ Sim's shell supplies the missing wrapper: a 24/7 fixed-step loop with a clock-ra
 dial, an append-only event log with replay, snapshots and restore, WebSocket sync
 of path decisions, accounts and per-Soul ownership, agent pairing and MCP, the
 three-tier brain, spend governance, deployment. What the engine transplant will
-demand of Mars (recorded in `../eden4/15-SCAFFOLD-SPEC.md` §2):
+demand of Mars (see `../sim/ENGINE-CONTRACT.md`):
 
 1. `snapshot()` at any tick with in-flight action state serialized (Mars has
    `serializeExec/restoreExec` per verb and `resumable` flags, but not universally;
@@ -78,7 +78,7 @@ demand of Mars (recorded in `../eden4/15-SCAFFOLD-SPEC.md` §2):
 
 ## Mars roadmap, as of 2026-09-30
 
-From `mars/ACTIVE_ROADMAP.md`: release 21 is live (classroom → lightning talks →
+From `ACTIVE_ROADMAP.md`: release 21 is live (classroom → lightning talks →
 conversation → shared food → resumed unfinished notes, physical chair/table
 setup). Next: quiet rest, then the connected communal day (rest/work/food/social/
 sleep), then **reuse in a small non-Mars environment**, which is the seam Sim is
@@ -87,7 +87,7 @@ within product 50/30/20 (complete experiences / breadth of activities and usable
 objects / social believability). Work is done by up to three Codex workers with a
 full release gate; local Git only.
 
-The two frontier documents (`mars/SIMULATION_FRONTIER*.md`, 2026-09-30) describe
+The two frontier documents (`SIMULATION_FRONTIER*.md`, 2026-09-30) describe
 where the engine wants to go after that: intentions that last days, projects with
 unfinished state, commitments, relationships, learning, care of shared things, and
 readable social choreography, with three candidate demonstrations (communal dinner,

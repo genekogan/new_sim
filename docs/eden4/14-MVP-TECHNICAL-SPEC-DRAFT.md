@@ -1,5 +1,7 @@
 # 14 — MVP technical spec (draft 1)
 
+> **Currency (2026-09-30):** a design draft written before anything was built. Its architecture, three-timescale mind and steering surfaces were carried out in Sim with changes; `15` records the plan and what was built, and the Sim repo's `docs/sim/` is authoritative for how things work now. Still useful here: the prior-art survey (§10), the reasoning, and the parts not built (building, economy, ritual, morphology).
+
 Rounds 9–10, 2026-09-29. Status: **draft for discussion; the items marked
 (Gene, r10) are his answers, the rest is Claude's lean.** Design only; no
 building yet.

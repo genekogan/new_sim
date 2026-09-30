@@ -1,5 +1,7 @@
 # 15 — Scaffold spec (the wrapper around a faked engine)
 
+> **Currency (2026-09-30):** §1–§14 are the plan written *before* the build and are stale in places: the database driver (`node:sqlite`, not `better-sqlite3`), box user and paths (`sim`, `/srv/sim/releases`), the budget ($0.50/day with a governor), agent onboarding (pairing codes and `/skill.md`, not `/claim` links), the mid-brain questions and selection policy, and deployment (releases, staging, Litestream). §15–§16 record what was built. For how Sim works now, the repo's `docs/sim/` is authoritative and `docs/STATUS.md` is the current state.
+
 Round 11, 2026-09-30. Status: **proposed for the overnight build; open
 items in §14 need Gene's answers first.** Disposable starter kit; may be
 thrown away. Its job is wiring, not gameplay, and every knob it fakes must

@@ -1,0 +1,26 @@
+# Data: tables, retention, backups
+
+One SQLite file (`node:sqlite`, WAL) at `$DATA_DIR/sim.db`. All SQL is in
+`apps/server/src/db.ts`; schema changes are numbered, forward-only migrations in
+`migrations.ts` recorded in `schema_migrations` (never edit a shipped one).
+
+| Table | Holds | Notes |
+|---|---|---|
+| `worlds` | id, schema, rules version, dt, seed, clock rate | one row (`toy-1`) |
+| `events` | the canonical log: `seq, tick, kind, author, payload JSON, at, soul_id` | index on `(world_id, soul_id, seq)`; never pruned |
+| `snapshots` | `tick, seq, state_hash, physical_hash, rules_version, snapshot JSON` | keeps the latest 5 plus the first of each of the last 7 days |
+| `users` | Privy user id, email, wallet, role, invited_by | |
+| `souls` | id, owner, entity id, name, description, retired_at, token hash/label/created/last used, native | name unique among live Souls |
+| `invites` | code, max uses, uses, note | |
+| `brain_calls` | one row per model call with the full body | debugging data: pruned after 24 h and beyond 6,000 rows |
+| `prompts` | long prompts stored once by hash | |
+| `spend_hourly` | cost and tokens per hour, tier, model | exact spend forever |
+| `narratives` | narrator plans | |
+| `schema_migrations` | applied migration ids | |
+
+Canonical and small: `worlds`, `events`, `users`, `souls`, `invites`. Disposable and
+large: `brain_calls`, `snapshots` (rebuildable from the log), `narratives`.
+
+Maintenance, hourly in-process: prune call bodies, `VACUUM` when more than 30% of
+pages are free, write `backup-YYYYMMDDHH.db`, keep 6 hourly plus 7 daily files.
+Off-box: Litestream (see `RUNBOOK.md`). Assets: none stored yet.

@@ -42,6 +42,43 @@ the early community does. See `13-PARAMETERS-AND-TRADEOFFS.md`.
   (round 8, restating the original intent behind "letting go"). The world
   and its rules must be able to evolve without that getting artificially harder.
 
+## Decided in rounds 9–15 (2026-09-29 → 09-30, the build)
+
+- **Mars first, then takeover.** Finish the Mars simulator, stop it as a separate
+  effort, and have eden4 take over and generalize that codebase. No fork. Mars
+  becomes one world inside eden4. (r10)
+- **Steering only, never direct control** of an inhabitant. People may move a
+  camera freely and follow their own; the view is not locked to it. (r10)
+- **World clock rate is a dial**, to be tested. (r10)
+- **One box, simple**; microservices only when needed. (r10)
+- **Catalog of bodies first**, upgradeable to generated ones later. (r10)
+- **Lean in-page steering**: a small translator, not eden3. (r10)
+- **Inhabitants are called Souls.** (r11; "Sims" is EA's mark, "bodies" rejected)
+- **Jev (TypeSafe) is the mid-brain**, and is also used for the camera and
+  broadcast; a larger, slower model plans at a higher level. (r11)
+- **The narrator is wired in now**, runs on a fast model with caching, and plans
+  **per region, asynchronously** rather than for the whole world at once. (r11, r12)
+- **Privy from the start**; to users it is plain sign-in, wallets stay hidden. (r11)
+- **Ship steering before anything else.** (r11)
+- **The server keeps coarse truth; clients do local motion.** Minor drift is an
+  acceptable price for offloading compute. (r12)
+- **Several Souls per account.** (r12)
+- **Repo `sim`, private for now**, under Gene's account; site `sim.eden.art`. (r12;
+  this overrides "open day one" from r10 for the time being)
+- **Model spend $0.50 a day while debugging**, with spend visible in the app. (r13)
+- **Alpha behind invite codes.** Owners see only their own Souls' model calls;
+  Gene sees all. (r14)
+- **A Moltbook-like flow**: arrive and watch, sign in, create a Soul, steer it in
+  the page or hand one line to your own agent; a dashboard per Soul. (r15)
+- **The world ontology, and topics/regions/subscriptions, are Gene's to design.**
+  Keep them as ideas until he takes part. (r15)
+- **One project, two heads**: eden4/Sim wraps the Mars simulator. The Sim repo
+  holds the documentation for both. (r15)
+
+Open from these rounds (see `17`): whether agents see the whole world or only
+what their Soul perceives; whether an attached agent may choose activities
+directly; what `perceive` should contain once the real engine arrives.
+
 ## Withdrawn from Decided (round 8, Gene pulled back)
 
 - *One body minted per day, auctioned, ~30 years, ~10,000 bodies.* Gene: it
@@ -200,7 +237,7 @@ the project is called **eden4** for now. Gene said he'll come back to:
 - what the daily ritual is for (Claude's lean: the manna fall);
 - where newcomers land, and the entry price.
 
-## Candidate first slice (not yet approved; for discussion)
+## Candidate first slice (superseded: the first slice was built as Sim, see `15`; building, manna and the ritual from this list are not built)
 
 The smallest version worth vibe-coding, reusing the Mars engine (`07`):
 - A 100 × 100 m flat ground; pallet racks + wood vocabulary.

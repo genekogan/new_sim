@@ -6,27 +6,26 @@ over: read, argue, extend, and record decisions in `DECISIONS.md` here.
 
 ## What is in this folder
 
-- `mars/SIMULATION_FRONTIER.md`, `mars/SIMULATION_FRONTIER_APPLICATIONS.md`:
-  the Mars-side statement of the frontier, copied verbatim on 2026-09-30. The
+- `../mars/SIMULATION_FRONTIER.md`, `../mars/SIMULATION_FRONTIER_APPLICATIONS.md`:
+  the Mars-side statement of the frontier, mirrored verbatim on 2026-09-30. The
   first describes the capabilities (multi-day projects, commitments, relationships,
   learning, care, social choreography) and the continuity they need; the second
   separates Mars-shaped engagements, the reusable simulator, and the broader Eden
   world.
-- `mars/` also holds the Mars engine's vision, engineering guide, spec, active
-  roadmap, handoff and subsystem docs (takes, camera, body, movement, social,
-  items, vehicles), copied the same day, and `MARS-ENGINE-SNAPSHOT.md`, a
-  survey of the engine's architecture and contracts as Sim wraps them.
+- `../mars/` holds the rest of the Mars engine's docs (indexed in its README) and
+  `ENGINE-SNAPSHOT.md`, a survey of the engine's architecture and contracts as
+  Sim wraps them.
 - `../eden4/`: the seventeen eden4 strategy documents (vision, bodies, neutrality
   and versioned rules, economy, formalism, engine frontier, dials, the MVP and
   scaffold specs, the hardening sprint, the agent interface).
-- `../../README.md`, `../RUNBOOK.md`: what Sim (this repo) actually is and runs.
+- `../sim/`: how Sim (this repo) actually works; `../STATUS.md`: what is built and what is not.
 
 ## Where the three projects stand
 
 | | State on 2026-09-30 |
 |---|---|
 | **Mars engine** | Release 21: deterministic engine, classroom → talks → conversation → food → resumed work, physical furniture setup. Next: quiet rest, communal day, reuse in a non-Mars environment. Local-only Git. |
-| **Sim (this repo)** | The shell: one canonical world on a server, event log + replay, WebSocket sync, accounts, Souls, three-tier brain (Jev mid-brain, Haiku narrator, Jev director), agent pairing, MCP, spend governor, staging/rollback, R2 replication. Engine is a toy behind the Mars contract. Live at sim.eden.art. |
+| **Sim (this repo)** | The shell: one canonical world on a server, event log + replay, WebSocket sync, accounts, Souls, three-tier brain (Jev mid-brain, Haiku narrator, Jev director), agent pairing, MCP, spend governor, staging/rollback, R2 replication. Engine is a toy behind the Mars contract. Live at sim.eden.art. Details: `../STATUS.md`. |
 | **eden4 (the idea)** | One persistent, centrally simulated world; bodies as the unit; always on; steering not puppeting; versioned rules; economy designed as we go; names and numbers deliberately shelved. |
 
 ## The discussion, framed

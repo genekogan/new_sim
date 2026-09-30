@@ -300,3 +300,31 @@ special case of the broader thing"). "lets just call it eden4 right now."
 report to `report/eden4.html`; wrote `13-PARAMETERS-AND-TRADEOFFS.md`
 (shape now, numbers later; dials with ranges, leans, status); added a
 **Shelved** status and a "Withdrawn from Decided" section to `06`.
+
+## Rounds 9–15 — from brainstorm to a running shell (2026-09-29 → 09-30)
+
+Compact record; Gene's decisions are in `06`, details in `14`–`17`.
+
+- **Round 9.** Gene asked for a practical technical construction of a playable,
+  massively multiplayer version built on the Mars simulator. Claude surveyed the
+  Mars engine, Jev and prior art (Screeps, SpaceMolt, Project Sid) and drafted `14`.
+- **Round 10.** Gene: not a fork, a takeover after Mars; steering only; clock as a
+  dial; one box; catalog bodies; lean translator.
+- **Round 11.** Gene: Jev as the mid-brain and for camera/narrative; "Souls";
+  Privy; wire the narrator now. He asked for a scaffold around a faked engine,
+  built overnight. Claude wrote `15`.
+- **Round 12.** Gene: coarse server, local clients; per-region narrator;
+  `sim.eden.art`; private repo. Claude built and deployed Sim overnight, then
+  rewrote the Jev prompts against TypeSafe's official docs.
+- **Round 13.** Gene asked for spend tracking and a $0.50/day budget. Claude added
+  a per-tier governor after finding the two servers had spent ~$2.46 overnight.
+- **Round 14.** Gene asked how to harden the shell for ~25 people. Claude measured
+  (100× headroom at that scale; breaks between 200 and 1,000 Souls), found five
+  defects, and proposed `16`. Gene approved the fixes, the invite gate, call
+  privacy and an adapter dry run.
+- **Round 15.** Gene asked for a Moltbook-like flow and a Soul dashboard. Claude
+  built pairing, the installable skill, the dashboard, then durability (R2
+  replication, staging, rollback, watchdog) and wrote `17`. Gene reserved the
+  world ontology and topics for himself, and asked that the Sim repo hold all
+  documentation for both heads of the project.
+
