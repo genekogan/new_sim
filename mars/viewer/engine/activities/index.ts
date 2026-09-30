@@ -15,3 +15,6 @@ export type {
   ClassroomAttention,
   ClassroomPhase,
 } from './types.ts';
+
+export { STOW_ACTIONS, stowItems, readStow } from './stow.ts';
+export type { StowParams, StowPlacement, StowPhase, StowReadout } from './stow.ts';
