@@ -4,7 +4,10 @@ import { startClassroom } from './classroom.ts';
 import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
 import { readClassroom, type ClassroomIntent } from '../../engine/activities/index.ts';
 import { displayReadout } from '../../engine/objects/classroom.ts';
+import { readWorkstation } from '../../engine/objects/workstation.ts';
+import type { ActionRecord } from '../../engine/actions/types.ts';
 
+const departure = (actor: string): [number, number] => actor === 'visitor' ? [-7, 12] : [10, 12];
 export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => void }) {
   const [actor, setActor] = useState('guest1');
   const [feedback, setFeedback] = useState('');
@@ -12,12 +15,22 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   const id = classroomSessionId(sim.rt), state = id ? readClassroom(sim.rt, id) : undefined;
   const running = !!id && sim.rt.isActive(id);
   const screen = displayReadout(sim.rt, 'screen');
+  const workstation = readWorkstation(sim.rt, 'workstation');
+  const work = 'code' in workstation ? undefined : workstation;
+  const workAction = [...sim.rt.records.values()].find((r) => r.verb === 'work_at' && sim.rt.isActive(r.id));
+  const member = state?.participants.find((p) => p.actor === actor);
+  const participating = member?.state === 'participating';
+  const joining = member?.arrival === 'joining';
+  const busy = sim.rt.holder(`actor:${actor}`).length > 0;
+  const actors = Object.values(sim.rt.world.entities).filter((e) => e.kind === 'human').map((e) => e.id);
+  const response = (r: ActionRecord, accepted: string) => {
+    setFeedback(r.diagnostic ? `${r.diagnostic.code}: ${r.diagnostic.message}` : accepted); refresh();
+  };
   const command = (intent: ClassroomIntent) => {
     if (!id) return;
-    const r = sim.rt.submit('classroom_control', { session: id, intent });
-    setFeedback(r.diagnostic ? `${r.diagnostic.code}: ${r.diagnostic.message}` : `Requested ${intent.kind}${'actor' in intent ? ` for ${intent.actor}` : ''}`);
-    refresh();
+    response(sim.rt.submit('classroom_control', { session: id, intent }), `Requested ${intent.kind}${'actor' in intent ? ` for ${intent.actor}` : ''}`);
   };
+  const askable = participating && !joining && member.role === 'audience' && ['arriving', 'rotating', 'releasing', 'presenting', 'question'].includes(state?.phase ?? '');
   return <div className="lab-hud lab-classroom" data-testid="classroom-hud">
     <div className="lab-hud-head">HYPOTHETICAL · live classroom · {state?.phase ?? 'ready'}</div>
     <div>Floor: <b>{state?.floorHolder ?? '—'}</b> · Shared attention: <b>{state?.attentionTarget?.actor ?? '—'}</b></div>
@@ -25,24 +38,28 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     {state?.waitingReason && <div role="status">Waiting: {state.waitingReason}</div>}
     {state?.diagnostic && <div role="alert">{state.diagnostic.code}: {state.diagnostic.message}</div>}
     <div className="lab-classroom-controls">
-      <button disabled={running} onClick={() => {
-        const r = startClassroom(sim.rt, sim.scenario.name === 'classroom-8' ? 8 : 4);
-        setFeedback(r.diagnostic ? `${r.diagnostic.code}: ${r.diagnostic.message}` : 'Session started'); refresh();
-      }}>Start session</button>
+      <button disabled={running} onClick={() => response(startClassroom(sim.rt, sim.scenario.name === 'classroom-8' ? 8 : 4), 'Session started')}>Start session</button>
       <select aria-label="Classroom participant" value={actor} onChange={(e) => setActor(e.target.value)}>
-        {(state?.participants.map((p) => p.actor) ?? ['host', 'presenter1', 'presenter2', ...Array.from({ length: sim.scenario.name === 'classroom-8' ? 8 : 4 }, (_, i) => `guest${i + 1}`)]).map((a) => <option key={a}>{a}</option>)}
+        {actors.map((a) => <option key={a}>{a}</option>)}
       </select>
-      <button disabled={!running} onClick={() => command({ kind: 'question', actor })}>Ask question</button>
+      <button disabled={!running || participating || busy || !state?.controls.includes('join')} onClick={() => command({ kind: 'join', actor, departure: departure(actor) })}>Join session</button>
+      <button disabled={!running || !askable} onClick={() => command({ kind: 'question', actor })}>Ask question</button>
       <button disabled={!running} onClick={() => command({ kind: 'advance' })}>Next presenter</button>
-      <button disabled={!running} onClick={() => command({ kind: 'depart', actor })}>Leave session</button>
-      <button disabled={!running} onClick={() => {
-        const r = sim.rt.submit('walk_to', { actor, x: 12, z: 10 });
-        setFeedback(r.diagnostic ? `${r.diagnostic.code}: ${r.diagnostic.message}` : `Directed ${actor} to courtyard`); refresh();
-      }}>Direct to courtyard</button>
+      <button disabled={!running || !participating} onClick={() => command({ kind: 'depart', actor })}>Leave session</button>
+      <button onClick={() => response(sim.rt.submit('walk_to', { actor, x: 12, z: 10 }), `Directed ${actor} to courtyard`)}>Direct to courtyard</button>
       <button disabled={!running} onClick={() => command({ kind: 'cancel' })}>End session</button>
     </div>
+    <div data-testid="workstation-readout">Workstation: <b>{work?.status ?? 'unavailable'}</b>{work?.task && <> · {work.task} · {work.user} · {Math.round(work.progress * 100)}% ({work.elapsed.toFixed(1)}/{work.duration}s)</>}{work?.phase && <> · {work.phase === 'arriving' ? 'waiting for chair arrival' : work.phase === 'stopping' ? 'waiting for safe stand-up' : 'seated work'}</>}</div>
+    {'code' in workstation && <div role="alert">{workstation.code}: {workstation.message}</div>}
+    <div className="lab-classroom-controls">
+      <button disabled={busy || !!workAction || work?.status === 'unfinished'} onClick={() => response(sim.rt.submit('work_at', { actor, station: 'workstation', seat: 'work-chair#seat', duration: 30, task: 'Sketch notes' }), `Requested work for ${actor}`)}>Work on Sketch notes</button>
+      <button disabled={!workAction} onClick={() => { if (workAction) response(sim.rt.cancel(workAction.id), 'Stopping work safely; unfinished progress will remain'); }}>Interrupt work</button>
+      <button disabled={busy || !!workAction || work?.status !== 'unfinished' || work.user !== actor} onClick={() => response(sim.rt.submit('work_at', { actor, station: 'workstation', seat: 'work-chair#seat', duration: 30, task: 'Sketch notes', resume: true }), `Requested resume for ${actor}`)}>Resume Sketch notes</button>
+    </div>
     <div role="status" data-testid="classroom-feedback">{feedback}</div>
-    {state && <div className="lab-classroom-people">{state.participants.map((p) => <span key={p.actor} title={p.reason ?? p.seat}>{p.actor}: {p.state === 'excluded' ? `left (${p.reason})` : p.role}{state.queuedQuestions.includes(p.actor) ? ' · question queued' : ''}</span>)}</div>}
-    <small>Ground floor, fixed arrangements. Leaving/directing someone releases their participation; rejoining and resuming an interrupted session are not supported yet. Use Reset for a fresh arrangement.</small>
+    {joining && <div role="status">{actor} is joining: wait for actual seating before asking a question.</div>}
+    {busy && !participating && workAction && (workAction.params as { actor?: string }).actor === actor && <div role="status">Interrupt work or direct {actor} away before joining.</div>}
+    {state && <div className="lab-classroom-people">{state.participants.map((p) => <span key={p.actor} title={p.reason ?? p.seat}>{p.actor}: {p.state === 'excluded' ? `left (${p.reason})` : p.arrival === 'joining' ? 'joining' : p.role}{state.queuedQuestions.includes(p.actor) ? ' · question queued' : ''}</span>)}</div>}
+    <small>Join or rejoin an available audience seat while talks are running. Work uses the separate nearby chair; unfinished work resumes only by an explicit same-user request. Ground floor, fixed arrangements; typing animation is deferred.</small>
   </div>;
 }

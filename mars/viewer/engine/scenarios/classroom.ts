@@ -24,6 +24,8 @@ export function classroomWorld(audienceCount: 4 | 8 = 4) {
   // Camp-chair local seat heading is +z; yaw pi faces the presenter (-z).
   const w = addAll(emptyWorld('classroom', scene), ...chairs,
     fixture('screen', 'standing-display', 0, -7), fixture('lectern', 'speaker-lectern', 0, -4),
+    fixture('workstation', 'computer-workstation', 6, -5), fixture('work-chair', 'camp-chair', 6, -6.2),
+    human('visitor', -7, 10), human('worker', 8, -6),
     ...actors.map((a, i) => human(a, (i - (actors.length - 1) / 2) * 1.15, 9)));
   w.entities.screen.equipment = { kind: 'display', config: { available: true, mode: 'off', content: 'Lightning talks · hypothetical classroom' } };
   return w;

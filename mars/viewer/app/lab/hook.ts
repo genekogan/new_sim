@@ -1,3 +1,4 @@
+import { readWorkstation } from '../../engine/objects/workstation.ts';
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
 import * as THREE from 'three';
 import type { LabView, OverlayName } from './lab-view.ts';
@@ -110,6 +111,7 @@ export function installHook(view: LabView, notify: () => void) {
       Object.values(sim.rt.world.entities)
         .filter((e) => e.kind === 'component')
         .map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: JSON.parse(JSON.stringify(e.pose)), corners: entityCorners(e), rendered: view.components.bounds(e.id) })),
+    workstation: () => ({ state: readWorkstation(sim.rt, 'workstation'), claims: Object.fromEntries(['workstation:workstation', 'actor:worker', 'slot:work-chair#seat'].map((key) => [key, sim.rt.holder(key)])) }),
     classroomAttention: () => view.humans.attention(),
     classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, 'screen') }; },
     startClassroom: () => { const r = sim.rt.submit('classroom_session', classroomParams(sim.scenario.name === 'classroom-8' ? 8 : 4)); notify(); return { id: r.id, status: r.status, diagnostic: r.diagnostic }; },

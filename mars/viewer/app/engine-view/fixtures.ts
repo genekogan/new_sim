@@ -10,11 +10,12 @@ import { CATALOG } from '../../engine/world/catalog.ts';
 import { BUNDLES } from '../../engine/world/catalog-stock.ts';
 import { createFire, seedOf, type Fire } from './fire.ts';
 import { tableObject } from './items.ts';
+import { workstationObject, type WorkstationVisual } from './workstation.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
 type Stack = { group: THREE.Group; count: number };
 type Screen = { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; key: string };
-type View = { obj: THREE.Object3D; key: string; fire?: Fire; stack?: Stack; screen?: Screen };
+type View = { obj: THREE.Object3D; key: string; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual };
 
 /** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
 const DUNNAGE = 0.1;
@@ -268,6 +269,7 @@ export class FixtureViews {
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
     else if (e.def === 'campfire') obj = this.campfire(e.id, sx, v);
     else if (e.def === 'standing-display') obj = this.standingDisplay(sx, sy, sz, v);
+    else if (e.def === 'computer-workstation') { v.workstation = workstationObject(this.box.bind(this), sx, sy, sz); obj = v.workstation.obj; }
     else if (e.def === 'speaker-lectern') obj = this.lectern(sx, sy, sz);
     else if (e.def === 'table-6ft') obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
     else if (BUNDLES[e.def]) obj = this.stack(e, sx, sy, sz, v);
@@ -289,7 +291,7 @@ export class FixtureViews {
   }
 
   clear() {
-    for (const v of this.views.values()) { v.fire?.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); }
+    for (const v of this.views.values()) { v.fire?.dispose(); v.workstation?.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); }
     this.group.clear();
     this.views.clear();
   }
@@ -302,7 +304,7 @@ export class FixtureViews {
       if (!v || v.key !== e.def) {
         if (v) {
           this.group.remove(v.obj);
-          v.fire?.dispose();
+          v.fire?.dispose(); v.workstation?.dispose();
           v.screen?.texture.dispose(); v.screen?.material.dispose();
         }
         v = this.build(e);
@@ -316,11 +318,12 @@ export class FixtureViews {
         this.fillStack(e, v.stack, sx, sy, sz);
       }
       if (v.screen) this.drawScreen(e, v.screen);
+      v.workstation?.update(e);
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
         this.group.remove(v.obj);
-        v.fire?.dispose();
+        v.fire?.dispose(); v.workstation?.dispose();
         v.screen?.texture.dispose(); v.screen?.material.dispose();
         this.views.delete(id);
       }
