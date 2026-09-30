@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createTurns, stepTurns, type TurnState } from './turns.ts';
 import type {
   ActionDef,
   ActionRecord,
@@ -78,6 +79,7 @@ type Exec = {
   floor?: string;
   attention?: string;
   children: string[];
+  groups: { action: string; turns: TurnState }[];
   externalDepartures: string[];
   extraDepartures: Record<string, Vec2>;
   pending: string[];
@@ -134,6 +136,7 @@ function beginCleanup(rt: Runtime, ex: Exec, error?: Diagnostic) {
   ex.floor = undefined;
   ex.attention = undefined;
   phase(rt, ex, 'cleanup');
+  updateGroupTurns(rt, ex, 0);
   for (const i of ex.children) if (rt.isActive(i)) rt.cancel(i);
 }
 function exclude(rt: Runtime, ex: Exec, actor: string, reason: string) {
@@ -342,6 +345,26 @@ function startRotation(rt: Runtime, ex: Exec) {
   ex.pending = [previous?.hold, next?.hold].filter((a): a is string => !!a);
   phase(rt, ex, 'rotating');
 }
+function conversationGroups(rt: Runtime, ex: Exec): ClassroomReadout['groups'] {
+  return ex.groups.map(({ action, turns }) => {
+    const rec = rt.records.get(action)!;
+    const members = (rec.params as { actors: string[] }).actors.filter((actor) =>
+      participating(ex).some((p) => p.actor === actor) &&
+      (rec.phase !== 'talking' || rt.world.entities[actor]?.human?.task === action));
+    const status = ex.stopping || ex.phase !== 'conversing' || !rt.isActive(action)
+      ? 'ended' : rec.phase === 'talking' ? 'talking' : 'gathering';
+    const floorHolder = status === 'talking' && members.length >= 2 && turns.floorHolder && members.includes(turns.floorHolder) ? turns.floorHolder : undefined;
+    const actor = floorHolder ? rt.world.entities[floorHolder] : undefined;
+    return { action, members, status, floorHolder, attentionTarget: actor ? { actor: actor.id, point: [actor.pose.p[0], actor.pose.p[2]] as Vec2 } : undefined };
+  });
+}
+function updateGroupTurns(rt: Runtime, ex: Exec, dt: number) {
+  for (const group of conversationGroups(rt, ex)) {
+    const turns = ex.groups.find((g) => g.action === group.action)!.turns;
+    if (stepTurns(turns, group.members, group.status === 'talking', dt))
+      rt.mark('classroom.group-floor', { session: ex.id, group: group.action, members: group.members, floorHolder: turns.floorHolder });
+  }
+}
 function publish(rt: Runtime, ex: Exec) {
   if (ex.params.displayId && !ex.stopping) {
     if (!display(rt)) {
@@ -399,6 +422,7 @@ export function readClassroom(
             'cancel',
           ]
         : [],
+    groups: conversationGroups(rt, ex),
     queuedQuestions: [...ex.questions],
     joining: ex.people
       .filter((p) => p.state === 'participating' && p.arrival === 'joining')
@@ -630,6 +654,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
       timer: 0,
       presenterIndex: 0,
       children: [],
+      groups: [],
       externalDepartures: [],
       extraDepartures: {},
       pending: [],
@@ -947,6 +972,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
               duration: ex.params.conversationSeconds ?? 5,
             });
             ex.pending.push(rec.id);
+            ex.groups.push({ action: rec.id, turns: createTurns(i) });
           }
           phase(rt, ex, 'conversing');
         }
@@ -979,15 +1005,18 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
             continue; // Retained members keep talking until the directive ends; stop the group before any return can move.
           ex.expectedStops.push(rec.id);
           rt.cancel(rec.id);
+          updateGroupTurns(rt, ex, 0); // Record the old floor ending before replacing its child.
           const remaining = cp.actors.filter((a) =>
             participating(ex).some((p) => p.actor === a),
           );
-          if (remaining.length >= 2)
+          if (remaining.length >= 2) {
             ex.pending[i] = child(rt, ex, 'converse', {
               actors: remaining,
               ...(cp.at ? { at: cp.at } : {}),
               duration: cp.duration,
             }).id;
+            ex.groups[i] = { action: ex.pending[i], turns: createTurns(i) };
+          }
         }
         ex.waiting =
           'waiting for conversation arrivals and bounded talk completion';
@@ -1025,6 +1054,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
         break;
       }
     }
+    updateGroupTurns(rt, ex, dt);
     publish(rt, ex);
     return { status: 'running', phase: ex.phase };
   },

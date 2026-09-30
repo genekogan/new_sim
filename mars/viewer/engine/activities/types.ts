@@ -121,6 +121,13 @@ export interface ClassroomReadout {
     arrival?: 'joining' | 'seated';
   }[];
   controls: ClassroomIntent['kind'][];
+  groups: {
+    action: string;
+    members: string[];
+    status: 'gathering' | 'talking' | 'ended';
+    floorHolder?: string;
+    attentionTarget?: ClassroomAttention;
+  }[];
   queuedQuestions: string[];
   joining: string[];
   diagnostic?: Diagnostic;

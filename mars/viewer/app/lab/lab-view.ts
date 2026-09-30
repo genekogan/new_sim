@@ -241,6 +241,10 @@ export class LabView {
     if (state?.attentionTarget && ['presenting', 'question'].includes(state.phase))
       for (const person of state.participants)
         if (person.state === 'participating' && person.actor !== state.attentionTarget.actor) targets[person.actor] = state.attentionTarget.point;
+    for (const group of state?.groups ?? [])
+      if (group.status === 'talking' && group.attentionTarget)
+        for (const actor of group.members)
+          if (actor !== group.floorHolder) targets[actor] = group.attentionTarget.point;
     this.humans.setAttention(targets);
   }
 
