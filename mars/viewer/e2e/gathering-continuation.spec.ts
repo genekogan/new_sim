@@ -135,3 +135,33 @@ test('ending only the guest discussion preserves worker and presenter commitment
   expect(await page.evaluate(() => window.__marsEngine.gatheringContinuations())).toEqual([]);
   await expect(page.getByTestId('continuation-work')).toHaveCount(0);
 });
+test('live courtyard direction pauses only the affected discussion, then Resume keeps the same partner and remaining talk', async ({ page }) => {
+  await prepare(page, 4);
+  const before = await advance(page, 'discussion');
+  await page.getByRole('combobox', { name: 'Classroom participant', exact: true }).selectOption('guest1');
+  await button(page, 'Direct to courtyard').click();
+  const directed = await page.evaluate(() => window.__marsEngine.records().findLast(r => r.verb === 'walk_to' && !r.parent && r.params.actor === 'guest1')?.id);
+  expect(directed).toBeTruthy();
+  expect(await page.evaluate(id => {
+    for (let i = 0; i < 12000; i++) {
+      const record = window.__marsEngine.records().find(r => r.id === id);
+      if (record && ['completed', 'cancelled', 'failed'].includes(record.status)) return record.status;
+      window.__marsEngine.step();
+    }
+    throw Error(`Directed walk ${id} did not finish`);
+  }, directed)).toBe('completed');
+  const stopped = await page.evaluate(() => window.__marsEngine.gatheringContinuations().find(s => s?.bindings.binding.kind === 'discussion'));
+  expect(stopped?.mode).toBe('waiting');
+  expect(stopped?.diagnostic?.code).toBe('continuation.directed-away');
+  expect(stopped?.elapsed).toBeGreaterThanOrEqual(before.discussion.elapsed);
+  expect(stopped?.remaining).toBeGreaterThan(0);
+  expect(stopped?.bindings.binding).toEqual(before.discussion.bindings.binding);
+  expect(await page.evaluate(() => window.__marsEngine.purposefulRoutine()?.status)).not.toBe('cancelled');
+  await expect(page.getByTestId('continuation-discussion')).toContainText('continuation.directed-away');
+  await capture(page, 'continuation-directed-away.png');
+  await button(page, 'Resume discussion').click();
+  const finished = await advance(page, 'finished');
+  expect(finished.discussion.elapsed).toBe(20);
+  expect(finished.work.status).toBe('completed');
+  await clean(page);
+});

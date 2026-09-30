@@ -15,7 +15,7 @@ export function GatheringContinuationHud({ sim, refresh }: { sim: LabSim; refres
   const prior = [...rt.records.values()].findLast(record => {
     if (record.verb !== 'purposeful_routine') return false;
     const state = readPurposefulRoutine(rt, record.id);
-    return state?.bindings.session === session && state.bindings.actor === B.work.actor &&
+    return !!state && state.bindings.session === session && state.bindings.actor === B.work.actor &&
       state.bindings.work.station === B.work.station && state.bindings.work.task === task && state.bindings.work.duration === B.work.duration;
   });
   const current = requests?.epoch === sim.scenarioEpoch ? requests : undefined;
@@ -54,7 +54,7 @@ export function GatheringContinuationHud({ sim, refresh }: { sim: LabSim; refres
         <b>{kind === 'work' ? 'Presenter1 · follow-up work' : 'Guest1 + guest2 · continuing discussion'}</b>
         <div>{record?.status === 'cancelled' ? 'Ended; remaining commitment was not fulfilled' : record?.status === 'failed' ? 'Declined' : state?.status === 'completed' ? 'Finished' : state?.mode ?? record?.status}</div>
         {state && <>
-          <div>{state.phase} · {state.elapsed.toFixed(1)}/{state.duration}s · {state.remaining.toFixed(1)}s remaining</div>
+          <div>{state.status === 'completed' ? 'finished' : state.status === 'cancelled' ? 'ended' : state.phase} · {state.elapsed.toFixed(1)}/{state.duration}s · {state.remaining.toFixed(1)}s remaining</div>
           {state.floorHolder && <div>Speaking: {state.floorHolder}</div>}
           {state.waitingReason && <div role="status">{state.waitingReason}</div>}
           {state.diagnostic && <div role="status">{state.diagnostic.code}: {state.diagnostic.message}</div>}
