@@ -19,7 +19,7 @@ Live: https://sim.eden.art (once DNS points at eden2) · https://<eden2-sslip-ho
 | `packages/client` | Client replica + reconnecting connection (browser and Node) |
 | `apps/server` | The sequencer: tick loop, event log, snapshots, WS hub, REST, MCP, Privy, brain scheduler |
 | `apps/web` | React + Vite debug shell with Privy login |
-| `infra/` | systemd unit, Caddy site file, deploy script, one-time box setup |
+| `infra/` | systemd units (prod, staging, watchdog), Caddy site file, Litestream config, deploy / rollback / box-setup scripts |
 
 ## How it works
 
