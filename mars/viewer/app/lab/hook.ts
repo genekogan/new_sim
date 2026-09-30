@@ -138,6 +138,7 @@ export function installHook(view: LabView, notify: () => void) {
       return { state: readWorkstation(sim.rt, work.station), claims: Object.fromEntries([`workstation:${work.station}`, `actor:${work.actor}`, `slot:${work.seat}`].map(key => [key, sim.rt.holder(key)])) };
     },
     activityExample: () => structuredClone(activityExample(sim.scenario.name)),
+    workstationAppearances: () => view.fixtures.workstationAppearanceStates(),
     classroomAttention: () => view.humans.attention(),
     /** Detached activity readouts; an observer cannot mutate coordination or food. */
     sharedFood: () => structuredClone([...sim.rt.records.values()].filter(r => r.verb === 'shared_food_break').map(r => readSharedFoodBreak(sim.rt, r.id))),

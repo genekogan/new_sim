@@ -80,6 +80,12 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <p className="lab-meta">
         tick {sim.rt.tick} · t {sim.rt.time.toFixed(2)} s {sim.done() ? '· done' : sim.paused ? '· paused' : ''}
       </p>
+      {s.name === 'design-studio' && <section className="lab-meta" data-testid="workstation-appearance">
+        Computer appearance: <a href="https://sketchfab.com/3d-models/retro-computer-monitor-8926293078874194b551e74c40a3debf" target="_blank" rel="noopener">Retro Computer &amp; Monitor</a> by <a href="https://sketchfab.com/JasperTobias" target="_blank" rel="noopener">JasperTobias</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Scaled and rotated; screen shows live simulated work.
+        {view.fixtures.workstationAppearanceStates().map(state => <div key={state.id}>
+          {state.status === 'failed' ? <span role="alert">{state.diagnostic} · Using the primitive computer appearance.</span> : `Appearance: ${state.status}`}
+        </div>)}
+      </section>}
       {s.hud && (
         <ul className="lab-meta lab-hud" data-testid="lab-scenario-hud">
           {s.hud(sim.rt).map((l, i) => (

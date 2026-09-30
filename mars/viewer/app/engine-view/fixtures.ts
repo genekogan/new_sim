@@ -10,7 +10,7 @@ import { CATALOG } from '../../engine/world/catalog.ts';
 import { BUNDLES } from '../../engine/world/catalog-stock.ts';
 import { createFire, seedOf, type Fire } from './fire.ts';
 import { tableObject } from './items.ts';
-import { workstationObject, type WorkstationVisual } from './workstation.ts';
+import { workstationObject, type WorkstationVisual, type WorkstationAppearanceOptions } from './workstation.ts';
 import { rendererColor } from './palette.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
@@ -47,6 +47,7 @@ export class FixtureViews {
   readonly group = new THREE.Group();
   private views = new Map<string, View>();
   private dusk = false;
+  private workstationAppearances: Record<string, WorkstationAppearanceOptions> = {};
   private readonly geos: THREE.BufferGeometry[] = [];
   private readonly mats = new Map<string, THREE.Material>();
   private readonly unit = this.keep(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0));
@@ -276,7 +277,7 @@ export class FixtureViews {
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
     else if (e.def === 'campfire') obj = this.campfire(e.id, sx, v);
     else if (e.def === 'standing-display') obj = this.standingDisplay(sx, sy, sz, v);
-    else if (e.def === 'computer-workstation') { v.workstation = workstationObject(this.box.bind(this), sx, sy, sz); obj = v.workstation.obj; }
+    else if (e.def === 'computer-workstation') { v.workstation = workstationObject(this.box.bind(this), sx, sy, sz, this.workstationAppearances[e.id]); obj = v.workstation.obj; }
     else if (e.def === 'speaker-lectern') obj = this.lectern(sx, sy, sz);
     else if (e.def === 'table-6ft') obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
     else if (BUNDLES[e.def]) obj = this.stack(e, sx, sy, sz, v);
@@ -292,9 +293,15 @@ export class FixtureViews {
     this.dusk = on;
   }
 
-  reset(world: Pick<WorldState, 'entities'>) {
+  reset(world: Pick<WorldState, 'entities'>, appearances: Record<string, WorkstationAppearanceOptions> = {}) {
+    this.workstationAppearances = { ...appearances };
     this.clear();
     this.onTick(world);
+  }
+
+  /** Renderer-only asset status and fitted local bounds; no authoritative state. */
+  workstationAppearanceStates() {
+    return [...this.views].flatMap(([id, view]) => view.workstation?.appearanceState ? [{ id, ...view.workstation.appearanceState() }] : []);
   }
 
   clear() {

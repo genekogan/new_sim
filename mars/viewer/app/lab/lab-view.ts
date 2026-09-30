@@ -117,7 +117,7 @@ export class LabView {
     [fog.near, fog.far] = this.statics.fog ?? [70, 160];
     this.humans.reset(rt.world);
     this.components.reset(rt.world);
-    this.fixtures.reset(rt.world);
+    this.fixtures.reset(rt.world, this.sim.scenario.name === 'design-studio' ? { 'studio-computer': { kind: 'retro-computer' } } : undefined);
     this.lighting(!!this.sim.scenario.evening);
     this.slotTick = -1;
     this.agents.clear();
