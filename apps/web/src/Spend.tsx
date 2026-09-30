@@ -3,7 +3,7 @@ import type { Api } from './useSim.ts';
 
 type Agg = { total: number; calls: number; byTier: Record<string, { calls: number; cost: number }> };
 type Report = {
-  at: number; budgetPerDay: number; mode: string; hardCapHit: boolean;
+  at: number; budgetPerDay: number; mode: string; hardCapHit: boolean; capSpent: number; capSince: number;
   actual: Record<'last15m' | 'last1h' | 'last24h' | 'today' | 'last7d' | 'thisMonth' | 'allTime', Agg>;
   projected: { basis: string; perHour: number; perDayTrend: number; perDayGoverned: number; perWeek: number; perMonth: number; perYear: number; endOfToday: number; endOfMonth: number; byTierPerDay: Record<string, number> };
   governor: { tier: string; share: number; perDay: number; level: number; capacity: number; estCost: number; denied: number }[];
@@ -37,6 +37,7 @@ export function SpendPanel({ api, authed, isAdmin }: { api: Api; authed: boolean
       <h2>Spend — model API cost, actual and projected</h2>
       <div className="kv" style={{ marginBottom: 10 }}>
         <span>daily budget</span><span><b>{$(r.budgetPerDay)}</b> · spread evenly across the day by the governor · brain mode {r.mode}{r.hardCapHit && <b className="bad"> · 24 h hard cap reached: free defaults only</b>}</span>
+        <span>hard cap</span><span>{$(r.capSpent)} of {$(r.budgetPerDay)} spent under the current budget (since {new Date(r.capSince).toISOString().slice(11, 16)} UTC, rolling 24 h)</span>
         <span>today so far</span><span><span className="bar" style={{ width: Math.min(300, usedToday * 300) }} />{$(r.actual.today.total)} of {$(r.budgetPerDay)} ({(usedToday * 100).toFixed(0)}%)</span>
         <span>projected</span><span>end of today ≈ <b>{$(r.projected.endOfToday)}</b> · end of month ≈ <b>{$(r.projected.endOfMonth)}</b></span>
         <span>run rate</span><span>{$(r.projected.perHour)}/h ({r.projected.basis}) → {$(r.projected.perDayTrend)}/day trend, {$(r.projected.perDayGoverned)}/day allowed · {$(r.projected.perWeek)}/week · {$(r.projected.perMonth)}/month · {$(r.projected.perYear)}/year</span>

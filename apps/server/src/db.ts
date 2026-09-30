@@ -91,8 +91,8 @@ export class Db {
       : this.db.prepare('SELECT id, body FROM brain_calls ORDER BY id DESC LIMIT ?').all(limit)) as any[];
     return rows.map((r) => ({ ...JSON.parse(r.body), id: r.id })).reverse();
   }
-  brainToday(): { calls: number; cost: number; jevMs: number } {
-    const since = Date.now() - 24 * 3600 * 1000;
+  brainToday(sinceMs = 0): { calls: number; cost: number; jevMs: number } {
+    const since = Math.max(sinceMs, Date.now() - 24 * 3600 * 1000);
     const a = this.db.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(cost_usd),0) AS s FROM brain_calls WHERE at > ?').get(since) as any;
     const b = this.db.prepare("SELECT COALESCE(AVG(ms),0) AS m FROM (SELECT ms FROM brain_calls WHERE tier = 'mid' AND ms > 2 ORDER BY id DESC LIMIT 100)").get() as any;
     return { calls: a.c, cost: a.s, jevMs: b.m };

@@ -25,8 +25,10 @@ export class Brain {
   jev: JevClient;
   mode: 'live' | 'fake';
   gov: Governor;
+  /** The hard cap counts spend in the rolling 24 h, but only since the current budget took effect. */
+  capSince = Date.now();
   get budget() { return this.gov.budget; }
-  set budget(b: number) { this.gov.setBudget(b); }
+  set budget(b: number) { this.gov.setBudget(b); this.capSince = Date.now(); this.spentToday = 0; }
   inflight = new Set<string>();
   spentToday = 0; callsToday = 0; jevMsAvg = 0;
   camera: CameraLine | null = null;
@@ -44,9 +46,9 @@ export class Brain {
     this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
     db.backfillSpend();
     this.jev = new JevClient(cfg.typesafeKey, this.mode);
-    const t = db.brainToday(); this.spentToday = t.cost; this.callsToday = t.calls; this.jevMsAvg = t.jevMs;
+    const t = db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.jevMsAvg = t.jevMs;
     host.listeners.push({ afterTick: (tick) => this.afterTick(tick), onApplied: (e) => this.onApplied(e) });
-    setInterval(() => { const t = this.db.brainToday(); this.spentToday = t.cost; this.callsToday = t.calls; this.db.pruneBrainCalls(); }, 60_000).unref();
+    setInterval(() => { const t = this.db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.db.pruneBrainCalls(); }, 60_000).unref();
   }
 
   setMode(m: 'live' | 'fake') { this.mode = m; this.jev.mode = this.cfg.typesafeKey ? m : 'fake'; }
@@ -101,7 +103,7 @@ export class Brain {
       byTierPerDay: Object.fromEntries((Object.keys(SHARES) as Tier[]).map((t) => [t, Math.min((actual.last1h.byTier[t]?.cost ?? 0) * 24, this.gov.perDay(t))])),
     };
     return {
-      at: now, budgetPerDay: this.budget, mode: this.mode, hardCapHit: this.overBudget,
+      at: now, budgetPerDay: this.budget, mode: this.mode, hardCapHit: this.overBudget, capSpent: this.spentToday, capSince: this.capSince,
       actual, projected, governor: this.gov.view(),
       hourly: this.db.spendHourly(24).map((r) => ({ ...r, tier: tierOf(r.tier) })),
       byModel: this.db.spendByModel(),
