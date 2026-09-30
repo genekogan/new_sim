@@ -11,7 +11,7 @@ import { heldBy } from '../items/model.ts';
 
 function runtime() {
   const world = designStudioWorld();
-  return new Runtime(world, createRegistry(), servicesFor({ classroom: designStudioScene() })(world), ENGINE_INVARIANTS);
+  return new Runtime(world, createRegistry(), servicesFor({ 'design-studio': designStudioScene() })(world), ENGINE_INVARIANTS);
 }
 function until(rt: Runtime, done: () => boolean, max = 16000) {
   for (let i = 0; i < max && !done(); i++) rt.step();
