@@ -24,5 +24,16 @@
   "source_commit": "7648dbf",
   "release": 24,
   "engine_evidence": "../../docs/engineering/EVIDENCE.md",
-  "gate_report": "../.cloudflare/gate/2026-09-30T18-19-37-557Z/report.json"
+  "gate_report": "../.cloudflare/gate/2026-09-30T18-19-37-557Z/report.json",
+  "last_rollback": {
+    "failed_release": 25,
+    "failed_version": "2edcf368-baeb-4dbf-aea7-da48ccccee62",
+    "failed_source_commit": "73eda3931e791706db5386cf67c438a39ab11284",
+    "reason": "production MCP Cloudflare 1102 resource-limit failure",
+    "live_release": 24,
+    "live_version": "0bb846b0-25de-4db3-9f3e-7e0ae5409dcc",
+    "deployed_at": "2026-09-30T20:46:47.577Z",
+    "verification": "100% rollback status and HTTP 341 assets/19 routes/GLB range/auth passed; no MCP retry",
+    "verified_at": "2026-09-30T20:49:17.609Z"
+  }
 }

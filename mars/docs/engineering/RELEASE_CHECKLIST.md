@@ -1119,3 +1119,14 @@ Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback d88e1112-a018-4f08-9ed0-350c6f0b63ee --name mars-campus-2026 -m "rollback release24: <reason>"
 ```
+
+
+## Failed release 25 and rollback (2026-09-30)
+
+Local clean candidate **73eda3931e791706db5386cf67c438a39ab11284** passed full gate `.cloudflare/gate/2026-09-30T20-11-03-728Z/report.json`: 99 unit / 845 engine passes, zero fail / six skip / 11 TODO, 137 browser passes / seven skip in 1300.8s, clean lint/both TypeScript/unchanged flagship/probe/all 36 local MCP tools. Original idle ceilings and regenerated LOCAL evidence passed; these do not certify production. Prior 19-13-27 RED and 19-50-00 SIGINT RED reports remain retained. Candidate adds bounded attendee follow-ups and independent fixed primitive studio; imported appearance/autonomy remain excluded. Current historical house 3/9 refusals and original skips remain.
+
+Temporary deployment **2edcf368-baeb-4dbf-aea7-da48ccccee62** uploaded four new assets / 383 existing, startup 115ms; dry 415 files / 7005.18 KiB / 1261.22 KiB gzip. Eight verified existing large objects skipped, zero R2 writes. HTTP 341 assets / 19 routes / range / auth passed. Production MCP failed after direct-camera checkpoint with **Cloudflare 1102 Worker resource limits / HTTP 503**, ray `a43611434c821f8d`, timestamp 20:44:45Z. Serial checks stopped: director/status/camera/bay and root production journeys did not run; no all-36 production MCP pass or release 25 PROD_VERIFIED claim. Failure retained in `viewer/.cloudflare/mcp-release-25.log`.
+
+Root explicitly authorized rollback to verified release 24. Wrangler 4.136.2 rollback succeeded; **actual live version 0bb846b0-25de-4db3-9f3e-7e0ae5409dcc is 100%**, rollback deployment created **2026-09-30T20:46:47.577Z**. HTTP 341 assets / 19 routes / GLB range / auth passed at 20:49:17.609Z; separate main page 200 in 0.864s. No MCP retry, source change or DO-state rollback claimed. Source 73eda39/worktrees/failed attempts/logs preserved. Metadata identifies live 24 and explicit failed-25 rollback receipt; candidate EVIDENCE.md/evidence.json remains local proof, not live-24 validation. No successful release-25 tag implied.
+
+Logs: `viewer/.cloudflare/{mcp,rollback,rollback-status,rollback-http}-release-25.log`; local gate/perf/evidence/build/upload/dry logs retained beside them. Chronological disposition: `briefs/after-gathering-release.REPORT.md`. Root investigates resource limits with fresh isolated baseline-24 rooms before choosing further source/deployment work.
