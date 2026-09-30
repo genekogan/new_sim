@@ -317,3 +317,8 @@
 .lab-classroom-controls button:disabled { opacity: .4; }
 .lab-classroom-people { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 5px 0; }
 .lab-classroom small { display: block; opacity: .75; margin-top: 7px; }
+
+/* Keep an unsupported layout inspectable without covering the world. Full
+   diagnostics remain selectable and scrollable; the failure status stays visible. */
+.lab-admission-diags { max-height: 120px; overflow-y: auto; }
+.lab-admission-checks { max-height: 180px; overflow-y: auto; }

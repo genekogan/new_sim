@@ -2421,3 +2421,7 @@ Classroom source f40f659 (release14) on `codex/classroom-integration` derives ty
 - **Seat withdrawal/local rebind — deferred alternative:** useful local occupied/approach recovery analysis, not implemented. Gene chose real furniture moving first. `briefs/classroom-furniture-feasibility.PLAN.md` retains source mechanisms, tests, remaining work, reservation dependencies and narrow promotion triggers. Promote for a featured live-event furniture intervention after physical mover support; do not confuse closing a seat with relocating it.
 
 Original accounting stays **38 fixed /36 reclassified /142 remaining**. All216 IDs above retain authoritative dispositions and provenance; supplemental stages do not change those classifications.
+
+New exposed-journey follow-up: [BUILD-02 and PILE-01 limitations](LIVE_LAB_REPAIRS.md#bounded-limitation-retained)
+retain current-layout off-axis staging/delivery and unanimated aggregate extraction.
+That repair record owns their disposition; existing LAST_MILE IDs/provenance remain unchanged.

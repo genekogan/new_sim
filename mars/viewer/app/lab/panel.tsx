@@ -89,7 +89,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <h2>Expectations</h2>
-      <ul className="lab-checks">
+      <ul className={`lab-checks${s.admission?.(sim.rt) ? ' lab-admission-checks' : ''}`}>
         {checks.map((c, i) => (
           <li key={i} className={c.ok ? 'ok' : 'bad'}>
             {c.ok ? '✓' : '✗'} {c.message}

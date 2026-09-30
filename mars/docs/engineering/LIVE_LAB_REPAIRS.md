@@ -58,3 +58,14 @@ orphan stance causes both; dispatch timing is not an admission excuse. Captures
 and complete state/records are retained, including the initial reset-wait harness
 timeout. New required Node full historical completion117277ticks/d382e461…0617
 passes with all66parts/zero violations/clean crew; full gate and release pending.
+
+Combined focused source check: **10 browser passes /2 retained historical fidelity
+FIXMEs**, 1.5min, including actual Play/Step/Reset for both current unsupported
+presets and full supported historical completion55.9s. Root inspected combined
+current-house capture after narrowing only diagnostic scroll areas: all details and
+negative status remain visible/accessible while crew/piles/controls remain usable.
+App TypeScript/lint clean; focused Node5passes/1existing historical-stock TODO
+(the solar dimensions mismatch still fails its TODO assertion and is not a pass).
+A compiler command mistakenly invoked npx from repository root instead of viewer
+and failed before running TypeScript; the correct viewer compiler subsequently
+passed. No dependencies or project files were installed/changed by that invocation.
