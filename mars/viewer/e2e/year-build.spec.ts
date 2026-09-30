@@ -14,6 +14,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { labFrames, openLab } from './lab-helpers';
 import { ARTIFACTS, captureView } from './helpers';
 import { loadCampusFile } from '../engine/campus/history-node.ts';
@@ -69,7 +70,7 @@ type H = {
   runToEnd(max: number): { tick: number; done: boolean };
   stateHash(): string;
   state(): { tick: number; time: number; done: boolean; humans: { id: string; p: number[]; yaw: number; activity: string; level: number }[]; checks: { ok: boolean; message: string }[] };
-  components(): { id: string; def: string; phase?: string; pose: { p: number[]; yaw: number; pitch?: number; roll?: number } }[];
+  components(): { id: string; def: string; phase?: string; support?: string; pose: { p: number[]; yaw: number; pitch?: number; roll?: number } }[];
   camera(pos: number[], target: number[]): void;
   bones(): Record<string, Bone>;
   stacks(): { id: string; def: string; count: number; top: number | null }[];
@@ -79,27 +80,74 @@ type Stats = { ticks: number; stance: number; stanceOff: string[]; ladder: numbe
 const newStats = (): Stats => ({ ticks: 0, stance: 0, stanceOff: [], ladder: 0, ladderOff: [], holds: 0, holdsReached: 0, holdMiss: [], points: 0, reached: 0, reachableMiss: [], byAct: {}, over: [], kinds: {} });
 
 for (const [scenario, missing] of [['year-build-2022', 3], ['year-build-2022-house', 9]] as const) {
-  test(`${scenario}: current unsupported layout refuses automatic play before any physical actions`, async ({ page }) => {
+  test(`${scenario}: current unsupported layout refuses Play, Step and Reset before physical actions`, async ({ page }, testInfo) => {
     await openLab(page, scenario);
-    await labFrames(page);
-    const result = await page.evaluate(() => {
+    await page.evaluate((name) => (window.__marsEngine as unknown as { runScenario(n: string, o: object): Promise<unknown> }).runScenario(name, { paused: true }), scenario);
+    const initial = await page.evaluate(() => {
       const h = window.__marsEngine as unknown as H;
-      const before = { humans: h.state().humans, components: h.components() };
-      h.step(100);
-      return { before, after: { humans: h.state().humans, components: h.components() }, admission: h.yearBuild()!.admission, records: h.records(), state: h.state(), rows: h.sequence().steps };
+      return { humans: h.state().humans, components: h.components() };
     });
-    expect(result.admission?.code).toBe('year-build.unsupported');
-    expect(result.admission?.subjects).toHaveLength(missing);
-    expect(result.admission?.message).toContain('chiba-12-foot-orange-beam-0684c6e5');
-    expect(result.admission?.message).toContain('kitchen-12-foot-orange-beam-11ad38b2');
-    expect(result.records).toEqual([]);
-    expect(result.rows!.every((row) => row.status === 'pending')).toBe(true);
-    expect(result.after).toEqual(result.before);
-    expect(result.state.done).toBe(true);
-    expect(result.state.checks.some((check) => !check.ok && check.message.includes('unsupported'))).toBe(true);
-    expect(await page.evaluate(() => window.__marsEngine!.violations())).toEqual([]);
+    const assertRefusal = async (control: string) => {
+      const result = await page.evaluate(() => {
+        const h = window.__marsEngine as unknown as H;
+        return { physical: { humans: h.state().humans, components: h.components() }, admission: h.yearBuild()!.admission, records: h.records(), state: h.state(), rows: h.sequence().steps, violations: window.__marsEngine!.violations() };
+      });
+      expect(result.admission?.code, control).toBe('year-build.unsupported');
+      expect(result.admission?.subjects, control).toHaveLength(missing);
+      expect(result.admission?.message).toContain('chiba-12-foot-orange-beam-0684c6e5');
+      expect(result.admission?.message).toContain('kitchen-12-foot-orange-beam-11ad38b2');
+      expect(result.records, control).toEqual([]);
+      expect(result.rows!.every((row) => row.status === 'pending'), control).toBe(true);
+      expect(result.physical, control).toEqual(initial);
+      expect(result.state.done, control).toBe(true);
+      expect(result.state.checks.some((check) => !check.ok && check.message.includes('unsupported')), control).toBe(true);
+      expect(result.violations, control).toEqual([]);
+    };
+    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    await labFrames(page);
+    await assertRefusal('Play');
+    await page.getByRole('button', { name: 'Step', exact: true }).click();
+    await assertRefusal('Step');
+    await page.getByRole('button', { name: 'Reset', exact: true }).click();
+    await labFrames(page);
+    await assertRefusal('Reset');
+    await captureView(page, `${scenario}-current-unsupported`, { testInfo, compare: false });
   });
 }
+
+test('exact pre-W51 historical source: whole skeleton completes live, all 66 parts supported and crew clear, unchanged pin', async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
+  const source = execFileSync('git', ['show', 'a0c347e0374b473876c97f536dc44dba42399521:viewer/public/engine/campus-2022.json'], { encoding: 'utf8' });
+  expect(JSON.parse(source).contentHash).toBe('8b88e6f090c79b92784954787f0329295286d5b6f5e76f0d9d450023da8c49f2');
+  await page.route('**/engine/campus-2022.json', (route) => route.fulfill({ contentType: 'application/json', body: source }));
+  await openLab(page, 'year-build-2022-house');
+  await page.evaluate(() => (window.__marsEngine as unknown as { runScenario(n: string, o: object): Promise<unknown> }).runScenario('year-build-2022-house', { paused: true }));
+  expect((await yb(page)).admission).toBeNull();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.waitForFunction(() => window.__marsEngine!.state().tick > 0);
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  // Yield between bounded tick batches so the UI/browser stays responsive throughout the full build.
+  let done = false;
+  for (let chunk = 0; chunk < 240 && !done; chunk++) {
+    done = await page.evaluate(() => (window.__marsEngine as unknown as H).runToEnd(500).done);
+  }
+  expect(done, 'historical skeleton finished within 120000 ticks').toBe(true);
+  const result = await page.evaluate(() => {
+    const h = window.__marsEngine as unknown as H;
+    return { state: h.state(), hash: h.stateHash(), yb: h.yearBuild()!, components: h.components(), rows: h.sequence().steps!, bones: h.bones(), violations: window.__marsEngine!.violations() };
+  });
+  expect(result.state.tick).toBe(117277);
+  expect(result.hash).toBe('d382e4614e8ae157ad971ab7a4cb2b922c4737197006b39b4a209dc0db040617');
+  expect(result.yb.compare.n).toBe(66);
+  expect(result.yb.compare.ok).toBe(66);
+  expect(result.rows.every((row) => row.status === 'completed')).toBe(true);
+  expect(result.violations).toEqual([]);
+  expect(result.components.every((component) => component.phase === 'installed' && component.support !== 'held')).toBe(true);
+  expect(Object.values(result.bones).every((bone) => !bone.on)).toBe(true);
+  for (const check of result.state.checks) expect(check.ok, check.message).toBe(true);
+  await look(page, [result.yb.centre[0] + 17, 11, result.yb.centre[1] + 18], [result.yb.centre[0], 2.4, result.yb.centre[1]]);
+  await captureView(page, 'year-build-historical-supported-whole', { testInfo, compare: false });
+});
 
 async function yb(page: Page): Promise<YB> {
   return page.evaluate(() => (window.__marsEngine as unknown as H).yearBuild()!);

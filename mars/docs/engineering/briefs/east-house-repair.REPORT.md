@@ -112,3 +112,50 @@ The nine rejected beam suffixes are `02eaafd3`, `0e197289`, `38352bc2`,
 `61fa7a83`, `6b514974`, `91b67b6d`, `94aa4849`, `b5bf3cc8`, `cae496c2`, all
 under `east-house-12-foot-orange-beam-`. Each names the same blocked line-0 and
 far-end plots and Chiba/kitchen dependency described above.
+
+### Final focused browser evidence (root UI contract integrated)
+
+Candidate `362d1c4` contains atomic staging preflight, diagnostic export and
+required Node regressions. Root-owned production admission commit `e6830dc` was
+cherry-picked into this worker as `cfa3e2d` solely for integrated browser proof.
+No historical content or baseline files were modified.
+
+`npx tsc --noEmit -p .` from `viewer/`: clean.
+
+`E2E_VITE_PORT=5491 E2E_RUN=codex-east-house-repair-1 npx playwright test -c e2e/playwright.config.ts year-build.spec.ts`:
+**4 passed, 2 skipped, 0 failed, about 1.3min**. The two skips remain the original
+W51 historical fidelity/capture FIXMEs, not the new required tests. YEAR_BUILD_FULL
+cannot override them; their reason remains preserved.
+
+Both current-source presets passed actual **Play → Step → Reset** button
+interactions: every stage retained the named `year-build.unsupported` diagnostic,
+zero submitted actions, pending sequence rows, unchanged actor/component poses,
+explicit false unsupported expectation and zero invariant violations. First bay
+has three missing beams (`0e197289`, `6b514974`, `91b67b6d`); whole house has nine.
+
+The new **mandatory whole-house browser proof** routes only the 2022 source URL to
+its exact pre-W51 Git source. It starts with the real Play button, waits for actual
+ticks, pauses via the real Pause button, then runs 500-tick batches with a yield
+between them. It completed in **57.7s**, at unchanged **117277 ticks /
+`d382e4614e8ae157ad971ab7a4cb2b922c4737197006b39b4a209dc0db040617`**: 552 completed
+steps, all 66 canonical parts installed (max0.57mm), no held components, crew off
+stances, zero invariant violations and all completion checks green. This is exact
+historical-source support, not support for the current production layout.
+
+Inspected images under `viewer/e2e/artifacts/codex-east-house-repair-1/`:
+
+- `year-build-2022-current-unsupported.png`: unstarted pile yard and grounded crew,
+  explicit current-layout unsupported title/description, named three-part refusal.
+- `year-build-2022-house-current-unsupported.png`: same stationary crew/yard, all
+  nine excluded beams disclosed (the full diagnostic occupies substantial screen
+  space), tick0, zero violations.
+- `year-build-historical-supported-whole.png`: complete green-frame/orange-beam
+  skeleton and grounded crew; 552/552 and66/66 green completion checks. The static
+  production title/description still label the *current* layout unsupported; this
+  image uses the explicit test-only historical source override, as its name and
+  this report record. No claim of current-source completion is made.
+
+Full engine suite/release gate/deployment remain the parent's integration work.
+Focused validation and all existing historical pins were green and unchanged.
+Approximate worker cost: ~20k tokens and ~45min including coordinated waiting;
+these are estimates, not metered usage.
