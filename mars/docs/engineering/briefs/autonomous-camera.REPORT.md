@@ -349,3 +349,34 @@ remain theirs. Camera packaging is locally implemented/inspected/tested, not yet
 integrated/released. Existing footage/policy defects from the preceding checkpoint
 remain applicable. No shared-interface blocker. Roughly 15 minutes for this batch;
 remaining production work is the owner's combined gate/staging/deployment.
+
+## 2026-09-30 — final documentation and session retirement
+
+Gene asked for an extensive future-agent handoff and retirement of this session.
+Reviewed camera code through bf24353 is now integrated and production-verified in
+release18, source b2928ef, version4e77562e-9dc4-4f76-890b-22bc188d8ed7. Historical
+branch-only status paragraphs above remain chronological evidence; the rewritten
+brief is the current authority. Production tour and compiled live entry were
+verified by integration owner. Broader live scenarios and Jev superiority are not
+claimed; replay/fixture limitations remain explicit.
+
+Documentation-only branch codex/autonomous-camera-handoff, base/merge-base3e444e7.
+Rewrote autonomous-camera.md as complete resume/architecture/ownership/contracts/
+policies/precedence/safety/async/replay/evidence/build/runbook/validation/backlog/
+open-questions/retirement handoff. Added viewer/cinematography/README.md pointing to
+it and this REPORT. No implementation, fixtures, pins, release code, historical
+content, shared roadmap or API changes. No helpers, paid calls or new videos.
+
+After rebasing on current main, npm run test:engine:762 total,745 pass,0 fail,
+6 skip,11 TODO (68.67s); npm run typecheck and npx tsc --noEmit -p
+cinematography/tsconfig.json pass. Markdown relative links and diff checked. No
+browser rerun was needed for documentation-only changes. All pinned tests pass
+unchanged. Captures referenced in handoff were previously inspected; preserved
+ignored MP4/proof/log directories remain in the dedicated camera checkout.
+
+Only camera-owned Vite5593 process37901 was verified by listener and cwd for
+shutdown; no other servers/ports/worktrees will be touched. Worktree/artifacts
+are preserved, not archived/deleted. Completed review helper has no active work.
+Documentation commit is sent to integration owner for main inclusion without a
+production release dependency. Future camera development or paid experiments
+resume only when Gene asks; all remaining work is in the explicit brief backlog.
