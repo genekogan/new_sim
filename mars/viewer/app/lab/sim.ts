@@ -49,7 +49,12 @@ export class LabSim {
     this.acc = 0;
     this.rt.observers.push({ onEvent: (_rt, e) => this.record(e) });
     this.onReset(this.rt);
-    s.start(this.rt);
+    const refusal = s.admission?.(this.rt);
+    if (refusal) {
+      const line: LogLine = { tick: 0, level: 'warn', text: `${refusal.code}: ${refusal.message}` };
+      this.log.push(line);
+      this.diagnostics.push(line);
+    } else s.start(this.rt);
     // violations are pushed to rt.events without an observer callback
     this.seen = this.rt.events.length;
     this.harvest();

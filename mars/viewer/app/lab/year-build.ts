@@ -12,7 +12,7 @@ import { SequenceRunner } from '../../engine/sequence/runner.ts';
 import { runServices } from '../../engine/rehearsal/rehearse.ts';
 import { campusYearUrl, type CampusYearFile } from '../../engine/campus/history.ts';
 import { buildingFootprint } from '../../engine/campus/bom.ts';
-import { compareToCanonical, yearBuildSetup, type YearBuildSetup } from '../../engine/scenarios/year-build.ts';
+import { compareToCanonical, yearBuildSetup, yearBuildSupportDiagnostic, type YearBuildSetup } from '../../engine/scenarios/year-build.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
 import { evaluateShot } from '../../engine/camera/shots.ts';
 import { bindRunner, sequenceOf } from './build-bay.ts';
@@ -84,7 +84,7 @@ function preset(name: string, bays: number | undefined, title: string, maxTicks:
     name,
     title,
     description:
-      `HYPOTHETICAL year build phase A (engine/scenarios/year-build.ts, YEAR_BUILD.md): mars-${YEAR_BUILD_YEAR} forked, the ${YEAR_BUILD_ASSEMBLY} removed, its 16 ft frames and 12 ft beams stacked in a pile yard beside it; a crew of six takes each piece off its stack, carries and raises the frames (held from behind), hangs the low beams from the ground, climbs the bracing to take the middle beams (2.48 m) handed up, and relays the top beams (4.76 m) up through two people lower on the frames. ${bays ? `First ${bays} bay (the suite's tranche).` : 'The whole house (552 steps, ~97 simulated minutes).'} Acceptance: every sequenced frame / beam installed within 1 cm / 1° of the checkpoint.`,
+      `CURRENT LAYOUT UNSUPPORTED: the existing beam staging requires ground positions blocked by neighboring Chiba/kitchen structures. The named admission diagnostic lists every omitted skeleton part and both blockers; no build starts. Use Build a rack bay for a supported live construction example. Historical full-build tests apply to their recorded source, not this layout. HYPOTHETICAL year build phase A (engine/scenarios/year-build.ts, YEAR_BUILD.md): mars-${YEAR_BUILD_YEAR} forked, the ${YEAR_BUILD_ASSEMBLY} removed, its 16 ft frames and 12 ft beams stacked in a pile yard beside it; a crew of six takes each piece off its stack, carries and raises the frames (held from behind), hangs the low beams from the ground, climbs the bracing to take the middle beams (2.48 m) handed up, and relays the top beams (4.76 m) up through two people lower on the frames. ${bays ? `First ${bays} bay (the suite's tranche).` : 'The whole house (recorded supported source: 552 steps, ~97 simulated minutes).'} Acceptance: every sequenced frame / beam installed within 1 cm / 1° of the checkpoint.`,
     prepare: prepareYearBuild,
     scene: (): SpatialScene => {
       if (!last) throw Error('year-build: build() first (the scene comes with the setup)');
@@ -92,13 +92,15 @@ function preset(name: string, bays: number | undefined, title: string, maxTicks:
     },
     humans: () => [],
     build: () => yearBuildRuntime(bays),
+    admission: (rt) => yearBuildSupportDiagnostic(infos.get(rt)!.setup.build),
     start: (rt) => sequenceOf(rt)!.advance(),
     tick: (rt) => {
+      if (yearBuildSupportDiagnostic(infos.get(rt)!.setup.build)) return;
       const r = sequenceOf(rt)!;
       r.poll();
       r.advance();
     },
-    done: (rt) => sequenceOf(rt)!.done,
+    done: (rt) => !!yearBuildSupportDiagnostic(infos.get(rt)!.setup.build) || sequenceOf(rt)!.done,
     maxTicks,
     get focus(): [number, number, number, number] {
       // the building from the south-east, the pile yard (+x side) in view
@@ -114,6 +116,11 @@ function preset(name: string, bays: number | undefined, title: string, maxTicks:
     expect: (rt): Check[] => {
       const r = sequenceOf(rt)!;
       const info = infos.get(rt)!;
+      const refusal = yearBuildSupportDiagnostic(info.setup.build);
+      if (refusal) return [
+        { ok: false, message: `${refusal.code}: ${refusal.message}` },
+        { ok: rt.records.size === 0 && rt.violations.length === 0, message: 'refused before acquiring resources or moving the crew' },
+      ];
       const bad = r.reports.filter((s) => s.status !== 'completed');
       const cmp = compareToCanonical(rt.world, info.setup.build);
       const off = cmp.filter((c) => !c.ok);
@@ -131,12 +138,12 @@ function preset(name: string, bays: number | undefined, title: string, maxTicks:
       const log = blockedLog(rt);
       return [
         `campus-${YEAR_BUILD_YEAR}.json fetch ${info.fetchMs.toFixed(0)} ms · setup (publish, graph, BOM, yard, sequence, bind) ${info.setupMs.toFixed(0)} ms`,
-        `${b.template.steps.length} steps · ${b.targets.length} parts to place · ${b.unplaced.length} unplaced (phase B / outside the tranche) · piles: ${b.entities.filter((e) => e.kind === 'fixture').length}`,
+        `${b.template.steps.length} planned steps · ${b.targets.length} sequenced parts · ${b.unplaced.length} unplaced; requested skeleton exclusions are checked before starting · piles: ${b.entities.filter((e) => e.kind === 'fixture').length}`,
         log.length ? `blocked / refused: ${log.map((l) => `${l.code} ×${l.n}`).join(', ')}` : 'blocked / refused: none so far',
       ];
     },
   };
 }
 
-export const yearBuild = preset('year-build-2022', 1, '2022 east-house: skeleton from piles (first bay)', 20 * 60 * 60);
-export const yearBuildHouse = preset('year-build-2022-house', undefined, '2022 east-house: skeleton from piles (whole house)', 20 * 60 * 240);
+export const yearBuild = preset('year-build-2022', 1, '2022 east-house: first bay (layout unsupported)', 20 * 60 * 60);
+export const yearBuildHouse = preset('year-build-2022-house', undefined, '2022 east-house: whole house (layout unsupported)', 20 * 60 * 240);

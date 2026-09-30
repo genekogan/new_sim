@@ -8,7 +8,7 @@ import { emptyWorld, human, addAll, component } from '../../engine/world/factory
 import { walkTo } from '../../engine/locomotion/walk.ts';
 import { clearanceAt } from '../../engine/spatial/grid.ts';
 import { nextRandom, seedRng } from '../../engine/core/rng.ts';
-import type { ActionDef } from '../../engine/actions/types.ts';
+import type { ActionDef, Diagnostic } from '../../engine/actions/types.ts';
 import type { Entity } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
 import type { CameraPose } from '../../engine/camera/shots.ts';
@@ -33,6 +33,8 @@ export type Scenario = {
   scene: () => SpatialScene;
   humans: (base: SpatialScene) => Entity[];
   start: (rt: Runtime) => void;
+  /** Read-only feasibility refusal before any scripted action acquires resources. */
+  admission?: (rt: Runtime) => Diagnostic | null;
   /** Called after every tick (scripted construction, stress re-targeting). */
   tick?: (rt: Runtime) => void;
   /** Never completes on its own (stress). */

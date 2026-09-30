@@ -19,7 +19,7 @@ import { TakePeople } from '../engine-view/take-replay.ts';
 import { TakeRecorder } from '../../engine/take/recorder.ts';
 import type { ChangeEvent, Take } from '../../engine/take/types.ts';
 import { blockedLog, yearBuildOf } from './year-build.ts';
-import { compareToCanonical } from '../../engine/scenarios/year-build.ts';
+import { compareToCanonical, yearBuildSupportDiagnostic } from '../../engine/scenarios/year-build.ts';
 import { Highlights, type HighlightOpts } from './highlight.ts';
 import type { WorldState } from '../../engine/world/types.ts';
 
@@ -156,6 +156,7 @@ export function installHook(view: LabView, notify: () => void) {
       for (const u of b.unplaced) reasons[u.reason.split(':')[0]] = (reasons[u.reason.split(':')[0]] ?? 0) + 1;
       return {
         bays: info.bays ?? null,
+        admission: yearBuildSupportDiagnostic(b),
         setupMs: +info.setupMs.toFixed(0),
         fetchMs: +info.fetchMs.toFixed(0),
         centre: info.centre,
