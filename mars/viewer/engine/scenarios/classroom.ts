@@ -3,6 +3,7 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import { emptyWorld, human, addAll, FIXTURE } from '../world/factory.ts';
+import { itemEntity, placeOnSlot, surfaceSlot } from '../items/model.ts';
 import type { ClassroomParams } from '../activities/index.ts';
 
 export function classroomScene(): SpatialScene {
@@ -25,8 +26,17 @@ export function classroomWorld(audienceCount: 4 | 8 = 4) {
   const w = addAll(emptyWorld('classroom', scene), ...chairs,
     fixture('screen', 'standing-display', 0, -7), fixture('lectern', 'speaker-lectern', 0, -4),
     fixture('workstation', 'computer-workstation', 6, -5), fixture('work-chair', 'camp-chair', 6, -6.2),
+    fixture('belongings-table', 'table-6ft', 10, -5),
     human('visitor', -7, 10), human('worker', 8, -6),
     ...actors.map((a, i) => human(a, (i - (actors.length - 1) / 2) * 1.15, 9)));
+  // A small usable object example; return slots are authored choices, not inferred history.
+  for (const [id, def, slot] of [['break-bowl', 'bowl', 'r0c1'], ['break-spoon', 'spoon', 'r0c2']]) {
+    const item = itemEntity(id, def, [0, 0, 0]);
+    const support = surfaceSlot(w, `belongings-table#${slot}`);
+    if ('code' in support) throw new Error(`${support.code}: ${support.message}`);
+    placeOnSlot(item, support, 0);
+    w.entities[id] = item;
+  }
   w.entities.screen.equipment = { kind: 'display', config: { available: true, mode: 'off', content: 'Lightning talks · hypothetical classroom' } };
   return w;
 }

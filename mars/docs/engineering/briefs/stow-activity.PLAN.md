@@ -1,5 +1,7 @@
 # Explicit stow / activity preparation feasibility
 
+Current bounded implementation: **surface slots only**, standing ground actors and fixed authored arrangements. The earlier ground opt-in proposal below is preserved as feasibility provenance and deferred until shared ground placement safety exists. Admission guards shipped in release 16. No meal preparation/eating or automatic next-activity handoff is claimed.
+
 Read-only source inspection: main `cb5ff57`, `<mars-campus-repo>`. Read AGENTS, ENGINE_GUIDE, SIMULATION_VISION, ACTIVE_ROADMAP and ITEMS. No dirty held-source bridge files accessed or changed; no browser, gate or paid calls.
 
 ## Smallest supported action
