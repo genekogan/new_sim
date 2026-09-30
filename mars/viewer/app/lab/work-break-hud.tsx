@@ -15,10 +15,14 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   const active = records.filter(r => rt.isActive(r.id));
   const work = readWorkstation(rt, B.work.station);
   const working = active.find(r => r.verb === 'work_at');
+  const workBusy = rt.holder(`actor:${B.work.actor}`).length > 0;
   const shared = active.find(r => r.verb === 'shared_food_break') ?? records.filter(r => r.verb === 'shared_food_break').at(-1);
   const sharedActive = !!shared && rt.isActive(shared.id);
   const sharedState = shared && readSharedFoodBreak(rt, shared.id);
-  const group = active.find(r => r.verb === 'converse');
+  const group = active.find(r => {
+    const members = (r.params as { actors?: string[] }).actors;
+    return r.verb === 'converse' && members?.length === B.people.length && B.people.every(p => members.includes(p.actor));
+  });
   const foodAction = active.find(r => ['take_item', 'serve', 'eat', 'stow_items', 'walk_to'].includes(r.verb) && (r.params as { actor?: string }).actor === actor);
   const busy = rt.holder(`actor:${actor}`).length > 0;
   const held = heldBy(rt.world, actor);
@@ -30,15 +34,16 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     <div className="lab-hud-head">HYPOTHETICAL · work and shared food · one continuing world</div>
     <ol>
       <li>Start notes, then interrupt after some progress. Wait for safe stand-up.</li>
+      <li>Use the classroom controls above: start the session, join worker, ask a question, watch both talks and conversations, and wait for departure.</li>
       <li>Start shared food break: both people take utensils, serve, gather, eat and return them.</li>
       <li>Stop anytime. After safe stopping, restart to use retained utensils and partial portions.</li>
       <li>When hands are free, resume the same notes. Individual food controls remain available below.</li>
     </ol>
     <div data-testid="break-work-readout">Notes: {'code' in work ? work.message : `${work.status} · ${work.task ?? 'Sketch notes'} · ${work.user ?? 'unassigned'} · ${work.elapsed.toFixed(1)}/${work.duration}s · ${work.phase ?? 'ready'}`}</div>
     <div className="lab-classroom-controls">
-      <button disabled={!!working || !('code' in work) && work.status === 'unfinished'} onClick={() => submit('work_at', B.work, 'Starting notes')}>Start notes</button>
+      <button disabled={workBusy || !!working || !('code' in work) && work.status === 'unfinished'} onClick={() => submit('work_at', B.work, 'Starting notes')}>Start notes</button>
       <button disabled={!working} onClick={() => working && response(rt.cancel(working.id), 'Stopping work safely; progress remains')}>Interrupt notes</button>
-      <button disabled={!!working || 'code' in work || work.status !== 'unfinished'} onClick={() => submit('work_at', { ...B.work, resume: true }, 'Returning to the same unfinished notes')}>Resume notes</button>
+      <button disabled={workBusy || !!working || 'code' in work || work.status !== 'unfinished'} onClick={() => submit('work_at', { ...B.work, resume: true }, 'Returning to the same unfinished notes')}>Resume notes</button>
     </div>
     <div className="lab-classroom-controls">
       <button data-testid="start-shared-food" disabled={sharedActive || B.people.some(p => rt.holder(`actor:${p.actor}`).length > 0)} onClick={() => submit('shared_food_break', { pot: B.pot, participants: B.people, at: B.conversation.at }, 'Both people begin a shared break through ordinary actions')}>Start shared food break</button>
