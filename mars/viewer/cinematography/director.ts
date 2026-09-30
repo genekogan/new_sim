@@ -111,7 +111,7 @@ export class Director {
   }
   request(): Request | undefined {
     const o = this.observation;
-    if (!o || this.operator) return;
+    if (!o || this.operator || this.shots.length === 0) return;
     return {
       session: this.session,
       version: o.semanticVersion,
@@ -147,6 +147,8 @@ export class Director {
       this.reset(o.session);
     this.observation = o;
     if (!Number.isFinite(o.aspect) || o.aspect < 0.25 || o.aspect > 4) {
+      this.shots = [];
+      this.external = undefined;
       const reason =
         'camera.aspect-unsupported: render aspect must be between 0.25 and 4';
       this.note(reason);

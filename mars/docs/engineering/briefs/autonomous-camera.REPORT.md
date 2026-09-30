@@ -170,3 +170,26 @@ Both typechecks and scoped/repo lint pass. Full engine recheck and new MP4 follo
 Gene’s direction: camera readiness does not block playable engine milestones.
 Owner is releasing engine-only improvements separately; reviewed camera commits
 will integrate at a convenient green boundary. No additional integration scope.
+
+## Correction checkpoint proof
+
+Corrected live runtime capture at `228b30b715f1015145a2dc4d222f2c1090f99671`:
+`viewer/e2e/artifacts/codex-autonomous-camera-clear-aspect/review.mp4`, 47.24 s,
+zero browser errors and camera diagnostics. 364 updates, mean 0.971 ms,
+p95 1.2 ms, max 12.6 ms. Actual canvas aspect 1.15 (the HUD consumes width),
+not the browser’s 1.6. Whole-clip frames and quarter-second cut samples inspected.
+Presenter/questioner/guest2 takeover/return/departure holds remain legible.
+`clear-aspect/before-after.mp4` compares prior director on left with corrected
+framing on right, using separate live executions. Portrait screenshot is in
+`codex-autonomous-camera-review-fixes/portrait-questioner.png`.
+
+Full engine correction gate: 625 total, 608 pass, zero fail, 6 skip, 11 TODO
+(70.55 s); 22 focused pass; browser 2/2; both typechecks and both lint scopes pass.
+A final nonvisual guard suppresses provider requests when no feasible candidates
+exist or aspect is unsupported; no API is consulted to repair an infeasible view.
+This guard does not change the supported-scene footage. Its final full engine recheck also passes: 608/625, zero failures (61.89 s), with the same 6 skips and 11 TODOs.
+
+No camera integration/release yet. Engine owner has reviewed additive checkpoint
+commits and retains the frozen interface/next green-boundary integration decision.
+Local review remains on http://127.0.0.1:5593/cinematography/review.html.
+No further paid calls; no camera helpers; no changes to engine release sequencing.

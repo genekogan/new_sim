@@ -395,6 +395,7 @@ void test('portrait render aspect fits both subjects and invalid aspect has a na
   const d = new Director();
   assert.match(d.update(invalid).reason, /aspect-unsupported/);
   assert.equal(d.pose, undefined);
+  assert.equal(d.request(), undefined);
 });
 void test('question pair uses the actual presenter when questioner owns the public floor', () => {
   const o = observation();
