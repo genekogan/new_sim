@@ -15,12 +15,12 @@ import { rendererColor } from './palette.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
 type Stack = { group: THREE.Group; count: number };
-type Screen = { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; key: string };
+type Screen = { geometry: THREE.PlaneGeometry; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; key: string };
 type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: number };
 const poseOf = (e: Entity): Pose => ({ p: [...e.pose.p], yaw: e.pose.yaw, pitch: e.pose.pitch ?? 0, roll: e.pose.roll ?? 0 });
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
-type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual };
+type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual; ownedGeometries?: THREE.BufferGeometry[] };
 
 /** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
 const DUNNAGE = 0.1;
@@ -140,10 +140,11 @@ export class FixtureViews {
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
-    const panel = new THREE.Mesh(this.keep(new THREE.PlaneGeometry(sx - 0.12, sy * 0.64 - 0.1)), material);
+    const geometry = new THREE.PlaneGeometry(sx - 0.12, sy * 0.64 - 0.1);
+    const panel = new THREE.Mesh(geometry, material);
     panel.position.set(0, sy * 0.68, sz * 0.29);
     g.add(panel);
-    v.screen = { canvas, texture, material, key: '' };
+    v.screen = { geometry, canvas, texture, material, key: '' };
     return g;
   }
 
@@ -279,7 +280,11 @@ export class FixtureViews {
     else if (e.def === 'standing-display') obj = this.standingDisplay(sx, sy, sz, v);
     else if (e.def === 'computer-workstation') { v.workstation = workstationObject(this.box.bind(this), sx, sy, sz, this.workstationAppearances[e.id]); obj = v.workstation.obj; }
     else if (e.def === 'speaker-lectern') obj = this.lectern(sx, sy, sz);
-    else if (e.def === 'table-6ft') obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
+    else if (e.def === 'table-6ft') {
+      obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
+      v.ownedGeometries = [];
+      obj.traverse(o => { if (o instanceof THREE.Mesh) v.ownedGeometries!.push(o.geometry); });
+    }
     else if (BUNDLES[e.def]) obj = this.stack(e, sx, sy, sz, v);
     else if (e.def === 'cutting-station') obj = this.cutting(sx, sy, sz, color);
     else obj = this.box(color, 0, 0, 0, sx, sy, sz);
@@ -305,7 +310,7 @@ export class FixtureViews {
   }
 
   clear() {
-    for (const v of this.views.values()) { v.fire?.dispose(); v.workstation?.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); }
+    for (const v of this.views.values()) { v.fire?.dispose(); v.workstation?.dispose(); v.screen?.geometry.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); v.ownedGeometries?.forEach(g => g.dispose()); }
     this.group.clear();
     this.views.clear();
   }
@@ -319,7 +324,7 @@ export class FixtureViews {
         if (v) {
           this.group.remove(v.obj);
           v.fire?.dispose(); v.workstation?.dispose();
-          v.screen?.texture.dispose(); v.screen?.material.dispose();
+          v.screen?.geometry.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); v.ownedGeometries?.forEach(g => g.dispose());
         }
         v = this.build(e);
         this.views.set(e.id, v);
@@ -340,7 +345,7 @@ export class FixtureViews {
       if (!world.entities[id]) {
         this.group.remove(v.obj);
         v.fire?.dispose(); v.workstation?.dispose();
-        v.screen?.texture.dispose(); v.screen?.material.dispose();
+        v.screen?.geometry.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); v.ownedGeometries?.forEach(g => g.dispose());
         this.views.delete(id);
       }
   }

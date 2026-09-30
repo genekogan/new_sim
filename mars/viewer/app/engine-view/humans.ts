@@ -32,6 +32,7 @@ import { handPoint, STATION_SLOT } from '../../engine/construction/liftcrew.ts';
 import { LIFT_HAND } from '../../engine/construction/raise.ts';
 import { DT } from '../../engine/runtime/runtime.ts';
 import { createRig, type Rig, type Template } from './people.ts';
+import { disposeSkeletons } from '../../lib/three-resources.ts';
 import { seatHeight } from './fixtures.ts';
 import { BODY_MODEL, UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, curlHand, legTo, legsOf, palm, place, setWorldQuat, smooth, spineOf, swing, turn, type Arm, type Leg, type Spine } from './rig.ts';
 import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
@@ -237,6 +238,7 @@ export class HumanViews {
     for (const v of this.views.values()) {
       v.rig.mixer.stopAllAction();
       v.rig.mixer.uncacheRoot(v.rig.model);
+      disposeSkeletons(v.rig.model);
     }
     this.views.clear();
     this.group.clear();
@@ -328,6 +330,9 @@ export class HumanViews {
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
+        v.rig.mixer.stopAllAction();
+        v.rig.mixer.uncacheRoot(v.rig.model);
+        disposeSkeletons(v.rig.model);
         this.group.remove(v.rig.holder);
         this.views.delete(id);
       }
@@ -472,6 +477,8 @@ export class HumanViews {
     for (const [id, v] of this.views)
       if (!seen.has(id)) {
         v.rig.mixer.stopAllAction();
+        v.rig.mixer.uncacheRoot(v.rig.model);
+        disposeSkeletons(v.rig.model);
         this.group.remove(v.rig.holder);
         this.views.delete(id);
       }

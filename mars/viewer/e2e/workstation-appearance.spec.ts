@@ -69,14 +69,20 @@ test('repeated imported-computer resets and switching worlds release old rendere
   await page.waitForFunction(() => window.__marsEngine.workstationAppearances()[0]?.status === 'ready');
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const baseline = await page.evaluate(() => window.__marsEngine.info());
+  const resets: typeof baseline[] = [];
   for (let i = 0; i < 3; i++) {
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
     await page.waitForFunction(() => window.__marsEngine.workstationAppearances()[0]?.status === 'ready');
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     const info = await page.evaluate(() => window.__marsEngine.info());
-    expect(info.geometries).toBeLessThanOrEqual(baseline.geometries);
-    expect(info.textures).toBeLessThanOrEqual(baseline.textures);
+    resets.push(info);
     expect(await page.evaluate(() => window.__marsEngine.violations())).toEqual([]);
+  }
+  for (const info of resets) {
+    const counts = (x: typeof baseline) => ({ geometries: x.geometries, textures: x.textures });
+    const detail = JSON.stringify({ baseline: counts(baseline), resets: resets.map(counts) });
+    expect(info.geometries, detail).toBeLessThanOrEqual(baseline.geometries);
+    expect(info.textures, detail).toBeLessThanOrEqual(baseline.textures);
   }
   await page.getByRole('combobox', { name: 'Scenario', exact: true }).selectOption('work-break-4');
   await expect(page.getByTestId('workstation-appearance')).toHaveCount(0);
