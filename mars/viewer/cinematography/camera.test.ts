@@ -6,6 +6,7 @@ import { feasibleShots } from './shots.ts';
 import { safePose, execute } from './physical.ts';
 import { Observer, cameraScene } from './observation.ts';
 import { replayFrame } from './replay.ts';
+import { JevProvider } from './jev-server.ts';
 import {
   classroomWorld,
   classroomScene,
@@ -325,4 +326,51 @@ void test('operator stillness pins a valid pose through moving semantic subjects
   next.subjects.a.p[0] += 1;
   d.update(next);
   assert.deepEqual(d.pose, pose);
+});
+void test('Jev reserves costs before overlapping calls and accounts unknown outcomes offline', async () => {
+  const original = globalThis.fetch;
+  let finish: ((response: Response) => void) | undefined;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+  };
+  try {
+    const provider = new JevProvider('mock-only', {
+      budgetUSD: 0.003,
+      maxCalls: 2,
+    });
+    const first = provider.choose(request(), new AbortController().signal);
+    await assert.rejects(
+      provider.choose(request(), new AbortController().signal),
+      /spending-cap/,
+    );
+    assert.equal(calls, 1);
+    finish!(
+      Response.json({
+        model: 'jev-1.13.0',
+        answers: { shot: { type: 'choice', choice: 'HOLD' } },
+        usage: { input_tokens: 100, output_tokens: 1 },
+      }),
+    );
+    await first;
+    assert.equal(provider.inputTokens, 100);
+    assert.equal(provider.reservedUSD, 0);
+    globalThis.fetch = async () => {
+      throw Error('offline simulated network error');
+    };
+    await assert.rejects(
+      provider.choose(request(), new AbortController().signal),
+    );
+    assert.equal(provider.reservedUSD, 0);
+    assert.ok(provider.costUSD > 0.0026);
+    await assert.rejects(
+      provider.choose(request(), new AbortController().signal),
+      /call-cap/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
 });
