@@ -25,3 +25,6 @@ export type { SharedFoodBreakParams, SharedFoodBreakReadout, SharedFoodParticipa
 
 export { PURPOSEFUL_ROUTINE_ACTIONS, purposefulRoutine, purposefulRoutineControl, readPurposefulRoutine } from './purposeful-routine.ts';
 export type { PurposefulRoutineParams, PurposefulRoutineControlParams, PurposefulRoutineReadout, RoutineMode } from './purposeful-routine.ts';
+
+export { GATHERING_CONTINUATION_ACTIONS, gatheringContinuation, gatheringContinuationControl, readGatheringContinuation } from './gathering-continuation.ts';
+export type { GatheringContinuationParams, GatheringContinuationControlParams, GatheringContinuationReadout, GatheringContinuationMode, WorkContinuationBinding, DiscussionContinuationBinding } from './gathering-continuation.ts';
