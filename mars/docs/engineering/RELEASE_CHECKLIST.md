@@ -802,7 +802,7 @@ WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 3b93cbd2-bc84-44
 
 Clean source **a4078c6** passed the full gate before local-main fast-forward. Live **284cdc8f-2d8c-4e73-a7f8-d058afe1727f**, created01:02:07Z/deployed01:02:10Z, confirmed100%. Rollback **c0522537-d4e4-4a64-9bd3-c52b711eecd4** (release14), confirmed before rollout. Metadata/evidence records the deployed source. Unrelated historical-agent working changes preserved; no remote, push, pins or golden changes.
 
-What works: late audience joining/rejoining during presentation/questions, a real seated computer workstation with visible task progress, safe interruption, classroom attendance or courtyard direction, and explicit return to the same unfinished task. Quiet seated work/reading is supported; typing animation is not claimed. Ground-floor fixed arrangements, one available spare audience seat, at most12 distinct lifetime audience members, audience-only joining; held items refuse. Active activity snapshots remain explicitly nonresumable. Broader autonomy, furnishing edits, precise hand expression and take-replay head attention remain deferred.
+What works: late audience joining/rejoining during presentation/questions, a real seated computer workstation with visible task progress, safe interruption, classroom attendance or courtyard direction, and explicit return to the same unfinished task. Quiet seated work/reading is supported; typing animation is not claimed. Ground-floor fixed arrangements, one available spare audience seat, at most12 distinct lifetime audience members, audience-only joining; construction holds refuse. A subsequent review found small in-hand items were not separately refused; correction is pending the next green milestone. Active activity snapshots remain explicitly nonresumable. Broader autonomy, furnishing edits, precise hand expression and take-replay head attention remain deferred.
 
 Original LAST_MILE accounting stays **38 fixed /36 reclassified /142 remaining**; all216 IDs remain recoverable. These narrower capabilities do not close broad original requirements.
 
@@ -818,7 +818,7 @@ Original LAST_MILE accounting stays **38 fixed /36 reclassified /142 remaining**
 | Idle performance |original limits pass: exact peak112.619ms/mean0.714948ms; corridor54.360ms/0.582276ms; grids111.5–198.7ms; zero violations,pinned outcomes |
 | Regenerated evidence |586/0;17 rows PROVEN,8 milestones PROVEN; capabilities25/2/1 retain documented exceptions |
 
-Skipped/TODO cases are not counted as executed proof. Focused valid/invalid tests cover joining eligibility, occupied seats, held objects, cancellation/resource cleanup, directive precedence and task identity/elapsed continuation. No test thresholds or baselines changed.
+Skipped/TODO cases are not counted as executed proof. Focused valid/invalid tests cover joining eligibility, occupied seats, construction holds, cancellation/resource cleanup, directive precedence and task identity/elapsed continuation. No test thresholds or baselines changed.
 
 Build/dry-run passed:340 public files/821.1MiB,eight large objects already uploaded,zero R2 writes;6912.20KiB/1241.14KiB gzip. Rollout uploaded21 assets(343 existing),startup125ms. Existing chunk-size/dynamic-import warnings remain; no new DO migration.
 

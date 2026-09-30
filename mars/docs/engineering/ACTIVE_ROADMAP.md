@@ -11,10 +11,11 @@ simple configurable maps; historical Studio remains the museum side.
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Shared floor and attention in smaller conversations | GPT-6.1 Sol implementation; lead review | Distinct stable turns only after physical gathering; departure/cancel clears floor, unchanged body poses | Tested31d995c/e82d243; next combined gate, no generated dialogue/gesture expansion |
-| Read-only observation/reset and validated render camera | Lead; camera task owns policies | Same-tick reset identity; cached detached geometry tracks furniture, actor-only changes do not invalidate; invalid FOV atomic refusal | Tested d98d9e5; next combined gate, no competing world controller |
-| Optional camera integration | Separate camera task; lead integration/deploy | Genuine live intervention, manual control precedence, safe fallback and captured policies, offline tests in normal gate | Dedicated branch/report; production entry wiring and critical review required |
-| Next playable world increment | Lead after the above batch | Narrow classroom rearrangement or work/break/meal continuity, using existing physical actions | Choose directly enabling gaps; no universal needs/editor redesign |
+| Shared floor and small-item admission | GPT-6.1 Sol bounded implementation; lead release | Formed groups have stable turns; departures/cancellation clear attention; classroom/work refuse small held items without changing support | Independent engine release candidate; full gate before merge |
+| Frozen read-only camera interface | Lead hooks; camera task policies | Same-tick reset identity, detached cached geometry, atomic finite render pose/FOV | Engine candidate contains hooks; camera readiness does not block release |
+| Explicit preparation for the next activity | GPT-6.1 Sol ordinary implementation after current gate | Approved item destinations, physical put_item children, coherent cancellation, clear remaining hands | Surface-slot reservation prerequisite; bounded plan in briefs/stow-activity.PLAN.md |
+| Optional camera integration | Separate camera task; lead convenient integration boundary | Reviewed paused/aspect/provider corrections, same-world optional controls, offline and runtime proof | Preserved codex/classroom-social-camera; camera experiments/MP4 remain camera-owned |
+
 
 ## First supported experience
 
@@ -76,3 +77,8 @@ Gene launched a separate autonomous-camera task owning live cinematography/edito
 Camera brief (pending its own commit/integration): `<mars-worktrees>/autonomous-camera/docs/engineering/briefs/autonomous-camera.md`. Ownership: new `viewer/cinematography/**`, `viewer/app/camera-lab/**`, camera-specific spec/brief/report. Existing Lab hooks suffice for early demos; richer callback/FOV changes require a bounded shared agreement. Snapshot adapter/policy derivation stays camera-owned; activity task supplies small read-only hooks when needed.
 
 Release15 selects coordinator2fc68a6 + workstation2a3e90f + UI fb36339 with provenance. Three focused browser journeys pass; lead inspected unobscured seated/resumed work and late visitor seating. Activities revision2 invalidates old bound plans through normal rebind rules; no physical golden change.
+
+Current engine-only release candidate: `codex/classroom-floor-release`, based on verified
+release15 metadata cb5ff57. It selects group floors/questioner readout and frozen camera
+hooks without camera implementation/UI/build changes. Small held-item admission correction2835abb is selected and focused-tested; combined full gate is pending. Camera integration remains preserved separately
+and will join a convenient green boundary after review; it is not a release dependency.
