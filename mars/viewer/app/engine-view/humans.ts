@@ -1298,7 +1298,8 @@ const _m = new THREE.Matrix4(), _mi = new THREE.Matrix4(), _qb = new THREE.Quate
  */
 function slotPoint(e: Entity, slot: string, from: THREE.Vector3, floor: number, out: THREE.Vector3): boolean | undefined {
   if (slot === STATION_SLOT) return false;
-  const authored = CATALOG[e.def]?.capabilities?.fixtureCarry?.handling.grips[1]?.find((g) => g.id === slot);
+  const grips = CATALOG[e.def]?.capabilities?.fixtureCarry?.handling.grips;
+  const authored = grips && Object.values(grips).flat().find((g) => g.id === slot);
   if (authored) {
     const span = authored.span ?? [0, 0, 0];
     const end = (sign: number) => new THREE.Vector3(...toWorld(e.pose, [authored.local[0] + sign * span[0], authored.local[1] + sign * span[1], authored.local[2] + sign * span[2]]));

@@ -1,3 +1,4 @@
+import { TableMoveHud } from './table-move-hud.tsx';
 import { FixtureMoveHud } from './fixture-move-hud.tsx';
 import { BelongingsHud } from './belongings-hud.tsx';
 import { useState } from 'react';
@@ -61,6 +62,7 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     </div>
     <BelongingsHud sim={sim} actor={actor} refresh={refresh} />
     <FixtureMoveHud sim={sim} actor={actor} refresh={refresh} />
+    <TableMoveHud sim={sim} actor={actor} refresh={refresh} />
     {state?.groups.length ? <div data-testid="conversation-floors">{state.groups.map((g) => <div key={g.action}>{g.members.join(', ')} · {g.status} · Floor: <b>{g.floorHolder ?? '—'}</b></div>)}</div> : null}
     <div role="status" data-testid="classroom-feedback">{feedback}</div>
     {joining && <div role="status">{actor} is joining: wait for actual seating before asking a question.</div>}

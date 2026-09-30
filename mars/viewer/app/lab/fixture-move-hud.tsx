@@ -25,6 +25,6 @@ export function FixtureMoveHud({ sim, actor, refresh }: { sim: LabSim; actor: st
     </div>
     <div role="status" data-testid="fixture-move-progress">{state && <>Chair: {state.status} · {state.phase} · {state.held ? 'held by carrier' : 'supported on ground'}{state.stopping && ' · stopping safely'}{state.waitingReason && ` · ${state.waitingReason}`}{state.diagnostic && ` · ${state.diagnostic.code}`}</>}</div>
     <div role="status" data-testid="fixture-move-feedback">{feedback}</div>
-    <small>Choose a free standing carrier. Empty, unreserved chair only; occupied chairs and held belongings refuse. After set-down, direct the carrier to the courtyard to clear later gathering positions. A new arrival uses the chair where it was placed. Tables and active reserved-seat rearrangement follow later.</small>
+    <small>Choose a free standing carrier. Empty, unreserved chair only; occupied chairs and held belongings refuse. After set-down, direct the carrier to the courtyard to clear later gathering positions. A new arrival uses the chair where it was placed. Active reserved-seat rearrangement is not supported.</small>
   </div>;
 }
