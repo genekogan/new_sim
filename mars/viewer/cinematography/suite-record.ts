@@ -190,7 +190,7 @@ presentation('presentation');
           departing: [],
         };
     },
-    note: 'Actual registered computer_work and workstation readout. Other classroom actors idle; no parallel task model.',
+    note: 'Actual registered work_at and workstation readout. Other classroom actors idle; no parallel task model.',
   });
 }
 {

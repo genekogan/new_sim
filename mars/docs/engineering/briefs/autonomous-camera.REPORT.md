@@ -314,3 +314,38 @@ without weakening placement/readability or expanding the interface. Estimate
 frozen hooks; no estimate of universal camera completion. No engine blocker.
 This checkpoint used roughly 45 minutes of active development/verification after
 the previous suite setup; approximate token accounting is unavailable.
+
+## 2026-09-29 — production tour packaging
+
+Engine owner requested this bounded packaging for Gene's bleeding-edge combined
+checkpoint. `codex/autonomous-camera-next` remains frozen at c1c9b11; this separate
+`codex/autonomous-camera-tour` commit changes only camera-owned files. Base remains
+ab85a15. No helpers, paid calls, new policies or MP4 generation.
+
+Replay loads `/camera-demo/suite.json`, has visible scenario/Play/Pause/Restart
+controls and direct `?case=` selection. Scenario changes pause/reset and dispose
+old scene resources. Abort-based cleanup removes control listeners and disables
+controls. Responsive layout keeps controls separate on narrow screens. Missing
+public data produces an explicit unavailable message. Labels retain recorded
+REPLAY, world-time/provenance, fixture notes and defects; workstation caption now
+names the actual registered work_at action. Live review adds Continuous following
+alongside clear/restrained; source policy behavior is unchanged.
+
+Camera browser 3/3 pass (28.2s), including actual public URL loading, active-clock
+pause, restart, scenario change/play, and continuous controller replacement on
+classroom8. New screenshot production-tour-controls.png in ignored
+codex-autonomous-camera-tour-final was inspected: controls and both policy panels
+are legible. Repo/explicit camera TSc and scoped lint pass. Full engine unchanged:
+692 total/675 pass/zero fail/6skip/11TODO (74.64s); all pins unchanged. Initial
+selector test raced controller replacement; wait now requires its first new
+continuous frame before the existing classroom8 membership assertion.
+
+Fresh e2e calls the owner's deploy/prepare-camera-demo.mjs when present; isolated
+camera branches use an explicit legacy recorder/copy fallback because that shared
+build file does not exist here. No browser request mocking. The owner packages
+Vite HTML input, generator, ignored public data, release staging and shared tour
+links; no tracked large data. Combined gate, production verification and release
+remain theirs. Camera packaging is locally implemented/inspected/tested, not yet
+integrated/released. Existing footage/policy defects from the preceding checkpoint
+remain applicable. No shared-interface blocker. Roughly 15 minutes for this batch;
+remaining production work is the owner's combined gate/staging/deployment.

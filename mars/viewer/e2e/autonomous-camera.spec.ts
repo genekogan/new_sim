@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { EngineHook } from '../app/lab/hook.ts';
@@ -10,7 +10,7 @@ declare global {
       ready: boolean;
       play: () => void;
       seek: (time: number) => void;
-      state: () => { time: number; index: number };
+      state: () => { time: number; index: number; playing: boolean };
       dispose: () => void;
     };
     __marsEngine: EngineHook;
@@ -25,15 +25,28 @@ test('varied replay suite starts safely and renders every scenario with sustaine
   page,
 }) => {
   test.setTimeout(90000);
-  execFileSync(process.execPath, ['cinematography/suite-record.ts'], {
-    timeout: 60000,
-    stdio: 'pipe',
-  });
+  const prepare = 'deploy/prepare-camera-demo.mjs';
+  execFileSync(
+    process.execPath,
+    [existsSync(prepare) ? prepare : 'cinematography/suite-record.ts'],
+    {
+      timeout: 60000,
+      stdio: 'pipe',
+    },
+  );
+  // Standalone camera branches predate the owner's production build generator.
+  if (!existsSync(prepare)) {
+    mkdirSync('public/camera-demo', { recursive: true });
+    copyFileSync(
+      'e2e/artifacts/codex-autonomous-camera-suite/suite.json',
+      'public/camera-demo/suite.json',
+    );
+  }
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/app/camera-lab/suite.html');
   await page.waitForFunction(() => window.__cameraSuite?.ready);
-  await page.evaluate(() => window.__cameraSuite.play());
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.waitForTimeout(100);
   expect(
     await page.evaluate(() => window.__cameraSuite.state().time),
@@ -45,6 +58,36 @@ test('varied replay suite starts safely and renders every scenario with sustaine
       i,
     );
   }
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.waitForTimeout(120);
+  expect(await page.evaluate(() => window.__cameraSuite.state().playing)).toBe(
+    true,
+  );
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const paused = await page.evaluate(() => window.__cameraSuite.state().time);
+  await page.waitForTimeout(120);
+  expect(await page.evaluate(() => window.__cameraSuite.state().time)).toBe(
+    paused,
+  );
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  expect(
+    await page.evaluate(() => window.__cameraSuite.state().time),
+  ).toBeLessThan(1);
+  await page
+    .getByRole('combobox', { name: 'Replay scenario' })
+    .selectOption('workstation');
+  await expect(page.locator('#title')).toContainText('workstation');
+  expect(await page.evaluate(() => window.__cameraSuite.state().playing)).toBe(
+    false,
+  );
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.waitForTimeout(120);
+  expect(
+    await page.evaluate(() => window.__cameraSuite.state().time),
+  ).toBeGreaterThan(0);
+  await page.screenshot({
+    path: path.join(artifacts, 'production-tour-controls.png'),
+  });
   expect(errors).toEqual([]);
   await page.evaluate(() => window.__cameraSuite.dispose());
 });
@@ -63,6 +106,14 @@ test('review entry honors classroom-8 and keeps Jev local-only', async ({
   );
   await expect(page.locator('#jev')).toBeDisabled();
   await expect(page.locator('#jev-control')).toBeHidden();
+  await page
+    .getByRole('combobox', { name: 'Camera policy' })
+    .selectOption('continuous');
+  await page.waitForFunction(
+    () =>
+      window.__cameraReview?.report().policy === 'continuous' &&
+      window.__cameraReview.report().frames.length > 0,
+  );
   await expect(page.locator('small')).toContainText(
     'observational camera prototype',
   );

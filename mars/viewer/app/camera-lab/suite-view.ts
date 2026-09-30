@@ -1,4 +1,4 @@
-// Development-only comparison. Same actual recorded world in both viewports.
+// Recorded comparison. Same actual world take in both viewports; no live simulation or API.
 import * as THREE from 'three';
 import { TakePeople } from '../engine-view/take-replay.ts';
 import { loadTemplates } from '../engine-view/people.ts';
@@ -7,9 +7,15 @@ import { replayFrame } from '../../cinematography/replay.ts';
 import type { ProgramFrame } from '../../cinematography/replay.ts';
 import type { Observation, Policy } from '../../cinematography/types.ts';
 import type { Take } from '../../engine/take/types.ts';
-const data = (await (
-  await fetch('/e2e/artifacts/codex-autonomous-camera-suite/suite.json')
-).json()) as {
+const response = await fetch('/camera-demo/suite.json');
+if (!response.ok) {
+  document.querySelector('#title')!.textContent =
+    'Recorded camera tour unavailable';
+  document.querySelector('#status')!.textContent =
+    'This build is missing the recorded demo data. Live camera controls remain available in the Lab.';
+  throw new Error('camera.demo-data-unavailable');
+}
+const data = (await response.json()) as {
   branch: string;
   commit: string;
   cases: {
@@ -36,9 +42,20 @@ renderer.toneMappingExposure = 0.95;
 document.body.appendChild(renderer.domElement);
 const query = new URLSearchParams(location.search),
   single = query.get('case');
-const selected = single
-  ? data.cases.filter((c) => c.id === single)
-  : data.cases;
+let selected =
+  single && data.cases.some((c) => c.id === single)
+    ? data.cases.filter((c) => c.id === single)
+    : data.cases;
+const scenarioControl = document.querySelector(
+  '#scenario',
+) as unknown as HTMLSelectElement;
+for (const c of data.cases) {
+  const option = document.createElement('option');
+  option.value = c.id;
+  option.textContent = c.label;
+  scenarioControl.appendChild(option);
+}
+scenarioControl.value = selected.length === 1 ? selected[0].id : 'all';
 let index = -1,
   time = 0,
   start = 0,
@@ -179,8 +196,12 @@ draw();
 const hook = {
   ready: true,
   play() {
+    if (time >= selected.length * 15 - 0.001) time = 0;
     start = performance.now() - time * 1000;
     playing = true;
+  },
+  pause() {
+    playing = false;
   },
   seek(t: number) {
     playing = false;
@@ -195,7 +216,45 @@ const hook = {
     abort.abort();
     resources.dispose();
     renderer.dispose();
+    document.querySelectorAll('[data-replay-control]').forEach((control) => {
+      (control as unknown as HTMLButtonElement).disabled = true;
+    });
   },
 };
 (window as unknown as { __cameraSuite: typeof hook }).__cameraSuite = hook;
+document
+  .querySelector('#play')!
+  .addEventListener('click', () => hook.play(), { signal: abort.signal });
+document
+  .querySelector('#pause')!
+  .addEventListener('click', () => hook.pause(), { signal: abort.signal });
+document.querySelector('#restart')!.addEventListener(
+  'click',
+  () => {
+    hook.seek(0);
+    hook.play();
+  },
+  { signal: abort.signal },
+);
+scenarioControl.addEventListener(
+  'change',
+  () => {
+    hook.pause();
+    selected =
+      scenarioControl.value === 'all'
+        ? data.cases
+        : data.cases.filter((c) => c.id === scenarioControl.value);
+    disposeViews();
+    index = -1;
+    hook.seek(0);
+    const url = new URL(location.href);
+    if (scenarioControl.value === 'all') url.searchParams.delete('case');
+    else url.searchParams.set('case', scenarioControl.value);
+    history.replaceState(null, '', url);
+  },
+  { signal: abort.signal },
+);
+document.querySelectorAll('[data-replay-control]').forEach((control) => {
+  (control as unknown as HTMLButtonElement).disabled = false;
+});
 window.addEventListener('beforeunload', () => hook.dispose());
