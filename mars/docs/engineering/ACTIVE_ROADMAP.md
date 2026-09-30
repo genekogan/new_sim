@@ -133,3 +133,12 @@ release and deployed verification (or exact explicit unsupported-layout contract
 Then continue purposeful communal-day routines without a further priority interview;
 owner approval resolves the previous pending choice. Keep routines / usable objects /
 social expression advancing together and retain the subsequent non-Mars reuse milestone.
+
+
+## Latest released checkpoint: 23 / next playable intent
+
+The exposed Lab repair milestone is deployed and verified as `d88e1112-a018-4f08-9ed0-350c6f0b63ee` from clean `cb37603`. Reach is a valid still-world renderer probe; synthetic poses are detached. Rejected staging no longer emits orphan climbs/material acquisitions. Rack piles share their component palette. Current 2022 first-bay/whole-house completion remains unsupported (3/9 staging exclusions), explicitly declined before actions; exact supported historical full completion is separately required and passes. See LIVE_LAB_REPAIRS for causes, coverage/exclusions and production proof.
+
+Active deliverable: **participate in a bound gathering, then finish the same interrupted Sketch notes** across default 4-guest and physically prepared side 8-guest rooms. Build one small registered intent coordinator using existing classroom, food, sit/stand and work actions. Stable bindings, visible obligations/waits, owned-child cleanup, independent-direction precedence and explicit pause/resume; no global actor reservation, second mover, universal activity language, needs or sleep. Start may require the existing notes already unfinished and worker safely released; keep that scope honest.
+
+Exit: real seating/question/presenter rotation/conversation/departure → actual food/utensil returns → bounded quiet rest/get-up → same notes completed, with representative live interventions and missing-resource diagnostics, no duplicated meal or leaked claims, reproducible state, inspected captures, full green gate and deployed proof. Empty-after-eating must not be interpreted as never-served on resume. Estimated **6–12 remaining working hours**, assuming existing cleanup/ownership APIs suffice; escalate before any shared cancellation or persistence redesign. Continue usable objects/social expression alongside the coherent journey, then reuse mechanisms in a small non-Mars setting. Original inventory counts remain supporting history, not the active completion queue.

@@ -5,14 +5,14 @@ purposeful communal-day routines; it does not restore LAST_MILE queue ordering.
 
 | ID | Reproduced cause | Repair and coverage contract | Status |
 | --- | --- | --- | --- |
-| PROBE-01 | Tick1: b0/b1/b2 at x13.8 overlap deck edge (0.15m clearance); g2 at15.2,10 overlaps stairs-b-body (0m). Initial tick0 never ran invariants. Existing pose sweeps never pressed Step. | Valid initial placements; normal Step/Play/reset; detached synthetic measurement poses must not mutate authoritative world. | Candidate, unreleased |
-| BUILD-01 | Planner emits beam take/climbs before staging feasibility; rejected beam leaves m4/m5 on orphan stances, then s0021 attempts another climb. | Preflight before any acquisition/climb. Current layout has9 blocked whole-house beams /3 first-bay beams. Preserve admission and collision checks; expose named unsupported-layout diagnostic if no supported choreography exists. | Candidate, unreleased |
-| PILE-01 | Aggregate uprights use catalog blue, extracted components use shared renderer frame palette. Count decreases when extraction completes and individual identity begins; no evidence of duplicate authoritative stock. | Shared renderer palette without historical-value edits. Validate count conservation, provenance and persistent identity/support through pickup/install. Extraction is currently an unanimated aggregate-to-individual transition, not individual pre-existing stack entities. | Candidate, unreleased |
+| PROBE-01 | Tick1: b0/b1/b2 at x13.8 overlap deck edge (0.15m clearance); g2 at15.2,10 overlaps stairs-b-body (0m). Initial tick0 never ran invariants. Existing pose sweeps never pressed Step. | Valid initial placements; normal Step/Play/reset; detached synthetic measurement poses must not mutate authoritative world. | Released in 23 |
+| BUILD-01 | Planner emits beam take/climbs before staging feasibility; rejected beam leaves m4/m5 on orphan stances, then s0021 attempts another climb. | Preflight before any acquisition/climb. Current layout has9 blocked whole-house beams /3 first-bay beams. Preserve admission and collision checks; expose named unsupported-layout diagnostic if no supported choreography exists. | Released orphan-climb repair; current layout unsupported |
+| PILE-01 | Aggregate uprights use catalog blue, extracted components use shared renderer frame palette. Count decreases when extraction completes and individual identity begins; no evidence of duplicate authoritative stock. | Shared renderer palette without historical-value edits. Validate count conservation, provenance and persistent identity/support through pickup/install. Extraction is currently an unanimated aggregate-to-individual transition, not individual pre-existing stack entities. | Released palette/identity proof; pull animation deferred |
 
 Original production reproduction: release22, viewer/e2e/artifacts/live-reported-original
 (ignored proof bundle). Body fresh/reset/first-Step and house s0021 captured.
 Exact diagnostics and preceding action/support snapshots are retained as JSON.
-Automatic-play verification remains required, distinct from programmatic stepping.
+Automatic Play reproduction and deployed control verification are recorded below, separately from programmatic stepping.
 
 ## Coverage honesty
 
@@ -27,7 +27,7 @@ layout. Do not discard old fidelity requirements or silently repin them.
 
 No historical colors/placement facts, golden tolerances or geometry admission rules
 may change to conceal these failures. Worker reports under engineering briefs retain
-exact sources, tests and limitations. Release verification will update this document.
+exact sources, tests and limitations. The release-23 verification below is the current checkpoint.
 
 ## Bounded limitation retained
 
@@ -46,7 +46,7 @@ retains the running transport state. The original failure artifacts are preserve
 a paused reset via runScenario followed by the actual Play button is separately
 recorded. No test threshold or expected outcome changed to conceal that harness error.
 
-## Focused inspected checkpoint
+## Focused inspected checkpoint (before full gate)
 
 Reach3Node +3browser checks pass, including unchanged body measurement sweep;
 root inspected fresh first-Step and synthetic measurement PNGs. Pile4browser checks
@@ -96,3 +96,14 @@ harness mistake; source was unchanged by that failed attempt.
 ## Full gate watchdog evidence
 
 The clean `3108f08` full gate report `viewer/.cloudflare/gate/2026-09-30T15-56-10-034Z/report.json` remains RED: lint, 99 unit tests, 797 engine tests (6 documented skips, 11 TODO), and both TypeScript configurations passed; E2E timed out after exactly 1,200 seconds after passing case 116, with no test failure logged. Later flagship/probe/MCP stages did not execute; cleanupError: null. The suite now has 133 cases versus 123 at release 22, including the required full historical build. Raise only the whole serialized-suite watchdog from 20 to 25 minutes so all required checks can execute. Individual test deadlines, performance ceilings, assertions, pixel tolerances, expected outcomes and original baselines are unchanged. This is validation-capacity maintenance, not proof of a green result; repeat the entire clean gate before integration. No engine pin movement.
+
+
+## Release 23 — deployed and verified
+
+Live version `d88e1112-a018-4f08-9ed0-350c6f0b63ee`, source `cb376037d3b63173cda30a9642ad18e8d9076cff`; rollback release 22. Clean full gate `viewer/.cloudflare/gate/2026-09-30T16-20-40-253Z/report.json`: 99 unit /797 engine passes, 6 engine skips and 11 TODO; 126 browser passes /7 skips; lint, both TypeScript configurations, flagship, unchanged determinism probe and all 36 MCP tools pass. Required historical full build completes all 66 parts in 117277 ticks with unchanged hash and clean crew. This does not establish current-layout completion. Browser suite took 1225.6 seconds (20.4 minutes), exceeding the original 1200-second aggregate watchdog while preserving every individual deadline/assertion/performance ceiling. Both prior red reports are retained. Original idle performance ceilings pass; evidence records 17 rows /8 milestones proven with existing exclusions, not all selectable scenarios supported.
+
+Production focused browser checks: **5 passed in 34.4 seconds**, including Reach Step/Reset/Play and synthetic state nonmutation, supported rack-bay identity/support lifecycle, and actual controls on both current declined house layouts. Fresh direct-URL audit: **3 journeys passed**, zero violations and console/page errors; body initially auto-validates the still world, Reset gives tick 0, first Step tick 1 and Play tick 20. House initial/reset tick 0; **manual Step validates tick 1 without dispatching construction**, and Play leaves the declined world at that tick. Actors, stock and empty action records remain unchanged; all 3/9 named staging exclusions remain visible. Do not describe manual Step as freezing the clock at zero.
+
+An extra audit initially asserted the wrong clock contract (0 rather than 1 after manual Step); its script/log and partial captures are preserved under `viewer/.cloudflare/repair-failures/prod-fresh-clock-assumption`. No source behavior or existing regression changed. Final captures wait for the rendered HUD tick after backend completion, avoiding a stale-frame screenshot. Root personally inspected 12 production PNGs covering repaired Reach, current refusal/pile appearance, rack-bay lifecycle and existing compiled camera/bay. Proof bundles: `viewer/e2e/artifacts/prod-repair-23`, `prod-repair-23-fresh-3` and release helper `prod-smoke-23`. All earlier attempts and original worktree copies remain.
+
+BUILD-02 off-axis staging/delivery and continuous aggregate extraction remain explicit unfinished limitations. No historical placement/color values, engine state pins, tolerances or original image baselines changed. Purposeful communal-day routines resume after this milestone; no further priority interview is pending.
