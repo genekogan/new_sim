@@ -1,21 +1,20 @@
 # Active roadmap
 
 Owner direction: [SIMULATION_VISION.md](SIMULATION_VISION.md), 2026-09-29.
-Current product milestone: **a playable classroom that becomes lightning talks,
-questions and smaller conversations**. Preferences confirmed: semi-planned events with adaptable execution and live
+Current product milestone: **connect the usable classroom to work → shared food → return to unfinished work**. The released classroom already supports lightning talks, questions and smaller conversations. Preferences confirmed: semi-planned events with adaptable execution and live
 intervention; advance complete experiences / activity-object breadth / social
 believability together at approximately **50 /30 /20**. Continue in **/lab** with
 simple configurable maps; historical Studio remains the museum side.
 
 ## Small active queue
 
-Gene's next priority, confirmed after release17: **physical chair/table moving and usable room setup first**. Develop this alongside existing classroom continuity and visible social behavior; no universal furnishing language up front.
+Gene's priority after release17 was **physical chair/table moving and usable room setup first**. The bounded tranche is integrated after a clean full gate at1eee5c6 and deployed as release19; production browser22/22 and inspected setup/social captures pass. Continue the surrounding life/activity experience rather than expanding furniture fidelity. Production camera/build-bay checks also pass; the release record is in RELEASE_CHECKLIST19.
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Bounded usable room setup | Lead app integration; GPT-6.1 Sol medium engine candidate | Explicit default/side layout runs registered table/chair actions; stop safely, preserve partial placements; two room sizes complete talks/questions/conversations after setup | Engine candidate24 focused checks and UI journeys2/2 green; inspected runtime captures; combined full gate pending. Stop if a layout optimizer or claims redesign becomes necessary |
-| Classroom continuity and social use of the new layout | Lead alongside setup | Late arrival uses moved seat; questions/rotation and smaller conversations remain coherent; returned objects use relocated table | No automatic global restart or occupied furniture transport |
-| Camera independent continuation | Separate camera owner | Camera-only policies/tests/MP4 on its branch; small read-only interfaces remain stable | Never a dependency of physical room setup; batch reviewed compatible commits at a convenient green boundary |
+| Same-world shared food break | GPT-6.1 Sol medium coordinator; lead Lab integration | One intent binds two people/items/service points; ordinary actions serve, gather, eat and return utensils; partial-food/held-item retry and safe stop; interrupted notes remain unchanged | Authored binding6/6 focused + timed-command replay/TSc/lint pass. Explicit live UI2/2 journeys pass with six inspected serving/eating/resumed-work captures; one-command coordinator remains a separate unreleased candidate. Stop if shared Runtime/item redesign or general scheduling becomes necessary |
+| Continuity and visible social use | Lead alongside food activity | Two room sizes preserve the same world/user/task/elapsed work; inspect actual serving/eating/return; floor/attention turns only among the actually formed group; intervention leaves coherent partial state | No autonomous day scheduler, arbitrary seating optimizer, nutritional model or fine finger certification |
+
 
 Physical design/provenance: `briefs/fixture-mover.PLAN.md`. Alternative seat-withdrawal analysis remains recoverable in `briefs/classroom-furniture-feasibility.PLAN.md`; it is deferred in favor of Gene's physical-movement choice, not implemented or completed.
 
@@ -49,7 +48,7 @@ captures to assess shared attention and pacing.
 
 ## Current baseline and preserved work
 
-Release18 source **b2928ef** passed the full clean-head gate and is merged/deployed as `4e77562e-9dc4-4f76-890b-22bc188d8ed7`. Production verification is recorded in RELEASE_CHECKLIST18. It adds physical spare-chair and cleared-table movement, discoverable classroom quick tour, reviewed camera policies and explicitly recorded six-scene comparison. Rollback is release17 `7b809dd0-7655-4192-b968-5eb35d83df40`. Original accounting remains38 fixed /36 reclassified /142 remaining; unrelated historical-agent changes remain preserved.
+Release19 source **1eee5c6** passed the full clean-head gate and is merged/deployed as `ce6daf22-caa7-4698-8b28-6b2a2935b7d3`. It adds registered physical default/side room setup, safe stop/draining/partial state and usable moved seating/table surfaces. Release18 supplies the chair/table mechanics, quick tour and reviewed camera checkpoint. Rollback is release18 `4e77562e-9dc4-4f76-890b-22bc188d8ed7`. Original accounting remains38 fixed /36 reclassified /142 remaining; unrelated historical-agent changes remain preserved.
 
 The old combined technical candidate remains on `codex/wave2-consolidation` at `ec3aa6f`, with unresolved baseline/construction failures; it is not a green release. The studio-integration checkout hosts the clean classroom branch. Useful compatible work is selected with explicit provenance rather than making specialized construction fidelity a classroom dependency.
 
@@ -78,9 +77,9 @@ needs/interests/relationships and additional assets only as those experiences de
 
 Two hypothetical /lab arrangements support audience joining/return, presenter questions/rotation, conversations/departure, usable computer work state and explicit interrupted-task return. Same user/task/30-second duration and elapsed progress persist. Actors physically return one or two held bowl/spoon items to approved table slots before explicitly resuming work or joining. Safe cancellation exposes remaining held objects; no automatic chaining, ground fallback or eating claim.
 
-Release18 full gate: unit99/0, engine745/0 (6 documented skips/11 TODO), browser103 pass/7 documented skips, clean lint and both TypeScript configs, unchanged flagship/probe, all36 MCP tools. Original idle ceilings/outcomes pass. Published-entry production results are recorded in RELEASE_CHECKLIST18; dev-source provider failure injection remains local proof.
+Release19 full gate: unit99/0, engine769/0 (6 documented skips/11 TODO), browser105 pass/7 documented skips, clean lint and both TypeScript configs, unchanged flagship/probe, all36 MCP tools. Original idle ceilings/outcomes pass. Published-entry production results are recorded in RELEASE_CHECKLIST19; dev-source provider failure injection remains local proof.
 
-Ground floor, empty unreserved camp-chair/table movement is the released boundary. Table contents must be explicitly removed; two free carriers are required. Coordinated layout setup is a separate unreleased candidate. Max12 distinct lifetime audience members; quiet seated work, no typing animation. Active activity snapshots remain explicitly nonresumable, autonomy and take-replay gaze unvalidated. Previous refusals remain in the global failed-action banner after remedy. Optional Manual/Clear/Restrained camera affects the current world only as an observer; provider disabled in production. Conversation camera refinements stay camera-owned.
+Ground floor, empty unreserved camp-chair/table movement is the released boundary. Table contents must be explicitly removed; two free carriers are required. Registered coordinated setup is released for the two explicit layouts; it does not optimize arbitrary furnishing. Max12 distinct lifetime audience members; quiet seated work, no typing animation. Active activity snapshots remain explicitly nonresumable, autonomy and take-replay gaze unvalidated. Previous refusals remain in the global failed-action banner after remedy. Optional Manual/Clear/Restrained camera affects the current world only as an observer; provider disabled in production. Conversation camera refinements stay camera-owned.
 
 ## Camera workstream coordination
 
@@ -98,4 +97,9 @@ Owner requests one inspectable combined checkpoint: physical spare-chair carry/c
 After this checkpoint the next visible outcome is a bounded usable layout choice that invokes supported physical actions before a full classroom/talk/conversation journey. Estimated remaining **6–10 working hours** for that bounded setup tranche, including representative disruption, inspected captures and release validation, assuming shared routing/claims need no subsystem redesign. Communal-day intentions and reuse remain subsequent stages.
 
 
-Next setup candidate: registered serial `setup_room` uses explicit crew/targets, readonly preflight, child replanning and safe draining on cancellation. It does not optimize arbitrary layouts or acquire tabletop contents automatically. Root two-room setup → late arrival → questions → conversations journeys pass2/2 with inspected captures; combined full gate pending; it is not in release18.
+Release19 setup: registered serial `setup_room` uses explicit crew/targets, readonly preflight, child replanning and safe draining on cancellation. It does not optimize arbitrary layouts or acquire tabletop contents automatically. Both room journeys observe late seating, questions, presenter2, actual formed social floors and leak-free departure; full gate and production22/22 pass with inspected captures.
+
+The physical chair/table/usable-setup tranche has reached its bounded exit criteria. **Next food-break increment:6–10 working hours remaining**, including UI, one-command coordination, representative interruptions/retry, visual inspection and full release validation, assuming the passing binding needs no shared physical subsystem changes. This is not an estimate for the full communal day or simulator. Waking/rest/sleep, needs/appointments/autonomy and another-environment reuse remain the following outcomes, not hidden prerequisites.
+
+
+Camera session retired at Gene's request on2026-09-30. Reviewed code throughbf24353 is integrated; durable architecture/provenance/resume/backlog are in `briefs/autonomous-camera.md` and its REPORT. Preserve its worktree/captures. Future camera work requires Gene's request, retains independent ownership and never blocks engine milestones. No camera worker is part of this active queue.

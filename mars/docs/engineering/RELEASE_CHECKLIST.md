@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 18 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 19 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -926,3 +926,32 @@ Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 7b809dd0-7655-4192-b968-5eb35d83df40 --name mars-campus-2026 -m "rollback release18: <reason>"
 ```
+
+
+## production-deploy-19-2026-09-30-usable-room-setup
+
+Clean source **1eee5c6ecfde607ddc742763c4b07b9d59a0c60e** passed the full rebased gate before local-main fast-forward. Live **ce6daf22-caa7-4698-8b28-6b2a2935b7d3**, created05:35:14.086Z/deployed05:35:16.295Z, confirmed100%. Rollback **4e77562e-9dc4-4f76-890b-22bc188d8ed7** (release18), confirmed before rollout. Subsequent metadata/evidence/camera-retirement documentation changes do not alter the deployed source. Historical-agent dirty main paths and unfinished branches remain preserved; no remote/push, pins, goldens, tolerances or historical values changed.
+
+**Playable boundary:** explicit default/side layouts in four/eight-guest rooms drive ordinary physical table/chair actions with chosen crews. Readonly preflight refuses loaded/occupied/unavailable setups; stop waits for actual safe lowering and preserves partial placements. Retry/restore and current readiness remain visible. Moved spare seating and relocated table surfaces are used in the subsequent full talk/question/presenter-rotation/conversation journey. No arbitrary optimizer, automatic contents removal, occupied-seat transport or active-activity restore claim.
+
+| Check | Result |
+|---|---|
+| Full gate | GREEN `.cloudflare/gate/2026-09-30T05-09-24-342Z/report.json`;1eee5c6,gitDirty:false,cleanupError:null |
+| Lint / both TypeScript configs | Clean |
+| Unit |99 pass /0 fail |
+| Engine |786 total:769 pass /0 fail /6 documented skip /11 TODO |
+| Browser |105 pass /7 documented skip,1152.1s |
+| Flagship take / probe | Byte-identical; completed hash b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local control-plane integration | All36MCP tools, isolation/auth/method/limits pass |
+| Idle performance | Original250/120ms peak,3ms mean and pinned outcomes pass; exact peak113.782834ms/mean0.7187029942ms, corridor57.533167/0.5679969042; zero violations. Historical grids113.172–186.81125ms (<1000ms) |
+| Regenerated evidence |769/0;17 rows and8 milestones PROVEN; capabilities25/2/1 retain exceptions |
+| Production |341assets/19routes/range/auth;36MCPtools; director9steps8264ms;22browser journeys pass(3.2min) |
+| Compiled live camera / bay | Published camera follow/return/Continuous/portrait/reset/dispose, unchanged paused world,0diagnostics/errors; bay10901ticks/43steps/5checks/zero violations/errors/exact probehash |
+
+The first full reviewed gate04-42-29-214Z had104passes/1failure/7skips: the existing Studio shot-hold sampler had a400ms global RAF gap above its unchanged375ms cadence limit in a final incomplete shot. Original trace/samples retained. The unchanged focused test passed1/1(2.2min), then the unchanged full gate passed105/7. No cadence, hold-duration, baseline or physical outcome was edited. An earlier04-32-40-308Z gate was deliberately stopped to strengthen new-layout presenter/social proofs; it is retained as partial, not counted green. Earlier test-order/actor-filter mistakes and traces remain in the room-setup report.
+
+Build/dry415files,6947.91KiB/1249.84KiB gzip; rollout9new assets/378existing,startup105ms. Eight content-addressed large objects and their verified receipt are unchanged: **zero R2 writes**. Known chunk/dynamic-import warnings remain. Actual published camera entry is separately tested; only the dev-source URL/provider-injection test is excluded from production because production serves bundled entries (local full gate proves it). Jev stays disabled, recorded tour is explicitly replay.
+
+Root personally inspected nine new production PNGs: held table, both ready layouts, moved-seat question, both formed-group conversations, questioner/portrait camera and bay. Captures `viewer/e2e/artifacts/prod-smoke-19/`; gate/performance/evidence/browser/camera/bay logs and audits under `.cloudflare/`; deployment helper report `briefs/room-setup-release.REPORT.md`. Prior-refusal global banner remains visible after remedy; fine fingers and broader camera composition are not certified. Camera owner retired with docs-only handoff; no further camera implementation added.
+
+Original inventory remains38fixed/36reclassified/142remaining (216 recoverable); broad deferred rows were not closed to count this bounded capability. Furniture/setup tranche exits here. Next6–10working-hour bounded food-break increment assumes existing passing bindings need no shared physical redesign; full communal day/autonomy/reuse are subsequent outcomes.

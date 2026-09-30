@@ -8,16 +8,16 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `b2928ef` (engine tree clean) |
-| Generated | 2026-09-30T04:08:14.198Z · Node v22.20.0 |
-| Engine suite | 762 tests in 98 files: 745 pass, 0 fail, 6 skipped, 11 TODO · 59.4 s wall |
-| External gate | `.cloudflare/gate/2026-09-30T03-47-46-115Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `1eee5c6` (engine tree clean) |
+| Generated | 2026-09-30T05:32:26.094Z · Node v22.20.0 |
+| Engine suite | 786 tests in 99 files: 769 pass, 0 fail, 6 skipped, 11 TODO · 68.4 s wall |
+| External gate | `.cloudflare/gate/2026-09-30T05-09-24-342Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 6823 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 9593 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 17338 ms compute (cropped 9563 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 7297 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 10949 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 21776 ms compute (cropped 10764 ms in the same test) · final `c56ea8da…` = cropped `c56ea8da…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -269,7 +269,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -292,7 +292,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -308,7 +308,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -447,7 +447,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -477,7 +477,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -503,7 +503,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -521,7 +521,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -706,7 +706,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -754,10 +754,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -782,8 +782,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -802,9 +802,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T03-47-46-115Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-09-30T05-09-24-342Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -1031,87 +1031,36 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `d04271d` (2026-09-30T02:29:18.264Z): 75 added, 0 removed.
+Compared with the report at `b2928ef` (2026-09-30T04:08:14.198Z): 24 added, 0 removed.
 
-- added: camera.test.ts :: a change of conversation group honors the minimum hold while the old subject remains feasible
-- added: camera.test.ts :: continuous following retains its subject through unrelated speaker changes
-- added: camera.test.ts :: derived workstation target exists without modifying object task state
-- added: camera.test.ts :: edited medium shot follows facing direction and clear conversation covers the floor
-- added: camera.test.ts :: foreground score detects architecture in front of the target and excludes intended objects
-- added: fixture-move.test.ts :: a human arriving during lowering pauses held support and resumes safely
-- added: fixture-move.test.ts :: access links and hand reservations are explicit refusals
-- added: fixture-move.test.ts :: busy mover actor is not silently stood up
-- added: fixture-move.test.ts :: carried fixture motion bound detects an unsupported jump
-- added: fixture-move.test.ts :: changed resting phase before pickup refuses rather than restoring an obsolete phase
-- added: fixture-move.test.ts :: concurrent move and sit lose to authoritative fixture/seat claims
-- added: fixture-move.test.ts :: explicit directional destination yaw -1.5707963267948966
-- added: fixture-move.test.ts :: explicit directional destination yaw 0
-- added: fixture-move.test.ts :: explicit directional destination yaw 1.5707963267948966
-- added: fixture-move.test.ts :: explicit directional destination yaw 3.141592653589793
-- added: fixture-move.test.ts :: fixture action refuses active snapshots; completed grounded chair persists
-- added: fixture-move.test.ts :: fixture integrity detects real grip drift and bystander overlap independently
-- added: fixture-move.test.ts :: ground footprint added during lowering cannot strand or release a suspended chair
-- added: fixture-move.test.ts :: held real bowl requires explicit stow before fixture moving
-- added: fixture-move.test.ts :: late source move/occupancy before pickup fails safely
-- added: fixture-move.test.ts :: occupied sit and arriving reservation are never preempted by moving chair
-- added: fixture-move.test.ts :: preserves original fixture resting phase placed
-- added: fixture-move.test.ts :: preserves original fixture resting phase staged
-- added: fixture-move.test.ts :: preserves original fixture resting phase stored
-- added: fixture-move.test.ts :: preserves original fixture resting phase undefined
-- added: fixture-move.test.ts :: real chair lift/carry/turn/setdown retains fixture identity and usable exact-heading seat
-- added: fixture-move.test.ts :: recognized fixture load participates in static/human load and motion invariants
-- added: fixture-move.test.ts :: refusal connections does not mutate world
-- added: fixture-move.test.ts :: refusal contents does not mutate world
-- added: fixture-move.test.ts :: refusal missing actor does not mutate world
-- added: fixture-move.test.ts :: refusal missing fixture does not mutate world
-- added: fixture-move.test.ts :: refusal nonhuman actor does not mutate world
-- added: fixture-move.test.ts :: refusal occupied chair does not mutate world
-- added: fixture-move.test.ts :: refusal off-floor target does not mutate world
-- added: fixture-move.test.ts :: refusal tilted chair does not mutate world
-- added: fixture-move.test.ts :: refusal unsupported chair does not mutate world
-- added: fixture-move.test.ts :: refusal wrong fixture does not mutate world
-- added: fixture-move.test.ts :: refusal wrong level does not mutate world
-- added: fixture-move.test.ts :: repeatable chair movement outcome and marks
-- added: fixture-move.test.ts :: safe cancellation during gather retains support until grounded
-- added: fixture-move.test.ts :: safe cancellation during lift retains support until grounded
-- added: fixture-move.test.ts :: safe cancellation during move retains support until grounded
-- added: fixture-move.test.ts :: safe cancellation during release retains support until grounded
-- added: fixture-move.test.ts :: safe cancellation during set-down retains support until grounded
-- added: fixture-move.test.ts :: unreachable target and late occupied setdown stay within validated execution
-- added: fixture-move.test.ts :: unsafe lowering refuses and keeps held fixture plus claims until obstacle is removed
-- added: table-move.test.ts :: all pending surface reservations refuse movement and moving table rejects ordinary put
-- added: table-move.test.ts :: blocked narrow corridor fits a person but refuses whole upright table and crew
-- added: table-move.test.ts :: chair remains one carrier and held helper small items refuse explicitly
-- added: table-move.test.ts :: contents added before pickup refuse and do not strand gather claims
-- added: table-move.test.ts :: empty table cannot be moved until real bowl/spoon are taken and explicit stow frees both crew
-- added: table-move.test.ts :: one worker holds removed bowl and spoon while two free guests move table then returns both
-- added: table-move.test.ts :: pending real take refuses contents until release; moving table never gains supported items
-- added: table-move.test.ts :: table cancellation gather retains support until safe release
-- added: table-move.test.ts :: table cancellation lift retains support until safe release
-- added: table-move.test.ts :: table cancellation move retains support until safe release
-- added: table-move.test.ts :: table cancellation release retains support until safe release
-- added: table-move.test.ts :: table cancellation set-down retains support until safe release
-- added: table-move.test.ts :: table exact directional heading -1.5707963267948966
-- added: table-move.test.ts :: table exact directional heading 0
-- added: table-move.test.ts :: table exact directional heading 3.141592653589793
-- added: table-move.test.ts :: table lowering invalidation human retains held load then resumes
-- added: table-move.test.ts :: table lowering invalidation static retains held load then resumes
-- added: table-move.test.ts :: table move active snapshot refusal, deterministic repetition and completed persistence
-- added: table-move.test.ts :: table preserves resting phase placed
-- added: table-move.test.ts :: table preserves resting phase staged
-- added: table-move.test.ts :: table preserves resting phase stored
-- added: table-move.test.ts :: table refuses bowl on table without mutation
-- added: table-move.test.ts :: table refuses busy helper without mutation
-- added: table-move.test.ts :: table refuses connected without mutation
-- added: table-move.test.ts :: table refuses duplicate without mutation
-- added: table-move.test.ts :: table refuses missing helper without mutation
-- added: table-move.test.ts :: table refuses no helper without mutation
-- added: table-move.test.ts :: table refuses not grounded without mutation
-- added: table-move.test.ts :: two real people continuously lift/carry/lower an upright table and ordinary put uses relocated top
+- added: room-setup.test.ts :: active setup snapshots refuse and terminal readout survives JSON restore deterministically
+- added: room-setup.test.ts :: actual authored classroom4 default/side setup uses existing fixtures
+- added: room-setup.test.ts :: actual authored classroom8 default/side setup uses existing fixtures
+- added: room-setup.test.ts :: both-move preflight refuses contents before physical commitment
+- added: room-setup.test.ts :: both-move preflight refuses duplicate crew before physical commitment
+- added: room-setup.test.ts :: both-move preflight refuses held helper before physical commitment
+- added: room-setup.test.ts :: both-move preflight refuses missing crew before physical commitment
+- added: room-setup.test.ts :: both-move preflight refuses occupied before physical commitment
+- added: room-setup.test.ts :: cancelled partial physical placement is visible without undo; later changed completed layout loses readiness
+- added: room-setup.test.ts :: competing coordinators and reserved pending chair refuse without preemption
+- added: room-setup.test.ts :: coordinator cancel waits for real gather safe stop
+- added: room-setup.test.ts :: coordinator cancel waits for real lift safe stop
+- added: room-setup.test.ts :: coordinator cancel waits for real move safe stop
+- added: room-setup.test.ts :: coordinator cancel waits for real release safe stop
+- added: room-setup.test.ts :: coordinator cancel waits for real set-down safe stop
+- added: room-setup.test.ts :: duplicate fixtures and unsupported kinds refuse named admission
+- added: room-setup.test.ts :: external child cancellation ends partial setup after physical cleanup
+- added: room-setup.test.ts :: external prior-placement change cannot report ready
+- added: room-setup.test.ts :: fixed180-second deadline starts cleanup of nonprogressing child
+- added: room-setup.test.ts :: invalid setup schema cannot crash the read-only setup monitor
+- added: room-setup.test.ts :: one explicit chair move is supported; infeasible second target refuses whole preflight
+- added: room-setup.test.ts :: pending crew acquired after preflight refuses next child with completed placement preserved
+- added: room-setup.test.ts :: safe blocked lowering retains parent and crew claims until actual footprint clears
+- added: room-setup.test.ts :: serial real moves own physical resources themselves and finish usable explicit layout
 
 ## Tests not cited by any row or milestone
 
-435 of 762 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+459 of 786 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1430,6 +1379,30 @@ Compared with the report at `d04271d` (2026-09-30T02:29:18.264Z): 75 added, 0 re
 - `raise-cancel.test.ts` pass: raise cancel (LM-036): thin held sheets cannot penetrate the landing frame envelope
 - `room-campus-2026.test.ts` pass: room 2026: incompatible year/file pairs refuse; omitted loader preserves synthetic-only test setup
 - `room-campus-2026.test.ts` pass: room 2026: legacy workspace id collision refuses without replacing user work
+- `room-setup.test.ts` pass: serial real moves own physical resources themselves and finish usable explicit layout
+- `room-setup.test.ts` pass: actual authored classroom4 default/side setup uses existing fixtures
+- `room-setup.test.ts` pass: actual authored classroom8 default/side setup uses existing fixtures
+- `room-setup.test.ts` pass: both-move preflight refuses contents before physical commitment
+- `room-setup.test.ts` pass: both-move preflight refuses occupied before physical commitment
+- `room-setup.test.ts` pass: both-move preflight refuses held helper before physical commitment
+- `room-setup.test.ts` pass: both-move preflight refuses duplicate crew before physical commitment
+- `room-setup.test.ts` pass: both-move preflight refuses missing crew before physical commitment
+- `room-setup.test.ts` pass: duplicate fixtures and unsupported kinds refuse named admission
+- `room-setup.test.ts` pass: competing coordinators and reserved pending chair refuse without preemption
+- `room-setup.test.ts` pass: coordinator cancel waits for real gather safe stop
+- `room-setup.test.ts` pass: coordinator cancel waits for real lift safe stop
+- `room-setup.test.ts` pass: coordinator cancel waits for real move safe stop
+- `room-setup.test.ts` pass: coordinator cancel waits for real set-down safe stop
+- `room-setup.test.ts` pass: coordinator cancel waits for real release safe stop
+- `room-setup.test.ts` pass: safe blocked lowering retains parent and crew claims until actual footprint clears
+- `room-setup.test.ts` pass: external child cancellation ends partial setup after physical cleanup
+- `room-setup.test.ts` pass: pending crew acquired after preflight refuses next child with completed placement preserved
+- `room-setup.test.ts` pass: external prior-placement change cannot report ready
+- `room-setup.test.ts` pass: active setup snapshots refuse and terminal readout survives JSON restore deterministically
+- `room-setup.test.ts` pass: fixed180-second deadline starts cleanup of nonprogressing child
+- `room-setup.test.ts` pass: one explicit chair move is supported; infeasible second target refuses whole preflight
+- `room-setup.test.ts` pass: cancelled partial physical placement is visible without undo; later changed completed layout loses readiness
+- `room-setup.test.ts` pass: invalid setup schema cannot crash the read-only setup monitor
 - `room-storage.test.ts` pass: room workload: step and entity admission boundaries and malformed inputs preserve controller validation
 - `sequence.test.ts` pass: substitution: whole-string refs, indices, fields, $$ escape; no interpolation or eval
 - `sequence.test.ts` pass: bind: validated against registry + baseline; plan hash is content-addressed

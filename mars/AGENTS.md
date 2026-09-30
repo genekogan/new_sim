@@ -41,6 +41,9 @@ moving and usable room setup first. See ACTIVE_ROADMAP for bounded supported sta
 
 Further camera development is independently owned: do not routinely review or manage
 its iterations. Handle necessary shared-interface decisions and batch integration.
+Gene retired the original camera session on 2026-09-30 after release18. Preserve its
+worktree/artifacts; `docs/engineering/briefs/autonomous-camera.md` is the durable
+resume entry. Further camera work requires Gene's request and never blocks activities.
 At meaningful green milestones report playable actions/interventions, constraints,
 next outcome and real blocker, validation/release and a remaining-hours range with
 assumptions. Furniture support must remain bounded so classroom/social experience
