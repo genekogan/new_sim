@@ -11,6 +11,7 @@ import { BUNDLES } from '../../engine/world/catalog-stock.ts';
 import { createFire, seedOf, type Fire } from './fire.ts';
 import { tableObject } from './items.ts';
 import { workstationObject, type WorkstationVisual } from './workstation.ts';
+import { rendererColor } from './palette.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
 type Stack = { group: THREE.Group; count: number };
@@ -204,7 +205,9 @@ export class FixtureViews {
     st.count = n;
     st.group.clear();
     const piece = CATALOG[b.piece];
-    const color = piece?.color ?? '#c9a36b';
+    // The aggregate is stock of this same component: use its existing renderer
+    // palette so extraction does not appear to substitute a different material.
+    const color = piece ? rendererColor(piece, '#c9a36b') : '#c9a36b';
     const perLayer = e.def.startsWith('stack-beam') ? 5 : e.def.startsWith('stack-upright') ? 1 : 1;
     const layers = Math.ceil(b.capacity / perLayer);
     const lh = (sy - DUNNAGE) / layers;
