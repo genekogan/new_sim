@@ -91,3 +91,9 @@ Camera brief/provenance: `<mars-worktrees>/autonomous-camera/docs/engineering/br
 
 
 Release17 integrates reviewed camera corrections through a6cc661 and root entry wiring d04271d at a convenient green boundary. Subsequent camera work stays isolated; experimental provider and ignored recorded replay data are not production capabilities.
+
+## Bleeding-edge checkpoint candidate (release18)
+
+Owner requests one inspectable combined checkpoint: physical spare-chair carry/cancel/reseat, two-person cleared-table relocation and ordinary returned objects, reviewed camera policies through2591b9e plus production replay/player packagingbf24353, and top-panel quick tour of all these behaviors. Full combined gate and release remain pending; the six camera scenes are labeled recorded comparisons, while classroom4/8 remain live and playable. Fine furniture anatomy, active reserved-seat rearrangement and automated room-wide layout are deliberately outside this checkpoint.
+
+After this checkpoint the next visible outcome is a bounded usable layout choice that invokes supported physical actions before a full classroom/talk/conversation journey. Estimated remaining **6–10 working hours** for that bounded setup tranche, including representative disruption, inspected captures and release validation, assuming shared routing/claims need no subsystem redesign. Communal-day intentions and reuse remain subsequent stages.
