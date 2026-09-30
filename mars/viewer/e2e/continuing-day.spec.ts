@@ -148,3 +148,24 @@ for (const count of [4, 8]) test(`one continuing world connects unfinished work,
   expect(errors).toEqual([]);
   writeFileSync(path.join(artifacts, `continuing-day-${count}-proof.json`), JSON.stringify({ epoch, unfinished, worker, question, second, groups, eating, food, resumed, records: await page.evaluate(() => window.__marsEngine.records()), errors }, null, 2));
 });
+
+test('direct classroom hook preserves the authored audience in both continuing-world rooms', async ({ page }) => {
+  await page.goto('/lab?scenario=work-break-8');
+  await page.waitForFunction(() => window.__marsEngine?.ready);
+  for (const count of [4, 8]) {
+    const result = await page.evaluate(count => {
+      const e = window.__marsEngine;
+      e.runScenario(`work-break-${count}`, { paused: true });
+      const action = e.startClassroom();
+      for (let i = 0; i < 6000 && e.classroom().session?.phase !== 'presenting'; i++) e.step();
+      return { action, state: e.classroom().session, violations: e.violations() };
+    }, count);
+    expect(result.action.diagnostic).toBeUndefined();
+    expect(result.state?.phase).toBe('presenting');
+    expect(result.state?.participants.filter(p => p.role === 'audience')).toHaveLength(count);
+    expect(result.violations).toEqual([]);
+    await page.evaluate(id => window.__marsEngine.cancelAction(id), result.action.id);
+    expect((await finish(page, 'classroom_session')).status).toBe('cancelled');
+    expect(await page.evaluate(() => window.__marsEngine.slots().filter(s => s.claimedBy !== null))).toEqual([]);
+  }
+});

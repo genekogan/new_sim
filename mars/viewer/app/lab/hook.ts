@@ -8,6 +8,7 @@ import { classroomSessionId, classroomParams } from '../../engine/scenarios/clas
 import { readClassroom, readSharedFoodBreak } from '../../engine/activities/index.ts';
 import { displayReadout } from '../../engine/objects/classroom.ts';
 import { SELECTABLE_SCENARIOS, SCENARIOS } from './scenarios.ts';
+import { classroomRoomCount } from './room-layout.ts';
 import { sequenceRows } from './sequence-hud.tsx';
 import { entityCorners } from '../../engine/spatial/service.ts';
 import { slotStates } from './overlay-slots.ts';
@@ -130,7 +131,7 @@ export function installHook(view: LabView, notify: () => void) {
     activityAttention: () => view.humans.attention(),
     activityAttentionTargets: () => structuredClone(view.attentionTargets),
     classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, 'screen') }; },
-    startClassroom: () => { const r = sim.rt.submit('classroom_session', classroomParams(sim.scenario.name === 'classroom-8' ? 8 : 4)); notify(); return { id: r.id, status: r.status, diagnostic: r.diagnostic }; },
+    startClassroom: () => { const r = sim.rt.submit('classroom_session', classroomParams(classroomRoomCount(sim.scenario.name) ?? 4)); notify(); return { id: r.id, status: r.status, diagnostic: r.diagnostic }; },
     stateHash: () => sim.rt.stateHash(),
     /** Bundles / stacks as drawn: pieces left (contents.count) and the top of the drawn stack (m). */
     stacks: () => view.fixtures.stacks(),
