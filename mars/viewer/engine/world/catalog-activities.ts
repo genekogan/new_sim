@@ -4,6 +4,12 @@ import type { AssetDef } from './catalog.ts';
 
 export const ACTIVITY_ASSETS: AssetDef[] = [
   {
+    id: 'computer-workstation', label: 'generic computer workstation', category: 'fixture',
+    size: [1.4, 1.3, 0.75], massKg: 34, color: '#59636d', obstacle: true,
+    capabilities: { workstation: { seatPoint: [0, -1.2], seatTolerance: 0.22, facingYaw: Math.PI / 2, facingTolerance: 0.3 } },
+    dims: { confidence: 'hypothetical', note: 'generic composite: 1.4 × 0.75 m desk, 0.74 m desktop height; 0.6 × 0.4 m monitor above desktop, highest point 1.3 m; collision uses full composite envelope; separate compatible chair required; not a documented Mars object or imported laptop' },
+  },
+  {
     id: 'standing-display', label: 'standing classroom display', category: 'fixture',
     size: [1.6, 1.65, 0.36], massKg: 38, color: '#202c38', obstacle: true,
     capabilities: { display: { accepts: 'text', maxChars: 160 } },

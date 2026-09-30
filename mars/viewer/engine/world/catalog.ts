@@ -3,7 +3,7 @@
 // the tall blue two-column braced frame; beams are the orange horizontals.
 // Other values are industry-typical and marked provisional until checked
 // against photos or the 2026 component catalog.
-import { dcos, dsin, FT, IN, type Vec3, hypot } from '../core/math.ts';
+import { dcos, dsin, FT, IN, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import type { Confidence } from './types.ts';
 import { ITEM_ASSETS, type SurfaceSlotDef } from './catalog-items.ts';
 import { stockAssets } from './catalog-stock.ts';
@@ -81,7 +81,7 @@ export type AssetDef = {
   /** Placed electrical equipment (catalog-solar.ts, spec §19): its kind and default configuration. */
   equipment?: { kind: EquipmentKind; defaults: Record<string, number | string> };
   /** Usable activity affordances, independent of mesh appearance and per-entity state. */
-  capabilities?: { display?: { accepts: 'text'; maxChars: number }; presenterStation?: true };
+  capabilities?: { display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
   dims: { confidence: Confidence; note: string };
 };
 
