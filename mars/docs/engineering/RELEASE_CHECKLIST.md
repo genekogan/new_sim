@@ -1086,3 +1086,36 @@ Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 8695c09e-1ae8-4315-bcc7-1572189722fb --name mars-campus-2026 -m "rollback release23: <reason>"
 ```
+
+
+## Production deploy 24 (2026-09-30, purposeful routine)
+
+Exact clean source **7648dbfb1a9963df0c63e3c3e380b724389e9cb2** passed full gate before main integration/deployment. Live **0bb846b0-25de-4db3-9f3e-7e0ae5409dcc**, created 18:48:53.181Z/deployed 18:48:55.603Z, confirmed 100%. Rollback **d88e1112-a018-4f08-9ed0-350c6f0b63ee** (release 23), confirmed before rollout. Root main integration retained historical dirty binary diff/inventory byte-identically; helper never touched dirty main. Local Git only, no remote/push; metadata/evidence commits do not change deployed source.
+
+One explicit bound intention joins the actual classroom, asks worker's question, observes both presenters/formed conversation, departs, performs one shared meal/utensil returns, five-second occupied quiet rest/get-up, then completes the same unfinished notes. Start/Pause/Resume/End and retained obligation readouts are exposed in work-break 4 / physical-side 8 rooms. Children retain ordinary physical authority; unrelated directives win. Activities version 8→9 is an additive capability. Ended routines retain their own task progress even when a new task uses identical labels. No physical pins/goldens/tolerances/history changed.
+
+| Check | Result |
+| --- | --- |
+| Full exact-source gate | GREEN `.cloudflare/gate/2026-09-30T18-19-37-557Z/report.json`; 7648dbf, gitDirty:false, cleanupError:null |
+| Lint / unit / both TypeScript | clean; 99 unit passes |
+| Engine |821 pass / 0 fail / 6 skip / 11 TODO |
+| Browser |130 pass / 7 skip, 1242.6s |
+| Flagship / probe / local MCP |unchanged flagship/b746b094…f0c3;all 36 tools |
+| Original idle ceilings |zero violations/pinned outcomes;exact peak 107.662833ms / mean 0.6849538975ms, corridor 51.810458/0.5383040483ms;original 250/120ms peak, 3ms mean,<1000ms historical grids |
+| Regenerated evidence |821/0;17 rows / 8 milestones PROVEN;capabilities 25/2/1 retained |
+| Build / rollout |340 files / 821.1 MiB;dry 415 files / 6990.09 KiB / 1258.91 KiB gzip;4 new assets / 383 existing; startup 120ms;zero R2 writes |
+| Production infrastructure |341 assets / 19 routes/range/auth;36 MCP tools;director nine steps 10251ms PASS |
+| Frozen compiled camera / exact bay |unchanged paused hash f7db899e…065/portrait/reset/dispose/zero diagnostics/errors/hidden Jev;bay 10901 ticks / 43 steps / five checks/0violations/errors/exact b746 hash |
+| Published browser |14/14 in 1.8min:purposeful 4, quiet-rest 4, body 2, tour 1, bay 1, current unsupported-house 2 |
+| Visual inspection |root 27 production PNGs (24 journey + 3 helper camera/bay) |
+
+Prior 2acb72b gate was deliberately SIGINT-interrupted after read-only review found reused-station progress defect; RED report 17-53-23-398Z/clean cleanup retained,not green. Corrected getter retains ended-task progress with distinct and identical actor/task/duration reuse regressions. Incorrect hidden-button reuse harness failed before product assertion; preserved `.cloudflare/repair-failures/purposeful-reuse-ui-assumption`. Actual exposed Start notes proof passed; no deadline/outcome changes. Existing release 23 RED/watchdog/fixture history remains retained.
+
+Root actual production 14 journeys cover both purposeful layouts, partial-meal Pause/End, quiet rest, body controls/probe isolation, discovery, supported component identity/install and both current-house actual Play/Step/Reset refusals. Same-label new notes task progresses while completed routine remains 30s. Root inspected 24 PNGs in `viewer/e2e/artifacts/prod-purposeful-24` plus three helper camera/bay under `prod-smoke-24`. Root ignored config `.cloudflare/prod-routine-24.config.ts`; helper logs `.cloudflare/*release-24.log`; audits `audit/{http-smoke,prod-camera-24,prod-lab-24}.json`; report `briefs/purposeful-routine-release.REPORT.md`.
+
+Supported boundary remains authored directed intentions, not autonomous needs or sleep. Active snapshots/persistence unsupported; other attendees park at authored departure positions, next slice unverified. Current reconciled 2022 first-bay/full houses remain unsupported with 3/9 named blocked beams; original skips/FIXMEs are not passes. Recorded camera comparison remains replay; provider disabled/local injection proof retained; no new camera/MP4/paid provider work. Eight verified unchanged content-addressed large objects yielded zero R2 writes; no new migration. Build log has no warning/error matches.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback d88e1112-a018-4f08-9ed0-350c6f0b63ee --name mars-campus-2026 -m "rollback release24: <reason>"
+```
