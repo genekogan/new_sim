@@ -20,6 +20,15 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <summary>Try talks, interrupted work, chair and table setup</summary>
         <ol className="lab-desc">
           <li>
+            <b>Prepare a usable room.</b> In a fresh room select worker and Take bowl, then Take spoon,
+            waiting for each pickup. Prepare side layout uses the default free crew to move the cleared
+            table and spare chair in order. Stop room setup waits for safe set-down and keeps the partial
+            arrangement; retry or Restore default layout. Once ready, Start session and select visitor
+            to Join session during presentations. Pause when choosing an intervention. After joining,
+            select worker and Put belongings away on the relocated table, then Direct to courtyard.
+            Only these two authored ground layouts are supported.
+          </li>
+          <li>
             <b>Talks → question → rotation → conversations.</b> Choose Start session, wait for seating,
             select an audience guest and Ask question. Watch the floor and shared attention change;
             Next presenter advances the talk. Let both presenters finish to see small conversations

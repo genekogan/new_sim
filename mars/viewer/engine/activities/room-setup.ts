@@ -97,12 +97,9 @@ export function readRoomSetup(
 ): RoomSetupReadout | undefined {
   const rec = rt.records.get(action);
   if (!rec || rec.verb !== 'setup_room') return;
-  const p = rec.params as SetupRoomParams;
-  if (
-    !Array.isArray(p?.moves) ||
-    !p.moves.every((m) => m?.to && typeof m.fixture === 'string')
-  )
-    return;
+  const parsed = setupRoom.schema.safeParse(rec.params);
+  if (!parsed.success) return;
+  const p = parsed.data;
   const ex = (rt.services.roomSetups as Store | undefined)?.[action],
     active = rt.isActive(action);
   const completed = p.moves.filter(

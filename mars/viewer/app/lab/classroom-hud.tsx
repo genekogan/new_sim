@@ -1,4 +1,5 @@
 import { TableMoveHud } from './table-move-hud.tsx';
+import { RoomSetupHud } from './room-setup-hud.tsx';
 import { FixtureMoveHud } from './fixture-move-hud.tsx';
 import { BelongingsHud } from './belongings-hud.tsx';
 import { useState } from 'react';
@@ -17,6 +18,7 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   if (!sim.scenario.name.startsWith('classroom-')) return null;
   const id = classroomSessionId(sim.rt), state = id ? readClassroom(sim.rt, id) : undefined;
   const running = !!id && sim.rt.isActive(id);
+  const setupRunning = [...sim.rt.records.values()].some((r) => r.verb === 'setup_room' && sim.rt.isActive(r.id));
   const screen = displayReadout(sim.rt, 'screen');
   const workstation = readWorkstation(sim.rt, 'workstation');
   const work = 'code' in workstation ? undefined : workstation;
@@ -42,7 +44,7 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     {state?.waitingReason && <div role="status">Waiting: {state.waitingReason}</div>}
     {state?.diagnostic && <div role="alert">{state.diagnostic.code}: {state.diagnostic.message}</div>}
     <div className="lab-classroom-controls">
-      <button disabled={running} onClick={() => response(startClassroom(sim.rt, sim.scenario.name === 'classroom-8' ? 8 : 4), 'Session started')}>Start session</button>
+      <button disabled={running || setupRunning} onClick={() => response(startClassroom(sim.rt, sim.scenario.name === 'classroom-8' ? 8 : 4), 'Session started')}>Start session</button>
       <select aria-label="Classroom participant" value={actor} onChange={(e) => setActor(e.target.value)}>
         {actors.map((a) => <option key={a}>{a}</option>)}
       </select>
@@ -61,6 +63,7 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
       <button disabled={busy || !!workAction || work?.status !== 'unfinished' || work.user !== actor} onClick={() => response(sim.rt.submit('work_at', { actor, station: 'workstation', seat: 'work-chair#seat', duration: 30, task: 'Sketch notes', resume: true }), `Requested resume for ${actor}`)}>Resume Sketch notes</button>
     </div>
     <BelongingsHud sim={sim} actor={actor} refresh={refresh} />
+    <RoomSetupHud sim={sim} sessionRunning={running} refresh={refresh} />
     <FixtureMoveHud sim={sim} actor={actor} refresh={refresh} />
     <TableMoveHud sim={sim} actor={actor} refresh={refresh} />
     {state?.groups.length ? <div data-testid="conversation-floors">{state.groups.map((g) => <div key={g.action}>{g.members.join(', ')} · {g.status} · Floor: <b>{g.floorHolder ?? '—'}</b></div>)}</div> : null}

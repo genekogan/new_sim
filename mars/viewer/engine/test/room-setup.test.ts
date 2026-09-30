@@ -7,7 +7,6 @@ import type { SpatialScene } from '../spatial/types.ts';
 import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
 import { emptyWorld, addAll, human, FIXTURE } from '../world/factory.ts';
 import {
-  ROOM_SETUP_ACTIONS,
   readRoomSetup,
   type SetupRoomParams,
 } from '../activities/room-setup.ts';
@@ -15,6 +14,7 @@ import { CATALOG } from '../world/catalog.ts';
 import { itemEntity, surfaceSlot, placeOnSlot } from '../items/model.ts';
 import { classroomScene, classroomWorld } from '../scenarios/classroom.ts';
 import type { ActionDef } from '../actions/types.ts';
+
 const scene: SpatialScene = {
   bounds: [-16, -16, 16, 16],
   levels: [{ id: 0, y: 0, label: 'ground' }],
@@ -54,7 +54,7 @@ function setup() {
   );
   const rt = new Runtime(
     world,
-    createRegistry(ROOM_SETUP_ACTIONS),
+    createRegistry(),
     { spatial: new Spatial(scene) },
     ENGINE_INVARIANTS,
   );
@@ -131,7 +131,7 @@ for (const count of [4, 8] as const)
     const w = classroomWorld(count);
     const rt = new Runtime(
       w,
-      createRegistry(ROOM_SETUP_ACTIONS),
+      createRegistry(),
       { spatial: new Spatial(classroomScene()) },
       ENGINE_INVARIANTS,
     );
@@ -353,7 +353,7 @@ test('active setup snapshots refuse and terminal readout survives JSON restore d
     done(rt, a.id);
     const restored = Runtime.restore(
       JSON.parse(JSON.stringify(rt.snapshot())),
-      createRegistry(ROOM_SETUP_ACTIONS),
+      createRegistry(),
       { spatial: new Spatial(scene) },
       ENGINE_INVARIANTS,
     );
@@ -424,4 +424,17 @@ test('cancelled partial physical placement is visible without undo; later change
     readRoomSetup(next.rt, record.id)?.diagnostic?.code,
     'setup_room.layout-changed',
   );
+});
+
+test('invalid setup schema cannot crash the read-only setup monitor', () => {
+  const { rt, p } = setup();
+  const malformed = structuredClone(p) as unknown as { moves: { helpers?: unknown }[] };
+  malformed.moves[0].helpers = 3;
+  const hash = rt.stateHash();
+  const rec = rt.submit('setup_room', malformed);
+  assert.equal(rec.status, 'failed');
+  assert.ok(rec.diagnostic);
+  assert.equal(readRoomSetup(rt, rec.id), undefined);
+  assert.equal(rt.stateHash(), hash);
+  clean(rt);
 });

@@ -2,11 +2,13 @@ import { useState } from 'react';
 import type { LabSim } from './sim.ts';
 import type { ActionRecord } from '../../engine/actions/types.ts';
 import { readFixtureMove } from '../../engine/carry/fixture.ts';
+import { classroomFurniture } from './room-layout.ts';
 
 export function TableMoveHud({ sim, actor, refresh }: { sim: LabSim; actor: string; refresh: () => void }) {
   const [helper, setHelper] = useState('guest2');
   const [feedback, setFeedback] = useState('');
-  const fixture = 'belongings-table';
+  const table = classroomFurniture(sim.scenario.name).table;
+  const fixture = table.id;
   const actors = Object.values(sim.rt.world.entities).filter((e) => e.kind === 'human').map((e) => e.id);
   const last = [...sim.rt.records.values()].filter((r) => r.verb === 'move_fixture' && (r.params as { fixture?: string }).fixture === fixture).at(-1);
   const active = !!last && sim.rt.isActive(last.id);
@@ -16,7 +18,7 @@ export function TableMoveHud({ sim, actor, refresh }: { sim: LabSim; actor: stri
     setFeedback(r.diagnostic ? `${r.diagnostic.code}: ${r.diagnostic.message}` : text);
     refresh();
   };
-  const move = (side: boolean) => response(sim.rt.submit('move_fixture', { actor, helpers: [helper], fixture, to: { x: side ? 12 : 10, z: side ? -2 : -5, yaw: 0 } }), `Requested ${actor} and ${helper} to move the empty table`);
+  const move = (side: boolean) => response(sim.rt.submit('move_fixture', { actor, helpers: [helper], fixture, to: table[side ? 'side' : 'default'] }), `Requested ${actor} and ${helper} to move the empty table`);
   return <div data-testid="table-move-hud">
     <div>Table setup · {actor} with helper</div>
     <select aria-label="Table helper" value={helper} onChange={(e) => setHelper(e.target.value)} disabled={active}>
