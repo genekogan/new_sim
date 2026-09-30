@@ -22,6 +22,7 @@ export class Observer {
     scene: SpatialScene,
     activity?: ClassroomReadout,
     geometryVersion = 0,
+    aspect = 16 / 9,
   ): Observation {
     const members =
       activity?.participants
@@ -40,12 +41,15 @@ export class Observer {
     const semantic = {
       phase: activity?.phase ?? 'idle',
       speaker: activity?.floorHolder,
+      presenter:
+        (activity as (ClassroomReadout & { presenter?: string }) | undefined)
+          ?.presenter ?? activity?.floorHolder,
       focus: activity?.attentionTarget?.actor,
       members,
       display: world.entities.screen ? 'screen' : undefined,
       departing,
     };
-    const fp = JSON.stringify([semantic, geometryVersion]);
+    const fp = JSON.stringify([semantic, geometryVersion, aspect]);
     if (fp !== this.fingerprint) {
       this.version++;
       this.cursor++;
@@ -82,6 +86,7 @@ export class Observer {
       session: this.session,
       tick,
       time,
+      aspect,
       semanticVersion: this.version,
       geometryVersion,
       eventCursor: this.cursor,

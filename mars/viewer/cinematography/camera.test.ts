@@ -7,6 +7,8 @@ import { safePose, execute } from './physical.ts';
 import { Observer, cameraScene } from './observation.ts';
 import { replayFrame } from './replay.ts';
 import { JevProvider } from './jev-server.ts';
+import { CameraWorld } from '../engine/camera/geom.ts';
+import { readability } from '../engine/camera/quality.ts';
 import {
   classroomWorld,
   classroomScene,
@@ -26,6 +28,7 @@ function observation(time = 0): Observation {
     session: 'test-1',
     tick: Math.round(time * 20),
     time,
+    aspect: 16 / 9,
     semanticVersion: 1,
     geometryVersion: 1,
     eventCursor: 1,
@@ -255,6 +258,7 @@ void test('single in-flight and1Hz cap; asynchronous failure leaves local camera
     a.ask(request(), 2000, () => applied++),
     false,
   );
+  await Promise.resolve();
   resolve(reply);
   await wait(1);
   assert.equal(applied, 1);
@@ -372,5 +376,48 @@ void test('Jev reserves costs before overlapping calls and accounts unknown outc
     );
   } finally {
     globalThis.fetch = original;
+  }
+});
+void test('portrait render aspect fits both subjects and invalid aspect has a named diagnostic', () => {
+  const o = observation();
+  o.aspect = 0.6;
+  const group = feasibleShots(o).find((s) => s.id === 'group')!;
+  assert.ok(group);
+  const read = readability(
+    new CameraWorld(o.scene),
+    group.pose,
+    o.subjects,
+    ['a', 'b'],
+    { aspect: o.aspect },
+  );
+  assert.ok(read.subjects.every((s) => s.inFrame > 0.95 && s.visible > 0.95));
+  const invalid = { ...o, aspect: NaN };
+  const d = new Director();
+  assert.match(d.update(invalid).reason, /aspect-unsupported/);
+  assert.equal(d.pose, undefined);
+});
+void test('question pair uses the actual presenter when questioner owns the public floor', () => {
+  const o = observation();
+  o.activity.phase = 'question';
+  o.activity.presenter = 'c';
+  o.activity.members.push('c');
+  o.subjects.c = { p: [-3, 0, 0], yaw: 0, kind: 'human', height: 1.7 };
+  assert.ok(feasibleShots(o).some((s) => s.id === 'pair:a:c'));
+});
+void test('synchronous provider throw and malformed reply fall back and clear request state', async () => {
+  for (const choose of [
+    () => {
+      throw Error('sync provider');
+    },
+    () => Promise.resolve(undefined as unknown as Reply),
+  ]) {
+    const a = new Advisory({ choose });
+    assert.doesNotThrow(() => a.ask(request(), 0, () => assert.fail()));
+    await wait(1);
+    assert.equal(a.busy, false);
+    assert.equal(a.failures, 1);
+    assert.equal(a.timer, undefined);
+    assert.ok(new Director().update(observation()).pose);
+    a.dispose();
   }
 });

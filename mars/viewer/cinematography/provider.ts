@@ -48,10 +48,30 @@ export class Advisory {
     this.timer = timer;
     // Abort asks transport to settle. Keep busy until it actually does, even if a
     // broken provider ignores abort; local camera continues and requests cannot pile up.
-    this.provider
-      .choose(structuredClone(request), controller.signal)
+    Promise.resolve()
+      .then(() => {
+        if (this.disposed || controller.signal.aborted)
+          throw Error('camera.provider-cancelled');
+        return this.provider.choose(
+          structuredClone(request),
+          controller.signal,
+        );
+      })
       .then((reply) => {
+        if (
+          !reply ||
+          typeof reply.choice !== 'string' ||
+          typeof reply.model !== 'string' ||
+          ![
+            reply.inputTokens,
+            reply.outputTokens,
+            reply.latencyMs,
+            reply.costUSD,
+          ].every((n) => Number.isFinite(n) && n >= 0)
+        )
+          throw Error('camera.provider-invalid-reply');
         this.accounting.push(reply);
+        if (this.accounting.length > 2048) this.accounting.shift();
         if (!this.disposed && !controller.signal.aborted) {
           apply(reply, request);
           this.accepted++;

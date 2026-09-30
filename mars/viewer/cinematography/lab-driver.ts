@@ -44,6 +44,8 @@ export function attachLabCamera(
     lastWall = -Infinity,
     lastTick = -1,
     lastGeometryEpoch = -1,
+    lastAspect = -1,
+    controlDirty = true,
     dragging = false,
     manualUntil = -Infinity,
     lastManual: ProgramFrame['pose'] | undefined;
@@ -62,6 +64,7 @@ export function attachLabCamera(
   viewDocument.body.appendChild(label);
   const canvas = viewDocument.querySelector('canvas');
   const manualStart = () => {
+    controlDirty = true;
     dragging = true;
     lastManual = hook.cameraPose() as ProgramFrame['pose'];
     director.takeover({
@@ -90,6 +93,7 @@ export function attachLabCamera(
       dragging = false;
       manualUntil = -Infinity;
       director.release();
+      controlDirty = true;
     }
   };
   canvas?.addEventListener('pointerdown', manualStart);
@@ -120,6 +124,8 @@ export function attachLabCamera(
       overhead.length = 0;
       lastTick = -1;
       lastGeometryEpoch = -1;
+      lastAspect = -1;
+      controlDirty = true;
       dragging = false;
       manualUntil = -Infinity;
       lastManual = undefined;
@@ -129,7 +135,20 @@ export function attachLabCamera(
       | { scene?: SpatialScene; epoch?: number }
       | undefined;
     const geometryChanged = (geometry?.epoch ?? 0) !== lastGeometryEpoch;
-    if (state.tick === lastTick && !manualActive && !geometryChanged) return;
+    const aspect =
+      canvas && canvas.width > 0 && canvas.height > 0
+        ? canvas.width / canvas.height
+        : NaN;
+    if (
+      state.tick === lastTick &&
+      !manualActive &&
+      !geometryChanged &&
+      !controlDirty &&
+      aspect === lastAspect
+    )
+      return;
+    controlDirty = false;
+    lastAspect = aspect;
     lastGeometryEpoch = geometry?.epoch ?? 0;
     lastTick = state.tick;
     if (!state.scenario.startsWith('classroom-')) {
@@ -160,6 +179,7 @@ export function attachLabCamera(
       scene,
       hook.classroom().session,
       geometry?.epoch ?? 0,
+      aspect,
     );
     let actualManual: ProgramFrame['pose'] | undefined;
     if (manualActive) {
@@ -211,9 +231,11 @@ export function attachLabCamera(
   raf = viewWindow.requestAnimationFrame(loop);
   return {
     takeover(subject: string, seconds = 5) {
+      controlDirty = true;
       director.takeover({ subject, expires: hook.state().time + seconds });
     },
     release() {
+      controlDirty = true;
       dragging = false;
       manualUntil = -Infinity;
       director.release();

@@ -33,7 +33,7 @@ export function feasibleShots(o: Observation, previous?: Shot): Shot[] {
         elevation,
         padding,
         fov: 45,
-        aspect: 16 / 9,
+        aspect: o.aspect,
       },
     });
   };
@@ -53,6 +53,7 @@ export function feasibleShots(o: Observation, previous?: Shot): Shot[] {
         1.18,
       );
     const partner =
+      present.find((id) => id !== focus && id === o.activity.presenter) ??
       present.find((id) => id !== focus && id === o.activity.speaker) ??
       present.find((id) => id !== focus);
     if (partner)
@@ -77,14 +78,17 @@ export function feasibleShots(o: Observation, previous?: Shot): Shot[] {
       id: previous.id,
       intention: previous.intention,
       ids: previous.subjects,
-      spec: previous.spec,
+      spec:
+        previous.spec.kind === 'frameGroup'
+          ? { ...previous.spec, aspect: o.aspect }
+          : previous.spec,
     });
   const world = new CameraWorld(o.scene),
     shots: Shot[] = [];
   for (const s of specs) {
     const desired = evaluateShot(s.spec, () => o.subjects, o.time);
     const options = candidates(world, desired, o.subjects, s.ids, {
-      aspect: 16 / 9,
+      aspect: o.aspect,
       variants: ['az+30', 'az-30', 'el+15', 'wide1.3'],
       maxPush: 0,
     });

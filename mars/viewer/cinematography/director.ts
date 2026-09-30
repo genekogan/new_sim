@@ -146,6 +146,12 @@ export class Director {
     if (this.session !== o.session || o.time < this.lastTime)
       this.reset(o.session);
     this.observation = o;
+    if (!Number.isFinite(o.aspect) || o.aspect < 0.25 || o.aspect > 4) {
+      const reason =
+        'camera.aspect-unsupported: render aspect must be between 0.25 and 4';
+      this.note(reason);
+      return { cut: false, reason };
+    }
     const dt = Math.min(0.1, Math.max(0, o.time - this.lastTime));
     this.lastTime = o.time;
     if (this.operator && o.time >= this.operator.expires) this.release();

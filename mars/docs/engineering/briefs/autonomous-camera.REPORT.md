@@ -143,3 +143,30 @@ unless localhost/127.0.0.1:5593. Review entry plus live intervention browser tes
 pass 2/2 (10.2 s), both typechecks pass. Replay page remains local-only.
 Ignored `comparison/review-manifest.json` records absolute clip paths, SHA256,
 durations, source commit, inspection method and before/after ffmpeg command.
+
+## Bounded integration review corrections
+
+Engine-owner review found paused control invalidation, fixed 16:9 assumptions,
+and synchronous provider throws. Corrected all three within camera-owned paths:
+- Subject takeover/Return auto mark the adapter dirty even without a world tick.
+- Actual canvas aspect flows through causal observation/fingerprint, synthesis,
+  candidate scoring and smooth execution. Supported aspect 0.25–4; other values
+  give a named limitation. Recorded camera fixtures default explicitly to 16:9.
+- Provider invocation enters a Promise boundary, validates reply shape, clears
+  timers/busy on errors, avoids sending after disposal and bounds accounting.
+
+The additive presenter field also identifies the true presenter/questioner pair
+when the new public floor belongs to the questioner. Conversation-group floors
+remain outside this classroom adapter’s supported scope. Agreed engine APIs are
+frozen: scenarioEpoch, immutable cameraGeometry, render camera with optional FOV.
+
+22 focused offline tests pass. Browser entry and live tests pass 2/2 (10.2 s),
+including takeover and Return auto on an unchanged paused tick and a genuinely
+portrait render canvas. First portrait test assumed the mobile browser layout
+produced portrait; it did not, and the test was corrected after measuring canvas
+dimensions. Failure trace remains local. Portrait questioner screenshot inspected.
+Both typechecks and scoped/repo lint pass. Full engine recheck and new MP4 follow.
+
+Gene’s direction: camera readiness does not block playable engine milestones.
+Owner is releasing engine-only improvements separately; reviewed camera commits
+will integrate at a convenient green boundary. No additional integration scope.

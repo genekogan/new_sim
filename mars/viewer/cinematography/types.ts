@@ -19,6 +19,7 @@ export type Observation = {
   session: string;
   tick: number;
   time: number;
+  aspect: number;
   semanticVersion: number;
   geometryVersion: number;
   eventCursor: number;
@@ -26,6 +27,7 @@ export type Observation = {
   activity: {
     phase: string;
     speaker?: string;
+    presenter?: string;
     focus?: string;
     members: string[];
     display?: string;

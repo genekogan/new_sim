@@ -81,14 +81,24 @@ test('live coverage, manual precedence, asynchronous failure and cleanup preserv
   );
   await page.evaluate(() => {
     window.__cameraReview.takeover('guest2', 2);
-    window.__marsEngine.step(2);
   });
   await page.waitForFunction(() =>
     window.__cameraReview
       .report()
       .decisions.some((d) => d.source === 'operator'),
   );
+  expect(await page.evaluate(() => window.__marsEngine.stateHash())).toBe(hash);
   await page.screenshot({ path: path.join(artifacts, 'manual-subject.png') });
+  await page.evaluate(() => window.__cameraReview.release());
+  await page.waitForFunction(
+    () => window.__cameraReview.report().decisions.at(-1)?.source === 'local',
+  );
+  expect(await page.evaluate(() => window.__marsEngine.stateHash())).toBe(hash);
+  await page.evaluate(() => window.__cameraReview.takeover('guest2', 2));
+  await page.waitForFunction(
+    () =>
+      window.__cameraReview.report().decisions.at(-1)?.source === 'operator',
+  );
   await page.evaluate(() => window.__marsEngine.step(50));
   await page.waitForFunction(
     () => window.__cameraReview.report().decisions.at(-1)?.source === 'local',
@@ -99,6 +109,25 @@ test('live coverage, manual precedence, asynchronous failure and cleanup preserv
     window.__cameraReview.report().frames.at(-1)?.shot?.includes('guest1'),
   );
   await page.screenshot({ path: path.join(artifacts, 'questioner.png') });
+  // Above the mobile breakpoint, the side HUD leaves a genuinely portrait canvas.
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForFunction(
+    () => window.__cameraReview.report().observations.at(-1)?.aspect! < 1,
+    undefined,
+    { timeout: 10000 },
+  );
+  expect(
+    await page.evaluate(
+      () => window.__cameraReview.report().frames.at(-1)?.pose,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: path.join(artifacts, 'portrait-questioner.png'),
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForFunction(
+    () => window.__cameraReview.report().observations.at(-1)?.aspect! > 1,
+  );
   const report = await page.evaluate(() => window.__cameraReview.report());
   expect(report.frames.length).toBeGreaterThan(2);
   expect(report.diagnostics).toEqual([]);

@@ -109,7 +109,7 @@ export function execute(
     pose,
     o.subjects,
     subjects,
-    { aspect: 16 / 9, minSize: 0.08 },
+    { aspect: o.aspect, minSize: 0.08 },
   ).score;
   if (!placement(world, pose.position, 0).valid || read < 0.55)
     return {
