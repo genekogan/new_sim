@@ -5,14 +5,14 @@ import path from 'node:path';
 import type { EngineHook } from '../app/lab/hook.ts';
 declare global { interface Window { __marsEngine: EngineHook } }
 const artifacts = path.resolve('e2e/artifacts', process.env.E2E_RUN ?? 'room-setup');
-const finish = (page: Page, verb: string) => page.evaluate((v) => {
+const finish = (page: Page, verb: string, actor?: string) => page.evaluate(({ v, actor }) => {
   for (let i = 0; i < 12000; i++) {
-    const rec = window.__marsEngine.records().filter((r) => r.verb === v).at(-1);
+    const rec = window.__marsEngine.records().filter((r) => r.verb === v && (!actor || r.params.actor === actor)).at(-1);
     if (rec && ['completed', 'failed', 'cancelled'].includes(rec.status)) return rec;
     window.__marsEngine.step();
   }
   throw Error(`${v} did not finish`);
-}, verb);
+}, { v: verb, actor });
 const capture = async (page: Page, name: string) => {
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await page.screenshot({ path: path.join(artifacts, name) });
@@ -84,16 +84,47 @@ for (const count of [4, 8]) test(`bounded room layout can stop, retry and host t
     throw Error('visitor never held the floor');
   });
   await capture(page, `setup-${count}-question.png`);
+  const rotated = await page.evaluate(() => {
+    for (let i = 0; i < 6000; i++) {
+      const s = window.__marsEngine.classroom().session;
+      if (s?.phase === 'presenting' && s.floorHolder === 'presenter2') return s;
+      window.__marsEngine.step();
+    }
+    throw Error('prepared room never presented the second talk');
+  });
   await actor.selectOption('worker');
   await page.getByRole('button', { name: 'Put belongings away', exact: true }).click();
   expect((await finish(page, 'stow_items')).status).toBe('completed');
   await page.getByRole('button', { name: 'Direct to courtyard', exact: true }).click();
-  expect((await finish(page, 'walk_to')).status).toBe('completed');
+  expect((await finish(page, 'walk_to', 'worker')).status).toBe('completed');
+  const conversations = await page.evaluate(() => {
+    for (let i = 0; i < 12000; i++) {
+      const s = window.__marsEngine.classroom().session;
+      if (s?.phase === 'conversing' && s.groups.length > 0 && s.groups.every((g) =>
+        g.status === 'talking' && !!g.floorHolder && g.members.includes(g.floorHolder) &&
+        g.attentionTarget?.actor === g.floorHolder)) return s;
+      const rec = window.__marsEngine.records().filter((r) => r.verb === 'classroom_session').at(-1);
+      if (rec && ['completed', 'failed', 'cancelled'].includes(rec.status)) throw Error('session ended before formed conversations');
+      window.__marsEngine.step();
+    }
+    throw Error('prepared room never formed conversations with a shared floor');
+  });
+  await capture(page, `setup-${count}-conversations.png`);
   const ended = await finish(page, 'classroom_session');
   expect(ended.status).toBe('completed');
   expect(await page.evaluate(() => window.__marsEngine.heldItems())).toEqual([]);
   expect(await page.evaluate(() => window.__marsEngine.violations())).toEqual([]);
   expect((await page.evaluate(() => window.__marsEngine.records())).filter((r) => r.status === 'failed').map((r) => r.diagnostic?.code)).toEqual(['setup_room.preflight']);
+  expect(await page.evaluate(() => window.__marsEngine.slots().filter((s) => s.claimedBy !== null))).toEqual([]);
+  expect(await page.evaluate(() => window.__marsEngine.records().filter((r) =>
+    ['setup_room', 'move_fixture', 'classroom_session', 'converse', 'walk_to', 'take_slot', 'sit', 'stand', 'stow_items'].includes(r.verb) &&
+    !['completed', 'failed', 'cancelled'].includes(r.status)))).toEqual([]);
   expect(errors).toEqual([]);
-  writeFileSync(path.join(artifacts, `setup-${count}-proof.json`), JSON.stringify({ setup, placed, visitor, ended, errors }, null, 2));
+  writeFileSync(path.join(artifacts, `setup-${count}-proof.json`), JSON.stringify({ setup, placed, visitor, rotated, conversations, ended, errors }, null, 2));
+  await page.getByRole('button', { name: 'Load 8-guest room', exact: true }).click();
+  await page.getByText('Choose setup crew', { exact: true }).click();
+  await page.getByRole('combobox', { name: 'Room chair carrier', exact: true }).selectOption('guest8');
+  await page.getByRole('button', { name: 'Load 4-guest room', exact: true }).click();
+  await page.getByText('Choose setup crew', { exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Room chair carrier', exact: true })).toHaveValue('guest3');
 });

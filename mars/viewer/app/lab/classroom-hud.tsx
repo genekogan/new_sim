@@ -63,7 +63,7 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
       <button disabled={busy || !!workAction || work?.status !== 'unfinished' || work.user !== actor} onClick={() => response(sim.rt.submit('work_at', { actor, station: 'workstation', seat: 'work-chair#seat', duration: 30, task: 'Sketch notes', resume: true }), `Requested resume for ${actor}`)}>Resume Sketch notes</button>
     </div>
     <BelongingsHud sim={sim} actor={actor} refresh={refresh} />
-    <RoomSetupHud sim={sim} sessionRunning={running} refresh={refresh} />
+    <RoomSetupHud key={sim.scenarioEpoch} sim={sim} sessionRunning={running} refresh={refresh} />
     <FixtureMoveHud sim={sim} actor={actor} refresh={refresh} />
     <TableMoveHud sim={sim} actor={actor} refresh={refresh} />
     {state?.groups.length ? <div data-testid="conversation-floors">{state.groups.map((g) => <div key={g.action}>{g.members.join(', ')} · {g.status} · Floor: <b>{g.floorHolder ?? '—'}</b></div>)}</div> : null}

@@ -9,7 +9,8 @@ export function RoomSetupHud({ sim, sessionRunning, refresh }: { sim: LabSim; se
   const [helper, setHelper] = useState('guest2');
   const [feedback, setFeedback] = useState('');
   const actors = Object.values(sim.rt.world.entities).filter((e) => e.kind === 'human').map((e) => e.id);
-  const last = [...sim.rt.records.values()].filter((r) => r.verb === 'setup_room').at(-1);
+  const setups = [...sim.rt.records.values()].filter((r) => r.verb === 'setup_room');
+  const last = setups.findLast((r) => sim.rt.isActive(r.id)) ?? setups.at(-1);
   const active = !!last && sim.rt.isActive(last.id);
   const state = last && readRoomSetup(sim.rt, last.id);
   const prepare = (layout: RoomLayout) => {
