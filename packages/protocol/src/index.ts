@@ -38,6 +38,12 @@ export type DecisionPayload = {
 export type ScenePayload = { region: string; narrative: number; beat: Beat };
 export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive: string; targets: string[]; flavor: string };
 
+/** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
+export function publicEvent(e: LogEvent): LogEvent {
+  if (e.kind === 'intent' && e.payload?.intent?.note) { const { note: _n, ...intent } = e.payload.intent; return { ...e, payload: { ...e.payload, intent } }; }
+  return e;
+}
+
 // ---------------------------------------------------------------- public views
 export type PublicSoul = {
   id: string; entityId: string; name: string; description: string; owner: string; // owner is an opaque short id
@@ -45,7 +51,10 @@ export type PublicSoul = {
 };
 export type BrainCall = {
   id: number; tick: number; at: number; tier: 'mid' | 'translate' | 'director' | 'narrator' | 'shot';
-  subject: string; model: string; request: unknown; response: unknown; applied: unknown;
+  subject: string;
+  /** Absent for world-level calls (narrator, director), which only admins see. */
+  soulId?: string | null;
+  model: string; request: unknown; response: unknown; applied: unknown;
   ms: number; inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number; mode: 'live' | 'fake'; error?: string;
 };
 export type CameraLine = { tick: number; shot: unknown; text: string; heldSec: number };
@@ -71,7 +80,7 @@ export type Batch = {
 export type Heartbeat = { tick: number; seq: number; viewHash: string; keyframes: Record<string, PoseSample>; clients: number; clockRate: number; paused: boolean };
 
 export type ServerMsg =
-  | { t: 'welcome'; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number }
+  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number }
   | ({ t: 'snapshot'; reason: string } & Snapshot)
   | ({ t: 'batch' } & Batch)
   | ({ t: 'heartbeat' } & Heartbeat)
@@ -84,7 +93,7 @@ export type ServerMsg =
   | { t: 'pong'; n: number; serverTime: number }
   | { t: 'error'; code: string; message: string };
 
-export type Me = { userId: string; short: string; email: string | null; wallet: string | null; role: 'user' | 'admin'; souls: string[] };
+export type Me = { userId: string; short: string; email: string | null; wallet: string | null; role: 'user' | 'admin'; souls: string[]; invited: boolean };
 export type ServerStats = {
   tick: number; tickMsAvg: number; tickMsMax: number; clients: number; entities: number; souls: number; liveActions: number;
   seq: number; logEvents: number; lastSnapshotTick: number; dbBytes: number; uptimeSec: number;
@@ -116,5 +125,11 @@ export const adminSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('brain_mode'), mode: z.enum(['live', 'fake']) }),
   z.strictObject({ action: z.literal('snapshot') }),
   z.strictObject({ action: z.literal('budget'), usdPerDay: z.number().min(0).max(100) }),
+  z.strictObject({ action: z.literal('invite'), uses: z.number().int().min(1).max(500), note: z.string().max(80).optional() }),
 ]);
 export type AdminAction = z.infer<typeof adminSchema>;
+
+export const pairExchangeSchema = z.strictObject({ code: z.string().trim().min(4).max(40), agent: z.string().trim().max(60).optional() });
+export const pairStartSchema = z.strictObject({ agent: z.string().trim().max(60).optional() });
+export const pairApproveSchema = z.strictObject({ code: z.string().trim().min(4).max(40), soulId: z.string() });
+export const inviteSchema = z.strictObject({ code: z.string().trim().min(3).max(40) });

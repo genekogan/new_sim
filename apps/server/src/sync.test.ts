@@ -22,7 +22,7 @@ const api = async (path: string, token: string, body?: unknown, method?: string)
 
 before(async () => {
   proc = spawn(process.execPath, [new URL('./main.ts', import.meta.url).pathname], {
-    env: { PATH: process.env.PATH, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'sim-sync-')), BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent' },
+    env: { PATH: process.env.PATH, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'sim-sync-')), BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent', INVITE_REQUIRED: '1' },
     stdio: ['ignore', 'inherit', 'inherit'],
   });
   for (let i = 0; i < 50; i++) { try { if ((await fetch(`${BASE}/healthz`)).ok) return; } catch { /* not up yet */ } await sleep(200); }
@@ -70,52 +70,109 @@ test('a corrupted replica detects the mismatch and resyncs', async () => {
   c.close();
 });
 
-test('signed-in user creates a soul, commands it, and an agent steers it with a claimed token', async () => {
+test('invite gate: a new user cannot create a Soul until they redeem a code', async () => {
+  const blocked = await api('/v1/souls', 'dev:alice', { name: 'Testa', description: 'a test soul who likes benches' });
+  assert.equal(blocked.status, 403); assert.equal(blocked.body.code, 'invite-required');
+  assert.equal((await api('/v1/me', 'dev:alice')).body.me.invited, false);
+  assert.equal((await api('/v1/admin', 'dev:alice', { action: 'invite', uses: 2 })).status, 403);
+  const inv = await api('/v1/admin', 'dev:admin', { action: 'invite', uses: 2, note: 'test' });
+  assert.equal(inv.status, 200);
+  assert.equal((await api('/v1/invite', 'dev:alice', { code: 'nope' })).status, 404);
+  assert.equal((await api('/v1/invite', 'dev:alice', { code: inv.body.code })).status, 200);
+  assert.equal((await api('/v1/invite', 'dev:bob', { code: inv.body.code })).status, 200);
+  assert.equal((await api('/v1/invite', 'dev:carol', { code: inv.body.code })).status, 404, 'code is used up');
+  assert.equal((await api('/v1/me', 'dev:alice')).body.me.invited, true);
+});
+
+test('create a Soul, steer it from the page, pair an agent both ways, steer by REST and MCP', async () => {
   const user = 'dev:alice';
   const made = await api('/v1/souls', user, { name: 'Testa', description: 'a test soul who likes benches' });
   assert.equal(made.status, 200, JSON.stringify(made.body));
   const id = made.body.soul.id;
-  const dup = await api('/v1/souls', 'dev:bob', { name: 'testa', description: 'imposter' });
-  assert.equal(dup.status, 409);
+  assert.equal((await api('/v1/souls', 'dev:bob', { name: 'testa', description: 'imposter' })).status, 409);
   assert.equal((await api(`/v1/souls/${id}`, 'dev:bob')).status, 403);
-  const me = await api('/v1/me', user);
-  assert.deepEqual(me.body.me.souls, [id]);
-  // direct structured intent from the web
-  const set = await api(`/v1/souls/${id}/intent`, user, { intent: { goal: 'go', target: 'the kiosk' } });
+  assert.deepEqual((await api('/v1/me', user)).body.me.souls, [id]);
+  await sleep(500);
+  // structured intent from the page, with a private note
+  const set = await api(`/v1/souls/${id}/intent`, user, { intent: { goal: 'go', target: 'the kiosk', note: 'secret plan' } });
   assert.equal(set.status, 200, JSON.stringify(set.body));
   assert.equal(set.body.intent.target, 'kiosk');
-  // claim flow → agent token
-  const claim = await api(`/v1/souls/${id}/claim`, user, {});
-  const page = await (await fetch(claim.body.url)).text();
-  const token = page.match(/TOKEN: (sim_\S+)/)![1];
-  assert.equal((await fetch(claim.body.url)).status, 404, 'claim link is one-time');
-  const status = await api('/v1/agent/status', token);
-  assert.equal(status.body.name, 'Testa');
+
+  // --- pairing, owner-initiated: a short code in a one-line prompt
+  const pair = await api(`/v1/souls/${id}/pair`, user, {});
+  assert.match(pair.body.code, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  assert.ok(pair.body.prompt.includes('/skill.md') && pair.body.prompt.includes(pair.body.code));
+  const skill = await (await fetch(`${BASE}/skill.md`)).text();
+  assert.ok(skill.startsWith('---\nname: sim') && skill.includes('/v1/agent/pair'));
+  const post = (path: string, b: unknown) => fetch(BASE + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then(async (r) => ({ status: r.status, body: await r.json() as any }));
+  const ex = await post('/v1/agent/pair', { code: pair.body.code.toLowerCase().replace('-', ''), agent: 'test agent' });
+  assert.equal(ex.status, 200, JSON.stringify(ex.body));
+  const token = ex.body.token as string;
+  assert.equal(ex.body.soul.name, 'Testa');
+  assert.equal((await post('/v1/agent/pair', { code: pair.body.code })).status, 404, 'a code works once');
+
+  // --- the agent API
+  assert.equal((await api('/v1/agent/me', token)).body.paired_as, 'test agent');
+  const seen = await api('/v1/agent/perceive', token);
+  assert.equal(seen.status, 200);
+  assert.ok(seen.body.nearby.length > 0 && seen.body.could_do_now.length > 0 && seen.body.soul.intent.note === 'secret plan');
+  const waitP = api('/v1/agent/wait?seconds=20', token);
   const steer = await api('/v1/agent/intent', token, { intent: { goal: 'rest' } });
-  assert.equal(steer.status, 200);
-  assert.ok(steer.body.accepted_at_tick > 0);
+  assert.equal(steer.status, 200); assert.ok(steer.body.accepted_at_tick > 0);
+  const waited = await waitP;
+  assert.notEqual(waited.body.reason, 'timeout');
   assert.equal((await api('/v1/agent/intent', token, { intent: { goal: 'fly' } })).status, 400);
   assert.equal((await api('/v1/agent/intent', token, { intent: { goal: 'go', target: 'atlantis' } })).status, 400);
-  // MCP with the same token
-  const mcp = async (method: string, params: unknown) => (await fetch(`${BASE}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).json() as Promise<any>;
-  const init = await mcp('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } });
-  assert.equal(init.result.serverInfo.name, 'sim');
-  const tools = await mcp('tools/list', {});
-  assert.deepEqual(tools.result.tools.map((t: any) => t.name).sort(), ['soul_log', 'soul_set_intent', 'soul_status', 'world_query']);
-  const call = await mcp('tools/call', { name: 'soul_set_intent', arguments: { goal: 'attend', target: 'campfire' } });
+
+  // --- MCP with the same token: header form and URL form
+  const mcp = async (method: string, params: unknown, url = `${BASE}/mcp`, auth = true) => (await fetch(url, { method: 'POST', headers: { ...(auth ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).json() as Promise<any>;
+  assert.equal((await mcp('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } })).result.serverInfo.name, 'sim');
+  assert.deepEqual((await mcp('tools/list', {})).result.tools.map((t: any) => t.name).sort(), ['soul_command', 'soul_log', 'soul_perceive', 'soul_set_intent', 'soul_status', 'soul_wait', 'world_query']);
+  const call = await mcp('tools/call', { name: 'soul_set_intent', arguments: { goal: 'attend', target: 'campfire' } }, `${BASE}/mcp/${token}`, false);
   assert.equal(JSON.parse(call.result.content[0].text).ok, true);
   assert.equal((await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 401);
-  // revoke
-  await api(`/v1/souls/${id}/revoke`, user, {});
-  assert.equal((await api('/v1/agent/status', token)).status, 401);
-  // the intent shows up in the public log, and the soul acts on it
-  await sleep(3000);
+
+  // --- the owner's dashboard
+  const dash = await api(`/v1/souls/${id}`, user);
+  assert.equal(dash.body.agent.attached, true); assert.equal(dash.body.agent.label, 'test agent'); assert.ok(dash.body.agent.last_used > 0);
+  await sleep(2500);
+  const tl = await api(`/v1/souls/${id}/timeline`, user);
+  assert.ok(tl.body.events.some((e: any) => e.kind === 'birth'));
+  assert.ok(tl.body.events.some((e: any) => e.kind === 'intent' && e.text.includes('secret plan')), 'the owner sees their own note');
+  assert.ok(tl.body.events.some((e: any) => e.kind === 'intent' && e.text.includes('your agent')));
+  assert.ok(tl.body.events.some((e: any) => e.kind === 'decision' && e.why));
+
+  // --- privacy: nobody else sees the note or the model calls about this Soul
   const log = await (await fetch(`${BASE}/v1/log?limit=1000`)).json() as any;
   assert.ok(log.events.some((e: any) => e.kind === 'intent' && e.payload.soulId === id && e.payload.source === 'mcp'));
-  assert.ok(log.events.some((e: any) => e.kind === 'decision' && e.payload.soulId === id));
-  // retire
+  assert.ok(!JSON.stringify(log).includes('secret plan'), 'notes are not in the public log');
+  assert.ok(!JSON.stringify(await (await fetch(`${BASE}/v1/world`)).json()).includes('secret plan'));
+  const mine = await api('/v1/brain?limit=200', user), bobs = await api('/v1/brain?limit=200', 'dev:bob'), all = await api('/v1/brain?limit=200', 'dev:admin');
+  assert.ok(mine.body.calls.length > 0 && mine.body.calls.every((c: any) => c.soulId === id));
+  assert.equal(bobs.body.calls.length, 0);
+  assert.ok(all.body.calls.length > mine.body.calls.length);
+  assert.equal((await api('/v1/spend', user)).status, 403);
+  const spy = client('dev:bob'); const got: any[] = []; spy.handlers.onBrain = (c) => got.push(...c);
+  await sleep(4000);
+  assert.equal(got.length, 0, 'another user receives no model calls over the socket');
+  spy.close();
+
+  // --- pairing, agent-initiated: the agent asks, the owner approves, the agent polls
+  const start = await post('/v1/agent/pair/start', { agent: 'second agent' });
+  assert.ok(start.body.approve_url.includes('#pair/'));
+  assert.equal((await (await fetch(`${BASE}/v1/agent/pair/poll?poll_token=${start.body.poll_token}`)).json() as any).status, 'pending');
+  assert.equal((await api(`/v1/pair/${start.body.user_code}`, user)).body.agent, 'second agent');
+  assert.equal((await api('/v1/pair/approve', 'dev:bob', { code: start.body.user_code, soulId: id })).status, 403, 'only the owner can approve for a Soul');
+  assert.equal((await api('/v1/pair/approve', user, { code: start.body.user_code, soulId: id })).status, 200);
+  const polled = await (await fetch(`${BASE}/v1/agent/pair/poll?poll_token=${start.body.poll_token}`)).json() as any;
+  assert.equal(polled.status, 'approved');
+  assert.equal((await api('/v1/agent/status', token)).status, 401, 'the old token was replaced');
+  assert.equal((await api('/v1/agent/status', polled.token)).body.name, 'Testa');
+
+  // --- revoke and retire
+  await api(`/v1/souls/${id}/revoke`, user, {});
+  assert.equal((await api('/v1/agent/status', polled.token)).status, 401);
   assert.equal((await api(`/v1/souls/${id}`, user, undefined, 'DELETE')).status, 200);
   await sleep(1000);
-  const world = await (await fetch(`${BASE}/v1/world`)).json() as any;
-  assert.ok(!world.souls.some((s: any) => s.name === 'Testa'));
+  assert.ok(!((await (await fetch(`${BASE}/v1/world`)).json()) as any).souls.some((s: any) => s.name === 'Testa'));
 });

@@ -68,7 +68,7 @@ export class ToyEngine implements Engine {
     this.paths = []; this.changes = []; this.cursor = this.runtime.events.length;
     // Bound memory: the runtime event list and terminal records are not part of the hashed world.
     if (this.runtime.events.length > 20000) { this.runtime.events.splice(0, this.runtime.events.length - 1000); this.cursor = this.runtime.events.length; }
-    if (this.runtime.records.size > 5000) for (const [id, r] of this.runtime.records) { if (r.endedTick !== undefined && r.endedTick < this.world.tick - 6000) this.runtime.records.delete(id); }
+    if (this.world.tick % 600 === 0) for (const [id, r] of this.runtime.records) { if (r.endedTick !== undefined && r.endedTick < this.world.tick - 1200) this.runtime.records.delete(id); }
     return out;
   }
 

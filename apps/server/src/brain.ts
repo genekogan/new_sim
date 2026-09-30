@@ -30,6 +30,7 @@ export class Brain {
   get budget() { return this.gov.budget; }
   set budget(b: number) { this.gov.setBudget(b); this.capSince = Date.now(); this.spentToday = 0; }
   inflight = new Set<string>();
+  private lastServed = new Map<string, number>(); // soulId → tick of the last paid model call
   spentToday = 0; callsToday = 0; jevMsAvg = 0;
   camera: CameraLine | null = null;
   private shotId = ''; private shotSinceTick = 0;
@@ -61,6 +62,9 @@ export class Brain {
 
   private record(c: Omit<BrainCall, 'id' | 'at'>): number {
     const full = { ...c, at: Date.now() };
+    // long system prompts are stored once and referenced by hash
+    const sys = (full.request as any)?.system?.[0];
+    if (sys?.text && sys.text.length > 2000) full.request = { ...(full.request as object), system: [{ ...sys, text: this.db.internPrompt(sys.text) }] };
     const id = this.db.saveBrainCall(WORLD_ID, full);
     this.spentToday += c.costUsd; this.callsToday++;
     if (c.mode === 'live') this.gov.charge(tierOf(c.tier), c.costUsd);
@@ -82,8 +86,8 @@ export class Brain {
     const actual = {
       last15m: sum(this.db.spendRecent(now - 15 * 60_000)),
       last1h: sum(this.db.spendRecent(now - H)),
-      last24h: sum(this.db.spendRecent(now - 24 * H)),
-      today: sum(this.db.spendRecent(dayStart)),
+      last24h: sum(this.db.spendSince(now - 23 * H)),
+      today: sum(this.db.spendSince(dayStart)),
       last7d: sum(this.db.spendSince(now - 7 * 24 * H)),
       thisMonth: sum(this.db.spendSince(monthStart)),
       allTime: sum(this.db.spendSince(0)),
@@ -115,11 +119,15 @@ export class Brain {
   // ------------------------------------------------------------ per tick
   private afterTick(tick: number) {
     const w = this.host.engine.world;
-    // Tier 2: mid-brain, per Soul, when due
-    for (const m of this.host.minds.values()) {
-      if (m.nextEvalTick > tick || this.inflight.has(m.soulId) || !w.entities[m.entityId]) continue;
-      if (this.inflight.size >= MAX_INFLIGHT) break;
-      void this.evaluate(m, m.evalTrigger || 'timer');
+    // Tier 2: mid-brain, per Soul, when due. Fair order: owner intents first, then whoever has waited longest,
+    // so a fixed iteration order can never let a few Souls take the whole mid-brain share.
+    if (this.inflight.size < MAX_INFLIGHT) {
+      const due: Mind[] = [];
+      for (const m of this.host.minds.values()) if (m.nextEvalTick <= tick && !this.inflight.has(m.soulId) && w.entities[m.entityId]) due.push(m);
+      if (due.length) {
+        due.sort((a, b) => prio(a.evalTrigger) - prio(b.evalTrigger) || (this.lastServed.get(a.soulId) ?? 0) - (this.lastServed.get(b.soulId) ?? 0) || (a.soulId < b.soulId ? -1 : 1));
+        for (const m of due) { if (this.inflight.size >= MAX_INFLIGHT) break; void this.evaluate(m, m.evalTrigger || 'timer'); }
+      }
     }
     // expire nudges
     if (tick % TPS === 0) for (const m of this.host.minds.values()) if (m.nudge && m.nudge.untilTick < tick) m.nudge = null;
@@ -189,6 +197,7 @@ export class Brain {
     try {
       if (!budgetOk) { decision = fallbackMid(ctx, seed); usedFallback = true; error = this.overBudget ? 'over daily budget: deterministic fallback' : 'mid-brain share spent for now (governor): deterministic fallback'; }
       else {
+        this.lastServed.set(m.soulId, tick);
         const r = await this.jev.ask(request);
         response = r.response; ms = r.ms; cost = r.costUsd; tokens = r.response.usage.input_tokens; mode = r.mode;
         decision = interpretMid(r.response, ctx, keys, seed);
@@ -203,7 +212,7 @@ export class Brain {
     const applied = stale ? { dropped: 'intent changed during the call; re-evaluating' } : opt
       ? { option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, probabilities: decision.probabilities, ...policy, seed }
       : { option: 'continue', mood: decision.mood, reevalSeconds: decision.reevalSeconds, ...policy };
-    const callId = this.record({ tick, tier: 'mid', subject: m.name, model: mode === 'live' ? JEV_MODEL : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
+    const callId = this.record({ tick, tier: 'mid', subject: m.name, soulId: m.soulId, model: mode === 'live' ? JEV_MODEL : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
     if (stale) { m.nextEvalTick = now + 1; m.evalTrigger = 'new-intent'; return; }
     m.wantsCompany = decision.sociable;
     if (!opt) { m.mood = decision.mood; m.nextEvalTick = now + decision.reevalSeconds * TPS; m.evalTrigger = 'timer'; host.markDirty(m.soulId); return; }
@@ -230,11 +239,11 @@ export class Brain {
     try {
       const r = await this.jev.ask(request);
       out = interpretTranslate(r.response, text, targetKeys);
-      this.record({ tick, tier: 'translate', subject: m.name, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: out, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+      this.record({ tick, tier: 'translate', subject: m.name, soulId: m.soulId, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: out, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
       if (out.ok || !this.cfg.anthropicKey || this.mode === 'fake' || this.overBudget || !this.gov.allow('user')) return { ...out, via: 'jev' };
     } catch (e) {
       out = { ok: false, confidence: 0, reason: String((e as Error).message) };
-      this.record({ tick, tier: 'translate', subject: m.name, model: JEV_MODEL, request, response: null, applied: out, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: out.reason });
+      this.record({ tick, tier: 'translate', subject: m.name, soulId: m.soulId, model: JEV_MODEL, request, response: null, applied: out, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: out.reason });
       if (!this.cfg.anthropicKey) return { ...out, via: 'jev' };
     }
     // second pass: a small LLM with a tool schema
@@ -242,7 +251,7 @@ export class Brain {
       const h = await haikuTranslate(this.cfg.anthropicKey!, this.cfg.narratorModel, text, m.name, targets.map((t) => ({ id: t.id, name: t.name })), GOALS);
       const valid = h.out && (GOALS as readonly string[]).includes(h.out.goal) && (h.out.target === null || targets.some((t) => t.id === h.out.target));
       const res: Translation = valid ? { ok: true, confidence: 0.7, intent: { goal: h.out.goal as WireIntent['goal'], target: h.out.target, note: sanitize(text) } } : { ok: false, confidence: 0, reason: 'not understood as something to do' };
-      this.record({ tick, tier: 'translate', subject: m.name, model: this.cfg.narratorModel, request: h.request, response: h.raw, applied: res, ms: h.ms, inputTokens: h.inputTokens, outputTokens: h.outputTokens, cachedTokens: 0, costUsd: h.costUsd, mode: 'live' });
+      this.record({ tick, tier: 'translate', subject: m.name, soulId: m.soulId, model: this.cfg.narratorModel, request: h.request, response: h.raw, applied: res, ms: h.ms, inputTokens: h.inputTokens, outputTokens: h.outputTokens, cachedTokens: 0, costUsd: h.costUsd, mode: 'live' });
       return { ...res, via: 'haiku' };
     } catch (e) { return { ok: false, confidence: 0, reason: String((e as Error).message), via: 'haiku' }; }
   }
@@ -308,7 +317,7 @@ export class Brain {
     if (this.mode === 'live' && (this.overBudget || !this.gov.allow('user'))) return { id: 'wide-follow', text: cands[1].text + ' (default: brain budget spent for now)', spec: cands[1].spec };
     const r = await this.jev.ask(request);
     const pick = cands.find((c) => c.id === (r.response.answers.shot as ChoiceA).choice) ?? cands[1];
-    this.record({ tick, tier: 'shot', subject: m.name, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { shot: pick.id, spec: pick.spec }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+    this.record({ tick, tier: 'shot', subject: m.name, soulId: m.soulId, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { shot: pick.id, spec: pick.spec }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
     return { id: pick.id, text: pick.text, spec: pick.spec };
   }
 
@@ -324,7 +333,7 @@ export class Brain {
     const others = Object.keys(w.regions).filter((r) => r !== region).map((r) => { const n = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === r).length; return `${w.regions[r].label}: ${n} souls`; });
     return {
       region, label: w.regions[region].label, time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), places,
-      souls: here.slice(0, 20).map((m) => ({ name: m.name, about: m.description, intent: describeIntent(m.intent, nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing, wants_company: m.wantsCompany > 0.6 ? 'yes' : m.wantsCompany < 0.35 ? 'no' : 'maybe' })),
+      souls: here.slice(0, 20).map((m) => ({ name: m.name, about: m.description, intent: describeIntent(m.intent ? { ...m.intent, note: undefined } : null, nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing, wants_company: m.wantsCompany > 0.6 ? 'yes' : m.wantsCompany < 0.35 ? 'no' : 'maybe' })),
       recent, neighbours: others, previous_summary: this.narratorState.lastSummary[region] ?? null,
     };
   }
@@ -364,6 +373,7 @@ export class Brain {
 }
 
 // ---------------------------------------------------------------- helpers
+const prio = (trigger: string) => ({ 'new-intent': 0, 'activity-failed': 1, 'activity-ended': 1, birth: 1, 'narrator-beat': 2 } as Record<string, number>)[trigger] ?? 3;
 const durationFloor = (h: string) => (h === 'seconds' ? 8 : h === 'minute' ? 20 : 30);
 const score = (e: Entity) => ({ perform: 5, converse: 4, walk: 3, gather: 2, wave: 2 } as Record<string, number>)[e.human!.activity] ?? 0;
 const heldWord = (s: number) => (s < 8 ? 'just started' : s < 25 ? 'a little while' : s < 60 ? 'quite a while' : 'a long time');
@@ -377,7 +387,7 @@ export function tickerText(e: LogEvent, host: WorldHost): string | null {
   switch (e.kind) {
     case 'birth': return `${e.payload.name} arrived at the gate`;
     case 'decision': return `${name(e.payload.soulId)}: ${lowerFirst(e.payload.label)}`;
-    case 'intent': return `${name(e.payload.soulId)} has a new intent: ${describeIntent(e.payload.intent, (id) => host.engine.world.entities[id]?.label ?? id)}`;
+    case 'intent': return `${name(e.payload.soulId)} has a new intent: ${describeIntent({ ...e.payload.intent, note: undefined }, (id) => host.engine.world.entities[id]?.label ?? id)}`;
     case 'scene': return `In ${host.engine.world.regions[e.payload.region]?.label ?? e.payload.region}: ${e.payload.beat.flavor}`;
     case 'retire': return `A soul departed`;
     default: return null;

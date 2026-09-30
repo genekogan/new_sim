@@ -252,7 +252,7 @@ export class WorldHost {
     const nameOf = (id: string) => this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id;
     return {
       id: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: ownerShort(m.owner), native: m.native,
-      intent: m.intent, intentText: describeIntent(m.intent, nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
+      intent: m.intent ? { goal: m.intent.goal, target: m.intent.target ?? null } : null, intentText: describeIntent(m.intent ? { ...m.intent, note: undefined } : null, nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
     };
   }
   viewHash(): string {

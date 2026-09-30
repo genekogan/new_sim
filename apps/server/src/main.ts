@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { getRequestListener } from '@hono/node-server';
 import { toyFactory } from '@sim/engine-toy';
@@ -22,6 +23,7 @@ const NATIVES: { name: string; description: string }[] = [
 ];
 
 const db = new Db(join(config.dataDir, 'sim.db'));
+if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(', ')}`);
 const host = new WorldHost(db, toyFactory, config.worldSeed, config.snapshotEveryTicks);
 const boot = host.boot();
 console.log(`[world] ${WORLD_ID} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
@@ -41,7 +43,7 @@ const souls = new Souls(host, db, brain, config);
 
 const server = createServer();
 hub = new Hub(server, host, auth, db);
-hub.brain = brain;
+hub.brain = brain; hub.build = config.build;
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls });
 const listener = getRequestListener(app.fetch);
 server.on('request', (req, res) => {
@@ -55,7 +57,7 @@ if (config.seedNatives && db.liveSouls(WORLD_ID).length === 0) {
   console.log(`[world] seeded ${NATIVES.length} native souls`);
 }
 
-server.listen(config.port, config.host, () => console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), brain ${brain.mode}, budget $${brain.budget}/day`));
+server.listen(config.port, config.host, () => console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`));
 
 let closing = false;
 const shutdown = (sig: string) => {
@@ -69,5 +71,20 @@ const shutdown = (sig: string) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-// hourly on-box backup of the SQLite file
-setInterval(() => { db.backupTo(join(config.dataDir, `backup-${new Date().toISOString().slice(0, 13).replace(/[-T:]/g, '')}.db`)).catch((e) => console.error('[backup]', e)); }, 3600_000).unref();
+// Hourly on-box backup with retention: the last 6 hourly files plus one per day (the 00:00 UTC file) for 7 days.
+function pruneBackups() {
+  const files = readdirSync(config.dataDir).filter((f) => /^backup-\d{10}\.db$/.test(f)).sort().reverse();
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const keep = new Set(files.slice(0, 6));
+  for (const f of files) { const day = f.slice(7, 15), hour = f.slice(15, 17); if (hour === '00' && Number(today) - Number(day) <= 7) keep.add(f); }
+  for (const f of files) if (!keep.has(f)) { try { unlinkSync(join(config.dataDir, f)); } catch { /* already gone */ } }
+}
+async function backupNow() {
+  db.pruneBrainCalls();
+  if (db.vacuumIfBloated()) console.log('[db] vacuumed');
+  await db.backupTo(join(config.dataDir, `backup-${new Date().toISOString().slice(0, 13).replace(/[-T:]/g, '')}.db`));
+  pruneBackups();
+}
+pruneBackups();
+setTimeout(() => void backupNow().catch((e) => console.error('[backup]', e)), 60_000).unref();
+setInterval(() => void backupNow().catch((e) => console.error('[backup]', e)), 3600_000).unref();

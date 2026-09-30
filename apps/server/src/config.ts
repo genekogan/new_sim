@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const env = process.env;
@@ -20,6 +20,8 @@ export const config = {
   snapshotEveryTicks: Number(env.SNAPSHOT_EVERY_TICKS ?? 20 * 60 * 5),
   seedNatives: env.SEED_NATIVES !== '0',
   maxSoulsPerUser: Number(env.MAX_SOULS_PER_USER ?? 5),
+  inviteRequired: env.INVITE_REQUIRED !== '0',
+  build: env.BUILD_ID || (() => { try { return readFileSync(new URL('../../../BUILD', import.meta.url), 'utf8').trim(); } catch { return 'dev'; } })(),
 };
 mkdirSync(config.dataDir, { recursive: true });
 export type Config = typeof config;

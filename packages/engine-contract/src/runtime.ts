@@ -153,7 +153,7 @@ export class Runtime {
       nextId: this.nextId,
       eventCursor: this.events.length,
       violations: this.violations,
-      records: [...this.records.values()],
+      records: [...this.live.values()].map((l) => l.record), // finished actions are history, not state
       live: [...this.live.entries()].map(([id, l]) => ({ id, exec: l.def.serializeExec(l.exec), reservations: l.reservations })),
     });
   }

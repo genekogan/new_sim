@@ -184,7 +184,7 @@ export function sanitizePlan(plan: Plan, d: RegionDigest): Plan {
 }
 
 export function fakePlan(d: RegionDigest): Plan {
-  const beats: Beat[] = [];
+  const beats: Plan['beats'] = [];
   if (d.souls.length >= 2) beats.push({ at_min: 1, kind: 'group', directive: 'converse', targets: d.souls.slice(0, 2).map((s) => s.name), flavor: 'they fall into easy talk' });
   if (d.places[0]) beats.push({ at_min: 3, kind: 'scene', directive: 'gathering', targets: [d.places[0].id], flavor: 'people drift toward it' });
   return { summary: `(fake narrator) ${d.souls.length} souls in ${d.label}.`, beats };

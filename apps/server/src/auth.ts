@@ -69,7 +69,7 @@ export class Auth {
   }
 
   me(u: UserRow): Me {
-    return { userId: u.id, short: ownerShort(u.id), email: u.email, wallet: u.wallet, role: u.role, souls: this.db.soulsOf(u.id).map((s) => s.id) };
+    return { userId: u.id, short: ownerShort(u.id), email: u.email, wallet: u.wallet, role: u.role, souls: this.db.soulsOf(u.id).map((s) => s.id), invited: !this.cfg.inviteRequired || u.role === 'admin' || !!u.invited_by };
   }
 }
 

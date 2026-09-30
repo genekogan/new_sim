@@ -3,13 +3,20 @@
 // 5 s carrying the view hash so each client can verify its replica.
 import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { PROTO, type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
+import { z } from 'zod';
+import { PROTO, publicEvent, type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Db } from './db.ts';
 import { WORLD_ID, type WorldHost } from './world.ts';
 
-type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string };
+const clientMsg = z.discriminatedUnion('t', [
+  z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional() }),
+  z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
+  z.object({ t: z.literal('ping'), n: z.number() }),
+]);
+const MAX_PER_IP = 30, MAX_CLIENTS = 2000;
+type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number };
 const MAX_BUFFERED = 1_000_000;
 
 export class Hub {
@@ -17,6 +24,7 @@ export class Hub {
   clients = new Set<Client>();
   brain!: Brain;
   startedAt = Date.now();
+  build = 'dev';
   host: WorldHost; auth: Auth; db: Db;
 
   constructor(server: Server, host: WorldHost, auth: Auth, db: Db) {
@@ -27,7 +35,7 @@ export class Hub {
       this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnect(ws, req));
     });
     host.listeners.push({
-      onBatch: (b) => this.broadcast({ t: 'batch', ...b }),
+      onBatch: (b) => this.broadcast({ t: 'batch', ...b, log: b.log.map(publicEvent) }),
       onHeartbeat: (h) => this.broadcast({ t: 'heartbeat', ...h, clients: this.clients.size }),
     });
     setInterval(() => this.sweep(), 15_000).unref();
@@ -35,12 +43,22 @@ export class Hub {
   }
 
   private onConnect(ws: WebSocket, req: IncomingMessage) {
-    const c: Client = { ws, me: null, ready: false, alive: true, joinedAt: Date.now(), resyncs: 0, sent: 0, ip: String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '') };
+    const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim();
+    let sameIp = 0; for (const x of this.clients) if (x.ip === ip) sameIp++;
+    if (this.clients.size >= MAX_CLIENTS || sameIp >= MAX_PER_IP) { ws.close(1013, 'too many connections'); return; }
+    const c: Client = { ws, me: null, ready: false, alive: true, joinedAt: Date.now(), resyncs: 0, sent: 0, ip, msgs: 0, windowStart: Date.now() };
     this.clients.add(c);
     ws.on('pong', () => (c.alive = true));
     ws.on('close', () => this.clients.delete(c));
     ws.on('error', () => this.clients.delete(c));
-    ws.on('message', (data) => { let m: ClientMsg; try { m = JSON.parse(String(data)); } catch { return; } void this.onMessage(c, m); });
+    ws.on('message', (data) => {
+      // inbound messages are validated and rate limited (20 per 10 s is far more than a well-behaved client sends)
+      const now = Date.now(); if (now - c.windowStart > 10_000) { c.windowStart = now; c.msgs = 0; }
+      if (++c.msgs > 20) { ws.close(1008, 'too many messages'); return; }
+      let raw: unknown; try { raw = JSON.parse(String(data)); } catch { return; }
+      const p = clientMsg.safeParse(raw); if (!p.success) return;
+      void this.onMessage(c, p.data as ClientMsg);
+    });
   }
 
   private async onMessage(c: Client, m: ClientMsg) {
@@ -51,17 +69,17 @@ export class Hub {
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       c.me = u ? this.auth.me(u) : null;
       const e = this.host.engine;
-      this.send(c, { t: 'welcome', proto: PROTO, worldId: WORLD_ID, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now() });
+      this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: WORLD_ID, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now() });
       // resume from the ring buffer if the client only missed a little; otherwise a full snapshot
       const ring = this.host.ring;
       const canResume = typeof m.since === 'number' && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
       if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
-      this.send(c, { t: 'log', events: this.db.tailEvents(WORLD_ID, 150) });
+      this.send(c, { t: 'log', events: this.db.tailEvents(WORLD_ID, 150).map(publicEvent) });
       if (this.brain.camera) this.send(c, { t: 'camera', line: this.brain.camera });
       if (this.brain.ticker.length) this.send(c, { t: 'ticker', lines: this.brain.ticker.slice(-20) });
       for (const v of this.brain.narratives.values()) this.send(c, { t: 'narrative', view: v });
-      if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(60) });
+      if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(40, { soulIds: c.me.role === 'admin' ? null : c.me.souls }) });
       this.send(c, { t: 'stats', stats: this.stats() });
       c.ready = true;
     }
@@ -76,8 +94,8 @@ export class Hub {
     const s = JSON.stringify(m);
     for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED) continue; c.sent += s.length; c.ws.send(s); }
   }
-  /** Brain internals go to signed-in clients only. */
-  brainCall(call: BrainCall) { this.broadcast({ t: 'brain', calls: [call] }, (c) => !!c.me); }
+  /** Model calls go to admins, and to the owner of the Soul a call is about. World-level calls (narrator, director) are admin only. */
+  brainCall(call: BrainCall) { this.broadcast({ t: 'brain', calls: [call] }, (c) => !!c.me && (c.me.role === 'admin' || (!!call.soulId && c.me.souls.includes(call.soulId)))); }
   refreshMe(userId: string) { for (const c of this.clients) if (c.me?.userId === userId) { const u = this.db.user(userId); if (u) c.me = this.auth.me(u); } }
 
   private sweep() {

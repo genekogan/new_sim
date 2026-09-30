@@ -12,6 +12,9 @@ const text = (v: unknown, isError = false) => ({ content: [{ type: 'text' as con
 function serverFor(souls: Souls, soul: SoulRow) {
   const s = new McpServer({ name: 'sim', version: '0.1.0' });
   s.registerTool('world_query', { description: 'The world: regions, places, every Soul and what it is doing. Free and instant.', inputSchema: {}, annotations: { readOnlyHint: true } }, async () => text(souls.worldSummary()));
+  s.registerTool('soul_perceive', { description: `What your Soul (${soul.name}) perceives right now: surroundings, energy, mood, nearby souls and places, and what it could do. Start here.`, inputSchema: {}, annotations: { readOnlyHint: true } }, async () => { try { return text(souls.perceive(soul)); } catch (e) { if (e instanceof ApiError) return text({ ok: false, code: e.code, message: e.message }, true); throw e; } });
+  s.registerTool('soul_wait', { description: 'Block until something happens to your Soul (an activity ends, a new one starts, an intent lands) or the timeout passes. Use instead of polling.', inputSchema: { seconds: z.number().int().min(1).max(55).optional() }, annotations: { readOnlyHint: true } }, async ({ seconds }) => { try { return text(await souls.wait(soul, seconds ?? 30)); } catch (e) { if (e instanceof ApiError) return text({ ok: false, code: e.code, message: e.message, ...e.extra }, true); throw e; } });
+  s.registerTool('soul_command', { description: 'Fallback: give a plain-language command and let the world’s small translator turn it into an intent. Prefer soul_set_intent.', inputSchema: { text: z.string().min(1).max(280) } }, async ({ text: t }) => { try { return text(await souls.command(soul, t, 'mcp')); } catch (e) { if (e instanceof ApiError) return text({ ok: false, code: e.code, message: e.message, ...e.extra }, true); throw e; } });
   s.registerTool('soul_status', { description: `Status of your Soul (${soul.name}): position, activity, mood, intent, what is nearby, and what it could do now.`, inputSchema: {}, annotations: { readOnlyHint: true } }, async () => text(souls.status(soul)));
   s.registerTool('soul_log', { description: 'Recent history of your Soul.', inputSchema: { limit: z.number().int().min(1).max(100).optional() }, annotations: { readOnlyHint: true } }, async ({ limit }) => text(souls.soulLog(soul, limit ?? 30)));
   s.registerTool('soul_set_intent', {
@@ -25,7 +28,8 @@ function serverFor(souls: Souls, soul: SoulRow) {
 }
 
 export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls: Souls) {
-  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  // bearer header, or /mcp/<token> for connector apps that only accept a URL
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') ?? req.url?.match(/^\/mcp\/(sim_[A-Za-z0-9_-]+)/)?.[1];
   const soul = souls.soulFromToken(token);
   if (!soul) { res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' }).end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'missing or invalid soul token' }, id: null })); return; }
   if (req.method !== 'POST') { res.writeHead(405, { 'content-type': 'application/json', allow: 'POST' }).end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'method not allowed (stateless server: POST only)' }, id: null })); return; }

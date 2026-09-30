@@ -2,14 +2,20 @@
   "name": "sim",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.13.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "packageManager": "pnpm@10.27.0",
   "scripts": {
     "dev": "pnpm -r --parallel --filter ./apps/* dev",
     "build": "pnpm --filter @sim/web build",
     "test": "pnpm -r test",
     "test:replay": "pnpm --filter @sim/server test:replay",
-    "start": "node --experimental-strip-types apps/server/src/main.ts"
+    "start": "node --experimental-strip-types apps/server/src/main.ts",
+    "typecheck": "pnpm -r exec tsc --noEmit -p .",
+    "check": "pnpm typecheck && pnpm test"
   },
-  "devDependencies": { "typescript": "^5.9.3" }
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
 }
