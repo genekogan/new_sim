@@ -14,7 +14,15 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   const records = [...rt.records.values()];
   const active = records.filter(r => rt.isActive(r.id));
   const work = readWorkstation(rt, B.work.station);
-  const working = active.find(r => r.verb === 'work_at');
+  const stationBusy = active.some(r => r.verb === 'work_at' && (r.params as { station?: string }).station === B.work.station);
+  const working = active.find(r => {
+    if (r.verb !== 'work_at') return false;
+    const params = r.params as typeof B.work;
+    return params.actor === B.work.actor && params.station === B.work.station && params.seat === B.work.seat
+      && params.task === B.work.task && params.duration === B.work.duration;
+  });
+  const ownUnfinished = !('code' in work) && work.status === 'unfinished' && work.user === B.work.actor
+    && work.task === B.work.task && work.duration === B.work.duration;
   const workBusy = rt.holder(`actor:${B.work.actor}`).length > 0;
   const shared = active.find(r => r.verb === 'shared_food_break') ?? records.filter(r => r.verb === 'shared_food_break').at(-1);
   const sharedActive = !!shared && rt.isActive(shared.id);
@@ -41,9 +49,9 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     </ol>
     <div data-testid="break-work-readout">Notes: {'code' in work ? work.message : `${work.status} · ${work.task ?? 'Sketch notes'} · ${work.user ?? 'unassigned'} · ${work.elapsed.toFixed(1)}/${work.duration}s · ${work.phase ?? 'ready'}`}</div>
     <div className="lab-classroom-controls">
-      <button disabled={workBusy || !!working || !('code' in work) && work.status === 'unfinished'} onClick={() => submit('work_at', B.work, 'Starting notes')}>Start notes</button>
+      <button disabled={workBusy || stationBusy || !('code' in work) && work.status === 'unfinished'} onClick={() => submit('work_at', B.work, 'Starting notes')}>Start notes</button>
       <button disabled={!working} onClick={() => working && response(rt.cancel(working.id), 'Stopping work safely; progress remains')}>Interrupt notes</button>
-      <button disabled={workBusy || !!working || 'code' in work || work.status !== 'unfinished'} onClick={() => submit('work_at', { ...B.work, resume: true }, 'Returning to the same unfinished notes')}>Resume notes</button>
+      <button disabled={workBusy || stationBusy || !ownUnfinished} onClick={() => submit('work_at', { ...B.work, resume: true }, 'Returning to the same unfinished notes')}>Resume notes</button>
     </div>
     <div className="lab-classroom-controls">
       <button data-testid="start-shared-food" disabled={sharedActive || B.people.some(p => rt.holder(`actor:${p.actor}`).length > 0)} onClick={() => submit('shared_food_break', { pot: B.pot, participants: B.people, at: B.conversation.at }, 'Both people begin a shared break through ordinary actions')}>Start shared food break</button>

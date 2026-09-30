@@ -104,6 +104,23 @@ for (const count of [4, 8]) test(`attendees continue discussion and computer fol
   expect(working.routine?.progress.workElapsed).toBe(30);
   expect(working.routine?.status).toBe('completed');
   await expect(page.getByTestId('continuation-work')).toContainText('running');
+  await expect(button(page, 'Interrupt notes')).toBeDisabled();
+  await expect(button(page, 'Resume notes')).toBeDisabled();
+  await expect(button(page, 'Start notes')).toBeDisabled();
+  if (count === 4) {
+    await button(page, 'Pause work').click();
+    await page.evaluate(() => {
+      for (let i = 0; i < 6000; i++) {
+        const work = window.__marsEngine.gatheringContinuations().find(s => s?.bindings.binding.kind === 'work');
+        if (work?.mode === 'paused') return;
+        window.__marsEngine.step();
+      }
+      throw Error('Presenter follow-up did not safely pause');
+    });
+    await expect(button(page, 'Interrupt notes')).toBeDisabled();
+    await expect(button(page, 'Resume notes')).toBeDisabled();
+    await button(page, 'Resume work').click();
+  }
   await capture(page, `continuation-${count}-work.png`, true);
   const finished = await advance(page, 'finished');
   expect(finished.work.elapsed).toBe(12);
