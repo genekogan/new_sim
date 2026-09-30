@@ -74,7 +74,7 @@ passed. No dependencies or project files were installed/changed by that invocati
 
 Clean bde7e3f gate14-47-45 passed lint/unit99/engine796(6skip11TODO)/bothTSc,
 then exposed renderer colour test relying on current house partial execution.
-Root stopped owned gate withSIGINT; cleanupError:null, red report preserved.
+Root stopped owned gate withSIGINT; cleanupError: null, red report preserved.
 Colour proof now explicitly uses the exact supported historical source while
 retaining the16ft kit, actual raise and unchanged colour/pixel tolerances.
 Current refusal tests remain mandatory. Its one full-page baseline requires an
@@ -92,3 +92,7 @@ tolerances. A transient cold-title null guard failure was preserved; the correct
 guard has a focused cold-selector regression. No release occurred from either red
 run. No-tests-found from an initial wrong-directory edit attempt is retained as a
 harness mistake; source was unchanged by that failed attempt.
+
+## Full gate watchdog evidence
+
+The clean `3108f08` full gate report `viewer/.cloudflare/gate/2026-09-30T15-56-10-034Z/report.json` remains RED: lint, 99 unit tests, 797 engine tests (6 documented skips, 11 TODO), and both TypeScript configurations passed; E2E timed out after exactly 1,200 seconds after passing case 116, with no test failure logged. Later flagship/probe/MCP stages did not execute; cleanupError: null. The suite now has 133 cases versus 123 at release 22, including the required full historical build. Raise only the whole serialized-suite watchdog from 20 to 25 minutes so all required checks can execute. Individual test deadlines, performance ceilings, assertions, pixel tolerances, expected outcomes and original baselines are unchanged. This is validation-capacity maintenance, not proof of a green result; repeat the entire clean gate before integration. No engine pin movement.
