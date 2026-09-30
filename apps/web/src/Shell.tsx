@@ -5,6 +5,7 @@ import { makeApi, useSim, type Sim } from './useSim.ts';
 import { BrainPanel, BroadcastPanel, NarrativePanel } from './BrainPanels.tsx';
 import { MePanel, AdminPanel } from './MePanels.tsx';
 import { ArchPanel } from './Arch.tsx';
+import { SpendPanel } from './Spend.tsx';
 
 export type AuthCtx = {
   ready: boolean; authed: boolean; label: string | null;
@@ -12,7 +13,7 @@ export type AuthCtx = {
   debug: { privyUserId: string | null; wallet: unknown; linked: unknown[] };
 };
 type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean };
-const TABS = ['everything', 'world', 'brain', 'story', 'me', 'sync', 'architecture'] as const;
+const TABS = ['everything', 'world', 'brain', 'spend', 'story', 'me', 'sync', 'architecture'] as const;
 type Tab = (typeof TABS)[number];
 
 export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
@@ -47,6 +48,7 @@ export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
           {show('world') && <WorldPanel sim={sim} mine={mine} selected={selected} onSelect={setSelected} />}
           {show('world', 'story') && <BroadcastPanel sim={sim} />}
           {show('me') && <MePanel sim={sim} auth={auth} api={api} selected={selected} onSelect={setSelected} />}
+          {show('spend', 'brain') && <SpendPanel api={api} authed={auth.authed} isAdmin={sim.me?.role === 'admin'} />}
           {show('brain') && <BrainPanel sim={sim} authed={auth.authed} selected={selected} />}
           {show('story') && <NarrativePanel sim={sim} />}
           {show('sync') && <SyncPanel sim={sim} />}

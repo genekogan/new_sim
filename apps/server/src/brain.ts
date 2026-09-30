@@ -10,6 +10,7 @@ import { GOALS, describeIntent, type Beat, type BrainCall, type CameraLine, type
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { WORLD_ID, energyWord, hash32, type Mind, type WorldHost } from './world.ts';
+import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 
 const TPS = 20;
 const MAX_INFLIGHT = 8;
@@ -23,7 +24,9 @@ type NarratorState = { nextRun: Record<string, number>; lastSummary: Record<stri
 export class Brain {
   jev: JevClient;
   mode: 'live' | 'fake';
-  budget: number;
+  gov: Governor;
+  get budget() { return this.gov.budget; }
+  set budget(b: number) { this.gov.setBudget(b); }
   inflight = new Set<string>();
   spentToday = 0; callsToday = 0; jevMsAvg = 0;
   camera: CameraLine | null = null;
@@ -38,7 +41,8 @@ export class Brain {
 
   constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
-    this.mode = cfg.brainMode; this.budget = cfg.budgetUsdPerDay;
+    this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
+    db.backfillSpend();
     this.jev = new JevClient(cfg.typesafeKey, this.mode);
     const t = db.brainToday(); this.spentToday = t.cost; this.callsToday = t.calls; this.jevMsAvg = t.jevMs;
     host.listeners.push({ afterTick: (tick) => this.afterTick(tick), onApplied: (e) => this.onApplied(e) });
@@ -57,9 +61,53 @@ export class Brain {
     const full = { ...c, at: Date.now() };
     const id = this.db.saveBrainCall(WORLD_ID, full);
     this.spentToday += c.costUsd; this.callsToday++;
+    if (c.mode === 'live') this.gov.charge(tierOf(c.tier), c.costUsd);
     if (c.tier === 'mid' && c.mode === 'live') this.jevMsAvg = this.jevMsAvg ? this.jevMsAvg * 0.9 + c.ms * 0.1 : c.ms;
     this.sink.onCall({ ...full, id });
     return id;
+  }
+
+  // ------------------------------------------------------------ spend
+  spendReport() {
+    const now = Date.now(), H = 3600_000;
+    const sum = (rows: { tier: string; calls: number; cost: number }[]) => {
+      const byTier: Record<string, { calls: number; cost: number }> = {};
+      for (const r of rows) { const t = tierOf(r.tier); byTier[t] = { calls: (byTier[t]?.calls ?? 0) + Number(r.calls), cost: (byTier[t]?.cost ?? 0) + Number(r.cost ?? 0) }; }
+      return { total: Object.values(byTier).reduce((a, b) => a + b.cost, 0), calls: Object.values(byTier).reduce((a, b) => a + b.calls, 0), byTier };
+    };
+    const dayStart = new Date(new Date(now).toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
+    const monthStart = new Date(new Date(now).toISOString().slice(0, 7) + '-01T00:00:00Z').getTime();
+    const actual = {
+      last15m: sum(this.db.spendRecent(now - 15 * 60_000)),
+      last1h: sum(this.db.spendRecent(now - H)),
+      last24h: sum(this.db.spendRecent(now - 24 * H)),
+      today: sum(this.db.spendRecent(dayStart)),
+      last7d: sum(this.db.spendSince(now - 7 * 24 * H)),
+      thisMonth: sum(this.db.spendSince(monthStart)),
+      allTime: sum(this.db.spendSince(0)),
+    };
+    // Projections: the recent trend, and what the governor will actually allow (it caps each tier at its share).
+    const perDayTrend = actual.last1h.total * 24;
+    const perDayGoverned = Math.min(perDayTrend, this.budget);
+    const hoursLeftToday = (dayStart + 24 * H - now) / H;
+    const daysInMonth = new Date(Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth() + 1, 0)).getUTCDate();
+    const daysLeftMonth = (monthStart + daysInMonth * 24 * H - now) / (24 * H);
+    const projected = {
+      basis: 'rate over the last hour',
+      perHour: actual.last1h.total, perDayTrend, perDayGoverned,
+      perWeek: perDayGoverned * 7, perMonth: perDayGoverned * 30, perYear: perDayGoverned * 365,
+      endOfToday: actual.today.total + (perDayGoverned / 24) * hoursLeftToday,
+      endOfMonth: actual.thisMonth.total + perDayGoverned * daysLeftMonth,
+      byTierPerDay: Object.fromEntries((Object.keys(SHARES) as Tier[]).map((t) => [t, Math.min((actual.last1h.byTier[t]?.cost ?? 0) * 24, this.gov.perDay(t))])),
+    };
+    return {
+      at: now, budgetPerDay: this.budget, mode: this.mode, hardCapHit: this.overBudget,
+      actual, projected, governor: this.gov.view(),
+      hourly: this.db.spendHourly(24).map((r) => ({ ...r, tier: tierOf(r.tier) })),
+      byModel: this.db.spendByModel(),
+      since: this.db.spendFirstHour() ? this.db.spendFirstHour()! * H : null,
+      pricing: { jev: '$0.042 per million input tokens; output free', haiku: '$1 / $5 per million input / output tokens; cache write $1.25, cache read $0.10' },
+    };
   }
 
   // ------------------------------------------------------------ per tick
@@ -128,13 +176,16 @@ export class Brain {
     const fp = fingerprint(ctx);
     if (ctx.running && trigger === 'timer' && fp === m.lastFingerprint) { m.nextEvalTick = tick + TPS * 60; return; } // nothing changed: skip the call
     m.lastFingerprint = fp;
+    // Governor: if the mid-brain share is spent for now, a busy soul simply waits; an idle soul takes a free default.
+    const budgetOk = !this.overBudget && (this.mode === 'fake' || this.gov.allow('mid'));
+    if (!budgetOk && ctx.running) { m.nextEvalTick = tick + Math.max(20, this.gov.waitSeconds('mid')) * TPS; m.lastFingerprint = ''; return; }
     this.inflight.add(m.soulId);
     const version = m.intentVersion;
     const seed = `${m.soulId}:${tick}`;
     const { request, keys } = buildMidRequest(ctx);
     let decision, response: unknown = null, ms = 0, cost = 0, tokens = 0, mode: 'live' | 'fake' = 'fake', error: string | undefined, usedFallback = false;
     try {
-      if (this.overBudget) { decision = fallbackMid(ctx, seed); usedFallback = true; error = 'over daily budget: deterministic fallback'; }
+      if (!budgetOk) { decision = fallbackMid(ctx, seed); usedFallback = true; error = this.overBudget ? 'over daily budget: deterministic fallback' : 'mid-brain share spent for now (governor): deterministic fallback'; }
       else {
         const r = await this.jev.ask(request);
         response = r.response; ms = r.ms; cost = r.costUsd; tokens = r.response.usage.input_tokens; mode = r.mode;
@@ -173,11 +224,12 @@ export class Brain {
     ].slice(0, 24);
     const { request, targetKeys } = buildTranslateRequest(text, m.name, targets);
     let out: Translation;
+    if (this.mode === 'live' && (this.overBudget || !this.gov.allow('user'))) return { ok: false, confidence: 0, reason: 'the brain budget is spent for now; try again in a few minutes', via: 'governor' };
     try {
       const r = await this.jev.ask(request);
       out = interpretTranslate(r.response, text, targetKeys);
       this.record({ tick, tier: 'translate', subject: m.name, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: out, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
-      if (out.ok || !this.cfg.anthropicKey || this.mode === 'fake' || this.overBudget) return { ...out, via: 'jev' };
+      if (out.ok || !this.cfg.anthropicKey || this.mode === 'fake' || this.overBudget || !this.gov.allow('user')) return { ...out, via: 'jev' };
     } catch (e) {
       out = { ok: false, confidence: 0, reason: String((e as Error).message) };
       this.record({ tick, tier: 'translate', subject: m.name, model: JEV_MODEL, request, response: null, applied: out, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: out.reason });
@@ -224,7 +276,7 @@ export class Brain {
     try {
       if (ctx.candidates.length === 0 && !ctx.current) ctx.candidates = candidates;
       const request = buildDirectorRequest(ctx);
-      const r = this.overBudget ? null : await this.jev.ask(request);
+      const r = this.overBudget || (this.mode === 'live' && !this.gov.allow('director')) ? null : await this.jev.ask(request);
       if (r) {
         const d = interpretDirector(r.response, ctx);
         const lines: TickerLine[] = d.announce.map((e) => ({ tick, text: e.text }));
@@ -251,6 +303,7 @@ export class Brain {
       ...(near ? [{ id: 'two-shot', text: `Two-shot with ${near.who}`, why: 'Someone is right next to them', spec: { kind: 'frameGroup', subjects: [id, near.id], azimuth: 0.8, elevation: 0.25, padding: 1.6 } } as ShotCandidate] : []),
     ];
     const request = buildShotRequest({ name: m.name, doing: m.doing }, cands);
+    if (this.mode === 'live' && (this.overBudget || !this.gov.allow('user'))) return { id: 'wide-follow', text: cands[1].text + ' (default: brain budget spent for now)', spec: cands[1].spec };
     const r = await this.jev.ask(request);
     const pick = cands.find((c) => c.id === (r.response.answers.shot as ChoiceA).choice) ?? cands[1];
     this.record({ tick, tier: 'shot', subject: m.name, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { shot: pick.id, spec: pick.spec }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
@@ -280,6 +333,11 @@ export class Brain {
     const d = this.digest(region);
     if (d.souls.length === 0) return; // nobody here: no call
     if (this.overBudget) return;
+    if (this.mode === 'live' && !this.gov.allow('narrator')) {
+      // the narrator's share cannot afford a plan yet: try again when it can (plus jitter so regions stay apart)
+      ns.nextRun[region] = tick + (Math.max(60, this.gov.waitSeconds('narrator')) + (hash32(`${region}:${tick}:w`) % 120)) * TPS;
+      return;
+    }
     this.narrating.add(region);
     const request = buildNarratorRequest(d, this.cfg.narratorModel);
     try {

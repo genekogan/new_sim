@@ -72,6 +72,7 @@ export function buildApp(d: Deps) {
     const lim = d.souls.limits.allow(`shot:${s.id}`, 12, 60_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'slow down', { retry_after: lim.retryAfter });
     return c.json({ ok: true, shot: await d.brain.shotFor(m) });
   });
+  app.get('/v1/spend', async (c) => { await requireUser(c); return c.json(d.brain.spendReport()); });
   app.get('/v1/brain', async (c) => { await requireUser(c); return c.json({ calls: d.db.brainCalls(Math.min(500, Number(c.req.query('limit') ?? 100)), c.req.query('tier') || undefined) }); });
 
   // ---- admin

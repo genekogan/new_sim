@@ -23,6 +23,7 @@ export class Db {
       CREATE UNIQUE INDEX IF NOT EXISTS souls_name ON souls (world_id, name COLLATE NOCASE) WHERE retired_at IS NULL;
       CREATE TABLE IF NOT EXISTS brain_calls (id INTEGER PRIMARY KEY AUTOINCREMENT, world_id TEXT NOT NULL, tick INTEGER NOT NULL, at INTEGER NOT NULL, tier TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, cost_usd REAL NOT NULL, ms REAL NOT NULL);
       CREATE INDEX IF NOT EXISTS brain_calls_at ON brain_calls (at);
+      CREATE TABLE IF NOT EXISTS spend_hourly (hour INTEGER NOT NULL, tier TEXT NOT NULL, model TEXT NOT NULL, calls INTEGER NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL, cached_tokens INTEGER NOT NULL, cost_usd REAL NOT NULL, PRIMARY KEY (hour, tier, model));
       CREATE TABLE IF NOT EXISTS narratives (id INTEGER PRIMARY KEY AUTOINCREMENT, world_id TEXT NOT NULL, region TEXT NOT NULL, tick INTEGER NOT NULL, at INTEGER NOT NULL, body TEXT NOT NULL);
     `);
   }
@@ -78,6 +79,10 @@ export class Db {
   // brain calls
   saveBrainCall(worldId: string, c: Omit<BrainCall, 'id'>): number {
     const r = this.db.prepare('INSERT INTO brain_calls (world_id, tick, at, tier, subject, body, cost_usd, ms) VALUES (?,?,?,?,?,?,?,?)').run(worldId, c.tick, c.at, c.tier, c.subject, JSON.stringify(c), c.costUsd, c.ms);
+    // hourly rollup: survives pruning of brain_calls, so all-time spend stays exact
+    if (c.mode === 'live') this.db.prepare(`INSERT INTO spend_hourly (hour, tier, model, calls, input_tokens, output_tokens, cached_tokens, cost_usd) VALUES (?,?,?,1,?,?,?,?)
+      ON CONFLICT(hour, tier, model) DO UPDATE SET calls = calls + 1, input_tokens = input_tokens + excluded.input_tokens, output_tokens = output_tokens + excluded.output_tokens, cached_tokens = cached_tokens + excluded.cached_tokens, cost_usd = cost_usd + excluded.cost_usd`)
+      .run(Math.floor(c.at / 3600_000), c.tier, c.model, c.inputTokens, c.outputTokens, c.cachedTokens, c.costUsd);
     return Number(r.lastInsertRowid);
   }
   brainCalls(limit: number, tier?: string): BrainCall[] {
@@ -91,6 +96,31 @@ export class Db {
     const a = this.db.prepare('SELECT COUNT(*) AS c, COALESCE(SUM(cost_usd),0) AS s FROM brain_calls WHERE at > ?').get(since) as any;
     const b = this.db.prepare("SELECT COALESCE(AVG(ms),0) AS m FROM (SELECT ms FROM brain_calls WHERE tier = 'mid' AND ms > 2 ORDER BY id DESC LIMIT 100)").get() as any;
     return { calls: a.c, cost: a.s, jevMs: b.m };
+  }
+  /** Spend since a time, by tier (live calls only). */
+  spendSince(sinceMs: number): { tier: string; calls: number; cost: number; tokens: number }[] {
+    return (this.db.prepare('SELECT tier, SUM(calls) AS calls, SUM(cost_usd) AS cost, SUM(input_tokens + output_tokens) AS tokens FROM spend_hourly WHERE hour >= ? GROUP BY tier').all(Math.floor(sinceMs / 3600_000)) as any[]);
+  }
+  /** Exact spend over the last N minutes from the raw call table (for the short window). */
+  spendRecent(sinceMs: number): { tier: string; calls: number; cost: number }[] {
+    return this.db.prepare("SELECT tier, COUNT(*) AS calls, SUM(cost_usd) AS cost FROM brain_calls WHERE at >= ? AND body LIKE '%\"mode\":\"live\"%' GROUP BY tier").all(sinceMs) as any[];
+  }
+  spendHourly(hours: number): { hour: number; tier: string; cost: number; calls: number }[] {
+    return this.db.prepare('SELECT hour, tier, SUM(cost_usd) AS cost, SUM(calls) AS calls FROM spend_hourly WHERE hour >= ? GROUP BY hour, tier ORDER BY hour').all(Math.floor(Date.now() / 3600_000) - hours + 1) as any[];
+  }
+  spendByModel(): { model: string; calls: number; cost: number; input: number; output: number; cached: number }[] {
+    return this.db.prepare('SELECT model, SUM(calls) AS calls, SUM(cost_usd) AS cost, SUM(input_tokens) AS input, SUM(output_tokens) AS output, SUM(cached_tokens) AS cached FROM spend_hourly GROUP BY model').all() as any[];
+  }
+  spendFirstHour(): number | null { return ((this.db.prepare('SELECT MIN(hour) AS h FROM spend_hourly').get() as any)?.h as number) ?? null; }
+  /** Backfill the rollup from calls recorded before it existed (idempotent: only when the rollup is empty). */
+  backfillSpend() {
+    if ((this.db.prepare('SELECT COUNT(*) AS c FROM spend_hourly').get() as any).c > 0) return;
+    for (const r of this.db.prepare('SELECT body FROM brain_calls ORDER BY id').all() as any[]) {
+      const c = JSON.parse(r.body); if (c.mode !== 'live') continue;
+      this.db.prepare(`INSERT INTO spend_hourly (hour, tier, model, calls, input_tokens, output_tokens, cached_tokens, cost_usd) VALUES (?,?,?,1,?,?,?,?)
+        ON CONFLICT(hour, tier, model) DO UPDATE SET calls = calls + 1, input_tokens = input_tokens + excluded.input_tokens, output_tokens = output_tokens + excluded.output_tokens, cached_tokens = cached_tokens + excluded.cached_tokens, cost_usd = cost_usd + excluded.cost_usd`)
+        .run(Math.floor(c.at / 3600_000), c.tier, c.model, c.inputTokens ?? 0, c.outputTokens ?? 0, c.cachedTokens ?? 0, c.costUsd ?? 0);
+    }
   }
   pruneBrainCalls(keep = 20000) { this.db.prepare('DELETE FROM brain_calls WHERE id <= (SELECT MAX(id) FROM brain_calls) - ?').run(keep); }
 
