@@ -56,6 +56,24 @@ await test('live canvas material replaces actual CRT faces without changing sour
   const monitor = scene.getObjectByName('Monitor.002_RetroPalette2_0'), original = monitor.geometry, uv = Array.from(original.attributes.uv.array), live = new THREE.MeshBasicMaterial();
   assert.equal(attachWorkstationScreen(scene, live, r), 8);
   assert.deepEqual(Array.from(original.attributes.uv.array), uv); assert.notEqual(monitor.geometry, original); assert.equal(monitor.material[1], live);
+  const mappedGeometry = monitor.geometry;
+  assert.ok(mappedGeometry.groups.length <= 7, 'actual asset needs at most seven contiguous draws, not one draw per triangle');
+  assert.equal(mappedGeometry.groups.filter(g => g.materialIndex === 1).reduce((sum, g) => sum + g.count, 0), 8 * 3);
+  assert.deepEqual(Array.from(mappedGeometry.index.array), Array.from(original.index.array));
+  assert.deepEqual(Array.from(mappedGeometry.attributes.position.array), Array.from(original.attributes.position.array));
+  assert.deepEqual(Array.from(mappedGeometry.attributes.normal.array), Array.from(original.attributes.normal.array));
+  const selected = i => Math.abs(original.attributes.uv.getX(i) - 0.188) < 0.001 && Math.abs(original.attributes.uv.getY(i) - 0.858) < 0.001;
+  let covered = 0;
+  for (const g of mappedGeometry.groups) {
+    assert.equal(g.start, covered); covered += g.count;
+    for (let i = g.start; i < g.start + g.count; i += 3)
+      assert.equal(g.materialIndex, [0, 1, 2].every(k => selected(original.index.getX(i + k))) ? 1 : 0);
+  }
+  assert.equal(covered, original.index.count);
+  for (let i = 0; i < original.attributes.uv.count; i++) if (!selected(i)) {
+    assert.equal(mappedGeometry.attributes.uv.getX(i), original.attributes.uv.getX(i));
+    assert.equal(mappedGeometry.attributes.uv.getY(i), original.attributes.uv.getY(i));
+  }
   for (const g of monitor.geometry.groups.filter(g => g.materialIndex === 1)) for (let k = 0; k < g.count; k++) {
     const i = monitor.geometry.index.getX(g.start + k), mapped = monitor.geometry.attributes.uv;
     assert.ok(mapped.getX(i) >= 0 && mapped.getX(i) <= 1 && mapped.getY(i) >= 0 && mapped.getY(i) <= 1);

@@ -55,7 +55,11 @@ export function attachWorkstationScreen(model: THREE.Object3D, material: THREE.M
   let faces = 0;
   for (let i = 0; i < index.count; i += 3) {
     const screen = [0, 1, 2].every(k => selected(index.getX(i + k)));
-    geometry.addGroup(i, 3, screen ? 1 : 0);
+    const materialIndex = screen ? 1 : 0;
+    const previous = geometry.groups.at(-1);
+    // Preserve indexed triangle order while drawing each contiguous material run once.
+    if (previous?.materialIndex === materialIndex) previous.count += 3;
+    else geometry.addGroup(i, 3, materialIndex);
     if (screen) faces++;
   }
   if (!faces) { geometry.dispose(); throw Error('Imported computer CRT triangles are unavailable'); }

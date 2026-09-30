@@ -21,3 +21,7 @@ Public credit metadata uses the archive-relative source identifier; the exact lo
 ## Focused slot result
 
 After release25fullgate finished GREEN, worker ran only `node --test deploy/imported-workstation.test.mjs`:8/8pass,0failure/skip,191.555ms (wall0.734s). Exact copied binary/credit, transformed fit, authored CRT geometry mapping, unchanged primitive task canvas, named404fallback, lateparse/palette cleanup and detached/idempotent lifetime proof pass. No source change was required. Heavy slot immediately released for25deployment; no actualbrowserimportcapture or full26gate yet. Root authored actualNPC/fallback/reset checks remains queued, and the importedappearance is NOT in25source73eda39.
+
+## Bounded draw-group correction
+
+Read-only indexed-geometry inspection found 352 monitor triangles and seven contiguous material runs (three CRT runs containing the same eight screen triangles). The initial helper created one draw group per triangle. Coalescing adjacent same-material triangles now yields seven monitor groups without index reordering, position/normal changes, or alteration to non-screen UVs. Focused assertions bound groups to seven, prove contiguous complete coverage and exact per-triangle material selection, retain eight CRT faces, and preserve original source UV plus non-screen mapped UVs. This correction's focused tests remain queued while the release25 deployment owns the heavy slot; no browser/performance claims. Light TSC/scoped lint validation is recorded with the correction commit.
