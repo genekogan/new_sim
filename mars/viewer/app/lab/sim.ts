@@ -116,7 +116,7 @@ export class LabSim {
     if (!this.paused && !this.done()) {
       this.acc += Math.min(seconds, 0.25) * this.speed;
       let n = 0;
-      while (this.acc >= DT && n++ < maxSteps) {
+      while (this.acc >= DT && !this.done() && n++ < maxSteps) {
         this.step();
         this.acc -= DT;
       }

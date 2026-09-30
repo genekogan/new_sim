@@ -2,6 +2,27 @@ import { test, expect } from '@playwright/test';
 import { openLab, labFrames } from './lab-helpers.ts';
 import { captureView, collectConsoleErrors } from './helpers.ts';
 
+test('delayed playback frames stop exactly at the scenario budget or completion', async ({ page }) => {
+  await openLab(page, 'body');
+  const result = await page.evaluate(async () => {
+    const moduleUrl = '/app/lab/sim.ts';
+    const { LabSim } = await import(moduleUrl);
+    const budget = new LabSim();
+    budget.load('body');
+    budget.stepN(19);
+    budget.advance(0.25);
+    const first = budget.rt.tick;
+    budget.advance(0.25);
+    const completion = new LabSim();
+    completion.load('body');
+    completion.scenario = { ...completion.scenario, continuous: false, done: (rt: { tick: number }) => rt.tick >= 2 };
+    completion.advance(0.25);
+    return { first, repeated: budget.rt.tick, done: budget.done(), violations: budget.rt.violations,
+      completion: completion.rt.tick, completed: completion.done() };
+  });
+  expect(result).toEqual({ first: 20, repeated: 20, done: true, violations: [], completion: 2, completed: true });
+});
+
 test('body probe selectable Step, Reset and Play validate a safe still world', async ({ page }, testInfo) => {
   const errors = collectConsoleErrors(page);
   await openLab(page);
