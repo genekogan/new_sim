@@ -178,7 +178,7 @@ for (const [name, change, code] of [
   ],
   [
     'wrong fixture',
-    (rt) => (rt.world.entities.chair.def = 'table-6ft'),
+    (rt) => (rt.world.entities.chair.def = 'campfire'),
     'move_fixture.unsupported',
   ],
   [

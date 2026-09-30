@@ -29,7 +29,7 @@ import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
-export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/5`;
+export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/6`;
 
 export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...STOW_ACTIONS];
 export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS, ...FRAMING_INVARIANTS];

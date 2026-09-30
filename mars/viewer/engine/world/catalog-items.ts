@@ -51,6 +51,10 @@ export const ITEM_ASSETS: AssetDef[] = [
     color: '#d9d4c7',
     obstacle: true,
     surfaceSlots: tableSlots(),
+    capabilities: {fixtureCarry:{upright:true,handling:{carryCrew:[2,2],carryPose:'edge',carryHeight:1,grips:{2:[
+      {id:'table-edge-negative',local:[0,TABLE_TOP,-.375],span:[.3,0,0]},
+      {id:'table-edge-positive',local:[0,TABLE_TOP,.375],span:[.3,0,0]},
+    ]}}}},
     dims: provisional('generic 6 ft folding table, 1.83 × 0.75 m top at 0.75 m; 3 × 6 item places 0.3 m apart'),
   },
   {

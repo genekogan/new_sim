@@ -102,8 +102,8 @@ export function activeLoadDiscs(rt: Runtime, braking = false): LoadDisc[] {
   return out;
 }
 
-/** A chair is held in front of its single carrier; construction defaults face along the load. */
-const carryFacing = (ex: CarryExec, yaw:number) => wrapAngle(yaw - (ex.p.fixture ? ex.p.f.carriers[0].side * Math.PI / 2 : 0));
+/** Upright fixtures are held in front of each carrier; construction defaults face along the load. */
+const carryFacing = (ex: CarryExec, yaw:number, index=0) => wrapAngle(yaw - (ex.p.fixture ? ex.p.f.carriers[index].side * Math.PI / 2 : 0));
 
 /** Place load + carriers for formation pose q (the only way positions change while moving). */
 function applyFormation(rt: Runtime, ex: CarryExec, q: SE2) {
@@ -111,7 +111,7 @@ function applyFormation(rt: Runtime, ex: CarryExec, q: SE2) {
   item.pose = carriedPose(ex.p.f, q, ex.p.levelY);
   const spots = carrierSpots(ex.p.f, q);
   crewOf(rt, ex).forEach((h, i) => {
-    h.pose = { p: [spots[i][0], ex.p.levelY, spots[i][1]], yaw: carryFacing(ex, q.th) };
+    h.pose = { p: [spots[i][0], ex.p.levelY, spots[i][1]], yaw: carryFacing(ex, q.th, i) };
   });
   ex.q = q;
 }
@@ -194,7 +194,7 @@ function poseAtU(ex: CarryExec, u: number): SE2 {
 function beginTransition(rt: Runtime, ex: CarryExec, phase: 'lift' | 'set-down', to: Pose, toSpots: Vec2[], yaw: number, final: Entity['phase']) {
   const item = itemOf(rt, ex);
   const fromSpots = crewOf(rt, ex).map((h) => [h.pose.p[0], h.pose.p[2]] as Vec2);
-  ex.tr = { from: { ...item.pose, p: [...item.pose.p] }, to, fromSpots, toSpots, yaw: ex.p.fixture ? carryFacing(ex, to.yaw) : yaw, final };
+  ex.tr = { from: { ...item.pose, p: [...item.pose.p] }, to, fromSpots, toSpots, yaw, final };
   ex.phase = phase;
   ex.t = 0;
   for (const h of crewOf(rt, ex)) h.human!.activity = phase;
@@ -207,7 +207,7 @@ function stepTransition(rt: Runtime, ex: CarryExec, dt: number, dur: number): bo
   itemOf(rt, ex).pose = lerpPose(tr.from, tr.to, a);
   crewOf(rt, ex).forEach((h, i) => {
     const s = tr.fromSpots[i], e = tr.toSpots[i];
-    h.pose = { p: [s[0] + (e[0] - s[0]) * a, ex.p.levelY, s[1] + (e[1] - s[1]) * a], yaw: wrapAngle(h.pose.yaw + angleDelta(h.pose.yaw, tr.yaw) * a) };
+    h.pose = { p: [s[0] + (e[0] - s[0]) * a, ex.p.levelY, s[1] + (e[1] - s[1]) * a], yaw: wrapAngle(h.pose.yaw + angleDelta(h.pose.yaw, (ex.p.fixture ? carryFacing(ex, tr.yaw, i) : tr.yaw)) * a) };
   });
   return ex.t >= dur - 1e-9;
 }
@@ -290,10 +290,9 @@ export const carry: ActionDef<CarryParams, CarryProgram, CarryExec> = {
       }
       // arrived carriers turn to face along the load (walk_to's own `face` option is not used: see CARRY.md)
       let aligned = true;
-      const face = carryFacing(ex, p.pickup.th);
       crewOf(rt, ex).forEach((h, i) => {
         if (ex.walks[i]) return;
-        const d = angleDelta(h.pose.yaw, face);
+        const d = angleDelta(h.pose.yaw, carryFacing(ex, p.pickup.th, i));
         if (Math.abs(d) > 0.02) aligned = false;
         h.pose.yaw = wrapAngle(h.pose.yaw + clamp(d, -TURN_RATE * dt, TURN_RATE * dt));
       });

@@ -22,11 +22,13 @@ import {
 export interface MoveFixtureParams {
   actor: string;
   fixture: string;
+  helpers?: string[];
   to: { x: number; z: number; yaw: number };
 }
 export interface FixtureMoveReadout {
   action: string;
   actor: string;
+  crew: string[];
   fixture: string;
   status: ActionStatus;
   phase: string;
@@ -50,8 +52,9 @@ const sourceBinding = (e: Entity) =>
     connections: e.connections ?? [],
     contents: e.contents,
   });
+const crewFor = (p: MoveFixtureParams) => [p.actor, ...(p.helpers ?? [])];
 const paramsFor = (p: MoveFixtureParams): CarryParams => ({
-  crew: [p.actor],
+  crew: crewFor(p),
   item: p.fixture,
   to: p.to,
 });
@@ -159,10 +162,18 @@ function loweringIssue(
 function claims(rt: Runtime, p: MoveFixtureParams): Reservation[] {
   const e = rt.world.entities[p.fixture];
   return [
-    { resource: `actor:${p.actor}`, mode: 'exclusive' },
-    { resource: `hand:${p.actor}:left`, mode: 'exclusive' },
-    { resource: `hand:${p.actor}:right`, mode: 'exclusive' },
+    ...crewFor(p).flatMap((actor) => [
+      { resource: `actor:${actor}`, mode: 'exclusive' as const },
+      { resource: `hand:${actor}:left`, mode: 'exclusive' as const },
+      { resource: `hand:${actor}:right`, mode: 'exclusive' as const },
+    ]),
     { resource: `entity:${p.fixture}`, mode: 'exclusive' },
+    ...(e
+      ? (CATALOG[e.def]?.surfaceSlots ?? []).map((s) => ({
+          resource: `surface-slot:${p.fixture}#${s.id}`,
+          mode: 'exclusive' as const,
+        }))
+      : []),
     ...(e
       ? fixtureSlots(rt, e).map((s) => ({
           resource: `slot:${s.id}`,
@@ -186,6 +197,7 @@ export function readFixtureMove(
   return {
     action,
     actor: p.actor,
+    crew: crewFor(p),
     fixture: p.fixture,
     status: record.status,
     phase: terminal
@@ -212,10 +224,11 @@ export const moveFixture: ActionDef<
 > = {
   verb: 'move_fixture',
   description:
-    'One free standing person physically moves an empty unreserved upright camp-chair to explicit ground coordinates; no access links or implicit activity interruption.',
+    'One or two free standing people physically move an empty unreserved capability-supported upright chair or table to explicit ground coordinates; no access links or implicit activity interruption.',
   schema: z.strictObject({
     actor: id,
     fixture: id,
+    helpers: z.array(id).max(1).optional(),
     to: z.strictObject({
       x: z.number().min(-500).max(500),
       z: z.number().min(-500).max(500),
@@ -224,62 +237,84 @@ export const moveFixture: ActionDef<
   }),
   yieldTo: () => [],
   reservations: (world, p) => [
-    { resource: `actor:${p.actor}`, mode: 'exclusive' },
-    { resource: `hand:${p.actor}:left`, mode: 'exclusive' },
-    { resource: `hand:${p.actor}:right`, mode: 'exclusive' },
+    ...crewFor(p).flatMap((actor) => [
+      { resource: `actor:${actor}`, mode: 'exclusive' as const },
+      { resource: `hand:${actor}:left`, mode: 'exclusive' as const },
+      { resource: `hand:${actor}:right`, mode: 'exclusive' as const },
+    ]),
     { resource: `entity:${p.fixture}`, mode: 'exclusive' },
+    ...(CATALOG[world.entities[p.fixture]?.def]?.surfaceSlots ?? []).map(
+      (s) => ({
+        resource: `surface-slot:${p.fixture}#${s.id}`,
+        mode: 'exclusive' as const,
+      }),
+    ),
     ...(CATALOG[world.entities[p.fixture]?.def]?.slots ?? []).map((s) => ({
       resource: `slot:${p.fixture}#${s.id}`,
       mode: 'exclusive' as const,
     })),
   ],
   plan(rt, p) {
-    const a = rt.world.entities[p.actor];
-    if (!a?.human || a.kind !== 'human')
+    const crew = crewFor(p);
+    if (new Set(crew).size !== crew.length)
       return {
         ok: false,
         diagnostic: diag(
-          'actor-invalid',
-          `${p.actor} is missing or not a person`,
-          [p.actor],
+          'duplicate-crew',
+          'fixture carriers must be distinct people',
+          crew,
         ),
       };
-    const grip = holdingDiagnostic(rt.world, p.actor);
-    if (grip) return { ok: false, diagnostic: grip };
-    const held = heldBy(rt.world, p.actor);
-    if (held.length)
-      return {
-        ok: false,
-        diagnostic: diag(
-          'hands-full',
-          `${p.actor} must explicitly stow ${held.map((h) => h.item.id).join(', ')} before moving ${p.fixture}`,
-          [p.actor, p.fixture, ...held.map((h) => h.item.id)],
-        ),
-      };
-    if (
-      a.human.level !== 0 ||
-      a.human.on ||
-      Math.abs(a.pose.p[1]) > 0.01 ||
-      !rt.services.spatial ||
-      rt.services.spatial.base.links.some((l: { usable: boolean }) => l.usable)
-    )
-      return {
-        ok: false,
-        diagnostic: diag(
-          'ground-scope',
-          `${p.actor}/${p.fixture} movement supports level-zero rooms without usable access links`,
-          [p.actor, p.fixture],
-        ),
-      };
-    if (a.human.activity !== 'idle')
-      return {
-        ok: false,
-        diagnostic: diag(
-          'actor-busy',
-          `${p.actor} must finish ${a.human.activity} before moving ${p.fixture}`,
-          [p.actor, p.fixture],
-        ),
-      };
+    for (const actor of crew) {
+      const a = rt.world.entities[actor];
+      if (!a?.human || a.kind !== 'human')
+        return {
+          ok: false,
+          diagnostic: diag(
+            'actor-invalid',
+            `${actor} is missing or not a person`,
+            [actor],
+          ),
+        };
+      const grip = holdingDiagnostic(rt.world, actor);
+      if (grip) return { ok: false, diagnostic: grip };
+      const held = heldBy(rt.world, actor);
+      if (held.length)
+        return {
+          ok: false,
+          diagnostic: diag(
+            'hands-full',
+            `${actor} must explicitly stow ${held.map((h) => h.item.id).join(', ')} before moving ${p.fixture}`,
+            [actor, p.fixture, ...held.map((h) => h.item.id)],
+          ),
+        };
+      if (
+        a.human.level !== 0 ||
+        a.human.on ||
+        Math.abs(a.pose.p[1]) > 0.01 ||
+        !rt.services.spatial ||
+        rt.services.spatial.base.links.some(
+          (l: { usable: boolean }) => l.usable,
+        )
+      )
+        return {
+          ok: false,
+          diagnostic: diag(
+            'ground-scope',
+            `${actor}/${p.fixture} movement supports level-zero rooms without usable access links`,
+            [actor, p.fixture],
+          ),
+        };
+      if (a.human.activity !== 'idle')
+        return {
+          ok: false,
+          diagnostic: diag(
+            'actor-busy',
+            `${actor} must finish ${a.human.activity} before moving ${p.fixture}`,
+            [actor, p.fixture],
+          ),
+        };
+    }
     const issue = fixtureIssue(rt, p.fixture);
     if (issue) return { ok: false, diagnostic: issue };
     for (const r of claims(rt, p)) {
