@@ -31,15 +31,18 @@ Live: https://sim.eden.art (once DNS points at eden2) · https://<eden2-sslip-ho
   - *Narrator (Haiku 4.5, per region, ~5 min, staggered).* Cached system prompt + region digest → up to four beats with a closed directive list. Beats become `scene` events and reach Souls as suggestions in Jev's context.
   - *Director (Jev, ~6 s while watched).* Picks a broadcast shot (Mars `ShotSpec`) and ticker lines.
   - *Translator (Jev, Haiku fallback).* Owner's text → closed intent.
-- **Agents.** A Soul's owner mints a one-time claim prompt; the agent fetches a per-Soul token and uses REST (`/v1/agent/*`) or MCP (`/mcp`). See `/v1/skill.md`.
+- **Agents.** The owner pastes one line into their assistant: `Read <base>/skill.md and follow it to steer my Soul "X" in Sim. Pairing code: XXXX-XXXX`. The skill file is installable and explains pairing (code exchange, or ask-and-approve), the endpoints (`perceive`, `world`, `log`, `intent`, `wait`), and MCP (`/mcp` with a bearer token, or `/mcp/<token>`).
+- **Flow.** `watch` (anonymous) → sign in → invite code → create a Soul → direct it from the page or attach an agent → per-Soul dashboard (status, perception, story, thinking).
+- **Privacy.** Model calls are visible to admins and to the owner of the Soul they concern. Owners' intent notes are redacted from every public view.
+- **Spend.** A governor splits the daily budget (`BRAIN_BUDGET_USD_PER_DAY`) into per-tier shares refilled continuously; the `spend` tab (admin) shows actual and projected cost.
 
 ## Develop
 
 ```bash
 pnpm install
 cp .env.example .env    # fill keys; DEV_AUTH=1 enables dev:<name> tokens and ?dev in the web app
-pnpm test
-pnpm --filter @sim/web build && node --env-file=.env apps/server/src/main.ts
+pnpm check                # type check + tests
+pnpm --filter @sim/web build && BRAIN_MODE=fake node --env-file=.env apps/server/src/main.ts   # fake brain: no model spend
 ```
 
 Deploy: `infra/deploy.sh` (see `docs/RUNBOOK.md`).
