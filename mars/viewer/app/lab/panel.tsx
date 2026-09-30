@@ -5,6 +5,7 @@ import { ClassroomHud } from './classroom-hud.tsx';
 import { SELECTABLE_SCENARIOS, type Check } from './scenarios.ts';
 import { OVERLAYS, type LabView, type OverlayName } from './lab-view.ts';
 import { SequencePanel } from './sequence-hud.tsx';
+import { CheckpointTour } from './checkpoint-tour.tsx';
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4, 8];
 const OVERLAY_LABEL: Record<OverlayName, string> = {
@@ -38,6 +39,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
   return (
     <aside className="lab-panel">
       <h1>Engine Lab</h1>
+      <CheckpointTour scenario={s.name} onScenario={onScenario} />
       <LabCameraControls view={view} />
       <p className="lab-sub">
         Deterministic engine · fixed tick 1/20 s · <a href="/studio">studio</a>
