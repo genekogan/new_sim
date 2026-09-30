@@ -26,3 +26,7 @@ They show all three members of the audience group clearly inside the room; HUD f
 ## Limits
 
 Turn state conveys floor/attention, not generated speech or hand gestures. Existing head rotation remains bounded and visually approximate. Periods vary deterministically by bounded group index; no psychology or unscripted dialogue is inferred. Active classroom snapshots still explicitly refuse resume under the existing contract. No full gate, deployment, shared roadmap, camera policy, registry, or golden changes.
+
+## Question readout correction
+
+The public session floor now reports the audience questioner during question phase; additive `presenter` retains the current presenter identity for camera/readout consumers. Returning to presenting restores the public floor to that presenter. Internal presenter rotation, display service focus/resource behavior, and actor poses remain unchanged. Existing two-arrangement question regressions assert question floor, retained presenter, and restored floor. Focused classroom tests/typecheck/oxlint pass for this correction.

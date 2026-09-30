@@ -154,6 +154,14 @@ for (const [size, arrangement] of [
       session: a.id,
       intent: { kind: 'question', actor: 'a0' },
     });
+    until(rt, () => readClassroom(rt, a.id)?.phase === 'question');
+    const question = readClassroom(rt, a.id)!;
+    assert.equal(question.floorHolder, 'a0');
+    assert.equal(question.presenter, 'p1');
+    until(rt, () => readClassroom(rt, a.id)?.phase === 'presenting');
+    const returned = readClassroom(rt, a.id)!;
+    assert.equal(returned.floorHolder, 'p1');
+    assert.equal(returned.presenter, 'p1');
     until(rt, () => !rt.isActive(a.id), 6000);
     assert.equal(a.status, 'completed', a.diagnostic?.message);
     assert.ok(

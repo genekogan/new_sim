@@ -109,6 +109,8 @@ export interface ClassroomReadout {
   session: string;
   phase: ClassroomPhase;
   floorHolder?: string;
+  /** Current presentation identity, retained while an audience question owns the floor. */
+  presenter?: string;
   attentionTarget?: ClassroomAttention;
   waitingReason?: string;
   participants: {

@@ -404,7 +404,8 @@ export function readClassroom(
   return {
     session,
     phase: ex.phase,
-    floorHolder: ex.floor,
+    floorHolder: ex.phase === 'question' ? ex.attention : ex.floor,
+    presenter: ex.floor,
     attentionTarget: attention(rt, ex),
     waitingReason: ex.waiting,
     participants: ex.people.map(
