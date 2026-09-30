@@ -49,7 +49,7 @@ export async function dispatchControl(context: ControlContext, name: string, arg
 }
 
 export function registerControlTools(server: McpServer, context: ControlContext) {
-  for (const tool of controlTools()) server.registerTool(tool.name, {
+  for (const tool of registry.values()) server.registerTool(tool.name, {
     description: tool.description,
     // Publish precise schemas but validate in the shared dispatcher/controller, preserving JSON refusals.
     inputSchema: listedSchema(tool.inputSchema) as unknown as z.ZodType,
