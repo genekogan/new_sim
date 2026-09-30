@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
     <title>Mars live camera review</title>
     <style>
       body {
@@ -42,14 +44,21 @@
         <option value="restrained">Restrained observation</option></select
       ><button id="subject">Follow guest2 for 6s</button
       ><button id="auto">Return to auto</button
-      ><label><input type="checkbox" id="jev" />Bounded Jev bridge</label
-      ><small>Hypothetical classroom · development branch</small>
+      ><label id="jev-control"
+        ><input type="checkbox" id="jev" />Bounded Jev bridge (local
+        only)</label
+      ><small>Hypothetical classroom · observational camera prototype</small>
     </header>
     <iframe title="Live Mars Lab" src="/lab?scenario=classroom-4"></iframe>
     <script type="module">
       import { attachLabCamera } from './lab-driver.ts';
       import { BridgeProvider } from './jev-client.ts';
       const frame = document.querySelector('iframe');
+      const localBridge =
+        ['localhost', '127.0.0.1'].includes(location.hostname) &&
+        location.port === '5593';
+      document.querySelector('#jev').disabled = !localBridge;
+      document.querySelector('#jev-control').hidden = !localBridge;
       let camera;
       let ready;
       const start = () => {
@@ -59,7 +68,7 @@
         camera = attachLabCamera(
           hook,
           document.querySelector('#policy').value,
-          document.querySelector('#jev').checked
+          localBridge && document.querySelector('#jev').checked
             ? new BridgeProvider()
             : undefined,
           { document: frame.contentDocument },
@@ -75,6 +84,11 @@
           }
         }, 100);
       };
+      const requestedScenario = new URLSearchParams(location.search).get(
+        'scenario',
+      );
+      if (requestedScenario === 'classroom-8')
+        frame.src = '/lab?scenario=classroom-8';
       document.querySelector('#policy').onchange = start;
       document.querySelector('#jev').onchange = start;
       document.querySelector('#subject').onclick = () =>

@@ -4,7 +4,7 @@
 
 Implemented on `codex/autonomous-camera` in
 `<mars-worktrees>/autonomous-camera`. Rebased onto `a4078c6`.
-Core checkpoint `edc45f0`; authorized owner hook `d98d9e5` cherry-picked as
+Core checkpoint `edc45f0`, provider `a3f980e`, review/capture `5649493`; authorized owner hook `d98d9e5` cherry-picked as
 `e1e47c6`. No pushes, remotes, dependency changes, baseline changes or historical
 content edits. The engine chat owns shared entrypoints, combined gate and release.
 Camera helpers: zero. Ports: 5593 review, 5591 tests, 7393 optional bounded bridge.
@@ -101,7 +101,7 @@ Pre-rebase full engine: 605 total, 588 pass, zero fail, 6 skip, 11 TODO (75.0 s)
 19 focused offline tests now cover geometry, swept walls, occlusion, minimum holds,
 manual precedence/expiry/stillness, stale/invalid replies, API timeout/failure,
 cleanup, replay cuts, recovery holds, and provider accounting/reservations.
-Rebased full engine result and final captures are recorded in the checkpoint update.
+Rebased full engine: 622 total, 605 pass, zero fail, 6 skip, 11 TODO (59.1 s). Final camera browser recheck: 1/1 (8.0 s).
 Repo and explicit camera typechecks pass. Scoped camera and repo lint pass.
 Browser camera + owner hook tests: 2/2 (12.1 s), including native manual drag,
 world hash preservation, mock API failure, return to auto, questioner, same-tick
@@ -109,3 +109,37 @@ paused reset, live geometry, FOV validation and disposal.
 Earlier live clear-v3 overhead: 321 updates at about 10 Hz, mean 0.823 ms,
 p95 1.1 ms, max 8.6 ms under concurrent load. This is functional measurement,
 not the owner’s idle-host release benchmark. No guarantees/tests loosened.
+
+## Final footage checkpoint
+
+Captured unchanged committed source `56494933afd8c5da1bbb1ccc7d05dc267ff720ff`.
+Final live clear MP4: 47.36 seconds, no page errors or camera diagnostics.
+355 camera updates, mean 0.983 ms, p95 1.2 ms, max 8.9 ms. Stable presenter,
+questioner, explicit guest2 takeover, auto return and departure/presenter-change
+wide view. Reviewed whole-clip frames and quarter-second samples around the cut.
+
+Recorded policy outputs: clear 6 cuts, restrained 5 cuts, including each policy’s
+explicit visibility recovery cut at 58.05 seconds to an elevated alternate.
+Recovery preserves head/chest visibility; the foreground partition still obscures
+lower bodies and dominates the composition. The point-based readability score
+does not promise full-body visibility. This is a visible limitation, retained in
+the footage rather than hidden. The camera never moves actors or architecture.
+
+`clear-final/before-after.mp4` puts the initial live baseline on the left and final
+live clear coverage on the right. They are separate live executions with the same
+intervention script, not identical-world replay. Reproduce with ffmpeg hstack,
+scaling both 1280×800 source clips to 640×400 and using the shorter duration.
+The recorded policy clips share the exact same final take. Earlier Jev evaluation
+used the prior causal fixture checkpoint and retained all request/candidate states
+in its report; no later paid rerun or matching final visual model comparison is claimed.
+
+The owner acknowledged all three camera commits and will select them onto their
+social/hooks candidate, review production entry wiring and run the combined gate.
+No camera release has occurred.
+
+Production-entry preparation requested by owner: viewport/noindex metadata,
+truthful prototype label, classroom-8 query selection, and Jev hidden/disabled
+unless localhost/127.0.0.1:5593. Review entry plus live intervention browser tests
+pass 2/2 (10.2 s), both typechecks pass. Replay page remains local-only.
+Ignored `comparison/review-manifest.json` records absolute clip paths, SHA256,
+durations, source commit, inspection method and before/after ffmpeg command.

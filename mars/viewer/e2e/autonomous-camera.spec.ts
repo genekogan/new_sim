@@ -13,6 +13,33 @@ const artifacts = path.resolve(
   'e2e/artifacts',
   process.env.E2E_RUN ?? 'codex-autonomous-camera-e2e',
 );
+test('review entry honors classroom-8 and keeps Jev local-only', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/cinematography/review.html?scenario=classroom-8');
+  await page.waitForFunction(
+    () => window.__cameraReview?.report().frames.length > 0,
+  );
+  await expect(page.locator('iframe')).toHaveAttribute(
+    'src',
+    '/lab?scenario=classroom-8',
+  );
+  await expect(page.locator('#jev')).toBeDisabled();
+  await expect(page.locator('#jev-control')).toBeHidden();
+  await expect(page.locator('small')).toContainText(
+    'observational camera prototype',
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        window.__cameraReview.report().observations.at(-1)?.activity.members
+          .length,
+    ),
+  ).toBeGreaterThan(4);
+  expect(errors).toEqual([]);
+});
 test('live coverage, manual precedence, asynchronous failure and cleanup preserve the world', async ({
   page,
 }) => {
