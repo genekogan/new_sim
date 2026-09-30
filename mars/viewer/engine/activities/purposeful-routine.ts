@@ -375,7 +375,7 @@ export const purposefulRoutineControl: ActionDef<PurposefulRoutineControlParams,
 };
 export function readPurposefulRoutine(rt: Runtime, action: string): PurposefulRoutineReadout | undefined {
   const ex = lookup(rt, action), record = rt.records.get(action); if (!ex || !record) return;
-  const elapsed = boundWorkElapsed(rt, ex);
+  const elapsed = rt.isActive(action) ? boundWorkElapsed(rt, ex) : undefined;
   return { action, status: record.status, mode: ex.mode, obligation: ex.phase === 'work' ? 'finish-work' : 'gathering', phase: record.phase ?? ex.phase,
     bindings: structuredClone(ex.p), child: ex.child,
     ...(ex.error ? { diagnostic: structuredClone(ex.error), waitingReason: ex.error.message } : record.diagnostic ? { diagnostic: structuredClone(record.diagnostic), waitingReason: record.diagnostic.message } : {}),

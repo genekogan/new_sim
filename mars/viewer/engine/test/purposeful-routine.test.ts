@@ -291,6 +291,22 @@ test('completed routine retains its actual notes progress when another actor reu
   clean(rt);
 });
 
+test('completed routine stays frozen when worker starts a new task with identical bindings', () => {
+  const { rt, routine, params } = start();
+  finished(rt, routine.id);
+  const historical = readPurposefulRoutine(rt, routine.id)!;
+  assert.equal(historical.progress.workElapsed, 30);
+  const next = rt.submit('work_at', { actor: params.actor, ...params.work });
+  assert.notEqual(next.status, 'failed', next.diagnostic?.message);
+  until(rt, () => { const w = readWorkstation(rt, params.work.station); return !('code' in w) && w.action === next.id && w.status === 'active' && w.elapsed === 0; });
+  assert.deepEqual(readPurposefulRoutine(rt, routine.id), historical);
+  until(rt, () => { const w = readWorkstation(rt, params.work.station); return !('code' in w) && w.action === next.id && w.elapsed >= 1; });
+  assert.deepEqual(readPurposefulRoutine(rt, routine.id), historical);
+  rt.cancel(next.id); until(rt, () => !rt.isActive(next.id));
+  assert.deepEqual(readPurposefulRoutine(rt, routine.id), historical);
+  clean(rt);
+});
+
 for (const mismatch of ['user', 'task', 'durationSeconds'] as const)
   test(`interrupted routine retains observed work rather than mismatched ${mismatch} progress`, () => {
     const { rt, routine, params } = start();
