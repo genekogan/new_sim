@@ -6,14 +6,17 @@ intervention; advance complete experiences / activity-object breadth / social
 believability together at approximately **50 /30 /20**. Continue in **/lab** with
 simple configurable maps; historical Studio remains the museum side.
 
+Owner allocation update (2026-09-30): approximately **60% product, 30% high/medium-leverage engineering across experiences, 10% polish/evidence**. Retain **50/30/20** within product work. This supersedes the earlier 70/20/10 planning guide; do not require every engineering item to be an immediate blocker. Verify existing work before selecting bounded tasks.
+
 ## Small active queue
 
 Gene's priority after release17 was **physical chair/table moving and usable room setup first**. The bounded tranche is integrated after a clean full gate at1eee5c6 and deployed as release19; production browser22/22 and inspected setup/social captures pass. Continue the surrounding life/activity experience rather than expanding furniture fidelity. Production camera/build-bay checks also pass; the release record is in RELEASE_CHECKLIST19.
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Exposed Lab repairs | Root +3 bounded Sol6.1 workers | Safe Reach Step/Play; atomic staging refusal; pile material/identity continuity; mandatory previously missing checks and deployed proof | Current east-house staging blocked; explicitly unsupported rather than false completion |
-| Purposeful communal-day routines | Lead; owner approved | Stable intention across existing work/rest/food/social actions; live intervention and same unfinished work in two arrangements | Begin implementation after repair release; no bed/psychology/runtime redesign prerequisite |
+| Paired walk to lunch, then the same unfinished work | Root + bounded Sol6.1 worker | Invite a free-handed companion; regroup, travel together, pause/direct/resume coherently, then ordinary shared food and retained notes in Mars and studio | Draft only; actual corridor and child execution must pass focused tests before parent/UI integration; no universal escort redesign |
+| Explicit stepped-access WASD traversal | Bounded Sol6.1 worker + root review | Opt-in intended ascent/descent support meshes; continuous traversal of bounded auditorium tiers; furniture, walls, gaps and ceilings still constrain movement | Mechanic draft only; exact historical support tags require source-owner coordination; no content geometry/appearance changes or NPC traversal claim |
+| Selected usable computer and shared resource lifetime | Root + release helper | Attributed computer works through same object capability; visible fallback; repeated resets release owned GPU resources; safe isolated MCP schema caching | Clean c43e382 full gate green; production26 verification pending, live24; failed25 precise resource cause remains unknown |
 
 
 Physical design/provenance: `briefs/fixture-mover.PLAN.md`. Alternative seat-withdrawal analysis remains recoverable in `briefs/classroom-furniture-feasibility.PLAN.md`; it is deferred in favor of Gene's physical-movement choice, not implemented or completed.

@@ -56,3 +56,12 @@ skipped/FIXME scenarios work. Preserve exact historical staging dependencies and
 make unsupported production journeys explicit. After this bounded repair milestone,
 continue purposeful communal-day routines autonomously; Gene has approved that
 priority and the earlier interview is resolved. Do not stop at the repair release.
+
+Owner allocation update (2026-09-30): roughly 60% playable experiences/object/social
+mechanisms, 30% high/medium-leverage engineering across experiences, 10% polish/evidence.
+Retain 50/30/20 within product work. Keep one playable increment, one bounded
+engineering improvement and optional one object/social improvement active; verify
+existing work before commissioning rather than auditing the entire legacy inventory.
+Explicit access structures (including auditorium/bleacher steps intended to reach
+levels) should support WASD auto-step through narrow traversal metadata; do not
+generalize this to furniture or alter historical appearance/placement to hide defects.
