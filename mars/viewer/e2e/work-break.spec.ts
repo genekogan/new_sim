@@ -45,6 +45,10 @@ for (const count of [4, 8]) test(`one continuing world ${count}: notes → share
       await button('Resume notes').click();
       await expect(page.getByTestId('break-feedback')).toContainText('workstation.hands-occupied');
       expect(await page.evaluate(() => window.__marsEngine.stateHash())).toBe(hash);
+      await page.getByRole('button', { name: /^Dismiss refusal / }).click();
+      expect(await page.evaluate(() => window.__marsEngine.stateHash())).toBe(hash);
+      expect(await page.evaluate(() => window.__marsEngine.records().filter(r => r.status === 'failed').map(r => r.diagnostic?.code))).toEqual(['workstation.hands-occupied']);
+      await expect(page.getByRole('alert')).toHaveCount(0);
     }
     await button('Approach serving pot').click(); expect((await finish(page, 'walk_to', actor)).status).toBe('completed');
     await button('Serve stew').click();

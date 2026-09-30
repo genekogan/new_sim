@@ -12,6 +12,7 @@ import './lab.css';
 export default function Lab() {
   const host = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<LabView | null>(null);
+  const [acknowledged, setAcknowledged] = useState<{ epoch: number; ids: string[] }>({ epoch: -1, ids: [] });
   const [, refresh] = useReducer((x: number) => x + 1, 0);
 
   useEffect(() => {
@@ -42,8 +43,9 @@ export default function Lab() {
   const sim = view?.sim;
   const checks = sim ? sim.checks() : [];
   const failed = sim
-    ? [...sim.rt.records.values()].filter((r) => r.status === 'failed')
+    ? [...sim.rt.records.values()].filter((r) => r.status === 'failed' && !(acknowledged.epoch === sim.scenarioEpoch && acknowledged.ids.includes(r.id)))
     : [];
+  const canDismissRefusal = sim?.scenario.name.startsWith('classroom-') || sim?.scenario.name.startsWith('work-break-');
   const violations = sim?.rt.violations.length ?? 0;
   const done = sim?.done() ?? false;
   return (
@@ -64,6 +66,7 @@ export default function Lab() {
               <div key={r.id} className={`lab-banner ${expected ? 'expected' : 'error'}`} role="alert">
                 {r.id} {r.verb} {expected ? 'EXPECTED CONFLICT (scripted, not a failure)' : 'FAILED'} · {r.diagnostic?.code}:{' '}
                 {r.diagnostic?.message}
+                {canDismissRefusal && <button style={{ pointerEvents: 'auto', marginLeft: 12 }} aria-label={`Dismiss refusal ${r.id}`} onClick={() => setAcknowledged(previous => ({ epoch: sim!.scenarioEpoch, ids: [...(previous.epoch === sim!.scenarioEpoch ? previous.ids : []), r.id] }))}>Dismiss · kept in log</button>}
               </div>
             );
           })}
