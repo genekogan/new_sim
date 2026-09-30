@@ -5,7 +5,7 @@
 //   const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022));
 //   const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
 //   compareToCanonical(reh.finalState, s.build)  // every sequenced frame / beam within 1 cm / 1°
-import type { ActionDef } from '../actions/types.ts';
+import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { wrapAngle } from '../core/math.ts';
 import { CARRY_INVARIANTS } from '../carry/invariants.ts';
@@ -67,6 +67,17 @@ export type YearBuildSetup = {
   plan: BoundPlan;
   cfg: EngineConfig;
 };
+
+/** A partial skeleton plan is useful for inspection, but cannot promise a playable complete build. */
+export function yearBuildSupportDiagnostic(build: YearBuildPlan): Diagnostic | null {
+  const missing = build.unplaced.filter((p) => (p.kind === 'beam' || p.kind === 'upright') && !p.reason.startsWith('outside the requested tranche'));
+  if (!missing.length) return null;
+  return {
+    code: 'year-build.unsupported',
+    message: `This skeleton build is unsupported on the current campus scene: ${missing.length} required parts cannot be sequenced. ${missing.map((p) => `${p.node}: ${p.reason}`).join('; ')}`,
+    subjects: missing.map((p) => p.node),
+  };
+}
 
 /** Publish `mars-<year>` (protected), fork it, commit the piles + crew, bind the skeleton template. */
 export function yearBuildSetup(year: number, assembly: string, file: CampusYearFile, opts: { radius?: number; bays?: number; phaseB?: { sections?: readonly Section[]; only?: (p: PartB, i: number, all: PartB[], dir: 1 | -1) => boolean }; avoidNeighbours?: boolean } = {}): YearBuildSetup {

@@ -8,16 +8,33 @@
 // to installers on the bracing (2.48 m seat), the relay for a top beam (4.76 m seat: givers → relay,
 // relay → installers), the finished first bay and an eye-level view from the yard side to compare with
 // the owner's skeleton-stage photo (docs/engineering/evidence/2026-09-28-skeleton-stage-racks-2x4-frame-before-plywood.jpg).
-// The whole house (`year-build-2022-house`) runs with YEAR_BUILD_FULL=1 (timed, final pin, no captures).
+// Historical completion captures below remain parked after W51. YEAR_BUILD_FULL=1 removes
+// the cost-based skip only; it does not override their unconditional reconciliation fixme.
+// The current-source support audit below is mandatory even while those captures are parked.
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { labFrames, openLab } from './lab-helpers';
 import { ARTIFACTS, captureView } from './helpers';
 import { loadCampusFile } from '../engine/campus/history-node.ts';
-import { yearBuildSetup } from '../engine/scenarios/year-build.ts';
+import { yearBuildSetup, yearBuildSupportDiagnostic } from '../engine/scenarios/year-build.ts';
 import { rehearse } from '../engine/rehearsal/rehearse.ts';
 const W51_FIXME = '2022 reconciliation W51: mars-2022 re-seeded (houses, stairs, solar, trailers moved); the recorded 2022 takes / pins no longer match it — re-record parked with the content (OWNER_DECISIONS 2026-09-29 evening; RECONCILIATION_2022.md)';
+
+test('current 2022 east-house source: first bay and whole house disclose physical staging exclusions', () => {
+  // This audit deliberately runs regardless of YEAR_BUILD_FULL and the historical capture FIXMEs.
+  for (const bays of [1, undefined]) {
+    const setup = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays });
+    const diagnostic = yearBuildSupportDiagnostic(setup.build);
+    expect(diagnostic?.code).toBe('year-build.unsupported');
+    expect(diagnostic?.subjects).toHaveLength(bays ? 3 : 9);
+    expect(diagnostic?.message).toContain('chiba-12-foot-orange-beam-0684c6e5');
+    expect(diagnostic?.message).toContain('kitchen-12-foot-orange-beam-11ad38b2');
+    for (const id of diagnostic!.subjects!) {
+      expect(setup.plan.steps.filter((step) => step.params.piece === id || step.params.item === id || step.params.beam === id), id).toEqual([]);
+    }
+  }
+});
 
 /**
  * The node rehearsal of the same setup (engine/test/year-build.test.ts pins it: first bay 41 019 ticks
@@ -30,6 +47,7 @@ function rehearsal(bays?: number) {
 }
 
 type YB = {
+  admission: { code: string; message: string; subjects?: string[] } | null;
   bays: number | null;
   setupMs: number;
   fetchMs: number;
@@ -44,6 +62,7 @@ type Row = { id: string; verb: string; status: string; phase?: string };
 type Arm = { side: string; shoulder: number[]; palm: number[]; len: number; source: string | null; err: number | null; ratio: number | null };
 type Bone = { activity: string; on: string | null; soles: number[]; arms: Arm[]; frame: { kind: string; u: number; exit: number; weight: number; feet: { p: number[]; planted: boolean }[] | null } | null };
 type H = {
+  records(): unknown[];
   yearBuild(): YB | null;
   sequence(): { steps: Row[] | null };
   step(n: number): { tick: number; done: boolean };
@@ -58,6 +77,29 @@ type H = {
 /** Pose statistics over the checked ticks. */
 type Stats = { ticks: number; stance: number; stanceOff: string[]; ladder: number; ladderOff: string[]; holds: number; holdsReached: number; holdMiss: string[]; points: number; reached: number; reachableMiss: string[]; byAct: Record<string, [number, number]>; over: string[]; kinds: Record<string, number> };
 const newStats = (): Stats => ({ ticks: 0, stance: 0, stanceOff: [], ladder: 0, ladderOff: [], holds: 0, holdsReached: 0, holdMiss: [], points: 0, reached: 0, reachableMiss: [], byAct: {}, over: [], kinds: {} });
+
+for (const [scenario, missing] of [['year-build-2022', 3], ['year-build-2022-house', 9]] as const) {
+  test(`${scenario}: current unsupported layout refuses automatic play before any physical actions`, async ({ page }) => {
+    await openLab(page, scenario);
+    await labFrames(page);
+    const result = await page.evaluate(() => {
+      const h = window.__marsEngine as unknown as H;
+      const before = { humans: h.state().humans, components: h.components() };
+      h.step(100);
+      return { before, after: { humans: h.state().humans, components: h.components() }, admission: h.yearBuild()!.admission, records: h.records(), state: h.state(), rows: h.sequence().steps };
+    });
+    expect(result.admission?.code).toBe('year-build.unsupported');
+    expect(result.admission?.subjects).toHaveLength(missing);
+    expect(result.admission?.message).toContain('chiba-12-foot-orange-beam-0684c6e5');
+    expect(result.admission?.message).toContain('kitchen-12-foot-orange-beam-11ad38b2');
+    expect(result.records).toEqual([]);
+    expect(result.rows!.every((row) => row.status === 'pending')).toBe(true);
+    expect(result.after).toEqual(result.before);
+    expect(result.state.done).toBe(true);
+    expect(result.state.checks.some((check) => !check.ok && check.message.includes('unsupported'))).toBe(true);
+    expect(await page.evaluate(() => window.__marsEngine!.violations())).toEqual([]);
+  });
+}
 
 async function yb(page: Page): Promise<YB> {
   return page.evaluate(() => (window.__marsEngine as unknown as H).yearBuild()!);

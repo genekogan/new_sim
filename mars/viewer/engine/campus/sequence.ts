@@ -242,9 +242,9 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     mark(f.node.id, 'upright', t.step, c, rz, h);
     return h;
   };
-  const stage = (b: Bm): { stage: string } | null => {
-    const t = take(b.node.id, b.node.def!);
-    if (!t) { unplaced.push({ node: b.node.id, kind: 'beam', reason: `no ${b.node.def} left in the piles` }); return null; }
+  // Preflight geometry before claiming material or sending anybody onto a frame.
+  // A refused beam must not leave an acquired piece or an orphan installer stance.
+  const stagingPlot = (b: Bm): { x: number; z: number; end: string } | null => {
     // on the stage axis LOAD_OUT outside the seat line of its column (outward = away from the row's centre), at the
     // rack's line-0 end beyond frame line 0: the carry crew straddles a beam (one carrier each side), and
     // beside a bay one of them would stand on the seat line (on the installed low beam, or in the 0.91 m
@@ -258,6 +258,11 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
     const ends = [{ ...at(lineCoord(frames, 0, dir) - (L / 2 + AISLE_END)), end: 'line-0' }, { ...at(lineCoord(frames, K - 1, dir) + (L / 2 + AISLE_END)), end: `far (line ${K - 1})` }];
     const free = ends.find((e) => stagePlotFree(e, b.node.box.yaw, L, scene));
     if (!free) { unplaced.push({ node: b.node.id, kind: 'beam', reason: `no room to stage it at either end of its aisle: ${ends.map((e) => `${e.end} end (${e.x}, ${e.z}) blocked by ${stagePlotBlocker(e, b.node.box.yaw, L, scene)}`).join('; ')}` }); return null; }
+    return free;
+  };
+  const stage = (b: Bm, free: { x: number; z: number; end: string }): { stage: string } | null => {
+    const t = take(b.node.id, b.node.def!);
+    if (!t) { unplaced.push({ node: b.node.id, kind: 'beam', reason: `no ${b.node.def} left in the piles` }); return null; }
     const { x, z } = free;
     const c = step('carry', { crew: G.map(C), item: b.node.id, to: { x, z, yaw: r3(b.node.box.yaw) } }, G, [t.step], `carry beam ${b.node.id} to the ${free.end} end of its stage axis`);
     spotClear.set(t.pile, c);
@@ -267,11 +272,17 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
   const hang = (b: Bm, fa: Frame, fb: Frame): boolean => {
     const st = b.seat <= GROUND_HANG_MAX ? null : stanceFor(b.seat);
     if (st && 'why' in st) { unplaced.push({ node: b.node.id, kind: 'beam', reason: st.why! }); return false; }
+    const free = stagingPlot(b);
+    if (!free) return false;
+    if (!yard.piles.some((p) => p.piece === b.node.def && (left.get(p.id) ?? 0) > 0)) {
+      unplaced.push({ node: b.node.id, kind: 'beam', reason: `no ${b.node.def} left in the piles` });
+      return false;
+    }
     const colA = engCol(fa.k, b.col);
     const params: Record<string, unknown> = { beam: b.node.id, a: fa.node.id, b: fb.node.id, column: colA, height: r3(b.seat) };
     const deps = [raised.get(fa.node.id)!, raised.get(fb.node.id)!].filter(Boolean);
     if (!st) {
-      const s = stage(b);
+      const s = stage(b, free);
       if (!s) return false;
       const h = step('hang_beam', { ...params, installers: G.map(C) }, G, [...deps, s.stage], `hang ${b.node.id} at ${b.seat.toFixed(2)} m from the ground`);
       mark(b.node.id, 'beam', h);
@@ -286,7 +297,7 @@ export function yearBuildPlan(g: AssemblyGraph, scene: CampusScene, assembly: st
       climbs.push(step('climb_stance', { actor: C(HOLD[0]), upright: fa.node.id, column: colA, face: fA, feet: st.fr }, [HOLD[0]], [climbs[0]], `relay ${C(HOLD[0])} climbs below`));
       climbs.push(step('climb_stance', { actor: C(HOLD[1]), upright: fb.node.id, column: engCol(fb.k, cBcanon), face: fB, feet: st.fr }, [HOLD[1]], [climbs[1]], `relay ${C(HOLD[1])} climbs below`));
     }
-    const s = stage(b);
+    const s = stage(b, free);
     if (!s) return false;
     const actors = [...I, ...G, ...(st.fr !== null ? HOLD : [])];
     const h = step('hang_beam', { ...params, installers: I.map(C), givers: G.map(C), ...(st.fr !== null ? { relay: HOLD.map(C) } : {}) }, actors, [...deps, s.stage, ...climbs],
