@@ -1019,3 +1019,36 @@ Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe --name mars-campus-2026 -m "rollback release21: <reason>"
 ```
+
+
+## production-deploy-22-2026-09-30-quiet-seated-rest
+
+Clean source **aa3317ad98a09ae1febe07ffc1b5ebcdc506f70f** passed the full rebased gate before local-main fast-forward. Live **8695c09e-1ae8-4315-bcc7-1572189722fb**, created08:15:35.216Z/deployed08:15:37.413Z,100%. Rollback **3238c275-9311-436a-9a75-9526aa4a02ab** (release21). Later metadata/docs/evidence do not change deployed source. Historical-agent dirty main and all prior candidates preserved; local Git only, no pins/goldens/tolerances/history/camera implementation changes.
+
+**Playable boundary:** quiet seated rest in work-break4/8 uses ordinary registered sit/stand/cancel at the real spare chair, including physically prepared side layout. Hands-free preference explains utensil returns. Actual occupancy/claims and proven own root-action return lineage drive controls; foreign/classroom sits are never adopted. Get up/Stop safely release seating before explicit notes return or permanent direction. Ordinary temporary direction retains existing engine return. Same unfinished notes survive food/rest and resume2.1/30s from2s. Ephemeral panel identity is not GUI snapshot/browser-reload restoration; no sleep, recovery timer, nutrition or autonomy model. Initial duplicate sibling React key failure4failed/5passed retained and corrected by unique panel key without assertion/tolerance changes.
+
+| Check | Result |
+|---|---|
+| Full gate | GREEN `.cloudflare/gate/2026-09-30T07-51-05-026Z/report.json`;aa3317a,gitDirty:false,cleanupError:null |
+| Lint / both TypeScript configs | Clean |
+| Unit / engine |99pass/0fail;807engine total:790pass/0fail/6documentedskip/11TODO |
+| Browser |116pass/7documentedskip,1118.7s |
+| Flagship / probe | Byte-identical; completed b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local integration | All36MCP tools/isolation/auth/method/limits PASS |
+| Original idle ceilings | Zero violations/pinned outcomes; exactpeak110.37375ms/mean0.6844038175ms; corridor53.475625/0.5389009183ms; historicalgrids103.776959–194.966166ms. Existing250/120ms peaks,3ms mean and1000ms grids unchanged |
+| Regenerated evidence |17rows/8milestonesPROVEN; capability25/2/1 and documented exceptions retained; no missing/ambiguous/file/failing-test problems |
+| Production infrastructure |341assets/19routes/GLB range/auth;36tools; director9steps7648ms; live100% |
+| Production browser |33/33(4.0min), including4rest cases plus existing classroom/continuity/food/setup/Studio/observer camera |
+| Published camera | Paused-world controls/reset/portrait0.5232558;0diagnostics/errors. Exact dev-source provider-injection title excluded only from production; local fullgate covers it, compiledentry checked separately |
+| Production bay |10901ticks/43steps/5checks/0violations/errors; unchanged exactb746 hash |
+| Visual inspection | Root9productionPNG:4restseated/resumed,2continuing8question/groups,2camera/1bay. Worker4androot2finalcombined rest captures inspected as well |
+| Build/deploy | Prepare340files/821.1MiB;dry415files/6963.59KiB/1253.65KiBgzip;4newassets/383existing;startup96ms;0R2writes/8verifiedexistingobjects |
+
+Proofs `viewer/.cloudflare/quiet-rest-*.log`, `viewer/.cloudflare/audit/prod-{camera,lab}-22.json`, `viewer/e2e/artifacts/prod-smoke-22`; preserved original failure/focused bundles `codex-quiet-rest-{1,2}`. Helper receipt/report `briefs/quiet-rest-release.REPORT.md`. Tag `release-22-quiet-seated-rest` identifies exact validated source.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 3238c275-9311-436a-9a75-9526aa4a02ab --name mars-campus-2026 -m "rollback release22: <reason>"
+```
+
+Recorded camera replay comparison with release21: only top-level branch/commit provenance differs; all other case/record data is identical. The static payload SHA changes for that provenance, not camera behavior, take outcomes or golden baselines.

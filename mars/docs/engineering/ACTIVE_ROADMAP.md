@@ -1,7 +1,7 @@
 # Active roadmap
 
 Owner direction: [SIMULATION_VISION.md](SIMULATION_VISION.md), 2026-09-29.
-Current product milestone: **extend the released same-world work → classroom → conversation → shared food → unfinished-work journey with quiet seated rest**. The released classroom already supports lightning talks, questions and smaller conversations. Preferences confirmed: semi-planned events with adaptable execution and live
+Current product milestone: **advance connected communal-day routines from the released work → classroom → conversation → food → quiet rest → unfinished-work interactions**. The released classroom already supports lightning talks, questions and smaller conversations. Preferences confirmed: semi-planned events with adaptable execution and live
 intervention; advance complete experiences / activity-object breadth / social
 believability together at approximately **50 /30 /20**. Continue in **/lab** with
 simple configurable maps; historical Studio remains the museum side.
@@ -12,7 +12,6 @@ Gene's priority after release17 was **physical chair/table moving and usable roo
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Quiet seated rest | GPT-6.1 Sol medium; lead review/Lab integration | Existing ordinary sit/stand in both rooms after food returns; real seat ownership/readout, safe Stop/Get up, interruption provenance and explicit return to unchanged notes; foreign seats/actions never adopted | Candidate on codex/quiet-rest, not released. No sleep/needs claim, new engine verb, Runtime redesign or active UI snapshot restoration. Full gate and inspected captures before integration |
 | Next communal-day direction | Owner preference pending; lead | Choose among autonomous existing routines, true bed sleep/wake, or more usable work/meal objects; preserve approximately50/30/20 product balance | Interview pending; no major implementation dependent on an unanswered/preselected choice |
 
 
@@ -114,3 +113,10 @@ Release20 current: ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe, rollback19ce6daf22. The
 Source8d214a5 is live as3238c275-9311-436a-9a75-9526aa4a02ab (rollback20 ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe). Both work-break4/8 presets expose the actual same-world classroom and physical default/side setup: interrupt notes, attend/question/rotate, form smaller conversations, depart, share food/return utensils, resume the same unfinished notes. Full clean gate112browser/790engine; production29journeys plus compiledcamera/exactbay pass,11production captures inspected. See RELEASE_CHECKLIST21. Earlier food and furniture exit criteria are complete; earlier estimates are checkpoint history, not remaining work.
 
 Quiet-rest bounded slice estimate **3–6 working hours remaining**, including focused disruptions, root review/visual inspection, full gate and release, assuming existing sit/stand ownership needs no subsystem redesign. Larger autonomy/sleep/object priority awaits Gene's interview answer; no full communal-day/reuse completion claim.
+
+
+## Latest released checkpoint:22
+
+Quiet seated rest is integrated after the clean aa3317a full gate and live as8695c09e-1ae8-4315-bcc7-1572189722fb (rollback21). Ordinary sit/stand/cancel use the spare chair where physical setup placed it, preserve actual claims through getting up, refuse foreign seats and retain same unfinished notes. Panel controls own only proven requests/returns; reset clears UI identity. Temporary ordinary direction keeps existing return behavior; permanent departure gets up first. Full gate116browser/790engine/99unit; live33journeys and compiledcamera/exactbay pass,9productioncaptures personally inspected. No sleep/recovery/autonomy or active UI restore claim.
+
+Furniture setup, shared food, continuing classroom-day bridge and this quiet-rest slice have reached their bounded exits: **0 remaining hours for these shipped slices**. The next tranche is connected communal-day routines; owner preference interview remains pending for autonomous existing routines vs supported bed sleep/wake vs deeper usable work/meal objects. A bed interaction needs a horizontal support/body-clearance/lie/get-up contract; autonomous routines need bounded stable intentions and handoff through existing commands. Neither is a hidden prerequisite for these released directed experiences. Scope and a defensible hours range for that next tranche follow the answer. The larger sequence still leads to reusable activities in a small non-Mars setting after connected-day continuity. Fine anatomy, camera iterations, arbitrary layouts and specialized construction remain deferred.
