@@ -11,10 +11,10 @@ simple configurable maps; historical Studio remains the museum side.
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Preserve inventory and durable direction | Lead; Luna audits original IDs | All 216 IDs recoverable; candidate work distinguished from released work; exact worktrees/WIP retained | One bounded planning pass; no broad doc cleanup |
-| Classroom activity coordination | Sol implementation, lead architecture/review | Actual seating/role binding, explicit attention and questions, presenter rotation, coherent departure/interruption/cleanup in two arrangements | Existing release13 social actions; surface large missing prerequisites |
-| Play controls, meaningful display and visible attention | Lead plus GPT-6.1 Sol bounded worker | Start/intervene while running; clearly communicate speaker, listeners, phase and waiting reason | Confirmed /lab direction + coordinator interface; no universal editor |
-| Combined validation and release | Lead | Focused disruptions/captures, full established gate, production checks and release record | Review compatible near-complete changes; preserve failing deferred requirements |
+| Explicit late joining and audience return | Sol coordinator; lead review | Spare authored seat, speaker continues, busy/missing-seat refusal, safe cancellation | Tested checkpoint2fc68a6; browser/integration pending |
+| Seated computer work and intention continuity | GPT-6.1 Sol; lead review | Real chair/desk binding; interrupted work remains unfinished, explicit return continues progress; coherent ownership | Tested checkpoint2a3e90f; Lab wiring and captures pending; no precision typing |
+| Combined classroom/workstation play | GPT-6.1 Sol UI; lead release | Work → join → leave → resume in Lab; meaningful screen state and waiting reasons | No competing actor controller; inspect actual captures; full gate before merge |
+| Visible social behavior | Lead, alongside the above | Shared attention remains legible while arrivals/interventions occur | Bounded head/gaze standard; richer gestures and spoken dialogue deferred |
 
 ## First supported experience
 
@@ -38,17 +38,9 @@ captures to assess shared attention and pacing.
 
 ## Current baseline and preserved work
 
-Production remains **release13**, main `3bd40f2`, deployed version
-`3b93cbd2-bc84-4484-a3e8-21705a069b25`. Last shipped accounting was 38 fixed /
-36 reclassified /142 remaining; this is historical release accounting, not a count
-of untouched current work. Main also contains another agent's uncommitted historical
-reconstruction changes; do not overwrite them.
+First classroom source **f40f659** passed the full gate and was fast-forwarded into local main. Release14 is deployed as `c0522537-d4e4-4a64-9bd3-c52b711eecd4`; production verification passed. Rollback is release13 `3b93cbd2-bc84-4484-a3e8-21705a069b25`. Original-row accounting remains38 fixed /36 reclassified /142 remaining: the narrower classroom does not complete broader original requirements. Main's unrelated historical-agent changes are preserved.
 
-The old combined candidate is preserved on branch `codex/wave2-consolidation` at
-`ec3aa6f`. The studio-integration checkout now hosts the new classroom branch. It includes useful unreleased work and unresolved
-baseline/construction failures; it is not a green release. A classroom branch starts
-from stable main so specialized construction fidelity does not become a dependency.
-Compatible useful work can be selected with explicit provenance and the full gate.
+The old combined technical candidate remains on `codex/wave2-consolidation` at `ec3aa6f`, with unresolved baseline/construction failures; it is not a green release. The studio-integration checkout hosts the clean classroom branch. Useful compatible work is selected with explicit provenance rather than making specialized construction fidelity a classroom dependency.
 
 Finished current row: LM-117 bounded step-and-turn dance candidate `2af7a67`
 (integration `ec3aa6f`), five party checks, combined social checks, inspected browser
@@ -73,4 +65,8 @@ needs/interests/relationships and additional assets only as those experiences de
 
 ## Current implementation checkpoint
 
-The combined classroom candidate now implements two usable /lab arrangements, typed activity controls/readout, real display state and head attention. Focused coordinator19/object4/map5/claim1 and browser2/2 pass; final four captures inspected. Full gate/main integration/release are next. Initial constraints: ground-only, fixed furniture, explicit refusal for held objects/required missing equipment; departure excludes membership, no join/resume yet. Next experience work should add continuity/rejoining and richer shared attention while introducing useful individual workstation interaction, retaining the confirmed50/30/20 balance.
+Release14 implements two hypothetical /lab arrangements, typed activity controls/readout, owned display state and bounded head attention. Full gate: unit93/0, engine570/0 (6 documented skips/11 TODO), browser86 pass/7 documented skips, lint/tsc clean, unchanged flagship/probe, all36 MCP tools. Idle performance passes original limits. Ground-only fixed furniture, held-object refusal and explicit cancellation remain the supported boundary. Joining and resumable computer work are tested separate checkpoints, awaiting UI/visual integration and the next combined gate. Active classroom/workstation snapshots remain unsupported; attention is currently live-Lab behavior, not a validated take-replay feature.
+
+## Camera workstream coordination
+
+Gene launched a separate autonomous-camera task owning live cinematography/editor policies, bounded Typesafe/Jev experiments, camera tests and periodic MP4 demos. This activity task retains world-engine and default integration/deployment ownership. Cross-task messages are authorized. Initial allocation proposed: one active activity helper, up to two camera helpers (combined maximum three); camera confirmation pending. Activity browser/gate ports5495/5491; camera5501–5509 proposed. Shared Lab hook edits need agreement; prefer separate modules and small read-only phase/role/attention/participant/state interfaces. Live camera work is not a prerequisite for the next playable classroom/workstation increment.

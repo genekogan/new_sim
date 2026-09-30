@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 13 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 14 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -764,4 +764,35 @@ Production verification passed:340 assets/19 routes/GLB range/auth;all36 MCP too
 Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback f63d5e1a-556b-4379-b61c-2f7fa60a42e4 --name mars-campus-2026 -m "rollback release13: <reason>"
+```
+
+## Production deploy 14 (2026-09-30, first playable classroom)
+
+Clean source **f40f659** passed the full gate on the rebased classroom branch before fast-forward merge into local main. Live **c0522537-d4e4-4a64-9bd3-c52b711eecd4**, created00:24:36Z/deployed00:24:38Z, confirmed100%. Rollback **3b93cbd2-bc84-4484-a3e8-21705a069b25** (release13), confirmed100% before deploy. The subsequent metadata/evidence commit records that source rather than changing the deployed build. No remote/push, pin/golden or historical values changed; unrelated dirty main changes preserved.
+
+What works: hypothetical /lab classroom-4 and classroom-8; staggered real seating, presenter/host roles, owned powered display, questions/shared attention, presenter rotation, director intervention, small conversations and departure/cleanup. Runtime execution uses existing physical actions and resource ownership. Ground floor/fixed furniture only; held objects/missing equipment refuse. Late joining and resumable computer work are tested isolated follow-ups, not this release. Active classroom snapshots explicitly refuse; live head attention is not a validated take-replay feature. Exact hands, richer gestures/dialogue and moving-furniture rebinding remain deferred.
+
+Original LAST_MILE accounting stays **38 fixed /36 reclassified /142 remaining**. All216 IDs and candidate provenance remain in RAINY_DAY_BACKLOG; this narrower playable increment does not close the broader original social requirements.
+
+| Required check | Result |
+| --- | --- |
+| Full gate | GREEN `.cloudflare/gate/2026-09-30T00-00-40-560Z/report.json`; f40f659,gitDirty:false,cleanupError:null |
+| Lint / TypeScript | clean, zero warnings/errors |
+| Unit |93 pass /0 fail |
+| Engine |587 total:570 pass /0 fail /6 documented skips /11 historical TODO |
+| Browser |86 pass /7 documented historical skips;920.1s |
+| Flagship recording / determinism |byte-identical take/camera/final-state; unchanged b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local MCP |all36 tools pass |
+| Idle performance |original limits pass: exact peak111.201ms/mean0.717142ms; corridor52.666ms/0.541603ms; grids104.1–180.2ms; zero violations,pinned outcomes |
+| Regenerated evidence |570/0;17 rows PROVEN,8 milestones PROVEN; capabilities25/2/1 retain documented historical exceptions |
+
+No skipped case is counted as executed proof. Focused classroom/object/map checks include missing/occupied equipment, cancellation, directed departure and complete conversations. Capture inspection exposed failed ambient nudges against parent-owned actors; the selected claim guard corrects that behavior, with no-failed-record assertions retained. No baselines were changed.
+
+Build/dry-run passed:340 public files/821.1MiB,eight large objects already uploaded,zero R2 writes;388 build assets,6895.13KiB/1237.13KiB gzip. Rollout uploaded22 assets,startup110ms. Known chunk-size/dynamic-import warnings remain. No new DO migration.
+
+Production verification passed:340 assets/19 routes/GLB range/auth;all36 MCP tools;director demo all steps(10.059s);classroom2/2 and Studio direct/refusal/save/download/reopen/file-track2/2, combined4/4(50.6s);build-bay10901ticks/43steps/5checks/zero violations/errors and exact Node probe hash. Lead personally inspected seven production captures:presenting,question,rotation,three formed conversation groups,directed Studio playback,reopened track,and completed supported bay. Original history reconstruction remained outside this release. Captures/audits copied to main; logs integration `viewer/.cloudflare/*release-14.log`, captures `viewer/e2e/artifacts/prod-smoke-14/`.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 3b93cbd2-bc84-4484-a3e8-21705a069b25 --name mars-campus-2026 -m "rollback release14: <reason>"
 ```

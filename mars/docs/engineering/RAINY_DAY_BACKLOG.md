@@ -21,13 +21,15 @@ Prefer GPT-6.1 Sol medium for ordinary implementation; Luna for clear metadata/m
 | Vehicle lanes / bounded loaded detour | `codex/forklift-traffic-recovery` `9531a3b`, `6a63934`; `briefs/vehicle-lanes.REPORT.md`, `forklift-detour.REPORT.md` | Focused candidate; late-arrival/reverse recovery still partial |
 | Joist support articulation | `codex/support-transfer-articulation` `5dfe067`, install-cancel checkout | Opt-in candidate, not default registry; V3 actual-foot issue not claimed fixed |
 | Exact item entry | `codex/item-entry-bridge` `52286a0` plus dirty deadlock-tails checkout; `briefs/item-entry.REPORT.md` | **Uncommitted WIP: source-hold exit/directive guard incomplete. Preserve; do not merge.** Fine fingers deferred separately from correctness |
-| New classroom integration | `codex/classroom-integration`, studio-integration checkout, starts release13 | Active; gate/release pending |
+| First playable classroom | `codex/classroom-integration`, f40f659, studio-integration checkout | Full gate green and merged; release14 deployed and production verified |
+| Audience joining | `codex/classroom-joining`2fc68a6; `briefs/classroom-joining.REPORT.md` in its checkout | Tested24/24; browser/UI/integration pending |
+| Computer work continuity | `codex/workstation-interaction`2a3e90f; `briefs/workstation.REPORT.md` in its checkout | Tested11/11; browser/UI/integration pending |
 
 Worktree directories are under `<mars-worktrees>/`. Branches and reports are evidence pointers, not a green release claim. Preserve ignored captures/scripts and other agents’ dirty work.
 
-## New activity evidence (unreleased)
+## New activity evidence (release14 and follow-ups)
 
-Classroom candidate `codex/classroom-integration` derives typed roles/requirements, seat binding, attention/questions, rotation, conversation and safe interruption from release13. Reports: [coordinator](briefs/classroom-activity.REPORT.md), [objects](briefs/classroom-objects.REPORT.md), [playable integration](briefs/classroom-playable.REPORT.md), [claim-aware nudges](briefs/classroom-make-way.REPORT.md). This narrows prerequisites associated with LM115/116/120/121 and selects only the actor-claim guard from432f05e/LM105; none of those broader original rows is declared fully fixed. Joining/resumption, moving-seat rebinding, gestures and conversation turn-taking remain gaps.
+Classroom source f40f659 (release14) on `codex/classroom-integration` derives typed roles/requirements, seat binding, attention/questions, rotation, conversation and safe interruption from release13. Reports: [coordinator](briefs/classroom-activity.REPORT.md), [objects](briefs/classroom-objects.REPORT.md), [playable integration](briefs/classroom-playable.REPORT.md), [claim-aware nudges](briefs/classroom-make-way.REPORT.md). This narrows prerequisites associated with LM115/116/120/121 and selects only the actor-claim guard from432f05e/LM105; none of those broader original rows is declared fully fixed. Joining/resumption have tested unreleased checkpoints above; moving-seat rebinding, gestures and conversation turn-taking remain gaps. Release14 does not validate rendered attention during recorded take replay.
 
 ## Original row dispositions
 
