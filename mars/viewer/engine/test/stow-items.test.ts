@@ -374,6 +374,7 @@ test('active stow snapshots refuse explicitly; completed objects still snapshot/
     );
   assert.equal(restored.stateHash(), rt.stateHash());
   assert.equal(readStow(restored, action.id)?.status, 'prepared');
+  assert.deepEqual(readStow(restored, action.id), readStow(rt, action.id));
   clean(restored, params);
 });
 
@@ -446,4 +447,75 @@ test('stow refuses seated ownership without implicitly standing or cancelling it
     ['bowl', 'spoon'],
   );
   assert.deepEqual(rt.violations, []);
+});
+
+test('explicit snapshot drop preserves cancelled readout when active exec is omitted', () => {
+  const { rt, params } = setup(),
+    action = rt.submit('stow_items', params);
+  const snap = JSON.parse(JSON.stringify(rt.snapshot({ allowDrop: true }))),
+    restored = Runtime.restore(
+      snap,
+      createRegistry(),
+      { spatial: new Spatial(scene) },
+      ENGINE_INVARIANTS,
+    );
+  assert.equal(restored.records.get(action.id)?.status, 'cancelled');
+  assert.equal(readStow(restored, action.id)?.phase, 'cancelled');
+  assert.equal(
+    readStow(restored, action.id)?.diagnostic?.code,
+    'snapshot.dropped',
+  );
+  assert.deepEqual(readStow(restored, action.id)?.remaining, ['bowl', 'spoon']);
+  assert.deepEqual(readStow(restored, action.id)?.completed, []);
+  clean(restored, params);
+});
+test('final completion refuses an earlier placement changed while second put executes', () => {
+  const { rt, params } = setup(),
+    action = rt.submit('stow_items', params);
+  until(rt, () =>
+    [...rt.records.values()]
+      .filter((r) => r.parent === action.id && r.verb === 'put_item')
+      .some((r, i) => i === 1 && r.phase === 'reach'),
+  );
+  const alternative = surfaceSlot(rt.world, 'table#r1c0');
+  assert.ok(!('code' in alternative));
+  placeOnSlot(rt.world.entities.bowl, alternative, 0);
+  until(rt, () => !rt.isActive(action.id));
+  assert.equal(action.status, 'failed');
+  assert.equal(action.diagnostic?.code, 'stow.support-changed');
+  assert.deepEqual(readStow(rt, action.id)?.remaining, []);
+  assert.equal(rt.world.entities.bowl.support?.kind, 'resting-on');
+  assert.equal(rt.world.entities.spoon.support?.kind, 'resting-on');
+  clean(rt, params);
+  const restored = Runtime.restore(
+    JSON.parse(JSON.stringify(rt.snapshot())),
+    createRegistry(),
+    { spatial: new Spatial(scene) },
+    ENGINE_INVARIANTS,
+  );
+  assert.equal(readStow(restored, action.id)?.status, 'failed');
+  assert.equal(
+    readStow(restored, action.id)?.diagnostic?.code,
+    'stow.support-changed',
+  );
+  assert.equal(readStow(restored, action.id)?.completed.length, 2);
+});
+
+test('quiescent partial cancellation preserves historical completed and remaining readout on restore', () => {
+  const { rt, params } = setup(),
+    action = rt.submit('stow_items', params);
+  until(rt, () => readStow(rt, action.id)?.completed.length === 1);
+  rt.cancel(action.id);
+  until(rt, () => !rt.isActive(action.id));
+  const restored = Runtime.restore(
+    JSON.parse(JSON.stringify(rt.snapshot())),
+    createRegistry(),
+    { spatial: new Spatial(scene) },
+    ENGINE_INVARIANTS,
+  );
+  assert.deepEqual(readStow(restored, action.id), readStow(rt, action.id));
+  assert.equal(readStow(restored, action.id)?.status, 'cancelled');
+  assert.equal(readStow(restored, action.id)?.completed.length, 1);
+  assert.deepEqual(readStow(restored, action.id)?.remaining, ['spoon']);
+  clean(restored, params);
 });

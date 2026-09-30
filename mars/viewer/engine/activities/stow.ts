@@ -87,12 +87,27 @@ export function readStow(rt: Runtime, action: string): StowReadout | undefined {
   const params = record.params as StowParams;
   if (!ex) {
     const actor = typeof params?.actor === 'string' ? params.actor : '';
+    const phase =
+      record.status === 'completed'
+        ? 'prepared'
+        : record.status === 'cancelled'
+          ? 'cancelled'
+          : 'failed';
+    const placements = Array.isArray(params?.placements)
+      ? params.placements.filter(
+          (p) =>
+            p &&
+            typeof p.item === 'string' &&
+            typeof p.surfaceSlot === 'string',
+        )
+      : [];
+    const completed = placements.filter((p) => placed(rt, p));
     return {
       action,
       actor,
-      status: 'failed',
-      phase: 'failed',
-      completed: [],
+      status: phase,
+      phase,
+      completed: completed.map((p) => ({ ...p })),
       remaining: heldBy(rt.world, actor).map(({ item }) => item.id),
       diagnostic: record.diagnostic,
     };
@@ -369,6 +384,19 @@ export const stowItems: ActionDef<StowParams, Program, Exec> = {
       ex.child = undefined;
     }
     if (ex.index === ex.params.placements.length) {
+      const changed = ex.params.placements.find((p) => !placed(rt, p));
+      if (changed) {
+        stop(
+          rt,
+          ex,
+          diag(
+            'support-changed',
+            `${changed.item} no longer rests on approved destination ${changed.surfaceSlot} at final preparation check`,
+            [ex.params.actor, changed.item, changed.surfaceSlot],
+          ),
+        );
+        return { status: 'running', phase: 'stopping' };
+      }
       const remaining = heldBy(rt.world, ex.params.actor).map(
         ({ item }) => item.id,
       );
