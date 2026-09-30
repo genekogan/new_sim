@@ -128,6 +128,8 @@ test('pause and terminal End of presenter work preserve pair and worker; partial
   pause(rt, work.id);
   assert.equal(rt.isActive(routine.id), true); assert.equal(rt.isActive(discussion.id), true);
   complete(rt, 'gathering_continuation_control', { continuation: work.id, intent: 'resume' });
+  assert.equal(readGatheringContinuation(rt, work.id)!.mode, 'awaiting');
+  assert.equal(readGatheringContinuation(rt, work.id)!.child, undefined, 'early Resume observes its exact gate without taking the classroom actor');
   until(rt, () => readGatheringContinuation(rt, work.id)!.elapsed >= 2);
   pause(rt, work.id); const retained = readGatheringContinuation(rt, work.id)!.elapsed;
   assert.ok(retained >= 2 && retained < 12); assert.deepEqual(rt.holder('actor:presenter1'), []);

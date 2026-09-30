@@ -201,9 +201,14 @@ export const gatheringContinuationControl: ActionDef<GatheringContinuationContro
     if (!ex || !rt.isActive(p.continuation) || ex.ending) return { ok: false, diagnostic: diagnostic('inactive', `${p.continuation} cannot accept ${p.intent}`, [p.continuation]) };
     if (p.intent === 'resume') {
       if (!['paused', 'waiting'].includes(ex.mode)) return { ok: false, diagnostic: diagnostic('not-paused', `${p.continuation} must finish cleanup before resume`, [p.continuation]) };
-      const issue = identityIssue(rt, ex.p) ?? readyIssue(rt, ex.p) ?? workCheckpoint(rt, ex);
+      const issue = identityIssue(rt, ex.p);
       if (issue) return { ok: false, diagnostic: issue };
       const gate = gateIssue(rt, ex); if (gate.terminal) return { ok: false, diagnostic: gate.issue! };
+      // A pending exact gate resumes logical observation only; dispatch still requires free actors.
+      if (!gate.issue) {
+        const physical = readyIssue(rt, ex.p) ?? workCheckpoint(rt, ex);
+        if (physical) return { ok: false, diagnostic: physical };
+      }
     }
     return { ok: true, program: null };
   },
