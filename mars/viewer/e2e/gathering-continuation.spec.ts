@@ -140,7 +140,7 @@ test('live courtyard direction pauses only the affected discussion, then Resume 
   const before = await advance(page, 'discussion');
   await page.getByRole('combobox', { name: 'Classroom participant', exact: true }).selectOption('guest1');
   await button(page, 'Direct to courtyard').click();
-  const directed = await page.evaluate(() => window.__marsEngine.records().findLast(r => r.verb === 'walk_to' && !r.parent && r.params.actor === 'guest1')?.id);
+  const directed = await page.evaluate(() => window.__marsEngine.records().filter(r => r.verb === 'walk_to' && !r.parent && r.params.actor === 'guest1').at(-1)?.id);
   expect(directed).toBeTruthy();
   expect(await page.evaluate(id => {
     for (let i = 0; i < 12000; i++) {
