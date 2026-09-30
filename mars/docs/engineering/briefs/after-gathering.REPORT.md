@@ -27,3 +27,10 @@ npx --no-install oxlint engine/activities/gathering-continuation.ts engine/test/
 ```
 
 No green or release claim. Root owns integrated browser evidence, full pin/gate certification, review and deployment. Prerequisite investigation found no shared API blocker; no additional agents or network used. Root expressly authorized a source candidate commit during the release24 deployment check hold, before focused validation. The commit is reviewable and unverified; focused checks remain queued for the granted slot.
+
+
+## Root Lab candidate (unverified)
+
+Selected553b345 as941d710 into after-gathering-lab. New epoch-scoped panel submits two independent commitments with stable selected-session/exact-worker-routine bindings. Each has Pause/Resume/End, real elapsed/remaining/floor and named wait/refusal feedback; terminal End is not shown as fulfillment. Reset clears IDs. A detached read-only hook and listener-attention adapter observe physically formed owned groups without camera-policy changes. Quick tour explains the new continuation.
+
+Three browser regressions authored: default4 and physically prepared side8 actual Play plus complete follow-up work/discussion, exact retained worker progress after different-user computer reuse, actual listener attention, and local discussion Pause/End while worker/presenter finish, then reset. Runtime captures planned; no tests or visual claims yet because release24 holds the serialized heavy slot.

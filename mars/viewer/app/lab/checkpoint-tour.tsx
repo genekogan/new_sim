@@ -26,7 +26,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
             then Start session. Once talks begin, Start purposeful routine joins the worker, asks a
             question, follows both presenters and conversations, shares food, rests, and finishes the
             same notes. Pause routine retains progress; Resume continues after safe release. End routine
-            leaves the gathering running for others. This is a directed example, not an autonomous day.
+            leaves the gathering running for others. Commit attendee continuations lets two guests keep discussing the talks while presenter1 waits for these exact notes and then uses the computer for follow-up work. Each commitment has separate Pause, Resume and End controls. These are directed examples, not autonomous choices.
           </li>
           <li>
             <b>Prepare a usable room.</b> In a fresh room select worker and Take bowl, then Take spoon,

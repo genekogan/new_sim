@@ -5,6 +5,7 @@ import { ClassroomHud } from './classroom-hud.tsx';
 import { WorkBreakHud } from './work-break-hud.tsx';
 import { RestHud } from './rest-hud.tsx';
 import { PurposefulRoutineHud } from './purposeful-routine-hud.tsx';
+import { GatheringContinuationHud } from './gathering-continuation-hud.tsx';
 import { SELECTABLE_SCENARIOS, type Check } from './scenarios.ts';
 import { OVERLAYS, type LabView, type OverlayName } from './lab-view.ts';
 import { SequencePanel } from './sequence-hud.tsx';
@@ -87,6 +88,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         </ul>
       )}
       <PurposefulRoutineHud key={`purposeful-routine:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <GatheringContinuationHud key={`continuation:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ClassroomHud key={s.name} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />

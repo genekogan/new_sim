@@ -8,6 +8,7 @@ import { ThreeResources } from '../../lib/three-resources';
 import type { Spatial } from '../../engine/spatial/service.ts';
 import { traffic } from '../../engine/locomotion/walk.ts';
 import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
+import { readGatheringContinuation } from '../../engine/activities/gathering-continuation.ts';
 import { readClassroom, readSharedFoodBreak } from '../../engine/activities/index.ts';
 import { labCameraDiagnostic } from './camera-observation.ts';
 import type { Runtime } from '../../engine/runtime/runtime.ts';
@@ -254,6 +255,14 @@ export class LabView {
       const point: [number, number] = [food.attentionTarget.position[0], food.attentionTarget.position[2]];
       for (const person of food.participants)
         if (person.actor !== food.floorHolder && rt.holder(`actor:${person.actor}`).includes(food.group)) targets[person.actor] = point;
+    }
+    for (const action of rt.records.values()) {
+      if (action.verb !== 'gathering_continuation' || !rt.isActive(action.id)) continue;
+      const continuation = readGatheringContinuation(rt, action.id);
+      if (!continuation?.attentionTarget || !continuation.child || continuation.bindings.binding.kind !== 'discussion') continue;
+      for (const actor of continuation.bindings.binding.actors)
+        if (actor !== continuation.floorHolder && rt.holder(`actor:${actor}`).includes(continuation.child))
+          targets[actor] = continuation.attentionTarget.point;
     }
     this.attentionTargets = targets;
     this.humans.setAttention(targets);
