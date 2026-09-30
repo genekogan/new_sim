@@ -54,6 +54,11 @@ type Exec = {
 type Store = Record<string, Exec>;
 const store = (rt: Runtime): Store => (rt.services.purposefulRoutines ??= {});
 const lookup = (rt: Runtime, id: string): Exec | undefined => (rt.services.purposefulRoutines as Store | undefined)?.[id];
+function boundWorkElapsed(rt: Runtime, ex: Exec): number | undefined {
+  const work = readWorkstation(rt, ex.p.work.station);
+  return !('code' in work) && work.user === ex.p.actor && work.task === ex.p.work.task && work.duration === ex.p.work.duration
+    ? work.elapsed : undefined;
+}
 const diagnostic = (code: string, message: string, subjects: string[], cause?: Diagnostic): Diagnostic => ({
   code: `routine.${code}`, message, subjects, ...(cause ? { details: { cause } } : {}),
 });
@@ -276,6 +281,9 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
       beginDrain(ex, false, diagnostic('directed-away', `${by.verb} ${by.id} takes priority over ${ex.id}; drain owned children before explicit resume`, [ex.p.actor, by.id, ex.id]));
   },
   step(rt, ex, dt) {
+    // Retain actual bound-task progress before cleanup or completion releases it.
+    const elapsed = boundWorkElapsed(rt, ex);
+    if (elapsed !== undefined) ex.workElapsed = elapsed;
     if (ex.mode === 'draining' || ex.mode === 'ending') return drain(rt, ex);
     if (ex.mode === 'paused' || ex.mode === 'waiting') return ex.error ? { status: 'blocked', diagnostic: ex.error } : { status: 'running', phase: 'paused' };
     if (ex.child) {
@@ -367,11 +375,11 @@ export const purposefulRoutineControl: ActionDef<PurposefulRoutineControlParams,
 };
 export function readPurposefulRoutine(rt: Runtime, action: string): PurposefulRoutineReadout | undefined {
   const ex = lookup(rt, action), record = rt.records.get(action); if (!ex || !record) return;
-  const work = readWorkstation(rt, ex.p.work.station);
+  const elapsed = boundWorkElapsed(rt, ex);
   return { action, status: record.status, mode: ex.mode, obligation: ex.phase === 'work' ? 'finish-work' : 'gathering', phase: record.phase ?? ex.phase,
     bindings: structuredClone(ex.p), child: ex.child,
     ...(ex.error ? { diagnostic: structuredClone(ex.error), waitingReason: ex.error.message } : record.diagnostic ? { diagnostic: structuredClone(record.diagnostic), waitingReason: record.diagnostic.message } : {}),
     progress: { questionAsked: ex.questionAsked, presenters: [...ex.presenters], conversationSeen: ex.conversationSeen,
-      meal: structuredClone(ex.meal), restSeconds: ex.restSeconds, workElapsed: 'code' in work ? ex.workElapsed : work.elapsed }, ownedActions: [...ex.children] };
+      meal: structuredClone(ex.meal), restSeconds: ex.restSeconds, workElapsed: elapsed ?? ex.workElapsed }, ownedActions: [...ex.children] };
 }
 export const PURPOSEFUL_ROUTINE_ACTIONS: ActionDef[] = [purposefulRoutine, purposefulRoutineControl];

@@ -270,3 +270,42 @@ test('pause after question queue before worker floor clears latch and asks once 
   assert.equal(readPurposefulRoutine(rt, routine.id)!.progress.questionAsked, true);
   clean(rt);
 });
+
+test('completed routine retains its actual notes progress when another actor reuses the computer', () => {
+  const { rt, routine, params } = start();
+  finished(rt, routine.id);
+  assert.equal(readPurposefulRoutine(rt, routine.id)!.progress.workElapsed, 30);
+  const next = rt.submit('work_at', { actor: 'presenter1', station: params.work.station, seat: params.work.seat, task: 'Talk follow-up', duration: 4 });
+  assert.notEqual(next.status, 'failed', next.diagnostic?.message);
+  until(rt, () => { const w = readWorkstation(rt, params.work.station); return !('code' in w) && w.user === 'presenter1' && w.task === 'Talk follow-up' && w.elapsed >= 1; });
+  const current = readWorkstation(rt, params.work.station);
+  assert.ok(!('code' in current));
+  assert.equal(current.user, 'presenter1'); assert.equal(current.task, 'Talk follow-up');
+  assert.ok(current.elapsed >= 1 && current.elapsed < 4);
+  const authority = structuredClone(rt.services.purposefulRoutines);
+  assert.equal(readPurposefulRoutine(rt, routine.id)!.progress.workElapsed, 30);
+  assert.deepEqual(rt.services.purposefulRoutines, authority, 'getter does not update retained authority');
+  until(rt, () => !rt.isActive(next.id));
+  assert.equal(next.status, 'completed');
+  assert.equal(readPurposefulRoutine(rt, routine.id)!.progress.workElapsed, 30);
+  clean(rt);
+});
+
+for (const mismatch of ['user', 'task', 'durationSeconds'] as const)
+  test(`interrupted routine retains observed work rather than mismatched ${mismatch} progress`, () => {
+    const { rt, routine, params } = start();
+    until(rt, () => readPurposefulRoutine(rt, routine.id)!.progress.workElapsed >= 5);
+    pause(rt, routine.id);
+    const retained = readPurposefulRoutine(rt, routine.id)!.progress.workElapsed;
+    assert.ok(retained >= 5 && retained < 30);
+    // Adversarial foreign equipment state: identity must match every binding.
+    const config = rt.world.entities[params.work.station].equipment!.config;
+    config[mismatch] = mismatch === 'durationSeconds' ? 40 : 'foreign';
+    config.workSeconds = 17;
+    rt.step();
+    const authority = structuredClone(rt.services.purposefulRoutines);
+    assert.equal(readPurposefulRoutine(rt, routine.id)!.progress.workElapsed, retained);
+    assert.deepEqual(rt.services.purposefulRoutines, authority);
+    assert.equal(readPurposefulRoutine(rt, routine.id)!.mode, 'paused');
+    assert.deepEqual(rt.violations, []);
+  });

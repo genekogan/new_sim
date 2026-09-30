@@ -70,3 +70,9 @@ Remaining estimate:3–6 working hours for this bounded release, assuming no gat
 regression or shared cleanup/persistence redesign. Other guests still finish at
 authored departure positions; their own continuing purposes are a next social-life
 increment. This is one directed/mixed intention, not autonomous needs or sleep.
+
+## Retained task readout correction before release24
+
+Read-only next-slice inspection found that later computer reuse could make a completed routine display the new occupant's elapsed time. The coordinator now retains actual elapsed time on its authoritative steps, including cleanup/completion, and its getter reads station progress only when user, task and total duration match the committed obligation. Otherwise the getter returns retained progress without mutating execution state. No workstation/Runtime API or physical behavior changes.
+
+Four focused regressions prove ordinary `work_at` reuse by presenter1 with a different task keeps the completed notes readout at30s while the new task progresses/completes, and interrupted work does not adopt foreign progress when any individual user/task/duration binding changes. Getter immutability is asserted. Final focused suite23 passed /0 failed /0 skipped (10.53s); TypeScript and scoped coordinator/test oxlint clean. No pins/baselines changed. Root owns the restarted integrated gate, browser reuse proof and release; the after-gathering proposal remains unimplemented.
