@@ -119,7 +119,10 @@ function create(c: (typeof selected)[number]): View {
   };
 }
 function draw() {
-  const next = Math.min(selected.length - 1, Math.floor(time / 15)),
+  const next = Math.max(
+      0,
+      Math.min(selected.length - 1, Math.floor(time / 15)),
+    ),
     c = selected[next];
   if (next !== index) {
     disposeViews();
@@ -163,7 +166,10 @@ function draw() {
 }
 raf = requestAnimationFrame(function loop(wall) {
   if (playing) {
-    time = Math.min(selected.length * 15 - 0.001, (wall - start) / 1000);
+    time = Math.max(
+      0,
+      Math.min(selected.length * 15 - 0.001, (wall - start) / 1000),
+    );
     draw();
     if (time >= selected.length * 15 - 0.001) playing = false;
   }
@@ -177,7 +183,8 @@ const hook = {
     playing = true;
   },
   seek(t: number) {
-    time = t;
+    playing = false;
+    time = Math.max(0, Math.min(selected.length * 15 - 0.001, t));
     draw();
   },
   state: () => ({ time, playing, index }),

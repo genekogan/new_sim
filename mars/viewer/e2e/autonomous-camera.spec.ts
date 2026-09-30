@@ -5,6 +5,13 @@ import type { EngineHook } from '../app/lab/hook.ts';
 import type { attachLabCamera } from '../cinematography/lab-driver.ts';
 declare global {
   interface Window {
+    __cameraSuite: {
+      ready: boolean;
+      play: () => void;
+      seek: (time: number) => void;
+      state: () => { time: number; index: number };
+      dispose: () => void;
+    };
     __marsEngine: EngineHook;
     __cameraReview: ReturnType<typeof attachLabCamera>;
   }
@@ -13,6 +20,28 @@ const artifacts = path.resolve(
   'e2e/artifacts',
   process.env.E2E_RUN ?? 'codex-autonomous-camera-e2e',
 );
+test('varied replay suite starts safely and renders every scenario with sustained policy views', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/app/camera-lab/suite.html');
+  await page.waitForFunction(() => window.__cameraSuite?.ready);
+  await page.evaluate(() => window.__cameraSuite.play());
+  await page.waitForTimeout(100);
+  expect(
+    await page.evaluate(() => window.__cameraSuite.state().time),
+  ).toBeGreaterThanOrEqual(0);
+  for (let i = 0; i < 6; i++) {
+    await page.evaluate((i) => window.__cameraSuite.seek(i * 15 + 0.1), i);
+    await expect(page.locator('#title')).toContainText('REPLAY');
+    expect(await page.evaluate(() => window.__cameraSuite.state().index)).toBe(
+      i,
+    );
+  }
+  expect(errors).toEqual([]);
+  await page.evaluate(() => window.__cameraSuite.dispose());
+});
 test('review entry honors classroom-8 and keeps Jev local-only', async ({
   page,
 }) => {
