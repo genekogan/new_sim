@@ -1,3 +1,4 @@
+import { traceClientTools } from './tool-trace.mjs';
 import {
   Client,
   StreamableHTTPClientTransport,
@@ -53,6 +54,7 @@ const after = await (await get()).json();
 assert.equal(after.state.revision, before.state.revision);
 assert.equal(after.state.fire, 'on');
 const client = new Client({ name: 'mars-verification', version: '1.0.0' });
+traceClientTools(client, 'room-2026', { enabled: process.env.SIM_TRACE_TOOLS === '1' });
 await client.connect(
   new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
     requestInit: { headers },
@@ -400,6 +402,7 @@ assert.equal((await vtake(`id=${rex.take_id}&from=3&to=4&include=cameras`)).body
 // two independent rooms (different capabilities) never see each other's plans or takes
 const key2 = randomBytes(32).toString('hex'), view2 = hash(key2), room2 = hash(view2);
 const client2 = new Client({ name: 'mars-verification-2', version: '1.0.0' });
+traceClientTools(client2, 'independent-room-2026', { enabled: process.env.SIM_TRACE_TOOLS === '1' });
 await client2.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${room2}.${key2}` } } }));
 const ecall2 = async (name, args) => {
   calledEngineTools.add(name);
@@ -564,6 +567,7 @@ assert.equal((await ecall('engine_log', { workspace: 'iso-w1' })).body.head, hea
 // ---- historical year room (2022): canonical mars-2022 seeded from public/engine/campus-2022.json ----
 {
   const c22 = new Client({ name: 'mars-verification-2022', version: '1.0.0' });
+traceClientTools(c22, 'room-2022', { enabled: process.env.SIM_TRACE_TOOLS === '1' });
   await c22.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp?year=2022`), { requestInit: { headers } }));
   const y = async (name, args) => {
     calledEngineTools.add(name);
