@@ -295,11 +295,17 @@ export class WorldHost {
   }
 
   // ------------------------------------------------------------ snapshots
-  saveSnapshot() {
+  snapshotMs = { capture: 0, persist: 0 };
+  /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
+  saveSnapshot(sync = false) {
+    const t0 = performance.now();
     const runtime = this.engine.snapshot();
-    const body: SnapshotBody = { runtime, minds: [...this.minds.values()], seq: this.seq, extra: this.extra };
-    this.db.saveSnapshot(WORLD_ID, { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body });
+    const body: SnapshotBody = { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra) };
+    const meta = { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body };
+    this.snapshotMs.capture = performance.now() - t0;
     this.lastSnapshotTick = runtime.tick;
+    const persist = () => { const t1 = performance.now(); this.db.saveSnapshot(WORLD_ID, meta); this.snapshotMs.persist = performance.now() - t1; };
+    if (sync) persist(); else setImmediate(persist);
     return { tick: runtime.tick, stateHash: runtime.stateHash };
   }
 }

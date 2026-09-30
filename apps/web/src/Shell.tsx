@@ -162,7 +162,8 @@ function SyncPanel({ sim }: { sim: Sim }) {
           <span>tick</span><span>{s.tick} · step {s.tickMsAvg.toFixed(3)} ms avg, {s.tickMsMax.toFixed(2)} ms max (budget 50 ms)</span>
           <span>world</span><span>{s.entities} entities · {s.souls} souls · {s.liveActions} live actions</span>
           <span>clients</span><span>{s.clients}</span>
-          <span>log</span><span>{s.seq} events · last snapshot at tick {s.lastSnapshotTick} ({Math.round((s.tick - s.lastSnapshotTick) / 20)} s ago)</span>
+          <span>log</span><span>{s.seq} events · last snapshot at tick {s.lastSnapshotTick} ({Math.round((s.tick - s.lastSnapshotTick) / 20)} s ago) · capture {s.snapshotMs.capture.toFixed(1)} ms in-tick, write {s.snapshotMs.persist.toFixed(1)} ms deferred</span>
+          <span>build</span><span>{s.build}</span>
           <span>database</span><span>{(s.dbBytes / 1024).toFixed(0)} KB</span>
           <span>uptime</span><span>{fmtDur(s.uptimeSec)}</span>
         </div>

@@ -1,9 +1,13 @@
-# Sim scaffold. Lives in /etc/caddy/sites/ and is pulled in by one
-# `import sites/*.caddy` line at the end of /etc/caddy/Caddyfile.
-# The sslip.io name resolves to this box without any DNS change; sim.eden.art
-# starts working as soon as its A record points at <eden2-ip>.
+# Sim. Lives in /etc/caddy/sites/ and is pulled in by one `import sites/*.caddy`
+# line at the end of /etc/caddy/Caddyfile.
 https://sim.eden.art, https://<eden2-sslip-host> {
 	encode zstd gzip
 	header X-Robots-Tag "noindex, nofollow"
 	reverse_proxy 127.0.0.1:4500
+}
+# Staging: the release candidate runs here (fake brain, separate data) before production flips to it.
+https://<staging-host> {
+	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
+	reverse_proxy 127.0.0.1:4501
 }

@@ -7,7 +7,8 @@ Wants=network-online.target
 Type=simple
 User=sim
 Group=sim
-WorkingDirectory=/srv/sim/apps/server
+# /srv/sim/current -> /srv/sim/releases/<build>; deploy flips the link, rollback flips it back
+WorkingDirectory=/srv/sim/current/apps/server
 EnvironmentFile=/home/sim/sim.env
 ExecStart=/usr/bin/node src/main.ts
 Restart=always

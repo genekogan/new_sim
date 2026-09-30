@@ -116,7 +116,8 @@ export class Connection {
       clearInterval(this.pingTimer); this.stats.state = 'closed'; this.handlers.onChange?.();
       if (this.closed) return;
       this.stats.reconnects++;
-      setTimeout(() => this.connect(), Math.min(10_000, 500 * 2 ** this.retry++));
+      // exponential backoff with jitter, so a restart does not bring every client back on the same millisecond
+      setTimeout(() => this.connect(), Math.min(15_000, 500 * 2 ** this.retry++) * (0.5 + Math.random()));
     };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
   }

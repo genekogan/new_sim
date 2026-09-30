@@ -64,7 +64,7 @@ const shutdown = (sig: string) => {
   if (closing) return; closing = true;
   console.log(`[world] ${sig}: saving snapshot at tick ${host.engine.world.tick}`);
   host.stop();
-  try { host.saveSnapshot(); } catch (e) { console.error('[world] snapshot failed', e); }
+  try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
   server.close(); for (const c of hub.clients) c.ws.close(1001, 'server restarting');
   db.close(); process.exit(0);
 };

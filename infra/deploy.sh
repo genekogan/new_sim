@@ -1,35 +1,34 @@
 #!/usr/bin/env bash
-# Deploy Sim to eden2. Run from the repo root on the laptop:  infra/deploy.sh
-# Builds the web app locally, rsyncs the repo to /srv/sim, installs server
-# dependencies on the box as the `sim` user, restarts the unit, checks health.
-# Touches nothing under /opt/eden3 and nothing belonging to mars-mcp.
+# Deploy Sim to eden2 as a new release: test + build locally, rsync into
+# /srv/sim/releases/<build>, install deps, run it as STAGING first, smoke-test,
+# then flip PRODUCTION to it. Rollback: infra/rollback.sh [<build>].
 set -euo pipefail
 HOST="${SIM_HOST:-root@eden2}"
 cd "$(dirname "$0")/.."
+BUILD="$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo -dirty)"
+REL="/srv/sim/releases/$BUILD"
 
-BUILD_ID="$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo -dirty)"
-echo "== typecheck + test ($BUILD_ID)"
+echo "== typecheck + test ($BUILD)"
 pnpm typecheck >/dev/null
 pnpm -r test >/dev/null
 echo "== build web"
-BUILD_ID="$BUILD_ID" pnpm --filter @sim/web build >/dev/null
-echo "$BUILD_ID" > BUILD
+BUILD_ID="$BUILD" pnpm --filter @sim/web build >/dev/null
+echo "$BUILD" > BUILD
 
-echo "== rsync"
-rsync -az --delete \
+echo "== rsync → $REL"
+ssh "$HOST" "install -d -o sim -g sim -m 750 /srv/sim/releases $REL"
+rsync -az --delete --link-dest=/srv/sim/current/ \
   --exclude node_modules --exclude .git --exclude data --exclude '.env' --exclude '.env.*' --exclude '*.db' --exclude '*.db-*' \
-  ./ "$HOST:/srv/sim/"
+  ./ "$HOST:$REL/"
 
-echo "== install + restart"
-ssh "$HOST" 'set -e
-  chown -R sim:sim /srv/sim
-  sudo -u sim -H bash -lc "cd /srv/sim && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile --filter @sim/server... 2>&1 | tail -2"
-  install -m 644 /srv/sim/infra/sim.service /etc/systemd/system/sim.service
-  systemctl daemon-reload
-  systemctl enable sim >/dev/null 2>&1
-  systemctl restart sim
-  sleep 4
-  systemctl is-active sim
-  curl -fsS http://127.0.0.1:4500/healthz; echo
-  journalctl -u sim -n 6 --no-pager | cut -c1-200'
-echo "== done"
+echo "== install deps"
+ssh "$HOST" "chown -R sim:sim $REL && sudo -u sim -H bash -lc 'cd $REL && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile --filter @sim/server... 2>&1 | tail -1'"
+
+echo "== staging"
+ssh "$HOST" "ln -sfn $REL /srv/sim/staging && systemctl restart sim-staging && sleep 4 && systemctl is-active sim-staging >/dev/null && curl -fsS http://127.0.0.1:4501/healthz | grep -q '\"build\":\"$BUILD\"' && echo 'staging ok'" || { echo "STAGING FAILED: production untouched"; ssh "$HOST" "journalctl -u sim-staging -n 20 --no-pager | cut -c1-200"; exit 1; }
+
+echo "== production"
+ssh "$HOST" "ln -sfn $REL /srv/sim/current && systemctl restart sim && sleep 4 && systemctl is-active sim && curl -fsS http://127.0.0.1:4500/healthz; echo
+  cd /srv/sim/releases && ls -1t | tail -n +6 | xargs -r rm -rf   # keep the 5 newest releases
+  journalctl -u sim -n 4 --no-pager | grep -E 'world|http' | cut -c1-200"
+echo "== done: $BUILD"

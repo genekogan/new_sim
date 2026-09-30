@@ -96,7 +96,7 @@ export type ServerMsg =
 export type Me = { userId: string; short: string; email: string | null; wallet: string | null; role: 'user' | 'admin'; souls: string[]; invited: boolean };
 export type ServerStats = {
   tick: number; tickMsAvg: number; tickMsMax: number; clients: number; entities: number; souls: number; liveActions: number;
-  seq: number; logEvents: number; lastSnapshotTick: number; dbBytes: number; uptimeSec: number;
+  seq: number; logEvents: number; lastSnapshotTick: number; snapshotMs: { capture: number; persist: number }; dbBytes: number; uptimeSec: number; build: string;
   brain: { mode: string; callsToday: number; costToday: number; budget: number; inflight: number; jevMsAvg: number };
 };
 
