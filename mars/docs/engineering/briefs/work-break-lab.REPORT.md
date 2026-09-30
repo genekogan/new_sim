@@ -1,6 +1,6 @@
 # Same-world work and food break — Lab candidate
 
-Unreleased draft on codex/work-break-lab, based on room-setup source1eee5c6.
+Released20 from exact043806e; implementation provenance on codex/work-break-lab, based on room-setup source1eee5c6. Earlier candidate evidence below is retained as history.
 The engine worker owns the authored world/binding and focused invariants/replay
 proof. Root owns this interactive Lab entry and its browser/visual validation.
 
@@ -31,3 +31,5 @@ One-command coordination integrated as5b78a70 (worker73debb6): global activities
 Focused binding/coordinator21/21 pass; global TypeScript/lint clean. Manual browser2/2 still passes after the HUD change. Coordinated live browser2/2(12.6s) proves both room sizes, safe Stop, independent courtyard command preserved, partial held-food retry without retaking/reserving, actual floor rotation and renderer targets, all returns/free resources and same unfinished notes. Root inspected all six new runtime images; resumed-work camera framing is corrected in the next proof run because the previous frame showed the serving table while the worker was offscreen. First new browser run retained2attention-assertion failures: nonzero head angle was an invalid measurement for already-facing people; corrected proof checks the real target and finite bounded turn, without changing simulation, limits or baselines. Read-only Sol6.1 review found no serious integration issues. Full clean gate/release pending.
 
 Final corrected framing proof2/2(12.9s) passes; root inspected both actual resumed-workstation captures (same2.1/30s task), alongside the four meal/turn frames. Additive attention targets clear on world reset and activity completion. No general head-angle fidelity claim.
+
+Release20 full gate109browser/790engine/99unit allgreen, bothTSc/lint/36tools/unchangedprobe; production26/26 pluscompiledcamera/exactbay pass. Nineproductioncaptures inspected. Liveec7ff2a6-4a8d-41e8-95ae-3bf920931dfe; rollback19. See RELEASE_CHECKLIST20 for exactsource/timing/evidence. Same-world combined classroom attendance is subsequent bridgecandidate, not included20.

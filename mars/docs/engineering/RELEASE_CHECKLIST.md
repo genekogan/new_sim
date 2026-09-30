@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 19 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 20 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -955,3 +955,35 @@ Build/dry415files,6947.91KiB/1249.84KiB gzip; rollout9new assets/378existing,sta
 Root personally inspected nine new production PNGs: held table, both ready layouts, moved-seat question, both formed-group conversations, questioner/portrait camera and bay. Captures `viewer/e2e/artifacts/prod-smoke-19/`; gate/performance/evidence/browser/camera/bay logs and audits under `.cloudflare/`; deployment helper report `briefs/room-setup-release.REPORT.md`. Prior-refusal global banner remains visible after remedy; fine fingers and broader camera composition are not certified. Camera owner retired with docs-only handoff; no further camera implementation added.
 
 Original inventory remains38fixed/36reclassified/142remaining (216 recoverable); broad deferred rows were not closed to count this bounded capability. Furniture/setup tranche exits here. Next6–10working-hour bounded food-break increment assumes existing passing bindings need no shared physical redesign; full communal day/autonomy/reuse are subsequent outcomes.
+
+
+## production-deploy-20-2026-09-30-shared-food-break
+
+Exact source **043806eacd6d8284885513e7d220c25193116c6f** passed the clean rebased gate before local-main fast-forward. Live **ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe**, created06:45:48.789Z/deployed06:45:50.850Z, confirmed100%. Rollback **ce6daf22-caa7-4698-8b28-6b2a2935b7d3** (release19). Subsequent metadata/evidence/docs commits do not alter deployed source. Historical-agent dirty changes and all unfinished worktrees are preserved; no remote/push, pins, goldens or tolerances changed.
+
+**Playable boundary:** /lab work-break-4 and8 keep one Runtime for interrupted notes → shared food → explicit same-task resumption. One registered shared_food_break intent takes utensils, serves, gathers, eats and returns to approved slots through existing physical actions. Safe Stop drains actual children; ordinary courtyard commands preserve independent player control. Held items and partial food persist; retry does not duplicate takes/serves. Actual floor/wait/return state is visible; renderer attention observes currently group-owned listeners. Manual steps remain available. Explicit refusal dismissal retains diagnostics/history and cannot hide invariants/render failures.
+
+| Check | Result |
+|---|---|
+| Full gate | GREEN .cloudflare/gate/2026-09-30T06-22-38-018Z/report.json;043806e,gitDirty:false,cleanupError:null |
+| Lint / both TypeScript configs | Clean |
+| Unit |99 pass /0 fail |
+| Engine |807 total:790 pass /0 fail /6 documented skip /11 TODO |
+| Browser |109 pass /7 documented skip,1063.2s |
+| Flagship / probe |Byte-identical; unchanged b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local control plane |All36 MCP tools pass |
+| Idle performance |Original250/120ms peak,3ms mean/pins pass; exact107.234167ms/0.6904529142ms, corridor53.22275ms/0.5391477792ms;0violations. Historical grids103.771–175.457ms (<1000ms) |
+| Regenerated evidence |790/0;17 rows/8 milestones PROVEN,capabilities25/2/1 retain exceptions |
+| Production |341assets/19routes/range/auth;all36tools;director9steps8895ms;26 browser journeys pass(3.2min) |
+| Compiled camera / bay |Published camera read-only follow/return/Continuous/portrait/reset/dispose,0diagnostics/errors; bay10901ticks43steps5checks0violations/errors/exact hash |
+
+Prepare340files/821.1MiB; dry415files,6963.59KiB/1253.65KiB gzip;5new assets/382existing,startup90ms. Eight verified large-object receipts unchanged: **zero R2 writes**. Release helper found no build warning/error matches. Dev-source/provider-injection camera test is excluded only from production because it imports unbundled source; full local gate proves it, compiled public entry is independently verified. Jev remains disabled. No new camera implementation or paid calls.
+
+Root inspected9productionPNG: six meal/rotating-floor/resumed-notes captures, questioner/portrait and build-bay. Captures e2e/artifacts/prod-smoke-20; audits .cloudflare/audit/prod-camera-20.json and prod-lab-20.json; root shared-food-production logs; helper *release-20.log and briefs/work-break-release.REPORT.md. First focused UI proof incorrectly required a nonzero head angle for already-facing people; original failures retained, corrected proof measures real targets and bounded finite turns without changing simulation/limits.
+
+Supported standing pair, ground-floor authored service/return points, abstract portion fractions, separate explicit work resume. No seated dining, nutrition/needs, autonomous day scheduling, arbitrary serving-table rebind or active-activity snapshot restore. Fine finger/clothing precision remains deferred. The existing classroom and food presets are separately selectable; connected same-world attendance is the next candidate, not a released20 claim. Original216 rows remain recoverable:38fixed/36reclassified/142remaining.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback ce6daf22-caa7-4698-8b28-6b2a2935b7d3 --name mars-campus-2026 -m "rollback release20: <reason>"
+```
