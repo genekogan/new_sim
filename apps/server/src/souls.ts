@@ -92,11 +92,11 @@ export class Souls {
   }
 
   // ---- agent tokens
-  mintClaim(soul: SoulRow) {
+  mintClaim(soul: SoulRow, base: string = this.cfg.publicUrl) {
     const code = newId('claim') + newId('').slice(1);
     this.claims.set(code, { soulId: soul.id, expires: Date.now() + 15 * 60_000 });
-    const url = `${this.cfg.publicUrl}/claim/${code}`;
-    const prompt = `You can steer my Soul "${soul.name}" in Sim, a shared simulated world. Fetch this one-time link with a plain HTTP GET (for example: curl -s ${url}) to receive an API token and instructions, then read ${this.cfg.publicUrl}/v1/skill.md and follow it. The link works once and expires in 15 minutes.`;
+    const url = `${base}/claim/${code}`;
+    const prompt = `You can steer my Soul "${soul.name}" in Sim, a shared simulated world. Fetch this one-time link with a plain HTTP GET (for example: curl -s ${url}) to receive an API token and instructions, then read ${base}/v1/skill.md and follow it. The link works once and expires in 15 minutes.`;
     return { url, prompt, expires_in: 900 };
   }
   redeemClaim(code: string) {

@@ -20,6 +20,8 @@ export function buildApp(d: Deps) {
   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
   const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); return s; };
   const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token'); return s; };
+  /** Public base URL as the caller reached us (works on any hostname pointing at the box). */
+  const baseOf = (c: Context) => { const host = c.req.header('x-forwarded-host') ?? c.req.header('host'); const proto = c.req.header('x-forwarded-proto') ?? (host?.startsWith('localhost') || host?.startsWith('127.') ? 'http' : 'https'); return host ? `${proto}://${host}` : d.cfg.publicUrl; };
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
 
   app.onError((err, c) => {
@@ -28,6 +30,8 @@ export function buildApp(d: Deps) {
     return c.json({ ok: false, code: 'internal', message: 'internal error' }, 500);
   });
 
+  app.use('*', async (c, next) => { await next(); c.header('X-Robots-Tag', 'noindex, nofollow'); });
+
   // ---- public
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused }));
   app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: d.cfg.publicUrl, worldId: WORLD_ID, authReady: d.auth.ready, devAuth: d.auth.devAuth }));
@@ -35,10 +39,10 @@ export function buildApp(d: Deps) {
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
   app.get('/v1/log', (c) => c.json({ events: d.db.events(WORLD_ID, Number(c.req.query('after') ?? 0), Math.min(1000, Number(c.req.query('limit') ?? 200))) }));
-  app.get('/v1/skill.md', (c) => c.text(skillMd(d.cfg.publicUrl), 200, { 'content-type': 'text/markdown; charset=utf-8' }));
+  app.get('/v1/skill.md', (c) => c.text(skillMd(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8' }));
   app.get('/claim/:code', (c) => {
     const { soul, token } = d.souls.redeemClaim(c.req.param('code'));
-    return c.text(`# Sim: token for the Soul "${soul.name}"\n\nTOKEN: ${token}\n\nUse it as \`Authorization: Bearer <TOKEN>\`. Keep it private; it steers this one Soul only and its owner can revoke it.\nNext: read ${d.cfg.publicUrl}/v1/skill.md\nQuick check: curl -s -H "Authorization: Bearer ${token}" ${d.cfg.publicUrl}/v1/agent/status\n`, 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-store' });
+    return c.text(`# Sim: token for the Soul "${soul.name}"\n\nTOKEN: ${token}\n\nUse it as \`Authorization: Bearer <TOKEN>\`. Keep it private; it steers this one Soul only and its owner can revoke it.\nNext: read ${baseOf(c)}/v1/skill.md\nQuick check: curl -s -H "Authorization: Bearer ${token}" ${baseOf(c)}/v1/agent/status\n`, 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-store' });
   });
 
   // ---- signed-in users
@@ -61,7 +65,7 @@ export function buildApp(d: Deps) {
     const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { goal, target?, note? } }');
     const r = await d.souls.setIntent(s, p.data.intent, 'web'); return c.json({ ok: true, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq });
   });
-  app.post('/v1/souls/:id/claim', async (c) => { const u = await requireUser(c); return c.json({ ok: true, ...d.souls.mintClaim(ownSoul(u, c.req.param('id'))) }); });
+  app.post('/v1/souls/:id/claim', async (c) => { const u = await requireUser(c); return c.json({ ok: true, ...d.souls.mintClaim(ownSoul(u, c.req.param('id')), baseOf(c)) }); });
   app.post('/v1/souls/:id/revoke', async (c) => { const u = await requireUser(c); d.db.setSoulToken(ownSoul(u, c.req.param('id')).id, null); return c.json({ ok: true }); });
   app.post('/v1/souls/:id/shot', async (c) => {
     const u = await requireUser(c); const s = ownSoul(u, c.req.param('id')); const m = d.host.minds.get(s.id); if (!m) throw new ApiError(409, 'not-in-world', 'not in the world');

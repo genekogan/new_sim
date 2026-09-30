@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMidRequest, fakeJev, interpretMid, sample, buildTranslateRequest, interpretTranslate, sanitizePlan, type MidContext } from './index.ts';
+import { buildMidRequest, fakeJev, interpretMid, pick, buildTranslateRequest, interpretTranslate, sanitizePlan, type MidContext } from './index.ts';
 
 const ctx: MidContext = {
   world: { time: 'late afternoon', weather: 'clear', happening: 'a gathering at the campfire (3 souls)' },
-  soul: { name: 'Verdelis', about: 'a shy gardener', intent: 'attend the campfire', energy: 'tired', mood: 'curious', doing: 'standing around', recent: [] },
+  soul: { name: 'Verdelis', about: 'a shy gardener', intent: 'attend the campfire', ownerNote: null, hasIntent: true, intentIsNew: false, energy: 'tired', where: 'the center', doing: 'standing around', recent: [] },
   nearby: [{ who: 'the campfire', what: 'campfire', distance: 'near', doing: '3 souls here' }],
   nudge: null, running: false, trigger: 'test',
   options: [
@@ -12,26 +12,38 @@ const ctx: MidContext = {
     { id: 'wander', template: 'wander', label: 'Drift', steps: [{ verb: 'ambient_wander', params: {} }], durationHint: 'minute' },
   ],
 };
-test('mid request has one criterion per option and no continue when idle', () => {
-  const r = buildMidRequest(ctx);
-  assert.deepEqual(Object.keys((r.questions.next as any).criteria), ['attend:campfire', 'wander']);
-  assert.ok(!JSON.stringify(r.state).match(/\d+\.\d+/), 'no raw numbers in state');
+test('mid request: readable option names, conditions on every option, no status-quo option when idle', () => {
+  const { request, keys } = buildMidRequest(ctx);
+  const crit = (request.questions.next as any).criteria;
+  assert.deepEqual(Object.keys(crit), ['walk_to_the_campfire', 'drift']);
+  assert.deepEqual([...keys.values()], ['attend:campfire', 'wander']);
+  for (const v of Object.values(crit) as any[]) { assert.ok(v.what && v.good_when && v.not_for); }
+  assert.equal(request.questions.keep_going, undefined);
+  assert.ok(!JSON.stringify(request.state).match(/\d+\.\d+/), 'no raw numbers in state');
+  assert.equal(request.model, 'jev-1.13.0');
 });
-test('interpretMid only returns valid option ids and is seed-deterministic', () => {
-  const res = fakeJev(buildMidRequest(ctx)).response;
-  const a = interpretMid(res, ctx, 's:1'), b = interpretMid(res, ctx, 's:1');
+test('mid request asks keep_going only while running and not on a new intent', () => {
+  assert.ok(buildMidRequest({ ...ctx, running: true }).request.questions.keep_going);
+  assert.equal(buildMidRequest({ ...ctx, running: true, soul: { ...ctx.soul, intentIsNew: true } }).request.questions.keep_going, undefined);
+});
+test('interpretMid maps names back to option ids and is seed-deterministic', () => {
+  const { request, keys } = buildMidRequest(ctx);
+  const res = fakeJev(request).response;
+  const a = interpretMid(res, ctx, keys, 's:1'), b = interpretMid(res, ctx, keys, 's:1');
   assert.equal(a.option, b.option);
   assert.ok(['attend:campfire', 'wander'].includes(a.option));
 });
-test('sample respects floor and distribution', () => {
-  assert.equal(sample({ a: 1, b: 0 }, 0.0), 'a');
-  assert.equal(sample({ a: 1, b: 0 }, 0.999), 'b');
+test('pick: argmax when clear, never picks near-zero options', () => {
+  assert.equal(pick({ a: 0.7, b: 0.3 }, 0.99, { argmaxAt: 0.6 }).key, 'a');
+  for (let u = 0; u < 1; u += 0.01) assert.notEqual(pick({ a: 0.55, b: 0.43, c: 0.02 }, u, { argmaxAt: 0.8 }).key, 'c');
+  assert.equal(pick({ a: 0.55, b: 0.43, c: 0.02 }, 0.9, { argmaxAt: 0.8 }).key, 'b');
 });
 test('translate: unsure escapes', () => {
-  const req = buildTranslateRequest('asdf', 'V', [{ id: 'kiosk', name: 'the kiosk', kind: 'kiosk', distance: 'near' }]);
-  const out = interpretTranslate({ model: 'x', usage: { input_tokens: 0, output_tokens: 0 }, answers: { goal: { type: 'choice', choice: 'unsure', confidence: 0.9, probabilities: {} }, target: { type: 'choice', choice: 'none', confidence: 0.9, probabilities: {} }, actionable: { type: 'noul', noul: 0.1 } } }, 'asdf');
+  const { request, targetKeys } = buildTranslateRequest('asdf', 'V', [{ id: 'kiosk', name: 'the kiosk', kind: 'kiosk', distance: 'near' }]);
+  const out = interpretTranslate({ model: 'x', usage: { input_tokens: 0, output_tokens: 0 }, answers: { goal: { type: 'choice', choice: 'unsure', confidence: 0.9, probabilities: {} }, target: { type: 'choice', choice: 'none_of_these', confidence: 0.9, probabilities: {} }, actionable: { type: 'noul', noul: 0.1 } } }, 'asdf', targetKeys);
   assert.equal(out.ok, false);
-  assert.ok(req.questions.goal);
+  assert.ok(request.questions.goal);
+  assert.equal(targetKeys.get('the_kiosk'), 'kiosk');
 });
 test('narrator plan sanitizer drops invented targets', () => {
   const d = { region: 'center', label: 'c', time: '', weather: '', places: [{ id: 'campfire', name: 'x', state: '' }], souls: [{ name: 'A', about: '', intent: '', mood: '', energy: '', doing: '', wants_company: '' }], recent: [], neighbours: [], previous_summary: null };

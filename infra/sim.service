@@ -1,0 +1,25 @@
+[Unit]
+Description=Sim: shared simulated world (sequencer + web)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sim
+Group=sim
+WorkingDirectory=/srv/sim/apps/server
+EnvironmentFile=/home/sim/sim.env
+ExecStart=/usr/bin/node src/main.ts
+Restart=always
+RestartSec=3
+# SIGTERM makes the server save a snapshot before exiting
+TimeoutStopSec=20
+MemoryMax=1G
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/sim-data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

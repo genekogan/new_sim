@@ -18,13 +18,18 @@ export type DirectorContext = {
 };
 
 export function buildDirectorRequest(c: DirectorContext): JevRequest {
-  const criteria: Record<string, { what: string; not_for?: string }> = {};
+  const criteria: Record<string, Record<string, unknown>> = {};
   for (const s of c.candidates) criteria[s.id] = { what: `${s.text}. ${s.why}`, ...(s.notFor ? { not_for: s.notFor } : {}) };
   if (c.current) criteria['hold'] = { what: `Stay on the current shot (${c.current.text})`, not_for: 'when it has been held a long time or something more interesting started elsewhere' };
   const questions: JevRequest['questions'] = {
-    shot: { type: 'choice', instructions: 'You are directing a live broadcast of a small world for spectators. Which shot should the camera take now? Prefer where something is happening; avoid cutting too often.', criteria },
+    shot: { type: 'choice', instructions: { question: 'Which shot should the live broadcast camera take now?', consider: ['`happening_now`', '`current_shot` and how long it has been held'] }, criteria },
   };
-  for (const e of c.events.slice(0, 12)) questions[`announce_${e.id}`] = { type: 'noul', instructions: `Is this worth announcing to spectators as a one-line ticker item: "${e.text}"?` };
+  // One Noul per candidate line. The line is data carried next to the question, never spliced into it.
+  for (const e of c.events.slice(0, 12)) questions[`announce_${e.id}`] = {
+    type: 'noul',
+    instructions: { question: 'Is `line` worth showing to spectators as a one-line ticker item?', line: e.text },
+    criteria: { true: 'An arrival, a new intent, a gathering, a performance, or a storyteller moment: something a viewer would want to know', false: 'Routine movement or resting that nobody watching would miss' },
+  };
   return { model: JEV_MODEL, state: { current_shot: c.current ? { shot: c.current.text, held_for: c.current.held } : 'none yet', happening_now: c.happening }, questions };
 }
 
@@ -39,5 +44,5 @@ export function interpretDirector(res: JevResponse, c: DirectorContext) {
 export function buildShotRequest(soul: { name: string; doing: string }, candidates: ShotCandidate[]): JevRequest {
   const criteria: Record<string, { what: string; not_for?: string }> = {};
   for (const s of candidates) criteria[s.id] = { what: `${s.text}. ${s.why}`, ...(s.notFor ? { not_for: s.notFor } : {}) };
-  return { model: JEV_MODEL, state: { soul }, questions: { shot: { type: 'choice', instructions: `Which camera shot is the most cinematic way to show ${soul.name} right now?`, criteria } } };
+  return { model: JEV_MODEL, state: { soul }, questions: { shot: { type: 'choice', instructions: 'Which camera shot shows `soul.name` most cinematically, given `soul.doing`?', criteria } } };
 }

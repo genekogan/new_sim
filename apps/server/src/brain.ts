@@ -2,7 +2,7 @@
 // and response for the debug shell, and turns answers into logged events.
 import type { Entity } from '@sim/engine-contract';
 import {
-  JevClient, buildDirectorRequest, buildMidRequest, buildShotRequest, buildTranslateRequest, callNarrator, buildNarratorRequest, fallbackMid, fingerprint,
+  JEV_MODEL, JevClient, buildDirectorRequest, buildMidRequest, buildShotRequest, buildTranslateRequest, callNarrator, buildNarratorRequest, fallbackMid, fingerprint,
   haikuTranslate, interpretDirector, interpretMid, interpretTranslate, sanitize,
   type DirectorContext, type MidContext, type RegionDigest, type ShotCandidate, type Target, type Translation, type ChoiceA,
 } from '@sim/brain';
@@ -97,9 +97,14 @@ export class Brain {
     const eng = this.host.engine, w = eng.world, ent = w.entities[m.entityId];
     const nameOf = (id: string) => w.entities[id]?.label ?? w.regions[id]?.label ?? id;
     const s = eng.describeSurroundings(m.entityId);
+    const intentText = m.intent ? describeIntent({ ...m.intent, note: undefined }, nameOf) : 'none';
     return {
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: s.happening },
-      soul: { name: m.name, about: m.description, intent: describeIntent(m.intent, nameOf), energy: energyWord(m.energy), mood: m.mood, doing: ent.human!.task ? m.doing : 'standing around', recent: m.recent.slice(-3) },
+      soul: {
+        name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.note ?? null, hasIntent: !!m.intent,
+        intentIsNew: trigger === 'new-intent', energy: energyWord(m.energy), where: w.regions[s.region]?.label ?? s.region,
+        doing: ent.human!.task ? m.doing : 'standing around', recent: m.recent.slice(-3),
+      },
       nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
       nudge: m.nudge?.text ?? null,
       options: eng.enumerateActivities(m.entityId, m.intent),
@@ -126,14 +131,14 @@ export class Brain {
     this.inflight.add(m.soulId);
     const version = m.intentVersion;
     const seed = `${m.soulId}:${tick}`;
-    const request = buildMidRequest(ctx);
+    const { request, keys } = buildMidRequest(ctx);
     let decision, response: unknown = null, ms = 0, cost = 0, tokens = 0, mode: 'live' | 'fake' = 'fake', error: string | undefined, usedFallback = false;
     try {
       if (this.overBudget) { decision = fallbackMid(ctx, seed); usedFallback = true; error = 'over daily budget: deterministic fallback'; }
       else {
         const r = await this.jev.ask(request);
         response = r.response; ms = r.ms; cost = r.costUsd; tokens = r.response.usage.input_tokens; mode = r.mode;
-        decision = interpretMid(r.response, ctx, seed);
+        decision = interpretMid(r.response, ctx, keys, seed);
       }
     } catch (e) { decision = fallbackMid(ctx, seed); usedFallback = true; error = String((e as Error).message ?? e); }
     this.inflight.delete(m.soulId);
@@ -141,12 +146,13 @@ export class Brain {
     const now = host.engine.world.tick;
     const stale = m.intentVersion !== version;
     const opt = ctx.options.find((o) => o.id === decision.option);
+    const policy = { how: decision.how, pool: decision.pool, topP: decision.topP, keepGoing: decision.keepGoing, sociable: decision.sociable, optionKeys: Object.fromEntries(keys) };
     const applied = stale ? { dropped: 'intent changed during the call; re-evaluating' } : opt
-      ? { option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, sampledFrom: decision.probabilities, modelArgmax: decision.chosenByModel, seed }
-      : { option: 'continue', mood: decision.mood, reevalSeconds: decision.reevalSeconds };
-    const callId = this.record({ tick, tier: 'mid', subject: m.name, model: mode === 'live' ? 'jev-latest' : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
+      ? { option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, probabilities: decision.probabilities, ...policy, seed }
+      : { option: 'continue', mood: decision.mood, reevalSeconds: decision.reevalSeconds, ...policy };
+    const callId = this.record({ tick, tier: 'mid', subject: m.name, model: mode === 'live' ? JEV_MODEL : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
     if (stale) { m.nextEvalTick = now + 1; m.evalTrigger = 'new-intent'; return; }
-    m.wantsCompany = decision.wantsCompany;
+    m.wantsCompany = decision.sociable;
     if (!opt) { m.mood = decision.mood; m.nextEvalTick = now + decision.reevalSeconds * TPS; m.evalTrigger = 'timer'; host.markDirty(m.soulId); return; }
     m.nextEvalTick = now + TPS * 30; // provisional; the decision event sets the real one when applied
     if (m.nudge) m.nudge = null;    // a nudge is offered once
@@ -165,16 +171,16 @@ export class Brain {
       ...Object.values(eng.world.entities).filter((e) => e.kind === 'fixture' && !s.nearby.some((n) => n.id === e.id)).map((e) => ({ id: e.id, name: e.label ?? e.id, kind: e.def, distance: 'far' })),
       ...Object.values(eng.world.regions).map((r) => ({ id: r.id, name: r.label, kind: 'region', distance: 'n/a' })),
     ].slice(0, 24);
-    const request = buildTranslateRequest(text, m.name, targets);
+    const { request, targetKeys } = buildTranslateRequest(text, m.name, targets);
     let out: Translation;
     try {
       const r = await this.jev.ask(request);
-      out = interpretTranslate(r.response, text);
-      this.record({ tick, tier: 'translate', subject: m.name, model: r.mode === 'live' ? 'jev-latest' : 'fake', request, response: r.response, applied: out, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+      out = interpretTranslate(r.response, text, targetKeys);
+      this.record({ tick, tier: 'translate', subject: m.name, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: out, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
       if (out.ok || !this.cfg.anthropicKey || this.mode === 'fake' || this.overBudget) return { ...out, via: 'jev' };
     } catch (e) {
       out = { ok: false, confidence: 0, reason: String((e as Error).message) };
-      this.record({ tick, tier: 'translate', subject: m.name, model: 'jev-latest', request, response: null, applied: out, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: out.reason });
+      this.record({ tick, tier: 'translate', subject: m.name, model: JEV_MODEL, request, response: null, applied: out, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: out.reason });
       if (!this.cfg.anthropicKey) return { ...out, via: 'jev' };
     }
     // second pass: a small LLM with a tool schema
@@ -224,12 +230,12 @@ export class Brain {
         const lines: TickerLine[] = d.announce.map((e) => ({ tick, text: e.text }));
         if (d.chosen && d.chosen.id !== this.shotId) { this.shotId = d.chosen.id; this.shotSinceTick = tick; this.camera = { tick, shot: d.chosen.spec, text: d.chosen.text, heldSec: 0 }; }
         else if (this.camera) this.camera = { ...this.camera, heldSec: Math.round((tick - this.shotSinceTick) / TPS) };
-        this.record({ tick, tier: 'director', subject: 'broadcast', model: r.mode === 'live' ? 'jev-latest' : 'fake', request, response: r.response, applied: { shot: d.hold ? 'hold' : d.chosen?.id, spec: d.chosen?.spec, confidence: (r.response.answers.shot as ChoiceA).confidence, ticker: lines.map((l) => l.text) }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+        this.record({ tick, tier: 'director', subject: 'broadcast', model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { shot: d.hold ? 'hold' : d.chosen?.id, spec: d.chosen?.spec, confidence: (r.response.answers.shot as ChoiceA).confidence, ticker: lines.map((l) => l.text) }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
         if (this.camera) this.sink.onCamera(this.camera);
         if (lines.length) { this.ticker.push(...lines); if (this.ticker.length > 50) this.ticker.splice(0, this.ticker.length - 50); this.sink.onTicker(lines); }
       }
     } catch (e) {
-      this.record({ tick, tier: 'director', subject: 'broadcast', model: 'jev-latest', request: null, response: null, applied: null, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: String((e as Error).message) });
+      this.record({ tick, tier: 'director', subject: 'broadcast', model: JEV_MODEL, request: null, response: null, applied: null, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: String((e as Error).message) });
     }
     this.directing = false;
   }
@@ -247,7 +253,7 @@ export class Brain {
     const request = buildShotRequest({ name: m.name, doing: m.doing }, cands);
     const r = await this.jev.ask(request);
     const pick = cands.find((c) => c.id === (r.response.answers.shot as ChoiceA).choice) ?? cands[1];
-    this.record({ tick, tier: 'shot', subject: m.name, model: r.mode === 'live' ? 'jev-latest' : 'fake', request, response: r.response, applied: { shot: pick.id, spec: pick.spec }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+    this.record({ tick, tier: 'shot', subject: m.name, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { shot: pick.id, spec: pick.spec }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
     return { id: pick.id, text: pick.text, spec: pick.spec };
   }
 

@@ -10,6 +10,7 @@ export type ActivityOption = {
   id: string;            // e.g. 'attend:campfire'
   template: string;      // activity template name, e.g. 'attend'
   label: string;         // human readable: 'Walk to the campfire and join the gathering'
+  goodWhen?: string;     // when this is the right choice (feeds Jev criteria)
   notFor?: string;       // when this is a bad choice (feeds Jev criteria)
   target?: string;       // entity/region id
   steps: { verb: string; params: Record<string, unknown> }[];

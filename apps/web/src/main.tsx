@@ -1,0 +1,48 @@
+import { StrictMode, useEffect, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
+import { Shell, type AuthCtx } from './Shell.tsx';
+import './styles.css';
+
+type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean };
+
+function WithPrivy({ cfg }: { cfg: Cfg }) {
+  const p = usePrivy();
+  const email = p.user?.email?.address ?? p.user?.google?.email ?? null;
+  const auth: AuthCtx = {
+    ready: p.ready, authed: p.ready && p.authenticated, label: email ?? p.user?.id ?? null,
+    login: () => p.login(), logout: () => p.logout(),
+    getToken: async () => (p.ready && p.authenticated ? await p.getAccessToken() : null),
+    debug: { privyUserId: p.user?.id ?? null, wallet: p.user?.wallet ?? null, linked: p.user?.linkedAccounts?.map((a) => ({ type: a.type, ...(('address' in a) ? { address: (a as { address: string }).address } : {}) })) ?? [] },
+  };
+  return <Shell cfg={cfg} auth={auth} />;
+}
+
+function WithDev({ cfg }: { cfg: Cfg }) {
+  const [name, setName] = useState<string | null>(() => localStorage.getItem('sim.dev'));
+  const auth: AuthCtx = {
+    ready: true, authed: !!name, label: name ? `dev:${name}` : null,
+    login: () => { const n = prompt('dev user name (dev auth is on; "admin" is an admin)'); if (n) { localStorage.setItem('sim.dev', n); setName(n); } },
+    logout: async () => { localStorage.removeItem('sim.dev'); setName(null); },
+    getToken: async () => (name ? `dev:${name}` : null),
+    debug: { privyUserId: null, wallet: null, linked: [] },
+  };
+  return <Shell cfg={cfg} auth={auth} />;
+}
+
+function Root() {
+  const [cfg, setCfg] = useState<Cfg | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => { fetch('/v1/config').then((r) => r.json()).then(setCfg).catch((e) => setErr(String(e))); }, []);
+  if (err) return <pre>cannot reach the server: {err}</pre>;
+  if (!cfg) return <pre>connecting…</pre>;
+  const useDev = cfg.devAuth && new URLSearchParams(location.search).has('dev');
+  if (!cfg.privyAppId || useDev) return <WithDev cfg={cfg} />;
+  return (
+    <PrivyProvider appId={cfg.privyAppId} config={{ embeddedWallets: { ethereum: { createOnLogin: 'users-without-wallets' }, showWalletUIs: false }, appearance: { theme: 'dark' } }}>
+      <WithPrivy cfg={cfg} />
+    </PrivyProvider>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<StrictMode><Root /></StrictMode>);

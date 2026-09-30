@@ -149,7 +149,7 @@ export class ToyEngine implements Engine {
       const s = RING[slotOf(actorId)];
       opts.push({
         id: 'attend:campfire', template: 'attend', target: 'campfire', durationHint: 'minutes',
-        label: 'Walk to the campfire and join whoever is gathered there', notFor: 'when already at the campfire, or when wanting to be alone',
+        label: 'Walk to the campfire and join whoever is gathered there', goodWhen: 'the soul wants company or the intent is to attend or gather', notFor: 'the soul wants to be alone or is exhausted',
         steps: [{ verb: 'walk_to', params: { to: [s[0] / 1000, s[1] / 1000] } }, { verb: 'gather', params: { at: 'campfire', seconds: 150 } }],
       });
     }
@@ -158,13 +158,13 @@ export class ToyEngine implements Engine {
       .map((id) => ({ id, d: distMm(me, mmOf(w.entities[id])) })).sort((x, y) => x.d - y.d).slice(0, 2);
     for (const b of benches) opts.push({
       id: `rest:${b.id}`, template: 'rest', target: b.id, durationHint: 'minutes',
-      label: `Walk to ${name(w.entities[b.id])} (${bucket(b.d)}) and rest there`, notFor: 'when something interesting is happening nearby or the soul is restless',
+      label: `Walk to ${name(w.entities[b.id])} (${bucket(b.d)}) and rest there`, goodWhen: 'energy is low, the intent is to rest, or the soul wants quiet', notFor: 'the soul is energetic and something interesting is happening nearby',
       steps: [{ verb: 'walk_to', params: { to: b.id, standoff: 1 } }, { verb: 'sit', params: { on: b.id, seconds: 5 } }, { verb: 'rest', params: { seconds: 120 } }],
     });
     // converse with the nearest few souls
     for (const o of others.slice(0, 3)) opts.push({
       id: `converse:${o.e.id}`, template: 'converse', target: o.e.id, durationHint: 'minute',
-      label: `Go to ${name(o.e)} (${bucket(o.d)}, ${doingOf(w, o.e)}) and talk`, notFor: 'when the other soul is far away, or this soul wants to be alone',
+      label: `Go to ${name(o.e)} (${bucket(o.d)}, ${doingOf(w, o.e)}) and talk`, goodWhen: `the soul wants company, or the intent names ${name(o.e)}`, notFor: 'the soul wants to be alone, or the other soul is far away',
       steps: [{ verb: 'walk_to', params: { to: o.e.id, standoff: 1.3 } }, { verb: 'wave', params: { at: o.e.id, seconds: 2 } }, { verb: 'converse', params: { with: o.e.id, seconds: 45 } }],
     });
     // intent-specific
@@ -173,22 +173,22 @@ export class ToyEngine implements Engine {
       const te = w.entities[t];
       if (intent!.goal === 'follow' && te.kind === 'human' && !opts.some((o) => o.id === `follow:${t}`)) opts.unshift({
         id: `follow:${t}`, template: 'follow', target: t, durationHint: 'minute',
-        label: `Follow ${name(te)} wherever they are going`, notFor: 'when the intent is not about this soul',
+        label: `Follow ${name(te)} wherever they are going`, goodWhen: `the intent is to follow ${name(te)}`, notFor: 'the intent is about something else',
         steps: [{ verb: 'walk_to', params: { to: t, standoff: 2 } }, { verb: 'rest', params: { seconds: 8 } }, { verb: 'walk_to', params: { to: t, standoff: 2 } }, { verb: 'rest', params: { seconds: 8 } }, { verb: 'walk_to', params: { to: t, standoff: 2 } }],
       });
-      if (intent!.goal === 'go' || (intent!.goal === 'converse' && te.kind !== 'human')) opts.unshift({
+      if ((intent!.goal === 'go' || (intent!.goal === 'converse' && te.kind !== 'human')) && distMm(me, mmOf(te)) > 3000) opts.unshift({
         id: `go:${t}`, template: 'go', target: t, durationHint: 'minute',
-        label: `Walk to ${name(te)} and stay there a while`, notFor: 'when already there',
+        label: `Walk to ${name(te)} and stay there a while`, goodWhen: `the intent is to go to ${name(te)}`, notFor: 'the intent is about something else',
         steps: [{ verb: 'walk_to', params: { to: t, standoff: 1.5 } }, { verb: 'rest', params: { seconds: 60 } }],
       });
     }
-    if (t && w.regions[t] && intent!.goal === 'go') {
+    if (t && w.regions[t] && intent!.goal === 'go' && this.regionAt(a.pose.p) !== t) {
       const poly = w.regions[t].polygon; const cx = (poly[0][0] + poly[2][0]) / 2, cz = (poly[0][1] + poly[2][1]) / 2;
-      opts.unshift({ id: `go:${t}`, template: 'go', target: t, durationHint: 'minute', label: `Walk to ${w.regions[t].label}`, notFor: 'when already there', steps: [{ verb: 'walk_to', params: { to: [cx, cz] } }, { verb: 'rest', params: { seconds: 30 } }] });
+      opts.unshift({ id: `go:${t}`, template: 'go', target: t, durationHint: 'minute', label: `Walk to ${w.regions[t].label}`, goodWhen: `the intent is to go to ${w.regions[t].label}`, notFor: 'the intent is about something else', steps: [{ verb: 'walk_to', params: { to: [cx, cz] } }, { verb: 'rest', params: { seconds: 30 } }] });
     }
-    opts.push({ id: 'perform', template: 'perform', durationHint: 'seconds', label: 'Perform something (sing, dance or tell a story) right here', notFor: 'when nobody is around to see it, or the soul is shy or tired', steps: [{ verb: 'perform', params: { seconds: 30 } }] });
-    opts.push({ id: 'wander', template: 'wander', durationHint: 'minute', label: 'Drift around nearby with no particular aim', notFor: 'when the intent names something specific to do', steps: [{ verb: 'ambient_wander', params: { seconds: 60, radius: 12 } }] });
-    opts.push({ id: 'wander:far', template: 'wander', durationHint: 'minutes', label: 'Go exploring farther afield', notFor: 'when tired, or when the intent is to stay with others', steps: [{ verb: 'ambient_wander', params: { seconds: 120, radius: 35 } }] });
+    opts.push({ id: 'perform', template: 'perform', durationHint: 'seconds', label: 'Perform something (sing, dance or tell a story) right here', goodWhen: 'others are close by to watch and the personality enjoys an audience', notFor: 'nobody is close, or the soul is shy or tired', steps: [{ verb: 'perform', params: { seconds: 30 } }] });
+    opts.push({ id: 'wander', template: 'wander', durationHint: 'minute', label: 'Drift around nearby with no particular aim', goodWhen: 'there is no intent and nothing nearby appeals', notFor: 'the intent names something specific to do', steps: [{ verb: 'ambient_wander', params: { seconds: 60, radius: 12 } }] });
+    opts.push({ id: 'wander:far', template: 'wander', durationHint: 'minutes', label: 'Go exploring farther afield', goodWhen: 'the soul is energetic and curious, or the intent is to wander', notFor: 'the soul is tired, or the intent is to stay with others', steps: [{ verb: 'ambient_wander', params: { seconds: 120, radius: 35 } }] });
     const seen = new Set<string>();
     return opts.filter((o) => (seen.has(o.id) ? false : (seen.add(o.id), true))).slice(0, 9);
   }
