@@ -34,7 +34,14 @@ export function fitWorkstationModel(model: THREE.Object3D, sx: number, sy: numbe
 
 /** Authored CRT palette region in this one attributed asset; preserve its curved faces. */
 export function attachWorkstationScreen(model: THREE.Object3D, material: THREE.Material, resources: ThreeResources) {
-  const monitor = model.getObjectByName('Monitor.002_RetroPalette2_0');
+  const authoredName = 'Monitor.002_RetroPalette2_0';
+  const loadedName = THREE.PropertyBinding.sanitizeNodeName(authoredName);
+  const matches: THREE.Object3D[] = [];
+  // GLTFLoader sanitizes animation names but retains the exact source node identity.
+  model.traverse(object => {
+    if (object.userData.name === authoredName || object.name === loadedName) matches.push(object);
+  });
+  const monitor = matches.length === 1 ? matches[0] : undefined;
   if (!(monitor instanceof THREE.Mesh) || Array.isArray(monitor.material)) throw Error('Imported computer CRT mesh is unavailable');
   const original = monitor.geometry;
   const uv = original.getAttribute('uv'), positions = original.getAttribute('position'), index = original.index;

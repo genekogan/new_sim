@@ -27,7 +27,9 @@ function assetScene() {
       for (const [name, id] of Object.entries(primitive.attributes)) geometry.setAttribute({ POSITION: 'position', NORMAL: 'normal', TEXCOORD_0: 'uv' }[name], attribute(id));
       geometry.setIndex(attribute(primitive.indices)); object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
     }
-    object.name = node.name;
+    // Match GLTFLoader._loadNodeShallow: sanitized display name, exact source identity.
+    object.name = THREE.PropertyBinding.sanitizeNodeName(node.name);
+    object.userData.name = node.name;
     if (node.matrix) object.applyMatrix4(new THREE.Matrix4().fromArray(node.matrix));
     return object;
   });
@@ -53,7 +55,9 @@ await test('actual complete transformed model fits above desk inside current env
 });
 await test('live canvas material replaces actual CRT faces without changing source geometry', () => {
   const { scene } = assetScene(), r = new ThreeResources(); r.object(scene);
-  const monitor = scene.getObjectByName('Monitor.002_RetroPalette2_0'), original = monitor.geometry, uv = Array.from(original.attributes.uv.array), live = new THREE.MeshBasicMaterial();
+  const monitor = scene.getObjectByName('Monitor002_RetroPalette2_0'), original = monitor.geometry, uv = Array.from(original.attributes.uv.array), live = new THREE.MeshBasicMaterial();
+  assert.equal(scene.getObjectByName('Monitor.002_RetroPalette2_0'), undefined, 'actual loader removes periods');
+  assert.equal(monitor.userData.name, 'Monitor.002_RetroPalette2_0');
   assert.equal(attachWorkstationScreen(scene, live, r), 8);
   assert.deepEqual(Array.from(original.attributes.uv.array), uv); assert.notEqual(monitor.geometry, original); assert.equal(monitor.material[1], live);
   const mappedGeometry = monitor.geometry;
@@ -123,7 +127,7 @@ await test('successful load exposes detached fit proof and disposes owned import
     const v = importedWorkstation(parent, texture, 1.4, 1.3, 0.75, 0.74, { kind: 'retro-computer' }, () => ready++);
     await turn(); assert.equal(v.state().status, 'ready'); assert.equal(ready, 1); assert.equal(parent.children.length, 1);
     const state = v.state(); state.bounds.min[1] = -100; assert.ok(v.state().bounds.min[1] > 0.74);
-    assert.equal(scene.getObjectByName('Monitor.002_RetroPalette2_0').material[1].map, texture);
+    assert.equal(scene.getObjectByName('Monitor002_RetroPalette2_0').material[1].map, texture);
     v.dispose(); v.dispose(); assert.equal(disposed, 1); assert.equal(parent.children.length, 0); texture.dispose();
   } finally { Object.defineProperty(GLTFLoader.prototype, 'parseAsync', parse); Object.assign(globalThis, saved); }
 });
@@ -137,7 +141,7 @@ await test('reset during asynchronous parse disposes late geometry and never att
     const v = importedWorkstation(parent, texture, 1.4, 1.3, 0.75, 0.74, { kind: 'retro-computer', onStatus: s => states.push(s.status) }, () => ready++);
     await turn(); v.dispose();
     const { scene } = assetScene(); let disposed = 0;
-    scene.getObjectByName('Monitor.002_RetroPalette2_0').geometry.addEventListener('dispose', () => disposed++);
+    scene.getObjectByName('Monitor002_RetroPalette2_0').geometry.addEventListener('dispose', () => disposed++);
     resolveParse({ scene }); await turn();
     assert.equal(disposed, 1); assert.equal(parent.children.length, 0); assert.equal(ready, 0); assert.deepEqual(states, ['loading', 'disposed']); texture.dispose();
   } finally { Object.defineProperty(GLTFLoader.prototype, 'parseAsync', parse); Object.assign(globalThis, saved); }
