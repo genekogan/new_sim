@@ -23,6 +23,8 @@ export class LabSim {
   diagnostics: LogLine[] = [];
   paused = false;
   speed = 1;
+  /** Changes on every successful world load, including same-id/same-tick resets. */
+  scenarioEpoch = 0;
   private acc = 0;
   private costs: number[] = [];
   onTick: (rt: Runtime) => void = () => {};
@@ -39,6 +41,7 @@ export class LabSim {
     if (!s) throw Error(`unknown scenario "${name}" (have ${SCENARIOS.map((x) => x.name).join(', ')})`);
     this.scenario = s;
     this.rt = buildRuntime(s);
+    this.scenarioEpoch++;
     this.log = [{ tick: 0, level: 'info', text: `scenario ${s.name}: ${s.description}` }];
     this.diagnostics = [];
     this.costs = [];

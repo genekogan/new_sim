@@ -9,6 +9,7 @@ import type { Spatial } from '../../engine/spatial/service.ts';
 import { traffic } from '../../engine/locomotion/walk.ts';
 import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
 import { readClassroom } from '../../engine/activities/index.ts';
+import { labCameraDiagnostic } from './camera-observation.ts';
 import type { Runtime } from '../../engine/runtime/runtime.ts';
 import { LabSim } from './sim.ts';
 import { StaticScene } from './scene.ts';
@@ -171,10 +172,14 @@ export class LabView {
     this.camera.updateProjectionMatrix();
   }
 
-  look(pos: number[], target: number[]) {
+  look(pos: number[], target: number[], fov?: number) {
+    const diagnostic = labCameraDiagnostic(pos, target, fov);
+    if (diagnostic) return { ok: false as const, diagnostic };
+    if (fov !== undefined) this.setFov(fov);
     this.camera.position.set(pos[0], pos[1], pos[2]);
     this.orbit.target.set(target[0], target[1], target[2]);
     this.orbit.update();
+    return { ok: true as const };
   }
 
   setOverlay(name: OverlayName, on: boolean) {

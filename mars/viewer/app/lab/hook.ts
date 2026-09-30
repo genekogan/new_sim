@@ -1,4 +1,5 @@
 import { readWorkstation } from '../../engine/objects/workstation.ts';
+import { LabCameraGeometryCache } from './camera-observation.ts';
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
 import * as THREE from 'three';
 import type { LabView, OverlayName } from './lab-view.ts';
@@ -23,6 +24,7 @@ export type EngineHook = ReturnType<typeof installHook>;
 
 export function installHook(view: LabView, notify: () => void) {
   const sim = view.sim;
+  const cameraGeometry = new LabCameraGeometryCache();
   const marks = new Highlights(); // question captures: outlines + labels by id (highlight.ts)
   view.scene.add(marks.group);
   // take-replay check (recordTake / humanFields / replayTake)
@@ -55,6 +57,9 @@ export function installHook(view: LabView, notify: () => void) {
     get frames() {
       return view.frames;
     },
+    get scenarioEpoch() { return sim.scenarioEpoch; },
+    /** Frozen clone cached by world identity and navigation geometry epoch. */
+    cameraGeometry: () => cameraGeometry.read(sim.rt, sim.scenarioEpoch),
     get error() {
       return view.error;
     },
@@ -182,8 +187,8 @@ export function installHook(view: LabView, notify: () => void) {
       notify();
     },
     overlays: () => [...view.overlays],
-    camera(pos: number[], target: number[]) {
-      view.look(pos, target);
+    camera(pos: number[], target: number[], fov?: number) {
+      return view.look(pos, target, fov);
     },
     /** Framing presets for a scenario: top-down diagnostic and oblique, or a named scenario view ('Oblique yard'). */
     cameraPreset(kind: string) {
