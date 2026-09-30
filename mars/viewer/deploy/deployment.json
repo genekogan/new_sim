@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "0bb846b0-25de-4db3-9f3e-7e0ae5409dcc",
+  "version": "01a29ba2-76cd-4b26-8a64-02c77d4f5f22",
   "published": "2026-09-30",
   "verification": "../.cloudflare/audit/http-smoke.json",
   "updated": "2026-09-30",
-  "feature": "release 24: explicit purposeful classroom, shared meal, quiet rest, and retained notes routine",
+  "feature": "release 26: continuing attendee purposes and reusable studio; selected computer appearance degraded to primitive fallback",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,14 +17,14 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "d88e1112-a018-4f08-9ed0-350c6f0b63ee",
-  "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=work-break-4",
-  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-24-2026-09-30-purposeful-routine",
+  "rollback_version": "0bb846b0-25de-4db3-9f3e-7e0ae5409dcc",
+  "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=design-studio",
+  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-26-2026-09-30-degraded-computer-appearance",
   "questions_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/questions/",
-  "source_commit": "7648dbf",
-  "release": 24,
+  "source_commit": "c43e382cd2c1f8ec7915b613edbd2b71569e5fd0",
+  "release": 26,
   "engine_evidence": "../../docs/engineering/EVIDENCE.md",
-  "gate_report": "../.cloudflare/gate/2026-09-30T18-19-37-557Z/report.json",
+  "gate_report": "../.cloudflare/gate/2026-09-30T21-21-39-867Z/report.json",
   "last_rollback": {
     "failed_release": 25,
     "failed_version": "2edcf368-baeb-4dbf-aea7-da48ccccee62",
@@ -35,5 +35,16 @@
     "deployed_at": "2026-09-30T20:46:47.577Z",
     "verification": "100% rollback status and HTTP 341 assets/19 routes/GLB range/auth passed; no MCP retry",
     "verified_at": "2026-09-30T20:49:17.609Z"
-  }
+  },
+  "status": "degraded: selected computer asset missing; explicit packaging repair pending",
+  "production_verification": {
+    "infrastructure": "HTTP 341 assets/19 routes/range/auth, all36 MCP, director, frozen camera and exact bay PASS",
+    "browser_passed": 13,
+    "browser_failed": 1,
+    "browser_interrupted": 1,
+    "failure": "loaded computer returned404; primitive fallback rendered",
+    "interrupted": "reset case stopped with SIGINT130 after known missing-asset cause",
+    "full_production_pass": false
+  },
+  "deployed_at": "2026-09-30T21:50:54.558Z"
 }
