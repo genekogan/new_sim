@@ -11,7 +11,7 @@ import { SOLAR_ASSETS, type EquipmentKind } from './catalog-solar.ts';
 import { framingAssets } from './catalog-framing.ts';
 import { ACTIVITY_ASSETS } from './catalog-activities.ts';
 
-export type GripSlot = { id: string; local: Vec3 };
+export type GripSlot = { id: string; local: Vec3; /** Optional centered handle segment, full end-to-end local vector; midpoint drives formation. */ span?: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
 
 /**
@@ -81,7 +81,9 @@ export type AssetDef = {
   /** Placed electrical equipment (catalog-solar.ts, spec §19): its kind and default configuration. */
   equipment?: { kind: EquipmentKind; defaults: Record<string, number | string> };
   /** Usable activity affordances, independent of mesh appearance and per-entity state. */
-  capabilities?: { display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
+  capabilities?: {
+    /** Upright ground fixture transport; handling geometry is defined only here. */
+    fixtureCarry?: { handling: Handling; upright: true }; display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
   dims: { confidence: Confidence; note: string };
 };
 
@@ -253,6 +255,7 @@ const SOCIAL_FIXTURES: AssetDef[] = [
     obstacle: true,
     slots: [{ id: 'seat', kind: 'seat', local: [0, 0], yaw: FACE_Z }],
     dims: provisional('generic folding camp chair'),
+    capabilities: { fixtureCarry: { upright: true, handling: { carryCrew: [1, 1], carryPose: 'edge', carryHeight: 1, grips: { 1: [{ id: 'chair-back', local: [0, 0.6, -0.258], span: [0.3, 0, 0] }] } } } },
   },
   {
     id: 'campfire',

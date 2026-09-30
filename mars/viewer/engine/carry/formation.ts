@@ -89,10 +89,13 @@ export function shortName(defId: string): string {
   return def(defId).label;
 }
 
+export const handlingFor = (d: AssetDef) => d.capabilities?.fixtureCarry?.handling ?? d.handling;
+export const isCarryLoad = (e: Entity) => e.phase === 'carried' && (e.kind === 'component' || (e.kind === 'fixture' && !!def(e.def).capabilities?.fixtureCarry));
+
 /** Crew-size and load checks (spec §7 "a six-foot human cannot casually carry a nineteen-foot frame alone"). */
 export function checkCrew(defId: string, n: number, itemId?: string): Diagnostic | null {
   const d = def(defId);
-  const h = d.handling;
+  const h = handlingFor(d);
   const name = shortName(defId);
   const L = d.size[longAxis(d)];
   const who = itemId ? [itemId] : [];
@@ -122,10 +125,10 @@ export function checkCrew(defId: string, n: number, itemId?: string): Diagnostic
 /** Build the formation for an asset and crew size (assumes `checkCrew` passed). */
 export function formationFor(defId: string, n: number): Formation {
   const d = def(defId);
-  const h = d.handling!;
+  const h = handlingFor(d)!;
   const ax = longAxis(d);
-  const carry = orientationFor(d, h.carryPose);
-  const lay = orientationFor(d, 'flat');
+  const carry = d.capabilities?.fixtureCarry?.upright ? { pitch: 0, roll: 0 } : orientationFor(d, h.carryPose);
+  const lay = d.capabilities?.fixtureCarry?.upright ? { pitch: 0, roll: 0 } : orientationFor(d, 'flat');
   // carried box extents in the formation frame
   const [sx, sy, sz] = d.size;
   const cLocal: Vec3 = [0, sy / 2, 0];

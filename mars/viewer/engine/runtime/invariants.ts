@@ -6,6 +6,7 @@ import { entityFootprint, type Spatial } from '../spatial/service.ts';
 import type { Invariant, Runtime } from './runtime.ts';
 import { def, HUMAN_RADIUS } from '../world/catalog.ts';
 import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
+import { isCarryLoad } from '../carry/formation.ts';
 import type { WorldState } from '../world/types.ts';
 import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP } from '../locomotion/walk.ts';
 
@@ -83,7 +84,7 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   for (const e of Object.values(rt.world.entities)) {
     const human = e.kind === 'human' && !!e.human;
-    if (!human && !(e.kind === 'component' && e.phase === 'carried')) continue;
+    if (!human && !isCarryLoad(e)) continue;
     const ext = human ? 0 : Math.max(...def(e.def).size) / 2;
     const cur = { p: [e.pose.p[0], e.pose.p[1], e.pose.p[2]] as Vec3, yaw: e.pose.yaw, ext };
     poses.set(e.id, cur);

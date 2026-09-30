@@ -28,6 +28,8 @@ export type CarryParams = { crew: string[]; item: string; to: { x: number; z: nu
 export type ClimbPlan = ClimbGeom & { s0: number; s1: number; fromLevel: number; toLevel: number; toY: number; deck: Trajectory };
 
 export type CarryProgram = {
+  /** Only the fixture mover uses this ground profile; legacy component carry is unchanged. */
+  fixture?: { restingPhase: Entity['phase']; binding: string };
   f: Formation;
   crew: string[];
   item: string;
@@ -121,12 +123,12 @@ function gatherRoutes(sp: Spatial, item: Entity, people: Entity[], f: Formation,
   return { ok: true, approach, gather };
 }
 
-export function planCarryAction(rt: Runtime, p: CarryParams): PlanResult<CarryProgram> {
+export function planCarryAction(rt: Runtime, p: CarryParams, fixture = false): PlanResult<CarryProgram> {
   const w = rt.world;
   const sp = rt.services.spatial as Spatial;
   const item = w.entities[p.item];
   if (!item) return bad({ code: 'entity.unknown', message: `no item "${p.item}"`, subjects: [p.item] });
-  if (item.kind !== 'component') return bad({ code: 'carry.not-carriable', message: `"${p.item}" is a ${item.kind}, not a component`, subjects: [p.item] });
+  if (!fixture && item.kind !== 'component') return bad({ code: 'carry.not-carriable', message: `"${p.item}" is a ${item.kind}, not a component`, subjects: [p.item] });
   const people: Entity[] = [];
   for (const id of p.crew) {
     const e = w.entities[id];
@@ -138,7 +140,7 @@ export function planCarryAction(rt: Runtime, p: CarryParams): PlanResult<CarryPr
   }
   const crewDiag = checkCrew(item.def, p.crew.length, item.id);
   if (crewDiag) return bad({ ...crewDiag, subjects: [item.id, ...p.crew] });
-  if ((item.phase !== 'stored' && item.phase !== 'staged') || item.support?.kind !== 'ground')
+  if ((!fixture && item.phase !== 'stored' && item.phase !== 'staged') || item.support?.kind !== 'ground')
     return bad({ code: 'carry.item-unavailable', message: `${item.id} is ${item.phase ?? 'in use'} (support ${item.support?.kind ?? 'none'}); only items lying on the ground can be picked up`, subjects: [item.id] });
   const level = people[0].human!.level;
   const split = people.find((e) => e.human!.level !== level);
@@ -158,7 +160,7 @@ export function planCarryAction(rt: Runtime, p: CarryParams): PlanResult<CarryPr
   const f = formationFor(item.def, p.crew.length);
   const lie = entityFrame(item);
   // pickup: the crew may lift facing either way along the load
-  const startCands: SE2[] = [lie.q, { ...lie.q, th: lie.q.th + Math.PI }];
+  const startCands: SE2[] = fixture ? [lie.q] : [lie.q, { ...lie.q, th: lie.q.th + Math.PI }];
   const startWhy: string[] = [];
   const starts = startCands.filter((q) => {
     const spots = carrierSpots(f, q, lie.halfW);
@@ -175,7 +177,7 @@ export function planCarryAction(rt: Runtime, p: CarryParams): PlanResult<CarryPr
   if (toLevel !== level) return planStairCarry(rt, p, item, people, f, g, level, levelY, lie, starts, toLevel);
   // set-down target (yaw = long-axis direction; the crew may arrive facing either way)
   const tq: SE2 = { x: p.to.x, z: p.to.z, th: p.to.yaw };
-  const cands = [tq, { ...tq, th: tq.th + Math.PI }];
+  const cands = fixture ? [tq] : [tq, { ...tq, th: tq.th + Math.PI }];
   const lays = cands.map((q) => laidIssue(sp, f, q, level, levelY, item.id, p.crew));
   if (lays.every((l) => l)) {
     const lay = lays[0]!;

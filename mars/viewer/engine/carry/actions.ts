@@ -14,7 +14,7 @@ import type { Spatial } from '../spatial/service.ts';
 import { makeWay, stairBlocker, traffic, walkTo, takeReplan } from '../locomotion/walk.ts';
 import { CARRY_CLIMB_SPEED, climbPose, type ClimbPose } from './climb.ts';
 import { entityFootprint } from '../spatial/service.ts';
-import { carriedPose, carrierSpots, entityFrame, formationFor, laidPose, worldDiscs, type SE2 } from './formation.ts';
+import { carriedPose, carrierSpots, entityFrame, formationFor, laidPose, worldDiscs, isCarryLoad, type SE2 } from './formation.ts';
 import { poseHit } from './sweep.ts';
 import { labelOf, laidIssue, planCarryAction, type CarryParams, type CarryProgram } from './validate.ts';
 import { planCarry } from './planner.ts';
@@ -28,8 +28,8 @@ const GATHER_TIMEOUT_S = 120;
 const TURN_RATE = 3.0; // rad/s, turning to face along the load before lifting
 
 type WalkExec = ReturnType<typeof walkTo.start>;
-type Transition = { from: Pose; to: Pose; fromSpots: Vec2[]; toSpots: Vec2[]; yaw: number; final: 'staged' | 'stored' };
-type Exec = {
+type Transition = { from: Pose; to: Pose; fromSpots: Vec2[]; toSpots: Vec2[]; yaw: number; final: Entity['phase'] };
+export type CarryExec = {
   id: string;
   p: CarryProgram;
   phase: 'gather' | 'lift' | 'move' | 'climb' | 'set-down' | 'release';
@@ -65,12 +65,12 @@ const lerpPose = (a: Pose, b: Pose, t: number): Pose => ({
   pitch: (a.pitch ?? 0) + ((b.pitch ?? 0) - (a.pitch ?? 0)) * t,
   roll: (a.roll ?? 0) + ((b.roll ?? 0) - (a.roll ?? 0)) * t,
 });
-const crewOf = (rt: Runtime, ex: Exec): Entity[] => ex.p.crew.map((id) => rt.world.entities[id]);
-const itemOf = (rt: Runtime, ex: Exec) => rt.world.entities[ex.p.item];
+const crewOf = (rt: Runtime, ex: CarryExec): Entity[] => ex.p.crew.map((id) => rt.world.entities[id]);
+const itemOf = (rt: Runtime, ex: CarryExec) => rt.world.entities[ex.p.item];
 
 export type LoadDisc = { p: Vec2; r: number; actionId: string; entity: string; crew: string[]; level: number; braking?: boolean };
 
-const execsOf = (rt: Runtime): Map<string, Exec> => (rt.services.carryExecs ??= new Map());
+export const carryExecsOf = (rt: Runtime): Map<string, CarryExec> => (rt.services.carryExecs ??= new Map());
 
 /**
  * Read-only: the load discs of every load currently lifted by a live `carry` action (review C3).
@@ -83,14 +83,14 @@ const execsOf = (rt: Runtime): Map<string, Exec> => (rt.services.carryExecs ??= 
 export function activeLoadDiscs(rt: Runtime, braking = false): LoadDisc[] {
   const out: LoadDisc[] = [];
   for (const e of Object.values(rt.world.entities)) {
-    if (e.kind !== 'component' || e.phase !== 'carried' || e.support?.kind !== 'held' || !e.support.by.length) continue;
+    if (!isCarryLoad(e) || e.support?.kind !== 'held' || !e.support.by.length) continue;
     const actionId = e.reservedBy;
-    if (!actionId || rt.records.get(actionId)?.verb !== 'carry' || !rt.isActive(actionId)) continue;
+    if (!actionId || !['carry', 'move_fixture'].includes(rt.records.get(actionId)?.verb ?? '') || !rt.isActive(actionId)) continue;
     const crew = e.support.by;
     const level = rt.world.entities[crew[0]]?.human?.level ?? 0;
     const f = formationFor(e.def, crew.length);
     for (const d of worldDiscs(f, entityFrame(e).q)) if (d.d.part === 'load') out.push({ p: d.p, r: d.d.r, actionId, entity: e.id, crew, level });
-    const ex = braking ? execsOf(rt).get(actionId) : undefined;
+    const ex = braking ? carryExecsOf(rt).get(actionId) : undefined;
     if (ex?.phase !== 'move' || ex.v < 0.02) continue;
     const U = ex.p.traj.u[ex.p.traj.u.length - 1], i0 = ex.i;
     const stop = (ex.v * ex.v) / (4 * ACCEL) + ex.v / 20; // braking distance at 2·ACCEL + one tick
@@ -102,19 +102,22 @@ export function activeLoadDiscs(rt: Runtime, braking = false): LoadDisc[] {
   return out;
 }
 
+/** A chair is held in front of its single carrier; construction defaults face along the load. */
+const carryFacing = (ex: CarryExec, yaw:number) => wrapAngle(yaw - (ex.p.fixture ? ex.p.f.carriers[0].side * Math.PI / 2 : 0));
+
 /** Place load + carriers for formation pose q (the only way positions change while moving). */
-function applyFormation(rt: Runtime, ex: Exec, q: SE2) {
+function applyFormation(rt: Runtime, ex: CarryExec, q: SE2) {
   const item = itemOf(rt, ex);
   item.pose = carriedPose(ex.p.f, q, ex.p.levelY);
   const spots = carrierSpots(ex.p.f, q);
   crewOf(rt, ex).forEach((h, i) => {
-    h.pose = { p: [spots[i][0], ex.p.levelY, spots[i][1]], yaw: wrapAngle(q.th) };
+    h.pose = { p: [spots[i][0], ex.p.levelY, spots[i][1]], yaw: carryFacing(ex, q.th) };
   });
   ex.q = q;
 }
 
 /** A non-crew person inside the formation's footprint (load discs + carrier spots) at arc length u. */
-function pathBystander(rt: Runtime, ex: Exec, u: number): string | null {
+function pathBystander(rt: Runtime, ex: CarryExec, u: number): string | null {
   const p = ex.p;
   const i0 = ex.i;
   const q = poseAtU(ex, u);
@@ -135,7 +138,7 @@ function pathBystander(rt: Runtime, ex: Exec, u: number): string | null {
  * carrier spot from the current pose to the end, +0.15 m), or the carry has stopped moving. A walker
  * blocked in the formation's way steps aside to such a spot and walks on once its goal passes it.
  */
-function clearOfRoute(rt: Runtime, ex: Exec, q: Vec2): boolean {
+function clearOfRoute(rt: Runtime, ex: CarryExec, q: Vec2): boolean {
   if (!rt.isActive(ex.id) || ex.phase !== 'move') return true;
   const { traj, f } = ex.p;
   const U = traj.u[traj.u.length - 1];
@@ -150,7 +153,7 @@ function clearOfRoute(rt: Runtime, ex: Exec, q: Vec2): boolean {
 }
 
 /** A non-crew person standing within a body width of any station, or inside a laid footprint (+0.4 m). */
-function bystanderAt(rt: Runtime, ex: Exec, spots: Vec2[], frame: ReturnType<typeof entityFrame> | null): string | null {
+export function carryBystanderAt(rt: Runtime, ex: CarryExec, spots: Vec2[], frame: ReturnType<typeof entityFrame> | null): string | null {
   const p = ex.p;
   for (const o of Object.values(rt.world.entities)) {
     if (o.kind !== 'human' || p.crew.includes(o.id) || o.human?.level !== p.level) continue;
@@ -172,14 +175,14 @@ const sub2r = (q: Vec2, c: Vec2, th: number): Vec2 => {
  * Mid-carry replan starts: always the current pose; the heading-flipped pose only when it keeps
  * every carrier within 0.3 m of where they stand (otherwise the crew would teleport — review C1).
  */
-function replanStarts(rt: Runtime, ex: Exec, here: SE2): SE2[] {
+function replanStarts(rt: Runtime, ex: CarryExec, here: SE2): SE2[] {
   const flip: SE2 = { ...here, th: wrapAngle(here.th + Math.PI) };
   const spots = carrierSpots(ex.p.f, flip);
   const near = crewOf(rt, ex).every((h, i) => hypot(spots[i][0] - h.pose.p[0], spots[i][1] - h.pose.p[2]) <= 0.3);
   return near ? [here, flip] : [here];
 }
 
-function poseAtU(ex: Exec, u: number): SE2 {
+function poseAtU(ex: CarryExec, u: number): SE2 {
   const { poses, u: us } = ex.p.traj;
   while (ex.i < us.length - 2 && us[ex.i + 1] <= u) ex.i++;
   const a = poses[ex.i], b = poses[ex.i + 1] ?? a;
@@ -188,16 +191,16 @@ function poseAtU(ex: Exec, u: number): SE2 {
   return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, th: a.th + (b.th - a.th) * t };
 }
 
-function beginTransition(rt: Runtime, ex: Exec, phase: 'lift' | 'set-down', to: Pose, toSpots: Vec2[], yaw: number, final: 'staged' | 'stored') {
+function beginTransition(rt: Runtime, ex: CarryExec, phase: 'lift' | 'set-down', to: Pose, toSpots: Vec2[], yaw: number, final: Entity['phase']) {
   const item = itemOf(rt, ex);
   const fromSpots = crewOf(rt, ex).map((h) => [h.pose.p[0], h.pose.p[2]] as Vec2);
-  ex.tr = { from: { ...item.pose, p: [...item.pose.p] }, to, fromSpots, toSpots, yaw, final };
+  ex.tr = { from: { ...item.pose, p: [...item.pose.p] }, to, fromSpots, toSpots, yaw: ex.p.fixture ? carryFacing(ex, to.yaw) : yaw, final };
   ex.phase = phase;
   ex.t = 0;
   for (const h of crewOf(rt, ex)) h.human!.activity = phase;
 }
 
-function stepTransition(rt: Runtime, ex: Exec, dt: number, dur: number): boolean {
+function stepTransition(rt: Runtime, ex: CarryExec, dt: number, dur: number): boolean {
   const tr = ex.tr!;
   ex.t = Math.min(dur, ex.t + dt);
   const a = smooth(ex.t / dur);
@@ -209,14 +212,14 @@ function stepTransition(rt: Runtime, ex: Exec, dt: number, dur: number): boolean
   return ex.t >= dur - 1e-9;
 }
 
-function startSetDown(rt: Runtime, ex: Exec, q: SE2) {
+function startSetDown(rt: Runtime, ex: CarryExec, q: SE2) {
   const laid = laidPose(ex.p.f, q, ex.p.levelY);
   const halfW = entityFrame({ ...itemOf(rt, ex), pose: laid }).halfW;
-  beginTransition(rt, ex, 'set-down', laid, carrierSpots(ex.p.f, q, halfW), q.th, 'staged');
+  beginTransition(rt, ex, 'set-down', laid, carrierSpots(ex.p.f, q, halfW), q.th, ex.p.fixture ? ex.p.fixture.restingPhase : 'staged');
 }
 
 /** Existing augmented-grid carry recovery, always starts at the current validated formation. */
-function retryCarryPeople(rt: Runtime, ex: Exec, c: SE2): boolean {
+function retryCarryPeople(rt: Runtime, ex: CarryExec, c: SE2): boolean {
   const p = ex.p, sp = rt.services.spatial as Spatial;
   const others = Object.values(rt.world.entities)
     .filter((o) => o.kind === 'human' && !p.crew.includes(o.id) && o.human?.level === p.level)
@@ -235,7 +238,7 @@ function retryCarryPeople(rt: Runtime, ex: Exec, c: SE2): boolean {
   return false;
 }
 
-export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
+export const carry: ActionDef<CarryParams, CarryProgram, CarryExec> = {
   verb: 'carry',
   description:
     'A crew of 1–4 people picks up a component (upright, beam, 2x4, plywood), carries it as one rigid formation along a route validated for load + carriers, and lays it down at (x, z, yaw). Rejected with a diagnostic if the crew is too small or the formation cannot fit.',
@@ -250,8 +253,8 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
     });
     for (const c of prog.crew) rt.world.entities[c].human!.task = id;
     rt.world.entities[prog.item].reservedBy = id;
-    const ex: Exec = { id, p: prog, phase: 'gather', walks, t: 0, u: 0, v: 0, i: 0, q: prog.pickup, cancelling: false, epoch: -1 };
-    execsOf(rt).set(id, ex);
+    const ex: CarryExec = { id, p: prog, phase: 'gather', walks, t: 0, u: 0, v: 0, i: 0, q: prog.pickup, cancelling: false, epoch: -1 };
+    carryExecsOf(rt).set(id, ex);
     return ex;
   },
   step(rt, ex, dt): StepResult {
@@ -266,8 +269,9 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       }
       if (ex.walks.some((w) => w)) return { status: 'running', phase: 'gather-cancel' };
       for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
-      itemOf(rt, ex).reservedBy = undefined;
-      execsOf(rt).delete(ex.id);
+      const resting = itemOf(rt, ex);
+      if (resting) resting.reservedBy = undefined;
+      carryExecsOf(rt).delete(ex.id);
       return { status: 'completed', outputs: { cancelled: true } };
     }
     if (ex.phase === 'gather') {
@@ -276,7 +280,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         const w = ex.walks[i];
         if (!w) continue;
         const r = walkTo.step(rt, w, dt);
-        if (r.status === 'failed') return execsOf(rt).delete(ex.id), { status: 'failed', diagnostic: { ...r.diagnostic, code: 'carry.gather-failed', message: `${p.crew[i]} could not reach the ${p.f.name}: ${r.diagnostic.message}` } };
+        if (r.status === 'failed') return carryExecsOf(rt).delete(ex.id), { status: 'failed', diagnostic: { ...r.diagnostic, code: 'carry.gather-failed', message: `${p.crew[i]} could not reach the ${p.f.name}: ${r.diagnostic.message}` } };
         if (r.status === 'completed') {
           ex.walks[i] = null;
           const h = rt.world.entities[p.crew[i]].human!;
@@ -286,7 +290,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       }
       // arrived carriers turn to face along the load (walk_to's own `face` option is not used: see CARRY.md)
       let aligned = true;
-      const face = wrapAngle(p.pickup.th);
+      const face = carryFacing(ex, p.pickup.th);
       crewOf(rt, ex).forEach((h, i) => {
         if (ex.walks[i]) return;
         const d = angleDelta(h.pose.yaw, face);
@@ -294,11 +298,11 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         h.pose.yaw = wrapAngle(h.pose.yaw + clamp(d, -TURN_RATE * dt, TURN_RATE * dt));
       });
       if (ex.walks.some((w) => w) || !aligned) {
-        if (ex.t > GATHER_TIMEOUT_S) return execsOf(rt).delete(ex.id), { status: 'failed', diagnostic: { code: 'carry.gather-stuck', message: `the crew did not assemble around ${p.item} within ${GATHER_TIMEOUT_S} s`, subjects: [p.item, ...p.crew] } };
+        if (ex.t > GATHER_TIMEOUT_S) return carryExecsOf(rt).delete(ex.id), { status: 'failed', diagnostic: { code: 'carry.gather-stuck', message: `the crew did not assemble around ${p.item} within ${GATHER_TIMEOUT_S} s`, subjects: [p.item, ...p.crew] } };
         return { status: 'running', phase: 'gather' };
       }
       // nobody may stand where the carriers step to grip the load (idle bystanders are asked to move)
-      const inWay = bystanderAt(rt, ex, carrierSpots(p.f, p.pickup), null);
+      const inWay = carryBystanderAt(rt, ex, carrierSpots(p.f, p.pickup), null);
       if (inWay) {
         makeWay(rt, inWay, [p.pickup.x, p.pickup.z]);
         return blockedWait(rt, ex.id, p.item, [inWay], { code: 'carry.pickup-occupied', message: `the crew cannot take up ${p.item}: ${inWay} is standing at a grip position`, subjects: [p.item, inWay], at: [p.pickup.x, p.levelY, p.pickup.z] }, p.crew);
@@ -308,7 +312,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
       item.phase = 'carried';
       item.support = { kind: 'held', by: [...p.crew] };
       crewOf(rt, ex).forEach((h, i) => (h.human!.grip = { entity: p.item, slot: p.f.carriers[i].slot }));
-      beginTransition(rt, ex, 'lift', carriedPose(p.f, p.pickup, p.levelY), carrierSpots(p.f, p.pickup), wrapAngle(p.pickup.th), 'stored');
+      beginTransition(rt, ex, 'lift', carriedPose(p.f, p.pickup, p.levelY), carrierSpots(p.f, p.pickup), wrapAngle(p.pickup.th), p.fixture ? p.fixture.restingPhase : 'stored');
       return { status: 'running', phase: 'lift' };
     }
     if (ex.phase === 'lift') {
@@ -381,12 +385,12 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         }
         // the set-down stations must be free of other people: idle bystanders are asked to step
         // aside (directed work outranks idling); the crew holds the load meanwhile
-        const bystander = bystanderAt(rt, ex, p.setdown, entityFrame({ ...itemOf(rt, ex), pose: p.laid }));
+        const bystander = carryBystanderAt(rt, ex, p.setdown, entityFrame({ ...itemOf(rt, ex), pose: p.laid }));
         if (bystander) {
           makeWay(rt, bystander, [p.target.x, p.target.z]);
           return blockedWait(rt, ex.id, p.item, [bystander], { code: 'carry.setdown-occupied', message: `the crew holds ${p.item} at its destination: ${bystander} is standing where it must be set down`, subjects: [p.item, bystander], at: [p.target.x, p.levelY, p.target.z] }, p.crew);
         }
-        beginTransition(rt, ex, 'set-down', p.laid, p.setdown, wrapAngle(p.target.th), 'staged');
+        beginTransition(rt, ex, 'set-down', p.laid, p.setdown, wrapAngle(p.target.th), p.fixture ? p.fixture.restingPhase : 'staged');
       }
       return { status: 'running', phase: ex.phase };
     }
@@ -407,7 +411,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
     ex.t += dt;
     if (ex.t < RELEASE_S) return { status: 'running', phase: 'release' };
     for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
-    execsOf(rt).delete(ex.id);
+    carryExecsOf(rt).delete(ex.id);
     const e = itemOf(rt, ex);
     return {
       status: 'completed',
@@ -449,13 +453,14 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
         return { ok: true, deferred: true };
       }
       for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
-      itemOf(rt, ex).reservedBy = undefined;
-      execsOf(rt).delete(ex.id);
+      const resting = itemOf(rt, ex);
+      if (resting) resting.reservedBy = undefined;
+      carryExecsOf(rt).delete(ex.id);
       return { ok: true };
     }
     if (ex.phase === 'lift') {
       // lower it back where it lay
-      beginTransition(rt, ex, 'set-down', p.lying, p.approach, wrapAngle(p.pickup.th), 'stored');
+      beginTransition(rt, ex, 'set-down', p.lying, p.approach, wrapAngle(p.pickup.th), p.fixture ? p.fixture.restingPhase : 'stored');
       ex.cancelling = true;
       return { ok: true, deferred: true };
     }
@@ -493,7 +498,7 @@ export const carry: ActionDef<CarryParams, CarryProgram, Exec> = {
 };
 
 /** A non-crew person the next climb step would bring the carrier's body or the load closer to than allowed. */
-function climbBlocker(rt: Runtime, ex: Exec, next: ClimbPose): string | null {
+function climbBlocker(rt: Runtime, ex: CarryExec, next: ClimbPose): string | null {
   const p = ex.p;
   const me = crewOf(rt, ex)[0];
   const body = stairBlocker(rt, me, me.pose.p, next.carrier, 0.28);
@@ -519,7 +524,7 @@ function climbBlocker(rt: Runtime, ex: Exec, next: ClimbPose): string | null {
 }
 
 /** Release the flight's traffic resource (walkers left on it keep a shared, non-exclusive entry). */
-function leaveStair(rt: Runtime, ex: Exec) {
+function leaveStair(rt: Runtime, ex: CarryExec) {
   if (!ex.onStair) return;
   const res = `link:${ex.p.climb!.link.id}`;
   const t = traffic(rt).get(res);
@@ -535,7 +540,7 @@ function leaveStair(rt: Runtime, ex: Exec) {
  * is held as an exclusive traffic resource (walkers wait at either end); anyone the carrier or the load
  * would walk into makes the carrier wait (`climb-wait`), idle people are asked to step aside.
  */
-function stepClimb(rt: Runtime, ex: Exec, dt: number): StepResult {
+function stepClimb(rt: Runtime, ex: CarryExec, dt: number): StepResult {
   const p = ex.p, c = p.climb!;
   const h = crewOf(rt, ex)[0];
   const face = wrapAngle(c.face);

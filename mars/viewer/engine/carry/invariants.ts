@@ -6,10 +6,11 @@ import type { Vec2 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Invariant, Runtime } from '../runtime/runtime.ts';
 import type { Spatial } from '../spatial/service.ts';
-import { entityFrame, formationFor, gripError } from './formation.ts';
+import { entityFrame, formationFor, gripError, isCarryLoad, toWorld } from './formation.ts';
 import { poseHit } from './sweep.ts';
 import { activeLoadDiscs } from './actions.ts';
-import { HUMAN_RADIUS } from '../world/catalog.ts';
+import { HAND_REACH, LIFT_APEX_MAX } from '../construction/liftcrew.ts';
+import { CATALOG, HUMAN_RADIUS } from '../world/catalog.ts';
 import { linkUnder, stairClearance } from './climb.ts';
 import { fragileLoadsOk } from './fragile.ts';
 import { hypot } from '../core/math.ts';
@@ -21,7 +22,7 @@ export const carryIntegrity: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
   for (const e of Object.values(ents)) {
-    if (e.kind !== 'component' || e.phase !== 'carried') continue;
+    if (!isCarryLoad(e)) continue;
     const s = e.support;
     if (s?.kind === 'forks') continue; // on a forklift: covered by the forkliftLoad invariant (vehicles/forklift.ts)
     if (s?.kind !== 'held' || !s.by.length) {
@@ -108,4 +109,24 @@ export const carryStairsClearance: Invariant = (rt: Runtime) => {
   return out;
 };
 
-export const CARRY_INVARIANTS = [carryIntegrity, humanLoadClearance, carryStairsClearance, fragileLoadsOk];
+/** Fixture transport's authored hand segment stays reachable throughout lift/move/lower. */
+export const fixtureCarryReach: Invariant = rt => {
+  const out: Diagnostic[]=[];
+  for(const e of Object.values(rt.world.entities)){
+    const capability=CATALOG[e.def]?.capabilities?.fixtureCarry;
+    if(e.kind!=='fixture'||!capability||e.support?.kind!=='held'||!e.reservedBy||rt.records.get(e.reservedBy)?.verb!=='move_fixture'||!rt.isActive(e.reservedBy))continue;
+    for(const id of e.support.by){
+      const actor=rt.world.entities[id], grip=capability.handling.grips[e.support.by.length]?.find(g=>g.id===actor?.human?.grip?.slot);
+      if(!actor?.human||!grip){out.push({code:'carry.fixture-grip',message:`${id} has no authored grip for held fixture ${e.id}`,subjects:[id,e.id]});continue;}
+      for(const sign of [-.5,.5]){
+        const span=grip.span??[0,0,0];
+        const hand=toWorld(e.pose,[grip.local[0]+sign*span[0],grip.local[1]+sign*span[1],grip.local[2]+sign*span[2]]);
+        if(hypot(actor.pose.p[0]-hand[0],actor.pose.p[2]-hand[2])>HAND_REACH+1e-6||hand[1]-actor.pose.p[1]>LIFT_APEX_MAX+1e-6)
+          out.push({code:'carry.fixture-reach',message:`${id} cannot reach ${e.id} grip ${grip.id}`,subjects:[id,e.id],at:hand});
+      }
+    }
+  }
+  return out;
+};
+
+export const CARRY_INVARIANTS = [carryIntegrity, humanLoadClearance, carryStairsClearance, fragileLoadsOk, fixtureCarryReach];
