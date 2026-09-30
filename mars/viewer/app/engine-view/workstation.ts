@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { importedWorkstation, type WorkstationAppearanceOptions, type WorkstationAppearanceState } from './imported-workstation.ts';
+export type { WorkstationAppearanceOptions, WorkstationAppearanceState } from './imported-workstation.ts';
 import type { Entity } from '../../engine/world/types.ts';
-export interface WorkstationVisual { obj: THREE.Group; update(e: Entity): void; dispose(): void }
+export interface WorkstationVisual { obj: THREE.Group; update(e: Entity): void; dispose(): void; appearanceState?(): WorkstationAppearanceState }
 /** Generic composite scaled to the catalog envelope; no imported laptop mesh. */
-export function workstationObject(box: (color: string, cx: number, y0: number, cz: number, sx: number, sy: number, sz: number, metal?: number) => THREE.Mesh, sx: number, sy: number, sz: number) {
+export function workstationObject(box: (color: string, cx: number, y0: number, cz: number, sx: number, sy: number, sz: number, metal?: number) => THREE.Mesh, sx: number, sy: number, sz: number, appearance?: WorkstationAppearanceOptions): WorkstationVisual {
   const group = new THREE.Group(), desktop = sy * 0.74 / 1.3;
   group.add(box('#a98b68', 0, desktop - 0.04, 0, sx, 0.04, sz));
   for (const x of [-1, 1]) for (const z of [-1, 1]) group.add(box('#59636d', x * (sx / 2 - 0.08), 0, z * (sz / 2 - 0.08), 0.05, desktop - 0.04, 0.05, 0.4));
@@ -17,8 +19,10 @@ export function workstationObject(box: (color: string, cx: number, y0: number, c
   const material = new THREE.MeshBasicMaterial({ map: texture });
   const geometry = new THREE.PlaneGeometry(0.54, 0.34);
   const screen = new THREE.Mesh(geometry, material); screen.position.set(0, sy - 0.2, sz * 0.22 - 0.037); screen.rotation.y = Math.PI; group.add(screen);
+  const primitive = group.children.slice(5);
+  const imported = appearance ? importedWorkstation(group, texture, sx, sy, sz, desktop, appearance, () => { for (const part of primitive) part.visible = false; }) : undefined;
   let key = '';
-  return { obj: group, update(e: Entity) {
+  return { obj: group, ...(imported ? { appearanceState: imported.state } : {}), update(e: Entity) {
     const c = e.equipment?.kind === 'workstation' ? e.equipment.config : {};
     const status = typeof c.status === 'string' ? c.status : 'idle';
     const task = typeof c.task === 'string' ? c.task : 'Computer ready';
@@ -30,6 +34,6 @@ export function workstationObject(box: (color: string, cx: number, y0: number, c
     ctx.font = '22px sans-serif'; ctx.fillText(`${status} · ${Math.round(progress * 100)}%`, 24, 105);
     ctx.fillStyle = '#355764'; ctx.fillRect(24, 153, 336, 25); ctx.fillStyle = '#7dc7bc'; ctx.fillRect(24, 153, 336 * progress, 25);
     texture.needsUpdate = true;
-  }, dispose() { texture.dispose(); material.dispose(); geometry.dispose(); } };
+  }, dispose() { imported?.dispose(); texture.dispose(); material.dispose(); geometry.dispose(); } };
 
 }
