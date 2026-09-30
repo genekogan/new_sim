@@ -2,7 +2,7 @@
 
 This is the authoritative **current disposition** ledger for all 216 original LAST_MILE IDs. Original requirements and source abbreviations remain in [LAST_MILE.md](LAST_MILE.md). [ACTIVE_ROADMAP.md](ACTIVE_ROADMAP.md) selects current work; [SIMULATION_VISION.md](SIMULATION_VISION.md) explains why. Deferred does not mean completed.
 
-Audit basis: main release13 `3bd40f2` (source `b0f7419`); unreleased candidate `codex/wave2-consolidation` at `ec3aa6f`. Release accounting remains **38 fixed /36 reclassified /142 remaining**. The remaining group contains 30 candidate evidence pointers, 10 explicit partial/deferred records and 102 rows without row-specific proof found. These are documentation-based classifications, **not independent verification of every implementation**. Candidate reports may cover only prerequisites or narrower behavior. Verify code, dependencies and current tests before promotion.
+Audit basis: main release13 `3bd40f2` (source `b0f7419`); unreleased candidate `codex/wave2-consolidation` at `ec3aa6f`. Release accounting remains **38 fixed /36 reclassified /142 remaining**. The initial inventory audit found 30 candidate evidence pointers, 10 explicit partial/deferred records and 102 rows without row-specific proof. Later narrower activity updates below retain open original requirements; these initial audit buckets are not a fresh per-row certification. These are documentation-based classifications, **not independent verification of every implementation**. Candidate reports may cover only prerequisites or narrower behavior. Verify code, dependencies and current tests before promotion.
 
 The old wave2 gate is not green. Its last full-engine checkpoint had 17 failures; subsequent fixes make that count stale. No clean combined gate/re-pin/release has been established. Classroom work starts from released main and does not erase deferred failing requirements.
 
@@ -22,14 +22,17 @@ Prefer GPT-6.1 Sol medium for ordinary implementation; Luna for clear metadata/m
 | Joist support articulation | `codex/support-transfer-articulation` `5dfe067`, install-cancel checkout | Opt-in candidate, not default registry; V3 actual-foot issue not claimed fixed |
 | Exact item entry | `codex/item-entry-bridge` `52286a0` plus dirty deadlock-tails checkout; `briefs/item-entry.REPORT.md` | **Uncommitted WIP: source-hold exit/directive guard incomplete. Preserve; do not merge.** Fine fingers deferred separately from correctness |
 | First playable classroom | `codex/classroom-integration`, f40f659, studio-integration checkout | Full gate green and merged; release14 deployed and production verified |
-| Audience joining | `codex/classroom-joining`2fc68a6; `briefs/classroom-joining.REPORT.md` in its checkout | Tested24/24; browser/UI/integration pending |
-| Computer work continuity | `codex/workstation-interaction`2a3e90f; `briefs/workstation.REPORT.md` in its checkout | Tested11/11; browser/UI/integration pending |
+| Audience joining | 2fc68a6 selected in a4078c6; `briefs/classroom-joining.REPORT.md` | Release15 full gate and merged; production verification passed |
+| Computer work continuity | 2a3e90f/UI fb36339 selected in a4078c6; `briefs/workstation.REPORT.md`, `classroom-life-ui.REPORT.md` | Release15 full gate and merged; production verification passed |
+| Shared conversation floors | `codex/classroom-turns`31d995c/e82d243; selected in b3cb81e | Tested37/37 and inspected browser1/1; next combined gate/release pending |
+| Read-only camera hooks | `codex/lab-camera-hooks`d98d9e5; selected in b3cb81e | Node3/3/browser1/1 inspected, lint/tsc; next combined gate/release pending |
+| Autonomous cinematography | `codex/autonomous-camera`, dedicated checkout/brief | Separate task owns policies/experiment/camera tests/MP4s; not integrated/deployed |
 
 Worktree directories are under `<mars-worktrees>/`. Branches and reports are evidence pointers, not a green release claim. Preserve ignored captures/scripts and other agents’ dirty work.
 
 ## New activity evidence (release14 and follow-ups)
 
-Classroom source f40f659 (release14) on `codex/classroom-integration` derives typed roles/requirements, seat binding, attention/questions, rotation, conversation and safe interruption from release13. Reports: [coordinator](briefs/classroom-activity.REPORT.md), [objects](briefs/classroom-objects.REPORT.md), [playable integration](briefs/classroom-playable.REPORT.md), [claim-aware nudges](briefs/classroom-make-way.REPORT.md). This narrows prerequisites associated with LM115/116/120/121 and selects only the actor-claim guard from432f05e/LM105; none of those broader original rows is declared fully fixed. Joining/resumption have tested unreleased checkpoints above; moving-seat rebinding, gestures and conversation turn-taking remain gaps. Release14 does not validate rendered attention during recorded take replay.
+Classroom source f40f659 (release14) on `codex/classroom-integration` derives typed roles/requirements, seat binding, attention/questions, rotation, conversation and safe interruption from release13. Reports: [coordinator](briefs/classroom-activity.REPORT.md), [objects](briefs/classroom-objects.REPORT.md), [playable integration](briefs/classroom-playable.REPORT.md), [claim-aware nudges](briefs/classroom-make-way.REPORT.md). This narrows prerequisites associated with LM115/116/120/121 and selects only the actor-claim guard from432f05e/LM105; none of those broader original rows is declared fully fixed. Audience joining and explicit workstation interruption/resumption are release15. Moving-seat rebinding and gestures remain gaps; tested classroom-group turn-taking is queued for the next batch, not general standalone conversation completion. Release14 does not validate rendered attention during recorded take replay.
 
 ## Original row dispositions
 
@@ -1454,11 +1457,11 @@ Classroom source f40f659 (release14) on `codex/classroom-integration` derives ty
 
 ### LM-121 — [R1] No conversation turn-taking, gaze or gestures
 
-- **Disposition:** Deferred, current implementation unverified; active classroom prerequisite under review.
+- **Disposition:** Deferred remainder; bounded released attention and tested group-turn candidate.
 - **Why it matters / original intent:** renderer; original proposal `fix`. See the original requirement above for its concrete capability.
 - **Provenance:** [LAST_MILE.md](LAST_MILE.md), original source line 207; cited sources `EV:295,359,798,947; SO:151`.
-- **Current implementation / remaining work:** converse publishes the current speaker; heads turn to speaker/focus; spec asserts gaze direction
-- **Source/tests/evidence:** No independent row-specific file/test audit in this pass; source/test pointers in the original status above must be checked before implementation.
+- **Current implementation / remaining work:** Original remainder: standalone converse publishes speaker; distinct gestures/poses and broader reusable conversation behavior. Released14/15 classroom presentation/question head attention is bounded and visually inspected. Candidate31d995c/e82d243 adds reusable turn clock, physically formed group floor/readout/head targets and correct questioner floor; not yet integrated.
+- **Source/tests/evidence:** Candidate engine/activities/turns.ts, classroom.ts/types.ts; engine/test/classroom-turns.test.ts; app/lab/lab-view.ts; e2e/classroom-turns.spec.ts.37 focused checks/browser1/1, root inspected both turn captures. See briefs/classroom-turns.REPORT.md in codex/classroom-turns, selected future b3cb81e. Broader standalone gestures/replay not certified.
 - **Deferral / promotion trigger:** Relevant to classroom seating/shared attention/interruption. Narrow to the next playable acceptance criteria; unrelated detail remains deferred.
 - **Dependencies:** LM-120. **Likely baseline impact:** yes — baselines.
 - **Bounded next task / model:** Verify current source and one representative valid/invalid case, then implement only the promoted gap. GPT-6.1 Sol medium by default; escalate hard geometry/concurrency, use Luna for factual catalog/documentation updates only.

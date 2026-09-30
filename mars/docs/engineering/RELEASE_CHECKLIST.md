@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 14 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 15 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -795,4 +795,36 @@ Production verification passed:340 assets/19 routes/GLB range/auth;all36 MCP too
 Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 3b93cbd2-bc84-4484-a3e8-21705a069b25 --name mars-campus-2026 -m "rollback release14: <reason>"
+```
+
+
+## Production deploy 15 (2026-09-30, classroom work continuity)
+
+Clean source **a4078c6** passed the full gate before local-main fast-forward. Live **284cdc8f-2d8c-4e73-a7f8-d058afe1727f**, created01:02:07Z/deployed01:02:10Z, confirmed100%. Rollback **c0522537-d4e4-4a64-9bd3-c52b711eecd4** (release14), confirmed before rollout. Metadata/evidence records the deployed source. Unrelated historical-agent working changes preserved; no remote, push, pins or golden changes.
+
+What works: late audience joining/rejoining during presentation/questions, a real seated computer workstation with visible task progress, safe interruption, classroom attendance or courtyard direction, and explicit return to the same unfinished task. Quiet seated work/reading is supported; typing animation is not claimed. Ground-floor fixed arrangements, one available spare audience seat, at most12 distinct lifetime audience members, audience-only joining; held items refuse. Active activity snapshots remain explicitly nonresumable. Broader autonomy, furnishing edits, precise hand expression and take-replay head attention remain deferred.
+
+Original LAST_MILE accounting stays **38 fixed /36 reclassified /142 remaining**; all216 IDs remain recoverable. These narrower capabilities do not close broad original requirements.
+
+| Required check | Result |
+| --- | --- |
+| Full gate | GREEN `viewer/.cloudflare/gate/2026-09-30T00-39-26-235Z/report.json`; a4078c6,gitDirty:false,cleanupError:null |
+| Lint / TypeScript | clean, zero warnings/errors |
+| Unit |93 pass /0 fail |
+| Engine |603 total:586 pass /0 fail /6 documented skips /11 historical TODO |
+| Browser |89 pass /7 documented skips;999.3s |
+| Flagship recording / determinism |byte-identical flagship; unchanged b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local MCP |all36 tools pass |
+| Idle performance |original limits pass: exact peak112.619ms/mean0.714948ms; corridor54.360ms/0.582276ms; grids111.5–198.7ms; zero violations,pinned outcomes |
+| Regenerated evidence |586/0;17 rows PROVEN,8 milestones PROVEN; capabilities25/2/1 retain documented exceptions |
+
+Skipped/TODO cases are not counted as executed proof. Focused valid/invalid tests cover joining eligibility, occupied seats, held objects, cancellation/resource cleanup, directive precedence and task identity/elapsed continuation. No test thresholds or baselines changed.
+
+Build/dry-run passed:340 public files/821.1MiB,eight large objects already uploaded,zero R2 writes;6912.20KiB/1241.14KiB gzip. Rollout uploaded21 assets(343 existing),startup125ms. Existing chunk-size/dynamic-import warnings remain; no new DO migration.
+
+Production verification passed:340 assets/19 routes/GLB range/auth,all36 MCP tools,director all steps(14.314s),classroom2/2+work continuity3/3+Studio2/2 (7/7),build-bay10901ticks/43steps/5checks/zero violations/errors and exact Node probe hash. Lead personally inspected production captures of clear seated work and resumed progress, directed unfinished work, late visitor seating, questions/rotation/formed conversations, Studio playback/reopened track and completed supported bay. Work captures show quiet hands resting rather than typing. Captures/audits retained under `viewer/e2e/artifacts/prod-smoke-15/` and `viewer/.cloudflare/*release-15.log`.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback c0522537-d4e4-4a64-9bd3-c52b711eecd4 --name mars-campus-2026 -m "rollback release15: <reason>"
 ```

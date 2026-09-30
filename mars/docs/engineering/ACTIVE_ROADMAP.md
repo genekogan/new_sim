@@ -11,10 +11,10 @@ simple configurable maps; historical Studio remains the museum side.
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Explicit late joining and audience return | Sol coordinator; lead review | Spare authored seat, speaker continues, busy/missing-seat refusal, safe cancellation | Tested checkpoint2fc68a6; browser/integration pending |
-| Seated computer work and intention continuity | GPT-6.1 Sol; lead review | Real chair/desk binding; interrupted work remains unfinished, explicit return continues progress; coherent ownership | Tested checkpoint2a3e90f; Lab wiring and captures pending; no precision typing |
-| Combined classroom/workstation play | GPT-6.1 Sol UI; lead release | Work → join → leave → resume in Lab; meaningful screen state and waiting reasons | No competing actor controller; inspect actual captures; full gate before merge |
-| Visible social behavior | Lead, alongside the above | Shared attention remains legible while arrivals/interventions occur | Bounded head/gaze standard; richer gestures and spoken dialogue deferred |
+| Shared floor and attention in smaller conversations | GPT-6.1 Sol implementation; lead review | Distinct stable turns only after physical gathering; departure/cancel clears floor, unchanged body poses | Tested31d995c/e82d243; next combined gate, no generated dialogue/gesture expansion |
+| Read-only observation/reset and validated render camera | Lead; camera task owns policies | Same-tick reset identity; cached detached geometry tracks furniture, actor-only changes do not invalidate; invalid FOV atomic refusal | Tested d98d9e5; next combined gate, no competing world controller |
+| Optional camera integration | Separate camera task; lead integration/deploy | Genuine live intervention, manual control precedence, safe fallback and captured policies, offline tests in normal gate | Dedicated branch/report; production entry wiring and critical review required |
+| Next playable world increment | Lead after the above batch | Narrow classroom rearrangement or work/break/meal continuity, using existing physical actions | Choose directly enabling gaps; no universal needs/editor redesign |
 
 ## First supported experience
 
@@ -38,7 +38,7 @@ captures to assess shared attention and pacing.
 
 ## Current baseline and preserved work
 
-First classroom source **f40f659** passed the full gate and was fast-forwarded into local main. Release14 is deployed as `c0522537-d4e4-4a64-9bd3-c52b711eecd4`; production verification passed. Rollback is release13 `3b93cbd2-bc84-4484-a3e8-21705a069b25`. Original-row accounting remains38 fixed /36 reclassified /142 remaining: the narrower classroom does not complete broader original requirements. Main's unrelated historical-agent changes are preserved.
+Classroom/work continuity source **a4078c6** passed the full gate and was fast-forwarded into local main. Release15 is deployed as `284cdc8f-2d8c-4e73-a7f8-d058afe1727f`; production verification passed. Rollback is release14 `c0522537-d4e4-4a64-9bd3-c52b711eecd4`. Original-row accounting remains38 fixed /36 reclassified /142 remaining: narrower playable behavior does not complete broader original requirements. Main's unrelated historical-agent changes are preserved.
 
 The old combined technical candidate remains on `codex/wave2-consolidation` at `ec3aa6f`, with unresolved baseline/construction failures; it is not a green release. The studio-integration checkout hosts the clean classroom branch. Useful compatible work is selected with explicit provenance rather than making specialized construction fidelity a classroom dependency.
 
@@ -65,7 +65,9 @@ needs/interests/relationships and additional assets only as those experiences de
 
 ## Current implementation checkpoint
 
-Release14 implements two hypothetical /lab arrangements, typed activity controls/readout, owned display state and bounded head attention. Full gate: unit93/0, engine570/0 (6 documented skips/11 TODO), browser86 pass/7 documented skips, lint/tsc clean, unchanged flagship/probe, all36 MCP tools. Idle performance passes original limits. Ground-only fixed furniture, held-object refusal and explicit cancellation remain the supported boundary. Joining and resumable computer work are tested separate checkpoints, awaiting UI/visual integration and the next combined gate. Active classroom/workstation snapshots remain unsupported; attention is currently live-Lab behavior, not a validated take-replay feature.
+Release15 implements two hypothetical /lab arrangements, audience joining/return, presenter questions/rotation, conversation/departure, usable computer workstation state and explicit interrupted-task return. Same user/task/30-second total duration and elapsed progress persist across work → join → leave → resume. Full gate: unit93/0, engine586/0 (6 documented skips/11 TODO), browser89 pass/7 documented skips, lint/tsc clean, unchanged flagship/probe, all36 MCP tools. Idle performance passes original limits. Ground-only fixed furniture, held-object refusal and safe stand-up/cancellation remain the boundary. One spare classroom seat; unfinished station task belongs to its user. Quiet seated reading/work, no typing animation. Live active snapshots unsupported, no autonomous routine selection, and attention replay unvalidated.
+
+Next combined branch `codex/classroom-social-camera` at b3cb81e (lab-camera-hooks checkout) selects tested group-turn31d995c/question-floor correctione82d243 and camera-hooks d98d9e5. Forty focused node checks and separate actual browser proofs pass; inspected clear work/turn/camera captures. Activities revision3 records new semantic floors; no physical goldens. This is not main/released. Autonomous-camera task implementation awaits its reviewed checkpoint and deliberate production entry integration.
 
 ## Camera workstream coordination
 
@@ -73,4 +75,4 @@ Gene launched a separate autonomous-camera task owning live cinematography/edito
 
 Camera brief (pending its own commit/integration): `<mars-worktrees>/autonomous-camera/docs/engineering/briefs/autonomous-camera.md`. Ownership: new `viewer/cinematography/**`, `viewer/app/camera-lab/**`, camera-specific spec/brief/report. Existing Lab hooks suffice for early demos; richer callback/FOV changes require a bounded shared agreement. Snapshot adapter/policy derivation stays camera-owned; activity task supplies small read-only hooks when needed.
 
-Joining/workstation combined candidate: branch `codex/classroom-life-integration`, coordinator2fc68a6 + workstation2a3e90f + UI fb36339 selected with provenance. Three browser journeys pass; lead inspected unobscured seated/resumed work and actual late visitor seating. Same task/user/30-second total duration survives interruption, no failed records, violations or leaked final claims. Activities rules revision2 explicitly invalidates old bound plans; physical goldens remain unchanged. Next step is the full combined gate, then release.
+Release15 selects coordinator2fc68a6 + workstation2a3e90f + UI fb36339 with provenance. Three focused browser journeys pass; lead inspected unobscured seated/resumed work and late visitor seating. Activities revision2 invalidates old bound plans through normal rebind rules; no physical golden change.
