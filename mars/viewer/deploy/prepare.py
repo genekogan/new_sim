@@ -28,7 +28,7 @@ def scrub(value):
 # `*` = within one path segment); a whole asset namespace that the app loads by
 # convention (engine/**) must be a glob, not a per-file list, so new files ship
 # without edits here. deploy/prepare-allowlist.test.mjs scans app/ and engine/ for
-# /engine|modular|browser|data|history|2020/ URL literals and fails if one is not
+# /engine|modular|browser|data|history|2020|models/ URL literals and fails if one is not
 # covered by `python3 deploy/prepare.py --list`.
 GLOBS = [
     'engine/**',
@@ -43,6 +43,8 @@ FILES = {
         'evidence/rv-ring-march9.webp', 'evidence/front-alignment-march17.webp',
         'evidence/side-stairs-march17.webp', 'evidence/portal-screens-2020.webp'],
     'browser': ['campus.glb', 'campus.glb.br'],
+    # Only the selected workstation and its attribution; never publish the model archive.
+    'models': ['retro-computer-monitor.glb', 'retro-computer-monitor.credit.json'],
     'modular': ['README.html', 'components.json', 'references.json', 'rooms.json',
         'stock-library.json', 'appearance-credits.html', 'appearance-sources.json', 'silhouette-replacements.json', 'person_casual.glb', 'person_punk.glb', 'person_woman.glb', 'modeled-pieces.csv', 'camera-checks.json',
         'campus-components.glb', 'chiba-components.glb', 'chiba-photo-reference.glb',

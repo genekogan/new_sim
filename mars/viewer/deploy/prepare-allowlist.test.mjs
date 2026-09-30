@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
-const NAMESPACES = ['engine', 'modular', 'browser', 'data', 'history', '2020'];
+const NAMESPACES = ['engine', 'modular', 'browser', 'data', 'history', '2020', 'models'];
 const NS = NAMESPACES.join('|');
 // '…' / "…" literals, and `…` template literals whose ${…} parts become one-segment wildcards
 const QUOTED = new RegExp(`(['"])(/(?:${NS})/[^'"\\s]*)\\1`, 'g');
@@ -79,7 +79,7 @@ const staged = new Set(release.files);
 
 test('the scanner sees the known asset references (guards against a silently broken regex)', () => {
   const urls = new Set(references().map((r) => r.url));
-  for (const known of ['/engine/takes/manifest.json', '/engine/campus-2026.json', '/data/manifest.json'])
+  for (const known of ['/engine/takes/manifest.json', '/engine/campus-2026.json', '/data/manifest.json', '/models/retro-computer-monitor.glb'])
     assert.ok(urls.has(known), `scanner missed ${known}`);
   assert.ok(urls.size >= 15, `only ${urls.size} asset URLs found`);
 });
@@ -90,7 +90,7 @@ test('engine/** is a directory rule, so new engine assets ship without editing p
     assert.ok(staged.has(path.relative(PUBLIC, f).split(path.sep).join('/')), `${f} not staged`);
 });
 
-test('every /engine|modular|browser|data|history|2020/ URL in app/ and engine/ is staged by deploy/prepare.py', () => {
+test('every /engine|modular|browser|data|history|2020|models/ URL in app/ and engine/ is staged by deploy/prepare.py', () => {
   const problems = [];
   for (const { url, at } of references()) {
     if (!url.includes(HOLE)) {
@@ -103,4 +103,13 @@ test('every /engine|modular|browser|data|history|2020/ URL in app/ and engine/ i
     for (const h of hits) if (!staged.has(h)) problems.push(`${at} ${shown} can resolve to /${h}, which is not staged`);
   }
   assert.deepEqual(problems, [], 'add the file to FILES or a GLOBS rule in deploy/prepare.py:\n' + problems.join('\n'));
+});
+
+// The app URL requires its attribution sidecar even though the app does not fetch
+// that JSON. Keep this selected release explicit rather than publishing models/**.
+test('selected workstation model and attribution ship as explicit files only', () => {
+  const selected = ['models/retro-computer-monitor.credit.json', 'models/retro-computer-monitor.glb'];
+  for (const file of selected) assert.ok(staged.has(file), `${file} missing from release allowlist`);
+  assert.deepEqual(release.files.filter((file) => file.startsWith('models/')), selected);
+  assert.ok(!release.globs.some((glob) => glob.startsWith('models/')), 'selected models must not use a broad archive glob');
 });
