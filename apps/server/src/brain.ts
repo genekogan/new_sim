@@ -1,0 +1,320 @@
+// The three-tier brain, server side. Schedules calls, records every request
+// and response for the debug shell, and turns answers into logged events.
+import type { Entity } from '@sim/engine-contract';
+import {
+  JevClient, buildDirectorRequest, buildMidRequest, buildShotRequest, buildTranslateRequest, callNarrator, buildNarratorRequest, fallbackMid, fingerprint,
+  haikuTranslate, interpretDirector, interpretMid, interpretTranslate, sanitize,
+  type DirectorContext, type MidContext, type RegionDigest, type ShotCandidate, type Target, type Translation, type ChoiceA,
+} from '@sim/brain';
+import { GOALS, describeIntent, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TickerLine, type WireIntent } from '@sim/protocol';
+import type { Config } from './config.ts';
+import type { Db } from './db.ts';
+import { WORLD_ID, energyWord, hash32, type Mind, type WorldHost } from './world.ts';
+
+const TPS = 20;
+const MAX_INFLIGHT = 8;
+const DIRECTOR_EVERY = TPS * 6;
+const SHOT_COMMIT_TICKS = TPS * 10;
+const NARRATE_EVERY = TPS * 60 * 5;
+
+export type BrainSink = { onCall(c: BrainCall): void; onCamera(l: CameraLine): void; onTicker(l: TickerLine[]): void; onNarrative(v: NarrativeView): void; clients(): number };
+type NarratorState = { nextRun: Record<string, number>; lastSummary: Record<string, string | null> };
+
+export class Brain {
+  jev: JevClient;
+  mode: 'live' | 'fake';
+  budget: number;
+  inflight = new Set<string>();
+  spentToday = 0; callsToday = 0; jevMsAvg = 0;
+  camera: CameraLine | null = null;
+  private shotId = ''; private shotSinceTick = 0;
+  ticker: TickerLine[] = [];
+  narratives = new Map<string, NarrativeView>();       // latest per region
+  private pendingBeats: { fireTick: number; region: string; narrative: number; beat: Beat; index: number }[] = [];
+  private narrating = new Set<string>();
+  private directing = false;
+  private tickerCandidates: { id: string; text: string; tick: number }[] = [];
+  host: WorldHost; db: Db; cfg: Config; sink: BrainSink;
+
+  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink) {
+    this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
+    this.mode = cfg.brainMode; this.budget = cfg.budgetUsdPerDay;
+    this.jev = new JevClient(cfg.typesafeKey, this.mode);
+    const t = db.brainToday(); this.spentToday = t.cost; this.callsToday = t.calls; this.jevMsAvg = t.jevMs;
+    host.listeners.push({ afterTick: (tick) => this.afterTick(tick), onApplied: (e) => this.onApplied(e) });
+    setInterval(() => { const t = this.db.brainToday(); this.spentToday = t.cost; this.callsToday = t.calls; this.db.pruneBrainCalls(); }, 60_000).unref();
+  }
+
+  setMode(m: 'live' | 'fake') { this.mode = m; this.jev.mode = this.cfg.typesafeKey ? m : 'fake'; }
+  get overBudget() { return this.spentToday >= this.budget; }
+  private get narratorState(): NarratorState {
+    const x = this.host.extra as { narrator?: NarratorState };
+    if (!x.narrator) x.narrator = { nextRun: { center: this.host.engine.world.tick + TPS * 40, ring: this.host.engine.world.tick + TPS * 190 }, lastSummary: {} };
+    return x.narrator;
+  }
+
+  private record(c: Omit<BrainCall, 'id' | 'at'>): number {
+    const full = { ...c, at: Date.now() };
+    const id = this.db.saveBrainCall(WORLD_ID, full);
+    this.spentToday += c.costUsd; this.callsToday++;
+    if (c.tier === 'mid' && c.mode === 'live') this.jevMsAvg = this.jevMsAvg ? this.jevMsAvg * 0.9 + c.ms * 0.1 : c.ms;
+    this.sink.onCall({ ...full, id });
+    return id;
+  }
+
+  // ------------------------------------------------------------ per tick
+  private afterTick(tick: number) {
+    const w = this.host.engine.world;
+    // Tier 2: mid-brain, per Soul, when due
+    for (const m of this.host.minds.values()) {
+      if (m.nextEvalTick > tick || this.inflight.has(m.soulId) || !w.entities[m.entityId]) continue;
+      if (this.inflight.size >= MAX_INFLIGHT) break;
+      void this.evaluate(m, m.evalTrigger || 'timer');
+    }
+    // expire nudges
+    if (tick % TPS === 0) for (const m of this.host.minds.values()) if (m.nudge && m.nudge.untilTick < tick) m.nudge = null;
+    // Tier 3 beats firing
+    while (this.pendingBeats.length && this.pendingBeats[0].fireTick <= tick) {
+      const b = this.pendingBeats.shift()!;
+      void this.host.enqueue('scene', `narrator:${b.region}`, { region: b.region, narrative: b.narrative, beat: b.beat } satisfies ScenePayload);
+      const v = this.narratives.get(b.region);
+      if (v && v.id === b.narrative && v.beats[b.index]) { v.beats[b.index].fired = true; this.db.updateNarrative(v.id, v); this.sink.onNarrative(v); }
+    }
+    // Tier 3: narrator per region, staggered
+    const ns = this.narratorState;
+    for (const region of Object.keys(w.regions)) if ((ns.nextRun[region] ?? 0) <= tick && !this.narrating.has(region)) void this.narrate(region, 'schedule');
+    // Tier 2b: director + ticker, only while someone is watching
+    if (tick % DIRECTOR_EVERY === 0 && !this.directing && this.sink.clients() > 0) void this.direct();
+  }
+
+  private onApplied(e: LogEvent) {
+    const line = tickerText(e, this.host);
+    if (line) { this.tickerCandidates.push({ id: String(e.seq), text: line, tick: e.tick }); if (this.tickerCandidates.length > 30) this.tickerCandidates.shift(); }
+  }
+
+  // ------------------------------------------------------------ tier 2: mid-brain
+  midContext(m: Mind, trigger: string): MidContext {
+    const eng = this.host.engine, w = eng.world, ent = w.entities[m.entityId];
+    const nameOf = (id: string) => w.entities[id]?.label ?? w.regions[id]?.label ?? id;
+    const s = eng.describeSurroundings(m.entityId);
+    return {
+      world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: s.happening },
+      soul: { name: m.name, about: m.description, intent: describeIntent(m.intent, nameOf), energy: energyWord(m.energy), mood: m.mood, doing: ent.human!.task ? m.doing : 'standing around', recent: m.recent.slice(-3) },
+      nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
+      nudge: m.nudge?.text ?? null,
+      options: eng.enumerateActivities(m.entityId, m.intent),
+      running: !!ent.human!.task,
+      trigger,
+    };
+  }
+
+  private updateEnergy(m: Mind, ent: Entity, tick: number) {
+    const dt = (tick - m.lastEnergyTick) / TPS; m.lastEnergyTick = tick;
+    const a = ent.human!.activity;
+    const rate = a === 'walk' ? -0.25 : a === 'perform' ? -0.4 : a === 'rest' || a === 'sit' ? 0.6 : a === 'gather' ? 0.15 : -0.03; // per second
+    m.energy = Math.max(0, Math.min(100, m.energy + rate * dt));
+  }
+
+  async evaluate(m: Mind, trigger: string) {
+    const host = this.host, tick = host.engine.world.tick;
+    const ent = host.engine.world.entities[m.entityId];
+    this.updateEnergy(m, ent, tick);
+    const ctx = this.midContext(m, trigger);
+    const fp = fingerprint(ctx);
+    if (ctx.running && trigger === 'timer' && fp === m.lastFingerprint) { m.nextEvalTick = tick + TPS * 60; return; } // nothing changed: skip the call
+    m.lastFingerprint = fp;
+    this.inflight.add(m.soulId);
+    const version = m.intentVersion;
+    const seed = `${m.soulId}:${tick}`;
+    const request = buildMidRequest(ctx);
+    let decision, response: unknown = null, ms = 0, cost = 0, tokens = 0, mode: 'live' | 'fake' = 'fake', error: string | undefined, usedFallback = false;
+    try {
+      if (this.overBudget) { decision = fallbackMid(ctx, seed); usedFallback = true; error = 'over daily budget: deterministic fallback'; }
+      else {
+        const r = await this.jev.ask(request);
+        response = r.response; ms = r.ms; cost = r.costUsd; tokens = r.response.usage.input_tokens; mode = r.mode;
+        decision = interpretMid(r.response, ctx, seed);
+      }
+    } catch (e) { decision = fallbackMid(ctx, seed); usedFallback = true; error = String((e as Error).message ?? e); }
+    this.inflight.delete(m.soulId);
+    if (!host.minds.has(m.soulId)) return;
+    const now = host.engine.world.tick;
+    const stale = m.intentVersion !== version;
+    const opt = ctx.options.find((o) => o.id === decision.option);
+    const applied = stale ? { dropped: 'intent changed during the call; re-evaluating' } : opt
+      ? { option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, sampledFrom: decision.probabilities, modelArgmax: decision.chosenByModel, seed }
+      : { option: 'continue', mood: decision.mood, reevalSeconds: decision.reevalSeconds };
+    const callId = this.record({ tick, tier: 'mid', subject: m.name, model: mode === 'live' ? 'jev-latest' : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
+    if (stale) { m.nextEvalTick = now + 1; m.evalTrigger = 'new-intent'; return; }
+    m.wantsCompany = decision.wantsCompany;
+    if (!opt) { m.mood = decision.mood; m.nextEvalTick = now + decision.reevalSeconds * TPS; m.evalTrigger = 'timer'; host.markDirty(m.soulId); return; }
+    m.nextEvalTick = now + TPS * 30; // provisional; the decision event sets the real one when applied
+    if (m.nudge) m.nudge = null;    // a nudge is offered once
+    void host.enqueue('decision', 'brain:mid', {
+      soulId: m.soulId, entityId: m.entityId, option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood,
+      reevalTicks: Math.max(decision.reevalSeconds, durationFloor(opt.durationHint)) * TPS, fallback: usedFallback, call: callId, trigger,
+    } satisfies DecisionPayload);
+  }
+
+  // ------------------------------------------------------------ web console: text → intent
+  async translate(m: Mind, text: string): Promise<Translation & { via: string }> {
+    const eng = this.host.engine, tick = eng.world.tick;
+    const s = eng.describeSurroundings(m.entityId);
+    const targets: Target[] = [
+      ...s.nearby.map((n) => ({ id: n.id, name: n.who, kind: n.what, distance: n.distance })),
+      ...Object.values(eng.world.entities).filter((e) => e.kind === 'fixture' && !s.nearby.some((n) => n.id === e.id)).map((e) => ({ id: e.id, name: e.label ?? e.id, kind: e.def, distance: 'far' })),
+      ...Object.values(eng.world.regions).map((r) => ({ id: r.id, name: r.label, kind: 'region', distance: 'n/a' })),
+    ].slice(0, 24);
+    const request = buildTranslateRequest(text, m.name, targets);
+    let out: Translation;
+    try {
+      const r = await this.jev.ask(request);
+      out = interpretTranslate(r.response, text);
+      this.record({ tick, tier: 'translate', subject: m.name, model: r.mode === 'live' ? 'jev-latest' : 'fake', request, response: r.response, applied: out, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+      if (out.ok || !this.cfg.anthropicKey || this.mode === 'fake' || this.overBudget) return { ...out, via: 'jev' };
+    } catch (e) {
+      out = { ok: false, confidence: 0, reason: String((e as Error).message) };
+      this.record({ tick, tier: 'translate', subject: m.name, model: 'jev-latest', request, response: null, applied: out, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: out.reason });
+      if (!this.cfg.anthropicKey) return { ...out, via: 'jev' };
+    }
+    // second pass: a small LLM with a tool schema
+    try {
+      const h = await haikuTranslate(this.cfg.anthropicKey!, this.cfg.narratorModel, text, m.name, targets.map((t) => ({ id: t.id, name: t.name })), GOALS);
+      const valid = h.out && (GOALS as readonly string[]).includes(h.out.goal) && (h.out.target === null || targets.some((t) => t.id === h.out.target));
+      const res: Translation = valid ? { ok: true, confidence: 0.7, intent: { goal: h.out.goal as WireIntent['goal'], target: h.out.target, note: sanitize(text) } } : { ok: false, confidence: 0, reason: 'not understood as something to do' };
+      this.record({ tick, tier: 'translate', subject: m.name, model: this.cfg.narratorModel, request: h.request, response: h.raw, applied: res, ms: h.ms, inputTokens: h.inputTokens, outputTokens: h.outputTokens, cachedTokens: 0, costUsd: h.costUsd, mode: 'live' });
+      return { ...res, via: 'haiku' };
+    } catch (e) { return { ok: false, confidence: 0, reason: String((e as Error).message), via: 'haiku' }; }
+  }
+
+  // ------------------------------------------------------------ tier 2b: director + ticker
+  private shotCandidates(): ShotCandidate[] {
+    const eng = this.host.engine, w = eng.world;
+    const c: ShotCandidate[] = [];
+    const humans = Object.values(w.entities).filter((e) => e.kind === 'human');
+    const atFire = humans.filter((e) => e.human!.on === 'campfire');
+    if (atFire.length >= 2) c.push({ id: 'group:campfire', text: `Frame the ${atFire.length} souls gathered at the campfire`, why: 'A gathering is the liveliest thing to watch', notFor: 'when it has been on screen a long time', spec: { kind: 'frameGroup', subjects: atFire.map((e) => e.id), azimuth: 0.6, elevation: 0.35, padding: 1.4 } });
+    const interesting = humans.map((e) => ({ e, m: this.host.mindByEntity.get(e.id) })).filter((x) => x.m).sort((a, b) => score(b.e) - score(a.e) || a.e.id.localeCompare(b.e.id)).slice(0, 5);
+    for (const { e, m } of interesting) c.push({ id: `follow:${e.id}`, text: `Follow ${m!.name}, who is ${m!.doing.toLowerCase()}`, why: e.human!.activity === 'walk' ? 'They are on the move' : 'A closer look at one soul', notFor: 'when they are just standing still with nothing going on', spec: { kind: 'follow', subject: e.id, offset: [0, 2.2, -4.5], lookHeight: 1.4 } });
+    const talkers = humans.filter((e) => e.human!.activity === 'converse').slice(0, 2);
+    if (talkers.length) c.push({ id: `two:${talkers[0].id}`, text: `A two-shot of ${this.host.mindByEntity.get(talkers[0].id)?.name ?? 'a soul'} in conversation`, why: 'Two souls are talking', spec: { kind: 'orbit', subject: talkers[0].id, radius: 4, height: 1.8, period: 40 } });
+    c.push({ id: 'wide:center', text: 'A wide establishing shot of the center', why: 'Shows the campfire, the near benches and who is around', notFor: 'when it was the previous shot', spec: { kind: 'establishing', region: { min: [-18, -18], max: [18, 18] }, elevation: 0.7 } });
+    c.push({ id: 'wide:world', text: 'A very wide shot of the whole ground', why: 'Shows everyone at once', notFor: 'when something specific deserves attention', spec: { kind: 'establishing', region: { min: [-50, -50], max: [50, 50] }, elevation: 1.0 } });
+    return c;
+  }
+
+  async direct() {
+    const tick = this.host.engine.world.tick;
+    if (this.camera && tick - this.shotSinceTick < SHOT_COMMIT_TICKS && this.tickerCandidates.length === 0) return; // commit window: no chatter
+    this.directing = true;
+    const candidates = this.shotCandidates();
+    const events = this.tickerCandidates.splice(0);
+    const held = this.camera ? heldWord((tick - this.shotSinceTick) / TPS) : '';
+    const ctx: DirectorContext = {
+      current: this.camera ? { id: this.shotId, text: this.camera.text, held } : null,
+      happening: [...this.host.minds.values()].slice(0, 12).map((m) => `${m.name}: ${m.doing}`),
+      candidates: tick - this.shotSinceTick < SHOT_COMMIT_TICKS ? [] : candidates, events,
+    };
+    try {
+      if (ctx.candidates.length === 0 && !ctx.current) ctx.candidates = candidates;
+      const request = buildDirectorRequest(ctx);
+      const r = this.overBudget ? null : await this.jev.ask(request);
+      if (r) {
+        const d = interpretDirector(r.response, ctx);
+        const lines: TickerLine[] = d.announce.map((e) => ({ tick, text: e.text }));
+        if (d.chosen && d.chosen.id !== this.shotId) { this.shotId = d.chosen.id; this.shotSinceTick = tick; this.camera = { tick, shot: d.chosen.spec, text: d.chosen.text, heldSec: 0 }; }
+        else if (this.camera) this.camera = { ...this.camera, heldSec: Math.round((tick - this.shotSinceTick) / TPS) };
+        this.record({ tick, tier: 'director', subject: 'broadcast', model: r.mode === 'live' ? 'jev-latest' : 'fake', request, response: r.response, applied: { shot: d.hold ? 'hold' : d.chosen?.id, spec: d.chosen?.spec, confidence: (r.response.answers.shot as ChoiceA).confidence, ticker: lines.map((l) => l.text) }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+        if (this.camera) this.sink.onCamera(this.camera);
+        if (lines.length) { this.ticker.push(...lines); if (this.ticker.length > 50) this.ticker.splice(0, this.ticker.length - 50); this.sink.onTicker(lines); }
+      }
+    } catch (e) {
+      this.record({ tick, tier: 'director', subject: 'broadcast', model: 'jev-latest', request: null, response: null, applied: null, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: String((e as Error).message) });
+    }
+    this.directing = false;
+  }
+
+  /** On-demand cinematic shot for one Soul (owner view). */
+  async shotFor(m: Mind) {
+    const tick = this.host.engine.world.tick, id = m.entityId;
+    const near = this.host.engine.describeSurroundings(id).nearby.find((n) => n.what === 'a soul' && (n.distance === 'here' || n.distance === 'close'));
+    const cands: ShotCandidate[] = [
+      { id: 'over-shoulder', text: 'Close over-the-shoulder follow', why: 'Intimate, shows where they are heading', notFor: 'when they are sitting still', spec: { kind: 'follow', subject: id, offset: [0.6, 1.9, -2.6], lookHeight: 1.5 } },
+      { id: 'wide-follow', text: 'Wide follow from behind and above', why: 'Shows the soul in its surroundings', spec: { kind: 'follow', subject: id, offset: [0, 5, -9], lookHeight: 1.2 } },
+      { id: 'slow-orbit', text: 'Slow orbit around the soul', why: 'Good for a soul who is resting, sitting or performing', notFor: 'when they are walking fast', spec: { kind: 'orbit', subject: id, radius: 5, height: 2, period: 45 } },
+      ...(near ? [{ id: 'two-shot', text: `Two-shot with ${near.who}`, why: 'Someone is right next to them', spec: { kind: 'frameGroup', subjects: [id, near.id], azimuth: 0.8, elevation: 0.25, padding: 1.6 } } as ShotCandidate] : []),
+    ];
+    const request = buildShotRequest({ name: m.name, doing: m.doing }, cands);
+    const r = await this.jev.ask(request);
+    const pick = cands.find((c) => c.id === (r.response.answers.shot as ChoiceA).choice) ?? cands[1];
+    this.record({ tick, tier: 'shot', subject: m.name, model: r.mode === 'live' ? 'jev-latest' : 'fake', request, response: r.response, applied: { shot: pick.id, spec: pick.spec }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+    return { id: pick.id, text: pick.text, spec: pick.spec };
+  }
+
+  // ------------------------------------------------------------ tier 3: narrator
+  digest(region: string): RegionDigest {
+    const eng = this.host.engine, w = eng.world;
+    const here = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === region);
+    const nameOf = (id: string) => w.entities[id]?.label ?? w.regions[id]?.label ?? id;
+    const places = Object.values(w.entities).filter((e) => e.kind === 'fixture' && e.id !== 'gate' && eng.regionAt(e.pose.p) === region)
+      .map((e) => { const n = Object.values(w.entities).filter((x) => x.human?.on === e.id).length; return { id: e.id, name: e.label ?? e.id, state: n ? `${n} souls here` : 'empty' }; });
+    const names = new Set(here.map((m) => m.name));
+    const recent = this.db.tailEvents(WORLD_ID, 120).filter((e) => e.kind === 'decision' || e.kind === 'birth' || e.kind === 'intent').map((e) => tickerText(e, this.host)).filter((t): t is string => !!t && [...names].some((n) => t.startsWith(n))).slice(-25);
+    const others = Object.keys(w.regions).filter((r) => r !== region).map((r) => { const n = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === r).length; return `${w.regions[r].label}: ${n} souls`; });
+    return {
+      region, label: w.regions[region].label, time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), places,
+      souls: here.slice(0, 20).map((m) => ({ name: m.name, about: m.description, intent: describeIntent(m.intent, nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing, wants_company: m.wantsCompany > 0.6 ? 'yes' : m.wantsCompany < 0.35 ? 'no' : 'maybe' })),
+      recent, neighbours: others, previous_summary: this.narratorState.lastSummary[region] ?? null,
+    };
+  }
+
+  async narrate(region: string, why: string) {
+    const tick = this.host.engine.world.tick, ns = this.narratorState;
+    ns.nextRun[region] = tick + NARRATE_EVERY + (hash32(`${region}:${tick}`) % (TPS * 60)) - TPS * 30; // ~5 min ± 30 s, so regions drift apart
+    const d = this.digest(region);
+    if (d.souls.length === 0) return; // nobody here: no call
+    if (this.overBudget) return;
+    this.narrating.add(region);
+    const request = buildNarratorRequest(d, this.cfg.narratorModel);
+    try {
+      const r = await callNarrator(this.cfg.anthropicKey, this.mode, d, this.cfg.narratorModel);
+      const now = this.host.engine.world.tick;
+      const beats = r.plan.beats.map((b) => ({ ...b, fired: false, fireTick: now + Math.round(Math.min(5, Math.max(0, b.at_min)) * 60 * TPS) }));
+      const view: Omit<NarrativeView, 'id'> = { region, tick: now, summary: r.plan.summary, beats, nextRunTick: ns.nextRun[region] };
+      const id = this.db.saveNarrative(WORLD_ID, region, now, view);
+      const full = { ...view, id };
+      this.narratives.set(region, full);
+      ns.lastSummary[region] = r.plan.summary;
+      this.pendingBeats = this.pendingBeats.filter((b) => b.region !== region); // a new plan supersedes the old one's unfired beats
+      beats.forEach((b, index) => this.pendingBeats.push({ fireTick: b.fireTick, region, narrative: id, index, beat: { at_min: b.at_min, kind: b.kind, directive: b.directive, targets: b.targets, flavor: b.flavor } }));
+      this.pendingBeats.sort((a, b) => a.fireTick - b.fireTick);
+      this.record({ tick, tier: 'narrator', subject: region, model: r.mode === 'live' ? this.cfg.narratorModel : 'fake', request, response: r.raw, applied: { why, plan: r.plan }, ms: r.ms, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens, costUsd: r.costUsd, mode: r.mode });
+      this.sink.onNarrative(full);
+    } catch (e) {
+      this.record({ tick, tier: 'narrator', subject: region, model: this.cfg.narratorModel, request, response: null, applied: null, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: String((e as Error).message) });
+    }
+    this.narrating.delete(region);
+  }
+}
+
+// ---------------------------------------------------------------- helpers
+const durationFloor = (h: string) => (h === 'seconds' ? 8 : h === 'minute' ? 20 : 30);
+const score = (e: Entity) => ({ perform: 5, converse: 4, walk: 3, gather: 2, wave: 2 } as Record<string, number>)[e.human!.activity] ?? 0;
+const heldWord = (s: number) => (s < 8 ? 'just started' : s < 25 ? 'a little while' : s < 60 ? 'quite a while' : 'a long time');
+export function timeWord(datetime: string): string {
+  const h = Number(datetime.slice(11, 13));
+  return h < 5 ? 'deep night' : h < 8 ? 'early morning' : h < 11 ? 'morning' : h < 14 ? 'midday' : h < 17 ? 'afternoon' : h < 19 ? 'late afternoon' : h < 22 ? 'evening' : 'night';
+}
+export const weatherWord = (w: { clouds: number; rain: number; wind: number }) => (w.rain > 0.3 ? 'raining' : w.clouds > 0.6 ? 'overcast' : w.wind > 0.6 ? 'windy' : 'clear');
+export function tickerText(e: LogEvent, host: WorldHost): string | null {
+  const name = (soulId: string) => host.minds.get(soulId)?.name ?? 'a soul';
+  switch (e.kind) {
+    case 'birth': return `${e.payload.name} arrived at the gate`;
+    case 'decision': return `${name(e.payload.soulId)}: ${lowerFirst(e.payload.label)}`;
+    case 'intent': return `${name(e.payload.soulId)} has a new intent: ${describeIntent(e.payload.intent, (id) => host.engine.world.entities[id]?.label ?? id)}`;
+    case 'scene': return `In ${host.engine.world.regions[e.payload.region]?.label ?? e.payload.region}: ${e.payload.beat.flavor}`;
+    case 'retire': return `A soul departed`;
+    default: return null;
+  }
+}
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);

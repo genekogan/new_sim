@@ -43,12 +43,10 @@ export class ToyEngine implements Engine {
   private paths: PathCommit[] = [];
   private changes: ChangeEvent[] = [];
   private cursor = 0;
-  /** Latest committed path per entity (derived; rebuilt from exec state on restore is not needed for correctness). */
-  private lastPath = new Map<string, PathCommit>();
 
   constructor(world: WorldState | Runtime) {
     const services: ToyServices = {
-      emitPath: (p) => { this.paths.push(p); this.lastPath.set(p.entity, p); },
+      emitPath: (p) => { this.paths.push(p); },
       change: (entity, field, value) => { this.changes.push([this.runtime.tick, entity, field, value]); },
     };
     if (world instanceof Runtime) { this.runtime = world; this.runtime.services = services; this.cursor = this.runtime.events.length; }
@@ -96,7 +94,6 @@ export class ToyEngine implements Engine {
   removeEntity(id: string) {
     for (const lid of this.runtime.liveIds()) { const r = this.runtime.records.get(lid); if ((r?.params as { actor?: string } | undefined)?.actor === id) this.runtime.cancel(lid, { code: 'actor.removed', message: 'actor removed' }); }
     delete this.world.entities[id];
-    this.lastPath.delete(id);
     this.changes.push([this.world.tick, id, 'present', null]);
   }
 
@@ -109,9 +106,15 @@ export class ToyEngine implements Engine {
     const e = this.world.entities[id];
     return [this.world.tick, Math.round(e.pose.p[0] * 1000), 0, Math.round(e.pose.p[2] * 1000), Math.round(e.pose.yaw * 1000)];
   }
+  /** The path an entity is currently walking, derived from in-flight action state (so it survives restore). */
   currentPath(id: string): PathCommit | undefined {
-    const p = this.lastPath.get(id);
-    return p && p.waypoints[p.waypoints.length - 1][0] > this.world.tick ? p : undefined;
+    for (const { record, exec } of this.runtime.liveEntries()) {
+      if ((record.params as { actor?: string }).actor !== id) continue;
+      const x = exec as { samples?: PoseSample[] | null; child?: { samples?: PoseSample[] | null } | null };
+      const samples = x.samples ?? x.child?.samples;
+      if (samples && samples[samples.length - 1][0] > this.world.tick) return { entity: id, startTick: samples[0][0], speed: 0, waypoints: samples, activity: 'walk', actionId: record.id };
+    }
+    return undefined;
   }
 
   describeSurroundings(actorId: string) {

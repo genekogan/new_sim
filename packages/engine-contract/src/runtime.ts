@@ -139,6 +139,8 @@ export class Runtime {
   isActive(id: string) { return this.live.has(id); }
   holder(resource: string): string[] { return [...(this.holders.get(resource) ?? [])].sort(); }
   liveIds(): string[] { return [...this.live.keys()].sort(); }
+  /** In-flight actions with their exec state (read-only use: views, debugging). */
+  liveEntries(): { record: ActionRecord; exec: unknown }[] { return this.liveIds().map((id) => { const l = this.live.get(id)!; return { record: l.record, exec: l.exec }; }); }
   mark(name: string, data?: unknown) { this.emit({ tick: this.tick, type: 'mark', name, data }); }
   stateHash() { return hashOf(this.world); }
 

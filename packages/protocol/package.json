@@ -1,0 +1,8 @@
+{
+  "name": "@sim/protocol",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@sim/engine-contract": "workspace:*", "zod": "^4.6.5" }
+}

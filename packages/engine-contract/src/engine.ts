@@ -56,6 +56,8 @@ export interface Engine {
   regionAt(p: Vec3): string;
   /** Kinematic position of an entity at a tick (for keyframes and clients). */
   poseSampleOf(entityId: string): PoseSample;
+  /** The timed path an entity is currently on, if any (for snapshots sent to joining clients). */
+  currentPath(entityId: string): PathCommit | undefined;
 }
 
 export interface EngineFactory {
