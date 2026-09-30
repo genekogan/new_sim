@@ -143,3 +143,9 @@ remote rider missions use the same smoother. The synthetic helmet meshes and
 body roll were removed; the unicycle wheel still spins. All 41 regression tests,
 TypeScript, lint, build and Wrangler dry run passed. The live studio was checked
 with the helmet absent and no console errors.
+
+## Recorded camera tour packaging (release18 candidate)
+
+`npm run dev` generates the six-scene replay at ignored `public/camera-demo/suite.json`. Direct Vite users run `node deploy/prepare-camera-demo.mjs` first. This is labeled recorded playback, separate from the live authoritative /lab and /cinematography/review.html classroom.
+
+Normal release sequence remains `python3 deploy/prepare.py`, then `CLOUDFLARE_RELEASE=1 npm run build`. The build's prebuild hook freshly records/validates all six cases, checks zero recorded violations/failures and all three camera policies, stages the JSON with a content hash in `.cloudflare/release.json`, then Vite bundles the suite HTML. No ignored developer artifacts are fetched in production; no MP4 or generated JSON is committed. The 18.4MB replay stays under the25MiB static limit and changes no large-object manifest or R2 receipt.

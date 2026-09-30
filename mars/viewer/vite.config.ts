@@ -12,6 +12,7 @@ export default defineConfig({
       input: {
         main: new URL('./index.html', import.meta.url).pathname,
         camera: new URL('./cinematography/review.html', import.meta.url).pathname,
+        cameraSuite: new URL('./app/camera-lab/suite.html', import.meta.url).pathname,
       },
     },
   },
