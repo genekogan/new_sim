@@ -82,6 +82,10 @@ test('take_from_bundle: pieces come off the stack one at a time onto the take-ou
   assert.equal(b1.def, 'beam-12ft');
   assert.equal(b1.phase, 'stored');
   assert.equal(b1.support?.kind, 'ground');
+  assert.equal(b1.provenance.origin, HYPO.origin);
+  assert.equal(b1.provenance.confidence, HYPO.confidence);
+  assert.equal(b1.provenance.note, 'taken from beams; test yard');
+  assert.equal(b1.label, `${def('beam-12ft').label} (from beams)`, 'stock origin remains inspectable');
   assert.equal(bundleCount(rt.world.entities.beams), 1);
   assert.deepEqual(Object.keys(rt.world.entities), Object.keys(rt.world.entities).slice().sort(), 'canonical entity order after adding');
   // the spot is taken until b1 is carried away

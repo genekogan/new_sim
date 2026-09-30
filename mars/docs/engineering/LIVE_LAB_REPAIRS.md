@@ -28,3 +28,33 @@ layout. Do not discard old fidelity requirements or silently repin them.
 No historical colors/placement facts, golden tolerances or geometry admission rules
 may change to conceal these failures. Worker reports under engineering briefs retain
 exact sources, tests and limitations. Release verification will update this document.
+
+## Bounded limitation retained
+
+BUILD-02: current east-house full completion remains wanted but unsupported by
+the two existing aisle-end staging positions. Both overlap Chiba beam0684c6e5 /
+kitchen beam11ad38b2. Nine whole-house /three first-bay beams require a new feasible
+staging-and-delivery choreography; this is an engine capability dependency on the
+reconciled layout, not permission to alter historical placements. Keep this item
+recoverable via the linked east-house report. Promote when a playable construction
+scenario requires it; bound the task to one off-axis supported delivery before
+broadening. Current production should refuse before any actions, retaining crew
+and materials. Full historical-source completion remains separately mandatory.
+
+Original automatic-play reproduction script had a reset wait race because Reset
+retains the running transport state. The original failure artifacts are preserved;
+a paused reset via runScenario followed by the actual Play button is separately
+recorded. No test threshold or expected outcome changed to conceal that harness error.
+
+## Focused inspected checkpoint
+
+Reach3Node +3browser checks pass, including unchanged body measurement sweep;
+root inspected fresh first-Step and synthetic measurement PNGs. Pile4browser checks
+pass, currentcatalog shared palette plus explicitly historical extraction and
+supported build-bay identity/support handoff; root inspected before/extracted/carried
+captures. Original automatic production Play starts from paused reset tick0 and
+reproduces s0021 at tick2865; programmatic exact sequence failed at2815. The same
+orphan stance causes both; dispatch timing is not an admission excuse. Captures
+and complete state/records are retained, including the initial reset-wait harness
+timeout. New required Node full historical completion117277ticks/d382e461…0617
+passes with all66parts/zero violations/clean crew; full gate and release pending.

@@ -12,7 +12,8 @@ Gene's priority after release17 was **physical chair/table moving and usable roo
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Next communal-day direction | Owner preference pending; lead | Choose among autonomous existing routines, true bed sleep/wake, or more usable work/meal objects; preserve approximately50/30/20 product balance | Interview pending; no major implementation dependent on an unanswered/preselected choice |
+| Exposed Lab repairs | Root +3 bounded Sol6.1 workers | Safe Reach Step/Play; atomic staging refusal; pile material/identity continuity; mandatory previously missing checks and deployed proof | Current east-house staging blocked; explicitly unsupported rather than false completion |
+| Purposeful communal-day routines | Lead; owner approved | Stable intention across existing work/rest/food/social actions; live intervention and same unfinished work in two arrangements | Begin implementation after repair release; no bed/psychology/runtime redesign prerequisite |
 
 
 Physical design/provenance: `briefs/fixture-mover.PLAN.md`. Alternative seat-withdrawal analysis remains recoverable in `briefs/classroom-furniture-feasibility.PLAN.md`; it is deferred in favor of Gene's physical-movement choice, not implemented or completed.
