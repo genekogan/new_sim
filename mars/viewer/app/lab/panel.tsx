@@ -1,6 +1,7 @@
 // Engine Lab side panel: scenario picker, transport, overlays, cameras,
 // expectations, perf and the action/diagnostic log.
-import { SCENARIOS, type Check } from './scenarios.ts';
+import { ClassroomHud } from './classroom-hud.tsx';
+import { SELECTABLE_SCENARIOS, type Check } from './scenarios.ts';
 import { OVERLAYS, type LabView, type OverlayName } from './lab-view.ts';
 import { SequencePanel } from './sequence-hud.tsx';
 
@@ -42,8 +43,8 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <label className="lab-field">
         Scenario
         <select value={s.name} onChange={(e) => onScenario(e.target.value)} aria-label="Scenario">
-          {!SCENARIOS.some((x) => x.name === s.name) && <option value={s.name}>{s.title}</option>}
-          {SCENARIOS.map((x) => (
+          {!SELECTABLE_SCENARIOS.some((x) => x.name === s.name) && <option value={s.name}>{s.title}</option>}
+          {SELECTABLE_SCENARIOS.map((x) => (
             <option key={x.name} value={x.name}>
               {x.title}
             </option>
@@ -78,6 +79,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
           ))}
         </ul>
       )}
+      <ClassroomHud key={s.name} sim={sim} refresh={refresh} />
       <h2>Expectations</h2>
       <ul className="lab-checks">
         {checks.map((c, i) => (

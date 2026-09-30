@@ -121,3 +121,10 @@ export const displayControl: ActionDef<Control, null, ControlExec> = {
 };
 
 export const OBJECT_ACTIONS: ActionDef[] = [displayControl];
+
+/** Environment adapter, deliberately a class: snapshot stores state, not service functions. */
+export class ClassroomDisplayService {
+  supports = displaySupport;
+  focus = classroomDisplayFocus;
+  clear = classroomDisplayClear;
+}

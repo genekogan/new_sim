@@ -70,3 +70,7 @@ individual dispositions and promotion triggers belong in RAINY_DAY_BACKLOG.
 After the classroom is usable: communal day with rest/work/food/social continuity,
 then reuse the activity/capability model in a gallery, workshop or office. Introduce
 needs/interests/relationships and additional assets only as those experiences demand.
+
+## Current implementation checkpoint
+
+The combined classroom candidate now implements two usable /lab arrangements, typed activity controls/readout, real display state and head attention. Focused coordinator19/object4/map5/claim1 and browser2/2 pass; final four captures inspected. Full gate/main integration/release are next. Initial constraints: ground-only, fixed furniture, explicit refusal for held objects/required missing equipment; departure excludes membership, no join/resume yet. Next experience work should add continuity/rejoining and richer shared attention while introducing useful individual workstation interaction, retaining the confirmed50/30/20 balance.

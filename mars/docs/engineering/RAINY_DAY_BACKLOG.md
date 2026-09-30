@@ -25,6 +25,10 @@ Prefer GPT-6.1 Sol medium for ordinary implementation; Luna for clear metadata/m
 
 Worktree directories are under `<mars-worktrees>/`. Branches and reports are evidence pointers, not a green release claim. Preserve ignored captures/scripts and other agents’ dirty work.
 
+## New activity evidence (unreleased)
+
+Classroom candidate `codex/classroom-integration` derives typed roles/requirements, seat binding, attention/questions, rotation, conversation and safe interruption from release13. Reports: [coordinator](briefs/classroom-activity.REPORT.md), [objects](briefs/classroom-objects.REPORT.md), [playable integration](briefs/classroom-playable.REPORT.md), [claim-aware nudges](briefs/classroom-make-way.REPORT.md). This narrows prerequisites associated with LM115/116/120/121 and selects only the actor-claim guard from432f05e/LM105; none of those broader original rows is declared fully fixed. Joining/resumption, moving-seat rebinding, gestures and conversation turn-taking remain gaps.
+
 ## Original row dispositions
 
 ### LM-001 — [C1] Stale plan is refused and the director must re-bind by hand; no automatic replan/rebind

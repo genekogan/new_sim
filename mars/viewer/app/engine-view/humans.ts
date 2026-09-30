@@ -84,6 +84,7 @@ type View = {
   reachRatio: (number | null)[];
   diag?: Diag;
   layered: boolean;
+  gaze?: { prev: number; cur: number };
 };
 /** Per-frame readout of the pose layers (lab hook `bones()`, e2e). */
 export type Diag = {
@@ -215,6 +216,17 @@ export class HumanViews {
     this.climbs = links.filter((l) => l.kind === 'climb').map((l) => ({ id: l.id, path: l.path as [number, number, number][] }));
   }
 
+  /** Lab activity attention; a bounded head turn, never rotates a claimed seated body. Call once per tick. */
+  setAttention(targets: Record<string, [number, number]>) {
+    for (const [id, v] of this.views) {
+      const q = targets[id];
+      const want = q && v.cur.walkW < 0.1 ? Math.max(-0.65, Math.min(0.65, (Math.atan2(q[1] - v.cur.p[2], q[0] - v.cur.p[0]) - v.cur.yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI)) : 0;
+      const prior = v.gaze?.cur ?? 0;
+      v.gaze = { prev: prior, cur: prior + Math.max(-0.1, Math.min(0.1, want - prior)) };
+    }
+  }
+  attention() { return [...this.views].map(([id, v]) => ({ id, turn: v.gaze?.cur ?? 0 })); }
+
   /** The flights in use (tests: tread tops). */
   stairs() {
     return this.flights.map((f) => ({ id: f.id, o: f.o, dir: f.dir, going: f.going, width: f.width, yBottom: f.yBottom, yTop: f.yTop, treads: f.treads.map((t) => ({ ...t })) }));
@@ -240,7 +252,7 @@ export class HumanViews {
     rig.holder.name = id;
     this.group.add(rig.holder);
     const arms = armsOf(rig), legs = legsOf(rig), spine = spineOf(rig);
-    const touched = [...arms.flatMap((a) => [a.upper, a.lower, a.shoulder, a.hand, ...a.fingers, ...a.thumb]), ...legs.flatMap((l) => [l.upper, l.lower, l.foot]), spine?.body, spine?.hips, spine?.abdomen, spine?.torso];
+    const touched = [...arms.flatMap((a) => [a.upper, a.lower, a.shoulder, a.hand, ...a.fingers, ...a.thumb]), ...legs.flatMap((l) => [l.upper, l.lower, l.foot]), spine?.body, spine?.hips, spine?.abdomen, spine?.torso, spine?.head];
     const saved = touched.filter((o): o is THREE.Object3D => !!o).map((o) => ({ o, p: o.position.clone(), q: o.quaternion.clone() }));
     const h = hashId(id);
     const v: View = { rig, prev: s, cur: { ...s }, speed: 0, activity, age: 0, base: activity, arms, legs, spine, seat: SEAT_DEFAULT, vary: (h % 1000) / 1000, cross: ((Math.imul(h, 2654435761) >>> 15) & 1) === 1, saved, layered: false, reachRatio: [], ankle: [], footRest: [], footLat: [], surf: { foot: new Map(), hand: new Map() } };
@@ -509,7 +521,8 @@ export class HumanViews {
     const part = v.grip ? this.parts.get(v.grip) : undefined;
     const gripping = !hasHands && !!((reach || part) && v.grip && v.arms.length);
     const gait = sitW > 0 ? null : this.gaitOf(h.position);
-    if (!(sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0)) return;
+    const gaze = v.gaze ? v.gaze.prev + (v.gaze.cur - v.gaze.prev) * alpha : 0;
+    if (!(Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0)) return;
     for (const s of v.saved) { s.p.copy(s.o.position); s.q.copy(s.o.quaternion); }
     v.layered = true;
     h.updateMatrixWorld(true);
@@ -616,6 +629,12 @@ export class HumanViews {
       if (fp.kind !== 'beam') closeHands(v, k);
     } else dangle(v, pz.bend, []);
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
+    if (v.spine?.head && Math.abs(gaze) > 1e-5) {
+      const head = v.spine.head;
+      const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(head.parent!.getWorldQuaternion(new THREE.Quaternion()).invert());
+      head.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, -gaze));
+      h.updateMatrixWorld(true);
+    }
     v.diag = diagOf(v, gait?.g ?? null, gait?.f.id ?? '', pz, targets, source, fp, proneW > 0 ? pr : null);
   }
 

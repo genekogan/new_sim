@@ -7,6 +7,9 @@ import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ThreeResources } from '../../lib/three-resources';
 import type { Spatial } from '../../engine/spatial/service.ts';
 import { traffic } from '../../engine/locomotion/walk.ts';
+import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
+import { readClassroom } from '../../engine/activities/index.ts';
+import type { Runtime } from '../../engine/runtime/runtime.ts';
 import { LabSim } from './sim.ts';
 import { StaticScene } from './scene.ts';
 import { HumanViews } from '../engine-view/humans.ts';
@@ -83,6 +86,7 @@ export class LabView {
     this.sim.onReset = (rt) => this.reset(rt);
     this.sim.onTick = (rt) => {
       this.humans.onTick(rt.world);
+      this.activityAttention(rt);
       this.components.onTick(rt.world);
       this.fixtures.onTick(rt.world);
     };
@@ -224,6 +228,15 @@ export class LabView {
     if (sp.epoch === this.stairEpoch) return;
     this.stairEpoch = sp.epoch;
     this.humans.setStairs(sp.scene.links);
+  }
+
+  private activityAttention(rt: Runtime) {
+    const id = classroomSessionId(rt), state = id ? readClassroom(rt, id) : undefined;
+    const targets: Record<string, [number, number]> = {};
+    if (state?.attentionTarget && ['presenting', 'question'].includes(state.phase))
+      for (const person of state.participants)
+        if (person.state === 'participating' && person.actor !== state.attentionTarget.actor) targets[person.actor] = state.attentionTarget.point;
+    this.humans.setAttention(targets);
   }
 
   /** Pose everyone for the current tick without drawing (test hook `bones()`): same as a paused frame. */

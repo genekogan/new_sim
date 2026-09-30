@@ -1,7 +1,10 @@
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
 import * as THREE from 'three';
 import type { LabView, OverlayName } from './lab-view.ts';
-import { SCENARIOS } from './scenarios.ts';
+import { classroomSessionId, classroomParams } from '../../engine/scenarios/classroom.ts';
+import { readClassroom } from '../../engine/activities/index.ts';
+import { displayReadout } from '../../engine/objects/classroom.ts';
+import { SELECTABLE_SCENARIOS, SCENARIOS } from './scenarios.ts';
 import { sequenceRows } from './sequence-hud.tsx';
 import { entityCorners } from '../../engine/spatial/service.ts';
 import { slotStates } from './overlay-slots.ts';
@@ -54,7 +57,7 @@ export function installHook(view: LabView, notify: () => void) {
     get error() {
       return view.error;
     },
-    scenarios: () => SCENARIOS.map((s) => ({ name: s.name, title: s.title, continuous: !!s.continuous })),
+    scenarios: () => SELECTABLE_SCENARIOS.map((s) => ({ name: s.name, title: s.title, continuous: !!s.continuous })),
     /** Load a scenario (fresh world). Pass { paused: false } to let it play in real time.
      *  Scenarios with async data (year walkabouts) return a Promise of the state. */
     runScenario(name: string, opts: { paused?: boolean; speed?: number } = {}) {
@@ -107,6 +110,9 @@ export function installHook(view: LabView, notify: () => void) {
       Object.values(sim.rt.world.entities)
         .filter((e) => e.kind === 'component')
         .map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: JSON.parse(JSON.stringify(e.pose)), corners: entityCorners(e), rendered: view.components.bounds(e.id) })),
+    classroomAttention: () => view.humans.attention(),
+    classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, 'screen') }; },
+    startClassroom: () => { const r = sim.rt.submit('classroom_session', classroomParams(sim.scenario.name === 'classroom-8' ? 8 : 4)); notify(); return { id: r.id, status: r.status, diagnostic: r.diagnostic }; },
     stateHash: () => sim.rt.stateHash(),
     /** Bundles / stacks as drawn: pieces left (contents.count) and the top of the drawn stack (m). */
     stacks: () => view.fixtures.stacks(),

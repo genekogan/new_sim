@@ -310,3 +310,10 @@
   margin-right: 2px;
   border-radius: 50%;
 }
+
+.lab-classroom { position: static; max-width: none; margin: 10px 0; pointer-events: auto; background: rgba(16, 23, 31, .94); padding: 12px; font-size: 12px; }
+.lab-classroom-controls { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+.lab-classroom-controls button, .lab-classroom-controls select { padding: 5px 8px; border: 1px solid #647484; border-radius: 3px; background: #253442; color: #f0f4f6; }
+.lab-classroom-controls button:disabled { opacity: .4; }
+.lab-classroom-people { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 5px 0; }
+.lab-classroom small { display: block; opacity: .75; margin-top: 7px; }
