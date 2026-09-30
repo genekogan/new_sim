@@ -5,7 +5,7 @@ export function ArchPanel({ sim, cfg }: { sim: Sim; cfg: { publicUrl: string; wo
   const d = `
    owners' agents (Claude / GPT / Codex)          you, in this page
         │  REST /v1/agent/*  or  MCP /mcp               │  type a command
-        │  bearer = per-Soul token (claim link)         ▼
+        │  bearer = per-Soul token (pairing code)          ▼
         │                                     ┌─ translate (Jev) ─┐   text → closed intent
         ▼                                     ▼                    │
   ┌──────────────────────────── one Node process: the sequencer ───┴───────────────────────┐

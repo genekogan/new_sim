@@ -19,7 +19,7 @@ Auth, three kinds:
 |---|---|
 | `GET /healthz` | `{ ok, tick, clients, paused, build }` |
 | `GET /v1/config` | Privy app id, base URL, world id, `inviteRequired`, `build` |
-| `GET /v1/world` | regions, places, every Soul (name, description, doing, mood, region) |
+| `GET /v1/world` | `world, tick, time, rules_version, size_m, goals[], regions[], places[]`, and `souls[]` with `id` (the **entity** id, `h_…`), `name`, `about`, `doing`, `mood`, `region` |
 | `GET /v1/log?after=&limit=` | public events (owner notes removed) |
 | `GET /v1/debug/world` | raw engine `WorldState` |
 | `GET /v1/debug/verbs` | rules version, dt, verbs with JSON Schemas |
@@ -30,7 +30,7 @@ Auth, three kinds:
 | Route | Purpose |
 |---|---|
 | `GET /v1/me` | `{ me: {userId, short, email, wallet, role, souls[], invited}, souls[], maxSouls }` |
-| `POST /v1/invite {code}` | redeem an invite (needed before creating or steering when `INVITE_REQUIRED` is on) |
+| `POST /v1/invite {code}` | redeem an invite (needed before creating or steering when `INVITE_REQUIRED` is on; 10 attempts per hour) |
 | `POST /v1/souls {name, description}` | create a Soul (≤ `MAX_SOULS_PER_USER`, unique name, 5 per hour) |
 | `DELETE /v1/souls/:id` | retire it |
 | `GET /v1/souls/:id` | dashboard: `{ status, agent, spend, created_at }` |
@@ -40,7 +40,7 @@ Auth, three kinds:
 | `POST /v1/souls/:id/intent {intent}` | set the intent exactly (20/min) |
 | `POST /v1/souls/:id/pair` | mint a pairing code and the one-line prompt (15 min, one use) |
 | `POST /v1/souls/:id/revoke` | detach the agent |
-| `POST /v1/souls/:id/shot` | ask the director for a cinematic shot of this Soul (12/min) |
+| `POST /v1/souls/:id/shot` | one Jev call that picks a cinematic shot of this Soul (12/min; charged to the user share of the budget) |
 | `GET /v1/pair/:code`, `POST /v1/pair/approve {code, soulId}` | inspect / approve an agent-initiated pairing |
 | `GET /v1/brain?limit=&tier=&soul=` | model calls: own Souls only (admins: all) |
 | `GET /v1/prompt/:hash` | a long prompt stored once by hash |
@@ -61,11 +61,12 @@ Pairing (no auth):
 
 | Route | Flow |
 |---|---|
-| `POST /v1/agent/pair {code, agent?}` | owner-initiated: exchange the code from the one-line prompt for `{ token, soul }` |
-| `POST /v1/agent/pair/start {agent?}` | agent-initiated: returns `{ user_code, approve_url, poll_token, interval_s }`; the human opens `approve_url` (`/#pair/<code>`) and approves |
-| `GET /v1/agent/pair/poll?poll_token=` | `{status:'pending'}` or `{status:'approved', token, soul}` (token delivered once) |
+| `POST /v1/agent/pair {code, agent?}` | owner-initiated: exchange the code from the one-line prompt for `{ token, soul }` (20/min per IP) |
+| `POST /v1/agent/pair/start {agent?}` | agent-initiated: returns `{ user_code, approve_url, poll_token, interval_s }`; the human opens `approve_url` (`/#pair/<code>`) and approves (6/min per IP) |
+| `GET /v1/agent/pair/poll?poll_token=` | `{status:'pending'}` or `{status:'approved', token, soul}` (token delivered once; 60/min per IP) |
 
-Pairing replaces any token already attached to that Soul.
+Pairing replaces any token already attached to that Soul. Codes and pending
+approvals last 15 minutes and live in memory, so a server restart cancels them.
 
 With the Soul token:
 

@@ -1,7 +1,7 @@
 # The Mars engine, as surveyed for Sim (snapshot)
 
 Surveyed 2026-09-30 from `<mars-campus-repo>`
-(local-only Git, HEAD `5c8672d`, release 21 deployed). This is what the Sim shell
+(local-only Git, HEAD `5c8672d`, release 24 live). This is what the Sim shell
 is built to wrap. The engine keeps moving at hundreds of commits a day, so treat
 numbers as a dated snapshot and re-read the mirrored docs in this folder for direction.
 Nothing in Sim modifies that repo.
@@ -19,15 +19,15 @@ make Mars one world inside it.
 
 | Folder | Lines | Role |
 |---|---|---|
-| `engine/` | ~57k (19k tests) | pure TypeScript, no DOM, no `Date.now`/`Math.random`; zod is the only dependency |
+| `engine/` | ~64k (22k tests) | pure TypeScript, no DOM, no `Date.now`/`Math.random`; zod is the only dependency |
 | `app/` | ~18k | React 19 + three.js 0.185 (not R3F); `/lab` live sandbox, `/studio` historical museum |
 | `simulation/` | ~1.8k | Cloudflare Worker + one SQLite Durable Object per room/year; MCP over Streamable HTTP + REST |
 | `deploy/`, `e2e/` | ~11k | release gate, Playwright |
 
 Engine modules by size: construction 8.4k (racks, beams, stairs; Mars-specific),
-camera 4.6k, campus 3.4k (Mars-specific), vehicles 2.5k, api 2.1k, carry 2k,
-locomotion 1.7k, spatial 1.6k (0.1 m raster, A*, traffic), runtime 1.4k,
-activities 1.3k (classroom), world 1.2k, social 1.1k, take 1.1k, sequence 0.9k.
+camera 4.6k, activities 3.6k (classroom, routines), campus 3.4k (Mars-specific),
+vehicles 2.5k, carry 2.4k, api 2.1k, locomotion 1.7k, spatial 1.6k (0.1 m raster,
+A*, traffic), runtime 1.4k, world 1.2k, social 1.1k, take 1.1k, sequence 0.9k.
 
 ## Contracts Sim mirrors (in `packages/engine-contract`)
 
@@ -60,7 +60,8 @@ Mars runs "submit plan → simulate faster than real time inside one request →
 store a take → viewers poll once a second". There is no background tick, no
 WebSocket, no accounts (capability tokens per room), no per-entity ownership, no
 economy, no LLM in the loop (one bounded Jev camera experiment). Admission caps:
-128 entities, 96 steps, 30 s CPU per invocation. Stress-tested to 30 walkers
+128 entities and 96 steps per run; separately, Cloudflare allows about 30 s of CPU
+per invocation, which those caps do not guarantee fitting within. Stress-tested to 30 walkers
 (sub-millisecond ticks; 50–100 ms spikes when many replan A* at once).
 
 Sim's shell supplies the missing wrapper: a 24/7 fixed-step loop with a clock-rate
@@ -75,17 +76,30 @@ demand of Mars (see `../sim/ENGINE-CONTRACT.md`):
 2. A cheap `enumerateActivities(actor)` feasibility pass for the brain, since
    `rehearse` (~200 ms) is too slow per Soul.
 3. Emitting committed paths as they are decided (the take format already fits).
+4. Spawning and removing people at runtime (`spawnHuman` / `removeEntity`), for
+   arrivals and departures.
+
+The adapter must also bridge a signature difference: Mars's `serializeExec?(rt, exec)`
+and `restoreExec?(rt, data)` are optional per verb, with a `resumable` flag; Sim's
+contract requires `serializeExec(exec)` and `restoreExec(rt, params, data, actionId)`
+on every verb.
 
 ## Mars roadmap, as of 2026-09-30
 
-From `ACTIVE_ROADMAP.md`: release 21 is live (classroom → lightning talks →
-conversation → shared food → resumed unfinished notes, physical chair/table
-setup). Next: quiet rest, then the connected communal day (rest/work/food/social/
-sleep), then **reuse in a small non-Mars environment**, which is the seam Sim is
-built for. Product allocation 60/30/10 (product / leverage engineering / polish);
-within product 50/30/20 (complete experiences / breadth of activities and usable
-objects / social believability). Work is done by up to three Codex workers with a
-full release gate; local Git only.
+From `ACTIVE_ROADMAP.md`: **release 24 is live.** Shipped so far: the classroom
+(lightning talks, questions, smaller conversations), physical chair and table
+moving with room setup, shared food with utensil returns, quiet seated rest
+(release 22), exposed Lab repairs (23), and a bounded "purposeful routine": take
+part in a gathering, eat, rest, then finish the same interrupted notes, with
+pause/resume/end (24). **Release 25** (continuing purposes for other attendees,
+and the first **non-Mars reuse**: an independent design studio with its own nine
+people, fixtures and tasks) passed the local gate but failed in production with a
+Cloudflare resource-exhaustion error and was rolled back to 24; fixing that is
+the immediate Mars task. Still ahead: the fuller communal day (autonomous
+routines, sleep), needs and interests. Product allocation 60/30/10 (product /
+leverage engineering / polish); within product 50/30/20 (complete experiences /
+breadth of activities and usable objects / social believability). Work is done
+by up to three Codex workers with a full release gate; local Git only.
 
 The two frontier documents (`SIMULATION_FRONTIER*.md`, 2026-09-30) describe
 where the engine wants to go after that: intentions that last days, projects with

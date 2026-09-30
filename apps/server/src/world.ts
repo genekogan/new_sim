@@ -54,6 +54,9 @@ export class WorldHost {
   private last = 0;
   private carry = 0;
   private overruns = 0;
+  private calm = 0;
+  /** The rate an admin set (persisted). `clockRate` is the effective rate, lower while dilated. */
+  baseRate = 1;
   private kfCursor = 0;
   db: Db; factory: EngineFactory; seed: string; snapshotEvery: number;
 
@@ -69,7 +72,7 @@ export class WorldHost {
       this.db.createWorld({ id: WORLD_ID, schema: 'pending', rules_version: this.factory.rulesVersion, dt: 1 / 20, seed: this.seed });
       w = this.db.world(WORLD_ID)!;
     }
-    this.clockRate = w.clock_rate;
+    this.clockRate = this.baseRate = w.clock_rate;
     const snap = this.db.latestSnapshot(WORLD_ID);
     let from: 'genesis' | 'snapshot' = 'genesis';
     if (snap && snap.rulesVersion === this.factory.rulesVersion) {
@@ -111,10 +114,14 @@ export class WorldHost {
     let due = Math.floor(this.carry);
     this.carry -= due;
     if (due > 40) {
-      due = 40; this.carry = 0;
+      due = 40; this.carry = 0; this.calm = 0;
       // EVE-style time dilation: if we cannot keep up, slow the world clock instead of dropping inputs.
-      if (++this.overruns >= 3 && this.clockRate > 0.25) { this.overruns = 0; this.setClockRate(Math.max(0.25, this.clockRate / 2), 'system', 'dilation'); }
-    } else this.overruns = 0;
+      // Dilation is temporary: it is not persisted, and the clock recovers once the loop keeps up again.
+      if (++this.overruns >= 3 && this.clockRate > this.baseRate / 4) { this.overruns = 0; this.clockRate = Math.max(this.baseRate / 4, this.clockRate / 2); void this.enqueue('rules', 'system', { clockRate: this.clockRate, why: 'dilation' }); }
+    } else {
+      this.overruns = 0;
+      if (this.clockRate < this.baseRate && ++this.calm >= 200) { this.calm = 0; this.clockRate = Math.min(this.baseRate, this.clockRate * 2); void this.enqueue('rules', 'system', { clockRate: this.clockRate, why: 'recovered' }); }
+    }
     for (let i = 0; i < due; i++) this.tickOnce();
   }
 
@@ -238,7 +245,7 @@ export class WorldHost {
   addMind(m: Mind) { this.minds.set(m.soulId, m); this.mindByEntity.set(m.entityId, m); }
 
   setClockRate(rate: number, author: string, why: string) {
-    this.clockRate = rate; this.db.setClockRate(WORLD_ID, rate);
+    this.clockRate = this.baseRate = rate; this.db.setClockRate(WORLD_ID, rate);
     void this.enqueue('rules', author, { clockRate: rate, why });
   }
   setPaused(p: boolean, author: string) {

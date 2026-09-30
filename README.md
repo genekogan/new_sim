@@ -33,7 +33,7 @@ paths by task, current status and glossary.
 ```bash
 pnpm install
 cp .env.example .env
-pnpm check                                   # type check + 26 tests
+pnpm check                                   # type check + 26 tests (Node ≥ 22.18)
 pnpm --filter @sim/web build
 BRAIN_MODE=fake DEV_AUTH=1 node --env-file=.env apps/server/src/main.ts
 # http://localhost:4500/?dev=1

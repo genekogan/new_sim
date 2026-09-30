@@ -3,7 +3,7 @@ import type { LogEvent } from '@sim/protocol';
 import { describeIntent } from '@sim/protocol';
 import { makeApi, useSim, type Sim } from './useSim.ts';
 import { BrainPanel, BroadcastPanel, NarrativePanel } from './BrainPanels.tsx';
-import { AdminPanel } from './MePanels.tsx';
+import { AdminPanel } from './AdminPanel.tsx';
 import { SoulHome } from './SoulHome.tsx';
 import { ArchPanel } from './Arch.tsx';
 import { SpendPanel } from './Spend.tsx';

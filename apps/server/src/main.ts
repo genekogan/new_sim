@@ -13,6 +13,7 @@ import { handleMcp } from './mcp.ts';
 import { Souls } from './souls.ts';
 import { WORLD_ID, WorldHost } from './world.ts';
 
+/** Seeded only into a world with no live Souls, so it is never empty. */
 const NATIVES: { name: string; description: string }[] = [
   { name: 'Oda', description: 'a patient gardener who knows every bench and likes quiet mornings' },
   { name: 'Pim', description: 'a restless young musician who sings to anyone who will listen' },
@@ -74,9 +75,12 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // Hourly on-box backup with retention: the last 6 hourly files plus one per day (the 00:00 UTC file) for 7 days.
 function pruneBackups() {
   const files = readdirSync(config.dataDir).filter((f) => /^backup-\d{10}\.db$/.test(f)).sort().reverse();
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const keep = new Set(files.slice(0, 6));
-  for (const f of files) { const day = f.slice(7, 15), hour = f.slice(15, 17); if (hour === '00' && Number(today) - Number(day) <= 7) keep.add(f); }
+  const now = Date.now();
+  for (const f of files) {
+    const day = Date.UTC(Number(f.slice(7, 11)), Number(f.slice(11, 13)) - 1, Number(f.slice(13, 15)));
+    if (f.slice(15, 17) === '00' && now - day <= 8 * 86400_000) keep.add(f); // real date difference, correct across month boundaries
+  }
   for (const f of files) if (!keep.has(f)) { try { unlinkSync(join(config.dataDir, f)); } catch { /* already gone */ } }
 }
 async function backupNow() {

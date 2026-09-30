@@ -24,9 +24,9 @@ over: read, argue, extend, and record decisions in `DECISIONS.md` here.
 
 | | State on 2026-09-30 |
 |---|---|
-| **Mars engine** | Release 21: deterministic engine, classroom → talks → conversation → food → resumed work, physical furniture setup. Next: quiet rest, communal day, reuse in a non-Mars environment. Local-only Git. |
+| **Mars engine** | Release 24 live: deterministic engine; classroom → talks → conversation → food → quiet rest → resumed work as one purposeful routine; physical furniture setup. Release 25 (continuing purposes, first non-Mars studio) passed locally, failed in production, rolled back. Local-only Git. Details: `../mars/ENGINE-SNAPSHOT.md`. |
 | **Sim (this repo)** | The shell: one canonical world on a server, event log + replay, WebSocket sync, accounts, Souls, three-tier brain (Jev mid-brain, Haiku narrator, Jev director), agent pairing, MCP, spend governor, staging/rollback, R2 replication. Engine is a toy behind the Mars contract. Live at sim.eden.art. Details: `../STATUS.md`. |
-| **eden4 (the idea)** | One persistent, centrally simulated world; bodies as the unit; always on; steering not puppeting; versioned rules; economy designed as we go; names and numbers deliberately shelved. |
+| **eden4 (the idea)** | One persistent, centrally simulated world; owned inhabitants (Souls, "bodies" in the older notes) as the unit; always on; steering not puppeting; versioned rules; economy designed as we go; names and numbers deliberately shelved. |
 
 ## The discussion, framed
 

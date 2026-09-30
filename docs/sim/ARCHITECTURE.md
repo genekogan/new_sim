@@ -46,8 +46,11 @@ Model outputs never enter the engine directly. A mid-brain choice becomes a
 ## Tick loop
 
 `setInterval` every 50 ms; a fixed-step accumulator runs `elapsed × clockRate / 50`
-ticks, at most 40 per frame. Three consecutive overruns halve the clock rate
-(time dilation) and log a `rules` event. Pause and clock rate are admin dials.
+ticks, at most 40 per frame. Three consecutive overruns halve the effective clock
+rate (time dilation, down to a quarter of the set rate) and log a `rules` event;
+after about ten seconds of keeping up it doubles back toward the set rate.
+Dilation is not persisted. Pause and the set clock rate are admin dials; the set
+rate persists across restarts.
 Every 10 ticks a batch is broadcast; every 100 ticks a heartbeat; every
 `SNAPSHOT_EVERY_TICKS` (default 6,000 = 5 min) a snapshot.
 
@@ -56,8 +59,10 @@ Every 10 ticks a batch is broadcast; every 100 ticks a heartbeat; every
 - **Snapshot** = engine runtime snapshot (world + in-flight actions) + minds +
   module state, captured inside a tick; the database write is deferred past the
   tick for periodic snapshots. Also taken synchronously on SIGTERM.
-- **Boot** = latest snapshot whose rules version matches, then fast-forward through
-  later log events by stepping the engine to their ticks. No snapshot → genesis.
+- **Boot** = the latest snapshot, if its rules version matches the engine's, then
+  fast-forward through later log events by stepping the engine to their ticks.
+  No snapshot, or a rules mismatch → genesis and a replay of the whole log under
+  the current rules (rule changes with migrations, "epochs", are not built).
 - **Off-box**: Litestream replicates the SQLite file to R2 continuously; hourly
   on-box backups are kept too. See `RUNBOOK.md`.
 
@@ -75,7 +80,8 @@ A Soul exists in three places: a `souls` row (identity, owner, agent token), a
 **mind** in `WorldHost.minds` (standing intent, mood, energy, recent history,
 next-think time; snapshotted but not part of the hashed engine state), and an
 engine **entity** of kind `human`. Ids: Soul `s_<hex>`, entity `h_<hex>`.
-Six "native" Souls owned by `system` are seeded into an empty world.
+Six "native" Souls owned by `system` (Oda, Pim, Rowan, Tamsin, Juno, Basil) are
+seeded when the world has no live Souls.
 
 ## What is real and what is faked
 

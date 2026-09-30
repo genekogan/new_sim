@@ -17,8 +17,10 @@ Mars engine (`../mars/ENGINE-SNAPSHOT.md`) so the adapter is thin.
 | `PoseSample = [tick, x mm, y mm, z mm, yaw mrad]` | `take/types.ts` |
 
 Differences on purpose: the scaffold `Runtime` requires every `ActionDef` to
-implement `serializeExec` / `restoreExec`, so `snapshot()` works at any tick with
-actions in flight (Mars supports this per verb, not universally). `HumanState`
+implement `serializeExec(exec)` / `restoreExec(rt, params, data, actionId)`, so
+`snapshot()` works at any tick with actions in flight. In Mars these are optional
+per verb with different signatures (`serializeExec?(rt, exec)`, `restoreExec?(rt, data)`)
+plus a `resumable` flag; an adapter must bridge that. `HumanState`
 adds `soul`; `Entity` adds `seats`.
 
 ## What the shell needs from an engine (`engine.ts`)

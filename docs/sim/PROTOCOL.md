@@ -12,7 +12,7 @@ Everything that crosses a process boundary is defined in
 | `birth` | `soul:<id>` or `world` | `{ soulId, entityId, name, description, owner }` | spawn a human at the gate; create the mind |
 | `intent` | `soul:<id>` | `{ soulId, intent: {goal, target?, note?}, source: web\|api\|mcp\|system }` | replace the standing intent; re-think at once |
 | `decision` | `brain:mid` | `{ soulId, entityId, option, label, steps[], mood, reevalTicks, fallback, call?, trigger }` | `submit('do_activity', …, {preempt: true})` |
-| `scene` | `narrator:<region>` | `{ region, narrative, beat: {at_min, kind, directive, targets[], flavor} }` | nudge the named Souls (or all in the region) and re-think |
+| `scene` | `narrator:<region>` | `{ region, narrative, beat: {at_min, kind, directive, targets[], flavor} }` | nudge the named Souls (or, for a `scene` beat, all in the region; `quiet` nudges nobody) and re-think |
 | `retire` | `soul:<id>` | `{ soulId, entityId }` | remove the entity and the mind |
 | `rules` | `admin` / `system` | `{ clockRate, why }` | recorded; no world effect |
 | `admin` | `admin` | `{ action, … }` | recorded; no world effect |
@@ -23,7 +23,8 @@ stored in the log but removed by `publicEvent()` from every public view.
 
 ## WebSocket (`/ws`, JSON, protocol 1)
 
-Client → server (validated, max 20 messages per 10 s, 64 KB each):
+Client → server (validated; max 20 messages per 10 s, beyond which the socket is
+closed with code 1008; 64 KB each):
 
 | message | meaning |
 |---|---|
@@ -35,7 +36,7 @@ Server → client:
 
 | message | when | content |
 |---|---|---|
-| `welcome` | after hello | `build, proto, worldId, rulesVersion, schema, dt, clockRate, serverTick, you` |
+| `welcome` | after hello | `build, proto, worldId, rulesVersion, schema, dt, clockRate, serverTick, serverTime, you` |
 | `snapshot` | join, resync, or too far behind | `tick, seq, viewHash, entities, regions, env, paths[], souls[]` |
 | `batch` | every 10 ticks (500 ms) | `seq, fromTick, toTick, paths[], changes[], souls[], removedSouls[], log[]` |
 | `heartbeat` | every 100 ticks (5 s) | `tick, seq, viewHash, keyframes{id: PoseSample}, clients, clockRate, paused` |

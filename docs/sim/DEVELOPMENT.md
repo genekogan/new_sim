@@ -1,7 +1,7 @@
 # Development
 
-Requirements: Node ≥ 22.13 (the server runs TypeScript by type stripping, so no
-enums or parameter properties), pnpm 10.
+Requirements: Node ≥ 22.18 (the server runs TypeScript by unflagged type stripping,
+so no enums or parameter properties, and uses `node:sqlite` with `backup`), pnpm 10.
 
 ```bash
 pnpm install
@@ -11,6 +11,10 @@ pnpm --filter @sim/web build
 BRAIN_MODE=fake DEV_AUTH=1 node --env-file=.env apps/server/src/main.ts
 # open http://localhost:4500/?dev=1  (dev sign-in; the name "admin" is an admin)
 ```
+
+For front-end work with hot reload, `pnpm dev` runs Vite on :5173 (proxying `/v1`,
+`/ws`, `/skill.md`, `/mcp` to :4500) and the server with `--watch`; the server's
+data then lands in `apps/server/data/`.
 
 Always run locally with `BRAIN_MODE=fake` unless you are testing the models: a live
 local server spends real money around the clock.
@@ -25,7 +29,7 @@ local server spends real money around the clock.
 | `PRIVY_APP_ID`, `PRIVY_APP_SECRET` | none | sign-in; without them logins are disabled |
 | `ADMIN_EMAILS` | none | comma-separated admin emails |
 | `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY` | none | Jev and Haiku; without a key that tier runs fake |
-| `BRAIN_MODE` | `live` | `fake` = no model calls |
+| `BRAIN_MODE` | `live` | `fake` = no model calls. Any other value means live |
 | `BRAIN_BUDGET_USD_PER_DAY` | 0.5 | governor budget |
 | `NARRATOR_MODEL` | `claude-haiku-4-5-20251001` | |
 | `INVITE_REQUIRED` | on (`0` disables) | invite gate |
@@ -47,7 +51,8 @@ local server spends real money around the clock.
 | `apps/server/src/sync.test.ts` | real server + WebSocket clients: late joiners agree, dropped socket resumes from the ring, corrupted replica resyncs, invite gate, full Soul / pairing / agent / MCP / privacy flow |
 | `apps/server/src/brain.test.ts` | fair mid-brain scheduling |
 
-CI (`.github/workflows/ci.yml`) runs type check, tests and the web build on every push.
+CI (`.github/workflows/ci.yml`) runs type check, tests and the web build on pushes
+to `main` and on pull requests.
 `infra/deploy.sh` runs the same gate before deploying.
 
 ## Conventions

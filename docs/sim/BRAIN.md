@@ -8,7 +8,7 @@ Design background: `../eden4/14-MVP-TECHNICAL-SPEC-DRAFT.md` §5.
 | Tier | Model | When | Output |
 |---|---|---|---|
 | Reflex | none (the engine) | every tick | runs the current activity |
-| **Mid-brain** | Jev `jev-1.13.0` | per Soul: new intent, activity ended or failed, narrator beat, or a timer it sets itself | a `decision` event |
+| **Mid-brain** | Jev `jev-1.13.0` | per Soul: on arrival, new intent, activity ended or failed, narrator beat, or a timer it sets itself | a `decision` event |
 | **Narrator** | Claude Haiku 4.5 | per region, about every 5 min ± 30 s, staggered; skipped if the region is empty | up to 4 beats → `scene` events |
 | **Director** | Jev | every 6 s while at least one client is connected; a shot is held ≥10 s | broadcast `ShotSpec` + ticker lines |
 | Translator | Jev, Haiku fallback | an owner types a command | an `intent` event |
@@ -29,7 +29,8 @@ a condition on every option, numbers as words, user text as data.
    - `next` (Choice): which option; each option has `what`, `good_when`, `not_for`,
      and `serves_intent: true` when the engine knows it is what the intent asks for.
      Option names are readable slugs mapped back to ids in code.
-   - `pace` (Score, 3 situation levels) → next think in 10 / 45 / 150 s.
+   - `pace` (Score, 3 situation levels) → next think in 10 / 45 / 150 s, but not
+     sooner than the chosen activity's floor (8 / 20 / 30 s by its duration hint).
    - `sociable` (Noul).
    - `keep_going` (Noul), only while an activity is running and the intent is not new.
 4. **Policy** (`interpretMid`): `keep_going ≥ 0.7` → continue. Otherwise take the top
