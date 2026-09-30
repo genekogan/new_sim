@@ -22,3 +22,6 @@ export { ROOM_SETUP_ACTIONS, setupRoom, readRoomSetup } from './room-setup.ts';
 export type { SetupRoomParams, RoomSetupReadout } from './room-setup.ts';
 export { SHARED_FOOD_ACTIONS, sharedFoodBreak, readSharedFoodBreak } from './shared-food-break.ts';
 export type { SharedFoodBreakParams, SharedFoodBreakReadout, SharedFoodParticipant } from './shared-food-break.ts';
+
+export { PURPOSEFUL_ROUTINE_ACTIONS, purposefulRoutine, purposefulRoutineControl, readPurposefulRoutine } from './purposeful-routine.ts';
+export type { PurposefulRoutineParams, PurposefulRoutineControlParams, PurposefulRoutineReadout, RoutineMode } from './purposeful-routine.ts';
