@@ -40,3 +40,33 @@ Focused coordinator tests:19 passed /0 failed /0 skipped (8.51s), including the 
 Pins:none changed. Full actual pin impact, full release gate and runtime captures await root's integrated candidate checks. The scoped related tests preserve existing behavior; they do not substitute for that gate. Source changes were reviewed for ownership/secrets before staging. Approximate active implementation/inspection:about one hour; investigation found no shared subsystem prerequisite. No extra agents were spawned by this worker.
 
 Final source checks: TypeScript clean; scoped oxlint clean; related engine command45 passed /0 failed /0 skipped (8.42s), including19 purposeful-routine regressions and the unchanged social/work-break suites. Read-only independent review identified only the queued-question latch issue, fixed and covered by the exact19th regression before this final run. No further serious findings were reported.
+# Lab integration candidate
+
+Root selected core `9cf8e8b` as `126feb2`, retaining its complete PLAN after the
+missing plan ancestor caused a modify/delete cherry-pick conflict. No work was
+discarded; the original worker commits and all release23 worktrees remain.
+
+The work-break4/8 Lab now offers Start/Pause/Resume/End, actual obligations and
+meal/rest/work progress, named waits, and reset-scoped ownership. A classroom
+quick-tour entry opens the continuing world and explains preparation. Start
+requires existing unfinished notes, a free worker and a presentation/question
+phase; it does not silently interrupt foreign work. Standalone rest ignores the
+logical routine reservation but still respects real actor holders and children.
+Terminal End is explicitly labeled ended rather than successful completion.
+
+Combined focused browser9/9 (both journeys, partial meal, End/reset, discovery,
+existing rest controls) and final routine4/4 pass. Both TypeScript configs and
+lint pass before the final wording/capture refinement; full gate remains required.
+Actual Play is exercised before bounded stepping. Root inspected12 captures across
+the two runs, including seated question, formed conversation, held meal, retained
+paused portions, rest, completion and End. The first completion capture's manual
+test camera was occluded by the wall; final proof uses the existing workstation
+view. Capture waits now require HUD progress to agree with backend observations.
+This strengthens proof without changing simulation outcomes or camera policies.
+
+No physical pins, goldens, tolerances or historical content changed. Full clean
+gate, main integration and production verification are pending; live remains23.
+Remaining estimate:3–6 working hours for this bounded release, assuming no gate
+regression or shared cleanup/persistence redesign. Other guests still finish at
+authored departure positions; their own continuing purposes are a next social-life
+increment. This is one directed/mixed intention, not autonomous needs or sleep.

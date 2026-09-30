@@ -14,12 +14,20 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
       <div className="lab-row">
         <button onClick={() => onScenario('classroom-4')}>Load 4-guest room</button>
         <button onClick={() => onScenario('classroom-8')}>Load 8-guest room</button>
-        <button onClick={() => onScenario(scenario === 'classroom-8' ? 'work-break-8' : 'work-break-4')}>Try work → shared food break</button>
+        <button onClick={() => onScenario(scenario === 'classroom-8' ? 'work-break-8' : 'work-break-4')}>Try a continuing day</button>
       </div>
       <p className="lab-meta">Loading a room resets the current world. Then use Play and the live classroom controls below.</p>
       <details>
         <summary>Try talks, interrupted work, chair and table setup</summary>
         <ol className="lab-desc">
+          <li>
+            <b>Keep an intention across activities.</b> Try a continuing day loads the same room with
+            work and serving equipment. Start notes, interrupt after some progress, wait for stand-up,
+            then Start session. Once talks begin, Start purposeful routine joins the worker, asks a
+            question, follows both presenters and conversations, shares food, rests, and finishes the
+            same notes. Pause routine retains progress; Resume continues after safe release. End routine
+            leaves the gathering running for others. This is a directed example, not an autonomous day.
+          </li>
           <li>
             <b>Prepare a usable room.</b> In a fresh room select worker and Take bowl, then Take spoon,
             waiting for each pickup. Prepare side layout uses the default free crew to move the cleared

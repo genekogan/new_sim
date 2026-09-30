@@ -21,5 +21,10 @@ test('checkpoint tour launches real rooms and exposes current interaction and ca
   mkdirSync(artifacts, { recursive: true });
   await tour.locator('details').evaluate((el) => { (el as HTMLDetailsElement).open = false; });
   await page.screenshot({ path: path.join(artifacts, 'checkpoint-tour.png') });
+  await tour.getByRole('button', { name: 'Load 8-guest room' }).click();
+  await tour.getByRole('button', { name: 'Try a continuing day', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Scenario', exact: true })).toHaveValue('work-break-8');
+  await expect(page.getByTestId('purposeful-routine-hud')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start purposeful routine', exact: true })).toBeDisabled();
   expect(errors).toEqual([]);
 });

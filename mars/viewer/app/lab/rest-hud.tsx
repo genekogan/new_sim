@@ -34,7 +34,9 @@ export function RestHud({ sim, refresh }: { sim: LabSim; refresh: () => void }) 
   const items = heldBy(rt.world, actor).map(h => h.item.id);
   const actorBusy = () => rt.holder(`actor:${actor}`).length > 0 || [...rt.records.values()].some(record => {
     const params = record.params as { actor?: string; actors?: string[] };
-    return rt.isActive(record.id) && (params.actor === actor || params.actors?.includes(actor));
+    // A paused intention owns no physical actor. Real holders/children still
+    // block this control; a new ordinary sit can intervene in the intention.
+    return record.verb !== 'purposeful_routine' && rt.isActive(record.id) && (params.actor === actor || params.actors?.includes(actor));
   });
   const human = rt.world.entities[actor]?.human;
   const standingUp = active && (own.phase === 'stand-up' || own.phase === 'cancelling' || human?.activity === 'stand-up');
