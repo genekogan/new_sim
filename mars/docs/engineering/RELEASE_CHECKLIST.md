@@ -1052,3 +1052,37 @@ WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 3238c275-9311-43
 ```
 
 Recorded camera replay comparison with release21: only top-level branch/commit provenance differs; all other case/record data is identical. The static payload SHA changes for that provenance, not camera behavior, take outcomes or golden baselines.
+
+
+## Production deploy 23 (2026-09-30, exposed Lab repairs)
+
+Clean exact source **cb376037d3b63173cda30a9642ad18e8d9076cff** passed gate before deployment. Live **d88e1112-a018-4f08-9ed0-350c6f0b63ee**, created 16:49:25.879Z / deployed 16:49:28.354Z, confirmed 100%. Rollback **8695c09e-1ae8-4315-bcc7-1572189722fb** (release 22), confirmed before rollout. Metadata/evidence/report commits do not change built source. All historical dirty paths and prior worktrees preserved; no remote/push.
+
+Safe body first-Step/Play/Reset and detached synthetic probes are repaired. Atomic staging refusal prevents orphan climbs. Pile/component palette matches existing renderer colors; aggregate extraction remains unanimated. **Current reconciled 2022 first-bay/full layouts remain unsupported with three/nine named blocked beams, zero actions before refusal.** Original W51 FIXMEs remain. Supported exact historical-source full completion is separate mandatory proof, not current-layout acceptance.
+
+| Check | Result |
+| --- | --- |
+| Exact-source full gate | GREEN `.cloudflare/gate/2026-09-30T16-20-40-253Z/report.json`; cb37603, gitDirty:false, cleanupError:null |
+| Lint / both TypeScript | clean |
+| Unit / engine | 99 unit; 797 engine pass / 0 fail / 6 skip / 11 TODO |
+| Browser | 126 pass / 7 skip, 1225.6s |
+| Historical full completion | 55.8s / 117277 ticks / 66 parts/zero violations/clean crew; unchanged d382e461…0617 |
+| Flagship / probe / local MCP |unchanged flagship/b746b094…f0c3; all 36 tools |
+| Original idle performance | exact 103.568166ms peak/0.6586651475ms mean, corridor 50.58925/0.5199626625; grids 103.056666–173.63225ms; zero violations/original ceilings/pins retained |
+| Regenerated evidence | 797/0; 17 rows / 8 milestones PROVEN; capabilities 25/2/1 retained |
+| Build / rollout | prepare 340 files / 821.1 MiB; dry 415 files / 6963.59 KiB / 1253.65 KiB gzip; 18 new assets / 369 existing; startup 114 ms; zero R2 writes |
+| Production infrastructure | 341 assets / 19 routes / range / auth; 36 tools; director nine steps, 13186 ms PASS |
+| Frozen compiled camera / exact bay |published observer hash unchanged/portrait/reset/dispose/0diagnostics/errors/disabled Jev; bay 10901 ticks / 43 steps / five checks / zero violations/errors/exact b746 hash |
+| Production repair browser / fresh URLs |5/5 focused 34.4s;3/3 fresh direct URLs, zero violations/errors |
+| Visual inspection | root 12 PNGs across repair/lifecycle/camera/bay |
+
+Both prior RED gates retained. First bde7e3f color proof incorrectly executed unsupported current house; explicit exact historical fixture now uses one separately named inspected baseline, preserving original baseline/tolerances. Second 3108f08 reached aggregate 1200s watchdog after 116 passed cases/no test failure; later stages not run, cleanupError:null. cb37603 raises only serialized whole-suite watchdog 20→25min for 133 cases; green 1225.6s confirms capacity need. Individual deadlines/assertions/pins/performance ceilings remain unchanged. Original harness/cold-guard attempts stay preserved.
+
+Fresh production body: automatic tick 15→Step 16,Reset 0→Step 1→Play 20. Current houses: 0→Reset 0→Step 1→Play remains 1, zero action records/movement, named 3/9 refusals. **Manual Step advances one fixed tick even when admission declined.** Initial fresh audit assumed tick 0 after Step/Play and failed; corrected audit matches normal clock behavior. Preserved `.cloudflare/repair-failures/prod-fresh-clock-assumption`; no source/physics change. Final captures wait for rendered HUD.
+
+Root personally inspected 12 PNGs in `viewer/e2e/artifacts/prod-repair-23` and `prod-repair-23-fresh-3`, including three frozen helper camera/bay captures under `prod-smoke-23`. Helper logs/audits `.cloudflare/*release-23.log` and `audit/{http-smoke,prod-camera-23,prod-lab-23}.json`. Details: `briefs/live-lab-repairs-release.REPORT.md`. Paid provider/MP4/camera iteration absent; dev-source injection remains local proof. BUILD-02 off-axis staging/delivery and unanimated extraction remain limitations; no historical geometry/color facts or state pins changed.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 8695c09e-1ae8-4315-bcc7-1572189722fb --name mars-campus-2026 -m "rollback release23: <reason>"
+```
