@@ -38,6 +38,7 @@ const steps = [
   { name: 'test', cmd: ['npm', 'test'], timeout: 5 * MIN, parse: nodeTest },
   { name: 'test-engine', cmd: ['npm', 'run', 'test:engine'], timeout: 15 * MIN, parse: nodeTest },
   { name: 'tsc', cmd: ['npx', 'tsc', '--noEmit', '-p', '.'], timeout: 5 * MIN, parse: tsc },
+  { name: 'tsc-camera', cmd: ['npx', 'tsc', '--noEmit', '-p', 'cinematography/tsconfig.json'], timeout: 5 * MIN, parse: tsc },
   { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 20 * MIN, parse: playwright },
   { name: 'record-campus-take', cmd: ['node', 'deploy/record-campus-take.mjs', '--check'], timeout: 5 * MIN, parse: simulation },
   { name: 'determinism-probe', cmd: ['node', 'deploy/determinism-probe.mjs'], timeout: 5 * MIN, parse: probe },

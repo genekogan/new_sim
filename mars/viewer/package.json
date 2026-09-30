@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "start": "wrangler dev --config dist/server/cloudflare.json",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint app simulation lib deploy engine --ignore-pattern simulation/env.d.ts",
+    "lint": "oxlint app simulation lib deploy engine cinematography --ignore-pattern simulation/env.d.ts",
     "test": "node --test deploy/*.test.mjs",
     "test:simulation": "node deploy/simulation-integration.mjs",
     "gate": "node deploy/gate.mjs",

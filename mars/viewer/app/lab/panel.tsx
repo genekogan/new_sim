@@ -1,3 +1,4 @@
+import { LabCameraControls } from './camera-controls.tsx';
 // Engine Lab side panel: scenario picker, transport, overlays, cameras,
 // expectations, perf and the action/diagnostic log.
 import { ClassroomHud } from './classroom-hud.tsx';
@@ -37,6 +38,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
   return (
     <aside className="lab-panel">
       <h1>Engine Lab</h1>
+      <LabCameraControls view={view} />
       <p className="lab-sub">
         Deterministic engine · fixed tick 1/20 s · <a href="/studio">studio</a>
       </p>

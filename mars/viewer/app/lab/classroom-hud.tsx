@@ -33,6 +33,7 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   };
   const askable = participating && !joining && member.role === 'audience' && ['arriving', 'rotating', 'releasing', 'presenting', 'question'].includes(state?.phase ?? '');
   return <div className="lab-hud lab-classroom" data-testid="classroom-hud">
+    <a href={`/cinematography/review.html?scenario=${sim.scenario.name}`} target="_blank" rel="noopener">Open a separate classroom camera review</a>
     <div className="lab-hud-head">HYPOTHETICAL · live classroom · {state?.phase ?? 'ready'}</div>
     <div>Floor: <b>{state?.floorHolder ?? '—'}</b> · Shared attention: <b>{state?.attentionTarget?.actor ?? '—'}</b></div>
     <div>{'code' in screen ? screen.message : `Display ${screen.mode} · ${screen.content}`}</div>
