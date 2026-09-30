@@ -1,3 +1,4 @@
+import { FixtureMoveHud } from './fixture-move-hud.tsx';
 import { BelongingsHud } from './belongings-hud.tsx';
 import { useState } from 'react';
 import type { LabSim } from './sim.ts';
@@ -59,11 +60,12 @@ export function ClassroomHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
       <button disabled={busy || !!workAction || work?.status !== 'unfinished' || work.user !== actor} onClick={() => response(sim.rt.submit('work_at', { actor, station: 'workstation', seat: 'work-chair#seat', duration: 30, task: 'Sketch notes', resume: true }), `Requested resume for ${actor}`)}>Resume Sketch notes</button>
     </div>
     <BelongingsHud sim={sim} actor={actor} refresh={refresh} />
+    <FixtureMoveHud sim={sim} actor={actor} refresh={refresh} />
     {state?.groups.length ? <div data-testid="conversation-floors">{state.groups.map((g) => <div key={g.action}>{g.members.join(', ')} · {g.status} · Floor: <b>{g.floorHolder ?? '—'}</b></div>)}</div> : null}
     <div role="status" data-testid="classroom-feedback">{feedback}</div>
     {joining && <div role="status">{actor} is joining: wait for actual seating before asking a question.</div>}
     {busy && !participating && workAction && (workAction.params as { actor?: string }).actor === actor && <div role="status">Interrupt work or direct {actor} away before joining.</div>}
     {state && <div className="lab-classroom-people">{state.participants.map((p) => <span key={p.actor} title={p.reason ?? p.seat}>{p.actor}: {p.state === 'excluded' ? `left (${p.reason})` : p.arrival === 'joining' ? 'joining' : p.role}{state.queuedQuestions.includes(p.actor) ? ' · question queued' : ''}</span>)}</div>}
-    <small>Join or rejoin an available audience seat while talks are running. Work uses the separate nearby chair; unfinished work resumes only by an explicit same-user request. Ground floor, fixed arrangements; typing animation is deferred.</small>
+    <small>Join or rejoin an available audience seat while talks are running. Work uses the separate nearby chair; unfinished work resumes only by an explicit same-user request. Ground floor, explicit empty spare-chair setup; typing animation is deferred.</small>
   </div>;
 }

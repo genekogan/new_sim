@@ -252,6 +252,7 @@ export class LabView {
   poseNow() {
     this.syncStairs();
     this.components.render(1);
+    this.fixtures.render(this.sim.rt.time, 1);
     this.humans.render(1, this.reach);
     this.components.attachHeld(this.humans);
     return this.humans;
@@ -262,7 +263,7 @@ export class LabView {
     const alpha = this.sim.advance(dt);
     this.syncStairs();
     this.components.render(alpha);
-    this.fixtures.render(this.sim.rt.time);
+    this.fixtures.render(this.sim.rt.time, alpha);
     this.humans.render(alpha, this.reach);
     this.components.attachHeld(this.humans);
     this.syncOverlays();

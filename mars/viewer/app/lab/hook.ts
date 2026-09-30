@@ -1,3 +1,4 @@
+import { readFixtureMove } from '../../engine/carry/fixture.ts';
 import { readWorkstation } from '../../engine/objects/workstation.ts';
 import { LabCameraGeometryCache } from './camera-observation.ts';
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
@@ -116,6 +117,12 @@ export function installHook(view: LabView, notify: () => void) {
       Object.values(sim.rt.world.entities)
         .filter((e) => e.kind === 'component')
         .map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: JSON.parse(JSON.stringify(e.pose)), corners: entityCorners(e), rendered: view.components.bounds(e.id) })),
+    /** Detached physical/rendered fixture state and latest transport readout. */
+    fixtures: () => {
+      const rendered = new Map(view.fixtures.poses().map((v) => [v.id, v]));
+      return Object.values(sim.rt.world.entities).filter((e) => e.kind === 'fixture').map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: structuredClone(e.pose), rendered: rendered.get(e.id) }));
+    },
+    fixtureMove: () => { const id = [...sim.rt.records.values()].filter((r) => r.verb === 'move_fixture').at(-1)?.id; return id ? readFixtureMove(sim.rt, id) : undefined; },
     workstation: () => ({ state: readWorkstation(sim.rt, 'workstation'), claims: Object.fromEntries(['workstation:workstation', 'actor:worker', 'slot:work-chair#seat'].map((key) => [key, sim.rt.holder(key)])) }),
     classroomAttention: () => view.humans.attention(),
     classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, 'screen') }; },

@@ -2,8 +2,8 @@
 // SOCIAL_FIXTURES) → simple meshes inside each catalog box, local origin at the base centre,
 // seats facing local +z (rotation.y = −yaw, as for components). Renderers only read the world.
 // A campfire gets the animated fire of fire.ts (seeded by the entity id, driven by sim time); after
-// dusk (`setDusk(true)`) the flames brighten and its flickering warm point light comes on. Fixtures do
-// not move, so there is no tick interpolation.
+// dusk (`setDusk(true)`) the flames brighten and its flickering warm point light comes on. Fixtures
+// with an authored transport capability interpolate with their carriers between ticks.
 import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import { CATALOG } from '../../engine/world/catalog.ts';
@@ -15,7 +15,11 @@ import { workstationObject, type WorkstationVisual } from './workstation.ts';
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
 type Stack = { group: THREE.Group; count: number };
 type Screen = { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; key: string };
-type View = { obj: THREE.Object3D; key: string; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual };
+type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: number };
+const poseOf = (e: Entity): Pose => ({ p: [...e.pose.p], yaw: e.pose.yaw, pitch: e.pose.pitch ?? 0, roll: e.pose.roll ?? 0 });
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
+type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual };
 
 /** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
 const DUNNAGE = 0.1;
@@ -263,7 +267,7 @@ export class FixtureViews {
     const d = CATALOG[e.def];
     const [sx, sy, sz] = d?.size ?? [0.5, 0.5, 0.5];
     const color = d?.color ?? '#b08a5a';
-    const v: Partial<View> = { key: e.def };
+    const v: Partial<View> = { key: e.def, prev: poseOf(e), cur: poseOf(e) };
     let obj: THREE.Object3D;
     if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
@@ -311,8 +315,10 @@ export class FixtureViews {
         this.views.set(e.id, v);
         this.group.add(v.obj);
       }
-      v.obj.position.set(e.pose.p[0], e.pose.p[1], e.pose.p[2]);
-      v.obj.rotation.set(0, -e.pose.yaw, 0);
+      v.prev = v.cur;
+      v.cur = poseOf(e);
+      v.obj.position.set(...v.cur.p);
+      v.obj.rotation.set(v.cur.pitch, -v.cur.yaw, v.cur.roll, 'YXZ');
       if (v.stack) {
         const [sx, sy, sz] = CATALOG[e.def].size;
         this.fillStack(e, v.stack, sx, sy, sz);
@@ -338,8 +344,20 @@ export class FixtureViews {
   }
 
   /** Animate the fires: a pure function of (entity id, `t` = seconds of sim time). */
-  render(t: number) {
-    for (const v of this.views.values()) v.fire?.update(t, this.dusk ? 1 : 0.6, this.dusk ? 1 : 0);
+  render(t: number, alpha = 1) {
+    for (const v of this.views.values()) {
+      if (CATALOG[v.key]?.capabilities?.fixtureCarry) {
+        const a = v.prev, b = v.cur;
+        v.obj.position.set(lerp(a.p[0], b.p[0], alpha), lerp(a.p[1], b.p[1], alpha), lerp(a.p[2], b.p[2], alpha));
+        v.obj.rotation.set(lerp(a.pitch, b.pitch, alpha), -lerpAngle(a.yaw, b.yaw, alpha), lerp(a.roll, b.roll, alpha), 'YXZ');
+      }
+      v.fire?.update(t, this.dusk ? 1 : 0.6, this.dusk ? 1 : 0);
+    }
+  }
+
+  /** Detached rendered poses for physical interaction inspection; never writes the world. */
+  poses() {
+    return [...this.views].map(([id, v]) => ({ id, p: v.obj.position.toArray(), yaw: -v.obj.rotation.y }));
   }
 
   dispose() {

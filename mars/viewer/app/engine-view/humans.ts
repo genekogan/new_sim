@@ -26,6 +26,7 @@ import type { Entity, Pose, WorldState } from '../../engine/world/types.ts';
 import type { Vec3 } from '../../engine/core/math.ts';
 import type { Link } from '../../engine/spatial/types.ts';
 import { CATALOG } from '../../engine/world/catalog.ts';
+import { toWorld } from '../../engine/carry/formation.ts';
 import { entityCorners } from '../../engine/spatial/service.ts';
 import { handPoint, STATION_SLOT } from '../../engine/construction/liftcrew.ts';
 import { LIFT_HAND } from '../../engine/construction/raise.ts';
@@ -1297,6 +1298,13 @@ const _m = new THREE.Matrix4(), _mi = new THREE.Matrix4(), _qb = new THREE.Quate
  */
 function slotPoint(e: Entity, slot: string, from: THREE.Vector3, floor: number, out: THREE.Vector3): boolean | undefined {
   if (slot === STATION_SLOT) return false;
+  const authored = CATALOG[e.def]?.capabilities?.fixtureCarry?.handling.grips[1]?.find((g) => g.id === slot);
+  if (authored) {
+    const span = authored.span ?? [0, 0, 0];
+    const end = (sign: number) => new THREE.Vector3(...toWorld(e.pose, [authored.local[0] + sign * span[0], authored.local[1] + sign * span[1], authored.local[2] + sign * span[2]]));
+    out.copy(nearestOnSegment(end(-0.5), end(0.5), from, floor + LIFT_HAND));
+    return true;
+  }
   if (slot.startsWith('lift-') && slot !== 'lift-far') {
     const h = handPoint(e, e.pose, slot);
     if (!h) return undefined;

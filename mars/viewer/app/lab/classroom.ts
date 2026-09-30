@@ -9,7 +9,7 @@ export function startClassroom(rt: Runtime, count: 4 | 8) {
 }
 const preset = (count: 4 | 8): Scenario => ({
   name: `classroom-${count}`, title: `Playable classroom · ${count} guests (hypothetical)`,
-  description: 'Start a live lightning-talk session. People arrive, sit, present, take questions, rotate, converse and leave. Intervene while it runs. Ground floor, fixed furniture; no historical claims.',
+  description: 'Start a live lightning-talk session. People arrive, sit, present, take questions, rotate, converse and leave. Intervene while it runs. Ground floor, explicit empty spare-chair setup; no historical claims.',
   scene: classroomScene, humans: () => [],
   build: () => { const w = classroomWorld(count); return new Runtime(w, createRegistry(), servicesFor({ classroom: classroomScene() })(w), ENGINE_INVARIANTS); },
   start: () => {}, continuous: true, maxTicks: 20 * 1800, focus: count === 8 ? [0, 3, 16, 105] : [0, 1, 13, 105],
