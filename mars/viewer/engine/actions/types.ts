@@ -51,6 +51,8 @@ export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> 
   verb: string;
   description: string;
   schema: z.ZodType<Params>;
+  /** Whether reserved hand resources drive hand poses. Defaults true; composites may reserve only, and transfers may drive only selected published phases. */
+  drivesReservedHands?: boolean | ((record: ActionRecord) => boolean);
   /** Resources required (actors, entities, interaction slots, work zones). */
   reservations(world: WorldState, params: Params): Reservation[];
   /** Validate + plan against the current world. Pure w.r.t. world. */

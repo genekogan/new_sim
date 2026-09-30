@@ -75,7 +75,11 @@ function setHand(a: Entity, h: Hand, q: Vec3 | undefined) {
   else delete a.human!.hands;
 }
 const handNow = (a: Entity, h: Hand, b: BodyFrame): Vec3 => a.human!.hands?.[h] ?? restHand(b, h);
-const driven = (rt: Runtime, actor: string, h: Hand) => rt.holder(`hand:${actor}:${h}`).length > 0;
+const driven = (rt: Runtime, actor: string, h: Hand) => rt.holder(`hand:${actor}:${h}`).some((id) => {
+  const record = rt.records.get(id);
+  const policy = record && rt.registry.get(record.verb)?.drivesReservedHands;
+  return typeof policy === 'function' ? policy(record!) : policy !== false;
+});
 const isSeated = (a: Entity) => {
   const act = OVERLAYS.has(a.human!.activity) ? a.human!.baseActivity ?? 'idle' : a.human!.activity;
   return act === 'sit' || act === 'sit-down';
@@ -230,6 +234,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       { resource: `entity:${p.item}`, mode: 'exclusive' },
       ...(mode === 'put' && p.surfaceSlot !== 'ground' ? [{ resource: `surface-slot:${p.surfaceSlot}`, mode: 'exclusive' as const }] : []),
     ],
+    drivesReservedHands: (record) => record.phase === 'reach' || record.phase === 'withdraw',
     plan: (rt, p) => (mode === 'take' ? planTake(rt, p) : planPut(rt, p)),
     start(rt, p, prog, id) {
       const a = rt.world.entities[p.actor];
