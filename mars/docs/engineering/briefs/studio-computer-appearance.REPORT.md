@@ -16,3 +16,8 @@ Focused authored coverage: hash/embedded credit; real transformed complete geome
 Root owns optional FixtureViews.reset appearance map and detached appearance readouts; LabView opts in only studio-computer/design-studio. Read-only hook exposes renderer status/local bounds, and panel visibly credits JasperTobias/source/CC BY4.0 with scaled/rotated/live screen adaptation disclosure. Named load failure remains visible with primitive fallback; no authoritative world, actor, capability, support or camera state changes. Three focused browser checks are authored: supported envelope and actual NPC notes, injected503visiblefailure with usable same workstation, repeatedReset/switch cleanup. ViewerTSc/scopedlint pass; nofocusedNode/browser/runtimecaptures yet while frozen73eda39fullgate owns heavy slot. Sourcecommit is a durable candidate, not a working/released appearance claim.
 
 Public credit metadata uses the archive-relative source identifier; the exact local original remains documented in design-studio.REPORT. Author/source/license/unchanged binary hash and runtime adaptation disclosure remain public. No original asset edits.
+
+
+## Focused slot result
+
+After release25fullgate finished GREEN, worker ran only `node --test deploy/imported-workstation.test.mjs`:8/8pass,0failure/skip,191.555ms (wall0.734s). Exact copied binary/credit, transformed fit, authored CRT geometry mapping, unchanged primitive task canvas, named404fallback, lateparse/palette cleanup and detached/idempotent lifetime proof pass. No source change was required. Heavy slot immediately released for25deployment; no actualbrowserimportcapture or full26gate yet. Root authored actualNPC/fallback/reset checks remains queued, and the importedappearance is NOT in25source73eda39.
