@@ -6,6 +6,7 @@ type Props = {
 /** Discovery only: existing scenario loading and classroom controls own every action. */
 export function CheckpointTour({ scenario, onScenario }: Props) {
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
+  if (!classroom) return null;
   const cameraScenario = classroom ? scenario : 'classroom-4';
   return (
     <section aria-labelledby="checkpoint-tour-heading" data-testid="checkpoint-tour">

@@ -49,3 +49,5 @@ Integrate alongside the table UI and camera replay packaging, then verify the
 top-panel layout/keyboard discovery and both links in the combined browser build.
 No shared `ClassroomHud` edits needed. Approximately 10 minutes implementation,
 source review and validation; token use not measured.
+
+Root fullgate caught global nonclassroom screenshot changes. Tour is narrowed to classroom4/8; no baseline or tolerance edits. Firstred/partialgate and traces retained. Representative historical/fire and classroom discovery checks rerun beforecombinedfullgate.
