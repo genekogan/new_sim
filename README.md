@@ -19,6 +19,9 @@ Live: https://sim.eden.art (once DNS points at eden2) · https://<eden2-sslip-ho
 | `packages/client` | Client replica + reconnecting connection (browser and Node) |
 | `apps/server` | The sequencer: tick loop, event log, snapshots, WS hub, REST, MCP, Privy, brain scheduler |
 | `apps/web` | React + Vite debug shell with Privy login |
+| `docs/frontier/` | The next-frontier discussion (lives, projects, commitments, places), with the Mars engine's frontier and roadmap docs snapshotted in `mars/` |
+| `docs/eden4/` | The eden4 strategy documents (vision, formalism, specs, sprint plans), copied from Gene's notes |
+| `docs/ONBOARDING-CLOUD.md` | Prompt for a cloud agent taking over the frontier discussion |
 | `infra/` | systemd units (prod, staging, watchdog), Caddy site file, Litestream config, deploy / rollback / box-setup scripts |
 
 ## How it works
