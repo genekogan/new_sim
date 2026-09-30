@@ -1,0 +1,82 @@
+// World state shape, mirroring Mars viewer/engine/world/types.ts (mars-world/1)
+// so the real engine's state can later flow through the same wrapper.
+import type { RngState } from './rng.ts';
+
+export type Vec3 = [number, number, number];
+export type Pose = { p: Vec3; yaw: number; pitch?: number; roll?: number };
+export type Confidence = 'documented' | 'participant' | 'inferred' | 'provisional' | 'hypothetical';
+export type Provenance = {
+  origin: 'canonical' | 'reconstruction-edit' | 'design-edit' | 'simulation' | 'test-fixture';
+  confidence: Confidence;
+  evidence?: string[];
+  note?: string;
+};
+export type EntityKind = 'human' | 'component' | 'vehicle' | 'fixture' | 'marker';
+
+export type HumanState = {
+  activity: string; // 'idle' | 'walk' | 'sit' | 'converse' | 'wave' | 'rest' ...
+  task?: string; // owning action id
+  level: number;
+  on?: string; // fixture id when seated
+  speed?: number;
+  /** Extension (not in Mars): the Soul id that owns this human, if any. */
+  soul?: string;
+};
+
+export type Entity = {
+  id: string;
+  def: string;
+  kind: EntityKind;
+  label?: string;
+  tags?: string[];
+  pose: Pose;
+  provenance: Provenance;
+  human?: HumanState;
+  reservedBy?: string;
+  /** Fixture capacity for seats/gathering (toy extension). */
+  seats?: number;
+};
+
+export type Region = {
+  id: string;
+  label: string;
+  kind: 'place' | 'staging' | 'material-pile' | 'work-area' | 'walkable' | 'no-go';
+  polygon: [number, number][]; // (x, z), CCW
+  level?: number;
+  provenance: Provenance;
+};
+
+export type BaseRef = { campus: string; staticHash: string };
+export type Environment = {
+  datetime: string; // ISO local
+  weather: { clouds: number; rain: number; wind: number; dust: number; wet: number };
+};
+
+export type WorldState = {
+  schema: string;
+  base: BaseRef;
+  tick: number;
+  entities: Record<string, Entity>;
+  regions: Record<string, Region>;
+  env: Environment;
+  inventory: 'finite' | 'unlimited';
+  rng: RngState;
+};
+
+/** The physical view drops labels, tags, provenance, tick and env (Mars physicalView). */
+export function physicalView(w: WorldState) {
+  const entities: Record<string, unknown> = {};
+  for (const id of Object.keys(w.entities).sort()) {
+    const { label: _l, tags: _t, provenance: _p, ...rest } = w.entities[id];
+    entities[id] = rest;
+  }
+  const regions = Object.keys(w.regions)
+    .sort()
+    .map((id) => {
+      const r = w.regions[id];
+      return [id, r.kind, r.polygon, r.level ?? 0];
+    });
+  return { base: w.base, entities, regions, inventory: w.inventory, rng: w.rng };
+}
+
+export const canonicalEntityOrder = (w: WorldState) => Object.keys(w.entities).sort();
