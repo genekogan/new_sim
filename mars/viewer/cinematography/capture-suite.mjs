@@ -47,7 +47,7 @@ try {
         scenario:
           'six actual engine takes; labeled camera-owned semantic/occlusion fixtures',
         remaining:
-          'Baseline; rear angles and foreground obstruction; no live Jev, no riding.',
+          'Dense scenes may force wide/obstructed framing; replay head attention unsupported; no live Jev, no riding.',
       },
       null,
       2,

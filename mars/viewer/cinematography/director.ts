@@ -52,6 +52,12 @@ export function rankShot(
       floorActive
     )
       score += 2.5;
+    else if (
+      s.intention === 'follow' &&
+      s.subjects[0] === focus &&
+      o.activity.phase === 'walking'
+    )
+      score += 3;
     else if (s.intention === 'establishing') score += 1;
   } else {
     if (
@@ -63,11 +69,7 @@ export function rankShot(
     else if (s.intention === 'establishing') score += 2.6;
     else if (s.intention === 'speaker-display') score += 1.7;
   }
-  if (
-    o.activity.phase === 'arriving' ||
-    o.activity.phase === 'departing' ||
-    o.activity.phase === 'conversing'
-  ) {
+  if (o.activity.phase === 'arriving' || o.activity.phase === 'departing') {
     if (s.intention === 'establishing') score += 3;
   }
   if (focus && s.subjects.includes(focus)) score += 0.5;
@@ -90,6 +92,7 @@ export class Director {
   shots: Shot[] = [];
   observation?: Observation;
   external?: { reply: Reply; request: Request };
+  autoFollow?: string;
   note(message: string) {
     if (this.diagnostics.at(-1) !== message) this.diagnostics.push(message);
     if (this.diagnostics.length > 128) this.diagnostics.shift();
@@ -110,6 +113,7 @@ export class Director {
     this.decisions = [];
     this.diagnostics = [];
     this.external = undefined;
+    this.autoFollow = undefined;
   }
   takeover(intent: OperatorIntent) {
     this.operator = structuredClone(intent);
@@ -177,7 +181,7 @@ export class Director {
     this.lastTime = o.time;
     if (this.operator && o.time >= this.operator.expires) this.release();
     const policy = this.operator?.policy ?? this.policy;
-    const shots = feasibleShots(o, this.current);
+    const shots = feasibleShots(o, this.current, policy);
     this.shots = shots;
     let list = shots;
     if (this.operator?.subject)
@@ -193,6 +197,12 @@ export class Director {
     let best = [...list].sort(
       (a, b) => rank(b) - rank(a) || a.id.localeCompare(b.id),
     )[0];
+    if (policy === 'continuous' && !this.operator) {
+      if (!this.autoFollow || !o.subjects[this.autoFollow])
+        this.autoFollow =
+          o.activity.focus ?? o.activity.speaker ?? o.activity.members[0];
+      best = shots.find((s) => s.id === `follow:${this.autoFollow}`) ?? best;
+    }
     if (!best && this.operator && !this.operator.pose) {
       this.note(
         'camera.operator-unavailable: requested framing has no feasible candidate',
@@ -208,6 +218,7 @@ export class Director {
       current &&
       current.valid &&
       !this.operator &&
+      policy !== 'continuous' &&
       (held < constraints.hold ||
         !best ||
         rankShot(best, o, policy, this.recent) -

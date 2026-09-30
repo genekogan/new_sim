@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { EngineHook } from '../app/lab/hook.ts';
 import type { attachLabCamera } from '../cinematography/lab-driver.ts';
 declare global {
@@ -23,6 +24,11 @@ const artifacts = path.resolve(
 test('varied replay suite starts safely and renders every scenario with sustained policy views', async ({
   page,
 }) => {
+  test.setTimeout(90000);
+  execFileSync(process.execPath, ['cinematography/suite-record.ts'], {
+    timeout: 60000,
+    stdio: 'pipe',
+  });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/app/camera-lab/suite.html');

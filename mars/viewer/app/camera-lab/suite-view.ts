@@ -162,7 +162,7 @@ function draw() {
   document.querySelector('#title')!.textContent =
     `REPLAY · ${c.label} · ${data.branch} · ${data.commit.slice(0, 7)}`;
   document.querySelector('#status')!.textContent =
-    `${local.toFixed(1)}s world time · same take in both views. ${c.note} Remaining limits: recorded head attention unsupported; camera-only wall recovery may cut; initial baseline may show backs/foreground obstruction.`;
+    `${local.toFixed(1)}s world time · same take in both views. ${c.note} Remaining limits: recorded head attention unsupported; blocked-view recovery may cut; dense scenes may still force wide or obstructed framing.`;
 }
 raf = requestAnimationFrame(function loop(wall) {
   if (playing) {

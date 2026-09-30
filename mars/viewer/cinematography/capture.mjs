@@ -9,6 +9,9 @@ const mode = process.argv[2] || 'baseline';
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
   encoding: 'utf8',
 }).trim();
+const branch = execFileSync('git', ['branch', '--show-current'], {
+  encoding: 'utf8',
+}).trim();
 const out = path.resolve('e2e/artifacts', `codex-autonomous-camera-${mode}`);
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({
@@ -56,9 +59,9 @@ try {
       mode.startsWith('restrained') ? 'restrained' : 'clear',
     );
   await page.evaluate(
-    ({ mode, commit }) => {
+    ({ mode, commit, branch }) => {
       const label = document.createElement('div');
-      label.textContent = `LIVE · ${mode} · classroom-4 · codex/autonomous-camera · ${commit.slice(0, 7)} · hypothetical`;
+      label.textContent = `LIVE · ${mode} · classroom-4 · ${branch} · ${commit.slice(0, 7)} · hypothetical · dense views may obstruct`;
       Object.assign(label.style, {
         position: 'fixed',
         top: '0',
@@ -72,7 +75,7 @@ try {
       });
       document.body.append(label);
     },
-    { mode, commit },
+    { mode, commit, branch },
   );
   await page.waitForTimeout(8000);
   await page.getByRole('button', { name: 'Ask question', exact: true }).click();
@@ -100,10 +103,8 @@ try {
         mode,
         live: true,
         scenario: 'classroom-4',
-        branch: 'codex/autonomous-camera',
-        commit: execFileSync('git', ['rev-parse', 'HEAD'], {
-          encoding: 'utf8',
-        }).trim(),
+        branch,
+        commit,
         errors,
         ...proof,
       },

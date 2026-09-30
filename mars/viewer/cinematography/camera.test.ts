@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Director } from './director.ts';
 import { Advisory } from './provider.ts';
 import { feasibleShots } from './shots.ts';
+import { frontality, foreground } from './composition.ts';
 import { safePose, execute } from './physical.ts';
 import { Observer, cameraScene } from './observation.ts';
 import { replayFrame } from './replay.ts';
@@ -437,6 +438,93 @@ void test('continuous following retains its subject through unrelated speaker ch
   d.takeover({ subject: 'b', expires: 14 });
   d.update(next);
   assert.equal(d.selectedId, 'follow:b');
+  next.time = 14;
+  d.update(next);
+  assert.equal(
+    d.selectedId,
+    'follow:a',
+    'expiry restores the original autonomous subject',
+  );
+  d.takeover({ subject: 'b', expires: 30 });
+  d.update(next);
+  d.release();
+  d.update(next);
+  assert.equal(
+    d.selectedId,
+    'follow:a',
+    'explicit release restores the original subject',
+  );
+  delete next.subjects.a;
+  next.activity.members = ['b'];
+  d.update(next);
+  assert.equal(
+    d.selectedId,
+    'follow:b',
+    'removed subject hands off to a present subject',
+  );
+});
+void test('edited medium shot follows facing direction and clear conversation covers the floor', () => {
+  for (const yaw of [0, Math.PI / 2, Math.PI]) {
+    const o = observation();
+    o.subjects.a.yaw = yaw;
+    const before = JSON.stringify(o);
+    const shot = feasibleShots(o).find((s) => s.id === 'speaker:a')!;
+    assert.ok(shot);
+    assert.ok(frontality(shot.pose, o.subjects.a) > 0.7);
+    assert.ok(safePose(o, shot.pose));
+    assert.equal(JSON.stringify(o), before);
+  }
+  const o = observation();
+  o.activity.phase = 'conversing';
+  const clear = new Director('clear'),
+    restrained = new Director('restrained');
+  clear.update(o);
+  restrained.update(o);
+  assert.equal(clear.selectedId, 'speaker:a');
+  assert.match(restrained.selectedId!, /^pair:/);
+});
+void test('foreground score detects architecture in front of the target and excludes intended objects', () => {
+  const o = observation();
+  const pose = {
+    position: [0, 1.5, 6] as [number, number, number],
+    target: [0, 1.5, 0] as [number, number, number],
+    fov: 45,
+  };
+  assert.equal(foreground(new CameraWorld(o.scene), pose, o.aspect, []), 0);
+  o.scene.obstacles = [
+    {
+      id: 'partition',
+      obb: { c: [0, 3], half: [3, 0.1], yaw: 0 },
+      y0: 0,
+      y1: 4,
+    },
+  ];
+  assert.ok(foreground(new CameraWorld(o.scene), pose, o.aspect, []) > 0.5);
+  assert.equal(
+    foreground(new CameraWorld(o.scene), pose, o.aspect, ['partition']),
+    0,
+  );
+});
+void test('a change of conversation group honors the minimum hold while the old subject remains feasible', () => {
+  const d = new Director('clear'),
+    o = observation();
+  o.activity.phase = 'conversing';
+  d.update(o);
+  assert.equal(d.selectedId, 'speaker:a');
+  const next = observation(1);
+  next.activity = {
+    ...next.activity,
+    phase: 'conversing',
+    focus: 'b',
+    speaker: 'b',
+    members: ['b'],
+  };
+  next.semanticVersion++;
+  d.update(next);
+  assert.equal(d.selectedId, 'speaker:a');
+  next.time = 5;
+  d.update(next);
+  assert.equal(d.selectedId, 'speaker:b');
 });
 void test('derived workstation target exists without modifying object task state', () => {
   const w = classroomWorld(),
