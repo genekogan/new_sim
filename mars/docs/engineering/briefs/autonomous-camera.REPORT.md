@@ -223,3 +223,94 @@ was interrupted by my formatting-triggered HMR and stalled at the initial world
 time; failed WebM/frame retained, not success proof. Capture tooling now saves
 failed proof as well; source will remain fixed during the committed rerun.
 Engine-owner release17 idle measurement respected; no helpers/API calls.
+
+## 2026-09-29 evening — varied footage and facing/framing checkpoint
+
+The integration owner confirms reviewed camera checkpoint a6cc661 is integrated
+and released in release17 (source d04271d). This subsequent work is independently
+implemented and tested on `codex/autonomous-camera-next`; it is not yet integrated
+or released. Handoff branch remains unchanged. Base/merge-base is ab85a15, with
+new commits 4979de7 (six-scenario suite/continuous policy), 2831418 (reel clock and
+seek fix), 2591b9e (facing/framing/continuous handoff). No shared entrypoints or
+engine modules changed; no interface dependency, additional helper or paid call.
+
+Changes: `suite-record.ts` uses actual registered engine activities and Lab
+scenarios; `app/camera-lab/suite.*` and `capture-suite.mjs` render and capture six
+sustained 15-second passages with policy labels. Observation derives fixture
+points for object framing. `composition.ts` scores body facing and foreground
+architecture; `shots.ts` uses front-relative edited angles, tighter framing and
+cached composition scores over feasible candidates. Clear conversation covers
+the public floor; restrained holds pairs. Continuous uses the existing subject
+relative follow evaluator, retains its autonomous subject through unrelated
+focus changes, and restores it after operator expiry/release. A conversation
+membership change no longer bypasses minimum hold if the prior shot is feasible.
+Capture tooling now logs the actual branch. Browser suite generates its own
+ignored fixture data instead of depending on previously captured artifacts.
+
+Commands from viewer on the rebased branch:
+
+- `npm run test:engine`: 692 total, 675 pass, zero fail, 6 skip, 11 TODO; 62.17s.
+- `node --test cinematography/camera.test.ts`:27/27 pass; 0.23s.
+- `npm run typecheck`: pass.
+- `npx tsc --noEmit --target es2022 --module esnext --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck --strict --jsx react-jsx --types node cinematography/*.ts`: pass.
+- `npx oxlint cinematography app/camera-lab`: pass.
+- `E2E_VITE_PORT=5591 E2E_RUN=codex-autonomous-camera-front-portable PLAYWRIGHT_BROWSERS_PATH=.pw-browsers npx playwright test -c e2e/playwright.config.ts e2e/autonomous-camera.spec.ts --workers=1`:3/3 pass; 41.3s,including fixture generation.
+All pinned tests pass unchanged. An attempted standalone NodeNext/non-strict
+compiler invocation was inappropriate for the repo's bundler/TSX configuration;
+its configuration errors were corrected by the explicit command above. No source
+or assertions were weakened. Release full gate belongs to integration owner.
+
+Actual runtime MP4s under this worktree's ignored viewer/e2e/artifacts:
+
+- `codex-autonomous-camera-varied-baseline/review.mp4`:92.48s;source15f5726.
+- `codex-autonomous-camera-varied-front/review.mp4`:92.68s;source2591b9e.
+- `codex-autonomous-camera-clear-front-live/review.mp4`:48.28s;source2591b9e.
+- `codex-autonomous-camera-varied-front/before-after.mp4`: before above, after
+  below; same takes with explicitly approximate playback-clock alignment.
+Each original clip includes scenario,policy,live/replay,branch/commit and defects.
+`review-manifest.json`, `suite.json`, proof/decision logs and filmstrips preserve
+provenance. Reproduce with `node cinematography/suite-record.ts`, camera-owned
+Vite 5593, `node cinematography/capture-suite.mjs varied-front`, and
+`node cinematography/capture.mjs clear-front-live`. Keep source unchanged during
+capture. Baseline is archived before replacing generated suite data. Six world
+hashes AND full take JSON match exactly across baseline/revised policies; all
+six runs have zero invariant violations and no failed actions.
+
+Inspection covered the entire decoded MP4 durations via filmstrips, plus dense
+2 Hz conversation/walking transitions and 1 Hz operator transitions. Compared to
+baseline, faces are larger and generally front-on, conversation attention is
+legible, the workstation has a sustained worker/object view, simultaneous
+activity shifts from gathering to conversation, and the partition no longer
+hides most of the presenter. Continuous and clear walking now visibly differ:
+route view from behind versus front coverage. Operator takeover lasts four
+seconds in the fixture and continuous returns to its original subject, which
+baseline failed to do. Safety-driven cuts around the wall remain explicit;
+there is no fly-through-wall interpolation or hidden architecture.
+
+The live Lab clip independently shows a real-time question, guest2 takeover,
+autonomous return, departure and presenter rotation. Zero browser errors or
+camera diagnostics. Measured 352 camera updates: mean 1.64 ms, p95 2.0 ms, max 14.5 ms,
+capped around 10 Hz. This is camera update overhead, not a full render-performance
+regression proof. It exceeds the prior clip's mean 0.97 ms; cached scoring avoids
+repeated raycasts during sorting, but denser scenes still need measurement.
+
+Defects retained in footage: conversation partners' heads can crowd the lower
+frame; group context remains wide; walking recovery can cut abruptly; workstation
+screen content is not always legible. Body-facing proxy is not a perceptual
+quality metric, and replay still does not restore head attention. No riding
+proof. Visitor approaches the group vicinity, not formal membership admission.
+Simultaneous activity floor/attention annotations are explicitly camera-owned
+fixtures; actor activities themselves are actual engine actions. Jev remains
+optional/off because comparative footage has not established a benefit.
+
+Two earlier failed captures remain preserved: HMR interrupted the first; the
+second startup clock selected a negative scenario index. `failed-clock.mp4` and
+failed proof are failure records, not successful demos. The clock/seek browser
+regression and stable committed-source recording corrected both issues.
+
+Next bounded outcome: reduce foreground human crowding and abrupt reframing
+without weakening placement/readability or expanding the interface. Estimate
+2–4 active hours for that polish/footage batch, assuming existing scenarios and
+frozen hooks; no estimate of universal camera completion. No engine blocker.
+This checkpoint used roughly 45 minutes of active development/verification after
+the previous suite setup; approximate token accounting is unavailable.
