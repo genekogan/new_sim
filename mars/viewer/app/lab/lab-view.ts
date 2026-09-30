@@ -8,7 +8,7 @@ import { ThreeResources } from '../../lib/three-resources';
 import type { Spatial } from '../../engine/spatial/service.ts';
 import { traffic } from '../../engine/locomotion/walk.ts';
 import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
-import { readClassroom } from '../../engine/activities/index.ts';
+import { readClassroom, readSharedFoodBreak } from '../../engine/activities/index.ts';
 import { labCameraDiagnostic } from './camera-observation.ts';
 import type { Runtime } from '../../engine/runtime/runtime.ts';
 import { LabSim } from './sim.ts';
@@ -27,6 +27,7 @@ export const OVERLAYS = ['grid', 'routes', 'traffic', 'agents', 'obstacles', 'pr
 export type OverlayName = (typeof OVERLAYS)[number];
 
 export class LabView {
+  attentionTargets: Record<string, [number, number]> = {};
   readonly sim = new LabSim();
   readonly renderer: THREE.WebGLRenderer;
   readonly camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
@@ -106,6 +107,7 @@ export class LabView {
   }
 
   private reset(rt: LabSim['rt']) {
+    this.attentionTargets = {};
     this.statics?.dispose();
     if (this.statics) this.scene.remove(this.statics.group);
     this.statics = yearBackdrop(rt, (m) => (this.error = m)) ?? new StaticScene(rt.services.spatial.base);
@@ -245,6 +247,15 @@ export class LabView {
       if (group.status === 'talking' && group.attentionTarget)
         for (const actor of group.members)
           if (actor !== group.floorHolder) targets[actor] = group.attentionTarget.point;
+    for (const action of rt.records.values()) {
+      if (action.verb !== 'shared_food_break' || !rt.isActive(action.id)) continue;
+      const food = readSharedFoodBreak(rt, action.id);
+      if (!food?.attentionTarget || !food.group) continue;
+      const point: [number, number] = [food.attentionTarget.position[0], food.attentionTarget.position[2]];
+      for (const person of food.participants)
+        if (person.actor !== food.floorHolder && rt.holder(`actor:${person.actor}`).includes(food.group)) targets[person.actor] = point;
+    }
+    this.attentionTargets = targets;
     this.humans.setAttention(targets);
   }
 

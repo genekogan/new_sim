@@ -5,7 +5,7 @@ import { LabCameraGeometryCache } from './camera-observation.ts';
 import * as THREE from 'three';
 import type { LabView, OverlayName } from './lab-view.ts';
 import { classroomSessionId, classroomParams } from '../../engine/scenarios/classroom.ts';
-import { readClassroom } from '../../engine/activities/index.ts';
+import { readClassroom, readSharedFoodBreak } from '../../engine/activities/index.ts';
 import { displayReadout } from '../../engine/objects/classroom.ts';
 import { SELECTABLE_SCENARIOS, SCENARIOS } from './scenarios.ts';
 import { sequenceRows } from './sequence-hud.tsx';
@@ -125,6 +125,10 @@ export function installHook(view: LabView, notify: () => void) {
     fixtureMove: () => { const id = [...sim.rt.records.values()].filter((r) => r.verb === 'move_fixture').at(-1)?.id; return id ? readFixtureMove(sim.rt, id) : undefined; },
     workstation: () => ({ state: readWorkstation(sim.rt, 'workstation'), claims: Object.fromEntries(['workstation:workstation', 'actor:worker', 'slot:work-chair#seat'].map((key) => [key, sim.rt.holder(key)])) }),
     classroomAttention: () => view.humans.attention(),
+    /** Detached activity readouts; an observer cannot mutate coordination or food. */
+    sharedFood: () => structuredClone([...sim.rt.records.values()].filter(r => r.verb === 'shared_food_break').map(r => readSharedFoodBreak(sim.rt, r.id))),
+    activityAttention: () => view.humans.attention(),
+    activityAttentionTargets: () => structuredClone(view.attentionTargets),
     classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, 'screen') }; },
     startClassroom: () => { const r = sim.rt.submit('classroom_session', classroomParams(sim.scenario.name === 'classroom-8' ? 8 : 4)); notify(); return { id: r.id, status: r.status, diagnostic: r.diagnostic }; },
     stateHash: () => sim.rt.stateHash(),

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { WORK_BREAK_BINDING as B } from '../../engine/scenarios/work-break.ts';
 import { heldBy } from '../../engine/items/model.ts';
 import { readWorkstation } from '../../engine/objects/workstation.ts';
+import { readSharedFoodBreak } from '../../engine/activities/shared-food-break.ts';
 import type { ActionRecord } from '../../engine/actions/types.ts';
 import type { LabSim } from './sim.ts';
 
@@ -14,6 +15,9 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   const active = records.filter(r => rt.isActive(r.id));
   const work = readWorkstation(rt, B.work.station);
   const working = active.find(r => r.verb === 'work_at');
+  const shared = active.find(r => r.verb === 'shared_food_break') ?? records.filter(r => r.verb === 'shared_food_break').at(-1);
+  const sharedActive = !!shared && rt.isActive(shared.id);
+  const sharedState = shared && readSharedFoodBreak(rt, shared.id);
   const group = active.find(r => r.verb === 'converse');
   const foodAction = active.find(r => ['take_item', 'serve', 'eat', 'stow_items', 'walk_to'].includes(r.verb) && (r.params as { actor?: string }).actor === actor);
   const busy = rt.holder(`actor:${actor}`).length > 0;
@@ -26,22 +30,40 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     <div className="lab-hud-head">HYPOTHETICAL · work and shared food · one continuing world</div>
     <ol>
       <li>Start notes, then interrupt after some progress. Wait for safe stand-up.</li>
-      <li>For each person: take bowl and spoon, approach the pot, then serve.</li>
-      <li>Gather together, wait for conversation, and let each person eat.</li>
-      <li>End conversation, explicitly return both sets of utensils, then resume notes.</li>
+      <li>Start shared food break: both people take utensils, serve, gather, eat and return them.</li>
+      <li>Stop anytime. After safe stopping, restart to use retained utensils and partial portions.</li>
+      <li>When hands are free, resume the same notes. Individual food controls remain available below.</li>
     </ol>
-    <div data-testid="break-work-readout">Notes: {'code' in work ? work.message : `${work.status} · ${work.user ?? 'unassigned'} · ${work.elapsed.toFixed(1)}/${work.duration}s · ${work.phase ?? 'ready'}`}</div>
+    <div data-testid="break-work-readout">Notes: {'code' in work ? work.message : `${work.status} · ${work.task ?? 'Sketch notes'} · ${work.user ?? 'unassigned'} · ${work.elapsed.toFixed(1)}/${work.duration}s · ${work.phase ?? 'ready'}`}</div>
     <div className="lab-classroom-controls">
       <button disabled={!!working || !('code' in work) && work.status === 'unfinished'} onClick={() => submit('work_at', B.work, 'Starting notes')}>Start notes</button>
       <button disabled={!working} onClick={() => working && response(rt.cancel(working.id), 'Stopping work safely; progress remains')}>Interrupt notes</button>
       <button disabled={!!working || 'code' in work || work.status !== 'unfinished'} onClick={() => submit('work_at', { ...B.work, resume: true }, 'Returning to the same unfinished notes')}>Resume notes</button>
     </div>
+    <div className="lab-classroom-controls">
+      <button data-testid="start-shared-food" disabled={sharedActive || B.people.some(p => rt.holder(`actor:${p.actor}`).length > 0)} onClick={() => submit('shared_food_break', { pot: B.pot, participants: B.people, at: B.conversation.at }, 'Both people begin a shared break through ordinary actions')}>Start shared food break</button>
+      <button disabled={!sharedActive} onClick={() => shared && response(rt.cancel(shared.id), 'Stopping the break safely; partial food and supported utensils remain')}>Stop shared food break</button>
+    </div>
+    {working && <div role="status">Interrupt notes and wait for safe stand-up before starting the shared break.</div>}
+    <div data-testid="shared-food-readout">
+      {sharedState ? <>
+        <div>Shared break: {sharedState.status} · {sharedState.phase} · Floor: <b>{sharedState.floorHolder ?? '—'}</b></div>
+        {sharedState.participants.map(p => <div key={p.actor}>{p.actor} · holds {p.held.length ? p.held.join(', ') : 'nothing'} · bowl {Math.round(p.food * 100)}% · {p.returned.length}/2 returned</div>)}
+        {sharedState.waitingReason && <div role="status">Waiting: {sharedState.waitingReason}</div>}
+        {sharedState.diagnostic && <div role="status">{sharedState.diagnostic.code}: {sharedState.diagnostic.message}</div>}
+      </> : 'Ready: two free people, their bowls/spoons, a shared pot and approved return slots.'}
+      <div>Shared pot: {Math.round((rt.world.entities[B.pot].contents?.fraction ?? 0) * 100)}%</div>
+    </div>
+    <details>
+    <summary>Direct individual food actions</summary>
+    <p>Take bowl and spoon for each person, approach and serve, gather together, eat, end conversation, then return utensils. A new direct command can interrupt a coordinated break.</p>
     <label>Food-break participant <select aria-label="Food-break participant" value={actor} onChange={e => setActor(e.target.value)}>{B.people.map(p => <option key={p.actor}>{p.actor}</option>)}</select></label>
     <div data-testid="break-food-readout">{actor} holds {held.length ? held.map(h => h.item.id).join(', ') : 'nothing'} · bowl {Math.round((bowl.contents?.fraction ?? 0) * 100)}% · shared pot {Math.round((rt.world.entities[B.pot].contents?.fraction ?? 0) * 100)}%</div>
     <div className="lab-classroom-controls">
       <button disabled={busy || holds(person.bowl)} onClick={() => submit('take_item', { actor, item: person.bowl, hand: 'left' }, `${actor} takes a bowl`)}>Take break bowl</button>
       <button disabled={busy || holds(person.spoon)} onClick={() => submit('take_item', { actor, item: person.spoon, hand: 'right' }, `${actor} takes a spoon`)}>Take break spoon</button>
       <button disabled={busy} onClick={() => submit('walk_to', { actor, x: person.service[0], z: person.service[1] }, `${actor} approaches the serving pot`)}>Approach serving pot</button>
+      <button onClick={() => submit('walk_to', { actor, x: 12, z: 10 }, `Directed ${actor} to courtyard; an active break will stop coherently`)}>Direct participant to courtyard</button>
       <button disabled={busy || !holds(person.bowl)} onClick={() => submit('serve', { actor, bowl: person.bowl, pot: B.pot }, `${actor} serves stew`)}>Serve stew</button>
       <button disabled={!!foodAction || !holds(person.bowl) || !holds(person.spoon)} onClick={() => submit('eat', { actor, bowl: person.bowl, spoon: person.spoon }, `${actor} eats`)}>Eat stew</button>
       <button disabled={!foodAction} onClick={() => foodAction && response(rt.cancel(foodAction.id), 'Stopping the selected food action safely')}>Stop food action</button>
@@ -51,6 +73,7 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
       <button disabled={!!group || B.people.some(p => rt.holder(`actor:${p.actor}`).length > 0)} onClick={() => submit('converse', B.conversation, 'Both people gather for a shared break')}>Gather for shared break</button>
       <button disabled={!group} onClick={() => group && response(rt.cancel(group.id), 'Ending conversation safely; held utensils remain')}>End break conversation</button>
     </div>
+    </details>
     <div data-testid="break-action-readout">{active.filter(r => !r.parent).map(r => <div key={r.id}>{r.verb} · {r.status} · {r.phase}{r.diagnostic && ` · ${r.diagnostic.code}: ${r.diagnostic.message}`}</div>)}</div>
     <div role="status" data-testid="break-feedback">{feedback}</div>
     <small>Standing shared meal, explicit instructions and returns. Missing food, movement, full hands and resource conflicts refuse with named diagnostics. Rest, sleep, autonomous scheduling and seated meals are later increments.</small>

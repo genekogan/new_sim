@@ -36,6 +36,7 @@ for (const count of [4, 8]) test(`one continuing world ${count}: notes → share
   expect((await finish(page, 'work_at', 'worker')).status).toBe('cancelled');
   const unfinished = await page.evaluate(() => window.__marsEngine.workstation().state);
   expect(unfinished).toMatchObject({ status: 'unfinished', user: 'worker', task: 'Sketch notes', duration: 30 });
+  await page.getByText('Direct individual food actions', { exact: true }).click();
   for (const actor of ['worker', 'visitor']) {
     await participant.selectOption(actor);
     await button('Take break bowl').click(); expect((await finish(page, 'take_item', actor)).status).toBe('completed');

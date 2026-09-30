@@ -12,7 +12,7 @@ Gene's priority after release17 was **physical chair/table moving and usable roo
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Same-world shared food break | GPT-6.1 Sol medium coordinator; lead Lab integration | One intent binds two people/items/service points; ordinary actions serve, gather, eat and return utensils; partial-food/held-item retry and safe stop; interrupted notes remain unchanged | Authored binding6/6 focused + timed-command replay/TSc/lint pass. Explicit live UI2/2 journeys pass with six inspected serving/eating/resumed-work captures; one-command coordinator remains a separate unreleased candidate. Stop if shared Runtime/item redesign or general scheduling becomes necessary |
+| Same-world shared food break | GPT-6.1 Sol medium coordinator; lead Lab integration | One intent binds two people/items/service points; ordinary actions serve, gather, eat and return utensils; partial-food/held-item retry and safe stop; interrupted notes remain unchanged | Authored binding6/6 focused + timed-command replay/TSc/lint pass. Explicit live UI2/2 journeys pass with six inspected serving/eating/resumed-work captures; one-command coordinator integrated in the unreleased candidate:21/21 focused,2/2 live interruption/retry journeys and read-only group-attention proof pass. Stop if shared Runtime/item redesign or general scheduling becomes necessary |
 | Continuity and visible social use | Lead alongside food activity | Two room sizes preserve the same world/user/task/elapsed work; inspect actual serving/eating/return; floor/attention turns only among the actually formed group; intervention leaves coherent partial state | No autonomous day scheduler, arbitrary seating optimizer, nutritional model or fine finger certification |
 
 
@@ -103,3 +103,5 @@ The physical chair/table/usable-setup tranche has reached its bounded exit crite
 
 
 Camera session retired at Gene's request on2026-09-30. Reviewed code throughbf24353 is integrated; durable architecture/provenance/resume/backlog are in `briefs/autonomous-camera.md` and its REPORT. Preserve its worktree/captures. Future camera work requires Gene's request, retains independent ownership and never blocks engine milestones. No camera worker is part of this active queue.
+
+Current bounded food slice remaining estimate: **3–6 working hours**, including full combined gate and deployment/production proof, assuming no gate regression or shared physical redesign. Directed standing pair and authored service/return positions remain the supported scope; general scheduling, seated dining, arbitrary furnishing rebind and needs are subsequent increments.

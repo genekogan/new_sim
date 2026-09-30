@@ -30,7 +30,7 @@ function setup(count: 4 | 8 = 4, pot = 1, bowls = 0, elevated = false) {
     world.entities[person.bowl].contents!.fraction = bowls;
   if (elevated) world.entities[B.table].pose.p[1] = 2;
   const registry = createRegistry();
-  registry.set(sharedFoodBreak.verb, sharedFoodBreak);
+  assert.equal(registry.get(sharedFoodBreak.verb), sharedFoodBreak);
   return new Runtime(
     world,
     registry,
