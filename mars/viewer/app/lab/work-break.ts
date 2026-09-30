@@ -5,7 +5,7 @@ import { workBreakWorld } from '../../engine/scenarios/work-break.ts';
 import type { Scenario } from './scenarios.ts';
 
 const preset = (count: 4 | 8): Scenario => ({
-  name: `work-break-${count}`, title: `Work → shared food break · ${count}-guest room (hypothetical)`,
+  name: `work-break-${count}`, title: `Work → talks → shared food · ${count}-guest room (hypothetical)`,
   description: 'Keep one world: interrupt unfinished notes, join the classroom and ask a question, watch talks and smaller conversations, then serve stew with a companion, gather and eat, return utensils, then resume the same notes. Explicit live commands; no automatic day schedule or historical claims.',
   scene: classroomScene, humans: () => [],
   build: () => { const world = workBreakWorld(count); return new Runtime(world, createRegistry(), servicesFor({ classroom: classroomScene() })(world), ENGINE_INVARIANTS); },

@@ -35,6 +35,7 @@ for (const count of [4, 8]) test(`one continuing world connects unfinished work,
   const button = (name: string) => page.getByRole('button', { name, exact: true });
   await expect(page.getByRole('combobox', { name: 'Classroom participant', exact: true })).toHaveValue('worker');
   await expect(button('Prepare side layout')).toBeEnabled();
+  await expect(page.getByRole('link', { name: 'Open a separate classroom camera review' })).toHaveAttribute('href', `/cinematography/review.html?scenario=classroom-${count}`);
   if (count === 8) {
     for (const item of ['bowl', 'spoon']) {
       await button(`Take ${item}`).click();
