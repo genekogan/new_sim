@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 15 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 18 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -889,4 +889,40 @@ Root personally inspected eight new production captures: held items, first reach
 Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 7f910ca6-a3b6-4309-bb25-de9cb330fb56 --name mars-campus-2026 -m "rollback release17: <reason>"
+```
+
+
+## Production deploy 18 (2026-09-30, checkpoint tour)
+
+Clean source **b2928ef60f7df31c23d2efc5db6ffbe2b7667bd9** passed the full gate before local-main fast-forward. Live **4e77562e-9dc4-4f76-890b-22bc188d8ed7**, created04:11:45.252Z/deployed04:11:47.436Z, confirmed100%. Rollback **7b809dd0-7655-4192-b968-5eb35d83df40** (release17). Historical-agent dirty main paths and unfinished branches remain preserved. No remote/push, pins, goldens, tolerances or historical values changed.
+
+Open `/lab?scenario=classroom-4` for the top-panel quick tour and four/eight-guest room launches. Start, question, rotate presenters, join/leave, direct actors and watch smaller conversations. Quiet computer work retains unfinished progress across explicit interruption/return. Explicit bowl/spoon preparation, spare-chair carry/cancel/reseat and two-person cleared-table carry/cancel/returned surface use are playable. Camera owner reviewed work through bf24353 is selected; live review offers Clear/Restrained/Continuous and operator follow/return. `/app/camera-lab/suite.html` exposes six **recorded** comparisons with scenario selection/play/pause/restart. Actual recorded world execution and synthetic camera attention cues are labeled; this is not six additional live activities or recorded head-attention proof.
+
+| Required check | Result |
+| --- | --- |
+| Full gate | GREEN `.cloudflare/gate/2026-09-30T03-47-46-115Z/report.json`;b2928ef,gitDirty:false,cleanupError:null |
+| Lint / both TypeScript configs | clean, zero lint warnings |
+| Unit |99 pass /0 fail |
+| Engine |762 total:745 pass /0 fail /6 documented skips /11 historical TODO |
+| Browser |103 pass /7 documented skips;1019.7s |
+| Flagship / determinism |byte-identical; unchanged b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local MCP |all36 tools pass |
+| Idle performance |original ceilings/outcomes:exact peak110.315958ms/mean0.6810769592ms;corridor50.086333ms/0.5242200317ms;grids103.043375–174.7925ms;zero violations |
+| Regenerated evidence |745/0;17 rows PROVEN,8 milestones PROVEN;capabilities25/2/1 retain exceptions |
+| Production browser |20/20 pass,3.5min; real published classroom/work/items/chair/table/tour/replay/camera hooks/Studio journeys |
+| Published camera entry |follow/return/Continuous leave paused world unchanged; questioner, portrait aspect0.5232558139534884, reset epochs/disposal, zero diagnostics/errors; Jev hidden/disabled, zero provider requests |
+| Production infrastructure |341 assets/19 routes/GLB range/auth;all36 MCP tools;director all9 steps9.105s |
+| Production build bay |10901ticks/43steps/5checks;zero violations/errors;exact unchanged probe hash |
+
+First combined gate7df5510 was red/partial: global quick tour altered old nonclassroom screenshots. Root stopped the owned gate; cleanupError:null. Narrowing discovery to classroom4/8 in b2928ef preserved every baseline. Representative old/new browser3/3 then full gate passed. Original failure report03-39-28-889Z remains retained. No expected outcome was edited to obtain green. The dev-source URL/provider injection camera test remains locally proven and is excluded from production-only run because production serves bundled entries; actual published runtime is separately verified rather than counting that test as a production pass.
+
+Prepare/build/dry-run415files pass; Worker6940.45KiB/1248.44KiB gzip;46new assets/341existing,startup99ms. Eight content-addressed large objects and manifest unchanged, verified receipts, **zero R2 writes**. Reproducible18.4MB camera replay generated from exact release source is ignored and staged with a static receipt; no MP4 or large replay JSON is committed. Known bundle/import warnings remain.
+
+Root personally inspected nine new production PNGs: tour, chair held/reseated, table held/returned surface, replay controls, public questioner/portrait and completed supported bay. Captures in `viewer/e2e/artifacts/prod-smoke-18/`; audits in `.cloudflare/audit/prod-camera-18.json` and `prod-lab-18.json`; helper release logs `*release-18.log`. Camera-specific MP4 work stays with its owner.
+
+Supported boundary: ground-floor upright empty camp-chair/table; explicit tabletop removal; two free empty-handed table carriers. Occupied/reserved furniture, contents migration, arbitrary room optimization, fine finger/clothing contact, autonomous routines and active activity snapshot restore remain unsupported or deferred. Previous refusal banners persist after remedies. Bounded coordinated room setup is an **unreleased candidate**, not part of18. Original inventory remains **38fixed/36reclassified/142remaining**, all216 recoverable.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 7b809dd0-7655-4192-b968-5eb35d83df40 --name mars-campus-2026 -m "rollback release18: <reason>"
 ```
