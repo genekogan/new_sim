@@ -30,12 +30,13 @@ export class Souls {
   constructor(host: WorldHost, db: Db, brain: Brain, cfg: Config) {
     this.host = host; this.db = db; this.brain = brain; this.cfg = cfg;
     host.listeners.push({
-      onApplied: (e) => { const id = (e.payload as { soulId?: string })?.soulId; if (id) this.wake(id, e.kind === 'decision' ? 'new activity started' : e.kind === 'intent' ? 'intent accepted' : e.kind); },
+      onApplied: (e) => { const id = (e.payload as { soulId?: string })?.soulId; if (id) this.wake(id, e.kind === 'decision' ? `started: ${(e.payload as { label: string }).label}` : e.kind === 'intent' ? 'a new intent was accepted' : e.kind); },
       onRuntimeEvent: (ev) => {
         if (ev.type !== 'action' || ev.verb !== 'do_activity' || (ev.status !== 'completed' && ev.status !== 'failed')) return;
         const actor = (host.engine.runtime.records.get(ev.id)?.params as { actor?: string } | undefined)?.actor;
         const m = actor ? host.mindByEntity.get(actor) : undefined;
-        if (m) this.wake(m.soulId, ev.status === 'completed' ? 'activity finished' : 'activity failed');
+        const label = (host.engine.runtime.records.get(ev.id)?.params as { label?: string } | undefined)?.label ?? 'the activity';
+        if (m) this.wake(m.soulId, ev.status === 'completed' ? `finished: ${label}` : `could not complete: ${label} (${ev.code ?? 'failed'})`);
       },
     });
     setInterval(() => { const now = Date.now(); for (const [k, p] of this.pairings) if (p.expires < now) this.pairings.delete(k); }, 60_000).unref();
@@ -113,7 +114,7 @@ export class Souls {
       soul: { name: c.soul.name, about: c.soul.about, where: c.soul.where, energy: c.soul.energy, mood: m.mood, doing_now: c.soul.doing, recently: c.soul.recent, intent: m.intent, intent_text: c.soul.intent },
       nearby: s.nearby.map((n) => ({ id: n.id, name: n.who, kind: n.what, distance: n.distance, doing: n.doing })),
       storyteller_suggests: c.nudge,
-      could_do_now: c.options.map((o) => ({ id: o.id, what: o.label, good_when: o.goodWhen, not_for: o.notFor })),
+      could_do_now: c.options.map((o) => ({ id: o.id, what: o.label, good_when: o.goodWhen, not_for: o.notFor, ...(o.servesIntent ? { serves_current_intent: true } : {}) })),
     };
   }
 

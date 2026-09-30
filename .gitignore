@@ -8,3 +8,4 @@ dist
 *.db-shm
 data/
 .DS_Store
+BUILD

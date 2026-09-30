@@ -186,11 +186,31 @@ export class ToyEngine implements Engine {
       const poly = w.regions[t].polygon; const cx = (poly[0][0] + poly[2][0]) / 2, cz = (poly[0][1] + poly[2][1]) / 2;
       opts.unshift({ id: `go:${t}`, template: 'go', target: t, durationHint: 'minute', label: `Walk to ${w.regions[t].label}`, goodWhen: `the intent is to go to ${w.regions[t].label}`, notFor: 'the intent is about something else', steps: [{ verb: 'walk_to', params: { to: [cx, cz] } }, { verb: 'rest', params: { seconds: 30 } }] });
     }
+    // An intent that names a soul or a bench must always have a matching option, however far the target is.
+    if (t && w.entities[t] && t !== actorId) {
+      const te = w.entities[t], d = distMm(me, mmOf(te));
+      if (intent!.goal === 'converse' && te.kind === 'human' && !opts.some((o) => o.id === `converse:${t}`)) opts.unshift({
+        id: `converse:${t}`, template: 'converse', target: t, durationHint: 'minute',
+        label: `Go to ${name(te)} (${bucket(d)}, ${doingOf(w, te)}) and talk`, goodWhen: `the intent names ${name(te)}`, notFor: 'the intent is about something else',
+        steps: [{ verb: 'walk_to', params: { to: t, standoff: 1.3 } }, { verb: 'wave', params: { at: t, seconds: 2 } }, { verb: 'converse', params: { with: t, seconds: 45 } }],
+      });
+      if (intent!.goal === 'rest' && te.def === 'bench' && !opts.some((o) => o.id === `rest:${t}`) && occupancy(w, t) < (te.seats ?? 0)) opts.unshift({
+        id: `rest:${t}`, template: 'rest', target: t, durationHint: 'minutes',
+        label: `Walk to ${name(te)} (${bucket(d)}) and rest there`, goodWhen: `the intent is to rest at ${name(te)}`, notFor: 'the intent is about something else',
+        steps: [{ verb: 'walk_to', params: { to: t, standoff: 1 } }, { verb: 'sit', params: { on: t, seconds: 5 } }, { verb: 'rest', params: { seconds: 120 } }],
+      });
+    }
     opts.push({ id: 'perform', template: 'perform', durationHint: 'seconds', label: 'Perform something (sing, dance or tell a story) right here', goodWhen: 'others are close by to watch and the personality enjoys an audience', notFor: 'nobody is close, or the soul is shy or tired', steps: [{ verb: 'perform', params: { seconds: 30 } }] });
     opts.push({ id: 'wander', template: 'wander', durationHint: 'minute', label: 'Drift around nearby with no particular aim', goodWhen: 'there is no intent and nothing nearby appeals', notFor: 'the intent names something specific to do', steps: [{ verb: 'ambient_wander', params: { seconds: 60, radius: 12 } }] });
     opts.push({ id: 'wander:far', template: 'wander', durationHint: 'minutes', label: 'Go exploring farther afield', goodWhen: 'the soul is energetic and curious, or the intent is to wander', notFor: 'the soul is tired, or the intent is to stay with others', steps: [{ verb: 'ambient_wander', params: { seconds: 120, radius: 35 } }] });
+    // Flag what the intent asks for (a fact code knows), and list those first so they survive the cap.
+    if (intent) for (const o of opts) {
+      const g = intent.goal, tmpl = o.template;
+      o.servesIntent = t ? o.target === t && (tmpl === g || (g === 'gather' && tmpl === 'attend') || (g === 'attend' && tmpl === 'attend') || (g === 'go' && tmpl === 'go'))
+        : tmpl === g || (g === 'gather' && tmpl === 'attend');
+    }
     const seen = new Set<string>();
-    return opts.filter((o) => (seen.has(o.id) ? false : (seen.add(o.id), true))).slice(0, 9);
+    return opts.filter((o) => (seen.has(o.id) ? false : (seen.add(o.id), true))).sort((a, b) => Number(!!b.servesIntent) - Number(!!a.servesIntent)).slice(0, 9);
   }
 }
 

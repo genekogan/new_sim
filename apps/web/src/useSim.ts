@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Connection } from '@sim/client';
 import type { BrainCall, CameraLine, LogEvent, Me, NarrativeView, ServerStats, TickerLine } from '@sim/protocol';
 
+declare const __BUILD__: string;
+
 export type Sim = {
   conn: Connection; me: Me | null; log: LogEvent[]; brain: BrainCall[]; camera: CameraLine | null; ticker: TickerLine[];
   narratives: Record<string, NarrativeView>; stats: ServerStats | null; bytesPerSec: number;
@@ -16,7 +18,11 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
     const st = s.current;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     st.conn = new Connection(`${proto}://${location.host}/ws`, () => tokenRef.current(), {
-      onWelcome: (me) => { st.me = me; },
+      onWelcome: (me, w) => {
+        st.me = me;
+        // after a deploy, a page still running the old bundle reloads itself (once)
+        if (w.build && w.build !== 'dev' && __BUILD__ !== 'dev' && w.build !== __BUILD__ && sessionStorage.getItem('sim.reloaded') !== w.build) { sessionStorage.setItem('sim.reloaded', w.build); location.reload(); }
+      },
       onLog: (ev) => { const seen = new Set(st.log.map((e) => e.seq)); st.log = [...st.log, ...ev.filter((e) => !seen.has(e.seq))].slice(-400); },
       onBrain: (calls) => { const seen = new Set(st.brain.map((c) => c.id)); st.brain = [...st.brain, ...calls.filter((c) => !seen.has(c.id))].slice(-300); },
       onCamera: (l) => { st.camera = l; },

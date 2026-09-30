@@ -73,8 +73,10 @@ export function fakeJev(req: JevRequest): JevResult {
       answers[id] = { type: 'score', score: 1 % n, confidence: 0.5, probabilities: normalize(probabilities) };
     } else {
       const keys = Object.keys(q.criteria); const probabilities: Record<string, number> = {};
-      const pick = (text + id.length) % keys.length;
-      keys.forEach((k, i) => (probabilities[k] = i === pick ? 0.6 : 0.4 / Math.max(1, keys.length - 1)));
+      // prefer an option flagged as serving the owner's intent, so fake mode still follows direction
+      const flagged = keys.findIndex((k) => (q.criteria[k] as { serves_intent?: boolean } | null)?.serves_intent);
+      const pick = flagged >= 0 ? flagged : (text + id.length) % keys.length;
+      keys.forEach((k, i) => (probabilities[k] = i === pick ? (flagged >= 0 ? 0.9 : 0.6) : (flagged >= 0 ? 0.1 : 0.4) / Math.max(1, keys.length - 1)));
       answers[id] = { type: 'choice', choice: keys[pick], confidence: 0.5, probabilities: normalize(probabilities) };
     }
   }

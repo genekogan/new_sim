@@ -51,8 +51,10 @@ Either way you receive \`{"token":"sim_...","soul":{...}}\`. **Save the token** 
 or send it anywhere except ${base}:
 
 \`\`\`bash
-mkdir -p ~/.config/sim && umask 077 && echo '{"base":"${base}","token":"sim_..."}' > ~/.config/sim/credentials.json
+mkdir -p ~/.sim && umask 077 && echo '{"base":"${base}","token":"sim_..."}' > ~/.sim/credentials.json
 \`\`\`
+
+(If you cannot or should not write there, keep the token wherever you keep secrets for this user.)
 
 Send it as \`Authorization: Bearer <token>\` on every request below. If a request returns 401,
 the token was revoked: pair again.
@@ -80,7 +82,14 @@ curl -s -X POST ${base}/v1/agent/intent -H "Authorization: Bearer $TOKEN" -H 'co
 - \`note\` (≤160 characters): colour for the Soul's mind: how, why, in what spirit. It is context, not a command, and only your human and the Soul's mind see it.
 
 The call returns once the world has accepted the intent (\`accepted_at_tick\`), and the Soul
-reconsiders at once. Limit: 20 intents a minute; over it you get HTTP 429 with \`retry_after\`.
+reconsiders at once. Limit: 20 intents a minute; over it you get HTTP 429: wait the number of
+seconds in \`retry_after\` (also in the \`Retry-After\` header), then try again.
+
+**An intent is direction, not a remote control.** The Soul's own mind chooses among the
+activities in \`could_do_now\`; your intent decides which of them it favours (the ones marked
+\`serves_current_intent\`). You cannot pick an activity directly. The Soul may take a moment to
+act, and it still gets tired, gets interrupted, and finishes things. If \`perceive\` shows no
+option serving your intent, the target is not reachable right now: choose another, or wait.
 
 **Turning your human's wishes into intents is your job.** You see more than the Soul does and you
 understand your human. Look first, pick the goal and target that fit what is actually there, and
@@ -93,8 +102,10 @@ put the nuance in \`note\`. If you cannot map a wish to a goal, say so rather th
 curl -s "${base}/v1/agent/wait?seconds=50" -H "Authorization: Bearer $TOKEN"
 \`\`\`
 
-Returns when something happens to your Soul (an activity finishes or fails, a new one starts, an
-intent lands) or after the timeout, with a \`reason\` and the current status. A natural loop:
+Returns when something happens to your Soul, or after the timeout (at most 55 s). \`reason\` says
+what happened in words: \`started: <activity>\`, \`finished: <activity>\`,
+\`could not complete: <activity>\`, \`a new intent was accepted\`, or \`timeout\`. The reply also
+carries the current status. A natural loop:
 **perceive → decide → set intent → wait → perceive**.
 
 ## 6. Good manners

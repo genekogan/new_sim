@@ -33,7 +33,7 @@ export function buildMidRequest(c: MidContext): MidRequest {
   const criteria: Record<string, Record<string, unknown>> = {};
   for (const [k, id] of keys) {
     const o = byId.get(id)!;
-    criteria[k] = { what: o.label, good_when: o.goodWhen ?? 'it serves the intent', not_for: o.notFor ?? 'when another option serves the intent better' };
+    criteria[k] = { what: o.label, good_when: o.goodWhen ?? 'it serves the intent', not_for: o.notFor ?? 'when another option serves the intent better', ...(o.servesIntent ? { serves_intent: true } : {}) };
   }
   const state: Record<string, unknown> = {
     world: c.world,
@@ -123,7 +123,9 @@ export function interpretMid(res: JevResponse, c: MidContext, keys: Map<string, 
 /** Deterministic default policy: used when the budget is exhausted or Jev fails. */
 export function fallbackMid(c: MidContext, seed: string): MidDecision {
   const rng = seedRng(seed);
-  const option = c.running ? 'continue' : (c.options[Math.floor(nextFloat(rng) * c.options.length)]?.id ?? 'wander');
+  // without a model, an owner's intent is still honoured: take the option the engine flagged as serving it
+  const serving = c.options.find((o) => o.servesIntent);
+  const option = serving && (!c.running || c.soul.intentIsNew) ? serving.id : c.running ? 'continue' : (c.options[Math.floor(nextFloat(rng) * c.options.length)]?.id ?? 'wander');
   return { option, how: 'fallback', pool: [option], probabilities: { [option]: 1 }, topP: 1, keepGoing: null, mood: 'content', reevalSeconds: 60, sociable: 0.5, seed };
 }
 

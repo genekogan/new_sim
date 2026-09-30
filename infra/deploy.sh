@@ -7,10 +7,13 @@ set -euo pipefail
 HOST="${SIM_HOST:-root@eden2}"
 cd "$(dirname "$0")/.."
 
-echo "== test"
+BUILD_ID="$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo -dirty)"
+echo "== typecheck + test ($BUILD_ID)"
+pnpm typecheck >/dev/null
 pnpm -r test >/dev/null
 echo "== build web"
-pnpm --filter @sim/web build >/dev/null
+BUILD_ID="$BUILD_ID" pnpm --filter @sim/web build >/dev/null
+echo "$BUILD_ID" > BUILD
 
 echo "== rsync"
 rsync -az --delete \

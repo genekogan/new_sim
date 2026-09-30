@@ -3,7 +3,8 @@ import type { LogEvent } from '@sim/protocol';
 import { describeIntent } from '@sim/protocol';
 import { makeApi, useSim, type Sim } from './useSim.ts';
 import { BrainPanel, BroadcastPanel, NarrativePanel } from './BrainPanels.tsx';
-import { MePanel, AdminPanel } from './MePanels.tsx';
+import { AdminPanel } from './MePanels.tsx';
+import { SoulHome } from './SoulHome.tsx';
 import { ArchPanel } from './Arch.tsx';
 import { SpendPanel } from './Spend.tsx';
 
@@ -12,17 +13,21 @@ export type AuthCtx = {
   login(): void; logout(): Promise<void> | void; getToken(): Promise<string | null>;
   debug: { privyUserId: string | null; wallet: unknown; linked: unknown[] };
 };
-type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean };
-const TABS = ['everything', 'world', 'brain', 'spend', 'story', 'me', 'sync', 'architecture'] as const;
+type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; inviteRequired?: boolean; build?: string };
+const TABS = ['watch', 'my soul', 'world', 'brain', 'story', 'sync', 'spend', 'admin', 'architecture', 'everything'] as const;
+const ADMIN_TABS = new Set<string>(['spend', 'admin']);
+const hashTab = (): { tab: Tab; pair: string | null } => { const h = decodeURIComponent(location.hash.slice(1)); if (h.startsWith('pair/')) return { tab: 'my soul', pair: h.slice(5) }; return { tab: (TABS as readonly string[]).includes(h) ? (h as Tab) : 'watch', pair: null }; };
 type Tab = (typeof TABS)[number];
 
 export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
   const sim = useSim(auth.getToken, auth.authed);
   const api = useMemo(() => makeApi(auth.getToken), [auth.authed]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [tab, setTab] = useState<Tab>(() => (location.hash.slice(1) as Tab) || 'everything');
+  const [tab, setTab] = useState<Tab>(() => hashTab().tab);
+  const [pairCode, setPairCode] = useState<string | null>(() => hashTab().pair);
   const [selected, setSelected] = useState<string | null>(null); // soul id
-  useEffect(() => { location.hash = tab; }, [tab]);
-  useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if ((TABS as readonly string[]).includes(h)) setTab(h); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
+  useEffect(() => { if (!pairCode) location.hash = tab; }, [tab, pairCode]);
+  useEffect(() => { const f = () => { const h = hashTab(); setTab(h.tab); if (h.pair) setPairCode(h.pair); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
+  const isAdmin = sim.me?.role === 'admin';
   const show = (...t: Tab[]) => tab === 'everything' || t.includes(tab);
   const r = sim.conn.replica, st = sim.conn.stats;
   const mine = new Set(sim.me?.souls ?? []);
@@ -42,23 +47,55 @@ export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
             : <button className="primary" onClick={auth.login}>sign in</button>}
         </span>
       </header>
-      <nav>{TABS.map((t) => <button key={t} className={t === tab ? 'on' : ''} onClick={() => setTab(t)}>{t}</button>)}</nav>
+      <nav>{TABS.filter((t) => isAdmin || !ADMIN_TABS.has(t)).map((t) => <button key={t} className={t === tab ? 'on' : ''} onClick={() => { setPairCode(null); setTab(t); }}>{t}{t === 'world' ? ' ·debug' : ''}</button>)}</nav>
       <main>
         <div className="grid">
-          {show('world') && <WorldPanel sim={sim} mine={mine} selected={selected} onSelect={setSelected} />}
-          {show('world', 'story') && <BroadcastPanel sim={sim} />}
-          {show('me') && <MePanel sim={sim} auth={auth} api={api} selected={selected} onSelect={setSelected} />}
-          {show('spend', 'brain') && <SpendPanel api={api} authed={auth.authed} isAdmin={sim.me?.role === 'admin'} />}
-          {show('brain') && <BrainPanel sim={sim} authed={auth.authed} selected={selected} />}
+          {tab === 'watch' && <Intro authed={auth.authed} login={auth.login} go={() => setTab('my soul')} souls={r.souls.size} />}
+          {show('watch', 'world') && <WorldPanel sim={sim} mine={mine} selected={selected} onSelect={setSelected} />}
+          {show('watch', 'world', 'story') && <BroadcastPanel sim={sim} />}
+          {tab === 'watch' && <Happenings sim={sim} />}
+          {show('my soul') && <SoulHome sim={sim} auth={auth} api={api} selected={selected} onSelect={setSelected} pairCode={pairCode} clearPair={() => setPairCode(null)} base={cfg.publicUrl} />}
+          {show('spend') && isAdmin && <SpendPanel api={api} authed={auth.authed} isAdmin />}
+          {show('brain') && <BrainPanel sim={sim} authed={auth.authed} selected={selected} api={api} isAdmin={isAdmin} />}
           {show('story') && <NarrativePanel sim={sim} />}
           {show('sync') && <SyncPanel sim={sim} />}
           {show('world', 'sync') && <LogPanel log={sim.log} sim={sim} />}
-          {show('me') && sim.me?.role === 'admin' && <AdminPanel sim={sim} api={api} />}
+          {show('admin') && isAdmin && <AdminPanel sim={sim} api={api} />}
           {tab === 'architecture' && <ArchPanel sim={sim} cfg={cfg} />}
         </div>
       </main>
     </>
   );
+}
+
+// ------------------------------------------------------------------ arrival
+function Intro({ authed, login, go, souls }: { authed: boolean; login(): void; go(): void; souls: number }) {
+  return (
+    <section className="wide">
+      <h2>You are watching Sim, live</h2>
+      <p style={{ maxWidth: 820 }}>Sim is one small world that never stops. {souls} <b>Souls</b> live in it right now. Each has a name, a personality and a mind of its own; some belong to people, who give them direction now and then. Everyone who opens this page sees the same world at the same moment. There are no graphics yet: the map below is the world, drawn in letters.</p>
+      <div className="row">{authed ? <button className="primary" onClick={go}>go to my Soul</button> : <button className="primary" onClick={login}>sign in to create a Soul</button>}<span className="dim">Watching is free and needs no account.</span></div>
+    </section>
+  );
+}
+function Happenings({ sim }: { sim: Sim }) {
+  const rows = sim.log.filter((e) => e.kind !== 'rules' && e.kind !== 'admin').slice(-14).reverse();
+  return (
+    <section>
+      <h2>Just now</h2>
+      {rows.map((e) => <div key={e.seq}>{eventPlain(e, sim)}</div>)}
+      {rows.length === 0 && <span className="dim">quiet</span>}
+    </section>
+  );
+}
+function eventPlain(e: LogEvent, sim: Sim): string {
+  const p = e.payload ?? {}; const name = (id: string) => sim.conn.replica.souls.get(id)?.name ?? 'someone';
+  if (e.kind === 'birth') return `${p.name} arrived at the gate.`;
+  if (e.kind === 'decision') return `${name(p.soulId)} decided to ${String(p.label).charAt(0).toLowerCase()}${String(p.label).slice(1)}.`;
+  if (e.kind === 'intent') return `${name(p.soulId)} was given new direction by their owner.`;
+  if (e.kind === 'scene') return `Storyteller, ${p.region}: ${p.beat.flavor}.`;
+  if (e.kind === 'retire') return 'A Soul left the world.';
+  return e.kind;
 }
 
 // ------------------------------------------------------------------ world
@@ -149,7 +186,7 @@ export function eventText(e: LogEvent, sim: Sim): string {
   const label = (id: string) => r.entities[id]?.label ?? r.regions[id]?.label ?? id;
   switch (e.kind) {
     case 'birth': return `${p.name} is born — "${p.description}"`;
-    case 'intent': return `${name(p.soulId)} ← intent via ${p.source}: ${describeIntent(p.intent, label)}`;
+    case 'intent': return `${name(p.soulId)} ← intent via ${p.source}: ${describeIntent(p.intent, label)}`; // the owner's note is never in the public log
     case 'decision': return `${name(p.soulId)} → ${p.label} [${p.option}] (${p.trigger}${p.fallback ? ', fallback' : ''}; mood ${p.mood}; rethink in ${Math.round(p.reevalTicks / 20)} s)`;
     case 'scene': return `narrator/${p.region}: ${p.beat.kind} ${p.beat.directive} ${p.beat.targets.join(', ')} — ${p.beat.flavor}`;
     case 'retire': return `${p.soulId} retired`;

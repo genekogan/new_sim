@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BrainCall } from '@sim/protocol';
-import type { Sim } from './useSim.ts';
+import type { Api, Sim } from './useSim.ts';
 
 const usd = (n: number) => (n < 0.01 ? `$${n.toFixed(5)}` : `$${n.toFixed(3)}`);
 const J = ({ v }: { v: unknown }) => <pre className="json">{JSON.stringify(v, null, 2)}</pre>;
@@ -22,10 +22,16 @@ function appliedSummary(c: BrainCall): string {
   return '';
 }
 
-function Call({ c }: { c: BrainCall }) {
+function Prompt({ v, api }: { v: any; api?: Api }) {
+  const [text, setText] = useState<string | null>(typeof v === 'string' ? v : null);
+  if (text !== null) return <pre className="json">{text}</pre>;
+  return <p className="dim">stored once as {v?.$prompt} ({v?.chars} characters) {api && <button onClick={async () => setText(String((await api(`/v1/prompt/${v.$prompt}`)).data))}>show</button>}</p>;
+}
+
+export function Call({ c, open, api }: { c: BrainCall; open?: boolean; api?: Api }) {
   const req = c.request as any, res = c.response as any, a = c.applied as any;
   return (
-    <details className="call">
+    <details className="call" open={open}>
       <summary>
         <span className={`tag ${c.tier}`}>{c.tier}</span><b>{c.subject}</b> <span className="dim">t{c.tick} · {c.model} · {c.ms.toFixed(0)} ms · {c.inputTokens} in{c.outputTokens ? ` / ${c.outputTokens} out` : ''}{c.cachedTokens ? ` (${c.cachedTokens} cached)` : ''} · {usd(c.costUsd)}{a?.trigger ? ` · trigger: ${a.trigger}` : ''}</span>
         {c.error && <span className="bad"> · {c.error}</span>}
@@ -45,7 +51,7 @@ function Call({ c }: { c: BrainCall }) {
           <p className="dim">4. APPLIED: becomes a logged decision event; the engine runs these verb steps</p><J v={a} />
         </>}
         {c.tier === 'narrator' && req && <>
-          <p className="dim">SYSTEM prompt (cached block, {String(req.system?.[0]?.text ?? '').length} chars)</p><pre className="json">{req.system?.[0]?.text}</pre>
+          <p className="dim">SYSTEM prompt (the cached block)</p><Prompt v={req.system?.[0]?.text} api={api} />
           <p className="dim">DIGEST for this region (the only uncached input)</p><pre className="json">{req.messages?.[0]?.content}</pre>
           <p className="dim">PLAN returned (beats fire later as scene events and become nudges in Jev’s context)</p><J v={a?.plan} />
           <p className="dim">usage</p><J v={res?.usage} />
@@ -60,7 +66,7 @@ function Call({ c }: { c: BrainCall }) {
   );
 }
 
-export function BrainPanel({ sim, authed, selected }: { sim: Sim; authed: boolean; selected: string | null }) {
+export function BrainPanel({ sim, authed, selected, api, isAdmin }: { sim: Sim; authed: boolean; selected: string | null; api: Api; isAdmin: boolean }) {
   const [tier, setTier] = useState('all');
   const b = sim.stats?.brain;
   const selName = selected ? sim.conn.replica.souls.get(selected)?.name : null;
@@ -78,7 +84,8 @@ export function BrainPanel({ sim, authed, selected }: { sim: Sim; authed: boolea
       <p className="note">Three tiers. <b>mid</b>: Jev picks a Soul’s next activity from engine-enumerated options, on new intent, when an activity ends, on a narrator beat, or on a timer Jev sets itself. <b>narrator</b>: a small LLM plans beats for one region every ~5 minutes. <b>director</b>: Jev picks the broadcast shot and ticker lines. <b>translate</b>: your typed command → closed intent.</p>
       {!authed ? <p className="dim">Sign in to see model calls.</p> : <>
         <div className="row">{['all', 'mid', 'translate', 'narrator', 'director', 'shot'].map((k) => <button key={k} className={k === tier ? 'primary' : ''} onClick={() => setTier(k)}>{k}</button>)}{selName && <span className="dim">filtered to {selName} (click the row again to clear)</span>}</div>
-        <div className="scroll" style={{ maxHeight: 640 }}>{calls.length ? calls.map((c) => <Call key={c.id} c={c} />) : <p className="dim">no calls yet</p>}</div>
+        <div className="scroll" style={{ maxHeight: 640 }}>{calls.length ? calls.map((c) => <Call key={c.id} c={c} api={api} />) : <p className="dim">no calls yet</p>}
+        {!isAdmin && <p className="dim">You see the thinking of your own Souls. World-level calls (storyteller, camera) are visible to the operator only.</p>}</div>
       </>}
     </section>
   );
