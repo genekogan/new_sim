@@ -2,6 +2,7 @@ import { LabCameraControls } from './camera-controls.tsx';
 // Engine Lab side panel: scenario picker, transport, overlays, cameras,
 // expectations, perf and the action/diagnostic log.
 import { ClassroomHud } from './classroom-hud.tsx';
+import { WorkBreakHud } from './work-break-hud.tsx';
 import { SELECTABLE_SCENARIOS, type Check } from './scenarios.ts';
 import { OVERLAYS, type LabView, type OverlayName } from './lab-view.ts';
 import { SequencePanel } from './sequence-hud.tsx';
@@ -84,6 +85,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         </ul>
       )}
       <ClassroomHud key={s.name} sim={sim} refresh={refresh} />
+      <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <h2>Expectations</h2>
       <ul className="lab-checks">
         {checks.map((c, i) => (
