@@ -130,7 +130,7 @@ export const holdItems: ActionDef<{ actor: string }, null, HoldExec> = {
 // ---- take_item / put_item ----
 
 type TransferParams = { actor: string; item: string; hand?: Hand; surfaceSlot?: string };
-type Dest = { slot: SurfaceSlot } | { ground: Vec3 };
+type Dest = { slot: SurfaceSlot; ownerPose: Entity['pose']; ownerDef: string } | { ground: Vec3 };
 type TransferProgram = { hand: Hand; station?: Station; target: Vec3; dest?: Dest };
 type TransferExec = {
   id: string; mode: 'take' | 'put'; actor: string; item: string; hand: Hand; station?: Station; target: Vec3; dest?: Dest;
@@ -215,7 +215,7 @@ function planPut(rt: Runtime, p: TransferParams) {
     const d = checkStations(rt, [{ actor: p.actor, p: st.p, level: a.human!.level }]);
     if (d) return { ok: false as const, diagnostic: d };
   }
-  return { ok: true as const, program: { hand, station: st, target, dest: { slot } } as TransferProgram };
+  return { ok: true as const, program: { hand, station: st, target, dest: { slot, ownerPose: { ...owner.pose, p: [...owner.pose.p] }, ownerDef: owner.def } } as TransferProgram };
 }
 
 function transfer(mode: 'take' | 'put', verb: string, description: string, schema: z.ZodType<TransferParams>): ActionDef<TransferParams, TransferProgram, TransferExec> {
@@ -228,6 +228,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       { resource: `actor:${p.actor}`, mode: 'exclusive' },
       { resource: `hand:${p.actor}:${mode === 'take' ? p.hand : (w.entities[p.item]?.support as { hand?: Hand } | undefined)?.hand ?? 'right'}`, mode: 'exclusive' },
       { resource: `entity:${p.item}`, mode: 'exclusive' },
+      ...(mode === 'put' && p.surfaceSlot !== 'ground' ? [{ resource: `surface-slot:${p.surfaceSlot}`, mode: 'exclusive' as const }] : []),
     ],
     plan: (rt, p) => (mode === 'take' ? planTake(rt, p) : planPut(rt, p)),
     start(rt, p, prog, id) {
@@ -290,7 +291,28 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
           if (d) return { status: 'failed', diagnostic: d };
           ex.to = carryHand(b, ex.hand);
         } else {
-          if ('slot' in ex.dest!) placeOnSlot(it, ex.dest.slot, rt.world.entities[ex.dest.slot.owner].pose.yaw);
+          if ('slot' in ex.dest!) {
+            const dest = ex.dest, owner = rt.world.entities[dest.slot.owner];
+            const current = surfaceSlot(rt.world, dest.slot.id);
+            if ('code' in current) return { status: 'failed', diagnostic: {
+              code: 'item.destination-unavailable',
+              message: `${ex.actor} cannot release ${ex.item}: destination ${dest.slot.id} is no longer available (${current.message})`,
+              subjects: [ex.actor, ex.item, dest.slot.id, dest.slot.owner],
+            } };
+            if (owner.def !== dest.ownerDef || JSON.stringify(owner.pose) !== JSON.stringify(dest.ownerPose) || current.p.some((p, i) => p !== dest.slot.p[i]))
+              return { status: 'failed', diagnostic: {
+                code: 'item.destination-moved',
+                message: `${ex.actor} cannot release ${ex.item}: surface ${dest.slot.owner} or slot ${dest.slot.id} changed after the placement was planned`,
+                subjects: [ex.actor, ex.item, dest.slot.id, dest.slot.owner],
+              } };
+            const occupied = slotOccupant(rt.world, dest.slot.owner, dest.slot.slot);
+            if (occupied) return { status: 'failed', diagnostic: {
+              code: 'item.slot-occupied',
+              message: `${ex.actor} cannot release ${ex.item}: ${dest.slot.id} is now occupied by ${occupied.id}`,
+              subjects: [ex.actor, ex.item, dest.slot.id, occupied.id],
+            } };
+            placeOnSlot(it, dest.slot, owner.pose.yaw);
+          }
           else placeOnGround(it, ex.dest!.ground, a.pose.yaw);
           ex.to = restHand(b, ex.hand);
         }
