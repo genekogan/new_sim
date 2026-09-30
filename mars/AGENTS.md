@@ -48,3 +48,11 @@ At meaningful green milestones report playable actions/interventions, constraint
 next outcome and real blocker, validation/release and a remaining-hours range with
 assumptions. Furniture support must remain bounded so classroom/social experience
 advances, then connected communal routines and reuse in another environment.
+
+Current owner priority (2026-09-30): first repair exposed Lab Reach first-Step
+invariants, east-house orphan climb/staging failure and pile/component appearance
+continuity. See docs/engineering/LIVE_LAB_REPAIRS.md. A green gate does not prove
+skipped/FIXME scenarios work. Preserve exact historical staging dependencies and
+make unsupported production journeys explicit. After this bounded repair milestone,
+continue purposeful communal-day routines autonomously; Gene has approved that
+priority and the earlier interview is resolved. Do not stop at the repair release.

@@ -120,3 +120,15 @@ Quiet-rest bounded slice estimate **3–6 working hours remaining**, including f
 Quiet seated rest is integrated after the clean aa3317a full gate and live as8695c09e-1ae8-4315-bcc7-1572189722fb (rollback21). Ordinary sit/stand/cancel use the spare chair where physical setup placed it, preserve actual claims through getting up, refuse foreign seats and retain same unfinished notes. Panel controls own only proven requests/returns; reset clears UI identity. Temporary ordinary direction keeps existing return behavior; permanent departure gets up first. Full gate116browser/790engine/99unit; live33journeys and compiledcamera/exactbay pass,9productioncaptures personally inspected. No sleep/recovery/autonomy or active UI restore claim.
 
 Furniture setup, shared food, continuing classroom-day bridge and this quiet-rest slice have reached their bounded exits: **0 remaining hours for these shipped slices**. The next tranche is connected communal-day routines; owner preference interview remains pending for autonomous existing routines vs supported bed sleep/wake vs deeper usable work/meal objects. A bed interaction needs a horizontal support/body-clearance/lie/get-up contract; autonomous routines need bounded stable intentions and handoff through existing commands. Neither is a hidden prerequisite for these released directed experiences. Scope and a defensible hours range for that next tranche follow the answer. The larger sequence still leads to reusable activities in a small non-Mars setting after connected-day continuity. Fine anatomy, camera iterations, arbitrary layouts and specialized construction remain deferred.
+
+## Immediate owner override: exposed Lab repair milestone
+
+Repair Reach fresh-load/reset/first-Step and isolate synthetic renderer probes;
+prevent orphan climbs/acquisitions when east-house beam staging is infeasible;
+track and fix pile-to-component appearance disagreement. Preserve serious geometry
+checks and report current-scene completion coverage separately from parked historical
+FIXMEs. Exit: focused regressions, inspected runtime captures, full clean gate,
+release and deployed verification (or exact explicit unsupported-layout contract).
+Then continue purposeful communal-day routines without a further priority interview;
+owner approval resolves the previous pending choice. Keep routines / usable objects /
+social expression advancing together and retain the subsequent non-Mars reuse milestone.

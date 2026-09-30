@@ -21,12 +21,18 @@ import type { ChangeEvent, Take } from '../../engine/take/types.ts';
 import { blockedLog, yearBuildOf } from './year-build.ts';
 import { compareToCanonical } from '../../engine/scenarios/year-build.ts';
 import { Highlights, type HighlightOpts } from './highlight.ts';
+import type { WorldState } from '../../engine/world/types.ts';
 
 export type EngineHook = ReturnType<typeof installHook>;
 
 export function installHook(view: LabView, notify: () => void) {
   const sim = view.sim;
   const cameraGeometry = new LabCameraGeometryCache();
+  // Synthetic measurement poses persist between probe calls, but never enter
+  // authoritative execution. Any real tick or reset starts a fresh probe snapshot.
+  let probeWorld: WorldState | null = null;
+  let probeRuntime: typeof sim.rt | null = null;
+  let probeTick = -1;
   const marks = new Highlights(); // question captures: outlines + labels by id (highlight.ts)
   view.scene.add(marks.group);
   // take-replay check (recordTake / humanFields / replayTake)
@@ -225,17 +231,23 @@ export function installHook(view: LabView, notify: () => void) {
         }),
     /**
      * Body-model probe (preset `body` only): set a person's activity and hand points directly — renderer
-     * state the engine never produced — let the pose layers settle for `ticks` renderer ticks (the 0.4 s
-     * posture blend) and return that person's `bones()`. `hands: null` clears them.
+     * state the engine never produced — in a detached renderer snapshot. Let pose layers settle for
+     * `ticks` renderer ticks and return bones. Ordinary Step/Play/reset restores authoritative poses;
+     * synthetic requests never change world state, action ownership, replay or invariants.
      */
     probe(id: string, spec: { activity?: string; hands?: { left?: [number, number, number]; right?: [number, number, number] } | null }, ticks = 24) {
       if (sim.scenario.name !== 'body') throw new Error('probe() is for the lab preset `body`');
-      const e = sim.rt.world.entities[id];
+      if (probeRuntime !== sim.rt || probeTick !== sim.rt.tick || !probeWorld) {
+        probeWorld = structuredClone(sim.rt.world);
+        probeRuntime = sim.rt;
+        probeTick = sim.rt.tick;
+      }
+      const e = probeWorld.entities[id];
       if (!e?.human) return null;
       if (spec.activity) e.human.activity = spec.activity;
       if (spec.hands === null) delete e.human.hands;
-      else if (spec.hands) e.human.hands = spec.hands;
-      for (let i = 0; i < ticks; i++) view.humans.onTick(sim.rt.world);
+      else if (spec.hands) e.human.hands = structuredClone(spec.hands);
+      for (let i = 0; i < ticks; i++) view.humans.onTick(probeWorld);
       return view.poseNow().bones(id)[id] ?? null;
     },
     /**
