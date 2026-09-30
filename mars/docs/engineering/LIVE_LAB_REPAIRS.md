@@ -69,3 +69,26 @@ App TypeScript/lint clean; focused Node5passes/1existing historical-stock TODO
 A compiler command mistakenly invoked npx from repository root instead of viewer
 and failed before running TypeScript; the correct viewer compiler subsequently
 passed. No dependencies or project files were installed/changed by that invocation.
+
+## First full gate — retained red result
+
+Clean bde7e3f gate14-47-45 passed lint/unit99/engine796(6skip11TODO)/bothTSc,
+then exposed renderer colour test relying on current house partial execution.
+Root stopped owned gate withSIGINT; cleanupError:null, red report preserved.
+Colour proof now explicitly uses the exact supported historical source while
+retaining the16ft kit, actual raise and unchanged colour/pixel tolerances.
+Current refusal tests remain mandatory. Its one full-page baseline requires an
+intentional fixture/UI/palette update; original image is preserved before updating,
+with inspected evidence and reason recorded in PLANNING_BUDGET. Titles/descriptions
+now reflect actual loaded feasibility, avoiding contradictory unsupported text in
+historical validation fixtures or future supported source. Internal legacy scene
+IDs identify blockers; no new historical naming facts are asserted.
+
+The colour comparison exposed37.43% full-page difference after explicit source/UI
+change. Root inspected old/new captures before recording one separately named
+supported-historical baseline; the original render-polish-green-frame.png stays
+unchanged. Same16ft kit/actual raise/0violations/green palette, unchanged pixel
+tolerances. A transient cold-title null guard failure was preserved; the corrected
+guard has a focused cold-selector regression. No release occurred from either red
+run. No-tests-found from an initial wrong-directory edit attempt is retained as a
+harness mistake; source was unchanged by that failed attempt.

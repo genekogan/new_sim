@@ -1,5 +1,6 @@
 // Renderer-only acceptance views. These scenarios and their engine state are owned by the lead.
 import { test, expect, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { captureView, collectConsoleErrors } from './helpers';
 import { labFrames, openLab } from './lab-helpers';
 import { paintTexturePath } from '../app/engine-view/paint.ts';
@@ -68,21 +69,28 @@ test('paint reveal, mounted solar module and distinct equipment', async ({ page 
   expect(errors, 'console/page/network errors').toEqual([]);
 });
 
-test('2022 year-build engine upright is green at eye level', async ({ page }, testInfo) => {
+test('supported historical 2022 engine upright is green at eye level', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   const errors = collectConsoleErrors(page);
+  // Renderer colour proof, not current-layout whole-build acceptance.
+  // Required current-source refusal checks remain in year-build.spec.ts.
+  const body = execFileSync('git', ['show', 'a0c347e0374b473876c97f536dc44dba42399521:viewer/public/engine/campus-2022.json'], { encoding: 'utf8' });
+  expect(JSON.parse(body).contentHash).toBe('8b88e6f090c79b92784954787f0329295286d5b6f5e76f0d9d450023da8c49f2');
+  await page.route('**/engine/campus-2022.json', route => route.fulfill({ contentType: 'application/json', body }));
   await openLab(page, 'year-build-2022');
   await page.addStyleTag({ content: '.lab-perf { visibility: hidden }' });
   await page.evaluate(() => window.__marsEngine!.runScenario('year-build-2022', { paused: true }));
   const info = await page.evaluate(() => window.__marsEngine!.yearBuild()!);
+  expect(info.admission).toBeNull();
   const raise = info.steps.find((s) => s.verb === 'raise_upright')!;
   const result = await page.evaluate((id) => window.__marsEngine!.runUntilSteps([id], 'completed', 20000), raise.id);
   expect(result.reached, `raise step ${raise.id} completed`).toBe(true);
   const up = await page.evaluate((id) => window.__marsEngine!.components().find((c) => c.id === id)!, raise.item!);
-  expect(up.def).toMatch(/upright/);
+  expect(up.def).toBe('upright-16ft-kit');
+  expect(await page.evaluate(() => window.__marsEngine!.violations())).toEqual([]);
   console.log(`[render-polish] year-build tick ${result.tick}; ${up.id} ${up.def}`);
   const [x, , z] = up.pose.p;
   await look(page, [x + 4.5, 1.65, z + 4.2], [x, 2.1, z]);
-  await capture(page, 'render-polish-green-frame', testInfo);
+  await capture(page, 'render-polish-green-frame-supported-historical', testInfo);
   expect(errors, 'console/page/network errors').toEqual([]);
 });

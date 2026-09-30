@@ -82,9 +82,15 @@ export function blockedLog(rt: Runtime): { code: string; n: number; first: strin
 function preset(name: string, bays: number | undefined, title: string, maxTicks: number): Scenario {
   return {
     name,
-    title,
-    description:
-      `HYPOTHETICAL build from counted material piles. The current published layout is unsupported: neighboring Chiba/kitchen structures block the required beam staging positions. No build starts. The diagnostic below names every omitted part and its blockers; scroll it for the full details. Use Build a rack bay for supported live construction. Historical full-build validation uses its exact recorded source, not this layout.`,
+    get title() {
+      return title + (last && last.bays === bays && yearBuildSupportDiagnostic(last.setup.build) ? ' (layout unsupported)' : '');
+    },
+    get description() {
+      const refusal = last && yearBuildSupportDiagnostic(last.setup.build);
+      return refusal
+        ? 'HYPOTHETICAL build from counted material piles. Neighboring structures block the required beam staging positions. No build starts. The diagnostic below names every omitted part and its blockers; scroll it for the full details. Use Build a rack bay for supported live construction. Historical full-build validation uses its exact recorded source, not this layout.'
+        : 'HYPOTHETICAL skeleton build from counted stock: extract each piece, carry and raise frames, hold them while beams are installed, then release only when bracing is sufficient. Piles represent stock counts; extraction converts one unit into a named ground component, which retains its identity through carrying and installation. The loaded source passes staging preflight; crew and order are authored, not historical.';
+    },
     prepare: prepareYearBuild,
     scene: (): SpatialScene => {
       if (!last) throw Error('year-build: build() first (the scene comes with the setup)');
@@ -145,5 +151,5 @@ function preset(name: string, bays: number | undefined, title: string, maxTicks:
   };
 }
 
-export const yearBuild = preset('year-build-2022', 1, '2022 east-house: first bay (layout unsupported)', 20 * 60 * 60);
-export const yearBuildHouse = preset('year-build-2022-house', undefined, '2022 east-house: whole house (layout unsupported)', 20 * 60 * 240);
+export const yearBuild = preset('year-build-2022', 1, '2022 east-house: skeleton from piles (first bay)', 20 * 60 * 60);
+export const yearBuildHouse = preset('year-build-2022-house', undefined, '2022 east-house: skeleton from piles (whole house)', 20 * 60 * 240);

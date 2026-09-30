@@ -456,3 +456,21 @@ HISTORICAL_CONTENT.md. The five perf-walk pins and the hypothetical flagship/v3/
 **0 violations, same outcome.** Exact stress-30 remains `5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e`; profiled/unprofiled equality is asserted. No outcome, tick, take, camera or historical pin moves. `engine/test/stress-work.ts` adds reviewed method-call ceilings from unchanged base60deba6: exact route75total/27peak, routeAround9/1, gridsAround18/2, sync37097/58, rebuild1/1, grids1/1, walk plan75/27, step35724/30. Corridor routeAround5, gridsAround10, sync37087, step35722; other ceilings equal. Less work passes; added work needs deliberate review. Actual redundant route/rebuild operations prove these ceilings detect regressions.
 
 Counters use the existing profiler with a zero clock and cannot detect extra work inside a single call. Historical grid correctness checks likewise do not measure algorithmic cost. Therefore run `node deploy/perf-stress-budget.mjs` on an otherwise idle host before a performance-affecting release: original peak250/120ms, mean3ms and per-year grid<1000ms thresholds remain unchanged. Worker measurement: exact113.35ms/0.582msmean, corridor52.10ms/0.404msmean, grids90–152ms; all passed. No timing threshold was loosened. Details: `briefs/perf-gate.REPORT.md`.
+
+## 2026-09-30 exposed Lab repair — bounded visual fixture window
+
+`render-polish-green-frame.png` remains unchanged as the original renderer record.
+The current whole/first-bay layout now correctly refuses before any build. The
+colour check therefore binds exact historical source a0c347e…/contentHash8b88e6…49f2
+and retains the same16ft kit/frame, actual physical raise, zero invariant violations
+and green renderer palette. Root inspected its new eye-level capture at tick1249:
+valid held support, both carriers holding the same green frame, no new clipping
+claimed. The changed source/background and truthful loaded-layout UI explain the
+37.43% difference from the old full-page record; pixel threshold0.2/share0.015
+remain unchanged. A separately named baseline
+`render-polish-green-frame-supported-historical.png` records this explicit fixture;
+the old baseline is retained, not overwritten or counted as current acceptance.
+This is one intentional visual window, **0 violations, same outcome** (physical
+16ft frame raised/held and rendered green). No deterministic state/work pins or
+historical chapter takes move; full historical117277/d382 and flagship pins remain
+unchanged. Required current-layout refusal tests independently cover production.
