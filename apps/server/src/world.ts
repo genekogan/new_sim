@@ -142,7 +142,7 @@ export class WorldHost {
     // 3. broadcast
     if (now % BATCH_TICKS === 0) this.flush();
     if (now % HEARTBEAT_TICKS === 0) this.heartbeat();
-    if (now - this.lastSnapshotTick >= this.snapshotEvery) this.saveSnapshot();
+    if (now - this.lastSnapshotTick >= this.snapshotEvery) this.saveSnapshot(false);
     this.tickMs.push(performance.now() - t0);
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
   }
@@ -297,7 +297,7 @@ export class WorldHost {
   // ------------------------------------------------------------ snapshots
   snapshotMs = { capture: 0, persist: 0 };
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
-  saveSnapshot(sync = false) {
+  saveSnapshot(sync = true) {
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
     const body: SnapshotBody = { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra) };
