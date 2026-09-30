@@ -38,3 +38,10 @@ production stay with its owner; do not expand activity integration to absorb the
 
 Gene's next confirmed playable priority (after release17): physical chair/table
 moving and usable room setup first. See ACTIVE_ROADMAP for bounded supported stages.
+
+Further camera development is independently owned: do not routinely review or manage
+its iterations. Handle necessary shared-interface decisions and batch integration.
+At meaningful green milestones report playable actions/interventions, constraints,
+next outcome and real blocker, validation/release and a remaining-hours range with
+assumptions. Furniture support must remain bounded so classroom/social experience
+advances, then connected communal routines and reuse in another environment.

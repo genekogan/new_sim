@@ -20,6 +20,14 @@ Gene's next priority, confirmed after release17: **physical chair/table moving a
 
 Physical design/provenance: `briefs/fixture-mover.PLAN.md`. Alternative seat-withdrawal analysis remains recoverable in `briefs/classroom-furniture-feasibility.PLAN.md`; it is deferred in favor of Gene's physical-movement choice, not implemented or completed.
 
+## Bounded tranche exit criteria
+
+1. Chair milestone: physical move/cancel and actual use at the new location in both classroom sizes; occupied/reserved/held-item refusal without state changes; inspected credible grips/body clearance; unchanged legacy outcomes; full green gate and release.
+2. Table milestone: appropriate carriers move an empty table continuously and cancel safely; supported objects must first be explicitly removed; the relocated surface accepts ordinary placement/use. No fine-finger certification or occupied-load transport.
+3. Usable setup milestone: a small authored layout choice arranges supported seats and equipment with a clear aisle through registered physical actions; start a session, admit a late arrival, ask/rotate, then converse and leave. A representative intervention remains coherent rather than restarting the whole event.
+
+Initial remaining estimate after release17: **10–18 working hours** for these three stages, including inspected runtime proofs and full release gates, assuming shared carry remains compatible and no major routing failure appears. Reassess at each green milestone; this is not an estimate for the entire simulator. Do not exhaust furniture fidelity before advancing surrounding activities/social expression. Next sequence remains communal-day continuity, then reuse in a small non-Mars environment.
+
 ## First supported experience
 
 Begin with existing camp chairs/benches and a clearly hypothetical gathering space.
