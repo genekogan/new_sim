@@ -11,8 +11,8 @@ simple configurable maps; historical Studio remains the museum side.
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Shared floor and small-item admission | GPT-6.1 Sol bounded implementation; lead release | Formed groups have stable turns; departures/cancellation clear attention; classroom/work refuse small held items without changing support | Independent engine release candidate; full gate before merge |
-| Frozen read-only camera interface | Lead hooks; camera task policies | Same-tick reset identity, detached cached geometry, atomic finite render pose/FOV | Engine candidate contains hooks; camera readiness does not block release |
+| Shared floor and small-item admission | GPT-6.1 Sol bounded implementation; lead release | Formed groups have stable turns; departures/cancellation clear attention; classroom/work refuse small held items without changing support | Release16 deployed and verified; retain regression coverage |
+| Frozen read-only camera interface | Lead hooks; camera task policies | Same-tick reset identity, detached cached geometry, atomic finite render pose/FOV | Release16 freezes hooks; camera readiness does not block engine releases |
 | Explicit preparation for the next activity | GPT-6.1 Sol ordinary implementation after current gate | Approved item destinations, physical put_item children, coherent cancellation, clear remaining hands | Surface-slot reservation prerequisite; bounded plan in briefs/stow-activity.PLAN.md |
 | Optional camera integration | Separate camera task; lead convenient integration boundary | Reviewed paused/aspect/provider corrections, same-world optional controls, offline and runtime proof | Preserved codex/classroom-social-camera; camera experiments/MP4 remain camera-owned |
 
@@ -39,7 +39,7 @@ captures to assess shared attention and pacing.
 
 ## Current baseline and preserved work
 
-Classroom/work continuity source **a4078c6** passed the full gate and was fast-forwarded into local main. Release15 is deployed as `284cdc8f-2d8c-4e73-a7f8-d058afe1727f`; production verification passed. Rollback is release14 `c0522537-d4e4-4a64-9bd3-c52b711eecd4`. Original-row accounting remains38 fixed /36 reclassified /142 remaining: narrower playable behavior does not complete broader original requirements. Main's unrelated historical-agent changes are preserved.
+Release16 source **3134294** passed the full clean-head gate and is merged/deployed as `7f910ca6-a3b6-4309-bb25-de9cb330fb56`; production checks passed. It adds stable group floors, correct questioner/presenter identity, small-item admission refusals and frozen read-only camera hooks. Rollback is release15 `284cdc8f-2d8c-4e73-a7f8-d058afe1727f`. Original accounting remains38 fixed /36 reclassified /142 remaining; unrelated historical-agent changes remain preserved.
 
 The old combined technical candidate remains on `codex/wave2-consolidation` at `ec3aa6f`, with unresolved baseline/construction failures; it is not a green release. The studio-integration checkout hosts the clean classroom branch. Useful compatible work is selected with explicit provenance rather than making specialized construction fidelity a classroom dependency.
 

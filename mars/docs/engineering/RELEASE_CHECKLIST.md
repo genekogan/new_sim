@@ -828,3 +828,33 @@ Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback c0522537-d4e4-4a64-9bd3-c52b711eecd4 --name mars-campus-2026 -m "rollback release15: <reason>"
 ```
+
+
+## Production deploy 16 (2026-09-30, shared floor and free hands)
+
+Clean source **3134294** passed the full gate before local-main fast-forward. Live **7f910ca6-a3b6-4309-bb25-de9cb330fb56**, created01:57:34Z/deployed01:57:36Z, confirmed100%. Rollback **284cdc8f-2d8c-4e73-a7f8-d058afe1727f** (release15), confirmed before deploy. Metadata/evidence records the deployed source. Main historical-agent changes preserved; no remote/push, pins/goldens or historical values changed. Camera implementation remains separate.
+
+What works: formed conversation groups take staggered stable turns and clear departed/cancelled attention; questioner temporarily holds the floor while actual presenter identity remains available; class/work initial/join/resume refuse held bowl/spoon without support or progress changes. Explicit physical put permits later admission. Render-only reset/geometry/FOV hooks are frozen. Surface stow UI is a subsequent candidate. Ground-floor fixed layouts, bounded head gaze, quiet work rather than typing; no active activity snapshot resumption, furniture recovery or take-replay gaze claim.
+
+| Required check | Result |
+| --- | --- |
+| Full gate | GREEN `.cloudflare/gate/2026-09-30T01-26-16-361Z/report.json`;3134294,gitDirty:false,cleanupError:null |
+| Lint / TypeScript | clean |
+| Unit |96 pass /0 fail |
+| Engine |619 total:602 pass /0 fail /6 documented skips /11 historical TODO |
+| Browser |91 pass /7 documented skips;945.7s |
+| Flagship / determinism |byte-identical; unchanged b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local MCP |all36 tools pass |
+| Idle performance |original ceilings/outcomes:exact peak110.926125ms/mean0.710742996ms;corridor52.329834ms/0.554328080ms;grids107.54–186.70ms;zero violations |
+| Regenerated evidence |602/0;17 rows PROVEN,8 milestones PROVEN;capabilities25/2/1 retain exceptions |
+
+Skipped/TODO cases are not executed proof. Original accounting **38fixed/36reclassified/142remaining**, all216 recoverable. Focused valid/invalid tests and actual runtime inspection cover turns/departure/cancel, admission preservation and atomic camera refusals. No thresholds changed.
+
+Prepare/build/dry-run passed:340public files/821.1MiB; eight existing content-addressed R2 objects reuploaded (fresh worktree lacked local ignored receipts), unchanged keys/content. Worker6915.42KiB/1242.25KiB gzip;7new assets/357existing,startup114ms. Known chunk/import warnings remain, no new migration.
+
+Production passed:340assets/19routes/GLB range/auth;all36MCPtools;director allsteps9.527s;classroom2+continuity3+groupturn1+camera hooks1+Studio2 =9/9(1.2min);build-bay10901ticks/43steps/5checks/zero violations/errors/exact probe hash. Root inspected production turn-one/turn-two, reset/FOV and supported bay captures. Captures/audits in viewer/e2e/artifacts/prod-smoke-16 and viewer/.cloudflare/*release-16.log.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback 284cdc8f-2d8c-4e73-a7f8-d058afe1727f --name mars-campus-2026 -m "rollback release16: <reason>"
+```
