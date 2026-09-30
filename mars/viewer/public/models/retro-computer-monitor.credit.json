@@ -5,9 +5,9 @@
   "sourceUrl": "https://sketchfab.com/3d-models/retro-computer-monitor-8926293078874194b551e74c40a3debf",
   "license": "CC-BY-4.0",
   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-  "originalPath": "<lm-3d-models>/sketchfab/lore4/ai-computers/retro-computer-monitor-2.glb",
   "bytes": 139184,
   "sha256": "6f36a07dd2feeb36227f5b308e331b63e7bf3965b06c14e53204353e98180bf5",
   "changes": "Binary copied unchanged. Renderer rotates and uniformly fits the complete transformed model above the ordinary workstation desktop; live task canvas replaces the authored CRT face region at runtime.",
-  "dimensions": "Source units and physical dimensions are not documented; renderer uses transformed geometry bounds."
+  "dimensions": "Source units and physical dimensions are not documented; renderer uses transformed geometry bounds.",
+  "archiveRelativePath": "sketchfab/lore4/ai-computers/retro-computer-monitor-2.glb"
 }
