@@ -37,7 +37,7 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
       <li>Use the classroom controls above: start the session, join worker, ask a question, watch both talks and conversations, and wait for departure.</li>
       <li>Start shared food break: both people take utensils, serve, gather, eat and return them.</li>
       <li>Stop anytime. After safe stopping, restart to use retained utensils and partial portions.</li>
-      <li>When hands are free, resume the same notes. Individual food controls remain available below.</li>
+      <li>When hands are free, resume the same notes, or use the quiet-rest controls below and get up before resuming. Individual food controls remain available below.</li>
     </ol>
     <div data-testid="break-work-readout">Notes: {'code' in work ? work.message : `${work.status} · ${work.task ?? 'Sketch notes'} · ${work.user ?? 'unassigned'} · ${work.elapsed.toFixed(1)}/${work.duration}s · ${work.phase ?? 'ready'}`}</div>
     <div className="lab-classroom-controls">
@@ -81,6 +81,6 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     </details>
     <div data-testid="break-action-readout">{active.filter(r => !r.parent).map(r => <div key={r.id}>{r.verb} · {r.status} · {r.phase}{r.diagnostic && ` · ${r.diagnostic.code}: ${r.diagnostic.message}`}</div>)}</div>
     <div role="status" data-testid="break-feedback">{feedback}</div>
-    <small>Standing shared meal, explicit instructions and returns. Missing food, movement, full hands and resource conflicts refuse with named diagnostics. Rest, sleep, autonomous scheduling and seated meals are later increments.</small>
+    <small>Standing shared meal, explicit instructions and returns. Missing food, movement, full hands and resource conflicts refuse with named diagnostics. Quiet seated rest uses the spare chair through the controls below; get up or Stop and wait for release before resuming work. Sleep, autonomous scheduling and seated meals are later increments.</small>
   </div>;
 }
