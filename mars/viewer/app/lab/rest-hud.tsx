@@ -2,17 +2,17 @@ import { useState } from 'react';
 import type { ActionRecord } from '../../engine/actions/types.ts';
 import { heldBy } from '../../engine/items/model.ts';
 import { occupantOf, slotById } from '../../engine/social/slots.ts';
-import { WORK_BREAK_BINDING } from '../../engine/scenarios/work-break.ts';
-import { classroomFurniture } from './room-layout.ts';
+import { activityExample } from './activity-example.ts';
 import type { LabSim } from './sim.ts';
 
 /** Explicit quiet sitting only: no sleep state, timer, voluntary-return policy or next action. */
 export function RestHud({ sim, refresh }: { sim: LabSim; refresh: () => void }) {
   const [request, setRequest] = useState<{ epoch: number; sit: string; stand?: string }>();
   const [feedback, setFeedback] = useState('');
-  if (sim.scenario.name !== 'work-break-4' && sim.scenario.name !== 'work-break-8') return null;
-  const rt = sim.rt, actor = WORK_BREAK_BINDING.work.actor;
-  const seat = `${classroomFurniture(sim.scenario.name).chair.id}#seat`;
+  const example = activityExample(sim.scenario.name);
+  if (!example) return null;
+  const rt = sim.rt, actor = example.workBreak.work.actor;
+  const seat = example.rest.seat;
   const lineage = new Set<string>();
   if (request?.epoch === sim.scenarioEpoch) lineage.add(request.sit);
   // Read Runtime's published return provenance, never its private execution/return queue.

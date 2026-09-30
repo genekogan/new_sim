@@ -3,16 +3,17 @@ import type { ActionRecord } from '../../engine/actions/types.ts';
 import { readPurposefulRoutine, type PurposefulRoutineParams } from '../../engine/activities/purposeful-routine.ts';
 import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
 import { readClassroom } from '../../engine/activities/classroom.ts';
-import { WORK_BREAK_BINDING as B } from '../../engine/scenarios/work-break.ts';
+import { activityExample } from './activity-example.ts';
 import { readWorkstation } from '../../engine/objects/workstation.ts';
-import { classroomFurniture } from './room-layout.ts';
 import type { LabSim } from './sim.ts';
 
 /** UI submits intentions only; all progress and cleanup come from Runtime. */
 export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: () => void }) {
   const [request, setRequest] = useState<{ epoch: number; action: string }>();
   const [feedback, setFeedback] = useState('');
-  if (sim.scenario.name !== 'work-break-4' && sim.scenario.name !== 'work-break-8') return null;
+  const example = activityExample(sim.scenario.name);
+  if (!example) return null;
+  const B = example.workBreak;
   const rt = sim.rt, actor = B.work.actor, task = B.work.task ?? 'Sketch notes';
   const action = request?.epoch === sim.scenarioEpoch ? request.action : undefined;
   const record = action ? rt.records.get(action) : undefined;
@@ -35,8 +36,7 @@ export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: (
       actor, session,
       work: { station: B.work.station, seat: B.work.seat, task, duration: B.work.duration },
       food: { pot: B.pot, participants: B.people, at: B.conversation.at },
-      rest: { seat: `${classroomFurniture(sim.scenario.name).chair.id}#seat`, seconds: 5 },
-      departure: [10, 12],
+      rest: example.rest, departure: example.departure,
     };
     const result = rt.submit('purposeful_routine', params, { preempt: false });
     setRequest({ epoch: sim.scenarioEpoch, action: result.id });
@@ -50,8 +50,8 @@ export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: (
   const resumable = active && (state?.mode === 'paused' || state?.mode === 'waiting');
   return <section className="lab-hud lab-classroom" data-testid="purposeful-routine-hud">
     <div className="lab-hud-head">HYPOTHETICAL · a continuing intention</div>
-    <p>Attend this gathering, share food with visitor, rest briefly, then finish the same Sketch notes. You can pause or direct people while it runs.</p>
-    {!active && record?.status !== 'completed' && <p>Prepare: Start notes and interrupt after some progress; wait for safe stand-up, then Start session below. Start this routine before manually joining worker.</p>}
+    <p>Attend this gathering, share food with {example.roles.companion}, rest briefly, then finish the same {task}. You can pause or direct people while it runs.</p>
+    {!active && record?.status !== 'completed' && <p>Prepare: Start notes and interrupt after some progress; wait for safe stand-up, then Start session below. Start this routine before manually joining {actor}.</p>}
     {record?.status === 'completed' && <p>Finished this gathering, meal, rest and the same notes. Reset the world to try another version.</p>}
     <div className="lab-classroom-controls">
       <button disabled={!startReady} onClick={start}>Start purposeful routine</button>
@@ -63,10 +63,10 @@ export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: (
     <div data-testid="purposeful-routine-readout">
       {state ? <>
         <div>{actor} · {state.status === 'cancelled' ? 'ended; remaining activities were not completed' : state.mode} · {state.obligation} · {state.status === 'completed' ? 'finished' : state.phase}</div>
-        <div>Same Sketch notes: {state.progress.workElapsed.toFixed(1)}/{B.work.duration}s</div>
+        <div>Same {task}: {state.progress.workElapsed.toFixed(1)}/{B.work.duration}s</div>
         <details><summary>Committed gathering</summary>{state.bindings.session}</details>
-        <div>Question: {state.progress.questionAsked ? 'asked' : 'pending'} · Seated rest: {state.progress.restSeconds.toFixed(1)}/5s</div>
-        <div>Presenters attended: {state.progress.presenters.length}/2 · Conversation: {state.progress.conversationSeen ? 'joined' : 'pending'}</div>
+        <div>Question: {state.progress.questionAsked ? 'asked' : 'pending'} · Seated rest: {state.progress.restSeconds.toFixed(1)}/{example.rest.seconds}s</div>
+        <div>Presenters attended: {state.progress.presenters.length}/{example.session.presenters.length} · Conversation: {state.progress.conversationSeen ? 'joined' : 'pending'}</div>
         {state.progress.meal.map(person => <div key={person.actor}>{person.actor} · {person.served ? 'served' : 'not served'} · {person.consumed ? 'eaten' : 'meal unfinished'} · {person.returned ? 'utensils returned' : 'returns pending'}</div>)}
         {state.waitingReason && <div role="status">Waiting: {state.waitingReason}</div>}
         {state.diagnostic && <div role="status">{state.diagnostic.code}: {state.diagnostic.message}</div>}

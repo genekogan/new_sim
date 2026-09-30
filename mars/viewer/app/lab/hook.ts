@@ -10,6 +10,7 @@ import { readGatheringContinuation } from '../../engine/activities/gathering-con
 import { readPurposefulRoutine } from '../../engine/activities/purposeful-routine.ts';
 import { displayReadout } from '../../engine/objects/classroom.ts';
 import { SELECTABLE_SCENARIOS, SCENARIOS } from './scenarios.ts';
+import { activityExample } from './activity-example.ts';
 import { classroomRoomCount } from './room-layout.ts';
 import { sequenceRows } from './sequence-hud.tsx';
 import { entityCorners } from '../../engine/spatial/service.ts';
@@ -132,20 +133,24 @@ export function installHook(view: LabView, notify: () => void) {
       return Object.values(sim.rt.world.entities).filter((e) => e.kind === 'fixture').map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: structuredClone(e.pose), rendered: rendered.get(e.id) }));
     },
     fixtureMove: () => { const id = [...sim.rt.records.values()].filter((r) => r.verb === 'move_fixture').at(-1)?.id; return id ? readFixtureMove(sim.rt, id) : undefined; },
-    workstation: () => ({ state: readWorkstation(sim.rt, 'workstation'), claims: Object.fromEntries(['workstation:workstation', 'actor:worker', 'slot:work-chair#seat'].map((key) => [key, sim.rt.holder(key)])) }),
+    workstation: () => {
+      const work = activityExample(sim.scenario.name)?.workBreak.work ?? { actor: 'worker', station: 'workstation', seat: 'work-chair#seat' };
+      return { state: readWorkstation(sim.rt, work.station), claims: Object.fromEntries([`workstation:${work.station}`, `actor:${work.actor}`, `slot:${work.seat}`].map(key => [key, sim.rt.holder(key)])) };
+    },
+    activityExample: () => structuredClone(activityExample(sim.scenario.name)),
     classroomAttention: () => view.humans.attention(),
     /** Detached activity readouts; an observer cannot mutate coordination or food. */
     sharedFood: () => structuredClone([...sim.rt.records.values()].filter(r => r.verb === 'shared_food_break').map(r => readSharedFoodBreak(sim.rt, r.id))),
     activityAttention: () => view.humans.attention(),
     activityAttentionTargets: () => structuredClone(view.attentionTargets),
-    classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, 'screen') }; },
+    classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, activityExample(sim.scenario.name)?.session.displayId ?? 'screen') }; },
     purposefulRoutine: (action?: string) => {
       const id = action ?? [...sim.rt.records.values()].findLast(r => r.verb === 'purposeful_routine')?.id;
       const state = id ? readPurposefulRoutine(sim.rt, id) : undefined;
       return state ? structuredClone(state) : undefined;
     },
     gatheringContinuations: () => structuredClone([...sim.rt.records.values()].filter(r => r.verb === 'gathering_continuation').map(r => readGatheringContinuation(sim.rt, r.id))),
-    startClassroom: () => { const r = sim.rt.submit('classroom_session', classroomParams(classroomRoomCount(sim.scenario.name) ?? 4)); notify(); return { id: r.id, status: r.status, diagnostic: r.diagnostic }; },
+    startClassroom: () => { const r = sim.rt.submit('classroom_session', activityExample(sim.scenario.name)?.session ?? classroomParams(classroomRoomCount(sim.scenario.name) ?? 4)); notify(); return { id: r.id, status: r.status, diagnostic: r.diagnostic }; },
     stateHash: () => sim.rt.stateHash(),
     /** Bundles / stacks as drawn: pieces left (contents.count) and the top of the drawn stack (m). */
     stacks: () => view.fixtures.stacks(),

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { readGatheringContinuation, type GatheringContinuationParams } from '../../engine/activities/gathering-continuation.ts';
 import { readPurposefulRoutine } from '../../engine/activities/purposeful-routine.ts';
 import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
-import { WORK_BREAK_BINDING as B } from '../../engine/scenarios/work-break.ts';
+import { activityExample } from './activity-example.ts';
 import type { LabSim } from './sim.ts';
 
 type Requests = { epoch: number; work: string; discussion: string };
@@ -10,7 +10,9 @@ type Requests = { epoch: number; work: string; discussion: string };
 export function GatheringContinuationHud({ sim, refresh }: { sim: LabSim; refresh: () => void }) {
   const [requests, setRequests] = useState<Requests>();
   const [feedback, setFeedback] = useState('');
-  if (sim.scenario.name !== 'work-break-4' && sim.scenario.name !== 'work-break-8') return null;
+  const example = activityExample(sim.scenario.name);
+  if (!example) return null;
+  const B = example.workBreak;
   const rt = sim.rt, session = classroomSessionId(rt), task = B.work.task ?? 'Sketch notes';
   const prior = [...rt.records.values()].findLast(record => {
     if (record.verb !== 'purposeful_routine') return false;
@@ -22,18 +24,17 @@ export function GatheringContinuationHud({ sim, refresh }: { sim: LabSim; refres
   const start = () => {
     if (sim.rt !== rt || !session || !prior || current) return;
     const work: GatheringContinuationParams = {
-      session, binding: { kind: 'work', actor: 'presenter1',
-        work: { station: B.work.station, seat: B.work.seat, task: 'Record talk follow-up', duration: 12 },
+      session, binding: { ...example.followUpWork,
         prerequisite: { routine: prior.id, actor: B.work.actor, station: B.work.station, task, duration: B.work.duration } },
     };
     const discussion: GatheringContinuationParams = {
-      session, binding: { kind: 'discussion', actors: ['guest1', 'guest2'], at: [-7, 6], duration: 20 },
+      session, binding: example.followUpDiscussion,
     };
     const workRecord = rt.submit('gathering_continuation', work, { preempt: false });
     const discussionRecord = rt.submit('gathering_continuation', discussion, { preempt: false });
     setRequests({ epoch: sim.scenarioEpoch, work: workRecord.id, discussion: discussionRecord.id });
     const issues = [workRecord, discussionRecord].flatMap(record => record.diagnostic ? [`${record.diagnostic.code}: ${record.diagnostic.message}`] : []);
-    setFeedback(issues.length ? issues.join(' · ') : 'Two independent commitments made. They wait for physical departure; presenter1 also waits for these exact notes.');
+    setFeedback(issues.length ? issues.join(' · ') : `Two independent commitments made. They wait for physical departure; ${example.followUpWork.actor} also waits for these exact notes.`);
     refresh();
   };
   const control = (id: string, intent: 'pause' | 'resume' | 'end') => {
@@ -44,14 +45,14 @@ export function GatheringContinuationHud({ sim, refresh }: { sim: LabSim; refres
   };
   return <section className="lab-hud lab-classroom" data-testid="gathering-continuation-hud">
     <div className="lab-hud-head">HYPOTHETICAL · after the gathering</div>
-    <p>Give other people continuing purposes: guest1 and guest2 discuss the talks after leaving. Presenter1 waits for worker’s notes, then uses the same computer for follow-up work.</p>
+    <p>Give other people continuing purposes: {example.followUpDiscussion.actors.join(" and ")} discuss the talks after leaving. {example.followUpWork.actor} waits for {B.work.actor}’s notes, then uses the same computer for follow-up work.</p>
     <button disabled={!session || !prior || !!current} onClick={start}>Commit attendee continuations</button>
     {!current && <small>Start the purposeful routine first. These commitments use that exact gathering and unfinished-task intention.</small>}
     {current && (['work', 'discussion'] as const).map(kind => {
       const id = current[kind], state = readGatheringContinuation(rt, id), record = rt.records.get(id), active = rt.isActive(id);
       const resumable = state?.mode === 'paused' || state?.mode === 'waiting';
       return <div key={kind} data-testid={`continuation-${kind}`}>
-        <b>{kind === 'work' ? 'Presenter1 · follow-up work' : 'Guest1 + guest2 · continuing discussion'}</b>
+        <b>{kind === 'work' ? `${example.followUpWork.actor} · follow-up work` : `${example.followUpDiscussion.actors.join(' + ')} · continuing discussion`}</b>
         <div>{record?.status === 'cancelled' ? 'Ended; remaining commitment was not fulfilled' : record?.status === 'failed' ? 'Declined' : state?.status === 'completed' ? 'Finished' : state?.mode ?? record?.status}</div>
         {state && <>
           <div>{state.status === 'completed' ? 'finished' : state.status === 'cancelled' ? 'ended' : state.phase} · {state.elapsed.toFixed(1)}/{state.duration}s · {state.remaining.toFixed(1)}s remaining</div>

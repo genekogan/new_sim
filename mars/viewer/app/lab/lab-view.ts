@@ -111,7 +111,7 @@ export class LabView {
     this.attentionTargets = {};
     this.statics?.dispose();
     if (this.statics) this.scene.remove(this.statics.group);
-    this.statics = yearBackdrop(rt, (m) => (this.error = m)) ?? new StaticScene(rt.services.spatial.base);
+    this.statics = yearBackdrop(rt, (m) => (this.error = m)) ?? new StaticScene(rt.services.spatial.base, this.sim.scenario.name === 'design-studio' ? { ground: '#d7d7d0', wall: '#f0eee5' } : undefined);
     this.scene.add(this.statics.group);
     const fog = this.scene.fog as THREE.Fog;
     [fog.near, fog.far] = this.statics.fog ?? [70, 160];

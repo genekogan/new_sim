@@ -58,8 +58,8 @@ function stairs(link: Link): THREE.Group {
   return g;
 }
 
-function obstacleMesh(o: Obstacle) {
-  const mat = o.label === 'deck post' ? MAT.post : o.kind === 'wall' ? MAT.wall : MAT.solid;
+function obstacleMesh(o: Obstacle, wall = MAT.wall) {
+  const mat = o.label === 'deck post' ? MAT.post : o.kind === 'wall' ? wall : MAT.solid;
   const m = box(mat, o.obb.c[0], o.y0, o.obb.c[1], o.obb.half[0] * 2, o.y1 - o.y0, o.obb.half[1] * 2, o.obb.yaw);
   m.name = o.id;
   return m;
@@ -68,20 +68,28 @@ function obstacleMesh(o: Obstacle) {
 export class StaticScene {
   readonly group = new THREE.Group();
 
-  constructor(base: SpatialScene) {
+  private readonly styledMaterials: THREE.Material[] = [];
+  constructor(base: SpatialScene, colors?: { ground: string; wall: string }) {
+    const groundMaterial = colors ? MAT.ground.clone() : MAT.ground;
+    const wallMaterial = colors ? MAT.wall.clone() : MAT.wall;
+    if (colors) {
+      groundMaterial.color.set(colors.ground); wallMaterial.color.set(colors.wall);
+      this.styledMaterials.push(groundMaterial, wallMaterial);
+    }
     this.group.name = 'proving ground';
     const [x0, z0, x1, z1] = base.bounds;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0 + 40, z1 - z0 + 40), MAT.ground);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0 + 40, z1 - z0 + 40), groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.position.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
     ground.receiveShadow = true;
     this.group.add(ground);
     const bodies = new Set(base.links.map((l) => `${l.id}-body`));
-    for (const o of base.obstacles) if (!bodies.has(o.id)) this.group.add(obstacleMesh(o));
+    for (const o of base.obstacles) if (!bodies.has(o.id)) this.group.add(obstacleMesh(o, wallMaterial));
     for (const l of base.links) if (l.kind === 'stairs') this.group.add(stairs(l));
   }
 
   dispose() {
+    for (const material of this.styledMaterials) material.dispose();
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh && o.geometry !== unit) o.geometry.dispose();
     });

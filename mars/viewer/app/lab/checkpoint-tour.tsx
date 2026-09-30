@@ -14,6 +14,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
       <div className="lab-row">
         <button onClick={() => onScenario('classroom-4')}>Load 4-guest room</button>
         <button onClick={() => onScenario('classroom-8')}>Load 8-guest room</button>
+        <button onClick={() => onScenario('design-studio')}>Try an independent design studio</button>
         <button onClick={() => onScenario(scenario === 'classroom-8' ? 'work-break-8' : 'work-break-4')}>Try a continuing day</button>
       </div>
       <p className="lab-meta">Loading a room resets the current world. Then use Play and the live classroom controls below.</p>

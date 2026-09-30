@@ -28,3 +28,10 @@ npx --no-install oxlint engine/scenarios/design-studio.ts engine/test/design-stu
 No green/release claim or runtime capture yet. Root owns integrated actual browser proof, full gate and release. No shared prerequisite was discovered during bounded authoring; geometry remains unverified until focused tests can run. No extra agents, downloads or network used.
 
 Root expressly requested an UNVERIFIED source candidate commit during the full-gate hold for static wiring in its separate Lab worktree. Exactly these four owned paths were reviewed for secrets and whitespace before staging. This source commit does not certify geometry or replace the queued focused checks.
+
+
+## Root Lab wiring checkpoint (unverified runtime)
+
+Root selected source78470ce as c8e647a into independent codex/design-studio-lab. Existing panels resolve fresh authored bindings, so the new studio exposes the same work/session/routine/continuation controls with its own people, soup and project labels. New selectable preset and quick-tour link are authored; a bounded light floor/wall palette clones/disposes local materials without changing defaults. This first room intentionally excludes Mars-specific belongings/layout-moving controls. Two complete browser journeys are authored, including actual Play, question, all ordinary effects, continuation pause/End, reset and switching back. No imported mesh, autonomous choice, camera policy or new execution path.
+
+Root viewer TypeScript and scoped lint pass; no Node/browser checks or captures yet because release25 fullgate owns the heavy slot. Read-only Sol6.1 review found notes controls selected any active workstation work; root now restricts Interrupt/Resume to the exact authored actor/station/seat/task/duration and retains independent station-busy gating. Regression assertions cover foreign-user follow-up in old4/8 and the studio, including partial foreign work after safe Pause. No expected outcome/tolerance edits. Physical geometry/routes and captures remain unverified; do not report this candidate released.
