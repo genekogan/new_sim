@@ -8,3 +8,6 @@ Validation: focused work-break/shared-food 21/21 pass; final viewer TSc and scop
 
 
 Root integration selects worker a9d1f8a/0e541ee as742f35c/70ae552 onto release20 main9cd12ac. Root shares the authored room-count mapping with startClassroom hook (preserving its existing unrelated-preset fallback), preventing work-break-8 from silently becoming four guests. Actual hook regression starts, physically forms and safely cancels both audience sizes:1/1 pass(5.9s). Root combined serial browser8/8(52.2s) passes new journeys, existing manual/coordinated food and ordinary classrooms; full lint/TSc clean. Root personally inspected all8 final worker question/groups/food/resumed notes frames. No physical-engine changes or camera development. Full clean rebased gate/release pending; release20 remains live.
+
+
+Released21 at exact8d214a5 after full clean gate (112browser/790engine/99unit, lint/bothTSc/flagship/probe/all36tools); production29journeys, compiledcamera/exactbay and11root-inspected captures pass. Live3238c275-9311-436a-9a75-9526aa4a02ab; rollback20. Full release table and limits in RELEASE_CHECKLIST21.

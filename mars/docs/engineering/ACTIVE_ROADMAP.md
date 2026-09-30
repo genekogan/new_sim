@@ -1,7 +1,7 @@
 # Active roadmap
 
 Owner direction: [SIMULATION_VISION.md](SIMULATION_VISION.md), 2026-09-29.
-Current product milestone: **connect the usable classroom to work → shared food → return to unfinished work**. The released classroom already supports lightning talks, questions and smaller conversations. Preferences confirmed: semi-planned events with adaptable execution and live
+Current product milestone: **extend the released same-world work → classroom → conversation → shared food → unfinished-work journey with quiet seated rest**. The released classroom already supports lightning talks, questions and smaller conversations. Preferences confirmed: semi-planned events with adaptable execution and live
 intervention; advance complete experiences / activity-object breadth / social
 believability together at approximately **50 /30 /20**. Continue in **/lab** with
 simple configurable maps; historical Studio remains the museum side.
@@ -12,8 +12,8 @@ Gene's priority after release17 was **physical chair/table moving and usable roo
 
 | Deliverable | Ownership / model | Acceptance | Dependency / stop condition |
 |---|---|---|---|
-| Same-world shared food break | GPT-6.1 Sol medium coordinator; lead Lab integration | One intent binds two people/items/service points; ordinary actions serve, gather, eat and return utensils; partial-food/held-item retry and safe stop; interrupted notes remain unchanged | Authored binding6/6 focused + timed-command replay/TSc/lint pass. Explicit live UI2/2 journeys pass with six inspected serving/eating/resumed-work captures; released20 at043806e: full gate790engine/109browser; production26journeys and inspected captures pass. Stop if shared Runtime/item redesign or general scheduling becomes necessary |
-| Continuity and visible social use | Lead alongside food activity | Two room sizes preserve the same world/user/task/elapsed work; inspect actual serving/eating/return; floor/attention turns only among the actually formed group; intervention leaves coherent partial state | No autonomous day scheduler, arbitrary seating optimizer, nutritional model or fine finger certification |
+| Quiet seated rest | GPT-6.1 Sol medium; lead review/Lab integration | Existing ordinary sit/stand in both rooms after food returns; real seat ownership/readout, safe Stop/Get up, interruption provenance and explicit return to unchanged notes; foreign seats/actions never adopted | Candidate on codex/quiet-rest, not released. No sleep/needs claim, new engine verb, Runtime redesign or active UI snapshot restoration. Full gate and inspected captures before integration |
+| Next communal-day direction | Owner preference pending; lead | Choose among autonomous existing routines, true bed sleep/wake, or more usable work/meal objects; preserve approximately50/30/20 product balance | Interview pending; no major implementation dependent on an unanswered/preselected choice |
 
 
 Physical design/provenance: `briefs/fixture-mover.PLAN.md`. Alternative seat-withdrawal analysis remains recoverable in `briefs/classroom-furniture-feasibility.PLAN.md`; it is deferred in favor of Gene's physical-movement choice, not implemented or completed.
@@ -107,3 +107,10 @@ Camera session retired at Gene's request on2026-09-30. Reviewed code throughbf24
 Current bounded food slice remaining estimate: **3–6 working hours**, including full combined gate and deployment/production proof, assuming no gate regression or shared physical redesign. Directed standing pair and authored service/return positions remain the supported scope; general scheduling, seated dining, arbitrary furnishing rebind and needs are subsequent increments.
 
 Release20 current: ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe, rollback19ce6daf22. The bounded food slice is complete. Next active deliverable: **same-world notes → classroom join/question/lightning-talk rotation → smaller conversation → shared food → resumed notes**, using existing verbs and explicit controls, default4/side8 layouts. Worker is the extra classroom attendee; visitor remains food companion because one spare seat is supported. Exit: actual seating/question/second presenter/formed groups/departure, then physical food/returns and unchanged unfinished task, same epoch/no leaks/violations, inspected captures, full green gate and production proof. Real remaining uncertainty is combined route/group feasibility and UI binding, not a known engine-subsystem prerequisite. Estimate **4–8 working hours** including validation/release, assuming no routing/claims redesign. New autonomy, fine furniture fidelity and camera work remain outside this increment.
+
+
+## Latest released checkpoint:21
+
+Source8d214a5 is live as3238c275-9311-436a-9a75-9526aa4a02ab (rollback20 ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe). Both work-break4/8 presets expose the actual same-world classroom and physical default/side setup: interrupt notes, attend/question/rotate, form smaller conversations, depart, share food/return utensils, resume the same unfinished notes. Full clean gate112browser/790engine; production29journeys plus compiledcamera/exactbay pass,11production captures inspected. See RELEASE_CHECKLIST21. Earlier food and furniture exit criteria are complete; earlier estimates are checkpoint history, not remaining work.
+
+Quiet-rest bounded slice estimate **3–6 working hours remaining**, including focused disruptions, root review/visual inspection, full gate and release, assuming existing sit/stand ownership needs no subsystem redesign. Larger autonomy/sleep/object priority awaits Gene's interview answer; no full communal-day/reuse completion claim.

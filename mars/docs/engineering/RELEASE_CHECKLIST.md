@@ -987,3 +987,35 @@ Rollback from viewer:
 ```sh
 WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback ce6daf22-caa7-4698-8b28-6b2a2935b7d3 --name mars-campus-2026 -m "rollback release20: <reason>"
 ```
+
+
+## production-deploy-21-2026-09-30-continuing-classroom-day
+
+Clean source **8d214a5c250243da7e7b7a08ac7a3a9dfbf68f3d** passed the full rebased gate before local-main fast-forward. Live **3238c275-9311-436a-9a75-9526aa4a02ab**, created07:27:47.362Z/deployed07:27:49.444Z,100%. Rollback **ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe** (release20). Subsequent documentation/evidence/metadata do not change deployed source. Local-only Git; historical dirty main and unfinished candidates preserved. No pins, goldens, tolerances, historical values or camera implementation changes.
+
+**Playable boundary:** both hypothetical work-break4/8 rooms expose the actual classroom/setup in the same Runtime. Worker interrupts notes, joins the spare seat, asks/questions, observes presenter rotation and smaller conversations/departure, shares food with visitor and returns utensils before resuming the same notes. Physically prepared side layout is demonstrated. Manual food-conversation ending targets only the actual food pair; busy-worker notes and one-control-path room-count mapping are guarded. No autonomous phase chaining/day scheduler, nutrition model, arbitrary layout optimizer or active-activity snapshot restoration. One spare audience seat and authored ground arrangements remain constraints.
+
+| Check | Result |
+|---|---|
+| Full gate | GREEN `.cloudflare/gate/2026-09-30T07-04-25-430Z/report.json`;8d214a5,gitDirty:false,cleanupError:null |
+| Lint / both TypeScript configs | Clean |
+| Unit |99 pass /0 fail |
+| Engine |807 total:790 pass /0 fail /6 documented skip /11 TODO |
+| Browser |112 pass /7 documented skip,1089.4s |
+| Flagship / determinism | Byte-identical; completed b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local integration | All36MCP tools, isolation/auth/method/limits PASS |
+| Original idle ceilings | Zero violations; exact peak109.394792ms/mean0.6757439367ms; corridor53.698084/0.5372689542ms; historical grids102.480375–174.5675ms. Existing250/120ms peak,3ms mean and1000ms grid limits retained |
+| Regenerated evidence |17rows/8milestones PROVEN; capability25/2/1 and documented exceptions retained |
+| Production infrastructure |341assets/19routes/GLB range/auth; all36tools; director9steps9378ms PASS |
+| Production browser |29/29(3.5min), new continuity journeys and existing classroom/food/furniture/Studio/camera hooks |
+| Published camera | Paused-world observational controls/reset/portrait aspect0.5232558;0diagnostics/errors. Dev-source provider-injection case stays local-only and excluded by exact title from production, not counted as pass |
+| Production bay |10901ticks/43steps/5checks/0violations/errors; exact unchanged b746 hash |
+| Visual inspection | Root inspected11production PNGs:8continuity question/groups/food/resumed plus2camera/1bay |
+| Build/deploy | Prepare340files/821.1MiB; dry415files/6963.59KiB/1253.65KiBgzip;4newassets/383existing; startup97ms;0R2writes (8verified existing objects) |
+
+Logs/audits/captures: `viewer/.cloudflare/continuing-day-*.log`, `viewer/.cloudflare/audit/prod-{camera,lab}-21.json`, `viewer/e2e/artifacts/prod-smoke-21`. Helper deployment receipts/report: `briefs/continuing-day-release.REPORT.md`. Tag `release-21-continuing-classroom-day` identifies exact validated/deployed source.
+
+Rollback from viewer:
+```sh
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback ec7ff2a6-4a8d-41e8-95ae-3bf920931dfe --name mars-campus-2026 -m "rollback release21: <reason>"
+```
