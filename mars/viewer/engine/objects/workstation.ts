@@ -15,6 +15,7 @@ import type { Entity } from '../world/types.ts';
 import { humanOf } from '../social/actions.ts';
 import { isFree, slotById, type Slot } from '../social/slots.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
+import { heldBy } from '../items/model.ts';
 
 export interface WorkAtParams {
   actor: string;
@@ -238,6 +239,11 @@ export const workAt: ActionDef<WorkAtParams, Program, Exec> = {
     if ('code' in actor) return { ok: false, diagnostic: actor };
     const holding = holdingDiagnostic(rt.world, p.actor);
     if (holding) return { ok: false, diagnostic: holding };
+    const items = heldBy(rt.world, p.actor).map(({ item }) => item.id);
+    if (items.length) return {
+      ok: false,
+      diagnostic: diag('hands-occupied', `${p.actor} must explicitly put down ${items.join(', ')} before computer work`, [p.actor, ...items]),
+    };
     const held = rt.holder(`actor:${p.actor}`);
     if (held.length)
       return {

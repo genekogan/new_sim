@@ -12,6 +12,7 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Vec2 } from '../core/math.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
+import { heldBy } from '../items/model.ts';
 import { humanOf } from '../social/actions.ts';
 import {
   isFree,
@@ -107,6 +108,14 @@ function diagnostic(
 ): Diagnostic {
   return { code: `classroom.${code}`, message, subjects };
 }
+function freeSmallHands(rt: Runtime, actor: string): Diagnostic | null {
+  const items = heldBy(rt.world, actor).map(({ item }) => item.id);
+  return items.length ? diagnostic(
+    'hands-occupied',
+    `${actor} must explicitly put down ${items.join(', ')} before entering the classroom`,
+    [actor, ...items],
+  ) : null;
+}
 function child(
   rt: Runtime,
   ex: Exec,
@@ -186,6 +195,8 @@ function joinSeat(
   if ('code' in person) return person;
   const holding = holdingDiagnostic(rt.world, actor);
   if (holding) return holding;
+  const smallItems = freeSmallHands(rt, actor);
+  if (smallItems) return smallItems;
   if (person.human!.level !== 0)
     return diagnostic(
       'ground-only',
@@ -510,6 +521,8 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
       if ('code' in e) return { ok: false, diagnostic: e };
       const holding = holdingDiagnostic(rt.world, a);
       if (holding) return { ok: false, diagnostic: holding };
+      const smallItems = freeSmallHands(rt, a);
+      if (smallItems) return { ok: false, diagnostic: smallItems };
       if (e.human!.level !== 0)
         return {
           ok: false,
