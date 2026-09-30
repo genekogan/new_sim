@@ -1,6 +1,8 @@
 # Sim
 
-Scaffold for eden4: one canonical, server-simulated world shared by every
+The app shell of eden4, a two-headed project: this larger shared world, and the
+Mars world simulator that will become the engine inside it (see `docs/README.md`).
+One canonical, server-simulated world shared by every
 client, with inhabitants called **Souls** that owners steer and a three-tier
 brain keeps alive. The engine is a **toy** (a 100 m plane, a campfire,
 benches) behind the same contract as the Mars world engine, which replaces it
@@ -19,6 +21,7 @@ Live: https://sim.eden.art (once DNS points at eden2) · https://<eden2-sslip-ho
 | `packages/client` | Client replica + reconnecting connection (browser and Node) |
 | `apps/server` | The sequencer: tick loop, event log, snapshots, WS hub, REST, MCP, Privy, brain scheduler |
 | `apps/web` | React + Vite debug shell with Privy login |
+| `docs/README.md` | Documentation map: the two-headed project and where everything is |
 | `docs/frontier/` | The next-frontier discussion (lives, projects, commitments, places), with the Mars engine's frontier and roadmap docs snapshotted in `mars/` |
 | `docs/eden4/` | The eden4 strategy documents (vision, formalism, specs, sprint plans), copied from Gene's notes |
 | `docs/ONBOARDING-CLOUD.md` | Prompt for a cloud agent taking over the frontier discussion |

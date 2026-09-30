@@ -13,7 +13,8 @@ over: read, argue, extend, and record decisions in `DECISIONS.md` here.
   separates Mars-shaped engagements, the reusable simulator, and the broader Eden
   world.
 - `mars/` also holds the Mars engine's vision, engineering guide, spec, active
-  roadmap and handoff, copied the same day, and `MARS-ENGINE-SNAPSHOT.md`, a
+  roadmap, handoff and subsystem docs (takes, camera, body, movement, social,
+  items, vehicles), copied the same day, and `MARS-ENGINE-SNAPSHOT.md`, a
   survey of the engine's architecture and contracts as Sim wraps them.
 - `../eden4/`: the seventeen eden4 strategy documents (vision, bodies, neutrality
   and versioned rules, economy, formalism, engine frontier, dials, the MVP and

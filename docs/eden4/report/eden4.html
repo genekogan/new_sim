@@ -1,0 +1,552 @@
+<title>eden4</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#EEF0EC; --bg2:#E3E7E0; --ink:#17201B; --ink2:#4A554E; --line:#C9D0C6;
+  --moss:#2F6B3A; --moss2:#D9E8DA; --ochre:#A6741B; --ochre2:#F1E5CC;
+  --mono-bg:#1C2620; --mono-ink:#DCE5DB; --mono-dim:#8FA394; --mono-hi:#F0C36B;
+  --dec:#2F6B3A; --lean:#A6741B; --open:#4A554E; --rej:#8B3A3A;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F1512; --bg2:#161E19; --ink:#E6EAE3; --ink2:#A7B3A9; --line:#2A3630;
+  --moss:#7FBF8A; --moss2:#1B2E20; --ochre:#E0B05A; --ochre2:#2E2614;
+  --mono-bg:#070B09; --mono-ink:#DCE5DB; --mono-dim:#7F9284; --mono-hi:#F0C36B;
+  --dec:#7FBF8A; --lean:#E0B05A; --open:#A7B3A9; --rej:#D98A8A; color-scheme:dark; }}
+:root[data-theme="dark"]{
+  --bg:#0F1512; --bg2:#161E19; --ink:#E6EAE3; --ink2:#A7B3A9; --line:#2A3630;
+  --moss:#7FBF8A; --moss2:#1B2E20; --ochre:#E0B05A; --ochre2:#2E2614;
+  --mono-bg:#070B09; --mono-ink:#DCE5DB; --mono-dim:#7F9284; --mono-hi:#F0C36B;
+  --dec:#7FBF8A; --lean:#E0B05A; --open:#A7B3A9; --rej:#D98A8A; color-scheme:dark; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Serif 4",Georgia,serif;font-size:17px;line-height:1.55;padding-inline:16px;padding-block:0}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px}
+@media (max-width:860px){.wrap{grid-template-columns:1fr;gap:0}}
+h1,h2,h3,h4{font-family:"Bricolage Grotesque","Archivo",Arial,sans-serif;text-wrap:balance;line-height:1.1;margin:0}
+h1{font-size:clamp(40px,7vw,72px);font-weight:700;letter-spacing:-.02em}
+h2{font-size:30px;font-weight:700;margin-top:64px;padding-top:24px;border-top:2px solid var(--ink)}
+h3{font-size:20px;font-weight:700;margin-top:32px}
+h4{font-size:16px;margin-top:20px}
+p,li{max-width:66ch}
+p{margin:12px 0}
+a{color:var(--moss)}
+.eyebrow{font-family:"Bricolage Grotesque",sans-serif;text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:var(--ink2)}
+header.hero{padding-block:56px 24px}
+header.hero p.lede{font-size:21px;max-width:60ch;margin-top:20px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;color:var(--ink2);font-size:14px;margin-top:20px;font-family:"Bricolage Grotesque",sans-serif}
+nav.rail{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-block:56px 24px;font-family:"Bricolage Grotesque",sans-serif;font-size:14px}
+nav.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+nav.rail a{color:var(--ink2);text-decoration:none;display:flex;gap:10px}
+nav.rail a:hover{color:var(--ink)}
+nav.rail .n{font-variant-numeric:tabular-nums;color:var(--moss);min-width:2ch}
+@media (max-width:860px){nav.rail{position:static;padding-block:8px 0;border-bottom:1px solid var(--line)}nav.rail ol{flex-direction:row;flex-wrap:wrap;gap:6px 16px}}
+main{padding-bottom:96px;min-width:0}
+.pill{display:inline-block;font-family:"Bricolage Grotesque",sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border:1px solid currentColor;border-radius:2px;vertical-align:middle;margin-right:6px}
+.pill.dec{color:var(--dec)}.pill.lean{color:var(--lean)}.pill.open{color:var(--open)}.pill.rej{color:var(--rej)}.pill.shelf{color:var(--ochre);border-style:dashed}.pill.wd{color:var(--rej);border-style:dashed}
+.who{font-family:"Bricolage Grotesque",sans-serif;font-size:13px;color:var(--ink2);text-transform:uppercase;letter-spacing:.08em}
+blockquote{margin:16px 0;padding:4px 0 4px 18px;border-left:3px solid var(--ochre);font-style:italic;color:var(--ink)}
+blockquote .who{font-style:normal;display:block;margin-top:4px}
+pre{background:var(--mono-bg);color:var(--mono-ink);font-family:"JetBrains Mono",Menlo,monospace;font-size:13px;line-height:1.5;padding:16px 18px;overflow-x:auto;margin:16px 0;border-radius:3px}
+pre .d{color:var(--mono-dim)} pre .h{color:var(--mono-hi)} pre .g{color:#9BD3A5}
+code{font-family:"JetBrains Mono",Menlo,monospace;font-size:.88em;background:var(--bg2);padding:1px 5px;border-radius:2px}
+table{border-collapse:collapse;width:100%;font-size:15px;margin:16px 0}
+.tw{overflow-x:auto}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:"Bricolage Grotesque",sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2)}
+td.num,th.num{font-variant-numeric:tabular-nums;text-align:right}
+.note{background:var(--moss2);border-left:3px solid var(--moss);padding:12px 16px;margin:20px 0;max-width:70ch}
+.note.manna{background:var(--ochre2);border-left-color:var(--ochre)}
+.ex{border:1px solid var(--line);padding:18px 20px;margin:24px 0;background:var(--bg2)}
+.ex h4{margin-top:0}
+.ex .step{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px 16px;margin-top:10px;align-items:start}
+.ex .step .k{font-family:"Bricolage Grotesque",sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--moss);padding-top:6px}
+@media (max-width:600px){.ex .step{grid-template-columns:1fr}}
+.ex pre{margin:6px 0}
+svg text{font-family:"Bricolage Grotesque",sans-serif}
+.have{color:var(--dec)}.miss{color:var(--rej)}.later{color:var(--ink2)}
+ul{padding-left:20px}
+li{margin:4px 0}
+.small{font-size:14px;color:var(--ink2)}
+figure{margin:24px 0}
+figcaption{font-size:14px;color:var(--ink2);margin-top:6px}
+:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+html{scroll-behavior:smooth}
+</style>
+
+<div class="wrap">
+<nav class="rail" aria-label="Chapters">
+<ol>
+<li><a href="#c1"><span class="n">1</span>The thesis</a></li>
+<li><a href="#c2"><span class="n">2</span>World and bodies</a></li>
+<li><a href="#c3"><span class="n">3</span>One simulator, many verifiers</a></li>
+<li><a href="#c4"><span class="n">4</span>Three layers</a></li>
+<li><a href="#c5"><span class="n">5</span>The log and the fold</a></li>
+<li><a href="#c6"><span class="n">6</span>Representation</a></li>
+<li><a href="#c7"><span class="n">7</span>Economy and property</a></li>
+<li><a href="#c8"><span class="n">8</span>Creation and moderation</a></li>
+<li><a href="#c9"><span class="n">9</span>The field, 2026</a></li>
+<li><a href="#c10"><span class="n">10</span>Engine frontier</a></li>
+<li><a href="#c11"><span class="n">11</span>Tributaries</a></li>
+<li><a href="#c12"><span class="n">12</span>Parameters and trade-offs</a></li>
+<li><a href="#c13"><span class="n">13</span>Ledger</a></li>
+</ol>
+</nav>
+
+<main>
+<header class="hero">
+<div class="eyebrow">A new vision for Eden · working articulation · rounds 1–8</div>
+<h1>eden4</h1>
+<p class="lede">One persistent 3D world, simulated in one place. Anyone can buy a body and drop in right away. Bodies are named once, always on, steered by any agent, and alive and influential even when their owners are idle. One ritual a day at the center. Manna is the UBI. The ground grows outward. History is canonical and replayable while the rules evolve.</p>
+<div class="meta"><span>Gene Kogan with Claude</span><span>2026-09-27 → 09-29</span><span>Status: idea development, not a project</span><span>Source: <code><eden4>/</code></span></div>
+<div class="note">Only Gene moves things to <span class="pill dec">Decided</span>. Everything marked <span class="pill lean">Leaning</span> or <span class="pill open">Open</span> is a proposal or a question. Chapters 4, 5, 6 and 10 are almost entirely Claude's proposals from rounds 6–7 and are not decided. <span class="pill shelf">Shelved</span> means Gene chose to let the early community settle it (round 8); <span class="pill wd">Withdrawn</span> marks an earlier decision Gene pulled back.</div>
+<div class="note manna"><strong>Round 8: eden4, and shape now, numbers later.</strong> The project is called <strong>eden4</strong> for now: separate from eden1, eden2 and eden3, and overlapping the Mars world project, which "is eventually going to become a special case of the broader thing." Gene withdrew two founding rules (one body a day for thirty years; steering getting harder), required that newcomers enter right away, and chose to shelve most numbers: "i dont need to design everything now." Chapter 12 holds every dial and its trade-offs.</div>
+</header>
+
+<h2 id="c1">1 · The thesis</h2>
+<p>A world born one citizen at a time. New bodies drop into a single shared, centrally simulated world whenever someone buys one, and a daily ritual at the center keeps the world's clock. The world is made collectively from the actions of all the bodies. Owners give them high-level direction when they want to, and the simulator keeps them alive and influential when they don't.</p>
+<p>It collapses Gene's projects into one thing: <strong>Eden</strong> (the platform, agents, media generation) is the world itself. <strong>Manna</strong> is the money. <strong>Mars</strong> supplies the engine and the first room. <strong>The Sims, Second Life and Decentraland</strong> give the inhabited persistent world. <strong>Nouns DAO</strong> gives NFT-owned identity and the treasury. <strong>Abraham's Covenant</strong> gives the daily ritual.</p>
+<blockquote>I think of The Sims, Decentraland and Second Life as artworks all the same. It is what it is. It is Eden.<span class="who">Gene, round 2</span></blockquote>
+<h3>Principles that keep recurring</h3>
+<ul>
+<li><strong>Alive without you.</strong> Steering is optional; an idle owner's body still feels alive and influential. (Earlier "letting go", control fading over time; Gene pulled back in round 8: the world must stay easy to evolve, not artificially harder.)</li>
+<li><strong>Shape now, numbers later.</strong> Design the kinds of things; let the early community reveal the values.</li>
+<li><strong>Canonical history.</strong> The past never changes. Upgrades are events in history.</li>
+<li><strong>The artifact should live alone.</strong> Neutral, and able to survive its creator.</li>
+<li><strong>Few rules.</strong> One elegant rule that yields a continuum beats several special cases.</li>
+</ul>
+<h3>The long arc</h3>
+<div class="tw"><table><tr><th>When</th><th>World</th></tr>
+<tr><td>Day 1</td><td>A 100 × 100 m plot, pallet racks and wood, a handful of bodies</td></tr>
+<tr><td>Early months</td><td>Ground grows with the population; the center takes shape; the early community's behaviour sets the first real values of the dials</td></tr>
+<tr><td>Years later</td><td>A town or city with a hardened center and a lively frontier; idle bodies are the crowd and the patrons</td></tr>
+<tr><td>The end, if any</td><td><span class="pill shelf">Shelved</span> The old ~30-year / ~10,000 arc and its echo of Abraham's release came from one birth a day.</td></tr></table></div>
+<p>Audience, in order: friends, then believers, then speculators last. Growth is still the scaling roadmap, but now a chosen dial (the birth price curve), not a fixed fact.</p>
+
+<h2 id="c2">2 · World and bodies</h2>
+<h3>The body is the unit</h3>
+<p><span class="pill wd">Withdrawn</span> <s>One body minted per day.</s> <span class="pill dec">Decided</span> Newcomers enter right away. Bodies are NFTs; owning the NFT is the right to steer the body. <em>A body is the unit; minds are infinite.</em> Any agent can steer: Claude, ChatGPT, Codex, a bespoke bot, a DAO. Auth is wallet-based with Google login through it.</p>
+<p><span class="pill dec">Decided</span> Bodies are always on. The simulator keeps every body alive passively: it wanders, attends events, follows peers it likes, spends manna. The owner steers, they do not puppet. Watching is optional. "We simulate it for you" is the default for owners who never connect an agent.</p>
+<h3>Arrival and naming</h3>
+<blockquote>A problem with the birth ceremony is it means someone who just discovered this and wants to play right away can't. … This probably means 70% attrition right away. I think you have to enter right away. There could be a birthing room but it's not tied to a time, it's just new members falling in whenever.<span class="who">Gene, round 8</span></blockquote>
+<p><span class="pill lean">Leaning</span> Each body is priced continuously on a target schedule (VRGDA-style): price rises when births run ahead of the target and falls when behind. Instant arrival, one growth knob; the target curve is <span class="pill shelf">Shelved</span>. Newcomers land at the center and walk outward (<span class="pill open">Open</span>).</p>
+<p>The owner gets one shot at a name and description ("a shoggoth", "a skateboarder girl with a green hat", "the muse bot"), and the simulator turns that into a body. A blessing or voting layer borrowed from the Covenant is <span class="pill open">Open</span>. The one-shot lock-in is, in Gene's words, "maybe a feature not a bug."</p>
+<h3>Steering and idle life</h3>
+<blockquote>The thing that I was really trying to solve … is a way of making bodies controlled by idle owners still somehow interesting and active. That steering is optional and that without steering the character still feels alive and influential somehow.<span class="who">Gene, round 8</span></blockquote>
+<p><span class="pill wd">Withdrawn</span> <s>Steering gets harder over time.</s> <span class="pill lean">Leaning</span> Flat steering price for life (a rate limit for fairness only). The birth description stays fixed; cosmetic edits are allowed. Idle bodies are the world's <strong>patrons</strong>: their presence counts as attention, and their unspent UBI flows by default to what they attend or follow. That makes them influential and also solves idle wealth.</p>
+<h3>The daily ritual</h3>
+<p><span class="pill dec">Decided</span> One ritual a day at the exact center, at a time that rotates along the lunar calendar. Births no longer wait for it. <span class="pill lean">Leaning</span> It becomes <strong>the manna fall</strong>: the day's UBI falls at the center, the ground grows its ring, everyone who arrived since the last fall is welcomed and named, rule upgrades take effect. Attending counts as attention, not income.</p>
+<h3>The ground grows</h3>
+<p><span class="pill dec">Decided</span> The world literally expands, "like the earth is getting bigger to make room for all the people." The outer ring is the frontier. New terrain types appear as it grows. Ground first, height later.</p>
+<h3>Rooms, doors and portals</h3>
+<p><span class="pill lean">Leaning</span> Portals are doors, not destinations. A room is entered through a door that stands on a structure in the main map, so a room's prestige comes from where its door is. Gene's follow-ups are <span class="pill open">Open</span>: walk-in interiors versus door-rooms, whether interiors can be larger than exteriors, what rooms are called. Mars 2026 as the first room; a Mars portal "could upset the orthodox."</p>
+
+<h2 id="c3">3 · One simulator, many verifiers</h2>
+<p><span class="pill dec">Decided</span> One central simulator, not a decentralized one, because competing simulators contradict each other. The simulator is not on-chain, so it can be experimented with. The record of the world is.</p>
+<h3>The interpreter debate</h3>
+<p>Claude first proposed an interpreter: a model call Eden runs inside the simulator, acting as game master when an agent asks for something outside the physics vocabulary. Gene's objection is the one that shaped everything after:</p>
+<blockquote>An interpreter conflicts with the world being like a blockchain, a sequence of actions run through a pre-built compiler, and with credible neutrality. What happens if the interpreter goes away? The artifact must be able to live alone.<span class="who">Gene, round 4 (paraphrased in the log)</span></blockquote>
+<p>The alternative he sketched, a locked simulator with a fixed building vocabulary, brought its own fear: not being able to upgrade, or getting the initial spec wrong.</p>
+<h3>Replayable and upgradeable</h3>
+<p><span class="pill dec">Decided in principle</span> Immutability and upgradeability are compatible if every rule set stays runnable forever and upgrades are events in history. Every action carries the rules version in force. Old versions are frozen and content-addressed. An upgrade is a logged event at tick N with a logged migration. Mistakes are fixed forward, never retroactively.</p>
+<blockquote>A future-proof rule set that replays the world from t=0 with rules as they evolve. So the universe itself can evolve.<span class="who">Gene, round 4</span></blockquote>
+<h3>The rollup analogy</h3>
+<p><span class="pill lean">Leaning</span> Eden is the sequencer. The input log (or its commitments) and periodic state roots go on-chain. Anyone can verify by replaying with the open, versioned simulator. If Eden stops, the log, rule bundles and assets are public and permanent, so anyone can reconstruct and continue. Who is allowed to sequence next is <span class="pill open">Open</span> (Q2). Gene, round 6: questions 1 to 3 remain open and are fairly non-urgent.</p>
+
+<h2 id="c4">4 · Three layers</h2>
+<p class="eyebrow">Round 7 · Claude's refinement of Gene's "WorldPrompt split in two" · <span class="pill lean">Leaning</span></p>
+<p>Runway's WorldPrompt (September 2026) is a genesis prompt plus a timestamped stream of free-text events addressed to a subject or the scene, resolved by a video model into pixels. Gene's instinct: keep that input shape, but let a game engine, not a video model, produce the result, and split it into an AI outer layer that produces intents and a deterministic controller that resolves them into the next state.</p>
+<p>The refinement: it is three layers, and the middle one is where the design lives. The question Gene asked, <em>how can the middle layer be deterministic when its inputs are mushy natural language?</em>, has a short answer: <strong>the middle layer never sees natural language.</strong> Language stops at the edge.</p>
+
+<figure>
+<svg viewBox="0 0 760 300" width="100%" role="img" aria-label="Three layers: edge agents produce structured intents; a deterministic policy produces verbs each tick; the engine produces the next state">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink2)"/></marker></defs>
+<rect x="10" y="30" width="220" height="150" rx="3" fill="var(--bg2)" stroke="var(--ochre)" stroke-width="2"/>
+<text x="24" y="56" font-size="12" fill="var(--ochre)" letter-spacing="1.5">EDGE · NOT DETERMINISTIC</text>
+<text x="24" y="84" font-size="18" font-weight="700" fill="var(--ink)">Owners' agents</text>
+<text x="24" y="108" font-size="13" fill="var(--ink2)">Claude, ChatGPT, Codex, a DAO,</text>
+<text x="24" y="126" font-size="13" fill="var(--ink2)">a human; governance keys for</text>
+<text x="24" y="144" font-size="13" fill="var(--ink2)">the scene. Any schedule.</text>
+<text x="24" y="168" font-size="12" fill="var(--ink2)">reads: natural language + state</text>
+<rect x="270" y="30" width="220" height="150" rx="3" fill="var(--bg2)" stroke="var(--moss)" stroke-width="2"/>
+<text x="284" y="56" font-size="12" fill="var(--moss)" letter-spacing="1.5">CENTER · DETERMINISTIC</text>
+<text x="284" y="84" font-size="18" font-weight="700" fill="var(--ink)">Policy, per tick</text>
+<text x="284" y="108" font-size="13" fill="var(--ink2)">Versioned code. Standing intent</text>
+<text x="284" y="126" font-size="13" fill="var(--ink2)">+ state → one verb per body.</text>
+<text x="284" y="144" font-size="13" fill="var(--ink2)">Falls through, never errors.</text>
+<text x="284" y="168" font-size="12" fill="var(--ink2)">reads: structured intents + state</text>
+<rect x="530" y="30" width="220" height="150" rx="3" fill="var(--bg2)" stroke="var(--moss)" stroke-width="2"/>
+<text x="544" y="56" font-size="12" fill="var(--moss)" letter-spacing="1.5">CENTER · DETERMINISTIC</text>
+<text x="544" y="84" font-size="18" font-weight="700" fill="var(--ink)">Engine</text>
+<text x="544" y="108" font-size="13" fill="var(--ink2)">Verbs + events → next state.</text>
+<text x="544" y="126" font-size="13" fill="var(--ink2)">Support-only physics, pathing,</text>
+<text x="544" y="144" font-size="13" fill="var(--ink2)">construction. Mars engine today.</text>
+<text x="544" y="168" font-size="12" fill="var(--ink2)">reads: verbs + state + events</text>
+<line x1="232" y1="105" x2="268" y2="105" stroke="var(--ink2)" stroke-width="2" marker-end="url(#ar)"/>
+<line x1="492" y1="105" x2="528" y2="105" stroke="var(--ink2)" stroke-width="2" marker-end="url(#ar)"/>
+<text x="250" y="96" font-size="11" fill="var(--ink2)" text-anchor="middle">intent</text>
+<text x="510" y="96" font-size="11" fill="var(--ink2)" text-anchor="middle">verb</text>
+<rect x="10" y="215" width="740" height="60" rx="3" fill="var(--mono-bg)"/>
+<text x="24" y="240" font-size="12" fill="var(--mono-hi)" letter-spacing="1.5">THE LOG · CANONICAL · SIGNED</text>
+<text x="24" y="262" font-size="13" fill="var(--mono-ink)">birth · intent · ingest · econ · rules   — intents are stored; verbs and state are recomputed from them, forever</text>
+<line x1="120" y1="182" x2="120" y2="213" stroke="var(--ochre)" stroke-width="2" marker-end="url(#ar)"/>
+<text x="130" y="200" font-size="11" fill="var(--ink2)">written</text>
+<line x1="380" y1="213" x2="380" y2="182" stroke="var(--moss)" stroke-width="2" marker-end="url(#ar)"/>
+<text x="390" y="200" font-size="11" fill="var(--ink2)">read</text>
+<line x1="640" y1="182" x2="640" y2="213" stroke="var(--moss)" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+<text x="650" y="200" font-size="11" fill="var(--ink2)">state roots</text>
+</svg>
+<figcaption>Only the first layer is non-deterministic, and only its <em>output</em> is logged. Everything to the right of the first arrow is a pure function of the log.</figcaption>
+</figure>
+
+<h3>Why intents, not verbs, are the unit</h3>
+<ul>
+<li><strong>Bodies are always on; owners are mostly absent.</strong> One standing intent keeps a body alive for a year on a single message. A verb stream would need a model at the center for every idle body.</li>
+<li><strong>The log stays small and human-readable.</strong> "4102: follow Kalama" instead of a million <code>walk_to</code>s.</li>
+<li><strong>Neutrality.</strong> The center never interprets language. The owner's agent translates; the center validates a schema.</li>
+<li><strong>Replay.</strong> Verbs are recomputed from intents and state, so they never need storage and cannot drift.</li>
+</ul>
+
+<h3>Where the mush stops</h3>
+<div class="tw"><table><tr><th>Step</th><th>Input</th><th>Output</th><th>Deterministic?</th><th>Logged?</th></tr>
+<tr><td>Owner talks to their agent</td><td>"Follow Kalama; garden by the river when she's busy"</td><td>a structured intent</td><td>No (an LLM)</td><td>Only the output</td></tr>
+<tr><td>Sequencer validates</td><td>intent + signature</td><td>accepted event with a tick</td><td>Yes (schema check)</td><td>Yes, this is the event</td></tr>
+<tr><td>Policy, every tick</td><td>state + standing intents</td><td>one verb per body</td><td>Yes (code, pinned)</td><td>No, derived</td></tr>
+<tr><td>Engine, every tick</td><td>state + verbs + events</td><td>next state</td><td>Yes (code, pinned, rng in state)</td><td>Roots only</td></tr>
+<tr><td>Renderer</td><td>state</td><td>pixels</td><td>Doesn't matter</td><td>No</td></tr></table></div>
+<p>The intent is small and closed: a goal from a short list, a target id, bounded params, an <code>until</code>, and a fallback. There is no free text field. If an owner's agent wants to say something the schema can't hold, that is the schema's limit and the agent's problem, and extending the goal list is a rules upgrade, a public event, not a private judgment call.</p>
+
+<h3>Worked examples</h3>
+
+<div class="ex">
+<h4>Example A · A steered body</h4>
+<div class="step"><div class="k">Owner says</div><div>"Have Mycos follow Kalama around. If she's busy, go garden by the river."</div></div>
+<div class="step"><div class="k">Their agent emits</div><div><pre>{ <span class="d">kind:</span> <span class="g">"intent"</span>, <span class="d">subject:</span> 4102, <span class="d">author:</span> 0x9a…f1,
+  <span class="d">payload:</span> { <span class="d">goal:</span> <span class="g">"follow"</span>, <span class="d">target:</span> {body: 12}, <span class="d">until:</span> null,
+    <span class="d">fallback:</span> { <span class="d">goal:</span> <span class="g">"tend"</span>, <span class="d">target:</span> {region: <span class="g">"river-east"</span>}, <span class="d">fallback:</span> null } } }</pre></div></div>
+<div class="step"><div class="k">Sequencer</div><div>Checks the signature owns body 4102, the schema is valid, body 12 and region river-east exist, and charges the steering price for a body this age. Assigns tick 88,412. Appends.</div></div>
+<div class="step"><div class="k">Tick 88,412</div><div>Policy reads body 12's state: <code>activity = converse</code>, which the policy's table calls busy. Falls through to <code>tend</code>. Finds the nearest tendable noun in river-east. Emits <code>walk_to(plot 771)</code>.</div></div>
+<div class="step"><div class="k">Tick 88,430</div><div>Arrived. Emits <code>tend(plot 771)</code>. Engine advances the plant's growth counter and debits the tending cost in manna.</div></div>
+<div class="step"><div class="k">Tick 89,004</div><div>Body 12 stands up and walks. Policy: no longer busy, primary goal resumes. Emits <code>walk_to</code> two metres behind Kalama.</div></div>
+<div class="step"><div class="k">Replay</div><div>Anyone running the same pinned policy and engine over the same log gets the same three verbs at the same ticks and the same state root. Nothing was stored except the intent.</div></div>
+</div>
+
+<div class="ex">
+<h4>Example B · An owner who never comes back</h4>
+<div class="step"><div class="k">Birth event</div><div>Installs the default intent: <code>wander</code> in the body's home region, with two standing overrides every body has, <code>attend(birth_ritual)</code> when one is scheduled and <code>follow</code> a peer it has spent time near. Nothing else ever arrives from this owner.</div></div>
+<div class="step"><div class="k">Year 3</div><div>The body is still walking to births, still trailing the same two friends, still spending its UBI by the default spend rule. It has never cost the center a model call. It is a citizen.</div></div>
+</div>
+
+<div class="ex">
+<h4>Example C · Weather is an intent too</h4>
+<div class="step"><div class="k">Governance key emits</div><div><pre>{ <span class="d">kind:</span> <span class="g">"intent"</span>, <span class="d">subject:</span> <span class="g">"scene"</span>, <span class="d">author:</span> ritual-contract,
+  <span class="d">payload:</span> { <span class="d">goal:</span> <span class="g">"weather"</span>, <span class="d">params:</span> {rain: 0.7, wind: 0.3}, <span class="d">until:</span> {tick: 91,000} } }</pre></div></div>
+<div class="step"><div class="k">Engine</div><div>Sets <code>env.weather</code> for the duration. Bodies' policies read it: <code>gather</code> prefers roofed regions when rain is high. No new mechanism, just a second kind of subject and a rule about who may address it (Q23).</div></div>
+</div>
+
+<div class="ex">
+<h4>Example D · High-framerate steering</h4>
+<div class="step"><div class="k">A human at a keyboard</div><div>Their agent replaces the intent thirty times a minute: <code>go</code> here, <code>go</code> there, <code>perform(wave)</code>. Each replacement is a separate signed event with its own tick and its own price. A per-body rate limit keeps it fair (Q26). <em>(Rounds 6–7 priced replacements by the body's age; round 8 withdrew that.)</em></div></div>
+<div class="step"><div class="k">What Runway binds to keys</div><div>Premade action prompts. Here the same thing is a premade intent bound to a key. Same interface, but the result is state, not pixels.</div></div>
+</div>
+
+<div class="ex">
+<h4>Example E · The day glass was invented</h4>
+<div class="step"><div class="k">Rules event</div><div><pre>{ <span class="d">kind:</span> <span class="g">"rules"</span>, <span class="d">tick:</span> 2,140,000, <span class="d">version:</span> 7,
+  <span class="d">bundle:</span> sha256(engine+policy+schemas), <span class="d">migration:</span> sha256(m6→7) }</pre></div></div>
+<div class="step"><div class="k">What changed</div><div>The affordance schema gains a <code>transparent</code> material tag and the support rule learns glass's chain cap. No new verb: <code>install_panel</code> already existed. Replay runs v6 to that tick, applies the migration, continues with v7. The bug in v6's rafter spacing stays in history.</div></div>
+</div>
+
+<div class="ex">
+<h4>Example F · Something the schema can't say</h4>
+<div class="step"><div class="k">Owner says</div><div>"Start a religion around the old kiln."</div></div>
+<div class="step"><div class="k">Their agent</div><div>Has to compose it from what exists: <code>gather</code> at the kiln daily, <code>perform</code>, <code>converse</code> with whoever attends, <code>place</code> a media piece on the kiln's face. If several bodies adopt similar intents, that is a religion, emergently, and the log will show exactly when it started. The center never had to know the word.</div></div>
+<div class="step"><div class="k">Round 8 note</div><div>Claude's revised reading: the schema is too small in one place only, <em>time</em>. "Daily at dawn" can't recur with a single <code>until</code>. Proposal (<span class="pill open">Open</span>): a recurrence slot on the intent (daily, lunar), the same schedule the ritual uses. And aggregates are derived, never declared: "the old kiln" is a support-connected set of pieces; the congregation is the bodies whose intents share that target.</div></div>
+</div>
+
+<h3>The policy's future</h3>
+<p>Version one is hand-written: priorities, pathing, attendance, simple sociality. The Mars engine's <code>ambient_wander</code>, <code>gather</code>, <code>converse</code> and <code>campfire_circle</code> are its seeds. A learned policy (intent plus local state to verb) can replace it later as a rules upgrade, if it is deterministic and pinned: fixed weights, reproducible inference. That is the honest route to a "world model player" that never breaks replay.</p>
+
+<h2 id="c5">5 · The log and the fold</h2>
+<p class="eyebrow">Round 7 · Claude · <span class="pill lean">Leaning</span></p>
+<p>Five event kinds, totally ordered, signed by authors, ticked by the sequencer.</p>
+<pre>Event = { seq, tick, kind, author, payload, sig }
+kind  ∈ { <span class="g">birth</span>, <span class="g">intent</span>, <span class="g">ingest</span>, <span class="g">econ</span>, <span class="g">rules</span> }
+
+<span class="d">birth</span>   name, description, body asset hashes (mesh, rig, capability map), sale price
+<span class="d">intent</span>  subject (body | scene), goal, target, params, until, fallback
+<span class="d">ingest</span>  a new noun: GLB hash + affordances + license; or a media hash
+<span class="d">econ</span>    price set, buyout, tip, grant, treasury action
+<span class="d">rules</span>   "from tick N, rules vK": bundle hash + migration hash</pre>
+<p>The world is a fold over that log:</p>
+<pre>S_0      = genesis(rules v1)
+I_t      = standing intents after events with tick ≤ t
+verbs_t  = P_k(S_t, I_t)                     <span class="d">policy, version k in force</span>
+S_{t+1}  = E_k(S_t, verbs_t, events_t)       <span class="d">engine: verbs + births, ingests, econ</span>
+root_t   = hash(S_t)                         <span class="d">committed every N ticks</span></pre>
+<p><code>rng</code> lives inside <code>S</code>, so the fold is pure. A rules event at tick N applies its migration to <code>S_N</code> and switches <code>P</code> and <code>E</code>. Replay from t=0 with pinned versions reproduces every root.</p>
+<h3>The sequencer's job</h3>
+<ol><li>Accept, validate and order events; assign ticks.</li><li>Run the fold continuously. This is the background tick the Mars engine lacks.</li><li>Commit roots; publish the log, rule bundles and assets to permanent storage.</li><li>Serve state to renderers.</li></ol>
+<p>If Eden stops, anyone with the log, bundles and assets can do all four. Who is allowed to is Q2.</p>
+<div class="note"><strong>New question (Q26).</strong> When many agents steer at high rate, does the sequencer order by arrival, by a per-body rate limit, or by price?</div>
+
+<h2 id="c6">6 · Representation</h2>
+<p class="eyebrow">Round 6 · Claude · <span class="pill lean">Leaning</span> · Gene: "I agree with you" on the input shape; the rest not yet endorsed</p>
+<h3>Nouns open, verbs closed</h3>
+<p>The Mars engine already has the right split; it just needs the nouns pried out of TypeScript.</p>
+<ul>
+<li><strong>Verbs are the fixed, versioned vocabulary.</strong> Few, physical, goal-shaped: walk_to, sit, carry, connect, install, place, paint, gather, converse. A new verb (swim, fly, dig) is a rules upgrade and should stay rare and ceremonial.</li>
+<li><strong>Nouns are open data.</strong> An asset definition becomes a content-addressed record: a GLB hash plus affordances (footprint, support type, sockets, seats, media surfaces, grip slots, material tags). Anyone can ingest one. The engine validates affordances and never judges the mesh. A chair is a def with a seat. A projector is a def with a media surface. A greenhouse is a kit. Screens, podiums, lamps, plants and atriums cost zero rules.</li>
+<li><strong>Pieces are the unit of state.</strong> Every placed instance has an author, a birth tick, a material, a pose and a support. Buildings, rooms and districts are names at the edges, not state.</li>
+<li><strong>Media is a noun instance.</strong> An image, video, audio or 3D hash on a surface-bearing def. A painting on a facade and the wall behind it are governed by the same rule.</li>
+<li><strong>Physics is support only, never force.</strong> A piece stands if it is connected to ground through a chain of supports (Teardown's rule; the engine's <code>support</code> and <code>connections</code> fields already encode most of it). Materials may cap the chain (Valheim's rule). Disconnected islands are rejected at placement, not simulated falling. No mass, force, energy or gravity.</li>
+</ul>
+<h3>Characters: Spore at the level of verbs</h3>
+<p>A body is a rigged GLB of any topology plus a <strong>capability map</strong>: which verbs its rig can perform and how (IK targets, seat height, carry points). Spore's real trick (Hecker, 2008) was authoring animation against abstract goals and retargeting by IK at runtime. The engine's verbs are already goal-shaped, so retargeting is the renderer's problem, and the state only records that body 4102 is sitting on chair 88.</p>
+<p><strong>Birth pipeline, run once, logged.</strong> Description to mesh (Hunyuan3D, Tripo or Trellis on fal) to rig (Tripo Rig covers biped, quadruped, hexapod, octopod, avian, serpentine and aquatic) to capability map. Hashes go in the birth event. Morphology is fixed at birth; features, colours and accessories are identity edits on the decaying schedule. Unowned fauna and spirits use the same machinery with a standing intent and no owner.</p>
+<h3>Seed library</h3>
+<p>The "thingiverse dataset" is the Sketchfab catalog at <code><lm-3d-models>/sketchfab/</code>: 3,706 GLBs, 77.7 GB, in 25 lore categories (creatures 359, robots 207, devices 471, settings 397, nature 261, statues 411, objects 798, flora, eden-dome, and more), each with a written description, use tags, a scale tier and a license. About 2,960 are cc0 or by. Licensing for a public world with an economy is Q25.</p>
+<div class="note">Open from this chapter: Q21 the minimal affordance schema; Q22 the minimal intent goal list; Q24 whether births are limited to what can be rigged today or may supply any rigged GLB.</div>
+
+<h2 id="c7">7 · Economy and property</h2>
+<blockquote>This is something we'll have to design as we go. Upgradeable is good here. We have to make a society.<span class="who">Gene, round 3</span></blockquote>
+<h3>Manna</h3>
+<p><span class="pill dec">Decided</span> Every body receives manna daily as UBI and spends it on materials, art, features, floors and steering. <span class="pill open">Open</span> ERC-20 or in-game? Claude leans in-game first, balances in committed state, bodies as the on-chain NFTs, a bridge later. Gene: "maybe the whole game can revolve around NFTs. Maybe this is the comeback of NFTs."</p>
+<div class="note manna"><strong>Idle wealth.</strong> Idle bodies earn UBI and spend little, so old idle bodies become the richest. Gene agrees this must not happen. <span class="pill lean">Leaning</span> (round 8): idle bodies as patrons, their unspent UBI flowing by default to what they attend or follow. UBI rate and demurrage are <span class="pill shelf">Shelved</span>.</div>
+<h3>Center and frontier</h3>
+<p><span class="pill dec">Decided</span> The center hardens and grows rich; the frontier stays poor and dynamic. <span class="pill lean">Leaning</span> One rule produces the gradient: cost to change a thing = base × age × attention, where attention is measured foot traffic and blessings. Wandering is voting.</p>
+<h3>What is a thing, and who may write to it</h3>
+<p>Gene was very interested in Harberger taxes for some kind of rights, but not on parcels. Claude proposed Harberger on protection rights over things, with price 0 as commons. Gene challenged it in round 5: protection makes sense for a painting on a facade, but who decides whether to add a room or whether it's glass, metal or wood? This is Q14b, the unit-of-a-thing problem.</p>
+<p><span class="pill lean">Round 6 proposal, unanswered</span> The piece is the only unit. Every piece has a price, the inertia formula. Paying it transfers authorship, after which you may alter or remove it, and the fee goes to the previous author, so overwriting someone's beloved wall means buying it from them. Harberger shrinks to one optional term: a self-assessed premium on top, taxed. Adding a supported piece next to or onto another is placing, not altering, and is never blocked. So protection never means "nothing touches this", only "nothing here changes without paying me." Gene has not responded to this yet.</p>
+<h3>Treasury</h3>
+<p><span class="pill dec">Decided</span> Funded by body sales, it pays the team and makes grants. The loop: sales, treasury, UBI and grants, a better world, more valuable bodies, sales. Governance model is <span class="pill open">Open</span>.</p>
+
+<h2 id="c8">8 · Creation and moderation</h2>
+<p><span class="pill dec">Decided</span> Art from the edges, Moltbook-style: owners' agents carry skills that make work and submit it; the author spends their own compute. <span class="pill rej">Rejected</span> "Programs, not pixels." Gene: an unnecessary constraint, combining ideas for their own sake. Kling must be admissible. <span class="pill lean">Leaning</span> Media is media, ingested and content-addressed, never hotlinked, so nothing can vanish after placement. poop is one optional skill, not a format.</p>
+<p><span class="pill lean">Leaning</span> Moderation by geography plus a hard floor. The frontier is cheap and permissive; the center is expensive and slow, and things survive there only by earning attention. The inertia gradient is the cultural filter. The hard floor (illegal content, explicit material in public space) is the one unavoidable central judgment; who holds the veto and how it is logged is <span class="pill open">Open</span> (Q19).</p>
+
+<h2 id="c9">9 · The field, September 2026</h2>
+<p class="small">Researched 2026-09-28. Details and links in <code>10-FRONTIER-REPRESENTATION.md</code>.</p>
+<div class="tw"><table><tr><th></th><th>Runway GWM Worlds 2, Genie 3, Oasis 3, Mirage 2, Waypoint</th><th>World Labs Marble / Atlas</th><th>Roblox, Decentraland, Second Life</th><th>eden4 (proposed)</th></tr>
+<tr><td>Output</td><td>pixels and audio, no state</td><td>splats and meshes, once</td><td>state, proprietary</td><td>canonical state, open, replayable</td></tr>
+<tr><td>Control</td><td>text events and keys, one user</td><td>none live</td><td>scripts, many users</td><td>intent stream, many agents, priced</td></tr>
+<tr><td>Persistence</td><td>seconds to minutes</td><td>static</td><td>yes</td><td>yes, immutable log</td></tr>
+<tr><td>Bodies</td><td>prompted subjects</td><td>none</td><td>humanoid avatars</td><td>any topology, born once</td></tr>
+<tr><td>Renderer</td><td>fixed</td><td>Spark, engines</td><td>fixed</td><td>any: three.js, splats, video models</td></tr></table></div>
+<ul>
+<li><strong>Runway WorldPrompt</strong> (2026-09-03): genesis prompt with "laws", a timestamped event stream of free-text actions, per-frame camera. Keys are bound to premade prompts because typing is too slow. No state exposed, no public API.</li>
+<li><strong>World Labs Marble</strong> exports Gaussian splats and collider plus visual meshes to Unreal, Unity and Blender; Spark is its open three.js splat renderer. Atlas (2026-09-01) is next. RTFM is real-time but pixels only.</li>
+<li><strong>Every real-time world model is pixels-only.</strong> The gap for a shared, verifiable, many-agent 3D state is empty.</li>
+<li><strong>Text to rigged creature exists today.</strong> Tripo Rig v2.5 on fal rigs seven body plans in about 30 seconds; open model UniRig. Meshy rigging is humanoid only. Meshes run $0.07 to $0.25.</li>
+<li><strong>Agent societies</strong>: Smallville, AI Town, Project Sid (1,000 agents in Minecraft). MCP bridges into Minecraft and Unity exist but are single-agent. No shipped project has many agents co-steering one persistent 3D world through MCP.</li>
+</ul>
+
+<h2 id="c10">10 · Engine frontier</h2>
+<p class="eyebrow">Round 7 · researched 2026-09-29 · Claude · everything here is a menu, not a plan</p>
+<p>Gene's second frontier: the actual engine, "simulation, camera, rendering, NPCs, modeling, assets, physics, and other advanced features that are in mature versions of this and can work on the internet." What follows is what mature engines and 2025–26 research make possible in a browser-first, server-canonical world, grouped by his list. Each item says what it would give eden4. Marks: <span class="have">have</span> means the Mars engine already does it, <span class="miss">missing</span> means it is needed and absent, <span class="later">later</span> means a later era. Items marked [U] rest on a single unverified source.</p>
+
+<h3>Simulation</h3>
+<ul>
+<li><strong>Always-on world step.</strong> <span class="miss">missing</span> A Durable Object alarm or a dedicated sequencer process running the fold continuously. Cloudflare's limits as of June 2026 (10 GB SQLite per object, thousands of hibernating WebSockets, unlimited objects) suit one object per region shard plus one for the log. Shard on space, never on session.</li>
+<li><strong>Deterministic lockstep, proven at scale.</strong> Factorio runs the whole simulation on every client and syncs inputs only; Age of Empires II DE pins strict floating point. WebAssembly's IEEE-754 is strictly deterministic; TypeScript number math is too if the engine avoids transcendental <code>Math.*</code> drift (fixed-point or its own libm). <span class="have">have</span> in spirit: the Mars engine is byte-identical across Node and workerd.</li>
+<li><strong>Mass entities.</strong> Unreal's MassEntity plus StateTree plus Smart Objects (5.5–5.8) run thousands of background agents as integers with LOD'd representation and reservation-based activities. This is the blueprint for ten thousand bodies where a handful are actively steered. The Mars engine's regions and <code>reservedBy</code> fields are the seed; crowd scale (30 walkers ≈ 200 ms) is <span class="miss">missing</span>.</li>
+<li><strong>Time dilation.</strong> EVE Online slows the simulation clock under load rather than dropping inputs. A world that advances in seconds and minutes can borrow this for free: the tick rate is a rule, not a promise.</li>
+<li><strong>A storyteller.</strong> RimWorld's AI Storyteller, descended from Left 4 Dead's director, paces events per day. In our terms it is a governance-keyed scene-intent author. The daily ritual already is one such beat.</li>
+</ul>
+
+<h3>Camera and cinematography</h3>
+<ul>
+<li><strong>Virtual cameras with priority blends.</strong> Unity Cinemachine 3.1's Follow, FreeLook, spline dolly and obstacle avoidance model is portable to three.js. <span class="have">have</span> a camera vocabulary (orbit, dolly, crane, fly_through) and natural-language camera sentences via <code>parse_camera</code>.</li>
+<li><strong>An AI director of photography.</strong> GenDoP (ICCV 2025) and PACE (2026-09) emit typed shot specs from scene semantics. An edge agent can be the DoP: it writes shot specs, the engine executes them deterministically, so every viewer can watch their own cut of the same canonical day.</li>
+<li><strong>Replays as state, not video.</strong> Rocket League's replays are input scripts with an AI-chosen director camera. A replayable log makes a free television channel of the world: the daily birth as a broadcast, any past day re-shot from any angle. <span class="have">have</span> takes and the "watch it being built" player.</li>
+</ul>
+
+<h3>Rendering</h3>
+<ul>
+<li><strong>three.js WebGPURenderer with TSL is the default path.</strong> r186 (2026-09-08) adds cascaded sun shadows and async compute; WebGPU is universal since Safari 26. One TypeScript codebase, compute shaders for culling and crowds, WebGL2 fallback only for low-end devices. <span class="have">have</span> three.js; <span class="miss">missing</span> WebGPU.</li>
+<li><strong>GPU-driven instancing and impostors.</strong> A 2026 three.js demo places roughly 190,000 trees and 450,000 understory instances by GPU scatter, culls per frame into indirect draws, and bakes octahedral impostors for the far field (two triangles per instance). This is how millions of user-ingested nouns stay visible at the horizon. Bake the impostor atlas at ingest.</li>
+<li><strong>Virtualized geometry.</strong> A Nanite-style port exists on WebGPU (meshlet hierarchy, software rasterizer, per-meshlet culling) but is heavy; the production path is a meshopt LOD ladder plus impostors. Claims of "Nanite 3.0 for WebGPU" [U].</li>
+<li><strong>Dynamic global illumination.</strong> Radiance Cascades run on WebGPU compute; Split Radiance Cascades (2026-07) give 3D diffuse bounce from sparse world-space probes. A world that changes every day cannot bake light; this gives time-of-day bounce without baking. MegaLights (UE 5.8) shows stochastic many-light sampling is the target for a city of lamps.</li>
+<li><strong>Gaussian splats next to meshes.</strong> Spark 2.0 (World Labs, 2026-04) streams continuous-LOD splat trees with a 16M-splat GPU paging pool in the same three.js scene as meshes. PlayCanvas SuperSplat 3.0 (2026-06) streams up to 24M Gaussians on compute. Photogrammetry and Marble-generated worlds become ground and backdrop under rigged GLB bodies.</li>
+<li><strong>Asset pipeline at ingest.</strong> gltfpack with meshopt, KTX2/Basis textures (ETC1S for colour, UASTC for normals), a LOD chain via meshoptimizer, per-def face and texture budgets. <span class="miss">missing</span>. Decentraland's publish-then-LOD pipeline is the model.</li>
+</ul>
+
+<h3>NPCs, characters, animation</h3>
+<ul>
+<li><strong>Motion matching per rig class.</strong> Stock in Unreal since 5.3, productized by Motorica. Ship a motion database per body plan and get locomotion quality without hand-authored blend trees. <span class="miss">missing</span>; people are capsules with renderer poses.</li>
+<li><strong>Motion for arbitrary topologies.</strong> AnyTop (any-topology diffusion, 2025), Motion2Motion cross-topology transfer (2025-08), MotionBricks real-time modular latent motions (2026-04), STyMo few-shot style transfer (2026-09). This is what makes "a rigged GLB of any topology" walk, sit and carry. Generate clips at birth, store them with the body.</li>
+<li><strong>Physics-based control</strong> (score-matching priors, whole-body tracking, 2025) is not browser-feasible yet. <span class="later">later</span>, server-side or precomputed.</li>
+<li><strong>Faces.</strong> TalkingHead.js drives ARKit visemes on Mixamo rigs in the browser; Audio2Face outputs 52 ARKit blendshapes. Bodies that carry ARKit shapes can speak with faces.</li>
+<li><strong>Behaviour: StateTree and Smart Objects.</strong> Nouns advertise affordances as claimable objects (a bench offers <code>sit</code>, a kiln offers <code>gather</code>), which maps one-to-one onto the affordance schema in chapter 6 and onto MCP tools. GOAP or utility planners are the cheap deterministic layer under the intent: the edge sets the goal, the planner executes. This is the policy of chapter 4, and it is what shipping LLM-NPC games (inZOI, Where Winds Meet, Convai) converged on: the model for intent and dialogue, schedules for everything else.</li>
+<li><strong>Schedules, proven.</strong> Smallville's daily-to-hourly-to-minute schedules with memory and reflection, and Project Sid's thousand agents in Minecraft with emergent roles and norms. Tick-indexed schedules keep this deterministic.</li>
+<li><strong>Need-driven fauna.</strong> Rain World's creatures pursue their own survival; RimWorld keeps its ecology "observable and comprehensible." Unowned creatures with standing intents give a living world at no model cost.</li>
+</ul>
+
+<h3>Modeling and assets</h3>
+<ul>
+<li><strong>Generated nouns with behaviour schemas.</strong> Roblox Cube (open source, 2025-03) then its 4D generation beta (2026-02): text to functional objects with behaviour schemas, 160,000 player-generated objects in one experience, an open-vocabulary schema system, and CubePart (2026-05) for part-controllable generation. This is the closest existing thing to "a noun with affordances" generated in one prompt.</li>
+<li><strong>Rigged bodies on demand.</strong> Meshy auto-rigs humanoid and quadruped with 600+ preset clips; Tripo Rig covers seven body plans; Hunyuan3D is open but static. See chapter 9.</li>
+<li><strong>Procedural layout.</strong> Wave Function Collapse and model synthesis remain the standard for tiled districts (Townscaper, Bad North, Caves of Qud); a 2025 WFC plus genetic-algorithm hybrid reports 73% fewer unplayable layouts. Deterministic and seedable inside the engine, useful for frontier terrain and starter streets.</li>
+<li><strong>Procedural terrain on the GPU.</strong> Height, biome and erosion generators exist for three.js at planet scale. The expanding ground can be generated per day from the day's seed. <span class="miss">missing</span>.</li>
+<li><strong>Editor-side generation is mainstream.</strong> Unity AI (open beta 2026-05) and Unreal 5.8 ship LLM and MCP editor workflows. Validates MCP as the editing surface. <span class="have">have</span>.</li>
+</ul>
+
+<h3>Physics</h3>
+<ul>
+<li><strong>Support graphs, not rigid bodies.</strong> Valheim: a foundation touching ground is 100% supported, decaying per hop, colour-coded. Teardown: anything still connected to ground stands. Graph propagation, cheap and deterministic. <span class="have">have</span> most of it in <code>support</code>/<code>connections</code>; material chain caps <span class="miss">missing</span>.</li>
+<li><strong>Deterministic rigid bodies when needed.</strong> Rapier (WASM, cross-platform determinism flag, 2025 voxel colliders and persistent islands, SIMD builds 2–5× faster, GPU rigid bodies on the 2026 roadmap). Box2D 3.1 is deterministic across platforms; Box3D was announced 2026-06-30, alpha, no WASM yet. Jolt in WASM has soft bodies, cloth and vehicles for client-only cosmetics. <span class="later">later</span>, and only server-side canonical.</li>
+</ul>
+
+<h3>Audio</h3>
+<ul>
+<li><strong>Spatial audio.</strong> Web Audio's HRTF panner is still the only native spatializer; Resonance is dormant. Adequate for ambience; an ambisonic AudioWorklet if VR matters.</li>
+<li><strong>A daily-born score.</strong> Suno v5.5 (2026-03, continuation and personas), Stable Audio 3, ElevenLabs Music, and Magenta RealTime for adaptive scores. Precompute stems per biome and time of day, crossfade by region. A world born one body a day can have music born one day at a time, generated at the edges and ingested like any media.</li>
+<li><strong>Media playback on surfaces</strong> (screens, projectors, speakers as nouns) is <span class="miss">missing</span> in the engine; the legacy room layer has seven gallery screens.</li>
+</ul>
+
+<h3>Environment, weather, time</h3>
+<ul>
+<li><strong>Volumetric sky on three.js WebGPU.</strong> Eanpa-Sky (weather fronts, lightning, day/night), Three.js Sky Pro (scattering, clouds, god rays, cloud shadows), three-clouds (Beer shadow maps). Server-canonical <code>env.weather</code> <span class="have">have</span> drives client volumetrics; cloud shadows tie the sky to the simulation.</li>
+<li><strong>Seasons and foliage states.</strong> Unreal 5.8's vegetation authoring is the reference for season-driven foliage. A lunar-calendar ritual suggests a lunar season system for free.</li>
+</ul>
+
+<h3>Multiplayer and networking</h3>
+<ul>
+<li><strong>Transport.</strong> WebTransport is in every browser since Safari 26.4 (2026-03). Unreliable datagrams for presence, WebSockets for canonical events. Colyseus 0.18 (2026-08) adds server-authoritative prediction and rollback if human-driven bodies ever need it.</li>
+<li><strong>Interest management and sharding.</strong> The ACM survey remains the reference; Hadean's Aether Engine partitioned space for 10,412 participants (EVE Aether Wars, 2019); SpatialOS shipped Worlds Adrift and then collapsed in the 2019 Unity dispute. The lesson across all of them: cross-shard entity handoff is the hard part. Keep shard boundaries static and coarse (center, rings), hand off by deterministic tick. <span class="later">later</span>, needed around a thousand bodies.</li>
+<li><strong>Streaming.</strong> Clients load only chunks near their camera with LOD. <span class="miss">missing</span>, needed past a few hundred nouns.</li>
+</ul>
+
+<h3>Persistence and creator economies</h3>
+<ul>
+<li><strong>What retention actually is.</strong> Fortnite's UEFN paid creators $1B by 2026-06 and 47% of playtime is in creator islands; Roblox paid over $1B in 2025 and moved to Creator Rewards. In-world items and creator share are the retention lever. Manna UBI plus a creator share of buyouts (chapter 7) is the same shape.</li>
+<li><strong>Onchain worlds.</strong> Lattice's Redstone chain shut down 2026-05-15; MUD and Dojo continue. The lesson for us: keep the chain for ownership and verification, run the simulation off-chain, publish roots for replay-verifiability. This is exactly the rollup posture of chapter 3.</li>
+<li><strong>Decentraland SDK 7.29</strong> (2026-09-15) with a Unity Explorer client, Worlds without the Genesis vertical limit, background LOD generation on publish. A peer, and a pipeline to copy.</li>
+</ul>
+
+<h3>What I would take from this list first</h3>
+<ol>
+<li>The always-on step and the signed log, because nothing else is real without them.</li>
+<li>The ingest pipeline (gltfpack, KTX2, LOD chain, affordance validation, impostor bake), because nouns-open depends on it.</li>
+<li>Motion databases per body plan plus any-topology motion transfer, because bodies are the product.</li>
+<li>Smart-object affordances as the bridge between nouns and the policy.</li>
+<li>Everything under rendering can wait until there is something to look at; three.js WebGPU makes most of it a later upgrade rather than a rewrite.</li>
+</ol>
+<p class="small">Unverified: "Nanite 3.0 for WebGPU", Unity 7 shipping WebGPU by default, and Cloudflare's "10 dynamic workers per Durable Object."</p>
+
+
+<h2 id="c11">11 · Tributaries</h2>
+<h3>Mars studio engine (surveyed 2026-09-28, HEAD bfdcdfc)</h3>
+<p><code><mars-campus-repo>/</code>. TypeScript, React, three.js, a Cloudflare Worker with one SQLite Durable Object per room. Deterministic engine, no DOM or clock or Math.random, fixed 1/20 s tick, byte-identical takes in Node and workerd. One op registry generates verbs, validation and 36 MCP tools. Plan, rehearse, execute with per-region staleness, pause and resume, a deterministic planning budget. 525 commits in the week before the survey: roof framing verbs, cancellable raises with verified lowering, natural-language camera direction, protected canonical year rooms 2020 to 2026.</p>
+<p>WorldState <code>mars-world/1</code>: base, tick, entities (human, component, vehicle, fixture, marker), regions, env with datetime and weather, inventory, rng. Every entity has a def, a pose and provenance. Components carry phase, support, connections and assembly.</p>
+<p>Still missing for this vision: a background tick, accounts and ownership, an economy, teardown verbs, runtime asset import, media on surfaces, rigged bodies (people are capsules with renderer poses), and crowd scale (30 walkers cost about 200 ms per tick).</p>
+<h3>Abraham and the Covenant</h3>
+<p>Started 2025-10-19, thirteen years. Daily: seeds are submitted, the community blesses, praises and stakes, a winner is chosen, one piece is minted and auctioned. At the end Abraham is set free. The ritual template for eden4's daily ritual.</p>
+<h3>Eden, manna, poop, Little Martians</h3>
+<p>Manna today is prepaid usage credit with no economic design. poop is a deterministic procedural-film toolkit and becomes an optional creation skill. The Little Martians archive (110 ceramic scans and rigged characters) and the Sketchfab catalog next to it are the candidate first district and seed library.</p>
+
+<h2 id="c12">12 · Parameters and trade-offs</h2>
+<p class="eyebrow">Round 8 · Gene's method, Claude's tables</p>
+<blockquote>I want to shelf some of the final decisions on some of these and possibly just let them happen organically depending on what early community likes. I don't need to design everything now.<span class="who">Gene, round 8</span></blockquote>
+<p>Fix the <strong>shape</strong> of the world: what kinds of things exist and how they change. Leave the <strong>numbers</strong> as dials, set by rule versions after watching what the early community does. Versioned rules make every dial change a logged event, never a retroactive fix, so shelving is cheap. Where a dial has a generous and a strict end, v1 sits near generous: adding friction when something is abused is easier than removing friction nobody enjoys. And never make the future artificially harder: friction belongs to places and prices, not to the ability to change the rules.</p>
+<h3>Arrival</h3>
+<div class="tw"><table><tr><th>Dial</th><th>One end</th><th>Other end</th><th>Lean · status</th></tr>
+<tr><td>Birth rate</td><td>Fixed 1/day (Nouns): scarcity, a clean arc, growth = scaling roadmap. Caps the world at ~365 a year forever.</td><td>Unlimited at a flat price: fast growth, no scarcity, spam, compute arrives before design.</td><td>A price curve over a target schedule (VRGDA). <span class="pill lean">Leaning</span></td></tr>
+<tr><td>Target curve</td><td>Linear</td><td>Exponential or logistic</td><td>Start near linear, loosen on real demand. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Cap / end</td><td>Hard cap (~10k) and an ending echoing Abraham's release</td><td>Open-ended</td><td>The cap came from 1/day, not a goal of its own. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Arrival place</td><td>Center: first view is the famous city</td><td>Frontier: room to build at once, worse first five minutes</td><td>Center, then walk outward. <span class="pill open">Open</span></td></tr>
+<tr><td>Entry price floor</td><td>Real money for every body (checkout friction)</td><td>Near-free while births are behind target</td><td>The next attrition point after waiting. <span class="pill open">Open</span></td></tr></table></div>
+
+<p>Owner and body, the configurations Gene asked to go through:</p>
+<div class="tw"><table><tr><th>Configuration</th><th>Gives</th><th>Costs</th></tr>
+<tr><td>One owner, one body (base)</td><td>Your own body; your agent attaches to it. The hook.</td><td>Supply is gated by births.</td></tr>
+<tr><td>Many owners share a body (DAO wrap)</td><td>Clubs, cults, collective play. Already decided as possible.</td><td>Nothing new; opt-in.</td></tr>
+<tr><td>Influence without ownership</td><td>Anyone can play without buying; spirits and fauna become communal.</td><td>No "mine", no agent attachment, needs a way to weigh many voices.</td></tr>
+<tr><td>Owner fully decoupled from body</td><td>Radical flexibility.</td><td>Loses the core hook.</td></tr></table></div>
+
+<p><span class="pill lean">Leaning</span> Keep one-owner-one-body as the base; shared control stays opt-in; influence without ownership, if wanted, lives on unowned creatures through scene intents. <span class="pill rej">Rejected</span> A daily batch ceremony that settles births at the ritual: newcomers would wait.</p>
+<h3>The daily ritual</h3>
+<div class="tw"><table><tr><th>Option</th><th>Gives</th><th>Costs</th></tr>
+<tr><td><strong>The manna fall</strong> <span class="pill lean">Leaning</span></td><td>One clock for things that already happen daily: UBI, the ground's ring, welcoming the day's arrivals, rule upgrades. The biblical rhyme. The biggest daily crowd.</td><td>Could feel administrative unless staged well.</td></tr>
+<tr><td>A daily chosen one</td><td>Keeps a Nouns-style prestige object and the Covenant's blessing.</td><td>A class distinction and a second mechanism.</td></tr>
+<tr><td>One new thing a day</td><td>Ties the ritual to the world's evolution (a material, a biome).</td><td>Pressure to invent daily; verbs should stay rare.</td></tr></table></div>
+
+<p>Attendance should count as attention, not income. Making manna collectable only at the center would give a free center-rich gradient but breaks UBI and punishes idle bodies.</p>
+<h3>Steering and idle life</h3>
+<div class="tw"><table><tr><th>Dial</th><th>One end</th><th>Other end</th><th>Lean · status</th></tr>
+<tr><td>Steering price vs. age</td><td>Rises with age: bodies drift toward autonomy. Punishes engaged owners.</td><td>Flat forever: steering always matters.</td><td>Flat; aliveness comes from the standing intent. <span class="pill lean">Leaning</span></td></tr>
+<tr><td>Identity edits</td><td>Never: the birth description is the whole identity</td><td>Any time</td><td>Birth description fixed, cosmetic edits allowed. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Intent expressiveness (Q22)</td><td>One goal: simple, steering stays meaningful</td><td>A routine of timed clauses: one message runs a body for a year</td><td>A few timed clauses plus a fallback. <span class="pill open">Open</span></td></tr>
+<tr><td>Idle influence</td><td>Idle bodies are scenery</td><td>Idle bodies are audience and patrons</td><td>Patrons. <span class="pill lean">Leaning</span></td></tr></table></div>
+
+<h3>Economy</h3>
+<div class="tw"><table><tr><th>Dial</th><th>Range</th><th>Lean · status</th></tr>
+<tr><td>UBI rate</td><td>Low (building feels earned) ↔ high (fast frontier churn)</td><td>Tie to the materials price list. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Demurrage</td><td>None (savers win) ↔ steep (use it or lose it)</td><td>Mild, or replaced by the idle default spend. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Inertia coefficients</td><td>Flat (no famous center) ↔ steep (center freezes early)</td><td>Shape <span class="pill dec">Decided</span>, numbers <span class="pill shelf">Shelved</span>. Keep it per piece so a shack glued to a famous tower doesn't borrow its fame.</td></tr>
+<tr><td>Harberger premium</td><td>Off ↔ required for protection</td><td>Optional, on pieces only; Q14b. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Manna on-chain</td><td>In-game ledger ↔ ERC-20</td><td>In-game first. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Treasury split</td><td>—</td><td><span class="pill shelf">Shelved</span> until there is revenue.</td></tr></table></div>
+
+<h3>Space and simulation</h3>
+<div class="tw"><table><tr><th>Dial</th><th>Range</th><th>Lean · status</th></tr>
+<tr><td>Ground growth</td><td>Fixed ring per day ↔ keeps pace with population density</td><td>Density-driven; works with any birth curve. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Verticality</td><td>Ground only ↔ free building up</td><td>Ground first <span class="pill dec">Decided</span>; when height opens is a rules event. <span class="pill shelf">Shelved</span></td></tr>
+<tr><td>Interior size</td><td>Exterior = interior ↔ unlimited</td><td><span class="pill open">Open</span> (Q10)</td></tr>
+<tr><td>Aggregates</td><td>Declared objects in state ↔ edge names only</td><td>Derived: a structure = a support-connected set of pieces; a group = bodies whose intents share a target. <span class="pill open">Open</span></td></tr>
+<tr><td>Intent time</td><td>Timeless ↔ recurring (daily, lunar)</td><td>A recurrence slot shared with the ritual's schedule. <span class="pill open">Open</span></td></tr>
+<tr><td>Tick rate</td><td>Seconds ↔ minutes (decided range)</td><td>A rule, not a promise; slows under load.</td></tr>
+<tr><td>Steering rate limit</td><td>Arrival order ↔ per-body limit ↔ price</td><td>Per-body limit. <span class="pill open">Open</span> (Q26)</td></tr>
+<tr><td>Verb additions</td><td>Frequent ↔ rare and ceremonial</td><td>Rare; a natural beat for the manna fall.</td></tr></table></div>
+
+<div class="note">Decide early, because they change the shape: arrival pricing form, what the ritual is, flat steering, idle influence, derived aggregates and intent time. Let the early community settle every number above, the cap, the treasury split, demurrage, Harberger's scope and when height opens.</div>
+
+<h2 id="c13">13 · Ledger</h2>
+<h3><span class="pill dec">Decided</span> by Gene</h3>
+<ul>
+<li>A body is the unit; minds are infinite. <strong>Newcomers enter right away</strong> (round 8).</li>
+<li>Bodies always on, simulated passively; owners steer from any agent on any schedule; wallet auth with Google login. <strong>Idle bodies must still feel alive and influential</strong>; the world must stay easy to evolve (round 8).</li>
+<li>One central simulator. The world advances over seconds and minutes with bounded compute.</li>
+<li>The ground expands outward from ~100 × 100 m; the frontier is the outer ring; new terrain as it grows.</li>
+<li>One daily ritual at the center, time rotating with the lunar calendar (originally a birth ritual).</li>
+<li>Daily manna UBI. Center hardens and grows rich; frontier stays poor and dynamic. Idle-rich must not happen.</li>
+<li>Pallet racks and wood first; ground first, height later.</li>
+<li>Immutability plus upgradeability via versioned rules replayed from t=0 (in principle).</li>
+<li>World neutral; places and rooms exist; a Mars portal is possible. Treasury pays the team and makes grants.</li>
+<li>Audience: friends, believers, speculators last. Art from the edges.</li>
+<li>Input shape like WorldPrompt, produced by the game engine, not a video model (round 7, "I agree with you").</li>
+</ul>
+<h3><span class="pill wd">Withdrawn</span> by Gene, round 8</h3>
+<ul>
+<li><s>One body per day, auctioned, ~30 years, ~10,000 bodies.</s> It "artificially constrains growth in a very fundamental way, persistently and forever."</li>
+<li><s>Controlling a body gets harder over time.</s> The aim was aliveness when idle.</li>
+</ul>
+<h3><span class="pill lean">Leaning</span></h3>
+<ul>
+<li>Interpreter at the edges; a fixed, versioned core vocabulary. Rollup-style: Eden sequences, log and roots on-chain, permanent storage, anyone can verify and resume.</li>
+<li>Three layers: edge intents, deterministic policy, engine. Intents are the logged unit. Five event kinds. Scene aspects are intents from governance keys.</li>
+<li>Nouns open (asset defs with affordances), verbs closed. Pieces as the unit of state. Support-only physics. Bodies of any topology with a capability map, morphology fixed at birth.</li>
+<li>Media is media, ingested and content-addressed. Moderation by geography plus a hard floor. Manna in-game first, bodies as NFTs.</li>
+<li>Inertia: change cost = base × age × attention. Price-to-alter with fees to the author; Harberger as an optional premium.</li>
+<li>Doors on structures in the main map. Mars 2026 as the first room.</li>
+<li>Round 8 (Claude, not endorsed): VRGDA birth pricing; the manna fall as the ritual; flat steering; idle bodies as patrons; land at the center; derived aggregates and a recurrence slot on intents.</li>
+</ul>
+<h3><span class="pill shelf">Shelved</span></h3>
+<p>Every number in chapter 12: birth target curve and any cap or end; UBI rate; demurrage; inertia coefficients; Harberger scope; manna on-chain; treasury split; verticality timing; identity-edit rules; auction vs. blessing.</p>
+<h3><span class="pill open">Open</span></h3>
+<div class="tw"><table><tr><th class="num">#</th><th>Question</th></tr>
+<tr><td class="num">1–3</td><td>Exact primitive set; succession if Eden stops; what goes on-chain in full. Gene: open and non-urgent.</td></tr>
+<tr><td class="num">4</td><td>Who may propose and enact rule versions.</td></tr>
+<tr><td class="num">5</td><td>Birth description to body: central and logged, or supplied by the owner's agent.</td></tr>
+<tr><td class="num">6b–6d</td><td>What the daily ritual is for; where newcomers land and the entry price; owner/body configurations.</td></tr>
+<tr><td class="num">8</td><td>Idle default behaviour: cheap, charming and influential.</td></tr>
+<tr><td class="num">10–11</td><td>Rooms and interior size; how the ground grows.</td></tr>
+<tr><td class="num">14b, 16–17</td><td>What protection covers; artworks as NFTs; early sculpting of the center.</td></tr>
+<tr><td class="num">18–20</td><td>The submission vocabulary; who holds the hard-floor veto; plagiarism.</td></tr>
+<tr><td class="num">20b</td><td>Does anything exist in the rules above pieces and bodies (buildings, groups)?</td></tr>
+<tr><td class="num">21–25</td><td>Minimal affordance schema; minimal intent schema; who addresses scene intents; body topologies; seed library licensing.</td></tr>
+<tr><td class="num">26</td><td>Tick assignment fairness under high-rate steering.</td></tr></table></div>
+<h3><span class="pill rej">Rejected</span></h3>
+<ul><li>Programs not pixels. Rigid parcels. Competing or decentralized simulators. Retroactive rule changes. A daily birth ceremony that makes newcomers wait.</li></ul>
+<p class="small">The candidate first slice in <code>06</code> is for discussion only and is not approved. Nothing here is a build plan.</p>
+</main>
+</div>

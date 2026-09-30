@@ -19,7 +19,7 @@ relationships, shared things, places as activity systems, and what the shell,
 the engine and the owners' agents each need for that.
 
 Read, in this order (all in this repo):
-1. `README.md` and `docs/RUNBOOK.md`: what Sim is and runs.
+1. `docs/README.md` (the map: one project, two heads), `README.md` and `docs/RUNBOOK.md`.
 2. `docs/frontier/README.md`: the discussion so far, the framing questions, and how to work.
 3. `docs/frontier/mars/SIMULATION_FRONTIER.md` and `SIMULATION_FRONTIER_APPLICATIONS.md`:
    the Mars-side statement of the frontier (2026-09-30).
