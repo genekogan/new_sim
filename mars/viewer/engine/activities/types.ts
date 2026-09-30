@@ -78,6 +78,7 @@ export type ClassroomPhase =
 export type ClassroomIntent =
   | { kind: 'question'; actor: string }
   | { kind: 'depart'; actor: string }
+  | { kind: 'join'; actor: string; departure?: Vec2 }
   | { kind: 'advance' }
   | { kind: 'cancel' };
 export interface ClassroomParams {
@@ -116,9 +117,12 @@ export interface ClassroomReadout {
     seat: string;
     state: 'participating' | 'excluded';
     reason?: string;
+    /** A newly admitted member is on an ordinary sit child route until occupied. */
+    arrival?: 'joining' | 'seated';
   }[];
   controls: ClassroomIntent['kind'][];
   queuedQuestions: string[];
+  joining: string[];
   diagnostic?: Diagnostic;
 }
 /** Adapter operates presentation state only; authoritative movement stays in registered actions. */

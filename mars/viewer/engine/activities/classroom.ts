@@ -12,7 +12,13 @@ import type { Vec2 } from '../core/math.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
 import { humanOf } from '../social/actions.ts';
-import { isFree, seatApproach, slotById, type Slot } from '../social/slots.ts';
+import {
+  isFree,
+  occupantOf,
+  seatApproach,
+  slotById,
+  type Slot,
+} from '../social/slots.ts';
 import type {
   ClassroomControlParams,
   ClassroomDisplay,
@@ -47,6 +53,11 @@ const paramsSchema = z.strictObject({
 const intentSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('question'), actor: id }),
   z.strictObject({ kind: z.literal('depart'), actor: id }),
+  z.strictObject({
+    kind: z.literal('join'),
+    actor: id,
+    departure: point.optional(),
+  }),
   z.strictObject({ kind: z.literal('advance') }),
   z.strictObject({ kind: z.literal('cancel') }),
 ]);
@@ -68,6 +79,7 @@ type Exec = {
   attention?: string;
   children: string[];
   externalDepartures: string[];
+  extraDepartures: Record<string, Vec2>;
   pending: string[];
   queue: ClassroomIntent[];
   questions: string[];
@@ -129,9 +141,160 @@ function exclude(rt: Runtime, ex: Exec, actor: string, reason: string) {
   if (!p || p.state === 'excluded') return;
   p.state = 'excluded';
   p.reason = reason;
+  p.arrival = undefined;
   ex.questions = ex.questions.filter((a) => a !== actor);
   if (ex.attention === actor) ex.attention = ex.floor;
   rt.mark('classroom.participant-excluded', { session: ex.id, actor, reason });
+}
+function departureOf(ex: Exec, actor: string): Vec2 | undefined {
+  return ex.params.departure[actor] ?? ex.extraDepartures[actor];
+}
+
+/** Pure admission preview. The registered control rechecks before claiming in start. */
+function joinSeat(
+  rt: Runtime,
+  ex: Exec,
+  actor: string,
+  suppliedDeparture?: Vec2,
+): Slot | Diagnostic {
+  if (ex.stopping || !['presenting', 'question'].includes(ex.phase))
+    return diagnostic(
+      'join-phase',
+      `${actor} can join ${ex.id} only during presenting or question, not ${ex.phase}`,
+      [actor, ex.id],
+    );
+  const previous = ex.people.find((p) => p.actor === actor);
+  if (
+    previous &&
+    (previous.role !== 'audience' || previous.state !== 'excluded')
+  )
+    return diagnostic(
+      'join-ineligible',
+      `${actor} is already participating or has a non-audience role in ${ex.id}`,
+      [actor, ex.id],
+    );
+  if (!previous && ex.people.filter((p) => p.role === 'audience').length >= 12)
+    return diagnostic(
+      'audience-full',
+      `${ex.id} already has 12 distinct audience members`,
+      [actor, ex.id],
+    );
+  const person = humanOf(rt, actor);
+  if ('code' in person) return person;
+  const holding = holdingDiagnostic(rt.world, actor);
+  if (holding) return holding;
+  if (person.human!.level !== 0)
+    return diagnostic(
+      'ground-only',
+      `${actor} is on level ${person.human!.level}; classroom joining supports ground only`,
+      [actor],
+    );
+  const holders = rt.holder(`actor:${actor}`);
+  if (
+    holders.length &&
+    !(previous && holders.length === 1 && holders[0] === ex.id)
+  )
+    return diagnostic(
+      'join-busy',
+      `${actor} is held by ${holders.join(', ')} and cannot join ${ex.id}`,
+      [actor, ...holders],
+    );
+  if (!departureOf(ex, actor) && !suppliedDeparture)
+    return diagnostic(
+      'departure-missing',
+      `${actor} needs a departure point to join ${ex.id}`,
+      [actor, ex.id],
+    );
+  let last: Diagnostic | undefined;
+  const candidates = previous
+    ? [previous.seat, ...ex.params.seats.filter((s) => s !== previous.seat)]
+    : ex.params.seats;
+  for (const id of candidates) {
+    if (
+      ex.people.some(
+        (p) =>
+          p.actor !== actor && p.state === 'participating' && p.seat === id,
+      )
+    )
+      continue;
+    const slot = slotById(rt, id);
+    if ('code' in slot) {
+      last = slot;
+      continue;
+    }
+    if (
+      slot.kind !== 'seat' ||
+      slot.level !== 0 ||
+      !rt.world.entities[slot.owner]
+    )
+      continue;
+    const owners = rt.holder(`slot:${id}`);
+    // An excluded member may reclaim their original parent-reserved seat; new
+    // people use genuinely spare authored furniture only.
+    if (
+      owners.length &&
+      !(previous?.seat === id && owners.length === 1 && owners[0] === ex.id)
+    )
+      continue;
+    if (occupantOf(rt.world, slot, new Set([actor]))) continue;
+    const route = rt.registry.get('sit')!.plan(rt, { actor, slot: id });
+    if (route.ok) return slot;
+    last = route.diagnostic;
+  }
+  return diagnostic(
+    'join-no-seat',
+    `${actor} has no free reachable authored seat in ${ex.id}: ${last?.message ?? ex.params.seats.join(', ')}`,
+    [actor, ...ex.params.seats],
+  );
+}
+
+function admitJoin(
+  rt: Runtime,
+  ex: Exec,
+  intent: Extract<ClassroomIntent, { kind: 'join' }>,
+): Diagnostic | null {
+  const seat = joinSeat(rt, ex, intent.actor, intent.departure);
+  if ('code' in seat) return seat;
+  if (!rt.holder(`actor:${intent.actor}`).includes(ex.id)) {
+    const claim = rt.reclaimSocialActor(ex.id, intent.actor);
+    if (claim) return claim;
+  }
+  const previous = ex.people.find((p) => p.actor === intent.actor);
+  if (previous) {
+    // The old cancelled child remains in the action history. It must not
+    // exclude this person again after an explicit rejoin.
+    if (previous.hold) ex.expectedStops.push(previous.hold);
+    previous.state = 'participating';
+    previous.reason = undefined;
+    previous.seat = seat.id;
+    previous.arrival = 'joining';
+    previous.directedBy = undefined;
+  } else
+    ex.people.push({
+      actor: intent.actor,
+      role: 'audience',
+      seat: seat.id,
+      state: 'participating',
+      arrival: 'joining',
+    });
+  if (!departureOf(ex, intent.actor) && intent.departure)
+    ex.extraDepartures[intent.actor] = intent.departure;
+  const rec = child(rt, ex, 'sit', { actor: intent.actor, slot: seat.id });
+  ex.people.find((p) => p.actor === intent.actor)!.hold = rec.id;
+  if (rec.status === 'failed')
+    return (
+      rec.diagnostic ??
+      diagnostic('join-failed', `${intent.actor} could not take ${seat.id}`, [
+        intent.actor,
+        seat.id,
+      ])
+    );
+  rt.mark('classroom.joining', {
+    session: ex.id,
+    actor: intent.actor,
+    seat: seat.id,
+  });
+  return null;
 }
 function nextPresenter(ex: Exec): string | undefined {
   return ex.params.presenters
@@ -226,9 +389,20 @@ export function readClassroom(
     ),
     controls:
       rt.isActive(session) && !ex.stopping
-        ? ['question', 'depart', 'advance', 'cancel']
+        ? [
+            'question',
+            'depart',
+            ...(['presenting', 'question'].includes(ex.phase)
+              ? ['join' as const]
+              : []),
+            'advance',
+            'cancel',
+          ]
         : [],
     queuedQuestions: [...ex.questions],
+    joining: ex.people
+      .filter((p) => p.state === 'participating' && p.arrival === 'joining')
+      .map((p) => p.actor),
     diagnostic: ex.error,
   };
 }
@@ -246,12 +420,10 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
         mode: 'exclusive' as const,
       })),
       { resource: `slot:${p.presenterStation}`, mode: 'exclusive' },
-      ...(planned
-        .get(p)
-        ?.people.map((person) => ({
-          resource: `slot:${person.seat}`,
-          mode: 'exclusive' as const,
-        })) ?? []),
+      ...(planned.get(p)?.people.map((person) => ({
+        resource: `slot:${person.seat}`,
+        mode: 'exclusive' as const,
+      })) ?? []),
       ...(p.displayId
         ? [{ resource: `display:${p.displayId}`, mode: 'exclusive' as const }]
         : []),
@@ -459,6 +631,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
       presenterIndex: 0,
       children: [],
       externalDepartures: [],
+      extraDepartures: {},
       pending: [],
       queue: [],
       questions: [],
@@ -508,10 +681,11 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
       if (intent.kind === 'advance') ex.advance = true;
       if (intent.kind === 'question') ex.questions.push(intent.actor);
       if (intent.kind === 'depart') {
+        const destination = departureOf(ex, intent.actor)!;
         const rec = rt.submit('walk_to', {
           actor: intent.actor,
-          x: ex.params.departure[intent.actor][0],
-          z: ex.params.departure[intent.actor][1],
+          x: destination[0],
+          z: destination[1],
           level: 0,
         });
         ex.externalDepartures.push(rec.id); // Independent departure directive survives later session cleanup.
@@ -522,6 +696,19 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
       }
     }
     if (ex.stopping) return { status: 'running', phase: 'cleanup' };
+    for (const p of participating(ex))
+      if (
+        p.arrival === 'joining' &&
+        p.hold &&
+        rt.records.get(p.hold)?.phase === 'occupied'
+      ) {
+        p.arrival = 'seated';
+        rt.mark('classroom.joined', {
+          session: ex.id,
+          actor: p.actor,
+          seat: p.seat,
+        });
+      }
     // A foreign cancellation of a participant's social hold permanently excludes that member.
     for (const p of participating(ex))
       if (p.hold) {
@@ -814,7 +1001,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
         if (!live(rt, ex.pending)) {
           ex.pending = [];
           for (const p of participating(ex)) {
-            const q = ex.params.departure[p.actor];
+            const q = departureOf(ex, p.actor)!;
             ex.pending.push(
               child(rt, ex, 'walk_to', {
                 actor: p.actor,
@@ -863,7 +1050,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
 export const classroomControl: ActionDef<
   ClassroomControlParams,
   null,
-  { id: string }
+  { id: string; error?: Diagnostic }
 > = {
   verb: 'classroom_control',
   description:
@@ -885,6 +1072,7 @@ export const classroomControl: ActionDef<
       };
     const requestedActor = 'actor' in p.intent ? p.intent.actor : undefined;
     if (
+      p.intent.kind !== 'join' &&
       requestedActor &&
       !participating(ex).some((a) => a.actor === requestedActor)
     )
@@ -896,9 +1084,21 @@ export const classroomControl: ActionDef<
           [requestedActor, p.session],
         ),
       };
+    if (p.intent.kind === 'join') {
+      const seat = joinSeat(rt, ex, p.intent.actor, p.intent.departure);
+      if ('code' in seat) return { ok: false, diagnostic: seat };
+    }
+    const questionActor =
+      p.intent.kind === 'question' ? p.intent.actor : undefined;
     if (
-      p.intent.kind === 'question' &&
-      (!ex.params.audience.includes(p.intent.actor) ||
+      questionActor &&
+      (!ex.people.some(
+        (member) =>
+          member.actor === questionActor &&
+          member.role === 'audience' &&
+          member.state === 'participating' &&
+          member.arrival !== 'joining',
+      ) ||
         ![
           'arriving',
           'rotating',
@@ -911,8 +1111,8 @@ export const classroomControl: ActionDef<
         ok: false,
         diagnostic: diagnostic(
           'question-ineligible',
-          `${p.intent.actor} cannot ask a question during ${ex.phase} in ${p.session}`,
-          [p.intent.actor, p.session],
+          `${questionActor} cannot ask a question during ${ex.phase} in ${p.session}`,
+          [questionActor, p.session],
         ),
       };
     if (
@@ -933,10 +1133,19 @@ export const classroomControl: ActionDef<
     return { ok: true, program: null };
   },
   start(rt, p, _program, actionId) {
-    store(rt)[p.session].queue.push(p.intent);
+    const ex = store(rt)[p.session];
+    if (p.intent.kind === 'join') {
+      const error = admitJoin(rt, ex, p.intent);
+      if (error) beginCleanup(rt, ex, error);
+      return { id: actionId, error: error ?? undefined };
+    }
+    ex.queue.push(p.intent);
     return { id: actionId };
   },
-  step: () => ({ status: 'completed' }),
+  step: (_rt, ex) =>
+    ex.error
+      ? { status: 'failed', diagnostic: ex.error }
+      : { status: 'completed' },
   cancel: () => ({ ok: true }),
   resumable: true,
 };
