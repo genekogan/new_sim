@@ -72,12 +72,14 @@ export class Observer {
             [e.pose.p[0], e.pose.p[1] + height - 0.1, e.pose.p[2]],
           ],
         };
-      } else if (e.id === 'screen') {
+      } else if (e.kind === 'fixture') {
+        const extent = entityFootprint(e);
+        const height = Math.max(0.3, extent.y1 - extent.y0);
         subjects[e.id] = {
           p: [...e.pose.p],
           yaw: e.pose.yaw,
-          height: 2,
-          points: [[e.pose.p[0], e.pose.p[1] + 1.3, e.pose.p[2]]],
+          height,
+          points: [[e.pose.p[0], extent.y1 + 0.02, e.pose.p[2]]],
         };
       }
     }

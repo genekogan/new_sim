@@ -13,6 +13,7 @@ import type { CameraPose } from '../engine/camera/shots.ts';
 export const POLICY = {
   clear: { hold: 4, threshold: 0.65 },
   restrained: { hold: 9, threshold: 1.1 },
+  continuous: { hold: Infinity, threshold: Infinity },
 };
 export function rankShot(
   s: Shot,
@@ -22,8 +23,20 @@ export function rankShot(
 ): number {
   let score = s.quality * 2;
   const focus = o.activity.focus ?? o.activity.speaker;
-  const floorActive =
-    o.activity.phase === 'presenting' || o.activity.phase === 'question';
+  const floorActive = [
+    'presenting',
+    'question',
+    'conversing',
+    'working',
+  ].includes(o.activity.phase);
+  if (policy === 'continuous')
+    return (
+      s.quality * 2 +
+      (s.intention === 'follow' &&
+      s.subjects[0] === (focus ?? o.activity.members[0])
+        ? 10
+        : 0)
+    );
   if (policy === 'clear') {
     if (s.intention === 'questioner' && s.subjects[0] === focus && floorActive)
       score += 4;
@@ -111,7 +124,13 @@ export class Director {
   }
   request(): Request | undefined {
     const o = this.observation;
-    if (!o || this.operator || this.shots.length === 0) return;
+    if (
+      !o ||
+      this.operator ||
+      this.shots.length === 0 ||
+      this.policy === 'continuous'
+    )
+      return;
     return {
       session: this.session,
       version: o.semanticVersion,

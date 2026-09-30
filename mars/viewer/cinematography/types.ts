@@ -5,7 +5,7 @@ import type {
   SubjectPose,
   ShotSpec,
 } from '../engine/camera/shots.ts';
-export type Policy = 'clear' | 'restrained';
+export type Policy = 'clear' | 'restrained' | 'continuous';
 export type Intention =
   | 'establishing'
   | 'speaker'

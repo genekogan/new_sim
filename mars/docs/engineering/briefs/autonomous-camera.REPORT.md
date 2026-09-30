@@ -193,3 +193,33 @@ No camera integration/release yet. Engine owner has reviewed additive checkpoint
 commits and retains the frozen interface/next green-boundary integration decision.
 Local review remains on http://127.0.0.1:5593/cinematography/review.html.
 No further paid calls; no camera helpers; no changes to engine release sequencing.
+
+## Autonomous camera next — varied suite baseline
+
+Reviewed handoff branch `codex/autonomous-camera` remains at a6cc661. Further
+work is on `codex/autonomous-camera-next`, same dedicated worktree/ports, rebased
+onto independent engine release16. No engine/shared entrypoint edits.
+
+Six actual engine takes: classroom presentation/questions/rotation, classroom
+conversation groups/public floors, Lab wall-avoidance walk, actual work_at
+workstation, Lab campfire simultaneous activities, classroom with camera-only
+partition and operator override. Policies share identical takes/world hashes; all
+six runs have zero invariant violations and no failed actions. Visitor approaches
+conversation vicinity (not formal admission); concurrent speaker/attention cues
+are explicitly camera-owned because standalone Lab lacks public floor readout.
+No riding, live Jev or restored replay head attention claim.
+
+New continuous policy holds one followed subject through unrelated speaker
+changes, with safety recovery/manual controls retained. Camera observation adds
+derived fixture target points for workstation framing; no object task mutation.
+New suite-record.ts, capture-suite.mjs and local app/camera-lab/suite.* produce a
+90-second two-view reel with six uninterrupted 15-second passages. Baseline source
+has fixed room-side angles and weak foreground composition; preserve it before
+front-angle corrections for same-take comparison.
+
+24 focused camera tests; full engine643 total,626 pass,zero fail,6skip11TODO
+(63.1s). Repo/camera typechecks and scoped lint pass. An initial uncommitted capture
+was interrupted by my formatting-triggered HMR and stalled at the initial world
+time; failed WebM/frame retained, not success proof. Capture tooling now saves
+failed proof as well; source will remain fixed during the committed rerun.
+Engine-owner release17 idle measurement respected; no helpers/API calls.

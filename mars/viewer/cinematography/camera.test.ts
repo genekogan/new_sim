@@ -422,3 +422,27 @@ void test('synchronous provider throw and malformed reply fall back and clear re
     a.dispose();
   }
 });
+void test('continuous following retains its subject through unrelated speaker changes', () => {
+  const d = new Director('continuous');
+  d.update(observation());
+  assert.equal(d.selectedId, 'follow:a');
+  const next = observation(12);
+  next.activity.focus = 'b';
+  next.activity.speaker = 'b';
+  next.semanticVersion++;
+  d.update(next);
+  assert.equal(d.selectedId, 'follow:a');
+  assert.equal(d.decisions.filter((d) => d.cut).length, 0);
+  assert.equal(d.request(), undefined);
+  d.takeover({ subject: 'b', expires: 14 });
+  d.update(next);
+  assert.equal(d.selectedId, 'follow:b');
+});
+void test('derived workstation target exists without modifying object task state', () => {
+  const w = classroomWorld(),
+    before = JSON.stringify(w),
+    o = new Observer().read(w, 0, 0, cameraScene(w, classroomScene()));
+  assert.ok(o.subjects.workstation);
+  assert.ok(o.subjects.workstation.points!.length);
+  assert.equal(JSON.stringify(w), before);
+});

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Camera varied runtime suite</title>
+    <style>
+      body {
+        margin: 0;
+        background: #101820;
+        color: #fff;
+        font: 17px system-ui;
+      }
+      canvas {
+        display: block;
+      }
+      header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 20px;
+      }
+      #status {
+        position: absolute;
+        bottom: 16px;
+        left: 20px;
+        right: 20px;
+        line-height: 1.6;
+      }
+      .policies {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 30px;
+        font-size: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <b id="title">Loading runtime suite</b>
+      <div class="policies">
+        <span id="left"></span><span id="right"></span>
+      </div>
+    </header>
+    <div id="status"></div>
+    <script type="module" src="./suite-view.ts"></script>
+  </body>
+</html>
