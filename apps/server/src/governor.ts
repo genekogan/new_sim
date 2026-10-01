@@ -5,7 +5,7 @@
 // cap on the total stays as a backstop.
 export type Tier = 'mid' | 'narrator' | 'director' | 'user' | 'talk';
 /** user = compiling wishes, translate, on-demand shots (people clicking), reserved so it always works. talk = rendering speech. */
-export const SHARES: Record<Tier, number> = { mid: 0.35, narrator: 0.2, director: 0.05, user: 0.15, talk: 0.25 };
+export const SHARES: Record<Tier, number> = { mid: 0.3, narrator: 0.15, director: 0.05, user: 0.3, talk: 0.2 };
 const DAY_MS = 24 * 3600 * 1000;
 const CAPACITY_HOURS = 1; // a bucket holds at most one hour of its refill (allows short bursts)
 

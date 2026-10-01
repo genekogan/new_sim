@@ -13,7 +13,7 @@ import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { WORLD_ID, energyWord, hash32, type Mind, type WorldHost } from './world.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
-import { awaiting, candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
+import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
 import { cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
 
 const TPS = 20;
@@ -356,15 +356,20 @@ export class Brain {
         // check everything before minting anything
         const problems: string[] = []; const verbSet = this.engineVerbs();
         const staged = structuredClone(k); for (const [n, d] of Object.entries(out.new_links ?? {})) staged.vocab.links[n] ??= d;
+        const owners = Object.values(k.things).filter((x) => x.kind === 'soul' && x.id !== m.soulId && new RegExp(`\\b${x.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(’s|'s)`, 'i').test(wish));
         const validNew = new Map<string, Card>();
         for (const raw of out.new_cards ?? []) { const v = validateCard(raw, staged, verbSet); if (v.ok) validNew.set(v.card.name, v.card); else problems.push(`card "${String((raw as { name?: unknown })?.name)}": ${v.problems.join('; ')}`); }
         if (!Array.isArray(out.agenda) || out.agenda.length === 0) problems.push('the agenda is empty');
         for (const a of out.agenda ?? []) {
           const card = validNew.get(a.card) ?? k.vocab.cards[a.card];
           if (!card) { problems.push(`agenda step uses a card that does not exist: "${a.card}"`); continue; }
-          if (a.target !== null && !k.things[a.target]) problems.push(`agenda step "${a.card}" targets an unknown thing id "${a.target}" (use an id from the list, or null)`);
+          if (a.target !== null && !k.things[a.target]) problems.push(`agenda step "${a.card}" targets "${a.target}", which is not an id in the list of known things. Ids are never invented. If the thing does not exist yet (a party that has not started), set "target" to null and "of" to the id of the Soul or thing it will belong to`);
           else if (a.target && card.target && card.target.kind !== 'any' && k.things[a.target].kind !== card.target.kind) problems.push(`agenda step "${a.card}" needs a ${card.target.kind} but "${a.target}" is a ${k.things[a.target].kind}`);
           if (a.of && !k.things[a.of]) problems.push(`agenda step "${a.card}" has an unknown "of" id "${a.of}"`);
+          // "Rob's party" must be Rob's: a wish that names whose thing it is cannot be bound to someone else's.
+          const t = a.target ? k.things[a.target] : undefined;
+          if (t && t.kind !== 'soul' && t.kind !== 'place' && t.kind !== 'region' && owners.length && !owners.some((o) => belongsTo(this.host, t.id, o.id)) && Object.values(k.links).some((l) => l.to === t.id && k.things[l.from]?.kind === 'soul'))
+            problems.push(`agenda step "${a.card}" targets ${t.name} (${t.id}), but the wish says ${owners.map((o) => `${o.name}’s`).join(' or ')} and that thing is not theirs. If ${owners[0].name} has no such thing yet, set "target" to null and "of" to "${owners[0].id}"`);
         }
         attempts.push({ out, problems });
         if (problems.length && attempt === 0) { messages.push({ role: 'assistant', content: `I proposed: ${JSON.stringify(out)}` }, { role: 'user', content: `That cannot run. Problems:\n- ${problems.join('\n- ')}\nFix them and call compile again.` }); continue; }
@@ -409,7 +414,11 @@ export class Brain {
       earlier: this.db.talkBetween(from, to, 4).map((l) => ({ who: l.fromName, text: l.text })),
     };
     let lines: SpokenLine[] = [];
-    const live = this.mode === 'live' && !!this.cfg.anthropicKey && !this.overBudget && this.gov.allow('talk');
+    // Words cost money, so they go first to what people steer and to what matters: a question or an answer, or a Soul with an owner.
+    // Small talk between natives is rendered only while someone is watching and the speech budget is more than half full.
+    const matters = act === 'ask' || act === 'agree' || act === 'decline' || [from, to].some((id) => { const mm = this.host.minds.get(id); return !!mm && !mm.native; });
+    const spare = (() => { const b = this.gov.view().find((x) => x.tier === 'talk')!; return b.level > b.capacity / 2; })();
+    const live = this.mode === 'live' && !!this.cfg.anthropicKey && !this.overBudget && (matters || (this.sink.clients() > 0 && spare)) && this.gov.allow('talk');
     if (live) {
       try {
         const r = await callTool<{ lines: SpokenLine[] }>({ apiKey: this.cfg.anthropicKey!, model: this.cfg.talkModel, system: TALK_SYSTEM, messages: [{ role: 'user', content: talkUser(input) }], tool: TALK_TOOL, maxTokens: 300, timeoutMs: 20000 });

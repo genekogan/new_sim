@@ -287,7 +287,8 @@ export class WorldHost {
               if (m.agendaPos < m.agenda.length) { m.nextEvalTick = Math.min(m.nextEvalTick, tick + 15); m.evalTrigger = 'plan-advanced'; m.lastFingerprint = ''; }
             }
             // anyone spoken to re-thinks soon: this is how asking and answering chain together
-            for (const c of view.changes) if (c.op === 'say') { const o = this.minds.get(c.to); if (o) { o.nextEvalTick = Math.min(o.nextEvalTick, tick + 8 + (hash32(o.soulId) % 20)); o.evalTrigger = 'spoken-to'; o.lastFingerprint = ''; } }
+            // (small talk does not: the exchange has already happened, and waking the listener would only provoke a reply to the reply)
+            for (const c of view.changes) if (c.op === 'say' && c.act !== 'chat' && c.act !== 'tell') { const o = this.minds.get(c.to); if (o) { o.nextEvalTick = Math.min(o.nextEvalTick, tick + 8 + (hash32(o.soulId) % 20)); o.evalTrigger = 'spoken-to'; o.lastFingerprint = ''; } }
           } else {
             m.recent = [...m.recent.slice(-3), `${what} (did not happen: ${view.reason})`];
             m.pending = null; m.doing = 'standing around'; m.avoid = { id: view.target ? `${view.card}@${view.target}` : view.card, untilTick: tick + 1200 };

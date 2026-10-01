@@ -96,7 +96,7 @@ export class MarsEngine implements Engine {
   get world(): WorldState { return this.rt.world as WorldState; }
   private get ents(): Record<string, any> { return this.rt.world.entities; }
   describeVerbs(): VerbInfo[] {
-    return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}` }))];
+    return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
   stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving }); }

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { ActionDef } from './actions.ts';
 
-export type VerbInfo = { verb: string; description: string; inputSchema: Record<string, unknown> };
+/** `scope: 'world'` marks a verb that belongs to one world's engine (not the shared body language); such verbs are listed briefly, with schemas on request. */
+export type VerbInfo = { verb: string; description: string; inputSchema: Record<string, unknown>; scope?: 'world' };
 
 export function createRegistry(defs: ActionDef[]): Map<string, ActionDef> {
   const m = new Map<string, ActionDef>();

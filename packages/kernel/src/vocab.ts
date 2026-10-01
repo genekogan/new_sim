@@ -29,6 +29,10 @@ export const BASE_MANNERS: Record<string, Manner> = {
   grandly: { summary: 'theatrical, expansive, for an audience' },
 };
 
+// One play of a talking card is a whole exchange (both voices are rendered from it), so two people who have just spoken
+// do not start another until what was said has faded (two minutes). Without this, each reply provokes a reply for ever.
+const QUIET: Card['when'] = [{ notLinked: ['said', '$actor', '$target'] }, { notLinked: ['said', '$target', '$actor'] }];
+
 export const BASE_CARDS: Card[] = [
   { name: 'go to', summary: 'Walk to a place and be there', good_when: 'the intent names that place, or something is happening there', not_for: 'no reason to move',
     target: { kind: 'place' }, when: [{ notAt: ['$actor', '$target'] }, { notState: ['$actor', 'hosting', true] }], then: [{ move: ['$actor', '$target'] }, { set: ['$actor', 'doing', 'arriving'] }],
@@ -43,10 +47,10 @@ export const BASE_CARDS: Card[] = [
     target: { kind: 'soul', same_place: true }, when: [{ notLinked: ['said', '$actor', '$target'] }], then: [{ say: ['$actor', '$target', 'greet'] }],
     approach: [{ verb: 'walk_to', params: { to: '$target', standoff: 1.6 } }], during: [{ verb: 'wave', params: { at: '$target', seconds: 2 } }], takes: 'seconds' },
   { name: 'talk with', summary: 'Go to someone and have a conversation', good_when: 'the Soul wants company or the intent names them', not_for: 'the Soul wants to be alone',
-    target: { kind: 'soul' }, when: [{ notState: ['$actor', 'hosting', true] }], then: [{ move: ['$actor', '$target.at'] }, { say: ['$actor', '$target', 'chat'] }, { link: ['knows', '$actor', '$target'] }, { set: ['$actor', 'doing', 'talking with $target.name'] }],
+    target: { kind: 'soul' }, when: [{ notState: ['$actor', 'hosting', true] }, ...QUIET], then: [{ move: ['$actor', '$target.at'] }, { say: ['$actor', '$target', 'chat'] }, { link: ['knows', '$actor', '$target'] }, { set: ['$actor', 'doing', 'talking with $target.name'] }],
     approach: [{ verb: 'walk_to', params: { to: '$target', standoff: 1.3 } }], during: [{ verb: 'converse', params: { with: '$target', seconds: 30 } }], takes: 'minute' },
   { name: 'chat', summary: 'Talk with someone who is right here, without going anywhere', good_when: 'someone is here and the Soul feels like talking, or is hosting and wants to welcome them', not_for: 'the Soul wants quiet',
-    target: { kind: 'soul', same_place: true }, when: [], then: [{ say: ['$actor', '$target', 'chat'] }, { link: ['knows', '$actor', '$target'] }, { set: ['$actor', 'doing', 'talking with $target.name'] }],
+    target: { kind: 'soul', same_place: true }, when: [...QUIET], then: [{ say: ['$actor', '$target', 'chat'] }, { link: ['knows', '$actor', '$target'] }, { set: ['$actor', 'doing', 'talking with $target.name'] }],
     approach: [{ verb: 'walk_to', params: { to: '$target', standoff: 1.3 } }], during: [{ verb: 'converse', params: { with: '$target', seconds: 20 } }], takes: 'seconds' },
   { name: 'say yes', summary: 'Agree to what someone just asked', good_when: 'someone asked for something reasonable and the Soul is willing', not_for: 'the request goes against the Soul’s nature',
     target: { kind: 'soul', same_place: true }, when: [{ said: ['$target', '$actor', 'ask'] }, { notLinked: ['agreed', '$actor', '$target'] }],
