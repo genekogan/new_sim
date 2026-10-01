@@ -1,3 +1,4 @@
+import { chessAttention } from './chess.ts';
 import { readComputerMusic } from '../../engine/activities/computer-music.ts';
 // Engine Lab view: three.js renderer + orbit camera over a LabSim. The rAF
 // loop feeds real elapsed time into the sim accumulator (sim time decoupled
@@ -275,6 +276,7 @@ export class LabView {
         if (listener.state === 'listening' && listener.child && rt.holder(`actor:${listener.actor}`).includes(listener.child))
           targets[listener.actor] = [performer.pose.p[0],performer.pose.p[2]];
     }
+    Object.assign(targets, chessAttention(rt));
     this.attentionTargets = targets;
     this.humans.setAttention(targets);
   }

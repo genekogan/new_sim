@@ -2,6 +2,8 @@ import { readFixtureMove } from '../../engine/carry/fixture.ts';
 import { musicStation, readComputerMusic } from '../../engine/activities/computer-music.ts';
 import { musicSoundState } from './music-sound.ts';
 import { readBook } from '../../engine/objects/reading.ts';
+import { readChess } from '../../engine/objects/chess.ts';
+import { CATALOG } from '../../engine/world/catalog.ts';
 import { readWorkstation } from '../../engine/objects/workstation.ts';
 import { LabCameraGeometryCache } from './camera-observation.ts';
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
@@ -139,6 +141,8 @@ export function installHook(view: LabView, notify: () => void) {
     musicAudio: () => structuredClone(musicSoundState()),
     music: () => structuredClone({station:musicStation(sim.rt,'music-computer'),sessions:[...sim.rt.records.values()].filter(r=>r.verb==='computer_music').map(r=>readComputerMusic(sim.rt,r.id))}),
     reading: () => structuredClone(readBook(sim.rt, 'book')),
+    chess: () => structuredClone(readChess(sim.rt, 'board')),
+    chessTokens: () => Object.values(sim.rt.world.entities).filter(e => CATALOG[e.def]?.capabilities?.gameToken?.game === 'chess').map(e => ({ id: e.id, def: e.def, pose: structuredClone(e.pose), support: structuredClone(e.support) })),
     workstation: () => {
       const work = activityExample(sim.scenario.name)?.workBreak.work ?? { actor: 'worker', station: 'workstation', seat: 'work-chair#seat' };
       return { state: readWorkstation(sim.rt, work.station), claims: Object.fromEntries([`workstation:${work.station}`, `actor:${work.actor}`, `slot:${work.seat}`].map(key => [key, sim.rt.holder(key)])) };

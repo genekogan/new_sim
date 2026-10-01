@@ -10,6 +10,7 @@ import { CATALOG } from '../../engine/world/catalog.ts';
 import { BUNDLES } from '../../engine/world/catalog-stock.ts';
 import { createFire, seedOf, type Fire } from './fire.ts';
 import { tableObject } from './items.ts';
+import { chessBoardObject } from './chess.ts';
 import { workstationObject, type WorkstationVisual, type WorkstationAppearanceOptions } from './workstation.ts';
 import { rendererColor } from './palette.ts';
 
@@ -280,6 +281,7 @@ export class FixtureViews {
     else if (e.def === 'standing-display') obj = this.standingDisplay(sx, sy, sz, v);
     else if (e.def === 'computer-workstation') { v.workstation = workstationObject(this.box.bind(this), sx, sy, sz, this.workstationAppearances[e.id]); obj = v.workstation.obj; }
     else if (e.def === 'speaker-lectern') obj = this.lectern(sx, sy, sz);
+    else if (e.def === 'chess-board') obj = chessBoardObject(this.box.bind(this));
     else if (e.def === 'table-6ft') {
       obj = tableObject(sx, sy, sz, this.std(color), this.std('#5c5f63', 0.5, 0.4));
       v.ownedGeometries = [];

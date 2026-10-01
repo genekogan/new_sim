@@ -4,12 +4,13 @@
 // Placement is components.ts's job: resting items at their engine pose; items `in-hand` on the
 // holder's rendered palm with the catalog grip offset (attachHeld).
 import * as THREE from 'three';
+import { chessTokenObject } from './chess.ts';
 
 export const FOOD_COLOR: Record<string, string> = { stew: '#7b4a22' };
 
 export type ItemObject = { obj: THREE.Object3D; fill?: THREE.Mesh; fillSpan?: [number, number, number, number]; leaf?: THREE.Group; bookmark?: THREE.Object3D };
 
-type Kit = { mat: (color: string, side?: THREE.Side) => THREE.Material; geo: (key: string, make: () => THREE.BufferGeometry) => THREE.BufferGeometry };
+export type Kit = { mat: (color: string, side?: THREE.Side) => THREE.Material; geo: (key: string, make: () => THREE.BufferGeometry) => THREE.BufferGeometry };
 
 const mesh = (g: THREE.BufferGeometry, m: THREE.Material) => {
   const o = new THREE.Mesh(g, m);
@@ -38,6 +39,8 @@ function vessel(r0: number, r1: number, h: number, t: number, seg = 20) {
  * `fillSpan` = [y at empty, y at full, radius at empty, radius at full] of the food disc.
  */
 export function itemObject(def: string, size: [number, number, number], color: string, kit: Kit): ItemObject | null {
+  const chess = chessTokenObject(def, size, color, kit);
+  if (chess) return chess;
   const [sx, sy] = size;
   const g = new THREE.Group();
   const add = (o: THREE.Object3D) => (g.add(o), o);
