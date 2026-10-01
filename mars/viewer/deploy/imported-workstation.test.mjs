@@ -146,3 +146,44 @@ await test('reset during asynchronous parse disposes late geometry and never att
     assert.equal(disposed, 1); assert.equal(parent.children.length, 0); assert.equal(ready, 0); assert.deepEqual(states, ['loading', 'disposed']); texture.dispose();
   } finally { Object.defineProperty(GLTFLoader.prototype, 'parseAsync', parse); Object.assign(globalThis, saved); }
 });
+
+await test('delayed successful appearance releases fallback plane and material but preserves the live canvas', async () => {
+  const saved = { fetch: globalThis.fetch, location: globalThis.location, document: globalThis.document };
+  const parse = Object.getOwnPropertyDescriptor(GLTFLoader.prototype, 'parseAsync');
+  const { scene } = assetScene(); let resolvePalette;
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) });
+  globalThis.location = { href: 'http://localhost/lab' };
+  Object.defineProperty(globalThis, 'document', { configurable: true, writable: true, value: { createElement: () => ({ getContext: () => ({ fillRect() {}, fillText() {} }) }) } });
+  GLTFLoader.prototype.parseAsync = async () => ({ scene, parser: { getDependency: () => new Promise(resolve => { resolvePalette = resolve; }) } });
+  try {
+    const v = workstationObject(box, 1.4, 1.3, 0.75, { kind: 'retro-computer' });
+    const fallback = v.obj.children.find(o => o instanceof THREE.Mesh && o.geometry instanceof THREE.PlaneGeometry);
+    assert.ok(fallback); const texture = fallback.material.map;
+    let geometryDisposed = 0, materialDisposed = 0, textureDisposed = 0;
+    fallback.geometry.addEventListener('dispose', () => geometryDisposed++);
+    fallback.material.addEventListener('dispose', () => materialDisposed++);
+    texture.addEventListener('dispose', () => textureDisposed++);
+    await turn(); assert.equal(v.appearanceState().status, 'loading');
+    assert.equal(fallback.parent, v.obj); assert.equal(fallback.visible, true);
+    assert.deepEqual([geometryDisposed, materialDisposed, textureDisposed], [0, 0, 0]);
+    resolvePalette(new THREE.Texture()); await turn();
+    assert.equal(v.appearanceState().status, 'ready'); assert.equal(fallback.parent, null);
+    assert.deepEqual([geometryDisposed, materialDisposed, textureDisposed], [1, 1, 0]);
+    assert.equal(scene.getObjectByName('Monitor002_RetroPalette2_0').material[1].map, texture);
+    v.update({ equipment: { kind: 'workstation', config: { status: 'active', task: 'Retained live task' } } });
+    v.dispose(); assert.deepEqual([geometryDisposed, materialDisposed, textureDisposed], [1, 1, 1]);
+  } finally { Object.defineProperty(GLTFLoader.prototype, 'parseAsync', parse); Object.assign(globalThis, saved); }
+});
+await test('failed appearance preserves owned fallback screen until workstation disposal', async () => {
+  const saved = { fetch: globalThis.fetch, document: globalThis.document };
+  globalThis.fetch = async () => ({ ok: false, status: 404 });
+  Object.defineProperty(globalThis, 'document', { configurable: true, writable: true, value: { createElement: () => ({ getContext: () => ({ fillRect() {}, fillText() {} }) }) } });
+  try {
+    const v = workstationObject(box, 1.4, 1.3, 0.75, { kind: 'retro-computer' });
+    const fallback = v.obj.children.find(o => o instanceof THREE.Mesh && o.geometry instanceof THREE.PlaneGeometry);
+    let disposed = 0; fallback.geometry.addEventListener('dispose', () => disposed++);
+    await turn(); assert.equal(v.appearanceState().status, 'failed');
+    assert.equal(fallback.parent, v.obj); assert.equal(fallback.visible, true); assert.equal(disposed, 0);
+    v.dispose(); assert.equal(disposed, 1);
+  } finally { Object.assign(globalThis, saved); }
+});

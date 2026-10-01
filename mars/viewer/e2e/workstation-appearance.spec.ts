@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test, expect } from '@playwright/test';
 import type { EngineHook } from '../app/lab/hook.ts';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 declare global { interface Window { __marsEngine: EngineHook } }
 const artifacts = path.resolve('e2e/artifacts', process.env.E2E_RUN ?? 'workstation-appearance');
@@ -65,11 +65,20 @@ test('missing imported appearance is named visibly while the same workstation re
   await capture(page, 'imported-computer-fallback.png');
 });
 test('repeated imported-computer resets and switching worlds release old renderer assets', async ({ page }) => {
+  const model = readFileSync(path.resolve('public/models/retro-computer-monitor.glb'));
+  let delayed = false;
+  await page.route('**/models/retro-computer-monitor.glb', async route => {
+    // Serve the initial model immediately, then force the reset fallback to render
+    // while loading. The same strict baseline must hold after either arrival order.
+    if (delayed) await new Promise(resolve => setTimeout(resolve, 250));
+    await route.fulfill({ status: 200, contentType: 'model/gltf-binary', body: model });
+  });
   await ready(page);
   await page.waitForFunction(() => window.__marsEngine.workstationAppearances()[0]?.status === 'ready');
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const baseline = await page.evaluate(() => window.__marsEngine.info());
   const resets: typeof baseline[] = [];
+  delayed = true;
   for (let i = 0; i < 3; i++) {
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
     await page.waitForFunction(() => window.__marsEngine.workstationAppearances()[0]?.status === 'ready');
@@ -84,6 +93,9 @@ test('repeated imported-computer resets and switching worlds release old rendere
     expect(info.geometries, detail).toBeLessThanOrEqual(baseline.geometries);
     expect(info.textures, detail).toBeLessThanOrEqual(baseline.textures);
   }
+  mkdirSync(artifacts, { recursive: true });
+  writeFileSync(path.join(artifacts, 'imported-computer-reset-resources.json'), JSON.stringify({ baseline, resets }, null, 2));
+  await capture(page, 'imported-computer-after-delayed-resets.png');
   await page.getByRole('combobox', { name: 'Scenario', exact: true }).selectOption('work-break-4');
   await expect(page.getByTestId('workstation-appearance')).toHaveCount(0);
   expect(await page.evaluate(() => window.__marsEngine.workstationAppearances())).toEqual([]);

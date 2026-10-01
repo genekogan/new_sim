@@ -20,7 +20,20 @@ export function workstationObject(box: (color: string, cx: number, y0: number, c
   const geometry = new THREE.PlaneGeometry(0.54, 0.34);
   const screen = new THREE.Mesh(geometry, material); screen.position.set(0, sy - 0.2, sz * 0.22 - 0.037); screen.rotation.y = Math.PI; group.add(screen);
   const primitive = group.children.slice(5);
-  const imported = appearance ? importedWorkstation(group, texture, sx, sy, sz, desktop, appearance, () => { for (const part of primitive) part.visible = false; }) : undefined;
+  let primitiveScreenDisposed = false;
+  const releasePrimitiveScreen = () => {
+    if (primitiveScreenDisposed) return;
+    primitiveScreenDisposed = true;
+    screen.removeFromParent();
+    geometry.dispose();
+    material.dispose();
+  };
+  const imported = appearance ? importedWorkstation(group, texture, sx, sy, sz, desktop, appearance, () => {
+    for (const part of primitive) part.visible = false;
+    // Loading may render the fallback before the model arrives. Release its owned
+    // plane/material now; the imported CRT continues to use the shared canvas.
+    releasePrimitiveScreen();
+  }) : undefined;
   let key = '';
   return { obj: group, ...(imported ? { appearanceState: imported.state } : {}), update(e: Entity) {
     const c = e.equipment?.kind === 'workstation' ? e.equipment.config : {};
@@ -34,6 +47,6 @@ export function workstationObject(box: (color: string, cx: number, y0: number, c
     ctx.font = '22px sans-serif'; ctx.fillText(`${status} · ${Math.round(progress * 100)}%`, 24, 105);
     ctx.fillStyle = '#355764'; ctx.fillRect(24, 153, 336, 25); ctx.fillStyle = '#7dc7bc'; ctx.fillRect(24, 153, 336 * progress, 25);
     texture.needsUpdate = true;
-  }, dispose() { imported?.dispose(); texture.dispose(); material.dispose(); geometry.dispose(); } };
+  }, dispose() { imported?.dispose(); texture.dispose(); releasePrimitiveScreen(); } };
 
 }
