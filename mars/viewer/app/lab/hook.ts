@@ -1,4 +1,6 @@
 import { readFixtureMove } from '../../engine/carry/fixture.ts';
+import { musicStation, readComputerMusic } from '../../engine/activities/computer-music.ts';
+import { musicSoundState } from './music-sound.ts';
 import { readBook } from '../../engine/objects/reading.ts';
 import { readWorkstation } from '../../engine/objects/workstation.ts';
 import { LabCameraGeometryCache } from './camera-observation.ts';
@@ -134,6 +136,8 @@ export function installHook(view: LabView, notify: () => void) {
       return Object.values(sim.rt.world.entities).filter((e) => e.kind === 'fixture').map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: structuredClone(e.pose), rendered: rendered.get(e.id) }));
     },
     fixtureMove: () => { const id = [...sim.rt.records.values()].filter((r) => r.verb === 'move_fixture').at(-1)?.id; return id ? readFixtureMove(sim.rt, id) : undefined; },
+    musicAudio: () => structuredClone(musicSoundState()),
+    music: () => structuredClone({station:musicStation(sim.rt,'music-computer'),sessions:[...sim.rt.records.values()].filter(r=>r.verb==='computer_music').map(r=>readComputerMusic(sim.rt,r.id))}),
     reading: () => structuredClone(readBook(sim.rt, 'book')),
     workstation: () => {
       const work = activityExample(sim.scenario.name)?.workBreak.work ?? { actor: 'worker', station: 'workstation', seat: 'work-chair#seat' };

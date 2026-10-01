@@ -42,7 +42,9 @@ const steps = [
   // The prior 140-pass suite took 1293.529s; required current build proofs now
   // add ~258s plus actual access/foot-side/current-camera cases. Give the entire
   // serialized suite capacity; per-test and performance limits stay unchanged.
-  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 30 * MIN, parse: playwright },
+  // Release29 serialized browser proof took1766s; required music adds39.6s.
+  // Capacity for the complete suite only: per-test deadlines/assertions are unchanged.
+  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 32 * MIN, parse: playwright },
   { name: 'record-campus-take', cmd: ['node', 'deploy/record-campus-take.mjs', '--check'], timeout: 5 * MIN, parse: simulation },
   { name: 'determinism-probe', cmd: ['node', 'deploy/determinism-probe.mjs'], timeout: 5 * MIN, parse: probe },
 ];

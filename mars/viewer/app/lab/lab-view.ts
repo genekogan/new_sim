@@ -1,3 +1,4 @@
+import { readComputerMusic } from '../../engine/activities/computer-music.ts';
 // Engine Lab view: three.js renderer + orbit camera over a LabSim. The rAF
 // loop feeds real elapsed time into the sim accumulator (sim time decoupled
 // from fps) and renders interpolated state.
@@ -263,6 +264,16 @@ export class LabView {
       for (const actor of continuation.bindings.binding.actors)
         if (actor !== continuation.floorHolder && rt.holder(`actor:${actor}`).includes(continuation.child))
           targets[actor] = continuation.attentionTarget.point;
+    }
+    for (const action of rt.records.values()) {
+      if (action.verb !== 'computer_music' || !rt.isActive(action.id)) continue;
+      const music = readComputerMusic(rt, action.id);
+      if (!music || music.mode !== 'performing' || music.note === null || music.note === undefined) continue;
+      const performer = rt.world.entities[music.bindings.performer];
+      if (!performer) continue;
+      for (const listener of music.listeners)
+        if (listener.state === 'listening' && listener.child && rt.holder(`actor:${listener.actor}`).includes(listener.child))
+          targets[listener.actor] = [performer.pose.p[0],performer.pose.p[2]];
     }
     this.attentionTargets = targets;
     this.humans.setAttention(targets);

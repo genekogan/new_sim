@@ -44,3 +44,31 @@ this is a contaminated validation run, not evidence of successful resumption or 
 confirmed engine defect. Original120s timeout, trace and screenshots preserved in
 ignored `.cloudflare/music/first-red/`. Freeze source during the next run; no assertions,
 per-test deadlines or runtime guarantees change.
+
+## Actual departure/resumption correction and accepted focused proof
+
+The source-frozen rerun exposed a genuine UI binding failure: after directing
+listener-a away, interrupting the score and resuming, the HUD invited that same
+actor again while its player-directed walk still held it. `music.listener-busy`
+correctly refused; the original120sRED/trace is preserved in `.cloudflare/music/frozen-red/`.
+This admission check is unchanged. Read-only activity state now distinguishes
+explicit withdrawal from safe stand-up cleanup. Resume retains remaining invitations
+and never cancels/reclaims the departed actor. A focused regression asserts the
+original full-audience request still refuses and leaves the foreign walk intact,
+while remaining-audience resumption finishes both independent commitments.
+12music+partial-device-allocation13/13PASS, viewerTSc/wholelintPASS.
+
+Actual source-frozen browser1/1PASS41.0s (case39.6s): initialReset/Step, real
+nonzero analyser output from one running audio context, silentPause, independent
+listener departure, same-score interruption/resumption/completion, zero physical
+invariants/seat leaks and nine opened/nine closed contexts over repeatedReset.
+Root inspected allthree runtime captures and the contact sheet in
+`viewer/e2e/artifacts/music-runtime-remaining-invitations-20261001/`.
+No acoustic instrument/finger fidelity claim. Both priorREDs remain recorded.
+
+Required whole browser suite capacity: clean release29's151cases took1766.316s;
+adding this required39.6s case already exceeds the1800s aggregate watchdog.
+Increase only the serialized suite's watchdog30→32min. Individual120s deadlines,
+assertions, original performance ceilings, tolerances, expected outcomes and all
+exclusions remain unchanged. This allows complete required validation; it is not
+a green-gate claim. Full clean combined gate remains pending before integration.

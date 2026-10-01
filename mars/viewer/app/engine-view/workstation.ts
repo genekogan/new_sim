@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MUSIC_SCORES, recordedMusicProgram } from '../../engine/activities/computer-music.ts';
 import { importedWorkstation, type WorkstationAppearanceOptions, type WorkstationAppearanceState } from './imported-workstation.ts';
 export type { WorkstationAppearanceOptions, WorkstationAppearanceState } from './imported-workstation.ts';
 import type { Entity } from '../../engine/world/types.ts';
@@ -40,12 +41,20 @@ export function workstationObject(box: (color: string, cx: number, y0: number, c
     const status = typeof c.status === 'string' ? c.status : 'idle';
     const task = typeof c.task === 'string' ? c.task : 'Computer ready';
     const progress = typeof c.workSeconds === 'number' && typeof c.durationSeconds === 'number' && c.durationSeconds > 0 ? Math.min(1, c.workSeconds / c.durationSeconds) : 0;
-    const next = `${status}:${task}:${Math.round(progress * 100)}`; if (next === key) return; key = next;
+    const program = recordedMusicProgram(c);
+    const music = program && program.task === task && (status !== 'active' || c.programAction === c.action) ? program : undefined;
+    const pulse = music && typeof c.workSeconds === 'number' ? Math.floor((c.workSeconds+1e-9)/music.period) : 0;
+    const next = `${status}:${task}:${Math.round(progress * 100)}:${music ? pulse : ''}`; if (next === key) return; key = next;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     ctx.fillStyle = '#172b36'; ctx.fillRect(0, 0, 384, 240);
     ctx.fillStyle = '#d8eee9'; ctx.font = 'bold 25px sans-serif'; ctx.fillText(task.slice(0, 24), 24, 54);
     ctx.font = '22px sans-serif'; ctx.fillText(`${status} · ${Math.round(progress * 100)}%`, 24, 105);
     ctx.fillStyle = '#355764'; ctx.fillRect(24, 153, 336, 25); ctx.fillStyle = '#7dc7bc'; ctx.fillRect(24, 153, 336 * progress, 25);
+    if (music) {
+      const score=MUSIC_SCORES[music.score];
+      ctx.fillStyle='#d8eee9';ctx.font='16px sans-serif';ctx.fillText(`Original ${music.score} score`,24,137);
+      score.forEach((note,i)=>{ctx.fillStyle=status==='active' && c.phase==='working' && i===pulse%score.length?'#e5b75e':'#476779';ctx.fillRect(24+i*42,194,36,24);ctx.fillStyle='#142736';ctx.fillText(String(note),28+i*42,212);});
+    }
     texture.needsUpdate = true;
   }, dispose() { imported?.dispose(); texture.dispose(); releasePrimitiveScreen(); } };
 

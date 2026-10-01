@@ -423,6 +423,8 @@ export function readComputerMusic(rt: Runtime, action: string) {
       actor: l.actor,
       seat: l.seat,
       child: l.child,
+      // Explicit departure survives safe group interruption; cleanup is not withdrawal.
+      withdrawn: l.departed,
       state:
         l.departed ||
         ex.mode === 'completed' ||

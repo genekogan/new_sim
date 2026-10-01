@@ -261,3 +261,48 @@ test('completed music metadata cannot turn a later identically labelled ordinary
   until(rt, () => !rt.isActive(work.id));
   clean(rt);
 });
+
+test('resuming remaining invitations preserves an explicitly departed listener and its ongoing player command', () => {
+  const rt = musicRuntime(),
+    a = rt.submit('computer_music', MUSIC_BINDING);
+  until(rt, () => {
+    const s = musicStation(rt, MUSIC_BINDING.station);
+    return !!s && !('code' in s) && s.elapsed >= 4;
+  });
+  const walk = rt.submit('walk_to', { actor: 'listener-a', x: -6, z: -4 });
+  until(rt, () => readComputerMusic(rt, a.id)!.listeners[0].withdrawn);
+  rt.cancel(a.id);
+  until(rt, () => !rt.isActive(a.id));
+  assert.ok(
+    rt.isActive(walk.id),
+    'foreign walk still owns departed participant',
+  );
+  const prior = readComputerMusic(rt, a.id)!;
+  assert.equal(prior.listeners[0].withdrawn, true);
+  assert.equal(
+    prior.listeners[1].withdrawn,
+    false,
+    'safe cleanup preserves invitation',
+  );
+  const blocked = rt.submit('computer_music', {
+    ...MUSIC_BINDING,
+    resume: true,
+  });
+  assert.equal(blocked.diagnostic?.code, 'music.listener-busy');
+  assert.ok(rt.isActive(walk.id));
+  const listeners = prior.bindings.listeners.filter(
+    (l) => !prior.listeners.find((old) => old.actor === l.actor)!.withdrawn,
+  );
+  const resumed = rt.submit('computer_music', {
+    ...prior.bindings,
+    listeners,
+    resume: true,
+  });
+  assert.notEqual(resumed.status, 'failed', resumed.diagnostic?.message);
+  until(rt, () => !rt.isActive(resumed.id) && !rt.isActive(walk.id));
+  assert.equal(resumed.status, 'completed', resumed.diagnostic?.message);
+  assert.equal(walk.status, 'completed', walk.diagnostic?.message);
+  assert.equal(station(rt).elapsed, 24);
+  assert.equal(readComputerMusic(rt, resumed.id)!.bindings.listeners.length, 1);
+  clean(rt);
+});
