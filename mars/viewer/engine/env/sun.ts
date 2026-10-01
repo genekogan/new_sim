@@ -38,8 +38,8 @@ export const DEFAULT_SCENE_DATE = '2026-03-15';
  * west**. `NORTH_AZIMUTH_OFFSET` (degrees, added to the compass azimuth before projecting to x/z with
  * x = sin, z = −cos) is −90: azimuth 0 → −X, 90 → −Z. It is ONE global constant, exact for the 2020 scene;
  * the other year frames were measured against drone stills (QUESTIONS_FOR_GENE Q3 note, W42): the 2026 CAD's
- * north is ≈ −X turned 33° toward −Z (≈ −57° here), the 2025 Kit's ≈ −Z (0°), the 2022 Kit is mirrored and
- * the 2024 Kit's kitchen / RV ring sit on the wrong side of Chiba. A per-year bearing is an open follow-up.
+ * north is ≈ −X turned 33° toward −Z (≈ −57° here), the 2022 Kit is mirrored, and the 2024/2025 Kit
+ * scenes use north ≈ −Z (0°). Their exact surveyed bearing remains an open follow-up.
  */
 export const NORTH_AZIMUTH_OFFSET = -90;
 
@@ -50,9 +50,12 @@ export const NORTH_AZIMUTH_OFFSET = -90;
  *   houses' long walls and panel rows at bearings 95–103° (five picks, mean 100.4°; W49 read 10–12° clockwise of E–W),
  *   i.e. world −Z (Huaqiangbei's long axis) points ≈ 101° and north is world −X turned 11° toward +Z. ±5° (FlightYaw,
  *   not GimbalYaw; pitch −86.4°; picks by eye). Gene's estimate ("8 o'clock") would be −120.
+ * - 2024/2025 = 0 is the current local Kit axis convention: Gene identified the Chiba front as south and
+ *   Freeside as north in 2024, and 2025 Chiba's main stair as south-facing; these models place that front
+ *   at +Z and therefore north at −Z. It is an orientation consistency fix, not a survey-grade compass fit.
  * The year files carry it (`northAzimuthOffset`, deploy/history-scenes.mjs); the camera reads the scene's value.
  */
-export const YEAR_NORTH_AZIMUTH_OFFSET: Readonly<Partial<Record<number, number>>> = { 2022: -101 };
+export const YEAR_NORTH_AZIMUTH_OFFSET: Readonly<Partial<Record<number, number>>> = { 2022: -101, 2024: 0, 2025: 0 };
 /** The site bearing of a scene (its `meta.northAzimuthOffset` / file field), else the global. */
 export const northAzimuthOffsetOf = (s?: object | null): number => {
   const o = s as { northAzimuthOffset?: number; meta?: { northAzimuthOffset?: number } } | null | undefined;

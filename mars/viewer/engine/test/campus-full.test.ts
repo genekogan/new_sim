@@ -26,8 +26,9 @@ import { hypot } from '../core/math.ts';
 
 const RULES = 'mars-rules/flagship-campus-test';
 /** campus-flagship (staging-east crop) final state; also pinned in grid-incremental.test.ts. Re-pinned (was fee92ee0…0c56 @11316):
- *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; now 11459 ticks (PLANNING_BUDGET.md). */
-const CROPPED_HASH = 'c56ea8da9b0382a785680e2d70850632ae577cc88901817ef63f332e23247157';
+ *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; now 11459 ticks (PLANNING_BUDGET.md).
+ *  2026-10-01 reviewed museum canonical: only base/regions change; recorded final entities remain exact. */
+const CROPPED_HASH = '758d23176f2053989131e487382b4db34025f1ba4270740f6e804207714254e5';
 
 function setup() {
   const file = readCampus2026File();

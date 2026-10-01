@@ -1,6 +1,7 @@
 // Stable historical component ids + legacy layout migration (docs/engineering/HISTORY_IDS.md).
 import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {build} from 'esbuild';
 import fs from 'node:fs/promises';
 import * as T from 'three';
@@ -50,16 +51,24 @@ test('history ids: frozen migration table maps every legacy id to a live compone
   for(const [asm,run] of Object.entries(table.years[year]??{}))run.ids.forEach((s,i)=>{if(s===null){removed++;return;}entries++;
    assert.ok(live.has(`${asm}-${s}`),`${year} ${asm}-${run.start+i} → ${asm}-${s} no longer exists; add an alias instead of regenerating`);});
  }
- // 7,942 live legacy entries until 2026-09-29; the Chiba 2024 reconstruction edit removed the right-flap salvaged
- // windows (84 entries: backing, glazing, frames → null = removed; HISTORY_IDS.md). 9 older nulls predate it.
- // W46 (props seated on their surfaces, 2026-09-29) re-pointed 243 entries at successors, removing none: 2020 70
- // (toilets 12, RV wheels 48, workshop legs + bins 10), 2021 58, 2023 41, 2024 41, 2025 33; 2022 and 2026 held.
- // W51 (2022 reconciliation, 2026-09-29): the 2022 stairs (treads, risers, rails, posts) and solar modules were re-made
- // and their entries aliased by role (build order); 47 set to null: Ba Sing Se's 10th module (panel + cells), one
- // surplus rail post per house (4), the corner table (top + 4 legs) and trailers rv-10…rv-12 (12 pieces each).
- // 2023 / 2024 trailers moved out of Chiba keep their ids (placement is hashed relative to the trailer).
- assert.equal(entries,7942-84-47);assert.equal(removed,9+84+47);
+ // The five-year source review replaced many placeholder walls, rooms, and vehicles. Keep this
+ // snapshot explicit so a later scene edit cannot silently strand saved Studio layouts. Per-year
+ // role aliases and intentional removals are recorded in the year-specific ID_MIGRATION_AUDIT
+ // files under docs/media/reconstruction/campus-history (plus the 2021 reconstruction ledger).
+ assert.equal(entries,4950);assert.equal(removed,3001);
  assert.equal(legacyId(table,2021,'person-3'),undefined);
+});
+test('history ids: frozen legacy serial slots remain unchanged after reconstruction review2',()=>{
+ const slots=Object.entries(table.years).sort(([a],[b])=>a<b?-1:a>b?1:0).flatMap(([year,runs])=>Object.entries(runs).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([assembly,run])=>[year,assembly,run.start,run.ids.length]));
+ assert.equal(createHash('sha256').update(JSON.stringify(slots)).digest('hex'),'ac2142bbe543675e24866a6dd83212c3207fc3f939c60b01ba9344a3985397c5');
+ assert.equal(slots.reduce((sum,row)=>sum+row[3],0),7951);
+});
+test('layouts: retired review2 legacy component warns and drops instead of arbitrary reassignment',()=>{
+ const run=table.years['2023'].chiba,slot=run.ids.findIndex(s=>s===null),id=`chiba-${run.start+slot}`;
+ assert.ok(slot>=0);assert.equal(legacyId(table,2023,id),null);
+ const warnings=[];
+ const result=validateLayout({schema_version:1,base_model:'mars-campus-modular-v1',year:2023,edits:[{id,position:[1,0,0],quaternion:[0,0,0,1],scale:[1,1,1]}]},new Set(current(2023)),new Set(),2023,table,m=>warnings.push(m));
+ assert.deepEqual(result.edits,[]);assert.equal(warnings.length,1);assert.ok(warnings[0].includes(id));
 });
 test('layouts: legacy ids migrate, unmappable legacy ids warn and drop, stable ids pass',()=>{
  const baseline=new Set([...current(2021),'chiba','rv-1']),stock=new Set(['modular-bench']);

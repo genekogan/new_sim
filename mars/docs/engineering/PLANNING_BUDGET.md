@@ -474,3 +474,13 @@ This is one intentional visual window, **0 violations, same outcome** (physical
 16ft frame raised/held and rendered green). No deterministic state/work pins or
 historical chapter takes move; full historical117277/d382 and flagship pins remain
 unchanged. Required current-layout refusal tests independently cover production.
+
+### Frozen reviewed museum integration (2026-10-01)
+
+**0 violations, same outcome.** The candidate preserves the exact museum snapshot deployed as ad241a52 (source /tmp/mars-studio-interim-20261001), not the later unaccepted accuracy edits. Its 2026 canonical content hash is73887062b6fbef27ff4593e4e3840cda61476f3f075579ca3ddf2acd29b0904b. The hypothetical flagship completes all43steps at11459ticks with no invariant violations. Root compared every final entity, pose, support and ownership against the previously recorded flagship using its documented JSON representation: exact equality; only world.base and world.regions differ. First raw comparison retained a RED for undefined transient properties omitted by JSON persistence; the JSON comparison passes, without changing physical assertions. Evidence: candidate viewer/.cloudflare/historical-import/flagship-comparison.json and both comparison logs.
+
+The full/cropped campus and incremental-grid state pins intentionally move from c56ea8da9b0382a785680e2d70850632ae577cc88901817ef63f332e23247157 to758d23176f2053989131e487382b4db34025f1ba4270740f6e804207714254e5 because those hashes include the reviewed canonical world. Their equality, completion, exact entity comparison and timing remain required. Open-ground engine/probe pins and historical construction exclusions are untouched. Compatible campus take refreshes will be batched once, then verified by the full gate; this note does not claim those refreshes or the gate have passed.
+
+The frozen 2024/2025 JSON already records northAzimuthOffset0. Selecting the historical owner’s documented Kit-axis map in engine/env/sun.ts makes extraction coherent: the only discrepancy was that field and its contentHash; all2020–2025 extraction checks now pass without changing reviewed geometry. This is the owner-sourced local axis convention, not a surveyed bearing or a new historical inference.
+
+The same one-window take refresh covers flagship and campus build-bay-v3. Both recorder runs enforce completion and zero violations. V3 retains 17034ticks and exact recorded final entities; only base/regions differ, with final hash 0fe37f0174e52490a1cd726360c1b7fd32fe2c28303c2c7d3f0666f94e813e6a → 15d4e4ce80b4d191b5a2ec7db842888cf2d3a4c5d2e86c6475b0f3b9647fb33a. Their existing camera recipes remain unchanged; refreshed recordings still require full-gate replay/browser verification.

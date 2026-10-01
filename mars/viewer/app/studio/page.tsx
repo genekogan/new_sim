@@ -30,6 +30,7 @@ import { createWeather } from './weather';
 import { DEFAULT_SCENE_DATE, YEAR_NORTH_AZIMUTH_OFFSET } from '../../engine/env/sun';
 import { createGallery } from './gallery';
 import { add2026Details } from '../history/details-2026';
+import { INTERIOR_2026_VIEWS } from '../history/interior-2026-views';
 import { createHistoricalScreens } from '../history/screens';
 import { createHistoricalScene, sceneManifest, historyNotes, YEARS } from '../history/scenes';
 import {
@@ -44,6 +45,7 @@ type Ref = {
   caption: string;
   url: string;
   source_path: string;
+  camera?: { position: [number, number, number]; target: [number, number, number]; fov: number };
 };
 type Part = {
   id: string;
@@ -93,6 +95,7 @@ type Api = {
   select: (id: string) => void;
   focus: (id?: string) => void;
   view: (v: string) => void;
+  referenceView: (camera: NonNullable<Ref['camera']>) => void;
   cut: (v: string) => void;
   surface: (v: string) => void;
   mode: (v: string) => void;
@@ -837,6 +840,15 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         }
         focus(objects.get('chiba') || null);
       },
+      referenceView: (pose) => {
+        followRider = false;
+        walker.stop();
+        camera.position.fromArray(pose.position);
+        orbit.target.fromArray(pose.target);
+        camera.fov = pose.fov;
+        camera.updateProjectionMatrix();
+        orbit.update();
+      },
       scope: (v) => {
         selectScope = v;
       },
@@ -1519,7 +1531,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
                 </button>
               ))}
               <p className="small-note">
-                Building names outside Chiba are provisional spatial labels.
+                Source-backed building names and uncertain placements are identified in the evidence notes.
               </p>
             </div>
           )}
@@ -1637,6 +1649,16 @@ export default function Studio({ year = 2026 }: { year?: number }) {
           <div className="studio-viewport" ref={mount} />
           <div className="stage-top">
             <div className="stage-selectors">
+              {year===2026 && <label>
+                Room
+                <select aria-label="Visit a 2026 interior" value="" onChange={(e)=>{
+                  const pose=INTERIOR_2026_VIEWS[e.target.value];
+                  if(pose){setCut('complete');api.current?.cut('complete');api.current?.referenceView(pose);}
+                }}>
+                  <option value="">Go inside…</option>
+                  {Object.entries(INTERIOR_2026_VIEWS).map(([id,pose])=><option key={id} value={id}>{pose.label}</option>)}
+                </select>
+              </label>}
               <label>
                 View
                 <select
@@ -1833,6 +1855,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
             <img src={photo.url} alt={photo.title} />
             <h2>{photo.title}</h2>
             <p>{photo.caption}</p>
+            {photo.camera && <button onClick={() => api.current?.referenceView(photo.camera!)}>Use approximate reference angle</button>}
             <details>
               <summary>Source provenance</summary>
               <code>{photo.source_path}</code>

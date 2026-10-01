@@ -158,7 +158,7 @@ export function frontage2024(k:Kit,g:T.Group,w:number,d:number){
 }
 
 // ---- Mars 2022 reconciliation (Gene's questionnaire, 2026-09-29 evening; RECONCILIATION_2022.md; W51) ----------------
-const EV_STAIR='RECONCILIATION_2022 §b (Gene: stairs PARALLEL to the building; aerial-03 + DJI_0829 end slots ≈ 3.5 × 4.5–5 m; foot on the courtyard side = Q29 default); provisional';
+const _EV_STAIR='RECONCILIATION_2022 §b (Gene: stairs PARALLEL to the building; aerial-03 + DJI_0829 end slots ≈ 3.5 × 4.5–5 m; foot on the courtyard side = Q29 default); provisional';
 const EV_SOLAR='RECONCILIATION_2022 §d (Gene: south-facing rows on triangular wood frames ≈ 45°, low edge on the south roof edge; rows per aerial-03 = Q28 default); provisional';
 /** Deck tops of a 2022 rack house (Kit decks: 0.065 m sheets centred at 2.46 / 4.86). */
 export const DECK1_TOP_2022=2.46+.0325,ROOF_TOP_2022=4.86+.0325;
@@ -168,28 +168,24 @@ export const DECK1_TOP_2022=2.46+.0325,ROOF_TOP_2022=4.86+.0325;
  * climbs across the depth, from its foot on the sand at the courtyard face (z = +d/2) toward the outer side, to a
  * landing at first-floor deck height over the outer frame bay. The landing reaches past the outer frame into the aisle
  * between the outer and middle end frames, which is where one steps through the end-frame line onto the deck.
- * 13 risers of top/13 (≈ 0.192 m) from y = 0, 12 goings of 0.25 m (≈ 37.5°); risers are walk-through (as Kit.stairs).
+ * Review 2 supersedes the old13-riser guess with five broad rack-supported treads plus landing, observed in c477.
  */
 export function stair2022(k:Kit,g:T.Group,x:number,d:number,width:number,top=DECK1_TOP_2022){
- const s=new T.Group();s.userData={...g.userData,layer:layers.floor,source:EV_STAIR};s.position.x=x;g.add(s);
- const n=13,r=top/n,go=.25,z0=d/2-.06,zTop=z0-(n-1)*go,zOut=-d/2+.06,w=width,wood='#b89a75',dark='#937654',rail='#a48661';
- for(let i=1;i<n;i++){
-  k.box(s,'stair tread',[w,.06,go-.009],[0,i*r-.03,z0-(i-.5)*go],wood,layers.floor);
-  const rr=k.box(s,'stair riser',[w,r,.035],[0,(i-.5)*r,z0-(i-1)*go-.0175],dark,layers.floor);rr.userData.walkNoCollision=true;
+ const s=new T.Group();s.userData={...g.userData,layer:layers.floor,source:'Gene c477: all four stairs like this; c273 overhead: five broad rack-supported plywood treads, not twelve narrow timber steps'};s.position.x=x;g.add(s);
+ const n=6,r=top/n,go=d/n,z0=d/2,w=width;
+ // Five broad sitting/climbing terraces plus the deck-height landing. Count from
+ // c477 foreground stair and c273 top view; metric rise is fitted to the upper floor.
+ for(let i=1;i<=n;i++){
+  const z=z0-(i-.5)*go,y=i*r;
+  k.box(s,i===n?'stair landing':'stair tread',[w,.065,go-.012],[0,y-.0325,z],'#bfa17b',layers.floor);
+  k.box(s,'stair orange rack beam',[w,.12,.075],[0,y-.11,z+go/2-.05],'#b84c26',layers.steel);
+  for(const side of [-1,1])k.rod(s,'stair rack support',[side*w/2,0,z],[side*w/2,y,z],.037,'#33464e',layers.steel);
  }
- const last=k.box(s,'stair riser',[w,r,.035],[0,(n-.5)*r,zTop-.0175],dark,layers.floor);last.userData.walkNoCollision=true;
- k.box(s,'stair landing',[w,.065,zTop-zOut],[0,top-.0325,(zTop+zOut)/2],'#bfa17b',layers.floor);
- // three stringers under the treads, foot on the sand, head under the landing's front edge
- const run=z0-zTop,len=Math.hypot(run,top),tilt=Math.atan2(top,run);
- for(const sx of [-w/2+.06,0,w/2-.06]){const m=k.box(s,'stair stringer',[.045,.286,len],[sx,top/2-.13,(z0+zTop)/2],dark,layers.floor);m.rotation.x=tilt;}
- // landing posts to the sand at its outer corners and under its front edge
- for(const sx of [-w/2+.06,w/2-.06])for(const z of [zOut+.05,zTop-.05])k.rod(s,'stair landing post',[sx,0,z],[sx,top-.065,z],.045,dark,layers.floor);
- // handrail on the open (outer) side of the flight and round the landing's two open edges
- const rx=w/2;k.rod(s,'stair rail',[rx,1.0,z0],[rx,top+1.0,zTop],.035,rail,layers.floor);
- for(let i=0;i<=3;i++){const z=z0-i*run/3,y=i*top/3;k.rod(s,'stair rail post',[rx,y,z],[rx,y+1.0,z],.03,rail,layers.floor);}
- k.rod(s,'stair rail',[rx,top+1.0,zTop],[rx,top+1.0,zOut],.035,rail,layers.floor);
- k.rod(s,'stair rail',[rx,top+1.0,zOut],[-rx,top+1.0,zOut],.035,rail,layers.floor);
- for(const [px,pz] of [[rx,zOut],[-rx,zOut],[0,zOut]] as [number,number][])k.rod(s,'stair rail post',[px,top,pz],[px,top+1.0,pz],.03,rail,layers.floor);
+ // Open metal uprights and cross-bracing are visible at the exposed end;
+ // the earlier invented continuous sloping timber handrail is absent in c477.
+ for(const z of [-d/2,0,d/2])k.rod(s,'stair side upright',[w/2,0,z],[w/2,top+.7,z],.035,'#33464e',layers.steel);
+ k.rod(s,'stair side diagonal',[w/2,.3,-d/2],[w/2,top+.2,0],.018,'#33464e',layers.steel);
+ k.rod(s,'stair side diagonal',[w/2,.3,0],[w/2,top+.2,d/2],.018,'#33464e',layers.steel);
  return s;
 }
 /**

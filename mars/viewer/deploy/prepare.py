@@ -37,6 +37,8 @@ GLOBS = [
     'history/**/*.webp', 'history/**/*.json', 'history/**/*.html',
 ]
 FILES = {
+    'history': ['2025/c538-freeside-source.jpg', '2025/c509-roof-source.jpg',
+        '2023/review5-rear-c6656-t80.jpg'],
     '2020': ['evidence/site-march4.webp', 'evidence/forest-march9.webp',
         'evidence/portal-march17.webp', 'evidence/forest-march30.webp',
         'evidence/portal-depth-march9.webp', 'evidence/climbing-wall-2020.webp',

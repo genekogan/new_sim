@@ -73,7 +73,7 @@ function canvasTexture(draw: (ctx: CanvasRenderingContext2D, w: number, h: numbe
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
-function flowerMural() {
+export function flowerMural() {
   // Vector interpretation of the large magenta tessellated flower on the container end.
   return canvasTexture((c, w, h) => {
     c.fillStyle = '#e3e0d3'; c.fillRect(0, 0, w, h);

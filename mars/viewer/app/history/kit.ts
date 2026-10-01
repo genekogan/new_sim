@@ -157,6 +157,14 @@ export class Kit {
  /** A travel trailer on the ground: the wheels' axle is at their radius (.34) above the assembly origin, so the origin
   *  goes on GROUND. Trailers belong on the ground even where the ring runs through a building (2023 rv-8/9 and
   *  2024 rv-9/10 stand inside Chiba's footprint; W46 note in PROGRESS). */
- rv(id:string,x:number,z:number,angle:number,length=6.8){const g=this.assembly(id,'Travel trailer',[x,this.seat?GROUND:0,z],angle);this.box(g,'trailer shell',[2.35,2.35,length],[0,1.65,0],'#d8d8ce',layers.context);this.box(g,'roof AC',[.75,.23,.85],[0,2.94,.4],'#aaaead',layers.context);for(const side of [-1,1]){for(const zz of [-1.7,.9])this.box(g,'trailer window',[.025,.65,1.1],[side*1.19,1.94,zz],'#344347',layers.context);this.box(g,'trailer trim',[.03,.13,length-.1],[side*1.2,1.0,0],'#8f999a',layers.context);for(const zz of [-.6,.6]){const wheel=new T.Mesh(new T.CylinderGeometry(.34,.34,.16,12),this.mat('#222527'));wheel.rotation.z=Math.PI/2;wheel.position.set(side*1.13,.34,zz);this.tag(g,wheel,'trailer wheel',layers.context);}}return g;}
+ rv(id:string,x:number,z:number,angle:number,length=6.8){const g=this.assembly(id,'Travel trailer',[x,this.seat?GROUND:0,z],angle);const shell=this.box(g,'trailer shell',[2.35,2.35,length],[0,1.65,0],'#d8d8ce',layers.context);
+  // A light chamfer on the roof ends changes the silhouette without new assets.
+  // Clone cached boxes: this must never deform another trailer or wall.
+  shell.geometry=shell.geometry.clone();const vertices=shell.geometry.getAttribute('position');
+  for(let i=0;i<vertices.count;i++)if(vertices.getY(i)>0)vertices.setZ(i,vertices.getZ(i)-Math.sign(vertices.getZ(i))*.20);
+  vertices.needsUpdate=true;shell.geometry.computeVertexNormals();
+  this.box(g,'trailer rear bumper',[2.31,.16,.13],[0,.60,-length/2-.08],'#626b67',layers.context);
+  this.box(g,'trailer entry surround',[.034,1.65,.68],[1.204,1.46,-length*.27],'#b5bbb4',layers.context);
+this.box(g,'roof AC',[.75,.23,.85],[0,2.94,.4],'#aaaead',layers.context);for(const side of [-1,1]){for(const zz of [-1.7,.9])this.box(g,'trailer window',[.025,.65,1.1],[side*1.19,1.94,zz],'#344347',layers.context);this.box(g,'trailer trim',[.03,.13,length-.1],[side*1.2,1.0,0],'#8f999a',layers.context);for(const zz of [-.6,.6]){const wheel=new T.Mesh(new T.CylinderGeometry(.34,.34,.16,12),this.mat('#222527'));wheel.rotation.z=Math.PI/2;wheel.position.set(side*1.13,.34,zz);this.tag(g,wheel,'trailer wheel',layers.context);}}return g;}
  visitors(count:number){const g=this.assembly('people','Visitors · illustrative');for(let i=0;i<count;i++){const o=new T.Group();o.name=`Visitor ${i+1}`;o.position.set(Math.sin(i*2.4)*(12+i*.55),-.16,10+Math.cos(i*2.4)*(10+i*.4));o.userData={assembly_id:'people',component_id:`person-${i+1}`,kind:'context_person',definition_id:['person_casual','person_punk','person_woman'][i%3]};g.add(o);}}
 }
