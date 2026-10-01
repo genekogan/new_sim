@@ -12,6 +12,8 @@ import type { SharedFoodBreakParams } from './shared-food-break.ts';
 import { readWorkstation } from '../objects/workstation.ts';
 import { heldBy } from '../items/model.ts';
 import { slotById } from '../social/slots.ts';
+import { prepareFood, readFoodPreparation, type PrepareFoodParams, type FoodPreparation } from './prepare-food.ts';
+import { sleep, readSleep, type SleepParams } from './sleep.ts';
 
 export interface PurposefulRoutineParams {
   actor: string;
@@ -19,6 +21,8 @@ export interface PurposefulRoutineParams {
   work: { station: string; seat: string; task: string; duration: number };
   food: SharedFoodBreakParams;
   trip?: PairedWalkParams;
+  preparation?: PrepareFoodParams;
+  sleep?: SleepParams;
   rest: { seat: string; seconds: number };
   departure: Vec2;
 }
@@ -43,12 +47,14 @@ export interface PurposefulRoutineReadout {
   };
   ownedActions: string[];
   trip?: PairedWalkReadout;
+  preparation?: FoodPreparation;
+  sleep?: ReturnType<typeof readSleep>;
 }
 export interface PurposefulRoutineControlParams { routine: string; intent: 'pause' | 'resume' | 'end' }
 type Meal = { actor: string; served: boolean; consumed: boolean; returned: boolean; fraction: number };
 type Exec = {
-  id: string; p: PurposefulRoutineParams; mode: RoutineMode; phase: 'classroom' | 'trip' | 'food' | 'rest' | 'work';
-  child?: string; trip?: string; children: string[]; departureChild?: string; error?: Diagnostic;
+  id: string; p: PurposefulRoutineParams; mode: RoutineMode; phase: 'classroom' | 'trip' | 'preparation' | 'food' | 'rest' | 'sleep' | 'work';
+  child?: string; trip?: string; sleep?: string; preparation?: FoodPreparation; children: string[]; departureChild?: string; error?: Diagnostic;
   questionQueued: boolean; questionAsked: boolean; presenters: string[]; conversationSeen: boolean;
   foodStarted: boolean; foodGroup?: string; foodEats: string[]; foodReleasing: boolean;
   meal: Meal[]; restSeconds: number; restSit?: string; standing?: string; workElapsed: number;
@@ -108,6 +114,8 @@ function checkpointIssue(rt: Runtime, ex: Exec): Diagnostic | undefined {
   if (!work.available) return diagnostic('work-unavailable', `${ex.p.work.station} is unavailable for ${ex.p.actor}'s committed notes`, [ex.p.actor, ex.p.work.station]);
   if (work.user !== ex.p.actor || work.task !== ex.p.work.task || work.duration !== ex.p.work.duration || work.seat !== ex.p.work.seat || !['unfinished', 'completed'].includes(work.status))
     return diagnostic('work-changed', `${ex.p.work.station} no longer holds ${ex.p.actor}'s committed ${ex.p.work.task} (${ex.p.work.duration}s)`, [ex.p.actor, ex.p.work.station]);
+  if (ex.phase === 'preparation' && ex.preparation && stableStringify(readFoodPreparation(rt, ex.p.preparation!.pot)) !== stableStringify(ex.preparation))
+    return diagnostic('preparation-changed', 'The retained dish preparation changed outside this routine while paused', [ex.p.preparation!.pot, ex.id]);
   if (ex.phase === 'food' && ex.foodStarted) {
     for (const [item, expected] of Object.entries(ex.foodCheckpoint)) {
       const e = rt.world.entities[item];
@@ -125,6 +133,15 @@ function checkpointIssue(rt: Runtime, ex: Exec): Diagnostic | undefined {
       }
     }
   }
+}
+function afterTrip(ex: Exec) { return ex.p.preparation ? 'preparation' as const : 'food' as const; }
+function afterMeal(ex: Exec) { return ex.p.sleep ? 'sleep' as const : 'rest' as const; }
+function observePreparation(rt: Runtime, ex: Exec) {
+  if (!ex.p.preparation || ex.phase !== 'preparation' || !ex.child) return;
+  const child = rt.records.get(ex.child);
+  if (child?.verb !== 'prepare_food' || !running(child)) return;
+  const state = readFoodPreparation(rt, ex.p.preparation.pot);
+  if (state) ex.preparation = structuredClone(state);
 }
 function beginDrain(ex: Exec, end: boolean, error?: Diagnostic) {
   ex.ending ||= end;
@@ -159,15 +176,24 @@ function drain(rt: Runtime, ex: Exec): StepResult {
     ex.children.push(rec.id);
     if (rec.status === 'failed') ex.error = diagnostic('trip-pause', rec.diagnostic?.message ?? 'Trip pause refused', [ex.trip], rec.diagnostic);
   }
+  const sleeping = ex.sleep ? readSleep(rt, ex.sleep) : undefined;
+  if (!ex.ending && ex.sleep && rt.isActive(ex.sleep) && sleeping && !['paused', 'waiting', 'draining'].includes(sleeping.mode)) {
+    const rec = rt.submit('sleep_control', { sleep: ex.sleep, intent: 'pause' }, { parent: ex.id, preempt: false });
+    ex.children.push(rec.id);
+    if (rec.status === 'failed') ex.error = diagnostic('sleep-pause', rec.diagnostic?.message ?? 'Sleep pause refused', [ex.sleep], rec.diagnostic);
+  }
   for (const id of ex.children) {
-    if (id === ex.departureChild || !rt.isActive(id) || (id === ex.trip && !ex.ending)) continue;
-    if (!ex.ending && rt.records.get(id)?.verb === 'paired_walk_control') continue;
+    if (id === ex.departureChild || !rt.isActive(id) || ((id === ex.trip || id === ex.sleep) && !ex.ending)) continue;
+    if (!ex.ending && ['paired_walk_control', 'sleep_control'].includes(rt.records.get(id)?.verb ?? '')) continue;
     rt.cancel(id);
   }
   const currentTrip = ex.trip ? readPairedWalk(rt, ex.trip) : undefined;
   const tripDrained = !ex.trip || !rt.isActive(ex.trip) || (!!currentTrip && ['paused', 'waiting'].includes(currentTrip.mode) && currentTrip.ownedActions.every(id => !rt.isActive(id)));
+  const currentSleep = ex.sleep ? readSleep(rt, ex.sleep) : undefined;
+  const sleepDrained = !ex.sleep || !rt.isActive(ex.sleep) || (!!currentSleep && ['paused', 'waiting'].includes(currentSleep.mode) && currentSleep.ownedActions.every(id => !rt.isActive(id)));
+  observePreparation(rt, ex);
   observeMeal(rt, ex);
-  if (!tripDrained || ex.children.some(id => rt.isActive(id) && (id !== ex.trip || ex.ending)) || (member && rt.isActive(ex.p.session)))
+  if (!sleepDrained || !tripDrained || ex.children.some(id => rt.isActive(id) && ((id !== ex.trip && id !== ex.sleep) || ex.ending)) || (member && rt.isActive(ex.p.session)))
     return { status: 'running', phase: ex.ending ? 'ending' : 'draining' };
   ex.child = undefined; ex.restSit = undefined; ex.standing = undefined;
   ex.foodGroup = undefined; ex.foodEats = []; ex.foodReleasing = false;
@@ -241,7 +267,7 @@ function continuation(rt: Runtime, ex: Exec): StepResult {
     if (placements.length) { dispatch(rt, ex, 'stow_items', { actor: person.actor, placements }); return { status: 'running', phase: 'food-returning' }; }
     if (!returned(rt, person)) return wait(ex, diagnostic('return-changed', `${person.actor}'s consumed meal utensils are not at their committed return slots`, [person.actor, person.bowl, person.spoon]));
   }
-  ex.phase = 'rest'; return { status: 'running', phase: 'rest' };
+  ex.phase = afterMeal(ex); return { status: 'running', phase: ex.phase };
 }
 
 const id = z.string().min(1).max(160);
@@ -250,7 +276,7 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
   description: 'Join one explicit live gathering, take one shared meal/rest and finish the same unfinished notes; explicit pause/resume/end through ordinary actions.',
   schema: z.strictObject({ actor: id, session: id,
     work: z.strictObject({ station: id, seat: id, task: id, duration: z.number().positive().max(3600) }),
-    food: sharedFoodBreak.schema, trip: pairedWalk.schema.optional(), rest: z.strictObject({ seat: id, seconds: z.number().positive().max(300) }),
+    food: sharedFoodBreak.schema, trip: pairedWalk.schema.optional(), preparation: prepareFood.schema.optional(), sleep: sleep.schema.optional(), rest: z.strictObject({ seat: id, seconds: z.number().positive().max(300) }),
     departure: z.tuple([z.number(), z.number()]),
   }),
   reservations: (_w, p) => [{ resource: `routine:${p.actor}`, mode: 'exclusive' }],
@@ -273,10 +299,20 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
       return { ok: false, diagnostic: diagnostic('food-binding', `${p.actor} must be the first explicit food participant`, [p.actor]) };
     if (p.trip && (p.trip.actors[0] !== p.actor || p.trip.actors[1] !== p.food.participants[1]?.actor || p.food.participants.length !== 2))
       return { ok: false, diagnostic: diagnostic('trip-binding', 'The explicit pair must be this worker and the same second food participant', [p.actor, ...p.trip.actors]) };
-    const food = sharedFoodBreak.plan(rt, p.food);
+    if (p.preparation && (p.preparation.actor !== p.actor || p.preparation.pot !== p.food.pot || p.preparation.spoon !== p.food.participants[0].spoon))
+      return { ok: false, diagnostic: diagnostic('preparation-binding', 'Preparation must use this worker, shared pot and committed meal spoon', [p.actor, p.food.pot, p.food.participants[0].spoon]) };
+    if (p.sleep && p.sleep.actor !== p.actor)
+      return { ok: false, diagnostic: diagnostic('sleep-binding', 'Sleep must belong to the same committed worker', [p.actor, p.sleep.actor]) };
+    // The empty future dish is not an available meal. Validate real preparation
+    // now, and let the unchanged food action validate actual output at dispatch.
+    const food = p.preparation ? prepareFood.plan(rt, p.preparation) : sharedFoodBreak.plan(rt, p.food);
     if (!food.ok) return { ok: false, diagnostic: diagnostic('food', food.diagnostic.message, [p.food.pot], food.diagnostic) };
     const seat = slotById(rt, p.rest.seat);
-    if ('code' in seat || seat.kind !== 'seat') return { ok: false, diagnostic: diagnostic('rest-seat', `${p.rest.seat} is not an available seat binding`, [p.rest.seat], 'code' in seat ? seat : undefined) };
+    if (!p.sleep && ('code' in seat || seat.kind !== 'seat')) return { ok: false, diagnostic: diagnostic('rest-seat', `${p.rest.seat} is not an available seat binding`, [p.rest.seat], 'code' in seat ? seat : undefined) };
+    if (p.sleep) {
+      const result = sleep.plan(rt, p.sleep);
+      if (!result.ok) return { ok: false, diagnostic: diagnostic('sleep', result.diagnostic.message, [p.actor, p.sleep.mat], result.diagnostic) };
+    }
     return { ok: true, program: null };
   },
   start(rt, p, _program, action) {
@@ -300,6 +336,7 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
     // Retain actual bound-task progress before cleanup or completion releases it.
     const elapsed = boundWorkElapsed(rt, ex);
     if (elapsed !== undefined) ex.workElapsed = elapsed;
+    observePreparation(rt, ex);
     if (ex.mode === 'draining' || ex.mode === 'ending') return drain(rt, ex);
     if (ex.mode === 'paused' || ex.mode === 'waiting') return ex.error ? { status: 'blocked', diagnostic: ex.error } : { status: 'running', phase: 'paused' };
     if (ex.child) {
@@ -308,6 +345,8 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
       if (ex.error?.code === 'routine.food-changed') { beginDrain(ex, false, ex.error); return drain(rt, ex); }
       if (rt.isActive(child.id)) {
         const trip = child.id === ex.trip ? readPairedWalk(rt, child.id) : undefined;
+        const sleeping = child.id === ex.sleep ? readSleep(rt, child.id) : undefined;
+        if (sleeping && ['paused', 'waiting'].includes(sleeping.mode)) return wait(ex, diagnostic('sleep-wait', sleeping.diagnostic?.message ?? 'Sleep is paused; Resume continues remaining rest', [child.id], sleeping.diagnostic));
         if (trip && ['paused', 'waiting'].includes(trip.mode)) return wait(ex, diagnostic('trip-wait', trip.waitingReason ?? 'Trip is paused; Resume continues from actual positions', [child.id], trip.diagnostic));
         if (child.status === 'blocked' && child.diagnostic) return { status: 'blocked', diagnostic: diagnostic('child-wait', `${child.verb} ${child.id}: ${child.diagnostic.message}`, [child.id], child.diagnostic) };
         return { status: 'running', phase: child.phase ?? ex.phase };
@@ -316,9 +355,18 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
       if (child.status !== 'completed') { beginDrain(ex, false, diagnostic('child-stopped', `${child.verb} ${child.id} ended ${child.status}; explicit resume required`, [child.id], child.diagnostic)); return drain(rt, ex); }
       if (child.verb === 'paired_walk') {
         if (child.outputs?.arrived !== true) return wait(ex, diagnostic('trip-ended', 'The committed trip ended without joint arrival; it cannot be silently replaced', [child.id], child.diagnostic));
+        ex.phase = afterTrip(ex);
+      }
+      if (child.verb === 'prepare_food') {
+        if (!ex.preparation?.complete) return wait(ex, diagnostic('preparation-incomplete', 'Preparation ended without a completed dish; output cannot be substituted', [ex.p.food.pot, child.id]));
         ex.phase = 'food';
       }
-      if (child.verb === 'shared_food_break') { ex.phase = 'rest'; }
+      if (child.verb === 'shared_food_break') { ex.phase = afterMeal(ex); }
+      if (child.verb === 'sleep') {
+        const state = readSleep(rt, child.id);
+        if (!state || state.elapsed < ex.p.sleep!.duration - 1e-8 || child.outputs?.ended === true) return wait(ex, diagnostic('sleep-ended', 'Committed sleep ended before its duration; it cannot be silently replaced', [child.id]));
+        ex.phase = 'work';
+      }
       if (child.verb === 'work_at') { ex.mode = 'completed'; return { status: 'completed', outputs: { task: ex.p.work.task, session: ex.p.session } }; }
     }
     if (ex.phase === 'classroom') {
@@ -330,7 +378,7 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
       if (!session || !record || record.status === 'failed' || record.status === 'cancelled') return wait(ex, diagnostic('session-ended', `${ex.p.session} no longer offers this committed gathering`, [ex.p.session], record?.diagnostic));
       if (record.status === 'completed') {
         if (!ex.questionAsked || ex.presenters.length < 2 || !ex.conversationSeen) return wait(ex, diagnostic('gathering-incomplete', `${ex.p.session} ended before ${ex.p.actor}'s committed question, presenter rotation or conversation`, [ex.p.actor, ex.p.session]));
-        ex.phase = ex.p.trip ? 'trip' : 'food'; return { status: 'running', phase: ex.phase };
+        ex.phase = ex.p.trip ? 'trip' : afterTrip(ex); return { status: 'running', phase: ex.phase };
       }
       const member = session.participants.find(p => p.actor === ex.p.actor && p.state === 'participating');
       if (!member) {
@@ -346,7 +394,7 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
       if (!ex.trip) { const rec = dispatch(rt, ex, 'paired_walk', ex.p.trip); ex.trip = rec.id; return { status: 'running', phase: 'walk-to-lunch' }; }
       const record = rt.records.get(ex.trip)!;
       if (!rt.isActive(ex.trip)) {
-        if (record.status === 'completed' && record.outputs?.arrived === true) { ex.phase = 'food'; return { status: 'running', phase: 'food' }; }
+        if (record.status === 'completed' && record.outputs?.arrived === true) { ex.phase = afterTrip(ex); return { status: 'running', phase: ex.phase }; }
         return wait(ex, diagnostic('trip-ended', 'The committed trip ended without joint arrival; it cannot be silently replaced', [ex.trip], record.diagnostic));
       }
       const trip = readPairedWalk(rt, ex.trip)!;
@@ -357,6 +405,32 @@ export const purposefulRoutine: ActionDef<PurposefulRoutineParams, null, Exec> =
       }
       ex.child = ex.trip;
       return { status: 'running', phase: 'walk-to-lunch' };
+    }
+    if (ex.phase === 'preparation') {
+      const issue = actorReady(rt, ex.p.actor); if (issue) return wait(ex, issue);
+      if (readFoodPreparation(rt, ex.p.preparation!.pot)?.complete) {
+        // Only our retained completed preparation authorizes transition.
+        if (!ex.preparation?.complete) return wait(ex, diagnostic('preparation-changed', 'The dish completed outside this routine; explicit output cannot be substituted', [ex.p.food.pot]));
+        ex.phase = 'food'; return { status: 'running', phase: 'food' };
+      }
+      dispatch(rt, ex, 'prepare_food', ex.p.preparation);
+      return { status: 'running', phase: 'preparing-food' };
+    }
+    if (ex.phase === 'sleep') {
+      if (!ex.sleep) { const rec = dispatch(rt, ex, 'sleep', ex.p.sleep); ex.sleep = rec.id; return { status: 'running', phase: 'sleep-approaching' }; }
+      const record = rt.records.get(ex.sleep)!;
+      const state = readSleep(rt, ex.sleep)!;
+      if (!rt.isActive(ex.sleep)) {
+        if (record.status === 'completed' && record.outputs?.ended !== true && state.elapsed >= ex.p.sleep!.duration - 1e-8) { ex.phase = 'work'; return { status: 'running', phase: 'finish-work' }; }
+        return wait(ex, diagnostic('sleep-ended', 'Committed sleep ended before routine continuation; it cannot be silently replaced', [ex.sleep], record.diagnostic));
+      }
+      if (['paused', 'waiting'].includes(state.mode)) {
+        const rec = rt.submit('sleep_control', { sleep: ex.sleep, intent: 'resume' }, { parent: ex.id, preempt: false });
+        ex.children.push(rec.id);
+        if (rec.status === 'failed') return wait(ex, diagnostic('sleep-resume', rec.diagnostic?.message ?? 'Sleep resume refused', [ex.sleep], rec.diagnostic));
+      }
+      ex.child = ex.sleep;
+      return { status: 'running', phase: 'sleeping' };
     }
     if (ex.phase === 'food') {
       if (!ex.foodStarted) {
@@ -407,9 +481,11 @@ export const purposefulRoutineControl: ActionDef<PurposefulRoutineControlParams,
     if (p.intent === 'end') rt.cancel(ex.id);
     else if (p.intent === 'pause') beginDrain(ex, false);
     else {
-      if (ex.child === ex.trip) ex.child = undefined;
+      if (ex.child === ex.trip || ex.child === ex.sleep) ex.child = undefined;
       const trip = ex.trip ? rt.records.get(ex.trip) : undefined;
       if (trip?.status === 'failed' && !running(trip)) ex.trip = undefined; // Explicit retry of admission, never replace an executed trip.
+      const sleeping = ex.sleep ? rt.records.get(ex.sleep) : undefined;
+      if (sleeping?.status === 'failed' && !running(sleeping)) ex.sleep = undefined; // Admission retry only; never replace executed sleep.
       ex.mode = 'running'; ex.error = undefined; ex.departureRequested = false; ex.foodCheckpoint = {}; ex.questionQueued = ex.questionAsked || !!readClassroom(rt, ex.p.session)?.queuedQuestions.includes(ex.p.actor);
     }
     return { id: action };
@@ -423,6 +499,7 @@ export function readPurposefulRoutine(rt: Runtime, action: string): PurposefulRo
     bindings: structuredClone(ex.p), child: ex.child,
     ...(ex.error ? { diagnostic: structuredClone(ex.error), waitingReason: ex.error.message } : record.diagnostic ? { diagnostic: structuredClone(record.diagnostic), waitingReason: record.diagnostic.message } : {}),
     progress: { questionAsked: ex.questionAsked, presenters: [...ex.presenters], conversationSeen: ex.conversationSeen,
-      meal: structuredClone(ex.meal), restSeconds: ex.restSeconds, workElapsed: elapsed ?? ex.workElapsed }, ownedActions: [...ex.children], ...(ex.trip ? { trip: readPairedWalk(rt, ex.trip) } : {}) };
+      meal: structuredClone(ex.meal), restSeconds: ex.restSeconds, workElapsed: elapsed ?? ex.workElapsed }, ownedActions: [...ex.children], ...(ex.trip ? { trip: readPairedWalk(rt, ex.trip) } : {}),
+    ...(ex.preparation ? { preparation: structuredClone(ex.preparation) } : {}), ...(ex.sleep ? { sleep: readSleep(rt, ex.sleep) } : {}) };
 }
 export const PURPOSEFUL_ROUTINE_ACTIONS: ActionDef[] = [purposefulRoutine, purposefulRoutineControl];
