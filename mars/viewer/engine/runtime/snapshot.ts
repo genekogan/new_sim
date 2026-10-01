@@ -145,6 +145,12 @@ export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotO
   if (refused.length && !opts.allowDrop)
     throw new SnapshotError('snapshot.non-resumable', `cannot take a resumable snapshot at tick ${rt.tick}: ${list()}`, refused.map((r) => r.id));
   for (const r of refused) {
+    // Generic dropped-action cleanup cannot finalize durable work progress: the
+    // owning work_at must finish its ordinary stop before active state can be omitted.
+    const station = Object.values(rt.world.entities).find(e =>
+      e.equipment?.kind === 'workstation' && e.equipment.config.status === 'active' && e.equipment.config.action === r.id);
+    if (station) throw new SnapshotError('snapshot.drop-unsafe',
+      `cannot drop action ${r.id} (${r.verb}) from the snapshot at tick ${rt.tick}: workstation ${station.id} has active task state owned by it; safely stop the owning work first so unfinished progress is recorded`, [r.id, station.id]);
     const load = holdsLoad(rt, r.id);
     if (load) throw new SnapshotError('snapshot.drop-unsafe', `cannot drop action ${r.id} (${r.verb}) from the snapshot at tick ${rt.tick}: ${load}, and dropping it would leave the load unsupported`, [r.id]);
   }
