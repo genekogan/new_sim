@@ -11,7 +11,7 @@ globalThis.document = {createElement:()=>({width:1,height:1,getContext:()=>({fil
 const { createHistoricalScene, DRAFT_2027, YEARS } = await import(file.href);
 after(()=>fs.unlink(file));
 const collect = root => {const objects=[];root.traverse(o=>{if(o.userData.component_id) objects.push(o);});return objects;};
-test('2027 draft: unique stable editable IDs, no borrowed historical paint/opaque rooms',()=>{
+test('2027 draft: unique stable editable IDs, blue uprights/orange beams and no opaque rooms',()=>{
   const a=collect(createHistoricalScene(2027)),b=collect(createHistoricalScene(2027));
   assert.ok(YEARS.includes(2027)); assert.ok(a.length>700 && a.length<4000);
   assert.deepEqual(a.map(o=>o.userData.component_id),b.map(o=>o.userData.component_id));
@@ -19,7 +19,7 @@ test('2027 draft: unique stable editable IDs, no borrowed historical paint/opaqu
   assert.equal(a.filter(o=>o.userData.kind==='plywood wall').length,0);
   assert.equal(a.filter(o=>o.userData.kind==='context_person').length,0);
   assert.equal(a.filter(o=>o.userData.kind==='conceptual chamber cutaway').length,40);
-  for(const o of a){ assert.ok(o.userData.source.includes('Proposed 2027') || o.userData.assembly_id.startsWith('mit-trailer')); if(o instanceof T.Mesh){ const box=new T.Box3().setFromObject(o); assert.ok([...box.min.toArray(),...box.max.toArray()].every(Number.isFinite)); if(o.userData.layer==='Rack steel') assert.equal(o.material.color.getHexString(),'899294'); }}
+  for(const o of a){ assert.ok(o.userData.source.includes('Proposed 2027') || o.userData.assembly_id.startsWith('mit-trailer')); if(o instanceof T.Mesh){ const box=new T.Box3().setFromObject(o); assert.ok([...box.min.toArray(),...box.max.toArray()].every(Number.isFinite)); if(o.userData.layer==='Rack steel') assert.equal(o.material.color.getHexString(),o.userData.kind==='12 foot orange beam'?'c35b2d':'237ba5'); }}
 });
 test('2027 draft: diagram topology and explicit unresolved kitchen assignment',()=>{
   const root=createHistoricalScene(2027),groups=root.children;
@@ -37,4 +37,9 @@ test('2027 routes: explicit draft accepted while both default entries stay2026',
   assert.ok(source.includes('202[0-7]')); assert.ok(worker.includes('202[0-7]'));
   assert.ok(source.includes(': 2026;'));
   assert.ok(source.includes("year={route === '/studio' ? 2026 : Number(route.split('/')[2])}"));
+});
+
+test('2027 draft has an explicit JSON reference list instead of SPA HTML fallback',async()=>{
+ const refs=JSON.parse(await fs.readFile(new URL('../public/history/2027/references.json',import.meta.url),'utf8'));
+ assert.deepEqual(refs,[]);
 });

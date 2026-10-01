@@ -23,9 +23,9 @@ const SOURCE = 'Proposed 2027: resident Sep29 post and two user-supplied plan im
 function rack(k: Kit, id: string, name: string, x: number, z: number, nx: number, nz: number, yaw = 0) {
   const g = k.assembly(id, name, [x, GROUND, z], yaw, SOURCE);
   k.frame(g, nx, nz, 3.048, false);
-  // User asks raw materials/no paint. Keep all steel visible; no historical
-  // blue/orange paint, no opaque wall/roof, no invented upper occupied floor.
-  g.traverse(o => { if (o instanceof T.Mesh && o.userData.layer === layers.steel) o.material = k.mat('#899294', .65); });
+  // Gene requests blue uprights/orange beams; keep plywood undecorated
+  // with no opaque wall/roof or invented upper occupied floor.
+  g.traverse(o => { if (o instanceof T.Mesh && o.userData.layer === layers.steel) o.material = k.mat(o.userData.kind === '12 foot orange beam' ? '#c35b2d' : '#237ba5', .20); });
   // Minimal plywood aisle on ground; its bottom sits on soil.
   k.box(g, 'raw plywood entrance strip', [1.2, .045, nz * BAY], [0, .0225, 0], '#c8b18a', layers.floor);
   return g;

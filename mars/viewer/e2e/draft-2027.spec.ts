@@ -3,6 +3,9 @@ import { openStudio, expectCanvasNotBlank, collectConsoleErrors, waitReady, wait
 
 test('2027 draft: open concept renders, editable assemblies and plan view remain usable', async ({page}, testInfo) => {
   const errors = collectConsoleErrors(page);
+  const refs=await page.request.get('/history/2027/references.json');
+  expect(refs.headers()['content-type']).toContain('application/json');
+  expect(await refs.json()).toEqual([]);
   await openStudio(page, 2027);
   await expectCanvasNotBlank(page);
   await expect(page.getByLabel('Campus year')).toHaveValue('2027');
