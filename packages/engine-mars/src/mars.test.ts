@@ -30,6 +30,10 @@ else {
     assert.deepEqual(log.filter((x) => x.id === r.id).map((x) => (x.kind === 'step' ? `step${x.step}` : x.kind)), ['step0', 'step1', 'step2', 'completed']);
     assert.equal(e.world.entities['a'].human!.activity, 'sit');          // still seated: a hold outlives the program that made it
     assert.equal(e.programOf('a'), null);
+    // a program that only waits keeps the seat
+    const rest = e.perform({ actor: 'a', label: 'rest', steps: [{ verb: 'rest', params: { seconds: 2 } }, { verb: 'wave', params: { at: 'fire', seconds: 1 } }] });
+    assert.equal(run(e, 100).find((x) => x.id === rest.id && x.kind !== 'step')?.kind, 'completed');
+    assert.equal(e.world.entities['a'].human!.activity, 'sit');
     // the next program stands them up by itself
     const r2 = e.perform({ actor: 'a', label: 'to the fire', steps: [{ verb: 'gather', params: { at: 'fire', seconds: 1 } }] });
     const log2 = run(e, 600);

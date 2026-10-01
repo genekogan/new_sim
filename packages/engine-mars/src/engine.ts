@@ -51,6 +51,7 @@ export const BODY_VERBS: VerbInfo[] = [
   { verb: 'ambient_wander', description: 'Stroll between nearby points, pausing, for a number of seconds within a radius in metres.', inputSchema: { type: 'object', properties: { seconds: num, radius: num } } },
 ];
 const BODY = new Set(BODY_VERBS.map((v) => v.verb));
+const NEEDS_BODY = new Set(['walk_to', 'sit', 'gather', 'converse', 'ambient_wander']);
 /** Mars's meal scenario as a world: the same proving ground, furnished and with its cast of four already there. */
 export const MEAL_WORLD: MarsWorldConfig = { scene: 'meal', arrival: [-6, -12], arrivalPlace: 'lawn', reference: [-6, -10.5], grounds: { id: 'grounds', name: 'the grounds' } };
 
@@ -155,7 +156,9 @@ export class MarsEngine implements Engine {
     for (let guard = 0; guard < 12; guard++) {
       if (!this.ents[p.actor]) return this.end(p, 'cancelled', { code: 'actor.removed', message: 'the actor is gone' });
       if (!p.started) {
-        if (!this.release(p.actor, { code: 'program.replaced', message: `replaced by ${p.label}` })) {
+        // A program whose first step moves the body first leaves whatever seat, circle or borrowed conversation holds it.
+        // One that only waits, turns, or uses this world's own verbs (eating while seated) keeps what it has.
+        if (NEEDS_BODY.has(p.steps[0]?.verb) && !this.release(p.actor, { code: 'program.replaced', message: `replaced by ${p.label}` })) {
           if (tick - p.since > RELEASE_TIMEOUT) return this.end(p, 'failed', { code: 'actor.busy', message: 'the actor was not released in time' });
           return;
         }
@@ -347,7 +350,7 @@ export class MarsEngine implements Engine {
   private tryRemove(id: string): boolean {
     if (!this.ents[id]) return true;
     if (!this.release(id, { code: 'actor.removed', message: 'actor removed' })) return false;
-    delete this.ents[id]; this.keys.delete(id); this.acts.delete(id);
+    delete this.ents[id]; this.keys.delete(id); this.acts.delete(id); this.ons.delete(id);
     this.out.changes.push([this.rt.tick, id, 'present', null]);
     return true;
   }
