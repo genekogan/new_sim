@@ -36,7 +36,7 @@ export function buildApp(d: Deps) {
   });
   app.use('*', async (c, next) => { await next(); c.header('X-Robots-Tag', 'noindex, nofollow'); });
   // Nothing a person or an agent sends is large: a command, an intent, a few cards.
-  app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ error: { code: 'too-large', message: 'request body is larger than 64 KB' } }, 413) }));
+  app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
 
   // ---- public
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build }));
@@ -80,7 +80,7 @@ export function buildApp(d: Deps) {
   });
   app.post('/v1/souls/:id/intent', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, c.req.param('id'));
-    const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { goal, target?, note? } } or { intent: { agenda: [{card, target}], text? } }');
+    const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
     const r = await d.souls.setIntent(s, p.data.intent, 'web'); return c.json({ ok: true, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq });
   });
   app.post('/v1/souls/:id/pair', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c)) }); });
@@ -119,6 +119,7 @@ export function buildApp(d: Deps) {
       case 'brain_mode': d.brain.setMode(a.mode); void d.host.enqueue('admin', who, { action: 'brain_mode', mode: a.mode }); break;
       case 'budget': d.brain.budget = a.usdPerDay; void d.host.enqueue('admin', who, { action: 'budget', usdPerDay: a.usdPerDay }); break;
       case 'snapshot': return c.json({ ok: true, snapshot: d.host.saveSnapshot() });
+      case 'adopt_vocabulary': { const e = await d.host.adoptVocabulary(who); return c.json({ ok: true, tick: e.tick, seq: e.seq }); }
       case 'attune': { for (const m of d.host.minds.values()) void d.brain.attune(m); break; }
       case 'invite': { const code = newId('sim').replace('_', '-'); d.db.createInvite(code, a.uses, a.note ?? null, u.id); return c.json({ ok: true, code, uses: a.uses }); }
     }
@@ -140,7 +141,7 @@ export function buildApp(d: Deps) {
   app.get('/v1/agent/log', (c) => c.json({ events: d.souls.soulLog(agentSoul(c)) }));
   app.get('/v1/agent/wait', async (c) => c.json(await d.souls.wait(agentSoul(c), Number(c.req.query('seconds') ?? 30))));
   app.post('/v1/agent/intent', async (c) => {
-    const s = agentSoul(c); const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { goal, target?, note? } } or { intent: { agenda: [{card, target}], text? } }');
+    const s = agentSoul(c); const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
     const r = await d.souls.setIntent(s, p.data.intent, 'api'); return c.json({ ok: true, accepted_at_tick: r.event.tick, seq: r.event.seq, intent: r.intent, text: r.text, status: d.souls.status(s) });
   });
   app.post('/v1/agent/command', async (c) => {

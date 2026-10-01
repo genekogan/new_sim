@@ -9,7 +9,7 @@ import {
   type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
 import type { Db } from './db.ts';
-import { arrivalPlace, foldEvent, initKernel, soulThing } from './fold.ts';
+import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pinnedVocabulary, soulThing, type Vocabulary } from './fold.ts';
 import { frontier, stepIndex } from './deck.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
@@ -25,11 +25,11 @@ export type Mind = {
   nudge: { text: string; untilTick: number } | null;
   /** The intent's agenda (cards to favour, in order) and how far along it is. */
   agenda: AgendaStep[]; agendaPos: number;
-  /** The card whose depiction is running and whose effects have not applied yet. */
   /** Something that was just tried and could not be done: not offered again for a minute, so a Soul never retries the impossible in a loop. */
   avoid?: { id: string; untilTick: number };
   /** Tick since which the plan has had no playable step (to give up eventually). */
   planBlockedSince?: number;
+  /** The card whose depiction is running and whose effects have not applied yet. */
   pending: { program: string; card: string; hash: string; target: string | null; manner?: string; approachLen: number; applied: boolean } | null;
 };
 type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void };
@@ -104,12 +104,14 @@ export class WorldHost {
       this.counts = body.counts ?? {};
       // A snapshot from before the kernel existed: build the kernel from the Souls that are there.
       this.kernel = body.kernel ?? this.bootstrapKernel();
+      // (a kernel bootstrapped by an earlier build recorded every Soul as born at tick 0; a replay says otherwise)
+      if (body.kernel) { const born = this.db.birthTicks(WORLD_ID); for (const t of Object.values(this.kernel.things)) if (t.kind === 'soul' && t.born === 0 && born[t.id]) t.born = born[t.id]; }
       this.seq = body.seq;
       this.lastSnapshotTick = snap.tick;
       from = 'snapshot';
     } else {
       this.engine = this.factory.create(this.factory.genesis(w.seed));
-      this.kernel = initKernel(this.engine);
+      this.kernel = initKernel(this.engine, pinnedVocabulary(this.db.rulesEvents(WORLD_ID)));
     }
     // fast-forward: replay events logged after the snapshot, stepping the engine to their ticks
     const later = this.db.events(WORLD_ID, this.seq);
@@ -120,17 +122,22 @@ export class WorldHost {
     }
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
+    // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
+    if (!this.db.hasVocabulary(WORLD_ID)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
     if (this.pendingBootstrap) { void this.enqueue('rules', 'system', { kernelBootstrap: this.pendingBootstrap, why: 'the kernel begins here for a world that predates it' }); this.pendingBootstrap = null; }
     return { from, replayed: later.length };
   }
 
+  /** Adopt the code's current starting vocabulary in this world (base cards, kinds, link kinds, manners), as a logged change of rules. */
+  adoptVocabulary(author: string) { return this.enqueue('rules', author, { vocabulary: codeVocabulary(), why: 'adopted the current base vocabulary' } satisfies { vocabulary: Vocabulary; why: string }); }
   private pendingBootstrap: { at: Record<string, string | null> } | null = null;
   /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
   private bootstrapKernel(): KState {
-    const k = initKernel(this.engine), at: Record<string, string | null> = {};
+    const k = initKernel(this.engine), at: Record<string, string | null> = {}, born = this.db.birthTicks(WORLD_ID);
     for (const m of this.minds.values()) {
       // as a replay from genesis would have it (arrived, never moved); the logged bootstrap event then places each Soul where it stands
       soulThing(k, { soulId: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: m.owner }, arrivalPlace(k));
+      k.things[m.soulId].born = born[m.soulId] ?? 0;
       at[m.soulId] = this.engine.world.entities[m.entityId] ? this.nearestPlace(k, m.entityId) : arrivalPlace(k);
     }
     this.pendingBootstrap = { at };
@@ -249,7 +256,7 @@ export class WorldHost {
         const p = e.payload as BirthPayload;
         if (!this.minds.has(p.soulId)) this.addMind({
           soulId: p.soulId, entityId: p.entityId, name: p.name, description: p.description, owner: p.owner, native: p.owner === 'system',
-          intent: null, intentVersion: 0, mood: 'curious', energy: 80, wantsCompany: 0.5, recent: ['arrived at the gate (done)'], doing: 'standing around',
+          intent: null, intentVersion: 0, mood: 'curious', energy: 80, wantsCompany: 0.5, recent: ['arrived (done)'], doing: 'standing around',
           nextEvalTick: tick + 20 + (hash32(p.soulId) % 40), evalTrigger: 'birth', lastEnergyTick: tick, lastFingerprint: '', nudge: null,
           agenda: [], agendaPos: 0, pending: null,
         });
@@ -326,7 +333,7 @@ export class WorldHost {
         this.kernelDirty = true;
         break;
       }
-      case 'rules': if ((e.payload as { kernelBootstrap?: unknown } | null)?.kernelBootstrap) this.kernelDirty = true; break; // otherwise clock rate, pause, dilation: recorded, no world effect
+      case 'rules': if ((e.payload as { kernelBootstrap?: unknown; vocabulary?: unknown } | null)?.kernelBootstrap || (e.payload as { vocabulary?: unknown } | null)?.vocabulary) this.kernelDirty = true; break; // otherwise clock rate, pause, dilation: recorded, no world effect
       case 'admin': break;
     }
   }
@@ -374,8 +381,6 @@ export class WorldHost {
   }
 
   private resetAcc() { this.acc = { paths: [], changes: [], log: [], dirty: new Set(), removed: [], plays: [], fromTick: this.engine.world.tick }; }
-  /** Plays resolved since the last batch (for the hub to broadcast). */
-  takePlays(): PlayView[] { return this.acc.plays; }
   private flush() {
     const b: Batch = {
       seq: ++this.batchSeq, fromTick: this.acc.fromTick, toTick: this.engine.world.tick,

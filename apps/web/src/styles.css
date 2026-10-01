@@ -27,7 +27,7 @@ button, input, select, textarea { font: inherit; color: inherit; background: var
 button { cursor: pointer; } button:hover { border-color: var(--accent); } button:disabled { opacity: 0.5; cursor: default; }
 button.primary { border-color: var(--accent); color: var(--accent); }
 input, textarea { width: 100%; } .row { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; } .row > input { flex: 1; min-width: 160px; } .row > input[style] { min-width: 0; }
-.kv { display: grid; grid-template-columns: max-content 1fr; gap: 1px 14px; } .kv > :nth-child(odd) { color: var(--dim); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 1px 14px; } .kv > :nth-child(odd) { color: var(--dim); } .kv > * { min-width: 0; overflow-wrap: anywhere; }
 .call { border-top: 1px solid var(--line); padding: 5px 0; } .call summary { cursor: pointer; list-style: none; } .call summary::-webkit-details-marker { display: none; }
 .tag { display: inline-block; padding: 0 5px; border: 1px solid var(--line); border-radius: 3px; margin-right: 6px; font-size: 11px; }
 .tag.mid { color: var(--accent); } .tag.narrator { color: var(--warn); } .tag.director, .tag.shot { color: #8a7fd6; } .tag.translate { color: #4a9fd8; }

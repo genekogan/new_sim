@@ -1,4 +1,4 @@
-// Conformance suite: any EngineFactory (toy now, Mars adapter later) must pass.
+// Conformance suite: every EngineFactory (the toy engine, the Mars adapter) must pass.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { EngineFactory } from './engine.ts';

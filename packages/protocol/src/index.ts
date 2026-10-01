@@ -164,6 +164,7 @@ export const adminSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('snapshot') }),
   z.strictObject({ action: z.literal('budget'), usdPerDay: z.number().min(0).max(100) }),
   z.strictObject({ action: z.literal('attune') }),
+  z.strictObject({ action: z.literal('adopt_vocabulary') }),
   z.strictObject({ action: z.literal('invite'), uses: z.number().int().min(1).max(500), note: z.string().max(80).optional() }),
 ]);
 export type AdminAction = z.infer<typeof adminSchema>;

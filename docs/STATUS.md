@@ -87,7 +87,7 @@ it is the single place that says what is true now.
 | Snapshot | 3.5 ms at 31 Souls, 44 ms at 1,000 | 09-30 |
 | Server memory | ~150 MB resident | 09-30 |
 
-Tests: 51 (kernel 6, engine contract 4, toy engine 8, Mars adapter 13, brain 6, server 14).
+Tests: 52 (kernel 6, engine contract 4, toy engine 8, Mars adapter 13, brain 6, server 15).
 The Mars tests skip where there is no Mars checkout (CI).
 
 ## Known limits and risks
@@ -103,7 +103,10 @@ The Mars tests skip where there is no Mars checkout (CI).
   wishes a day across all owners; each owner is limited to twelve an hour, after which a
   cheaper translator handles plain goals.
 - **Any card can target anything anywhere**; only its own conditions limit reach.
-- **Cards cannot be retired or revised** once minted.
+- **Cards cannot be retired or revised** once minted. Base cards can be revised for an existing world
+  only by adopting a new base vocabulary (an admin action, logged).
+- The old goal `follow` now means "go and talk with"; nothing follows continuously.
+- On the Mars engine the director's shot list and the map still assume the toy world's layout.
 - On the Mars engine, only eight verbs resume exactly from a snapshot; the body language
   uses only those (`eden4/19` §6).
 

@@ -75,7 +75,7 @@ export class Hub {
       // resume from the ring buffer if the client only missed a little; otherwise a full snapshot
       const ring = this.host.ring;
       const canResume = typeof m.since === 'number' && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
-      if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b }); }
+      if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b, log: b.log.map(publicEvent) }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
       this.send(c, { t: 'log', events: this.db.tailEvents(WORLD_ID, 150).map(publicEvent) });
       this.send(c, { t: 'kernel', view: this.host.kernelView() });

@@ -64,7 +64,7 @@ export class Brain {
   get overBudget() { return this.spentToday >= this.budget; }
   private get narratorState(): NarratorState {
     const x = this.host.extra as { narrator?: NarratorState };
-    if (!x.narrator) x.narrator = { nextRun: { center: this.host.engine.world.tick + TPS * 40, ring: this.host.engine.world.tick + TPS * 190 }, lastSummary: {} };
+    if (!x.narrator) x.narrator = { nextRun: Object.fromEntries(this.regions().map((r, i) => [r, this.host.engine.world.tick + TPS * (40 + 150 * i)])), lastSummary: {} };
     return x.narrator;
   }
 
@@ -148,7 +148,7 @@ export class Brain {
     }
     // Tier 3: narrator per region, staggered
     const ns = this.narratorState;
-    for (const region of Object.keys(w.regions)) if ((ns.nextRun[region] ?? 0) <= tick && !this.narrating.has(region)) void this.narrate(region, 'schedule');
+    for (const region of this.regions()) if ((ns.nextRun[region] ?? 0) <= tick && !this.narrating.has(region)) void this.narrate(region, 'schedule');
     // Tier 2b: director + ticker, only while someone is watching
     if (tick % DIRECTOR_EVERY === 0 && !this.directing && this.sink.clients() > 0) void this.direct();
   }
@@ -188,7 +188,8 @@ export class Brain {
   private updateEnergy(m: Mind, ent: Entity, tick: number) {
     const dt = (tick - m.lastEnergyTick) / TPS; m.lastEnergyTick = tick;
     const a = ent.human!.activity;
-    const rate = a === 'walk' ? -0.25 : a === 'perform' ? -0.4 : a === 'rest' || a === 'sit' ? 0.6 : a === 'gather' ? 0.15 : -0.03; // per second
+    // activity names differ by engine: the toy says rest/gather, Mars says sit/warm/watch/listen/talk/eat
+    const rate = a === 'walk' ? -0.25 : a === 'perform' ? -0.4 : a === 'rest' || a === 'sit' || a === 'eat' ? 0.6 : a === 'gather' || a === 'warm' || a === 'watch' || a === 'listen' ? 0.15 : -0.03; // per second
     m.energy = Math.max(0, Math.min(100, m.energy + rate * dt));
   }
 
@@ -516,17 +517,19 @@ export class Brain {
   }
 
   // ------------------------------------------------------------ tier 3: narrator
+  /** The regions the narrator plans for: the engine's own (whatever `regionAt` can answer), not the raw world file's. */
+  regions(): string[] { return this.host.engine.anchors().filter((a) => a.kind === 'region').map((a) => a.id); }
   digest(region: string): RegionDigest {
     const eng = this.host.engine, w = eng.world;
     const here = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === region);
-    const nameOf = (id: string) => w.entities[id]?.label ?? w.regions[id]?.label ?? id;
+    const nameOf = (id: string) => this.host.nameOf(id);
     const places = Object.values(w.entities).filter((e) => e.kind === 'fixture' && e.id !== 'gate' && eng.regionAt(e.pose.p) === region)
       .map((e) => { const n = Object.values(w.entities).filter((x) => x.human?.on === e.id).length; return { id: e.id, name: e.label ?? e.id, state: n ? `${n} souls here` : 'empty' }; });
     const names = new Set(here.map((m) => m.name));
     const recent = this.db.tailEvents(WORLD_ID, 120).filter((e) => e.kind === 'decision' || e.kind === 'birth' || e.kind === 'intent').map((e) => tickerText(e, this.host)).filter((t): t is string => !!t && [...names].some((n) => t.startsWith(n))).slice(-25);
-    const others = Object.keys(w.regions).filter((r) => r !== region).map((r) => { const n = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === r).length; return `${w.regions[r].label}: ${n} souls`; });
+    const others = this.regions().filter((r) => r !== region).map((r) => { const n = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === r).length; return `${nameOf(r)}: ${n} souls`; });
     return {
-      region, label: w.regions[region].label, time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), places,
+      region, label: nameOf(region), time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), places,
       souls: here.slice(0, 20).map((m) => ({ name: m.name, about: m.description, intent: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing, wants_company: m.wantsCompany > 0.6 ? 'yes' : m.wantsCompany < 0.35 ? 'no' : 'maybe' })),
       recent, neighbours: others, previous_summary: this.narratorState.lastSummary[region] ?? null,
     };
@@ -581,7 +584,7 @@ export const weatherWord = (w: { clouds: number; rain: number; wind: number }) =
 export function tickerText(e: LogEvent, host: WorldHost): string | null {
   const name = (soulId: string) => host.minds.get(soulId)?.name ?? 'a soul';
   switch (e.kind) {
-    case 'birth': return `${e.payload.name} arrived at the gate`;
+    case 'birth': return `${e.payload.name} arrived`;
     case 'decision': return `${name(e.payload.soulId)}: ${lowerFirst(e.payload.label)}`;
     case 'intent': return `${name(e.payload.soulId)} has a new intent: ${describeIntent(publicIntent(e.payload.intent), (id) => host.nameOf(id))}`;
     case 'play': return null;

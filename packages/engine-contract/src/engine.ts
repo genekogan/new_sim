@@ -1,5 +1,5 @@
 // The engine adapter: what the wrapper (server, brain, clients) needs from ANY
-// engine. The toy engine implements it now; the Mars engine gets an adapter later.
+// engine. Two implement it: the toy engine and the Mars adapter (packages/engine-mars).
 import type { ActionRecord } from './actions.ts';
 import type { RuntimeEvent } from './runtime.ts';
 import type { WorldState, Vec3 } from './world.ts';
@@ -41,7 +41,7 @@ export type Anchor = { id: string; kind: 'region' | 'place'; name: string; in?: 
 
 /** A depiction program for one actor: an ordered list of engine verbs. */
 export type Program = { actor: string; label: string; steps: { verb: string; params: Record<string, unknown> }[] };
-/** Progress of a program, reported by the engine each tick. `step` is the index now running (or that ended it). */
+/** Progress of a program, reported by the engine each tick. `step` is the index now running; -1 on the events that end a program. */
 export type ProgramEvent = { tick: number; id: string; actor: string; kind: 'step' | 'completed' | 'failed' | 'cancelled'; step: number; code?: string; message?: string };
 
 /** What the shell reads of an engine's runtime: never its internals. */

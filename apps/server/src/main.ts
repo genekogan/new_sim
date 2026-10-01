@@ -87,7 +87,7 @@ function pruneBackups() {
   for (const f of files) if (!keep.has(f)) { try { unlinkSync(join(config.dataDir, f)); } catch { /* already gone */ } }
 }
 async function backupNow() {
-  db.pruneBrainCalls();
+  db.pruneBrainCalls(); db.pruneTalk();
   if (db.vacuumIfBloated()) console.log('[db] vacuumed');
   await db.backupTo(join(config.dataDir, `backup-${new Date().toISOString().slice(0, 13).replace(/[-T:]/g, '')}.db`));
   pruneBackups();

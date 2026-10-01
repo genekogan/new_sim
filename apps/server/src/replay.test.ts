@@ -10,7 +10,7 @@ import { config } from './config.ts';
 import { Db } from './db.ts';
 import { Souls } from './souls.ts';
 import { kernelHash } from '@sim/kernel';
-import { initKernel, replayKernel } from './fold.ts';
+import { initKernel, pinnedVocabulary, replayKernel } from './fold.ts';
 import { optionsFor } from './deck.ts';
 import { WORLD_ID, WorldHost, replayFromGenesis } from './world.ts';
 
@@ -110,5 +110,28 @@ test('a world from before the kernel existed is given one at boot, and replay fr
   assert.equal(replayed.engine.stateHash(), host2.engine.stateHash());
   host2.kernel.tick = replayed.kernel.tick; assert.equal(kernelHash(replayed.kernel), kernelHash(host2.kernel));
   await new Promise((r) => setTimeout(r, 200)); // words for what was said are written just after the play
+  db.close();
+});
+
+test('a world’s vocabulary is in its log: history replays with its own words, and adopting new ones is a logged change', async () => {
+  const db = new Db(join(mkdtempSync(join(tmpdir(), 'sim-')), 't.db'));
+  const host = new WorldHost(db, toyFactory, 'vocab', 1e9); host.boot();
+  births(host, ['a', 'b', 'c']);
+  drive(host, 800, (i) => i * 3);
+  const pin = pinnedVocabulary(db.events(WORLD_ID));
+  assert.ok(pin && pin.cards['go to'] && pin.links.hosts.control === true, 'the starting vocabulary was written at the first tick');
+  // a kernel started from a pinned vocabulary has exactly those words, whatever the code's set is today
+  const odd = structuredClone(pin!); odd.cards['rest'] = { ...odd.cards['rest'], summary: 'as it was written then', hash: 'then' }; delete (odd.cards as Record<string, unknown>)['dance'];
+  const k = initKernel(toyFactory.create(toyFactory.genesis('vocab')), odd);
+  assert.equal(k.vocab.cards['rest'].summary, 'as it was written then'); assert.equal(k.vocab.cards['dance'], undefined);
+  // adopting the code's current set is an event like any other, and replay still arrives at the same world
+  await Promise.all([host.adoptVocabulary('test'), (async () => { host.tickOnce(); })()]);
+  // retiring a Soul that made a thing, and another thing with it, removes all of them
+  const made = host.kernel.things; const before = Object.keys(made).length;
+  host.kernel.things['kite'] = { id: 'kite', kind: 'kite', name: 'a kite', traits: {}, states: {}, at: null, born: 0, by: 's_b' };
+  host.kernel.things['tail'] = { id: 'tail', kind: 'tail', name: 'its tail', traits: { with: 'kite' }, states: {}, at: null, born: 0, by: 's_b' };
+  void host.enqueue('retire', 'test', { soulId: 's_b', entityId: 'h_b' }); host.tickOnce();
+  assert.equal(host.kernel.things['s_b'], undefined); assert.equal(host.kernel.things['kite'], undefined); assert.equal(host.kernel.things['tail'], undefined);
+  assert.ok(Object.keys(host.kernel.things).length < before);
   db.close();
 });

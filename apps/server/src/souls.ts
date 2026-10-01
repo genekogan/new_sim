@@ -216,14 +216,14 @@ export class Souls {
     const beats = this.db.recentKind(WORLD_ID, 'scene', 300).filter((e) => e.seq >= since && Array.isArray(e.payload?.beat?.targets) && e.payload.beat.kind !== 'scene' && e.payload.beat.targets.includes(soul.name));
     return [...own, ...beats].sort((a, b) => a.seq - b.seq).slice(-limit).map((e) => {
       const p = e.payload;
-      const text = e.kind === 'birth' ? 'was born at the gate'
+      const text = e.kind === 'birth' ? 'arrived in the world'
         : e.kind === 'intent' ? `intent set via ${p.source === 'web' ? 'this page' : p.source === 'system' ? 'the world' : `your agent (${p.source})`}: ${describeIntent(p.intent, label)}`
         : e.kind === 'decision' ? `set out to ${lower(p.label)}${p.manner ? `, ${p.manner}` : ''}`
         : e.kind === 'play' ? `${p.card}${p.target ? ` → ${past.get(p.target) ?? label(p.target)}` : ''}${p.manner ? `, ${p.manner}` : ''}`
         : e.kind === 'deck' ? `deck changed: ${[...(p.add ?? []).map((c: string) => `+${c}`), ...(p.remove ?? []).map((c: string) => `−${c}`), ...(p.manners ? [`manners: ${p.manners.join(', ')}`] : [])].join(' ')} (${p.why})`
         : e.kind === 'scene' ? `the storyteller suggested: ${p.beat.directive} — ${p.beat.flavor}`
         : e.kind === 'retire' ? 'left the world' : e.kind;
-      const why = e.kind === 'decision' ? ({ 'new-intent': 'because you gave a new intent', 'activity-ended': 'after finishing the last thing', 'activity-failed': 'after the last thing did not work out', 'narrator-beat': 'after a storyteller suggestion', birth: 'first choice after arriving', timer: 'on reflection' } as Record<string, string>)[p.trigger] ?? p.trigger : null;
+      const why = e.kind === 'decision' ? ({ 'new-intent': 'because you gave a new intent', 'activity-ended': 'after finishing the last thing', 'activity-failed': 'after the last thing did not work out', 'narrator-beat': 'after a storyteller suggestion', 'plan-advanced': 'the plan moved on', 'spoken-to': 'someone spoke to it', birth: 'first choice after arriving', timer: 'on reflection' } as Record<string, string>)[p.trigger] ?? p.trigger : null;
       return { seq: e.seq, tick: e.tick, at: e.at, kind: e.kind, text, why, mood: e.kind === 'decision' ? p.mood : null, fallback: e.kind === 'decision' ? !!p.fallback : false, call: e.kind === 'decision' ? p.call ?? null : null };
     });
   }

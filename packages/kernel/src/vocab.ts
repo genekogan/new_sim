@@ -12,7 +12,7 @@ export const BASE_KINDS: Record<string, { summary: string }> = {
 export const BASE_LINKS: Record<string, LinkKind> = {
   said: { summary: 'last spoke to (made only by saying; lapses after two minutes)' },
   asked: { summary: 'has an open question to (made only by asking; closed by an answer, or after two minutes)' },
-  knows: { summary: 'has met and talked with', mutual: true },
+  knows: { summary: 'has met and talked with' },
   hosts: { summary: 'is the host of', control: true },
   attends: { summary: 'is taking part in' },
   agreed: { summary: 'said yes to a request from (made only by saying yes; stands for thirty minutes)' },

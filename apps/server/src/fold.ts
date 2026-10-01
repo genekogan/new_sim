@@ -10,12 +10,26 @@ import {
 } from '@sim/kernel';
 import type { BirthPayload, DecisionPayload, DeckPayload, LogEvent, MintPayload, PlayPayload, PlayView } from '@sim/protocol';
 
+/**
+ * The words a world began with (kinds, link kinds, manners, base cards), as written into its log.
+ * A world's history is replayed with its own vocabulary, never with whatever the code's starting set has since become:
+ * changing a base card in the code changes new worlds, and an existing world only when a `rules` event adopts it.
+ */
+export type Vocabulary = { kinds: KState['vocab']['kinds']; links: KState['vocab']['links']; manners: KState['vocab']['manners']; cards: KState['vocab']['cards'] };
+export const baseVocabulary = (k: KState): Vocabulary => ({ kinds: k.vocab.kinds, links: k.vocab.links, manners: k.vocab.manners, cards: Object.fromEntries(Object.entries(k.vocab.cards).filter(([, c]) => c.origin === 'base')) });
+export const codeVocabulary = (): Vocabulary => { const k = emptyKernel(); seedVocabulary(k); return structuredClone(baseVocabulary(k)); };
+function setVocabulary(k: KState, v: Vocabulary): void {
+  Object.assign(k.vocab.kinds, structuredClone(v.kinds)); Object.assign(k.vocab.links, structuredClone(v.links)); Object.assign(k.vocab.manners, structuredClone(v.manners)); Object.assign(k.vocab.cards, structuredClone(v.cards));
+}
+/** The first vocabulary written into a log, if any: what its genesis kernel started with. */
+export const pinnedVocabulary = (events: LogEvent[]): Vocabulary | null => (events.find((e) => e.kind === 'rules' && (e.payload as { vocabulary?: Vocabulary } | null)?.vocabulary)?.payload as { vocabulary: Vocabulary } | undefined)?.vocabulary ?? null;
+
 /** Where Souls arrive: the place the engine tags as its arrival point. */
 export const arrivalPlace = (k: KState): string | null => Object.keys(k.things).sort().find((id) => Array.isArray(k.things[id].traits.tags) && (k.things[id].traits.tags as string[]).includes('arrival')) ?? null;
 
 /** A fresh kernel for an engine world: the starting vocabulary plus a place Thing per physical anchor. */
-export function initKernel(engine: Engine): KState {
-  const k = emptyKernel(); seedVocabulary(k);
+export function initKernel(engine: Engine, pinned?: Vocabulary | null): KState {
+  const k = emptyKernel(); if (pinned) setVocabulary(k, pinned); else seedVocabulary(k);
   const anchors = engine.anchors();
   const mk = (id: string, kind: string, name: string, at: string | null, traits: Thing['traits']) => { const r = applyAll(k, [{ op: 'appear', id, kind, name, at, traits }], 'world'); if (!r.ok) throw new Error(`kernel genesis: ${r.message}`); };
   for (const a of anchors) if (a.kind === 'region') mk(a.id, 'region', a.name, null, { ...(a.point ? { point: a.point } : {}) });
@@ -67,6 +81,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       };
       if (!soul) return refuse('no such Soul');
       if (!card || card.hash !== p.hash) return refuse('that card is not in the vocabulary');
+      if (!k.decks[p.soulId]?.cards.includes(p.card)) return refuse('that card is not in this Soul’s deck');
       const why = whyNot(k, card, p.soulId, p.target); if (why) return refuse(why);
       let changes: Change[], nextId: number;
       try { ({ changes, nextId } = changesOf(k, card, bind(k, card, p.soulId, p.target)!, p.manner)); } catch (err) { return refuse(String((err as Error).message)); }
@@ -98,13 +113,15 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       if (engine.world.entities[p.entityId]) engine.removeEntity(p.entityId);
       // what the Soul hosted or made does not outlive it
       const orphans = Object.values(k.things).filter((t) => t.by === p.soulId).map((t) => t.id);
-      applyAll(k, [...orphans, ...(k.things[p.soulId] ? [p.soulId] : [])].map((id) => ({ op: 'vanish' as const, id })), 'world');
+      for (const id of [...orphans, p.soulId]) if (k.things[id]) applyAll(k, [{ op: 'vanish', id }], 'world');
       delete k.decks[p.soulId];
       return {};
     }
     case 'rules': {
       // A world that began before the kernel existed is given one once, and where each Soul was is written into the log,
       // so a replay from genesis arrives at the same kernel.
+      const voc = (e.payload as { vocabulary?: Vocabulary } | null)?.vocabulary;
+      if (voc) setVocabulary(k, voc);
       const boot = (e.payload as { kernelBootstrap?: { at: Record<string, string | null> } } | null)?.kernelBootstrap;
       if (boot) for (const id of Object.keys(boot.at).sort()) { const at = boot.at[id]; if (k.things[id] && (at === null || k.things[at])) k.things[id].at = at; }
       return {};
@@ -116,7 +133,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
 /** Pure replay of the log from genesis. Returns the engine and the kernel; neither calls a model. */
 export function replayFromGenesis(factory: { genesis(seed: string): unknown; create(world: any): Engine }, seed: string, events: LogEvent[], untilTick: number): { engine: Engine; kernel: KState; counts: Record<string, number> } {
   const engine = factory.create(factory.genesis(seed));
-  const kernel = initKernel(engine); const counts: Record<string, number> = {};
+  const kernel = initKernel(engine, pinnedVocabulary(events)); const counts: Record<string, number> = {};
   let i = 0;
   while (engine.world.tick < untilTick) {
     while (i < events.length && events[i].tick === engine.world.tick) foldEvent(engine, kernel, events[i++], counts);
@@ -129,8 +146,9 @@ export function replayFromGenesis(factory: { genesis(seed: string): unknown; cre
 /** Replay the kernel alone from the log: meaning needs no engine. `places` are the genesis anchors. */
 export function replayKernel(genesis: KState, events: LogEvent[]): KState {
   const k: KState = structuredClone(genesis); const counts: Record<string, number> = {};
+  const pin = pinnedVocabulary(events); if (pin) { k.vocab = { kinds: {}, links: {}, cards: {}, manners: {} }; setVocabulary(k, pin); }
   const noEngine = { world: { entities: {} as Record<string, unknown> }, spawnHuman() { return ''; }, removeEntity() {}, programOf() { return null; }, stop() {}, perform() { return { id: '', ok: true }; } } as unknown as Engine;
-  for (const e of events) if (e.kind === 'birth' || e.kind === 'play' || e.kind === 'mint' || e.kind === 'deck' || e.kind === 'retire') foldEvent(noEngine, k, e, counts);
+  for (const e of events) if (e.kind === 'birth' || e.kind === 'play' || e.kind === 'mint' || e.kind === 'deck' || e.kind === 'retire' || e.kind === 'rules') foldEvent(noEngine, k, e, counts);
   return k;
 }
 export { kernelHash };

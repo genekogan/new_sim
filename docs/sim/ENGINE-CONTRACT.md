@@ -1,8 +1,10 @@
 # The engine contract
 
-`packages/engine-contract` is the seam between the shell and any engine. The toy
-engine implements it now; the Mars engine gets an adapter later. Names mirror the
-Mars engine (`../mars/ENGINE-SNAPSHOT.md`) so the adapter is thin.
+`packages/engine-contract` is the seam between the shell and any engine. Two
+engines implement it: the toy engine (`packages/engine-toy`, the default) and an
+adapter over the Mars engine (`packages/engine-mars`, `ENGINE=mars`). Names mirror
+the Mars engine (`../mars/ENGINE-SNAPSHOT.md`). Design notes for the adapter:
+`../eden4/19-MARS-BRIDGE.md`.
 
 ## Mirrored from Mars `viewer/engine`
 
@@ -16,11 +18,11 @@ Mars engine (`../mars/ENGINE-SNAPSHOT.md`) so the adapter is thin.
 | `createRegistry`, `describeVerbs`, `jsonSchemaOf` (`registry.ts`) | `api/registry.ts` |
 | `PoseSample = [tick, x mm, y mm, z mm, yaw mrad]` | `take/types.ts` |
 
-Differences on purpose: the scaffold `Runtime` requires every `ActionDef` to
-implement `serializeExec(exec)` / `restoreExec(rt, params, data, actionId)`, so
-`snapshot()` works at any tick with actions in flight. In Mars these are optional
-per verb with different signatures (`serializeExec?(rt, exec)`, `restoreExec?(rt, data)`)
-plus a `resumable` flag; an adapter must bridge that. `HumanState`
+Differences on purpose: the scaffold `Runtime` (used by the toy engine only)
+requires every `ActionDef` to implement `serializeExec(exec)` / `restoreExec(rt,
+params, data, actionId)`, so `snapshot()` works at any tick with actions in flight.
+In Mars these are optional per verb. The Mars adapter does not use the scaffold
+`Runtime`; it wraps Mars's own and exposes it through `RuntimeView`. `HumanState`
 adds `soul`; `Entity` adds `seats`.
 
 ## What the shell needs from an engine (`engine.ts`)
@@ -28,56 +30,139 @@ adds `soul`; `Entity` adds `seats`.
 ```ts
 interface Engine {
   rulesVersion: string; dt: number; schema: string;
-  runtime: Runtime; world: WorldState; registry: Map<string, ActionDef>;
-  describeVerbs(): VerbInfo[];
+  runtime: RuntimeView;            // { tick, records, violations, liveIds() }
+  world: WorldState;
+  describeVerbs(): VerbInfo[];     // { verb, description, inputSchema, scope? }
   stateHash(): string; physicalHash(): string;
-  step(): { paths: PathCommit[]; changes: ChangeEvent[]; events: RuntimeEvent[] };
+  step(): { paths: PathCommit[]; changes: ChangeEvent[]; events: RuntimeEvent[]; programs: ProgramEvent[] };
+  perform(program): { id; ok; diagnostic? };        // start a program, replacing what the actor was doing
+  stop(programId): void;                            // the actor is left idle where it is
+  canPerform(program): { code; message } | null;    // is the first step feasible now? null = yes; no side effects
+  programOf(actor): string | null;
   submit(verb, params, opts?): ActionRecord; cancel(id, reason?): ActionRecord;
-  snapshot(): RuntimeSnapshot;
+  snapshot(): EngineSnapshot;      // opaque to the shell except { format, tick, stateHash }
   spawnHuman({ id, label, soul }): string; removeEntity(id): void;
-  enumerateActivities(actorId, intent): ActivityOption[];   // feasible now, params bound, cheap
+  anchors(): Anchor[];             // regions and named places that meaning can refer to; stable ids
+  enumerateActivities(actorId, intent): ActivityOption[];          // no longer called by the server
   describeSurroundings(actorId): { nearby[], region, happening };  // word-bucketed, no numbers
   regionAt(p): string; poseSampleOf(id): PoseSample; currentPath(id): PathCommit | undefined;
 }
-interface EngineFactory { rulesVersion; genesis(seed): WorldState; create(world): Engine; restore(snap): Engine }
+interface EngineFactory { rulesVersion; genesis(seed): WorldState; create(world): Engine; restore(snap: EngineSnapshot): Engine }
 ```
 
-- `step()` returns what changed for broadcast: **paths** (timed waypoints when an
-  actor commits to moving), **changes** (`[tick, entityId, field, value]`), and
-  runtime events.
+- **`Program`** `{ actor, label, steps: {verb, params}[] }` is a depiction program
+  for one actor. A `decision` event starts one. One actor runs one program.
+- **`ProgramEvent`** `{ tick, id, actor, kind, step, code?, message? }` with `kind`
+  one of `step`, `completed`, `failed`, `cancelled`. For `step`, `step` is the index
+  of the step now running; for the other kinds both engines send `-1`. The host
+  uses these events to apply a card's changes once its approach steps are done.
+- **`Anchor`** `{ id, kind: 'region' | 'place', name, in?, entity?, point?, tags? }`.
+  The fold mirrors every anchor as a kernel Thing at genesis and keeps `entity`,
+  `point` and `tags` as traits. The place tagged `arrival` is where new Souls are
+  put in the kernel.
+- **`step()`** returns what changed for broadcast: **paths** (timed waypoints),
+  **changes** (`[tick, entityId, field, value]`), runtime events and program events.
+- **`VerbInfo.scope`** is `'world'` for a verb that belongs to one world's engine and
+  not to the shared body language. Such verbs are listed briefly in `/cards.md`.
+- An unknown verb fails with the code `action.unknown-verb` in both engines.
 - `ActivityOption { id, template, label, goodWhen?, notFor?, servesIntent?, target?,
-  steps: {verb, params}[], durationHint }` is what the mid-brain chooses among.
-  The engine, not the model, decides feasibility and binds parameters.
-- `enumerateActivities` must be pure (no rng), because it is not called on replay.
+  steps, durationHint }` is the shape the mid-brain chooses among. The server now
+  builds these from cards (`apps/server/src/deck.ts`), not from `enumerateActivities`.
+
+## Body language
+
+Both engines describe the same nine verbs for one actor's body. Cards may use only
+verbs the running engine describes. The actor is implied by the program.
+
+`walk_to {to, standoff?}` · `sit {on, seconds?}` · `stand` · `rest {seconds?}` ·
+`wave {at?, seconds?}` · `converse {with, seconds?}` · `gather {at, seconds?}` ·
+`perform {what?, seconds?}` · `ambient_wander {seconds?, radius?}`
+
+`deck.ts` replaces card references in step params with what the engine can find:
+a body's entity id, a fixture's entity id, or a point `[x, z]`.
 
 ## Conformance suite
 
 `@sim/engine-contract/conformance` exports `conformance(name, factory, drive)`:
 determinism (same seed and inputs → same hash), different seeds diverge,
 snapshot/restore mid-action continues identically, `physicalHash` ignores labels
-and env, verbs describe with JSON Schema, unknown verb fails cleanly. Any engine
-adapter must pass it (`packages/engine-toy/src/toy.test.ts` shows usage).
+and env, verbs describe with JSON Schema, unknown verb fails cleanly. Both engines
+pass it (`packages/engine-toy/src/toy.test.ts`, `packages/engine-mars/src/mars.test.ts`).
 
 ## The toy engine (`packages/engine-toy`)
 
 - World: 100 × 100 m plane (`±50`), fixtures `campfire` (12 seats), `bench-1..4`
   (3 seats), `kiosk`, `gate` (arrival); regions `center` (±18 m) and `ring`.
   Schema `sim-toy-world/1`, rules `sim-toy/1+activities/1`.
-- Verbs: `walk_to`, `sit`, `stand`, `rest`, `converse`, `gather`, `wave`, `perform`,
-  `ambient_wander`, and `do_activity` (runs an ordered list of the others for one
-  actor; what `decision` events submit).
+- Verbs: the nine above plus `do_activity`, which runs an ordered list of the
+  others for one actor. `perform` submits a `do_activity` with `preempt`; the
+  program id is that action's id and `programOf` reads `human.task`.
+- Anchors: each region as a `region`; each fixture as a `place` in its region,
+  tagged with its `def`, `seats` if it has any, and `arrival` for the gate.
 - Movement: straight timed paths at 1.35 m/s, integer millimetres, no avoidance,
   arithmetic-only `atan2` so positions are bit-identical on server and clients.
-- Activity options: attend the campfire, rest on the two nearest free benches,
-  converse with the three nearest Souls, perform, wander near/far, plus
-  intent-specific options (follow, go, converse/rest with a named target).
-  Options the standing intent asks for are flagged `servesIntent`.
+- `enumerateActivities` still exists (attend the campfire, rest on a bench,
+  converse, perform, wander, plus intent-specific options) and is used only by the
+  toy engine's own tests.
 
-## What the Mars transplant must provide
+## The Mars adapter (`packages/engine-mars`)
 
-1. `snapshot()` / restore at any tick with in-flight actions (Mars: "active
-   activity snapshots remain explicitly nonresumable").
-2. A cheap `enumerateActivities` and `describeSurroundings` (Mars `rehearse` is
-   ~200 ms, too slow per Soul).
-3. Emitting committed paths as they are decided (the take track format fits).
-4. `spawnHuman` / `removeEntity` for arrivals and departures at runtime.
+The Mars engine is never copied into this repository. `load.ts` imports it
+read-only from a local checkout: `MARS_ENGINE_DIR`, or by default
+`<mars-campus-repo>/viewer/engine`. `marsAvailable()` is true
+when that directory has `runtime/runtime.ts`. `marsFactory()` is async (it loads
+the engine); `main.ts` calls it only when `ENGINE=mars`.
+
+- **World.** The default configuration is Mars's synthetic proving ground with its
+  test people removed; Souls arrive near a fixed arrival point. Rules version
+  `sim-mars/1+<Mars rules version>`; `schema` is the Mars world's own. A second
+  configuration, `MEAL_WORLD`, loads one of Mars's authored scenarios and is used
+  by a test only.
+- **Lowering.** Each body-language step becomes Mars actions and waits when the
+  step begins:
+
+  | Body step | Mars actions |
+  |---|---|
+  | `walk_to` | `walk_to {x, z}` to a reachable point `standoff` metres from the target (eight directions are tried; never closer than 0.9 m to an entity), then `face` it if it is an entity |
+  | `sit` | `sit {fixture}`, then wait; the seat is kept after the step |
+  | `gather` | `campfire_circle` or `gather {fixture}` or `gather {region}`, then wait; if none is possible, walk to within 2 m and wait |
+  | `converse` | `converse {actors}` if the other body is free and the verb plans; otherwise `face` and wait |
+  | `wave` | `face`, then wait |
+  | `rest`, `perform` | wait |
+  | `ambient_wander` | up to six `walk_to` legs with pauses, drawn from the world RNG |
+  | `stand` | `stand`, if something holds the actor |
+
+- **Raw verbs.** Every Mars verb is also described as `mars:<verb>` with `scope:
+  'world'`. A raw step fills in `actor` (or `actors: [actor]`) when the verb takes
+  one and the step gives none.
+- **One program per actor.** `perform` replaces the actor's program. A program
+  whose first step moves the body (`walk_to`, `sit`, `gather`, `converse`,
+  `ambient_wander`) first asks whatever holds the actor (a seat, a circle, a
+  borrowed conversation) to let go, and fails with `actor.busy` if that takes more
+  than 15 seconds. A program that begins by waiting, turning or with a raw Mars
+  verb keeps what the actor has. While something holds the actor, a `face` is
+  skipped, `stand` and raw verbs are submitted as they are, and any other Mars
+  action releases the actor first.
+- **Borrowed joint staging.** Mars's `converse` takes two actors. The adapter lets a
+  `converse` step borrow the other body only while that body has no program and
+  nothing holds it. The other body's own program takes it back whenever it needs
+  the body, and the borrower's step simply ends.
+- **Feasibility first.** `canPerform` plans the first step (`walk_to`, `sit` and raw
+  verbs go through Mars's `verb.plan`) and `perform` refuses a program that fails it,
+  because in Mars even a refused instruction disturbs the actor.
+- **Broadcast.** Movement is sent as keyframes: every 5 ticks (`KEY_EVERY`) a body
+  that moved gets a two-waypoint path from its last keyframe to its pose now.
+  `currentPath` returns nothing. Activity and seat changes are sent as changes.
+- **Snapshot.** Format `sim-mars-snapshot/1`: Mars's own snapshot plus the programs,
+  the program counter, bodies waiting to be removed, and the world configuration.
+  `stateHash` covers the Mars state hash and the adapter's programs. Body-language
+  steps lower only to Mars verbs that resume exactly (a test checks nothing is
+  dropped).
+- **Pruning.** Mars keeps every event and record. The adapter trims the event list
+  past 20,000 entries and forgets finished action records after 120 seconds.
+- **Regions.** `anchors()` returns one region, `grounds`, plus a place per Mars
+  region (except `no-go`) and per fixture. `regionAt` returns `grounds` for every
+  point. `enumerateActivities` returns nothing.
+
+Not built: scenes (one kernel Thing staged by one Mars coordinator, `../eden4/19`
+§5), engine entities for things that cards make, and any motion for manners.

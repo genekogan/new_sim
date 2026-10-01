@@ -39,6 +39,14 @@ export class Db {
   tailEvents(worldId: string, n: number): LogEvent[] {
     return (this.db.prepare('SELECT seq, tick, kind, author, payload, at FROM events WHERE world_id = ? ORDER BY seq DESC LIMIT ?').all(worldId, n) as any[]).map(rowToEvent).reverse();
   }
+  /** The tick at which each Soul was born (from the log). */
+  birthTicks(worldId: string): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const r of this.db.prepare("SELECT tick, payload FROM events WHERE world_id = ? AND kind = 'birth' ORDER BY seq").all(worldId) as any[]) { const id = JSON.parse(r.payload)?.soulId; if (id && out[id] === undefined) out[id] = r.tick; }
+    return out;
+  }
+  rulesEvents(worldId: string): LogEvent[] { return (this.db.prepare("SELECT seq, tick, kind, author, payload, at FROM events WHERE world_id = ? AND kind = 'rules' ORDER BY seq").all(worldId) as any[]).map(rowToEvent); }
+  hasVocabulary(worldId: string): boolean { return this.rulesEvents(worldId).some((e) => !!(e.payload as { vocabulary?: unknown } | null)?.vocabulary); }
   lastSeq(worldId: string): number { return ((this.db.prepare('SELECT MAX(seq) AS s FROM events WHERE world_id = ?').get(worldId) as any)?.s as number) ?? 0; }
   countEvents(worldId: string): number { return (this.db.prepare('SELECT COUNT(*) AS c FROM events WHERE world_id = ?').get(worldId) as any).c; }
 

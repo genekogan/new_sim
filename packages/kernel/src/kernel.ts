@@ -1,7 +1,7 @@
 // Applying changes. Deterministic and total: a change either applies or is
 // refused with a reason; nothing else can alter the state.
-// Coherence rule: an actor changes only itself, what it controls, and things
-// nobody controls. Anything shared happens when independent actions fit together.
+// Coherence rule: an actor changes only itself, what it controls, and what it
+// made. Anything shared happens when independent actions fit together.
 import { hashOf } from '@sim/engine-contract';
 import type { Change, Json, KState, Link, Thing } from './types.ts';
 
@@ -26,7 +26,7 @@ export const linked = (s: KState, kind: string, from: string, to: string): Link 
 };
 export const linksFrom = (s: KState, from: string, kind?: string): Link[] => Object.values(s.links).filter((l) => l.from === from && (!kind || l.kind === kind) && (l.until === undefined || l.until >= s.tick));
 export const linksTo = (s: KState, to: string, kind?: string): Link[] => Object.values(s.links).filter((l) => l.to === to && (!kind || l.kind === kind) && (l.until === undefined || l.until >= s.tick));
-/** The place a thing is at: itself if it is a place-like container of others, else where it is. */
+/** Where a thing is: the thing it is `at`, or null. */
 export const placeOf = (s: KState, id: string): string | null => s.things[id]?.at ?? null;
 export const samePlace = (s: KState, a: string, b: string): boolean => {
   if (a === b) return true;

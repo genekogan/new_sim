@@ -7,7 +7,8 @@
 // `mars:<verb>`, for vocabulary that belongs to a Mars world (serve, eat, carry…).
 //
 // Three rules it enforces, which the Mars runtime leaves to its caller:
-//  1. One actor, one program. Starting a program releases whatever held that actor.
+//  1. One actor, one program. A step that moves the body first releases whatever
+//     held that actor (a seat, a circle); one that only waits keeps it.
 //  2. Joint staging is borrowed. A Mars verb that takes several actors (converse)
 //     borrows the others' bodies only while they are free; their own program takes
 //     them back at any time, and the borrower treats that as the scene ending.
@@ -412,7 +413,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig };
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
       // Spatial services are rebuilt for the same base scene; the snapshot carries the rest.
-      const base = m.provingGroundWorld();
+      const base = (s.cfg ?? cfg).scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
       const rt = m.Runtime.restore(s.mars, registry, services(base), m.invariants);
       return new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving });
     },
