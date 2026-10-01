@@ -551,10 +551,12 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
         setManifest(sceneManifest(root, year));
         root.traverse(remember);
         batches = createRenderBatches(scene, root);
-        life = createCampusLife(scene, root, setError, additions, year === 2020 ? 2 : year === 2021 ? 3 : 6);
-        life.setEnabled(lifeEnabled);
+        if (year !== 2027) {
+          life = createCampusLife(scene, root, setError, additions, year === 2020 ? 2 : year === 2021 ? 3 : 6);
+          life.setEnabled(lifeEnabled);
+        }
         display();
-        focus(objects.get('chiba') || null);
+        focus(year === 2027 ? root : objects.get('chiba') || null);
         setStatus('');
       })
       .catch((e) => {
@@ -832,7 +834,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
           orbit.update();
           return;
         }
-        focus(objects.get('chiba') || null);
+        focus(year === 2027 ? root : objects.get('chiba') || null);
       },
       referenceView: (pose) => {
         followRider = false;
@@ -1333,6 +1335,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
       <main className="studio studio-presentation">
         <section className="studio-stage studio-presentation-stage" aria-label="Mars campus">
           <div className="studio-viewport" ref={mount} />
+          {year === 2027 && <aside style={{position: 'absolute', bottom: 52, left: 16, maxWidth: 480, background: '#26362dec', color: '#f0f0df', padding: 12, borderRadius: 6, zIndex: 4}}>2027 · resident concept draft. Raw open structures; fitted scale and unassigned kitchens. Drainage shown as a cutaway proposal. <a href="/studio/2027" style={{color: '#fff'}}>Open draft editor</a></aside>}
           <PresentationControls
             year={year} walking={walking} cycle={cycle} hour={hour}
             rooms={Object.entries(rooms).map(([id, pose]) => ({ id, label: pose.label }))}
@@ -1373,7 +1376,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
           </div>
         </a>
         <div className="studio-tabs">
-          <label className="year-picker">Year <select aria-label="Campus year" value={year} onChange={e => { location.href = Number(e.target.value) === 2026 ? '/studio' : `/studio/${e.target.value}`; }}>{YEARS.map(y => <option key={y} value={y}>{y}{y === 2020 ? ' · Brahman' : ''}</option>)}</select></label>
+          <label className="year-picker">Year <select aria-label="Campus year" value={year} onChange={e => { location.href = Number(e.target.value) === 2026 ? '/studio' : `/studio/${e.target.value}`; }}>{YEARS.map(y => <option key={y} value={y}>{y}{y === 2020 ? ' · Brahman' : y === 2027 ? ' · draft' : ''}</option>)}</select></label>
           <BuildPicker host={() => api.current?.take ?? null} year={year} />
           <button onClick={() => api.current?.view('chiba')}>{year === 2020 ? 'Portal' : year === 2022 ? 'Ba Sing Se' : 'Chiba'}</button>
           <button onClick={() => api.current?.view('campus')}>
@@ -1515,7 +1518,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
               component is selected.
             </p>
           </details>
-          <SimulationPanel
+          {year !== 2027 && <SimulationPanel
             year={year}
             onConnection={(v) => {
               setConnected(v);
@@ -1526,7 +1529,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
               api.current?.simulation(s);
             }}
             onFollow={(v) => api.current?.followCamera(v)}
-          />
+          />}
           <div className="panel-tabs">
             {['assemblies', 'parts', 'library'].map((p) => (
               <button
@@ -1670,6 +1673,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
         </aside>
         <section className="studio-stage">
           <div className="studio-viewport" ref={mount} />
+          {year === 2027 && <aside style={{position: 'absolute', bottom: 52, left: 16, maxWidth: 480, background: '#26362dec', color: '#f0f0df', padding: 12, borderRadius: 6, zIndex: 4}}>2027 · resident concept draft. Raw open structures; fitted scale and unassigned kitchens. Drainage shown as a cutaway proposal. <a href="/studio/2027" style={{color: '#fff'}}>Open draft editor</a></aside>}
           <div className="stage-top">
             <div className="stage-selectors">
               {year===2026 && <label>

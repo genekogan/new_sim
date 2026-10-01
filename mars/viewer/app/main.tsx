@@ -30,7 +30,7 @@ class ErrorBoundary extends Component<
 const route = location.pathname.replace(/\/$/, '') || '/';
 const requestedYear = new URLSearchParams(location.search).get('year');
 const presentationYear =
-  requestedYear && /^202[0-6]$/.test(requestedYear)
+  requestedYear && /^202[0-7]$/.test(requestedYear)
     ? Number(requestedYear)
     : 2026;
 createRoot(document.getElementById('root')!).render(
@@ -42,7 +42,7 @@ createRoot(document.getElementById('root')!).render(
         </p>
       }
     >
-      {route === '/studio' || /^\/studio\/202[0-6]$/.test(route) ? (
+      {route === '/studio' || /^\/studio\/202[0-7]$/.test(route) ? (
         <Studio
           year={route === '/studio' ? 2026 : Number(route.split('/')[2])}
         />

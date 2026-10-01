@@ -40,7 +40,7 @@ const layoutSchema = z
   .object({
     schema_version: z.literal(1),
     base_model: z.literal('mars-campus-modular-v1'),
-    year: z.number().int().min(2020).max(2026).optional(),
+    year: z.number().int().min(2020).max(2027).optional(),
     units: z.literal('metres').optional(),
     up: z.literal('Y').optional(),
     edits: z.array(editSchema).max(20000),

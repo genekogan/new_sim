@@ -43,7 +43,7 @@ function renderRoute(path) {
 }
 
 test('presentation root validates query years and photo aliases preserve reconstruction', () => {
-  for (let year = 2020; year <= 2026; year++) {
+  for (let year = 2020; year <= 2027; year++) {
     const root = renderRoute(`/?year=${year}`);
     assert.equal(root.type, 'Studio');
     assert.equal(root.props.year, year);
@@ -53,7 +53,7 @@ test('presentation root validates query years and photo aliases preserve reconst
     '',
     '?year=',
     '?year=2019',
-    '?year=2027',
+    '?year=2028',
     '?year=2020.0',
     '?year=02020',
     '?year=2020junk',
@@ -72,11 +72,12 @@ test('museum, lab, guide and unknown route behavior is retained', () => {
     assert.equal(route.props.year, path.includes('2020') ? 2020 : 2026);
     assert.equal(route.props.presentation, undefined);
   }
+  assert.equal(renderRoute('/studio/2027').props.year, 2027);
   assert.equal(renderRoute('/lab/').type, 'Lab');
   assert.equal(renderRoute('/simulation-guide/').type, 'Guide');
   for (const path of [
     '/studio/2019',
-    '/studio/2027',
+    '/studio/2028',
     '/photo/unknown',
     '/unknown',
   ]) {
@@ -123,6 +124,7 @@ test('generated Worker admits photo/presentation routes and retains method/unkno
     '/studio',
     '/studio/2020/',
     '/studio/2026',
+    '/studio/2027',
     '/lab/',
     '/simulation-guide/',
   ]) {
@@ -145,7 +147,7 @@ test('generated Worker admits photo/presentation routes and retains method/unkno
     assert.equal(refused.status, 405, path);
     assert.equal(refused.headers.get('allow'), 'GET, HEAD');
   }
-  for (const path of ['/photo/unknown', '/studio/2027', '/unknown']) {
+  for (const path of ['/photo/unknown', '/studio/2028', '/unknown']) {
     assert.equal(
       (
         await context.worker.fetch(
