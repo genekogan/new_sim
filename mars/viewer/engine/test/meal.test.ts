@@ -20,6 +20,69 @@ import { mealRegistry, mealRuntime, mealWorld, runMeal } from '../scenarios/meal
 
 const fixture = (id: string, def: string, x: number, z: number, yaw = 0): Entity => ({ id, def, kind: 'fixture', pose: { p: [x, 0, z], yaw }, provenance: FIXTURE });
 
+test('serve refuses to overwrite a nonempty bowl, preserving both contents', () => {
+  const rt = setup({}, fixture('t', 'table-6ft', -6, -8.5), human('p', -6.15, -9.2));
+  onTable(rt, 'pot', 'pot', 't', 'r1c2', { food: 'stew', fraction: 1 });
+  inHandOf(rt, 'p', 'b', 'bowl', 'left', { food: 'salad', fraction: 0.4 });
+  const before = structuredClone(rt.world);
+  const r = rt.submit('serve', { actor: 'p', pot: 'pot', bowl: 'b' });
+  assert.equal(r.status, 'failed');
+  assert.equal(r.diagnostic?.code, 'serve.bowl-not-empty');
+  assert.deepEqual(rt.world, before);
+});
+
+test('serve cannot create a full bowl from less than one serving', () => {
+  const rt = setup({}, fixture('t', 'table-6ft', -6, -8.5), human('p', -6.15, -9.2));
+  onTable(rt, 'pot', 'pot', 't', 'r1c2', { food: 'stew', fraction: 0.1 });
+  inHandOf(rt, 'p', 'b', 'bowl', 'left', { food: 'stew', fraction: 0 });
+  const before = structuredClone(rt.world);
+  const r = rt.submit('serve', { actor: 'p', pot: 'pot', bowl: 'b' });
+  assert.equal(r.diagnostic?.code, 'serve.insufficient-food');
+  assert.deepEqual(rt.world, before);
+});
+
+test('concurrent serving rechecks the shared pot at deposit and conserves its last portion', () => {
+  const rt = setup({}, fixture('t', 'table-6ft', -6, -8.5), human('p', -6.15, -9.2), human('q', -6.15, -7.8));
+  onTable(rt, 'pot', 'pot', 't', 'r1c2', { food: 'stew', fraction: 0.25 });
+  inHandOf(rt, 'p', 'bp', 'bowl', 'left', { food: 'stew', fraction: 0 });
+  inHandOf(rt, 'q', 'bq', 'bowl', 'left', { food: 'stew', fraction: 0 });
+  const p = rt.submit('serve', { actor: 'p', pot: 'pot', bowl: 'bp' });
+  const q = rt.submit('serve', { actor: 'q', pot: 'pot', bowl: 'bq' });
+  assert.equal(p.status, 'executing');
+  assert.equal(q.status, 'executing');
+  for (let i = 0; i < 100 && (rt.isActive(p.id) || rt.isActive(q.id)); i++) rt.step();
+  assert.deepEqual([p.status, q.status], ['completed', 'failed']);
+  assert.equal(q.diagnostic?.code, 'serve.insufficient-food');
+  const e = rt.world.entities;
+  assert.equal(4 * e.pot.contents!.fraction + e.bp.contents!.fraction + e.bq.contents!.fraction, 1);
+  assert.deepEqual([e.bp.support, e.bq.support], [
+    { kind: 'in-hand', by: 'p', hand: 'left' }, { kind: 'in-hand', by: 'q', hand: 'left' },
+  ]);
+  assert.deepEqual(rt.holder('entity:pot'), []);
+  assert.deepEqual(rt.holder('hand:q:left'), []);
+  assert.deepEqual(rt.holder('hand:q:right'), []);
+  assert.deepEqual(rt.violations, []);
+});
+
+for (const committed of [false, true]) test(`cancelled serving retains food conservation, deposited=${committed}`, () => {
+  const rt = setup({}, fixture('t', 'table-6ft', -6, -8.5), human('p', -6.15, -9.2));
+  onTable(rt, 'pot', 'pot', 't', 'r1c2', { food: 'stew', fraction: 0.25 });
+  inHandOf(rt, 'p', 'b', 'bowl', 'left', { food: 'stew', fraction: 0 });
+  const r = rt.submit('serve', { actor: 'p', pot: 'pot', bowl: 'b' });
+  if (committed) {
+    for (let i = 0; i < 100 && r.phase !== 'back'; i++) rt.step();
+    assert.equal(r.phase, 'back');
+  } else rt.step();
+  rt.cancel(r.id);
+  const e = rt.world.entities;
+  assert.equal(4 * e.pot.contents!.fraction + e.b.contents!.fraction, 1);
+  assert.equal(e.b.contents!.fraction, committed ? 1 : 0);
+  assert.equal(r.status, 'cancelled');
+  assert.deepEqual(e.b.support, { kind: 'in-hand', by: 'p', hand: 'left' });
+  assert.deepEqual(rt.holder('entity:pot'), []);
+  assert.deepEqual(rt.violations, []);
+});
+
 function setup(extra: Parameters<typeof provingGround>[0] = {}, ...es: Entity[]) {
   const base = provingGround(extra);
   const w = addAll(emptyWorld('proving-ground', base), ...es);

@@ -409,9 +409,19 @@ const frameOf = (a: Entity, base: string) => bodyFrame(a, base === 'sit' ? SEAT_
 type ServeParams = { actor: string; pot: string; bowl: string };
 type ServeExec = OverlayBase & { pot: string; bowl: string; bowlHand: Hand; hand: Hand; phase: 'to-pot' | 'to-bowl' | 'back'; from: Vec3; bowlFrom: Vec3 };
 
+/** Shared pots are checked again at the deposit, after other diners may serve. */
+function servingContents(pot: Entity, bowl: Entity): Diagnostic | undefined {
+  if ((bowl.contents?.fraction ?? 0) > 0) return {
+    code: 'serve.bowl-not-empty', message: `${bowl.id} still contains food; finish or explicitly preserve it before requesting a full serving`, subjects: [bowl.id],
+  };
+  if (!pot.contents || pot.contents.fraction < SERVING) return {
+    code: 'serve.insufficient-food', message: `${pot.id} has ${pot.contents?.fraction ?? 0} of a pot, but filling ${bowl.id} requires ${SERVING}; the remaining food is preserved`, subjects: [pot.id, bowl.id],
+  };
+}
+
 export const serve: ActionDef<ServeParams, { bowlHand: Hand }, ServeExec> = {
   verb: 'serve',
-  description: `A person holding a bowl fills it from a pot within ${BODY_REACH.toFixed(2)} m (on the table or in their other hand): the other hand goes to the pot (${SERVE_PHASES.toPot} s), to the bowl (${SERVE_PHASES.toBowl} s; the bowl becomes full of the pot's food, the pot loses ${SERVING}) and back (${SERVE_PHASES.back} s). Seated or standing still; refused item.out-of-reach, item.not-held, serve.pot-empty, serve.not-still.`,
+  description: `A person holding an empty bowl fills it from a pot within ${BODY_REACH.toFixed(2)} m (on the table or in their other hand): the other hand goes to the pot (${SERVE_PHASES.toPot} s), to the bowl (${SERVE_PHASES.toBowl} s; the bowl becomes full of the pot's food, the pot loses ${SERVING}) and back (${SERVE_PHASES.back} s). Seated or standing still; refused item.out-of-reach, item.not-held, serve.pot-empty, serve.insufficient-food, serve.bowl-not-empty, serve.not-still. Quantity is rechecked at deposit; no partial serving or implicit replacement of existing food.`,
   schema: z.strictObject({ actor: id80, pot: id80, bowl: id80 }),
   reservations: (w, p) => [
     { resource: `hand:${p.actor}:left`, mode: 'exclusive' },
@@ -429,6 +439,8 @@ export const serve: ActionDef<ServeParams, { bowlHand: Hand }, ServeExec> = {
     const pot = itemOf(rt, p.pot);
     if ('code' in pot) return { ok: false, diagnostic: pot };
     if (!CONTAINERS.has(pot.def) || !pot.contents || pot.contents.fraction <= 1e-9) return fail('serve.pot-empty', `${pot.id} has no food to serve`, [pot.id]);
+    const contents = servingContents(pot, bowl);
+    if (contents) return { ok: false, diagnostic: contents };
     const ps = pot.support;
     if (ps?.kind === 'in-hand' && ps.by !== p.actor) return fail('item.held-by', `${pot.id} is held by ${ps.by}`, [p.actor, pot.id, ps.by]);
     if (ps?.kind !== 'in-hand') {
@@ -476,6 +488,11 @@ export const serve: ActionDef<ServeParams, { bowlHand: Hand }, ServeExec> = {
     ex.t = 0;
     if (ex.phase === 'to-pot') { ex.phase = 'to-bowl'; return { status: 'running', phase: 'to-bowl' }; }
     if (ex.phase === 'to-bowl') {
+      const contents = servingContents(pot, bowl);
+      if (contents) {
+        overlayOff(rt, ex, 'serve');
+        return { status: 'failed', diagnostic: contents };
+      }
       bowl.contents = { food: pot.contents!.food, fraction: 1 };
       pot.contents = { food: pot.contents!.food, fraction: Math.max(0, q6(pot.contents!.fraction - SERVING)) };
       ex.phase = 'back';
