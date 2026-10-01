@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { Connection } from '@sim/client';
-import type { BrainCall, CameraLine, LogEvent, Me, NarrativeView, ServerStats, TickerLine } from '@sim/protocol';
+import type { BrainCall, CameraLine, KernelView, LogEvent, Me, NarrativeView, PlayView, ServerStats, TalkLine, TickerLine } from '@sim/protocol';
 
 declare const __BUILD__: string;
 
 export type Sim = {
   conn: Connection; me: Me | null; log: LogEvent[]; brain: BrainCall[]; camera: CameraLine | null; ticker: TickerLine[];
   narratives: Record<string, NarrativeView>; stats: ServerStats | null; bytesPerSec: number;
+  /** The meaning layer: things, links, vocabulary, decks (public). */
+  kernel: KernelView | null; plays: PlayView[]; talk: TalkLine[];
 };
 
 /** One connection for the page. Re-renders about 5 times a second while the world runs. */
 export function useSim(getToken: () => Promise<string | null>, authed: boolean): Sim {
   const tokenRef = useRef(getToken); tokenRef.current = getToken;
   const [, force] = useState(0);
-  const s = useRef<Omit<Sim, 'conn'> & { conn: Connection | null; lastBytes: number; lastAt: number }>({ conn: null, me: null, log: [], brain: [], camera: null, ticker: [], narratives: {}, stats: null, bytesPerSec: 0, lastBytes: 0, lastAt: Date.now() });
+  const s = useRef<Omit<Sim, 'conn'> & { conn: Connection | null; lastBytes: number; lastAt: number }>({ conn: null, me: null, log: [], brain: [], camera: null, ticker: [], narratives: {}, stats: null, bytesPerSec: 0, kernel: null, plays: [], talk: [], lastBytes: 0, lastAt: Date.now() });
   if (!s.current.conn) {
     const st = s.current;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -29,10 +31,18 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
       onTicker: (l) => { st.ticker = [...st.ticker, ...l].slice(-40); },
       onNarrative: (v) => { st.narratives = { ...st.narratives, [v.region]: v }; },
       onStats: (x) => { st.stats = x; },
+      onKernel: (v) => { st.kernel = v; },
+      onPlays: (p) => { const seen = new Set(st.plays.map((x) => x.seq)); st.plays = [...st.plays, ...p.filter((x) => !seen.has(x.seq))].slice(-300); },
+      onTalk: (l) => { const seen = new Set(st.talk.map((x) => x.id)); st.talk = [...st.talk, ...l.filter((x) => !seen.has(x.id))].slice(-300); },
     }, (u) => new WebSocket(u) as never);
   }
   useEffect(() => {
     const st = s.current; st.conn!.connect();
+    // what happened before this page opened (all public)
+    const get = (path: string) => fetch(path).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    void get('/v1/kernel').then((v) => { if (v && !st.kernel) st.kernel = v; });
+    void get('/v1/plays?limit=200').then((v) => { if (v?.plays) { const seen = new Set(st.plays.map((x) => x.seq)); st.plays = [...(v.plays as PlayView[]).filter((x) => !seen.has(x.seq)), ...st.plays].slice(-300); } });
+    void get('/v1/talk?limit=120').then((v) => { if (v?.lines) { const seen = new Set(st.talk.map((x) => x.id)); st.talk = [...(v.lines as TalkLine[]).filter((x) => !seen.has(x.id)).sort((a, b) => a.id - b.id), ...st.talk].slice(-300); } });
     const t = setInterval(() => {
       const now = Date.now(), b = st.conn!.stats.bytesIn;
       if (now - st.lastAt >= 2000) { st.bytesPerSec = ((b - st.lastBytes) * 1000) / (now - st.lastAt); st.lastBytes = b; st.lastAt = now; }

@@ -62,7 +62,8 @@ function belongsToIn(k: KState, target: string | null, of: string): boolean {
   if (!target) return false;
   if (target === of) return true;
   if (k.things[target]?.by === of) return true;
-  return Object.values(k.links).some((l) => l.from === of && l.to === target && !SPEECH_LINKS.has(l.kind) && (l.until === undefined || l.until >= k.tick));
+  // "Rob's party" is the one he hosts, made or holds: a link that gives control. Merely attending it does not make it his.
+  return Object.values(k.links).some((l) => l.from === of && l.to === target && k.vocab.links[l.kind]?.control === true && (l.until === undefined || l.until >= k.tick));
 }
 export const belongsTo = (host: WorldHost, target: string | null, of: string): boolean => belongsToIn(host.kernel, target, of);
 /** Does playing this card on this target match a step of the owner's agenda? */

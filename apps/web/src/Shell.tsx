@@ -7,6 +7,7 @@ import { AdminPanel } from './AdminPanel.tsx';
 import { SoulHome } from './SoulHome.tsx';
 import { ArchPanel } from './Arch.tsx';
 import { SpendPanel } from './Spend.tsx';
+import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, ThingsPanel, VocabularyPanel } from './Grammar.tsx';
 
 export type AuthCtx = {
   ready: boolean; authed: boolean; label: string | null;
@@ -14,7 +15,7 @@ export type AuthCtx = {
   debug: { privyUserId: string | null; wallet: unknown; linked: unknown[] };
 };
 type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; inviteRequired?: boolean; build?: string };
-const TABS = ['watch', 'my soul', 'world', 'brain', 'story', 'sync', 'spend', 'admin', 'architecture', 'everything'] as const;
+const TABS = ['watch', 'my soul', 'grammar', 'notebook', 'world', 'brain', 'story', 'sync', 'spend', 'admin', 'architecture', 'everything'] as const;
 const ADMIN_TABS = new Set<string>(['spend', 'admin']);
 const hashTab = (): { tab: Tab; pair: string | null } => { const h = decodeURIComponent(location.hash.slice(1)); if (h.startsWith('pair/')) return { tab: 'my soul', pair: h.slice(5) }; return { tab: (TABS as readonly string[]).includes(h) ? (h as Tab) : 'watch', pair: null }; };
 type Tab = (typeof TABS)[number];
@@ -53,7 +54,14 @@ export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
           {tab === 'watch' && <Intro authed={auth.authed} login={auth.login} go={() => setTab('my soul')} souls={r.souls.size} />}
           {show('watch', 'world') && <WorldPanel sim={sim} mine={mine} selected={selected} onSelect={setSelected} />}
           {show('watch', 'world', 'story') && <BroadcastPanel sim={sim} />}
+          {tab === 'watch' && <HeardPanel sim={sim} />}
           {tab === 'watch' && <Happenings sim={sim} />}
+          {show('grammar') && <SentencesPanel sim={sim} />}
+          {show('grammar') && <VocabularyPanel sim={sim} />}
+          {show('grammar') && <BacklogPanel sim={sim} />}
+          {show('grammar') && <ThingsPanel sim={sim} />}
+          {show('grammar') && <LibraryPanel sim={sim} />}
+          {show('notebook') && <NotebookPanel sim={sim} />}
           {show('my soul') && <SoulHome sim={sim} auth={auth} api={api} selected={selected} onSelect={setSelected} pairCode={pairCode} clearPair={() => setPairCode(null)} base={cfg.publicUrl} />}
           {show('spend') && isAdmin && <SpendPanel api={api} authed={auth.authed} isAdmin />}
           {show('brain') && <BrainPanel sim={sim} authed={auth.authed} selected={selected} api={api} isAdmin={isAdmin} />}
@@ -79,7 +87,7 @@ function Intro({ authed, login, go, souls }: { authed: boolean; login(): void; g
   );
 }
 function Happenings({ sim }: { sim: Sim }) {
-  const rows = sim.log.filter((e) => e.kind !== 'rules' && e.kind !== 'admin').slice(-14).reverse();
+  const rows = sim.log.filter((e) => e.kind !== 'rules' && e.kind !== 'admin' && e.kind !== 'decision' && e.kind !== 'deck').slice(-14).reverse();
   return (
     <section>
       <h2>Just now</h2>
@@ -90,7 +98,10 @@ function Happenings({ sim }: { sim: Sim }) {
 }
 function eventPlain(e: LogEvent, sim: Sim): string {
   const p = e.payload ?? {}; const name = (id: string) => sim.conn.replica.souls.get(id)?.name ?? 'someone';
-  if (e.kind === 'birth') return `${p.name} arrived at the gate.`;
+  if (e.kind === 'birth') return `${p.name} arrived.`;
+  if (e.kind === 'play') return `${name(p.soulId)} ${p.card}${p.target ? ` → ${sim.kernel?.things[p.target]?.name ?? 'something'}` : ''}.`;
+  if (e.kind === 'mint') return `A new card was made: “${p.card?.name}”.`;
+  if (e.kind === 'deck') return `${name(p.soulId)}’s deck changed.`;
   if (e.kind === 'decision') return `${name(p.soulId)} decided to ${String(p.label).charAt(0).toLowerCase()}${String(p.label).slice(1)}.`;
   if (e.kind === 'intent') return `${name(p.soulId)} was given new direction by their owner.`;
   if (e.kind === 'scene') return `Storyteller, ${p.region}: ${p.beat.flavor}.`;
@@ -103,9 +114,13 @@ const COLS = 64, ROWS = 28;
 function WorldPanel({ sim, mine, selected, onSelect }: { sim: Sim; mine: Set<string>; selected: string | null; onSelect(id: string | null): void }) {
   const r = sim.conn.replica, tick = sim.conn.displayTick();
   const souls = [...r.souls.values()].sort((a, b) => a.name.localeCompare(b.name));
-  const cell = (x: number, z: number) => [Math.max(0, Math.min(COLS - 1, Math.round(((x + 50) / 100) * (COLS - 1)))), Math.max(0, Math.min(ROWS - 1, Math.round(((z + 50) / 100) * (ROWS - 1))))] as const;
+  // fit the map to whatever this world contains (the toy plane is 100 m; a Mars scene is wherever its fixtures and people are)
+  const pts = Object.values(r.entities).map((e) => [e.pose.p[0], e.pose.p[2]] as const);
+  const toy = !!r.entities['gate'];
+  const x0 = toy ? -50 : Math.min(...pts.map((p) => p[0]), 0) - 4, x1 = toy ? 50 : Math.max(...pts.map((p) => p[0]), 1) + 4, z0 = toy ? -50 : Math.min(...pts.map((p) => p[1]), 0) - 4, z1 = toy ? 50 : Math.max(...pts.map((p) => p[1]), 1) + 4;
+  const cell = (x: number, z: number) => [Math.max(0, Math.min(COLS - 1, Math.round(((x - x0) / (x1 - x0)) * (COLS - 1)))), Math.max(0, Math.min(ROWS - 1, Math.round(((z - z0) / (z1 - z0)) * (ROWS - 1))))] as const;
   const grid: { ch: string; cls: string }[][] = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => ({ ch: '·', cls: 'dim' })));
-  const glyph: Record<string, string> = { campfire: '*', bench: '=', kiosk: 'K', gate: 'G' };
+  const glyph: Record<string, string> = { campfire: '*', bench: '=', 'bench-6ft': '=', 'camp-chair': 'h', 'table-6ft': 'T', kiosk: 'K', gate: 'G' };
   for (const e of Object.values(r.entities)) if (e.kind === 'fixture') { const [c, w] = cell(e.pose.p[0], e.pose.p[2]); grid[w][c] = { ch: glyph[e.def] ?? '?', cls: 'warn' }; }
   const pos = new Map<string, [number, number]>();
   for (const s of souls) {
@@ -113,7 +128,7 @@ function WorldPanel({ sim, mine, selected, onSelect }: { sim: Sim; mine: Set<str
     const p = r.poseAt(s.entityId, tick); const x = p[1] / 1000, z = p[3] / 1000; pos.set(s.id, [x, z]);
     const [c, w] = cell(x, z); grid[w][c] = { ch: s.name[0].toUpperCase(), cls: s.id === selected ? 'sel acc' : mine.has(s.id) ? 'acc' : '' };
   }
-  const regionOf = (x: number, z: number) => (Math.abs(x) <= 18 && Math.abs(z) <= 18 ? 'center' : 'ring');
+  const whereOf = (soulId: string) => { const k = sim.kernel; const at = k?.things[soulId]?.at; return at ? (k!.things[at]?.name ?? at) : ''; };
   return (
     <section className="wide">
       <h2>World — canonical state as this client sees it (positions computed locally from path decisions)</h2>
@@ -121,13 +136,13 @@ function WorldPanel({ sim, mine, selected, onSelect }: { sim: Sim; mine: Set<str
         <pre className="map">{grid.map((row, i) => <div key={i}>{row.map((c, j) => <span key={j} className={c.cls}>{c.ch}</span>)}</div>)}</pre>
         <div className="scrollx" style={{ flex: 1, minWidth: 620 }}>
           <table>
-            <thead><tr><th>soul</th><th>owner</th><th>activity</th><th>x, z</th><th>region</th><th>mood</th><th>energy</th><th>doing</th><th>intent</th></tr></thead>
+            <thead><tr><th>soul</th><th>owner</th><th>activity</th><th>x, z</th><th>at</th><th>mood</th><th>energy</th><th>doing</th><th>intent</th></tr></thead>
             <tbody>
               {souls.map((s) => { const e = r.entities[s.entityId], p = pos.get(s.id); return (
                 <tr key={s.id} className={`click ${s.id === selected ? 'sel' : ''}`} onClick={() => onSelect(s.id === selected ? null : s.id)} title={s.description}>
                   <td className={mine.has(s.id) ? 'acc' : ''}><b>{s.name}</b></td><td className="dim">{s.native ? 'world' : s.owner}</td>
                   <td>{e?.human?.activity ?? '—'}{e?.human?.on ? <span className="dim"> @{e.human.on}</span> : null}</td>
-                  <td>{p ? `${p[0].toFixed(1)}, ${p[1].toFixed(1)}` : '—'}</td><td className="dim">{p ? regionOf(p[0], p[1]) : ''}</td>
+                  <td>{p ? `${p[0].toFixed(1)}, ${p[1].toFixed(1)}` : '—'}</td><td className="dim">{whereOf(s.id)}</td>
                   <td>{s.mood}</td><td>{s.energy}</td><td className="wrap">{s.doing}</td><td className="wrap dim">{s.intentText}</td>
                 </tr>); })}
             </tbody>

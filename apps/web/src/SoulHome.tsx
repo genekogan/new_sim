@@ -1,5 +1,6 @@
 // The signed-in home: invite → create a Soul → steer it here or from your own
 // agent → watch its dashboard. One column of cards, in the order a newcomer needs them.
+import { DeckPanel, HeardPanel, SentencesPanel } from './Grammar.tsx';
 import { useEffect, useState } from 'react';
 import { GOALS, type BrainCall } from '@sim/protocol';
 import type { AuthCtx } from './Shell.tsx';
@@ -120,7 +121,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
   const send = async () => {
     if (!text.trim()) return; const t = text; setText(''); setBusy(true);
     const r = await api(`/v1/souls/${soul.id}/command`, { text: t }); setBusy(false);
-    const reply = r.status !== 200 ? (r.data.message ?? 'failed') : r.data.ok ? `understood: ${r.data.text}` : `not understood: ${r.data.reason}`;
+    const reply = r.status !== 200 ? (r.data.message ?? 'failed') : r.data.ok ? `the plan: ${r.data.text}${r.data.minted?.length ? ` · new card${r.data.minted.length > 1 ? 's' : ''} made for this: ${r.data.minted.join(', ')}` : ''}` : `could not: ${r.data.reason}`;
     setReplies((h) => [...h, { text: t, reply, ok: r.status === 200 && r.data.ok }].slice(-6));
   };
   const setIntent = async () => {
@@ -135,9 +136,10 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
       <section>
         <h2>{soul.name} — right now</h2>
         <p className="dim" style={{ marginTop: 0 }}>{soul.description}</p>
-        {!s ? <p className="dim">loading…</p> : !s.in_world ? <p className="dim">arriving at the gate…</p> : <div className="kv">
+        {!s ? <p className="dim">loading…</p> : !s.in_world ? <p className="dim">arriving…</p> : <div className="kv">
           <span>doing</span><span><b>{s.doing}</b> <span className="dim">({s.activity})</span></span>
-          <span>where</span><span>{s.position.region === 'center' ? 'the center' : 'the outer ring'} <span className="dim">({s.position.x.toFixed(0)}, {s.position.z.toFixed(0)})</span></span>
+          <span>where</span><span>{sim.kernel?.things[sim.kernel.things[soul.id]?.at ?? '']?.name ?? sim.conn.replica.regions[s.position.region]?.label ?? s.position.region} <span className="dim">({s.position.x.toFixed(0)}, {s.position.z.toFixed(0)})</span></span>
+          {s.agenda?.length > 0 && <><span>plan</span><span className="wrap">{s.agenda.map((a: any, i: number) => <span key={i} style={{ marginRight: 10 }} className={a.done ? 'dim' : ''}>{a.done ? '✓' : '·'} {a.card}{a.target ? ` (${a.target})` : ''}</span>)}</span></>}
           <span>mood · energy</span><span>{s.mood} · {s.energy}</span>
           <span>your direction</span><span>{s.intent ? s.intent_text : <span className="dim">none yet: living by its own nature</span>}</span>
           {s.storyteller_suggests && <><span>storyteller</span><span className="dim">{s.storyteller_suggests}</span></>}
@@ -156,8 +158,12 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
           <div className="row"><input placeholder="optional note: how, why, in what spirit (only you and the Soul see it)" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} /><button onClick={() => void setIntent()}>set</button></div>
         </details>
         {replies.slice().reverse().map((h, i) => <div key={i}><span className="dim">you:</span> {h.text} <span className={h.ok ? 'ok' : 'warn'}>→ {h.reply}</span></div>)}
-        <p className="note">Direction is not remote control. {soul.name} takes it as a standing intent and works out how to follow it, moment to moment, until you give a new one.</p>
+        <p className="note">Direction is not remote control. Your words become a plan: a few cards for {soul.name} to play in order. If the world has no card for what you ask, one is made. {soul.name} decides how and when, answers when spoken to, and cannot act for anyone else: to get something from another Soul, it asks.</p>
       </section>
+
+      <DeckPanel api={api} soulId={soul.id} name={soul.name} sim={sim} />
+      <SentencesPanel sim={sim} soulId={soul.id} limit={14} />
+      <HeardPanel sim={sim} soulId={soul.id} />
 
       <section className="wide">
         <h2>Or let your own AI assistant steer {soul.name}</h2>

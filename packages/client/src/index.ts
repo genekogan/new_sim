@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
+import { samplePath, viewHashOf, viewRow, PROTO, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 export class Replica {
   tick = 0;            // latest tick we have data through
@@ -76,7 +76,7 @@ export type ConnState = 'connecting' | 'open' | 'closed';
 export type ConnStats = { state: ConnState; resyncs: number; reconnects: number; heartbeats: number; lastCheck: string; lastHash: string; myHash: string; bytesIn: number; msgsIn: number; rttMs: number; lastHeartbeatTick: number; snapshots: number };
 export type Handlers = {
   onChange?(): void; onLog?(e: LogEvent[]): void; onBrain?(c: BrainCall[]): void; onCamera?(l: CameraLine): void; onTicker?(l: TickerLine[]): void;
-  onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
+  onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onKernel?(v: KernelView): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
 };
 type WSLike = { send(s: string): void; close(): void; readyState: number; onopen: any; onmessage: any; onclose: any; onerror: any };
 
@@ -155,6 +155,9 @@ export class Connection {
       case 'ticker': h.onTicker?.(m.lines); break;
       case 'narrative': h.onNarrative?.(m.view); break;
       case 'stats': h.onStats?.(m.stats); break;
+      case 'kernel': h.onKernel?.(m.view); break;
+      case 'plays': h.onPlays?.(m.plays); break;
+      case 'talk': h.onTalk?.(m.lines); break;
       case 'pong': this.stats.rttMs = this.now() - m.n; break;
       case 'error': console.warn('[sim] server error', m.code, m.message); break;
     }
