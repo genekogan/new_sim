@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { conformance } from '@sim/engine-contract/conformance';
 import type { Engine, ProgramEvent } from '@sim/engine-contract';
-import { marsAvailable, marsFactory } from './index.ts';
+import { MEAL_WORLD, loadMars, marsAvailable, marsFactory } from './index.ts';
 
 if (!marsAvailable()) test('mars adapter (skipped: no Mars checkout on this machine)', { skip: true }, () => {});
 else {
@@ -86,6 +86,26 @@ else {
     assert.equal(log2.find((x) => x.id === t2.id && x.kind !== 'step')?.kind, 'completed', JSON.stringify(log2));
     assert.equal(e.world.entities['a'].human!.activity, 'warm');
     assert.deepEqual(e.runtime.violations.map((v) => v.code), []);
+  });
+
+  test('mars: one of Mars’s own scenarios (four people serve themselves stew and eat round the fire) runs as four programs', async () => {
+    const mars = await loadMars(), meal = await marsFactory(MEAL_WORLD);
+    const e = meal.create(meal.genesis('meal'));
+    assert.deepEqual(people(e), ['p1', 'p2', 'p3', 'p4']);
+    const steps = mars.mealSteps();
+    const ids: Record<string, string> = {};
+    for (const [who, list] of Object.entries(steps)) {
+      // exactly Mars's authored steps, addressed as this world's own verbs; the actor is implied by whose program it is
+      const r = e.perform({ actor: who, label: 'dinner', steps: list.map((s) => { const { actor: _a, ...params } = s.params as Record<string, unknown>; return { verb: `mars:${s.verb}`, params }; }) });
+      assert.equal(r.ok, true, JSON.stringify(r)); ids[who] = r.id;
+    }
+    const log = run(e, 20 * 240);
+    for (const [who, id] of Object.entries(ids)) assert.equal(log.find((x) => x.id === id && x.kind !== 'step')?.kind, 'completed', `${who}: ${JSON.stringify(log.filter((x) => x.id === id).slice(-2))}`);
+    const w = e.world.entities as Record<string, any>;
+    for (let i = 1; i <= 4; i++) assert.ok(w[`bowl${i}`].contents.fraction < 0.2, `bowl${i} was eaten from: ${JSON.stringify(w[`bowl${i}`].contents)}`);
+    assert.ok(w['pot'].contents.fraction < 1, 'the pot was served from');
+    for (const who of Object.keys(ids)) assert.ok(['sit', 'eat'].includes(w[who].human.activity) || w[who].human.baseActivity === 'sit', `${who} is seated: ${w[who].human.activity}`);
+    assert.deepEqual([...new Set(e.runtime.violations.map((v) => v.code))], []);
   });
 
   test('mars: a restored world carries on identically, mid-program', () => {

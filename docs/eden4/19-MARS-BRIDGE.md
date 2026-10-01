@@ -31,6 +31,9 @@ different engines.
 | Restart from a snapshot plus later events equals the uninterrupted world | pass |
 | Two clients fed keyframes agree with the server's view hash | pass |
 | The DJ story through the real server, with Mars bodies | pass |
+| The DJ story from two plain-language wishes, **live models**, Mars bodies (compiler mints the cards; Rob agrees by reflex) | pass, $0.04 |
+| A world's own verbs (`mars:take_slot`, `mars:face`…) used directly as steps | pass |
+| **One of Mars's own authored scenarios** (four people take bowls and spoons, serve themselves stew, sit round the fire and eat) run unchanged as four programs | pass |
 | 20 people strolling | 0.36 ms per tick (budget: 50 ms) |
 
 ## 1. Three levels, two translations
@@ -211,7 +214,10 @@ stay available on the same code.
 | Time | bounded, as fast as it computes | continuous at 20 ticks a second, or a private instance run fast |
 
 A "Martian sim" in the new terms is: start an instance of the Mars world with a
-cast and their agendas, run it for a while, keep the recording. The history
+cast and their agendas, run it for a while, keep the recording. The meal
+scenario already runs this way: its authored steps, addressed as `mars:` verbs,
+become one program per person, and the adapter's program runner replaces the
+scenario's hand-written step driver. The history
 years, the museum, the evidence and provenance rules and the cinematography stay
 Mars's own and are untouched by any of this.
 

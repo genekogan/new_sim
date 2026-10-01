@@ -52,7 +52,8 @@ it is the single place that says what is true now.
 
 - `packages/engine-mars`: the real Mars engine behind Sim's engine contract, imported
   read-only from a local checkout (never copied into this repo). `ENGINE=mars` runs the
-  whole shell on it. Not deployed: the Mars code exists only on Gene's laptop.
+  whole shell on it, and one of Mars's own authored scenarios (the meal) runs through it
+  unchanged. Not deployed: the Mars code exists only on Gene's laptop.
 
 ## Faked or absent
 
@@ -86,7 +87,7 @@ it is the single place that says what is true now.
 | Snapshot | 3.5 ms at 31 Souls, 44 ms at 1,000 | 09-30 |
 | Server memory | ~150 MB resident | 09-30 |
 
-Tests: 49 (kernel 6, engine contract 4, toy engine 8, Mars adapter 11, brain 6, server 14).
+Tests: 51 (kernel 6, engine contract 4, toy engine 8, Mars adapter 13, brain 6, server 14).
 The Mars tests skip where there is no Mars checkout (CI).
 
 ## Known limits and risks

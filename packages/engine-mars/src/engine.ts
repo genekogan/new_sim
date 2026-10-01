@@ -31,7 +31,7 @@ type Prog = {
   index: number; started: boolean; since: number;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
 };
-export type MarsWorldConfig = { scene: 'proving-ground'; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { scene: 'proving-ground' | 'meal'; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
 
 const secs = (v: unknown, d: number) => Math.round(Math.min(3600, Math.max(0.5, typeof v === 'number' ? v : d)) * TPS);
@@ -51,6 +51,8 @@ export const BODY_VERBS: VerbInfo[] = [
   { verb: 'ambient_wander', description: 'Stroll between nearby points, pausing, for a number of seconds within a radius in metres.', inputSchema: { type: 'object', properties: { seconds: num, radius: num } } },
 ];
 const BODY = new Set(BODY_VERBS.map((v) => v.verb));
+/** Mars's meal scenario as a world: the same proving ground, furnished and with its cast of four already there. */
+export const MEAL_WORLD: MarsWorldConfig = { scene: 'meal', arrival: [-6, -12], arrivalPlace: 'lawn', reference: [-6, -10.5], grounds: { id: 'grounds', name: 'the grounds' } };
 
 const inPoly = (x: number, z: number, poly: [number, number][]) => {
   let inside = false;
@@ -396,6 +398,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     rulesVersion: `sim-mars/1+${m.rulesVersion}`,
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
+      if (cfg.scene === 'meal') { const w = m.mealWorld(); w.rng = m.seedRng(seed); return w as WorldState; }
       const w = m.provingGroundWorld();
       for (const id of Object.keys(w.entities)) if (w.entities[id].kind === 'human') delete w.entities[id];
       w.rng = m.seedRng(seed);

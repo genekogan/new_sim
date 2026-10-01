@@ -21,6 +21,9 @@ export type Mars = {
   describeVerbs: (registry: Map<string, any>) => { verb: string; description: string; inputSchema: Record<string, unknown> }[];
   scenes: Record<string, any>;
   provingGroundWorld: () => any;
+  /** One of Mars's own authored scenarios (a table, a pot of stew, four people, four chairs round a fire) and its per-person steps. */
+  mealWorld: () => any;
+  mealSteps: () => Record<string, { verb: string; params: Record<string, unknown>; until?: string }[]>;
   human: (id: string, x: number, z: number, opts?: Record<string, unknown>) => any;
   seedRng: (seed: string) => [number, number, number, number];
   nextRandom: (st: [number, number, number, number]) => number;
@@ -29,9 +32,9 @@ export type Mars = {
 export async function loadMars(): Promise<Mars> {
   if (!marsAvailable()) throw new Error(`Mars engine not found at ${marsDir()} (set MARS_ENGINE_DIR)`);
   const at = (f: string) => import(pathToFileURL(join(marsDir(), f)).href);
-  const [rt, reg, seeds, fac, rng] = await Promise.all([at('runtime/runtime.ts'), at('api/registry.ts'), at('api/seeds.ts'), at('world/factory.ts'), at('core/rng.ts')]);
+  const [rt, reg, seeds, fac, rng, meal] = await Promise.all([at('runtime/runtime.ts'), at('api/registry.ts'), at('api/seeds.ts'), at('world/factory.ts'), at('core/rng.ts'), at('scenarios/meal.ts')]);
   return {
     Runtime: rt.Runtime, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: reg.createRegistry, servicesFor: reg.servicesFor,
-    invariants: reg.ENGINE_INVARIANTS, describeVerbs: reg.describeVerbs, scenes: seeds.ENGINE_SCENES, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom,
+    invariants: reg.ENGINE_INVARIANTS, describeVerbs: reg.describeVerbs, scenes: seeds.ENGINE_SCENES, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom, mealWorld: meal.mealWorld, mealSteps: meal.mealSteps,
   };
 }
