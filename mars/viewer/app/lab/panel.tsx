@@ -4,6 +4,7 @@ import { LabCameraControls } from './camera-controls.tsx';
 import { ClassroomHud } from './classroom-hud.tsx';
 import { MusicHud } from './music-hud.tsx';
 import { ReadingHud } from './reading-hud.tsx';
+import { PreparationHud } from './preparation-hud.tsx';
 import { ChessHud } from './chess-hud.tsx';
 import { WorkBreakHud } from './work-break-hud.tsx';
 import { RestHud } from './rest-hud.tsx';
@@ -101,6 +102,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <ClassroomHud key={s.name} sim={sim} refresh={refresh} />
       <MusicHud key={`music:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ChessHud key={`chess:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <PreparationHud key={`preparation:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ReadingHud key={`reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />

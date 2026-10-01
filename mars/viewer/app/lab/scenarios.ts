@@ -26,6 +26,7 @@ import { WORK_BREAK_SCENARIOS } from './work-break.ts';
 import { MUSIC_SCENARIO } from './music.ts';
 import { READING_SCENARIO } from './reading.ts';
 import { CHESS_SCENARIO } from './chess.ts';
+import { PREPARATION_SCENARIOS } from './preparation.ts';
 import { DESIGN_STUDIO } from './design-studio.ts';
 import { solarPaint } from './solar-paint.ts';
 
@@ -108,6 +109,7 @@ const walk = (rt: Runtime, actor: string, x: number, z: number, level?: number) 
   rt.submit('walk_to', level === undefined ? { actor, x, z } : { actor, x, z, level });
 
 export const SCENARIOS: Scenario[] = [
+  ...PREPARATION_SCENARIOS,
   {
     name: 'wall',
     title: 'Wall avoidance',

@@ -322,8 +322,10 @@ for (const mode of ['complete', 'cancel', 'directive'] as const) {
       assert.ok(samples > 0);
       assert.ok(mode === 'complete' || interrupted, `did not reach ${phase}`);
       assert.ok(!rt.isActive(rec.id));
-      if (mode === 'complete') assert.equal(rec.status, 'completed', rec.diagnostic?.message);
-      if (mode === 'cancel') assert.equal(rec.status, 'cancelled', rec.diagnostic?.message);
+      if (mode === 'complete')
+        assert.equal(rec.status, 'completed', rec.diagnostic?.message);
+      if (mode === 'cancel')
+        assert.equal(rec.status, 'cancelled', rec.diagnostic?.message);
       if (directive)
         assert.equal(rt.records.get(directive)!.status, 'completed');
       assert.equal(total(rt), 2);
@@ -331,3 +333,120 @@ for (const mode of ['complete', 'cancel', 'directive'] as const) {
       released(rt);
     });
 }
+
+for (const yaw of [0, Math.PI / 2])
+  test(`prepared food uses both ordinary servings and preserves their vessels at yaw ${yaw}`, () => {
+    const rt = preparationRuntime(yaw);
+    run(rt);
+    const preparation = structuredClone(readFoodPreparation(rt, 'pot'));
+    const supported = ['pot', 'greens'].map((id) => ({
+      id,
+      pose: structuredClone(rt.world.entities[id].pose),
+      support: structuredClone(rt.world.entities[id].support),
+    }));
+    const perform = (verb: string, params: object) => {
+      const rec = rt.submit(verb, { actor: 'cook', ...params });
+      rt.runUntilIdle(1200, [rec.id]);
+      assert.equal(
+        rec.status,
+        'completed',
+        `${verb}: ${rec.diagnostic?.code} ${rec.diagnostic?.message}`,
+      );
+      assert.deepEqual(rt.violations, []);
+    };
+    perform('take_item', { item: 'beans', hand: 'left' });
+    perform('serve', { pot: 'pot', bowl: 'beans' });
+    assert.deepEqual(rt.world.entities.beans.contents, {
+      food: 'hypothetical cold shared dish',
+      fraction: 1,
+    });
+    assert.equal(rt.world.entities.pot.contents!.fraction, 0.25);
+    perform('eat', { bowl: 'beans', spoon: 'spoon' });
+    assert.equal(rt.world.entities.beans.contents!.fraction, 0);
+    assert.equal(
+      rt.world.entities.pot.contents!.fraction,
+      0.25,
+      'the second portion remains available',
+    );
+    assert.deepEqual(
+      readFoodPreparation(rt, 'pot'),
+      preparation,
+      'completed recipe provenance is retained',
+    );
+    perform('serve', { pot: 'pot', bowl: 'beans' });
+    assert.deepEqual(rt.world.entities.beans.contents, {
+      food: 'hypothetical cold shared dish',
+      fraction: 1,
+    });
+    assert.equal(
+      rt.world.entities.pot.contents!.fraction,
+      0,
+      'the second full portion empties the same pot',
+    );
+    assert.deepEqual(rt.world.entities.beans.support, {
+      kind: 'in-hand',
+      by: 'cook',
+      hand: 'left',
+    });
+    assert.deepEqual(rt.world.entities.spoon.support, {
+      kind: 'in-hand',
+      by: 'cook',
+      hand: 'right',
+    });
+    perform('eat', { bowl: 'beans', spoon: 'spoon' });
+    assert.equal(
+      total(rt),
+      0,
+      'both finite ingredient bowls have become two consumed full servings',
+    );
+    assert.deepEqual(
+      readFoodPreparation(rt, 'pot'),
+      preparation,
+      'both servings retain completed recipe provenance',
+    );
+    for (const verb of ['serve', 'eat'])
+      assert.equal(
+        [...rt.records.values()].filter(
+          (rec) => rec.verb === verb && rec.status === 'completed',
+        ).length,
+        2,
+      );
+    const emptyWorld = hashOf(rt.world);
+    const third = rt.submit('serve', {
+      actor: 'cook',
+      pot: 'pot',
+      bowl: 'beans',
+    });
+    assert.equal(third.status, 'failed');
+    assert.equal(third.diagnostic?.code, 'serve.pot-empty');
+    assert.equal(
+      hashOf(rt.world),
+      emptyWorld,
+      'a third serving cannot create food or alter the held vessels',
+    );
+    released(rt);
+    perform('put_item', { item: 'beans', surfaceSlot: 'table#r0c1' });
+    perform('put_item', { item: 'spoon', surfaceSlot: 'table#r0c4' });
+    assert.deepEqual(rt.world.entities.beans.support, {
+      kind: 'resting-on',
+      on: 'table',
+      slot: 'r0c1',
+    });
+    assert.deepEqual(rt.world.entities.spoon.support, {
+      kind: 'resting-on',
+      on: 'table',
+      slot: 'r0c4',
+    });
+    assert.deepEqual(
+      ['pot', 'greens'].map((id) => ({
+        id,
+        pose: rt.world.entities[id].pose,
+        support: rt.world.entities[id].support,
+      })),
+      supported,
+    );
+    assert.equal(total(rt), 0);
+    assert.deepEqual(readFoodPreparation(rt, 'pot'), preparation);
+    released(rt);
+    assert.deepEqual(rt.holder('holds:cook'), []);
+  });
