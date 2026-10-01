@@ -1,0 +1,121 @@
+// Cards: resolving references, testing conditions, finding what a Soul can play
+// now, and turning a play into concrete changes.
+import { hashOf } from '@sim/engine-contract';
+import { controllers, linked, linksTo, samePlace } from './kernel.ts';
+import { cardSchema, type Card, type Change, type Cond, type Json, type KState, type MintedCard } from './types.ts';
+
+export type Bindings = Record<string, string>; // slot name → thing id ('actor', 'target', derived slots, 'new')
+
+export const cardHash = (c: Card): string => hashOf(c).slice(0, 16);
+
+function resolve(s: KState, r: string, b: Bindings): string | null {
+  if (!r.startsWith('$')) return r;
+  const [slot, suffix] = r.slice(1).split('.');
+  const id = b[slot];
+  if (!id) return null;
+  if (suffix === 'at') return s.things[id]?.at ?? null;
+  return id;
+}
+
+export function holds(s: KState, c: Cond, b: Bindings): boolean {
+  const r = (x: string) => resolve(s, x, b);
+  if ('is' in c) { const id = r(c.is[0]); return !!id && s.things[id]?.kind === c.is[1]; }
+  if ('at' in c) { const a = r(c.at[0]), x = r(c.at[1]); return !!a && !!x && samePlace(s, a, x); }
+  if ('notAt' in c) { const a = r(c.notAt[0]), x = r(c.notAt[1]); return !a || !x || !samePlace(s, a, x); }
+  if ('linked' in c) { const a = r(c.linked[1]), x = r(c.linked[2]); return !!a && !!x && !!linked(s, c.linked[0], a, x); }
+  if ('notLinked' in c) { const a = r(c.notLinked[1]), x = r(c.notLinked[2]); return !a || !x || !linked(s, c.notLinked[0], a, x); }
+  if ('noneLinkedTo' in c) { const x = r(c.noneLinkedTo[1]); return !!x && linksTo(s, x, c.noneLinkedTo[0]).length === 0; }
+  if ('state' in c) { const id = r(c.state[0]); return !!id && JSON.stringify(s.things[id]?.states[c.state[1]] ?? null) === JSON.stringify(c.state[2] ?? null); }
+  if ('notState' in c) { const id = r(c.notState[0]); return !id || JSON.stringify(s.things[id]?.states[c.notState[1]] ?? null) !== JSON.stringify(c.notState[2] ?? null); }
+  if ('said' in c) { const a = r(c.said[0]), x = r(c.said[1]); const l = a && x ? linked(s, 'said', a, x) : undefined; return !!l && (l.data as { act?: string } | undefined)?.act === c.said[2]; }
+  if ('distinct' in c) return r(c.distinct[0]) !== r(c.distinct[1]);
+  return false;
+}
+
+/** Fill derived slots (e.g. host = whoever hosts the target). Returns null if one cannot be filled. */
+export function bind(s: KState, card: Card, actor: string, target: string | null): Bindings | null {
+  const b: Bindings = { actor };
+  // every play knows the region its actor is in (walk up the `at` chain)
+  for (let x: string | null = s.things[actor]?.at ?? null, n = 0; x && n < 6; x = s.things[x]?.at ?? null, n++) if (s.things[x]?.kind === 'region') { b.region = x; break; }
+  if (card.target) { if (!target) return null; b.target = target; }
+  for (const [slot, d] of Object.entries(card.derive ?? {})) {
+    const to = resolve(s, d.to, b); if (!to) return null;
+    const l = linksTo(s, to, d.link)[0]; if (!l) return null;
+    b[slot] = l.from;
+  }
+  return b;
+}
+
+/** Why a card cannot be played on a target right now, or null if it can. */
+export function whyNot(s: KState, card: Card, actor: string, target: string | null): string | null {
+  if (card.target) {
+    const t = target ? s.things[target] : undefined;
+    if (!t) return 'no such target';
+    if (card.target.kind !== 'any' && t.kind !== card.target.kind) return `needs a ${card.target.kind}`;
+    if (t.id === actor) return 'cannot target oneself';
+    if (card.target.same_place && !samePlace(s, actor, t.id)) return `${t.name} is not here`;
+  }
+  const b = bind(s, card, actor, target);
+  if (!b) return 'nobody fills a needed role (for example, there is no host)';
+  for (const c of card.when) if (!holds(s, c, b)) return `condition not met: ${JSON.stringify(c)}`;
+  return null;
+}
+
+export type Playable = { card: MintedCard; target: string | null; id: string };
+/** Every (card, target) a Soul could play now, given the things it can reach or knows of. */
+export function playable(s: KState, actor: string, candidates: string[]): Playable[] {
+  const deck = s.decks[actor]; if (!deck) return [];
+  const out: Playable[] = [];
+  for (const name of deck.cards) {
+    const card = s.vocab.cards[name]; if (!card) continue;
+    if (!card.target) { if (!whyNot(s, card, actor, null)) out.push({ card, target: null, id: name }); continue; }
+    for (const t of candidates) if (!whyNot(s, card, actor, t)) out.push({ card, target: t, id: `${name}@${t}` });
+  }
+  return out;
+}
+
+/** Turn a play into concrete changes. `manner` colours anything said. Deterministic: new ids come from s.nextId. */
+export function changesOf(s: KState, card: Card, b: Bindings, manner: string | undefined, ticksPerSecond = 20): { changes: Change[]; bindings: Bindings; nextId: number } {
+  const bb = { ...b }; let nextId = s.nextId; const out: Change[] = [];
+  const r = (x: string) => { const id = resolve({ ...s, things: { ...s.things } }, x, bb); if (!id) throw new Error(`unresolved reference ${x}`); return id; };
+  const text = (v: Json | undefined): Json | undefined => (typeof v === 'string' ? v.replace(/\$(\w+)\.name/g, (_m, slot) => s.things[bb[slot]]?.name ?? slot) : v);
+  for (const st of card.then) {
+    if ('move' in st) out.push({ op: 'move', id: r(st.move[0]), to: st.move[1] === '$target.at' && bb.target && !s.things[bb.target]?.at ? bb.target : r(st.move[1]) });
+    else if ('set' in st) out.push({ op: 'set', id: r(st.set[0]), key: st.set[1], value: text(st.set[2]) as Json });
+    else if ('link' in st) out.push({ op: 'link', kind: st.link[0], from: r(st.link[1]), to: r(st.link[2]), ...(st.value !== undefined ? { value: st.value } : {}), ...(st.data !== undefined ? { data: st.data } : {}), ...(st.forSeconds ? { until: s.tick + st.forSeconds * ticksPerSecond } : {}) });
+    else if ('unlink' in st) out.push({ op: 'unlink', kind: st.unlink[0], from: r(st.unlink[1]), to: r(st.unlink[2]) });
+    else if ('say' in st) out.push({ op: 'say', from: r(st.say[0]), to: r(st.say[1]), act: st.say[2], ...(st.about !== undefined ? { about: text(st.about) as Json } : {}), ...(manner ? { manner } : {}) });
+    else if ('appear' in st) {
+      const id = `t_${nextId++}`; bb.new = id;
+      const at = st.appear.at === '$target' ? bb.target : r(st.appear.at);
+      out.push({ op: 'appear', id, kind: st.appear.kind, name: String(text(st.appear.name)), at, ...(st.appear.states ? { states: st.appear.states as Record<string, Json> } : {}) });
+      if (st.linkFromActor) out.push({ op: 'link', kind: st.linkFromActor, from: bb.actor, to: id });
+    } else if ('vanish' in st) out.push({ op: 'vanish', id: r(st.vanish) });
+  }
+  return { changes: out, bindings: bb, nextId };
+}
+
+/** Static validation of a proposed card against the grammar and the coherence rule. Returns problems in plain words. */
+export function validateCard(input: unknown, s: KState, engineVerbs: Set<string>): { ok: true; card: Card } | { ok: false; problems: string[] } {
+  const p = cardSchema.safeParse(input);
+  if (!p.success) return { ok: false, problems: p.error.issues.map((i) => `${i.path.join('.') || 'card'}: ${i.message}`) };
+  const card = p.data, problems: string[] = [];
+  const slots = new Set(['actor', 'region', ...(card.target ? ['target'] : []), ...Object.keys(card.derive ?? {}), 'new']);
+  const okRef = (x: string) => !x.startsWith('$') || slots.has(x.slice(1).split('.')[0]);
+  const refsOf = (o: unknown): string[] => (typeof o === 'string' ? [o] : Array.isArray(o) ? o.flatMap(refsOf) : []);
+  for (const c of card.when) for (const x of refsOf(Object.values(c)[0])) if (!okRef(x)) problems.push(`a condition refers to an unknown slot ${x}`);
+  for (const st of card.then) {
+    if ('move' in st && st.move[0] !== '$actor') problems.push('a card may move only its actor');
+    if ('link' in st && st.link[1] !== '$actor') problems.push(`link "${st.link[0]}" must start from the actor: an actor asserts only its own links`);
+    if ('unlink' in st && st.unlink[1] !== '$actor' && st.unlink[2] !== '$actor') problems.push('a card may cut only links the actor is part of');
+    if ('say' in st && st.say[0] !== '$actor') problems.push('a card speaks only for its actor');
+    if ('set' in st && st.set[0] !== '$actor' && st.set[0] !== '$target' && st.set[0] !== '$new') problems.push('a card may set states only on the actor, its target, or a thing it just made');
+    if ('link' in st && st.link[0] === 'said') problems.push('"said" links are made by saying, not directly');
+    if ('appear' in st && st.appear.kind === 'soul') problems.push('a card cannot make a Soul');
+    for (const x of refsOf(Object.values(st)[0])) if (!okRef(x)) problems.push(`a step refers to an unknown slot ${x}`);
+  }
+  for (const d of [...card.approach, ...card.during]) if (!engineVerbs.has(d.verb)) problems.push(`the engine has no verb "${d.verb}" (list what you wanted under "wants" and use an existing verb)`);
+  if (s.vocab.cards[card.name] && cardHash(card) !== s.vocab.cards[card.name].hash) problems.push(`a different card named "${card.name}" already exists; choose another name`);
+  return problems.length ? { ok: false, problems: [...new Set(problems)] } : { ok: true, card };
+}
+export { controllers };

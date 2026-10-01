@@ -137,6 +137,19 @@ importers:
         specifier: ^22.19.19
         version: 22.20.4
 
+  packages/kernel:
+    dependencies:
+      '@sim/engine-contract':
+        specifier: workspace:*
+        version: link:../engine-contract
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.20.4
+
   packages/protocol:
     dependencies:
       '@sim/engine-contract':
