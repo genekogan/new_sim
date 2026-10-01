@@ -11,11 +11,12 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const music = scenario === 'computer-music';
   const reading = scenario === 'quiet-reading';
   const chess = scenario === 'tabletop-chess';
+  const sleep = scenario === 'ground-sleep' || scenario === 'ground-sleep-rotated';
   const preparation = scenario === 'cold-preparation' || scenario === 'cold-preparation-rotated';
   const gathering = classroom || scenario === 'work-break-4' || scenario === 'work-break-8';
   // Keep measurement/construction controls in their established compact layout.
   // Every newly playable room retains the tour when switching between experiences.
-  if (!gathering && !studio && !reading && !music && !chess && !preparation) return null;
+  if (!gathering && !studio && !reading && !music && !chess && !preparation && !sleep) return null;
   const cameraScenario = eight ? 'classroom-8' : 'classroom-4';
   return (
     <section aria-labelledby="checkpoint-tour-heading" data-testid="checkpoint-tour">
@@ -29,8 +30,10 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('quiet-reading')}>Try reading with a bookmark</button>
         <button onClick={() => onScenario('tabletop-chess')}>Try physical tabletop chess</button>
         <button onClick={() => onScenario('cold-preparation')}>Try cold meal preparation</button>
+        <button onClick={() => onScenario('ground-sleep')}>Try supported sleep and retained rest</button>
       </div>
       <p className="lab-meta">Loading a room resets the current world. These rooms and participants are hypothetical. Use Play and the activity controls below; Reset starts the selected room again.</p>
+      {sleep && <p className="lab-desc">Start sleep and Play. Pause wakes safely before releasing the mat; Resume continues the same remaining rest. Direct sleeper away uses ordinary player precedence. Visitor walks past tests shared ground-space use. One flat grounded mat; no bed or active reload guarantee.</p>}
       {preparation && <p className="lab-desc">Start preparation and Play. Transfer finite ingredients and mix in the same pot. Interrupt requests safe release; Resume retains deposits. Then take the emptied bowl, serve and eat with the same spoon, and return both objects. Two servings, one cold batch, grounded table only; no heat or chopping. The rotated-table preset uses the same activity.</p>}
       {chess && <p className="lab-desc">Choose a proposed move and Play. Two people physically take turns; capture preserves the same token in a tray. Change proposals for a different game. Interrupt or Direct current player away exercises owned cleanup and control handoff. Standing tabletop play, no castling or physical promotion.</p>}
       {music && <p className="lab-desc">Enable sound, Start music session and Play. Interrupt retains the recorded score after safe stand-up; Resume continues the same computer purpose. Direct listener away preserves the other commitments. Pause and Reset silence playback; Reset replaces the scene. Current computer/seated poses, two supplied listener chairs, no acoustic-instrument simulation.</p>}

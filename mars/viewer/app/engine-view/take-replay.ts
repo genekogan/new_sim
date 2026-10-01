@@ -251,7 +251,7 @@ export class TakePeople {
     for (const [id, e] of Object.entries(frame.entities)) {
       const src = recordOf(this.take, id) as Entity | undefined; // pose / phase / contents below come from the frame
       if (!src) continue;
-      const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; on?: string; proneYaw?: number; phaseK?: number };
+      const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; on?: string; proneYaw?: number; phaseK?: number; sleepPose?: NonNullable<Entity['human']>['sleepPose'] };
       if (src.kind === 'component') {
         // discrete state as of t (the final state's phase / support would put every item in its last place)
         comps[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(e.phase ? { phase: e.phase as Entity['phase'] } : {}), ...('support' in st ? { support: st.support ?? undefined } : {}), ...('connections' in st ? { connections: st.connections ?? undefined } : {}), ...(st.contents ? { contents: st.contents } : {}) };
@@ -273,7 +273,7 @@ export class TakePeople {
       // prone receiver (mars-take/4, W32): the lying heading in integer mrad and the phase progress in integer % → rad, 0–1
       const proneYaw = typeof st.proneYaw === 'number' ? st.proneYaw / ANG_Q : undefined;
       const phaseK = typeof st.phaseK === 'number' ? st.phaseK / 100 : undefined;
-      people.push({ id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}) });
+      people.push({ id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: structuredClone(st.sleepPose) } : {}) });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });

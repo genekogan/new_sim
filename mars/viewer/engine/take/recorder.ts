@@ -56,6 +56,7 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['baseActivity', (e) => e.human?.baseActivity], // the activity an overlay (eat) is layered on: 'sit' = seated
   ['on', (e) => e.human?.on], // the rack link (beam:… / climb:…) someone stands on
   ['speed', (e) => (e.human?.speed === undefined ? undefined : q(e.human.speed, SPEED_Q))], // integer cm/s (walk_to)
+  ['sleepPose', (e) => e.human?.sleepPose], // additive semantic lie/wake state; renderer owns rig coordinates
   ['contents', (e) => e.contents], // bowl / pot / cup fill (items)
   ['proneYaw', (e) => (e.human?.proneYaw === undefined ? undefined : q(e.human.proneYaw, ANG_Q))], ['phaseK', (e) => (e.human?.phaseK === undefined ? undefined : q(e.human.phaseK, 100))], // prone receiver: lying heading (mrad), phase progress (%)
 ];

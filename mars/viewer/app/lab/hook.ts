@@ -1,3 +1,4 @@
+import { sleepReadout } from './sleep.ts';
 import { preparationReadout } from './preparation.ts';
 import { readFixtureMove } from '../../engine/carry/fixture.ts';
 import { musicStation, readComputerMusic } from '../../engine/activities/computer-music.ts';
@@ -143,6 +144,7 @@ export function installHook(view: LabView, notify: () => void) {
     music: () => structuredClone({station:musicStation(sim.rt,'music-computer'),sessions:[...sim.rt.records.values()].filter(r=>r.verb==='computer_music').map(r=>readComputerMusic(sim.rt,r.id))}),
     reading: () => structuredClone(readBook(sim.rt, 'book')),
     chess: () => structuredClone(readChess(sim.rt, 'board')),
+    sleep: () => structuredClone(sleepReadout(sim.rt)),
     preparation: () => structuredClone(preparationReadout(sim.rt)),
     chessTokens: () => Object.values(sim.rt.world.entities).filter(e => CATALOG[e.def]?.capabilities?.gameToken?.game === 'chess').map(e => ({ id: e.id, def: e.def, pose: structuredClone(e.pose), support: structuredClone(e.support) })),
     workstation: () => {

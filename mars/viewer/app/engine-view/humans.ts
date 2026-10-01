@@ -39,6 +39,7 @@ import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderA
 import { flightOf, gaitAt, stairFootTarget, type Flight, type Gait } from './stair-gait.ts';
 import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
 import { GIRDLE, LIP, PRONE_ACTS, engineTurn, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
+import { sleepGoal, sleepHands } from './sleep.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
@@ -49,6 +50,7 @@ type View = {
   cur: Snap;
   speed: number;
   activity: string;
+  sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   readingGaze?: { prev: number; cur: number };
   /** Ticks since `activity` began (the prone rise clock, prone.ts riseOf, when the engine publishes no phaseK). */
   age: number;
@@ -106,8 +108,8 @@ export type Diag = {
    *  engine published at the latest tick (its body turn angleDelta(pose.yaw, proneYaw), phaseK; null: not published). */
   prone: (ProneState & { engTurn: number | null; phaseK: number | null }) | null;
 };
-/** Where an arm's target came from: engine hand points, a grip slot, or a renderer-chosen hold on the frame / balance pose. */
-type Source = 'hands' | 'grip' | 'frame' | null;
+/** Where an arm's target came from: engine hand points, a grip slot, or private frame/balance/ground-sleep contacts. */
+type Source = 'hands' | 'grip' | 'frame' | 'sleep' | null;
 /**
  * One person in a random-access frame (take replay / scrubbing). `walk` is the Walk clip weight
  * (0–1) and `walkDist` the metres walked along the track so far, so the Walk phase is a pure
@@ -132,6 +134,7 @@ export type SampledHuman = {
    *  within the engine phase — the prone layer's body turn and exact rise mid-phase (else each phase's end pose). */
   proneYaw?: number;
   phaseK?: number;
+  sleepPose?: NonNullable<Entity['human']>['sleepPose'];
 };
 export type { Hands };
 /** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
@@ -297,6 +300,7 @@ export class HumanViews {
       v.speed += (ground - v.speed) * 0.6;
       v.age = act === v.activity ? v.age + 1 : 0;
       v.activity = act;
+      v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.grip = e.human.grip?.entity;
       v.gripSlot = e.human.grip?.slot;
@@ -395,6 +399,10 @@ export class HumanViews {
   private proneGoal(v: View, e: Entity, world: WorldState, cur: ProneState | null, settled: boolean): ProneState | null {
     const d = v.dims, act = v.activity;
     if (!d) return null;
+    if (e.human?.sleepPose) {
+      v.proneEng = undefined;
+      return sleepGoal(e.human.sleepPose, e.pose.yaw);
+    }
     if (PRONE_ACTS.has(act)) {
       const k = e.human?.phaseK, turn = engineTurn(e.pose.yaw, e.human?.proneYaw);
       v.proneEng = { turn, k };
@@ -458,6 +466,7 @@ export class HumanViews {
       if (!v) v = this.make(f.id, { p: [...f.p], yaw: f.yaw, walkW: 0, walkT: 0, idleT: 0, sitW: 0, warmW: 0, pose: NEUTRAL, hands: {}, pr: null }, act);
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
+      v.sleepPose = f.sleepPose;
       v.base = base;
       v.grip = f.grip;
       v.gripSlot = f.gripSlot;
@@ -465,7 +474,7 @@ export class HumanViews {
       v.frame = frameCtx(f.on, act, (id) => parts[id], this.climbs);
       v.seat = SEAT_DEFAULT;
       const walk = SEATED.has(base) ? 0 : f.walk;
-      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK } } as unknown as Entity;
+      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose } } as unknown as Entity;
       const snap: Snap = {
         p: [...f.p],
         yaw: f.yaw,
@@ -616,6 +625,20 @@ export class HumanViews {
       if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
       closeHands(v, k.map((c, i) => c * (1 - flat[i])));
+    } else if (v.sleepPose && pr && v.dims && proneW > 0) {
+      // Free contact expression is private to the current rig, never authoritative hands/grips.
+      source = 'sleep';
+      const local = sleepHands(v.dims, pr);
+      v.arms.forEach((arm, i) => {
+        const q = local[armSide(v, i) === 'left' ? 0 : 1];
+        targets[i] = V().copy(h.position).addScaledVector(_fwd, q.f).addScaledVector(_right, q.lat).addScaledVector(UP, q.up);
+      });
+      const pa: ProneArms = { girdle: GIRDLE * proneW, pole: (arm) => V().copy(_right).multiplyScalar(-arm.side * 0.5).add(UP) };
+      const k = reachTo(v, targets, false, BODY_MODEL.maxExtension, undefined, pa);
+      v.arms.forEach((arm, i) => {
+        if (targets[i] && k[i] > 0) flatHand(v, arm, targets[i]!, h.position.y, proneW * k[i], pa.pole(arm, targets[i]!));
+      });
+      closeHands(v, k.map(() => 0));
     } else if (gripping) {
       source = 'grip';
       const grip = v.grip!, slot = v.gripSlot ?? '', floor = h.position.y;

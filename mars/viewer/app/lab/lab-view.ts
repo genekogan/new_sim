@@ -1,3 +1,4 @@
+import { SleepMatView } from './sleep-mat.ts';
 import { chessAttention } from './chess.ts';
 import { readComputerMusic } from '../../engine/activities/computer-music.ts';
 // Engine Lab view: three.js renderer + orbit camera over a LabSim. The rAF
@@ -35,6 +36,7 @@ export class LabView {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
   readonly scene = new THREE.Scene();
+  readonly sleepMat = new SleepMatView();
   private css = new CSS2DRenderer();
   private orbit: OrbitControls;
   readonly humans = new HumanViews();
@@ -88,8 +90,10 @@ export class LabView {
     const mk = (n: string) => Object.assign(new THREE.Group(), { name: `overlay:${n}` });
     this.groups = { grid: this.grids.heat, traffic: this.grids.traffic, agents: this.agents.discs, labels: this.agents.labels, routes: mk('routes'), obstacles: mk('obstacles'), prisms: mk('prisms'), links: mk('links'), violations: mk('violations'), slots: mk('slots') };
     for (const g of Object.values(this.groups)) this.scene.add(g);
+    this.scene.add(this.sleepMat.group);
     this.sim.onReset = (rt) => this.reset(rt);
     this.sim.onTick = (rt) => {
+      this.sleepMat.sync(rt.world, this.sim.scenario.name.startsWith('ground-sleep'));
       this.humans.onTick(rt.world);
       this.activityAttention(rt);
       this.components.onTick(rt.world);
@@ -111,6 +115,7 @@ export class LabView {
 
   private reset(rt: LabSim['rt']) {
     this.attentionTargets = {};
+    this.sleepMat.sync(rt.world, this.sim.scenario.name.startsWith('ground-sleep'));
     this.statics?.dispose();
     if (this.statics) this.scene.remove(this.statics.group);
     this.statics = yearBackdrop(rt, (m) => (this.error = m)) ?? new StaticScene(rt.services.spatial.base, this.sim.scenario.name === 'design-studio' ? { ground: '#d7d7d0', wall: '#f0eee5' } : undefined);
@@ -326,6 +331,7 @@ export class LabView {
     this.abort.abort();
     this.humans.clear();
     this.agents.clear();
+    this.sleepMat.dispose();
     this.statics?.dispose();
     this.components.dispose();
     this.fixtures.dispose();

@@ -1,3 +1,4 @@
+import { SleepHud } from './sleep-hud.tsx';
 import { LabCameraControls } from './camera-controls.tsx';
 // Engine Lab side panel: scenario picker, transport, overlays, cameras,
 // expectations, perf and the action/diagnostic log.
@@ -102,6 +103,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <ClassroomHud key={s.name} sim={sim} refresh={refresh} />
       <MusicHud key={`music:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ChessHud key={`chess:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <SleepHud key={`sleep-${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <PreparationHud key={`preparation:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ReadingHud key={`reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />

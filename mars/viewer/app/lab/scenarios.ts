@@ -1,3 +1,4 @@
+import { SLEEP_SCENARIOS } from './sleep.ts';
 // Engine Lab scenarios: proving-ground regressions (engine/test/walk.test.ts)
 // and the flagship build sequence (build-bay.ts) as runnable presets. Pure TS (no three.js/DOM) so node can run them too.
 import { Runtime } from '../../engine/runtime/runtime.ts';
@@ -109,6 +110,7 @@ const walk = (rt: Runtime, actor: string, x: number, z: number, level?: number) 
   rt.submit('walk_to', level === undefined ? { actor, x, z } : { actor, x, z, level });
 
 export const SCENARIOS: Scenario[] = [
+  ...SLEEP_SCENARIOS,
   ...PREPARATION_SCENARIOS,
   {
     name: 'wall',
