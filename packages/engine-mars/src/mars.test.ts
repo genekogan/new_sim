@@ -50,6 +50,23 @@ else {
     assert.equal(e.world.entities['a'].human!.activity, 'warm');          // still by the fire
   });
 
+  test('mars: a world’s own verbs are reachable as mars:<verb>, with the actor filled in and feasibility checked first', () => {
+    const e = factory.create(factory.genesis('t2b'));
+    e.spawnHuman({ id: 'a', label: 'A', soul: 's_a' });
+    assert.ok(e.describeVerbs().some((v) => v.verb === 'mars:serve' && v.scope === 'world'));
+    assert.ok(e.describeVerbs().some((v) => v.verb === 'walk_to' && v.scope === undefined));
+    const r = e.perform({ actor: 'a', label: 'take a seat the Mars way', steps: [{ verb: 'mars:take_slot', params: { owner: 'bench-n', activity: 'sit' } }, { verb: 'rest', params: { seconds: 1 } }, { verb: 'mars:stand', params: {} }, { verb: 'mars:face', params: { target: { entity: 'fire' } } }] });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const log = run(e, 900);
+    assert.deepEqual(log.filter((x) => x.id === r.id).map((x) => (x.kind === 'step' ? `step${x.step}` : x.kind)), ['step0', 'step1', 'step2', 'step3', 'completed'], JSON.stringify(log));
+    assert.equal(e.world.entities['a'].human!.activity, 'idle');
+    // an impossible raw step is refused up front, like any other
+    const no = e.perform({ actor: 'a', label: 'x', steps: [{ verb: 'mars:take_slot', params: { owner: 'no-such-thing' } }] });
+    assert.equal(no.ok, false); assert.ok(no.diagnostic);
+    assert.equal(e.perform({ actor: 'a', label: 'x', steps: [{ verb: 'mars:no_such', params: {} }] }).ok, false);
+    assert.deepEqual(e.runtime.violations.map((v) => v.code), []);
+  });
+
   test('mars: joint staging is borrowed: a conversation takes a free body, and that body’s own program takes it back', () => {
     const e = factory.create(factory.genesis('t3'));
     e.spawnHuman({ id: 'a', label: 'A', soul: 's_a' }); e.spawnHuman({ id: 'b', label: 'B', soul: 's_b' });

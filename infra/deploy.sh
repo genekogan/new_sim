@@ -26,7 +26,7 @@ echo "== install deps"
 ssh "$HOST" "chown -R sim:sim $REL && sudo -u sim -H bash -lc 'cd $REL && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile --filter @sim/server... 2>&1 | tail -1'"
 
 echo "== staging"
-ssh "$HOST" "ln -sfn $REL /srv/sim/staging && systemctl restart sim-staging && sleep 4 && systemctl is-active sim-staging >/dev/null && curl -fsS http://127.0.0.1:4501/healthz | grep -q '\"build\":\"$BUILD\"' && echo 'staging ok'" || { echo "STAGING FAILED: production untouched; removing the rejected release"; ssh "$HOST" "journalctl -u sim-staging -n 20 --no-pager | cut -c1-200; cur=\$(readlink /srv/sim/current); ln -sfn \$cur /srv/sim/staging; systemctl restart sim-staging; [ \"\$cur\" != \"$REL\" ] && rm -rf $REL"; exit 1; }
+ssh "$HOST" "ln -sfn $REL /srv/sim/staging && systemctl restart sim-staging && sleep 4 && systemctl is-active sim-staging >/dev/null && curl -fsS http://127.0.0.1:4501/healthz | grep -q '\"build\":\"$BUILD\"' && curl -fsS http://127.0.0.1:4501/v1/kernel | grep -q '\"things\"' && curl -fsS http://127.0.0.1:4501/cards.md | grep -q 'How to write a card' && echo 'staging ok'" || { echo "STAGING FAILED: production untouched; removing the rejected release"; ssh "$HOST" "journalctl -u sim-staging -n 20 --no-pager | cut -c1-200; cur=\$(readlink /srv/sim/current); ln -sfn \$cur /srv/sim/staging; systemctl restart sim-staging; [ \"\$cur\" != \"$REL\" ] && rm -rf $REL"; exit 1; }
 
 echo "== production"
 ssh "$HOST" "prev=\$(readlink /srv/sim/current || true); [ -n \"\$prev\" ] && [ \"\$prev\" != \"$REL\" ] && ln -sfn \$prev /srv/sim/previous; ln -sfn $REL /srv/sim/current && systemctl restart sim && sleep 4 && systemctl is-active sim && curl -fsS http://127.0.0.1:4500/healthz; echo

@@ -226,15 +226,18 @@ export class MarsEngine implements Engine {
   }
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id); }
 
+  /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */
+  private raw(me: string, step: { verb: string; params: Record<string, unknown> }): { verb: string; params: Record<string, unknown> } | Diag {
+    const verb = step.verb.slice(5), def = this.registry.get(verb), a = step.params ?? {};
+    if (!def) return { code: 'action.unknown-verb', message: `no action verb "${verb}"` };
+    const shape = (this.m.describeVerbs(new Map([[verb, def]]))[0].inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+    return { verb, params: { ...a, ...('actor' in shape && !('actor' in a) ? { actor: me } : {}), ...('actors' in shape && !('actors' in a) ? { actors: [me] } : {}) } };
+  }
+
   /** One body-language step → the Mars actions and waits that depict it, decided when the step begins. */
   private lower(p: Prog, step: { verb: string; params: Record<string, unknown> }): Op[] | Diag {
     const me = p.actor, a = step.params ?? {};
-    if (step.verb.startsWith('mars:')) {
-      const verb = step.verb.slice(5), def = this.registry.get(verb);
-      if (!def) return { code: 'action.unknown-verb', message: `no action verb "${verb}"` };
-      const shape = (this.m.describeVerbs(new Map([[verb, def]]))[0].inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
-      return [{ verb, params: 'actor' in shape && !('actor' in a) ? { ...a, actor: me } : a, settle: 'held', raw: true }];
-    }
+    if (step.verb.startsWith('mars:')) { const r = this.raw(me, step); return 'code' in r ? r : [{ ...r, settle: 'held', raw: true }]; }
     switch (step.verb) {
       case 'walk_to': {
         const g = this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
@@ -292,7 +295,8 @@ export class MarsEngine implements Engine {
   canPerform(program: Program): Diag | null {
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
     const first = program.steps[0]; if (!first) return null;
-    if (!first.verb.startsWith('mars:') && !BODY.has(first.verb)) return { code: 'action.unknown-verb', message: `no body verb "${first.verb}"` };
+    if (first.verb.startsWith('mars:')) { const r = this.raw(program.actor, first); return 'code' in r ? r : this.plan(r.verb, r.params); }
+    if (!BODY.has(first.verb)) return { code: 'action.unknown-verb', message: `no body verb "${first.verb}"` };
     if (first.verb === 'walk_to') { const g = this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0); return g !== 'here' && 'code' in g ? g : null; }
     if (first.verb === 'sit') return this.plan('sit', { actor: program.actor, fixture: String(first.params.on ?? '') });
     return null;
