@@ -93,7 +93,7 @@ export class LabView {
     this.scene.add(this.sleepMat.group);
     this.sim.onReset = (rt) => this.reset(rt);
     this.sim.onTick = (rt) => {
-      this.sleepMat.sync(rt.world, this.sim.scenario.name.startsWith('ground-sleep'));
+      this.sleepMat.sync(rt.world, this.sim.scenario.name.startsWith('ground-sleep') || this.sim.scenario.name.startsWith('prepared-day'));
       this.humans.onTick(rt.world);
       this.activityAttention(rt);
       this.components.onTick(rt.world);
@@ -115,7 +115,7 @@ export class LabView {
 
   private reset(rt: LabSim['rt']) {
     this.attentionTargets = {};
-    this.sleepMat.sync(rt.world, this.sim.scenario.name.startsWith('ground-sleep'));
+    this.sleepMat.sync(rt.world, this.sim.scenario.name.startsWith('ground-sleep') || this.sim.scenario.name.startsWith('prepared-day'));
     this.statics?.dispose();
     if (this.statics) this.scene.remove(this.statics.group);
     this.statics = yearBackdrop(rt, (m) => (this.error = m)) ?? new StaticScene(rt.services.spatial.base, this.sim.scenario.name === 'design-studio' ? { ground: '#d7d7d0', wall: '#f0eee5' } : undefined);

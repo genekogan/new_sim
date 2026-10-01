@@ -6,17 +6,18 @@ type Props = {
 /** Discovery only: existing scenario loading and classroom controls own every action. */
 export function CheckpointTour({ scenario, onScenario }: Props) {
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
-  const eight = scenario === 'classroom-8' || scenario === 'work-break-8';
+  const eight = scenario === 'classroom-8' || scenario === 'work-break-8' || scenario === 'prepared-day-8';
   const studio = scenario === 'design-studio';
   const music = scenario === 'computer-music';
   const reading = scenario === 'quiet-reading';
   const chess = scenario === 'tabletop-chess';
   const sleep = scenario === 'ground-sleep' || scenario === 'ground-sleep-rotated';
   const preparation = scenario === 'cold-preparation' || scenario === 'cold-preparation-rotated';
+  const preparedDay = scenario === 'prepared-day-4' || scenario === 'prepared-day-8' || scenario === 'prepared-day-studio';
   const gathering = classroom || scenario === 'work-break-4' || scenario === 'work-break-8';
   // Keep measurement/construction controls in their established compact layout.
   // Every newly playable room retains the tour when switching between experiences.
-  if (!gathering && !studio && !reading && !music && !chess && !preparation && !sleep) return null;
+  if (!gathering && !studio && !reading && !music && !chess && !preparation && !sleep && !preparedDay) return null;
   const cameraScenario = eight ? 'classroom-8' : 'classroom-4';
   return (
     <section aria-labelledby="checkpoint-tour-heading" data-testid="checkpoint-tour">
@@ -31,8 +32,14 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('tabletop-chess')}>Try physical tabletop chess</button>
         <button onClick={() => onScenario('cold-preparation')}>Try cold meal preparation</button>
         <button onClick={() => onScenario('ground-sleep')}>Try supported sleep and retained rest</button>
+        <button onClick={() => onScenario(eight ? 'prepared-day-8' : 'prepared-day-4')}>Try a prepared day with sleep</button>
+        <button onClick={() => onScenario('prepared-day-studio')}>Try the prepared day in an independent studio</button>
       </div>
       <p className="lab-meta">Loading a room resets the current world. These rooms and participants are hypothetical. Use Play and the activity controls below; Reset starts the selected room again.</p>
+      {preparedDay && <>
+        {eight && <p className="lab-desc">Prepare the supported 8-guest side layout first: select worker, Take bowl and Take spoon, waiting for each pickup; Prepare side layout and wait for safe set-down, then Put belongings away. This clears the spare chair and belongings table through ordinary physical setup. The initial factory retains their original positions.</p>}
+        <p className="lab-desc">Start notes, interrupt after some progress and wait for safe stand-up. Start session, then Start purposeful routine while talks are accepting participants. The companion walk is enabled initially. After gathering, the worker prepares two finite ingredients, shares the dish, sleeps on the ground mat and returns to the same notes. Pause/Resume retain recipe deposits, sleep elapsed and the unfinished purpose. Commit attendee continuations adds separate discussion and presenter work; its controls affect only that commitment. Authored ground layouts, one cold recipe and current-rig mat sleep; no active reload restoration or autonomous needs.</p>
+      </>}
       {sleep && <p className="lab-desc">Start sleep and Play. Pause wakes safely before releasing the mat; Resume continues the same remaining rest. Direct sleeper away uses ordinary player precedence. Visitor walks past tests shared ground-space use. One flat grounded mat; no bed or active reload guarantee.</p>}
       {preparation && <p className="lab-desc">Start preparation and Play. Transfer finite ingredients and mix in the same pot. Interrupt requests safe release; Resume retains deposits. Then take the emptied bowl, serve and eat with the same spoon, and return both objects. Two servings, one cold batch, grounded table only; no heat or chopping. The rotated-table preset uses the same activity.</p>}
       {chess && <p className="lab-desc">Choose a proposed move and Play. Two people physically take turns; capture preserves the same token in a tray. Change proposals for a different game. Interrupt or Direct current player away exercises owned cleanup and control handoff. Standing tabletop play, no castling or physical promotion.</p>}

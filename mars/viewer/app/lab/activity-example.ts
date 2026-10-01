@@ -6,6 +6,9 @@ import { pairedMealWalk } from '../../engine/scenarios/paired-meal-walk.ts';
 import { classroomFurniture } from './room-layout.ts';
 
 export function activityExample(scenario: string): DesignStudioBindings | undefined {
+  if (scenario === 'prepared-day-studio') return designStudioBindings();
+  if (scenario === 'prepared-day-4') scenario = 'work-break-4';
+  if (scenario === 'prepared-day-8') scenario = 'work-break-8';
   if (scenario === 'design-studio') return designStudioBindings();
   if (scenario !== 'work-break-4' && scenario !== 'work-break-8') return undefined;
   const count = scenario === 'work-break-8' ? 8 : 4;
@@ -23,6 +26,6 @@ export function activityExample(scenario: string): DesignStudioBindings | undefi
 export function mealWalkExample(scenario: string) {
   const example = activityExample(scenario);
   if (!example) return;
-  const x = scenario === 'design-studio' ? -9 : -8;
+  const x = scenario === 'design-studio' || scenario === 'prepared-day-studio' ? -9 : -8;
   return pairedMealWalk(example.roles.worker, example.roles.companion, x);
 }

@@ -29,6 +29,7 @@ import { READING_SCENARIO } from './reading.ts';
 import { CHESS_SCENARIO } from './chess.ts';
 import { PREPARATION_SCENARIOS } from './preparation.ts';
 import { DESIGN_STUDIO } from './design-studio.ts';
+import { PREPARED_DAY_SCENARIOS } from './prepared-day.ts';
 import { solarPaint } from './solar-paint.ts';
 
 export type Check = { ok: boolean; message: string };
@@ -306,7 +307,7 @@ export function stress(n: number): Scenario {
 }
 
 // Explicit proof fixture: available by name/URL without changing the established probe scenario set.
-export const scenarioByName = (name: string) => name === raiseCancel.name ? raiseCancel : [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS].find((s) => s.name === name);
+export const scenarioByName = (name: string) => name === raiseCancel.name ? raiseCancel : [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, ...PREPARED_DAY_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS].find((s) => s.name === name);
 
 /** Product presets are selectable without altering legacy probe scenarios/baselines. */
-export const SELECTABLE_SCENARIOS = [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS];
+export const SELECTABLE_SCENARIOS = [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, ...PREPARED_DAY_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS];

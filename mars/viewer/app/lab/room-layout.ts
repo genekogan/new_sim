@@ -2,8 +2,8 @@
 import type { MoveFixtureParams } from '../../engine/carry/fixture.ts';
 export type RoomLayout = 'default' | 'side';
 export function classroomRoomCount(scenario: string): 4 | 8 | undefined {
-  if (scenario === 'classroom-4' || scenario === 'work-break-4') return 4;
-  if (scenario === 'classroom-8' || scenario === 'work-break-8') return 8;
+  if (scenario === 'classroom-4' || scenario === 'work-break-4' || scenario === 'prepared-day-4') return 4;
+  if (scenario === 'classroom-8' || scenario === 'work-break-8' || scenario === 'prepared-day-8') return 8;
   return undefined;
 }
 export function classroomFurniture(scenario: string) {
