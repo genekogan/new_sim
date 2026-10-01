@@ -137,7 +137,15 @@ function write(
     (e.equipment && e.equipment.kind !== 'workstation')
   )
     return;
-  const c = config(e);
+  const c = { ...config(e) };
+  // Optional activity programs belong to this exact task action. A new ordinary
+  // purpose cannot inherit another program's behavior merely by reusing its label.
+  // A coordinator explicitly binds a resumed program to its new physical child.
+  if (c.programAction !== undefined && c.programAction !== ex.id) {
+    delete c.programAction;
+    delete c.programKind;
+    delete c.programData;
+  }
   e.equipment = {
     kind: 'workstation',
     config: {
