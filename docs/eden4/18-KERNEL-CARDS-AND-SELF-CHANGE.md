@@ -177,7 +177,9 @@ What is built:
   with no model involved.
 - **The ledger records plays and mints.** A play is (card hash, who, on what, in
   what manner). Replay applies the card's changes with deterministic code and
-  calls no model. The kernel replays from the log **without any engine**.
+  calls no model. The kernel replays from the log **without any engine**. Checked
+  on the live world on 2026-10-01: 11,939 events replayed in 35 ms and reproduced
+  the running server's kernel hash exactly.
 - **Three tiers decide.** *Reflex* (code, free): a question is answered before
   anything else; when cards serve the owner's plan the Soul chooses only among
   them; a Soul that asked waits for the answer. *Mid-brain* (Jev, ~$0.0001): a
@@ -284,7 +286,7 @@ normal (needs a fixed test set of intents).
 | 5. The DJ test | **passes**: by agenda with a fake brain (toy and Mars), and from two plain wishes with live models on the Mars engine | `apps/server/src/sync.test.ts`, `mars.test.ts` |
 | 6. Knowing | not built | still section 6 |
 | 7. Depiction backlog | **built** | `grammar`: animation to-do, ranked by how often cards wanted a motion |
-| 8. Self-change | not built | still section 8 |
+| 8. Self-change | **first step built**: a world's base vocabulary is written into its own log, replay starts from it, and adopting a newer set is a logged `rules` event (level 2 of section 8). Proposals, shadow replay and epochs are not built | `adopt_vocabulary` in the admin API |
 | Notebook | **built** | `notebook` tab: six open questions beside live evidence |
 
 ## 10. Gene's answers (round 17) and what is open now
