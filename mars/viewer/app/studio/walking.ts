@@ -1,14 +1,19 @@
 import * as THREE from 'three';
+import { steppedAccess, type SteppedAccess } from './stepped-access.ts';
 
 const EYE = 1.7,
   GROUND = -0.16,
   STEP = 0.35,
   CELL = 4;
+const CLEARANCE = 0.22;
+type AccessSurface = { height: number; lower: number; upper: number; low?: THREE.Mesh; high: THREE.Mesh; axis: THREE.Vector3; begin: number; end: number };
 const down = new THREE.Vector3(0, -1, 0);
 
 /** Local mesh queries keep walking independent of campus size. Rebuild on entry
  * so moved buildings and proposed components use their current transforms. */
 export class WalkingBody {
+  private accessDirection = new THREE.Vector3();
+  private access = new Map<THREE.Mesh, SteppedAccess>();
   private cells = new Map<string, THREE.Mesh[]>();
   private ray = new THREE.Raycaster();
   private normal = new THREE.Vector3();
@@ -25,6 +30,8 @@ export class WalkingBody {
 
   rebuild(roots: THREE.Object3D[]) {
     this.cells.clear();
+    this.access.clear();
+    this.accessDirection.set(0, 0, 0);
     for (const root of roots) {
       root.updateWorldMatrix(true, true);
       root.traverseVisible((object) => {
@@ -43,6 +50,8 @@ export class WalkingBody {
             return;
           parent = parent.parent;
         }
+        const traversal = steppedAccess(object);
+        if (traversal) this.access.set(object, traversal);
         const bounds = new THREE.Box3().setFromObject(object);
         const x0 = Math.floor(bounds.min.x / CELL),
           x1 = Math.floor(bounds.max.x / CELL);
@@ -72,7 +81,7 @@ export class WalkingBody {
     return [...meshes];
   }
 
-  private floor(position: THREE.Vector3, top: number, meshes: THREE.Mesh[]) {
+  private floorInfo(position: THREE.Vector3, top: number, meshes: THREE.Mesh[], accessWitness = false) {
     this.ray.set(new THREE.Vector3(position.x, top, position.z), down);
     this.ray.far = Math.max(0, top - GROUND + 0.01);
     const hit = this.ray.intersectObjects(meshes, false).find((h) => {
@@ -82,9 +91,70 @@ export class WalkingBody {
         .applyNormalMatrix(
           this.normalMatrix.getNormalMatrix(h.object.matrixWorld),
         );
-      return Math.abs(this.normal.y) > 0.55;
+      return accessWitness ? this.normal.y > 0.999999 : Math.abs(this.normal.y) > 0.55;
     });
-    return Math.max(GROUND, hit?.point.y ?? GROUND);
+    return { height: Math.max(GROUND, hit?.point.y ?? GROUND), mesh: hit?.object instanceof THREE.Mesh ? hit.object : undefined };
+  }
+
+  private floor(position: THREE.Vector3, top: number, meshes: THREE.Mesh[]) {
+    return this.floorInfo(position, top, meshes).height;
+  }
+
+  /** A short seam envelope requires actual adjacent support witnesses, never a whole-bay ramp. */
+  private accessSurface(position: THREE.Vector3, feet: number, movement: THREE.Vector3, meshes: THREE.Mesh[]): AccessSurface | 'blocked' | undefined {
+    if (!movement.lengthSq()) return;
+    const direction = movement.clone().normalize();
+    let attempted = false;
+    for (const mesh of meshes) {
+      const data = this.access.get(mesh);
+      if (!data || data.entry) continue;
+      const top = data.top + 0.001;
+      const front = this.floorInfo(position.clone().addScaledVector(direction, CLEARANCE), top, meshes, true);
+      if (front.mesh === mesh && front.height > feet + STEP) attempted = true;
+      if (Math.abs(direction.dot(data.axis)) < 0.5) continue;
+      const low = this.floorInfo(position.clone().addScaledVector(data.axis, -CLEARANCE), top, meshes, true);
+      const high = this.floorInfo(position.clone().addScaledVector(data.axis, CLEARANCE), top, meshes, true);
+      if (high.mesh !== mesh || high.height <= low.height + 0.001) continue;
+      if (Math.abs(high.height - data.top) > data.precision) continue;
+      const lower = low.mesh ? this.access.get(low.mesh) : undefined;
+      if (low.mesh && (!lower || lower.id !== data.id || lower.axis.dot(data.axis) < 0.999 || Math.abs(low.height - lower.top) > lower.precision)) continue;
+      const difference = high.height - low.height;
+      const ascending = movement.dot(data.axis) > 0;
+      const limit = ascending ? Math.min(data.maxRise, lower?.maxRise ?? data.maxRise) : Math.min(data.maxDrop, lower?.maxDrop ?? data.maxDrop);
+      if (difference > limit || feet < low.height - 0.001 || feet > high.height + 0.001) continue;
+      const gap = lower ? data.start - lower.end : 0;
+      const gapLimit = Math.min(data.maxGap, lower?.maxGap ?? data.maxGap);
+      // Overlapping physical tiers meet at the higher front, not at the
+      // lower bbox end (the authored entry floor extends under the tiers).
+      if (gap > gapLimit + 1e-9) continue;
+      const seam = data.start;
+      const along = position.dot(data.axis);
+      if (along < seam - CLEARANCE || along > seam + CLEARANCE) continue;
+      const fraction = (along - seam + CLEARANCE) / (2 * CLEARANCE);
+      return { height: low.height + fraction * difference, lower: low.height, upper: high.height, low: low.mesh, high: mesh, axis: data.axis, begin: seam - CLEARANCE, end: seam + CLEARANCE };
+    }
+    return attempted ? 'blocked' : undefined;
+  }
+
+  private finishSurface(position: THREE.Vector3, surface: AccessSurface | undefined, movement: THREE.Vector3, meshes: THREE.Mesh[]) {
+    if (!surface) return;
+    const along = position.dot(surface.axis), delta = movement.dot(surface.axis);
+    const below = delta < 0 && along < surface.begin && surface.begin - along <= -delta + 1e-9;
+    const above = delta > 0 && along > surface.end && along - surface.end <= delta + 1e-9;
+    if (!below && !above) return;
+    const expected = below ? surface.lower : surface.upper;
+    const expectedMesh = below ? surface.low : surface.high;
+    const actual = this.floorInfo(position, surface.upper + 0.001, meshes, true);
+    if (actual.mesh !== expectedMesh || Math.abs(actual.height - expected) > Math.max(this.access.get(surface.high)?.precision ?? 1e-6, surface.low ? this.access.get(surface.low)?.precision ?? 1e-6 : 1e-6)) return;
+    // Finish on the actually witnessed endpoint instead of beginning a tiny fall.
+    return { ...surface, height: expected };
+  }
+
+  private edgeHit(hit: THREE.Intersection, surface: AccessSurface | undefined) {
+    if (!surface || hit.object !== surface.high || !hit.face || hit.point.y > surface.upper + 0.001) return false;
+    this.normal.copy(hit.face.normal).applyNormalMatrix(this.normalMatrix.getNormalMatrix(hit.object.matrixWorld));
+    // Only the actual support's vertical front/back edge during this verified seam.
+    return Math.abs(this.normal.y) < 1e-6 && Math.abs(this.normal.dot(surface.axis)) > 0.999;
   }
 
   place() {
@@ -113,24 +183,37 @@ export class WalkingBody {
     if (movement.lengthSq() > 1) movement.normalize();
     movement.multiplyScalar((sprint ? 6 : 3) * dt);
     const meshes = this.nearby(p);
+    let feet = p.y - EYE;
+    const restingSurface = this.grounded ? this.accessSurface(p, feet, this.accessDirection, meshes) : undefined;
+    let surface = restingSurface && restingSurface !== 'blocked' ? restingSurface : undefined;
     // Slide along walls; sample the lower body, torso and head, with clearance.
     for (const axis of ['x', 'z'] as const) {
       const delta = movement[axis];
       if (!delta) continue;
       const heading = new THREE.Vector3();
       heading[axis] = Math.sign(delta);
+      const candidate = p.clone(); candidate[axis] += delta;
+      let nextSurface = this.grounded ? this.accessSurface(candidate, feet, movement, meshes) : undefined;
+      if (nextSurface === 'blocked') continue;
+      if (!nextSurface && this.grounded) nextSurface = this.finishSurface(candidate, surface, movement, meshes);
+      const nextFeet = nextSurface?.height ?? feet;
       let blocked = false;
+      if (nextSurface) {
+        this.ray.set(new THREE.Vector3(candidate.x, feet + EYE, candidate.z), new THREE.Vector3(0, 1, 0));
+        this.ray.far = Math.max(0, nextSurface.upper - feet) + 0.12;
+        blocked = this.ray.intersectObjects(meshes, false).length > 0;
+      }
       for (const height of [0.45, 1, EYE - 0.05]) {
-        this.ray.set(new THREE.Vector3(p.x, p.y - EYE + height, p.z), heading);
-        this.ray.far = Math.abs(delta) + 0.22;
-        if (this.ray.intersectObjects(meshes, false).length) {
+        this.ray.set(new THREE.Vector3(p.x, nextFeet + height, p.z), heading);
+        this.ray.far = Math.abs(delta) + CLEARANCE;
+        if (this.ray.intersectObjects(meshes, false).some(hit => !this.edgeHit(hit, nextSurface))) {
           blocked = true;
           break;
         }
       }
-      if (!blocked) p[axis] += delta;
+      if (!blocked) { p[axis] += delta; feet = nextFeet; surface = nextSurface; if (surface) this.accessDirection.copy(movement); }
     }
-    const oldFeet = p.y - EYE;
+    const oldFeet = feet;
     this.velocity -= 14 * dt;
     let nextFeet = oldFeet + this.velocity * dt;
     if (this.velocity > 0) {
@@ -141,7 +224,7 @@ export class WalkingBody {
         nextFeet = oldFeet;
       }
     }
-    const support = this.floor(
+    const support = surface?.height ?? this.floor(
       p,
       oldFeet + (this.grounded ? STEP : 0.001),
       meshes,
@@ -305,6 +388,9 @@ export function attachWalking(
   return {
     get active() {
       return active;
+    },
+    get grounded() {
+      return body.grounded;
     },
     start,
     stop,
