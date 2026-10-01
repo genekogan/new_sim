@@ -8,16 +8,16 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `7a2c826` (engine tree clean) |
-| Generated | 2026-10-01T18:17:50.549Z · Node v22.20.0 |
-| Engine suite | 960 tests in 116 files: 943 pass, 0 fail, 6 skipped, 11 TODO · 169.2 s wall |
-| External gate | `.cloudflare/gate/2026-10-01T17-33-53-236Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `5111019` (engine tree clean) |
+| Generated | 2026-10-01T21:36:39.360Z · Node v22.20.0 |
+| Engine suite | 1004 tests in 117 files: 987 pass, 0 fail, 6 skipped, 11 TODO · 155.5 s wall |
+| External gate | `.cloudflare/gate/2026-10-01T20-02-20-385Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 7063 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 10536 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 22264 ms compute (cropped 10243 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 6050 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 9057 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 18581 ms compute (cropped 8886 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -269,7 +269,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -292,7 +292,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -308,7 +308,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -447,7 +447,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -477,7 +477,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -503,7 +503,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -521,7 +521,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -706,7 +706,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -754,10 +754,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -782,8 +782,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -802,9 +802,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T17-33-53-236Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -1031,14 +1031,56 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `084f492` (2026-10-01T15:46:01.594Z): 2 added, 0 removed.
+Compared with the report at `7a2c826` (2026-10-01T18:17:50.549Z): 44 added, 0 removed.
 
-- added: year-build-occupied-hierarchy.test.ts :: attached descendants are resolved transitively without removing unrelated hierarchy
-- added: year-build-occupied-hierarchy.test.ts :: pre-build removes explicitly attached occupied descendants and retains every independent neighbor
+- added: food-preparation.test.ts :: cancel after deposit retains exact conserved retry progress
+- added: food-preparation.test.ts :: cancel before deposit retains exact conserved retry progress
+- added: food-preparation.test.ts :: cancel during mixing drains owned children and releases preparation resources
+- added: food-preparation.test.ts :: cancel during scooping drains owned children and releases preparation resources
+- added: food-preparation.test.ts :: cancel during taking drains owned children and releases preparation resources
+- added: food-preparation.test.ts :: cancel during to-pot drains owned children and releases preparation resources
+- added: food-preparation.test.ts :: cancel during to-source drains owned children and releases preparation resources
+- added: food-preparation.test.ts :: changed ingredient quantity on retry refuses without silently replenishing it
+- added: food-preparation.test.ts :: deterministic recorded preparation and already complete refusal
+- added: food-preparation.test.ts :: director walk drains preparation children, then runs; explicit retry preserves deposit
+- added: food-preparation.test.ts :: foreign actor reservation refuses and does not cancel independent walk
+- added: food-preparation.test.ts :: foreign spoon ownership refuses explicitly
+- added: food-preparation.test.ts :: held spoon continuity through cancel at depositing
+- added: food-preparation.test.ts :: held spoon continuity through cancel at mix-entry
+- added: food-preparation.test.ts :: held spoon continuity through cancel at mixing
+- added: food-preparation.test.ts :: held spoon continuity through cancel at returning
+- added: food-preparation.test.ts :: held spoon continuity through cancel at scooping
+- added: food-preparation.test.ts :: held spoon continuity through cancel at taking-held
+- added: food-preparation.test.ts :: held spoon continuity through cancel at to-pot
+- added: food-preparation.test.ts :: held spoon continuity through complete at complete
+- added: food-preparation.test.ts :: held spoon continuity through directive at depositing
+- added: food-preparation.test.ts :: held spoon continuity through directive at mix-entry
+- added: food-preparation.test.ts :: held spoon continuity through directive at mixing
+- added: food-preparation.test.ts :: held spoon continuity through directive at returning
+- added: food-preparation.test.ts :: held spoon continuity through directive at scooping
+- added: food-preparation.test.ts :: held spoon continuity through directive at taking-held
+- added: food-preparation.test.ts :: held spoon continuity through directive at to-pot
+- added: food-preparation.test.ts :: missing beans refuses without mutation
+- added: food-preparation.test.ts :: missing spoon refuses without mutation
+- added: food-preparation.test.ts :: moved support rejects active preparation and preserves partial contents
+- added: food-preparation.test.ts :: partial mixing survives quiescent JSON persistence and explicit retry
+- added: food-preparation.test.ts :: prepared food uses both ordinary servings and preserves their vessels at yaw 0
+- added: food-preparation.test.ts :: prepared food uses both ordinary servings and preserves their vessels at yaw 1.5707963267948966
+- added: food-preparation.test.ts :: two finite bowls prepare same supported pot at yaw 0
+- added: food-preparation.test.ts :: two finite bowls prepare same supported pot at yaw 1.5707963267948966
+- added: food-preparation.test.ts :: wrong pot support, nonempty pot and partial source refuse named arrangements
+- added: meal.test.ts :: cancelled serving retains food conservation, deposited=false
+- added: meal.test.ts :: cancelled serving retains food conservation, deposited=true
+- added: meal.test.ts :: concurrent serving rechecks the shared pot at deposit and conserves its last portion
+- added: meal.test.ts :: serve cannot create a full bowl from less than one serving
+- added: meal.test.ts :: serve refuses to overwrite a nonempty bowl, preserving both contents
+- added: meal.test.ts :: serving rechecks preparation completion at physical deposit without consuming food
+- added: meal.test.ts :: unfinished preparation refuses serving at admission, pot=0
+- added: meal.test.ts :: unfinished preparation refuses serving at admission, pot=0.5
 
 ## Tests not cited by any row or milestone
 
-633 of 960 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+677 of 1004 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1337,6 +1379,42 @@ Compared with the report at `084f492` (2026-10-01T15:46:01.594Z): 2 added, 0 rem
 - `fixture-move.test.ts` pass: a human arriving during lowering pauses held support and resumes safely
 - `fixture-move.test.ts` pass: ground footprint added during lowering cannot strand or release a suspended chair
 - `fixture-move.test.ts` pass: changed resting phase before pickup refuses rather than restoring an obsolete phase
+- `food-preparation.test.ts` pass: two finite bowls prepare same supported pot at yaw 0
+- `food-preparation.test.ts` pass: two finite bowls prepare same supported pot at yaw 1.5707963267948966
+- `food-preparation.test.ts` pass: cancel before deposit retains exact conserved retry progress
+- `food-preparation.test.ts` pass: cancel after deposit retains exact conserved retry progress
+- `food-preparation.test.ts` pass: partial mixing survives quiescent JSON persistence and explicit retry
+- `food-preparation.test.ts` pass: director walk drains preparation children, then runs; explicit retry preserves deposit
+- `food-preparation.test.ts` pass: missing beans refuses without mutation
+- `food-preparation.test.ts` pass: missing spoon refuses without mutation
+- `food-preparation.test.ts` pass: moved support rejects active preparation and preserves partial contents
+- `food-preparation.test.ts` pass: foreign spoon ownership refuses explicitly
+- `food-preparation.test.ts` pass: foreign actor reservation refuses and does not cancel independent walk
+- `food-preparation.test.ts` pass: deterministic recorded preparation and already complete refusal
+- `food-preparation.test.ts` pass: cancel during taking drains owned children and releases preparation resources
+- `food-preparation.test.ts` pass: cancel during to-source drains owned children and releases preparation resources
+- `food-preparation.test.ts` pass: cancel during scooping drains owned children and releases preparation resources
+- `food-preparation.test.ts` pass: cancel during to-pot drains owned children and releases preparation resources
+- `food-preparation.test.ts` pass: cancel during mixing drains owned children and releases preparation resources
+- `food-preparation.test.ts` pass: changed ingredient quantity on retry refuses without silently replenishing it
+- `food-preparation.test.ts` pass: wrong pot support, nonempty pot and partial source refuse named arrangements
+- `food-preparation.test.ts` pass: held spoon continuity through complete at complete
+- `food-preparation.test.ts` pass: held spoon continuity through cancel at taking-held
+- `food-preparation.test.ts` pass: held spoon continuity through cancel at scooping
+- `food-preparation.test.ts` pass: held spoon continuity through cancel at depositing
+- `food-preparation.test.ts` pass: held spoon continuity through cancel at mix-entry
+- `food-preparation.test.ts` pass: held spoon continuity through cancel at mixing
+- `food-preparation.test.ts` pass: held spoon continuity through cancel at returning
+- `food-preparation.test.ts` pass: held spoon continuity through cancel at to-pot
+- `food-preparation.test.ts` pass: held spoon continuity through directive at taking-held
+- `food-preparation.test.ts` pass: held spoon continuity through directive at scooping
+- `food-preparation.test.ts` pass: held spoon continuity through directive at depositing
+- `food-preparation.test.ts` pass: held spoon continuity through directive at mix-entry
+- `food-preparation.test.ts` pass: held spoon continuity through directive at mixing
+- `food-preparation.test.ts` pass: held spoon continuity through directive at returning
+- `food-preparation.test.ts` pass: held spoon continuity through directive at to-pot
+- `food-preparation.test.ts` pass: prepared food uses both ordinary servings and preserves their vessels at yaw 0
+- `food-preparation.test.ts` pass: prepared food uses both ordinary servings and preserves their vessels at yaw 1.5707963267948966
 - `forklift.test.ts` pass: traffic edit placement: held and fork loads block intersecting height bands but allow a parked EUC below a raised load
 - `framing.test.ts` pass: framing: a 16 ft bay gets 2 top plates, 4 rafters, 4 blocks by hand-up to the bracing — exact poses, 0 violations, refusals named, pinned
 - `framing.test.ts` pass: framing: determinism — the same scenario twice gives the same world hash
@@ -1401,6 +1479,14 @@ Compared with the report at `084f492` (2026-10-01T15:46:01.594Z): 2 added, 0 rem
 - `live-link.test.ts` pass: an invalid future corridor cannot replan a climber onto its lower floor
 - `live-link.test.ts` pass: deferred stair cancellation retains its pose and ownership when either chosen landing disappears
 - `make-way-claims.test.ts` pass: LM105: an actor reserved by a waiting parent never receives conflicting ambient make-way submissions
+- `meal.test.ts` pass: unfinished preparation refuses serving at admission, pot=0
+- `meal.test.ts` pass: unfinished preparation refuses serving at admission, pot=0.5
+- `meal.test.ts` pass: serving rechecks preparation completion at physical deposit without consuming food
+- `meal.test.ts` pass: serve refuses to overwrite a nonempty bowl, preserving both contents
+- `meal.test.ts` pass: serve cannot create a full bowl from less than one serving
+- `meal.test.ts` pass: concurrent serving rechecks the shared pot at deposit and conserves its last portion
+- `meal.test.ts` pass: cancelled serving retains food conservation, deposited=false
+- `meal.test.ts` pass: cancelled serving retains food conservation, deposited=true
 - `navigation.test.ts` pass: perf: grid build + long route budget
 - `navigation.test.ts` pass: a failed route names the people walling it in (nameObstacles); a structural failure names none
 - `object-capabilities.test.ts` pass: display and lectern have physical dimensions, distinct capabilities and a usable presenter stand slot

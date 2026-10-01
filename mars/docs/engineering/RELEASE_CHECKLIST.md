@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 33 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 34 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -1390,3 +1390,72 @@ Clean full gate:281unit PASS;943engine PASS,6skip11TODO;164browser PASS,7skip; l
 Public verification:21routes/521assets/677requests, exact computer/credit SHA, GLB range/auth; all36 MCP and director9steps PASS.12public browser checks PASS;20reviewed room views and controls/mobile/night/EUC/Reach/build captures inspected. Additional `YEAR_BUILD_FULL=1` public automatic Play2/2 PASS19.1min: first-bay201steps/24parts, whole555steps/66parts/123818ticks, zero violations, same identity/support and canonical pose. Both final captures personally inspected. Original W51 legacy FIXMEs stay excluded; skeleton completion does not certify plywood/roof or fine anatomy.
 
 Main integration preserves48other owner pending paths byte/status/mode/mtime;8superseded selected originals retained with SHA audit in `viewer/.cloudflare/main-preservation-release33`.8large objects unchanged/0new R2 writes. Source-identified limitation: Aerial after EUC may leave rider following; WASD or Go inside releases it. Bounded handoff fix/regression queued with next meal batch, not a camera redesign. Whole Mars MVP40–70working hours, medium-low confidence, assumes bounded preparation/sleep and combined continuity. Continue immediately with saved preparation/output conservation, then supported sleep/unfinished-purpose day; no Eden expansion.
+
+
+## Production deploy 34 (2026-10-01): proposed2027 and conserved cold preparation
+
+Verified100% `515f3742-d764-4804-b545-f32b2e3cc22d` at20:47:17.403580Z from
+exact clean functional `511101939f52a1d77814d4682331d5d125aee04e`.
+Rollback33 `01437b0b-09de-48bc-99bb-ace4c03642bb` was independently confirmed100%
+before publication. Proposed2027 is online at
+https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2027 and
+https://mars-campus-2026.<workers-subdomain>.workers.dev/?year=2027; default2026 stays retained.
+Cold preparation: https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=cold-preparation.
+
+| Required validation | Executed result |
+|---|---|
+| Lint / both TypeScript projects |PASS/zero warnings|
+| Unit |286PASS/0fail/0skip/0TODO|
+| Engine |987PASS/0fail/6documented skips/11TODO|
+| Browser full gate |168PASS/0fail/7documented skips;38m42.5s|
+| Flagshiptake / determinism |PASS/unchangedb746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3|
+| LocalMCP / originalidleperf |all36PASS / exact111.961ms,corridor54.994ms peak;originallimits/pinsPASS|
+| PublicactualPlay /2027 |preparation2/2PASS27.8s+27.5s;2027 2/2PASS8.9s+24.3s|
+| Publicpresentation |freshunchanged3/3PASS3.5min, includingEUC→Aerial handoff|
+| PublicHTTP /MCP /director |522assets/24routes/696requests;all36/9stepsPASS16861ms|
+
+Clean combined gate `.cloudflare/gate/2026-10-01T20-02-20-385Z/report.json`
+records5111019,dirtyfalse,oktrue,interruptednull,cleanupnull. Sixengine skips/11TODO
+retain extraction and parkedW51 historical/fullA+B/kitchen/west-house diagnoses;
+sevenbrowser skips retain parkedquestioncaptures/chapterbuilds and bothlegacyW51
+FIXMEs. Current-source firstbay/whole-house automaticPlay throughs0021 and completion
+executePASS in this gate. Release33 fullautomatic publicPlay2/2 proof remains prior
+coverage; no new34construction publicbrowser run or plywood/roof certification.
+
+Two finite ingredient bowls become exactly two prepared servings through the same
+supported pot and heldspoon. Partial deposits survive interruption; explicit retry
+continues the same objects. Ordinary take/serve/eat/put consumes bothservings without
+filled-bowl overwrite, insufficient-portion creation or last-portion duplication.
+Bothtable orientations pass actualPlay, Reset/Step and threereset resource lifetimes.
+Scope is one hypothetical cold batch at an authored groundtable; no heat/chopping,
+finefinger physics, historical recipe or active-session reload guarantee. Depleted
+pot HUD may still sayreadyforserving despite0remaining and disabledservecontrols;
+bounded readonly wording polish is deferred. Proposed2027 retains explicit concept,
+fittedscale/unassignedcamp and drainage labels; no factualbuilt2027 claim.
+
+First publicbrowser attempt retained4PASS and3failures during network loss:
+yearnavigation received emptyURL, thenERR_NETWORK_CHANGED andERR_INTERNET_DISCONNECTED.
+Read-only HTML/assets200 preceded one fresh unchangedpresentation retry3/3PASS.
+No assertions/deadlines/source/pins/baselines were weakened. Initial log/traces remain
+in `.cloudflare/release34-public-browser.log` and
+`.cloudflare/test-results-release34-production`; fresh results in
+`.cloudflare/release34-public-presentation-retry.log` and
+`.cloudflare/test-results-release34-presentation-retry`.
+
+Normalprebuild camera suite,prepare/build/dry/deployPASS:606dryassets,
+8969.41KiB/1570.26gzip,19newassetuploads,161msstartup. Eightlargeasset manifests and
+hashkeys exactly unchanged; priorverified receipt reused,8skips/0R2writes. Frozen
+CAD/browser675f4beb/36ad67f retained. Equivalentcurlgzip,deflate originalsmokeassertions
+PASS; additionalLabroute/2027JSON and exactcomputer139184B+credit813BSHA match.
+GLBrange/auth/method assertionsPASS. NativeNodeHTTP timeout was not rerun;
+IPv4first Nodeoptions retained for originalMCP/director. No newtail sample or old25
+resourcefailure diagnosis claim. All10prep+2public2027+6freshpresentation PNGs
+personally inspected; paths in `release34-network-receipt.json`.
+
+Guarded mainfunctionalFF ce1c8af→5111019 preserved all48otherownerpending paths,
+status/SHA/bytes/mode/mtime/staged0; zero changedcandidate overlap. Originalselected8
+backups retained in alumni `main-preservation-release33`; newbefore/after34receipts
+in main `.cloudflare/main-preservation-release34`. LocalGit only; noDNS/remotechange.
+Sleep and prepared-day drafts remain separate/excluded. WholeMarsMVP40–70working
+hours,medium-low confidence; next supported sleep and connected unfinishedpurpose
+proof, no MarsMVP completion or Eden expansion claim.

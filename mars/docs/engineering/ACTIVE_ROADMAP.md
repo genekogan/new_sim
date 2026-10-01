@@ -17,28 +17,34 @@ clean full gate and production verification: complete in release33, functional7a
 Return immediately to the queue below after publication. This is presentation work,
 not a new activity/camera/animation subsystem or a change to the Mars/Eden boundary.
 
-## Current active queue (release33 verified)
+## Current active queue (release34 verified)
 
-Online: physical two-player tabletop chess with legal choices, stable same-token
-captures, interruption/restoration and player handoff; retained reading/bookmarks,
-audible music/listeners, classroom/setup/shared walking and historical31 museum.
-Downhill feet retain anatomical left/right. Current rigs remain the MVP boundary.
+Online: proposed2027 open-rack concept with explicit proposal labels and2026 default;
+physical cold two-ingredient preparation, retained deposits and two ordinary conserved
+servings; physical tabletop chess, reading/bookmarks, audible music/listeners,
+classroom/setup/shared walking and historical museum. Aerial releases EUC follow.
+Current rigs remain the MVP boundary; downhill feet retain anatomical left/right.
 
-1. **Playable:** bounded cold meal preparation with two finite ingredients and a
-   held utensil, persistent partial preparation, interruption/resumption and real
-   shared-food output. Integrated source candidate passes66focused checks and both actual Play layouts with inspected captures; rebased33 plus presentation handoff passes5browser journeys. Full combined gate/publication remain required; not shipped.
-2. **Engineering:** food conservation at admission and actual deposit, preventing
-   filled-bowl overwrite, insufficient-portion creation and concurrent-last-portion
-   duplication. Combined66focusedPASS includes incomplete-output admission/deposit refusal and two ordinary conserved servings. Full combined gate/publication remain required. This is saved work, not shipped.
-3. **Object/continuity:** supported lie/sleep/wake with a bounded current-rig adapter,
-   physical clearance, ordinary approach, coherent interruption and retained purpose.
-   Sol6.1 viability draft; no sleep claim yet. Then connect independent purposes
-   through gathering/walk/food/rest and return across the supported environments.
+1. **Playable:** supported lie/sleep/wake, then one connected prepared-day journey
+   retaining the same unfinished purpose across gathering/walk/food/rest and return.
+   Sleep uses a bounded current-rig adapter, physical clearance, ordinary approach
+   and coherent interruption. Its focused prototype remains unshipped; actual Play
+   validation is separate. Prepared-day core9805632 has12focusedPASS5.708s;
+   readonly depletion-label584ef5b is source-only. No combined/publicday claim.
+   Cold preparation and cross-experience serving conservation are verified in34
+   in both authored groundtable orientations; keep their physical contracts intact.
+2. **Engineering:** reuse structured exact-source engine test proof in the evidence
+   report to avoid rerunning the full engine suite after a clean gate. Existing
+   `--gate` imports only external checks; this release repeats the179.6-second engine
+   gate in `npm run evidence` (155.5seconds). Isolated `engine-evidence-reuse` starts
+   at5111019; no implementation or verification yet. Keep source/test identity and
+   missing-map failures strict. This bounded improvement runs beside sleep→day;
+   it is not a legacy-row audit or a weakened release gate.
 
-WholeMVP remaining **40–70 working hours**, medium-low confidence: real preparation,
-sleep and their combined continuity/disruption proof remain uncertain. October5
+WholeMVP remaining **40–70 working hours**, medium-low confidence: supported sleep and combined continuity/disruption proof remain uncertain;
+bounded preparation and two conserved servings are now verified online. October5
 requires bounded interactions; escalate if repeated anatomy or broader locomotion
-redesign becomes necessary. Source helpers are idle; historical validation and release33 presentation are complete. Camera is independent and unchanged.
+redesign becomes necessary. Proposed2027 and Aerial/EUC handoff are verified in release34; supported sleep and prepared-day drafts remain separate/excluded. Camera is independent and unchanged.
 Older dated entries below preserve provenance; this queue owns current priority.
 
 ## Required supported experiences and limits
