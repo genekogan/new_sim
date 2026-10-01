@@ -6,6 +6,29 @@ high-medium engineering / 20% polish, evidence and maintenance**; retain the
 50/30/20 product balance. The following is a proposed bounded acceptance contract,
 not a claim that unimplemented features work.
 
+## Current active queue (release30)
+
+Verified online: reading/bookmarks and computer music with0–2independent listeners,
+actual sound/pause/interruption/resumption, retained classroom/setup/sharedwalking.
+See RELEASE_CHECKLIST30 for executed checks and exclusions. Downhill foot correction
+is preserved; currentrig adapters remain the MVP boundary.
+
+1. **Playable:** bounded two-player chess at a real table, using ordinary token
+   handling, legalturns/captures, live choices and physical cleanup. Rules/physical
+   tests are saved; UI/captures/fullcombinedgate remain required before exposure.
+2. **Engineering:** stable token/support/rollback ownership across composite transfers
+   and useful failed-cleanup recovery; re-use existing hierarchical claims/handoff,
+   no alternate mover or universal gameframework.
+3. **Next breadth/continuity:** simple real mealprep and sleep, then link independent
+   reading/work, gathering, walk, food/rest and return. Existing preparedfood/rest
+   is not proof of preparation/sleep. Historicalready work integrates only after
+   combinedgate; camera unchanged and never blocks this queue.
+
+WholeMVP remaining40–70workinghours, medium-low confidence under bounded interactions;
+October5 target needs scope escalation if repeatedphysical/anatomical prerequisites
+appear. Chess/equipment drafts are not shipped features. Root works serially while
+historicalowner uses the3sharedhelper slots.
+
 ## Required supported experiences and limits
 
 - Gathering: existing Mars classrooms with 4 or 8 initial audience guests, host/two

@@ -72,3 +72,13 @@ Increase only the serialized suite's watchdog30→32min. Individual120s deadline
 assertions, original performance ceilings, tolerances, expected outcomes and all
 exclusions remain unchanged. This allows complete required validation; it is not
 a green-gate claim. Full clean combined gate remains pending before integration.
+
+
+## Verified release30
+
+Clean4793296 combinedgate GREEN207unit/915engine0fail6skip11TODO/152browser0fail7skip,
+bothTSc/lint/take/unchangedb746/all36localMCP. Originalidleperformance/pins unchanged.
+Published100%da02879a at2026-10-01T12:08:59.975443Z; exact receipt and limitations
+in RELEASE_CHECKLIST30. Root actualpublicmusic+reading2/2PASS73s, all6PNGs inspected;
+audiblePlay/silentPause/listenerdeparture/same-score resume/nine Reset contexts and
+retainedreadingbookmarks pass. No current-rig redesign or acoustic-instrument claim.

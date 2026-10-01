@@ -1277,3 +1277,60 @@ has not been regenerated in this receipt-only window; original partialflags rema
 Music is a separate focused draft, chess/mealprep/sleep unstarted. Whole MVP40–70
 workinghours medium-low confidence, existingrig/bounded interactions; targetOct5
 requires surfacing newphysicalprerequisites early rather than expanding silently.
+
+
+## Production deploy 30 (2026-10-01): computer music and independent listening
+
+Verified100% `da02879a-bdf1-4896-975a-066eedb1da2e` at12:08:59.975443Z from
+clean `479329689780bf30079bdc4bb54f2d35396fc006`; rollback29
+`4fc6d1d6-2eba-494e-afa3-1a6a78a4ea85`. Public entry:
+https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=computer-music.
+
+| Required validation | Result |
+|---|---|
+| Lint / both TypeScript projects | clean |
+| Unit |207pass /0fail /0skip /0TODO |
+| Engine |915pass /0fail /6documented skips /11TODO |
+| Browser |152pass /0fail /7documented skips;29m56s |
+| Flagship take |unchangedPASS |
+| Determinism probe |10901ticks; unchangedb746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local simulation |all36MCP tools/isolation/auth/body/method checksPASS |
+| Idle performance |originalpins/ceilingsPASS; exactpeak114.329ms / corridor51.075ms |
+| Published HTTP |500assets /19routes /642requests, exactcomputer+creditSHA/range/authPASS |
+| Published control plane |FIRSTall36MCP/isolation/authPASS; FIRSTdirector9steps13451msPASS |
+| Published actualPlay |music+reading2/2PASS; all6captures inspected |
+
+Clean combined report: computer-music/viewer/.cloudflare/gate/2026-10-01T11-22-37-536Z/report.json,
+HEAD4793296,dirtyfalse,oktrue,interruptednull,cleanupnull. Guarded main functionalFF
+preserved99ownerpendingpaths/status/SHA/staged0. Browser aggregate watchdog32min
+accommodates the extra required39.6s case; individual deadlines/assertions/outcomes,
+performance ceilings, pins, tolerances and exclusions unchanged.
+
+Now initiate original electronic music at the existing usable computer, enable
+sound, hear simulated note progression, pause/mute, direct one listener away,
+interrupt and resume the same score for the remaining audience. Two groundtable
+orientations and0–2listeners have focused coverage; one exposedpreset. Current
+computer/rest poses and bounded gaze only: no acoustic-instrument/fingerchoreography,
+newrig/IK/library or active-session restoration claim. Safe quiescent bookmarks
+persist; explicit same-person/score/task resumption still runs normal admission.
+Reading/bookmarks, shared walk and previous stair ankle repair remain unchanged.
+
+Build/dry581assets8185.77KiB/1432.80gzip,23new/524existinguploads,104msstartup.
+Eightlargeobjects exactly unchanged/8skipped/0R2writes; frozen browsercache675f4beb/
+36ad67f7 retained. Selectedcomputer139184B andcredit813B match prior verified SHA.
+Equivalentcurl gzip,deflate original checks PASS; nativeNodeHTTP not rerun.
+Safe147sampled host outcomes allok/exact30version,maxCPU1145/maxWall1326ms;
+this is not a complete trace, resource-ceiling guarantee or diagnosis of old25failure.
+Actual public music41.3s/reading31.7s Play verifies nonzeroaudio/silentPause,
+independent departure, safe interruption/resumption, nine opened/nine closed contexts
+across Reset, reading firstStep/bookmark/same-book completion and0invariants.
+Root inspected all6PNGs/contactsheet in release30-production. Camera/stair public
+proof remains release27; this gate passes their retained tests, not new30publiccases.
+
+Ignored receipts: mars-mvp-release30/viewer/.cloudflare/release30-network-receipt.json,
+curl-30-ae/receipt.json, deploy/status/build/upload/dry/perf/MCP/director/sanitizedtail
+and production-music-reading.log. Chess draft and historical e029f90 are preserved,
+unmerged and excluded. Full historical combined validation remains its prerequisite.
+Generated legacy EVIDENCE provenance flags remain explicit; no backlog completion
+claim. WholeMarsMVP40–70workinghours, medium-low confidence with boundedchess,
+mealprep/sleep/currentrig scope; October5 requires early tradeoffs for newprerequisites.
