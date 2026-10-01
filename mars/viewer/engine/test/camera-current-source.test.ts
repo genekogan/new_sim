@@ -35,7 +35,9 @@ test('current-source file and worker refuse missing sink and resolve actual coun
   if (!compiled.result.ok) {
     assert.equal(compiled.result.diagnostics[0].code, 'camera.direct.uncorrectable');
     assert.match(compiled.result.diagnostics[0].message, /occluded/);
-    assert.ok(compiled.result.diagnostics[0].subjects?.includes(id));
+    // Finished occupied geometry now exposes the retained plywood frontage as the occluder.
+    assert.deepEqual(compiled.result.diagnostics[0].subjects,['chiba-plywood-wall-853f6846','chiba-plywood-wall-853f6846.up']);
+    assert.ok(compiled.result.diagnostics[0].subjects.every(subject=>scene.obstacles.some(o=>o.id===subject)));
   }
   assert.equal(compiled.track, undefined, 'physical refusal does not create a fictitious valid track');
   const worker = compileTakeCamera({ take, scene, directions, opts: {} });

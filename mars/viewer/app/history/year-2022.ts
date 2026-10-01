@@ -5,6 +5,7 @@ import {stair2022, solarRow2022, TRAILERS_2022, ROOF_TOP_2022} from './photograp
 import {YEAR_NORTH_AZIMUTH_OFFSET, NORTH_AZIMUTH_OFFSET} from '../../engine/env/sun';
 
 import {roofRails, classroom} from './historical-helpers';
+import {reconcile2022Source} from './details-2022-reconciliation';
 export function make2022(k:Kit){
  // As-built pinwheel: DJI_0829 overhead, DJI_0806 orbit, March rooftop panorama and aerial-03.
  // Four measured roof footprints, each with an end stair. Corner passages stay open.
@@ -208,5 +209,7 @@ export function make2022(k:Kit){
   q.position.z=scale*(Math.sin(tilt)*x+Math.cos(tilt)*z);
   q.rotation.y-=tilt;
  }
+
+ reconcile2022Source(k);
 
 }

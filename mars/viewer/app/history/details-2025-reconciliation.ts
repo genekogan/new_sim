@@ -46,7 +46,7 @@ export function add2025Reconciliation(k:Kit,chiba:T.Group,free:T.Group,body:T.Gr
   k.box(occupied,'Auditorium loose chair perforated-back silhouette',[.45,.30,.045],[x,y+.75,z+.20],'#4f5854',layers.detail);
   for(const xx of [x-.19,x+.19])for(const zz of [z-.16,z+.16])k.rod(occupied,'Auditorium loose chair leg',[xx,y,zz],[xx,y+.43,zz],.014,'#444d49',layers.detail);
  }
- const clothGeom=new T.PlaneGeometry(3.36,5.5,12,16);clothGeom.rotateX(-Math.PI/2);const pos=clothGeom.getAttribute('position');for(let i=0;i<pos.count;i++){const u=(pos.getX(i)+1.68)/3.36,v=(pos.getZ(i)+2.75)/5.5;pos.setY(i,4.66-.44*Math.sin(Math.PI*u)*Math.sin(Math.PI*v));}clothGeom.computeVertexNormals();
+ const clothGeom=new T.PlaneGeometry(3.36,5.5,12,16);clothGeom.rotateX(-Math.PI/2);const pos=clothGeom.getAttribute('position');for(let i=0;i<pos.count;i++){const u=(pos.getX(i)+1.68)/3.36,v=(pos.getZ(i)+2.75)/5.5;pos.setY(i,4.66-(.30+.75*Math.pow(Math.sin(3*Math.PI*v),2))*Math.sin(Math.PI*u));}clothGeom.computeVertexNormals();
  const cloth=new T.Mesh(clothGeom,k.photo('/history/2025/reconciliation/auditorium-ceiling-pattern.webp'));cloth.position.z=-.5;k.tag(occupied,cloth,'Auditorium photographed patterned ceiling textile',layers.detail);cloth.userData.walkNoCollision=true;
  for(const x of [-1.68,1.68])for(const z of [-3.25,2.25])k.rod(occupied,'Auditorium cloth fitted ceiling tie',[x,4.66,z],[x,4.83,z],.004,'#c9c2aa',layers.detail).userData.walkNoCollision=true;
  const bulbMaterial=new T.MeshStandardMaterial({color:'#ffe3a4',emissive:'#ffc475',emissiveIntensity:.7});
@@ -77,7 +77,7 @@ export function add2025Reconciliation(k:Kit,chiba:T.Group,free:T.Group,body:T.Gr
   const shape=new T.Shape(polygon),geo=new T.ShapeGeometry(shape);geo.rotateX(-Math.PI/2);
   const pos=geo.getAttribute('position'),uv=geo.getAttribute('uv');
   for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=-pos.getZ(i),den=H[6]*x+H[7]*z+1;uv.setXY(i,(H[0]*x+H[1]*z+H[2])/den/1920,1-(H[3]*x+H[4]*z+H[5])/den/1080);}
-  const mesh=new T.Mesh(geo,k.photo('/history/2025/reconciliation/freeside-roof-native.webp'));mesh.position.set(-BAY,2.512,0);k.tag(free,mesh,'Freeside actual blue-edged pentagon roof painting',layers.roof);mesh.userData.walkNoCollision=true;mesh.userData.source='c44577 Feb9 native photograph; five center-corner projective fit, nominal1.1m center diameter and left-roof placement fitted';
+  const mesh=new T.Mesh(geo,k.photo('/history/2025/reconciliation/freeside-roof-native.webp'));mesh.position.set(-BAY,2.512,0);k.tag(free,mesh,'Freeside actual blue-edged pentagon roof painting',layers.roof);mesh.userData.walkNoCollision=true;mesh.visible=false;mesh.userData.historicalQuarantine=true;mesh.userData.walkNoCollision=true;mesh.userData.source='QUARANTINED: c44577 uploaded Feb10 2025 with caption in original context, followed by retrospective Chiba last-year question. Capture date/level and 2025 Freeside location not established. Former fitted roof placement retained invisibly for stable-ID inventory, not historical assertion.';
  }
  // Later occupied rear view c46125 shows the round window HIGH in the
  // flower-painted black wall, rather than at door-handle height. Aperture

@@ -1,0 +1,37 @@
+# Historical accuracy integration — October1,2026
+
+Status: source checkpoint; browser/full gate/publication pending. Preserve already deployed2026 checkpoint31 separately. Paired specialists worked with separate year leaves and original owner fixtures; root controls shared rendering, catalogs and deployment. No raw media modified, no paid model calls.
+
+## Supported corrections
+
+|Year|Observed detail reconciled|Precision limits|
+|---|---|---|
+|2026|Mimos L/poster wall/west–east couch/clothes, kitchen perimeter/hatch/blue doorway, dining bus seats, receiver-mounted small LCDs/plain pads and opposite-room paint, flush projection, supported stairs/roof, finished Freeside/Bodywork/CoLab, Tool library/workshop/terrace, OG and small furnishings/vehicles|66references and latest8critique attachments archived. CAD/photo fitted dimensions;2025classroom image does not establish2026position. Yacht lower donor contours differ. Portable inventory is representative.|
+|2025|Chiba native frontage/inside, Freeside pods/roof, occupied Tool workshop/library/upper native paint, scissor linkage, Bodywork communal rooms/cloth/native floral sofa, differentiated vehicles; corrected van parking clear of both Bodywork and Tool|Mixed completed stages, photograph perspective/room allocation fitted; roof pentagram source retrospectively refers to prior year and is quarantined; no unsupported transfer. Final rv10 shift0.28m yields nearest0.510488m clearance.|
+|2024|Finished Freeside real doors/windows/native murals/24near-ground PV/rounded tents; source blue steel, east native arches, gallery/dojo/pink cloth/kitchen grate/solarium furniture; courtyard lounge/IBC|January plan combined with February/March finish. West hoisted cabin recollection preserved; strict dated retrieval did not locate its particular form/bay. Terrace elevations and courtyard placements fitted. Settled occupied solarium and restored view inspected.|
+|2023|Rotapolis red fridge/triple cooking fixtures/black freezer and glazed door, Chiba partition/bar/auditorium/classroom equipment, native shelter/cloth, distinct fleet/lamps/mirrors/slideouts, blue toilets|Relative inventories observed; exact plan coordinates fitted. Hoisted west-bay cabin topology retains prior source/user evidence; cannot claim surveyed proportions. Actual freezer clears floorbeam after20cm depth correction.|
+|2022|Four occupied rooms: Cahuilla triple sink/red mini fridge/pantry/water, study library/books/chairs, Huaqiangbei DJ, Chatsubo bar/open stepped roof;14distinct vehicles/seven grounded trailers/pickup IBC, native paint and open timber forms|Named roof/photo correspondence and PV count conflict unresolved; preserve Gene names/quadrants and source IDs. Hidden bay assignments and vehicle identities fitted. Recorded construction takes remain separate from current occupied rendering.|
+|2021|Higher silver canopy/bare corridor, partial rooms/terraces, native flower/honeycomb parallel trailer, utility IBC/sink/hollow oval bath, library books/pink cushions/whiteboards, cowork furniture, schoolbus/cars/differentiated trailers|January photographs and dense aerial timestamps retained; canopy seasonal phase, exact movable inventory and hidden interiors fitted. No dated Rotapolis invented.|
+|2020|Portal roof level/taller guardframes, five observed stair tiers eachside and clear lounge,72screens, tilted8PV/native flower container, workshop/MCDA real aperture/backbar/native painted strip, six differentiated trailers/motorhomes plus van/SUV, small timber installations|March9/17geometry with March30Forest lighting, Febkitchen detail. No confirmed2020IBC cage fabricated. RV identity/paint unseenfaces, exact stair structure and small installation positions fitted.|
+
+## Combined source verification
+
+278unit tests pass. All original owner/kind IDs retained; new source IDs are explicit, unique and validated. Root corrected unpublished2020blackSUV assembly to lower-case ID without affecting any original. Visible-only prop tests inspect real support vertices; quarantined ID-bearing geometry stays preserved but does not count as evidence. Vehicle clearance checks inspect actual structural buildings, not standalone IBC containers.
+
+Shared idle displays no longer borrow2020Portal imagery for later years. The screen adapter restores original untextured colour after test/talk/off/reset; actual adapter behavior passes. Adaptive renderer now chooses drawing-buffer resolution before drawing; browser resize/cut-reset regression passed; actual resize yielded64pixel colours and both occupied chair views were inspected. No extra production proof hook.
+
+Six canonical scenes and obstacle catalogs regenerated from combined source. Current-source2024camera test still refuses an impossible shot, now naming the actual retained plywood wall occluders; source-era goldens and physics pins remain unchanged. Current canonical extraction and camera immutability25checks pass. Full engine/e2e/idle performance/build/public verification remain required. Original failed preflight logs retained; no green assertion substitutes for photographic acceptance.
+
+## Recovery
+
+Frozen release branch codex/historical-accuracy-2026 contains verified source6451794 and receipt metadata e53e5b6/1aa6f81. Integration worktree historical-integrated-20261001 preserves all six paired source batches. Source hashes, exact originals and rejected/accepted captures are saved under docs/media/reconstruction/campus-history/ and2026-campus/review-20260929/. Main has56preserved unverified variants: never overwrite them with a broad copy/reset.
+
+## Occupied hierarchy repair
+
+First combined full-engine run:939PASS/2FAIL/6skip/11TODO. Both real failures were current2022Cahuilla construction: newly observed water-dispenser furniture had separate nested room ownership, but the prebuild scene discarded its parent relationship and left the furniture in the crew target. Preserve this RED report.
+
+Optional actual assembly-parent provenance now survives extraction and loading. The hypothetical prebuild staging view removes only the selected parent and explicit descendants. Canonical occupied furniture/IDs/geometry stay unchanged; unrelated neighboring obstacles remain byte-identical. Source-era files without parent data retain their old behavior. Engine owner approved this boundary.
+
+Focused actualfirstbay+whole skeleton now2/2PASS72.39s with existingstrict identity/support/stancecleanup ands0021 completion assertions; hierarchy/neighbor/canonicalimmutability/legacy/transitivity2/2PASS. TSc/lintPASS. Fullcombined engine rerun still required before source commit; no physics pin changed.
+
+Combined engine rerun after hierarchy repair:943PASS/0FAIL/6documentedskip/11existingTODO,156.20s. Combined units278PASS/0FAIL; TSc and lint pass. No new physics golden pins; originalRED remains preserved. Browser adaptive/settledsolarium1PASS;16historical default/plan/framed cases PASS and actual22PNG contact sheet inspected. Six canonical content hashes match deterministic re-extraction. Full clean gate and publication remain pending.

@@ -22,10 +22,11 @@ const memo=new Map(),current=year=>{if(!memo.has(year))memo.set(year,idsOf(build
 
 test('history ids: every year rebuilds with identical, unique, semantic ids',()=>{
  for(const year of YEARS){
-  const a=current(year),b=idsOf(build2(year));
+  const scene=build2(year),a=current(year),b=idsOf(scene),named=new Map();
+  scene.traverse(o=>{if(o.userData.named_id)named.set(o.userData.component_id,`${o.userData.assembly_id}-${o.userData.named_id}`);});
   assert.deepEqual(b,a,`${year} ids differ between builds`);
   assert.equal(new Set(a).size,a.length,`${year} has duplicate ids`);
-  for(const id of a)assert.match(id,/^(person-\d+|[a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign|solarium-door))$/,`${year}: ${id}`);
+  for(const id of a){if(named.has(id)){assert.equal(id,named.get(id));assert.match(id,/^[a-z0-9]+(?:-[a-z0-9]+)*$/,`${year}: malformed explicit source ID ${id}`);continue;}assert.match(id,/^(person-\d+|[a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign|solarium-door))$/,`${year}: ${id}`);}
  }
 });
 test('history ids: inserting a component early in 2021 leaves every original id intact',()=>{

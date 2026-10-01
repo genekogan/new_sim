@@ -40,6 +40,15 @@ export function extractYear(scenes, year) {
   root.updateMatrixWorld(true);
   const manifest = scenes.sceneManifest(root, year);
   const asmConf = new Map();
+  const parents = new Map();
+  root.traverse(o=>{
+    const id=o.userData.assembly_id;
+    if(!id||o.userData.layer||o.userData.component_id)return;
+    for(let p=o.parent;p;p=p.parent){
+      const parent=p.userData.assembly_id;
+      if(parent&&parent!==id&&!p.userData.layer&&!p.userData.component_id){parents.set(id,parent);break;}
+    }
+  });
   const tris = new Map(); // component id → { meta, arr }
   const v = new T.Vector3();
   root.traverse((o) => {
@@ -64,7 +73,7 @@ export function extractYear(scenes, year) {
   const components = [...tris.values()].map(({ arr, ...m }) => ({ ...m, tris: Float64Array.from(arr) }));
   const assemblies = manifest.assemblies
     .filter((a) => !SKIP_ASSEMBLIES.has(a.id) && asmConf.has(a.id))
-    .map((a) => ({ id: a.id, name: a.name, confidence: asmConf.get(a.id) }));
+    .map((a) => ({ id: a.id, name: a.name, confidence: asmConf.get(a.id), ...(parents.has(a.id)&&asmConf.has(parents.get(a.id))?{parent:parents.get(a.id)}:{}) }));
   return buildYearFile({
     year,
     generator: 'deploy/history-scenes.mjs',

@@ -1157,9 +1157,8 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       keepCameraAboveGround(camera, walker.active ? undefined : orbit.target);
       batches?.setExcluded(selection);
       batches?.setActive(true);
-      renderer.render(scene, camera);
-      // Test hook for viewer/e2e (see e2e/README.md): scene loaded + frames rendered since.
-      if (root) testHook.frames++;
+      // Changing the drawing-buffer resolution clears it. Choose the budget
+      // before drawing so every presented frame contains the scene.
       budgetFrames++;
       if (now - budgetStart > 5000) {
         if (budgetFrames < 150 && renderer.getPixelRatio() > 0.8) {
@@ -1172,6 +1171,9 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         budgetFrames = 0;
         budgetStart = now;
       }
+      renderer.render(scene, camera);
+      // Test hook for viewer/e2e (see e2e/README.md): scene loaded + frames rendered since.
+      if (root) testHook.frames++;
     };
     let yearTrack: import('../engine-view/take-replay').ActiveTrack | null = null;
     const testHook = {

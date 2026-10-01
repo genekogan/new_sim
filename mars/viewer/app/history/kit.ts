@@ -37,7 +37,8 @@ const isAssembly=(o:T.Object3D)=>Boolean(o.userData.assembly_id&&!o.userData.lay
 // that surface to their unchanged tops; rigid props (crates, fridge) rest on it; trailers stand on the ground.
 // Mars 2022 is HELD at its pre-W46 placement: its furniture is in the year-build's static scene (the east-house fork
 // keeps every other 2022 obstacle within 35 m), so moving it moves the construction pins (first bay, skeleton, A+B)
-// and the recorded 2022 takes. Seat it together with the next year-build re-pin (docs/engineering/PROGRESS.md, W46).
+// and the recorded 2022 takes. The 2026-10-01 source leaf now seats the occupied 2022 model explicitly;
+// this generic helper remains held so previously recorded build phases are not silently rewritten.
 // 2026 (details-2026.ts) is held too: its tables stand in the CAD model's rooms, whose floors this Kit cannot see.
 export const SEAT_HELD_YEARS:ReadonlySet<number>=new Set([2022,2026]);
 const SUPPORT_LAYERS=new Set([layers.floor,layers.steel,layers.roof]);
@@ -140,8 +141,10 @@ export class Kit {
  table(g:T.Object3D,x:number,z:number,w=1.8,d=.75,y=.78){this.box(g,'table top',[w,.045,d],[x,y,z],'#d6d0bc');for(const a of [-1,1])for(const b of [-1,1]){const lx=x+a*(w/2-.12),lz=z+b*(d/2-.1),base=this.seat?this.surface(g,[[lx,lz],[lx-.022,lz],[lx+.022,lz],[lx,lz-.022],[lx,lz+.022]],y-.0225):.1;this.rod(g,'table leg',[lx,base,lz],[lx,y,lz],.022);}}
  screen(g:T.Object3D,x:number,y:number,z:number,w=1.3,angle=0,height=w*.5625){
   const s=this.box(g,'screen bezel',[w,height,.075],[x,y,z],'#17191c');s.rotation.y=angle;
-  const texture=this.photo('/2020/screens/portal-screen-02.webp');const map=(texture as T.MeshStandardMaterial).map;
-  const m=new T.MeshBasicMaterial({map,toneMapped:false});const o=new T.Mesh(new T.PlaneGeometry(w-.05,height-.05),m);o.position.set(x+Math.sin(angle)*.041,y,z+Math.cos(angle)*.041);o.rotation.y=angle;this.tag(g,o,'display content',layers.detail,'screen');
+  // The native Portal photograph belongs to2020. Other years start with
+  // an unlit physical display; shared channels may explicitly show content.
+  const map=this.year===2020?(this.photo('/2020/screens/portal-screen-02.webp') as T.MeshStandardMaterial).map:null;
+  const m=new T.MeshBasicMaterial({map,color:this.year===2020?'#ffffff':'#17232b',toneMapped:false});const o=new T.Mesh(new T.PlaneGeometry(w-.05,height-.05),m);o.position.set(x+Math.sin(angle)*.041,y,z+Math.cos(angle)*.041);o.rotation.y=angle;this.tag(g,o,'display content',layers.detail,'screen');
  }
  kitchen(g:T.Object3D,w:number,d:number,year=this.year){
   for(const x of [-w/2+.42,w/2-.42]){this.table(g,x,0,.7,d-1,.91);for(let i=0;i<6;i++){const cz=-d/2+.9+i*.68,cy=this.seat?this.surface(g,Kit.footprint(x,cz,.43,.45),.54)+.16:.38;this.box(g,'stored food crate',[.43,.32,.45],[x,cy,cz],['#92744e','#d2c3a2','#646b5a'][i%3]);}}

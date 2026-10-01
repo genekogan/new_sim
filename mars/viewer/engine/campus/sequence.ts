@@ -87,7 +87,12 @@ export function yearBuildScene(base: CampusScene, assembly: string, centre: Vec2
   ];
   const box = { c: [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] as Vec2, half: [(bounds[2] - bounds[0]) / 2, (bounds[3] - bounds[1]) / 2] as Vec2, yaw: 0 };
   const inBox = (o: CampusObstacle) => Math.abs(o.obb.c[0] - box.c[0]) <= box.half[0] + Math.max(...o.obb.half) && Math.abs(o.obb.c[1] - box.c[1]) <= box.half[1] + Math.max(...o.obb.half);
-  const obstacles = base.obstacles.filter((o) => o.assembly !== assembly && inBox(o));
+  // Attached occupied rooms/furniture are not present before their parent is built.
+  // Only explicit source hierarchy is used; nearby independent camps remain intact.
+  const removed=new Set([assembly]);
+  let added=true;
+  while(added){added=false;for(const [child,parent] of Object.entries(base.meta.assemblyParents??{}))if(removed.has(parent)&&!removed.has(child)){removed.add(child);added=true;}}
+  const obstacles = base.obstacles.filter((o) => !removed.has(o.assembly) && inBox(o));
   const ground = { ...base.surfaces.find((s) => s.id === 'ground')!, y: 0, obb: box, label: `open ground (Kit datum y = 0) around ${assembly}` };
   return {
     ...base,
@@ -95,7 +100,7 @@ export function yearBuildScene(base: CampusScene, assembly: string, centre: Vec2
     levels: [{ id: 0, y: 0, label: 'ground (Kit datum)' }],
     surfaces: [ground],
     obstacles,
-    regions: base.regions.filter((r) => r.id !== assembly),
+    regions: base.regions.filter((r) => !removed.has(r.id)),
     meta: { ...base.meta, groundY: 0, notes: [...base.meta.notes, `year build: ${assembly} removed (it is being built); ground at the Kit datum y = 0`] },
   };
 }

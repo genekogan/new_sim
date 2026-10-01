@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {add2020ReconciliationDetails} from './details-2020-reconciliation';
 import { GROUND } from '../studio/ambience-math';
 
 // Late-March 2020 evidence model. Coordinates are a photographic fit, not a survey.
@@ -381,7 +382,7 @@ function makeBoundary(root: THREE.Object3D) {
   return g;
 }
 export type SiteFeature = { id: string; title: string; confidence: 'high' | 'medium' | 'low'; source: string; object: THREE.Object3D };
-export function createBrahman2020Scene() {
+export function createBrahman2020Scene(beforeDetails?: (root:THREE.Group)=>void) {
   const root = new THREE.Group(); root.name = 'Brahman 2020 · late March evidence reconstruction';
   makeBoundary(root);
   makePortal(root); makeContainer(root); makeCanopy(root); makeForest(root); makeGeodesic(root); makeTent(root); makeMCDA(root); makeTrees(root);
@@ -392,6 +393,8 @@ export function createBrahman2020Scene() {
   makeRV(root, 'rv-4', [18, 0, -49], 7.1, 3.02, 1);
   makeRV(root, 'rv-5', [5, 0, -45], 6.6, -1.23);
   makeRV(root, 'rv-6', [-8, 0, -45], 5.4, -0.2, 1);
+  beforeDetails?.(root);
+  add2020ReconciliationDetails(root);
   const features: SiteFeature[] = [];
   root.traverse((object) => {
     if (object.userData.id) features.push({ ...object.userData as Omit<SiteFeature, 'object'>, object });

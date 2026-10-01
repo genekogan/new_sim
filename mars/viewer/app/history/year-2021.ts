@@ -2,8 +2,8 @@ import * as T from 'three';
 
 import {Kit, BAY, layers} from './kit';
 import {aluminet2021} from './photographic-corrections';
+import {add2021OccupiedDetails} from './details-2021-occupied';
 
-import {flowerMural} from '../studio-2020/scene';
 
 export function make2021(k:Kit){
  // Jan 27 near-nadir c1285 and next-day c6735: 8 (±1) 12-ft rack intervals along the long axis.
@@ -127,12 +127,12 @@ export function make2021(k:Kit){
  k.box(utility,'white bathtub',[.72,.53,1.6],[0,.55,-6.1],'#deded1');
  k.wall(utility,1.05,1.8,0,-5.15,1.1,'#ae8c5d');
  const container=k.assembly('container','White utility container',[10,0,12],Math.PI/2);k.box(container,'shipping container',[6.06,2.59,2.44],[0,1.3,0],'#cac9bc',layers.context);
- // Gene's January aerials: flower on the near end of the parallel white
- // container. Reuse the 2020 vector interpretation, facing the hall-front end.
- const containerMural=new T.Mesh(new T.PlaneGeometry(2.20,2.20),new T.MeshBasicMaterial({map:flowerMural(),side:T.DoubleSide}));
+ // Feb3 dense257: native photographed flower on the near end of the parallel
+ // white container. The existing geometry/owner ID faces the hall-front end.
+ const containerMural=new T.Mesh(new T.PlaneGeometry(2.20,2.20),k.photo('/history/2021/2021-container-flower.webp'));
  containerMural.position.set(-3.03-.025,1.30,0);containerMural.rotation.y=-Math.PI/2;
  k.tag(container,containerMural,'Mars flower front mural',layers.detail);containerMural.userData.walkNoCollision=true;
- containerMural.userData.source='Gene supplied 2021 aerials: red flower on near container end; reused 2020 vector interpretation, not exact painted tessellation';
+ containerMural.userData.source='c6730 Feb3 dense257 t128: native painted flower front, manually rectified, low source resolution';
  // Explicit Jan 27 camp placements from c1285, checked against c6735 frame 42. This snapshot
  // has seven clearly separated full-size travel trailers, a bus and smaller motor vehicles;
  // the former 15-trailer ellipse invented both extra units and an east-side residential arc.
@@ -236,4 +236,5 @@ export function make2021(k:Kit){
   }
   if(pickup)k.box(car,'open pickup bed',[1.48,.04,1.6],[0,1.035,-1.42],'#414844',layers.context);
  }
+ add2021OccupiedDetails(k);
 }

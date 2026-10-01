@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {add2025Reconciliation} from './details-2025-reconciliation';
+import {add2025OccupiedSurfaces} from './details-2025-occupied-surfaces';
 import {Kit, BAY, layers} from './kit';
 
 
@@ -10,7 +11,7 @@ export function make2025(k:Kit){
  k.frame(g,3,3,4.8768,true,d);k.deck(g,w,d,.22);
  // The middle of the auditorium stays hollow (c46581 and Gene's correction).
  for(const o of g.children.slice())if(o.name==='12 foot orange beam'&&Math.abs(o.position.x)<.1&&Math.abs(o.position.y-2.48)<.01&&o.position.z>-d/2+.05)g.remove(o);
- g.userData.source='c72593–c72600 Jan 31 cardinal series (three front rack bays), c47305 Feb 22 roof orbit, c46581 Jan 29 auditorium; site topology from c509 panorama, c538 and c47305 orbit; Gene correction: Tool Camp across courtyard, Freeside lateral west';
+ g.userData.source='c72593–c72600 Jan 31 cardinal series (three front rack bays), c47305 Feb 22 roof orbit, c46581 Jan 29 auditorium; site topology from c509 panorama, c538 and c47305 Chiba-only orbit; Gene correction: Tool Camp across courtyard, Freeside lateral west';
  g.userData.measurement='Three 12-foot bays across (c72595 front upright sequence); 3-bay depth supported by nine 4-foot plywood sheets in c72596 east facade; nominal bay scale, not surveyed';
  // The January front is three steel rack bays across: open stair/bleacher bay
  // between two enclosed wings. The roof is a broad white deck in February,
@@ -216,7 +217,7 @@ export function make2025(k:Kit){
  // kitchen/living room below. c509/c538 and the roof orbit put it west of Chiba; the attached
  // small pods stand to its west, unlike the former south-site booths.
  const free=kitchenBuilding(k,-17.1,18.9,2025,'freeside_2025');
- free.userData.source='c538 Jan 31 aerial, c46842 living room, c44513/c44558 kitchen, c509 panorama, c538 south oblique, c47305 37.5–60s; c509 low roof plane2.55m fit: center(-17.1,18.9), west/southwest of Chiba; spacing fitted, not surveyed';
+ free.userData.source='c538 Jan 31 aerial, c46842 living room, c44513/c44558 kitchen, c509 panorama, c538 south oblique, c538 completed front; c509 low roof plane2.55m fit: center(-17.1,18.9), west/southwest of Chiba; spacing fitted, not surveyed';
  // c538/c537: open lounge at grade, no broad staircase in front of Freeside.
  for(const o of free.children.slice()){
   if(o.name.startsWith('stair ')||(o.name==='12 foot orange beam'&&o.position.y>3))free.remove(o);
@@ -576,4 +577,5 @@ export function make2025(k:Kit){
  ];
  small.forEach(([x,z,angle,name,color],i)=>vehicle(`observed-car-${i+1}`,name,x,z,angle,i===0||i===8?5.4:4.6,color));
  add2025Reconciliation(k,g,free,body,dorm);
+ add2025OccupiedSurfaces(k,g,free,body,dorm);
 }

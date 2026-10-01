@@ -95,6 +95,11 @@ export function mergeBox(prisms: CampusObstacle[]): CompBox {
 
 function featureOf(kitDef: string, kind: CampusObstacle['kind']): FeatureClass | null {
   const d = kitDef.toLowerCase();
+  // Occupied 2022 source additions are opaque context, never certified stock.
+  if (/^2022 (gold work (cab|chassis)|work pale rear load|pickup \d+ (chassis|dark bed|tailgate)|orange pickup pale hood paint|tan pickup bed panel |school bus mirror)/.test(d)) return 'vehicle';
+  if (/^2022 (manysided (diagonal|rib|upper)|pyramid rib) \d+$/.test(d)) return 'context';
+  if (/^2022 ibc |^2022 pickup ibc tank$/.test(d)) return 'fixture';
+  if (/^2022 (study projection plane|study yellow board|pantry short partition|cahuilla native contour strip)$/.test(d)) return 'wall';
   if (kind === 'vehicle' || /^(yellow (school )?bus body|bus hood|camper van body|popup camper chassis|canvas camper sides)$/.test(d)) return 'vehicle';
   // Named historical vehicle cosmetics remain opaque context, not building stock.
   if (/^(car (road wheel|side glazing|headlight|front bumper)|bus (front bumper|passenger entry|road wheel|front windscreen|radiator grille|black rub rail|headlight|headlamp|front grille|side mirror)|trailer (rear bumper|entry surround))$/.test(d)) return 'vehicle';
@@ -194,7 +199,7 @@ export function assemblyGraph(year: number, scene: CampusScene, opts: { assembli
     edges.push({ from: id, to: 'ground', rel: 'rests-on' });
   }
   // bracing rods between a frame's posts belong to it
-  for (const c of comps.filter((c) => /bracing|diagonal/.test(info.get(c)!.kitDef) && !stairFeature(c) && !claimed.has(c))) {
+  for (const c of comps.filter((c) => /bracing|diagonal/.test(info.get(c)!.kitDef) && !stairFeature(c) && featureOf(info.get(c)!.kitDef, info.get(c)!.kind)!=='context' && !claimed.has(c))) {
     const b = info.get(c)!.box;
     const f = frames.find((f) => f.node.assembly === info.get(c)!.assembly && Math.abs(rot2([b.c[0] - f.centre[0], b.c[2] - f.centre[1]], -f.node.box.yaw)[1]) < 0.05 &&
       Math.abs(rot2([b.c[0] - f.centre[0], b.c[2] - f.centre[1]], -f.node.box.yaw)[0]) <= f.node.box.size[0] / 2 + 0.02 && b.y1 <= f.node.box.y1 + 0.05);
@@ -205,7 +210,7 @@ export function assemblyGraph(year: number, scene: CampusScene, opts: { assembli
   for (const f of frames) f.node.components.sort();
   for (const p of posts) if (!claimed.has(p)) un(p, 'post with no crossbar partner (not a two-column catalog frame)');
   // ---- beams: ends on posts of two frames ----
-  for (const c of comps.filter((c) => /beam/.test(info.get(c)!.kitDef) && !stairFeature(c) && !claimed.has(c))) {
+  for (const c of comps.filter((c) => /beam/.test(info.get(c)!.kitDef) && !stairFeature(c) && featureOf(info.get(c)!.kitDef, info.get(c)!.kind)!=='context' && !claimed.has(c))) {
     const i = info.get(c)!, b = i.box;
     const bd = BEAM_DEFS.find((d) => Math.abs(d.size[0] - b.size[0]) <= 0.02);
     if (!bd) { un(c, `beam length ${b.size[0].toFixed(3)} m matches no catalog beam (${BEAM_DEFS.map((d) => d.id).join(', ')})`); continue; }

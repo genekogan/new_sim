@@ -75,6 +75,7 @@ export function sceneFromYearFile(year: number, f: CampusYearFile): CampusScene 
       source: { glb: f.source.scene, glbBytes: 0, manifest: f.source.kit, status: f.source.notes },
       notes: [...YEAR_WALKABILITY_NOTES, f.source.notes, ...f.source.limitations],
       ...(f.northAzimuthOffset !== undefined ? { northAzimuthOffset: f.northAzimuthOffset } : {}),
+      ...(f.assemblies.some(a=>a.parent)?{assemblyParents:Object.fromEntries(f.assemblies.filter(a=>a.parent).map(a=>[a.id,a.parent!]))}:{}),
     },
   };
 }

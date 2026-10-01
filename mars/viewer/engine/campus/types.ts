@@ -25,7 +25,7 @@ export type CampusSceneFile = {
   northAzimuthOffset?: number;
   bands: { low: [number, number]; note: string };
   bounds: [number, number, number, number];
-  assemblies: { id: string; name: string }[];
+  assemblies: { id: string; name: string; parent?: string }[];
   labels: string[];
   obstacles: ObstacleRow[];
   /** Named regions (assemblies + hypothetical flagship areas), with provenance. */
@@ -48,5 +48,5 @@ export type CampusScene = Omit<SpatialScene, 'obstacles' | 'surfaces'> & {
   obstacles: CampusObstacle[];
   surfaces: CampusSurface[];
   regions: Region[];
-  meta: { groundY: number; contentHash: string; source: CampusSceneFile['source']; notes: string[]; northAzimuthOffset?: number };
+  meta: { groundY: number; contentHash: string; source: CampusSceneFile['source']; notes: string[]; northAzimuthOffset?: number; assemblyParents?: Record<string,string> };
 };

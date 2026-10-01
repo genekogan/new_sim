@@ -18,6 +18,12 @@ test('assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part c
   assert.equal(c.kinds.upright, 48);
   assert.equal(c.kinds.beam, 216);
   assert.equal(c.unclassified, 0, JSON.stringify(g.unclassified.slice(0, 3)));
+  for (const [name,feature] of [['2022 gold work cab','vehicle'],['2022 pickup 1 dark bed','vehicle'],['2022 pickup IBC tank','fixture'],['2022 pantry short partition','wall'],['2022 manysided diagonal 0','context']] as const) {
+    const n=g.nodes.find(n=>n.kitDef===name);
+    assert.ok(n,`${name} is accounted for`);
+    assert.equal(n.kind,'feature');assert.equal(n.feature,feature);assert.equal(n.def,undefined,'source context is not catalog construction stock');
+    assert.ok(!g.edges.some(e=>e.from===n.id&&(e.rel==='connects-to'||e.socket)),'no invented context fastening');
+  }
   const contour = g.nodes.filter((n) => n.kitDef === 'Cahuilla photographed contour panel');
   assert.equal(contour.length, 1, 'source-photographed Cahuilla cladding is accounted for');
   assert.equal(contour[0].kind, 'feature');

@@ -37,7 +37,7 @@ const box = (r: Region) => {
   return { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs), z1: Math.max(...zs) };
 };
 const asScene = (y: number) => Y(y).base as unknown as SpatialScene;
-const ID_RE = /^([a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign|solarium-door))$/;
+const ID_RE = /^([a-z0-9-]+-[a-z0-9-]+-[0-9a-f]{8}(-\d+)?|[a-z0-9-]+-(mars-letters|aluminet|flower-mural|entry-sign|solarium-door)|(?:202[0-5]-|[a-z0-9-]+-202[0-5]-)[a-z0-9-]+)$/;
 
 test('each year 2020–2025 loads as a ground-only scene with provenance on every obstacle', () => {
   for (const [y, { base, world }] of years) {

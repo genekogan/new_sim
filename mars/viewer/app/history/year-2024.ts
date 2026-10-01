@@ -2,6 +2,7 @@ import * as T from 'three';
 
 import {Kit, BAY, layers} from './kit';
 import {frontage2024} from './photographic-corrections';
+import {add2024OccupiedSurfaces} from './details-2024-occupied-surfaces';
 
 
 import {roofRails} from './historical-helpers';
@@ -283,4 +284,5 @@ export function make2024(k:Kit){
   const screen=k.box(car,'windscreen',[1.72,.47,.04],[0,1.15,length/2+.03],'#42525a',layers.context);
   screen.geometry=screen.geometry.clone();screen.geometry.rotateX(-.75);screen.geometry.translate(0,.14,-length*.255);
  });
+ add2024OccupiedSurfaces(k,g,fc);
 }

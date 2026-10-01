@@ -115,14 +115,14 @@ test('2024 Jan 22 aerial: six-by-three Chiba roof, Freeside about 47 m north, an
 // For every prop piece the lowest vertex is within 1 cm of the surface under its footprint: the highest upward-facing
 // structure face (deck sheet, beam, crossbar, platform) below it, else the studio ground (−0.16, the year files' groundY).
 const GROUND=-0.16,TOL=.01;
-const PROP=/^(table leg|bench foot|stored food crate|white refrigerator|café painted counter|trailer wheel|rv tire|portable toilet body|counter leg|workshop storage bin)$/;
+const PROP=/^(table leg|bench foot|stored food crate|white refrigerator|2022 Cahuilla red mini refrigerator|2022 black yellow pantry tote|2023 Rotapolis red refrigerator|2023 Rotapolis black chest freezer|café painted counter|trailer wheel|rv tire|portable toilet body|counter leg|workshop storage bin)$/;
 const SUPPORT=/deck|beam|crossbar|platform/;
 /** Trailers whose ring passes through Chiba (wheels on the ground, shells through the hall's deck): a layout question, not
  *  a datum one (QUESTIONS Q21 / W46). Asserted so a layout fix shows up here; remove the entry when it no longer applies. */
 const TRAILERS_IN_CHIBA={}; // W51: Q2 answered (none under Chiba in 2023 / 2024); the ring now keeps out (see below)
 function propGaps(root){
  root.updateMatrixWorld(true);const all=[],props=[];
- root.traverse(o=>{if(!(o instanceof T.Mesh)||o instanceof T.InstancedMesh)return;all.push(o);if(PROP.test(o.userData.kind??''))props.push(o);});
+ root.traverse(o=>{if(!(o instanceof T.Mesh)||o instanceof T.InstancedMesh)return;for(let a=o;a;a=a.parent)if(a.visible===false)return;all.push(o);if(PROP.test(o.userData.kind??''))props.push(o);});
  const supports=all.filter(o=>SUPPORT.test(o.userData.kind??'')),sides=supports.map(o=>o.material.side);supports.forEach(o=>{o.material.side=T.DoubleSide;});
  const rc=new T.Raycaster(),v=new T.Vector3(),out=[];
  for(const o of props){
@@ -146,8 +146,8 @@ function propGaps(root){
 for(const year of [2020,2021,2022,2023,2024,2025])test(`${year}: every prop stands on its surface (lowest vertex within 1 cm)`,()=>{
  const gaps=propGaps(createHistoricalScene(year)),kinds=new Set(gaps.map(g=>g.kind));
  assert.ok(gaps.length>0&&kinds.has('trailer wheel')||year===2020,`${year}: no props found`);
- if(SEAT_HELD_YEARS.has(year)){
-  // held (Kit comment): still unseated, so the year-build pins stand; un-holding it makes this test the place to update
+ if(SEAT_HELD_YEARS.has(year)&&year!==2022){
+  // Kit seating stays frozen for recorded takes. Current 2022 source corrections are explicitly seated in the year leaf and must pass this actual-visible check.
   assert.ok(gaps.some(g=>Math.abs(g.gap)>.1),`${year} is in SEAT_HELD_YEARS but its props are seated`);return;
  }
  const inChiba=TRAILERS_IN_CHIBA[year]??[],bad=[];
@@ -157,7 +157,7 @@ for(const year of [2020,2021,2022,2023,2024,2025])test(`${year}: every prop stan
  }
  assert.deepEqual(bad,[],`${year}: props off their surfaces`);
  if(year===2020)for(const [k,n] of [['rv tire',24],['portable toilet body',4],['table leg',4],['counter leg',3],['workshop storage bin',6]])assert.equal(gaps.filter(g=>g.kind===k).length,n,`2020 ${k}`);
- else for(const k of year===2021?['table leg','counter leg','trailer wheel']:year===2024?['table leg','trailer wheel']:['table leg','stored food crate','white refrigerator'])assert.ok(kinds.has(k),`${year} ${k}`);
+ else for(const k of year===2021?['table leg','counter leg','trailer wheel']:year===2024?['table leg','trailer wheel']:year===2023?['table leg','2023 Rotapolis red refrigerator','2023 Rotapolis black chest freezer']:year===2022?['table leg','2022 Cahuilla red mini refrigerator','2022 black yellow pantry tote']:['table leg','stored food crate','white refrigerator'])assert.ok(kinds.has(k),`${year} ${k}`);
 });
 test('2020 RV wheels roll along the vehicle: tire ring in the RV\'s length–height plane, axle across it',()=>{
  const root=createHistoricalScene(2020);root.updateMatrixWorld(true);const rv=root.children.find(o=>o.userData.assembly_id==='rv-1');
@@ -270,7 +270,7 @@ test('2022 c273: seven trailers plus separately identified canopy and silver she
  const clashes=[];
  for(const year of [2022,2023,2024,2025]){
   const root=createHistoricalScene(year);root.updateMatrixWorld(true);
-  const rvs=root.children.filter(o=>/^rv-\d+$/.test(o.userData.assembly_id)),blds=root.children.filter(o=>o.userData.assembly_id&&!/^rv-|^car-|^observed-car-|^observed-black-bus$|^yellow-bus$|^people$/.test(o.userData.assembly_id));
+  const rvs=root.children.filter(o=>/^rv-\d+$/.test(o.userData.assembly_id)),blds=root.children.filter(o=>o.userData.assembly_id&&!/^rv-|^car-|^observed-car-|^observed-black-bus$|^yellow-bus$|^people$/.test(o.userData.assembly_id)&&meshes(o).some(m=>/rack upright|plywood deck|roof|canopy/.test(m.userData.kind??'')));
   if(year===2022){assert.deepEqual(rvs.map(o=>o.userData.assembly_id),['rv-1','rv-2','rv-3','rv-4','rv-5','rv-6','rv-8']);assert.ok(rvs.slice(0,5).every(o=>o.position.x<-10),'the train stands on the −X side');}
   for(const rv of rvs){
    // 2024 retains rv-N stable ids for mapped bus/van objects as well as trailers.

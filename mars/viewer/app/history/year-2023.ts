@@ -1,6 +1,7 @@
 import * as T from 'three';
 
 import {Kit, BAY, layers} from './kit';
+import {reconcile2023Source} from './details-2023-reconciliation';
 
 
 
@@ -243,4 +244,5 @@ export function make2023(k:Kit){
   ['census-v19','Dark SUV in foreground',13,19,.5,'#35515a',4.9],
  ];
  for(const [id,name,x,z,rot,color,len] of parked)vehicle(id,name,x,z,rot,color,len);
+ reconcile2023Source(k);
 }
