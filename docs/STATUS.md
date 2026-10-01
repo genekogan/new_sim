@@ -87,6 +87,9 @@ it is the single place that says what is true now.
 | Snapshot | 3.5 ms at 31 Souls, 44 ms at 1,000 | 09-30 |
 | Server memory | ~150 MB resident | 09-30 |
 
+Replay check on production (2026-10-01): the kernel replayed from the live world's 11,939
+events in 35 ms and matched the running server's hash (`infra/verify-kernel.ts`).
+
 Tests: 52 (kernel 6, engine contract 4, toy engine 8, Mars adapter 13, brain 6, server 15).
 The Mars tests skip where there is no Mars checkout (CI).
 

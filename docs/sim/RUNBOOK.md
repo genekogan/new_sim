@@ -38,6 +38,19 @@ Admin dials (pause, clock rate, brain live/fake, budget, narrate now, snapshot,
 invite codes, connected clients) are in the web app's **admin** tab; cost is in
 the **spend** tab. Both need an email listed in `ADMIN_EMAILS`.
 
+## Check that the log still explains the world
+
+`infra/verify-kernel.ts` replays the kernel from the event log (no engine stepping,
+no models, read-only) and compares the result with the live server's kernel hash:
+
+```bash
+ssh root@eden2 'cd /srv/sim/current/apps/server && sudo -u sim node /srv/sim/current/infra/verify-kernel.ts /srv/sim-data/sim.db http://127.0.0.1:4500'
+```
+
+It prints the event counts and `MATCH`, or the things and links that differ. First
+run, 2026-10-01: 11,939 events replayed in 35 ms and matched. Run it after any
+deploy that touches `packages/kernel` or `apps/server/src/fold.ts`.
+
 ## Restore from R2
 
 Tested 2026-09-30: the restored copy was one event behind live, integrity ok.
