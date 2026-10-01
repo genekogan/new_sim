@@ -34,14 +34,20 @@ test('fixture subject: route to the current 2024 counter, verify real visibility
   await waitFrames(page, 4);
   await captureView(page, 'camera-fixture-current-counter', { testInfo, compare: false });
   // Keep the worst-disagreement capture above; separately inspect the actual countertop-facing phase.
-  const facing = await page.evaluate(() => (window.__marsStudio as unknown as Hook).verifyCamera(15, 15, 2, { track: 'year' }));
+  // Current occupied geometry frames the countertop during 12–14 s. The old
+  // 15 s single-point check lies in the later turn away (2/5 points framed).
+  // Verify the entire observed facing interval, retaining the 60% visibility limit.
+  const interval = await page.evaluate(() => (window.__marsStudio as unknown as Hook).verifyCamera(12, 14, 2, { track: 'year' }));
+  expect(interval.samples).toBe(5);
+  expect(interval.all.every(sample => sample[2] >= 0.6), 'counter visible throughout its facing interval').toBe(true);
+  const facing = await page.evaluate(() => (window.__marsStudio as unknown as Hook).verifyCamera(13, 13, 2, { track: 'year' }));
   expect(facing.samples).toBe(1);
   expect(facing.meanReal, 'current countertop visible during the turn toward it').toBeGreaterThanOrEqual(0.6);
   const pose = facing.worst[0];
   await page.evaluate(({ camera, target }) => (window.__marsStudio as unknown as Hook).look(camera, target), pose);
   await waitFrames(page, 4);
   await captureView(page, 'camera-fixture-current-counter-facing', { testInfo, compare: false });
-  writeArtifact('camera-fixture-current-counter.json', { sentence: `fly through ${CURRENT_COUNTER}`, parsed, direction, compiled, verification, facing });
+  writeArtifact('camera-fixture-current-counter.json', { sentence: `fly through ${CURRENT_COUNTER}`, parsed, direction, compiled, verification, interval, facing });
   expect(errors).toEqual([]);
 });
 
