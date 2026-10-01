@@ -1,6 +1,6 @@
 # 2026 photographic reconstruction checkpoint — 2026-10-01
 
-Candidate: `codex/historical-accuracy-2026`, base09da6a0. Public release29 does not yet contain this candidate. Existing pending archive/source work preserved; historical paired specialists are independently reviewing2025/2024,2023/2022,2021/2020. No claim that seven years are finished.
+Deployed checkpoint31: source `64517945c0bf0e109fb0a836611de9f4128d6362`, version `8f794aad-ddd7-4439-a840-707937429d54`, published 2026-10-01T13:36:45.198Z at https://mars-campus-2026.<workers-subdomain>.workers.dev/studio. Existing pending archive/source work preserved; historical paired specialists are independently reviewing2025/2024,2023/2022,2021/2020. No claim that seven years are finished.
 
 ## Implemented and inspected
 
@@ -16,7 +16,7 @@ Candidate: `codex/historical-accuracy-2026`, base09da6a0. Public release29 does 
 
 All66 supplied photographs inspected in preserved source pass. Latest eight critique images/request copied into archive. Final combined actual browser photographs manually inspected; rejected intermediate renders retained.47 actual compressed-model geometry/runtime gates pass,8429 unique ownerIDs (originalIDs retained,3 explicit workshopfloor/support additions). Final canonical hash256ac4954e7e2f00eef5146165933bb6bab52ef53305d35ac918cd5f542de25a,9497 conservative obstacles. Both offline review GLBs regenerated. Seven new native WebP crops171372bytes; no new raw-media copies/downloads, model/API calls or added shadow lights. Cloth24triangles, bounded workshop floor/supports36triangles. This is an asset-cost account, not a device-FPS measurement.
 
-Candidate TSc and zero-warning lint pass. Focused full/crop/grid9/9 pass after engine-owner conditional exact source-identity repin; original RED and pre-pin physical evidence retained. Both complete43steps573simulatedseconds,0violations, same entities/support/positions/duration and execute/replay; canonical untouched. Independent b746 probe asserted unchanged. Grouping7/7 passes; all667manifestrackIDs enumerated once,654scene rackreceivers (six source-clipped kitchen diagonals retain explicit absent-prism provenance). Flagship replay regenerated once. Full engine/gate/build/public verification pending.
+Candidate TSc and zero-warning lint pass. Focused full/crop/grid9/9 pass after engine-owner conditional exact source-identity repin; original RED and pre-pin physical evidence retained. Both complete43steps573simulatedseconds,0violations, same entities/support/positions/duration and execute/replay; canonical untouched. Independent b746 probe asserted unchanged. Grouping7/7 passes; all667manifestrackIDs enumerated once,654scene rackreceivers (six source-clipped kitchen diagonals retain explicit absent-prism provenance). Flagship replay regenerated once. Full clean source gate and build pass; post-deploy HTTP, asset, MCP and director verification pass (details below).
 
 ## Limits
 
@@ -30,4 +30,12 @@ Equivalent source-era camera archive fixture was inspected: pendingcompressedfix
 
 ## Pre-commit verification
 
-`npm test`:240/240PASS,0fail. `npm run test:engine`:907PASS,0fail,6documentedskip,11existingTODO (notproven),154.1s. ViewerTSc andzero-warninglintPASS. Allsixpre-specialist2020–2025canonicalhashesmatchafteryearownershipsplit; nofuturepairedchangesincluded. Fullgate anddeploy remainpending afterrebaseonto latestfunctionalmain4793296.
+`npm test`:240/240PASS,0fail. `npm run test:engine`:907PASS,0fail,6documentedskip,11existingTODO (notproven),154.1s. ViewerTSc andzero-warninglintPASS. Allsixpre-specialist2020–2025canonicalhashesmatchafteryearownershipsplit; nofuturepairedchangesincluded. This earlier pre-commit result is superseded by the deployed clean-source gate below.
+
+## Deployed checkpoint31 verification
+
+Clean source full gate: 241 unit passes; 919 engine passes, 6 documented skips and 11 existing TODOs; 152 browser passes and 7 documented skips; viewer/camera typechecks, zero-warning lint, independent canonical probe and flagship replay checks pass. Required idle performance passes with zero violations. Build, dry run and deployment pass. All eight existing large R2 asset keys reused without new uploads.
+
+Post-deploy verification: 19 routes and 507 assets, authorization/method restrictions, GLB range header and selected computer SHA/license pass through the established curl transport (649 bounded requests). Native Node HTTP attempt timed out connecting; original failure retained, equivalent assertions completed. Public simulation/MCP and director demonstrations pass. Matching local Studio http://127.0.0.1:5491/studio and photo viewer http://127.0.0.1:7343/ respond200. Browser checks cover the deployed source before publication; a fresh public room visual capture has not been repeated.
+
+Main was advanced to the accepted source while 56 unverified pending variants were preserved with a byte/metadata audit. Those variants and the subsequent paired historical edits are excluded from checkpoint31. This is an interim accuracy release, not seven-year completion.
