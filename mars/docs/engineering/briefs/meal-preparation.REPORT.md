@@ -111,3 +111,34 @@ subsystem. Supported scope is exactly two initially full finite bowls, one empty
 pot, a right-hand spoon, one existing ground table, ground-only access and one
 batch; ingredient selection/planning, multiple cooks and subsequent batch reuse
 remain unsupported.
+
+## Featured spoon continuity follow-up (pending validation)
+
+Root review identified target-to-carry jumps in the first candidate: preparation
+cleared the right hand immediately, so ordinary `hold_items` moved the held spoon
+to carry on its next step. Initial mixing likewise entered the pot rim directly.
+The source follow-up adds an ordinary `REACH_TIME` (0.4 second) smooth withdrawal
+after scoop/deposit/mixing and before walking or releasing preparation claims,
+plus a smooth entry to mixing. Cancel/director handoff drains owned children,
+retains the current supported held-spoon point, withdraws while claims remain, then
+releases. This uses only existing hand expression and item following; quantity
+commitments and the JSON state contract are unchanged. No shared Runtime changes.
+
+Fifteen new per-tick continuity checks cover the complete journey plus cancellation
+and director walk during held-taking, scoop, deposit, mix entry, mixing, withdrawal
+and pot approach. The stricter existing `MAX_HUMAN_STEP_PER_TICK` (0.15 m) ceiling
+checks held-spoon translation plus rotation of its farthest point; the component
+ceiling of 0.6 m would allow the reviewed visible snap. Root requested source-only
+work while historical gate/performance validation owns the host, so these new
+checks have not yet run and the follow-up has not been committed.
+
+## Root combined draft continuity proof
+
+The exact frozen follow-up source was copied with SHAmanifest into root
+meal-prep-mvp after release32 receipts/global registration and food-state integration.
+Approved1.439-second Node-only window passed34preparation checks (including15
+new every-tick heldspoon complete/cancel/directive checks) and3incomplete-serving
+admission/deposit regressions. Zero failures/skips in those scopes. Existing
+0.15m physical bound retained, no Runtime/rig changes. First log-path invocation
+ran no tests; corrected invocation only. Source-scan/TSc/actualPlay/fullgate and
+production proof remain required for the updated combined draft; no shipped claim.

@@ -20,6 +20,49 @@ import { mealRegistry, mealRuntime, mealWorld, runMeal } from '../scenarios/meal
 
 const fixture = (id: string, def: string, x: number, z: number, yaw = 0): Entity => ({ id, def, kind: 'fixture', pose: { p: [x, 0, z], yaw }, provenance: FIXTURE });
 
+const incompletePreparation = (): NonNullable<Entity['foodPreparation']> => ({
+  kind: 'cold-two-ingredient-v1',
+  ingredients: [
+    { item: 'beans', food: 'beans', initial: 1, deposited: 1 },
+    { item: 'greens', food: 'greens', initial: 1, deposited: 1 },
+  ],
+  mixedTicks: 30,
+  complete: false,
+});
+
+for (const fraction of [0, 0.5]) test(`unfinished preparation refuses serving at admission, pot=${fraction}`, () => {
+  const rt = setup({}, fixture('t', 'table-6ft', -6, -8.5), human('p', -6.15, -9.2));
+  const pot = onTable(rt, 'pot', 'pot', 't', 'r1c2', { food: 'cold dish', fraction });
+  pot.foodPreparation = incompletePreparation();
+  inHandOf(rt, 'p', 'b', 'bowl', 'left', { food: 'cold dish', fraction: 0 });
+  const before = structuredClone(rt.world);
+  const r = rt.submit('serve', { actor: 'p', pot: 'pot', bowl: 'b' });
+  assert.equal(r.status, 'failed');
+  assert.equal(r.diagnostic?.code, 'serve.preparation-incomplete');
+  assert.deepEqual(r.diagnostic?.subjects, ['pot']);
+  assert.deepEqual(rt.world, before);
+  assert.deepEqual(rt.holder('entity:pot'), []);
+});
+
+test('serving rechecks preparation completion at physical deposit without consuming food', () => {
+  const rt = setup({}, fixture('t', 'table-6ft', -6, -8.5), human('p', -6.15, -9.2));
+  const pot = onTable(rt, 'pot', 'pot', 't', 'r1c2', { food: 'cold dish', fraction: 0.5 });
+  inHandOf(rt, 'p', 'b', 'bowl', 'left', { food: 'cold dish', fraction: 0 });
+  const r = rt.submit('serve', { actor: 'p', pot: 'pot', bowl: 'b' });
+  assert.equal(r.status, 'executing');
+  for (let i = 0; i < 100 && r.phase !== 'to-bowl'; i++) rt.step();
+  assert.equal(r.phase, 'to-bowl');
+  pot.foodPreparation = incompletePreparation();
+  rt.runUntilIdle(100, [r.id]);
+  assert.equal(r.status, 'failed');
+  assert.equal(r.diagnostic?.code, 'serve.preparation-incomplete');
+  assert.deepEqual([pot.contents?.fraction, rt.world.entities.b.contents?.fraction], [0.5, 0]);
+  assert.deepEqual(rt.world.entities.b.support, { kind: 'in-hand', by: 'p', hand: 'left' });
+  assert.deepEqual(rt.holder('entity:pot'), []);
+  assert.deepEqual(rt.holder('hand:p:right'), []);
+  assert.deepEqual(rt.violations, []);
+});
+
 test('serve refuses to overwrite a nonempty bowl, preserving both contents', () => {
   const rt = setup({}, fixture('t', 'table-6ft', -6, -8.5), human('p', -6.15, -9.2));
   onTable(rt, 'pot', 'pot', 't', 'r1c2', { food: 'stew', fraction: 1 });

@@ -82,6 +82,17 @@ export type HumanState = {
   proneYaw?: number;
 };
 
+/** Persistent committed quantities for one bounded cold preparation batch. */
+export type FoodPreparation = {
+  kind: 'cold-two-ingredient-v1';
+  ingredients: [
+    { item: string; food: string; initial: number; deposited: number },
+    { item: string; food: string; initial: number; deposited: number },
+  ];
+  mixedTicks: number;
+  complete: boolean;
+};
+
 export type Entity = {
   id: string;
   def: string; // AssetDef id
@@ -101,6 +112,8 @@ export type Entity = {
   reservedBy?: string;
   /** Containers (bowl, pot…; catalog-items.ts CONTAINERS): what food is in it and how full (0..1). */
   contents?: { food: string; fraction: number };
+  /** Partial preparation survives interruption; incomplete contents cannot be served. */
+  foodPreparation?: FoodPreparation;
   /** Placed electrical equipment (construction/solar.ts place_equipment, spec §19): kind + configuration. */
   equipment?: { kind: string; config: Record<string, number | string | boolean> };
   /** Paint on a paintable face (engine/work/paint.ts): colour or texture, coverage 0..1 of the face, per reach band. */

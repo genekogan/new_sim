@@ -2,7 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
 import { Spatial } from '../spatial/service.ts';
-import { DEFAULT_INVARIANTS } from '../runtime/invariants.ts';
+import {
+  DEFAULT_INVARIANTS,
+  MAX_HUMAN_STEP_PER_TICK,
+} from '../runtime/invariants.ts';
+import { dist3 } from '../items/body.ts';
+import { angleDelta, type Vec3 } from '../core/math.ts';
+import { CATALOG } from '../world/catalog.ts';
 import { classroomScene } from '../scenarios/classroom.ts';
 import {
   preparationParams,
@@ -69,7 +75,7 @@ for (const [yaw, x, z] of [
         hands.add(hashOf(rt.world.entities.cook.human!.hands?.right));
       if (
         rt.world.entities.pot.contents!.fraction > 0 &&
-        rec.status !== 'completed'
+        readFoodPreparation(rt, 'pot')!.mixedTicks < 60
       )
         assert.equal(readFoodPreparation(rt, 'pot')!.complete, false);
       return !rt.isActive(action.id);
@@ -253,3 +259,75 @@ test('wrong pot support, nonempty pot and partial source refuse named arrangemen
     released(rt);
   }
 });
+
+// Use the existing stricter on-foot displacement ceiling for this featured held
+// utensil, including its farthest point under rotation. The component ceiling
+// (0.6m) would permit the original target-to-carry snap.
+for (const mode of ['complete', 'cancel', 'directive'] as const) {
+  const phases =
+    mode === 'complete'
+      ? ['complete']
+      : [
+          'taking-held',
+          'scooping',
+          'depositing',
+          'mix-entry',
+          'mixing',
+          'returning',
+          'to-pot',
+        ];
+  for (const phase of phases)
+    test(`held spoon continuity through ${mode} at ${phase}`, () => {
+      const rt = preparationRuntime(),
+        rec = rt.submit('prepare_food', params());
+      let prior: { p: Vec3; yaw: number } | undefined,
+        interrupted = false,
+        directive: string | undefined;
+      let samples = 0;
+      for (let tick = 0; tick < 2400; tick++) {
+        const spoon = rt.world.entities.spoon;
+        const held = spoon.support?.kind === 'in-hand';
+        const ready =
+          phase === 'taking-held'
+            ? rec.phase === 'taking' && held
+            : rec.phase === phase;
+        if (mode !== 'complete' && !interrupted && ready) {
+          interrupted = true;
+          if (mode === 'cancel') rt.cancel(rec.id);
+          else
+            directive = rt.submit('walk_to', {
+              actor: 'cook',
+              x: -4,
+              z: -4,
+            }).id;
+        }
+        rt.step();
+        if (spoon.support?.kind === 'in-hand') {
+          if (prior) {
+            const extent = Math.max(...CATALOG[spoon.def].size) / 2;
+            const displacement =
+              dist3(prior.p, spoon.pose.p) +
+              Math.abs(angleDelta(prior.yaw, spoon.pose.yaw)) * extent;
+            assert.ok(
+              displacement <= MAX_HUMAN_STEP_PER_TICK + 1e-9,
+              `held spoon ${displacement}m jump during ${rec.phase} at tick ${rt.tick}`,
+            );
+            samples++;
+          }
+          prior = { p: [...spoon.pose.p], yaw: spoon.pose.yaw };
+        } else prior = undefined;
+        if (!rt.isActive(rec.id) && (!directive || !rt.isActive(directive)))
+          break;
+      }
+      assert.ok(samples > 0);
+      assert.ok(mode === 'complete' || interrupted, `did not reach ${phase}`);
+      assert.ok(!rt.isActive(rec.id));
+      if (mode === 'complete') assert.equal(rec.status, 'completed', rec.diagnostic?.message);
+      if (mode === 'cancel') assert.equal(rec.status, 'cancelled', rec.diagnostic?.message);
+      if (directive)
+        assert.equal(rt.records.get(directive)!.status, 'completed');
+      assert.equal(total(rt), 2);
+      assert.deepEqual(rt.violations, []);
+      released(rt);
+    });
+}

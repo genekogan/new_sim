@@ -31,3 +31,6 @@ export type { GatheringContinuationParams, GatheringContinuationControlParams, G
 
 export { PAIRED_WALK_ACTIONS, pairedWalk, pairedWalkControl, readPairedWalk } from './paired-walk.ts';
 export type { PairedWalkParams, PairedWalkControlParams, PairedWalkReadout, PairedWalkMode } from './paired-walk.ts';
+
+export { PREPARATION_ACTIONS, prepareFood, readFoodPreparation } from './prepare-food.ts';
+export type { PrepareFoodParams } from './prepare-food.ts';

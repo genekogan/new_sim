@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { ActionDef, Diagnostic, Reservation } from '../actions/types.ts';
 import type { Entity } from '../world/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
+import { DT } from '../runtime/runtime.ts';
+import { REACH_TIME } from '../items/actions.ts';
 import { hashOf } from '../core/hash.ts';
 import { rot2, type Vec3 } from '../core/math.ts';
 import {
@@ -45,10 +47,12 @@ type Exec = Program & {
   from?: Vec3;
   started: number;
   initialized: boolean;
+  afterReturn?: 'to-pot' | 'starting' | 'completed' | 'stopped';
 };
 const SCOOP_TICKS = 20,
   DEPOSIT_TICKS = 20;
 export const PREPARATION_MIX_TICKS = 60;
+const RETURN_TICKS = Math.ceil(REACH_TIME / DT);
 const QUANTITY = 0.25; // quarter bowl per spoon cycle; full bowl = quarter pot.
 const diag = (
   code: string,
@@ -80,7 +84,40 @@ function stop(rt: Runtime, ex: Exec, error?: Diagnostic) {
   ex.stopping = true;
   ex.error ??= error;
   if (ex.child && rt.isActive(ex.child)) rt.cancel(ex.child);
+  // Retain the current held hand until the parent drains its child and withdraws.
+}
+function beginReturn(rt: Runtime, ex: Exec, after: Exec['afterReturn']) {
+  const actor = rt.world.entities[ex.p.actor];
+  ex.from = actor.human!.hands?.right ?? carryHand(bodyFrame(actor), 'right');
+  ex.ticks = 0;
+  ex.phase = 'returning';
+  ex.afterReturn = after;
+}
+function returnHand(rt: Runtime, ex: Exec): boolean {
+  const actor = rt.world.entities[ex.p.actor],
+    spoon = rt.world.entities[ex.p.spoon];
+  if (
+    spoon?.support?.kind !== 'in-hand' ||
+    spoon.support.by !== ex.p.actor ||
+    spoon.support.hand !== 'right'
+  ) {
+    clearHand(rt, ex);
+    return true;
+  }
+  ex.ticks++;
+  handPoint(
+    rt,
+    ex,
+    lerp3(
+      ex.from!,
+      carryHand(bodyFrame(actor), 'right'),
+      smooth(ex.ticks / RETURN_TICKS),
+    ),
+  );
+  if (ex.ticks < RETURN_TICKS) return false;
+  // The final published hand/item position already equals ordinary carry maintenance.
   clearHand(rt, ex);
+  return true;
 }
 function stateProblem(
   rt: Runtime,
@@ -187,7 +224,14 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
     ingredients: z.tuple([id, id]),
   }),
   drivesReservedHands: (rec) =>
-    ['scooping', 'depositing', 'mixing'].includes(rec.phase ?? ''),
+    [
+      'scooping',
+      'depositing',
+      'mix-entry',
+      'mixing',
+      'returning',
+      'stopping',
+    ].includes(rec.phase ?? ''),
   reservations(w, p) {
     const support = w.entities[p.pot]?.support;
     return [
@@ -465,9 +509,22 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
         rt.cancel(ex.child);
         return { status: 'running', phase: 'stopping' };
       }
+      if (ex.phase !== 'returning' || ex.afterReturn !== 'stopped')
+        beginReturn(rt, ex, 'stopped');
+      if (!returnHand(rt, ex)) return { status: 'running', phase: 'returning' };
       return ex.error
         ? { status: 'failed', diagnostic: ex.error }
         : { status: 'completed', outputs: { partial: true } };
+    }
+    if (ex.phase === 'returning') {
+      if (!returnHand(rt, ex)) return { status: 'running', phase: 'returning' };
+      if (ex.afterReturn === 'completed')
+        return { status: 'completed', outputs: { pot: ex.p.pot, servings: 2 } };
+      if (ex.afterReturn === 'to-pot') {
+        approach(rt, ex, ex.p.pot, 'to-pot');
+        return { status: 'running', phase: ex.phase };
+      }
+      ex.phase = 'starting';
     }
     if (ex.child) {
       if (rt.isActive(ex.child)) return { status: 'running', phase: ex.phase };
@@ -489,7 +546,7 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
             ? 'scooping'
             : ex.phase === 'to-pot'
               ? 'depositing'
-              : 'mixing';
+              : 'mix-entry';
         ex.ticks = 0;
         ex.from = carryHand(bodyFrame(rt.world.entities[ex.p.actor]), 'right');
       }
@@ -538,7 +595,7 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
       return { status: 'running', phase: 'stopping' };
     }
     ex.ticks++;
-    if (ex.phase === 'mixing') {
+    if (ex.phase === 'mixing' || ex.phase === 'mix-entry') {
       const k = (ex.state.mixedTicks % 20) / 5,
         edge = Math.floor(k),
         f = k - edge;
@@ -556,16 +613,28 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
         ],
         target.pose.yaw,
       );
-      handPoint(rt, ex, [
+      const point: Vec3 = [
         target.pose.p[0] + offset[0],
         target.pose.p[1] + 0.1,
         target.pose.p[2] + offset[1],
-      ]);
-      ex.state.mixedTicks++;
-      if (ex.state.mixedTicks === PREPARATION_MIX_TICKS) {
-        ex.state.complete = true;
-        clearHand(rt, ex);
-        return { status: 'completed', outputs: { pot: ex.p.pot, servings: 2 } };
+      ];
+      if (ex.phase === 'mix-entry') {
+        handPoint(
+          rt,
+          ex,
+          lerp3(ex.from!, point, smooth(ex.ticks / RETURN_TICKS)),
+        );
+        if (ex.ticks === RETURN_TICKS) {
+          ex.phase = 'mixing';
+          ex.ticks = 0;
+        }
+      } else {
+        handPoint(rt, ex, point);
+        ex.state.mixedTicks++;
+        if (ex.state.mixedTicks === PREPARATION_MIX_TICKS) {
+          ex.state.complete = true;
+          beginReturn(rt, ex, 'completed');
+        }
       }
     } else {
       const duration = ex.phase === 'scooping' ? SCOOP_TICKS : DEPOSIT_TICKS;
@@ -579,8 +648,7 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
         ),
       );
       if (ex.ticks === duration) {
-        clearHand(rt, ex);
-        if (ex.phase === 'scooping') approach(rt, ex, ex.p.pot, 'to-pot');
+        if (ex.phase === 'scooping') beginReturn(rt, ex, 'to-pot');
         else {
           // Exact binary fractions: mutate both conserved quantities and progress in one tick.
           const source = rt.world.entities[ex.p.ingredients[ex.index]],
@@ -594,7 +662,7 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
             pot: pot.id,
             bowlFraction: QUANTITY,
           });
-          ex.phase = 'starting';
+          beginReturn(rt, ex, 'starting');
         }
       }
     }

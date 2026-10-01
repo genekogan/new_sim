@@ -411,6 +411,9 @@ type ServeExec = OverlayBase & { pot: string; bowl: string; bowlHand: Hand; hand
 
 /** Shared pots are checked again at the deposit, after other diners may serve. */
 function servingContents(pot: Entity, bowl: Entity): Diagnostic | undefined {
+  if (pot.foodPreparation && pot.foodPreparation.complete !== true) return {
+    code: 'serve.preparation-incomplete', message: `${pot.id} is still being prepared; finish its ingredient deposits and mixing before serving`, subjects: [pot.id],
+  };
   if ((bowl.contents?.fraction ?? 0) > 0) return {
     code: 'serve.bowl-not-empty', message: `${bowl.id} still contains food; finish or explicitly preserve it before requesting a full serving`, subjects: [bowl.id],
   };
@@ -438,6 +441,9 @@ export const serve: ActionDef<ServeParams, { bowlHand: Hand }, ServeExec> = {
     if (!CONTAINERS.has(bowl.def)) return fail('item.not-container', `${bowl.id} (${bowl.def}) cannot hold food`, [bowl.id]);
     const pot = itemOf(rt, p.pot);
     if ('code' in pot) return { ok: false, diagnostic: pot };
+    if (pot.foodPreparation && pot.foodPreparation.complete !== true) {
+      return { ok: false, diagnostic: servingContents(pot, bowl)! };
+    }
     if (!CONTAINERS.has(pot.def) || !pot.contents || pot.contents.fraction <= 1e-9) return fail('serve.pot-empty', `${pot.id} has no food to serve`, [pot.id]);
     const contents = servingContents(pot, bowl);
     if (contents) return { ok: false, diagnostic: contents };
