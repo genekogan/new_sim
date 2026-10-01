@@ -4,6 +4,9 @@ const base = process.env.SITE_BASE || 'http://127.0.0.1:8799';
 const observations = [];
 for (const path of [
   '/',
+  '/?year=2020',
+  '/photo',
+  '/photo/',
   '/studio',
   '/studio/',
   '/studio/2020',

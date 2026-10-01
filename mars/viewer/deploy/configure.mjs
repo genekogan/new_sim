@@ -38,7 +38,7 @@ export default {async fetch(request,env,ctx){
   const headers=new Headers(response.headers);headers.set('Cache-Control','no-cache');
   return new Response(request.method==='HEAD'?null:response.body,{status:response.status,headers});
  }
- if(['/', '/studio', '/studio/', '/simulation-guide', '/simulation-guide/', '/lab', '/lab/'].includes(path) || /^\\/studio\\/202[0-6]\\/?$/.test(path)){
+ if(['/', '/photo', '/photo/', '/studio', '/studio/', '/simulation-guide', '/simulation-guide/', '/lab', '/lab/'].includes(path) || /^\\/studio\\/202[0-6]\\/?$/.test(path)){
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
   url.pathname='/index.html';const response=await env.ASSETS.fetch(new Request(url,request));
   const headers=new Headers(response.headers);headers.set('Cache-Control','no-cache');
