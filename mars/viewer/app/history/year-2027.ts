@@ -93,7 +93,7 @@ export function make2027(k: Kit) {
     // Visible cutaway ribs communicate underground chambers, not actual installed equipment.
     const arch = new T.CylinderGeometry(.43, .43, 1.524, 12, 1, true, Math.PI/2, Math.PI);
     for (let i=0; i<20; i++) {
-      const mesh = new T.Mesh(arch, k.mat('#3c413e', .15)); mesh.rotation.x = Math.PI/2; mesh.scale.y = .70;
+      const mesh = new T.Mesh(arch, k.mat('#3c413e', .15)); mesh.rotation.x = Math.PI/2; mesh.scale.z = .70;
       mesh.position.set(0, .02, -length/2+(i+.5)*1.524);
       k.tag(g, mesh, 'conceptual chamber cutaway', layers.context); mesh.userData.walkNoCollision = true;
     }
