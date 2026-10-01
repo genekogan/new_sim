@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // Capture-only (NOT in the gate): the pictures for docs/engineering/questions/index.html.
 // QUESTIONS_CAPTURE=1 E2E_VITE_PORT=5611 E2E_RUN=w41 npx playwright test -c e2e/playwright.config.ts questions-captures.spec.ts
 // Optional QUESTIONS_ONLY=<regex on the shot name>. Writes JPEGs next to the page; LOOK at each one before using it.
@@ -40,7 +41,10 @@ const BLUE = { color: '#1f6fff', width: 0.04 };
 const HOUSES_2022 = (w = 0.1) => ['chiba', 'east-house', 'kitchen', 'west-house'].map((id) => ({ ids: [id], label: ({ chiba: 'Chiba', 'east-house': 'east house', kitchen: 'kitchen', 'west-house': 'west house' } as Record<string, string>)[id], opts: { color: '#1f6fff', width: w, height: 0.3, lift: 0.2 } }));
 const ORANGE = '#ff8a00';
 
-const SHOTS: Shot[] = [
+// Resolve source-dependent marks only when the opt-in capture actually runs.
+// Default gate collection must not execute parked historical coordinate lookups.
+function shots(): Shot[] {
+  return [
   // Q3 north: the model's map (compass drawn afterwards by the page generator's caption; see index.html)
   { name: 'q03-2022-top', scenario: 'year-2022', marks: HOUSES_2022(0.12), cam: { top: 52, centre: [0, 0, 0] } },
   // Q2 trailers inside Chiba
@@ -150,6 +154,8 @@ const SHOTS: Shot[] = [
   { name: 'q22-2026-top', scenario: 'year-2026', marks: [{ ids: ['chiba'], label: 'Chiba', opts: { color: '#1f6fff', height: 6, width: 0.2 } }], cam: { top: 96, centre: [12, 0, -4] } },
   { name: 'q22-2026-eye', scenario: 'year-2026', marks: [{ ids: ['chiba'], label: 'Chiba', opts: { color: '#1f6fff', height: 6, width: 0.07 } }], cam: { eye: [34, 3.5, 30], look: [0, 3, 0] } },
 ];
+}
+
 
 type Hook = {
   runScenario(n: string, o?: { paused?: boolean }): unknown;
@@ -245,6 +251,6 @@ test.describe('question captures', () => {
     await openLab(page);
     await page.addStyleTag({ content: '.lab { grid-template-columns: 1fr 0 !important } .lab-perf, .lab-hud, .lab-banners, .lab-verdict { display: none !important }' });
     await labFrames(page, 3);
-    for (const s of SHOTS) if (!ONLY || ONLY.test(s.name)) await take(page, s);
+    for (const s of shots()) if (!ONLY || ONLY.test(s.name)) await take(page, s);
   });
 });

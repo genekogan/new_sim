@@ -22,8 +22,10 @@ selected reviewed museum replaces that source: current2022 contentHash
 now admits and completes both skeletons in Node:24/66 canonical parts, zero
 violations, s0021 completed, ordinary descent/stance release and clean crew.
 See [current source verification](briefs/current-2022-construction-verification.REPORT.md).
-Current browser Play and clean combined release verification remain pending; no
-new online-supported claim yet. Old3/9 refusal tests use the SHA-verified7648
+Current browser full automatic Play passes both skeletons (201/555steps,
+46283/141772ticks, exact Node parity, zero violations); root and worker inspected
+actual completion captures. Clean combined gate/publication verification remains
+pending; no new online-supported claim yet. Old3/9 refusal tests use the SHA-verified7648
 fixture; their assertions and original fine-pose browser FIXMEs remain intact.
 Admission stays source-sensitive and never bypasses collision checks. PhaseB and
 continuous aggregate extraction remain unproved/deferred respectively.
