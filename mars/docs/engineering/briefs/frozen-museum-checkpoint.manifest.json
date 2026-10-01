@@ -1197,35 +1197,43 @@
   "tests": [
     {
       "path": "viewer/deploy/history-2026-actual-browser.test.mjs",
-      "sha256": "51a9407cb4c53650a5582332712da602f57dbe92efde950c89d4613e2e5b533f"
+      "sha256": "51a9407cb4c53650a5582332712da602f57dbe92efde950c89d4613e2e5b533f",
+      "candidateSha256": "51a9407cb4c53650a5582332712da602f57dbe92efde950c89d4613e2e5b533f"
     },
     {
       "path": "viewer/deploy/history-2026-structure.test.mjs",
-      "sha256": "e67ec747e5c61b11e0448d8526c1b67be3347f99f58177c5b9f00ff9d1592de6"
+      "sha256": "e67ec747e5c61b11e0448d8526c1b67be3347f99f58177c5b9f00ff9d1592de6",
+      "candidateSha256": "e67ec747e5c61b11e0448d8526c1b67be3347f99f58177c5b9f00ff9d1592de6"
     },
     {
       "path": "viewer/deploy/history-2026-interiors.test.mjs",
-      "sha256": "32515c5cfd02cd5285cef3457c525b287088cc6a8bc736be91f4ccbe73ba422f"
+      "sha256": "32515c5cfd02cd5285cef3457c525b287088cc6a8bc736be91f4ccbe73ba422f",
+      "candidateSha256": "32515c5cfd02cd5285cef3457c525b287088cc6a8bc736be91f4ccbe73ba422f"
     },
     {
       "path": "viewer/deploy/history-2026-compound.test.mjs",
-      "sha256": "bad01abd9aa375e8662d52f4193c09c61c6cbbadb61e4d7e0830da6723601604"
+      "sha256": "bad01abd9aa375e8662d52f4193c09c61c6cbbadb61e4d7e0830da6723601604",
+      "candidateSha256": "035c55849d7144b46f533058bdee7778a18b9774816d36292a7cf2190c685e66"
     },
     {
       "path": "viewer/deploy/history-2026-facade.test.mjs",
-      "sha256": "b53751c1e3a231c22e836b6e88d8b9b24a78f30f5b0b9fba782f5a9ab39bf3de"
+      "sha256": "b53751c1e3a231c22e836b6e88d8b9b24a78f30f5b0b9fba782f5a9ab39bf3de",
+      "candidateSha256": "b53751c1e3a231c22e836b6e88d8b9b24a78f30f5b0b9fba782f5a9ab39bf3de"
     },
     {
       "path": "viewer/deploy/history-ids.test.mjs",
-      "sha256": "46386af035ce3aa035355ee597146a9e29b7a3e8f5b6551142f91319a2aec84a"
+      "sha256": "46386af035ce3aa035355ee597146a9e29b7a3e8f5b6551142f91319a2aec84a",
+      "candidateSha256": "46386af035ce3aa035355ee597146a9e29b7a3e8f5b6551142f91319a2aec84a"
     },
     {
       "path": "viewer/deploy/history-geometry.test.mjs",
-      "sha256": "0f1c5a7bd249f7c75502f45210a7aff2fa650f22a4a4804e7ca05aa35d9ae85b"
+      "sha256": "0f1c5a7bd249f7c75502f45210a7aff2fa650f22a4a4804e7ca05aa35d9ae85b",
+      "candidateSha256": "afbcb06eb1d614c99f92e717d9290dadf81d66d59f2b8a5f7bba45de04773985"
     },
     {
       "path": "viewer/deploy/history-2025.test.mjs",
-      "sha256": "1ae814bf7435a49e9a26f44b39a205def807b2427a0abe988e1126c225cf5259"
+      "sha256": "1ae814bf7435a49e9a26f44b39a205def807b2427a0abe988e1126c225cf5259",
+      "candidateSha256": "84da9d10cfb5c52ee8bb5d6880d100189a6e5f775486bd8bb02b9870604b565a"
     }
   ]
 }

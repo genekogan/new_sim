@@ -276,7 +276,7 @@ test('2022 c273: seven trailers plus separately identified canopy and silver she
    // 2024 retains rv-N stable ids for mapped bus/van objects as well as trailers.
    const shell=meshes(rv,'trailer shell')[0]??meshes(rv,'bus body')[0]??meshes(rv,'van body')[0]??meshes(rv,'car body')[0]??meshes(rv,'vehicle body')[0];
    assert.ok(shell,`${year} ${rv.userData.assembly_id} has a vehicle shell`);
-   const L=shell.geometry.parameters.depth,t={x:rv.position.x,z:rv.position.z,angle:rv.rotation.y,length:L};
+
    for(const b of blds){let c=rectangleDistance(groundRectangle(rv),groundRectangle(b));if(c<.5){const vehicle=groundRectangle(rv);c=Math.min(...meshes(b).map(mesh=>rectangleDistance(vehicle,groundRectangle(mesh))));}if(c<.5)clashes.push(`${year} ${rv.userData.assembly_id} is ${c.toFixed(2)} m from ${b.name}`);}
   }
  }

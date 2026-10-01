@@ -87,7 +87,7 @@ test('all five retained cabin solids get real doors without rear through-holes',
  const [g]=add2026CabinDetails(root);root.updateMatrixWorld(true);
  const ids=['wood_component-1984','wood_component-1980','wood_component-1981','wood_component-1983','wood_component-1982'];
  for(const id of ids){const hut=host.children.find(o=>o.userData.component_id===id);assert.ok(hut);const frame=new T.Matrix4().compose(new T.Vector3(hut.position.x,0,hut.position.z),new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),id==='wood_component-1984'?-.78366:-.69813),new T.Vector3(1,1,1));
-  for(const y of [.2,1,1.9])for(const x of [-.80,-.5,-.2]){const ray=new T.Raycaster(new T.Vector3(x,y,-2).applyMatrix4(frame),new T.Vector3(0,0,1).transformDirection(frame),0,1);assert.equal(ray.intersectObject(host,true).length,0,`${id} door ray ${x},${y}: ${ray.intersectObject(host,true).map(h=>h.object.name||h.object.userData.component_id)}`);}
+  for(const y of [.2,1,1.9])for(const x of [-.80,-.5,-.2]){const ray=new T.Raycaster(new T.Vector3(x,y,-2).applyMatrix4(frame),new T.Vector3(0,0,1).transformDirection(frame),0,1);assert.equal(ray.intersectObject(host,true).length,0,`${id} door ray ${x},${y}: ${ray.intersectObject(host,true).map(h=>h.object.name||h.object.userData.component_id).join(',')}`);}
   const rear=new T.Raycaster(new T.Vector3(-.5,.6,2).applyMatrix4(frame),new T.Vector3(0,0,-1).transformDirection(frame),0,1);assert.ok(rear.intersectObject(hut).length,'rear lower wall not accidentally cut by front aperture');
  }
  const idsAdded=[];g.traverse(o=>{if(o.isMesh)idsAdded.push(o.userData.component_id);});assert.equal(idsAdded.length,new Set(idsAdded).size);

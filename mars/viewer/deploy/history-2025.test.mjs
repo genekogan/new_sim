@@ -7,6 +7,7 @@ import * as T from 'three';
 const file=new URL(`../.history-2025-test-${process.pid}.mjs`,import.meta.url);
 await build({stdin:{contents:`export * from './app/history/scenes';export {BAY} from './app/history/kit';`,resolveDir:new URL('..',import.meta.url).pathname,loader:'ts'},bundle:true,platform:'node',format:'esm',packages:'external',outfile:file.pathname,logLevel:'error'});
 T.TextureLoader.prototype.load=function(){return new T.Texture();};
+// oxlint-disable-next-line typescript/no-deprecated -- offline canvas stub; no browser DOM call
 globalThis.document={createElement:()=>({width:1,height:1,getContext:()=>new Proxy({}, {get:()=>()=>{}})})};
 const {createHistoricalScene,BAY,trailerClearance}=await import(file.href);
 after(()=>fs.unlink(file));
@@ -205,7 +206,7 @@ test('2025 Solar Sam canopy and bus have observed distinct structure and livery'
  assert.equal(meshes(canopy,'Scissor canopy actual red Chiba sign').length,1);
  assert.equal(meshes(bus,'Sam bus photographed white cab flank').length,2);assert.equal(meshes(bus,'Sam bus photographed yellow lower band').length,2);
  assert.equal(meshes(bus,'Sam bus rectangular mirror housing').length,2);
- for(const v of root.children.filter(o=>/^observed-car-/.test(o.userData.assembly_id||'')))assert.equal(meshes(v,'Vehicle side mirror housing').length,2,'mirror pass must run after vehicle creation');
+ for(const v of root.children.filter(o=>String(o.userData.assembly_id||'').startsWith('observed-car-')))assert.equal(meshes(v,'Vehicle side mirror housing').length,2,'mirror pass must run after vehicle creation');
 });
 test('2025 tapered pod edits do not mutate shared geometry or detach their curtain',()=>{
  const root=createHistoricalScene(2025),pods=members(root,'utility-booths'),sides=meshes(pods,'pod side wall'),doors=meshes(pods,'pod door');
