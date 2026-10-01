@@ -6,6 +6,17 @@ high-medium engineering / 20% polish, evidence and maintenance**; retain the
 50/30/20 product balance. The following is a proposed bounded acceptance contract,
 not a claim that unimplemented features work.
 
+## Immediate presentation checkpoint — 2026-10-01
+
+Owner asks for a minimal alumni entry at `/` using the existing Studio runtime,
+with photogrammetry retained at `/photo`, and editor/Lab at `/studio` and `/lab`.
+Only a collapsible year, aerial/WASD, reviewed room, Time (off initially), time-of-day
+and EUC panel is exposed. Automatic night campfire retains existing behavior.
+Combine reviewed historical source with live32 mechanics, then actual captures,
+clean full gate and production verification. No unverified meal/sleep drafts included.
+Return immediately to the queue below after publication. This is presentation work,
+not a new activity/camera/animation subsystem or a change to the Mars/Eden boundary.
+
 ## Current active queue (release32 verified)
 
 Online: physical two-player tabletop chess with legal choices, stable same-token

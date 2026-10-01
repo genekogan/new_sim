@@ -17,6 +17,8 @@ import {
 import type { Edit } from '../../lib/layout';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import './studio.css';
+import { PresentationControls } from './presentation-controls';
+import { PRESENTATION_ROOMS } from './presentation-rooms';
 import { attachWalking } from './walking';
 import { tagMarsSteppedAccess, type MarsSteppedAccessReport } from './mars-stepped-access';
 import { createEnvironment } from './environment';
@@ -193,7 +195,7 @@ function NumericField({
     />
   );
 }
-export default function Studio({ year = 2026 }: { year?: number }) {
+export default function Studio({ year = 2026, presentation = false }: { year?: number; presentation?: boolean }) {
   const [exportReady, setExportReady] = useState<{
     url: string;
     bytes: number;
@@ -568,6 +570,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
     });
     renderer.domElement.addEventListener('pointerup', (e) => {
       if (
+        presentation ||
         roomLocked ||
         walker.active ||
         Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4 ||
@@ -1182,6 +1185,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       get ready() { return testHook.frames >= 3; },
       info: () => ({ ...renderer.info.render, ...renderer.info.memory, pixelRatio: renderer.getPixelRatio() }),
       walking: () => ({ active: walker.active, grounded: walker.grounded, position: camera.position.toArray(), access: structuredClone(accessReport) }),
+      atmosphereState: () => ({ hour: sceneHour, cycle: cycleEnabled, fire: fireMode }),
       look: (position: number[], target: number[]) => {
         camera.position.fromArray(position);
         orbit.target.fromArray(target);
@@ -1307,7 +1311,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         (box.material as THREE.Material).dispose();
       }
     };
-  }, [year]);
+  }, [year, presentation]);
   const parts = (manifest?.instances || [])
     .filter(
       (p) =>
@@ -1323,6 +1327,31 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         return f();
       })
       .catch((e) => setError(e.message));
+  if (presentation) {
+    const rooms = PRESENTATION_ROOMS[year] ?? {};
+    return (
+      <main className="studio studio-presentation">
+        <section className="studio-stage studio-presentation-stage" aria-label="Mars campus">
+          <div className="studio-viewport" ref={mount} />
+          <PresentationControls
+            year={year} walking={walking} cycle={cycle} hour={hour}
+            rooms={Object.entries(rooms).map(([id, pose]) => ({ id, label: pose.label }))}
+            onYear={(next) => { location.href = next === 2026 ? '/' : `/?year=${next}`; }}
+            onWalk={() => walking ? api.current?.orbit() : api.current?.walk()}
+            onRoom={(id) => {
+              const pose = rooms[id];
+              if (pose) { setCut('complete'); api.current?.cut('complete'); api.current?.referenceView(pose); }
+            }}
+            onCycle={(next) => { setCycle(next); api.current?.atmosphere({ cycle: next, fire: 'auto' }); }}
+            onHour={(next) => { setHour(next); setCycle(false); api.current?.atmosphere({ hour: next, cycle: false, fire: 'auto' }); }}
+            onRide={() => api.current?.ride()}
+          />
+          {status && <div className="studio-status" role="status">{status}</div>}
+          {error && <div className="studio-error" role="alert">{error}</div>}
+        </section>
+      </main>
+    );
+  }
   return (
     <main className="studio">
       <header className="studio-header">
@@ -1349,7 +1378,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
           <button onClick={() => api.current?.view('campus')}>
             Whole campus
           </button>
-          <a href="/">Drone reconstruction ↗</a>
+          <a href="/photo">Drone reconstruction ↗</a>
         </div>
         <button className="save" onClick={() => api.current?.save()}>
           Save layout{edits > 0 ? ' •' : ''}

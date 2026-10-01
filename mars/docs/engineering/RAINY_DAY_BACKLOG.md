@@ -2425,3 +2425,28 @@ Original accounting stays **38 fixed /36 reclassified /142 remaining**. All216 I
 New exposed-journey follow-up: [BUILD-02 and PILE-01 limitations](LIVE_LAB_REPAIRS.md#bounded-limitation-retained)
 retain current-layout off-axis staging/delivery and unanimated aggregate extraction.
 That repair record owns their disposition; existing LAST_MILE IDs/provenance remain unchanged.
+
+## Owner-visible interaction refinements — 2026-10-01
+
+These remain wanted, not completed; preserve MVP mechanics and current rigs. They
+do not block the alumni presentation refresh or preparation/sleep integration.
+
+- **MVP-CHESS-TRANSFER:** released32 pickup retracts into normal carry before
+  destination reach. Ownership/support/cancellation work, but the table transfer
+  looks segmented. Inspect `engine/activities/chess.ts` and physical take/put
+  paths; verify exact current filenames before editing. Promote for featured
+  close-range play. Bounded Sol6.1 task: smooth the existing supported transfer,
+  preserving authoritative phases, token identity and interruption regressions;
+  inspect runtime captures. Escalate repeated bespoke anatomy. No baseline change
+  presumed; existing strict movement limits remain.
+- **MVP-READING-HANDS:** released reading retains purpose/bookmarks, but a flat
+  book and automatic pages communicate limited hand interaction. Inspect current
+  reading activity/renderer adapters and `e2e/reading.spec.ts`; bounded Sol6.1 task
+  for a purposeful current-rig gesture only after preparation/sleep. Existing
+  ownership, support and page-progress guarantees remain. Fine fingers deferred;
+  actual capture required before any visual-baseline change.
+- **MVP-FOLLOW-STUTTER:** owner reports far-camera stutter on “follow guest2 for
+  6s”. Not reproduced yet. Camera remains independently owned; retain a bounded
+  reproduction report covering timing/interpolation/quantization/rounding and
+  observed world/camera samples. Promote if it disrupts featured journeys. No
+  camera redesign, experiment or MP4 production commissioned by this queue.

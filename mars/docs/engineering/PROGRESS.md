@@ -1878,3 +1878,23 @@ Root viewer TypeScript and scoped lint pass; no Node/browser checks or captures 
 
 
 - **Release32 physical chess verified (2026-10-01):** exactclean084f492 basedhistorical645 fullgate243unit/941engine0fail6skip11TODO/154browser0fail7skip/lint/bothTSc/take/unchangedb746/all36localMCP; originalidleperfPASS. Firstgate missingignoredCADcache4unitRED retained, frozen31SHA copies fixenvironmentonly. MainFF645→084 preserves56ownerpendingpaths/status/bytes/mode/mtime/staged0, fullbackup/audit retained. Published100%c24b42b3 at15:59:41.295Z rollback31actual8f794aad. Publicchess2/2PASS34.2s, all5PNGs personallyinspected, threeReset51geometries26texturesexact; actingrightpalm match/error0/contact1 and samerenderedpawn, nofinger/anatomyexpansion.507assets19routes649equivalentcurlrequests/computer+creditSHA/range/auth, all36publicMCP and actualpublicdirector9steps15042msPASS. NativeNodeHTTPnotrerun/no sampledtail/no old25diagnosisclaim. Current2022firstbay/whole executePASS; originalFIXMEsremainexcluded. Allreviewedhistorical31receiptworkretained; latermuseumdraftexcluded. Physicalstandingchess/legalchoices/capture/interrupt/restore/handoff nowonline; castling/physicalpromotion/seatedchess/strongAI/active-sessionreload deferred. Foodconservation58focusedPASS draft plus2Sol6.1sourcehelpers foractualmealprep/supported sleep; noheavytests whilehistoricalownergate. WholeMVP40–70workinghoursmedium-lowconfidence, targetOctober5 requiresboundedphysicalinteractions. Nextdeliverable actualpreparation and conservedpartialstate/output, sleepviability; do notstopat32 or redesignrigs.
+
+
+### 2026-10-01 — alumni presentation candidate, saved MVP work preserved
+
+Owner presentation-first request is bounded to reusing Studio at `/`, retaining
+photo at `/photo`, editor/Lab and minimal controls. Actual-main-descended
+`codex/alumni-presentation` includes reviewed historical87files, strict actual
+counter interval fix and measured aggregate suite capacity; historical owner
+verified88 untouched source hashes. Two Sol6.1 helpers delivered routes/focused
+3PASS and scoped controls, then stopped. Root bridges the same renderer/walker/EUC
+and reviewed room cameras; no engine/rig changes. Focused9browser checks passed with20reviewed room views; root inspected contact
+sheet plus desktop/mobile/EUC/night captures. Three route tests, TSc and zero-warning
+lint pass. Clean combined full gate/publication remain pending; original focused
+failures retained, no per-case deadline or tolerance changed.
+Prep core3d07bf9, dirty UI/output-use followups and supported-sleep prototype are
+intact in their original worktrees, explicitly not shipped. Nonurgent chess
+transfer, reading-hands and guest2-camera-stutter requests recorded in
+RAINY_DAY_BACKLOG with bounded promotion criteria, no new camera project.
+WholeMVP forecast remains40–70 working hours plus this bounded presentation
+checkpoint; medium-low confidence around physical sleep/combined continuity.
