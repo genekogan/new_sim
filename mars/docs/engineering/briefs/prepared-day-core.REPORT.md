@@ -58,3 +58,7 @@ Mars8/studio variations remain unproven. Escalate any need for broader lifecycle
 routing, animation or support redesign. Current rigs, explicit authored choices,
 fixed ground arrangements, one cold two-ingredient recipe and two meal participants
 remain the scope. Runtime-local Pause/Resume only; active reload is unsupported.
+
+## First focused execution — 2026-10-01
+
+After release34 full gate and original idle performance completed, root ran `node --test engine/test/prepared-day-core.test.ts`:12/12PASS0skip0fail,5.708s. All authored full-chain, retained preparation/sleep, director handoff/End and incompatible-binding cases execute. Existing dependency link restored without installation. Log: `viewer/.cloudflare/prepared-day-first.log`. This supersedes the initial source-only status for these12 checks only; TypeScript/lint, unchanged existing-routine regressions, real Play/captures, Mars8/studio variations and clean combined gate remain required. Standalone sleep visual acceptance is first. No prepared-day main integration, deployment or Mars MVP completion claim.
