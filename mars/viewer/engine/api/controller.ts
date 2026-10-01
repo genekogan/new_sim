@@ -690,7 +690,7 @@ export class EngineController {
         snap = rt.snapshot({ allowDrop });
       } catch (e) {
         if (!(e instanceof SnapshotError)) throw e;
-        const hint = e.code === 'snapshot.drop-unsafe' ? 'pause before the load is picked up or after it is set down' : 'pause while no such action is live, or pass allowDrop (only while it holds no load)';
+        const hint = e.code === 'snapshot.drop-unsafe' ? 'safely stop the owning object task or set down its carried load before pausing' : 'pause while no such action is live, or pass allowDrop (only while it holds no load)';
         return fail(e.code, `pause at t = ${t} s: ${e.message} — nothing was committed; ${hint}`, { details: { subjects: e.subjects, at: t, live: liveActions(rt) } });
       }
       const take = rec.finish();

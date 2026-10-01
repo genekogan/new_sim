@@ -43,6 +43,13 @@ export const CONTAINERS: ReadonlySet<string> = new Set(['bowl', 'plate', 'cup', 
 
 export const ITEM_ASSETS: AssetDef[] = [
   {
+    id: 'reading-book', label: 'open reading book', category: 'item',
+    size: [.24, .025, .14], massKg: .4, color: '#345a84',
+    handling: hand1([0, .0125, 0]),
+    capabilities: { readable: { pages: 4, maxSeatDistance: .65 } },
+    dims: provisional('hypothetical open book, four compressed reading sections; not a historical Mars artifact'),
+  },
+  {
     id: 'table-6ft',
     label: '6 ft folding table',
     category: 'fixture',

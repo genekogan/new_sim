@@ -83,7 +83,7 @@ export type AssetDef = {
   /** Usable activity affordances, independent of mesh appearance and per-entity state. */
   capabilities?: {
     /** Upright ground fixture transport; handling geometry is defined only here. */
-    fixtureCarry?: { handling: Handling; upright: true }; display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
+    readable?: { pages: number; maxSeatDistance: number }; fixtureCarry?: { handling: Handling; upright: true }; display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
   dims: { confidence: Confidence; note: string };
 };
 
