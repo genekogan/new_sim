@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 20 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 27 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -1140,3 +1140,29 @@ Build/dry passed; replay 18,404,147 bytes verified static/source receipt. Prepar
 Root production browser disposition is **13 passed, one failed, one interrupted**: 12 activity/Reach journeys and injected fallback passed; loaded-computer case **FAILED404**, primitive fallback shown. Reset case **INTERRUPTED SIGINT130** after the known cause. Model/attribution were absent from `prepare.py` allowlist and prepared manifest, so the341-asset sweep did not check them. No full production pass, loaded appearance success or successful26appearance tag claimed. Release26 remains live with coherent primitive fallback; explicit two-file packaging repair `17e5962` is pending its required full gate and later publication.
 
 Logs/captures preserved: helper `.cloudflare/*release-26.log`, `tail-safe-release-26.jsonl`, `audit/prod-{camera,lab}-26.json`, `e2e/artifacts/prod-smoke-26`; root `studio-computer-appearance/viewer/e2e/artifacts/codex-production-combined-26` and `.cloudflare/prod-combined-26-results`. Details: `briefs/studio-computer-release.REPORT.md`. No camera development, provider calls, retries, pins/goldens or historical changes.
+
+## Production deploy 27 (2026-10-01): verified museum and playable checkpoint
+
+Live version **ef61dfc5-e0b7-469b-ab61-3b61f8b8b5cd**, deployed08:13:38.798507Z at100%; exact clean functional source **879c88ac0354b47eee81ce766401160d2503753d**. Actual prepublish rollback **ad241a52-e8d6-4c47-831e-557df9d5692a** retains the interim historical museum. Main fast-forwarded only after source gate GREEN and a verified278-file preservation snapshot:191 pending files already included,38 distinct future files restored,46 noncolliding files untouched,3 shared intent merges. No other agent work was discarded; dirty future historical geometry is not this release. Clean release build is isolated from dirty main.
+
+| Required check | Executed result |
+|---|---|
+| Lint / unit |PASS /206PASS,0fail |
+| Engine |860PASS,0fail,6documentedskip,11TODO |
+| Viewer + camera TypeScript |bothPASS |
+| Browser gate |147PASS,0fail,7documentedskip;28.5min |
+| Flagship take / deterministic probe |PASS /10901ticks, unchangedb746b094…7f0c3 |
+| Local MCP |20legacy+16engine eachcalled;isolation/authPASS |
+| Idle performance |original peak/mean/grid ceilingsPASS, no tolerance changes |
+| Production |500assets/19HTMLroutes/range/auth/exactmodel+creditSHA, all36MCP,9directorstepsPASS |
+| Published UI |16/16PASS plus exact bay and frozen camera proofs;34actualPNGs reviewed |
+
+Gate report: viewer/.cloudflare/gate/2026-10-01T07-18-41-571Z/report.json (oktrue,gitDirtyfalse,cleanup/interruptionnull). Releaseworktree viewer/.cloudflare contains build/prepare/performance/deploy/status/curl/MCP/director logs and audit receipts. Prepare499files841.4MiB; dry580staticfiles8143.95KiB/1423.86KiBgzip; deploy31new/515existing,97msstartup. Eight unchanged large objects skipped,zeroR2writes. Selected computer139184bytes and credit813bytes match exact manifest SHA/provenance.
+
+Published tests exercise actual Play stair ascent/descent (209 weighted samples each, closestleft−.0917m/right+.0800m,0violations), loaded/fallback computer and strict delayed-reset disposal, tour, Reach freshStep/Reset/Play and renderer isolation, actual designated Chiba WASD tiers and thin-table obstacle,4/8 purposeful routines and partial-mealPause/End, and current2022firstbay/whole through s0021 plus fixed-tick completion with canonical24/66identities,201/555steps and exact Node hashes. Full automatic current2022completion at normalUI8x passed separately LOCAL2/2 in21.5min; published completion proof combines actual Play through s0021 with responsive500tickchunks. Do not imply the entire published house was watched through automatic Play here. Oldsource-era W51FIXMEs remain excluded, not certified fine-pose fidelity. Frozen compiled camera controls/portrait/reset/dispose preserve paused authority; no camera development.
+
+Initial nativeNode HTTP sweeps failed before response with connectiontimeouts; all attempts retained, no1102observed. Curl's first no-Accept-Encoding request differed from nativefetch and failed the large-model length assertion; explicit native-equivalentgzip,deflate returned exact70772556byte identity headers and passed the complete unchanged sweep. First productionMCP/director passed under documentedNodeIPv4flags. Sanitized sampledtail202events allok,maxCPU475ms/maxWall634ms/exactversion; not complete CPU attribution or proof that failed25's unknownresource cause is fixed. No repeated deployment or hidden failure suppression.
+
+Included ready furniture/classroom/questions/rotation/conversation,4/8 unfinished-work→gathering→food/rest→return, independent fixed studio, computer and safe-drop/reset repairs, frozen museum, designated access and current-rig stair correction. Excluded: unverified paired-day integration and future historical/sourcevisibility corrections, broad autonomy/needs, reading/chess/music/mealpreparation/sleep breadth, fine anatomy and construction roof/plywood choreography. The aggregate stock-to-individual conversion is explicit; identity persists after extraction, not physical pile-removal fidelity. Whole Mars MVP estimate remains45–75workinghours,medium-lowconfidence; October5 is tight if a new physical prerequisite appears. Prefer bounded interactions over expanding rig/furniture fidelity. Paired regroup recovery is already under focused validation, not shipped in27.
+
+Evidence refresh:860PASS/0fail/6skip/11TODO; two stale citation names corrected to the actual unchanged source-era tests. Strict external-proof policy marks uncommitted viewer receipt/citation edits stale relative to the deployed879 gate: generated14PROVEN/3PARTIAL rows,18PROVEN/9PARTIAL/1UNPROVEN capabilities. Preserve that distinction; the exactclean879 gate and published proofs above remain valid. The next functional candidate’s clean gate will refresh current-document external provenance; no evidence guard was weakened.

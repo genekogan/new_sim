@@ -37,8 +37,7 @@ Add active persistence only where implemented and tested; do not imply it works.
 Fine fingers/clothing/contact, advanced autonomy/needs/relationships, dogs/gardening,
 complex construction choreography, arbitrary stair carrying and universal planning
 are explicitly deferred. The frozen reviewed2022 first-bay/whole-house skeleton passes current-source Node
-and full automatic Play completion; clean combined gate and publication proof
-are pending.
+and full automatic Play completion; clean combined gate and publication proof passed in release27.
 The older7648 source retains its explicit3/9 staging refusals and original FIXMEs.
 A legacy fixture is not proof for a different source, nor is skeleton completion
 a claim for plywood/roof phases or fine construction anatomy.
@@ -47,10 +46,10 @@ a claim for plywood/roof phases or fine construction anatomy.
 
 1. **Immediate online checkpoint:** verify actual designated Mars bleacher/access
    supports; narrow explicit traversal tags and real-geometry ascending/descending
-   proof (focused actual-CAD and browser WASD checks now pass; full gate/publication pending). Repair missing production model/credit and strict reset failure. Review
+   proof (actual-CAD, full gate and published WASD checks pass in release27). Repair missing production model/credit and strict reset failure. Review
    saved ready candidates, expose shipped experiences/camera in selector/tour.
    Clean combined full gate, inspected Play captures, local integration/deployment
-   and production re-verification. Exclude unverified paired-day drafts.
+   and production re-verification: **complete in release27**, source879c88a. Exclude unverified paired-day drafts; advance queue2 now.
 2. **Continuity increment:** validate saved paired-walk core and optional paired
    lunch/unfinished-work integration in Mars4/8 and studio, including departure,
    pause/resume/player handoff and cleanup. Do not rebuild the saved drafts.
