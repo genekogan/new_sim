@@ -36,7 +36,7 @@ import { disposeSkeletons } from '../../lib/three-resources.ts';
 import { seatHeight } from './fixtures.ts';
 import { BODY_MODEL, UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, curlHand, legTo, legsOf, palm, place, setWorldQuat, smooth, spineOf, swing, turn, type Arm, type Leg, type Spine } from './rig.ts';
 import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
-import { axisPoint, flightOf, gaitAt, type Flight, type Gait } from './stair-gait.ts';
+import { flightOf, gaitAt, stairFootTarget, type Flight, type Gait } from './stair-gait.ts';
 import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
 import { GIRDLE, LIP, PRONE_ACTS, engineTurn, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
@@ -1035,14 +1035,11 @@ function stairLegs(v: View, g: Gait, f: Flight, holder: THREE.Object3D) {
   const d = v.dims;
   if (!d || !v.spine || v.legs.length < 2) return;
   const w = g.weight;
-  const facing = Math.sign(Math.cos(-holder.rotation.y) * f.dir[0] + Math.sin(-holder.rotation.y) * f.dir[1]) || 1;
   const goals: THREE.Vector3[] = [];
   const pitches: number[] = [];
   v.legs.forEach((l, i) => {
-    const foot = g.feet[l.side > 0 ? 0 : 1];
+    const { foot, point: [x, z], facing } = stairFootTarget(f, g, l.side > 0 ? 'left' : 'right', v.footLat[i], -holder.rotation.y);
     const clip = l.foot.getWorldPosition(V());
-    const lat = g.lateral + (l.side > 0 ? -1 : 1) * Math.max(0.08, Math.abs(v.footLat[i]));
-    const [x, z] = axisPoint(f, foot.s - 0.04 * facing, lat);
     // toe-off: the trailing heel comes up over the last half-step of the stance, in the travel direction
     let heel = 0;
     if (foot.planted) {

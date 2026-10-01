@@ -128,3 +128,15 @@ export function gaitAt(f: Flight, x: number, z: number, bodyY: number): Gait | n
 export function axisPoint(f: Flight, s: number, lat: number): [number, number] {
   return [f.o[0] + f.dir[0] * s - f.dir[1] * lat, f.o[1] + f.dir[1] * s + f.dir[0] * lat];
 }
+
+/** Renderer target mapping: gait parity stays anatomical while the body's
+ * facing determines which side of the ascent axis that anatomical foot occupies.
+ * `spread` is the current rig's measured half stance width, never activity state.
+ */
+export function stairFootTarget(f: Flight, g: Gait, side: 'left' | 'right', spread: number, bodyYaw: number) {
+  const facing = Math.sign(Math.cos(bodyYaw) * f.dir[0] + Math.sin(bodyYaw) * f.dir[1]) || 1;
+  const foot = g.feet[side === 'left' ? 0 : 1];
+  const lat = g.lateral + (side === 'left' ? -1 : 1) * Math.max(0.08, Math.abs(spread)) * facing;
+  const point = axisPoint(f, foot.s - 0.04 * facing, lat);
+  return { foot, point, facing };
+}
