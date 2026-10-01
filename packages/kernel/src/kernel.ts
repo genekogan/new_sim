@@ -8,6 +8,8 @@ import type { Change, Json, KState, Link, Thing } from './types.ts';
 export const linkKey = (kind: string, from: string, to: string) => `${kind}|${from}|${to}`;
 export const SAID_TICKS = 20 * 120; // something said stays "just said" for two minutes
 export const AGREED_TICKS = 20 * 1800; // an agreement stands for thirty minutes
+/** Links that exist only because something was said. No card or actor can make them directly. */
+export const SPEECH_LINKS: ReadonlySet<string> = new Set(['said', 'asked', 'agreed']);
 export const MAX_MADE = 24;   // things one Soul may have brought into being at a time
 export const MAX_LINKS = 400; // links one Soul may hold at a time
 
@@ -62,7 +64,7 @@ export function check(s: KState, c: Change, by: string): void {
       exists(c.from); const target = exists(c.to);
       if (!world && c.from !== by) throw new Refused('coherence.link', 'an actor asserts only its own links');
       // What was said and what was agreed come only from saying it.
-      if (!world && (c.kind === 'said' || c.kind === 'agreed')) throw new Refused('coherence.speech', `"${c.kind}" comes only from saying it`);
+      if (!world && SPEECH_LINKS.has(c.kind)) throw new Refused('coherence.speech', `"${c.kind}" comes only from saying it`);
       if (!world && !s.links[linkKey(c.kind, c.from, c.to)] && linksFrom(s, by).length >= MAX_LINKS) throw new Refused('limit.links', `a Soul may hold at most ${MAX_LINKS} links at a time`);
       // Control is taken only over what you made, over a loose thing nobody controls, or when someone who has it agreed.
       if (!world && s.vocab.links[c.kind]?.control) {
@@ -72,7 +74,7 @@ export function check(s: KState, c: Change, by: string): void {
       }
       break;
     }
-    case 'unlink': if (!world && c.from !== by && c.to !== by) throw new Refused('coherence.link', 'an actor cuts only links it is part of'); break;
+    case 'unlink': if (!world && SPEECH_LINKS.has(c.kind)) throw new Refused('coherence.speech', `"${c.kind}" cannot be unsaid`); if (!world && c.from !== by && c.to !== by) throw new Refused('coherence.link', 'an actor cuts only links it is part of'); break;
     case 'say': exists(c.from); exists(c.to); if (!world && c.from !== by) throw new Refused('coherence.say', 'an actor speaks only for itself'); break;
   }
 }
@@ -96,7 +98,10 @@ export function apply(s: KState, c: Change): void {
     case 'unlink': delete s.links[linkKey(c.kind, c.from, c.to)]; break;
     case 'say':
       s.links[linkKey('said', c.from, c.to)] = { kind: 'said', from: c.from, to: c.to, since: s.tick, until: s.tick + SAID_TICKS, data: { act: c.act, ...(c.about !== undefined ? { about: c.about } : {}), ...(c.manner ? { manner: c.manner } : {}) } as Json };
-      // Saying yes is what makes an agreement: there is no other way to hold one.
+      // A question stays open (whatever else is said meanwhile) until it is answered or two minutes pass.
+      if (c.act === 'ask') s.links[linkKey('asked', c.from, c.to)] = { kind: 'asked', from: c.from, to: c.to, since: s.tick, until: s.tick + SAID_TICKS, ...(c.about !== undefined ? { data: { about: c.about } as Json } : {}) };
+      // An answer closes the question. Saying yes is what makes an agreement: there is no other way to hold one.
+      if (c.act === 'agree' || c.act === 'decline') delete s.links[linkKey('asked', c.to, c.from)];
       if (c.act === 'agree') s.links[linkKey('agreed', c.from, c.to)] = { kind: 'agreed', from: c.from, to: c.to, since: s.tick, until: s.tick + AGREED_TICKS };
       break;
   }

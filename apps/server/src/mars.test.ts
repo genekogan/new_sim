@@ -112,7 +112,7 @@ else {
     const cards = [
       { name: 'ask to be the dj', summary: 'Ask the host of a gathering to let you play the music', good_when: 'the intent is to DJ', not_for: 'there is already a DJ',
         target: { kind: 'gathering' }, derive: { host: { link: 'hosts', to: '$target' } },
-        when: [{ at: ['$actor', '$target'] }, { noneLinkedTo: ['dj of', '$target'] }, { distinct: ['$actor', '$host'] }, { notLinked: ['said', '$actor', '$host'] }, { notLinked: ['agreed', '$host', '$actor'] }],
+        when: [{ at: ['$actor', '$target'] }, { noneLinkedTo: ['dj of', '$target'] }, { distinct: ['$actor', '$host'] }, { notLinked: ['asked', '$actor', '$host'] }, { notLinked: ['agreed', '$host', '$actor'] }],
         then: [{ say: ['$actor', '$host', 'ask'], about: 'being the DJ at $target.name' }],
         approach: [{ verb: 'walk_to', params: { to: '$host', standoff: 1.3 } }], during: [{ verb: 'wave', params: { at: '$host', seconds: 2 } }], takes: 'seconds' },
       { name: 'be the dj', summary: 'Set up and play music at a gathering, once the host has agreed', good_when: 'the host said yes', not_for: 'no agreement yet',

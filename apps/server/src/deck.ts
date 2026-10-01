@@ -2,7 +2,7 @@
 // depiction program to concrete engine steps. This is the boundary where
 // meaning (kernel things) meets the engine (bodies, fixtures, points).
 import type { ActivityOption } from '@sim/engine-contract';
-import { bind, enablers, linked, linksFrom, linksTo, playable, samePlace, whyNot, type KState, type MintedCard, type Thing } from '@sim/kernel';
+import { SPEECH_LINKS, bind, enablers, linked, linksFrom, linksTo, playable, samePlace, whyNot, type KState, type MintedCard, type Thing } from '@sim/kernel';
 import type { Mind, WorldHost } from './world.ts';
 
 export type CardOption = ActivityOption & { card: string; hash: string; cardTarget: string | null; approachLen: number };
@@ -62,7 +62,7 @@ function belongsToIn(k: KState, target: string | null, of: string): boolean {
   if (!target) return false;
   if (target === of) return true;
   if (k.things[target]?.by === of) return true;
-  return Object.values(k.links).some((l) => l.from === of && l.to === target && l.kind !== 'said' && (l.until === undefined || l.until >= k.tick));
+  return Object.values(k.links).some((l) => l.from === of && l.to === target && !SPEECH_LINKS.has(l.kind) && (l.until === undefined || l.until >= k.tick));
 }
 export const belongsTo = (host: WorldHost, target: string | null, of: string): boolean => belongsToIn(host.kernel, target, of);
 /** Does playing this card on this target match a step of the owner's agenda? */
@@ -140,10 +140,7 @@ export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
 /** Who this Soul has asked something and not yet heard back from (they are here, and the question still hangs in the air). */
 export function awaiting(host: WorldHost, me: string): string[] {
   const k = host.kernel; k.tick = host.engine.world.tick;
-  return linksFrom(k, me, 'said').filter((l) => (l.data as { act?: string } | undefined)?.act === 'ask').map((l) => l.to).filter((to) => {
-    const back = linked(k, 'said', to, me), act = (back?.data as { act?: string } | undefined)?.act;
-    return !linked(k, 'agreed', to, me) && !((act === 'agree' || act === 'decline') && back!.since >= linked(k, 'said', me, to)!.since) && samePlace(k, me, to);
-  });
+  return linksFrom(k, me, 'asked').map((l) => l.to).filter((to) => samePlace(k, me, to));
 }
 
 /** The Soul's social situation in words, for its mind (and for agents through `perceive`). */
@@ -156,11 +153,11 @@ export function situationOf(host: WorldHost, m: Mind): { situation: string[]; he
     const mine = linked(k, 'attends', me, g.id), hosting = linked(k, 'hosts', me, g.id), here = samePlace(k, me, g.id);
     if (!mine && !hosting && !here && distance(host, me, g.id) > 40) continue;
     const host_ = linksTo(k, g.id, 'hosts')[0], n = linksTo(k, g.id, 'attends').length;
-    const roles = linksTo(k, g.id).filter((l) => !['attends', 'hosts', 'said', 'dancing at'].includes(l.kind)).map((l) => `${name(l.from)} ${l.kind}`);
+    const roles = linksTo(k, g.id).filter((l) => !['attends', 'hosts', 'dancing at'].includes(l.kind) && !SPEECH_LINKS.has(l.kind)).map((l) => `${name(l.from)} ${l.kind}`);
     out.push(`${g.name} is ${here ? 'here' : `at ${g.at ? name(g.at) : 'somewhere'}`}: hosted by ${host_ ? (host_.from === me ? 'you' : name(host_.from)) : 'nobody'}, ${n} taking part${g.states.music === 'playing' ? ', music is playing' : ''}${roles.length ? `, ${roles.join(', ')}` : ''}${mine ? ' (you are part of it)' : ''}`);
   }
   const waitingOn = awaiting(host, me);
-  for (const l of linksFrom(k, me, 'said')) { const d = l.data as { act?: string; about?: string }; if (d?.act === 'ask' && waitingOn.includes(l.to)) out.push(`you asked ${name(l.to)}${d.about ? ` about ${d.about}` : ''} and are waiting for an answer`); }
+  for (const l of linksFrom(k, me, 'asked')) { const d = (l.data ?? {}) as { about?: string }; if (waitingOn.includes(l.to)) out.push(`you asked ${name(l.to)}${d.about ? ` about ${d.about}` : ''} and are waiting for an answer`); }
   for (const l of linksTo(k, me, 'agreed')) out.push(`${name(l.from)} agreed to your request`);
   const heard = linksTo(k, me, 'said').map((l) => { const d = l.data as { act?: string; about?: string }; return { who: name(l.from), from: l.from, act: d?.act ?? 'spoke', ...(d?.about ? { about: String(d.about) } : {}) }; });
   const step = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;

@@ -1,7 +1,7 @@
 // Cards: resolving references, testing conditions, finding what a Soul can play
 // now, and turning a play into concrete changes.
 import { hashOf } from '@sim/engine-contract';
-import { controllers, linked, linksTo, preview, samePlace } from './kernel.ts';
+import { SPEECH_LINKS, controllers, linked, linksTo, preview, samePlace } from './kernel.ts';
 import { cardSchema, type Card, type Change, type Cond, type Json, type KState, type MintedCard } from './types.ts';
 
 export type Bindings = Record<string, string>; // slot name → thing id ('actor', 'target', derived slots, 'new')
@@ -148,7 +148,8 @@ export function validateCard(input: unknown, s: KState, engineVerbs: Set<string>
     if ('say' in st && st.say[0] !== '$actor') problems.push('a card speaks only for its actor');
     if ('set' in st && st.set[0] !== '$actor' && st.set[0] !== '$target' && st.set[0] !== '$new') problems.push('a card may set states only on the actor, its target, or a thing it just made');
     const made = 'link' in st ? st.link[0] : 'appear' in st ? st.linkFromActor : undefined;
-    if (made === 'said' || made === 'agreed') problems.push(`"${made}" comes only from saying it: use a say step (saying "agree" is what makes an agreement)`);
+    if (made && SPEECH_LINKS.has(made)) problems.push(`"${made}" comes only from saying it: use a say step (saying "ask" opens a question, saying "agree" makes an agreement)`);
+    if ('unlink' in st && SPEECH_LINKS.has(st.unlink[0])) problems.push(`"${st.unlink[0]}" cannot be unsaid`);
     if ('appear' in st && st.appear.kind === 'soul') problems.push('a card cannot make a Soul');
     if ('appear' in st) for (const x of [st.appear.at, ...(st.appear.with ? [st.appear.with] : [])]) if (!okRef(x)) problems.push(`a step refers to an unknown slot ${x}`);
     for (const x of refsOf(Object.values(st)[0])) if (!okRef(x)) problems.push(`a step refers to an unknown slot ${x}`);

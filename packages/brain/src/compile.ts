@@ -25,7 +25,7 @@ A Soul acts by playing **cards**. A card is a named, reusable action: when it is
 - \`link\`: must start from \`"$actor"\`. \`unlink\`: \`"$actor"\` must be one end.
 - \`say\`: from \`"$actor"\`.
 - \`set\`: on \`"$actor"\`, on \`"$new"\` (a thing this card just made), or on \`"$target"\`. Changing the target works at run time only if the actor controls it (has a control link to it), or made it and nobody controls it. Never another Soul. Never the world's own places: nobody can change or remove those.
-- A card can never create, move or change another Soul. **To get something from someone, ask.** Write one card that asks (\`say … "ask"\`) and a second card whose \`when\` requires their agreement: when a Soul plays the built-in card \`say yes\`, the world gets a link \`["agreed", <that Soul>, <the asker>]\` lasting thirty minutes. Agreement and speech come only from saying: a card can never link \`agreed\` or \`said\` itself. Agreement and speech come only from saying: a card can never link \`agreed\` or \`said\` itself.
+- A card can never create, move or change another Soul. **To get something from someone, ask.** Write one card that asks (\`say … "ask"\`) and a second card whose \`when\` requires their agreement: when a Soul plays the built-in card \`say yes\`, the world gets a link \`["agreed", <that Soul>, <the asker>]\` lasting thirty minutes. Saying \`ask\` also leaves \`["asked", <asker>, <them>]\` standing until they answer (or two minutes pass): use \`{"notLinked":["asked","$actor","$host"]}\` so a Soul does not ask twice. Speech links (\`said\`, \`asked\`, \`agreed\`) come only from saying: a card can never link or unlink them itself. Saying \`ask\` also leaves \`["asked", <asker>, <them>]\` standing until they answer (or two minutes pass): use \`{"notLinked":["asked","$actor","$host"]}\` so a Soul does not ask twice. Speech links (\`said\`, \`asked\`, \`agreed\`) come only from saying: a card can never link or unlink them itself.
 - A card that sets a state on \`"$target"\` or removes it must show where the right comes from: either \`when\` requires a control link the actor already holds (\`{"linked":["hosts","$actor","$target"]}\`, or \`"made"\` for the actor's own things), or an earlier step of the card takes one (\`{"link":["dj of","$actor","$target"]}\` with \`dj of\` declared as a control kind). A card without either is refused.
 - A link kind declared with \`"control": true\` gives power over its target (setting its states, ending it). It can only be made on a thing the actor made itself, or when someone who already controls the thing has an \`agreed\` link to the actor.
 
@@ -101,7 +101,7 @@ No card is minted. The second step has no target: any Soul who is there will do.
  "new_cards": [
   {"name": "ask to borrow", "summary": "Ask whoever holds a thing to lend it", "good_when": "the Soul wants to use something that someone else holds", "not_for": "nobody holds it, or the Soul already asked",
    "target": {"kind": "any"}, "derive": {"holder": {"link": "holds", "to": "$target"}},
-   "when": [{"distinct": ["$actor", "$holder"]}, {"at": ["$actor", "$holder"]}, {"notLinked": ["said", "$actor", "$holder"]}, {"notLinked": ["agreed", "$holder", "$actor"]}],
+   "when": [{"distinct": ["$actor", "$holder"]}, {"at": ["$actor", "$holder"]}, {"notLinked": ["asked", "$actor", "$holder"]}, {"notLinked": ["agreed", "$holder", "$actor"]}],
    "then": [{"say": ["$actor", "$holder", "ask"], "about": "borrowing $target.name"}],
    "approach": [{"verb": "walk_to", "params": {"to": "$holder", "standoff": 1.3}}], "during": [{"verb": "wave", "params": {"at": "$holder", "seconds": 2}}], "takes": "seconds"},
   {"name": "borrow", "summary": "Take a thing on loan once its holder has agreed", "good_when": "the holder said yes", "not_for": "no agreement yet",
@@ -153,7 +153,7 @@ export function compileUser(k: KState, soulId: string, wish: string, known: stri
   const soul = k.things[soulId]; const deck = k.decks[soulId]?.cards ?? [];
   const inDeck = deck.map((n) => k.vocab.cards[n]).filter(Boolean), library = Object.values(k.vocab.cards).filter((c) => !deck.includes(c.name));
   const things = known.map((id) => k.things[id]).filter(Boolean).map((t) => {
-    const links = Object.values(k.links).filter((l) => l.to === t.id && (l.until === undefined || l.until >= k.tick) && l.kind !== 'said').map((l) => `${k.things[l.from]?.name ?? l.from} ${l.kind}`);
+    const links = Object.values(k.links).filter((l) => l.to === t.id && (l.until === undefined || l.until >= k.tick) && l.kind !== 'said' && l.kind !== 'asked').map((l) => `${k.things[l.from]?.name ?? l.from} ${l.kind}`);
     return `- ${t.id} | ${t.kind} | ${plain(t.name, 60)}${t.at ? ` | at ${plain(k.things[t.at]?.name ?? t.at, 60)}` : ''}${Object.keys(t.states).length ? ` | ${plain(JSON.stringify(t.states), 160)}` : ''}${links.length ? ` | ${plain(links.join('; '), 200)}` : ''}`;
   });
   return `<soul>${plain(soul.name, 40)}: ${plain(soul.traits.about)} (currently at ${soul.at ? (k.things[soul.at]?.name ?? soul.at) : 'nowhere'})</soul>

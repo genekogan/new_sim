@@ -14,7 +14,7 @@ import type { Db } from './db.ts';
 import { WORLD_ID, energyWord, hash32, type Mind, type WorldHost } from './world.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
-import { cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
+import { SPEECH_LINKS, cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
 
 const TPS = 20;
 const MAX_INFLIGHT = 8;
@@ -313,7 +313,7 @@ export class Brain {
   /** Validate proposed cards and mint the valid ones into the vocabulary and this Soul's deck. No model involved. */
   async mint(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin']): Promise<MintVerdict[]> {
     const k = this.host.kernel, verbs = this.engineVerbs(), tick = this.host.engine.world.tick;
-    const newLinks: Record<string, LinkKind> = {}; for (const [n, d] of Object.entries(links ?? {})) if (!k.vocab.links[n] && /^[a-z][a-z ]{1,39}$/.test(n) && n !== 'said' && n !== 'agreed') newLinks[n] = { summary: String(d.summary).slice(0, 120), ...(d.control ? { control: true } : {}) };
+    const newLinks: Record<string, LinkKind> = {}; for (const [n, d] of Object.entries(links ?? {})) if (!k.vocab.links[n] && /^[a-z][a-z ]{1,39}$/.test(n) && !SPEECH_LINKS.has(n)) newLinks[n] = { summary: String(d.summary).slice(0, 120), ...(d.control ? { control: true } : {}) };
     const newKinds: Record<string, { summary: string }> = {}; for (const [n, d] of Object.entries(kinds ?? {})) if (!k.vocab.kinds[n] && /^[a-z][a-z ]{1,39}$/.test(n)) newKinds[n] = { summary: String(d.summary).slice(0, 120) };
     // cards are checked against the vocabulary as it will be once the link kinds proposed alongside them exist
     const staged = { ...k, vocab: { ...k.vocab, links: { ...k.vocab.links, ...newLinks } } };
