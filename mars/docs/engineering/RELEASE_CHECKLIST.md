@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 28 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 32 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -1342,3 +1342,40 @@ mealprep/sleep/currentrig scope; October5 requires early tradeoffs for newprereq
 - Clean full gate `.cloudflare/gate/2026-10-01T12-39-50-382Z/report.json`:241unitPASS,919enginePASS/6skip/11TODO,152browserPASS/7skip; TSc/lint/replay/independentprobe/MCP pass. Idleperformance zero violations. Build/dry/deploy pass;8largeR2 keys reused,0uploads.
 - Public19routes/507assets/auth/method/range/computerSHA/credit pass649boundedcurl requests; nativeNodeETIMEDOUT retained. PublicMCP+director pass nativeIPv4first. `.cloudflare/curl-31-ae/receipt.json`, `mcp-accuracy31.log`, `director-accuracy31.log` retain proof. Fresh publicroomvisual not repeated; source combined runtime verified.
 - Main645 with56unverified pending variants preserved; historical paired specialist additions excluded. Interimrelease, not seven-year completion. See historical-accuracy-2026.REPORT.md for observed/fitted uncertainties and accepted corrections.
+
+## Production deploy 32 (2026-10-01): physical tabletop chess
+
+Verified100% `c24b42b3-ff1f-4eea-8965-86c3ab4eb080`, deployed15:59:41.295Z.
+Exact clean functional `084f4929fcf7c6d01113d99a4746d88bc47cdf1a`; rollback31
+`8f794aad-ddd7-4439-a840-707937429d54` independently checked100% before publish.
+Metadata-only31receipts preserved separately; frozen source/browser cache retained.
+
+| Required check | Executed result |
+|---|---|
+| Unit |243PASS/0fail/0skip|
+| Engine |941PASS/0fail/6skip/11TODO|
+| Browser |154PASS/0fail/7skip|
+| Lint / bothTSc |PASS/zero warnings|
+| Flagshiptake / deterministicprobe |PASS/unchangedb746b0947e65…|
+| LocalMCP / originalidleperf |all36PASS / original limits and pinsPASS|
+| Publicactualchess |2PASS/0fail34.2s;5captures inspected|
+| Publicassets / MCP / director |507assets/19routes/649requests;all36/9stepsPASS|
+
+Standing players use 32 chess pieces, ordinary take and put, and the supported board/tray;
+legal alternatives, same-token captures, interrupted physical rollback and director
+handoff, quiescent board persistence and named cleanup-required recovery. No seated
+chess/castling/physicalpromotion/strongAI/finefingers or active-session reload claim.
+Retains historical31, audiblemusic/reading, classroom/setup/sharedwalk/camera and
+downhillfoot fix. Mealprep/conservation/sleep drafts and futurehistorical changes
+excluded. Two current2022 completion journeys executePASS; twooldW51FIXMEs and
+other listed skips remain exclusions. First gateRED missing ignored CADcache
+retained, fixed exact frozen31SHA files; no weakened assertions/pins/baselines.
+
+Build588files8348.37KiB/1485.62gzip,29new/525existing uploads,140msstartup.
+8largeobjectsunchanged/8skip/0R2writes. Published3resets exactly51geometries/
+26textures; heldpawn pose target and renderedpalm match. Exact computer/credit
+SHA/range/authpass. Curlgzip,deflate equivalent assertions pass; nativeNodeHTTP
+not rerun. PublicMCPIPv4first flags documented; director actualpublic15042ms.
+No new tail sample or failed25resourcecause claim. Evidence locations in
+briefs/chess-table.REPORT.md and release32-network-receipt.json. WholeMVP40–70
+workinghours/medium-lowconfidence; next physicalprep/sleep rather than chess polish.

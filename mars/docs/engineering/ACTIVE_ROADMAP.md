@@ -6,28 +6,32 @@ high-medium engineering / 20% polish, evidence and maintenance**; retain the
 50/30/20 product balance. The following is a proposed bounded acceptance contract,
 not a claim that unimplemented features work.
 
-## Current active queue (release30)
+## Current active queue (release32 verified)
 
-Verified online: reading/bookmarks and computer music with0–2independent listeners,
-actual sound/pause/interruption/resumption, retained classroom/setup/sharedwalking.
-See RELEASE_CHECKLIST30 for executed checks and exclusions. Downhill foot correction
-is preserved; currentrig adapters remain the MVP boundary.
+Online: physical two-player tabletop chess with legal choices, stable same-token
+captures, interruption/restoration and player handoff; retained reading/bookmarks,
+audible music/listeners, classroom/setup/shared walking and historical31 museum.
+Downhill feet retain anatomical left/right. Current rigs remain the MVP boundary.
 
-1. **Playable:** bounded two-player chess at a real table, using ordinary token
-   handling, legalturns/captures, live choices and physical cleanup. Rules/physical
-   tests are saved; UI/captures/fullcombinedgate remain required before exposure.
-2. **Engineering:** stable token/support/rollback ownership across composite transfers
-   and useful failed-cleanup recovery; re-use existing hierarchical claims/handoff,
-   no alternate mover or universal gameframework.
-3. **Next breadth/continuity:** simple real mealprep and sleep, then link independent
-   reading/work, gathering, walk, food/rest and return. Existing preparedfood/rest
-   is not proof of preparation/sleep. Historicalready work integrates only after
-   combinedgate; camera unchanged and never blocks this queue.
+1. **Playable:** bounded cold meal preparation with two finite ingredients and a
+   held utensil, persistent partial preparation, interruption/resumption and real
+   shared-food output. Sol6.1 source prototype exists; integration, actual Play,
+   inspected captures and full combined gate/publication remain required.
+2. **Engineering:** food conservation at admission and actual deposit, preventing
+   filled-bowl overwrite, insufficient-portion creation and concurrent-last-portion
+   duplication. Root draft58focusedPASS; add incomplete-preparation refusal and
+   integrate with preparation. This is saved work, not shipped.
+3. **Object/continuity:** supported lie/sleep/wake with a bounded current-rig adapter,
+   physical clearance, ordinary approach, coherent interruption and retained purpose.
+   Sol6.1 viability draft; no sleep claim yet. Then connect independent purposes
+   through gathering/walk/food/rest and return across the supported environments.
 
-WholeMVP remaining40–70workinghours, medium-low confidence under bounded interactions;
-October5 target needs scope escalation if repeatedphysical/anatomical prerequisites
-appear. Chess/equipment drafts are not shipped features. Root works serially while
-historicalowner uses the3sharedhelper slots.
+WholeMVP remaining **40–70 working hours**, medium-low confidence: real preparation,
+sleep and their combined continuity/disruption proof remain uncertain. October5
+requires bounded interactions; escalate if repeated anatomy or broader locomotion
+redesign becomes necessary. Two source-only helpers; historical owner currently
+uses serialized full-validation capacity. Camera is independent and unchanged.
+Older dated entries below preserve provenance; this queue owns current priority.
 
 ## Required supported experiences and limits
 

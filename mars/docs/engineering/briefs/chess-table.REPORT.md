@@ -1,4 +1,4 @@
-# Tabletop chess — focused draft, not released
+# Tabletop chess — release32 verified
 
 Root serial worktree `codex/chess-table-mvp`; no helper or camera/anatomy expansion.
 Pure bounded board rules are separate from actual ordinary take/put execution.
@@ -36,12 +36,12 @@ square rather than its empty destination. No resourcelease is left after complet
 
 ## Remaining acceptance / honest scope
 
-Lab controls/tour/selector and procedural checkerboard/distincttokens are now saved
-drafts, not exposed online. Choices include all supported legal
+Lab controls/tour/selector and procedural checkerboard/distinct tokens are online
+in verified release32. Choices include all supported legal
 turns with optional initial four-turn checkmate proposals, not fixed runtime playback.
 Both players face the board initially; read-only sharedgaze observes only explicitly
 bound boards and releases anyone with foreigncontrol. No worldscan/alternatemover.
-Focused actual Play proof is recorded below; fullgate and publishedproof remain required.
+Focused actual Play, full combined gate and published proof are recorded below.
 Blocked/unavailable/tilted/movedsupport/capabilitymismatch disruptions, deterministic
 repeat, quiescentJSON board/capture persistence and active-snapshot unsafe-drop
 refusal execute. Proceduralmeshes stay inside catalogbounds and share resources.
@@ -82,5 +82,31 @@ The existing take/put adapter drives that hand; the visible hanging opposite arm
 is not evidence of a second authority or a new pose system. A read-only bone/held
 item JSON attachment is added for the next required run to make this angle easier
 to assess. No rig, anatomy solver or physical execution changes are justified by
-this capture alone. Full combined gate and production verification are still pending;
-this work remains an unreleased candidate.
+this capture alone. This dated first-run candidate status is superseded by the
+combined acceptance and publication below.
+
+## Combined acceptance and publication — release32
+
+Clean functional084f492, based reviewed historical6451794, passed the established
+full gate:243unit,941engine/0fail/6skip/11TODO,154browser/0fail/7skip, bothTSc,
+zero-warning lint, unchanged flagship take/b746probe and all36localMCP. Original
+idle-performance limits/pins passed. Current2022firstbay/wholehouse completion
+checks executed and passed; originalW51FIXMEs remain excluded. Missing ignored
+CAD cache caused the first gate to fail4unitchecks before later phases; originalRED
+is retained and resolved with SHA-verified frozen31cache, no source/assertion change.
+
+Published100% c24b42b3-ff1f-4eea-8965-86c3ab4eb080 at2026-10-01T15:59:41.295Z,
+rollback31actual8f794aad. Public2/2PASS34.2s; fivePNGcaptures personally inspected,
+3resets51geometries/26texturesexact. Readonly held-pawn pose records acting right
+palm at requested target/error0/contact1 and matching rendered token grip; hanging
+leftarm is untargeted. Acting hand is partly occluded by board/torso in this view;
+no finger/skin guarantee or rig redesign. 507assets/19routes/649curlrequests and
+exact computer/credit SHA/range/auth, public36MCP and director9steps15042ms pass.
+NativeNodeHTTP not rerun; curl equivalent compression assertions retained. No new
+sampled-tail/resource-attribution claim. Meal preparation/sleep drafts excluded.
+
+Evidence: release32worktree viewer/.cloudflare/{release32-network-receipt.json,
+browser-release32.log,mcp-release32.log,director-release32.log,curl-32-ae/receipt.json},
+viewer/e2e/artifacts/release32-production; source chess-table-mvp gate
+2026-10-01T15-05-45-762Z. Earlier accidental local director invocation and no-tests
+filename error were corrected at invocation only; public two-case proof is explicit.
