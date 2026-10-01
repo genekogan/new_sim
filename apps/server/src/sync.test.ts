@@ -216,7 +216,9 @@ test('the DJ story through the real server: an agent proposes cards, two owners 
 
   // each owner gives direction as an agenda of cards; nobody scripts the other Soul
   assert.equal((await api(`/v1/souls/${rob.id}/intent`, admin, { intent: { agenda: [{ card: 'host a gathering', target: 'the campfire' }, { card: 'say yes', target: null }], text: 'throw a party at the campfire and let people help' } })).status, 200);
-  const wrenIntent = await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'join', of: 'Rob' }, { card: 'ask to be the dj', of: 'Rob' }, { card: 'be the dj', of: 'Rob' }], text: "go to Rob's party and ask him if you can DJ" } });
+  const wrenIntent = await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'go to', target: 'the gate' }, { card: 'ask to be the dj', of: 'Rob' }, { card: 'be the dj', of: 'Rob' }], text: "go to Rob's party and ask him if you can DJ" } });
+  // (That agenda is deliberately clumsy, as a model wrote it once: its first step is already true, and it never says to join.
+  //  The plan must still work: a step that cannot be played does not block the rest, and getting there is found by looking ahead.)
   assert.equal(wrenIntent.status, 200, JSON.stringify(wrenIntent.body));
   assert.equal((await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'no such card', target: null }] } })).status, 400);
 
@@ -230,7 +232,7 @@ test('the DJ story through the real server: an agent proposes cards, two owners 
   const trace = plays.map((p: any) => `${p.tick} ${p.soul}:${p.card}→${p.targetName}${p.ok ? '' : ' REFUSED ' + p.reason}`).join('\n');
   // the chain happened, in order, as independent plays by two Souls
   const done = plays.filter((p) => p.ok).map((p) => `${p.soul}:${p.card}`);
-  const order = ['Rob:host a gathering', 'Wren:join', 'Wren:ask to be the dj', 'Rob:say yes', 'Wren:be the dj'];
+  const order = ['Rob:host a gathering', 'Wren:ask to be the dj', 'Rob:say yes', 'Wren:be the dj'];
   let at = -1; for (const step of order) { const i = done.indexOf(step, at + 1); assert.ok(i > at, `${step} happened in order\n${trace}`); at = i; }
   // what "be the dj" changed: a role, a new thing, the music
   const dj = plays.find((p) => p.ok && p.card === 'be the dj');

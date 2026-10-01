@@ -1,7 +1,7 @@
 // Cards: resolving references, testing conditions, finding what a Soul can play
 // now, and turning a play into concrete changes.
 import { hashOf } from '@sim/engine-contract';
-import { controllers, linked, linksTo, samePlace } from './kernel.ts';
+import { controllers, linked, linksTo, preview, samePlace } from './kernel.ts';
 import { cardSchema, type Card, type Change, type Cond, type Json, type KState, type MintedCard } from './types.ts';
 
 export type Bindings = Record<string, string>; // slot name → thing id ('actor', 'target', derived slots, 'new')
@@ -59,6 +59,36 @@ export function whyNot(s: KState, card: Card, actor: string, target: string | nu
   if (!b) return 'nobody fills a needed role (for example, there is no host)';
   for (const c of card.when) if (!holds(s, c, b)) return `condition not met: ${JSON.stringify(c)}`;
   return null;
+}
+
+/** The conditions that do not hold for a play, or null if the target or a needed role is missing entirely. */
+export function unmet(s: KState, card: Card, actor: string, target: string | null): Cond[] | null {
+  if (card.target) { const t = target ? s.things[target] : undefined; if (!t || (card.target.kind !== 'any' && t.kind !== card.target.kind) || t.id === actor) return null; }
+  const b = bind(s, card, actor, target); if (!b) return null;
+  const out: Cond[] = card.when.filter((c) => !holds(s, c, b));
+  if (card.target?.same_place && target && !samePlace(s, actor, target)) out.push({ at: ['$actor', '$target'] });
+  return out;
+}
+/** How far a step is from playable: the fewest unmet conditions over its possible targets (Infinity if no target could ever do). 0 = playable now. */
+export function gap(s: KState, card: Card, actor: string, targets: (string | null)[]): number {
+  let best = Infinity;
+  for (const t of targets) { const u = unmet(s, card, actor, t); if (u && u.length < best) best = u.length; }
+  return best;
+}
+/**
+ * One step of looking ahead: which of the plays open to a Soul now would bring a blocked step closer to playable?
+ * Each play is tried on a copy of the state. This is how travel, leaving what you are in, or fetching what you
+ * need serve a plan without anyone having to write those steps down.
+ */
+export function enablers(s: KState, actor: string, step: { card: Card; targets: (s: KState) => (string | null)[] }, plays: Playable[], manner?: string): Set<string> {
+  const out = new Set<string>(); const before = gap(s, step.card, actor, step.targets(s));
+  if (before === 0) return out;
+  for (const p of plays) {
+    const b = bind(s, p.card, actor, p.target); if (!b) continue;
+    let r; try { r = preview(s, changesOf(s, p.card, b, manner).changes, actor); } catch { continue; }
+    if (r.ok && gap(r.state, step.card, actor, step.targets(r.state)) < before) out.add(p.id);
+  }
+  return out;
 }
 
 export type Playable = { card: MintedCard; target: string | null; id: string };

@@ -81,12 +81,18 @@ export function apply(s: KState, c: Change): void {
   }
 }
 
-/** Apply a batch atomically: all changes pass the check in order, or none apply. */
-export function applyAll(s: KState, changes: Change[], by: string): { ok: true } | { ok: false; code: string; message: string } {
-  const draft: KState = structuredClone(s);
+/** What the state would be after these changes, or the refusal. Never touches `s`. (Vocabulary and decks are shared, not copied: changes cannot alter them.) */
+export function preview(s: KState, changes: Change[], by: string): { ok: true; state: KState } | { ok: false; code: string; message: string } {
+  const draft: KState = { ...s, things: structuredClone(s.things), links: structuredClone(s.links) };
   try { for (const c of changes) { check(draft, c, by); apply(draft, c); if (c.op === 'appear') draft.things[c.id].by = by; } }
   catch (e) { if (e instanceof Refused) return { ok: false, code: e.code, message: e.message }; throw e; }
-  s.things = draft.things; s.links = draft.links; s.nextId = draft.nextId;
+  return { ok: true, state: draft };
+}
+
+/** Apply a batch atomically: all changes pass the check in order, or none apply. */
+export function applyAll(s: KState, changes: Change[], by: string): { ok: true } | { ok: false; code: string; message: string } {
+  const r = preview(s, changes, by); if (!r.ok) return r;
+  s.things = r.state.things; s.links = r.state.links;
   return { ok: true };
 }
 

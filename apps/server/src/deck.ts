@@ -2,7 +2,7 @@
 // depiction program to concrete engine steps. This is the boundary where
 // meaning (kernel things) meets the engine (bodies, fixtures, points).
 import type { ActivityOption } from '@sim/engine-contract';
-import { bind, linked, linksFrom, linksTo, playable, samePlace, whyNot, type MintedCard, type Thing } from '@sim/kernel';
+import { bind, enablers, linked, linksFrom, linksTo, playable, samePlace, whyNot, type KState, type MintedCard, type Thing } from '@sim/kernel';
 import type { Mind, WorldHost } from './world.ts';
 
 export type CardOption = ActivityOption & { card: string; hash: string; cardTarget: string | null; approachLen: number };
@@ -57,28 +57,57 @@ export function candidatesFor(host: WorldHost, soulId: string): string[] {
 }
 
 /** Does a target belong to `of`: is it that thing, or something it hosts, made, holds or otherwise links to? */
-export function belongsTo(host: WorldHost, target: string | null, of: string): boolean {
+type AgendaStep = { card: string; target?: string | null; of?: string | null };
+function belongsToIn(k: KState, target: string | null, of: string): boolean {
   if (!target) return false;
   if (target === of) return true;
-  const k = host.kernel; if (k.things[target]?.by === of) return true;
+  if (k.things[target]?.by === of) return true;
   return Object.values(k.links).some((l) => l.from === of && l.to === target && l.kind !== 'said' && (l.until === undefined || l.until >= k.tick));
 }
+export const belongsTo = (host: WorldHost, target: string | null, of: string): boolean => belongsToIn(host.kernel, target, of);
 /** Does playing this card on this target match a step of the owner's agenda? */
 export const matchesStep = (host: WorldHost, s: { card: string; target?: string | null; of?: string | null } | undefined, card: string, target: string | null) =>
   !!s && s.card === card && (!s.target || s.target === target) && (!s.of || belongsTo(host, target, s.of));
-/** Does this option serve the current step of the owner's agenda? */
-export const serves = (host: WorldHost, m: Mind, card: string, target: string | null) => matchesStep(host, m.agenda[m.agendaPos], card, target);
+/** The index of the first remaining agenda step this play matches, or -1. A plan is a set of things to get done in order, but a step that is redundant or already true must not block the ones after it. */
+export function stepIndex(host: WorldHost, m: Mind, card: string, target: string | null): number {
+  for (let i = m.agendaPos; i < m.agenda.length; i++) if (matchesStep(host, m.agenda[i], card, target)) return i;
+  return -1;
+}
+/** The targets an agenda step could be played on, in a given state (which may be a looked-ahead copy). */
+const stepTargets = (host: WorldHost, me: string, s: AgendaStep, needsTarget: boolean, cands: string[]) => (k: KState): (string | null)[] =>
+  !needsTarget ? [null] : (s.target ? [s.target] : [...cands, ...Object.keys(k.things).filter((id) => !cands.includes(id) && !host.kernel.things[id])]).filter((t) => !s.of || belongsToIn(k, t, s.of));
+/** Which remaining step is the plan's current frontier: the first one that could be played on some target now (or, failing that, simply the next). */
+export function frontier(host: WorldHost, m: Mind): number {
+  const k = host.kernel, me = m.soulId; const cands = candidatesFor(host, me);
+  for (let i = m.agendaPos; i < m.agenda.length; i++) {
+    const s = m.agenda[i], card = k.vocab.cards[s.card]; if (!card) continue;
+    if (stepTargets(host, me, s, !!card.target, cands)(k).some((t) => !whyNot(k, card, me, t))) return i;
+  }
+  return m.agendaPos;
+}
+/** Does this option serve the owner's plan right now? */
+export const serves = (host: WorldHost, m: Mind, card: string, target: string | null) => m.agendaPos < m.agenda.length && matchesStep(host, m.agenda[frontier(host, m)], card, target);
 
 /** The options the mind chooses among: playable cards, physically feasible, ranked and capped. */
 export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
   const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
+  const fr = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;
+  const servesNow = (card: string, target: string | null) => matchesStep(host, fr, card, target);
+  const all = playable(k, me, candidatesFor(host, me));
+  // Looking one step ahead: if the plan's step cannot be played yet, any play that brings it closer serves the plan
+  // (going where it happens, leaving what stands in the way). Nobody has to write those steps down.
+  let travel = new Set<string>();
+  if (fr && !all.some((p) => servesNow(p.card.name, p.target))) {
+    const card = k.vocab.cards[fr.card];
+    if (card) travel = enablers(k, me, { card, targets: stepTargets(host, me, fr, !!card.target, candidatesFor(host, me)) }, all.filter((p) => p.card.name !== fr.card));
+  }
   const scored: { o: CardOption; score: number }[] = [];
   const perCard = new Map<string, number>();
-  const plays = playable(k, me, candidatesFor(host, me)).map((p) => {
+  const plays = all.map((p) => {
     const t = p.target ? k.things[p.target] : null;
     const d = t ? distance(host, me, t.id) : 0;
     let score = 0;
-    if (serves(host, m, p.card.name, p.target)) score += 1000;
+    if (servesNow(p.card.name, p.target) || travel.has(p.id)) score += 1000;
     if (p.card.name === 'say yes' || p.card.name === 'say no') score += 300;                  // someone is waiting
     if (t && samePlace(k, me, t.id)) score += 40;
     if (t?.kind === 'gathering') score += 25;
@@ -98,7 +127,7 @@ export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
     const label = `${p.card.name}${t ? `: ${describeTarget(host, me, t)}` : ''}`;
     scored.push({ score, o: {
       id: p.id, template: p.card.name, label, goodWhen: p.card.good_when ?? p.card.summary, notFor: p.card.not_for, target: p.target ?? undefined,
-      servesIntent: serves(host, m, p.card.name, p.target), steps, durationHint: p.card.takes,
+      servesIntent: servesNow(p.card.name, p.target) || travel.has(p.id), steps, durationHint: p.card.takes,
       card: p.card.name, hash: p.card.hash, cardTarget: p.target, approachLen: p.card.approach.length,
     } });
     if (scored.length >= cap) break;
@@ -124,12 +153,12 @@ export function situationOf(host: WorldHost, m: Mind): { situation: string[]; he
   for (const l of linksFrom(k, me, 'said')) { const d = l.data as { act?: string; about?: string }; if (d?.act === 'ask') out.push(`you asked ${name(l.to)}${d.about ? ` about ${d.about}` : ''} and are waiting for an answer`); }
   for (const l of linksTo(k, me, 'agreed')) out.push(`${name(l.from)} agreed to your request`);
   const heard = linksTo(k, me, 'said').map((l) => { const d = l.data as { act?: string; about?: string }; return { who: name(l.from), from: l.from, act: d?.act ?? 'spoke', ...(d?.about ? { about: String(d.about) } : {}) }; });
-  const step = m.agenda[m.agendaPos];
+  const step = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;
   if (step) {
     const card = k.vocab.cards[step.card];
     const targets = (step.target ? [step.target] : candidatesFor(host, me)).filter((t) => !step.of || belongsTo(host, t, step.of));
     const possible = card && (card.target ? targets.some((t) => !whyNot(k, card, me, t)) : !whyNot(k, card, me, null));
-    out.push(`your owner's plan, step ${m.agendaPos + 1} of ${m.agenda.length}: ${step.card}${step.target ? ` (${name(step.target)})` : step.of ? ` (${name(step.of)}’s)` : ''}${possible ? '' : ': not possible yet'}`);
+    out.push(`your owner's plan, step ${m.agenda.indexOf(step) + 1} of ${m.agenda.length}: ${step.card}${step.target ? ` (${name(step.target)})` : step.of ? ` (${name(step.of)}’s)` : ''}${possible ? '' : ': not possible yet'}`);
   } else if (m.agenda.length) out.push("your owner's plan is complete");
   return { situation: out, heard };
 }

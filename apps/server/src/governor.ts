@@ -15,16 +15,17 @@ export class Governor {
   budget: number;
   private level: Record<Tier, number>;
   private last = Date.now();
-  private est: Record<Tier, number> = { mid: 0.00008, narrator: 0.004, director: 0.00005, user: 0.002, talk: 0.0006 };
+  private est: Record<Tier, number> = { mid: 0.00008, narrator: 0.004, director: 0.00005, user: 0.008, talk: 0.0006 };
   denied: Record<Tier, number> = { mid: 0, narrator: 0, director: 0, user: 0, talk: 0 };
 
   constructor(budgetPerDay: number) {
     this.budget = budgetPerDay;
-    // start each bucket at 15 minutes of refill so a fresh boot can act at once without a burst
-    this.level = Object.fromEntries((Object.keys(SHARES) as Tier[]).map((t) => [t, this.perDay(t) * (15 / 1440)])) as Record<Tier, number>;
+    // Background tiers start at 15 minutes of refill (no burst after a restart); tiers a person triggers start full.
+    this.level = Object.fromEntries((Object.keys(SHARES) as Tier[]).map((t) => [t, t === 'user' || t === 'talk' ? this.capacity(t) : Math.max(this.perDay(t) * (15 / 1440), this.est[t])])) as Record<Tier, number>;
   }
   perDay(t: Tier) { return this.budget * SHARES[t]; }
-  capacity(t: Tier) { return this.perDay(t) * (CAPACITY_HOURS / 24); }
+  /** A bucket holds an hour of refill, and never less than three typical calls (otherwise a tier whose calls cost more than an hour of its refill could never run). */
+  capacity(t: Tier) { return Math.max(this.perDay(t) * (CAPACITY_HOURS / 24), 3 * this.est[t]); }
   setBudget(b: number) { this.refill(); const r = b / (this.budget || 1); this.budget = b; for (const t of Object.keys(this.level) as Tier[]) this.level[t] = Math.min(this.level[t] * r, this.capacity(t)); }
 
   private refill() {

@@ -198,6 +198,12 @@ export class Brain {
     this.updateEnergy(m, ent, tick);
     const ctx = this.midContext(m, trigger);
     if (ctx.options.length === 0) { m.nextEvalTick = tick + TPS * 20; return; }
+    // A plan that has been impossible for ten minutes is given up, so a Soul is never stuck waiting for ever.
+    if (m.agendaPos < m.agenda.length) {
+      if (ctx.options.some((o) => o.servesIntent && o.card !== 'wait')) m.planBlockedSince = undefined;
+      else if (m.planBlockedSince === undefined) m.planBlockedSince = tick;
+      else if (tick - m.planBlockedSince > TPS * 600) { m.recent = [...m.recent.slice(-3), `gave up on the plan at "${m.agenda[m.agendaPos].card}" (not possible for a long while)`]; m.agendaPos = m.agenda.length; m.planBlockedSince = undefined; host.markDirty(m.soulId); }
+    }
     const fp = fingerprint(ctx);
     if (ctx.running && trigger === 'timer' && fp === m.lastFingerprint) { m.nextEvalTick = tick + TPS * 60; return; } // nothing changed: skip the call
     m.lastFingerprint = fp;

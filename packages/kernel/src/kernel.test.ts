@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyAll, bind, cardHash, changesOf, emptyKernel, kernelHash, linked, linksTo, playable, seedVocabulary, validateCard, whyNot, BASE_DECK, type Card, type KState } from './index.ts';
+import { applyAll, bind, cardHash, changesOf, emptyKernel, enablers, gap, kernelHash, linked, linksTo, playable, seedVocabulary, validateCard, whyNot, BASE_DECK, type Card, type KState } from './index.ts';
 
 const VERBS = new Set(['walk_to', 'sit', 'stand', 'rest', 'converse', 'gather', 'wave', 'perform', 'ambient_wander']);
 function world(): KState {
@@ -96,4 +96,22 @@ test('the DJ story: host, join, ask, agree, become the DJ, others dance: all fro
 test('changes are deterministic and replayable', () => {
   const run = () => { const s = world(); play(s, 'rob', 'host a gathering', 'campfire'); const p = Object.values(s.things).find((t) => t.kind === 'gathering')!; play(s, 'oda', 'join', p.id); play(s, 'oda', 'talk with', 'rob', 'shyly'); return kernelHash(s); };
   assert.equal(run(), run());
+});
+
+test('looking one step ahead: a blocked step is served by whatever play brings it closer', () => {
+  const s = world();
+  s.vocab.cards[ASK_DJ.name] = { ...ASK_DJ, hash: cardHash(ASK_DJ), by: 'wren', mintedAt: 0, origin: 'compiled' }; s.decks.wren.cards.push(ASK_DJ.name);
+  play(s, 'rob', 'host a gathering', 'campfire');
+  const party = Object.values(s.things).find((t) => t.kind === 'gathering')!.id;
+  const all = Object.keys(s.things);
+  // Wren is at the bench; asking needs her to be at the party. Joining it, or walking to the campfire, closes the gap; resting does not.
+  assert.equal(gap(s, s.vocab.cards[ASK_DJ.name], 'wren', [party]), 1);
+  const w = enablers(s, 'wren', { card: s.vocab.cards[ASK_DJ.name], targets: () => [party] }, playable(s, 'wren', all));
+  assert.ok(w.has(`join@${party}`) && w.has('go to@campfire'), [...w].join(', '));
+  assert.ok(!w.has('rest') && !w.has('go to@bench'));
+  // Rob hosts at the campfire but his owner now wants him at the bench: "go to" is closed to a host, and ending the gathering opens it.
+  const r = enablers(s, 'rob', { card: s.vocab.cards['go to'], targets: () => ['bench'] }, playable(s, 'rob', all));
+  assert.deepEqual([...r], [`end the gathering@${party}`]);
+  // looking ahead never changes the world
+  const h = kernelHash(s); enablers(s, 'wren', { card: s.vocab.cards[ASK_DJ.name], targets: () => [party] }, playable(s, 'wren', all)); assert.equal(kernelHash(s), h);
 });

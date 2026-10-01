@@ -10,7 +10,7 @@ import {
 } from '@sim/protocol';
 import type { Db } from './db.ts';
 import { ARRIVAL_PLACE, foldEvent, initKernel, soulThing } from './fold.ts';
-import { matchesStep } from './deck.ts';
+import { frontier, stepIndex } from './deck.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 export const WORLD_ID = 'toy-1';
@@ -26,6 +26,8 @@ export type Mind = {
   /** The intent's agenda (cards to favour, in order) and how far along it is. */
   agenda: AgendaStep[]; agendaPos: number;
   /** The card whose depiction is running and whose effects have not applied yet. */
+  /** Tick since which the plan has had no playable step (to give up eventually). */
+  planBlockedSince?: number;
   pending: { program: string; card: string; hash: string; target: string | null; manner?: string; approachLen: number; applied: boolean } | null;
 };
 type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void };
@@ -232,6 +234,9 @@ export class WorldHost {
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
   apply(e: LogEvent, replay: boolean) {
     const tick = e.tick;
+    // where the actor's plan stood just before this play (a play further down the plan must not skip a step that was possible)
+    const pm = e.kind === 'play' ? this.minds.get((e.payload as PlayPayload).soulId) : undefined;
+    const reach = pm && pm.agendaPos < pm.agenda.length ? frontier(this, pm) : -1;
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
     switch (e.kind) {
       case 'birth': {
@@ -273,8 +278,9 @@ export class WorldHost {
           const what = `${view.card}${view.targetName ? ` → ${view.targetName}` : ''}`;
           if (view.ok) {
             m.recent = [...m.recent.slice(-3), `${what} (done)`];
-            if (matchesStep(this, m.agenda[m.agendaPos], view.card, view.target)) {
-              m.agendaPos++;
+            const idx = stepIndex(this, m, view.card, view.target);
+            if (idx >= 0 && idx <= Math.max(reach, m.agendaPos)) {
+              m.agendaPos = idx + 1; m.planBlockedSince = undefined;
               // the plan moved on: think again now, rather than sitting out the rest of this activity
               if (m.agendaPos < m.agenda.length) { m.nextEvalTick = Math.min(m.nextEvalTick, tick + 15); m.evalTrigger = 'plan-advanced'; m.lastFingerprint = ''; }
             }
