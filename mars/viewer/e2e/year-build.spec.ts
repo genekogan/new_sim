@@ -13,6 +13,7 @@
 // The current-source support audit below is mandatory even while those captures are parked.
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { labFrames, openLab } from './lab-helpers';
@@ -22,10 +23,14 @@ import { yearBuildSetup, yearBuildSupportDiagnostic } from '../engine/scenarios/
 import { rehearse } from '../engine/rehearsal/rehearse.ts';
 const W51_FIXME = '2022 reconciliation W51: mars-2022 re-seeded (houses, stairs, solar, trailers moved); the recorded 2022 takes / pins no longer match it — re-record parked with the content (OWNER_DECISIONS 2026-09-29 evening; RECONCILIATION_2022.md)';
 
-test('current 2022 east-house source: first bay and whole house disclose physical staging exclusions', () => {
+const refusalSource = fs.readFileSync(new URL('../engine/test/fixtures/campus-history-pre-review-7648dbf/campus-2022.json', import.meta.url), 'utf8');
+expect(createHash('sha256').update(refusalSource).digest('hex')).toBe('e21a398fede6e7c02e75374eb4a0003f49c743eba367c7cda2d2cda8f6d0e95e');
+const refusalFile = JSON.parse(refusalSource) as ReturnType<typeof loadCampusFile>;
+
+test('source-era 7648dbf east-house: first bay and whole house disclose physical staging exclusions', () => {
   // This audit deliberately runs regardless of YEAR_BUILD_FULL and the historical capture FIXMEs.
   for (const bays of [1, undefined]) {
-    const setup = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays });
+    const setup = yearBuildSetup(2022, 'east-house', refusalFile, { bays });
     const diagnostic = yearBuildSupportDiagnostic(setup.build);
     expect(diagnostic?.code).toBe('year-build.unsupported');
     expect(diagnostic?.subjects).toHaveLength(bays ? 3 : 9);
@@ -37,10 +42,8 @@ test('current 2022 east-house source: first bay and whole house disclose physica
   }
 });
 
-/**
- * The node rehearsal of the same setup (engine/test/year-build.test.ts pins it: first bay 41 019 ticks
- * `ad844b78…`, whole house 116 477 `14d5c768…` at 36aa230) — computed here so an engine re-pin moves both.
- */
+/** Rehearse the exact currently loaded public source; browser completion must
+ * retain its ticks/hash. This is parity evidence, not a new golden pin. */
 function rehearsal(bays?: number) {
   const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays });
   const r = rehearse(s.history, s.workspace, s.plan, s.cfg);
@@ -80,7 +83,8 @@ type Stats = { ticks: number; stance: number; stanceOff: string[]; ladder: numbe
 const newStats = (): Stats => ({ ticks: 0, stance: 0, stanceOff: [], ladder: 0, ladderOff: [], holds: 0, holdsReached: 0, holdMiss: [], points: 0, reached: 0, reachableMiss: [], byAct: {}, over: [], kinds: {} });
 
 for (const [scenario, missing] of [['year-build-2022', 3], ['year-build-2022-house', 9]] as const) {
-  test(`${scenario}: current unsupported layout refuses Play, Step and Reset before physical actions`, async ({ page }, testInfo) => {
+  test(`${scenario}: source-era unsupported layout refuses Play, Step and Reset before physical actions`, async ({ page }, testInfo) => {
+    await page.route('**/engine/campus-2022.json', route => route.fulfill({ contentType: 'application/json', body: refusalSource }));
     await openLab(page, scenario);
     await page.evaluate((name) => (window.__marsEngine as unknown as { runScenario(n: string, o: object): Promise<unknown> }).runScenario(name, { paused: true }), scenario);
     const initial = await page.evaluate(() => {
@@ -111,7 +115,63 @@ for (const [scenario, missing] of [['year-build-2022', 3], ['year-build-2022-hou
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
     await labFrames(page);
     await assertRefusal('Reset');
-    await captureView(page, `${scenario}-current-unsupported`, { testInfo, compare: false });
+    await captureView(page, `${scenario}-source-era-unsupported`, { testInfo, compare: false });
+  });
+}
+
+// Mandatory current-source completion. Old fine-pose/golden capture tests below
+// keep their original FIXMEs; these checks do not claim those anatomy guarantees.
+for (const [scenario, bays, parts] of [['year-build-2022', 1, 24], ['year-build-2022-house', undefined, 66]] as const) {
+  test(`${scenario}: current source completes with automatic Play through s0021 and canonical continuity`, async ({ page }, testInfo) => {
+    const automaticCompletion = process.env.YEAR_BUILD_FULL === '1';
+    test.setTimeout(automaticCompletion && !bays ? 1_200_000 : 600_000);
+    const reference = rehearsal(bays);
+    await openLab(page, scenario);
+    expect((await yb(page)).admission).toBeNull();
+    await page.getByRole('button', { name: 'Step', exact: true }).click();
+    expect(await page.evaluate(() => window.__marsEngine!.violations())).toEqual([]);
+    await page.getByRole('button', { name: 'Reset', exact: true }).click();
+    await labFrames(page);
+    expect(await page.evaluate(() => window.__marsEngine!.state().tick)).toBe(0);
+    await captureView(page, `${scenario}-current-piles`, { testInfo, compare: false });
+    await page.getByRole('combobox', { name: 'Speed', exact: true }).selectOption('8');
+    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    await page.waitForFunction(() => {
+      const h = window.__marsEngine!;
+      return h.state().done || h.sequence().steps?.some(row => row.id === 's0021-climb-stance' && row.status === 'completed');
+    }, undefined, { timeout: 300_000 });
+    expect(await page.evaluate(() => window.__marsEngine!.sequence().steps!.find(row => row.id === 's0021-climb-stance')?.status)).toBe('completed');
+    expect(await page.evaluate(() => window.__marsEngine!.violations())).toEqual([]);
+    await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    await captureView(page, `${scenario}-current-after-s0021`, { testInfo, compare: false });
+    if (automaticCompletion) {
+      await page.getByRole('button', { name: 'Play', exact: true }).click();
+      await page.waitForFunction(() => window.__marsEngine!.state().done, undefined, { timeout: bays ? 420_000 : 1_020_000 });
+    } else {
+      // Normal gate covers automatic dispatch through the reported failure and
+      // exact full completion in responsive tick batches. Release proof also
+      // runs YEAR_BUILD_FULL=1 for the entire current whole-house Play journey.
+      let done = false;
+      for (let chunk = 0; chunk <= Math.ceil(reference.ticks / 500) && !done; chunk++)
+        done = await page.evaluate(() => window.__marsEngine!.runToEnd(500).done);
+      expect(done).toBe(true);
+    }
+    const result = await page.evaluate(() => {
+      const h = window.__marsEngine as unknown as H;
+      return { state: h.state(), hash: h.stateHash(), yb: h.yearBuild()!, components: h.components(), rows: h.sequence().steps!, bones: h.bones(), violations: window.__marsEngine!.violations() };
+    });
+    expect(result.state.tick).toBe(reference.ticks);
+    expect(result.hash).toBe(reference.hash);
+    expect(result.yb.compare.n).toBe(parts); expect(result.yb.compare.ok).toBe(parts);
+    expect(result.rows.every(row => row.status === 'completed')).toBe(true);
+    expect(result.violations).toEqual([]);
+    expect(result.components.every(component => component.phase === 'installed' && component.support !== 'held')).toBe(true);
+    expect(Object.values(result.bones).every(bone => !bone.on)).toBe(true);
+    expect(result.state.humans.every(human => human.activity === 'idle' && human.level === 0)).toBe(true);
+    for (const check of result.state.checks) expect(check.ok, check.message).toBe(true);
+    await look(page, [result.yb.centre[0] + 17, 11, result.yb.centre[1] + 18], [result.yb.centre[0], 2.4, result.yb.centre[1]]);
+    await captureView(page, `${scenario}-current-completed`, { testInfo, compare: false });
+    await testInfo.attach('current-source-build-completion', { body: JSON.stringify({ ...result, automaticCompletion, capturePauseAfterS0021: true }, null, 2), contentType: 'application/json' });
   });
 }
 

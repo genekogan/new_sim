@@ -14,7 +14,21 @@ Original production reproduction: release22, viewer/e2e/artifacts/live-reported-
 Exact diagnostics and preceding action/support snapshots are retained as JSON.
 Automatic Play reproduction and deployed control verification are recorded below, separately from programmatic stepping.
 
-## Coverage honesty
+## Reviewed-source checkpoint — 2026-10-01
+
+The release23/older7648 layout findings below remain historical evidence. The
+selected reviewed museum replaces that source: current2022 contentHash
+`2be1325ea2cee602b86243116a9f365991686e1751fffdf36472df484970831c`
+now admits and completes both skeletons in Node:24/66 canonical parts, zero
+violations, s0021 completed, ordinary descent/stance release and clean crew.
+See [current source verification](briefs/current-2022-construction-verification.REPORT.md).
+Current browser Play and clean combined release verification remain pending; no
+new online-supported claim yet. Old3/9 refusal tests use the SHA-verified7648
+fixture; their assertions and original fine-pose browser FIXMEs remain intact.
+Admission stays source-sensitive and never bypasses collision checks. PhaseB and
+continuous aggregate extraction remain unproved/deferred respectively.
+
+## Coverage honesty (release23 source)
 
 Release22 green gate executed116 browser cases but skipped7. Both 2022 first-bay
 and whole-house completion cases have unconditional W51 FIXME markers;
@@ -29,7 +43,7 @@ No historical colors/placement facts, golden tolerances or geometry admission ru
 may change to conceal these failures. Worker reports under engineering briefs retain
 exact sources, tests and limitations. The release-23 verification below is the current checkpoint.
 
-## Bounded limitation retained
+## Source-era bounded limitation retained
 
 BUILD-02: current east-house full completion remains wanted but unsupported by
 the two existing aisle-end staging positions. Both overlap Chiba beam0684c6e5 /

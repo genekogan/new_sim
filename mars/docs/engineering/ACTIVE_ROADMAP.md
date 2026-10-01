@@ -36,8 +36,11 @@ world/take replay does not imply arbitrary active logical activities survive rel
 Add active persistence only where implemented and tested; do not imply it works.
 Fine fingers/clothing/contact, advanced autonomy/needs/relationships, dogs/gardening,
 complex construction choreography, arbitrary stair carrying and universal planning
-are explicitly deferred. Historical current2022 whole-house remains unsupported
-until its exact staging dependency is resolved; a legacy fixture is not proof.
+are explicitly deferred. The frozen reviewed2022 first-bay/whole-house skeleton passes current-source Node
+completion; browser automatic Play and combined publication proof are pending.
+The older7648 source retains its explicit3/9 staging refusals and original FIXMEs.
+A legacy fixture is not proof for a different source, nor is skeleton completion
+a claim for plywood/roof phases or fine construction anatomy.
 
 ## Small active queue and exit criteria
 

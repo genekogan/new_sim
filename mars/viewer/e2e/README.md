@@ -203,3 +203,19 @@ model. Compare trends between runs, not absolute values. The adaptive loop
 drops SwiftShader to `pixelRatio` 0.8 on every route, because software GL
 renders under 30 fps. On a real GPU, draw calls and triangles are the same but
 the pixel ratio stays higher.
+
+## Current and historical east-house coverage
+
+`year-build.spec.ts` always executes current reviewed2022 first-bay and whole
+skeleton completion: real Play through the reported s0021 climb, then responsive
+fixed-tick batches to completion, exact current Node/browser hash and tick parity,
+canonical24/66 identity/support and clean crew. Release proof additionally runs
+`YEAR_BUILD_FULL=1 npm run e2e -- year-build.spec.ts --grep 'current source'`: both
+current journeys finish through the actual Play transport (brief pause for the
+s0021 capture), with ordinary UI speed8. The flag does not override the two
+original W51 fine-pose/golden FIXMEs, which remain skipped and unproved.
+
+The old7648 layout's3/9 staging refusals and the earlier supported whole-house
+fixture are separately source-verified. Neither certifies the loaded production
+layout. Skeleton completion does not establish plywood/roof construction, continuous
+aggregate extraction animation, or exhaustive anatomy clearance.
