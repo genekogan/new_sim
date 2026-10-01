@@ -26,12 +26,10 @@ Downhill feet retain anatomical left/right. Current rigs remain the MVP boundary
 
 1. **Playable:** bounded cold meal preparation with two finite ingredients and a
    held utensil, persistent partial preparation, interruption/resumption and real
-   shared-food output. Sol6.1 source prototype exists; integration, actual Play,
-   inspected captures and full combined gate/publication remain required.
+   shared-food output. Integrated source candidate passes66focused checks and both actual Play layouts with inspected captures; rebased33 plus presentation handoff passes5browser journeys. Full combined gate/publication remain required; not shipped.
 2. **Engineering:** food conservation at admission and actual deposit, preventing
    filled-bowl overwrite, insufficient-portion creation and concurrent-last-portion
-   duplication. Root draft58focusedPASS; add incomplete-preparation refusal and
-   integrate with preparation. This is saved work, not shipped.
+   duplication. Combined66focusedPASS includes incomplete-output admission/deposit refusal and two ordinary conserved servings. Full combined gate/publication remain required. This is saved work, not shipped.
 3. **Object/continuity:** supported lie/sleep/wake with a bounded current-rig adapter,
    physical clearance, ordinary approach, coherent interruption and retained purpose.
    Sol6.1 viability draft; no sleep claim yet. Then connect independent purposes
