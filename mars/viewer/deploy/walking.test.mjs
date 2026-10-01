@@ -24,7 +24,7 @@ function box(w, h, d, x, y, z) {
   return mesh;
 }
 
-test('walking speed is frame independent; diagonal input is normalized; sprint is faster', () => {
+void test('walking speed is frame independent; diagonal input is normalized; sprint is faster', () => {
   const a = setup(),
     b = setup(),
     c = setup();
@@ -40,7 +40,7 @@ test('walking speed is frame independent; diagonal input is normalized; sprint i
   for (let i = 0; i < 60; i++) d.body.step(1 / 60, 1, 0, false);
   assert.ok(d.camera.position.distanceTo(a.camera.position) < 1e-6);
 });
-test('jump leaves the ground, cannot double-jump, and lands at eye height', () => {
+void test('jump leaves the ground, cannot double-jump, and lands at eye height', () => {
   const { body, camera } = setup();
   body.jump();
   tick(body, 15);
@@ -52,7 +52,7 @@ test('jump leaves the ground, cannot double-jump, and lands at eye height', () =
   assert.ok(Math.abs(camera.position.y - 1.54) < 1e-6);
   assert.ok(body.grounded);
 });
-test('wall blocks walking; low stairs can be climbed; moving geometry rebuilds collisions', () => {
+void test('wall blocks walking; low stairs can be climbed; moving geometry rebuilds collisions', () => {
   const wall = box(5, 4, 0.1, 0, 2, -2),
     a = setup([wall]);
   tick(a.body, 180, 1);
@@ -66,7 +66,7 @@ test('wall blocks walking; low stairs can be climbed; moving geometry rebuilds c
   tick(b.body, 60, 1);
   assert.ok(Math.abs(b.camera.position.y - 1.79) < 0.01);
 });
-test('floors support walking and ceilings stop upward jumps', () => {
+void test('floors support walking and ceilings stop upward jumps', () => {
   const floor = box(5, 0.1, 5, 0, 1, 0),
     a = setup([floor]);
   a.camera.position.y = 3;
@@ -83,7 +83,7 @@ test('floors support walking and ceilings stop upward jumps', () => {
   assert.ok(peak < 2.1);
   assert.ok(b.body.grounded);
 });
-test('keyboard controls respect input focus, clear held keys on blur, and restore the orbit view', () => {
+void test('keyboard controls respect input focus, clear held keys on blur, and restore the orbit view', () => {
   class Element extends EventTarget {
     editable = false;
     tabIndex = -1;
@@ -160,7 +160,7 @@ test('keyboard controls respect input focus, clear held keys on blur, and restor
   delete globalThis.document;
 });
 
-test('arrows turn and look independently of WASD; movement, looking and jumping work together', () => {
+void test('arrows turn and look independently of WASD; movement, looking and jumping work together', () => {
   class Element extends EventTarget {
     closest() {
       return null;
@@ -282,7 +282,7 @@ function accessPair(options = {}) {
   const body = new WalkingBody(camera); body.rebuild([group]); body.place();
   return { group, low, high, camera, body };
 }
-test('explicit 0.61m actual support delta ascends and descends continuously while grounded', () => {
+void test('explicit 0.61m actual support delta ascends and descends continuously while grounded', () => {
   const { body, camera } = accessPair(); let previous = camera.position.y, maxChange = 0;
   for (let i = 0; i < 60; i++) { body.step(1 / 90, 1, 0, false); maxChange = Math.max(maxChange, Math.abs(camera.position.y - previous)); previous = camera.position.y; assert.equal(body.grounded, true); }
   assert.ok(Math.abs(camera.position.y - 2.15) < 1e-6);
@@ -291,50 +291,50 @@ test('explicit 0.61m actual support delta ascends and descends continuously whil
   for (let i = 0; i < 60; i++) { body.step(1 / 90, 1, 0, false); maxChange = Math.max(maxChange, Math.abs(camera.position.y - previous)); previous = camera.position.y; assert.equal(body.grounded, true); }
   assert.ok(Math.abs(camera.position.y - 1.54) < 1e-6); assert.ok(maxChange < 0.08);
 });
-test('paused input retains the same verified seam support without a camera snap', () => {
+void test('paused input retains the same verified seam support without a camera snap', () => {
   const { body, camera } = accessPair(); tick(body, 30, 1);
   assert.ok(camera.position.y > 1.54 && camera.position.y < 2.15);
   const before = camera.position.y; tick(body, 30); assert.ok(Math.abs(camera.position.y - before) < 1e-6); assert.equal(body.grounded, true);
   tick(body, 30, 1); assert.ok(Math.abs(camera.position.y - 2.15) < 1e-6);
 });
-test('explicit local access axis follows rotated translated physical supports', () => {
+void test('explicit local access axis follows rotated translated physical supports', () => {
   const { body, camera, group } = accessPair({ transform: { position: new THREE.Vector3(8, 0.7, -5), yaw: Math.PI / 3 } });
   tick(body, 60, 1); const local = camera.position.clone().applyMatrix4(group.matrixWorld.clone().invert());
   assert.ok(Math.abs(local.y - 2.15) < 1e-6); assert.ok(local.z < -1.2); assert.equal(body.grounded, true);
 });
-test('physical gap beyond explicit bound is not projected into an access ramp', () => {
+void test('physical gap beyond explicit bound is not projected into an access ramp', () => {
   const { body, camera } = accessPair({ gap: 0.1 }); tick(body, 90, 1);
   assert.ok(Math.abs(camera.position.y - 1.54) < 1e-6); assert.ok(camera.position.z > -0.5);
 });
-test('actual ground-to-tier 0.77m rise is refused even when nominal tier height is 0.61m', () => {
+void test('actual ground-to-tier 0.77m rise is refused even when nominal tier height is 0.61m', () => {
   const { body, camera } = accessPair({ difference: 0.77 }); tick(body, 90, 1);
   assert.ok(Math.abs(camera.position.y - 1.54) < 1e-6); assert.ok(camera.position.z > -0.5);
 });
-test('untagged furniture remains blocking and does not acquire access semantics', () => {
+void test('untagged furniture remains blocking and does not acquire access semantics', () => {
   const table = box(2, 0.61, 2, 0, 0.145, -1.5), { body, camera } = setup([table]);
   camera.position.z = 0.5; body.place(); tick(body, 90, 1);
   assert.ok(Math.abs(camera.position.y - 1.54) < 1e-6); assert.ok(camera.position.z > -0.5);
 });
-test('tagged tiers cannot be entered from a side and ceilings still block the lift', () => {
+void test('tagged tiers cannot be entered from a side and ceilings still block the lift', () => {
   const side = accessPair(); side.camera.position.set(-1.5, 1.54, -1.5); side.camera.rotation.y = -Math.PI / 2; side.body.place(); tick(side.body, 90, 1);
   assert.ok(side.camera.position.x < -1); assert.ok(Math.abs(side.camera.position.y - 1.54) < 1e-6);
   const ceiling = accessPair(); ceiling.group.add(box(3, 0.1, 4, 0, 2.04, -1)); ceiling.body.rebuild([ceiling.group]); tick(ceiling.body, 90, 1);
   assert.ok(Math.abs(ceiling.camera.position.y - 1.54) < 1e-6); assert.ok(ceiling.camera.position.z > -0.5);
 });
-test('missing invalid or unrelated metadata cannot enable a 0.61m tier lift', () => {
+void test('missing invalid or unrelated metadata cannot enable a 0.61m tier lift', () => {
   for (const metadata of [undefined, {}, accessMetadata({ axis: [0, 0] }), accessMetadata({ axis: [NaN, 1] }), accessMetadata({ maxRise: 0.7 }), accessMetadata({ maxDrop: Infinity }), accessMetadata({ maxGap: 0.1 }), accessMetadata({ id: 'foreign-access' })]) {
     const { body, camera } = accessPair({ metadata }); tick(body, 60, 1); assert.ok(Math.abs(camera.position.y - 1.54) < 1e-6, JSON.stringify(metadata));
   }
 });
 
-test('airborne motion and absent elevated lower floor do not gain virtual support', () => {
+void test('airborne motion and absent elevated lower floor do not gain virtual support', () => {
   const airborne = accessPair(); airborne.body.jump(); tick(airborne.body, 20, 1); assert.equal(airborne.body.grounded, false);
   const missing = accessPair({ transform: { position: new THREE.Vector3(0, 1, 0), yaw: 0 } });
   missing.low.removeFromParent(); missing.body.rebuild([missing.group]); missing.body.place(); tick(missing.body, 90, 1);
   assert.ok(Math.abs(missing.camera.position.y - 1.54) < 1e-6); assert.ok(missing.camera.position.z > -0.5);
 });
 
-test('only complete outward rectangular CAD-style buffer geometry can declare access', () => {
+void test('only complete outward rectangular CAD-style buffer geometry can declare access', () => {
   const plain = new THREE.BufferGeometry().copy(new THREE.BoxGeometry(2, 0.08, 2));
   assert.equal(rectangularSupport(plain), true);
   const inverted = plain.clone(); const backwards = Array.from(inverted.index.array);
@@ -351,7 +351,7 @@ test('only complete outward rectangular CAD-style buffer geometry can declare ac
     mesh.userData.walkTraversal = accessMetadata(); mesh.updateMatrixWorld(true); assert.equal(steppedAccess(mesh), undefined);
   }
 });
-test('irregular and downward-facing tagged supports cannot lift the camera', () => {
+void test('irregular and downward-facing tagged supports cannot lift the camera', () => {
   for (const type of ['hole', 'underside', 'tilted']) {
     const scene = accessPair();
     if (type === 'hole') scene.high.geometry.setIndex(Array.from(scene.high.geometry.index.array).slice(3));
@@ -363,4 +363,15 @@ test('irregular and downward-facing tagged supports cannot lift the camera', () 
     if (type === 'tilted') scene.high.rotation.x = 0.1;
     scene.body.rebuild([scene.group]); tick(scene.body, 60, 1); assert.ok(Math.abs(scene.camera.position.y - 1.54) < 1e-6, type);
   }
+});
+
+void test('thin horizontal tabletop between body rays remains an obstacle above ordinary step height', () => {
+  const floor = box(6, .1, 6, 0, .16308, -1);
+  const table = box(.72, .045, 1.16, 0, .94308, -1.5);
+  const { camera, body } = setup([floor, table]);
+  assert.ok(Math.abs(camera.position.y - 1.91308) < 1e-6);
+  tick(body, 60, 1);
+  assert.ok(camera.position.z > -.92, 'body center may not enter the thin table top footprint');
+  assert.ok(Math.abs(camera.position.y - 1.91308) < 1e-6, 'untagged table does not acquire step support');
+  assert.equal(body.grounded, true);
 });

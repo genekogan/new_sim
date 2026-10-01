@@ -203,6 +203,18 @@ export class WalkingBody {
         this.ray.far = Math.max(0, nextSurface.upper - feet) + 0.12;
         blocked = this.ray.intersectObjects(meshes, false).length > 0;
       }
+      // Thin horizontal furniture can lie between all three horizontal body
+      // rays. Sweep the candidate centre's vertical body band as well, leaving
+      // ordinary low steps and only this seam's actual support top admissible.
+      this.ray.set(new THREE.Vector3(candidate.x, nextFeet + EYE, candidate.z), down);
+      this.ray.far = Math.max(0, nextFeet + EYE - (feet + STEP));
+      if (this.ray.intersectObjects(meshes, false).some(hit => {
+        if (!nextSurface || !hit.face || (hit.object !== nextSurface.high && hit.object !== nextSurface.low)) return true;
+        this.normal.copy(hit.face.normal).applyNormalMatrix(this.normalMatrix.getNormalMatrix(hit.object.matrixWorld));
+        const expected = hit.object === nextSurface.high ? nextSurface.upper : nextSurface.lower;
+        const precision = hit.object instanceof THREE.Mesh ? this.access.get(hit.object)?.precision ?? 1e-6 : 1e-6;
+        return this.normal.y <= 0.999999 || Math.abs(hit.point.y - expected) > precision;
+      })) blocked = true;
       for (const height of [0.45, 1, EYE - 0.05]) {
         this.ray.set(new THREE.Vector3(p.x, nextFeet + height, p.z), heading);
         this.ray.far = Math.abs(delta) + CLEARANCE;

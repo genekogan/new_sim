@@ -35,7 +35,7 @@ const ids = ['0758', '0752', '0756', '0754', '0727', '0804', '0826', '0806'];
 const root = await campus();
 const axis = new THREE.Vector3(-1.103851318359375, 0, -0.5241432189941406).normalize();
 
-test('measured released auditorium supports retain complete authored-axis box profiles', () => {
+void test('measured released auditorium supports retain complete authored-axis box profiles', () => {
   const measurements = [];
   for (const id of ids) {
     const mesh = support(root, id), attr = mesh.geometry.getAttribute('position');
@@ -84,7 +84,7 @@ function journey(body, frames, forward) {
     assert.ok(Math.abs(body.camera.position.y - y) < .04, `continuous lift frame ${i}`);
   }
 }
-test('exact released CAD entry and eight tiers ascend and descend with physical support', () => {
+void test('exact released CAD entry and eight tiers ascend and descend with physical support', () => {
   const scene = root.clone(true);
   const before = ids.concat('1814').map(id => {
     const m = support(scene, id); return { geometry: m.geometry, material: m.material, matrix: m.matrix.toArray(), position: Array.from(m.geometry.attributes.position.array), index: Array.from(m.geometry.index.array) };
@@ -105,20 +105,22 @@ test('exact released CAD entry and eight tiers ascend and descend with physical 
     assert.deepEqual(Array.from(m.geometry.index.array), before[i].index);
   });
 });
-test('untagged released CAD retains legacy support behavior without authored access semantics', () => {
+void test('untagged released thin decks above ordinary STEP remain blocked at the actual first-tier front', () => {
   const scene = root.clone(true); const { camera, body } = walker(scene);
-  let largestLift = 0;
+  const first = support(scene, '0806'), positions = first.geometry.getAttribute('position');
+  const front = Math.min(...Array.from({ length: positions.count }, (_, i) => new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(first.matrixWorld).dot(axis)));
   for (let i = 0; i < 255; i++) {
-    const y = camera.position.y; body.step(1 / 90, 1, 0, false);
-    largestLift = Math.max(largestLift, camera.position.y - y);
+    body.step(1 / 90, 1, 0, false);
+    assert.equal(body.grounded, true, `untagged frame${i} stays on entry floor`);
+    assert.ok(Math.abs(camera.position.y - 1.9130799) < 2e-6, `untagged frame${i} remains below first tier`);
+    assert.ok(camera.position.dot(axis) <= front + 1e-6, `untagged frame${i} never enters thin deck volume`);
   }
-  // This centerline has intermediate imported rack supports: it was never a
-  // proven blocked line. Preserve that baseline instead of inventing a failure.
-  assert.ok(Math.abs(camera.position.y - 4.8022931) < 2e-6);
-  assert.ok(largestLift > .1, 'legacy support query retains abrupt ordinary lifts');
+  // Intentional body-volume correction: the former path reached the top by
+  // passing between sparse body rays before support queries snapped upward.
+  // A thin deck above ordinary STEP now requires its explicit designated tag.
   for (const id of ids.concat('1814')) assert.equal(support(scene, id).userData.walkTraversal, undefined);
 });
-test('exact source changes and entry footprint holes refuse atomic authored tags', () => {
+void test('exact source changes and entry footprint holes refuse atomic authored tags', () => {
   for (const kind of ['source', 'hole', 'position']) {
     const scene = root.clone(true), landing = support(scene, '1814');
     if (kind === 'source') landing.userData.source_mesh = 'Geom3D.foreign';
@@ -134,7 +136,7 @@ test('exact source changes and entry footprint holes refuse atomic authored tags
   }
 });
 
-test('entry registration revalidates its exact footprint after source mutation', () => {
+void test('entry registration revalidates its exact footprint after source mutation', () => {
   const scene = root.clone(true); assert.deepEqual(tagMarsSteppedAccess(scene).refused, []);
   const entry = support(scene, '1814');
   assert.equal(steppedAccess(entry).entry, true);
