@@ -39,10 +39,10 @@ const steps = [
   { name: 'test-engine', cmd: ['npm', 'run', 'test:engine'], timeout: 15 * MIN, parse: nodeTest },
   { name: 'tsc', cmd: ['npx', 'tsc', '--noEmit', '-p', '.'], timeout: 5 * MIN, parse: tsc },
   { name: 'tsc-camera', cmd: ['npx', 'tsc', '--noEmit', '-p', 'cinematography/tsconfig.json'], timeout: 5 * MIN, parse: tsc },
-  // 133 serialized cases include required full historical build coverage. The
-  // previous 20-minute stage deadline cut off passing case 116 (2026-09-30).
-  // This is a whole-suite watchdog; per-test and performance limits are unchanged.
-  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 25 * MIN, parse: playwright },
+  // The prior 140-pass suite took 1293.529s; required current build proofs now
+  // add ~258s plus actual access/foot-side/current-camera cases. Give the entire
+  // serialized suite capacity; per-test and performance limits stay unchanged.
+  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 30 * MIN, parse: playwright },
   { name: 'record-campus-take', cmd: ['node', 'deploy/record-campus-take.mjs', '--check'], timeout: 5 * MIN, parse: simulation },
   { name: 'determinism-probe', cmd: ['node', 'deploy/determinism-probe.mjs'], timeout: 5 * MIN, parse: probe },
 ];
