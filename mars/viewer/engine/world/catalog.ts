@@ -1,3 +1,4 @@
+import { CHESS_ASSETS } from './catalog-chess.ts';
 // Mars construction vocabulary (spec §6). Dimensions are data with their own
 // confidence: Gene confirmed rack sizes 8/9/12/19 ft and that an "upright" is
 // the tall blue two-column braced frame; beams are the orange horizontals.
@@ -83,7 +84,7 @@ export type AssetDef = {
   /** Usable activity affordances, independent of mesh appearance and per-entity state. */
   capabilities?: {
     /** Upright ground fixture transport; handling geometry is defined only here. */
-    readable?: { pages: number; maxSeatDistance: number }; fixtureCarry?: { handling: Handling; upright: true }; display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
+    boardGame?: 'chess'; readable?: { pages: number; maxSeatDistance: number }; fixtureCarry?: { handling: Handling; upright: true }; display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
   dims: { confidence: Confidence; note: string };
 };
 
@@ -338,7 +339,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
     ...ACTIVITY_ASSETS,
-    ...ITEM_ASSETS,
+    ...ITEM_ASSETS, ...CHESS_ASSETS,
     ...SOLAR_ASSETS,
     ...stockAssets({ upright }),
     ...framingAssets(), // 2x4 roof framing (catalog-framing.ts, construction/framing.ts)
