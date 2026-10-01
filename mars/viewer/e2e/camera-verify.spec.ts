@@ -7,13 +7,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { CURRENT_KITCHEN_DIRECTION } from './camera-current-fixture';
 import { captureView, collectConsoleErrors, openStudio, waitFrames, writeArtifact } from './helpers';
 import type { CameraVerifyReport } from '../app/studio/camera-verify';
 
 const manifest = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../public/engine/takes/manifest.json'), 'utf8'));
 const entry = manifest.takes[0];
 type Hook = { take: () => { t: number; engineCamera: boolean } | null; verifyCamera: (fromT?: number, toT?: number, hz?: number) => Promise<CameraVerifyReport | null> };
-const hook = (w: Window) => w.__marsStudio as unknown as Hook;
 
 async function scrub(page: Page, t: number) {
   await page.getByRole('slider', { name: 'Take time scrubber' }).fill(String(t));
@@ -59,8 +59,7 @@ test('camera verify: planned readability vs ray casts against the rendered meshe
 // - flagship bay orbit: 270° over 120 s, wide, from `seat_b1`'s start, against the flagship take (take people +
 //   parts drawn, replay seeked per sample);
 // - Chiba sunset pan: 2026 campus, nobody in it, 20 min before sunset on 2026-03-01 (17:18), take-less (no replay);
-// - 2024 kitchen: fly-through from (8, 1.6, 36) into kitchen-interior facing the sink, 2024 campus cropped to
-//   [-30, 15, 35, 70] (the fixture's crop), take-less, on /studio/2024;
+// - current 2024 Chiba kitchen: physical counter route from (1.829, 1.44, -0.9), full current scene;
 // - carryA close hold from the east at 1 s (foreground → raise 1 m).
 // Tolerance (CAMERA_VERIFY.md): no sample hidden by the real mesh (planner ≥ 0.8, real ≤ 0.3); |planner − real| ≥ 0.2
 // reported per track with the worst sample. Writes artifacts/<run>/camera-verify-directed.json and a capture of
@@ -117,7 +116,7 @@ test('camera verify: directed tracks (bay orbit, Chiba sunset pan, 2024 kitchen,
     ['flagship bay orbit', [{ subject: { kind: 'assembly', ref: 'rack bay' }, motion: { verb: 'orbit', degrees: 270 }, duration: 120, at: seat, framing: { size: 'wide' } }]],
     ['carryA close hold (corrected)', [{ subject: { kind: 'group', ref: 'carryA' }, motion: { verb: 'hold' }, at: 1, framing: { size: 'close', side: 'east' } }]],
   ] as const) {
-    const d = (await page.evaluate((x) => (window.__marsStudio as unknown as DirectHook).direct(x as unknown[]), dirs))!;
+    const d = (await page.evaluate((x) => (window.__marsStudio as unknown as DirectHook).direct([...x]), dirs))!;
     const w = await run(name, d, 'directed');
     if (w) {
       await page.evaluate(() => (window.__marsStudio as unknown as { playDirected: (on: boolean) => void }).playDirected(true));
@@ -138,8 +137,8 @@ test('camera verify: directed tracks (bay orbit, Chiba sunset pan, 2024 kitchen,
 
   // 2024: the kitchen move
   await openStudio(page, 2024);
-  const kitchen = await page.evaluate(() => (window.__marsStudio as unknown as DirectHook).directOnYear([{ subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through', from: [8, 1.6, 36] }, context: { interior: 'kitchen-interior', lookAt: 'sink' } }], { crop: [-30, 15, 35, 70], duration: 120 }));
-  const wk = await run('2024 kitchen fly-through', kitchen, 'year');
+  const kitchen = await page.evaluate((direction) => (window.__marsStudio as unknown as DirectHook).directOnYear([direction], { duration: 120 }), CURRENT_KITCHEN_DIRECTION);
+  const wk = await run('current 2024 counter fly-through', kitchen, 'year');
   if (wk) {
     await page.evaluate(([p, t]) => (window.__marsStudio as unknown as DirectHook).look(p, t), [wk.camera, wk.target] as const);
     await waitFrames(page, 4);

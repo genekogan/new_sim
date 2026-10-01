@@ -1,6 +1,6 @@
 // LM-012: actual browser worker execution, byte-equivalent result, responsive frames and cancellation.
 import { test, expect } from '@playwright/test';
-import { kitchenCameraFile } from '../engine/test/camera-studio-fixtures.ts';
+import { currentCameraFile, CURRENT_KITCHEN_DIRECTION } from './camera-current-fixture';
 import { compileTakeCamera } from '../app/studio/direct-camera-compile.ts';
 import { loadCampusYear } from '../engine/campus/history.ts';
 import { loadCampusFile } from '../engine/campus/history-node.ts';
@@ -13,10 +13,11 @@ type Hook = { direct: (d: unknown[]) => Promise<{ ok: boolean; trackId: string }
 test('file camera worker preserves output, renders frames during compile, and cancels on take close', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const errors = collectConsoleErrors(page);
-  const file = kitchenCameraFile(2800);
-  const directions = [{ subject: { kind: 'fixture', ref: 'sink' }, motion: { verb: 'hold' }, at: 2728.8, duration: 20 }];
+  const file = currentCameraFile(2800);
+  const directions = [{ ...CURRENT_KITCHEN_DIRECTION, at: 2728.8 }];
   const { base: scene } = loadCampusYear(2024, loadCampusFile(2024));
   const expected = compileTakeCamera({ take: file.take, scene, directions, opts: {} });
+  expect(expected.result.ok, JSON.stringify(expected.result)).toBe(true);
   const entry = { id: file.take.id, label: file.label, file: '/engine/takes/camera-worker-test.json', year: 2024, hypothetical: true,
     duration: 2800, entities: 0, finalStateHash: file.take.finalStateHash, cameraTrack: file.camera.id, moments: {}, violations: 0, blockedWaits: 0, bytes: JSON.stringify(file).length };
   await page.route('**/engine/takes/manifest.json', (r) => r.fulfill({ json: { schema: 'mars-take-manifest/1', takes: [entry] } }));
@@ -61,7 +62,7 @@ test('file camera worker preserves output, renders frames during compile, and ca
   await page.locator('.take-direct summary').click();
   await page.getByRole('textbox', { name: 'Directions JSON' }).fill(JSON.stringify(directions));
   await page.getByRole('button', { name: 'Compute camera' }).click();
-  await expect(page.getByRole('list', { name: 'Shot list' })).toContainText('sink bowl');
+  await expect(page.getByRole('list', { name: 'Shot list' })).toContainText('kitchen counter');
   const observation = await page.evaluate(async () => {
     const modulePath = '/engine/core/hash.ts';
     const { hashOf } = await import(/* @vite-ignore */ modulePath);
@@ -76,7 +77,7 @@ test('file camera worker preserves output, renders frames during compile, and ca
   expect(observation.probe.frames, 'UI frames after worker compile starts and before result arrives').toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Play directed track' }).click();
   await page.getByRole('button', { name: 'Pause take' }).click();
-  await captureView(page, 'camera-worker-sink', { testInfo, compare: false });
+  await captureView(page, 'camera-worker-current-counter', { testInfo, compare: false });
 
   // Start another real request, close the take after the worker has entered compilation, and await cancellation.
   await page.evaluate((d) => {
