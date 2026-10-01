@@ -165,6 +165,7 @@ function minutesSinceMidnight(iso: string): number {
 
 test('site bearing: world −X is north, −Z east, +X south, +Z west (the 2020 tire ring\'s long axis X runs N–S)', () => {
   assert.equal(NORTH_AZIMUTH_OFFSET, -90);
+  assert.equal(northAzimuthOffsetOf({ meta: { northAzimuthOffset: 0 } }), 0);
   const near = (v: number[], e: number[]) => hypot(v[0] - e[0], v[1] - e[1], v[2] - e[2]) < 1e-9;
   assert.ok(near(sunDirectionVector(0, 0), [-1, 0, 0]), 'north → −X');
   assert.ok(near(sunDirectionVector(0, 90), [0, 0, -1]), 'east → −Z');
@@ -211,10 +212,11 @@ test('the site bearing cannot move a construction pin: only camera/ and api/ (vi
   for (const f of rel) assert.ok(!/^(runtime|world|construction|campus|take|rehearsal|scenarios|planning|history)\//.test(f), f);
 });
 
-// --- Per-year bearing (W51, RECONCILIATION_2022 §f): 2022 measured from DJI_0829; every other year keeps the global.
-test('per-year bearing: 2022 = −101 (world −X turned 11° toward +Z is north); the global stays −90 and is every other year\'s fallback', () => {
-  assert.deepEqual({ ...YEAR_NORTH_AZIMUTH_OFFSET }, { 2022: -101 });
+// --- Per-year bearing (W51, RECONCILIATION_2022 §f): 2022 measured from DJI_0829; owner-selected 2024/2025 use local -Z north; unknown years retain global fallback.
+test('per-year bearing: 2022 = −101 (world −X turned 11° toward +Z is north); 2024/2025 = 0; global −90 remains unknown-year fallback', () => {
+  assert.deepEqual({ ...YEAR_NORTH_AZIMUTH_OFFSET }, { 2022: -101, 2024: 0, 2025: 0 });
   assert.equal(NORTH_AZIMUTH_OFFSET, -90);
+  assert.equal(northAzimuthOffsetOf({ meta: { northAzimuthOffset: 0 } }), 0);
   assert.equal(northAzimuthOffsetOf(undefined), -90);
   assert.equal(northAzimuthOffsetOf({ meta: {} }), -90);
   assert.equal(northAzimuthOffsetOf({ meta: { northAzimuthOffset: -101 } }), -101);

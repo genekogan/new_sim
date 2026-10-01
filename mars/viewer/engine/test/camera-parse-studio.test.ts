@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseForTake, directForTake, takeCameraScene } from '../../app/studio/direct-camera.ts';
-import { loadCampusFile } from '../campus/history-node.ts';
+import { sourceEra2024File } from './camera-source-era-fixture.ts';
 import { activitiesOf, cameraVocab, parseCameraSentences } from '../api/camera-vocab.ts';
 import { SemanticWorld, takeFacts } from '../camera/direct.ts';
 import { splitCameraSentences } from '../camera/parse.ts';
 import { kitchenCameraFile } from './camera-studio-fixtures.ts';
 
-test('studio file sentences use the op parser, vocabulary and resolver without a simulation room', async (t) => {
-  t.mock.method(globalThis, 'fetch', async () => Response.json(loadCampusFile(2024)));
+test('source-era studio file sentences use the op parser, vocabulary and resolver without a simulation room', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json(sourceEra2024File()));
   const file = kitchenCameraFile();
   const before = JSON.stringify(file);
   const text = 'hold on the sink then zoom in';
@@ -26,8 +26,8 @@ test('studio file sentences use the op parser, vocabulary and resolver without a
   assert.equal(JSON.stringify(file), before);
 });
 
-test('file camera scene and vocabulary reflect checkpoint obstacle edits without changing the shared source', async (t) => {
-  const source = loadCampusFile(2024);
+test('source-era file camera scene and vocabulary reflect checkpoint obstacle edits without changing the shared source', async (t) => {
+  const source = sourceEra2024File();
   const before = JSON.stringify(source);
   t.mock.method(globalThis, 'fetch', async () => Response.json(source));
   const file = kitchenCameraFile();

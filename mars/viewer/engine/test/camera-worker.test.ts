@@ -7,7 +7,7 @@ import { takeFacts } from '../camera/direct.ts';
 import { takeSampler } from '../camera/take-sampler.ts';
 import { takeDuration } from '../take/replay.ts';
 import { loadCampusYear } from '../campus/history.ts';
-import { loadCampusFile } from '../campus/history-node.ts';
+import { sourceEra2024File } from './camera-source-era-fixture.ts';
 import { kitchenCameraFile } from './camera-studio-fixtures.ts';
 
 class FakeWorker {
@@ -24,9 +24,9 @@ const job = { take: { id: 'test-take' } } as CameraCompileJob;
 const reply = cameraWorkerFailure('test-take', 'camera.direct.unknown', 'intentional test refusal');
 const code = (r: Awaited<ReturnType<typeof compileInWorker>>) => !r.result.ok && r.result.diagnostics[0].code;
 
-test('camera worker kernel preserves the complete synchronous result and reads inputs only', () => {
+test('source-era camera worker kernel preserves the complete synchronous result and reads inputs only', () => {
   const file = kitchenCameraFile();
-  const { base: scene } = loadCampusYear(2024, loadCampusFile(2024));
+  const { base: scene } = loadCampusYear(2024, sourceEra2024File());
   const directions = [{ subject: { kind: 'fixture', ref: 'sink' }, motion: { verb: 'hold' } }];
   const before = JSON.stringify({ file, scene, directions });
   const got = compileTakeCamera({ take: file.take, scene, directions, opts: {} });

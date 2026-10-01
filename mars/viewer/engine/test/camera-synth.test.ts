@@ -14,7 +14,7 @@ import { placement } from '../camera/quality.ts';
 import { subjectPoints } from '../camera/shots.ts';
 import { pointInPolygon } from '../camera/direct.ts';
 import { directCamera, MOTION_CAPS, type DirectResult } from '../camera/synth.ts';
-import { beforeSunset, campus2024, campus2026, flagship, onGrid, roomScene, stepTimes, withTime } from './camera-direct-fixtures.ts';
+import { beforeSunset, sourceEraCampus2024, campus2026, flagship, onGrid, roomScene, stepTimes, withTime } from './camera-direct-fixtures.ts';
 
 const DEG = Math.PI / 180;
 /** Compass bearing (deg clockwise from north) of a world ground vector — the inverse of sun.ts's projection
@@ -120,8 +120,8 @@ test('(b) 2026: pan across Chiba with the sunset behind — every sample in the 
   assert.equal(r16.plan.report.invalidSamples, 0);
 });
 
-test('(c) 2024: go inside the kitchen and face the sink — routed through the opening, never through a wall', () => {
-  const { scene, world } = campus2024();
+test('(c) source-era 2024: go inside the kitchen and face the sink — routed through the opening, never through a wall', () => {
+  const { scene, world } = sourceEraCampus2024();
   const from: Vec3 = [8, 1.6, 36];
   const dir = { subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through', from }, context: { interior: 'kitchen-interior', lookAt: 'sink' } };
   // phase 1 (the computed move as is): one continuous route over the half wall
@@ -264,7 +264,7 @@ test('determinism: the same directions give the identical track hash, and the tr
   const a = ok(directCamera(d, input)), b = ok(directCamera(JSON.parse(JSON.stringify(d)), input));
   assert.equal(a.report.trackHash, b.report.trackHash);
   assert.equal(hashOf(JSON.parse(JSON.stringify(a.plan.samples))), a.report.trackHash);
-  const { scene, world } = campus2024();
+  const { scene, world } = sourceEraCampus2024();
   const k = [{ subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through', from: [8, 1.6, 36] }, context: { interior: 'kitchen-interior', lookAt: 'sink' } }];
   const k1 = ok(directCamera(k, { scene, world, sampler: () => ({}), duration: 120 })), k2 = ok(directCamera(k, { scene, world, sampler: () => ({}), duration: 120 }));
   assert.equal(k1.report.trackHash, k2.report.trackHash);

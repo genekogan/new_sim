@@ -11,7 +11,7 @@ import { crossBindings, crossTemplate } from './sequence-fixtures.ts';
 import { datan, dtan } from '../core/math.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
-import { beforeSunset, campus2024, campus2026, flagship, onGrid, stepTimes, withTime } from './camera-direct-fixtures.ts';
+import { beforeSunset, sourceEraCampus2024, campus2026, flagship, onGrid, stepTimes, withTime } from './camera-direct-fixtures.ts';
 import { defaultSortOrder } from '../core/order.ts';
 
 const DEG = Math.PI / 180;
@@ -91,8 +91,8 @@ test('sentence: "do a pan across Chiba with the sunset in the background" → pa
   assert.deepEqual(sunBehindWindow(at, { vfovDeg: 50 }).sun.direction, sp.direction);
 });
 
-test('sentence: "go inside the kitchen and face the sink" (2024) → interior room + clustered sink fixture', () => {
-  const { scene, world } = campus2024();
+test('source-era fixture sentence: "go inside the kitchen and face the sink" (2024) → interior room + clustered sink fixture', () => {
+  const { scene, world } = sourceEraCampus2024();
   const c = compile({ subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through' }, context: { interior: 'Kitchen · sink, pantry and appliances', lookAt: 'sink' } }, ctxOf(scene, world));
   assert.ok(c.ok, JSON.stringify(c));
   assert.equal(c.intent.interior!.id, 'kitchen-interior', 'region named by its label');

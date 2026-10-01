@@ -1177,9 +1177,9 @@ test('parse_camera (LM-007/008): Gene’s four sentences through the op — rack
   assert.equal(c.call('parse_camera', { take_id: 'nope', sentences: four }).code, 'take.unknown');
 });
 
-test('parse_camera (LM-007/008/010): 2024 kitchen + sink resolve; bare 2026 racks are a question with candidates; unknown names and unsupported phrasing are refusals', async () => {
-  const { campus2024, campus2026 } = await import('./camera-direct-fixtures.ts');
-  const y24 = campus2024(), y26 = campus2026();
+test('parse_camera (LM-007/008/010): source-era 2024 kitchen + sink resolve; bare 2026 racks are a question with candidates; unknown names and unsupported phrasing are refusals', async () => {
+  const { sourceEraCampus2024, campus2026 } = await import('./camera-direct-fixtures.ts');
+  const y24 = sourceEraCampus2024(), y26 = campus2026();
   const history = seedHistory();
   history.publishCanonical('y24', 'Mars 2024', y24.world, 'test');
   history.publishCanonical('y26', 'Mars 2026', y26.world, 'test');
@@ -1310,4 +1310,24 @@ test('one control path (LM-014): every legacy tool is classified — an engine e
   }, 'move_person', { person_id: 'p1', x: 0, z: 0 });
   assert.equal(failure.isError, true);
   assert.deepEqual(failure.value, env);
+});
+
+test('current reviewed 2024 API refuses removed sink by name and resolves the actual Chiba kitchen counter without mutation', async () => {
+  const { loadCampusYear } = await import('../campus/history.ts');
+  const { loadCampusFile } = await import('../campus/history-node.ts');
+  const { base: scene, world } = loadCampusYear(2024, loadCampusFile(2024));
+  const before = JSON.stringify({ scene, world });
+  const history = seedHistory();
+  history.publishCanonical('current24', 'Reviewed Mars 2024', world, 'current source test');
+  const c = createController({ history, scenes: { ...ENGINE_SCENES, [world.base.campus]: scene } });
+  const missing = c.call('parse_camera', { workspace: 'current24', sentences: ['go inside the kitchen and face the sink'] }) as any;
+  assert.equal(missing.code, 'camera.direct.unknown');
+  assert.match(missing.refusals[0].message, /no fixture named 'sink'/);
+  assert.equal(missing.directions.length, 0);
+  const id = 'chiba-kitchen-kitchen-counter-f36f13fb';
+  assert.ok(scene.obstacles.some(o => o.id === id && /Chiba kitchen/.test(o.label ?? '')));
+  const actual = c.call('parse_camera', { workspace: 'current24', sentences: [`hold on ${id}`] }) as any;
+  assert.ok(actual.ok, actual.message);
+  assert.deepEqual([actual.directions[0].subject.kind, actual.directions[0].subject.id], ['fixture', id]);
+  assert.equal(JSON.stringify({ scene, world }), before);
 });

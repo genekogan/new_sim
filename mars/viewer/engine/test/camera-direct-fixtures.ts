@@ -8,7 +8,7 @@ import { cropScene, sceneFromFile } from '../campus/load.ts';
 import { readCampus2026File } from '../campus/node.ts';
 import { loadCampus2026 } from '../campus/world.ts';
 import { loadCampusYear } from '../campus/history.ts';
-import { loadCampusFile } from '../campus/history-node.ts';
+import { sourceEra2024File } from './camera-source-era-fixture.ts';
 import { entityFootprint } from '../spatial/service.ts';
 import { DEFAULT_CAMERA_POLICY, type CameraPolicy } from '../camera/geom.ts';
 import { partOccluders } from '../camera/occluders.ts';
@@ -60,10 +60,10 @@ export function campus2026() {
 }
 
 let y24: { scene: SpatialScene; world: WorldState } | undefined;
-/** Mars 2024 around the communal kitchen (the 2026 scene has no kitchen region or sink fixture). */
-export function campus2024() {
+/** Pre-review git7648dbf geometry for unchanged camera route/hash proof; its kitchen/sink is not current historical content. */
+export function sourceEraCampus2024() {
   if (y24) return y24;
-  const { base, world } = loadCampusYear(2024, loadCampusFile(2024));
+  const { base, world } = loadCampusYear(2024, sourceEra2024File());
   y24 = { scene: cropScene(base, [-30, 15, 35, 70]), world };
   return y24;
 }

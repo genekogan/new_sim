@@ -68,9 +68,9 @@ test('LM-009: separate sinks and unknown fixtures refuse with concrete diagnosti
   assert.match(missing.diagnostics[0].message, /missing-basin/);
 });
 
-test('LM-009: existing 2024 kitchen sink compiles with no invalid samples or world mutation', async () => {
-  const { campus2024 } = await import('./camera-direct-fixtures.ts');
-  const { scene, world } = campus2024();
+test('LM-009: source-era 2024 kitchen sink compiles with no invalid samples or world mutation', async () => {
+  const { sourceEraCampus2024 } = await import('./camera-direct-fixtures.ts');
+  const { scene, world } = sourceEraCampus2024();
   const before = JSON.stringify({ scene, world });
   const sw = new SemanticWorld(scene, world);
   const parsed = parseCameraSentences(sw, ['hold on the sink'], cameraVocab(sw, []));

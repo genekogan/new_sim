@@ -25,7 +25,7 @@ import { yearBuildScene } from '../campus/sequence.ts';
 import { entityFootprint } from '../spatial/service.ts';
 import type { Obstacle } from '../spatial/types.ts';
 import type { Take } from '../take/types.ts';
-import { beforeSunset, campus2024, campus2026, flagship, onGrid, personAt, roomScene, standingSheet, stepTimes, withTime, yardScene } from './camera-direct-fixtures.ts';
+import { beforeSunset, sourceEraCampus2024, campus2026, flagship, onGrid, personAt, roomScene, standingSheet, stepTimes, withTime, yardScene } from './camera-direct-fixtures.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GOLDEN = path.join(HERE, 'camera-direct-identity.golden.json');
@@ -74,8 +74,8 @@ function cases(): Case[] {
   // 2026 Chiba sunset pan; 2024 kitchen fly-through (phase 1 + phase 2 split)
   direct('Chiba sunset pan', [{ subject: { kind: 'region', ref: 'chiba' }, motion: { verb: 'pan' }, context: { sunBehind: { sunset: true } } }], () => ({ scene: campus2026().scene, world: withTime(campus2026().world, beforeSunset('2026-03-01', 20)), sampler: () => ({}), duration: 60 }));
   const kitchen = { subject: { kind: 'region', ref: 'kitchen-interior' }, motion: { verb: 'fly_through', from: [8, 1.6, 36] }, context: { interior: 'kitchen-interior', lookAt: 'sink' } };
-  direct('2024 kitchen fly-through (phase 1)', [kitchen], () => ({ ...campus2024(), sampler: () => ({}), duration: 120, correct: false }));
-  direct('2024 kitchen fly-through (phase 2)', [kitchen], () => ({ ...campus2024(), sampler: () => ({}), duration: 120 }));
+  direct('2024 kitchen fly-through (phase 1)', [kitchen], () => ({ ...sourceEraCampus2024(), sampler: () => ({}), duration: 120, correct: false }));
+  direct('2024 kitchen fly-through (phase 2)', [kitchen], () => ({ ...sourceEraCampus2024(), sampler: () => ({}), duration: 120 }));
   // synthetic corrections (camera-correct.test.ts)
   out.push(['plywood squeeze → raise', () => {
     const { scene, world } = yardScene();

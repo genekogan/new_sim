@@ -1,6 +1,6 @@
 // Hypothetical, action-free file take for studio camera tests; historical scene data is read-only.
 import { loadCampusYear } from '../campus/history.ts';
-import { loadCampusFile } from '../campus/history-node.ts';
+import { sourceEra2024File } from './camera-source-era-fixture.ts';
 import { Runtime } from '../runtime/runtime.ts';
 import { TakeRecorder } from '../take/recorder.ts';
 import { directCamera } from '../camera/synth.ts';
@@ -8,7 +8,7 @@ import { toCameraTrack } from '../camera/track.ts';
 import type { TakeReplayFile } from '../../app/engine-view/take-replay.ts';
 
 export function kitchenCameraFile(duration = 6): TakeReplayFile {
-  const { base, world } = loadCampusYear(2024, loadCampusFile(2024));
+  const { base, world } = loadCampusYear(2024, sourceEra2024File());
   const runtime = new Runtime(world, new Map(), {});
   const recorder = new TakeRecorder(runtime, { rulesVersion: 'camera-studio-test' });
   for (let i = 0; i < duration * 20; i++) runtime.step();
