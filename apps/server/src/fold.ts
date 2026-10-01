@@ -102,7 +102,14 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       delete k.decks[p.soulId];
       return {};
     }
-    default: return {}; // intent, scene, rules, admin: no effect on engine or kernel
+    case 'rules': {
+      // A world that began before the kernel existed is given one once, and where each Soul was is written into the log,
+      // so a replay from genesis arrives at the same kernel.
+      const boot = (e.payload as { kernelBootstrap?: { at: Record<string, string | null> } } | null)?.kernelBootstrap;
+      if (boot) for (const id of Object.keys(boot.at).sort()) { const at = boot.at[id]; if (k.things[id] && (at === null || k.things[at])) k.things[id].at = at; }
+      return {};
+    }
+    default: return {}; // intent, scene, admin: no effect on engine or kernel
   }
 }
 

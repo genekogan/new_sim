@@ -196,6 +196,8 @@ export class Souls {
   timeline(soul: SoulRow, limit = 80) {
     const w = this.host.engine.world;
     const label = (id: string) => this.host.nameOf(id);
+    // things that have since vanished keep the name they had when they were played on
+    const past = new Map<string, string>(); for (const pl of this.host.recentPlays) if (pl.target && pl.targetName) past.set(pl.target, pl.targetName);
     const own = this.db.soulEvents(WORLD_ID, soul.id, limit);
     const since = own[0]?.seq ?? 0;
     const beats = this.db.recentKind(WORLD_ID, 'scene', 300).filter((e) => e.seq >= since && Array.isArray(e.payload?.beat?.targets) && e.payload.beat.kind !== 'scene' && e.payload.beat.targets.includes(soul.name));
@@ -204,7 +206,7 @@ export class Souls {
       const text = e.kind === 'birth' ? 'was born at the gate'
         : e.kind === 'intent' ? `intent set via ${p.source === 'web' ? 'this page' : p.source === 'system' ? 'the world' : `your agent (${p.source})`}: ${describeIntent(p.intent, label)}`
         : e.kind === 'decision' ? `set out to ${lower(p.label)}${p.manner ? `, ${p.manner}` : ''}`
-        : e.kind === 'play' ? `${p.card}${p.target ? ` → ${label(p.target)}` : ''}${p.manner ? `, ${p.manner}` : ''}`
+        : e.kind === 'play' ? `${p.card}${p.target ? ` → ${past.get(p.target) ?? label(p.target)}` : ''}${p.manner ? `, ${p.manner}` : ''}`
         : e.kind === 'deck' ? `deck changed: ${[...(p.add ?? []).map((c: string) => `+${c}`), ...(p.remove ?? []).map((c: string) => `−${c}`), ...(p.manners ? [`manners: ${p.manners.join(', ')}`] : [])].join(' ')} (${p.why})`
         : e.kind === 'scene' ? `the storyteller suggested: ${p.beat.directive} — ${p.beat.flavor}`
         : e.kind === 'retire' ? 'left the world' : e.kind;

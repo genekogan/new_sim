@@ -120,16 +120,20 @@ export class WorldHost {
     }
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
+    if (this.pendingBootstrap) { void this.enqueue('rules', 'system', { kernelBootstrap: this.pendingBootstrap, why: 'the kernel begins here for a world that predates it' }); this.pendingBootstrap = null; }
     return { from, replayed: later.length };
   }
 
+  private pendingBootstrap: { at: Record<string, string | null> } | null = null;
   /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
   private bootstrapKernel(): KState {
-    const k = initKernel(this.engine);
+    const k = initKernel(this.engine), at: Record<string, string | null> = {};
     for (const m of this.minds.values()) {
-      const ent = this.engine.world.entities[m.entityId];
-      soulThing(k, { soulId: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: m.owner }, ent ? this.nearestPlace(k, m.entityId) : arrivalPlace(k));
+      // as a replay from genesis would have it (arrived, never moved); the logged bootstrap event then places each Soul where it stands
+      soulThing(k, { soulId: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: m.owner }, arrivalPlace(k));
+      at[m.soulId] = this.engine.world.entities[m.entityId] ? this.nearestPlace(k, m.entityId) : arrivalPlace(k);
     }
+    this.pendingBootstrap = { at };
     return k;
   }
   /** The place Thing an entity is physically at: a place within 5 m, else its region. */
@@ -322,7 +326,8 @@ export class WorldHost {
         this.kernelDirty = true;
         break;
       }
-      case 'rules': case 'admin': break; // clock rate, pause, dilation: recorded, no world effect
+      case 'rules': if ((e.payload as { kernelBootstrap?: unknown } | null)?.kernelBootstrap) this.kernelDirty = true; break; // otherwise clock rate, pause, dilation: recorded, no world effect
+      case 'admin': break;
     }
   }
 

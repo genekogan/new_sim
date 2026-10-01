@@ -30,6 +30,6 @@ export function cleanLines(lines: SpokenLine[], act: string): SpokenLine[] {
 /** No model: a plain line that says the act. Used in fake mode and when the budget is spent. */
 export function plainLine(t: TalkInput): SpokenLine[] {
   const L = t.listener.name;
-  const say = ({ greet: `Hello, ${L}.`, ask: `${L}, could I ask you something: ${t.about ?? 'a favour'}?`, agree: `Yes, ${L}. Go ahead.`, decline: `Not this time, ${L}.`, invite: `${L}, come along: ${t.about ?? ''}`, chat: `Good to see you, ${L}.` } as Record<string, string>)[t.act] ?? `${L}: ${t.act}${t.about ? ` (${t.about})` : ''}.`;
+  const say = ({ greet: `Hello, ${L}.`, ask: t.about ? `${L}, I wanted to ask you about ${t.about}. Would that be all right?` : `${L}, could I ask you a favour?`, agree: `Yes, ${L}. Go ahead.`, decline: `Not this time, ${L}.`, invite: `${L}, come along: ${t.about ?? ''}`, chat: `Good to see you, ${L}.` } as Record<string, string>)[t.act] ?? `${L}: ${t.act}${t.about ? ` (${t.about})` : ''}.`;
   return t.act === 'chat' ? [{ who: 'speaker', text: say }, { who: 'listener', text: `And you, ${t.speaker.name}.` }] : [{ who: 'speaker', text: say }];
 }

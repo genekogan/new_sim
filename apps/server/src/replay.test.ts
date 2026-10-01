@@ -68,3 +68,35 @@ test('restart: snapshot + fast-forward through later events equals the uninterru
   void reference;
   db.close();
 });
+
+test('a world from before the kernel existed is given one at boot, and replay from genesis still matches', () => {
+  const db = new Db(join(mkdtempSync(join(tmpdir(), 'sim-')), 't.db'));
+  const host = new WorldHost(db, toyFactory, 'old-world', 1e9); host.boot();
+  births(host, ['a', 'b', 'c']);
+  // decisions as they were before cards: a program of steps, no card, so no plays
+  for (let i = 0; i < 900; i++) {
+    if (i === 30) for (const [n, to] of [['a', 'campfire'], ['b', 'kiosk']] as const) void host.enqueue('decision', 'old', { soulId: `s_${n}`, entityId: `h_${n}`, option: `go:${to}`, label: `Walk to ${to}`, steps: [{ verb: 'walk_to', params: { to, standoff: 1.5 } }, { verb: 'rest', params: { seconds: 60 } }], reevalTicks: 600, fallback: false, trigger: 'old' });
+    host.tickOnce();
+  }
+  host.saveSnapshot();
+  assert.equal(db.events(WORLD_ID).filter((e) => e.kind === 'play').length, 0);
+  // make the snapshot what an old build would have written: no kernel in it
+  const row = db.db.prepare('SELECT tick, snapshot FROM snapshots ORDER BY tick DESC LIMIT 1').get() as { tick: number; snapshot: string };
+  const body = JSON.parse(row.snapshot); delete body.kernel; delete body.counts; for (const m of body.minds) { delete m.agenda; delete m.agendaPos; delete m.pending; }
+  db.db.prepare('UPDATE snapshots SET snapshot = ? WHERE tick = ?').run(JSON.stringify(body), row.tick);
+
+  const host2 = new WorldHost(db, toyFactory, 'old-world', 1e9);
+  assert.equal(host2.boot().from, 'snapshot');
+  for (let i = 0; i < 5; i++) host2.tickOnce();
+  const boot = db.events(WORLD_ID).find((e) => e.kind === 'rules' && (e.payload as any)?.kernelBootstrap);
+  assert.ok(boot, 'the bootstrap is in the log');
+  assert.equal(host2.kernel.things['s_a'].at, 'campfire'); assert.equal(host2.kernel.things['s_b'].at, 'kiosk');
+  assert.ok(host2.kernel.decks['s_c'].cards.includes('join'));
+  // life goes on with cards, and a replay from genesis (old events, the bootstrap, new plays) arrives at the same world
+  drive(host2, 1500, (i) => i * 11);
+  assert.ok(db.events(WORLD_ID).some((e) => e.kind === 'play'));
+  const replayed = replayFromGenesis(toyFactory, 'old-world', db.events(WORLD_ID), host2.engine.world.tick);
+  assert.equal(replayed.engine.stateHash(), host2.engine.stateHash());
+  host2.kernel.tick = replayed.kernel.tick; assert.equal(kernelHash(replayed.kernel), kernelHash(host2.kernel));
+  db.close();
+});

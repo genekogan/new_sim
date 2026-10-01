@@ -28,12 +28,15 @@ const OPS: Record<Change['op'], string> = { appear: 'appear', vanish: 'vanish', 
 export function SentencesPanel({ sim, soulId, limit = 40 }: { sim: Sim; soulId?: string; limit?: number }) {
   const name = nameIn(sim.kernel), now = sim.conn.displayTick();
   const rows = sim.plays.filter((p) => !soulId || p.soulId === soulId).slice(-limit).reverse();
+  // things that have since vanished are still named in the record of what happened to them
+  const past = new Map<string, string>();
+  for (const p of sim.plays) { if (p.target && p.targetName) past.set(p.target, p.targetName); for (const c of p.changes) if (c.op === 'appear') past.set(c.id, c.name); }
   return (
     <section className={soulId ? '' : 'wide'}>
       <h2>{soulId ? 'What it did — plays and what each one changed' : 'What happened — every action is a sentence: who, in what manner, which card, on what'}</h2>
       <div className="scroll">
         {rows.map((p) => {
-          const names = new Map<string, string>(); for (const c of p.changes) if (c.op === 'appear') names.set(c.id, c.name);
+          const names = past;
           return (
             <div key={p.seq} style={{ marginBottom: 6 }}>
               <span className="dim">{ago(p.tick, now)} </span><b>{p.soul}</b>{p.manner && <span className="dim"> {p.manner}</span>} <span className="acc">{p.card}</span>{p.targetName && <> → {p.targetName}</>}
