@@ -56,8 +56,18 @@ export function candidatesFor(host: WorldHost, soulId: string): string[] {
   return Object.values(host.kernel.things).filter((t) => t.id !== soulId && t.kind !== 'region').map((t) => t.id);
 }
 
+/** Does a target belong to `of`: is it that thing, or something it hosts, made, holds or otherwise links to? */
+export function belongsTo(host: WorldHost, target: string | null, of: string): boolean {
+  if (!target) return false;
+  if (target === of) return true;
+  const k = host.kernel; if (k.things[target]?.by === of) return true;
+  return Object.values(k.links).some((l) => l.from === of && l.to === target && l.kind !== 'said' && (l.until === undefined || l.until >= k.tick));
+}
+/** Does playing this card on this target match a step of the owner's agenda? */
+export const matchesStep = (host: WorldHost, s: { card: string; target?: string | null; of?: string | null } | undefined, card: string, target: string | null) =>
+  !!s && s.card === card && (!s.target || s.target === target) && (!s.of || belongsTo(host, target, s.of));
 /** Does this option serve the current step of the owner's agenda? */
-export const serves = (m: Mind, card: string, target: string | null) => { const s = m.agenda[m.agendaPos]; return !!s && s.card === card && (!s.target || s.target === target); };
+export const serves = (host: WorldHost, m: Mind, card: string, target: string | null) => matchesStep(host, m.agenda[m.agendaPos], card, target);
 
 /** The options the mind chooses among: playable cards, physically feasible, ranked and capped. */
 export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
@@ -68,11 +78,12 @@ export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
     const t = p.target ? k.things[p.target] : null;
     const d = t ? distance(host, me, t.id) : 0;
     let score = 0;
-    if (serves(m, p.card.name, p.target)) score += 1000;
+    if (serves(host, m, p.card.name, p.target)) score += 1000;
     if (p.card.name === 'say yes' || p.card.name === 'say no') score += 300;                  // someone is waiting
     if (t && samePlace(k, me, t.id)) score += 40;
     if (t?.kind === 'gathering') score += 25;
     if (!t) score += 10;
+    if (p.card.name === 'wait') score += 200;                                                 // always on offer
     score -= Math.min(30, d / 3);
     return { p, t, score };
   }).sort((a, b) => b.score - a.score || (a.p.id < b.p.id ? -1 : 1));
@@ -87,11 +98,13 @@ export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
     const label = `${p.card.name}${t ? `: ${describeTarget(host, me, t)}` : ''}`;
     scored.push({ score, o: {
       id: p.id, template: p.card.name, label, goodWhen: p.card.good_when ?? p.card.summary, notFor: p.card.not_for, target: p.target ?? undefined,
-      servesIntent: serves(m, p.card.name, p.target), steps, durationHint: p.card.takes,
+      servesIntent: serves(host, m, p.card.name, p.target), steps, durationHint: p.card.takes,
       card: p.card.name, hash: p.card.hash, cardTarget: p.target, approachLen: p.card.approach.length,
     } });
     if (scored.length >= cap) break;
   }
+  // If the plan's current step cannot be played yet, waiting is what serves the plan.
+  if (m.agenda[m.agendaPos] && !scored.some((x) => x.o.servesIntent)) { const w = scored.find((x) => x.o.card === 'wait'); if (w) { w.o.servesIntent = true; w.o.goodWhen = 'the plan’s next step is not possible yet: stay and wait for it'; } }
   return scored.map((s) => s.o);
 }
 
@@ -114,9 +127,9 @@ export function situationOf(host: WorldHost, m: Mind): { situation: string[]; he
   const step = m.agenda[m.agendaPos];
   if (step) {
     const card = k.vocab.cards[step.card];
-    const targets = step.target ? [step.target] : candidatesFor(host, me);
+    const targets = (step.target ? [step.target] : candidatesFor(host, me)).filter((t) => !step.of || belongsTo(host, t, step.of));
     const possible = card && (card.target ? targets.some((t) => !whyNot(k, card, me, t)) : !whyNot(k, card, me, null));
-    out.push(`your owner's plan, step ${m.agendaPos + 1} of ${m.agenda.length}: ${step.card}${step.target ? ` (${name(step.target)})` : ''}${possible ? '' : ': not possible yet'}`);
+    out.push(`your owner's plan, step ${m.agendaPos + 1} of ${m.agenda.length}: ${step.card}${step.target ? ` (${name(step.target)})` : step.of ? ` (${name(step.of)}’s)` : ''}${possible ? '' : ': not possible yet'}`);
   } else if (m.agenda.length) out.push("your owner's plan is complete");
   return { situation: out, heard };
 }
@@ -135,5 +148,5 @@ export function deckView(host: WorldHost, m: Mind) {
       whyNot: ok.length ? null : c.target ? (nearest ? whyNot(k, c, me, nearest) : `there is no ${c.target.kind}`) : whyNot(k, c, me, null),
     };
   });
-  return { cards, manners: deck.manners.map((n) => ({ name: n, summary: k.vocab.manners[n]?.summary ?? '' })), agenda: m.agenda.map((s, i) => ({ ...s, targetName: s.target ? (k.things[s.target]?.name ?? s.target) : null, done: i < m.agendaPos })), agendaPos: m.agendaPos };
+  return { cards, manners: deck.manners.map((n) => ({ name: n, summary: k.vocab.manners[n]?.summary ?? '' })), agenda: m.agenda.map((s, i) => ({ ...s, targetName: s.target ? (k.things[s.target]?.name ?? s.target) : s.of ? `${k.things[s.of]?.name ?? s.of}’s` : null, done: i < m.agendaPos })), agendaPos: m.agendaPos };
 }

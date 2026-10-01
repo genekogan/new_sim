@@ -171,7 +171,7 @@ export class Brain {
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: s.happening },
       soul: {
         name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.text ?? m.intent?.note ?? null, hasIntent: !!m.intent && m.agendaPos < Math.max(1, m.agenda.length),
-        intentIsNew: trigger === 'new-intent', energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
+        intentIsNew: URGENT.has(trigger), energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
         doing: ent.human!.task ? m.doing : 'standing around', recent: m.recent.slice(-3),
       },
       nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
@@ -296,7 +296,7 @@ export class Brain {
   }
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
-  async compile(m: Mind, wish: string): Promise<{ ok: true; agenda: { card: string; target: string | null }[]; minted: MintVerdict[] } | { ok: false; reason: string } | null> {
+  async compile(m: Mind, wish: string): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[] } | { ok: false; reason: string } | null> {
     if (this.mode === 'fake' || !this.cfg.anthropicKey) return null;
     if (this.overBudget || !this.gov.allow('user')) return { ok: false, reason: 'the thinking budget is spent for now; try again in a few minutes' };
     const k = this.host.kernel, tick = this.host.engine.world.tick;
@@ -326,6 +326,7 @@ export class Brain {
           if (!card) { problems.push(`agenda step uses a card that does not exist: "${a.card}"`); continue; }
           if (a.target !== null && !k.things[a.target]) problems.push(`agenda step "${a.card}" targets an unknown thing id "${a.target}" (use an id from the list, or null)`);
           else if (a.target && card.target && card.target.kind !== 'any' && k.things[a.target].kind !== card.target.kind) problems.push(`agenda step "${a.card}" needs a ${card.target.kind} but "${a.target}" is a ${k.things[a.target].kind}`);
+          if (a.of && !k.things[a.of]) problems.push(`agenda step "${a.card}" has an unknown "of" id "${a.of}"`);
         }
         attempts.push({ out, problems });
         if (problems.length && attempt === 0) { messages.push({ role: 'assistant', content: `I proposed: ${JSON.stringify(out)}` }, { role: 'user', content: `That cannot run. Problems:\n- ${problems.join('\n- ')}\nFix them and call compile again.` }); continue; }
@@ -337,7 +338,7 @@ export class Brain {
         const deal = [...new Set(out.agenda.map((a) => a.card))].filter((c) => this.host.kernel.vocab.cards[c] && !this.host.kernel.decks[m.soulId]?.cards.includes(c));
         if (deal.length) await this.host.enqueue('deck', `soul:${m.soulId}`, { soulId: m.soulId, add: deal, why: 'needed for the owner’s wish' });
         this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, agenda: out.agenda, minted, dealt: deal, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live' });
-        return { ok: true, agenda: out.agenda.map((a) => ({ card: a.card, target: a.target })), minted };
+        return { ok: true, agenda: out.agenda.map((a) => ({ card: a.card, target: a.target, ...(a.of ? { of: a.of } : {}) })), minted };
       }
     } catch (e) {
       this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { messages }, response: null, applied: { wish, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: String((e as Error).message) });
@@ -507,7 +508,9 @@ export class Brain {
 }
 
 // ---------------------------------------------------------------- helpers
-const prio = (trigger: string) => ({ 'new-intent': 0, 'activity-failed': 1, 'activity-ended': 1, birth: 1, 'narrator-beat': 2 } as Record<string, number>)[trigger] ?? 3;
+/** Triggers after which the question is "what now?", not "should I keep going?". */
+const URGENT = new Set(['new-intent', 'plan-advanced', 'spoken-to']);
+const prio = (trigger: string) => ({ 'new-intent': 0, 'spoken-to': 0, 'plan-advanced': 0, 'activity-failed': 1, 'activity-ended': 1, birth: 1, 'narrator-beat': 2 } as Record<string, number>)[trigger] ?? 3;
 const durationFloor = (h: string) => (h === 'seconds' ? 8 : h === 'minute' ? 20 : 30);
 const score = (e: Entity) => ({ perform: 5, converse: 4, walk: 3, gather: 2, wave: 2 } as Record<string, number>)[e.human!.activity] ?? 0;
 const heldWord = (s: number) => (s < 8 ? 'just started' : s < 25 ? 'a little while' : s < 60 ? 'quite a while' : 'a long time');

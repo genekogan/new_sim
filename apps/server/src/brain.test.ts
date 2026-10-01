@@ -25,5 +25,5 @@ test('mid-brain calls are shared fairly across Souls', async () => {
   // Souls that are spoken to think more often (that is by design); nobody may be starved by iteration order
   assert.ok(Math.min(...n) >= 2 && Math.max(...n) <= Math.min(...n) * 6, `no soul is starved: ${n}`);
   assert.ok(db.countEvents(WORLD_ID) > 12);
-  void brain; db.close();
+  void brain; await new Promise((r) => setTimeout(r, 100)); db.close(); // let in-flight speech rendering settle
 });

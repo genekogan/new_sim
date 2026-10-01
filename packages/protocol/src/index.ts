@@ -9,7 +9,12 @@ export const PROTO = 1;
 
 // ---------------------------------------------------------------- intents
 export const GOALS = ['wander', 'go', 'follow', 'attend', 'gather', 'converse', 'rest', 'perform'] as const;
-export const agendaStepSchema = z.strictObject({ card: z.string().min(2).max(60), target: z.string().max(80).nullable().optional() });
+/**
+ * One step of an agenda: a card, optionally on a specific `target`, or on any target belonging
+ * to `of` (something that thing hosts, made, holds, or the thing itself). `of` lets a plan name
+ * a target that does not exist yet: "the gathering Rob hosts".
+ */
+export const agendaStepSchema = z.strictObject({ card: z.string().min(2).max(60), target: z.string().max(80).nullable().optional(), of: z.string().max(80).nullable().optional() });
 /**
  * A standing intent. Either a legacy `goal` (compiled to a one-step agenda), or an
  * `agenda`: an ordered list of cards to favour, each optionally on a target. The Soul's
@@ -28,7 +33,7 @@ export type AgendaStep = z.infer<typeof agendaStepSchema>;
 export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => string = (x) => x): string => {
   if (!i) return 'no particular intent; live your life';
   let base: string;
-  if (i.agenda?.length) base = i.agenda.map((a) => `${a.card}${a.target ? ` (${nameOf(a.target)})` : ''}`).join(', then ');
+  if (i.agenda?.length) base = i.agenda.map((a) => `${a.card}${a.target ? ` (${nameOf(a.target)})` : a.of ? ` (${nameOf(a.of)}’s)` : ''}`).join(', then ');
   else {
     const t = i.target ? nameOf(i.target) : null;
     base = { wander: 'wander around', go: `go to ${t ?? 'somewhere'}`, follow: `follow ${t ?? 'someone'}`, attend: `attend ${t ?? 'whatever is happening'}`,

@@ -104,7 +104,7 @@ export class Souls {
     if (intent.agenda) {
       intent.agenda = intent.agenda.map((a) => {
         if (!k.vocab.cards[a.card]) throw new ApiError(400, 'unknown-card', `no such card: "${a.card}". See your deck, or propose the card first.`);
-        return { card: a.card, target: a.target ? need(a.target) : null };
+        return { card: a.card, target: a.target ? need(a.target) : null, ...(a.of ? { of: need(a.of) } : {}) };
       });
       // cards on the agenda that the Soul does not hold yet are dealt to it
       const deal = [...new Set(intent.agenda.map((a) => a.card))].filter((c) => !k.decks[soul.id]?.cards.includes(c));
@@ -161,7 +161,7 @@ export class Souls {
       storyteller_suggests: c.nudge,
       situation: c.situation ?? [],
       said_to_you: c.heard ?? [],
-      agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ?? null, done: i < m.agendaPos })),
+      agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ?? null, ...(a.of ? { of: a.of } : {}), done: i < m.agendaPos })),
       could_do_now: c.options.map((o) => ({ id: o.id, card: o.card, target: o.cardTarget, what: o.label, good_when: o.goodWhen, not_for: o.notFor, ...(o.servesIntent ? { serves_current_intent: true } : {}) })),
     };
   }

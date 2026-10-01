@@ -176,3 +176,82 @@ test('create a Soul, steer it from the page, pair an agent both ways, steer by R
   await sleep(1000);
   assert.ok(!((await (await fetch(`${BASE}/v1/world`)).json()) as any).souls.some((s: any) => s.name === 'Testa'));
 });
+
+test('the DJ story through the real server: an agent proposes cards, two owners set agendas, the party happens', async () => {
+  const admin = 'dev:admin'; // admins need no invite
+  const rob = (await api('/v1/souls', admin, { name: 'Rob', description: 'a generous host who loves a crowd' })).body.soul;
+  const wren = (await api('/v1/souls', admin, { name: 'Wren', description: 'a kite maker who secretly wants to DJ' })).body.soul;
+  assert.ok(rob?.id && wren?.id);
+  await sleep(600);
+
+  // the grammar is published for agents
+  const grammar = await (await fetch(`${BASE}/cards.md`)).text();
+  assert.ok(grammar.includes('a Soul acts only for itself') && grammar.includes('`walk_to`'));
+
+  // Wren's deck starts with the base cards and three manners
+  const deck0 = (await api(`/v1/souls/${wren.id}/deck`, admin)).body;
+  assert.ok(deck0.cards.some((c: any) => c.name === 'talk with') && deck0.manners.length >= 1);
+
+  // an invalid card is refused with reasons, and nothing is minted
+  const bad = await api(`/v1/souls/${wren.id}/cards`, admin, { cards: [{ name: 'seize the party', summary: 'Take over', target: { kind: 'gathering' }, when: [], then: [{ link: ['hosts', '$target', '$actor'] }], approach: [], during: [{ verb: 'teleport', params: {} }], takes: 'seconds' }] });
+  assert.equal(bad.body.ok, false);
+  assert.ok(bad.body.cards[0].problems.some((p: string) => p.includes('must start from the actor')));
+
+  // Wren's agent proposes the two cards the DJ story needs
+  const cards = [
+    { name: 'ask to be the dj', summary: 'Ask the host of a gathering to let you play the music', good_when: 'the intent is to DJ', not_for: 'there is already a DJ',
+      target: { kind: 'gathering' }, derive: { host: { link: 'hosts', to: '$target' } },
+      when: [{ at: ['$actor', '$target'] }, { noneLinkedTo: ['dj of', '$target'] }, { distinct: ['$actor', '$host'] }, { notLinked: ['said', '$actor', '$host'] }, { notLinked: ['agreed', '$host', '$actor'] }],
+      then: [{ say: ['$actor', '$host', 'ask'], about: 'being the DJ at $target.name' }],
+      approach: [{ verb: 'walk_to', params: { to: '$host', standoff: 1.3 } }], during: [{ verb: 'wave', params: { at: '$host', seconds: 2 } }], takes: 'seconds' },
+    { name: 'be the dj', summary: 'Set up and play music at a gathering, once the host has agreed', good_when: 'the host said yes', not_for: 'no agreement yet',
+      target: { kind: 'gathering' }, derive: { host: { link: 'hosts', to: '$target' } },
+      when: [{ at: ['$actor', '$target'] }, { linked: ['agreed', '$host', '$actor'] }, { noneLinkedTo: ['dj of', '$target'] }],
+      then: [{ link: ['dj of', '$actor', '$target'] }, { appear: { kind: 'dj kit', name: 'a DJ kit', at: '$target.at', states: { state: 'playing' } }, linkFromActor: 'made' }, { set: ['$target', 'music', 'playing'] }, { set: ['$actor', 'doing', 'playing music'] }],
+      approach: [], during: [{ verb: 'perform', params: { seconds: 60 } }], wants: ['set up equipment', 'dj at a deck'], takes: 'minutes' },
+  ];
+  const proposed = await api(`/v1/souls/${wren.id}/cards`, admin, { cards, links: { 'dj of': { summary: 'plays the music at', control: true } }, kinds: { 'dj kit': { summary: 'turntables and speakers' } } });
+  assert.equal(proposed.body.ok, true, JSON.stringify(proposed.body));
+  await sleep(300);
+
+  // each owner gives direction as an agenda of cards; nobody scripts the other Soul
+  assert.equal((await api(`/v1/souls/${rob.id}/intent`, admin, { intent: { agenda: [{ card: 'host a gathering', target: 'the campfire' }, { card: 'say yes', target: null }], text: 'throw a party at the campfire and let people help' } })).status, 200);
+  const wrenIntent = await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'join', of: 'Rob' }, { card: 'ask to be the dj', of: 'Rob' }, { card: 'be the dj', of: 'Rob' }], text: "go to Rob's party and ask him if you can DJ" } });
+  assert.equal(wrenIntent.status, 200, JSON.stringify(wrenIntent.body));
+  assert.equal((await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'no such card', target: null }] } })).status, 400);
+
+  // run the world at five times speed so the test does not take minutes
+  assert.equal((await api('/v1/admin', admin, { action: 'clock_rate', rate: 5 })).status, 200);
+  // the world runs: wait until the record shows Wren became the DJ
+  const mine = async () => (await (await fetch(`${BASE}/v1/plays?limit=200`)).json() as any).plays.filter((p: any) => [rob.id, wren.id].includes(p.soulId));
+  let plays: any[] = [];
+  for (let i = 0; i < 400; i++) { await sleep(300); plays = await mine(); if (plays.some((p) => p.ok && p.card === 'be the dj')) break; }
+  await api('/v1/admin', admin, { action: 'clock_rate', rate: 1 });
+  const trace = plays.map((p: any) => `${p.tick} ${p.soul}:${p.card}→${p.targetName}${p.ok ? '' : ' REFUSED ' + p.reason}`).join('\n');
+  // the chain happened, in order, as independent plays by two Souls
+  const done = plays.filter((p) => p.ok).map((p) => `${p.soul}:${p.card}`);
+  const order = ['Rob:host a gathering', 'Wren:join', 'Wren:ask to be the dj', 'Rob:say yes', 'Wren:be the dj'];
+  let at = -1; for (const step of order) { const i = done.indexOf(step, at + 1); assert.ok(i > at, `${step} happened in order\n${trace}`); at = i; }
+  // what "be the dj" changed: a role, a new thing, the music
+  const dj = plays.find((p) => p.ok && p.card === 'be the dj');
+  assert.equal(dj.targetName, 'Rob’s gathering');
+  assert.ok(dj.changes.some((c: any) => c.op === 'link' && c.kind === 'dj of' && c.from === wren.id));
+  assert.ok(dj.changes.some((c: any) => c.op === 'appear' && c.kind === 'dj kit'));
+  assert.ok(dj.changes.some((c: any) => c.op === 'set' && c.key === 'music' && c.value === 'playing'));
+  const asked = plays.find((p) => p.ok && p.card === 'ask to be the dj');
+  assert.deepEqual(asked.changes[0], { op: 'say', from: wren.id, to: rob.id, act: 'ask', about: 'being the DJ at Rob’s gathering', manner: asked.manner });
+  const k = await (await fetch(`${BASE}/v1/kernel`)).json() as any;
+  assert.equal(k.vocab.cards['be the dj'].origin, 'agent'); assert.equal(k.plays['be the dj'], 1);
+  // words were rendered for what was said
+  const talk = (await (await fetch(`${BASE}/v1/talk?limit=200`)).json() as any).lines;
+  assert.ok(talk.some((l: any) => l.fromName === 'Wren' && l.toName === 'Rob' && l.act === 'ask'));
+  assert.ok(talk.some((l: any) => l.fromName === 'Rob' && l.toName === 'Wren' && l.act === 'agree'));
+  // Wren's agenda is complete and her dashboard story shows it
+  const deck = (await api(`/v1/souls/${wren.id}/deck`, admin)).body;
+  assert.equal(deck.agendaPos, 3);
+  const tl = (await api(`/v1/souls/${wren.id}/timeline?limit=200`, admin)).body.events;
+  assert.ok(tl.some((e: any) => e.kind === 'play' && e.text.startsWith('be the dj')));
+  // and a client that joined late agrees with the server about all of it
+  const c = client(); await sleep(6500);
+  assert.equal(c.stats.lastCheck, 'ok'); c.close();
+});

@@ -9,7 +9,8 @@ import {
   type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
 import type { Db } from './db.ts';
-import { ARRIVAL_PLACE, defaultManners, foldEvent, initKernel, soulThing } from './fold.ts';
+import { ARRIVAL_PLACE, foldEvent, initKernel, soulThing } from './fold.ts';
+import { matchesStep } from './deck.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 export const WORLD_ID = 'toy-1';
@@ -272,8 +273,11 @@ export class WorldHost {
           const what = `${view.card}${view.targetName ? ` → ${view.targetName}` : ''}`;
           if (view.ok) {
             m.recent = [...m.recent.slice(-3), `${what} (done)`];
-            const step = m.agenda[m.agendaPos];
-            if (step && step.card === view.card && (!step.target || step.target === view.target)) m.agendaPos++;
+            if (matchesStep(this, m.agenda[m.agendaPos], view.card, view.target)) {
+              m.agendaPos++;
+              // the plan moved on: think again now, rather than sitting out the rest of this activity
+              if (m.agendaPos < m.agenda.length) { m.nextEvalTick = Math.min(m.nextEvalTick, tick + 15); m.evalTrigger = 'plan-advanced'; m.lastFingerprint = ''; }
+            }
             // anyone spoken to re-thinks soon: this is how asking and answering chain together
             for (const c of view.changes) if (c.op === 'say') { const o = this.minds.get(c.to); if (o) { o.nextEvalTick = Math.min(o.nextEvalTick, tick + 8 + (hash32(o.soulId) % 20)); o.evalTrigger = 'spoken-to'; o.lastFingerprint = ''; } }
           } else {
