@@ -37,6 +37,8 @@ export class Hub {
     host.listeners.push({
       onBatch: (b) => this.broadcast({ t: 'batch', ...b, log: b.log.map(publicEvent) }),
       onHeartbeat: (h) => this.broadcast({ t: 'heartbeat', ...h, clients: this.clients.size }),
+      onKernel: (view) => this.broadcast({ t: 'kernel', view }),
+      onPlay: (p) => this.broadcast({ t: 'plays', plays: [p] }),
     });
     setInterval(() => this.sweep(), 15_000).unref();
     setInterval(() => this.broadcast({ t: 'stats', stats: this.stats() }), 2_000).unref();
@@ -76,6 +78,9 @@ export class Hub {
       if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
       this.send(c, { t: 'log', events: this.db.tailEvents(WORLD_ID, 150).map(publicEvent) });
+      this.send(c, { t: 'kernel', view: this.host.kernelView() });
+      this.send(c, { t: 'plays', plays: this.host.recentPlays.slice(-60) });
+      this.send(c, { t: 'talk', lines: this.db.recentTalk(40) });
       if (this.brain.camera) this.send(c, { t: 'camera', line: this.brain.camera });
       if (this.brain.ticker.length) this.send(c, { t: 'ticker', lines: this.brain.ticker.slice(-20) });
       for (const v of this.brain.narratives.values()) this.send(c, { t: 'narrative', view: v });

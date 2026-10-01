@@ -3,9 +3,9 @@
 // its tier's bucket can cover its estimated cost, so spend is spread evenly
 // over the day instead of being exhausted in the morning. A hard rolling-24h
 // cap on the total stays as a backstop.
-export type Tier = 'mid' | 'narrator' | 'director' | 'user';
-/** user = translate + on-demand shots (people clicking), reserved so it always works. */
-export const SHARES: Record<Tier, number> = { mid: 0.5, narrator: 0.3, director: 0.1, user: 0.1 };
+export type Tier = 'mid' | 'narrator' | 'director' | 'user' | 'talk';
+/** user = compiling wishes, translate, on-demand shots (people clicking), reserved so it always works. talk = rendering speech. */
+export const SHARES: Record<Tier, number> = { mid: 0.35, narrator: 0.2, director: 0.05, user: 0.15, talk: 0.25 };
 const DAY_MS = 24 * 3600 * 1000;
 const CAPACITY_HOURS = 1; // a bucket holds at most one hour of its refill (allows short bursts)
 
@@ -15,8 +15,8 @@ export class Governor {
   budget: number;
   private level: Record<Tier, number>;
   private last = Date.now();
-  private est: Record<Tier, number> = { mid: 0.00008, narrator: 0.004, director: 0.00005, user: 0.0002 };
-  denied: Record<Tier, number> = { mid: 0, narrator: 0, director: 0, user: 0 };
+  private est: Record<Tier, number> = { mid: 0.00008, narrator: 0.004, director: 0.00005, user: 0.002, talk: 0.0006 };
+  denied: Record<Tier, number> = { mid: 0, narrator: 0, director: 0, user: 0, talk: 0 };
 
   constructor(budgetPerDay: number) {
     this.budget = budgetPerDay;
@@ -55,4 +55,4 @@ export class Governor {
     return (Object.keys(SHARES) as Tier[]).map((t) => ({ tier: t, share: SHARES[t], perDay: this.perDay(t), level: this.level[t], capacity: this.capacity(t), estCost: this.est[t], denied: this.denied[t] }));
   }
 }
-export const tierOf = (callTier: string): Tier => (callTier === 'mid' ? 'mid' : callTier === 'narrator' ? 'narrator' : callTier === 'director' ? 'director' : 'user');
+export const tierOf = (callTier: string): Tier => (callTier === 'mid' || callTier === 'attune' ? 'mid' : callTier === 'narrator' ? 'narrator' : callTier === 'director' ? 'director' : callTier === 'talk' ? 'talk' : 'user');

@@ -46,6 +46,13 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
       addColumn(db, 'souls', 'token_last_used', 'INTEGER');
     },
   },
+  {
+    id: 3, name: 'talk: rendered words for speech acts',
+    up(db) {
+      db.exec('CREATE TABLE IF NOT EXISTS talks (id INTEGER PRIMARY KEY AUTOINCREMENT, world_id TEXT NOT NULL, tick INTEGER NOT NULL, at INTEGER NOT NULL, from_id TEXT NOT NULL, to_id TEXT NOT NULL, body TEXT NOT NULL)');
+      db.exec('CREATE INDEX IF NOT EXISTS talks_pair ON talks (from_id, to_id, id)');
+    },
+  },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

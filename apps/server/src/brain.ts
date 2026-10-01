@@ -4,13 +4,17 @@ import type { Entity } from '@sim/engine-contract';
 import {
   JEV_MODEL, JevClient, buildDirectorRequest, buildMidRequest, buildShotRequest, buildTranslateRequest, callNarrator, buildNarratorRequest, fallbackMid, fingerprint,
   haikuTranslate, interpretDirector, interpretMid, interpretTranslate, sanitize,
+  buildAttuneRequest, interpretAttune, callTool, cardGrammar, cleanLines, compileUser, plainLine, talkUser, COMPILER_PREAMBLE, COMPILE_TOOL, TALK_SYSTEM, TALK_TOOL,
+  type CompileOut, type SpokenLine, type TalkInput,
   type DirectorContext, type MidContext, type RegionDigest, type ShotCandidate, type Target, type Translation, type ChoiceA,
 } from '@sim/brain';
-import { GOALS, describeIntent, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TickerLine, type WireIntent } from '@sim/protocol';
+import { GOALS, describeIntent, publicIntent, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { WORLD_ID, energyWord, hash32, type Mind, type WorldHost } from './world.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
+import { candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
+import { cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
 
 const TPS = 20;
 const MAX_INFLIGHT = 8;
@@ -18,7 +22,8 @@ const DIRECTOR_EVERY = TPS * 6;
 const SHOT_COMMIT_TICKS = TPS * 10;
 const NARRATE_EVERY = TPS * 60 * 5;
 
-export type BrainSink = { onCall(c: BrainCall): void; onCamera(l: CameraLine): void; onTicker(l: TickerLine[]): void; onNarrative(v: NarrativeView): void; clients(): number };
+export type BrainSink = { onCall(c: BrainCall): void; onCamera(l: CameraLine): void; onTicker(l: TickerLine[]): void; onNarrative(v: NarrativeView): void; onTalk?(l: TalkLine[]): void; clients(): number };
+export type MintVerdict = { name: string; ok: boolean; problems?: string[]; hash?: string };
 type NarratorState = { nextRun: Record<string, number>; lastSummary: Record<string, string | null> };
 
 export class Brain {
@@ -30,6 +35,9 @@ export class Brain {
   get budget() { return this.gov.budget; }
   set budget(b: number) { this.gov.setBudget(b); this.capSince = Date.now(); this.spentToday = 0; }
   inflight = new Set<string>();
+  /** The latest rendered words from one Soul to another (colour for the listener's mind). */
+  private lastWords = new Map<string, string>();
+  private nextTalkId = 1;
   private lastServed = new Map<string, number>(); // soulId → tick of the last paid model call
   spentToday = 0; callsToday = 0; jevMsAvg = 0;
   camera: CameraLine | null = null;
@@ -48,7 +56,7 @@ export class Brain {
     db.backfillSpend();
     this.jev = new JevClient(cfg.typesafeKey, this.mode);
     const t = db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.jevMsAvg = t.jevMs;
-    host.listeners.push({ afterTick: (tick) => this.afterTick(tick), onApplied: (e) => this.onApplied(e) });
+    host.listeners.push({ afterTick: (tick) => this.afterTick(tick), onApplied: (e) => this.onApplied(e), onPlay: (v) => { for (const c of v.changes) if (c.op === 'say' && host.kernel.things[c.to]?.kind === 'soul') void this.speak(c.from, c.to, c.act, typeof c.about === 'string' ? c.about : undefined, c.manner); } });
     setInterval(() => { const t = this.db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.db.pruneBrainCalls(); }, 60_000).unref();
   }
 
@@ -146,26 +154,32 @@ export class Brain {
   }
 
   private onApplied(e: LogEvent) {
+    if (e.kind === 'birth') { const m = this.host.minds.get(e.payload.soulId); if (m) void this.attune(m); }
     const line = tickerText(e, this.host);
     if (line) { this.tickerCandidates.push({ id: String(e.seq), text: line, tick: e.tick }); if (this.tickerCandidates.length > 30) this.tickerCandidates.shift(); }
   }
 
   // ------------------------------------------------------------ tier 2: mid-brain
-  midContext(m: Mind, trigger: string): MidContext {
-    const eng = this.host.engine, w = eng.world, ent = w.entities[m.entityId];
-    const nameOf = (id: string) => w.entities[id]?.label ?? w.regions[id]?.label ?? id;
+  midContext(m: Mind, trigger: string): Omit<MidContext, 'options'> & { options: CardOption[] } {
+    const eng = this.host.engine, w = eng.world, ent = w.entities[m.entityId], k = this.host.kernel;
+    const nameOf = (id: string) => this.host.nameOf(id);
     const s = eng.describeSurroundings(m.entityId);
-    const intentText = m.intent ? describeIntent({ ...m.intent, note: undefined }, nameOf) : 'none';
+    const intentText = m.intent ? describeIntent({ ...m.intent, note: undefined, text: undefined } as WireIntent, nameOf) : 'none';
+    const sit = situationOf(this.host, m);
+    const deck = k.decks[m.soulId];
     return {
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: s.happening },
       soul: {
-        name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.note ?? null, hasIntent: !!m.intent,
-        intentIsNew: trigger === 'new-intent', energy: energyWord(m.energy), where: w.regions[s.region]?.label ?? s.region,
+        name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.text ?? m.intent?.note ?? null, hasIntent: !!m.intent && m.agendaPos < Math.max(1, m.agenda.length),
+        intentIsNew: trigger === 'new-intent', energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
         doing: ent.human!.task ? m.doing : 'standing around', recent: m.recent.slice(-3),
       },
       nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
       nudge: m.nudge?.text ?? null,
-      options: eng.enumerateActivities(m.entityId, m.intent),
+      situation: sit.situation,
+      heard: sit.heard.map((h) => ({ who: h.who, act: h.act, ...(h.about ? { about: h.about } : {}), ...(this.lastWords.get(`${h.from}>${m.soulId}`) ? { words: this.lastWords.get(`${h.from}>${m.soulId}`)! } : {}) })),
+      manners: Object.fromEntries((deck?.manners ?? []).map((n) => [n, k.vocab.manners[n]?.summary ?? n])),
+      options: optionsFor(this.host, m),
       running: !!ent.human!.task,
       trigger,
     };
@@ -183,6 +197,7 @@ export class Brain {
     const ent = host.engine.world.entities[m.entityId];
     this.updateEnergy(m, ent, tick);
     const ctx = this.midContext(m, trigger);
+    if (ctx.options.length === 0) { m.nextEvalTick = tick + TPS * 20; return; }
     const fp = fingerprint(ctx);
     if (ctx.running && trigger === 'timer' && fp === m.lastFingerprint) { m.nextEvalTick = tick + TPS * 60; return; } // nothing changed: skip the call
     m.lastFingerprint = fp;
@@ -210,7 +225,7 @@ export class Brain {
     const opt = ctx.options.find((o) => o.id === decision.option);
     const policy = { how: decision.how, pool: decision.pool, topP: decision.topP, keepGoing: decision.keepGoing, sociable: decision.sociable, optionKeys: Object.fromEntries(keys) };
     const applied = stale ? { dropped: 'intent changed during the call; re-evaluating' } : opt
-      ? { option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, probabilities: decision.probabilities, ...policy, seed }
+      ? { option: opt.id, label: opt.label, card: opt.card, target: opt.cardTarget, manner: decision.manner, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, probabilities: decision.probabilities, ...policy, seed }
       : { option: 'continue', mood: decision.mood, reevalSeconds: decision.reevalSeconds, ...policy };
     const callId = this.record({ tick, tier: 'mid', subject: m.name, soulId: m.soulId, model: mode === 'live' ? JEV_MODEL : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
     if (stale) { m.nextEvalTick = now + 1; m.evalTrigger = 'new-intent'; return; }
@@ -221,6 +236,7 @@ export class Brain {
     void host.enqueue('decision', 'brain:mid', {
       soulId: m.soulId, entityId: m.entityId, option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood,
       reevalTicks: Math.max(decision.reevalSeconds, durationFloor(opt.durationHint)) * TPS, fallback: usedFallback, call: callId, trigger,
+      card: opt.card, target: opt.cardTarget, ...(decision.manner ? { manner: decision.manner } : {}), approachLen: opt.approachLen,
     } satisfies DecisionPayload);
   }
 
@@ -254,6 +270,124 @@ export class Brain {
       this.record({ tick, tier: 'translate', subject: m.name, soulId: m.soulId, model: this.cfg.narratorModel, request: h.request, response: h.raw, applied: res, ms: h.ms, inputTokens: h.inputTokens, outputTokens: h.outputTokens, cachedTokens: 0, costUsd: h.costUsd, mode: 'live' });
       return { ...res, via: 'haiku' };
     } catch (e) { return { ok: false, confidence: 0, reason: String((e as Error).message), via: 'haiku' }; }
+  }
+
+  // ------------------------------------------------------------ vocabulary: minting, compiling, attuning
+  private engineVerbs() { return new Set(this.host.engine.describeVerbs().map((v) => v.verb).filter((v) => v !== 'do_activity')); }
+
+  /** Validate proposed cards and mint the valid ones into the vocabulary and this Soul's deck. No model involved. */
+  async mint(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin']): Promise<MintVerdict[]> {
+    const k = this.host.kernel, verbs = this.engineVerbs(), tick = this.host.engine.world.tick;
+    const newLinks: Record<string, LinkKind> = {}; for (const [n, d] of Object.entries(links ?? {})) if (!k.vocab.links[n] && /^[a-z][a-z ]{1,39}$/.test(n) && n !== 'said' && n !== 'agreed') newLinks[n] = { summary: String(d.summary).slice(0, 120), ...(d.control ? { control: true } : {}) };
+    const newKinds: Record<string, { summary: string }> = {}; for (const [n, d] of Object.entries(kinds ?? {})) if (!k.vocab.kinds[n] && /^[a-z][a-z ]{1,39}$/.test(n)) newKinds[n] = { summary: String(d.summary).slice(0, 120) };
+    const verdicts: MintVerdict[] = []; let first = true;
+    for (const raw of cards.slice(0, 4)) {
+      const v = validateCard(raw, k, verbs); const name = String((raw as { name?: unknown })?.name ?? '?');
+      if (!v.ok) { verdicts.push({ name, ok: false, problems: v.problems }); continue; }
+      const card: Card = v.card; const hash = cardHash(card);
+      if (k.vocab.cards[card.name]) { // the same card already exists: just deal it
+        if (!k.decks[m.soulId]?.cards.includes(card.name)) await this.host.enqueue('deck', `soul:${m.soulId}`, { soulId: m.soulId, add: [card.name], why: 'dealt an existing card' });
+        verdicts.push({ name: card.name, ok: true, hash }); continue;
+      }
+      await this.host.enqueue('mint', `soul:${m.soulId}`, { card: { ...card, hash, by: m.soulId, mintedAt: tick, origin }, forSoul: m.soulId, ...(first && Object.keys(newLinks).length ? { links: newLinks } : {}), ...(first && Object.keys(newKinds).length ? { kinds: newKinds } : {}) });
+      first = false; verdicts.push({ name: card.name, ok: true, hash });
+    }
+    return verdicts;
+  }
+
+  /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
+  async compile(m: Mind, wish: string): Promise<{ ok: true; agenda: { card: string; target: string | null }[]; minted: MintVerdict[] } | { ok: false; reason: string } | null> {
+    if (this.mode === 'fake' || !this.cfg.anthropicKey) return null;
+    if (this.overBudget || !this.gov.allow('user')) return { ok: false, reason: 'the thinking budget is spent for now; try again in a few minutes' };
+    const k = this.host.kernel, tick = this.host.engine.world.tick;
+    const verbs = this.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity');
+    const system = COMPILER_PREAMBLE + cardGrammar(verbs);
+    const user = compileUser(k, m.soulId, wish, candidatesFor(this.host, m.soulId));
+    const messages: { role: 'user' | 'assistant'; content: string }[] = [{ role: 'user', content: user }];
+    let cost = 0, ms = 0, inTok = 0, outTok = 0, cached = 0; const attempts: unknown[] = [];
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const r = await callTool<CompileOut>({ apiKey: this.cfg.anthropicKey, model: this.cfg.compilerModel, system, cacheSystem: true, messages, tool: COMPILE_TOOL, maxTokens: 1800 });
+        cost += r.costUsd; ms += r.ms; inTok += r.inputTokens; outTok += r.outputTokens; cached += r.cachedTokens;
+        const out = r.out;
+        if (!out.understood) {
+          attempts.push({ out });
+          this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: false, reason: out.reason, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live' });
+          return { ok: false, reason: out.reason || 'not understood as something a Soul could do here' };
+        }
+        // check everything before minting anything
+        const problems: string[] = []; const verbSet = this.engineVerbs();
+        const staged = structuredClone(k); for (const [n, d] of Object.entries(out.new_links ?? {})) staged.vocab.links[n] ??= d;
+        const validNew = new Map<string, Card>();
+        for (const raw of out.new_cards ?? []) { const v = validateCard(raw, staged, verbSet); if (v.ok) validNew.set(v.card.name, v.card); else problems.push(`card "${String((raw as { name?: unknown })?.name)}": ${v.problems.join('; ')}`); }
+        if (!Array.isArray(out.agenda) || out.agenda.length === 0) problems.push('the agenda is empty');
+        for (const a of out.agenda ?? []) {
+          const card = validNew.get(a.card) ?? k.vocab.cards[a.card];
+          if (!card) { problems.push(`agenda step uses a card that does not exist: "${a.card}"`); continue; }
+          if (a.target !== null && !k.things[a.target]) problems.push(`agenda step "${a.card}" targets an unknown thing id "${a.target}" (use an id from the list, or null)`);
+          else if (a.target && card.target && card.target.kind !== 'any' && k.things[a.target].kind !== card.target.kind) problems.push(`agenda step "${a.card}" needs a ${card.target.kind} but "${a.target}" is a ${k.things[a.target].kind}`);
+        }
+        attempts.push({ out, problems });
+        if (problems.length && attempt === 0) { messages.push({ role: 'assistant', content: `I proposed: ${JSON.stringify(out)}` }, { role: 'user', content: `That cannot run. Problems:\n- ${problems.join('\n- ')}\nFix them and call compile again.` }); continue; }
+        if (problems.length) {
+          this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, rejected: problems, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: 'the compiled plan did not validate' });
+          return { ok: false, reason: `could not turn that into something the world can run (${problems[0]})` };
+        }
+        const minted = await this.mint(m, [...validNew.values()], out.new_links, out.new_kinds, 'compiled');
+        const deal = [...new Set(out.agenda.map((a) => a.card))].filter((c) => this.host.kernel.vocab.cards[c] && !this.host.kernel.decks[m.soulId]?.cards.includes(c));
+        if (deal.length) await this.host.enqueue('deck', `soul:${m.soulId}`, { soulId: m.soulId, add: deal, why: 'needed for the owner’s wish' });
+        this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, agenda: out.agenda, minted, dealt: deal, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live' });
+        return { ok: true, agenda: out.agenda.map((a) => ({ card: a.card, target: a.target })), minted };
+      }
+    } catch (e) {
+      this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { messages }, response: null, applied: { wish, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: String((e as Error).message) });
+      return { ok: false, reason: 'the compiler failed; try again' };
+    }
+    return { ok: false, reason: 'the compiler failed; try again' };
+  }
+
+  /** Pick the three manners that suit a Soul's description (one cheap Jev call), and record them in its deck. */
+  async attune(m: Mind) {
+    const k = this.host.kernel, tick = this.host.engine.world.tick;
+    if (this.mode === 'fake' || this.overBudget || !this.gov.allow('mid')) return;
+    const request = buildAttuneRequest({ name: m.name, about: m.description }, k.vocab.manners);
+    try {
+      const r = await this.jev.ask(request);
+      const manners = interpretAttune(r.response);
+      this.record({ tick, tier: 'attune', subject: m.name, soulId: m.soulId, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { manners }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
+      if (this.host.minds.has(m.soulId)) void this.host.enqueue('deck', 'brain:attune', { soulId: m.soulId, manners, why: 'manners attuned to the description' });
+    } catch { /* the default manners stay */ }
+  }
+
+  // ------------------------------------------------------------ speech: the act is state, the words are rendered here
+  async speak(from: string, to: string, act: string, about: string | undefined, manner: string | undefined) {
+    const k = this.host.kernel, tick = this.host.engine.world.tick;
+    const a = k.things[from], b = k.things[to]; if (!a || !b) return;
+    const input: TalkInput = {
+      speaker: { name: a.name, about: String(a.traits.about ?? ''), ...(manner ? { manner: `${manner}: ${k.vocab.manners[manner]?.summary ?? ''}` } : {}) },
+      listener: { name: b.name, about: String(b.traits.about ?? '') }, act, ...(about ? { about } : {}),
+      where: a.at ? this.host.nameOf(a.at) : 'somewhere',
+      earlier: this.db.talkBetween(from, to, 4).map((l) => ({ who: l.fromName, text: l.text })),
+    };
+    let lines: SpokenLine[] = [];
+    const live = this.mode === 'live' && !!this.cfg.anthropicKey && !this.overBudget && this.gov.allow('talk');
+    if (live) {
+      try {
+        const r = await callTool<{ lines: SpokenLine[] }>({ apiKey: this.cfg.anthropicKey!, model: this.cfg.talkModel, system: TALK_SYSTEM, messages: [{ role: 'user', content: talkUser(input) }], tool: TALK_TOOL, maxTokens: 300, timeoutMs: 20000 });
+        lines = cleanLines(r.out.lines, act);
+        this.record({ tick, tier: 'talk', subject: a.name, soulId: from, model: this.cfg.talkModel, request: r.request, response: r.raw, applied: { to: b.name, act, lines }, ms: r.ms, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens, costUsd: r.costUsd, mode: 'live' });
+      } catch (e) {
+        this.record({ tick, tier: 'talk', subject: a.name, soulId: from, model: this.cfg.talkModel, request: input, response: null, applied: null, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'live', error: String((e as Error).message) });
+      }
+    }
+    if (!lines.length) lines = plainLine(input);
+    const out: TalkLine[] = lines.map((l) => {
+      const speaker = l.who === 'speaker';
+      const line = { tick, at: Date.now(), from: speaker ? from : to, to: speaker ? to : from, fromName: speaker ? a.name : b.name, toName: speaker ? b.name : a.name, act, ...(manner && speaker ? { manner } : {}), text: l.text, place: a.at };
+      return { ...line, id: this.db.saveTalk(WORLD_ID, line) };
+    });
+    for (const l of out) this.lastWords.set(`${l.from}>${l.to}`, l.text);
+    this.sink.onTalk?.(out);
   }
 
   // ------------------------------------------------------------ tier 2b: director + ticker
@@ -333,7 +467,7 @@ export class Brain {
     const others = Object.keys(w.regions).filter((r) => r !== region).map((r) => { const n = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === r).length; return `${w.regions[r].label}: ${n} souls`; });
     return {
       region, label: w.regions[region].label, time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), places,
-      souls: here.slice(0, 20).map((m) => ({ name: m.name, about: m.description, intent: describeIntent(m.intent ? { ...m.intent, note: undefined } : null, nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing, wants_company: m.wantsCompany > 0.6 ? 'yes' : m.wantsCompany < 0.35 ? 'no' : 'maybe' })),
+      souls: here.slice(0, 20).map((m) => ({ name: m.name, about: m.description, intent: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing, wants_company: m.wantsCompany > 0.6 ? 'yes' : m.wantsCompany < 0.35 ? 'no' : 'maybe' })),
       recent, neighbours: others, previous_summary: this.narratorState.lastSummary[region] ?? null,
     };
   }
@@ -387,7 +521,9 @@ export function tickerText(e: LogEvent, host: WorldHost): string | null {
   switch (e.kind) {
     case 'birth': return `${e.payload.name} arrived at the gate`;
     case 'decision': return `${name(e.payload.soulId)}: ${lowerFirst(e.payload.label)}`;
-    case 'intent': return `${name(e.payload.soulId)} has a new intent: ${describeIntent({ ...e.payload.intent, note: undefined }, (id) => host.engine.world.entities[id]?.label ?? id)}`;
+    case 'intent': return `${name(e.payload.soulId)} has a new intent: ${describeIntent(publicIntent(e.payload.intent), (id) => host.nameOf(id))}`;
+    case 'play': return null;
+    case 'mint': return `A new card was coined: “${e.payload.card.name}”`;
     case 'scene': return `In ${host.engine.world.regions[e.payload.region]?.label ?? e.payload.region}: ${e.payload.beat.flavor}`;
     case 'retire': return `A soul departed`;
     default: return null;

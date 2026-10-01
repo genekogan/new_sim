@@ -3,29 +3,45 @@
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
+import type { Change, KState, LinkKind, MintedCard } from '@sim/kernel';
 
 export const PROTO = 1;
 
 // ---------------------------------------------------------------- intents
 export const GOALS = ['wander', 'go', 'follow', 'attend', 'gather', 'converse', 'rest', 'perform'] as const;
+export const agendaStepSchema = z.strictObject({ card: z.string().min(2).max(60), target: z.string().max(80).nullable().optional() });
+/**
+ * A standing intent. Either a legacy `goal` (compiled to a one-step agenda), or an
+ * `agenda`: an ordered list of cards to favour, each optionally on a target. The Soul's
+ * own mind still chooses every action; the agenda says which options serve the owner.
+ * `note` and `text` are the owner's words: private to the owner and the Soul's mind.
+ */
 export const intentSchema = z.strictObject({
-  goal: z.enum(GOALS),
+  goal: z.enum(GOALS).optional(),
   target: z.string().max(80).nullable().optional(),
-  note: z.string().max(160).optional(), // sanitized flavour, shown to the mid-brain as context only
-});
+  note: z.string().max(160).optional(),
+  agenda: z.array(agendaStepSchema).min(1).max(8).optional(),
+  text: z.string().max(280).optional(),
+}).refine((i) => !!i.goal || !!i.agenda, { message: 'give a goal or an agenda' });
 export type WireIntent = z.infer<typeof intentSchema>;
+export type AgendaStep = z.infer<typeof agendaStepSchema>;
 export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => string = (x) => x): string => {
   if (!i) return 'no particular intent; live your life';
-  const t = i.target ? nameOf(i.target) : null;
-  const base = {
-    wander: 'wander around', go: `go to ${t ?? 'somewhere'}`, follow: `follow ${t ?? 'someone'}`, attend: `attend ${t ?? 'whatever is happening'}`,
-    gather: `gather with others at ${t ?? 'a meeting place'}`, converse: `talk with ${t ?? 'someone'}`, rest: `rest${t ? ` at ${t}` : ''}`, perform: 'perform for others',
-  }[i.goal];
-  return i.note ? `${base} (${i.note})` : base;
+  let base: string;
+  if (i.agenda?.length) base = i.agenda.map((a) => `${a.card}${a.target ? ` (${nameOf(a.target)})` : ''}`).join(', then ');
+  else {
+    const t = i.target ? nameOf(i.target) : null;
+    base = { wander: 'wander around', go: `go to ${t ?? 'somewhere'}`, follow: `follow ${t ?? 'someone'}`, attend: `attend ${t ?? 'whatever is happening'}`,
+      gather: `gather with others at ${t ?? 'a meeting place'}`, converse: `talk with ${t ?? 'someone'}`, rest: `rest${t ? ` at ${t}` : ''}`, perform: 'perform for others' }[i.goal!];
+  }
+  const own = i.text ?? i.note;
+  return own ? `${base} (${own})` : base;
 };
+/** An intent with the owner's own words removed: what anyone may see. */
+export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'decision' | 'scene' | 'rules' | 'admin' | 'retire';
+export type EventKind = 'birth' | 'intent' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
@@ -34,13 +50,21 @@ export type DecisionPayload = {
   soulId: string; entityId: string; option: string; label: string;
   steps: { verb: string; params: Record<string, unknown> }[];
   mood?: string; reevalTicks: number; fallback: boolean; call?: number; trigger: string;
+  /** Present when the choice is a card: its effects apply once `approachLen` depiction steps have run. */
+  card?: string; target?: string | null; manner?: string; approachLen?: number;
 };
+/** A card's effects being applied to the kernel. Replays without the engine or any model. */
+export type PlayPayload = { soulId: string; card: string; hash: string; target: string | null; manner?: string };
+/** A new word enters the vocabulary: a card, and any link kinds it needs. */
+export type MintPayload = { card: MintedCard; links?: Record<string, LinkKind>; kinds?: Record<string, { summary: string }>; forSoul?: string };
+/** A Soul's deck changes: cards dealt or retired, manners set. */
+export type DeckPayload = { soulId: string; add?: string[]; remove?: string[]; manners?: string[]; why: string };
 export type ScenePayload = { region: string; narrative: number; beat: Beat };
 export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive: string; targets: string[]; flavor: string };
 
 /** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
 export function publicEvent(e: LogEvent): LogEvent {
-  if (e.kind === 'intent' && e.payload?.intent?.note) { const { note: _n, ...intent } = e.payload.intent; return { ...e, payload: { ...e.payload, intent } }; }
+  if (e.kind === 'intent' && (e.payload?.intent?.note || e.payload?.intent?.text)) return { ...e, payload: { ...e.payload, intent: publicIntent(e.payload.intent) } };
   return e;
 }
 
@@ -50,13 +74,19 @@ export type PublicSoul = {
   intent: WireIntent | null; intentText: string; mood: string; energy: string; doing: string; native: boolean;
 };
 export type BrainCall = {
-  id: number; tick: number; at: number; tier: 'mid' | 'translate' | 'director' | 'narrator' | 'shot';
+  id: number; tick: number; at: number; tier: 'mid' | 'translate' | 'director' | 'narrator' | 'shot' | 'compile' | 'talk' | 'attune';
   subject: string;
   /** Absent for world-level calls (narrator, director), which only admins see. */
   soulId?: string | null;
   model: string; request: unknown; response: unknown; applied: unknown;
   ms: number; inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number; mode: 'live' | 'fake'; error?: string;
 };
+/** A play as it resolved: what was attempted and what changed (or why nothing did). */
+export type PlayView = { seq: number; tick: number; soulId: string; soul: string; card: string; target: string | null; targetName: string | null; manner?: string; ok: boolean; reason?: string; changes: Change[] };
+/** Words rendered for something that was said. Depiction, not state: the act is in the kernel. */
+export type TalkLine = { id: number; tick: number; at: number; from: string; to: string; fromName: string; toName: string; act: string; manner?: string; text: string; place: string | null };
+/** The kernel as anyone may see it. */
+export type KernelView = Pick<KState, 'tick' | 'things' | 'links' | 'decks'> & { vocab: KState['vocab']; hash: string; plays: Record<string, number> };
 export type CameraLine = { tick: number; shot: unknown; text: string; heldSec: number };
 export type TickerLine = { tick: number; text: string };
 export type NarrativeView = { id: number; region: string; tick: number; summary: string; beats: (Beat & { fired: boolean; fireTick: number })[]; nextRunTick: number };
@@ -86,6 +116,9 @@ export type ServerMsg =
   | ({ t: 'heartbeat' } & Heartbeat)
   | { t: 'log'; events: LogEvent[] }
   | { t: 'brain'; calls: BrainCall[] }
+  | { t: 'kernel'; view: KernelView }
+  | { t: 'plays'; plays: PlayView[] }
+  | { t: 'talk'; lines: TalkLine[] }
   | { t: 'camera'; line: CameraLine }
   | { t: 'ticker'; lines: TickerLine[] }
   | { t: 'narrative'; view: NarrativeView }
@@ -116,7 +149,7 @@ export const createSoulSchema = z.strictObject({
   description: z.string().trim().min(3).max(200),
 });
 export const commandSchema = z.strictObject({ text: z.string().trim().min(1).max(280) });
-export const setIntentSchema = z.strictObject({ intent: intentSchema });
+export const setIntentSchema = z.object({ intent: intentSchema });
 export const adminSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('pause') }),
   z.strictObject({ action: z.literal('resume') }),
@@ -125,6 +158,7 @@ export const adminSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('brain_mode'), mode: z.enum(['live', 'fake']) }),
   z.strictObject({ action: z.literal('snapshot') }),
   z.strictObject({ action: z.literal('budget'), usdPerDay: z.number().min(0).max(100) }),
+  z.strictObject({ action: z.literal('attune') }),
   z.strictObject({ action: z.literal('invite'), uses: z.number().int().min(1).max(500), note: z.string().max(80).optional() }),
 ]);
 export type AdminAction = z.infer<typeof adminSchema>;
@@ -133,3 +167,9 @@ export const pairExchangeSchema = z.strictObject({ code: z.string().trim().min(4
 export const pairStartSchema = z.strictObject({ agent: z.string().trim().max(60).optional() });
 export const pairApproveSchema = z.strictObject({ code: z.string().trim().min(4).max(40), soulId: z.string() });
 export const inviteSchema = z.strictObject({ code: z.string().trim().min(3).max(40) });
+
+export const proposeCardsSchema = z.strictObject({
+  cards: z.array(z.any()).min(1).max(4),
+  links: z.record(z.string().max(40), z.strictObject({ summary: z.string().max(120), control: z.boolean().optional() })).optional(),
+  kinds: z.record(z.string().max(40), z.strictObject({ summary: z.string().max(120) })).optional(),
+});

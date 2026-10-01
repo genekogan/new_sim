@@ -1,7 +1,7 @@
 import {
   Runtime, createRegistry, describeVerbs, hashOf, nextFloat, physicalView,
-  type ActionDef, type ActivityOption, type ChangeEvent, type Diagnostic, type Engine, type EngineFactory, type Entity,
-  type Intent, type Invariant, type PathCommit, type PoseSample, type RuntimeSnapshot, type Vec3, type WorldState,
+  type ActionDef, type ActivityOption, type Anchor, type ChangeEvent, type Diagnostic, type Engine, type EngineFactory, type Entity,
+  type Intent, type Invariant, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeSnapshot, type Vec3, type WorldState,
 } from '@sim/engine-contract';
 import { HALF, START_DATETIME, TOY_RULES_VERSION, TOY_SCHEMA, genesis } from './world.ts';
 import { PRIMITIVES, distMm, doActivity, mmOf, occupancy, type ToyServices } from './verbs.ts';
@@ -64,7 +64,15 @@ export class ToyEngine implements Engine {
       this.world.env.datetime = new Date(START_MS + this.world.tick * 50).toISOString().slice(0, 19);
       this.changes.push([this.world.tick, '$env', 'datetime', this.world.env.datetime]);
     }
-    const out = { paths: this.paths, changes: this.changes, events: this.runtime.events.slice(this.cursor) };
+    const events = this.runtime.events.slice(this.cursor);
+    const programs: ProgramEvent[] = [];
+    for (const ev of events) {
+      if (ev.type !== 'action' || ev.verb !== 'do_activity') continue;
+      const actor = (this.runtime.records.get(ev.id)?.params as { actor?: string } | undefined)?.actor ?? '';
+      if (ev.status === 'executing' && ev.phase) programs.push({ tick: ev.tick, id: ev.id, actor, kind: 'step', step: Number(ev.phase.split(':')[0]) });
+      else if (ev.status === 'completed' || ev.status === 'failed' || ev.status === 'cancelled') programs.push({ tick: ev.tick, id: ev.id, actor, kind: ev.status, step: -1, code: ev.code, message: ev.message });
+    }
+    const out = { paths: this.paths, changes: this.changes, events, programs };
     this.paths = []; this.changes = []; this.cursor = this.runtime.events.length;
     // Bound memory: the runtime event list and terminal records are not part of the hashed world.
     if (this.runtime.events.length > 20000) { this.runtime.events.splice(0, this.runtime.events.length - 1000); this.cursor = this.runtime.events.length; }
@@ -73,6 +81,20 @@ export class ToyEngine implements Engine {
   }
 
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }) { return this.runtime.submit(verb, params, opts); }
+
+  perform(p: Program) {
+    const r = this.runtime.submit('do_activity', { actor: p.actor, label: p.label.slice(0, 200), steps: p.steps }, { preempt: true });
+    return { id: r.id, ok: r.status !== 'failed', ...(r.diagnostic ? { diagnostic: { code: r.diagnostic.code, message: r.diagnostic.message } } : {}) };
+  }
+  stop(programId: string) { if (this.runtime.isActive(programId)) this.runtime.cancel(programId, { code: 'program.stopped', message: 'stopped' }); }
+  canPerform(p: Program) {
+    const first = p.steps[0]; if (!first) return null;
+    const def = prims.get(first.verb); if (!def) return { code: 'verb.unknown', message: `unknown verb ${first.verb}` };
+    const parsed = def.schema.safeParse({ ...first.params, actor: p.actor }); if (!parsed.success) return { code: 'params.invalid', message: parsed.error.message };
+    const plan = def.plan(this.runtime, parsed.data);
+    return plan.ok ? null : { code: plan.diagnostic.code, message: plan.diagnostic.message };
+  }
+  programOf(actor: string) { return this.world.entities[actor]?.human?.task ?? null; }
   cancel(id: string, reason?: { code: string; message: string }) { return this.runtime.cancel(id, reason); }
   snapshot(): RuntimeSnapshot { return this.runtime.snapshot(); }
 
@@ -95,6 +117,13 @@ export class ToyEngine implements Engine {
     for (const lid of this.runtime.liveIds()) { const r = this.runtime.records.get(lid); if ((r?.params as { actor?: string } | undefined)?.actor === id) this.runtime.cancel(lid, { code: 'actor.removed', message: 'actor removed' }); }
     delete this.world.entities[id];
     this.changes.push([this.world.tick, id, 'present', null]);
+  }
+
+  anchors(): Anchor[] {
+    const w = this.world, out: Anchor[] = [];
+    for (const id of Object.keys(w.regions).sort()) { const r = w.regions[id], poly = r.polygon; out.push({ id, kind: 'region', name: r.label, point: [(poly[0][0] + poly[2][0]) / 2, (poly[0][1] + poly[2][1]) / 2] }); }
+    for (const id of Object.keys(w.entities).sort()) { const e = w.entities[id]; if (e.kind !== 'fixture') continue; out.push({ id, kind: 'place', name: e.label ?? id, in: this.regionAt(e.pose.p), entity: id, tags: [e.def, ...(e.seats ? ['seats'] : [])] }); }
+    return out;
   }
 
   regionAt(p: Vec3): string {

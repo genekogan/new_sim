@@ -47,7 +47,17 @@ export function check(s: KState, c: Change, by: string): void {
     case 'vanish': mayAlter(exists(c.id)); if (s.things[c.id].kind === 'soul' && !world) throw new Refused('coherence.soul', 'a Soul cannot be removed by an action'); break;
     case 'set': mayAlter(exists(c.id)); break;
     case 'move': { const t = exists(c.id); if (c.to !== null) exists(c.to); if (!world && c.id !== by) { if (t.kind === 'soul') throw new Refused('coherence.other-soul', 'a Soul moves only itself'); mayAlter(t); } break; }
-    case 'link': exists(c.from); exists(c.to); if (!world && c.from !== by) throw new Refused('coherence.link', 'an actor asserts only its own links'); break;
+    case 'link': {
+      exists(c.from); const target = exists(c.to);
+      if (!world && c.from !== by) throw new Refused('coherence.link', 'an actor asserts only its own links');
+      // Control is taken only over what you made, over a loose thing nobody controls, or when someone who has it agreed.
+      if (!world && s.vocab.links[c.kind]?.control) {
+        const ctl = controllers(s, target.id);
+        const mine = target.by === by, loose = target.traits.loose === true && ctl.length === 0, granted = ctl.some((x) => !!linked(s, 'agreed', x, by));
+        if (!mine && !loose && !granted) throw new Refused('coherence.control', `${by} cannot take control of ${target.name}: it was not made by them and nobody who controls it agreed`);
+      }
+      break;
+    }
     case 'unlink': if (!world && c.from !== by && c.to !== by) throw new Refused('coherence.link', 'an actor cuts only links it is part of'); break;
     case 'say': exists(c.from); exists(c.to); if (!world && c.from !== by) throw new Refused('coherence.say', 'an actor speaks only for itself'); break;
   }

@@ -84,6 +84,10 @@ test('the DJ story: host, join, ask, agree, become the DJ, others dance: all fro
   assert.equal(applyAll(s, [{ op: 'set', id: party.id, key: 'music', value: 'off' }], 'oda').ok, false);
   s.decks.oda.cards.push('be the dj');
   assert.ok(whyNot(s, s.vocab.cards['be the dj'], 'oda', party.id));
+  // nobody can simply declare control: Oda has no agreement from Rob or Wren
+  s.vocab.links['boss of'] = { summary: 'runs', control: true };
+  assert.equal(applyAll(s, [{ op: 'link', kind: 'boss of', from: 'oda', to: party.id }], 'oda').ok, false);
+  assert.equal(applyAll(s, [{ op: 'link', kind: 'boss of', from: 'oda', to: 'campfire' }], 'oda').ok, false, 'places made by the world cannot be seized');
   // the host ends it; links to it disappear
   play(s, 'rob', 'end the gathering', party.id);
   assert.equal(s.things[party.id], undefined); assert.equal(linksTo(s, party.id).length, 0);

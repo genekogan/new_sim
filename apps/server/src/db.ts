@@ -3,7 +3,7 @@ import { DatabaseSync, backup } from 'node:sqlite';
 import { statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { migrate } from './migrations.ts';
-import type { BrainCall, LogEvent, NarrativeView } from '@sim/protocol';
+import type { BrainCall, LogEvent, NarrativeView, TalkLine } from '@sim/protocol';
 
 export type UserRow = { id: string; email: string | null; wallet: string | null; role: 'user' | 'admin'; created_at: number; last_seen: number; invited_by: string | null };
 export type SoulRow = { id: string; world_id: string; owner: string; entity_id: string; name: string; description: string; created_at: number; retired_at: number | null; token_hash: string | null; token_created_at: number | null; native: number; token_label: string | null; token_last_used: number | null };
@@ -150,6 +150,21 @@ export class Db {
     if (free > 2000 && free > total * 0.3) { this.db.exec('VACUUM'); return true; }
     return false;
   }
+
+  // talk (rendered words; depiction, not state)
+  saveTalk(worldId: string, l: Omit<TalkLine, 'id'>): number {
+    return Number(this.db.prepare('INSERT INTO talks (world_id, tick, at, from_id, to_id, body) VALUES (?,?,?,?,?,?)').run(worldId, l.tick, l.at, l.from, l.to, JSON.stringify(l)).lastInsertRowid);
+  }
+  recentTalk(limit: number, soulId?: string): TalkLine[] {
+    const rows = (soulId
+      ? this.db.prepare('SELECT id, body FROM talks WHERE from_id = ? OR to_id = ? ORDER BY id DESC LIMIT ?').all(soulId, soulId, limit)
+      : this.db.prepare('SELECT id, body FROM talks ORDER BY id DESC LIMIT ?').all(limit)) as any[];
+    return rows.map((r) => ({ ...JSON.parse(r.body), id: r.id })).reverse();
+  }
+  talkBetween(a: string, b: string, limit: number): TalkLine[] {
+    return (this.db.prepare('SELECT id, body FROM talks WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?) ORDER BY id DESC LIMIT ?').all(a, b, b, a, limit) as any[]).map((r) => ({ ...JSON.parse(r.body), id: r.id })).reverse();
+  }
+  pruneTalk(keep = 20000) { this.db.prepare('DELETE FROM talks WHERE id <= (SELECT MAX(id) FROM talks) - ?').run(keep); }
 
   // narratives
   saveNarrative(worldId: string, region: string, tick: number, body: Omit<NarrativeView, 'id'>): number {

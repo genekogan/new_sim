@@ -1,13 +1,16 @@
 // WorldHost: the sequencer. Owns the engine, the event log, the tick loop,
 // snapshots, and the per-batch broadcast. The fold (doc 11):
 //   events logged with tick T are applied when world.tick == T, then the engine steps to T+1.
-import type { Engine, EngineFactory, PathCommit, ChangeEvent, RuntimeSnapshot, RuntimeEvent } from '@sim/engine-contract';
+import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, RuntimeSnapshot, RuntimeEvent } from '@sim/engine-contract';
+import { kernelHash, sweep, type KState } from '@sim/kernel';
 import {
-  describeIntent, viewHashOf, viewRow,
-  type Batch, type BirthPayload, type DecisionPayload, type EventKind, type Heartbeat, type IntentPayload, type LogEvent,
-  type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
+  describeIntent, publicIntent, viewHashOf, viewRow,
+  type AgendaStep, type Batch, type BirthPayload, type DecisionPayload, type EventKind, type Heartbeat, type IntentPayload, type KernelView, type LogEvent,
+  type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
 import type { Db } from './db.ts';
+import { ARRIVAL_PLACE, defaultManners, foldEvent, initKernel, soulThing } from './fold.ts';
+export { replayFromGenesis, replayKernel } from './fold.ts';
 
 export const WORLD_ID = 'toy-1';
 
@@ -19,14 +22,22 @@ export type Mind = {
   recent: string[]; doing: string;
   nextEvalTick: number; evalTrigger: string; lastEnergyTick: number; lastFingerprint: string;
   nudge: { text: string; untilTick: number } | null;
+  /** The intent's agenda (cards to favour, in order) and how far along it is. */
+  agenda: AgendaStep[]; agendaPos: number;
+  /** The card whose depiction is running and whose effects have not applied yet. */
+  pending: { program: string; card: string; hash: string; target: string | null; manner?: string; approachLen: number; applied: boolean } | null;
 };
 type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void };
-export type SnapshotBody = { runtime: RuntimeSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown> };
+export type SnapshotBody = { runtime: RuntimeSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
   onHeartbeat?(h: Heartbeat): void;
   onApplied?(e: LogEvent): void;
   onRuntimeEvent?(e: RuntimeEvent): void;
+  onProgram?(e: ProgramEvent, m: Mind): void;
+  /** A card's effects were applied (or refused). Not called during replay. */
+  onPlay?(p: PlayView, m: Mind | undefined): void;
+  onKernel?(v: KernelView): void;
   afterTick?(tick: number): void;
 };
 
@@ -37,6 +48,11 @@ const RING_BATCHES = 600;
 
 export class WorldHost {
   engine!: Engine;
+  /** Meaning: things, links, vocabulary, decks. Replays from the log without the engine. */
+  kernel!: KState;
+  counts: Record<string, number> = {};       // successful plays per card
+  recentPlays: PlayView[] = [];
+  private kernelDirty = true;
   minds = new Map<string, Mind>();          // by soulId
   mindByEntity = new Map<string, Mind>();
   seq = 0;
@@ -48,7 +64,7 @@ export class WorldHost {
   extra: Record<string, unknown> = {};       // module state persisted with snapshots (narrator schedule etc.)
   tickMs: number[] = [];
   private queue: Pending[] = [];
-  private acc = { paths: [] as PathCommit[], changes: [] as ChangeEvent[], log: [] as LogEvent[], dirty: new Set<string>(), removed: [] as string[], fromTick: 0 };
+  private acc = { paths: [] as PathCommit[], changes: [] as ChangeEvent[], log: [] as LogEvent[], dirty: new Set<string>(), removed: [] as string[], plays: [] as PlayView[], fromTick: 0 };
   private batchSeq = 0;
   private timer: NodeJS.Timeout | null = null;
   private last = 0;
@@ -78,24 +94,45 @@ export class WorldHost {
     if (snap && snap.rulesVersion === this.factory.rulesVersion) {
       const body = snap.body as SnapshotBody;
       this.engine = this.factory.restore(body.runtime);
-      for (const m of body.minds) this.addMind(m);
+      for (const m of body.minds) this.addMind({ ...m, agenda: m.agenda ?? [], agendaPos: m.agendaPos ?? 0, pending: m.pending ?? null });
       this.extra = body.extra ?? {};
+      this.counts = body.counts ?? {};
+      // A snapshot from before the kernel existed: build the kernel from the Souls that are there.
+      this.kernel = body.kernel ?? this.bootstrapKernel();
       this.seq = body.seq;
       this.lastSnapshotTick = snap.tick;
       from = 'snapshot';
     } else {
       this.engine = this.factory.create(this.factory.genesis(w.seed));
+      this.kernel = initKernel(this.engine);
     }
     // fast-forward: replay events logged after the snapshot, stepping the engine to their ticks
     const later = this.db.events(WORLD_ID, this.seq);
     for (const e of later) {
-      while (this.engine.world.tick < e.tick) { const out = this.engine.step(); this.afterStep(out.events, true); }
+      while (this.engine.world.tick < e.tick) { const out = this.engine.step(); this.afterPrograms(out.programs, true); }
       this.apply(e, true);
       this.seq = e.seq;
     }
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
     return { from, replayed: later.length };
+  }
+
+  /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
+  private bootstrapKernel(): KState {
+    const k = initKernel(this.engine);
+    for (const m of this.minds.values()) {
+      const ent = this.engine.world.entities[m.entityId];
+      soulThing(k, { soulId: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: m.owner }, ent ? this.nearestPlace(k, m.entityId) : ARRIVAL_PLACE);
+    }
+    return k;
+  }
+  /** The place Thing an entity is physically at: a place within 5 m, else its region. */
+  nearestPlace(k: KState, entityId: string): string | null {
+    const e = this.engine.world.entities[entityId]; if (!e) return null;
+    let best: string | null = null, bd = 5;
+    for (const t of Object.values(k.things)) { if (t.kind !== 'place') continue; const pe = this.engine.world.entities[t.traits.entity as string]; if (!pe) continue; const d = Math.hypot(pe.pose.p[0] - e.pose.p[0], pe.pose.p[2] - e.pose.p[2]); if (d < bd) { bd = d; best = t.id; } }
+    return best ?? this.engine.regionAt(e.pose.p);
   }
 
   start() {
@@ -143,7 +180,8 @@ export class WorldHost {
     this.acc.paths.push(...out.paths);
     this.acc.changes.push(...out.changes);
     for (const c of out.changes) { const m = this.mindByEntity.get(c[1]); if (m) this.acc.dirty.add(m.soulId); }
-    this.afterStep(out.events, false);
+    this.afterPrograms(out.programs, false);
+    for (const ev of out.events) for (const l of this.listeners) l.onRuntimeEvent?.(ev);
     const now = this.engine.world.tick;
     for (const l of this.listeners) l.afterTick?.(now);
     // 3. broadcast
@@ -154,26 +192,33 @@ export class WorldHost {
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
   }
 
-  private afterStep(events: RuntimeEvent[], replay: boolean) {
+  /** React to the engine's progress on depiction programs: apply a card's effects when its approach is done. */
+  private afterPrograms(events: ProgramEvent[], replay: boolean) {
     for (const ev of events) {
-      if (ev.type === 'action' && ev.verb === 'do_activity' && (ev.status === 'completed' || ev.status === 'failed' || ev.status === 'cancelled')) {
-        const rec = this.engine.runtime.records.get(ev.id);
-        const actor = (rec?.params as { actor?: string; label?: string } | undefined)?.actor;
-        const m = actor ? this.mindByEntity.get(actor) : undefined;
-        if (m) {
-          const label = (rec!.params as { label: string }).label;
-          const outcome = ev.status === 'completed' ? 'done' : ev.status === 'failed' ? `could not: ${ev.code}` : 'interrupted';
-          m.recent = [...m.recent.slice(-3), `${shorten(label)} (${outcome})`];
-          if (ev.status !== 'cancelled') {
-            m.doing = 'standing around';
-            // re-evaluate shortly after an activity ends; jitter by soul so they do not all think on the same tick
-            m.nextEvalTick = Math.min(m.nextEvalTick, ev.tick + 10 + (hash32(m.soulId) % 30));
-            m.evalTrigger = ev.status === 'completed' ? 'activity-ended' : 'activity-failed';
-          }
-          this.acc.dirty.add(m.soulId);
+      const m = this.mindByEntity.get(ev.actor); if (!m) continue;
+      const mine = m.pending && m.pending.program === ev.id ? m.pending : null;
+      const playNow = () => {
+        if (!mine || mine.applied) return;
+        mine.applied = true;
+        // during replay the play is already in the log
+        if (!replay) void this.enqueue('play', `soul:${m.soulId}`, { soulId: m.soulId, card: mine.card, hash: mine.hash, target: mine.target, ...(mine.manner ? { manner: mine.manner } : {}) } satisfies PlayPayload);
+      };
+      if (ev.kind === 'step') { if (mine && ev.step >= mine.approachLen) playNow(); }
+      else {
+        if (ev.kind === 'completed') playNow();
+        const outcome = ev.kind === 'completed' ? 'done' : ev.kind === 'failed' ? `could not: ${ev.code}` : 'interrupted';
+        // a program replaced by a newer decision, or stopped because its card was refused, is not news
+        if (ev.kind === 'failed' || (ev.kind === 'completed' && !mine) || (ev.kind === 'cancelled' && mine && ev.code !== 'program.stopped')) m.recent = [...m.recent.slice(-3), `${shorten(m.doing)} (${outcome})`];
+        if (mine) m.pending = null;
+        if (ev.kind !== 'cancelled') {
+          m.doing = 'standing around';
+          // re-evaluate shortly after an activity ends; jitter by soul so they do not all think on the same tick
+          m.nextEvalTick = Math.min(m.nextEvalTick, ev.tick + 10 + (hash32(m.soulId) % 30));
+          m.evalTrigger = ev.kind === 'completed' ? 'activity-ended' : 'activity-failed';
         }
+        this.acc.dirty.add(m.soulId);
       }
-      if (!replay) for (const l of this.listeners) l.onRuntimeEvent?.(ev);
+      if (!replay) for (const l of this.listeners) l.onProgram?.(ev, m);
     }
   }
 
@@ -183,40 +228,66 @@ export class WorldHost {
     return new Promise((resolve) => this.queue.push({ kind, author, payload, resolve }));
   }
 
-  /** Apply a logged event to the engine and minds. Shared by the live loop, boot fast-forward and replay. */
+  /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
   apply(e: LogEvent, replay: boolean) {
     const tick = e.tick;
+    const r = foldEvent(this.engine, this.kernel, e, this.counts);
     switch (e.kind) {
       case 'birth': {
         const p = e.payload as BirthPayload;
-        this.engine.spawnHuman({ id: p.entityId, label: p.name, soul: p.soulId });
         if (!this.minds.has(p.soulId)) this.addMind({
           soulId: p.soulId, entityId: p.entityId, name: p.name, description: p.description, owner: p.owner, native: p.owner === 'system',
           intent: null, intentVersion: 0, mood: 'curious', energy: 80, wantsCompany: 0.5, recent: ['arrived at the gate (done)'], doing: 'standing around',
           nextEvalTick: tick + 20 + (hash32(p.soulId) % 40), evalTrigger: 'birth', lastEnergyTick: tick, lastFingerprint: '', nudge: null,
+          agenda: [], agendaPos: 0, pending: null,
         });
-        this.acc.dirty.add(p.soulId);
+        this.acc.dirty.add(p.soulId); this.kernelDirty = true;
         break;
       }
       case 'intent': {
         const p = e.payload as IntentPayload; const m = this.minds.get(p.soulId);
-        if (m) { m.intent = p.intent; m.intentVersion++; m.nextEvalTick = tick + 1; m.evalTrigger = 'new-intent'; m.lastFingerprint = ''; this.acc.dirty.add(m.soulId); }
+        if (m) { m.intent = p.intent; m.agenda = p.intent.agenda ?? []; m.agendaPos = 0; m.intentVersion++; m.nextEvalTick = tick + 1; m.evalTrigger = 'new-intent'; m.lastFingerprint = ''; this.acc.dirty.add(m.soulId); }
         break;
       }
       case 'decision': {
         const p = e.payload as DecisionPayload; const m = this.minds.get(p.soulId);
-        if (!this.engine.world.entities[p.entityId]) break;
-        const r = this.engine.submit('do_activity', { actor: p.entityId, label: p.label, option: p.option, steps: p.steps }, { preempt: true });
-        if (m) {
-          if (p.mood) m.mood = p.mood;
-          m.doing = r.status === 'failed' ? 'standing around' : p.label;
-          m.nextEvalTick = tick + (r.status === 'failed' ? 40 : p.reevalTicks);
-          m.evalTrigger = r.status === 'failed' ? 'activity-failed' : 'timer';
-          if (r.status === 'failed') m.recent = [...m.recent.slice(-3), `${shorten(p.label)} (could not: ${r.diagnostic?.code})`];
-          this.acc.dirty.add(m.soulId);
-        }
+        if (!m || r.programId === undefined) break;
+        if (p.mood) m.mood = p.mood;
+        m.doing = r.programOk ? p.label : 'standing around';
+        m.nextEvalTick = tick + (r.programOk ? p.reevalTicks : 40);
+        m.evalTrigger = r.programOk ? 'timer' : 'activity-failed';
+        if (!r.programOk) { m.recent = [...m.recent.slice(-3), `${shorten(p.label)} (could not: ${r.programCode})`]; m.pending = null; }
+        else if (p.card) {
+          const card = this.kernel.vocab.cards[p.card];
+          m.pending = { program: r.programId, card: p.card, hash: card?.hash ?? '', target: p.target ?? null, ...(p.manner ? { manner: p.manner } : {}), approachLen: p.approachLen ?? 0, applied: false };
+        } else m.pending = null;
+        this.acc.dirty.add(m.soulId);
         break;
       }
+      case 'play': {
+        const view = r.play!; const m = this.minds.get(view.soulId);
+        this.kernelDirty = true;
+        this.recentPlays.push(view); if (this.recentPlays.length > 200) this.recentPlays.shift();
+        if (m) {
+          const what = `${view.card}${view.targetName ? ` → ${view.targetName}` : ''}`;
+          if (view.ok) {
+            m.recent = [...m.recent.slice(-3), `${what} (done)`];
+            const step = m.agenda[m.agendaPos];
+            if (step && step.card === view.card && (!step.target || step.target === view.target)) m.agendaPos++;
+            // anyone spoken to re-thinks soon: this is how asking and answering chain together
+            for (const c of view.changes) if (c.op === 'say') { const o = this.minds.get(c.to); if (o) { o.nextEvalTick = Math.min(o.nextEvalTick, tick + 8 + (hash32(o.soulId) % 20)); o.evalTrigger = 'spoken-to'; o.lastFingerprint = ''; } }
+          } else {
+            m.recent = [...m.recent.slice(-3), `${what} (did not happen: ${view.reason})`];
+            m.pending = null; m.doing = 'standing around';
+            m.nextEvalTick = Math.min(m.nextEvalTick, tick + 20); m.evalTrigger = 'activity-failed';
+          }
+          this.acc.dirty.add(m.soulId);
+        }
+        this.acc.plays.push(view);
+        if (!replay) for (const l of this.listeners) l.onPlay?.(view, m);
+        break;
+      }
+      case 'mint': case 'deck': this.kernelDirty = true; break;
       case 'scene': {
         const p = e.payload as ScenePayload; const b = p.beat;
         const until = tick + 20 * 120;
@@ -234,12 +305,12 @@ export class WorldHost {
       }
       case 'retire': {
         const p = e.payload as { soulId: string; entityId: string }; const m = this.minds.get(p.soulId);
-        if (m) { this.engine.removeEntity(m.entityId); this.minds.delete(m.soulId); this.mindByEntity.delete(m.entityId); this.acc.removed.push(m.soulId); }
+        if (m) { this.minds.delete(m.soulId); this.mindByEntity.delete(m.entityId); this.acc.removed.push(m.soulId); }
+        this.kernelDirty = true;
         break;
       }
       case 'rules': case 'admin': break; // clock rate, pause, dilation: recorded, no world effect
     }
-    void replay;
   }
 
   addMind(m: Mind) { this.minds.set(m.soulId, m); this.mindByEntity.set(m.entityId, m); }
@@ -256,11 +327,18 @@ export class WorldHost {
 
   // ------------------------------------------------------------ views
   publicSoul(m: Mind): PublicSoul {
-    const nameOf = (id: string) => this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id;
+    const nameOf = (id: string) => this.nameOf(id);
     return {
       id: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: ownerShort(m.owner), native: m.native,
-      intent: m.intent ? { goal: m.intent.goal, target: m.intent.target ?? null } : null, intentText: describeIntent(m.intent ? { ...m.intent, note: undefined } : null, nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
+      intent: publicIntent(m.intent), intentText: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
     };
+  }
+  /** A human-readable name for a kernel thing id, an engine entity id or a region id. */
+  nameOf(id: string): string { return this.kernel.things[id]?.name ?? this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id; }
+  kernelView(): KernelView {
+    const k = this.kernel; k.tick = this.engine.world.tick;
+    const links = Object.fromEntries(Object.entries(k.links).filter(([, l]) => l.until === undefined || l.until >= k.tick));
+    return { tick: k.tick, things: k.things, links, decks: k.decks, vocab: k.vocab, hash: kernelHash(k).slice(0, 16), plays: this.counts };
   }
   viewHash(): string {
     const w = this.engine.world;
@@ -277,16 +355,21 @@ export class WorldHost {
     };
   }
 
-  private resetAcc() { this.acc = { paths: [], changes: [], log: [], dirty: new Set(), removed: [], fromTick: this.engine.world.tick }; }
+  private resetAcc() { this.acc = { paths: [], changes: [], log: [], dirty: new Set(), removed: [], plays: [], fromTick: this.engine.world.tick }; }
+  /** Plays resolved since the last batch (for the hub to broadcast). */
+  takePlays(): PlayView[] { return this.acc.plays; }
   private flush() {
     const b: Batch = {
       seq: ++this.batchSeq, fromTick: this.acc.fromTick, toTick: this.engine.world.tick,
       paths: this.acc.paths, changes: this.acc.changes, log: this.acc.log, removedSouls: this.acc.removed,
       souls: [...this.acc.dirty].map((id) => this.minds.get(id)).filter((m): m is Mind => !!m).map((m) => this.publicSoul(m)),
     };
+    const plays = this.acc.plays;
     this.resetAcc();
     this.ring.push(b); if (this.ring.length > RING_BATCHES) this.ring.shift();
     for (const l of this.listeners) l.onBatch?.(b);
+    // links such as "just said" lapse with time, so the view also refreshes periodically
+    if (this.kernelDirty || plays.length || this.engine.world.tick % 200 === 0) { this.kernelDirty = false; sweep(this.kernel); const v = this.kernelView(); for (const l of this.listeners) l.onKernel?.(v); }
   }
   markDirty(soulId: string) { this.acc.dirty.add(soulId); }
   get currentBatchSeq() { return this.batchSeq; }
@@ -307,7 +390,7 @@ export class WorldHost {
   saveSnapshot(sync = true) {
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
-    const body: SnapshotBody = { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra) };
+    const body: SnapshotBody = { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra), kernel: structuredClone(this.kernel), counts: { ...this.counts } };
     const meta = { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body };
     this.snapshotMs.capture = performance.now() - t0;
     this.lastSnapshotTick = runtime.tick;
@@ -321,19 +404,3 @@ export const hash32 = (s: string) => { let h = 2166136261; for (let i = 0; i < s
 export const ownerShort = (owner: string) => (owner === 'system' ? 'world' : `u${hash32(owner).toString(36)}`);
 export const energyWord = (e: number) => (e > 75 ? 'energetic' : e > 45 ? 'fine' : e > 20 ? 'tired' : 'exhausted');
 const shorten = (s: string) => (s.length > 70 ? s.slice(0, 67) + '...' : s);
-
-/** Pure replay of the log from genesis: the fold. Used by the replay test and available for verification. */
-export function replayFromGenesis(factory: EngineFactory, seed: string, events: LogEvent[], untilTick: number): Engine {
-  const engine = factory.create(factory.genesis(seed));
-  let i = 0;
-  while (engine.world.tick < untilTick) {
-    while (i < events.length && events[i].tick === engine.world.tick) {
-      const e = events[i++];
-      if (e.kind === 'birth') { const p = e.payload as BirthPayload; engine.spawnHuman({ id: p.entityId, label: p.name, soul: p.soulId }); }
-      else if (e.kind === 'decision') { const p = e.payload as DecisionPayload; if (engine.world.entities[p.entityId]) engine.submit('do_activity', { actor: p.entityId, label: p.label, option: p.option, steps: p.steps }, { preempt: true }); }
-      else if (e.kind === 'retire') { const p = e.payload as { entityId: string }; engine.removeEntity(p.entityId); }
-    }
-    engine.step();
-  }
-  return engine;
-}

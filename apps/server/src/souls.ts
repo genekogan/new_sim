@@ -1,6 +1,7 @@
 // Soul operations shared by the web API, the agent API and MCP.
 import { randomBytes } from 'node:crypto';
-import { createSoulSchema, describeIntent, intentSchema, type BirthPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
+import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
+import { deckView } from './deck.ts';
 import { hashToken, newId, newSoulToken, RateLimit } from './auth.ts';
 import type { Brain } from './brain.ts';
 import { tickerText } from './brain.ts';
@@ -69,38 +70,82 @@ export class Souls {
   }
 
   // ------------------------------------------------------------ steering
+  /** Find a kernel thing by id, by a body's entity id, or by name ("the kiosk", "kiosk", "Oda"). */
+  resolveThing(ref: string): string | null {
+    const k = this.host.kernel; if (k.things[ref]) return ref;
+    const low = ref.toLowerCase().replace(/^the /, '');
+    const hit = Object.values(k.things).find((t) => t.traits.body === ref || t.traits.entity === ref) ?? Object.values(k.things).find((t) => t.name.toLowerCase().replace(/^the /, '') === low);
+    return hit?.id ?? null;
+  }
+
+  /** A legacy goal as a one- or two-step agenda of base cards. Deterministic. */
+  private agendaFromGoal(goal: NonNullable<WireIntent['goal']>, target: string | null): AgendaStep[] {
+    const kind = target ? this.host.kernel.things[target]?.kind : null;
+    switch (goal) {
+      case 'wander': return [{ card: 'wander', target: null }];
+      case 'go': return kind === 'gathering' ? [{ card: 'join', target }] : kind === 'soul' ? [{ card: 'talk with', target }] : [{ card: 'go to', target }];
+      case 'follow': case 'converse': return kind === 'soul' || !target ? [{ card: 'talk with', target }] : [{ card: 'go to', target }];
+      case 'attend': return kind === 'place' ? [{ card: 'go to', target }] : [{ card: 'join', target: kind === 'gathering' ? target : null }];
+      case 'gather': return kind === 'gathering' ? [{ card: 'join', target }] : [{ card: 'host a gathering', target: kind === 'place' ? target : null }];
+      case 'rest': return kind === 'place' ? [{ card: 'go to', target }, { card: 'rest', target: null }] : [{ card: 'rest', target: null }];
+      case 'perform': return [{ card: 'perform', target: null }];
+    }
+  }
+
   /** Set the standing intent. Resolves once the tick has accepted it (blocking mutation). */
   async setIntent(soul: SoulRow, input: unknown, source: IntentPayload['source']): Promise<{ event: LogEvent; intent: WireIntent; text: string }> {
     const lim = this.limits.allow(`intent:${soul.id}`, 20, 60_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many intents; slow down', { retry_after: lim.retryAfter });
     const p = intentSchema.safeParse(input);
-    if (!p.success) throw new ApiError(400, 'invalid-intent', p.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
-    const w = this.host.engine.world;
-    const intent = p.data;
-    if (intent.target) {
-      // accept an entity id, a region id, or a soul/place name
-      const t = intent.target, low = t.toLowerCase();
-      if (!w.entities[t] && !w.regions[t]) {
-        const byName = Object.values(w.entities).find((e) => (e.label ?? '').toLowerCase() === low) ?? Object.values(w.entities).find((e) => (e.label ?? '').toLowerCase().replace(/^the /, '') === low.replace(/^the /, ''));
-        const region = Object.values(w.regions).find((r) => r.label.toLowerCase() === low);
-        if (byName) intent.target = byName.id; else if (region) intent.target = region.id;
-        else throw new ApiError(400, 'unknown-target', `no such target: ${t}. Look at the world or perceive endpoints for valid names and ids.`);
-      }
-    }
+    if (!p.success) throw new ApiError(400, 'invalid-intent', p.error.issues.map((i) => `${i.path.join('.') || 'intent'}: ${i.message}`).join('; '));
+    const k = this.host.kernel; const intent: WireIntent = { ...p.data };
+    const need = (ref: string) => { const id = this.resolveThing(ref); if (!id) throw new ApiError(400, 'unknown-target', `no such target: ${ref}. Look at the world or perceive endpoints for valid names and ids.`); return id; };
+    if (intent.target) intent.target = need(intent.target);
+    if (intent.agenda) {
+      intent.agenda = intent.agenda.map((a) => {
+        if (!k.vocab.cards[a.card]) throw new ApiError(400, 'unknown-card', `no such card: "${a.card}". See your deck, or propose the card first.`);
+        return { card: a.card, target: a.target ? need(a.target) : null };
+      });
+      // cards on the agenda that the Soul does not hold yet are dealt to it
+      const deal = [...new Set(intent.agenda.map((a) => a.card))].filter((c) => !k.decks[soul.id]?.cards.includes(c));
+      if (deal.length) await this.host.enqueue('deck', `soul:${soul.id}`, { soulId: soul.id, add: deal, why: 'on the agenda' } satisfies DeckPayload);
+    } else intent.agenda = this.agendaFromGoal(intent.goal!, intent.target ?? null);
     const event = await this.host.enqueue('intent', `soul:${soul.id}`, { soulId: soul.id, intent, source } satisfies IntentPayload);
-    return { event, intent, text: describeIntent(intent, (id) => w.entities[id]?.label ?? w.regions[id]?.label ?? id) };
+    return { event, intent, text: describeIntent(intent, (id) => this.host.nameOf(id)) };
   }
 
-  /** Free text → closed intent via the server's small translator, then the same path as setIntent. */
+  /** A wish in plain words. The compiler turns it into an agenda (minting cards if needed); without a compiler, the small translator picks a goal. */
   async command(soul: SoulRow, text: string, source: IntentPayload['source'] = 'web') {
     const lim = this.limits.allow(`cmd:${soul.id}`, 20, 60_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many commands; slow down', { retry_after: lim.retryAfter });
     const mind = this.host.minds.get(soul.id);
     if (!mind) throw new ApiError(409, 'not-in-world', 'this soul is not in the world yet');
+    const c = await this.brain.compile(mind, text);
+    if (c) {
+      if (!c.ok) return { ok: false as const, reason: c.reason, via: 'compiler' };
+      const r = await this.setIntent(soul, { agenda: c.agenda, text: text.slice(0, 280) }, source);
+      return { ok: true as const, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq, via: 'compiler', confidence: 1, minted: c.minted.filter((v) => v.ok).map((v) => v.name) };
+    }
     const tr = await this.brain.translate(mind, text);
     if (!tr.ok) return { ok: false as const, reason: tr.reason, via: tr.via };
     const r = await this.setIntent(soul, tr.intent, source);
-    return { ok: true as const, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq, via: tr.via, confidence: tr.confidence };
+    return { ok: true as const, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq, via: tr.via, confidence: tr.confidence, minted: [] as string[] };
+  }
+
+  /** An owner's agent proposes cards for its Soul's deck. Validated like any other card; no model involved. */
+  async proposeCards(soul: SoulRow, input: unknown) {
+    const lim = this.limits.allow(`cards:${soul.id}`, 12, 3600_000);
+    if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many card proposals this hour', { retry_after: lim.retryAfter });
+    const p = proposeCardsSchema.safeParse(input);
+    if (!p.success) throw new ApiError(400, 'invalid', 'body must be { cards: [card, …], links?: {name: {summary, control?}}, kinds?: {name: {summary}} }; see /cards.md');
+    const mind = this.host.minds.get(soul.id); if (!mind) throw new ApiError(409, 'not-in-world', 'this soul is not in the world yet');
+    const verdicts = await this.brain.mint(mind, p.data.cards, p.data.links, p.data.kinds, 'agent');
+    return { ok: verdicts.every((v) => v.ok), cards: verdicts };
+  }
+
+  deck(soul: SoulRow) {
+    const m = this.host.minds.get(soul.id); if (!m) throw new ApiError(409, 'not-in-world', 'this soul is not in the world yet');
+    return deckView(this.host, m);
   }
 
   // ------------------------------------------------------------ views
@@ -114,7 +159,10 @@ export class Souls {
       soul: { name: c.soul.name, about: c.soul.about, where: c.soul.where, energy: c.soul.energy, mood: m.mood, doing_now: c.soul.doing, recently: c.soul.recent, intent: m.intent, intent_text: c.soul.intent },
       nearby: s.nearby.map((n) => ({ id: n.id, name: n.who, kind: n.what, distance: n.distance, doing: n.doing })),
       storyteller_suggests: c.nudge,
-      could_do_now: c.options.map((o) => ({ id: o.id, what: o.label, good_when: o.goodWhen, not_for: o.notFor, ...(o.servesIntent ? { serves_current_intent: true } : {}) })),
+      situation: c.situation ?? [],
+      said_to_you: c.heard ?? [],
+      agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ?? null, done: i < m.agendaPos })),
+      could_do_now: c.options.map((o) => ({ id: o.id, card: o.card, target: o.cardTarget, what: o.label, good_when: o.goodWhen, not_for: o.notFor, ...(o.servesIntent ? { serves_current_intent: true } : {}) })),
     };
   }
 
@@ -122,15 +170,15 @@ export class Souls {
     const m = this.host.minds.get(soul.id); const e = this.host.engine;
     if (!m || !e.world.entities[m.entityId]) return { id: soul.id, name: soul.name, description: soul.description, in_world: false };
     const ent = e.world.entities[m.entityId]; const s = e.describeSurroundings(m.entityId);
-    const nameOf = (id: string) => e.world.entities[id]?.label ?? e.world.regions[id]?.label ?? id;
+    const nameOf = (id: string) => this.host.nameOf(id);
     return {
       id: soul.id, name: soul.name, description: soul.description, in_world: true, tick: e.world.tick, time: e.world.env.datetime,
       position: { x: ent.pose.p[0], z: ent.pose.p[2], region: s.region }, activity: ent.human!.activity, doing: ent.human!.task ? m.doing : 'standing around',
       mood: m.mood, energy: energyWord(m.energy), wants_company: m.wantsCompany,
-      intent: m.intent, intent_text: describeIntent(m.intent, nameOf), recent: m.recent, nearby: s.nearby, happening: s.happening,
+      intent: m.intent, intent_text: describeIntent(m.intent, nameOf), agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ? this.host.nameOf(a.target) : null, done: i < m.agendaPos })), recent: m.recent, nearby: s.nearby, happening: s.happening,
       storyteller_suggests: m.nudge?.text ?? null,
       next_think_in_s: Math.max(0, Math.round((m.nextEvalTick - e.world.tick) / 20)),
-      available_now: e.enumerateActivities(m.entityId, m.intent).map((o) => ({ id: o.id, label: o.label })),
+      available_now: this.brain.midContext(m, 'status').options.map((o) => ({ id: o.id, label: o.label })),
     };
   }
 
@@ -147,7 +195,7 @@ export class Souls {
   /** The Soul's story so far, for its owner: its own events plus storyteller beats that named it. */
   timeline(soul: SoulRow, limit = 80) {
     const w = this.host.engine.world;
-    const label = (id: string) => w.entities[id]?.label ?? w.regions[id]?.label ?? id;
+    const label = (id: string) => this.host.nameOf(id);
     const own = this.db.soulEvents(WORLD_ID, soul.id, limit);
     const since = own[0]?.seq ?? 0;
     const beats = this.db.recentKind(WORLD_ID, 'scene', 300).filter((e) => e.seq >= since && Array.isArray(e.payload?.beat?.targets) && e.payload.beat.kind !== 'scene' && e.payload.beat.targets.includes(soul.name));
@@ -155,7 +203,9 @@ export class Souls {
       const p = e.payload;
       const text = e.kind === 'birth' ? 'was born at the gate'
         : e.kind === 'intent' ? `intent set via ${p.source === 'web' ? 'this page' : p.source === 'system' ? 'the world' : `your agent (${p.source})`}: ${describeIntent(p.intent, label)}`
-        : e.kind === 'decision' ? `${p.option === 'continue' ? 'kept going' : lower(p.label)}`
+        : e.kind === 'decision' ? `set out to ${lower(p.label)}${p.manner ? `, ${p.manner}` : ''}`
+        : e.kind === 'play' ? `${p.card}${p.target ? ` → ${label(p.target)}` : ''}${p.manner ? `, ${p.manner}` : ''}`
+        : e.kind === 'deck' ? `deck changed: ${[...(p.add ?? []).map((c: string) => `+${c}`), ...(p.remove ?? []).map((c: string) => `−${c}`), ...(p.manners ? [`manners: ${p.manners.join(', ')}`] : [])].join(' ')} (${p.why})`
         : e.kind === 'scene' ? `the storyteller suggested: ${p.beat.directive} — ${p.beat.flavor}`
         : e.kind === 'retire' ? 'left the world' : e.kind;
       const why = e.kind === 'decision' ? ({ 'new-intent': 'because you gave a new intent', 'activity-ended': 'after finishing the last thing', 'activity-failed': 'after the last thing did not work out', 'narrator-beat': 'after a storyteller suggestion', birth: 'first choice after arriving', timer: 'on reflection' } as Record<string, string>)[p.trigger] ?? p.trigger : null;
@@ -170,6 +220,7 @@ export class Souls {
       goals: ['wander', 'go', 'follow', 'attend', 'gather', 'converse', 'rest', 'perform'],
       regions: Object.values(w.regions).map((r) => ({ id: r.id, label: r.label })),
       places: Object.values(w.entities).filter((x) => x.kind === 'fixture').map((x) => ({ id: x.id, label: x.label, x: x.pose.p[0], z: x.pose.p[2] })),
+      gatherings: Object.values(this.host.kernel.things).filter((t) => t.kind === 'gathering').map((t) => ({ id: t.id, name: t.name, at: t.at ? this.host.nameOf(t.at) : null, states: t.states, host: Object.values(this.host.kernel.links).filter((l) => l.kind === 'hosts' && l.to === t.id).map((l) => this.host.nameOf(l.from))[0] ?? null, taking_part: Object.values(this.host.kernel.links).filter((l) => l.kind === 'attends' && l.to === t.id).length })),
       souls: [...this.host.minds.values()].map((m) => { const p = this.host.publicSoul(m); const ent = w.entities[m.entityId]; return { id: m.entityId, name: p.name, about: p.description, doing: p.doing, mood: p.mood, region: ent ? e.regionAt(ent.pose.p) : null }; }),
     };
   }

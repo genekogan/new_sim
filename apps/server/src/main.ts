@@ -38,6 +38,7 @@ const brain = new Brain(host, db, config, {
   onCamera: (line) => hub?.broadcast({ t: 'camera', line }),
   onTicker: (lines) => hub?.broadcast({ t: 'ticker', lines }),
   onNarrative: (view) => hub?.broadcast({ t: 'narrative', view }),
+  onTalk: (lines) => hub?.broadcast({ t: 'talk', lines }),
   clients: () => hub?.clients.size ?? 0,
 });
 const souls = new Souls(host, db, brain, config);

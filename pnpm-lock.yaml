@@ -29,6 +29,9 @@ importers:
       '@sim/engine-toy':
         specifier: workspace:*
         version: link:../../packages/engine-toy
+      '@sim/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
       '@sim/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -94,6 +97,9 @@ importers:
       '@sim/engine-contract':
         specifier: workspace:*
         version: link:../engine-contract
+      '@sim/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@sim/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -155,6 +161,9 @@ importers:
       '@sim/engine-contract':
         specifier: workspace:*
         version: link:../engine-contract
+      '@sim/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       zod:
         specifier: ^4.6.5
         version: 4.6.5

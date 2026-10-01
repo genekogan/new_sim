@@ -32,6 +32,18 @@ export type PoseSample = number[];
 export type PathCommit = { entity: string; startTick: number; speed: number; waypoints: PoseSample[]; activity: string; actionId: string };
 export type ChangeEvent = [number, string, string, unknown]; // [tick, entityId, field, value|null]
 
+/**
+ * A physical anchor: something in the engine's world that meaning can refer to
+ * (a region, a named place, a usable fixture). The kernel mirrors anchors as
+ * place Things; depiction programs refer back to them by `entity` or `point`.
+ */
+export type Anchor = { id: string; kind: 'region' | 'place'; name: string; in?: string; entity?: string; point?: [number, number]; tags?: string[] };
+
+/** A depiction program for one actor: an ordered list of engine verbs. */
+export type Program = { actor: string; label: string; steps: { verb: string; params: Record<string, unknown> }[] };
+/** Progress of a program, reported by the engine each tick. `step` is the index now running (or that ended it). */
+export type ProgramEvent = { tick: number; id: string; actor: string; kind: 'step' | 'completed' | 'failed' | 'cancelled'; step: number; code?: string; message?: string };
+
 export interface Engine {
   readonly rulesVersion: string;
   readonly dt: number;
@@ -43,7 +55,15 @@ export interface Engine {
   stateHash(): string;
   physicalHash(): string;
   /** Advance one tick. Returns what changed for broadcast. */
-  step(): { paths: PathCommit[]; changes: ChangeEvent[]; events: RuntimeEvent[] };
+  step(): { paths: PathCommit[]; changes: ChangeEvent[]; events: RuntimeEvent[]; programs: ProgramEvent[] };
+  /** Start a depiction program for an actor, replacing whatever that actor was doing. */
+  perform(program: Program): { id: string; ok: boolean; diagnostic?: { code: string; message: string } };
+  /** Stop a running program (the actor is left idle where it is). */
+  stop(programId: string): void;
+  /** Physical feasibility of a program's first step right now, without running it (Mars: `verb.plan`). Null = feasible. */
+  canPerform(program: Program): { code: string; message: string } | null;
+  /** The program an actor is running, if any. */
+  programOf(actor: string): string | null;
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
   snapshot(): RuntimeSnapshot;
@@ -54,6 +74,8 @@ export interface Engine {
   enumerateActivities(actorId: string, intent: Intent | null): ActivityOption[];
   /** Word-bucketed local context for the brain: never numbers. */
   describeSurroundings(actorId: string): { nearby: { id: string; who: string; what: string; distance: 'here' | 'close' | 'near' | 'far'; doing: string }[]; region: string; happening: string };
+  /** Regions and named places/fixtures that meaning can refer to. Stable ids. */
+  anchors(): Anchor[];
   /** Region id containing a point (for per-region narration). */
   regionAt(p: Vec3): string;
   /** Kinematic position of an entity at a tick (for keyframes and clients). */

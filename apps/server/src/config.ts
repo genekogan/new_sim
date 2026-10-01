@@ -16,6 +16,8 @@ export const config = {
   brainMode: (env.BRAIN_MODE === 'fake' ? 'fake' : 'live') as 'live' | 'fake',
   budgetUsdPerDay: Number(env.BRAIN_BUDGET_USD_PER_DAY ?? 0.5),
   narratorModel: env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
+  compilerModel: env.COMPILER_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
+  talkModel: env.TALK_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
   worldSeed: env.WORLD_SEED ?? 'sim-genesis-1',
   snapshotEveryTicks: Number(env.SNAPSHOT_EVERY_TICKS ?? 20 * 60 * 5),
   seedNatives: env.SEED_NATIVES !== '0',

@@ -8,6 +8,7 @@ import type { Brain } from './brain.ts';
 import type { Config } from './config.ts';
 import type { Db, SoulRow, UserRow } from './db.ts';
 import type { Hub } from './hub.ts';
+import { cardGrammar } from '@sim/brain';
 import { skillMd } from './skill.ts';
 import { ApiError, type Souls } from './souls.ts';
 import { WORLD_ID, type WorldHost } from './world.ts';
@@ -39,6 +40,10 @@ export function buildApp(d: Deps) {
   app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldId: WORLD_ID, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
+  app.get('/v1/kernel', (c) => c.json(d.host.kernelView()));
+  app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-Math.min(200, Number(c.req.query('limit') ?? 60))) }));
+  app.get('/v1/talk', (c) => c.json({ lines: d.db.recentTalk(Math.min(200, Number(c.req.query('limit') ?? 60))) }));
+  app.get('/cards.md', (c) => c.text(cardGrammar(d.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity')), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' }));
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
   app.get('/v1/log', (c) => c.json({ events: d.db.events(WORLD_ID, Number(c.req.query('after') ?? 0), Math.min(1000, Number(c.req.query('limit') ?? 200))).map(publicEvent) }));
   const skill = (c: Context) => c.text(skillMd(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
@@ -61,6 +66,9 @@ export function buildApp(d: Deps) {
   app.delete('/v1/souls/:id', async (c) => { const u = await requireUser(c); await d.souls.retire(ownSoul(u, c.req.param('id'))); d.hub.refreshMe(u.id); return c.json({ ok: true }); });
   app.get('/v1/souls/:id', async (c) => { const u = await requireUser(c); return c.json(d.souls.dashboard(ownSoul(u, c.req.param('id')))); });
   app.get('/v1/souls/:id/timeline', async (c) => { const u = await requireUser(c); return c.json({ events: d.souls.timeline(ownSoul(u, c.req.param('id')), Math.min(200, Number(c.req.query('limit') ?? 80))) }); });
+  app.get('/v1/souls/:id/deck', async (c) => { const u = await requireUser(c); return c.json(d.souls.deck(ownSoul(u, c.req.param('id')))); });
+  app.get('/v1/souls/:id/talk', async (c) => { const u = await requireUser(c); return c.json({ lines: d.db.recentTalk(60, ownSoul(u, c.req.param('id')).id) }); });
+  app.post('/v1/souls/:id/cards', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json(await d.souls.proposeCards(ownSoul(u, c.req.param('id')), await body(c))); });
   app.get('/v1/souls/:id/perceive', async (c) => { const u = await requireUser(c); return c.json(d.souls.perceive(ownSoul(u, c.req.param('id')))); });
   app.post('/v1/souls/:id/command', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, c.req.param('id'));
@@ -69,7 +77,7 @@ export function buildApp(d: Deps) {
   });
   app.post('/v1/souls/:id/intent', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, c.req.param('id'));
-    const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { goal, target?, note? } }');
+    const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { goal, target?, note? } } or { intent: { agenda: [{card, target}], text? } }');
     const r = await d.souls.setIntent(s, p.data.intent, 'web'); return c.json({ ok: true, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq });
   });
   app.post('/v1/souls/:id/pair', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c)) }); });
@@ -108,6 +116,7 @@ export function buildApp(d: Deps) {
       case 'brain_mode': d.brain.setMode(a.mode); void d.host.enqueue('admin', who, { action: 'brain_mode', mode: a.mode }); break;
       case 'budget': d.brain.budget = a.usdPerDay; void d.host.enqueue('admin', who, { action: 'budget', usdPerDay: a.usdPerDay }); break;
       case 'snapshot': return c.json({ ok: true, snapshot: d.host.saveSnapshot() });
+      case 'attune': { for (const m of d.host.minds.values()) void d.brain.attune(m); break; }
       case 'invite': { const code = newId('sim').replace('_', '-'); d.db.createInvite(code, a.uses, a.note ?? null, u.id); return c.json({ ok: true, code, uses: a.uses }); }
     }
     return c.json({ ok: true, clockRate: d.host.clockRate, paused: d.host.paused, brainMode: d.brain.mode, budget: d.brain.budget });
@@ -128,13 +137,15 @@ export function buildApp(d: Deps) {
   app.get('/v1/agent/log', (c) => c.json({ events: d.souls.soulLog(agentSoul(c)) }));
   app.get('/v1/agent/wait', async (c) => c.json(await d.souls.wait(agentSoul(c), Number(c.req.query('seconds') ?? 30))));
   app.post('/v1/agent/intent', async (c) => {
-    const s = agentSoul(c); const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { goal, target?, note? } }');
+    const s = agentSoul(c); const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { goal, target?, note? } } or { intent: { agenda: [{card, target}], text? } }');
     const r = await d.souls.setIntent(s, p.data.intent, 'api'); return c.json({ ok: true, accepted_at_tick: r.event.tick, seq: r.event.seq, intent: r.intent, text: r.text, status: d.souls.status(s) });
   });
   app.post('/v1/agent/command', async (c) => {
     const s = agentSoul(c); const p = commandSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'text is required (1–280 characters)');
     return c.json(await d.souls.command(s, p.data.text, 'api'));
   });
+  app.get('/v1/agent/deck', (c) => c.json(d.souls.deck(agentSoul(c))));
+  app.post('/v1/agent/cards', async (c) => c.json(await d.souls.proposeCards(agentSoul(c), await body(c))));
   app.post('/v1/agent/release', (c) => { const s = agentSoul(c); d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
 
   // ---- static web app (SPA)
