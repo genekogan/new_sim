@@ -1378,7 +1378,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
         <div className="studio-tabs">
           <label className="year-picker">Year <select aria-label="Campus year" value={year} onChange={e => { location.href = Number(e.target.value) === 2026 ? '/studio' : `/studio/${e.target.value}`; }}>{YEARS.map(y => <option key={y} value={y}>{y}{y === 2020 ? ' · Brahman' : y === 2027 ? ' · draft' : ''}</option>)}</select></label>
           <BuildPicker host={() => api.current?.take ?? null} year={year} />
-          <button onClick={() => api.current?.view('chiba')}>{year === 2020 ? 'Portal' : year === 2022 ? 'Ba Sing Se' : 'Chiba'}</button>
+          <button onClick={() => year === 2027 ? api.current?.focus('draft-site') : api.current?.view('chiba')}>{year === 2027 ? 'Courtyard' : year === 2020 ? 'Portal' : year === 2022 ? 'Ba Sing Se' : 'Chiba'}</button>
           <button onClick={() => api.current?.view('campus')}>
             Whole campus
           </button>
@@ -1393,7 +1393,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
           id="studio-controls"
           className={`studio-sidebar ${panelOpen ? 'panel-open' : ''}`}
         >
-          <div className="studio-kicker">{year} REPLICA · WORKING MODEL</div>
+          <div className="studio-kicker">{year} {year === 2027 ? 'PROPOSED · CONCEPT DRAFT' : 'REPLICA · WORKING MODEL'}</div>
           <h1>Built from parts.</h1>
           <p className="studio-intro">
             {historyNotes[year]}
