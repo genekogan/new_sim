@@ -49,6 +49,7 @@ type View = {
   cur: Snap;
   speed: number;
   activity: string;
+  readingGaze?: { prev: number; cur: number };
   /** Ticks since `activity` began (the prone rise clock, prone.ts riseOf, when the engine publishes no phaseK). */
   age: number;
   /** The engine's prone body turn / phaseK at the latest tick (diagnostics; undefined: not published). */
@@ -202,6 +203,7 @@ export class HumanViews {
   private templates: Template[] = [];
   private parts = new Map<string, Part>();
   private flights: Flight[] = [];
+  private readingActors = new Set<string>();
   private climbs: { id: string; path: [number, number, number][] }[] = [];
 
   constructor() {
@@ -267,6 +269,9 @@ export class HumanViews {
   /** Call after every engine tick. Pure function of (previous snapshot, world). */
   onTick(world: WorldState) {
     if (!this.templates.length) return;
+    this.readingActors = new Set(Object.values(world.entities).filter(e =>
+      e.equipment?.kind === 'reading' && e.equipment.config.status === 'active' && e.equipment.config.phase === 'reading'
+    ).map(e => String(e.equipment!.config.user)));
     let fx: Fixtures | undefined;
     for (const e of Object.values(world.entities)) {
       if (e.kind !== 'human' || !e.human) continue;
@@ -282,6 +287,9 @@ export class HumanViews {
         v.cur.pose = v.prev.pose = this.postureGoal(v, e, world, false);
         continue;
       }
+      const priorReading = v.readingGaze?.cur ?? 0;
+      const wantedReading = this.readingActors.has(e.id) ? .35 : 0;
+      v.readingGaze = {prev:priorReading,cur:priorReading+Math.max(-.04,Math.min(.04,wantedReading-priorReading))};
       const c = v.cur;
       // Ground speed: the engine's (walk_to publishes human.speed, W4) or the position delta.
       const inst = Math.hypot(e.pose.p[0] - c.p[0], e.pose.p[2] - c.p[2]) / DT;
@@ -637,6 +645,12 @@ export class HumanViews {
       if (fp.kind !== 'beam') closeHands(v, k);
     } else dangle(v, pz.bend, []);
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
+    // A bounded book gaze uses the existing rig adapter only; seat/body authority is unchanged.
+    if (v.spine?.head && v.readingGaze && sitW > .9) {
+      const head=v.spine.head;
+      const axis=_right.clone().applyQuaternion(head.parent!.getWorldQuaternion(new THREE.Quaternion()).invert());
+      head.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axis,-(v.readingGaze.prev+(v.readingGaze.cur-v.readingGaze.prev)*alpha)));
+    }
     if (v.spine?.head && Math.abs(gaze) > 1e-5) {
       const head = v.spine.head;
       const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(head.parent!.getWorldQuaternion(new THREE.Quaternion()).invert());

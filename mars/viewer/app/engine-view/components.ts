@@ -6,9 +6,9 @@
 // local box origin at the base centre.
 import * as THREE from 'three';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
-import { def } from '../../engine/world/catalog.ts';
+import { def, CATALOG } from '../../engine/world/catalog.ts';
 import { isPanel, isRail } from '../../engine/world/catalog-solar.ts';
-import { itemObject, setFill, type ItemObject } from './items.ts';
+import { itemObject, setFill, setReading, type ItemObject } from './items.ts';
 import { PaintOverlay } from './paint.ts';
 import { rendererColor } from './palette.ts';
 import { solarPanelMesh, solarRailMesh, solarTiltLegs } from './solar-mesh.ts';
@@ -224,7 +224,11 @@ export class ComponentViews {
         v.cur = poseOf(e);
       }
       this.views.set(e.id, v);
-      if (v.item) setFill(v.item, e.contents?.fraction);
+      if (v.item) {
+        setFill(v.item, e.contents?.fraction);
+        const readable=CATALOG[e.def]?.capabilities?.readable;
+        if (readable) setReading(v.item,e.equipment?.config,readable.pages);
+      }
       if (e.paint || v.paint) (v.paint ??= new PaintOverlay(v.obj)).update(e);
       v.inHand = e.support?.kind === 'in-hand' ? { by: e.support.by, hand: e.support.hand } : undefined;
     }

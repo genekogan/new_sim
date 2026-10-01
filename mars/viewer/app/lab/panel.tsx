@@ -2,6 +2,7 @@ import { LabCameraControls } from './camera-controls.tsx';
 // Engine Lab side panel: scenario picker, transport, overlays, cameras,
 // expectations, perf and the action/diagnostic log.
 import { ClassroomHud } from './classroom-hud.tsx';
+import { ReadingHud } from './reading-hud.tsx';
 import { WorkBreakHud } from './work-break-hud.tsx';
 import { RestHud } from './rest-hud.tsx';
 import { PurposefulRoutineHud } from './purposeful-routine-hud.tsx';
@@ -96,6 +97,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <PurposefulRoutineHud key={`purposeful-routine:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <GatheringContinuationHud key={`continuation:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ClassroomHud key={s.name} sim={sim} refresh={refresh} />
+      <ReadingHud key={`reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <h2>Expectations</h2>

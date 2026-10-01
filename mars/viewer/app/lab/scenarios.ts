@@ -23,6 +23,7 @@ import { yearWalkabouts } from './year-walkabout.ts';
 import { yearBuild, yearBuildHouse } from './year-build.ts';
 import { CLASSROOM_SCENARIOS } from './classroom.ts';
 import { WORK_BREAK_SCENARIOS } from './work-break.ts';
+import { READING_SCENARIO } from './reading.ts';
 import { DESIGN_STUDIO } from './design-studio.ts';
 import { solarPaint } from './solar-paint.ts';
 
@@ -299,7 +300,7 @@ export function stress(n: number): Scenario {
 }
 
 // Explicit proof fixture: available by name/URL without changing the established probe scenario set.
-export const scenarioByName = (name: string) => name === raiseCancel.name ? raiseCancel : [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, DESIGN_STUDIO, ...SCENARIOS].find((s) => s.name === name);
+export const scenarioByName = (name: string) => name === raiseCancel.name ? raiseCancel : [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, READING_SCENARIO, DESIGN_STUDIO, ...SCENARIOS].find((s) => s.name === name);
 
 /** Product presets are selectable without altering legacy probe scenarios/baselines. */
-export const SELECTABLE_SCENARIOS = [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, DESIGN_STUDIO, ...SCENARIOS];
+export const SELECTABLE_SCENARIOS = [...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, READING_SCENARIO, DESIGN_STUDIO, ...SCENARIOS];

@@ -8,10 +8,11 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
   const eight = scenario === 'classroom-8' || scenario === 'work-break-8';
   const studio = scenario === 'design-studio';
+  const reading = scenario === 'quiet-reading';
   const gathering = classroom || scenario === 'work-break-4' || scenario === 'work-break-8';
   // Keep measurement/construction controls in their established compact layout.
   // Every newly playable room retains the tour when switching between experiences.
-  if (!gathering && !studio) return null;
+  if (!gathering && !studio && !reading) return null;
   const cameraScenario = eight ? 'classroom-8' : 'classroom-4';
   return (
     <section aria-labelledby="checkpoint-tour-heading" data-testid="checkpoint-tour">
@@ -21,8 +22,10 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('classroom-8')}>Load 8-guest room</button>
         <button onClick={() => onScenario('design-studio')}>Try an independent design studio</button>
         <button onClick={() => onScenario(eight ? 'work-break-8' : 'work-break-4')}>Try a continuing day</button>
+        <button onClick={() => onScenario('quiet-reading')}>Try reading with a bookmark</button>
       </div>
       <p className="lab-meta">Loading a room resets the current world. These rooms and participants are hypothetical. Use Play and the activity controls below; Reset starts the selected room again.</p>
+      {reading && <p className="lab-desc">Start reading and Play. Interrupt reading retains a bookmark after safe stand-up; Resume reading continues the same reader and book. Direct reader away exercises player precedence. This first reading arrangement supports a flat book on a grounded table and a compatible real chair; held-book reading is not supported.</p>}
       {studio && <p className="lab-desc">Independent studio: Start notes, interrupt after progress, then Start session and Start purposeful routine during presentations. Watch a critique, questions, shared soup, quiet rest and return to the same project notes. Commit attendee continuations adds separate guest discussion and presenter follow-up work. The attributed computer uses the same workstation rules. This room has one fixed arrangement; Mars furniture setup and live automatic camera controls are not supported here.</p>}
       {gathering && <details>
         <summary>Try talks, interrupted work, chair and table setup</summary>

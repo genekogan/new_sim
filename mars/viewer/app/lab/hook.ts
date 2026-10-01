@@ -1,4 +1,5 @@
 import { readFixtureMove } from '../../engine/carry/fixture.ts';
+import { readBook } from '../../engine/objects/reading.ts';
 import { readWorkstation } from '../../engine/objects/workstation.ts';
 import { LabCameraGeometryCache } from './camera-observation.ts';
 // window.__marsEngine: test/automation hook for the Engine Lab (e2e/lab.spec.ts).
@@ -133,6 +134,7 @@ export function installHook(view: LabView, notify: () => void) {
       return Object.values(sim.rt.world.entities).filter((e) => e.kind === 'fixture').map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: structuredClone(e.pose), rendered: rendered.get(e.id) }));
     },
     fixtureMove: () => { const id = [...sim.rt.records.values()].filter((r) => r.verb === 'move_fixture').at(-1)?.id; return id ? readFixtureMove(sim.rt, id) : undefined; },
+    reading: () => structuredClone(readBook(sim.rt, 'book')),
     workstation: () => {
       const work = activityExample(sim.scenario.name)?.workBreak.work ?? { actor: 'worker', station: 'workstation', seat: 'work-chair#seat' };
       return { state: readWorkstation(sim.rt, work.station), claims: Object.fromEntries([`workstation:${work.station}`, `actor:${work.actor}`, `slot:${work.seat}`].map(key => [key, sim.rt.holder(key)])) };

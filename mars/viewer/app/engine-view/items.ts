@@ -7,7 +7,7 @@ import * as THREE from 'three';
 
 export const FOOD_COLOR: Record<string, string> = { stew: '#7b4a22' };
 
-export type ItemObject = { obj: THREE.Object3D; fill?: THREE.Mesh; fillSpan?: [number, number, number, number] };
+export type ItemObject = { obj: THREE.Object3D; fill?: THREE.Mesh; fillSpan?: [number, number, number, number]; leaf?: THREE.Group; bookmark?: THREE.Object3D };
 
 type Kit = { mat: (color: string, side?: THREE.Side) => THREE.Material; geo: (key: string, make: () => THREE.BufferGeometry) => THREE.BufferGeometry };
 
@@ -48,6 +48,23 @@ export function itemObject(def: string, size: [number, number, number], color: s
     g.add(m);
     return m;
   };
+  if (def === 'reading-book') {
+    const [, , depth] = size;
+    const cover = add(mesh(kit.geo('reading-cover', () => new THREE.BoxGeometry(sx, .004, depth)), kit.mat(color)));
+    cover.position.y = .002;
+    const pages = add(mesh(kit.geo('reading-pages', () => new THREE.BoxGeometry(sx-.008, sy-.008, depth-.008)), kit.mat('#ece6d7')));
+    pages.position.y = sy / 2;
+    for (const side of [-1,1]) for (let line = 0; line < 6; line++) {
+      const ink = add(mesh(kit.geo('reading-line', () => new THREE.BoxGeometry(sx*.34, .0005, .0015)), kit.mat('#787365')));
+      ink.position.set(side*sx*.25,sy+.0005,(line-2.5)*depth*.11);
+    }
+    const leaf = new THREE.Group(); leaf.position.y = sy+.001; g.add(leaf);
+    const sheet=mesh(kit.geo('reading-leaf', () => new THREE.BoxGeometry(sx/2-.004,.001,depth-.008)),kit.mat('#f5efdf'));
+    sheet.position.x = sx/4; leaf.add(sheet);
+    const bookmark = add(mesh(kit.geo('reading-bookmark', () => new THREE.BoxGeometry(.012,.001,depth*.55)),kit.mat('#b83535')));
+    bookmark.position.set(-sx*.4,sy+.003,depth*.3);
+    return {obj:g,leaf,bookmark};
+  }
   if (def === 'bowl') {
     add(mesh(kit.geo('bowl', () => vessel(sx * 0.3, sx / 2, sy, 0.006)), kit.mat(color, THREE.DoubleSide)));
     return { obj: g, fill: food(), fillSpan: [0.008, sy * 0.85, sx * 0.3, sx * 0.47] };
@@ -78,6 +95,18 @@ export function itemObject(def: string, size: [number, number, number], color: s
     return { obj: g };
   }
   return null;
+}
+
+/** Secondary page expression reads the authoritative bookmark; it never moves the book. */
+export function setReading(it: ItemObject, state: Record<string, string | number | boolean> | undefined, pages: number) {
+  if (!it.leaf || !it.bookmark) return;
+  const seconds=typeof state?.readSeconds === 'number' ? state.readSeconds : 0;
+  const duration=typeof state?.durationSeconds === 'number' ? state.durationSeconds : 0;
+  const progress=duration > 0 ? Math.max(0,Math.min(1,seconds/duration)) : 0;
+  const section=progress*pages, local=section-Math.floor(section);
+  const turn=state?.phase === 'reading' && progress < 1 && local>.93 ? (local-.93)/.07 : 0;
+  it.leaf.rotation.z=turn*Math.PI;
+  it.bookmark.position.x=-.096+.192*progress;
 }
 
 /** Food disc height / radius for a fill fraction (hidden when empty). */
