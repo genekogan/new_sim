@@ -1,0 +1,209 @@
+{
+  "schema": "mars-browser-source-baseline-review/1",
+  "priorCommit": "74b358f823c0d6d5b5cac90576b1d1930c412c2a",
+  "frozenSourceReport": "frozen-museum-checkpoint.REPORT.md",
+  "threshold": 0.2,
+  "maxDiffPixelRatio": 0.015,
+  "reviewedImages": [
+    {
+      "name": "lab-year-2021-top-prisms.png",
+      "oldSha256": "019ca3604af541f17fc30b6aedebca25be985e500869694299b183ccda567fbd",
+      "newSha256": "cbafc95fb9e0811c013151038b34061b67f66d4df4fa9e140f98ee76f70f695d",
+      "ratio": 0.11351953125,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "lab-year-2022-top-prisms.png",
+      "oldSha256": "6bc9e36732496abf2857f102bb3ef628b4544e0e3f5d0f14d413ca466cd7522a",
+      "newSha256": "4ad2e35df161f0c37df1d8d4060e56fb9f765723e2e4ab223fe1c6a71e02cfda",
+      "ratio": 0.28409765625,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "lab-year-2024-top-prisms.png",
+      "oldSha256": "6c136a04b4b0f32510237d0340619dbe618310133e1f75414d757ce42245176a",
+      "newSha256": "225ce29e801e693e23eeae6268e289e0eaf3e7ddcc9075630c7be775f5a776fb",
+      "ratio": 0.0662626953125,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2021-classroom-eye.png",
+      "oldSha256": "a039ea4d75974c9859f6fa2640af656b7e9a29a8ab2574603932cf302f93960c",
+      "newSha256": "6b4cc133754225fa53588c22d25f934eb4be80e49e0ae27a35508f347f661ba2",
+      "ratio": 0.2738515625,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Corrected obsolete inspection camera to current tables/display"
+    },
+    {
+      "name": "studio-2021-corridor-aluminet.png",
+      "oldSha256": "2fbb7563746080e14592e8bdf82062205bc5c18c362023832e35bdd5a22ba03c",
+      "newSha256": "75161b792ac36241f447d21c510520d4e7f1c95a52f39d3b6f71b012a1d95d48",
+      "ratio": 0.1883701171875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2021-default.png",
+      "oldSha256": "87d31697ba29d25b5f24e392aaa62bf14013b3424d31708c3c5d9e218add9a49",
+      "newSha256": "a01f114abc7da1855bba5176438691298685b029f10f8646e46925c87f3ea6c4",
+      "ratio": 0.21412109375,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2021-plan.png",
+      "oldSha256": "864bfd0463f0fdf83ac081c3bf756c1603302f26bd1b15bad30cef1452fd3118",
+      "newSha256": "a216b4afdf0c5ee865f2ac1c29f463e046df43e80a08546de089c6406b1931f5",
+      "ratio": 0.1699169921875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2022-courtyard.png",
+      "oldSha256": "08ff7d103812b124c24cdf4112cfde211aabac0cf6af5187dbbf2dabc89d757d",
+      "newSha256": "8cf14918906554e3b3deaf84c63a9e2fd6e54f24671258e504b90a6d764becfe",
+      "ratio": 0.12917578125,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2022-default.png",
+      "oldSha256": "1563cf62d50d9cea9947e372566cb8a6cf8c73a94ea3562a3764210936cebc9a",
+      "newSha256": "089a340e8dca74ffcdb08f92b3be0ea7facd4256dad1ced95445b354fd6e0cfd",
+      "ratio": 0.1580810546875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2022-plan.png",
+      "oldSha256": "b24f78798d60ca4993630492e6fcf4c156cf5af08e701237f99ae3931b67fb85",
+      "newSha256": "78abb0dcb7b2aae3bc86e3d2b7d29b92ec1e1d1eec63bd9ae2ccb31003b47255",
+      "ratio": 0.11919921875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2023-default.png",
+      "oldSha256": "5d8c3cc260673e43e1ba0ec7e0c4f9f8f4177b05b50e027acdb10507c1ad159b",
+      "newSha256": "b6b364de1f0a438c9ec3b5eeea59ec73fae7dd4702fd579affa4a1399c1d9d35",
+      "ratio": 0.1979404296875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2023-plan.png",
+      "oldSha256": "30439afe4f6363ddc35d50ac88b9dcfe5c92bdebe5db3f51ba941c6f8b279508",
+      "newSha256": "8844e506a34352e6c0f005e907d5b157a93d34728545b8fb067422986931196e",
+      "ratio": 0.1819833984375,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2024-default.png",
+      "oldSha256": "139b0da61c7fc7ecee35ae329ba2d5237aa43b7437ff8c894c4968a6660d04e5",
+      "newSha256": "6aea5a44d8c4a7d9cba9e451758ad4ba51de12934681b4ad76f8c665c19bd396",
+      "ratio": 0.187361328125,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2024-front-eye.png",
+      "oldSha256": "196be513e4290fe77e13b1f5f60744320b66cdaacc677548e02690a90316d4cc",
+      "newSha256": "0ed6ba0cf5445a9b2be55038ef34997c51d942200cddd2a89adc5be5cd90b534",
+      "ratio": 0.0626435546875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2024-frontage.png",
+      "oldSha256": "c85f70a2de2ce70ddcecdb922d22230fd2800e445190facb979a07c6801514d8",
+      "newSha256": "b912c9637ad6849f58e084a3ce6b3d62c1f8b96382ed53a971b3b5d44e193d75",
+      "ratio": 0.0732587890625,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2024-kitchen-eye.png",
+      "oldSha256": "ca23176804b6ab8afd2dfd50e8adc2ba1be61c818be3d9aca4b9567a279fc41a",
+      "newSha256": "7c68ab6a13f1017ae17f94007f90daf651b8cf974dd1654e3a6cc32c732950a1",
+      "ratio": 0.2496640625,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Corrected obsolete inspection camera to current named furniture; tight current counter framing"
+    },
+    {
+      "name": "studio-2024-plan.png",
+      "oldSha256": "1ba407039dfc36c3abca1cf100d0f707a9329a7eca550fa2875d426d043df870",
+      "newSha256": "c8378dc265b79146b12a30f0b90db12c32b6ce112d7cfcdbe4d51f769bde1410",
+      "ratio": 0.1352978515625,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2024-solarium-door.png",
+      "oldSha256": "f8ee6f6349061d9c211fbff163a2909fb5a3b8fdf4dfc1eb0f044576a2e98b1a",
+      "newSha256": "c7543a4bd71edd5772baec930d7b5ea1156fadb04f8950bd583b98c8e10da4e5",
+      "ratio": 0.1071943359375,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2024-solarium.png",
+      "oldSha256": "81d4211bc8b3c0d40e8526fc4b3a3080093f2f556faebfde6a339dccbb13fd45",
+      "newSha256": "e1c1c78cbf7ecbc5af2da83c22224d4b6fe522a2be07d4d09a1651c4ff2527c0",
+      "ratio": 0.0618720703125,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2025-default.png",
+      "oldSha256": "8de05ee01a1c95536863f402ddb24b1cac281127107cefa9fe0fe7b2b6eac4d3",
+      "newSha256": "870ca720bb6a279ee3f43a338c5b7ca3e17ec202b834c30b090800f3be9a3d97",
+      "ratio": 0.24509375,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-2025-plan.png",
+      "oldSha256": "4fe792002359c0b4eae12b61fc1c25c402754e33db1b290dbf4050dc20117a04",
+      "newSha256": "cc7c669e26ca58789575724d047e758b17f10bb3f9f76a14cbfce4f475534c5f",
+      "ratio": 0.177732421875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-default.png",
+      "oldSha256": "1be0a972111118e6ae463aabe1830edd4ec9ec26629e6b5a1c0e723712e5bb97",
+      "newSha256": "2e68fa184bbdab925452d11e385826434f15f24539b27bb0c21b6f553e755e36",
+      "ratio": 0.1162392578125,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-plan.png",
+      "oldSha256": "35b5a8443284f22284ecf830066114c73d75dee72f018af5722211101eb55720",
+      "newSha256": "41b545b2cd3792cfcb54c6dbc5f0d28d0ef3f27a4c080648fc470247ffbaf94f",
+      "ratio": 0.1075283203125,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Reviewed frozen museum geometry/source copy/evidence; original camera and comparison thresholds unchanged"
+    },
+    {
+      "name": "studio-take-held.png",
+      "oldSha256": "e9186e446040be5d7600b3e6a2d57b50794dc4424052c7c3458b50fbd708e7d0",
+      "newSha256": "6df56768b76d6ad5b0db47a10ca2f3102ab0ee9b221fe9a080bb76c8bb3a659a",
+      "ratio": 0.0566748046875,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Exact physical take poses/hash retained; frozen museum background, source copy/photo strip and refreshed source-sensitive take metadata"
+    },
+    {
+      "name": "studio-take-visitor.png",
+      "oldSha256": "4d836b48d5a74dacdf69dd7c36f5f3bae8bf96d3be238ccc8155cf7c20ac17ff",
+      "newSha256": "170ca7c26e8753c196568b3dd360bb04619f4bb266e388433a2d32206f8dcf0c",
+      "ratio": 0.0540380859375,
+      "disposition": "reviewed intentional frozen-source baseline",
+      "reason": "Exact physical take poses/hash retained; frozen museum background, source copy/photo strip and refreshed source-sensitive take metadata"
+    }
+  ]
+}

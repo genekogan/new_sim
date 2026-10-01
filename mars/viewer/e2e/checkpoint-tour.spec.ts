@@ -27,7 +27,10 @@ test('checkpoint tour launches real rooms and exposes current interaction and ca
   await expect(page.getByTestId('purposeful-routine-hud')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start purposeful routine', exact: true })).toBeDisabled();
   await expect(tour).toBeVisible();
-  await expect(tour).toContainText('reconciled beam staging');
+  // Admission is source-sensitive; current and source-era construction proof are separate.
+  await expect(tour).toContainText('build checks the loaded layout before starting');
+  await expect(tour).toContainText('missing staging positions and blockers');
+  await expect(tour).toContainText('Historical source-era fixtures are separate validation evidence');
   await tour.getByRole('button', { name: 'Try an independent design studio', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Scenario', exact: true })).toHaveValue('design-studio');
   await expect(tour).toContainText('one fixed arrangement');

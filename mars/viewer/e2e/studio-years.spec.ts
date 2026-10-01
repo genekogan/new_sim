@@ -47,10 +47,11 @@ const CORRECTIONS: { year: number; name: string; position: number[]; target: num
   { year: 2024, name: 'solarium-door', position: [16.5, 1.8, 10.5], target: [10.9, 1.5, 6.0] },
   // Props on their surfaces (§15, W46), eye level: an RV side-on (wheels roll along it, tires on the −0.16 ground) …
   { year: 2020, name: 'rv-eye', position: [-6.2, 1.4, -47.2], target: [-8.4, 0.4, -55] },
-  // … classroom tables and benches standing on the ground-floor deck (legs/feet no longer start inside it) …
-  { year: 2021, name: 'classroom-eye', position: [4.6, 1.3, 8.5], target: [4.6, 0.3, 2] },
-  // … and the kitchen: counters, crates and fridge on the deck, trailers behind on the ground.
-  { year: 2024, name: 'kitchen-eye', position: [0.2, 1.1, 42], target: [3.7, 0.3, 44.5] },
+  // Current reviewed 2021 seminar tables/display: old eye z8.5 now sits behind an opaque wall.
+  { year: 2021, name: 'classroom-eye', position: [4.572, 1.44, 5.2], target: [5.0, 1.1, -1.339] },
+  // Current reviewed Chiba counter/red fridge; the old z42 eye now faces empty desert.
+  // This explicit view matches the separately measured current-fixture facing phase.
+  { year: 2024, name: 'kitchen-eye', position: [2.2148, 1.44, -0.7678], target: [2.1177, 1.0432, -2.5271] },
 ];
 
 for (const c of CORRECTIONS) {
