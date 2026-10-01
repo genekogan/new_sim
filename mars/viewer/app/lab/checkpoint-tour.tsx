@@ -9,6 +9,9 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const eight = scenario === 'classroom-8' || scenario === 'work-break-8';
   const studio = scenario === 'design-studio';
   const gathering = classroom || scenario === 'work-break-4' || scenario === 'work-break-8';
+  // Keep measurement/construction controls in their established compact layout.
+  // Every newly playable room retains the tour when switching between experiences.
+  if (!gathering && !studio) return null;
   const cameraScenario = eight ? 'classroom-8' : 'classroom-4';
   return (
     <section aria-labelledby="checkpoint-tour-heading" data-testid="checkpoint-tour">

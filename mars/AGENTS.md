@@ -79,3 +79,12 @@ product work. The contract and supported scope are in ACTIVE_ROADMAP.md.
 First finish actual designated Mars WASD stepped access and the selected-computer
 asset/reset release blockers, then verified checkpoint and sustained MVP work.
 Saved drafts are not shipped features. Preserve all other agents' work.
+
+Animation boundary (owner 2026-10-01): retain the current rigs and animation
+libraries through Mars MVP. Fix severe poses/facing in featured journeys, including
+crossed ankles during stair descent, in renderer pose adapters; preserve authoritative
+movement/support/ownership and activity semantics. Spend at most 2–4 hours checking
+this boundary, making only small improvements that reduce repeated implementation.
+Record current limitations and a bounded post-MVP Eden comparison of existing posing
+versus authored motions with constrained IK. Escalate repeated bespoke anatomy
+requirements rather than expanding into an animation redesign.

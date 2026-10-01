@@ -36,5 +36,11 @@ test('checkpoint tour launches real rooms and exposes current interaction and ca
   await tour.getByRole('button', { name: 'Load 4-guest room', exact: true }).click();
   await expect(page.getByTestId('lab-camera-controls')).toBeVisible();
   await expect(tour).toContainText('Live camera');
+  // The tour follows playable rooms without displacing diagnostic controls.
+  await page.getByRole('combobox', { name: 'Scenario', exact: true }).selectOption('stairs');
+  await expect(tour).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Scenario', exact: true }).selectOption('work-break-4');
+  await expect(tour).toBeVisible();
   expect(errors).toEqual([]);
 });
