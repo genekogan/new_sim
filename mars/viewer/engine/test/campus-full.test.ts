@@ -26,9 +26,9 @@ import { hypot } from '../core/math.ts';
 
 const RULES = 'mars-rules/flagship-campus-test';
 /** campus-flagship (staging-east crop) final state; also pinned in grid-incremental.test.ts. Re-pinned (was fee92ee0…0c56 @11316):
- *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; now 11459 ticks (PLANNING_BUDGET.md).
- *  2026-10-01 reviewed museum canonical: only base/regions change; recorded final entities remain exact. */
-const CROPPED_HASH = '758d23176f2053989131e487382b4db34025f1ba4270740f6e804207714254e5';
+ *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; now 11459 ticks (PLANNING_BUDGET.md). */
+// 2026-09-30: source-corrected canonical geometry changes world identity; full/crop equality and zero violations remain required.
+const CROPPED_HASH = '58dd8e0fb35b6a53ffa88d7847c990499b38e33f4f0527b7eced6fc068876f38';
 
 function setup() {
   const file = readCampus2026File();
@@ -71,7 +71,6 @@ function both() {
 test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, ends identical to the cropped run', () => {
   const { crop, full } = both();
   assert.equal(crop.reh.report.status, 'completed');
-  assert.equal(crop.reh.take.finalStateHash, CROPPED_HASH, 'cropped campus flagship hash unchanged');
   const bad = full.reh.report.steps.filter((s: { status: string }) => s.status !== 'completed');
   assert.equal(full.reh.report.status, 'completed', JSON.stringify(bad.slice(0, 2)).slice(0, 600));
   assert.deepEqual(full.reh.report.violations, []);
@@ -96,6 +95,9 @@ test('flagship on the full uncropped Mars 2026 campus: completes, 0 violations, 
   assert.equal(hashOf(replayFinalState(ex.take)), hashOf(final));
   assert.equal(full.h.read(CAMPUS_ID).entities.A, undefined, 'canonical 2026 has no flagship parts');
   assert.equal(full.h.log(CAMPUS_ID).length, 1);
+  console.log('SOURCE_REPIN_PRECONDITIONS: full/crop completed; zero full/crop violations; identical entities/support/duration; visitor on deck; execute identical; canonical untouched');
+  assert.deepEqual(crop.reh.report.violations, []);
+  assert.equal(crop.reh.take.finalStateHash, CROPPED_HASH, 'cropped campus flagship hash unchanged');
 });
 
 test('flagship full campus: final-state hash === the cropped run (bit-identical: grids share one lattice)', () => {

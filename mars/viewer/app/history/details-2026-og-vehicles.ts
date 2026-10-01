@@ -1,8 +1,9 @@
 import * as T from 'three';
 import {Kit,layers} from './kit';
 import busCadIds from './og-bus-cad-ids.json';
+import {GROUND} from '../studio/ambience-math';
 
-/** Clip each triangle against world y=0, retaining interpolated vertex data.
+/** Clip each triangle against the Studio sand datum, retaining interpolated vertex data.
  * Above-grade vertices are not moved. The new cut lies on the ground plane;
  * its underside needs no visible cap. Shared CAD geometry remains untouched. */
 export function trimOGSolarAtGrade(root:T.Group){
@@ -15,7 +16,7 @@ export function trimOGSolarAtGrade(root:T.Group){
   const attrs=Object.entries(src.attributes),out:Record<string,number[]>={};for(const [name] of attrs)out[name]=[];
   const g=new T.BufferGeometry(),pos=src.getAttribute('position'),world=new T.Vector3();let written=0;
   type V={d:number;values:Record<string,number[]>};
-  const read=(i:number):V=>{const values:Record<string,number[]>={};for(const [name,a] of attrs){values[name]=[];for(let k=0;k<a.itemSize;k++)values[name].push(a.getComponent(i,k));}world.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);return {d:world.y,values};};
+  const read=(i:number):V=>{const values:Record<string,number[]>={};for(const [name,a] of attrs){values[name]=[];for(let k=0;k<a.itemSize;k++)values[name].push(a.getComponent(i,k));}world.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);return {d:world.y-GROUND,values};};
   const mix=(a:V,b:V):V=>{const t=a.d/(a.d-b.d),values:Record<string,number[]>={};for(const [name] of attrs)values[name]=a.values[name].map((v,k)=>v+(b.values[name][k]-v)*t);return {d:0,values};};
   for(let i=0;i<pos.count;i+=3){
    const tri=[read(i),read(i+1),read(i+2)],poly:V[]=[];
@@ -27,7 +28,7 @@ export function trimOGSolarAtGrade(root:T.Group){
   }
   for(const [name,a] of attrs)g.setAttribute(name,new T.Float32BufferAttribute(out[name],a.itemSize));
   g.computeBoundingBox();g.computeBoundingSphere();o.geometry=g;src.dispose();
-  o.userData.og_grade_trim='c48035/c49110 and DJI0002 t396: inclined solar timbers end at soil; clipped CAD below-grade extension at world y0, above-ground geometry retained';
+  o.userData.og_grade_trim='c48035/c49110 and DJI0002 t396: inclined solar timbers end at soil; clipped CAD below-grade extension at Studio sand−0.16m, above-ground geometry retained';
  }
 }
 
@@ -61,6 +62,9 @@ export function add2026OGVehicles(root:T.Group){
    o.userData.photographic_adjustment='Joint OG Collins silhouette fit; original component identity retained';
   });
   bus.scale.y=1.22;
+  root.updateMatrixWorld(true);
+  bus.position.y+=GROUND-new T.Box3().setFromObject(bus).min.y;
+  bus.userData.groundContact='Whole source-fitted bus settled to Studio sand after joint silhouette correction; original parts stay together';
  }
 
  const boat=k.assembly('og-boat-details','OG · boat source details',[-83.1,0,-16.6],-.51,
@@ -196,5 +200,13 @@ export function add2026OGVehicles(root:T.Group){
   k.box(forklift,'forklift vertical fork heel',[.07,.52,.13],[1.25,.37,z],black,layers.context);
   k.box(forklift,'forklift horizontal fork',[1.4,.07,.13],[1.92,.145,z],black,layers.context);
  }
- k.finalize();root.add(...k.root.children);return [boat,og,club,kitchen,forklift];
+ k.finalize();
+ // Original hull and new trailer must move together; shifting tyres alone
+ // would separate the photographed cruiser from its road trailer.
+ boat.position.y=GROUND;
+ for(const id of oldIds){const o=root.getObjectByName(id);if(o)o.position.y+=GROUND;}
+ forklift.position.y=GROUND;
+ boat.userData.groundContact='Four actual trailer tyres meet sand; retained hull follows the rigid road-trailer settlement';
+ forklift.userData.groundContact='Actual forklift tyres meet Studio sand; same-role IDs retained';
+ og.translateX(3.0);og.position.y=GROUND;og.userData.registration='c49457 griddle to right of open stock bay, outside source rails; portable placement fitted; caster feet meet Studio sand';root.add(...k.root.children);return [boat,og,club,kitchen,forklift];
 }

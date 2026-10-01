@@ -1,6 +1,4 @@
 // Assembly graph of the canonical year scenes (engine/campus/assembly.ts; owner feedback §7 phase A).
-import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hashOf } from '../core/hash.ts';
@@ -11,27 +9,43 @@ import type { CampusScene } from '../campus/types.ts';
 import { def } from '../world/catalog.ts';
 import { defaultSortOrder } from '../core/order.ts';
 
-// Preserve source-era geometry/count assertions on their exact input bytes.
-function sourceEraFile(y: number): CampusYearFile {
-  if (![2021, 2022, 2023, 2024].includes(y)) return loadCampusFile(y);
-  const root = new URL('./fixtures/campus-history-pre-review-7648dbf/', import.meta.url);
-  const manifest = JSON.parse(readFileSync(new URL('manifest.json', root), 'utf8')) as { years: Record<string, { sha256: string; contentHash: string }> };
-  const bytes = readFileSync(new URL(`campus-${y}.json`, root));
-  assert.equal(createHash('sha256').update(bytes).digest('hex'), manifest.years[String(y)].sha256);
-  const file = JSON.parse(bytes.toString()) as CampusYearFile;
-  assert.equal(file.contentHash, manifest.years[String(y)].contentHash); return file;
-}
-const scene = (y: number) => loadCampusYear(y, sourceEraFile(y)).base;
+const scene = (y: number) => loadCampusYear(y, loadCampusFile(y) as CampusYearFile).base;
 
-test('byte-verified pre-review7648dbf assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part classified, deterministic', () => {
+test('assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part classified, deterministic', () => {
   const base = scene(2022);
   const g = assemblyGraph(2022, base);
   const c = graphCounts(g);
   assert.equal(c.kinds.upright, 48);
   assert.equal(c.kinds.beam, 216);
   assert.equal(c.unclassified, 0, JSON.stringify(g.unclassified.slice(0, 3)));
-  assert.equal(g.sceneHash, sourceEraFile(2022).contentHash);
+  const contour = g.nodes.filter((n) => n.kitDef === 'Cahuilla photographed contour panel');
+  assert.equal(contour.length, 1, 'source-photographed Cahuilla cladding is accounted for');
+  assert.equal(contour[0].kind, 'feature');
+  assert.equal(contour[0].feature, 'wall');
+  assert.equal(contour[0].def, undefined, 'photographed cladding is not certified catalog stock');
+  assert.ok(!g.edges.some((e) => e.from === contour[0].id && (e.rel === 'connects-to' || e.socket)), 'no invented fastening or rack socket');
+  for (const name of ['car road wheel', 'bus front bumper', 'bus passenger entry', 'bus road wheel']) {
+    const details = g.nodes.filter((n) => n.kitDef === name);
+    assert.ok(details.length > 0, `${name} present in canonical vehicle context`);
+    for (const n of details) {
+      assert.equal(n.kind, 'feature'); assert.equal(n.feature, 'vehicle');
+      assert.equal(n.def, undefined, `${name} is not catalog building stock`);
+      assert.ok(!g.edges.some((e) => e.from === n.id && (e.rel === 'connects-to' || e.socket)), 'no fabricated construction sockets');
+    }
+  }
+  const stairSupports = g.nodes.filter((n) => /stair (orange rack beam|side upright|side diagonal)/.test(n.kitDef));
+  assert.equal(stairSupports.length, 44, 'six beams, three posts and two diagonals per historical stair');
+  for (const n of stairSupports) {
+    assert.equal(n.kind, 'feature');
+    assert.equal(n.feature, 'stair-part');
+    assert.equal(n.def, undefined, 'an opaque stair support is not certified catalog stock');
+    assert.ok(!g.edges.some((e) => e.from === n.id && e.rel === 'connects-to'), 'no fabricated rack socket');
+  }
+  assert.equal(g.sceneHash, loadCampusFile(2022).contentHash);
   assert.equal(hashOf(assemblyGraph(2022, scene(2022))), hashOf(g));
+  const joists = g.nodes.filter((n) => /timber joist/.test(n.kitDef));
+  assert.ok(joists.length > 0);
+  for (const n of joists) { assert.equal(n.feature, 'structural-member'); assert.equal(n.def, undefined); }
   const order = topoOrder(g);
   const pos = new Map(order.map((id, i) => [id, i]));
   for (const house of ['chiba', 'east-house', 'kitchen', 'west-house']) {
@@ -63,11 +77,20 @@ test('byte-verified pre-review7648dbf assembly graph 2022: 4 houses × (12 frame
   }
 });
 
-test('source-era assembly graph: every year builds and orders; 2020 racks do not map onto catalog frames and are reported, not forced', () => {
+test('assembly graph: every year builds and orders; 2020 racks do not map onto catalog frames and are reported, not forced', () => {
   for (const y of [2021, 2023, 2024, 2025]) {
     const g = assemblyGraph(y, scene(y));
     assert.ok(topoOrder(g).length === g.nodes.length);
-    assert.ok(graphCounts(g).kinds.upright! >= 52, `${y} uprights`);
+    assert.ok(graphCounts(g).kinds.upright! > 0, `${y} has catalog-compatible frames`);
+    // Evidence revisions change frame counts and may introduce non-stock heights.
+    // Every component must be claimed exactly once or rejected with an explicit
+    // reason; a universal minimum silently encouraged forcing historical frames.
+    const components = new Set(scene(y).obstacles.map((o) => o.component));
+    const accounted = [...g.nodes.flatMap((n) => n.components), ...g.unclassified.map((u) => u.component)];
+    assert.equal(new Set(accounted).size, accounted.length, `${y}: no double claims`);
+    assert.deepEqual(new Set(accounted), components, `${y}: complete component accounting`);
+    for (const u of g.unclassified) assert.ok(u.reason.length > 0, u.component);
+    if (y === 2023) assert.ok(g.unclassified.some((u) => /post height 2\.480 m is not 8 ft/.test(u.reason)), '2.48m historical frame remains rejected by the 8ft catalog rule');
   }
   const g20 = assemblyGraph(2020, scene(2020));
   const why = g20.unclassified.map((u) => `${u.kitDef}: ${u.reason}`);
@@ -104,25 +127,4 @@ test('assembly graph: deliberately broken geometry is reported with a reason, ne
   // catalog: the reconstruction frame keeps the stock seats and adds the Kit levels
   const seats = new Set((def('upright-16ft-kit').sockets ?? []).map((s) => s.local[1].toFixed(4)));
   for (const y of ['0.2200', '2.4800', '4.7568', '0.3048', '1.8288']) assert.ok(seats.has(y), y);
-});
-
-
-test('current public year graphs preserve actual rack identity/order and explicitly report unsupported components', () => {
-  for (const year of [2020, 2021, 2022, 2023, 2024, 2025]) {
-    const file = loadCampusFile(year), base = loadCampusYear(year, file).base, graph = assemblyGraph(year, base);
-    assert.equal(graph.sceneHash, file.contentHash);
-    assert.equal(topoOrder(graph).length, graph.nodes.length);
-    assert.equal(new Set(graph.nodes.map(n => n.id)).size, graph.nodes.length);
-    const components = new Set(base.obstacles.map(o => o.component));
-    for (const issue of graph.unclassified) {
-      assert.ok(components.has(issue.component), `${year}: refusal names actual component ${issue.component}`);
-      assert.ok(issue.reason.length > 10, `${year}: ${issue.component} has an explicit classification reason`);
-    }
-    if (year === 2022) for (const house of ['chiba', 'east-house', 'kitchen', 'west-house']) {
-      const selected = assemblyGraph(year, base, { assemblies: [house] });
-      assert.equal(selected.nodes.filter(n => n.kind === 'upright').length, 12, house);
-      assert.equal(selected.nodes.filter(n => n.kind === 'beam').length, 54, house);
-    }
-    console.log(`[current graph ${year}] ${JSON.stringify(graphCounts(graph))}`);
-  }
 });

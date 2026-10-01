@@ -251,7 +251,7 @@ test('Spatial.sync patches === full rebuild at every construction step: campus f
     const plan = bindTemplate(buildBayTemplate(site), buildBayBindings, { history: h, baseline: 'build', registry: buildBayRegistry() });
     const reh = rehearse(h, 'build', plan, cfg);
     assert.equal(reh.report.status, 'completed');
-    assert.equal(reh.take.finalStateHash, '758d23176f2053989131e487382b4db34025f1ba4270740f6e804207714254e5', 'campus flagship hash unchanged');
+    assert.equal(reh.take.finalStateHash, '58dd8e0fb35b6a53ffa88d7847c990499b38e33f4f0527b7eced6fc068876f38', 'campus flagship hash unchanged');
   });
   assert.ok(n > 300, `${n} rebuilds checked`);
 });

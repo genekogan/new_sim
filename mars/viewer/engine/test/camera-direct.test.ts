@@ -13,6 +13,8 @@ import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { beforeSunset, sourceEraCampus2024, campus2026, flagship, onGrid, stepTimes, withTime } from './camera-direct-fixtures.ts';
 import { defaultSortOrder } from '../core/order.ts';
+import { loadCampusYear } from '../campus/history.ts';
+import { loadCampusFile } from '../campus/history-node.ts';
 
 const DEG = Math.PI / 180;
 const wrapDiff = (a: number, b: number) => Math.abs(((a - b + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
@@ -241,4 +243,12 @@ test('api: engine_direct_camera plans + stores a directed track beside the take;
   assert.ok(raw.report.shots[1].validation.invalidSamples > 0 && raw.report.shots[1].planner.cuts > 0, 'correct: false = the phase-1 move (inside the wall, rescued by a planner cut)');
   assert.deepEqual(raw.report.shots[1].corrections, []);
   assert.equal(c.call('direct_camera', { take_id: 'nope', directions: dirs }).code, 'take.unknown');
+});
+
+test('current 2024 reconstruction resolves Chiba kitchen and its photographed red refrigerator', () => {
+  const { base, world } = loadCampusYear(2024, loadCampusFile(2024));
+  const c = compile({ subject: { kind: 'region', ref: 'chiba-kitchen' }, motion: { verb: 'hold' }, context: { lookAt: 'red under-counter refrigerator' } }, ctxOf(base, world));
+  assert.ok(c.ok, JSON.stringify(c));
+  assert.equal(c.intent.subject.id, 'chiba-kitchen');
+  assert.match(c.intent.lookAt!.label, /red under-counter refrigerator/);
 });

@@ -104,3 +104,20 @@ export function add2026WestCanopyContact(root:T.Group){
  });
  k.finalize();host.add(g);return g;
 }
+
+/** c6695/c6701: short blue-topped approach below the long west flight and
+ * timber transfer onto the main roof. Existing recovered treads are retained;
+ * only the missing approach/arrival gaps are filled. Dimensions fitted. */
+export function add2026WestStairTransfers(root:T.Group){
+ if(root.getObjectByName('Chiba · west stair approach and roof transfer'))return;
+ const k=new Kit(2026),g=k.assembly('west-stair-source-transfers','Chiba · west stair approach and roof transfer',[0,0,0],0,'c6695/c6701: blue-topped low approach porch and timber roof threshold; actual recovered tread/roof datums, fitted section sizes.');
+ const yaw=-Math.atan2(.4265,.9045),up=new T.Vector3(-.4265,0,.9045).normalize(),first=new T.Vector3(-.72694,.725,-3.02763);
+ const porch=first.clone().addScaledVector(up,-.36);porch.y=.695;
+ const deck=k.box(g,'West stair source blue approach porch',[1.50,.06,.85],porch.toArray() as [number,number,number],'#3473a6',layers.floor);deck.rotation.y=yaw;
+ for(const side of [-.64,.64])for(const along of [-.33,.33]){const p=porch.clone().add(new T.Vector3(side,0,along).applyAxisAngle(new T.Vector3(0,1,0),yaw));p.y=.2525;k.box(g,'West approach porch grounded timber leg',[.07,.825,.07],p.toArray() as [number,number,number],'#9c8462',layers.floor);}
+ for(let i=0;i<3;i++){const height=.505-i*.22,p=porch.clone().addScaledVector(up,-(.56+i*.28));p.y=height-.025;const tread=k.box(g,'West approach short grounded tread',[1.12,.05,.30],p.toArray() as [number,number,number],i===0?'#3473a6':'#a88f6c',layers.floor);tread.rotation.y=yaw;for(const side of [-.48,.48]){const leg=p.clone().add(new T.Vector3(side,0,0).applyAxisAngle(new T.Vector3(0,1,0),yaw));leg.y=(height-.05-.16)/2;k.box(g,'West approach step grounded leg',[.065,height+.11,.065],leg.toArray() as [number,number,number],'#947d5f',layers.floor);}}
+ // Existing0820 arrival top6.11893 -> actual0563 roof6.19144. The short
+ // wooden threshold overlaps each receiver; no large invented platform.
+ k.box(g,'West stair roof timber transfer threshold',[.70,.0725,.90],[-2.72,6.15519,-1.05],'#b99d75',layers.floor);
+ k.finalize();root.add(g);return g;
+}

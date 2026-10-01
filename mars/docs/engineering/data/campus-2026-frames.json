@@ -2,7 +2,7 @@
   "schema": "mars-2026-frames/1",
   "source": {
     "scene": "viewer/public/engine/campus-2026.json",
-    "sceneContentHash": "73887062b6fbef27ff4593e4e3840cda61476f3f075579ca3ddf2acd29b0904b",
+    "sceneContentHash": "256ac4954e7e2f00eef5146165933bb6bab52ef53305d35ac918cd5f542de25a",
     "manifest": "viewer/public/modular/components.json"
   },
   "generator": "viewer/deploy/group-2026-frames.mjs",
@@ -712,7 +712,6 @@
       "members": [
         "rack_member-0261",
         "rack_member-0262",
-        "rack_member-0263",
         "rack_member-0264",
         "rack_member-0265",
         "rack_member-0266",
@@ -872,7 +871,6 @@
       "members": [
         "rack_member-0306",
         "rack_member-0307",
-        "rack_member-0308",
         "rack_member-0309",
         "rack_member-0310",
         "rack_member-0311",
@@ -1188,8 +1186,6 @@
         "rack_member-0396",
         "rack_member-0397",
         "rack_member-0398",
-        "rack_member-0399",
-        "rack_member-0400",
         "rack_member-0401",
         "rack_member-0402"
       ],
@@ -1348,8 +1344,6 @@
         "rack_member-0441",
         "rack_member-0442",
         "rack_member-0443",
-        "rack_member-0444",
-        "rack_member-0445",
         "rack_member-0446",
         "rack_member-0447"
       ],
@@ -2982,17 +2976,17 @@
   ],
   "counts": {
     "rackMemberComponents": 667,
-    "sceneRackMemberComponents": 660,
+    "sceneRackMemberComponents": 654,
     "beamCandidates": 89,
     "sceneBeamCandidateComponents": 83,
     "frames": 81,
     "beams": 12,
-    "unclassified": 92,
+    "unclassified": 98,
     "byAssembly": {
       "chiba": {
         "frames": 47,
         "beams": 0,
-        "unclassified": 21
+        "unclassified": 27
       },
       "north-rack-building": {
         "frames": 9,
@@ -3022,7 +3016,7 @@
     "byReason": {
       "beam-end-miss": 12,
       "panel-not-beam": 59,
-      "no-scene-prism": 13,
+      "no-scene-prism": 19,
       "coincident-post": 8
     }
   },
@@ -3508,6 +3502,18 @@
       "reason": "post overlaps rack_member-0234 within 0.02 m"
     },
     {
+      "component": "rack_member-0263",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0308",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
       "component": "rack_member-0346",
       "assembly": "chiba",
       "code": "no-scene-prism",
@@ -3533,6 +3539,30 @@
     },
     {
       "component": "rack_member-0382",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0399",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0400",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0444",
+      "assembly": "chiba",
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
+    },
+    {
+      "component": "rack_member-0445",
       "assembly": "chiba",
       "code": "no-scene-prism",
       "reason": "manifest component has no 2026 scene prism"

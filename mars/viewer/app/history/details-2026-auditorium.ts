@@ -1,11 +1,15 @@
 import * as T from 'three';
 import {componentMeshes} from './cad-components';
 import {Kit,layers} from './kit';
+import {gallery2026Mounts} from './gallery-2026-anchors';
 
 export const AUDITORIUM_2026_SOURCES=[33334,33350,33355,33354];
 /** Source-backed portable auditorium arrangement. Tier geometry and screen
  * wood1985 remain imported CAD. No fixed theatre-chair rows are invented. */
 export function add2026AuditoriumDetails(root:T.Group){
+ // Donor lower-room baked glowing-screen monitors duplicated the runtime
+ // receiver-mounted LCDs. Their owner IDs and editable records are retained.
+ for(const id of ['2293','2321','2323','2325']){const o=componentMeshes(root,'cad_component-'+id).owner;if(o){o.visible=false;o.userData.walkNoCollision=true;o.userData.sourceCorrection='Source-mounted runtime LCD replaces duplicate donor Glowing Screen Test display';}}
  const prior=root.getObjectByName('Chiba auditorium · photographed furnishings');if(prior)return [prior];
  const host=root.getObjectByName('Chiba');if(!host)return [];
  // c33350 shows a broad pale projection wall, not the narrow portrait
@@ -90,7 +94,7 @@ export function add2026AuditoriumDetails(root:T.Group){
   box('auditorium gallery pale backing panel',[1.38,1.02,.032],[u,1.73,11.595],'#d2c8b7');
   box('auditorium gallery small screen bezel',[.49,.32,.035],[u,1.78,11.56],'#262e32');
   box('auditorium gallery screen surface',[.445,.272,.012],[u,1.78,11.534],'#496470');
-  const source=new T.Mesh(new T.PlaneGeometry(1.30,.94),k.photo(`/history/2026/accuracy/gallery-native-c80-${i%3}.webp`));source.position.set(u,1.73,-11.572);k.tag(g,source,'Chiba gallery native c80 installation panel '+i,layers.detail);source.userData.walkNoCollision=true;source.userData.source='c80 native installation crop; perspective retained. Panel order representative, not all exhibits claimed at identical date.';
+  const source=new T.Mesh(new T.PlaneGeometry(1.30,.94),k.mat('#d2c8b7'));source.position.set(u,1.73,-11.572);k.tag(g,source,'Chiba gallery native c80 installation panel '+i,layers.detail);source.userData.walkNoCollision=true;source.userData.source='c80 native installation crop; perspective retained. Panel order representative, not all exhibits claimed at identical date.';
   const hood=box('auditorium gallery angled panel hood',[1.43,.055,.25],[u,2.285,11.49],'#c9bda6');hood.rotation.x=.25;
  }
  // The recognizable upper-gallery portrait uses source pixels from c33334,
@@ -98,5 +102,31 @@ export function add2026AuditoriumDetails(root:T.Group){
  const art=new T.MeshBasicMaterial({map:new T.TextureLoader().load('/history/2026/auditorium-source-portrait.webp'),side:T.DoubleSide});art.name='2026 auditorium source portrait c33334';art.map!.colorSpace=T.SRGBColorSpace;
  const portrait=new T.Mesh(new T.PlaneGeometry(.80,1.10),art);portrait.position.set(8.0,3.85,-.20);k.tag(g,portrait,'auditorium upper gallery source portrait',layers.detail);portrait.userData.walkNoCollision=true;
  g.userData.accuracy='All furniture supported on actual CAD surfaces. Portable counts/layout fitted to multiple2026 photographs, not a single exact event; screen content not reconstructed.';
- k.finalize();host.add(g);return [g];
+ for(let i=0;i<6;i++)for(const x of [-.38,.38])box('auditorium gallery source stand-off mount bracket',[.035,.055,.10],[i+x,0,0],'#66675d');
+ k.finalize();host.add(g);root.updateWorldMatrix(true,true);
+ const mounts=gallery2026Mounts(root),inv=g.matrixWorld.clone().invert();
+ for(const kind of ['auditorium gallery pale backing panel','auditorium gallery small screen bezel','auditorium gallery screen surface']){
+  const parts=g.children.filter(o=>o.userData.kind===kind);
+  parts.forEach((o,i)=>{const a=mounts[i];if(!a){o.visible=false;o.userData.missingReceiver=true;return;}const m=o as T.Mesh;
+   m.geometry=new T.BoxGeometry(...(kind==='auditorium gallery pale backing panel'?[1.38,1.02,.035]:kind==='auditorium gallery small screen bezel'?[.53,.36,.055]:[.445,.272,.008]) as [number,number,number]);
+   const offset=a.standOff+(kind==='auditorium gallery pale backing panel'?.020:kind==='auditorium gallery small screen bezel'?.070:.102);
+   o.position.copy(a.point.clone().addScaledVector(a.normal,offset).applyMatrix4(inv));o.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),a.normal.clone().transformDirection(inv));o.userData.receiverId=a.receiverId;o.userData.receiverMounted20261001=true;o.userData.measuredRackStandOff=a.standOff;
+  });
+ }
+ const brackets=g.children.filter(o=>o.userData.kind==='auditorium gallery source stand-off mount bracket');brackets.forEach((o,j)=>{const a=mounts[Math.floor(j/2)];if(!a){o.visible=false;return;}const q=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,1),a.normal),side=new T.Vector3(j%2?.38:-.38,0,0).applyQuaternion(q),depth=a.standOff+.002;(o as T.Mesh).geometry=new T.BoxGeometry(.035,.055,Math.max(.002,depth));o.position.copy(a.point.clone().add(side).addScaledVector(a.normal,depth/2).applyMatrix4(inv));o.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),a.normal.clone().transformDirection(inv));o.userData.receiverId=a.receiverId;});
+ for(const o of g.children)if(/Chiba gallery native c80 installation panel|auditorium gallery angled panel hood/.test(o.userData.kind??'')){o.visible=false;o.userData.walkNoCollision=true;o.userData.sourceCorrection='Gene Oct1 actual small LCDs on plain mounted wood pads; whole room-photo/monitor duplicates hidden, IDs retained';}
+ // Gene Oct1: native painted wall belongs across the upper room. These
+ // person/monitor-free source patches are on retained wood, not display pads.
+ const opposite=gallery2026Mounts(root,true);
+ const proxies=g.children.filter(o=>/Chiba gallery native c80 installation panel/.test(o.userData.kind??''));
+ for(const [i,o] of proxies.slice(0,2).entries()){
+  const a=opposite[i+1];if(!a)continue;const m=o as T.Mesh;
+  m.geometry=new T.PlaneGeometry(i===0?1.30:1.30,i===0?1.10:1.70);
+  m.material=k.photo(i===0?'/history/2026/accuracy/upper-native-black-paint.webp':'/history/2026/accuracy/upper-native-green-paint.webp');
+  o.position.copy(a.point.clone().addScaledVector(a.normal,.004).applyMatrix4(inv));
+  o.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),a.normal.clone().transformDirection(inv));
+  o.visible=true;o.userData.receiverId=a.receiverId;o.userData.nativeUpperOppositePaint=true;
+  o.userData.sourceCorrection='c80 painting-only native crop, opposite upper room per Gene Oct1; cropped perspective/extent fitted, not whole-room display texture';
+ }
+ return [g];
 }

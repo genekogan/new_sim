@@ -31,6 +31,7 @@ import { DEFAULT_SCENE_DATE, YEAR_NORTH_AZIMUTH_OFFSET } from '../../engine/env/
 import { createGallery } from './gallery';
 import { add2026Details } from '../history/details-2026';
 import { INTERIOR_2026_VIEWS } from '../history/interior-2026-views';
+import { createSourceVisibilityGuard } from './source-visibility';
 import { createHistoricalScreens } from '../history/screens';
 import { createHistoricalScene, sceneManifest, historyNotes, YEARS } from '../history/scenes';
 import {
@@ -336,6 +337,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
     const additions = new THREE.Group();
     additions.name = 'Proposed additions';
     scene.add(additions);
+    const sourceVisibility = createSourceVisibilityGuard();
     const objects = new Map<string, THREE.Object3D>(),
       baseline = new Map<string, Edit>(),
       originalMaterials = new Map<
@@ -470,6 +472,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
     };
     transform.addEventListener('objectChange', changed);
     function remember(o: THREE.Object3D) {
+      sourceVisibility.remember(o);
       const id = idOf(o);
       if (id) {
         objects.set(id, o);
@@ -486,19 +489,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
     function display() {
       life?.setCut(cutMode);
       const update = (o: THREE.Object3D) => {
-        const layer = o.userData.layer;
-        if (layer)
-          o.visible =
-            !(
-              cutMode === 'inside' &&
-              (layer === 'Roofs and upper floors' ||
-                layer === 'Walls and screens')
-            ) &&
-            !(
-              cutMode === 'frame' &&
-              layer !== 'Rack steel' &&
-              layer !== 'Timber, floors and stairs'
-            );
+        sourceVisibility.cut(o,cutMode);
         if (o instanceof THREE.Mesh && originalMaterials.has(o)) {
           if (surfaceMode === 'generic' && !genericMaterials.has(o)) {
             const original = originalMaterials.get(o)!;

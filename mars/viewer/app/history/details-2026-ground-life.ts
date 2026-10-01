@@ -24,6 +24,29 @@ export function add2026GroundLife(root:T.Group){
  // Both retained banks use the same portable-toilet donor and fitted location.
  const body=['2159','2203','2242','2281','2285','2289'];
  for(const n of body){const {owner,meshes}=componentMeshes(root,'cad_component-'+n);for(const m of meshes)m.material=new T.MeshStandardMaterial({color:'#e4b963',roughness:.83,side:T.DoubleSide});if(owner)owner.userData.reviewSource='c49192 pale-yellow molded/ribbed portable toilet bodies; original shell geometry retained';}
+ // c49192 has rounded-top molded doors, not donor diagonal embossing.
+ root.updateWorldMatrix(true,true);
+ // Complete donor units: base, shell, cap, interior and separate door.
+ // Settle whole units rigidly rather than inventing tall ground plinths.
+ const toiletUnits=[['2148','2159','2170','2181','3556'],['2192','2203','2214','2225','3557'],['2233','2242','2245','2246','3558'],['2280','2281','2282','2283','3559'],['2284','2285','2286','2287','3560'],['2288','2289','2290','2291','3561']];
+ for(const ids of toiletUnits){const base=componentMeshes(root,'cad_component-'+ids[0]).owner;if(!base)continue;const dy=GROUND-new T.Box3().setFromObject(base).min.y;for(const id of ids){const o=componentMeshes(root,'cad_component-'+id).owner;if(o){o.position.y+=dy;o.userData.toiletGroundSettlement=dy;}}const oldDoor=componentMeshes(root,'cad_component-'+ids[4]).owner;if(oldDoor){oldDoor.visible=false;oldDoor.userData.walkNoCollision=true;oldDoor.userData.sourceCorrection='c49192 molded arched closed-door form replaces donor angular embossing; original ID retained';}}
+ root.updateWorldMatrix(true,true);
+ const toiletSet=k.assembly('source-toilet-fronts','Portable toilets · native arched fronts',[0,0,0],0,'c49192 arched inset door, native sign, pale molded front and black ground plinth; dimensions fitted to retained shells');root.add(toiletSet);
+ for(const [i,n] of body.entries()){
+  const {owner,meshes}=componentMeshes(root,'cad_component-'+n);if(!owner)continue;
+  const normal=new T.Vector3(...(i<3?[-.839,0,.544]:[-.995,0,-.098]) as [number,number,number]).normalize(),b=new T.Box3().setFromObject(owner),center=b.getCenter(new T.Vector3());let plane=-Infinity;
+  for(const m of meshes){const p=m.geometry.attributes.position;for(let j=0;j<p.count;j++)plane=Math.max(plane,new T.Vector3().fromBufferAttribute(p,j).applyMatrix4(m.matrixWorld).dot(normal));}
+  const a=k.assembly('toilet-front-'+n,'Native molded toilet front '+n,[0,0,0],0,'c49192');toiletSet.add(a);a.position.copy(center);a.position.y=b.min.y;a.position.addScaledVector(normal,plane-center.dot(normal)+.016);a.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),normal);
+  k.box(a,'toilet source pale front skin',[1.12,2.09,.025],[0,1.045,0],'#e7c381',layers.detail);
+  const shape=new T.Shape();shape.moveTo(-.43,.07);shape.lineTo(.43,.07);shape.lineTo(.43,1.67);shape.quadraticCurveTo(.43,1.97,0,2.03);shape.quadraticCurveTo(-.43,1.97,-.43,1.67);shape.closePath();
+  const door=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:.035,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.018,bevelThickness:.012,curveSegments:8}),k.mat('#edcd90'));door.position.z=.02;k.tag(a,door,'toilet source rounded arch molded door',layers.detail);door.userData.sourceOwner='cad_component-'+n;
+  for(const x of [-.365,.365])k.box(a,'toilet molded door vertical relief',[.030,1.46,.025],[x,.87,.071],'#d9b477',layers.detail);
+  k.box(a,'toilet molded door lower relief',[.74,.032,.025],[0,.20,.071],'#d9b477',layers.detail);
+  k.box(a,'toilet molded door middle relief',[.74,.024,.025],[0,.84,.071],'#d9b477',layers.detail);
+  const label=new T.Mesh(new T.PlaneGeometry(.27,.25),k.photo('/history/2026/accuracy/toilet-native-sign.webp'));label.position.set(0,1.48,.076);k.tag(a,label,'toilet source native sanitation label',layers.detail);label.userData.walkNoCollision=true;
+  k.box(a,'toilet dark door latch',[.035,.13,.035],[.34,.89,.09],'#4d514c',layers.detail);
+
+ }
  for(const n of ['2170','2214','2245','2282','2286','2290']){const {owner,meshes}=componentMeshes(root,'cad_component-'+n);for(const m of meshes)m.material=new T.MeshStandardMaterial({color:'#eee9dd',roughness:.88,side:T.DoubleSide});if(owner)owner.userData.reviewSource='c49192 white peaked molded toilet roof; original cap geometry retained';}
  const og=k.assembly('og-east-life','OG · east dinner frontage',[-110.91,GROUND,.04],-.65,'c49457: eastern open rack frontage, hanging warm strings, folding tables/chairs and griddle. Placement fit from retained OG frame.');root.add(og);
  k.box(og,'OG east folding dinner table',[1.20,.04,.60],[2.75,.73,-5.95],'#b8aa8c',layers.detail);for(const x of [2.25,3.25])for(const z of [-6.15,-5.75])k.rod(og,'OG dinner table folding leg',[x,.02,z],[x,.71,z],.017,'#464e48',layers.detail);

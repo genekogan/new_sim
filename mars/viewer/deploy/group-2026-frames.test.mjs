@@ -18,7 +18,12 @@ test('all real 2026 input components appear exactly once, with stable counts', (
   const inputs = manifest.instances.filter((i) => i.kind === 'rack_member' || i.kind === 'beam_candidate').map((i) => i.id);
   const outputs = [...data.frames.flatMap((f) => [...f.posts, ...f.members]), ...data.beams.map((b) => b.component), ...data.unclassified.map((u) => u.component)];
   assert.equal(data.counts.rackMemberComponents, 667);
-  assert.equal(data.counts.sceneRackMemberComponents, 660);
+  // Six wholly internal kitchen diagonals were clipped to the photographed
+  // clear working aisle/hatch. Original manifest IDs remain classified absent,
+  // rather than silently dropped or counted as load-bearing rack stock.
+  assert.equal(data.counts.sceneRackMemberComponents, 654);
+  const sourceClipped = ['rack_member-0263','rack_member-0308','rack_member-0399','rack_member-0400','rack_member-0444','rack_member-0445'];
+  for (const id of sourceClipped) assert.ok(data.unclassified.some(u => u.component === id && u.code === 'no-scene-prism'), `${id} retains explicit manifest provenance`);
   assert.equal(data.counts.beamCandidates, 89);
   const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   assert.deepEqual(outputs.sort(compare), inputs.sort(compare));

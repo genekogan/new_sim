@@ -25,7 +25,7 @@ import type { CampusObstacle, CampusScene } from './types.ts';
 
 export const ASSEMBLY_GRAPH_VERSION = 'mars-assembly-graph/1';
 
-export type FeatureClass = 'deck-sheet' | 'wall' | 'stair-part' | 'solar' | 'roof' | 'railing' | 'door' | 'window' | 'fixture' | 'vehicle' | 'context';
+export type FeatureClass = 'structural-member' | 'deck-sheet' | 'wall' | 'stair-part' | 'solar' | 'roof' | 'railing' | 'door' | 'window' | 'fixture' | 'vehicle' | 'context';
 export type NodeKind = 'upright' | 'beam' | 'feature';
 
 /** A merged component box in world coordinates: centre (x, y, z), yaw of the local x axis, full size (x, y, z). */
@@ -95,19 +95,25 @@ export function mergeBox(prisms: CampusObstacle[]): CompBox {
 
 function featureOf(kitDef: string, kind: CampusObstacle['kind']): FeatureClass | null {
   const d = kitDef.toLowerCase();
-  if (kind === 'vehicle') return 'vehicle';
+  if (kind === 'vehicle' || /^(yellow (school )?bus body|bus hood|camper van body|popup camper chassis|canvas camper sides)$/.test(d)) return 'vehicle';
+  // Named historical vehicle cosmetics remain opaque context, not building stock.
+  if (/^(car (road wheel|side glazing|headlight|front bumper)|bus (front bumper|passenger entry|road wheel|front windscreen|radiator grille|black rub rail|headlight|headlamp|front grille|side mirror)|trailer (rear bumper|entry surround))$/.test(d)) return 'vehicle';
   if (/solar|photovoltaic/.test(d)) return 'solar';
+  // Timber joists are neither plywood sheets nor validated rack beams.
+  if (/\bjoist\b/.test(d)) return 'structural-member';
   if (/deck sheet|rooftop deck|plywood floor|side deck|climbing sheet|deck$/.test(d)) return 'deck-sheet';
-  if (/^stair |stair (tread|riser|rail|stringer)|side stair/.test(d)) return 'stair-part';
+  if (/\bstair\b/.test(d)) return 'stair-part';
   if (/door/.test(d)) return 'door';
   if (/window|glaz|glass|translucent/.test(d)) return 'window';
-  if (/wall|scrim|screen|mural|letters|sign/.test(d)) return 'wall';
-  if (/roof|aluminet|tarp|canopy/.test(d)) return 'roof';
+  // Source-photographed opaque cladding; no catalog stock or fastening recipe inferred.
+  if (d === 'cahuilla photographed contour panel') return 'wall';
+  if (/wall|panel cap|scrim|screen|mural|letters|sign/.test(d)) return 'wall';
+  if (/roof|aluminet|tarp|canopy|^shade post$|awning/.test(d)) return 'roof';
   if (/rail/.test(d)) return 'railing';
   if (/curtain/.test(d)) return 'wall';
   if (/ceiling/.test(d)) return 'roof';
   if (/floor|platform/.test(d)) return 'deck-sheet';
-  if (/shipping container/.test(d)) return 'context';
+  if (/shipping container|^silver shelter shell$/.test(d)) return 'context';
   if (/table|\btap\b|tap spout|shelf|crate|jar|pot|cup|sink|fridge|freezer|counter|bin|bench|chair/.test(d)) return 'fixture';
   if (kind === 'fixture' || kind === 'glass') return 'fixture';
   return null;
@@ -146,14 +152,17 @@ export function assemblyGraph(year: number, scene: CampusScene, opts: { assembli
   const unclassified: Unclassified[] = [];
   const claimed = new Set<string>();
   const un = (c: string, reason: string) => { const i = info.get(c)!; unclassified.push({ component: c, assembly: i.assembly, kitDef: i.kitDef, reason }); claimed.add(c); };
+  // Historic stairs are opaque features until a dedicated stair assembly recipe
+  // validates them. Their support beams/posts must not be mistaken for bay frames.
+  const stairFeature = (c: string) => featureOf(info.get(c)!.kitDef, info.get(c)!.kind) === 'stair-part';
   const isPost = (k: string) => /^rack upright$|upright$/.test(k) && !/crossbar|bracing|diagonal/.test(k);
   // ---- frames: crossbar + two posts at its ends ----
-  const posts = comps.filter((c) => isPost(info.get(c)!.kitDef));
+  const posts = comps.filter((c) => !stairFeature(c) && isPost(info.get(c)!.kitDef));
   const postXZ = new Map(posts.map((p) => [p, [info.get(p)!.box.c[0], info.get(p)!.box.c[2]] as Vec2]));
   type Frame = { node: AsmNode; posts: [string, string]; across: Vec2; normal: Vec2; centre: Vec2 };
   const frames: Frame[] = [];
   const postFrame = new Map<string, Frame>();
-  for (const cb of comps.filter((c) => /crossbar/.test(info.get(c)!.kitDef))) {
+  for (const cb of comps.filter((c) => /crossbar/.test(info.get(c)!.kitDef) && !stairFeature(c))) {
     const b = info.get(cb)!.box;
     const ax = rot2([1, 0], b.yaw);
     const e0: Vec2 = [b.c[0] - ax[0] * b.size[0] / 2, b.c[2] - ax[1] * b.size[0] / 2];
@@ -185,7 +194,7 @@ export function assemblyGraph(year: number, scene: CampusScene, opts: { assembli
     edges.push({ from: id, to: 'ground', rel: 'rests-on' });
   }
   // bracing rods between a frame's posts belong to it
-  for (const c of comps.filter((c) => /bracing|diagonal/.test(info.get(c)!.kitDef) && !claimed.has(c))) {
+  for (const c of comps.filter((c) => /bracing|diagonal/.test(info.get(c)!.kitDef) && !stairFeature(c) && !claimed.has(c))) {
     const b = info.get(c)!.box;
     const f = frames.find((f) => f.node.assembly === info.get(c)!.assembly && Math.abs(rot2([b.c[0] - f.centre[0], b.c[2] - f.centre[1]], -f.node.box.yaw)[1]) < 0.05 &&
       Math.abs(rot2([b.c[0] - f.centre[0], b.c[2] - f.centre[1]], -f.node.box.yaw)[0]) <= f.node.box.size[0] / 2 + 0.02 && b.y1 <= f.node.box.y1 + 0.05);
@@ -196,7 +205,7 @@ export function assemblyGraph(year: number, scene: CampusScene, opts: { assembli
   for (const f of frames) f.node.components.sort();
   for (const p of posts) if (!claimed.has(p)) un(p, 'post with no crossbar partner (not a two-column catalog frame)');
   // ---- beams: ends on posts of two frames ----
-  for (const c of comps.filter((c) => /beam/.test(info.get(c)!.kitDef) && !claimed.has(c))) {
+  for (const c of comps.filter((c) => /beam/.test(info.get(c)!.kitDef) && !stairFeature(c) && !claimed.has(c))) {
     const i = info.get(c)!, b = i.box;
     const bd = BEAM_DEFS.find((d) => Math.abs(d.size[0] - b.size[0]) <= 0.02);
     if (!bd) { un(c, `beam length ${b.size[0].toFixed(3)} m matches no catalog beam (${BEAM_DEFS.map((d) => d.id).join(', ')})`); continue; }

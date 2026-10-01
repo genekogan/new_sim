@@ -117,6 +117,7 @@ export function add2026CompoundDetails(root:T.Group){
  k.box(g,'Freeside lime sofa base',[2.18,.30,.84],[1.10,.25,4.3],'#a7ac63');
  k.box(g,'Freeside lime sofa back',[2.18,.49,.18],[1.10,.63,3.94],'#a7ac63');
  for(const x of [.07,2.13])k.box(g,'Freeside lime sofa arm',[.14,.43,.84],[x,.52,4.3],'#a7ac63');
+ for(const x of [.25,1.95])for(const z of [3.99,4.61])k.box(g,'Freeside open mic sofa short grounded foot',[.045,.03,.045],[x,.085,z],'#655b43',layers.detail);
  for(const [x,z,w] of [[1.10,5.25,2.1],[4.4,5.15,1.65]])k.box(g,'Freeside open mic pale mattress',[w,.14,1.04],[x,.13,z],'#c9bca6');
  // Small pallet stage faces west toward the courtyard, as in c33330. Keep
  // ground furniture/event state explicit; no added enclosed room or roof.
@@ -133,6 +134,23 @@ export function add2026CompoundDetails(root:T.Group){
  k.box(g,'open mic dark shade strip',[.04,.30,3.01],[7.72,2.18,5.08],'#5b5344',layers.detail);
  k.rod(g,'open mic microphone stand',[7.03,.24,5.18],[7.03,1.42,5.18],.012,'#353e3f',layers.detail);k.rod(g,'open mic microphone boom',[7.03,1.40,5.18],[6.66,1.52,5.18],.012,'#353e3f',layers.detail);
  k.box(g,'open mic portable folding table',[.64,.04,1.40],[7.09,.90,5.15],'#bfae93',layers.detail);for(const z of [4.58,5.72])for(const x of [6.87,7.31])k.box(g,'open mic table slender legs',[.025,.73,.025],[x,.515,z],'#474e4a',layers.detail);
+ for(let i=0;i<3;i++){const a=i*Math.PI*2/3;k.rod(g,'open mic microphone tripod foot',[7.03,.24,5.18],[7.03+.20*Math.cos(a),.23,5.18+.20*Math.sin(a)],.008,'#353e3f',layers.detail);}
+ // c38 occupied performance: three folding seats on the pallets and the
+ // separate black-draped electronics table beside the band, not another room.
+ for(const z of [4.10,5.15,6.20]){
+  k.box(g,'open mic performer folding chair seat',[.40,.035,.40],[7.28,.64,z],'#555d54',layers.detail);
+  k.box(g,'open mic performer folding chair back',[.025,.34,.40],[7.46,.94,z],'#555d54',layers.detail);
+  for(const zz of [z-.17,z+.17]){
+   k.rod(g,'open mic performer folding chair crossed leg',[7.10,.22,zz],[7.45,.62,zz],.012,'#626b61',layers.detail);
+   k.rod(g,'open mic performer folding chair crossed leg',[7.45,.22,zz],[7.10,.62,zz],.012,'#626b61',layers.detail);
+  }
+ }
+ k.box(g,'open mic keyboard narrow housing',[.26,.055,.92],[7.05,.947,4.61],'#343b38',layers.detail);
+ for(let i=0;i<20;i++)k.box(g,'open mic keyboard pale key',[.13,.013,.032],[6.96,.979,4.28+i*.033],'#dddccf',layers.detail);
+ k.box(g,'open mic separate black draped DJ table',[.72,.79,1.15],[6.65,.465,7.52],'#27292b',layers.detail);
+ k.box(g,'open mic DJ table top',[.74,.045,1.19],[6.65,.88,7.52],'#393c3a',layers.detail);
+ k.box(g,'open mic DJ laptop base',[.25,.025,.35],[6.65,.917,7.52],'#8a8e89',layers.detail);
+ k.box(g,'open mic DJ laptop screen',[.025,.24,.35],[6.78,1.04,7.52],'#59656b',layers.detail);
  // Feb17 post and c50416–19/c28 identify metal
  // roofing on kitchen, library and CoLab. Preserve all original CAD pieces.
  const finishes=k.assembly('compound-2026-metal-roofs','Freeside and Bodywork/CoLab · observed metal roofs',[0,0,0],0,
@@ -235,7 +253,7 @@ export function add2026CompoundDetails(root:T.Group){
  for(const y of [.87,2.03])k.box(library,'Freeside north entry white sill header',[.055,.055,3.40],[-3.68,y,-.015],'#d5d5c7',layers.wall);
  // c22: reused FREESIDE painted leaf beside open entry; native pixels
  // contain only its painted panel, no people. Posed against the side post.
- const _signDoor=k.box(library,'Freeside north entry reused painted door backing',[.035,2.10,.88],[-3.73,1.00,-2.10],'#8a785d',layers.wall);
+ k.box(library,'Freeside north entry reused painted door backing',[.035,2.10,.88],[-3.73,1.00,-2.10],'#8a785d',layers.wall);
  const signFace=new T.Mesh(new T.PlaneGeometry(.84,2.05),k.photo('/history/2026/accuracy/freeside-native-entry-paint.webp'));signFace.position.set(-3.752,1.00,-2.10);signFace.rotation.y=-Math.PI/2;k.tag(library,signFace,'Freeside native north entry paint c22',layers.detail);signFace.userData.walkNoCollision=true;
  // Outside-right IBC in c22, molded translucent white tank/metal cage.
  k.box(library,'Freeside source north entry IBC black plinth',[1.15,.13,1.02],[-4.72,-.095,.68],'#363c39',layers.detail);
@@ -279,7 +297,24 @@ export function add2026CompoundDetails(root:T.Group){
  root.traverse(o=>{if(['beam_candidate-0055','beam_candidate-0056','beam_candidate-0057','beam_candidate-0058','beam_candidate-0059','beam_candidate-0060'].includes(cadId(o))){o.visible=false;o.userData.walkNoCollision=true;o.userData.sourceCorrection='c22/c50119 unobstructed central ground-level entry; inferred low donor barrier omitted';}});
  // c38/c49687 stage is outside the SOUTH of the living house, not in
  // c22's north kitchen/living entry. Portable event placement remains fitted.
- for(const o of g.children)if(/open mic|Freeside lime|Freeside.*spool/.test(o.userData.kind??'')){o.position.z+=10;o.userData.eventPlacement='c38/c49687 south-side outside living house; portable fitted layout';}
+ for(const o of g.children)if(/open mic|Freeside lime|Freeside.*spool/.test(o.userData.kind??'')){
+  // Set the fitted pallet underside (.07m) onto Studio sand (−.16m).
+  // Same-role transforms occur after ID finalization; source IDs stay frozen.
+  if(o instanceof T.Mesh&&o.userData.kind==='open mic table slender legs'){
+   o.geometry=o.geometry.clone();o.scale.y*=.66/.73;o.position.y+=.035;
+  }
+  // The full retained Bodywork shell extends farther south than the new
+  // shallow roof proxies. +10 remained under1829/1836; +24 clears its actual
+  // rear face. Portable event location remains a fitted source interpretation.
+  o.position.z+=24;o.position.y-=.23;
+  o.userData.eventPlacement='c38/c49687 south-side outdoor event beyond retained Bodywork shell; pallet underside meets sand, table feet meet pallet top; portable layout fitted';
+ }
+ // c38 pale U-shaped cloth swag over reed blind. New explicit owner after
+ // finalization leaves all prior event IDs fixed; portable fitted extent.
+ const clothPositions:number[]=[],clothIndices:number[]=[];
+ for(let i=0;i<=12;i++){const t=i/12,sag=Math.sin(Math.PI*t),z=27.62+2.92*t,y=2.24-.86*sag;clothPositions.push(7.625-.015*Math.sin(t*Math.PI*6),y,z,7.61-.025*Math.sin(t*Math.PI*6),y-.36-.09*sag,z);if(i<12){const j=i*2;clothIndices.push(j,j+1,j+2,j+1,j+3,j+2);}}
+ const clothGeometry=new T.BufferGeometry();clothGeometry.setAttribute('position',new T.Float32BufferAttribute(clothPositions,3));clothGeometry.setIndex(clothIndices);clothGeometry.computeVertexNormals();
+ const cloth=new T.Mesh(clothGeometry,new T.MeshStandardMaterial({color:'#d5d0bd',roughness:.95,side:T.DoubleSide}));cloth.name='Open mic · native pale sagging backdrop cloth';cloth.userData={component_id:'freeside-native-open-mic-sagging-cloth-20261001',assembly_id:g.userData.assembly_id,kind:'open mic pale native sagging cloth',definition_id:'open mic source cloth swag',layer:layers.detail,source:'c38 native pale U-shaped swag over reed backdrop; extent/sag fitted, no source people'};g.add(cloth);
  // Same-role source corrections after ID finalization retain frozen identifiers.
  const pipe=colab.children.find(o=>o.userData.kind==='Bodywork c28 vertical white pipe');if(pipe)pipe.position.x=3.50;
  const rail=colab.children.find(o=>o.userData.kind==='CoLab photographed pale stair handrail');if(rail instanceof T.Mesh){
@@ -408,7 +443,7 @@ export function add2026CompletedKitchen(root:T.Group){
   k.box(leaf,'Freeside reused entry door lower panel',[1.02,1.12,.045],[sign*.51,.56,0],color,layers.wall);
   for(const xx of [sign*.035,sign*.985])k.box(leaf,'Freeside reused door upper stile',[.07,.97,.045],[xx,1.61,0],color,layers.wall);
   k.box(leaf,'Freeside reused entry door upper rail',[1.02,.08,.045],[sign*.51,2.065,0],color,layers.wall);
-  const paint=typeof document==='undefined'?null:new T.TextureLoader().load(`/history/2026/completion/${x<3?'tan':'yellow'}-door-paint.webp`);if(paint)paint.colorSpace=T.SRGBColorSpace;
+  const paint=typeof document==='undefined'?null:new T.TextureLoader().load(x<3?'/history/2026/completion/tan-door-paint.webp':'/history/2026/completion/yellow-door-paint.webp');if(paint)paint.colorSpace=T.SRGBColorSpace;
   const panelMat=new T.MeshStandardMaterial({map:paint,roughness:.94});
   k.box(leaf,'Freeside reused entry door painted upper panel',[.88,.84,.015],[sign*.51,1.59,0],panelMat,layers.wall);
   k.box(leaf,'Freeside entry door handle',[.035,.18,.065],[sign*.89,1.02,.04],'#554e3c',layers.detail);

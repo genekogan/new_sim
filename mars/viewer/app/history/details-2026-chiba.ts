@@ -5,6 +5,19 @@ import {componentMeshes} from './cad-components';
 import {cutCompoundOpening} from './details-2026-compound';
 import {GROUND} from '../studio/ambience-math';
 
+/** Exact triangle subtraction of a source-supported 3D clearance volume.
+ * Attribute interpolation preserves UVs; original shared geometry is untouched. */
+function clearKitchenRackVolume(geometry:T.BufferGeometry,toKitchen:T.Matrix4){
+ const src=geometry.index?geometry.toNonIndexed():geometry.clone(),names=Object.keys(src.attributes),output:Record<string,number[]>={};for(const n of names)output[n]=[];
+ type V={p:T.Vector3,a:Record<string,number[]>};
+ const clip=(poly:V[],axis:'x'|'y'|'z',value:number,positive:boolean)=>{const out:V[]=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],da=(a.p[axis]-value)*(positive?1:-1),db=(b.p[axis]-value)*(positive?1:-1);if(da>=0)out.push(a);if((da>=0)!==(db>=0)){const t=da/(da-db),attrs:Record<string,number[]>={};for(const n of names)attrs[n]=a.a[n].map((v,j)=>v+t*(b.a[n][j]-v));out.push({p:a.p.clone().lerp(b.p,t),a:attrs});}}return out;};
+ for(let i=0;i<src.attributes.position.count;i+=3){let remaining:V[]=[];for(let j=0;j<3;j++){const a:Record<string,number[]>={};for(const n of names){const attr=src.getAttribute(n);a[n]=Array.from({length:attr.itemSize},(_,c)=>attr.getComponent(i+j,c));}remaining.push({p:new T.Vector3(...a.position as [number,number,number]).applyMatrix4(toKitchen),a});}const pieces:V[][]=[];
+  for(const [axis,value,positive]of [['x',.24,true],['x',3.90,false],['y',.16,true],['y',2.15,false],['z',-4.75,true],['z',3.15,false]] as const){if(!remaining.length)break;pieces.push(clip(remaining,axis,value,!positive));remaining=clip(remaining,axis,value,positive);}
+  for(const poly of pieces)for(let j=1;j+1<poly.length;j++)for(const v of [poly[0],poly[j],poly[j+1]])for(const n of names)output[n].push(...v.a[n]);
+ }
+ const result=new T.BufferGeometry();for(const n of names)result.setAttribute(n,new T.Float32BufferAttribute(output[n],src.getAttribute(n).itemSize));if(result.attributes.position.count){result.computeBoundingBox();result.computeBoundingSphere();}src.dispose();return result;
+}
+
 /** Photograph-specific movable interior additions. Coordinates are in the
  * imported Chiba CAD frame (origin CAD177,66; glTF Y up), never campus world.
  * Room registration remains provisional; source CAD furniture is retained.
@@ -177,6 +190,8 @@ export function add2026ChibaInteriors(root:T.Group){
  // actual opaque faces too; a new window frame over a solid wall is invalid.
  existing.updateWorldMatrix(true,true);kitchen.updateMatrix();
  const rearFrame=existing.matrixWorld.clone().multiply(kitchen.matrix).invert();
+ // c50144 clear serving hatch: clip only front-aperture diagonals, retain edge posts/header and other source rack faces.
+ for(const id of ['rack_member-0444','rack_member-0462','rack_member-0307','rack_member-0304','rack_member-0439','rack_member-0305','rack_member-0440'])for(const m of componentMeshes(existing,id).meshes){const into=rearFrame.clone().multiply(m.matrixWorld);m.geometry=cutCompoundOpening(m.geometry,into,[.24,3.40,.90,2.15],[-4.8,-3.95]);m.userData.servingApertureEvidence='c50144 broad clear serving aperture; front-only unsupported diagonal portions clipped, original owner retained';}
  for(const m of componentMeshes(existing,'wood_component-0547').meshes){const into=rearFrame.clone().multiply(m.matrixWorld);for(const [a,b]of [[.30,1.58],[1.72,3.68]])m.geometry=cutCompoundOpening(m.geometry,into,[a,b,.87,1.94]);m.userData.apertureEvidence='c50695 rear exterior two-window sink face; full-shell ray0547 was opaque, apertures fitted';}
  for(const o of kitchen.children){const kind=o.userData.kind??'';if(kind.startsWith('kitchen rear exterior plywood')||kind==='kitchen rear exterior window pier'){o.visible=false;o.userData.walkNoCollision=true;}if(kind.startsWith('kitchen rear observed window'))o.position.z=3.30;}
  kitchen.userData.roomPlan='Kitchen retains western donor shell; dining continues north on annex0016 opposite Mimos coffee wall. c47859 internal passage; c50691 three stations; Gene reverse-face topology. Translation fitted.';
@@ -193,6 +208,23 @@ export function add2026ChibaInteriors(root:T.Group){
   });owner.userData.kitchenCounterFit='c50695 long left bank perpendicular to rear windows; donor appliance shapes retained, plan registration fitted';
  });
  kitchen.userData.retainedBankIds=[];existing.traverse(o=>{if(o.userData.kitchenCounterFit)kitchen.userData.retainedBankIds.push(o.userData.component_id);});
+ // c50144 exterior serving hatch: restore kitchen-front infill erased by
+ // the formerly over-wide passage cut. Dining circulation x4.12–8.14 stays
+ // open to ground; this front hatch is opposite the rear sink windows.
+ k.box(kitchen,'kitchen source front serving lower plywood',[3.46,.84,.045],[1.79,.42,-4.285],'#732a24',layers.wall);
+ for(const x of [.12,3.46])k.box(kitchen,'kitchen source serving hatch jamb',[.08,2.22,.08],[x,1.11,-4.285],'#a38b63',layers.wall);
+ k.box(kitchen,'kitchen source serving hatch header',[3.42,.16,.08],[1.79,2.18,-4.285],'#a38b63',layers.wall);
+ k.box(kitchen,'kitchen source serving above-hatch plywood fascia',[3.46,.48,.045],[1.79,2.50,-4.285],'#816b4b',layers.wall);
+ k.box(kitchen,'kitchen source exterior serving shelf',[3.52,.045,.40],[1.79,.86,-4.47],'#af945f',layers.detail);
+ for(const x of [.30,3.28])k.rod(kitchen,'kitchen serving shelf timber bracket',[x,.63,-4.29],[x,.82,-4.63],.022,'#967d53',layers.detail);
+ const servingLeaf=new T.Group();servingLeaf.userData={...kitchen.userData};servingLeaf.position.set(3.54,0,-4.285);servingLeaf.rotation.y=-.95;kitchen.add(servingLeaf);
+ k.box(servingLeaf,'kitchen source red front door',[.55,2.08,.04],[.275,1.04,0],'#aa3028',layers.wall);
+ k.box(servingLeaf,'kitchen red front door round handle',[.035,.08,.055],[.48,.94,-.03],'#68543b',layers.detail);
+ const gong=new T.Mesh(new T.CircleGeometry(.20,24),k.mat('#9c7b39',.6));gong.position.set(3.14,1.88,-3.98);gong.rotation.y=Math.PI;k.tag(kitchen,gong,'kitchen serving source suspended bronze gong c50144',layers.detail);k.rod(kitchen,'kitchen serving gong suspension cord',[3.14,2.28,-3.98],[3.14,2.07,-3.98],.005,'#a47e50',layers.detail);
+ // c50691 source paint: two exposed plywood patches within the blue wall.
+ for(const [name,z,w,h,y]of [['diner-large-wood-patch',-10.25,1.25,.98,1.35],['diner-small-wood-patch',-7.0,.64,.61,1.13]] as [string,number,number,number,number][]){const patch=new T.Mesh(new T.PlaneGeometry(w,h),k.photo(`/history/2026/accuracy/${name}.webp`));patch.position.set(6.823,y,z);patch.rotation.y=-Math.PI/2;k.tag(kitchen,patch,'diner native blue wall plywood patch '+name,layers.detail);patch.userData.walkNoCollision=true;}
+ const glow=new T.MeshStandardMaterial({color:'#f5e6b8',emissive:'#d1ae61',emissiveIntensity:.5});
+ for(let i=0;i<13;i++){const z=-11.55+i*.60;const bulb=new T.Mesh(new T.SphereGeometry(.03,8,6),glow);bulb.position.set(6.76,2.17-(i%2)*.04,z);k.tag(kitchen,bulb,'diner source perimeter string bulb',layers.detail);bulb.userData.walkNoCollision=true;if(i)k.rod(kitchen,'diner source wall string cable',[6.78,2.24,z-.60],[6.78,2.24,z],.0035,'#383a33',layers.detail);}
  const cafe=k.assembly('mimos-details','Mimos · source coffee counter and gallery',[2.05645,floor,-8.92635],angle+Math.PI/2,'DSCF0863, IMG0317, DSCF1259, IMG6074; room registration from archived CAD, provisional');
  cafe.userData.registration='CAD179.05645,74.92635; counter long axis parallel solarium; CAD raycast floor.37, glazed seating is ground level; exact service-wall position provisional';
  // Keep the glazed side / central route clear; service furnishings stay on
@@ -237,7 +269,20 @@ export function add2026ChibaInteriors(root:T.Group){
  // plywood. CAD floor rays confirm no raised deck here. Lower only this set.
  for(const o of cafe.children)if(!beforeLowTable.has(o)){o.position.y-=floor;o.userData.support='ground-level glazed bay, IMG6074';}
  k.box(cafe,'Mimos glazed bay ground mat',[2.35,.014,1.75],[.15,-floor+.007,1.62],'#746f5e',layers.detail);
- k.finalize();for(const [o,id]of frozenWorkingIds)o.userData.component_id=id;
+ // Gene Oct1: counters continue to the serving face; entry is a real
+ // blue wall with a doorway rather than the formerly full-width opening.
+ k.box(kitchen,'kitchen source continued left perimeter counter top',[.70,.04,5.42],[3.50,.91,-1.50],metal,layers.detail);
+ for(const z of [-4.06,-2.30,-.55,.98])for(const x of [3.20,3.78])k.box(kitchen,'kitchen continued wood counter leg',[.055,.87,.055],[x,.435,z],'#a78a60',layers.detail);
+ k.box(kitchen,'kitchen source serving inside counter return',[2.56,.04,.46],[1.83,.91,-4.02],metal,layers.detail);
+ for(const x of [.65,1.84,3.0])k.box(kitchen,'kitchen serving return timber leg',[.055,.87,.055],[x,.435,-4.02],'#a78a60',layers.detail);
+ k.box(kitchen,'kitchen entry blue wall left of door',[1.53,2.32,.04],[4.885,1.16,-4.285],'#234f73',layers.wall);
+ k.box(kitchen,'kitchen entry blue wall right of door',[1.54,2.32,.04],[7.37,1.16,-4.285],'#234f73',layers.wall);
+ k.box(kitchen,'kitchen blue entry door header',[.95,.24,.04],[6.125,2.20,-4.285],'#234f73',layers.wall);
+ const entryLeaf=k.box(kitchen,'kitchen blue entry door open leaf',[.95,2.08,.035],[5.65,1.04,-4.285],'#d8d8c9',layers.detail);entryLeaf.geometry=entryLeaf.geometry.clone().translate(.475,0,0);entryLeaf.rotation.y=1.40;
+ kitchen.userData.critique20261001='Source counters to serving-window perimeter; actual blue entry wall with95cm open doorway, source topology firsthand and dimensions fitted';
+ k.finalize();for(const o of kitchen.children){if(/kitchen serving.*gong/.test(o.userData.kind??''))o.position.x-=2.70;if(/kitchen source front serving lower plywood|kitchen source serving above-hatch plywood fascia|kitchen source serving top header/.test(o.userData.kind??''))o.position.z=-4.45;}for(const [o,id]of frozenWorkingIds)o.userData.component_id=id;
+ for(const o of kitchen.children)if(o instanceof T.Mesh&&o.userData.kind==='diner bolted seat support')o.geometry=new T.CylinderGeometry(.018,.018,.37,6);
+
  // Preserve existing IDs while seating the ground-bay set on the actual
  // Studio sand datum; the raised service deck remains at CAD .37m.
  for(const o of cafe.children)if(o.userData.support==='ground-level glazed bay, IMG6074'||o.userData.kind==='Mimos glazed bay ground mat')o.position.y+=GROUND;
@@ -247,5 +292,21 @@ export function add2026ChibaInteriors(root:T.Group){
  for(const o of cafe.children)if(o.userData.kind==='Mimos red mini refrigerator'||o.userData.kind==='Mimos mini refrigerator handle'){
   o.position.x-=4.35;o.userData.registration='Moved onto retained .3635m deck beside pantry; source DSCF1259, exact furniture placement fitted';
  }
- existing.add(...k.root.children);return [kitchen,cafe];
+ existing.add(...k.root.children);root.updateWorldMatrix(true,true);
+ // c50144/c50695 completed kitchen has no transverse blue cage through
+ // hatch, working aisle or rear glazing. Subtract ONLY observed clear volume,
+ // preserving edge posts, side frames, orange ceiling headers and ground ties.
+ const intoKitchen=kitchen.matrixWorld.clone().invert(),clearanceBox=new T.Box3(new T.Vector3(.24,.16,-4.75),new T.Vector3(3.90,2.15,3.15)),clearedOwners=new Set<string>();
+ existing.traverse(owner=>{if(owner.userData.kind!=='rack_member')return;owner.traverse(o=>{const m=o as T.Mesh;if(!m.isMesh)return;const into=intoKitchen.clone().multiply(m.matrixWorld);m.geometry.computeBoundingBox();if(!m.geometry.boundingBox!.clone().applyMatrix4(into).intersectsBox(clearanceBox))return;const corrected=clearKitchenRackVolume(m.geometry,into);if(corrected.attributes.position.count){m.geometry=corrected;}else{corrected.dispose();m.visible=false;m.userData.walkNoCollision=true;}m.userData.sourceClearance='c50144/c50695 observed clear kitchen hatch/working aisle/rear windows; bounded 3D subtraction; all edges/ceiling/ground outside volume retained';clearedOwners.add(owner.userData.component_id);});});
+ kitchen.userData.sourceKitchenRackClearanceOwners=[...clearedOwners].sort();root.updateWorldMatrix(true,true);
+ // Counter perimeter fits around source steel; never remove real rack to
+ // make a continuous furnishing. Clone and notch only the countertop.
+ const tops=kitchen.children.filter(o=>/kitchen source continued left perimeter counter top|kitchen source serving inside counter return/.test(o.userData.kind??'')) as T.Mesh[];
+ for(const top of tops){if(top.userData.kind.includes('continued')){top.geometry=new T.BoxGeometry(.94,.04,5.42);top.position.x=3.62;}else{top.geometry=new T.BoxGeometry(2.56,.04,.82);top.position.z=-4.00;}top.updateMatrix();}root.updateWorldMatrix(true,true);
+ root.traverse(owner=>{if(owner.userData.kind!=='rack_member')return;owner.traverse(o=>{const rack=o as T.Mesh;if(!rack.isMesh)return;for(const top of tops){
+  rack.geometry.computeBoundingBox();const b=rack.geometry.boundingBox!.clone().applyMatrix4(kitchen.matrixWorld.clone().invert().multiply(rack.matrixWorld));
+  if(b.min.y>.932||b.max.y<.888)continue;top.geometry.computeBoundingBox();const tb=top.geometry.boundingBox!.clone().applyMatrix4(top.matrix);if(!tb.intersectsBox(b))continue;
+  top.geometry=cutCompoundOpening(top.geometry,new T.Matrix4().makeRotationX(Math.PI/2).multiply(top.matrix),[b.min.x-.006,b.max.x+.006,-b.max.z-.006,-b.min.z+.006],[.88,.94]);
+  top.userData.sourceCounterNotches='Fitted around retained rack, source perimeter counter; steel IDs unchanged';
+ } });});return [kitchen,cafe];
 }

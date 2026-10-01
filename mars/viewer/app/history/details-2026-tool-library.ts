@@ -18,8 +18,8 @@ export function add2026ToolLibrary(root:T.Group){
  for(let i=0;i<6;i++)k.box(g,'Tool library coffee table book stack',[.22,.025,.15],[-.65,.523+i*.025,0],['#8a6a57','#d7cfb9','#51646c'][i%3],layers.detail);
  const board=k.box(g,'Tool library leaning whiteboard',[.95,1.58,.035],[1.55,.83,-1.10],'#e0e0d4',layers.detail);board.rotation.z=-.12;
  // c48833 wooden hexagonal ring and three-lobed ring: actual cutout openings.
- const ring=(name:string,r:number,hole:number,sides:number,p:[number,number,number],horizontal=false)=>{const shape=new T.Shape();for(let i=0;i<=sides;i++){const a=i/sides*Math.PI*2;const x=r*Math.cos(a),y=r*Math.sin(a);if(i){shape.lineTo(x,y);}else{shape.moveTo(x,y);}}const path=new T.Path();for(let i=0;i<=32;i++){const a=-i/32*Math.PI*2;const x=hole*Math.cos(a),y=hole*Math.sin(a);if(i){path.lineTo(x,y);}else{path.moveTo(x,y);}}shape.holes.push(path);const m=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:.018,bevelEnabled:false}),k.mat('#baa077'));m.position.set(...p);if(horizontal)m.rotation.x=-Math.PI/2;k.tag(g,m,name,layers.detail);};
- ring('Tool library hexagonal mathematical cutout',.39,.28,6,[-.8,.05,1.15],true);const lobes=new T.Shape();for(let i=0;i<=72;i++){const a=i/72*Math.PI*2,r=.41+.11*Math.cos(3*a),x=r*Math.cos(a),y=r*Math.sin(a);if(i){lobes.lineTo(x,y);}else{lobes.moveTo(x,y);}}const hole=new T.Path();hole.absarc(0,0,.25,0,Math.PI*2,true);lobes.holes.push(hole);const tri=new T.Mesh(new T.ExtrudeGeometry(lobes,{depth:.018,bevelEnabled:false}),k.mat('#baa077'));tri.rotation.x=-Math.PI/2;tri.position.set(.4,.04,1.20);k.tag(g,tri,'Tool library three lobed mathematical cutout',layers.detail);
+ const ring=(name:string,r:number,hole:number,sides:number,p:[number,number,number],horizontal=false)=>{const shape=new T.Shape();for(let i=0;i<=sides;i++){const a=i/sides*Math.PI*2;const x=r*Math.cos(a),y=r*Math.sin(a);if(i)shape.lineTo(x,y);else shape.moveTo(x,y);}const path=new T.Path();for(let i=0;i<=32;i++){const a=-i/32*Math.PI*2;const x=hole*Math.cos(a),y=hole*Math.sin(a);if(i)path.lineTo(x,y);else path.moveTo(x,y);}shape.holes.push(path);const m=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:.018,bevelEnabled:false}),k.mat('#baa077'));m.position.set(...p);if(horizontal)m.rotation.x=-Math.PI/2;k.tag(g,m,name,layers.detail);};
+ ring('Tool library hexagonal mathematical cutout',.39,.28,6,[-.8,.05,1.15],true);const lobes=new T.Shape();for(let i=0;i<=72;i++){const a=i/72*Math.PI*2,r=.41+.11*Math.cos(3*a),x=r*Math.cos(a),y=r*Math.sin(a);if(i)lobes.lineTo(x,y);else lobes.moveTo(x,y);}const hole=new T.Path();hole.absarc(0,0,.25,0,Math.PI*2,true);lobes.holes.push(hole);const tri=new T.Mesh(new T.ExtrudeGeometry(lobes,{depth:.018,bevelEnabled:false}),k.mat('#baa077'));tri.rotation.x=-Math.PI/2;tri.position.set(.4,.04,1.20);k.tag(g,tri,'Tool library three lobed mathematical cutout',layers.detail);
  // Permanent ground workshop under the side deck; leave full-height middle
  // bay clear. c78/50113/33370 show black-yellow supply bins and worktables.
  const base=-2.73;
@@ -48,6 +48,39 @@ export function add2026ToolLibrary(root:T.Group){
  g.userData.terraceEvidence='c50588 roofless continuing east deck, north/far low plywood parapets and right exit; one nominal3.66m rack bay restored beyond missing donor floor; exact parcel placement fitted';
  k.box(g,'Tool library north full plywood book backing',[3.20,2.015,.035],[0,1.0075,-1.735],'#b49b72',layers.wall);
  k.finalize();for(const o of g.children){const kind=o.userData.kind||'';if(kind.startsWith('Tool ground')||kind.startsWith('Tool workbench')||kind.startsWith('Tool workshop')||kind.startsWith('Tool bench'))o.position.y-=.127;}host.add(g);root.updateMatrixWorld(true);
+ // c78/c33370: the retained waist-height rack boards are WORKTOPS,
+ // not a low occupied ceiling. Register tools on their actual triangle face,
+ // preserving genuine shelf geometry and all same-role owner IDs.
+ const worktop=componentMeshes(root,'wood_component-1961'),ray=new T.Raycaster();
+ const probe=new T.Vector3(0,-1.1,5.80).applyMatrix4(g.matrixWorld);ray.set(probe,new T.Vector3(0,-1,0));ray.far=1;
+ const receiver=ray.intersectObjects(worktop.meshes,true)[0];
+ if(receiver){
+  const localY=g.worldToLocal(receiver.point.clone()).y;
+  for(const o of g.children){const kind=o.userData.kind||'';if(kind.startsWith('Tool bench vise')||kind==='Tool workshop drill case'||kind==='Tool workshop drill handle'||kind==='Tool ground bench lower storage shelf'||kind==='Tool workshop black storage bin'||kind==='Tool workshop yellow bin lid')o.position.z+=7.34;}
+  for(const o of g.children){const kind=o.userData.kind||'';
+   if(kind==='Tool ground workshop long bench top'||kind==='Tool workbench grounded legs'){o.visible=false;o.userData.walkNoCollision=true;o.userData.sourceOmission='c78 real retained1961 rack worktop replaces duplicate added bench';}
+   if(kind.startsWith('Tool bench vise')){o.position.y+=localY-(base+.944-.127-.0175);o.userData.actualReceiver='wood_component-1961';}
+   if(kind==='Tool workshop drill case'||kind==='Tool workshop drill handle'){o.position.y+=localY-(base+.945-.127-.07);o.userData.actualReceiver='wood_component-1961';}
+  }
+  g.userData.workshopWorktopReceiver={component_id:'wood_component-1961',localCenter:[0,localY,5.80],worldTop:receiver.point.y,source:'c78/c33370 waist-height side rack worktop; real low board retained'};
+ }
+ // Main folding table belongs in the tall central aisle, not underneath
+ // side storage boards. Source photographs show plywood under its feet;
+ // recovered1934 provides the central ground-level floor receiver.
+ const ground=componentMeshes(root,'wood_component-1934');
+ const floorProbe=new T.Vector3(3.75,-1.7,8.0).applyMatrix4(g.matrixWorld);ray.set(floorProbe,new T.Vector3(0,-1,0));ray.far=1.5;
+ const floorHit=ray.intersectObjects(ground.meshes,true)[0];
+ if(floorHit){const floorY=g.worldToLocal(floorHit.point.clone()).y;for(const o of g.children){if(!(o.userData.kind||'').startsWith('Tool workshop folding table'))continue;o.position.x+=3.75;o.position.z+=7.55;o.position.y+=floorY-(base-.127);o.userData.actualReceiver='wood_component-1934';}g.userData.workshopCentralAisle={floor_id:'wood_component-1934',localCenter:[3.75,floorY,8],worldTop:floorHit.point.y,source:'c78/c50113/c33370 plywood ground and open central event/work aisle; position fitted'};}
+ // c78 plywood continues under the side inventory. Restore only its
+ // missing bounded footprint at the measured nearby1934 floor datum, using
+ // fitted timber supports to sand; not a lowered isolated sand board.
+ if(floorHit){const top=floorHit.point.y,localTop=g.worldToLocal(floorHit.point.clone()).y;
+  const ply=k.box(g,'Tool source side-workshop ground plywood',[3.20,.04,.90],[0,localTop-.02,5.80],'#bca17b',layers.floor);ply.userData.component_id='tool-native-workshop-ground-plywood-20261001';ply.userData.source='c78/c33370 continuous plywood ground under side worktop; bounded footprint and joist sections fitted; nearby1934 floor datum';
+  for(const x of [-1.30,1.30]){const height=top-.04+.16,joist=k.box(g,'Tool source workshop plywood grounded timber support',[.075,height,.90],[x,(top-.04-.16)/2-2.697,5.80],'#a68c65',layers.floor);joist.userData.component_id='tool-native-workshop-ground-support-'+(x<0?'west':'east')+'-20261001';}
+  const shift=localTop-(base+.27-.127-.02);for(const o of g.children){const kind=o.userData.kind||'';if(kind==='Tool ground bench lower storage shelf'||kind==='Tool workshop black storage bin'||kind==='Tool workshop yellow bin lid'){o.position.y+=shift;o.userData.actualReceiver=ply.userData.component_id;}}
+  g.userData.workshopStorageFloor={component_id:ply.userData.component_id,worldTop:top,reference_id:'wood_component-1934',source:'c78 continuous ground plywood; bounded missing side footprint at adjacent floor datum'};
+ }
+ root.updateMatrixWorld(true);
  // Actual surrounding CAD frames1975/76/78/79/86 top at4.7183m.
  // Donor1973 combines a lower2.687m deck and unsupported low4.048m roof.
  // Align that upper roof to those existing supports, never lift the furniture

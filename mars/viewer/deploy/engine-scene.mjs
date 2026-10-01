@@ -8,6 +8,8 @@ import { readFile, writeFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import * as THREE from 'three';
+import { build } from 'esbuild';
+import { unlink } from 'node:fs/promises';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { extractObstacles, GROUND_Y, LOW_BAND } from '../engine/campus/extract.ts';
@@ -37,6 +39,14 @@ async function loadScene() {
   const s = Buffer.concat([header, json, bin]);
   await MeshoptDecoder.ready;
   const { scene } = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(s.buffer.slice(s.byteOffset, s.byteOffset + s.byteLength), '');
+  // Match Studio: source-reviewed architectural corrections and furnishings are
+  // part of the canonical geometry, not just a browser decoration overlay.
+  const moduleFile=path.join(ROOT,`.engine-details-${process.pid}.mjs`);
+  await build({entryPoints:[path.join(ROOT,'app/history/details-2026.ts')],bundle:true,platform:'node',format:'esm',packages:'external',outfile:moduleFile,logLevel:'error'});
+  THREE.TextureLoader.prototype.load=function(){return new THREE.Texture();};
+// oxlint-disable-next-line typescript/no-deprecated -- offline canvas stub for geometry extraction; no browser DOM
+  globalThis.document={createElement:()=>({width:1,height:1,getContext:()=>new Proxy({}, {get:()=>()=>{}})})};
+  try {const {add2026Details}=await import(moduleFile);add2026Details(scene);} finally {await unlink(moduleFile);}
   scene.updateMatrixWorld(true);
   return { scene, bytes: b.length, materialNames };
 }
@@ -48,6 +58,7 @@ function ownerOf(o) {
 function skipped(o) {
   for (let p = o; p; p = p.parent) {
     const u = p.userData || {};
+    if (p.visible === false || u.walkNoCollision) return true;
     if (SKIP_KINDS.has(u.kind) || SKIP_ASSEMBLIES.has(u.assembly_id) || u.layer === 'Aerial reference') return true;
   }
   return false;
@@ -59,6 +70,7 @@ export async function extract() {
   const byId = new Map(manifest.instances.map((i) => [i.id, i]));
   const assemblyNames = Object.fromEntries(manifest.assemblies.map((a) => [a.id, a.name]));
   const { scene, bytes } = await loadScene();
+  scene.traverse(o=>{if(o.userData.assembly_id && !o.userData.component_id)assemblyNames[o.userData.assembly_id]=o.name;});
   const tLoad = performance.now() - t0;
   const tris = new Map(); // component id → number[]
   const extras = new Map();

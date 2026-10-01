@@ -52,6 +52,7 @@ scene.traverse((o) => {
   let p = o;
   while (p) {
     if (
+      p.visible === false || p.userData.walkNoCollision ||
       p.userData.kind === 'context_person' ||
       p.userData.layer === 'Aerial reference'
     )

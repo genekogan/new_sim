@@ -1,6 +1,6 @@
 import * as T from 'three';
 import {add2026FacadeDetails} from './details-2026-facade';
-import {add2026RoofStructure,add2026WestCanopyContact,correct2026RackFinish,correct2026WestStairOpening} from './details-2026-structure';
+import {add2026RoofStructure,add2026WestCanopyContact,add2026WestStairTransfers,correct2026RackFinish,correct2026WestStairOpening} from './details-2026-structure';
 import {add2026ChibaInteriors} from './details-2026-chiba';
 import {add2026CompoundDetails} from './details-2026-compound';
 import {add2026ToolLibrary} from './details-2026-tool-library';
@@ -16,6 +16,7 @@ import {add2026AuditoriumDetails} from './details-2026-auditorium';
 export function add2026Details(root:T.Group){
  correct2026RackFinish(root);
  correct2026WestStairOpening(root);
+ add2026WestStairTransfers(root);
  add2026FacadeDetails(root);
  const canopy=add2026WestCanopyContact(root);
  const roof=add2026RoofStructure(root);

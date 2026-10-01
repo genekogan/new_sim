@@ -43,6 +43,9 @@ export function extractYear(scenes, year) {
   const tris = new Map(); // component id → { meta, arr }
   const v = new T.Vector3();
   root.traverse((o) => {
+    // Preserve raw/source IDs in the manifest, but do not export quarantined
+    // historical geometry as an engine-visible/collidable component.
+    for (let ancestor = o; ancestor; ancestor = ancestor.parent) if (ancestor.visible === false) return;
     const u = o.userData;
     if (!o.isMesh || !u.component_id || SKIP_ASSEMBLIES.has(u.assembly_id) || u.kind === 'site_context') return;
     let c = tris.get(u.component_id);

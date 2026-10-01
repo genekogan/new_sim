@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {gallery2026Mounts,projection2026Mount} from '../history/gallery-2026-anchors';
 import { ThreeResources, isVisible } from '../../lib/three-resources';
 import {
   screenIds,
@@ -22,28 +23,25 @@ export function createGallery(scene: THREE.Scene, root: THREE.Group) {
       roughness: 0.9,
     }),
     black = new THREE.MeshStandardMaterial({ color: 0x141619, roughness: 0.6 });
+  const mounts=gallery2026Mounts(root),projectionMount=projection2026Mount(root);
+  const intoChiba=chiba.matrixWorld.clone().invert();
+  const physicalPads:THREE.Object3D[]=[];root.traverse(o=>{if(o.userData.kind==='auditorium gallery pale backing panel')physicalPads.push(o);if(/auditorium gallery small screen bezel|auditorium gallery screen surface/.test(o.userData.kind??''))o.visible=false;});
   const screens = screenIds.map((id, i) => {
     const projector = i === 0,
-      width = projector ? 3.2 : 1.05,
-      height = projector ? 4.3 : 0.62;
+      width = projector ? 3.2 : .49,
+      height = projector ? 4.3 : .32;
     const holder = new THREE.Group();
-    if (projector) {
-      holder.position.copy(origin).addScaledVector(n, 0.06);
-      holder.position.y = 2.65;
-      holder.rotation.y = -Math.atan2(u.z, u.x);
-    } else {
-      holder.position
-        .copy(origin)
-        .addScaledVector(u, 3.6)
-        .addScaledVector(n, 1.3 + ((i - 1) % 3) * 2.1);
-      holder.position.y = i <= 3 ? 4.45 : 1.55;
-      holder.rotation.y = Math.atan2(-u.x, -u.z);
-    }
+    holder.name='Gallery receiver-mounted screen '+id;
+    const mount=projector?projectionMount:mounts[i-1];
+    if(mount){
+      holder.position.copy(mount.point.clone().addScaledVector(mount.normal,projector?.004:((mount as {standOff?:number}).standOff??0)+.040).applyMatrix4(intoChiba));
+      holder.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),mount.normal.clone().transformDirection(intoChiba));
+      holder.userData.receiverId=mount.receiverId;
+      holder.userData.receiverMounted20261001=true;
+    }else{holder.visible=false;holder.userData.missingReceiver=true;}
     group.add(holder);
     if (!projector) {
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 0.06), back);
-      panel.position.z = -0.06;
-      holder.add(panel);
+      if(!physicalPads.length){const panel = new THREE.Mesh(new THREE.BoxGeometry(.68, .56, .035), back);panel.position.z = -.020;holder.add(panel);}
       const frame = new THREE.Mesh(
         new THREE.BoxGeometry(width + 0.07, height + 0.07, 0.06),
         black,
@@ -82,7 +80,7 @@ export function createGallery(scene: THREE.Scene, root: THREE.Group) {
       new THREE.PlaneGeometry(width, height),
       material,
     );
-    face.position.z = 0.04;
+    face.position.z = projector ? 0 : .04;
     holder.add(face);
     let title = '';
     return {

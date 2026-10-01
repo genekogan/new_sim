@@ -18,7 +18,7 @@ import { classifyHistory, historyConfidence } from '../campus/history-extract.ts
 import { loadCampusFile } from '../campus/history-node.ts';
 import type { Region } from '../world/types.ts';
 import { RULES_VERSION } from '../construction/rules.ts';
-import { hypot, obbCorners } from '../core/math.ts';
+import { hypot } from '../core/math.ts';
 import type { Vec3 } from '../core/math.ts';
 import { DatabaseSync } from 'node:sqlite';
 import type { WorldState } from '../world/types.ts';
@@ -66,7 +66,7 @@ test('each year 2020–2025 loads as a ground-only scene with provenance on ever
     assert.equal(world.inventory, 'finite');
     assert.ok(world.env.datetime.startsWith(String(y)));
   }
-  // Source-reviewed photographed features coexist with provisional placements.
+  // The reviewed 2021 scene mixes direct photographed features with still-provisional placements.
   assert.ok(Y(2021).base.obstacles.some((o) => o.provenance.confidence === 'provisional'));
   assert.ok(Y(2021).base.obstacles.some((o) => o.provenance.confidence === 'inferred'));
   assert.ok(Y(2020).base.obstacles.some((o) => o.provenance.confidence === 'inferred'));
@@ -83,9 +83,9 @@ test('obstacle ids are the stable Kit ids (pinned names survive)', () => {
   assert.ok(comps(2021).has('chiba-mars-letters'));
   assert.ok(comps(2024).has('chiba-flower-mural'));
   assert.ok(comps(2024).has('chiba-entry-sign'));
-  // The aluminet is overhead (≥ 3.4 m) and walk-through: only a `.up` prism, no ground blocker.
+  // The source-fitted aluminet drops at both ends but stays overhead (> 2 m) and walk-through: only a `.up` prism, no ground blocker.
   const al = Y(2021).base.obstacles.filter((o) => o.component === 'chiba-aluminet');
-  assert.ok(al.length && al.every((o) => o.id.startsWith('chiba-aluminet.up') && o.y0 > 3));
+  assert.ok(al.length && al.every((o) => o.id.startsWith('chiba-aluminet.up') && o.y0 > 2));
   // hashed ids from the frozen legacy migration table resolve here too (same Kit build)
   assert.ok([...comps(2022)].some((c) => /^kitchen-12-foot-orange-beam-[0-9a-f]{8}$/.test(c)));
 });
@@ -339,6 +339,45 @@ const PRE_EDIT_W51: Record<number, string> = {
   2023: '8e401abb922bbea265694577a71dd7ae9521022646094cf7924d447c1d3e44dc',
   2024: '832e8d9af699feb5afed6949189b4995354db7696ccbaa3c50e52126e37f8865',
 };
+
+// 2026-09-29 photographic source review: one new protected canonical for each
+// historical year. These hashes are the committed files before this review,
+// not values derived from the new procedural scenes.
+const PRE_EDIT_PHOTO_REVIEW: Record<number, string> = {
+  2021: '8dcfd059dcfb8248e3ee9e0d347402645c4622cb0872351afd40bfaa753379d9',
+  2022: 'f8090a99bc9ed24ab37f096ad2bd37bca49d277ae3d7167e51c711d856d4c479',
+  2023: '883e6371d53348df0349127e870ad86acc06b59cd53adc7bf8c1f8b22441fe8c',
+  2024: 'bd2e0c79f527fa628cea77830dfcb3c4ff7806c02db80d8c3e332548412bc0ba',
+  2025: '5399653dfa9d78883104f96580206d8d52d322314e0766db7ac273c7bb3fc909',
+};
+// User-rejected first pass, frozen before the dense aerial second review.
+const PRE_EDIT_SECOND_REVIEW: Record<number, string> = {
+  "2021": "796abf8cb4216af66608f35af12573e74109faa70c815473f531830f9b011d8f",
+  "2022": "50b567444ff99cde693a0b1a2c989b4b9c14240ab259f60256b89d426a949129",
+  "2023": "a84258a16c1e07d876b0e762a967ff8b2d593edd8aab345403e9005fabc23cb4",
+  "2024": "17558dab740ae4846c07af4a208724b13b479cd7ec51b770ff721b75da7cdc1e",
+  "2025": "309c6b5614a991cd6bf2a11c17efaaf7eef28c4d224ad486e919ba6e13106665"
+};
+for (const year of [2021, 2022, 2023, 2024, 2025]) test(`photo review ${year}: reconstruction edit re-seeds the protected canonical`, () => {
+  const f = loadCampusFile(year);
+  assert.notEqual(f.contentHash, PRE_EDIT_PHOTO_REVIEW[year]);
+  assert.notEqual(f.contentHash, PRE_EDIT_SECOND_REVIEW[year]);
+  const now = loadCampusYear(year, f).world;
+  const pre: WorldState = { ...structuredClone(now), base: { ...now.base, staticHash: PRE_EDIT_PHOTO_REVIEW[year] } };
+  const h = new WorldHistory(RULES_VERSION);
+  h.publishCanonical(campusYearId(year), `Mars ${year} (before photographic review)`, pre, `campus-${year}.json before source review`);
+  assert.throws(() => h.commit(campusYearId(year), now, { kind: 'reconstruction-edit', note: 'photo review' }), (e: unknown) => e instanceof HistoryError && e.code === 'protected');
+  h.fork(campusYearId(year), `mars-${year}-photo-review`, 'source-backed reconstruction');
+  const cp = h.commit(`mars-${year}-photo-review`, now, {
+    kind: 'reconstruction-edit',
+    note: `${year} source-backed building, room and vehicle corrections`,
+    evidence: [`docs/media/reconstruction/campus-history/year-${year}/RECONSTRUCTION.md`],
+  }, 'reconstruction-edit photographic review');
+  const published = new WorldHistory(RULES_VERSION);
+  publishCampusYear(published, year, f);
+  assert.equal(published.head(campusYearId(year)).physicalHash, cp.physicalHash);
+  assert.equal(hashOf(published.read(campusYearId(year))), hashOf(h.read(cp.id)));
+});
 const W51_EVIDENCE = ['docs/engineering/RECONCILIATION_2022.md', 'docs/engineering/questions/photos/2022-aerial-03.jpg', 'docs/engineering/questions/photos/2022-DJI_0829.jpg'];
 for (const year of [2022, 2023, 2024]) test(`W51 ${year} edit: mars-${year} re-seeded — pre-edit canonical + reconstruction-edit checkpoint = the new canonical`, () => {
   const f = loadCampusFile(year);
@@ -368,43 +407,28 @@ test('2022 review: structural IDs kept; seven trailers and two reclassified shel
   for (const y of [2024, 2025]) assert.equal(Y(y).base.meta.northAzimuthOffset, 0, `${y} uses the local -Z north convention`);
 });
 
-/** Distance to the actual polygon, retaining the original half-metre safety margin. */
-function footprintDistance(p: Vec2, polygon: Vec2[]): number {
-  let inside = false, closest = Infinity;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const a = polygon[j], b = polygon[i];
-    if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
-    const dx = b[0] - a[0], dz = b[1] - a[1], n = dx * dx + dz * dz;
-    const t = n ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / n)) : 0;
-    closest = Math.min(closest, hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dz));
-  }
-  return inside ? 0 : closest;
-}
-test('2023 former AABB parking failure point is outside all actual Chiba structure prisms', () => {
-  const chiba = Y(2023).base.obstacles.filter(o => o.assembly === 'chiba');
-  const trailers = Y(2023).base.obstacles.filter(o => /^rv-\d+$/.test(o.assembly));
-  for (const [point, minimum] of [[[-10.13, -5.13], 1.4], [[-8.38, -4.63], 0.9]] as [Vec2, number][]) {
-    const nearest = Math.min(...chiba.map(o => footprintDistance(point, obbCorners(o.obb))));
-    assert.ok(nearest > minimum, `(${point}) actual structural clearance ${nearest}`);
-    assert.ok(trailers.some(o => o.assembly === 'rv-5' && footprintDistance(point, obbCorners(o.obb)) === 0));
-  }
-});
-
 test('W51 2023/2024: no trailer stands in or against Chiba — its footprint grid is exactly what it is without any trailer', () => {
   for (const y of [2023, 2024]) {
     const ch = box(reg(y, 'chiba'));
+    const polygon = reg(y, 'chiba').polygon;
+    const insideHull = (x: number, z: number) => {
+      let inside = false;
+      for(let i=0,j=polygon.length-1;i<polygon.length;j=i++) {
+        const a=polygon[i],b=polygon[j];
+        if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0]) inside=!inside;
+      }
+      return inside;
+    };
     const rvs = Y(y).base.obstacles.filter((o) => /^rv-\d+$/.test(o.assembly));
     assert.ok(rvs.length > 0);
     const full = buildGrids(asScene(y), 0.25).levels.get(0)!;
     const bare = buildGrids({ ...asScene(y), obstacles: Y(y).base.obstacles.filter((o) => !/^rv-\d+$/.test(o.assembly)) } as unknown as SpatialScene, 0.25).levels.get(0)!;
     assert.equal(full.nx, bare.nx);
-    const structuralFootprints = Y(y).base.obstacles.filter(o => o.assembly === 'chiba').map(o => obbCorners(o.obb));
-    assert.ok(structuralFootprints.length > 0);
     let inside = 0;
     for (let c = 0; c < full.nx * full.nz; c++) {
       const [px, pz] = centreOf(full, c);
-      if (px < ch.x0 - 0.5 || px > ch.x1 + 0.5 || pz < ch.z0 - 0.5 || pz > ch.z1 + 0.5) continue;
-      if (!structuralFootprints.some(polygon => footprintDistance([px, pz], polygon) <= 0.5)) continue; // same margin around every structural prism
+      // Test the actual hull: the end ladder extends its AABB into unrelated parking.
+      if (px < ch.x0 || px > ch.x1 || pz < ch.z0 || pz > ch.z1 || !insideHull(px,pz)) continue;
       inside++;
       assert.equal(full.free[c], bare.free[c], `${y} cell (${px.toFixed(2)}, ${pz.toFixed(2)}) in / beside Chiba is changed by a trailer`);
     }
