@@ -67,8 +67,7 @@ is required to deliver the first activity.
 
 ## Allocation and judgment
 
-Aim approximately at 70% next playable experience, 20% directly enabling foundations
-or serious failures, and 10% polish/maintenance/docs. These are judgment guidelines,
+Owner update 2026-09-30: aim approximately at 50% playable experiences, 30% high/medium-leverage engineering across experiences, and 20% polish/evidence/maintenance/docs. These are judgment guidelines,
 not fabricated accounting. Promote work that unlocks the experience, fixes a serious
 failure, reduces repeated cost, or produces substantial visible value cheaply.
 Before expanding: what user-visible capability does this unlock, and is this level
@@ -115,3 +114,17 @@ and verifying intended behavior. Batch compatible validation; do not remove chec
 Reports lead with what is playable/visible, scenario status, awkward or impossible
 behavior, the next blocker, deliberate deferrals, validation/release, and material
 scope/cost concerns. A good playable milestone outranks a perfect old checklist score.
+
+## Bounded Mars MVP and Eden handoff (2026-09-30)
+
+Deliver a reviewed, tested and website-accessible Mars MVP within five days,
+target October 5. Mars covers representative gathering/learning, individual/shared
+pursuits and communal routines with flexible execution, live intervention and
+retained intentions. The precise supported contract lives in ACTIVE_ROADMAP.md.
+Eden's diverse terrain, arbitrary assembly, broad autonomous souls and universal
+interaction systems are outside this tranche. Use reusable activity/object/execution
+mechanisms and clean extension points, without designing Eden in advance.
+After complete-suite critical review, acceptance, public website entry and recorded
+release/evidence/limitations/handoff, **stop Mars feature expansion**. Do not begin
+Eden automatically. Historical reconstructions remain separately owned; illustrative
+participants and staging must be labeled hypothetical.

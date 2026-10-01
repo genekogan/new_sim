@@ -1,4 +1,75 @@
-# Active roadmap
+# Mars MVP contract — five-day target
+
+Owner mandate 2026-09-30; target October 5. This section supersedes earlier
+open-ended milestones and allocation below. **50% playable experiences / 30%
+high-medium engineering / 20% polish, evidence and maintenance**; retain the
+50/30/20 product balance. The following is a proposed bounded acceptance contract,
+not a claim that unimplemented features work.
+
+## Required supported experiences and limits
+
+- Gathering: existing 4- and 8-person Mars classrooms, two physically usable
+  arrangements, presentations/questions/rotation/conversation/arrival/departure.
+- Pursuits: usable computer work, reading, paired ground walking, a two-player
+  chess game at a usable table, and bounded music performance/listening. Each
+  must have visible interaction, authoritative progression and interruption;
+  props and labels alone do not meet acceptance.
+- Day: simple meal preparation and sharing, breaks, rest/sleep, socializing and
+  return to the same unfinished purpose. At least one longer scenario connects
+  work or reading → gathering → walk/social digression → food/rest → original
+  unfinished purpose, with distinguishable concurrent commitments.
+- Reuse: existing small hypothetical non-Mars studio uses the same activity and
+  object mechanisms. Fixed supported furniture sets and bounded relational layout
+  choices; no arbitrary room planner, terrain or universal manipulation.
+
+## Required disruptions and guarantees
+
+Representative suite covers late arrival, occupied seat, unavailable equipment,
+blocked route, moved furniture, departure, player precedence, interruption/resumption.
+Require continuous major-volume motion, valid ownership/support, owned-resource
+cleanup, named refusal/waiting, retained completed effects and unfinished intentions,
+and deterministic replay under recorded decisions. Document exact persistence:
+world/take replay does not imply arbitrary active logical activities survive reload.
+Add active persistence only where implemented and tested; do not imply it works.
+Fine fingers/clothing/contact, advanced autonomy/needs/relationships, dogs/gardening,
+complex construction choreography, arbitrary stair carrying and universal planning
+are explicitly deferred. Historical current2022 whole-house remains unsupported
+until its exact staging dependency is resolved; a legacy fixture is not proof.
+
+## Small active queue and exit criteria
+
+1. **Immediate online checkpoint:** verify actual designated Mars bleacher/access
+   supports; narrow explicit traversal tags and real-geometry ascending/descending
+   proof. Repair missing production model/credit and strict reset failure. Review
+   saved ready candidates, expose shipped experiences/camera in selector/tour.
+   Clean combined full gate, inspected Play captures, local integration/deployment
+   and production re-verification. Exclude unverified paired-day drafts.
+2. **Continuity increment:** validate saved paired-walk core and optional paired
+   lunch/unfinished-work integration in Mars4/8 and studio, including departure,
+   pause/resume/player handoff and cleanup. Do not rebuild the saved drafts.
+3. **Next breadth/engineering batch:** bounded reading/chess/music and food/sleep
+   interactions plus one cross-experience resource/recovery/persistence improvement,
+   chosen after verifying existing implementations. Do not commission all at once.
+
+## Publication and finish
+
+Before every functional main integration run the existing full gate on the clean
+combined candidate; keep skipped/FIXME, failed, unsupported and deliberate diagnostic
+scenarios distinct. Inspect actual runtime Play captures, validate combinations,
+deploy and verify online. Final critical review checks every family/disruption,
+records source/release/evidence/limitations and an accessible Mars website entry.
+Then mark Mars MVP complete and stop expansion; record Eden handoff without starting it.
+
+Initial whole-MVP estimate **45–75 working hours**, medium-low confidence, assuming
+bounded chess/music/reading/sleep interactions and no new major physical prerequisite.
+Checkpoint repairs and new interaction breadth dominate uncertainty. If they expose
+larger prerequisites, surface an explicit recommended scope cut early; do not silently
+substitute prerecorded scenes. This estimate is not the next-release ETA.
+
+---
+
+## Preserved previous roadmap and completed milestone provenance
+
 
 Owner direction: [SIMULATION_VISION.md](SIMULATION_VISION.md), 2026-09-29.
 Current product milestone: **advance connected communal-day routines from the released work → classroom → conversation → food → quiet rest → unfinished-work interactions**. The released classroom already supports lightning talks, questions and smaller conversations. Preferences confirmed: semi-planned events with adaptable execution and live

@@ -65,3 +65,17 @@ existing work before commissioning rather than auditing the entire legacy invent
 Explicit access structures (including auditorium/bleacher steps intended to reach
 levels) should support WASD auto-step through narrow traversal metadata; do not
 generalize this to furniture or alter historical appearance/placement to hide defects.
+
+## Mars MVP boundary — owner mandate 2026-09-30
+
+Target a reviewed, tested, website-accessible Mars MVP in five days (October 5).
+Mars is a bounded, opinionated life simulation; Eden is a separate future project.
+After agreed MVP acceptance and website publication, stop Mars feature expansion;
+record the reusable mechanisms and deferred work for Eden, do not start Eden.
+Current allocation supersedes earlier percentages: 50% playable experiences,
+30% high/medium-leverage engineering, 20% polish/evidence/maintenance/documentation.
+Retain 50/30/20 among complete experiences/object breadth/social behavior within
+product work. The contract and supported scope are in ACTIVE_ROADMAP.md.
+First finish actual designated Mars WASD stepped access and the selected-computer
+asset/reset release blockers, then verified checkpoint and sustained MVP work.
+Saved drafts are not shipped features. Preserve all other agents' work.
