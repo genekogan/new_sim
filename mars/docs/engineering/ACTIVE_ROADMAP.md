@@ -43,7 +43,7 @@ until its exact staging dependency is resolved; a legacy fixture is not proof.
 
 1. **Immediate online checkpoint:** verify actual designated Mars bleacher/access
    supports; narrow explicit traversal tags and real-geometry ascending/descending
-   proof. Repair missing production model/credit and strict reset failure. Review
+   proof (focused actual-CAD and browser WASD checks now pass; full gate/publication pending). Repair missing production model/credit and strict reset failure. Review
    saved ready candidates, expose shipped experiences/camera in selector/tour.
    Clean combined full gate, inspected Play captures, local integration/deployment
    and production re-verification. Exclude unverified paired-day drafts.

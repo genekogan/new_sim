@@ -18,6 +18,7 @@ import type { Edit } from '../../lib/layout';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import './studio.css';
 import { attachWalking } from './walking';
+import { tagMarsSteppedAccess, type MarsSteppedAccessReport } from './mars-stepped-access';
 import { createEnvironment } from './environment';
 import { keepCameraAboveGround } from './camera-ground';
 import { createEucFollowCamera } from './euc-follow-camera';
@@ -328,6 +329,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       orbit.enabled = !e.value && !walker.active;
     });
     let root: THREE.Group | null = null;
+    let accessReport: MarsSteppedAccessReport = { tagged: [], refused: [] };
     const additions = new THREE.Group();
     additions.name = 'Proposed additions';
     scene.add(additions);
@@ -541,6 +543,8 @@ export default function Studio({ year = 2026 }: { year?: number }) {
         root = g.scene;
         if (year === 2026) {
           add2026Details(root);
+          accessReport = tagMarsSteppedAccess(root);
+          if (accessReport.refused.length) setError(accessReport.refused.map(r => `${r.id}: ${r.reason}`).join('; '));
           resources.object(root);
 
         }
@@ -1172,6 +1176,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
       frames: 0,
       get ready() { return testHook.frames >= 3; },
       info: () => ({ ...renderer.info.render, ...renderer.info.memory, pixelRatio: renderer.getPixelRatio() }),
+      walking: () => ({ active: walker.active, grounded: walker.grounded, position: camera.position.toArray(), access: structuredClone(accessReport) }),
       look: (position: number[], target: number[]) => {
         camera.position.fromArray(position);
         orbit.target.fromArray(target);
@@ -1735,6 +1740,7 @@ export default function Studio({ year = 2026 }: { year?: number }) {
                     ? 'Mouse look active · Esc returns to orbit'
                     : 'Drag to look, or lock the mouse'}
                 </span>
+                {year === 2026 && <span>Designated Chiba auditorium tiers support continuous auto-step. Furniture remains an obstacle.</span>}
                 {!mouseLocked && (
                   <button onClick={() => api.current?.lock()}>
                     Lock mouse

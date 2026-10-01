@@ -71,6 +71,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         </ol>
       </details>}
       <p className="lab-meta">The full Scenario selector also exposes movement, body measurement and construction checks. Current 2022 east-house build is unsupported because reconciled beam staging is incomplete; its refusal is not a working build. The supported legacy build fixture is separate validation evidence.</p>
+      <p className="lab-sub"><a href="/studio">Explore Mars · Walk WASD through designated Chiba auditorium tiers</a></p>
       <p className="lab-sub">
         <a href={`/cinematography/review.html?scenario=${cameraScenario}`} target="_blank" rel="noopener">Optional live camera review</a>
         {' · '}
