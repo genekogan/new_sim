@@ -1,0 +1,25 @@
+{
+  "commit": "7648dbfb1a9963df0c63e3c3e380b724389e9cb2",
+  "years": {
+    "2021": {
+      "source": "viewer/public/engine/campus-2021.json",
+      "sha256": "1cfdea013b66f6fb1e69d9b1f8b4da7b1f1ace1d491ddcf53f88d468db2c3f92",
+      "contentHash": "8dcfd059dcfb8248e3ee9e0d347402645c4622cb0872351afd40bfaa753379d9"
+    },
+    "2022": {
+      "source": "viewer/public/engine/campus-2022.json",
+      "sha256": "e21a398fede6e7c02e75374eb4a0003f49c743eba367c7cda2d2cda8f6d0e95e",
+      "contentHash": "f8090a99bc9ed24ab37f096ad2bd37bca49d277ae3d7167e51c711d856d4c479"
+    },
+    "2023": {
+      "source": "viewer/public/engine/campus-2023.json",
+      "sha256": "3d5cd26c4d38b5c701f8b35717a33027358a4307c1679eaabd948ceb8c0a3a8d",
+      "contentHash": "883e6371d53348df0349127e870ad86acc06b59cd53adc7bf8c1f8b22441fe8c"
+    },
+    "2024": {
+      "source": "viewer/public/engine/campus-2024.json",
+      "sha256": "c595c89162caa1d5e552e19ff1ca2670266172294c4e64b2adace09c0b2bb462",
+      "contentHash": "bd2e0c79f527fa628cea77830dfcb3c4ff7806c02db80d8c3e332548412bc0ba"
+    }
+  }
+}

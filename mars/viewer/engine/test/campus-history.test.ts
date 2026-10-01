@@ -18,7 +18,7 @@ import { classifyHistory, historyConfidence } from '../campus/history-extract.ts
 import { loadCampusFile } from '../campus/history-node.ts';
 import type { Region } from '../world/types.ts';
 import { RULES_VERSION } from '../construction/rules.ts';
-import { hypot } from '../core/math.ts';
+import { hypot, obbCorners } from '../core/math.ts';
 import type { Vec3 } from '../core/math.ts';
 import { DatabaseSync } from 'node:sqlite';
 import type { WorldState } from '../world/types.ts';
@@ -66,8 +66,9 @@ test('each year 2020–2025 loads as a ground-only scene with provenance on ever
     assert.equal(world.inventory, 'finite');
     assert.ok(world.env.datetime.startsWith(String(y)));
   }
-  // Kit sources say "provisional"; 2020 carries high → inferred.
-  assert.ok(Y(2021).base.obstacles.every((o) => o.provenance.confidence === 'provisional'));
+  // Source-reviewed photographed features coexist with provisional placements.
+  assert.ok(Y(2021).base.obstacles.some((o) => o.provenance.confidence === 'provisional'));
+  assert.ok(Y(2021).base.obstacles.some((o) => o.provenance.confidence === 'inferred'));
   assert.ok(Y(2020).base.obstacles.some((o) => o.provenance.confidence === 'inferred'));
   assert.equal(historyConfidence('Photographic fit; dimensions and hidden surfaces remain provisional'), 'provisional');
   assert.equal(historyConfidence('high'), 'inferred');
@@ -160,8 +161,28 @@ test('2021: a walker goes straight through the corridor between the two long bui
   console.log(`  2021 corridor: ${r.len.toFixed(1)} m, clearance ${r.clearance.toFixed(2)}, ${r.ms.toFixed(0)} ms`);
 });
 
+test('2021 low terrace shelves block ground walking while high decks remain overhead', () => {
+  const scene=Y(2021).base, g=buildGrids(asScene(2021),0.1).levels.get(0)!;
+  const decks=scene.obstacles.filter(o=>o.assembly==='chiba'&&o.component.includes('plywood-deck-sheet'));
+  const low=decks.filter(o=>o.y0>.25&&o.y0<g.y+HUMAN_PROFILE.height-.01);
+  assert.ok(low.some(o=>o.obb.c[0]<0)&&low.some(o=>o.obb.c[0]>0),'both wings have low shelves');
+  for(const deck of low)assert.equal(clearanceAt(g,deck.obb.c),0,`${deck.component}: low shelf blocks`);
+  assert.ok(decks.some(o=>o.y0>2&&o.id.includes('.up')),'tall platforms are overhead geometry');
+  // The former 40% ground-blocking target encoded a continuous low deck that the
+  // flythrough contradicts. Corridor routing above remains an independent test.
+});
+
+test('2023 upper west sheet cuts do not mutate shared ground deck geometry', () => {
+  const decks=Y(2023).base.obstacles.filter(o=>o.assembly==='chiba'&&o.component.includes('plywood-deck-sheet')&&o.y0<.3);
+  assert.equal(decks.length,21,'seven bays retain three ground sheets each');
+  for(const deck of decks){
+    assert.ok(Math.abs(deck.obb.c[1])<.01,`${deck.component}: ground deck remains centered`);
+    assert.ok(Math.abs(deck.obb.half[1]-3.6576)<.01,`${deck.component}: full 24-foot ground depth`);
+  }
+});
+
 test('building interiors are not walkable (ground-floor decks block)', () => {
-  for (const y of [2021, 2023, 2025]) {
+  for (const y of [2023, 2025]) {
     const g = buildGrids(asScene(y), 0.25).levels.get(0)!;
     const poly = reg(y, 'chiba').polygon;
     const inside = (p: Vec2) => {
@@ -176,7 +197,7 @@ test('building interiors are not walkable (ground-floor decks block)', () => {
       n++;
       if (!g.free[c]) blocked++;
     }
-    assert.ok(blocked / n > (y === 2021 ? 0.4 : 0.6), `${y}: only ${((100 * blocked) / n).toFixed(0)}% of Chiba blocks`);
+    assert.ok(blocked / n > 0.6, `${y}: only ${((100 * blocked) / n).toFixed(0)}% of Chiba blocks`);
   }
 });
 
@@ -334,16 +355,39 @@ for (const year of [2022, 2023, 2024]) test(`W51 ${year} edit: mars-${year} re-s
   assert.equal(hashOf(h2.read(campusYearId(year))), hashOf(h.read(cp.id)));
 });
 
-test('W51 2022: ids kept (racks, decks, walls, rooms; rv-1…9), stairs / solar re-made, rv-10…12 and the corner table gone; names on the regions; north −101 on the scene', () => {
+test('2022 review: structural IDs kept; seven trailers and two reclassified shelters, stairs / solar re-made, rv-10…12 and the corner table gone; names on the regions; north −101 on the scene', () => {
   const comps = new Set(Y(2022).base.obstacles.map((o) => o.component));
-  for (const k of ['chiba-rack-upright-', 'east-house-12-foot-orange-beam-', 'kitchen-plywood-deck-sheet-', 'west-house-plywood-wall-', 'rv-9-trailer-shell-']) assert.ok([...comps].some((c) => c.startsWith(k)), k);
+  for (const k of ['chiba-rack-upright-', 'east-house-12-foot-orange-beam-', 'kitchen-plywood-deck-sheet-', 'west-house-plywood-wall-', 'rv-8-trailer-shell-']) assert.ok([...comps].some((c) => c.startsWith(k)), k);
   assert.ok(comps.has('east-house-plywood-deck-sheet-141763ed'), 'a deck strip kept its id (group moved, placement in the house unchanged)');
-  for (const k of ['rv-10-', 'rv-11-', 'rv-12-', 'west-house-table-']) assert.ok(![...comps].some((c) => c.startsWith(k)), `${k} removed`);
+  for (const k of ['rv-7-', 'rv-9-', 'rv-10-', 'rv-11-', 'rv-12-', 'west-house-table-']) assert.ok(![...comps].some((c) => c.startsWith(k)), `${k} removed`);
   assert.ok([...comps].some((c) => c.startsWith('chiba-stair-landing-')) && [...comps].some((c) => c.startsWith('west-house-solar-frame-rafter-')));
   assert.deepEqual(['chiba', 'east-house', 'kitchen', 'west-house'].map((id) => reg(2022, id).label), ['Ba Sing Se', 'Cahuilla', 'Chatsubo', 'Huaqiangbei']);
   assert.ok(!Y(2022).base.obstacles.some((o) => /chiba/i.test(o.label ?? '')), 'no "Chiba" label in 2022');
   assert.equal(Y(2022).base.meta.northAzimuthOffset, -101);
-  for (const y of [2020, 2021, 2023, 2024, 2025]) assert.equal(Y(y).base.meta.northAzimuthOffset, undefined, `${y} uses the global bearing`);
+  for (const y of [2020, 2021, 2023]) assert.equal(Y(y).base.meta.northAzimuthOffset, undefined, `${y} uses the global bearing`);
+  for (const y of [2024, 2025]) assert.equal(Y(y).base.meta.northAzimuthOffset, 0, `${y} uses the local -Z north convention`);
+});
+
+/** Distance to the actual polygon, retaining the original half-metre safety margin. */
+function footprintDistance(p: Vec2, polygon: Vec2[]): number {
+  let inside = false, closest = Infinity;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[j], b = polygon[i];
+    if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+    const dx = b[0] - a[0], dz = b[1] - a[1], n = dx * dx + dz * dz;
+    const t = n ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / n)) : 0;
+    closest = Math.min(closest, hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dz));
+  }
+  return inside ? 0 : closest;
+}
+test('2023 former AABB parking failure point is outside all actual Chiba structure prisms', () => {
+  const chiba = Y(2023).base.obstacles.filter(o => o.assembly === 'chiba');
+  const trailers = Y(2023).base.obstacles.filter(o => /^rv-\d+$/.test(o.assembly));
+  for (const [point, minimum] of [[[-10.13, -5.13], 1.4], [[-8.38, -4.63], 0.9]] as [Vec2, number][]) {
+    const nearest = Math.min(...chiba.map(o => footprintDistance(point, obbCorners(o.obb))));
+    assert.ok(nearest > minimum, `(${point}) actual structural clearance ${nearest}`);
+    assert.ok(trailers.some(o => o.assembly === 'rv-5' && footprintDistance(point, obbCorners(o.obb)) === 0));
+  }
 });
 
 test('W51 2023/2024: no trailer stands in or against Chiba — its footprint grid is exactly what it is without any trailer', () => {
@@ -354,10 +398,13 @@ test('W51 2023/2024: no trailer stands in or against Chiba — its footprint gri
     const full = buildGrids(asScene(y), 0.25).levels.get(0)!;
     const bare = buildGrids({ ...asScene(y), obstacles: Y(y).base.obstacles.filter((o) => !/^rv-\d+$/.test(o.assembly)) } as unknown as SpatialScene, 0.25).levels.get(0)!;
     assert.equal(full.nx, bare.nx);
+    const structuralFootprints = Y(y).base.obstacles.filter(o => o.assembly === 'chiba').map(o => obbCorners(o.obb));
+    assert.ok(structuralFootprints.length > 0);
     let inside = 0;
     for (let c = 0; c < full.nx * full.nz; c++) {
       const [px, pz] = centreOf(full, c);
       if (px < ch.x0 - 0.5 || px > ch.x1 + 0.5 || pz < ch.z0 - 0.5 || pz > ch.z1 + 0.5) continue;
+      if (!structuralFootprints.some(polygon => footprintDistance([px, pz], polygon) <= 0.5)) continue; // same margin around every structural prism
       inside++;
       assert.equal(full.free[c], bare.free[c], `${y} cell (${px.toFixed(2)}, ${pz.toFixed(2)}) in / beside Chiba is changed by a trailer`);
     }
