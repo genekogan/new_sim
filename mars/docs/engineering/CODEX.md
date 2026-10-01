@@ -34,6 +34,17 @@ Notes:
 - Work only inside `$WT`. Never edit files in `$MAIN`, and never check out or touch another `codex/*` or
   `w*` branch.
 
+For a combined release candidate, **freeze the two ignored browser model files by
+copying them from the reviewed checkpoint instead of linking a mutable main export**.
+Verify and record their SHA256 before validation and publication. Check that both
+files exist before starting the gate: unit checks load the actual compressed CAD,
+so a synthetic fixture or missing cache is insufficient. The chess candidate's first
+gate stopped with four missing-cache unit failures; restoring the exact reviewed31
+files made all243unit checks pass, without any source/assertion changes. Keep that
+failure record. Dependencies/browser binaries may remain linked. Current ownership,
+integration responsibility and serialized GPU/worker allocation are governed by
+AGENTS.md and ACTIVE_ROADMAP.md; the older contributor split below is historical.
+
 ### Your own ports and output directories (mandatory)
 
 Claude workers run Vite and Playwright concurrently on this machine. The defaults are theirs, so use these values:
