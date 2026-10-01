@@ -13,11 +13,11 @@ with photogrammetry retained at `/photo`, and editor/Lab at `/studio` and `/lab`
 Only a collapsible year, aerial/WASD, reviewed room, Time (off initially), time-of-day
 and EUC panel is exposed. Automatic night campfire retains existing behavior.
 Combine reviewed historical source with live32 mechanics, then actual captures,
-clean full gate and production verification. No unverified meal/sleep drafts included.
+clean full gate and production verification: complete in release33, functional7a2c826. Public12checks plus2full automatic builds pass; meal/sleep drafts excluded.
 Return immediately to the queue below after publication. This is presentation work,
 not a new activity/camera/animation subsystem or a change to the Mars/Eden boundary.
 
-## Current active queue (release32 verified)
+## Current active queue (release33 verified)
 
 Online: physical two-player tabletop chess with legal choices, stable same-token
 captures, interruption/restoration and player handoff; retained reading/bookmarks,
@@ -40,8 +40,7 @@ Downhill feet retain anatomical left/right. Current rigs remain the MVP boundary
 WholeMVP remaining **40–70 working hours**, medium-low confidence: real preparation,
 sleep and their combined continuity/disruption proof remain uncertain. October5
 requires bounded interactions; escalate if repeated anatomy or broader locomotion
-redesign becomes necessary. Two source-only helpers; historical owner currently
-uses serialized full-validation capacity. Camera is independent and unchanged.
+redesign becomes necessary. Source helpers are idle; historical validation and release33 presentation are complete. Camera is independent and unchanged.
 Older dated entries below preserve provenance; this queue owns current priority.
 
 ## Required supported experiences and limits
