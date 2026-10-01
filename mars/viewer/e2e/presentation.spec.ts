@@ -121,6 +121,23 @@ test.describe('running presentation life', () => {
       ).atmosphereState(),
     );
     expect(state).toEqual({ hour: 22, cycle: false, fire: 'auto' });
+    // Rider follow leaves walking false: Aerial must explicitly hand back the view.
+    await expect(
+      page.getByRole('button', { name: 'WASD', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'false');
+    await expect
+      .poll(() => page.locator('canvas').getAttribute('data-rider-position'))
+      .toMatch(/^-?\d/);
+    await page.getByRole('button', { name: 'Aerial', exact: true }).click();
+    await expect
+      .poll(() => page.locator('canvas').getAttribute('data-camera-mode'))
+      .toBe('free');
+    await expect
+      .poll(() => page.locator('canvas').getAttribute('data-rider-position'))
+      .toBe('');
+    await expect(
+      page.getByRole('button', { name: 'Aerial', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     expect(errors).toEqual([]);
   });
 });

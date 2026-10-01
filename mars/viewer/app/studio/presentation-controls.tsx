@@ -8,6 +8,7 @@ type PresentationControlsProps = {
   hour: number;
   rooms: { id: string; label: string }[];
   onYear: (year: number) => void;
+  onAerial: () => void;
   onWalk: () => void;
   onRoom: (id: string) => void;
   onCycle: (cycle: boolean) => void;
@@ -27,6 +28,7 @@ export function PresentationControls({
   hour,
   rooms,
   onYear,
+  onAerial,
   onWalk,
   onRoom,
   onCycle,
@@ -72,9 +74,7 @@ export function PresentationControls({
           <button
             type="button"
             aria-pressed={!walking}
-            onClick={() => {
-              if (walking) onWalk();
-            }}
+            onClick={onAerial}
           >
             Aerial
           </button>

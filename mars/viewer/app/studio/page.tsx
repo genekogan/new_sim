@@ -1337,6 +1337,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
             year={year} walking={walking} cycle={cycle} hour={hour}
             rooms={Object.entries(rooms).map(([id, pose]) => ({ id, label: pose.label }))}
             onYear={(next) => { location.href = next === 2026 ? '/' : `/?year=${next}`; }}
+            onAerial={() => api.current?.view('campus')}
             onWalk={() => walking ? api.current?.orbit() : api.current?.walk()}
             onRoom={(id) => {
               const pose = rooms[id];
