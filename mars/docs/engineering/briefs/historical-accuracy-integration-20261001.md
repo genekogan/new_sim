@@ -1,6 +1,6 @@
 # Historical accuracy integration — October1,2026
 
-Status: source checkpoint; browser/full gate/publication pending. Preserve already deployed2026 checkpoint31 separately. Paired specialists worked with separate year leaves and original owner fixtures; root controls shared rendering, catalogs and deployment. No raw media modified, no paid model calls.
+Status: supported seven-year reconciliation integrated into main and verified publicly in release33. Preserve original verified2026 checkpoint31 and all intermediate proofs separately. Paired specialists worked with separate year leaves and original owner fixtures; root controls shared rendering, catalogs and deployment. No raw media modified, no paid model calls.
 
 ## Supported corrections
 
@@ -35,3 +35,13 @@ Optional actual assembly-parent provenance now survives extraction and loading. 
 Focused actualfirstbay+whole skeleton now2/2PASS72.39s with existingstrict identity/support/stancecleanup ands0021 completion assertions; hierarchy/neighbor/canonicalimmutability/legacy/transitivity2/2PASS. TSc/lintPASS. Fullcombined engine rerun still required before source commit; no physics pin changed.
 
 Combined engine rerun after hierarchy repair:943PASS/0FAIL/6documentedskip/11existingTODO,156.20s. Combined units278PASS/0FAIL; TSc and lint pass. No new physics golden pins; originalRED remains preserved. Browser adaptive/settledsolarium1PASS;16historical default/plan/framed cases PASS and actual22PNG contact sheet inspected. Six canonical content hashes match deterministic re-extraction. Full clean gate and publication remain pending.
+
+## Verified publication — release33
+
+Exact functional source7a2c82691dd6e90c6cf26bb49ce80d954b6e0973, live version01437b0b-09de-48bc-99bb-ace4c03642bb at https://mars-campus-2026.<workers-subdomain>.workers.dev/studio. All88 accepted historical files match the root checkpoint; shared Studio presentation retains adaptive-before-draw fix. All seven years reviewed against preserved source, integrated and deployed with fitted-dimension/evidence limits above.
+
+Clean combined gate2026-10-01T17-33-53-236Z:281unitPASS,943enginePASS/0fail/6skip/11existingTODO,164browserPASS/7skip,lint/bothTSc/replay/all36localMCP PASS; original independent b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 unchanged. Original idleperformance budgets and all six historical grids<1000ms pass. Original1counter-facing browser failure is retained; strict12–14s actual5sample interval repair passed, actualPNG inspected, no visibility threshold lowered. Complete serialized suite watchdog40min addresses observed1919020ms former32min capacity; individual assertions/deadlines unchanged.
+
+Public proof:21routes/521postbuild manifest assets/677bounded curl requests,range GLB header,anonymous401/method405,selectedcomputer139184bytes exactSHA/credit/license PASS. Existing camera-suite prebuild explains initial520→521 count. Public all36MCP/auth/isolation and original9-stepdirector PASS. Public12browsercases PASS:20historical room views/fullscreen/mobile/photo/EUC/night, Reach continuity,current2022first+whole Playthroughs0021 then tickbatchcompletion. Additional full-runtime automaticPlay proof is independently owned and remains separate; legacy7browser skips are not completion claims.
+
+Preservation-safe main integrationbcb→7a:all56pending paths backed up with SHA/mode/mtime/status and binary patches; only8colliding reviewed paths replaced, six earlier draft variants remain recoverable; other48bytes/status/mode/mtime unchanged and staged0. Raw media untouched;14nativehistoricalWebP assets total230712bytes. Eight existing largeR2keys reused, no R2writes/new destination/account/costs. Root archive receipts, accepted/rejected renders and remaining uncertainty: <mars-media>/reconstruction/campus-history/integration-release-20261001/. Photograph fitting is not a surveyed every-square-foot guarantee.
