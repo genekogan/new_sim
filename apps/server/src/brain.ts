@@ -315,9 +315,11 @@ export class Brain {
     const k = this.host.kernel, verbs = this.engineVerbs(), tick = this.host.engine.world.tick;
     const newLinks: Record<string, LinkKind> = {}; for (const [n, d] of Object.entries(links ?? {})) if (!k.vocab.links[n] && /^[a-z][a-z ]{1,39}$/.test(n) && n !== 'said' && n !== 'agreed') newLinks[n] = { summary: String(d.summary).slice(0, 120), ...(d.control ? { control: true } : {}) };
     const newKinds: Record<string, { summary: string }> = {}; for (const [n, d] of Object.entries(kinds ?? {})) if (!k.vocab.kinds[n] && /^[a-z][a-z ]{1,39}$/.test(n)) newKinds[n] = { summary: String(d.summary).slice(0, 120) };
+    // cards are checked against the vocabulary as it will be once the link kinds proposed alongside them exist
+    const staged = { ...k, vocab: { ...k.vocab, links: { ...k.vocab.links, ...newLinks } } };
     const verdicts: MintVerdict[] = []; let first = true;
     for (const raw of cards.slice(0, 4)) {
-      const v = validateCard(raw, k, verbs); const name = String((raw as { name?: unknown })?.name ?? '?');
+      const v = validateCard(raw, staged, verbs); const name = String((raw as { name?: unknown })?.name ?? '?');
       if (!v.ok) { verdicts.push({ name, ok: false, problems: v.problems }); continue; }
       const card: Card = v.card; const hash = cardHash(card);
       if (k.vocab.cards[card.name]) { // the same card already exists: just deal it
@@ -359,6 +361,16 @@ export class Brain {
         const owners = Object.values(k.things).filter((x) => x.kind === 'soul' && x.id !== m.soulId && new RegExp(`\\b${x.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(’s|'s)`, 'i').test(wish));
         const validNew = new Map<string, Card>();
         for (const raw of out.new_cards ?? []) { const v = validateCard(raw, staged, verbSet); if (v.ok) validNew.set(v.card.name, v.card); else problems.push(`card "${String((raw as { name?: unknown })?.name)}": ${v.problems.join('; ')}`); }
+        // Repair what can be repaired without asking again. Models keep inventing an id for a thing that does not exist yet
+        // ("Rob's party" before it starts), or bind it to someone else's: both mean "whatever is his", which is what `of` says.
+        const mine = (t: { id: string; kind: string }) => t.kind !== 'soul' && t.kind !== 'place' && t.kind !== 'region' && Object.values(k.links).some((l) => l.to === t.id && k.things[l.from]?.kind === 'soul');
+        const repairs: string[] = [];
+        for (const a of Array.isArray(out.agenda) ? out.agenda : []) {
+          const t = a.target ? k.things[a.target] : undefined;
+          if (a.target && !t) { repairs.push(`${a.card}: unknown id ${a.target} → ${owners[0] ? `whatever is ${owners[0].name}’s` : 'any'}`); a.target = null; if (!a.of && owners[0]) a.of = owners[0].id; }
+          else if (t && owners.length && mine(t) && !owners.some((o) => belongsTo(this.host, t.id, o.id))) { repairs.push(`${a.card}: ${t.name} is not ${owners[0].name}’s → whatever is ${owners[0].name}’s`); a.target = null; a.of = owners[0].id; }
+        }
+        if (repairs.length) attempts.push({ repaired: repairs });
         if (!Array.isArray(out.agenda) || out.agenda.length === 0) problems.push('the agenda is empty');
         for (const a of out.agenda ?? []) {
           const card = validNew.get(a.card) ?? k.vocab.cards[a.card];

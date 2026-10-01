@@ -5,6 +5,7 @@ import { applyAll, bind, cardHash, changesOf, emptyKernel, enablers, gap, kernel
 const VERBS = new Set(['walk_to', 'sit', 'stand', 'rest', 'converse', 'gather', 'wave', 'perform', 'ambient_wander']);
 function world(): KState {
   const s = emptyKernel(); seedVocabulary(s);
+  s.vocab.links['dj of'] = { summary: 'plays the music at', control: true };
   const mk = (id: string, kind: string, name: string, at: string | null) => assert.equal(applyAll(s, [{ op: 'appear', id, kind, name, at }], 'world').ok, true);
   mk('center', 'region', 'the center', null); mk('campfire', 'place', 'the campfire', 'center'); mk('bench', 'place', 'the bench', 'center');
   for (const n of ['rob', 'wren', 'oda']) { mk(n, 'soul', n[0].toUpperCase() + n.slice(1), 'bench'); s.decks[n] = { cards: [...BASE_DECK], manners: ['warmly'] }; }
@@ -55,7 +56,6 @@ test('validation rejects cards that break the grammar or use verbs the engine la
 test('the DJ story: host, join, ask, agree, become the DJ, others dance: all from independent plays', () => {
   const s = world();
   for (const c of [ASK_DJ, BE_DJ]) { const v = validateCard(c, s, VERBS); assert.equal(v.ok, true); s.vocab.cards[c.name] = { ...c, hash: cardHash(c), by: 'wren', mintedAt: s.tick, origin: 'compiled' }; s.decks.wren.cards.push(c.name); }
-  s.vocab.links['dj of'] = { summary: 'plays the music at', control: true };
   play(s, 'rob', 'host a gathering', 'campfire');
   const party = Object.values(s.things).find((t) => t.kind === 'gathering')!;
   assert.equal(party.name, 'Rob’s gathering'); assert.equal(party.at, 'campfire');
@@ -136,6 +136,12 @@ test('the world is not anyone’s to change; speech and agreement cannot be forg
   assert.equal(applyAll(s, [{ op: 'link', kind: 'said', from: 'rob', to: 'wren' }], 'rob').ok, false);
   const bless = { ...ASK_DJ, name: 'bless', then: [{ link: ['agreed', '$actor', '$target'] }] };
   const forged = { ...ASK_DJ, name: 'forge', then: [{ appear: { kind: 'note', name: 'n', at: '$target' }, linkFromActor: 'said' }] };
+  // a card that changes its target must say where the right comes from, and every link kind must be declared
+  const grab = validateCard({ ...ASK_DJ, name: 'start the music', then: [{ set: ['$target', 'music', 'playing'] }] }, s, VERBS);
+  assert.equal(grab.ok, false); if (!grab.ok) assert.ok(grab.problems.some((p) => p.includes('nothing gives the actor the right')));
+  const undeclared = validateCard({ ...ASK_DJ, name: 'befriend', then: [{ link: ['best friend of', '$actor', '$target'] }] }, s, VERBS);
+  assert.equal(undeclared.ok, false); if (!undeclared.ok) assert.ok(undeclared.problems.some((p) => p.includes('is not declared')));
+  assert.equal(validateCard(BE_DJ, s, VERBS).ok, true);
   for (const c of [bless, forged]) { const v = validateCard(c, s, VERBS); assert.equal(v.ok, false); if (!v.ok) assert.ok(v.problems.some((p) => p.includes('comes only from saying it')), v.problems.join('; ')); }
   assert.equal(applyAll(s, [{ op: 'say', from: 'rob', to: 'wren', act: 'agree' }], 'rob').ok, true);
   assert.ok(linked(s, 'agreed', 'rob', 'wren'));

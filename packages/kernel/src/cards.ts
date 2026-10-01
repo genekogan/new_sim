@@ -153,6 +153,22 @@ export function validateCard(input: unknown, s: KState, engineVerbs: Set<string>
     if ('appear' in st) for (const x of [st.appear.at, ...(st.appear.with ? [st.appear.with] : [])]) if (!okRef(x)) problems.push(`a step refers to an unknown slot ${x}`);
     for (const x of refsOf(Object.values(st)[0])) if (!okRef(x)) problems.push(`a step refers to an unknown slot ${x}`);
   }
+  // Every link kind a card uses must be declared, so that everyone knows what it means and whether it gives control.
+  const kinds = new Set<string>();
+  for (const c of card.when) { if ('linked' in c) kinds.add(c.linked[0]); if ('notLinked' in c) kinds.add(c.notLinked[0]); if ('noneLinkedTo' in c) kinds.add(c.noneLinkedTo[0]); }
+  for (const st of card.then) { if ('link' in st) kinds.add(st.link[0]); if ('unlink' in st) kinds.add(st.unlink[0]); if ('appear' in st && st.linkFromActor) kinds.add(st.linkFromActor); }
+  for (const d of Object.values(card.derive ?? {})) kinds.add(d.link);
+  for (const kind of kinds) if (!s.vocab.links[kind]) problems.push(`link kind "${kind}" is not declared: declare it (a one-line meaning, and control: true if holding it should give power over its target)`);
+  // A card that changes or removes its target must say where the right to do so comes from: a control link the actor
+  // already holds (in "when"), or one the card takes first (a "link" step, which the world allows only on the actor's
+  // own things or when someone who controls the target agreed). Otherwise it would be refused every time it is played.
+  const control = (kind: string) => s.vocab.links[kind]?.control === true;
+  let holds = card.when.some((c) => 'linked' in c && control(c.linked[0]) && c.linked[1] === '$actor' && c.linked[2] === '$target');
+  for (const st of card.then) {
+    if ('link' in st && control(st.link[0]) && st.link[1] === '$actor' && st.link[2] === '$target') holds = true;
+    const touches = ('set' in st && st.set[0] === '$target') || ('vanish' in st && st.vanish === '$target');
+    if (touches && !holds) { problems.push('the card changes its target, but nothing gives the actor the right to: require a control link in "when" (for example ["linked", "hosts", "$actor", "$target"] or ["linked", "made", "$actor", "$target"]), or take one in an earlier "link" step (possible when someone who controls the target has agreed)'); break; }
+  }
   for (const d of [...card.approach, ...card.during]) if (!engineVerbs.has(d.verb)) problems.push(`the engine has no verb "${d.verb}" (list what you wanted under "wants" and use an existing verb)`);
   if (s.vocab.cards[card.name] && cardHash(card) !== s.vocab.cards[card.name].hash) problems.push(`a different card named "${card.name}" already exists; choose another name`);
   return problems.length ? { ok: false, problems: [...new Set(problems)] } : { ok: true, card };
