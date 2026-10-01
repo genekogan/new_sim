@@ -23,7 +23,7 @@ test('2027 presentation draft is selectable and2026 remains default', async ({pa
   const errors=collectConsoleErrors(page);
   await page.goto('/?year=2027'); await waitReady(page);
   await expectCanvasNotBlank(page);
-  await page.getByRole('button',{name:/Controls/}).click();
+  await expect(page.getByRole('button',{name:/Controls/})).toHaveAttribute('aria-expanded','true');
   await expect(page.getByLabel('Year',{exact:true})).toHaveValue('2027');
   await page.getByLabel('Year',{exact:true}).selectOption('2026');
   await expect(page).toHaveURL(/\/$/); await waitReady(page);
