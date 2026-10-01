@@ -12,7 +12,7 @@ a second admin, so every secret there is readable by both.
 | Data | `/srv/sim-data/sim.db` (SQLite, WAL) + hourly `backup-YYYYMMDDHH.db` (6 hourly + 7 daily) |
 | Replication | `litestream.service` → R2 `s3://<bucket>/sim/litestream/sim.db`, 10 s sync, 7-day retention; config `/etc/litestream.yml`, credentials `/etc/litestream.env` (root 0600) |
 | Watchdog | `sim-watch.timer`, every minute: restarts `sim` if the tick has not advanced on two consecutive checks (unless paused); logs if Caddy is down |
-| Env file | `/home/sim/sim.env` (0600). Must set `PORT=4500`, `HOST=127.0.0.1`, `DATA_DIR=/srv/sim-data` (the only writable path for the unit) and `PUBLIC_URL`; plus `ADMIN_EMAILS`, `BRAIN_MODE`, `BRAIN_BUDGET_USD_PER_DAY`, the Privy app id/secret, TypeSafe and Anthropic keys. It also holds `R2_*` variables that no server code reads yet (reserved for the asset store). Staging: `/home/sim/sim-staging.env` |
+| Env file | `/home/sim/sim.env` (0600). Must set `PORT=4500`, `HOST=127.0.0.1`, `DATA_DIR=/srv/sim-data` (the only writable path for the unit) and `PUBLIC_URL`; plus `ADMIN_EMAILS`, `BRAIN_MODE`, `BRAIN_BUDGET_USD_PER_DAY`, optionally `COMPILER_MODEL` and `TALK_MODEL`, the Privy app id/secret, TypeSafe and Anthropic keys. It also holds `R2_*` variables that no server code reads yet (reserved for the asset store). Staging: `/home/sim/sim-staging.env` |
 | Caddy | `/etc/caddy/sites/sim.caddy`, pulled in by one `import sites/*.caddy` line at the end of `/etc/caddy/Caddyfile` |
 | DNS | `sim.eden.art` A record in Route53 (Gene edits DNS) |
 

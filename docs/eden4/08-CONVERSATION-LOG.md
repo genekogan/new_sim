@@ -337,4 +337,22 @@ Compact record; Gene's decisions are in `06`, details in `14`–`17`.
   expressive than the engine) and asked whether Souls could change the world's
   software. Claude proposed `18`: structure the effects and leave content open;
   a small kernel; minted cards and per-Soul decks; self-change by level.
-
+- **Round 17.** Gene pushed back on the kernel: "promise, card, gathering, bond?
+  these feel not *fundamental* as time, position, identity, motion, immutable
+  attributes, intents." Consent, he said, means the state "has to be somehow
+  emergent from their combined conceptions… coherent global state as a result of
+  otherwise discorded actions." Each Soul has its own cards; owners' agents
+  proposing cards "would be fun and powerful"; dialogue is the hardest part; the
+  self-change boundary is fine; the DJ scenario is the acceptance test; no money
+  yet. Claude rebuilt the kernel as a grammar (things, links, time, five changes)
+  with open vocabulary, and one coherence rule.
+- **Round 18.** Gene: the kernel is "good enough to develop and try… i want to
+  make upgrades"; words on demand "while i can"; and he asked how this compiles
+  down to the Mars world's existing activities, which are to become special cases
+  of the ontology: "tomorrow we will import the engine." He then asked for
+  self-audit and bug-hunting, and for study of the Mars engine "as you work on
+  making the multiplayer game shell control this engine." Claude built the kernel,
+  cards, decks, minting, speech, a reflex tier and the grammar and notebook pages;
+  had the work reviewed independently and fixed what it found; ran live models and
+  fixed what that showed; wrote a Mars adapter and ran the whole shell on the real
+  Mars engine (the DJ story passes there from two plain wishes); and wrote `19`.

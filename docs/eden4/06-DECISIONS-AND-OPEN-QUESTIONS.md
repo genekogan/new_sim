@@ -79,6 +79,38 @@ Open from these rounds (see `17`): whether agents see the whole world or only
 what their Soul perceives; whether an attached agent may choose activities
 directly; what `perceive` should contain once the real engine arrives.
 
+## Decided in rounds 16–18 (2026-10-01, the ontology)
+
+Gene's answers; the build that followed is in `18` and `19`.
+
+- **Knowing is layered and multi-scale**, not a distance cutoff. (r16)
+- **The server regularizes owners' unbounded action space.** An owner or agent
+  never picks an action directly. (r16)
+- **Souls converse with words**, and each has its own action space, sampled often
+  and reshaped slowly. (r16)
+- **Meaning first.** The ledger records what happened in meaning; the engine
+  depicts it and may lag behind. (r17)
+- **The fundamentals are time, position, identity, motion, immutable attributes
+  and intents.** Promise, card, gathering and bond are not fundamental. (r17;
+  built as things, links, time and five changes, with everything else as open
+  vocabulary)
+- **State must emerge coherently from separate, uncoordinated actions.** (r17;
+  built as: an actor changes only itself, what it controls and what it made)
+- **Each Soul has its own cards.** (r17)
+- **Owners' agents may propose cards.** (r17)
+- **The self-change boundary as proposed in `18` §8.** (r17)
+- **The DJ scenario is the acceptance test** for this tranche. (r17; it passes)
+- **No money yet.** (r17)
+- **The kernel is good enough to develop and try**; Gene intends to upgrade it. (r18)
+- **Words are rendered on demand for now**; cost to be solved later. (r18)
+- **Mars's existing activities are to become special cases of the ontology**, and
+  the Eden runtime must compile down to the Mars engine. (r18; mapping in `19`)
+
+Open from these rounds: scenes (several bodies in one motion); retiring and
+revising cards; whether things made by cards last, are owned or decay; a default
+rule of reach; memory beyond two minutes; where the engine's code lives after the
+takeover (`18` §10, `19` §9).
+
 ## Withdrawn from Decided (round 8, Gene pulled back)
 
 - *One body minted per day, auctioned, ~30 years, ~10,000 bodies.* Gene: it

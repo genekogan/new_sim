@@ -1,9 +1,10 @@
 # eden4 — Eden as one persistent, simulated world
 
-> Status (2026-09-30): **a vision with a running shell.** Rounds 1–8 (09-27 → 09-29)
-> were brainstorm; rounds 9–15 designed and built **Sim**, the app shell
-> (`<old-sim-repo>`, github.com/genekogan/sim, live at https://sim.eden.art), around a
-> toy engine. The world itself (building, economy, ritual, rooms, graphics) is
+> Status (2026-10-01): **a vision with a running shell and a first ontology.**
+> Rounds 1–8 (09-27 → 09-29) were brainstorm; rounds 9–15 designed and built
+> **Sim**, the app shell (`<old-sim-repo>`, github.com/genekogan/sim, live at
+> https://sim.eden.art), around a toy engine; rounds 16–18 added the meaning layer
+> (a small kernel, cards, speech) and ran the shell on the real Mars engine. The world itself (building, economy, ritual, rooms, graphics) is
 > not built. Nothing here is decided unless it appears as **Decided** in
 > [`06-DECISIONS-AND-OPEN-QUESTIONS.md`](06-DECISIONS-AND-OPEN-QUESTIONS.md).
 > Inhabitants are now called **Souls**; notes written before 09-30 say "bodies".
@@ -73,7 +74,8 @@ Currency: **vision** = still the design intent, open questions included · **led
 | [`15-SCAFFOLD-SPEC.md`](15-SCAFFOLD-SPEC.md) | Rounds 11–13 (*spec*): the scaffold plan, then what was built (§15–§16) |
 | [`16-HARDENING-SPRINT.md`](16-HARDENING-SPRINT.md) | Round 14 (*spec*): measurements, defects, the sprint; done/not-done at its top |
 | [`17-AGENT-INTERFACE.md`](17-AGENT-INTERFACE.md) | Round 15: the arrive → own → steer → attach-an-agent flow, who knows what, open questions, and Gene's answers (round 16) |
-| [`18-KERNEL-CARDS-AND-SELF-CHANGE.md`](18-KERNEL-CARDS-AND-SELF-CHANGE.md) | Round 16 (*proposal*): structure the effects and leave content open; a nine-kind kernel; cards and decks as a minted action space; speech acts; layered knowing; how the world can safely change itself; a tranche that designs in the UI |
+| [`18-KERNEL-CARDS-AND-SELF-CHANGE.md`](18-KERNEL-CARDS-AND-SELF-CHANGE.md) | Rounds 16–18 (*kernel, cards and speech are built; knowing and self-change are proposals*): a kernel that is a grammar (things, links, time, five changes) with open vocabulary; one coherence rule; cards, decks, plans and minting; speech acts; what running it taught; how the world can safely change itself |
+| [`19-MARS-BRIDGE.md`](19-MARS-BRIDGE.md) | Round 18 (*proven on the proving ground, planned for the campus*): the shell running on the real Mars engine; body language as the layer between cards and engine verbs; how Mars's activities become vocabulary; scenes (proposed); what the takeover must change in the engine; first days |
 | [`report/eden4.html`](report/eden4.html) | The articulation after round 8 as one HTML report (*historical*: predates Sim) |
 
 ## Handoff note for the next agent
@@ -92,5 +94,8 @@ Currency: **vision** = still the design intent, open questions included · **led
 - The shell is built; the world is not. How Sim works, its current state and
   what remains are documented in the Sim repo (`docs/sim/`, `docs/STATUS.md`).
 - The world ontology and anything about topics, regions and subscriptions are
-  Gene's to design. Present shapes and trade-offs; do not settle them.
-- Engine, camera and animation are the Mars project's scope until the takeover.
+  Gene's to design. Present shapes and trade-offs; do not settle them. The kernel
+  in `18` is the ontology he judged "good enough to develop and try"; he intends
+  to upgrade it.
+- Engine, camera and animation are the Mars project's scope until the takeover,
+  which Gene expects to begin on 2026-10-02. `19` is the plan for it.

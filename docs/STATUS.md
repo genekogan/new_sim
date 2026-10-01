@@ -1,6 +1,6 @@
 # Status
 
-As of **2026-09-30** (the live build id is at `/healthz`). Update this file when the state changes;
+As of **2026-10-01** (the live build id is at `/healthz`). Update this file when the state changes;
 it is the single place that says what is true now.
 
 ## Live
@@ -10,57 +10,84 @@ it is the single place that says what is true now.
 | Production | https://sim.eden.art (eden2 Hetzner box), also https://<eden2-sslip-host> |
 | Staging | https://<staging-host> (fake brain, separate data) |
 | Repo | github.com/genekogan/sim (private); CI green |
-| World | `toy-1`, running continuously since 2026-09-30 05:09 UTC; six native Souls (Oda, Pim, Rowan, Tamsin, Juno, Basil) plus owners' Souls |
+| World | `toy-1` on the **toy engine**, running continuously since 2026-09-30 05:09 UTC; six native Souls (Oda, Pim, Rowan, Tamsin, Juno, Basil) plus owners' Souls |
 | Access | invite codes required to create or steer a Soul; watching is open; one admin (Gene) |
-| Model spend | capped at $0.50/day by the governor; about $1.4 spent in total so far |
+| Model spend | capped at $0.50/day by the governor |
 | Durability | Litestream → R2 every 10 s (restore tested), hourly on-box backups, watchdog timer, release folders with rollback |
 
-## Built (the shell)
+## Built
+
+**The shell**
 
 - Canonical event log, deterministic fold, replay from genesis, snapshots, restore.
 - 20 Hz tick loop with clock-rate dial, pause, time dilation.
-- WebSocket sync by path decisions; view-hash heartbeat; resync; resume from a ring buffer.
+- WebSocket sync; view-hash heartbeat; resync; resume from a ring buffer.
 - Privy sign-in, invite gate, Souls (several per account), ownership, retirement.
-- Steering: plain-language commands (Jev translator with Haiku fallback), exact intents.
-- Agent interface: installable `/skill.md`, pairing both ways, per-Soul tokens, REST
-  (`perceive`, `world`, `log`, `intent`, `command`, `wait`), MCP (header or URL token).
-- Brain: Jev mid-brain per Soul, Haiku narrator per region, Jev director and ticker;
-  every call recorded and inspectable; fair scheduling; spend governor and spend tab.
-- Web app: `watch` (anonymous), `my soul` (invite → create → direct → attach agent →
-  dashboard with story and thinking), debug tabs (world, brain, story, sync,
-  architecture), admin and spend tabs.
-- Privacy: model calls visible to admins and the Soul's owner; owners' notes
-  removed from every public view.
-- Operations: numbered DB migrations, retention, CI, staging-then-production
-  deploys, rollback, watchdog, R2 replication.
+- Agent interface: installable `/skill.md`, pairing both ways, per-Soul tokens, REST and MCP.
+- Operations: numbered DB migrations, retention, CI, staging-then-production deploys,
+  rollback, watchdog, R2 replication.
 
-## Faked or absent (the world)
+**The meaning layer** (2026-10-01; design in `eden4/18`)
 
-- **Engine: a toy.** 100 m plane, seven fixtures, straight-line walking, ten verbs.
-  The Mars engine is not integrated; no adapter exists yet.
+- **Kernel**: things, links, time and five kinds of change (appear/vanish, set, move,
+  link/unlink, say). Everything else (kinds of thing, kinds of link, manners, cards) is open
+  vocabulary. One rule: an actor changes only itself, what it controls and what it made.
+  The kernel replays from the log with no engine.
+- **Cards**: named actions with conditions, changes and a depiction. Fifteen base cards; a
+  deck and three manners per Soul; a shared library.
+- **Plans**: an owner's wish becomes an agenda of cards (`of` for things that do not exist
+  yet). One-step lookahead finds travel and unblocking by itself; unplayable steps are passed
+  over; a plan impossible for ten minutes is given up.
+- **Minting**: a compiler (Haiku) writes missing cards; owners' agents can propose cards;
+  every card is validated before it enters the library.
+- **Speech**: acts (ask, agree, decline…) are state; words are rendered afterwards by a
+  small model and stored beside the record.
+- **Minds in three tiers**: reflex (code, free), mid-brain (Jev), compiler (Haiku). Plus the
+  narrator per region and the director.
+- **Pages**: `grammar` (plays as sentences, things, vocabulary, card library, animation
+  to-do), `notebook` (open design questions beside live evidence), deck/plan/speech on
+  `my soul`, overheard speech on `watch`.
+
+**A second engine** (2026-10-01; design in `eden4/19`)
+
+- `packages/engine-mars`: the real Mars engine behind Sim's engine contract, imported
+  read-only from a local checkout (never copied into this repo). `ENGINE=mars` runs the
+  whole shell on it. Not deployed: the Mars code exists only on Gene's laptop.
+
+## Faked or absent
+
+- **Production runs the toy engine**: a 100 m plane, seven fixtures, straight-line walking.
 - **No rendering.** The map is text; camera shots are data.
-- **Souls do not speak.** "Converse" is an activity without words.
-- **Not built from the eden4 design:** manna and any economy, building and
-  materials, ground growth, rooms and doors, the daily ritual, generated bodies,
-  NFTs or any chain component, asset storage, moderation.
-- **Minds are not canonical.** Mood, energy and think-timers are snapshotted but
-  not hashed or reproducible from the log.
+- **Scenes** (several bodies in one coordinated motion: a class, a meal, a carry) are
+  designed (`eden4/19` §5), not built.
+- **Layered knowing** (atlas, news, memory) and **self-change proposals** (`eden4/18` §6, §8)
+  are not built.
+- **Not built from the eden4 vision:** manna and any economy, building and materials,
+  ground growth, rooms and doors, the daily ritual, generated bodies, NFTs or any chain
+  component, asset storage, moderation.
+- **Minds are not canonical.** Mood, energy, plan position and think-timers are snapshotted
+  but not reproducible from the log.
 
 ## Measured
 
 | What | Value | When |
 |---|---|---|
-| Mid-brain call (Jev) | ~1,900 input tokens, ~220 ms, ~$0.00008 | 09-30 |
+| Mid-brain call (Jev) | ~$0.00009, ~220 ms | 10-01 |
+| Reflex decision | no model call | 10-01 |
+| Compile a wish (Haiku) | $0.007–0.012 (about 7,700 input tokens; a third of that when cached) | 10-01 |
+| One exchange of words (Haiku) | ~$0.002 | 10-01 |
 | Narrator plan (Haiku, cache warm) | ~$0.003, 3–5 s | 09-30 |
-| Tick, 31 Souls / 50 clients | 0.44 ms avg; 2 KB/s per client | 09-30 |
-| Tick, 206 Souls / 300 clients | 1.0 ms avg; 22 KB/s per client; all in sync | 09-30 |
-| 1,006 Souls / 300 clients | 3.9 ms avg; 129 KB/s per client; clients lose sync | 09-30 |
+| DJ story, live models, 8 Souls, 3 minutes | $0.041 in total | 10-01 |
+| Tick, toy engine, 31 Souls / 50 clients | 0.44 ms avg; 2 KB/s per client | 09-30 |
+| Tick, toy engine, 206 Souls / 300 clients | 1.0 ms avg; 22 KB/s per client; all in sync | 09-30 |
+| Tick, toy engine, 1,006 Souls / 300 clients | 3.9 ms avg; clients lose sync | 09-30 |
+| Tick, **Mars engine**, 20 people strolling | 0.36 ms avg, 8.5 ms worst | 10-01 |
+| Mars 2026 campus | loads in 3 ms; walk planning 6 ms avg, 34 ms worst; state hash 1.7 ms | 10-01 |
 | Snapshot | 3.5 ms at 31 Souls, 44 ms at 1,000 | 09-30 |
 | Server memory | ~150 MB resident | 09-30 |
-| Database | ~65 MB after cleanup | 09-30 |
 
-At the target of about 25 people the shell has roughly 100× headroom; it breaks
-between 200 and 1,000 Souls because every client receives everything.
+Tests: 49 (kernel 6, engine contract 4, toy engine 8, Mars adapter 11, brain 6, server 14).
+The Mars tests skip where there is no Mars checkout (CI).
 
 ## Known limits and risks
 
@@ -71,20 +98,23 @@ between 200 and 1,000 Souls because every client receives everything.
 - `node:sqlite` is still marked experimental in Node 22.
 - Budget and brain mode changed in the admin tab are lost on restart; pairing
   codes and pending approvals are in memory and are cancelled by a restart.
-- Real Privy sign-in was confirmed by Gene; the full browser flow is otherwise
-  tested with dev accounts.
+- **A wish costs about a cent.** At $0.50/day the compiler's share covers roughly fifteen
+  wishes a day across all owners; each owner is limited to twelve an hour, after which a
+  cheaper translator handles plain goals.
+- **Any card can target anything anywhere**; only its own conditions limit reach.
+- **Cards cannot be retired or revised** once minted.
+- On the Mars engine, only eight verbs resume exactly from a snapshot; the body language
+  uses only those (`eden4/19` §6).
 
 ## Next
 
-Agreed and not yet done, in rough order (`eden4/16-HARDENING-SPRINT.md` has detail):
+1. **Take over the Mars engine** (Gene, from 2026-10-02): decide where its code lives; run
+   staging on `ENGINE=mars`; a furnished campus world; the first scene; a Mars vocabulary
+   pack. Plan in `eden4/19` §8.
+2. Layered knowing and memory; self-change proposals (`eden4/18` §6, §8).
+3. Cost: a cheap matcher for wishes existing cards already cover; audience-aware cadence.
+4. From the hardening sprint (`eden4/16`): protocol version negotiation, hot/cold database
+   split, structured metrics, asset store on R2, load Privy only on sign-in.
 
-1. **Mars adapter dry run**: a thin adapter importing the Mars engine read-only,
-   run against the conformance suite, to list exactly what the transplant needs.
-2. Brain cost: audience-aware cadence, token diet, per-Soul budgets.
-3. Protocol version negotiation; hot/cold database split; structured metrics.
-4. Asset store on R2; load Privy only on sign-in.
-
-Waiting on Gene: the world ontology (what is state, regions, topics and
-subscriptions), and the two questions in `eden4/17-AGENT-INTERFACE.md` (what
-agents may see; whether an agent may choose activities directly). The design
-discussion for what comes after is in `frontier/`.
+Waiting on Gene: the questions at the end of `eden4/18` and `eden4/19`. The earlier design
+discussion is in `frontier/`.

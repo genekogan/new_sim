@@ -6,6 +6,24 @@ is built to wrap. The engine keeps moving at hundreds of commits a day, so treat
 numbers as a dated snapshot and re-read the mirrored docs in this folder for direction.
 Nothing in Sim modifies that repo.
 
+> **Update, 2026-10-01 (Mars HEAD `9638489`, release 27).** The engine has since been driven
+> live by Sim: `packages/engine-mars` wraps it behind the engine contract and the whole shell
+> runs on it (`ENGINE=mars`). What that proved, what the adapter had to add, and what the
+> takeover must change are in [`../eden4/19-MARS-BRIDGE.md`](../eden4/19-MARS-BRIDGE.md). Facts
+> measured in that dry run, which correct or sharpen the survey below:
+>
+> - The engine runs in plain Node with type stripping; the default registry has 52 verbs.
+> - `verb.plan(rt, params)` is free of side effects and is the feasibility check. A refused
+>   `submit`, by contrast, still pulls its actors out of social holds.
+> - A person can be added to a running world by editing `world.entities` and calling
+>   `canonicalEntityOrder`; there is no API for it.
+> - `Runtime.snapshot()` resumes exactly for `walk_to`, `take_slot`, `sit`, `stand`, `face`,
+>   `converse`, `gather` and `campfire_circle` only.
+> - `Runtime.records` and `Runtime.events` are never pruned.
+> - The 2026 campus scene loads in 3 ms as static geometry with nine regions, six people and
+>   no fixtures; furniture exists only in scenario files.
+> - 20 people walking cost 0.36 ms a tick on the proving ground.
+
 ## What it is
 
 Mars Studio: a deterministic world and activity engine plus a three.js viewer,
