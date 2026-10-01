@@ -50,6 +50,14 @@ test('physical tabletop chess: fresh Step, four actual Play turns, checkmate and
       });
       const game = await page.evaluate(() => window.__marsEngine.chess());
       expect(game).toMatchObject({ position: { ply: 0 }, pending: true });
+      const pose = await page.evaluate(() => {
+        const bones = window.__marsEngine.bones('white-player');
+        return { bones, held: window.__marsEngine.heldItems(), game: window.__marsEngine.chess() };
+      });
+      writeFileSync(
+        path.join(artifacts, 'chess-held-pawn-pose.json'),
+        JSON.stringify(pose, null, 2),
+      );
       await page.screenshot({
         path: path.join(artifacts, 'chess-same-pawn-in-hand.png'),
       });

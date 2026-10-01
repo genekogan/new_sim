@@ -37,18 +37,17 @@ square rather than its empty destination. No resourcelease is left after complet
 ## Remaining acceptance / honest scope
 
 Lab controls/tour/selector and procedural checkerboard/distincttokens are now saved
-drafts, not exposed online or visually accepted. Choices include all supported legal
+drafts, not exposed online. Choices include all supported legal
 turns with optional initial four-turn checkmate proposals, not fixed runtime playback.
 Both players face the board initially; read-only sharedgaze observes only explicitly
 bound boards and releases anyone with foreigncontrol. No worldscan/alternatemover.
-No actual Play capture, fullgate or publishedproof yet; do not call this playable.
+Focused actual Play proof is recorded below; fullgate and publishedproof remain required.
 Blocked/unavailable/tilted/movedsupport/capabilitymismatch disruptions, deterministic
 repeat, quiescentJSON board/capture persistence and active-snapshot unsafe-drop
 refusal execute. Proceduralmeshes stay inside catalogbounds and share resources.
-Two required browser cases are authored (not yet run): freshReset/Step, actualPlay
+Two required browser cases execute: freshReset/Step, actualPlay
 fourturns/checkmate, samepawninhand, interruption/restoration, alternativecapture,
-32stableIDs and exactresourcecounts through3Reset. Historical fullgate currently
-owns serialized browser capacity; root intentionally holds runtimevalidation.
+32stableIDs and exactresourcecounts through3Reset.
 Standingtabletop only: existing transfers stand; no claim of seatedchess or finger
 precision. No strongAI/universalgamesystem. Castling is explicitly unsupported;
 pure queenpromotion is legal but physicalpromotion explicitlyrefuses rather than
@@ -62,3 +61,26 @@ was corrected to use the global registry once (the intermediate duplicate extra
 registration RED is preserved); no assertion weakened. Appearance/gameToken
 capabilities separate color/role semantics from mesh identity. Unsupported unrelated
 props refuse before acquisition. Current rig/item adapters remain unchanged.
+
+## Actual runtime review, 2026-10-01
+
+Frozen clean361a636, rebased on reviewed historical6451794: two required browser
+cases PASS in34.1s (16.8s and15.9s), alternate ports5395/8915, actual UI Play.
+`viewer/.cloudflare/chess/actual-play-first.log` retains the run;
+`viewer/e2e/artifacts/chess-runtime-first/` contains five inspected PNGs and
+`chess-reset-resources.json`. Same pawn ownership is observed during transfer;
+four turns finish checkmate, cancellation physically restores the original pawn,
+and alternative e2-e4/d7-d5/e4-d5 retains the captured black token in the tray.
+All32 identities remain stable, zero invariant violations, exact51 geometries and
+26 textures after each of three resets. Browser/Vite processes closed afterward.
+
+Root inspected all five captures and the contact sheet: recognizable board/pieces,
+standing players oriented toward the board, supported capture tray and coherent
+completed positions. The first grasp image partly occludes the acting right hand
+behind the player/board; it does not establish finger contact or full arm clearance.
+The existing take/put adapter drives that hand; the visible hanging opposite arm
+is not evidence of a second authority or a new pose system. A read-only bone/held
+item JSON attachment is added for the next required run to make this angle easier
+to assess. No rig, anatomy solver or physical execution changes are justified by
+this capture alone. Full combined gate and production verification are still pending;
+this work remains an unreleased candidate.
