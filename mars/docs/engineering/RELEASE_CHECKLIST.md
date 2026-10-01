@@ -1334,3 +1334,11 @@ unmerged and excluded. Full historical combined validation remains its prerequis
 Generated legacy EVIDENCE provenance flags remain explicit; no backlog completion
 claim. WholeMarsMVP40–70workinghours, medium-low confidence with boundedchess,
 mealprep/sleep/currentrig scope; October5 requires early tradeoffs for newprerequisites.
+
+## Production deploy 31 — 2026-10-01 — 2026 accuracy checkpoint
+
+- Source64517945c0bf0e109fb0a836611de9f4128d6362; version8f794aad-ddd7-4439-a840-707937429d54; published13:36:45.198Z,100%.
+- https://mars-campus-2026.<workers-subdomain>.workers.dev/studio; rollbackda02879a-bdf1-4896-975a-066eedb1da2e.
+- Clean full gate `.cloudflare/gate/2026-10-01T12-39-50-382Z/report.json`:241unitPASS,919enginePASS/6skip/11TODO,152browserPASS/7skip; TSc/lint/replay/independentprobe/MCP pass. Idleperformance zero violations. Build/dry/deploy pass;8largeR2 keys reused,0uploads.
+- Public19routes/507assets/auth/method/range/computerSHA/credit pass649boundedcurl requests; nativeNodeETIMEDOUT retained. PublicMCP+director pass nativeIPv4first. `.cloudflare/curl-31-ae/receipt.json`, `mcp-accuracy31.log`, `director-accuracy31.log` retain proof. Fresh publicroomvisual not repeated; source combined runtime verified.
+- Main645 with56unverified pending variants preserved; historical paired specialist additions excluded. Interimrelease, not seven-year completion. See historical-accuracy-2026.REPORT.md for observed/fitted uncertainties and accepted corrections.
