@@ -47,7 +47,7 @@ export function eventCollector(files) {
     finish(wallMs) {
       const top = results.filter((r) => r.nesting === 0);
       const count = (kind) => top.filter((r) => r.result === kind).length;
-      return { results, stdout, fileErrors, seenFiles: [...seen].sort(), suite: { files: files.length, tests: top.length, pass: count('pass'), fail: count('fail'), skip: count('skip'), todo: count('todo'), fileErrors: fileErrors.length, wallMs } };
+      return { results, stdout, fileErrors, seenFiles: [...seen].sort((a, b) => a < b ? -1 : a > b ? 1 : 0), suite: { files: files.length, tests: top.length, pass: count('pass'), fail: count('fail'), skip: count('skip'), todo: count('todo'), fileErrors: fileErrors.length, wallMs } };
     },
   };
 }

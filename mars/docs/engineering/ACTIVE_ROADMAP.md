@@ -28,8 +28,9 @@ Current rigs remain the MVP boundary; downhill feet retain anatomical left/right
 1. **Playable:** supported lie/sleep/wake, then one connected prepared-day journey
    retaining the same unfinished purpose across gathering/walk/food/rest and return.
    Sleep uses a bounded current-rig adapter, physical clearance, ordinary approach
-   and coherent interruption. Its focused prototype remains unshipped; actual Play
-   validation is separate. Prepared-day core9805632 has12focusedPASS5.708s;
+   and coherent interruption. Both current rigs pass actual Play (2/2, 52.1s), 50 focused checks and
+   strict interruption/replay/reset assertions; all captures inspected. This
+   remains an unshipped candidate. Prepared-day core9805632 has12focusedPASS5.708s;
    readonly depletion-label584ef5b is source-only. No combined/publicday claim.
    Cold preparation and cross-experience serving conservation are verified in34
    in both authored groundtable orientations; keep their physical contracts intact.
@@ -37,11 +38,14 @@ Current rigs remain the MVP boundary; downhill feet retain anatomical left/right
    report to avoid rerunning the full engine suite after a clean gate. Existing
    `--gate` imports only external checks; this release repeats the179.6-second engine
    gate in `npm run evidence` (155.5seconds). Isolated `engine-evidence-reuse` starts
-   at5111019; no implementation or verification yet. Keep source/test identity and
+   at5111019; structured native-CLI reporter/receipt candidate a47c02d passes
+   11 focused proof/parity checks. Combined gate and actual evidence reuse remain
+   required; no full-suite speedup measured. Keep source/test identity and
    missing-map failures strict. This bounded improvement runs beside sleep→day;
    it is not a legacy-row audit or a weakened release gate.
 
-WholeMVP remaining **40–70 working hours**, medium-low confidence: supported sleep and combined continuity/disruption proof remain uncertain;
+WholeMVP remaining **40–70 working hours**, medium-low confidence: connected continuity/disruption and final acceptance proof remain uncertain;
+standalone supported sleep has passed actual Play on both current rigs;
 bounded preparation and two conserved servings are now verified online. October5
 requires bounded interactions; escalate if repeated anatomy or broader locomotion
 redesign becomes necessary. Proposed2027 and Aerial/EUC handoff are verified in release34; supported sleep and prepared-day drafts remain separate/excluded. Camera is independent and unchanged.

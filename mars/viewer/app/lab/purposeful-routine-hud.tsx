@@ -42,7 +42,7 @@ export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: (
       food: { pot: B.pot, participants: B.people, at: B.conversation.at },
       rest: example.rest, departure: example.departure,
       ...(walkTogether ? { trip: mealWalkExample(sim.scenario.name) } : {}),
-      ...(prepared ?? {}),
+      ...prepared,
     };
     const result = rt.submit('purposeful_routine', params, { preempt: false });
     setRequest({ epoch: sim.scenarioEpoch, action: result.id });
