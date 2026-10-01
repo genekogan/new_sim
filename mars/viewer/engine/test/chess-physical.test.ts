@@ -3,7 +3,11 @@ import { boardStatus } from '../games/chess-rules.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chessRuntime } from '../scenarios/chess.ts';
-import type { Runtime } from '../runtime/runtime.ts';
+import { Runtime } from '../runtime/runtime.ts';
+import { SnapshotError } from '../runtime/snapshot.ts';
+import { Spatial } from '../spatial/service.ts';
+import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
+import { READING_SCENE } from '../scenarios/reading.ts';
 function finish(rt: Runtime, id: string) {
   for (let i = 0; i < 1200 && rt.isActive(id); i++) rt.step();
   const r = rt.records.get(id)!;
@@ -437,4 +441,186 @@ test('explicit restoration refuses active or absent pending state without changi
   assert.equal(refused.diagnostic?.code, 'chess.no-unfinished-move');
   assert.deepEqual(rt.world, during);
   finish(rt, active.id);
+});
+
+test('unavailable, tilted or unsupported equipment refuses before claiming or moving tokens', () => {
+  for (const [kind, code] of [
+    ['unavailable', 'chess.unavailable'],
+    ['tilted', 'chess.flat-support-required'],
+    ['tray-moved', 'chess.surface-moved'],
+    ['tray-unsupported', 'chess.support-required'],
+  ]) {
+    const rt = chessRuntime();
+    if (kind === 'unavailable')
+      rt.world.entities.board.equipment!.config.available = false;
+    if (kind === 'tilted') rt.world.entities.board.pose.pitch = 0.2;
+    if (kind === 'tray-moved')
+      rt.world.entities['capture-tray'].pose.p[0] += 0.1;
+    if (kind === 'tray-unsupported')
+      rt.world.entities['capture-tray'].support = { kind: 'ground' };
+    const before = structuredClone(rt.world),
+      r = rt.submit('chess_move', {
+        actor: 'white-player',
+        board: 'board',
+        from: 'f2',
+        to: 'f3',
+        tray: 'capture-tray',
+      });
+    assert.equal(r.status, 'failed');
+    assert.equal(r.diagnostic?.code, code);
+    assert.deepEqual(rt.world, before);
+    assert.deepEqual(rt.holder('chess:board'), []);
+  }
+});
+
+test('completed board and capture state persist exactly; dropping active transfer is explicitly unsafe', () => {
+  const rt = chessRuntime();
+  finish(
+    rt,
+    rt.submit('chess_move', {
+      actor: 'white-player',
+      board: 'board',
+      from: 'e2',
+      to: 'e4',
+      tray: 'capture-tray',
+    }).id,
+  );
+  const copy = Runtime.restore(
+    JSON.parse(JSON.stringify(rt.snapshot())),
+    createRegistry(),
+    { spatial: new Spatial(READING_SCENE) },
+    ENGINE_INVARIANTS,
+  );
+  assert.deepEqual(copy.world, rt.world);
+  assert.deepEqual(readChess(copy, 'board'), readChess(rt, 'board'));
+  const action = copy.submit('chess_move', {
+    actor: 'black-player',
+    board: 'board',
+    from: 'd7',
+    to: 'd5',
+    tray: 'capture-tray',
+  });
+  const before = copy.stateHash();
+  assert.throws(
+    () => copy.snapshot({ allowDrop: true }),
+    (e: unknown) =>
+      e instanceof SnapshotError &&
+      e.code === 'snapshot.drop-unsafe' &&
+      e.subjects.includes('board'),
+  );
+  assert.equal(copy.stateHash(), before);
+  finish(copy, action.id);
+  finish(
+    copy,
+    copy.submit('chess_move', {
+      actor: 'white-player',
+      board: 'board',
+      from: 'e4',
+      to: 'd5',
+      tray: 'capture-tray',
+    }).id,
+  );
+  const again = Runtime.restore(
+    JSON.parse(JSON.stringify(copy.snapshot())),
+    createRegistry(),
+    { spatial: new Spatial(READING_SCENE) },
+    ENGINE_INVARIANTS,
+  );
+  assert.deepEqual(again.world, copy.world);
+  assert.deepEqual(again.world.entities['black-pawn-d7'].support, {
+    kind: 'resting-on',
+    on: 'capture-tray',
+    slot: 'captured-0',
+  });
+});
+
+test('same bound decisions reproduce tick-exact world state and physical events', () => {
+  const a = chessRuntime(),
+    b = chessRuntime();
+  for (const rt of [a, b])
+    for (const [actor, from, to] of [
+      ['white-player', 'e2', 'e4'],
+      ['black-player', 'd7', 'd5'],
+      ['white-player', 'e4', 'd5'],
+    ])
+      finish(
+        rt,
+        rt.submit('chess_move', {
+          actor,
+          board: 'board',
+          from,
+          to,
+          tray: 'capture-tray',
+        }).id,
+      );
+  assert.equal(a.tick, b.tick);
+  assert.equal(a.stateHash(), b.stateHash());
+  assert.deepEqual(a.events, b.events);
+  assert.deepEqual(a.violations, []);
+});
+
+test('a genuinely blocked table route fails coherently and clears only through explicit owned restoration', () => {
+  const scene = structuredClone(READING_SCENE);
+  for (const [id, x, z, hx, hz] of [
+    ['south', 0, -0.9, 1.55, 0.05],
+    ['north', 0, 0.9, 1.55, 0.05],
+    ['east', 1.5, 0, 0.05, 0.9],
+    ['west', -1.5, 0, 0.05, 0.9],
+  ] as const)
+    scene.obstacles.push({
+      id: `blocked-table-${id}`,
+      obb: { c: [x, z], half: [hx, hz], yaw: 0 },
+      y0: 0,
+      y1: 2.2,
+      kind: 'wall',
+    });
+  const rt = chessRuntime(0, undefined, scene),
+    before = readChess(rt, 'board'),
+    pawn = structuredClone(rt.world.entities['white-pawn-f2']);
+  const r = rt.submit('chess_move', {
+    actor: 'white-player',
+    board: 'board',
+    from: 'f2',
+    to: 'f3',
+    tray: 'capture-tray',
+  });
+  for (let i = 0; i < 1200 && rt.isActive(r.id); i++) rt.step();
+  assert.equal(r.status, 'failed');
+  assert.equal(r.diagnostic?.code, 'chess.cleanup-required');
+  assert.ok(
+    r.diagnostic.subjects?.some((s) => s.startsWith('blocked-table-')),
+    JSON.stringify(r.diagnostic),
+  );
+  assert.deepEqual(rt.world.entities['white-pawn-f2'].pose, pawn.pose);
+  assert.deepEqual(rt.world.entities['white-pawn-f2'].support, pawn.support);
+  assert.deepEqual(rt.holder('actor:white-player'), []);
+  assert.deepEqual(rt.violations, []);
+  finish(
+    rt,
+    rt.submit('chess_move', {
+      actor: 'white-player',
+      board: 'board',
+      from: 'f2',
+      to: 'f3',
+      tray: 'capture-tray',
+      restore: true,
+    }).id,
+  );
+  assert.deepEqual(readChess(rt, 'board'), before);
+});
+
+test('an unrelated prop cannot masquerade as the recorded token; appearance and game role bind through capabilities', () => {
+  const rt = chessRuntime();
+  rt.world.entities['white-pawn-f2'].def = 'bowl';
+  const before = structuredClone(rt.world),
+    r = rt.submit('chess_move', {
+      actor: 'white-player',
+      board: 'board',
+      from: 'f2',
+      to: 'f3',
+      tray: 'capture-tray',
+    });
+  assert.equal(r.status, 'failed');
+  assert.equal(r.diagnostic?.code, 'chess.token-mismatch');
+  assert.deepEqual(rt.world, before);
 });

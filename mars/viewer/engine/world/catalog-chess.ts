@@ -49,6 +49,7 @@ export const CHESS_ASSETS: AssetDef[] = [
         massKg: 0.035,
         color: color === 'white' ? '#ebe5d2' : '#34302a',
         dims,
+        capabilities: { gameToken: { game: 'chess', color, kind } },
         handling: {
           carryCrew: [1, 1],
           carryPose: 'flat',

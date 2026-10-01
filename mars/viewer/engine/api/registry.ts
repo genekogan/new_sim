@@ -15,6 +15,7 @@ import { CLASSROOM_ACTIONS, STOW_ACTIONS, ROOM_SETUP_ACTIONS, SHARED_FOOD_ACTION
 import { OBJECT_ACTIONS, ClassroomDisplayService } from '../objects/classroom.ts';
 import { COMPUTER_MUSIC_ACTIONS } from '../activities/computer-music.ts';
 import { READING_ACTIONS } from '../objects/reading.ts';
+import { CHESS_ACTIONS } from '../objects/chess.ts';
 import { WORKSTATION_ACTIONS } from '../objects/workstation.ts';
 import { ITEM_ACTIONS } from '../items/actions.ts';
 import { VEHICLE_ACTIONS, VEHICLE_INVARIANTS } from '../vehicles/index.ts';
@@ -31,9 +32,9 @@ import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
-export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/13`;
+export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/14`;
 
-export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS];
+export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS];
 export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS, ...FRAMING_INVARIANTS];
 
 export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> {

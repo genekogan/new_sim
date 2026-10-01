@@ -1,5 +1,4 @@
 // Hypothetical tabletop game. Ordinary item transfers must prove the physical binding first.
-import { CHESS_ACTIONS } from '../objects/chess.ts';
 import { Runtime } from '../runtime/runtime.ts';
 import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
 import { Spatial } from '../spatial/service.ts';
@@ -33,7 +32,11 @@ export function openingPosition(): Position {
     }
   return { pieces, turn: 'white', ply: 0 };
 }
-export function chessRuntime(yaw = 0, position: Position = openingPosition()) {
+export function chessRuntime(
+  yaw = 0,
+  position: Position = openingPosition(),
+  scene = READING_SCENE,
+) {
   const fixture = (id: string, def: string): Entity => ({
     id,
     def,
@@ -45,11 +48,13 @@ export function chessRuntime(yaw = 0, position: Position = openingPosition()) {
   const white = rot2([-0.15, -1.4], yaw),
     black = rot2([-0.15, 1.4], yaw);
   const world = addAll(
-    emptyWorld('tabletop-chess', READING_SCENE),
+    emptyWorld('tabletop-chess', scene),
     fixture('chess-table', 'table-6ft'),
     human('white-player', white[0], white[1]),
     human('black-player', black[0], black[1]),
   );
+  world.entities['white-player'].pose.yaw = yaw + Math.PI / 2;
+  world.entities['black-player'].pose.yaw = yaw - Math.PI / 2;
   for (const [id, def, slot] of [
     ['board', 'chess-board', 'chess-table#r1c2'],
     ['capture-tray', 'chess-tray', 'chess-table#r1c4'],
@@ -77,8 +82,8 @@ export function chessRuntime(yaw = 0, position: Position = openingPosition()) {
   }
   return new Runtime(
     world,
-    createRegistry(CHESS_ACTIONS),
-    { spatial: new Spatial(READING_SCENE) },
+    createRegistry(),
+    { spatial: new Spatial(scene) },
     ENGINE_INVARIANTS,
   );
 }

@@ -302,6 +302,15 @@ export const chessMove: ActionDef<Params, Program, Exec> = {
         ),
       };
     const c = config(rt, p.board)!;
+    if (c.available === false)
+      return {
+        ok: false,
+        diagnostic: diag(
+          'unavailable',
+          `${p.board} is unavailable; retain any pending move until the board is available`,
+          [p.board],
+        ),
+      };
     if (p.restore) {
       if (!game.pending || c.status !== 'unfinished' || c.action !== '')
         return {
@@ -398,7 +407,23 @@ export const chessMove: ActionDef<Params, Program, Exec> = {
           [p.board, moved.move.piece],
         ),
       };
-    for (const piece of game.position.pieces)
+    for (const piece of game.position.pieces) {
+      const token = rt.world.entities[piece.id],
+        capability = token && CATALOG[token.def]?.capabilities?.gameToken;
+      if (
+        !capability ||
+        capability.game !== 'chess' ||
+        capability.color !== piece.color ||
+        capability.kind !== piece.kind
+      )
+        return {
+          ok: false,
+          diagnostic: diag(
+            'token-mismatch',
+            `${piece.id} does not provide its recorded ${piece.color} ${piece.kind} capability`,
+            [p.board, piece.id],
+          ),
+        };
       if (
         !(
           p.restore && [moved.move.piece, moved.move.capture].includes(piece.id)
@@ -413,6 +438,7 @@ export const chessMove: ActionDef<Params, Program, Exec> = {
             [p.board, piece.id],
           ),
         };
+    }
     for (const s of [p.from, p.to]) {
       const slot = surfaceSlot(rt.world, `${p.board}#${s}`);
       if ('code' in slot) return { ok: false, diagnostic: slot };
@@ -447,6 +473,38 @@ export const chessMove: ActionDef<Params, Program, Exec> = {
           p.tray,
         ]),
       };
+    for (const surface of [b, tray]) {
+      if (surface.pose.pitch || surface.pose.roll)
+        return {
+          ok: false,
+          diagnostic: diag(
+            'flat-support-required',
+            `${surface.id} must remain flat on its supporting table`,
+            [surface.id],
+          ),
+        };
+      const support = surface.support;
+      if (support?.kind !== 'resting-on' || !support.slot)
+        return {
+          ok: false,
+          diagnostic: diag(
+            'support-required',
+            `${surface.id} must rest on a real usable table slot`,
+            [surface.id],
+          ),
+        };
+      const slot = surfaceSlot(rt.world, `${support.on}#${support.slot}`);
+      if ('code' in slot) return { ok: false, diagnostic: slot };
+      if (surface.pose.p.some((v, i) => Math.abs(v - slot.p[i]) > 1e-6))
+        return {
+          ok: false,
+          diagnostic: diag(
+            'surface-moved',
+            `${surface.id} no longer matches its supporting slot`,
+            [surface.id, support.on],
+          ),
+        };
+    }
     const capturedSlot = moved.move.capture
       ? surfaceSlotsOf(rt.world, p.tray).find(
           (s) => !slotOccupant(rt.world, s.owner, s.slot),
@@ -562,6 +620,16 @@ export const chessMove: ActionDef<Params, Program, Exec> = {
           'surface-moved',
           'The board or capture tray moved; pending physical state is retained for intervention',
           [ex.p.board, ex.p.tray],
+        ),
+      );
+    if (config(rt, ex.p.board)?.available === false)
+      return failure(
+        rt,
+        ex,
+        diag(
+          'unavailable',
+          `${ex.p.board} became unavailable; any unfinished transfer remains explicit for restoration`,
+          [ex.p.board, ex.p.actor],
         ),
       );
     const op = ex.ops[ex.index],
