@@ -26,5 +26,15 @@ test('checkpoint tour launches real rooms and exposes current interaction and ca
   await expect(page.getByRole('combobox', { name: 'Scenario', exact: true })).toHaveValue('work-break-8');
   await expect(page.getByTestId('purposeful-routine-hud')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start purposeful routine', exact: true })).toBeDisabled();
+  await expect(tour).toBeVisible();
+  await expect(tour).toContainText('reconciled beam staging');
+  await tour.getByRole('button', { name: 'Try an independent design studio', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Scenario', exact: true })).toHaveValue('design-studio');
+  await expect(tour).toContainText('one fixed arrangement');
+  await expect(page.getByTestId('workstation-appearance')).toBeVisible();
+  await expect(page.getByTestId('lab-camera-controls')).toHaveCount(0);
+  await tour.getByRole('button', { name: 'Load 4-guest room', exact: true }).click();
+  await expect(page.getByTestId('lab-camera-controls')).toBeVisible();
+  await expect(tour).toContainText('Live camera');
   expect(errors).toEqual([]);
 });

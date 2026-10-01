@@ -6,19 +6,22 @@ type Props = {
 /** Discovery only: existing scenario loading and classroom controls own every action. */
 export function CheckpointTour({ scenario, onScenario }: Props) {
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
-  if (!classroom) return null;
-  const cameraScenario = classroom ? scenario : 'classroom-4';
+  const eight = scenario === 'classroom-8' || scenario === 'work-break-8';
+  const studio = scenario === 'design-studio';
+  const gathering = classroom || scenario === 'work-break-4' || scenario === 'work-break-8';
+  const cameraScenario = eight ? 'classroom-8' : 'classroom-4';
   return (
     <section aria-labelledby="checkpoint-tour-heading" data-testid="checkpoint-tour">
-      <h2 id="checkpoint-tour-heading">Quick tour · hypothetical classroom</h2>
+      <h2 id="checkpoint-tour-heading">Quick tour · playable checkpoint</h2>
       <div className="lab-row">
         <button onClick={() => onScenario('classroom-4')}>Load 4-guest room</button>
         <button onClick={() => onScenario('classroom-8')}>Load 8-guest room</button>
         <button onClick={() => onScenario('design-studio')}>Try an independent design studio</button>
-        <button onClick={() => onScenario(scenario === 'classroom-8' ? 'work-break-8' : 'work-break-4')}>Try a continuing day</button>
+        <button onClick={() => onScenario(eight ? 'work-break-8' : 'work-break-4')}>Try a continuing day</button>
       </div>
-      <p className="lab-meta">Loading a room resets the current world. Then use Play and the live classroom controls below.</p>
-      <details>
+      <p className="lab-meta">Loading a room resets the current world. These rooms and participants are hypothetical. Use Play and the activity controls below; Reset starts the selected room again.</p>
+      {studio && <p className="lab-desc">Independent studio: Start notes, interrupt after progress, then Start session and Start purposeful routine during presentations. Watch a critique, questions, shared soup, quiet rest and return to the same project notes. Commit attendee continuations adds separate guest discussion and presenter follow-up work. The attributed computer uses the same workstation rules. This room has one fixed arrangement; Mars furniture setup and live automatic camera controls are not supported here.</p>}
+      {gathering && <details>
         <summary>Try talks, interrupted work, chair and table setup</summary>
         <ol className="lab-desc">
           <li>
@@ -66,13 +69,14 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
             Tabletop contents must be removed explicitly before moving.
           </li>
         </ol>
-      </details>
+      </details>}
+      <p className="lab-meta">The full Scenario selector also exposes movement, body measurement and construction checks. Current 2022 east-house build is unsupported because reconciled beam staging is incomplete; its refusal is not a working build. The supported legacy build fixture is separate validation evidence.</p>
       <p className="lab-sub">
         <a href={`/cinematography/review.html?scenario=${cameraScenario}`} target="_blank" rel="noopener">Optional live camera review</a>
         {' · '}
         <a href="/app/camera-lab/suite.html" target="_blank" rel="noopener">Recorded six-scene camera replay</a>
       </p>
-      <p className="lab-meta">The recorded replay is a camera demonstration, not a playable world.</p>
+      <p className="lab-meta">Live automatic camera controls are available in the 4- and 8-guest classroom rooms: choose Live camera, then Follow guest2 or Return camera to auto. The recorded replay is a camera demonstration, not a playable world.</p>
     </section>
   );
 }
