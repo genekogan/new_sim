@@ -41,6 +41,6 @@ export function conformance(name: string, factory: EngineFactory, drive: (e: Ret
     const e = factory.create(factory.genesis('seed-6'));
     const r = e.submit('no_such_verb', {});
     assert.equal(r.status, 'failed');
-    assert.equal(r.diagnostic?.code, 'verb.unknown');
+    assert.equal(r.diagnostic?.code, 'action.unknown-verb');
   });
 }

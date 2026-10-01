@@ -268,7 +268,7 @@ export function doActivity(prims: Map<string, ActionDef>): ActionDef<ActivityPar
     reservations: (_w, p) => actorRes(p.actor),
     plan(rt, p) {
       if (!human(rt.world, p.actor)) return { ok: false, diagnostic: diag('actor.unknown', `no human ${p.actor}`, [p.actor]) };
-      for (const s of p.steps) if (!prims.has(s.verb)) return { ok: false, diagnostic: diag('verb.unknown', `unknown step verb ${s.verb}`) };
+      for (const s of p.steps) if (!prims.has(s.verb)) return { ok: false, diagnostic: diag('action.unknown-verb', `unknown step verb ${s.verb}`) };
       return { ok: true, program: null };
     },
     start(rt, p, _prog, actionId) { setTask(rt, p.actor, actionId); svc(rt).change(p.actor, 'doing', p.label); return { actor: p.actor, i: 0, child: null, started: false, actionId }; },

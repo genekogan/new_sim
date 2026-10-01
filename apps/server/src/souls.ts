@@ -32,12 +32,9 @@ export class Souls {
     this.host = host; this.db = db; this.brain = brain; this.cfg = cfg;
     host.listeners.push({
       onApplied: (e) => { const id = (e.payload as { soulId?: string })?.soulId; if (id) this.wake(id, e.kind === 'decision' ? `started: ${(e.payload as { label: string }).label}` : e.kind === 'intent' ? 'a new intent was accepted' : e.kind); },
-      onRuntimeEvent: (ev) => {
-        if (ev.type !== 'action' || ev.verb !== 'do_activity' || (ev.status !== 'completed' && ev.status !== 'failed')) return;
-        const actor = (host.engine.runtime.records.get(ev.id)?.params as { actor?: string } | undefined)?.actor;
-        const m = actor ? host.mindByEntity.get(actor) : undefined;
-        const label = (host.engine.runtime.records.get(ev.id)?.params as { label?: string } | undefined)?.label ?? 'the activity';
-        if (m) this.wake(m.soulId, ev.status === 'completed' ? `finished: ${label}` : `could not complete: ${label} (${ev.code ?? 'failed'})`);
+      onProgram: (ev, m) => {
+        if (ev.kind === 'completed') this.wake(m.soulId, `finished: ${m.doing}`);
+        else if (ev.kind === 'failed') this.wake(m.soulId, `could not complete: ${m.doing} (${ev.code ?? 'failed'})`);
       },
     });
     setInterval(() => { const now = Date.now(); for (const [k, p] of this.pairings) if (p.expires < now) this.pairings.delete(k); }, 60_000).unref();
@@ -173,7 +170,7 @@ export class Souls {
     const nameOf = (id: string) => this.host.nameOf(id);
     return {
       id: soul.id, name: soul.name, description: soul.description, in_world: true, tick: e.world.tick, time: e.world.env.datetime,
-      position: { x: ent.pose.p[0], z: ent.pose.p[2], region: s.region }, activity: ent.human!.activity, doing: ent.human!.task ? m.doing : 'standing around',
+      position: { x: ent.pose.p[0], z: ent.pose.p[2], region: s.region }, activity: ent.human!.activity, doing: e.programOf(m.entityId) ? m.doing : 'standing around',
       mood: m.mood, energy: energyWord(m.energy), wants_company: m.wantsCompany,
       intent: m.intent, intent_text: describeIntent(m.intent, nameOf), agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ? this.host.nameOf(a.target) : null, done: i < m.agendaPos })), recent: m.recent, nearby: s.nearby, happening: s.happening,
       storyteller_suggests: m.nudge?.text ?? null,

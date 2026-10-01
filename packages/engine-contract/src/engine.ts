@@ -1,7 +1,7 @@
 // The engine adapter: what the wrapper (server, brain, clients) needs from ANY
 // engine. The toy engine implements it now; the Mars engine gets an adapter later.
-import type { ActionDef, ActionRecord } from './actions.ts';
-import type { Runtime, RuntimeEvent, RuntimeSnapshot } from './runtime.ts';
+import type { ActionRecord } from './actions.ts';
+import type { RuntimeEvent } from './runtime.ts';
 import type { WorldState, Vec3 } from './world.ts';
 import type { VerbInfo } from './registry.ts';
 
@@ -44,13 +44,17 @@ export type Program = { actor: string; label: string; steps: { verb: string; par
 /** Progress of a program, reported by the engine each tick. `step` is the index now running (or that ended it). */
 export type ProgramEvent = { tick: number; id: string; actor: string; kind: 'step' | 'completed' | 'failed' | 'cancelled'; step: number; code?: string; message?: string };
 
+/** What the shell reads of an engine's runtime: never its internals. */
+export interface RuntimeView { readonly tick: number; readonly records: Map<string, ActionRecord>; readonly violations: { tick: number; code: string; message: string }[]; liveIds(): string[] }
+/** An engine's resumable checkpoint. Only these three fields are read by the shell; the rest is the engine's own. */
+export type EngineSnapshot = { format: string; tick: number; stateHash: string };
+
 export interface Engine {
   readonly rulesVersion: string;
   readonly dt: number;
   readonly schema: string;
-  readonly runtime: Runtime;
+  readonly runtime: RuntimeView;
   readonly world: WorldState;
-  registry: Map<string, ActionDef>;
   describeVerbs(): VerbInfo[];
   stateHash(): string;
   physicalHash(): string;
@@ -66,7 +70,7 @@ export interface Engine {
   programOf(actor: string): string | null;
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
-  snapshot(): RuntimeSnapshot;
+  snapshot(): EngineSnapshot;
   /** Spawn a human entity for a Soul at the arrival point; returns the entity id. */
   spawnHuman(args: { id: string; label: string; soul: string }): string;
   removeEntity(id: string): void;
@@ -88,5 +92,5 @@ export interface EngineFactory {
   rulesVersion: string;
   genesis(seed: string): WorldState;
   create(world: WorldState): Engine;
-  restore(snap: RuntimeSnapshot): Engine;
+  restore(snap: EngineSnapshot): Engine;
 }

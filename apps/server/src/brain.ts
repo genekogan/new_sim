@@ -172,7 +172,7 @@ export class Brain {
       soul: {
         name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.text ?? m.intent?.note ?? null, hasIntent: !!m.intent && m.agendaPos < Math.max(1, m.agenda.length),
         intentIsNew: URGENT.has(trigger), energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
-        doing: ent.human!.task ? m.doing : 'standing around', recent: m.recent.slice(-3),
+        doing: eng.programOf(m.entityId) ? m.doing : 'standing around', recent: m.recent.slice(-3),
       },
       nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
       nudge: m.nudge?.text ?? null,
@@ -180,7 +180,7 @@ export class Brain {
       heard: sit.heard.map((h) => ({ who: h.who, act: h.act, ...(h.about ? { about: h.about } : {}), ...(this.lastWords.get(`${h.from}>${m.soulId}`) ? { words: this.lastWords.get(`${h.from}>${m.soulId}`)! } : {}) })),
       manners: Object.fromEntries((deck?.manners ?? []).map((n) => [n, k.vocab.manners[n]?.summary ?? n])),
       options: optionsFor(this.host, m),
-      running: !!ent.human!.task,
+      running: !!eng.programOf(m.entityId),
       trigger,
     };
   }

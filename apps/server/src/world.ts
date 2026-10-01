@@ -1,7 +1,7 @@
 // WorldHost: the sequencer. Owns the engine, the event log, the tick loop,
 // snapshots, and the per-batch broadcast. The fold (doc 11):
 //   events logged with tick T are applied when world.tick == T, then the engine steps to T+1.
-import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, RuntimeSnapshot, RuntimeEvent } from '@sim/engine-contract';
+import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, EngineSnapshot, RuntimeEvent } from '@sim/engine-contract';
 import { kernelHash, sweep, type KState } from '@sim/kernel';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
@@ -9,7 +9,7 @@ import {
   type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
 import type { Db } from './db.ts';
-import { ARRIVAL_PLACE, foldEvent, initKernel, soulThing } from './fold.ts';
+import { arrivalPlace, foldEvent, initKernel, soulThing } from './fold.ts';
 import { frontier, stepIndex } from './deck.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
@@ -31,7 +31,7 @@ export type Mind = {
   pending: { program: string; card: string; hash: string; target: string | null; manner?: string; approachLen: number; applied: boolean } | null;
 };
 type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void };
-export type SnapshotBody = { runtime: RuntimeSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
+export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
   onHeartbeat?(h: Heartbeat): void;
@@ -126,7 +126,7 @@ export class WorldHost {
     const k = initKernel(this.engine);
     for (const m of this.minds.values()) {
       const ent = this.engine.world.entities[m.entityId];
-      soulThing(k, { soulId: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: m.owner }, ent ? this.nearestPlace(k, m.entityId) : ARRIVAL_PLACE);
+      soulThing(k, { soulId: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: m.owner }, ent ? this.nearestPlace(k, m.entityId) : arrivalPlace(k));
     }
     return k;
   }

@@ -89,7 +89,7 @@ export class ToyEngine implements Engine {
   stop(programId: string) { if (this.runtime.isActive(programId)) this.runtime.cancel(programId, { code: 'program.stopped', message: 'stopped' }); }
   canPerform(p: Program) {
     const first = p.steps[0]; if (!first) return null;
-    const def = prims.get(first.verb); if (!def) return { code: 'verb.unknown', message: `unknown verb ${first.verb}` };
+    const def = prims.get(first.verb); if (!def) return { code: 'action.unknown-verb', message: `unknown verb ${first.verb}` };
     const parsed = def.schema.safeParse({ ...first.params, actor: p.actor }); if (!parsed.success) return { code: 'params.invalid', message: parsed.error.message };
     const plan = def.plan(this.runtime, parsed.data);
     return plan.ok ? null : { code: plan.diagnostic.code, message: plan.diagnostic.message };
@@ -122,7 +122,7 @@ export class ToyEngine implements Engine {
   anchors(): Anchor[] {
     const w = this.world, out: Anchor[] = [];
     for (const id of Object.keys(w.regions).sort()) { const r = w.regions[id], poly = r.polygon; out.push({ id, kind: 'region', name: r.label, point: [(poly[0][0] + poly[2][0]) / 2, (poly[0][1] + poly[2][1]) / 2] }); }
-    for (const id of Object.keys(w.entities).sort()) { const e = w.entities[id]; if (e.kind !== 'fixture') continue; out.push({ id, kind: 'place', name: e.label ?? id, in: this.regionAt(e.pose.p), entity: id, tags: [e.def, ...(e.seats ? ['seats'] : [])] }); }
+    for (const id of Object.keys(w.entities).sort()) { const e = w.entities[id]; if (e.kind !== 'fixture') continue; out.push({ id, kind: 'place', name: e.label ?? id, in: this.regionAt(e.pose.p), entity: id, tags: [e.def, ...(e.seats ? ['seats'] : []), ...(id === 'gate' ? ['arrival'] : [])] }); }
     return out;
   }
 
@@ -263,5 +263,5 @@ export const toyFactory: EngineFactory = {
   rulesVersion: TOY_RULES_VERSION,
   genesis,
   create: (world) => new ToyEngine(world),
-  restore: (snap) => new ToyEngine(Runtime.restore(snap, REGISTRY, {}, [inBounds])),
+  restore: (snap) => new ToyEngine(Runtime.restore(snap as RuntimeSnapshot, REGISTRY, {}, [inBounds])),
 };

@@ -25,7 +25,9 @@ const NATIVES: { name: string; description: string }[] = [
 
 const db = new Db(join(config.dataDir, 'sim.db'));
 if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(', ')}`);
-const host = new WorldHost(db, toyFactory, config.worldSeed, config.snapshotEveryTicks);
+// Which engine runs the bodies. `mars` imports the Mars world simulator from a local checkout (see packages/engine-mars).
+const factory = config.engine === 'mars' ? await (await import('@sim/engine-mars')).marsFactory() : toyFactory;
+const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks);
 const boot = host.boot();
 console.log(`[world] ${WORLD_ID} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
 

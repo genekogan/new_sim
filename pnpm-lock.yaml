@@ -26,6 +26,9 @@ importers:
       '@sim/engine-contract':
         specifier: workspace:*
         version: link:../../packages/engine-contract
+      '@sim/engine-mars':
+        specifier: workspace:*
+        version: link:../../packages/engine-mars
       '@sim/engine-toy':
         specifier: workspace:*
         version: link:../../packages/engine-toy
@@ -125,6 +128,16 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.20.4
+
+  packages/engine-mars:
+    dependencies:
+      '@sim/engine-contract':
+        specifier: workspace:*
+        version: link:../engine-contract
     devDependencies:
       '@types/node':
         specifier: ^22.19.19

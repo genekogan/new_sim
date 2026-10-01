@@ -63,7 +63,7 @@ export class Runtime {
     const record: ActionRecord = { id, verb, params, status: 'requested', history: [], requestedTick: this.tick, parent: opts.parent };
     this.records.set(id, record);
     this.transition(record, 'requested');
-    if (!def) return this.fail(record, { code: 'verb.unknown', message: `unknown verb ${verb}` });
+    if (!def) return this.fail(record, { code: 'action.unknown-verb', message: `unknown verb ${verb}` });
     const parsed = def.schema.safeParse(params);
     if (!parsed.success) return this.fail(record, { code: 'params.invalid', message: parsed.error.message });
     record.params = parsed.data;

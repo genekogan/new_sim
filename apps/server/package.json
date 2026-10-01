@@ -20,7 +20,8 @@
     "jose": "^6.2.12",
     "ws": "^8.22.0",
     "zod": "^4.6.5",
-    "@sim/kernel": "workspace:*"
+    "@sim/kernel": "workspace:*",
+    "@sim/engine-mars": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

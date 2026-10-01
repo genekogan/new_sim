@@ -19,6 +19,7 @@ export const config = {
   compilerModel: env.COMPILER_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
   talkModel: env.TALK_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
   worldSeed: env.WORLD_SEED ?? 'sim-genesis-1',
+  engine: (env.ENGINE === 'mars' ? 'mars' : 'toy') as 'toy' | 'mars',
   snapshotEveryTicks: Number(env.SNAPSHOT_EVERY_TICKS ?? 20 * 60 * 5),
   seedNatives: env.SEED_NATIVES !== '0',
   maxSoulsPerUser: Number(env.MAX_SOULS_PER_USER ?? 5),

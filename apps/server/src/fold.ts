@@ -10,7 +10,8 @@ import {
 } from '@sim/kernel';
 import type { BirthPayload, DecisionPayload, DeckPayload, LogEvent, MintPayload, PlayPayload, PlayView } from '@sim/protocol';
 
-export const ARRIVAL_PLACE = 'gate';
+/** Where Souls arrive: the place the engine tags as its arrival point. */
+export const arrivalPlace = (k: KState): string | null => Object.keys(k.things).sort().find((id) => Array.isArray(k.things[id].traits.tags) && (k.things[id].traits.tags as string[]).includes('arrival')) ?? null;
 
 /** A fresh kernel for an engine world: the starting vocabulary plus a place Thing per physical anchor. */
 export function initKernel(engine: Engine): KState {
@@ -42,7 +43,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
     case 'birth': {
       const p = e.payload as BirthPayload;
       engine.spawnHuman({ id: p.entityId, label: p.name, soul: p.soulId });
-      soulThing(k, p, k.things[ARRIVAL_PLACE] ? ARRIVAL_PLACE : null);
+      soulThing(k, p, arrivalPlace(k));
       return {};
     }
     case 'decision': {
