@@ -296,7 +296,10 @@ export class Brain {
         verdicts.push({ name: card.name, ok: true, hash }); continue;
       }
       await this.host.enqueue('mint', `soul:${m.soulId}`, { card: { ...card, hash, by: m.soulId, mintedAt: tick, origin }, forSoul: m.soulId, ...(first && Object.keys(newLinks).length ? { links: newLinks } : {}), ...(first && Object.keys(newKinds).length ? { kinds: newKinds } : {}) });
-      first = false; verdicts.push({ name: card.name, ok: true, hash });
+      first = false;
+      // the mint has been applied by now: if another Soul's card took the name in the same instant, say so
+      const won = k.vocab.cards[card.name]?.hash === hash;
+      verdicts.push(won ? { name: card.name, ok: true, hash } : { name: card.name, ok: false, problems: [`a different card named "${card.name}" was minted first; choose another name`] });
     }
     return verdicts;
   }

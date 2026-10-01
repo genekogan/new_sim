@@ -14,7 +14,7 @@ export const BASE_LINKS: Record<string, LinkKind> = {
   knows: { summary: 'has met and talked with', mutual: true },
   hosts: { summary: 'is the host of', control: true },
   attends: { summary: 'is taking part in' },
-  agreed: { summary: 'said yes to a request from' },
+  agreed: { summary: 'said yes to a request from (made only by saying yes; stands for thirty minutes)' },
   made: { summary: 'brought into being', control: true },
   holds: { summary: 'has in hand or in care', control: true },
 };
@@ -47,7 +47,7 @@ export const BASE_CARDS: Card[] = [
     approach: [{ verb: 'walk_to', params: { to: '$target', standoff: 1.3 } }], during: [{ verb: 'converse', params: { with: '$target', seconds: 30 } }], takes: 'minute' },
   { name: 'say yes', summary: 'Agree to what someone just asked', good_when: 'someone asked for something reasonable and the Soul is willing', not_for: 'the request goes against the Soul’s nature',
     target: { kind: 'soul', same_place: true }, when: [{ said: ['$target', '$actor', 'ask'] }, { notLinked: ['agreed', '$actor', '$target'] }],
-    then: [{ say: ['$actor', '$target', 'agree'] }, { link: ['agreed', '$actor', '$target'], forSeconds: 1800 }], approach: [], during: [{ verb: 'wave', params: { at: '$target', seconds: 2 } }], takes: 'seconds' },
+    then: [{ say: ['$actor', '$target', 'agree'] }], approach: [], during: [{ verb: 'wave', params: { at: '$target', seconds: 2 } }], takes: 'seconds' },
   { name: 'say no', summary: 'Decline what someone just asked', good_when: 'the request does not suit the Soul or the moment', not_for: 'a harmless request the Soul would enjoy granting',
     target: { kind: 'soul', same_place: true }, when: [{ said: ['$target', '$actor', 'ask'] }, { notLinked: ['agreed', '$actor', '$target'] }],
     then: [{ say: ['$actor', '$target', 'decline'] }, { unlink: ['said', '$target', '$actor'] }], approach: [], during: [{ verb: 'rest', params: { seconds: 3 } }], takes: 'seconds' },

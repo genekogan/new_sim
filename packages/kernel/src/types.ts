@@ -78,7 +78,7 @@ export const stepSchema = z.union([
   z.strictObject({ link: z.tuple([z.string().max(40), ref, ref]), value: z.number().optional(), data: z.any().optional(), forSeconds: z.number().min(1).max(86400).optional() }),
   z.strictObject({ unlink: z.tuple([z.string().max(40), ref, ref]) }),
   z.strictObject({ say: z.tuple([ref, ref, z.string().max(24)]), about: z.any().optional() }),
-  z.strictObject({ appear: z.strictObject({ kind: z.string().max(40), name: z.string().max(80), at: ref, states: z.record(z.string(), z.any()).optional() }), linkFromActor: z.string().max(40).optional() }),
+  z.strictObject({ appear: z.strictObject({ kind: z.string().max(40), name: z.string().max(80), at: ref, with: ref.optional(), states: z.record(z.string(), z.any()).optional() }), linkFromActor: z.string().max(40).optional() }),
   z.strictObject({ vanish: ref }),
 ]);
 export type Step = z.infer<typeof stepSchema>;

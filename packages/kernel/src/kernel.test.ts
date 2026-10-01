@@ -28,7 +28,7 @@ const BE_DJ: Card = {
   name: 'be the dj', summary: 'Set up and play music at a gathering, once the host has agreed', good_when: 'the host said yes', not_for: 'no agreement yet',
   target: { kind: 'gathering' }, derive: { host: { link: 'hosts', to: '$target' } },
   when: [{ at: ['$actor', '$target'] }, { linked: ['agreed', '$host', '$actor'] }, { noneLinkedTo: ['dj of', '$target'] }],
-  then: [{ link: ['dj of', '$actor', '$target'] }, { appear: { kind: 'dj kit', name: 'a DJ kit', at: '$target.at', states: { state: 'playing' } }, linkFromActor: 'made' }, { set: ['$target', 'music', 'playing'] }, { set: ['$actor', 'doing', 'playing music'] }],
+  then: [{ link: ['dj of', '$actor', '$target'] }, { appear: { kind: 'dj kit', name: 'a DJ kit', at: '$target.at', with: '$target', states: { state: 'playing' } }, linkFromActor: 'made' }, { set: ['$target', 'music', 'playing'] }, { set: ['$actor', 'doing', 'playing music'] }],
   approach: [], during: [{ verb: 'perform', params: { seconds: 60 } }], wants: ['set up equipment', 'dj at a deck'], takes: 'minutes' };
 
 test('coherence: an actor cannot change another Soul, and can only assert its own links', () => {
@@ -91,6 +91,7 @@ test('the DJ story: host, join, ask, agree, become the DJ, others dance: all fro
   // the host ends it; links to it disappear
   play(s, 'rob', 'end the gathering', party.id);
   assert.equal(s.things[party.id], undefined); assert.equal(linksTo(s, party.id).length, 0);
+  assert.equal(Object.values(s.things).filter((t) => t.kind === 'dj kit').length, 0, 'the kit was made to exist with the party, and went with it');
 });
 
 test('changes are deterministic and replayable', () => {
@@ -114,4 +115,33 @@ test('looking one step ahead: a blocked step is served by whatever play brings i
   assert.deepEqual([...r], [`end the gathering@${party}`]);
   // looking ahead never changes the world
   const h = kernelHash(s); enablers(s, 'wren', { card: s.vocab.cards[ASK_DJ.name], targets: () => [party] }, playable(s, 'wren', all)); assert.equal(kernelHash(s), h);
+});
+
+test('the world is not anyone’s to change; speech and agreement cannot be forged; makers are bounded', () => {
+  const s = world();
+  // a card that erases or defaces its target is valid grammar, and is refused where it matters: at the change
+  const erase: Card = { name: 'erase', summary: 'x', target: { kind: 'place' }, when: [], then: [{ vanish: '$target' }], approach: [], during: [], takes: 'seconds' };
+  const deface: Card = { name: 'deface', summary: 'x', target: { kind: 'place' }, when: [], then: [{ set: ['$target', 'ruined', true] }], approach: [], during: [], takes: 'seconds' };
+  for (const c of [erase, deface]) {
+    const r = applyAll(s, changesOf(s, c, bind(s, c, 'wren', 'campfire')!, undefined).changes, 'wren');
+    assert.equal(r.ok, false); if (!r.ok) assert.equal(r.code, 'coherence.not-yours');
+  }
+  assert.ok(s.things.campfire && s.things.campfire.states.ruined === undefined);
+  // what a Soul made is its own, and nobody else's
+  assert.equal(applyAll(s, [{ op: 'appear', id: 'kite', kind: 'kite', name: 'a kite', at: 'bench' }], 'wren').ok, true);
+  assert.equal(applyAll(s, [{ op: 'set', id: 'kite', key: 'colour', value: 'red' }], 'wren').ok, true);
+  assert.equal(applyAll(s, [{ op: 'vanish', id: 'kite' }], 'rob').ok, false);
+  // an agreement exists only because someone said yes
+  assert.equal(applyAll(s, [{ op: 'link', kind: 'agreed', from: 'rob', to: 'wren' }], 'rob').ok, false);
+  assert.equal(applyAll(s, [{ op: 'link', kind: 'said', from: 'rob', to: 'wren' }], 'rob').ok, false);
+  const bless = { ...ASK_DJ, name: 'bless', then: [{ link: ['agreed', '$actor', '$target'] }] };
+  const forged = { ...ASK_DJ, name: 'forge', then: [{ appear: { kind: 'note', name: 'n', at: '$target' }, linkFromActor: 'said' }] };
+  for (const c of [bless, forged]) { const v = validateCard(c, s, VERBS); assert.equal(v.ok, false); if (!v.ok) assert.ok(v.problems.some((p) => p.includes('comes only from saying it')), v.problems.join('; ')); }
+  assert.equal(applyAll(s, [{ op: 'say', from: 'rob', to: 'wren', act: 'agree' }], 'rob').ok, true);
+  assert.ok(linked(s, 'agreed', 'rob', 'wren'));
+  s.tick += 20 * 1801; assert.equal(linked(s, 'agreed', 'rob', 'wren'), undefined, 'and it lapses');
+  // bounds: a card is small, and a Soul cannot fill the world with things
+  const fat = validateCard({ ...ASK_DJ, name: 'fat', summary: 'x'.repeat(5000) }, s, VERBS); assert.equal(fat.ok, false);
+  let made = 0; for (let i = 0; i < 40; i++) if (applyAll(s, [{ op: 'appear', id: `junk${i}`, kind: 'junk', name: 'junk', at: 'bench' }], 'oda').ok) made++;
+  assert.equal(made, 24);
 });

@@ -1,3 +1,4 @@
+import { bodyLimit } from 'hono/body-limit';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
@@ -34,6 +35,8 @@ export function buildApp(d: Deps) {
     return c.json({ ok: false, code: 'internal', message: 'internal error' }, 500);
   });
   app.use('*', async (c, next) => { await next(); c.header('X-Robots-Tag', 'noindex, nofollow'); });
+  // Nothing a person or an agent sends is large: a command, an intent, a few cards.
+  app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ error: { code: 'too-large', message: 'request body is larger than 64 KB' } }, 413) }));
 
   // ---- public
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build }));

@@ -22,8 +22,8 @@ A Soul acts by playing **cards**. A card is a named, reusable action: when it is
 - \`move\`: only \`"$actor"\`.
 - \`link\`: must start from \`"$actor"\`. \`unlink\`: \`"$actor"\` must be one end.
 - \`say\`: from \`"$actor"\`.
-- \`set\`: on \`"$actor"\`, on \`"$new"\` (a thing this card just made), or on \`"$target"\`. Setting a state on the target works at run time only if the actor controls it (has a control link to it) or nobody does. Never on another Soul.
-- A card can never create, move or change another Soul. **To get something from someone, ask.** Write one card that asks (\`say … "ask"\`) and a second card whose \`when\` requires their agreement: when a Soul plays the built-in card \`say yes\`, the world gets a link \`["agreed", <that Soul>, <the asker>]\` lasting thirty minutes.
+- \`set\`: on \`"$actor"\`, on \`"$new"\` (a thing this card just made), or on \`"$target"\`. Changing the target works at run time only if the actor controls it (has a control link to it), or made it and nobody controls it. Never another Soul. Never the world's own places: nobody can change or remove those.
+- A card can never create, move or change another Soul. **To get something from someone, ask.** Write one card that asks (\`say … "ask"\`) and a second card whose \`when\` requires their agreement: when a Soul plays the built-in card \`say yes\`, the world gets a link \`["agreed", <that Soul>, <the asker>]\` lasting thirty minutes. Agreement and speech come only from saying: a card can never link \`agreed\` or \`said\` itself.
 - A link kind declared with \`"control": true\` gives power over its target (setting its states, ending it). It can only be made on a thing the actor made itself, or when someone who already controls the thing has an \`agreed\` link to the actor.
 
 ## Card format (JSON)
@@ -51,7 +51,7 @@ A Soul acts by playing **cards**. A card is a named, reusable action: when it is
 \`{"is":[ref,kind]}\` · \`{"at":[a,b]}\` a is at b or in the same place · \`{"notAt":[a,b]}\` · \`{"linked":[kind,from,to]}\` · \`{"notLinked":[kind,from,to]}\` · \`{"noneLinkedTo":[kind,to]}\` nobody has that link to it · \`{"state":[ref,key,value]}\` · \`{"notState":[ref,key,value]}\` · \`{"said":[from,to,act]}\` from said that act to to within the last two minutes · \`{"distinct":[a,b]}\`
 
 **Steps** (\`then\`, in order, 1 to 8):
-\`{"move":["$actor", ref]}\` · \`{"set":[ref,key,value]}\` (value null clears) · \`{"link":[kind,"$actor",to], "forSeconds":600, "data":…}\` · \`{"unlink":[kind,from,to]}\` · \`{"say":["$actor",to,act], "about":"…"}\` with act one of greet, ask, agree, decline, invite, tell, chat · \`{"appear":{"kind":"…","name":"…","at":ref,"states":{…}}, "linkFromActor":"made"}\` · \`{"vanish":ref}\`
+\`{"move":["$actor", ref]}\` · \`{"set":[ref,key,value]}\` (value null clears) · \`{"link":[kind,"$actor",to], "forSeconds":600, "data":…}\` · \`{"unlink":[kind,from,to]}\` · \`{"say":["$actor",to,act], "about":"…"}\` with act one of greet, ask, agree, decline, invite, tell, chat · \`{"appear":{"kind":"…","name":"…","at":ref,"with":ref,"states":{…}}, "linkFromActor":"made"}\` (\`with\` is optional: the new thing exists only as long as that thing does, e.g. a DJ kit \`with\` its gathering; a Soul may have at most 24 things of its making at a time) · \`{"vanish":ref}\`
 
 By convention a card that changes what the Soul is visibly doing sets \`["$actor","doing","<a few words>"]\`.
 
@@ -102,6 +102,8 @@ export const COMPILE_TOOL: ToolDef = {
 };
 export type CompileOut = { understood: boolean; reason?: string; agenda: { card: string; target: string | null; of?: string | null }[]; new_cards?: unknown[]; new_links?: Record<string, { summary: string; control?: boolean }>; new_kinds?: Record<string, { summary: string }> };
 
+/** User-written text placed in a prompt: one line, and unable to open or close a tag. */
+const plain = (v: unknown, max = 200) => String(v ?? '').replace(/[<>\r\n]+/g, ' ').slice(0, max);
 const cardLine = (c: MintedCard) => `- "${c.name}"${c.target ? ` (on a ${c.target.kind})` : ''}: ${c.summary}`;
 
 /** The uncached part: this Soul, its wish, what it holds, what exists. */
@@ -110,11 +112,11 @@ export function compileUser(k: KState, soulId: string, wish: string, known: stri
   const inDeck = deck.map((n) => k.vocab.cards[n]).filter(Boolean), library = Object.values(k.vocab.cards).filter((c) => !deck.includes(c.name));
   const things = known.map((id) => k.things[id]).filter(Boolean).map((t) => {
     const links = Object.values(k.links).filter((l) => l.to === t.id && (l.until === undefined || l.until >= k.tick) && l.kind !== 'said').map((l) => `${k.things[l.from]?.name ?? l.from} ${l.kind}`);
-    return `- ${t.id} | ${t.kind} | ${t.name}${t.at ? ` | at ${k.things[t.at]?.name ?? t.at}` : ''}${Object.keys(t.states).length ? ` | ${JSON.stringify(t.states)}` : ''}${links.length ? ` | ${links.join('; ')}` : ''}`;
+    return `- ${t.id} | ${t.kind} | ${plain(t.name, 60)}${t.at ? ` | at ${plain(k.things[t.at]?.name ?? t.at, 60)}` : ''}${Object.keys(t.states).length ? ` | ${plain(JSON.stringify(t.states), 160)}` : ''}${links.length ? ` | ${plain(links.join('; '), 200)}` : ''}`;
   });
-  return `<soul>${soul.name}: ${String(soul.traits.about ?? '')} (currently at ${soul.at ? (k.things[soul.at]?.name ?? soul.at) : 'nowhere'})</soul>
+  return `<soul>${plain(soul.name, 40)}: ${plain(soul.traits.about)} (currently at ${soul.at ? (k.things[soul.at]?.name ?? soul.at) : 'nowhere'})</soul>
 
-<wish>${wish.slice(0, 280)}</wish>
+<wish>${plain(wish, 280)}</wish>
 
 Cards in this Soul's deck:
 ${inDeck.map(cardLine).join('\n')}

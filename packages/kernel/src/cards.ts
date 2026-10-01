@@ -118,17 +118,24 @@ export function changesOf(s: KState, card: Card, b: Bindings, manner: string | u
     else if ('appear' in st) {
       const id = `t_${nextId++}`; bb.new = id;
       const at = st.appear.at === '$target' ? bb.target : r(st.appear.at);
-      out.push({ op: 'appear', id, kind: st.appear.kind, name: String(text(st.appear.name)), at, ...(st.appear.states ? { states: st.appear.states as Record<string, Json> } : {}) });
+      const tied = st.appear.with ? r(st.appear.with) : undefined;
+      out.push({ op: 'appear', id, kind: st.appear.kind, name: String(text(st.appear.name)), at, ...(tied ? { traits: { with: tied } } : {}), ...(st.appear.states ? { states: st.appear.states as Record<string, Json> } : {}) });
       if (st.linkFromActor) out.push({ op: 'link', kind: st.linkFromActor, from: bb.actor, to: id });
     } else if ('vanish' in st) out.push({ op: 'vanish', id: r(st.vanish) });
   }
   return { changes: out, bindings: bb, nextId };
 }
 
+export const MAX_CARD_BYTES = 4000;
+export const MAX_CARDS = 5000;
 /** Static validation of a proposed card against the grammar and the coherence rule. Returns problems in plain words. */
 export function validateCard(input: unknown, s: KState, engineVerbs: Set<string>): { ok: true; card: Card } | { ok: false; problems: string[] } {
+  // Bounded before anything else looks at it: a card is a few lines, never a document.
+  let size = 0; try { size = JSON.stringify(input)?.length ?? 0; } catch { return { ok: false, problems: ['the card is not plain JSON'] }; }
+  if (size > MAX_CARD_BYTES) return { ok: false, problems: [`the card is too large (${size} characters; the limit is ${MAX_CARD_BYTES})`] };
   const p = cardSchema.safeParse(input);
   if (!p.success) return { ok: false, problems: p.error.issues.map((i) => `${i.path.join('.') || 'card'}: ${i.message}`) };
+  if (!s.vocab.cards[p.data.name] && Object.keys(s.vocab.cards).length >= MAX_CARDS) return { ok: false, problems: ['the library is full'] };
   const card = p.data, problems: string[] = [];
   const slots = new Set(['actor', 'region', ...(card.target ? ['target'] : []), ...Object.keys(card.derive ?? {}), 'new']);
   const okRef = (x: string) => !x.startsWith('$') || slots.has(x.slice(1).split('.')[0]);
@@ -140,8 +147,10 @@ export function validateCard(input: unknown, s: KState, engineVerbs: Set<string>
     if ('unlink' in st && st.unlink[1] !== '$actor' && st.unlink[2] !== '$actor') problems.push('a card may cut only links the actor is part of');
     if ('say' in st && st.say[0] !== '$actor') problems.push('a card speaks only for its actor');
     if ('set' in st && st.set[0] !== '$actor' && st.set[0] !== '$target' && st.set[0] !== '$new') problems.push('a card may set states only on the actor, its target, or a thing it just made');
-    if ('link' in st && st.link[0] === 'said') problems.push('"said" links are made by saying, not directly');
+    const made = 'link' in st ? st.link[0] : 'appear' in st ? st.linkFromActor : undefined;
+    if (made === 'said' || made === 'agreed') problems.push(`"${made}" comes only from saying it: use a say step (saying "agree" is what makes an agreement)`);
     if ('appear' in st && st.appear.kind === 'soul') problems.push('a card cannot make a Soul');
+    if ('appear' in st) for (const x of [st.appear.at, ...(st.appear.with ? [st.appear.with] : [])]) if (!okRef(x)) problems.push(`a step refers to an unknown slot ${x}`);
     for (const x of refsOf(Object.values(st)[0])) if (!okRef(x)) problems.push(`a step refers to an unknown slot ${x}`);
   }
   for (const d of [...card.approach, ...card.during]) if (!engineVerbs.has(d.verb)) problems.push(`the engine has no verb "${d.verb}" (list what you wanted under "wants" and use an existing verb)`);

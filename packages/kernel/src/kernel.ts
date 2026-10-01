@@ -7,6 +7,9 @@ import type { Change, Json, KState, Link, Thing } from './types.ts';
 
 export const linkKey = (kind: string, from: string, to: string) => `${kind}|${from}|${to}`;
 export const SAID_TICKS = 20 * 120; // something said stays "just said" for two minutes
+export const AGREED_TICKS = 20 * 1800; // an agreement stands for thirty minutes
+export const MAX_MADE = 24;   // things one Soul may have brought into being at a time
+export const MAX_LINKS = 400; // links one Soul may hold at a time
 
 export function emptyKernel(): KState {
   return { tick: 0, things: {}, links: {}, vocab: { kinds: {}, links: {}, cards: {}, manners: {} }, decks: {}, nextId: 1 };
@@ -36,20 +39,31 @@ export const controllers = (s: KState, id: string): string[] => linksTo(s, id).f
 export function check(s: KState, c: Change, by: string): void {
   const world = by === 'world';
   const exists = (id: string) => { if (!s.things[id]) throw new Refused('thing.unknown', `no such thing: ${id}`); return s.things[id]; };
+  // A thing that is not a Soul may be changed by whoever controls it. If nobody controls it, only by its maker,
+  // or by anyone when it is marked loose. Things the world made (places, regions) are therefore nobody's to change.
   const mayAlter = (t: Thing) => {
     if (world || t.id === by) return;
     if (t.kind === 'soul') throw new Refused('coherence.other-soul', `${by} cannot change another Soul (${t.name}); ask them instead`);
     const ctl = controllers(s, t.id);
-    if (ctl.length && !ctl.includes(by)) throw new Refused('coherence.controlled', `${t.name} is controlled by someone else`);
+    if (ctl.includes(by)) return;
+    if (ctl.length) throw new Refused('coherence.controlled', `${t.name} is controlled by someone else`);
+    if (t.by !== by && t.traits.loose !== true) throw new Refused('coherence.not-yours', `${t.name} is not yours to change`);
   };
   switch (c.op) {
-    case 'appear': if (s.things[c.id]) throw new Refused('thing.exists', `${c.id} already exists`); if (c.at !== null) exists(c.at); if (c.kind === 'soul' && !world) throw new Refused('coherence.soul', 'only the world brings Souls into being'); break;
+    case 'appear':
+      if (s.things[c.id]) throw new Refused('thing.exists', `${c.id} already exists`); if (c.at !== null) exists(c.at);
+      if (c.kind === 'soul' && !world) throw new Refused('coherence.soul', 'only the world brings Souls into being');
+      if (!world && Object.values(s.things).filter((t) => t.by === by).length >= MAX_MADE) throw new Refused('limit.things', `a Soul may have at most ${MAX_MADE} things of its making at a time`);
+      break;
     case 'vanish': mayAlter(exists(c.id)); if (s.things[c.id].kind === 'soul' && !world) throw new Refused('coherence.soul', 'a Soul cannot be removed by an action'); break;
     case 'set': mayAlter(exists(c.id)); break;
     case 'move': { const t = exists(c.id); if (c.to !== null) exists(c.to); if (!world && c.id !== by) { if (t.kind === 'soul') throw new Refused('coherence.other-soul', 'a Soul moves only itself'); mayAlter(t); } break; }
     case 'link': {
       exists(c.from); const target = exists(c.to);
       if (!world && c.from !== by) throw new Refused('coherence.link', 'an actor asserts only its own links');
+      // What was said and what was agreed come only from saying it.
+      if (!world && (c.kind === 'said' || c.kind === 'agreed')) throw new Refused('coherence.speech', `"${c.kind}" comes only from saying it`);
+      if (!world && !s.links[linkKey(c.kind, c.from, c.to)] && linksFrom(s, by).length >= MAX_LINKS) throw new Refused('limit.links', `a Soul may hold at most ${MAX_LINKS} links at a time`);
       // Control is taken only over what you made, over a loose thing nobody controls, or when someone who has it agreed.
       if (!world && s.vocab.links[c.kind]?.control) {
         const ctl = controllers(s, target.id);
@@ -68,16 +82,23 @@ export function apply(s: KState, c: Change): void {
   switch (c.op) {
     case 'appear': s.things[c.id] = { id: c.id, kind: c.kind, name: c.name, traits: c.traits ?? {}, states: c.states ?? {}, at: c.at, born: s.tick, by: '' }; break;
     case 'vanish': {
-      delete s.things[c.id];
-      for (const k of Object.keys(s.links)) { const l = s.links[k]; if (l.from === c.id || l.to === c.id) delete s.links[k]; }
-      for (const t of Object.values(s.things)) if (t.at === c.id) t.at = null;
+      // A thing takes with it whatever was made to exist only alongside it (traits.with), and so on down.
+      const gone = [c.id];
+      for (let i = 0; i < gone.length; i++) for (const t of Object.values(s.things)) if (t.traits.with === gone[i] && !gone.includes(t.id)) gone.push(t.id);
+      for (const id of gone) delete s.things[id];
+      for (const k of Object.keys(s.links)) { const l = s.links[k]; if (gone.includes(l.from) || gone.includes(l.to)) delete s.links[k]; }
+      for (const t of Object.values(s.things)) if (t.at !== null && gone.includes(t.at)) t.at = null;
       break;
     }
     case 'set': if (c.value === null) delete s.things[c.id].states[c.key]; else s.things[c.id].states[c.key] = c.value; break;
     case 'move': s.things[c.id].at = c.to; break;
     case 'link': s.links[linkKey(c.kind, c.from, c.to)] = { kind: c.kind, from: c.from, to: c.to, since: s.tick, ...(c.value !== undefined ? { value: c.value } : {}), ...(c.data !== undefined ? { data: c.data } : {}), ...(c.until !== undefined ? { until: c.until } : {}) }; break;
     case 'unlink': delete s.links[linkKey(c.kind, c.from, c.to)]; break;
-    case 'say': s.links[linkKey('said', c.from, c.to)] = { kind: 'said', from: c.from, to: c.to, since: s.tick, until: s.tick + SAID_TICKS, data: { act: c.act, ...(c.about !== undefined ? { about: c.about } : {}), ...(c.manner ? { manner: c.manner } : {}) } as Json }; break;
+    case 'say':
+      s.links[linkKey('said', c.from, c.to)] = { kind: 'said', from: c.from, to: c.to, since: s.tick, until: s.tick + SAID_TICKS, data: { act: c.act, ...(c.about !== undefined ? { about: c.about } : {}), ...(c.manner ? { manner: c.manner } : {}) } as Json };
+      // Saying yes is what makes an agreement: there is no other way to hold one.
+      if (c.act === 'agree') s.links[linkKey('agreed', c.from, c.to)] = { kind: 'agreed', from: c.from, to: c.to, since: s.tick, until: s.tick + AGREED_TICKS };
+      break;
   }
 }
 
@@ -99,4 +120,7 @@ export function applyAll(s: KState, changes: Change[], by: string): { ok: true }
 /** Drop links whose time has passed. Call occasionally; lapsed links are already invisible to queries. */
 export function sweep(s: KState): number { let n = 0; for (const k of Object.keys(s.links)) { const l = s.links[k]; if (l.until !== undefined && l.until < s.tick) { delete s.links[k]; n++; } } return n; }
 
-export const kernelHash = (s: KState): string => hashOf({ things: s.things, links: Object.fromEntries(Object.entries(s.links).filter(([, l]) => l.until === undefined || l.until >= s.tick)), decks: s.decks, cards: Object.keys(s.vocab.cards).sort() });
+export const kernelHash = (s: KState): string => hashOf({
+  things: s.things, links: Object.fromEntries(Object.entries(s.links).filter(([, l]) => l.until === undefined || l.until >= s.tick)), decks: s.decks, nextId: s.nextId,
+  cards: Object.fromEntries(Object.entries(s.vocab.cards).map(([n, c]) => [n, c.hash])), linkKinds: s.vocab.links, kinds: s.vocab.kinds, manners: s.vocab.manners,
+});

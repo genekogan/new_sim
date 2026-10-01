@@ -34,6 +34,9 @@ export function soulThing(k: KState, p: BirthPayload, at: string | null): void {
   k.decks[p.soulId] = { cards: [...BASE_DECK], manners: defaultManners(p.soulId) };
 }
 
+/** The most cards a Soul's deck holds. */
+export const MAX_DECK = 80;
+
 export type FoldResult = { play?: PlayView; programId?: string; programOk?: boolean; programCode?: string };
 
 /** Apply one logged event to the engine and the kernel. Deterministic; returns what happened for the host's bookkeeping. */
@@ -78,12 +81,14 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       if (p.kinds) for (const [n, d] of Object.entries(p.kinds)) k.vocab.kinds[n] ??= d;
       if (p.links) for (const [n, d] of Object.entries(p.links)) k.vocab.links[n] ??= d;
       k.vocab.cards[p.card.name] ??= p.card;
-      if (p.forSoul && k.decks[p.forSoul] && !k.decks[p.forSoul].cards.includes(p.card.name)) k.decks[p.forSoul].cards.push(p.card.name);
+      // If someone else minted a different card under this name first, theirs stands and this Soul is not dealt it.
+      const same = k.vocab.cards[p.card.name].hash === p.card.hash, d = p.forSoul ? k.decks[p.forSoul] : undefined;
+      if (same && d && !d.cards.includes(p.card.name) && d.cards.length < MAX_DECK) d.cards.push(p.card.name);
       return {};
     }
     case 'deck': {
       const p = e.payload as DeckPayload; const d = k.decks[p.soulId]; if (!d) return {};
-      for (const c of p.add ?? []) if (k.vocab.cards[c] && !d.cards.includes(c)) d.cards.push(c);
+      for (const c of p.add ?? []) if (k.vocab.cards[c] && !d.cards.includes(c) && d.cards.length < MAX_DECK) d.cards.push(c);
       if (p.remove) d.cards = d.cards.filter((c) => !p.remove!.includes(c));
       if (p.manners) d.manners = p.manners.filter((m) => k.vocab.manners[m]).slice(0, 4);
       return {};

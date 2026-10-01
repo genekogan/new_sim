@@ -117,7 +117,10 @@ export class Souls {
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many commands; slow down', { retry_after: lim.retryAfter });
     const mind = this.host.minds.get(soul.id);
     if (!mind) throw new ApiError(409, 'not-in-world', 'this soul is not in the world yet');
-    const c = await this.brain.compile(mind, text);
+    // The compiler is the expensive tier and its budget is shared, so each owner gets a fair hourly share of it;
+    // past that, the small translator still understands plain goals.
+    const fair = this.limits.allow(`compile:${soul.owner}`, 12, 3600_000).ok;
+    const c = fair ? await this.brain.compile(mind, text) : null;
     if (c) {
       if (!c.ok) return { ok: false as const, reason: c.reason, via: 'compiler' };
       const r = await this.setIntent(soul, { agenda: c.agenda, text: text.slice(0, 280) }, source);
