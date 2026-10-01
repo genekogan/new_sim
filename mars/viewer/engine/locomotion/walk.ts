@@ -22,6 +22,7 @@ import { cellOf, clearanceAt, nearestBlocker, segmentClearance, type LevelGrid }
 import { PLAN_MARGIN, type Leg, type LinkLeg, type Route, type WalkLeg } from '../spatial/path.ts';
 import { smoothPolyline, type PathSeg } from './spline.ts';
 import { HUMAN_PROFILE, type AgentProfile } from '../spatial/types.ts';
+import { gapToSleep, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 
 const ACCEL = 1.2; // m/s²
 const BRAKE = 2 * ACCEL; // m/s² ordinary deceleration
@@ -206,6 +207,8 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     if ('code' in a) return { ok: false, diagnostic: a };
     if (a.human!.grip)
       return { ok: false, diagnostic: { code: 'actor.holding', message: `${p.actor} is holding ${a.human!.grip.entity} and cannot walk away until it is set down or stable`, subjects: [p.actor, a.human!.grip.entity] } };
+    const sleeper = occupant(rt, a, [p.x, p.z], HUMAN_PROFILE.radius, true, p.level ?? a.human!.level);
+    if (sleeper) return { ok: false, diagnostic: { code: 'walk.goal-occupied', message: `${p.actor}'s destination overlaps ${sleeper}'s supported sleep space`, subjects: [p.actor, sleeper] } };
     const r = planWalk(rt, a, { level: p.level ?? a.human!.level, p: [p.x, p.z] });
     return r.ok ? { ok: true, program: r.route } : { ok: false, diagnostic: { ...r.diagnostic, subjects: [p.actor, ...(r.diagnostic.subjects ?? [])] } };
   },
@@ -413,6 +416,8 @@ function tryEnter(rt: Runtime, ex: Exec, n: Narrow): string | null {
 
 /** Existing person/load recovery path, shared with the bounded persistent-wait request. */
 function retryPeople(rt: Runtime, ex: Exec, a: Entity): boolean {
+  // Do not substitute a snapped safe endpoint for a destination inside a sleeper.
+  if (!ex.cancelTo && occupant(rt, a, ex.goal.p, ex.profile.radius, true, ex.goal.level)) return false;
   const sp = spatial(rt);
   ex.stuck = 0;
   ex.still = 0;
@@ -881,9 +886,13 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     const y = yieldsOf(rt)[personBlock];
     if (ex.held.size && y && y.to === ex.actor && rt.tick - y.tick <= 1 && rt.tick - y.since >= RELEASE_AFTER && (ex.still ?? 0) >= RELEASE_AFTER) releaseAll(rt, ex);
     makeWay(rt, personBlock, pointAt(ex, ex.total));
+    if (!ex.cancelTo && occupant(rt, a, ex.goal.p, ex.profile.radius, true, ex.goal.level) === personBlock)
+      return blockedWait(rt, ex.id, ex.actor, [personBlock], { code: 'walk.goal-occupied', message: `${ex.actor}'s destination overlaps ${personBlock}'s supported sleep space`, subjects: [ex.actor, personBlock] });
     return blockedWait(rt, ex.id, ex.actor, [personBlock], { code: 'traffic.person', message: `${ex.actor} is waiting for ${personBlock} to move out of the way`, subjects: [ex.actor, personBlock] });
   }
   if (arrived) {
+    const sleeper = !ex.cancelTo && occupant(rt, a, ex.goal.p, ex.profile.radius, true, ex.goal.level);
+    if (sleeper) return blockedWait(rt, ex.id, ex.actor, [sleeper], { code: 'walk.goal-occupied', message: `${ex.actor}'s destination overlaps ${sleeper}'s supported sleep space`, subjects: [ex.actor, sleeper] });
     if (lagging) return { status: 'running', phase: 'settle' }; // the body is still closing on the corridor point
     if (Math.abs(ex.offset) > 0.05) {
       const occ = occupant(rt, a, pointAt(ex, ex.total), ex.profile.radius);
@@ -927,6 +936,11 @@ function intrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): st
   for (const o of entitiesOf(rt)) {
     if (o.id === me.id || o.kind !== 'human' || o.human?.level !== me.human!.level) continue;
     if (Math.abs(o.pose.p[1] - me.pose.p[1]) > 1.0) continue;
+    const sleepTo = gapToSleep(o, to);
+    if (sleepTo !== null) {
+      if (sleepTo <= r + SLEEP_BODY_MARGIN && sleepTo < gapToSleep(o, from)! - 1e-9) return o.id;
+      continue;
+    }
     const dTo = hypot(o.pose.p[0] - to[0], o.pose.p[2] - to[1]);
     if (dTo >= 2 * r - 0.02) continue;
     const dFrom = hypot(o.pose.p[0] - from[0], o.pose.p[2] - from[1]);
@@ -1011,17 +1025,17 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
   const reach = horizon + 2 * r + 1.0;
   // `near`: only the next few centimetres matter (contact avoidance, no cancelled steps): a walker that
   // is momentarily blocked is still a walker, handled by the encounter rules (give way, pass, follow)
-  const cands: { id: string; kind: 'person' | 'load'; p: Vec2; need: number; now: number; near?: boolean }[] = [];
+  const cands: { id: string; kind: 'person' | 'load'; p: Vec2; need: number; now: number; near?: boolean; sleeper?: Entity }[] = [];
   for (const o of entitiesOf(rt)) {
     if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level || Math.abs(o.pose.p[1] - a.pose.p[1]) > 1.0) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
-    const now = dist2(me, q);
+    const sleepNow = gapToSleep(o, me), now = sleepNow ?? dist2(me, q);
     if (now > reach || isActiveWalker(rt, o)) continue;
     // (people the route was planned around stay candidates: the smoothed route keeps ≥ 0.58 m from
     // them so they never trigger, unless the start snapped close to one — then we stop, not push)
     const t = o.human!.task;
     const walker = !!t && rt.records.get(t)?.verb === 'walk_to' && rt.isActive(t);
-    cands.push({ id: o.id, kind: 'person', p: q, need: 2 * r - 0.02, now, near: walker });
+    cands.push({ id: o.id, kind: 'person', p: q, need: sleepNow !== null ? r + SLEEP_BODY_MARGIN : 2 * r - 0.02, now, near: walker, ...(sleepNow !== null ? { sleeper: o } : {}) });
   }
   for (const d of loadDiscsFor(rt, a)) {
     const now = dist2(me, d.p);
@@ -1050,8 +1064,8 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
     }
     for (const c of cands) {
       if (c.near && dd > NEAR_LOOK) continue;
-      const dq = dist2(q, c.p);
-      if (dq < c.need && dq < c.now - 1e-9) return { d: dd, id: c.id, kind: c.kind };
+      const dq = c.sleeper ? gapToSleep(c.sleeper, q)! : dist2(q, c.p);
+      if ((c.sleeper ? dq <= c.need : dq < c.need) && dq < c.now - 1e-9) return { d: dd, id: c.id, kind: c.kind };
     }
     return null;
   };
@@ -1152,9 +1166,13 @@ function stepAwayClear(rt: Runtime, me: Entity, from: Vec2, q: Vec2): boolean {
   return true;
 }
 
-function occupant(rt: Runtime, me: Entity, p: Vec2, r: number): string | null {
-  for (const o of entitiesOf(rt))
-    if (o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level && hypot(o.pose.p[0] - p[0], o.pose.p[2] - p[1]) < 2 * r) return o.id;
+function occupant(rt: Runtime, me: Entity, p: Vec2, r: number, sleepOnly = false, level = me.human!.level): string | null {
+  for (const o of entitiesOf(rt)) {
+    if (o.id === me.id || o.kind !== 'human' || o.human?.level !== level) continue;
+    const sleepGap = gapToSleep(o, p);
+    if (sleepGap !== null) { if (sleepGap <= r + SLEEP_BODY_MARGIN) return o.id; }
+    else if (!sleepOnly && hypot(o.pose.p[0] - p[0], o.pose.p[2] - p[1]) < 2 * r) return o.id;
+  }
   return null;
 }
 
@@ -1171,17 +1189,18 @@ function sidestepTarget(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, along: n
   const s = Math.min(ex.total, ex.s + Math.max(0, along));
   const base = pointAt(ex, s);
   const n: Vec2 = rot2(tangentAt(ex, s), -Math.PI / 2);
-  const people: Vec2[] = [];
+  const people: { p: Vec2; sleeper?: Entity }[] = [];
   for (const o of entitiesOf(rt)) {
     if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level || isActiveWalker(rt, o)) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
-    if (dist2(q, base) < STATIC_OFFSET + 2 * r + 0.5) people.push(q);
+    const sleepGap = gapToSleep(o, base);
+    if ((sleepGap ?? dist2(q, base)) < STATIC_OFFSET + 2 * r + 0.5) people.push({ p: q, ...(sleepGap !== null ? { sleeper: o } : {}) });
   }
   const room = (off: number) => {
     const q = add2(base, scale2(n, -off));
     if (segmentClearance(g, base, q) < r) return -Infinity;
     let m = clearanceAt(g, q) - r;
-    for (const o of people) m = Math.min(m, dist2(q, o) - (2 * r - 0.02));
+    for (const o of people) m = Math.min(m, o.sleeper ? gapToSleep(o.sleeper, q)! - (r + SLEEP_BODY_MARGIN) : dist2(q, o.p) - (2 * r - 0.02));
     return m;
   };
   let best = 0, bestRoom = room(0);

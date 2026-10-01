@@ -10,6 +10,7 @@ import { buildGrids, gridsWithObstacles, StaticRaster, updateGrids, type GridSet
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 import type { Profiler } from '../runtime/profile.ts';
+import { sleepEnvelope, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
@@ -63,7 +64,10 @@ export type AroundPerson = { id: string; p: Vec2; y?: number; half?: number };
 function aroundObstacle(world: WorldState, q: AroundPerson): { o: Obstacle; foot?: number }[] {
   const e = world.entities[q.id] ?? world.entities[q.id.split('#')[0]];
   const h = q.half ?? 0.3;
-  const obbs = [{ c: q.p, half: [h, h] as Vec2, yaw: 0 }, ...(q.half === undefined ? [] : [{ c: q.p, half: [h, h] as Vec2, yaw: Math.PI / 4 }])];
+  // Sleep reserves the entire lie/rise union; crowd squeezing must not shrink it.
+  const envelope = e?.human ? sleepEnvelope(e) : null;
+  const sleeping = envelope ? { ...envelope, half: [envelope.half[0] + SLEEP_BODY_MARGIN, envelope.half[1] + SLEEP_BODY_MARGIN] as Vec2 } : null;
+  const obbs = sleeping ? [sleeping] : [{ c: q.p, half: [h, h] as Vec2, yaw: 0 }, ...(q.half === undefined ? [] : [{ c: q.p, half: [h, h] as Vec2, yaw: Math.PI / 4 }])];
   if (q.y === undefined && e && e.kind !== 'human') {
     const f = entityFootprint(e);
     return obbs.map((obb) => ({ o: { id: q.id, obb, y0: f.y0, y1: f.y1, kind: 'solid' as const, label: `${e.label ?? e.id} (moving)` } }));
@@ -246,7 +250,7 @@ export class Spatial {
   private gridsAroundNow(world: WorldState, people: AroundPerson[]): { scene: SpatialScene; grids: GridSet } {
     this.sync(world);
     const placed = people.flatMap((q) => aroundObstacle(world, q));
-    const key = `${this.epoch}|${placed.map(({ o, foot }) => `${o.id}@${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.yaw},${o.y0},${o.y1},${foot ?? ''}`).join(';')}`;
+    const key = `${this.epoch}|${placed.map(({ o, foot }) => `${o.id}@${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw},${o.y0},${o.y1},${foot ?? ''}`).join(';')}`;
     let hit = this.aroundCache.get(key);
     if (hit) {
       this.aroundCache.delete(key);

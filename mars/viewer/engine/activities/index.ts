@@ -34,3 +34,6 @@ export type { PairedWalkParams, PairedWalkControlParams, PairedWalkReadout, Pair
 
 export { PREPARATION_ACTIONS, prepareFood, readFoodPreparation } from './prepare-food.ts';
 export type { PrepareFoodParams } from './prepare-food.ts';
+
+export { SLEEP_ACTIONS, sleep, sleepHold, sleepControl, readSleep } from './sleep.ts';
+export type { SleepParams, SleepPose, SleepMode } from './sleep.ts';

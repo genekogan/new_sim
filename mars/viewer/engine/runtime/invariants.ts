@@ -9,6 +9,7 @@ import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '
 import { isCarryLoad } from '../carry/formation.ts';
 import type { WorldState } from '../world/types.ts';
 import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP } from '../locomotion/walk.ts';
+import { sleepSafetyIssue } from '../activities/sleep.ts';
 
 const TOL = 0.03;
 /**
@@ -52,6 +53,17 @@ export const humanHumanSeparation: Invariant = (rt: Runtime) => {
       if (d < 2 * HUMAN_RADIUS - 0.08)
         out.push({ code: 'collision.human-human', message: `${a.id} and ${b.id} overlap (${d.toFixed(2)} m apart)`, subjects: [a.id, b.id], at: a.pose.p });
     }
+  return out;
+};
+
+/** Full lie/rise footprint, ordinary-ground support and active actor/mat ownership. */
+export const supportedSleepSafety: Invariant = (rt: Runtime) => {
+  const out: Diagnostic[] = [];
+  for (const e of Object.values(rt.world.entities)) {
+    if (!e.human?.sleepPose) continue;
+    const issue = sleepSafetyIssue(rt, e);
+    if (issue) out.push(issue);
+  }
   return out;
 };
 
@@ -186,4 +198,4 @@ export function forgetMotion(rt: Runtime) {
   lastPoses.delete(rt);
 }
 
-export const DEFAULT_INVARIANTS = [humanStaticClearance, humanHumanSeparation, noUnsupported, maxStepPerTick, speedWithinCap, holdersPresent];
+export const DEFAULT_INVARIANTS = [humanStaticClearance, humanHumanSeparation, supportedSleepSafety, noUnsupported, maxStepPerTick, speedWithinCap, holdersPresent];

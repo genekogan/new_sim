@@ -80,6 +80,8 @@ export type HumanState = {
    * kneel-up; `pose.yaw` keeps facing straight out over the edge (the lip PRONE_BACK ahead of `pose.p` along it).
    */
   proneYaw?: number;
+  /** Ground-mat sleep only: semantic progress, independent of renderer rig coordinates. */
+  sleepPose?: { mat: string; standingFraction: number };
 };
 
 /** Persistent committed quantities for one bounded cold preparation batch. */
