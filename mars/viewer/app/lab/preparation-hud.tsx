@@ -77,7 +77,7 @@ export function PreparationHud({
       <div data-testid="preparation-readout">
         {state.phase} · {state.status} ·{' '}
         {state.preparation?.complete
-          ? 'ready for serving'
+          ? servings > 0 ? 'ready for serving' : 'finished, no full servings remain'
           : 'unfinished, not ready for serving'}{' '}
         · mixing {state.mixedTicks}/{state.mixTicks}
       </div>
