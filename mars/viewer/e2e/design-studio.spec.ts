@@ -6,7 +6,7 @@ import type { EngineHook } from '../app/lab/hook.ts';
 declare global { interface Window { __marsEngine: EngineHook } }
 const artifacts = path.resolve('e2e/artifacts', process.env.E2E_RUN ?? 'design-studio');
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
-async function prepare(page: Page) {
+async function prepare(page: Page, paired = false) {
   await page.goto('/lab?scenario=design-studio');
   await page.waitForFunction(() => window.__marsEngine?.ready);
   await page.evaluate(() => window.__marsEngine.runScenario('design-studio', { paused: true }));
@@ -41,6 +41,7 @@ async function prepare(page: Page) {
     }
     throw Error('Critique did not start');
   });
+  if (paired) await page.getByRole('checkbox', { name: 'Walk to lunch together before sharing food', exact: true }).check();
   await button(page, 'Start purposeful routine').click();
   await button(page, 'Commit attendee continuations').click();
 }
@@ -63,6 +64,17 @@ async function capture(page: Page, filename: string, work = false) {
   mkdirSync(artifacts, { recursive: true });
   await page.getByTestId(work ? 'continuation-work' : 'purposeful-routine-readout').scrollIntoViewIfNeeded();
   await page.evaluate(work => window.__marsEngine.camera(work ? [11, 3.2, -7] : [-3, 7, 10], work ? [8, .8, -4] : [-2, 1, 1]), work);
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.screenshot({ path: path.join(artifacts, filename) });
+}
+async function capturePair(page: Page, filename: string) {
+  mkdirSync(artifacts, { recursive: true });
+  const positions = await page.evaluate(() => {
+    const e = window.__marsEngine, actors = e.purposefulRoutine()!.trip!.bindings.actors;
+    return actors.map(id => e.state().humans.find(h => h.id === id)!.p);
+  });
+  const centre = positions[0].map((v, i) => (v + positions[1][i]) / 2);
+  await page.evaluate(p => window.__marsEngine.camera([p[0] + 3, p[1] + 2.2, p[2] + 3.2], [p[0], p[1] + .8, p[2]]), centre);
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await page.screenshot({ path: path.join(artifacts, filename) });
 }
@@ -134,4 +146,42 @@ test('studio local pause and terminal End preserve other commitments, then reset
   await page.getByRole('combobox', { name: 'Scenario', exact: true }).selectOption('work-break-4');
   await expect(page.getByTestId('purposeful-routine-hud')).toContainText('Sketch notes');
   expect((await page.evaluate(() => window.__marsEngine.activityExample()))?.roles.worker).toBe('worker');
+});
+
+
+test('studio shared lunch walk recovers actual reviewer crossing during Play and finishes the same intentions', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await prepare(page, true);
+  const crossing = await page.evaluate(() => {
+    for (let i = 0; i < 16000; i++) {
+      const routine = window.__marsEngine.purposefulRoutine();
+      if (routine?.trip?.diagnostic?.code === 'paired_walk.regroup-traffic') return routine.trip;
+      if (routine?.mode === 'waiting' || routine?.status === 'failed') throw Error(JSON.stringify(routine));
+      window.__marsEngine.step();
+    }
+    throw Error('Actual reviewer crossing was not exercised');
+  });
+  expect(crossing.mode).toBe('regrouping');
+  expect(crossing.waitingReason).toContain('form-reviewer');
+  await capturePair(page, 'studio-paired-regroup-wait.png');
+  await button(page, 'Play').click();
+  await page.waitForFunction(() => {
+    const trip = window.__marsEngine.purposefulRoutine()?.trip;
+    return trip?.mode === 'walking' && trip.participants.every(p => p.progress > 1);
+  }, null, { timeout: 60_000 });
+  await button(page, 'Pause').click();
+  const walking = await page.evaluate(() => window.__marsEngine.purposefulRoutine()!.trip!);
+  expect(walking.action).toBe(crossing.action);
+  expect(walking.separation).toBeLessThanOrEqual(1.8);
+  expect(walking.ownedActions.slice(0, crossing.ownedActions.length)).toEqual(crossing.ownedActions);
+  await capturePair(page, 'studio-paired-walking.png');
+  const final = await advance(page, 'finished');
+  expect(final.routine.trip!.action).toBe(crossing.action);
+  expect(final.routine.trip!.participants.every(p => p.arrived)).toBe(true);
+  expect(final.routine.progress.meal.every(m => m.served && m.consumed && m.returned)).toBe(true);
+  expect(final.routine.progress.workElapsed).toBe(30);
+  expect(final.work.status).toBe('completed');
+  expect(final.discussion.status).toBe('completed');
+  await capture(page, 'studio-paired-returned-to-purpose.png', true);
+  await clean(page); expect(errors).toEqual([]);
 });

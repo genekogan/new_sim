@@ -8,6 +8,7 @@ import { readPurposefulRoutine } from '../activities/purposeful-routine.ts';
 import { readGatheringContinuation } from '../activities/gathering-continuation.ts';
 import { readWorkstation } from '../objects/workstation.ts';
 import { heldBy } from '../items/model.ts';
+import { pairedMealWalk } from '../scenarios/paired-meal-walk.ts';
 
 function runtime() {
   const world = designStudioWorld();
@@ -21,13 +22,15 @@ function until(rt: Runtime, done: () => boolean, max = 16000) {
 function submit(rt: Runtime, verb: string, params: unknown) {
   const rec = rt.submit(verb, params); assert.notEqual(rec.status, 'failed', rec.diagnostic?.message); return rec;
 }
-function start() {
+function start(paired = false) {
   const rt = runtime(), b = designStudioBindings(), notes = submit(rt, 'work_at', b.workBreak.work);
   until(rt, () => { const w = readWorkstation(rt, b.workBreak.work.station); return !('code' in w) && w.elapsed >= 2; });
   rt.cancel(notes.id); until(rt, () => !rt.isActive(notes.id));
   const session = submit(rt, 'classroom_session', b.session);
   until(rt, () => readClassroom(rt, session.id)?.phase === 'presenting');
-  const routine = submit(rt, 'purposeful_routine', designStudioRoutineParams(session.id));
+  const routineParams = designStudioRoutineParams(session.id);
+  if (paired) routineParams.trip = pairedMealWalk(b.roles.worker, b.roles.companion, -9);
+  const routine = submit(rt, 'purposeful_routine', routineParams);
   const params = designStudioContinuationParams(session.id, routine.id);
   const followUp = submit(rt, 'gathering_continuation', params.work), discussion = submit(rt, 'gathering_continuation', params.discussion);
   return { rt, b, session, routine, followUp, discussion };
@@ -148,4 +151,16 @@ test('fresh studio and same timed commands reproduce full authoritative state/ac
   assert.equal(a.rt.stateHash(), b.rt.stateHash()); assert.deepEqual([...a.rt.records.values()], [...b.rt.records.values()]);
   assert.deepEqual(a.rt.events, b.rt.events); assert.deepEqual(readPurposefulRoutine(a.rt, a.routine.id), readPurposefulRoutine(b.rt, b.routine.id));
   clean(a.rt); clean(b.rt);
+});
+
+
+test('same paired trip and continuing purposes work in independent studio without Mars actor IDs', () => {
+  const run = start(true), { rt, routine, b } = run;
+  finish(run);
+  const state = readPurposefulRoutine(rt, routine.id)!;
+  assert.deepEqual(state.trip?.bindings.actors, [b.roles.worker, b.roles.companion]);
+  assert.ok(state.trip?.participants.every(p => p.arrived));
+  assert.ok(state.progress.meal.every(p => p.served && p.consumed && p.returned));
+  for (const actor of state.trip!.bindings.actors) assert.deepEqual(rt.holder(`paired-walk:${actor}`), []);
+  clean(rt);
 });

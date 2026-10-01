@@ -9,6 +9,7 @@ import type { PurposefulRoutineParams } from '../activities/purposeful-routine.t
 import { readWorkstation } from '../objects/workstation.ts';
 import { readClassroom } from '../activities/classroom.ts';
 import { heldBy } from '../items/model.ts';
+import { pairedMealWalk } from '../scenarios/paired-meal-walk.ts';
 
 function until(rt: Runtime, done: () => boolean, max = 16000) {
   for (let i = 0; i < max && !done(); i++) rt.step();
@@ -325,3 +326,100 @@ for (const mismatch of ['user', 'task', 'durationSeconds'] as const)
     assert.equal(readPurposefulRoutine(rt, routine.id)!.mode, 'paused');
     assert.deepEqual(rt.violations, []);
   });
+
+
+for (const count of [4, 8] as const) test(`optional paired lunch trip in ${count} room completes before food and preserves same notes`, () => {
+  const { rt, params } = setup(count);
+  params.trip = pairedMealWalk('worker', 'visitor', -8);
+  const routine = rt.submit('purposeful_routine', params);
+  assert.notEqual(routine.status, 'failed', routine.diagnostic?.message);
+  let jointWalking = 0;
+  until(rt, () => {
+    const state = readPurposefulRoutine(rt, routine.id)!;
+    if (state.trip?.mode === 'walking' && state.trip.participants.every(p => rt.world.entities[p.actor].human!.activity === 'walk')) jointWalking++;
+    return !rt.isActive(routine.id) || state.mode === 'waiting';
+  });
+  assert.equal(routine.status, 'completed', JSON.stringify(readPurposefulRoutine(rt, routine.id), null, 2));
+  const state = readPurposefulRoutine(rt, routine.id)!;
+  assert.ok(jointWalking > 40); assert.ok(state.trip?.participants.every(p => p.arrived));
+  assert.ok(state.progress.meal.every(p => p.served && p.consumed && p.returned));
+  assert.equal(state.progress.workElapsed, 30);
+  const trip = rt.records.get(state.trip!.action)!;
+  const food = state.ownedActions.map(id => rt.records.get(id)!).find(r => r.verb === 'shared_food_break')!;
+  assert.ok(food.requestedTick >= trip.endedTick!);
+  for (const actor of params.trip.actors) assert.deepEqual(rt.holder(`paired-walk:${actor}`), []);
+  clean(rt);
+});
+function pairedStart() {
+  const ready = setup(), { rt, params } = ready; params.trip = pairedMealWalk('worker', 'visitor', -8);
+  const routine = rt.submit('purposeful_routine', params);
+  assert.notEqual(routine.status, 'failed', routine.diagnostic?.message);
+  until(rt, () => readPurposefulRoutine(rt, routine.id)?.trip?.participants.every(p => p.progress > 2) === true || readPurposefulRoutine(rt, routine.id)?.mode === 'waiting');
+  assert.equal(readPurposefulRoutine(rt, routine.id)!.trip?.mode, 'walking');
+  return { ...ready, routine };
+}
+test('routine Pause retains the actual trip and Resume does not replay it after meal pause', () => {
+  const { rt, routine, params } = pairedStart();
+  const trip = readPurposefulRoutine(rt, routine.id)!.trip!.action;
+  pause(rt, routine.id);
+  const checkpoint = readPurposefulRoutine(rt, routine.id)!.trip!;
+  assert.equal(checkpoint.action, trip); assert.equal(checkpoint.mode, 'paused');
+  for (const actor of params.trip!.actors) assert.deepEqual(rt.holder(`actor:${actor}`), []);
+  assert.ok(checkpoint.participants.every(p => p.progress > 1));
+  resume(rt, routine.id);
+  until(rt, () => readPurposefulRoutine(rt, routine.id)!.progress.meal.some(p => p.fraction > 0 && p.fraction < 1) || readPurposefulRoutine(rt, routine.id)!.mode === 'waiting');
+  assert.ok(readPurposefulRoutine(rt, routine.id)!.progress.meal.some(p => p.fraction > 0 && p.fraction < 1));
+  pause(rt, routine.id); resume(rt, routine.id); finished(rt, routine.id);
+  assert.equal(readPurposefulRoutine(rt, routine.id)!.trip!.action, trip);
+  assert.equal([...rt.records.values()].filter(r => r.parent === routine.id && r.verb === 'paired_walk').length, 1);
+  clean(rt);
+});
+test('routine End during the trip releases its pair without moving or completing meal and notes', () => {
+  const { rt, routine, params } = pairedStart();
+  const retainedWork = readPurposefulRoutine(rt, routine.id)!.progress.workElapsed;
+  complete(rt, 'purposeful_routine_control', { routine: routine.id, intent: 'end' });
+  until(rt, () => !rt.isActive(routine.id)); assert.equal(routine.status, 'cancelled');
+  const state = readPurposefulRoutine(rt, routine.id)!;
+  assert.ok(state.progress.meal.every(p => !p.served && !p.consumed)); assert.equal(state.progress.workElapsed, retainedWork);
+  for (const actor of params.trip!.actors) { assert.deepEqual(rt.holder(`actor:${actor}`), []); assert.deepEqual(rt.holder(`paired-walk:${actor}`), []); }
+  clean(rt);
+});
+test('mismatched companion refuses before any routine effects', () => {
+  const { rt, params } = setup(); params.trip = pairedMealWalk('worker', 'visitor', -8); params.trip.actors[1] = 'guest1';
+  const hash = rt.stateHash(), routine = rt.submit('purposeful_routine', params);
+  assert.equal(routine.status, 'failed'); assert.equal(routine.diagnostic?.code, 'routine.trip-binding'); assert.equal(rt.stateHash(), hash);
+  assert.equal([...rt.records.values()].some(r => r.parent === routine.id), false);
+});
+
+
+test('directing the companion during a routine trip preserves foreign movement and explicit regroup', () => {
+  const { rt, routine, params } = pairedStart();
+  const trip = readPurposefulRoutine(rt, routine.id)!.trip!.action;
+  const direction = rt.submit('walk_to', { actor: params.trip!.actors[1], x: -11, z: 4 });
+  assert.notEqual(direction.status, 'failed', direction.diagnostic?.message);
+  until(rt, () => readPurposefulRoutine(rt, routine.id)!.mode === 'waiting');
+  assert.equal(rt.isActive(direction.id), true);
+  const refused = rt.submit('purposeful_routine_control', { routine: routine.id, intent: 'resume' });
+  assert.equal(refused.status, 'failed'); assert.equal(refused.diagnostic?.code, 'routine.actor-busy');
+  until(rt, () => !rt.isActive(direction.id)); assert.equal(direction.status, 'completed');
+  resume(rt, routine.id); finished(rt, routine.id);
+  assert.equal(readPurposefulRoutine(rt, routine.id)!.trip!.action, trip); clean(rt);
+});
+
+
+test('ending the paired child directly never substitutes joint arrival or starts the meal', () => {
+  const { rt, routine } = pairedStart();
+  const trip = readPurposefulRoutine(rt, routine.id)!.trip!.action;
+  complete(rt, 'paired_walk_control', { walk: trip, intent: 'end' });
+  until(rt, () => readPurposefulRoutine(rt, routine.id)!.mode === 'waiting');
+  const state = readPurposefulRoutine(rt, routine.id)!;
+  assert.equal(rt.records.get(trip)!.status, 'cancelled');
+  assert.ok(state.progress.meal.every(p => !p.served && !p.consumed));
+  assert.equal(state.ownedActions.some(id => rt.records.get(id)?.verb === 'shared_food_break'), false);
+  resume(rt, routine.id);
+  until(rt, () => readPurposefulRoutine(rt, routine.id)!.mode === 'waiting');
+  assert.equal(readPurposefulRoutine(rt, routine.id)!.diagnostic?.code, 'routine.trip-ended');
+  assert.equal([...rt.records.values()].filter(r => r.parent === routine.id && r.verb === 'paired_walk').length, 1);
+  complete(rt, 'purposeful_routine_control', { routine: routine.id, intent: 'end' });
+  until(rt, () => !rt.isActive(routine.id)); clean(rt);
+});

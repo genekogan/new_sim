@@ -3,7 +3,7 @@ import type { ActionRecord } from '../../engine/actions/types.ts';
 import { readPurposefulRoutine, type PurposefulRoutineParams } from '../../engine/activities/purposeful-routine.ts';
 import { classroomSessionId } from '../../engine/scenarios/classroom.ts';
 import { readClassroom } from '../../engine/activities/classroom.ts';
-import { activityExample } from './activity-example.ts';
+import { activityExample, mealWalkExample } from './activity-example.ts';
 import { readWorkstation } from '../../engine/objects/workstation.ts';
 import type { LabSim } from './sim.ts';
 
@@ -11,6 +11,7 @@ import type { LabSim } from './sim.ts';
 export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: () => void }) {
   const [request, setRequest] = useState<{ epoch: number; action: string }>();
   const [feedback, setFeedback] = useState('');
+  const [walkTogether, setWalkTogether] = useState(false);
   const example = activityExample(sim.scenario.name);
   if (!example) return null;
   const B = example.workBreak;
@@ -37,10 +38,11 @@ export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: (
       work: { station: B.work.station, seat: B.work.seat, task, duration: B.work.duration },
       food: { pot: B.pot, participants: B.people, at: B.conversation.at },
       rest: example.rest, departure: example.departure,
+      ...(walkTogether ? { trip: mealWalkExample(sim.scenario.name) } : {}),
     };
     const result = rt.submit('purposeful_routine', params, { preempt: false });
     setRequest({ epoch: sim.scenarioEpoch, action: result.id });
-    respond(result, 'Committed: attend this gathering, share food, rest, then finish these same notes');
+    respond(result, `Committed: attend this gathering, ${walkTogether ? 'walk to lunch together, ' : ''}share food, rest, then finish these same notes`);
   };
   const control = (intent: 'pause' | 'resume' | 'end') => {
     if (sim.rt !== rt || !action || !rt.isActive(action)) return;
@@ -53,6 +55,8 @@ export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: (
     <p>Attend this gathering, share food with {example.roles.companion}, rest briefly, then finish the same {task}. You can pause or direct people while it runs.</p>
     {!active && record?.status !== 'completed' && <p>Prepare: Start notes and interrupt after some progress; wait for safe stand-up, then Start session below. Start this routine before manually joining {actor}.</p>}
     {record?.status === 'completed' && <p>Finished this gathering, meal, rest and the same notes. Reset the world to try another version.</p>}
+    <label><input type="checkbox" checked={walkTogether} disabled={active} onChange={event => setWalkTogether(event.target.checked)} /> Walk to lunch together before sharing food</label>
+    {walkTogether && <p>Uses the clear ground aisle with an invited companion. Put down held items first; stairs and crowded routes may refuse or wait with a reason.</p>}
     <div className="lab-classroom-controls">
       <button disabled={!startReady} onClick={start}>Start purposeful routine</button>
       <button disabled={!active || state?.mode === 'paused' || state?.mode === 'draining' || state?.mode === 'ending'} onClick={() => control('pause')}>Pause routine</button>
@@ -64,6 +68,7 @@ export function PurposefulRoutineHud({ sim, refresh }: { sim: LabSim; refresh: (
       {state ? <>
         <div>{actor} · {state.status === 'cancelled' ? 'ended; remaining activities were not completed' : state.mode} · {state.obligation} · {state.status === 'completed' ? 'finished' : state.phase}</div>
         <div>Same {task}: {state.progress.workElapsed.toFixed(1)}/{B.work.duration}s</div>
+        {state.trip && <div data-testid="routine-trip-readout">Walk to lunch: {state.trip.mode} · {state.trip.participants.map(p => `${p.actor}: ${p.arrived ? 'arrived' : `${p.progress.toFixed(1)}m`}`).join(' · ')}{state.trip.waitingReason ? ` · ${state.trip.waitingReason}` : ''}</div>}
         <details><summary>Committed gathering</summary>{state.bindings.session}</details>
         <div>Question: {state.progress.questionAsked ? 'asked' : 'pending'} · Seated rest: {state.progress.restSeconds.toFixed(1)}/{example.rest.seconds}s</div>
         <div>Presenters attended: {state.progress.presenters.length}/{example.session.presenters.length} · Conversation: {state.progress.conversationSeen ? 'joined' : 'pending'}</div>

@@ -28,3 +28,6 @@ export type { PurposefulRoutineParams, PurposefulRoutineControlParams, Purposefu
 
 export { GATHERING_CONTINUATION_ACTIONS, gatheringContinuation, gatheringContinuationControl, readGatheringContinuation } from './gathering-continuation.ts';
 export type { GatheringContinuationParams, GatheringContinuationControlParams, GatheringContinuationReadout, GatheringContinuationMode, WorkContinuationBinding, DiscussionContinuationBinding } from './gathering-continuation.ts';
+
+export { PAIRED_WALK_ACTIONS, pairedWalk, pairedWalkControl, readPairedWalk } from './paired-walk.ts';
+export type { PairedWalkParams, PairedWalkControlParams, PairedWalkReadout, PairedWalkMode } from './paired-walk.ts';

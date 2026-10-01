@@ -14,7 +14,7 @@ const finish = (page: Page, verb: string) => page.evaluate(verb => {
   }
   throw Error(`${verb} did not finish`);
 }, verb);
-const prepare = async (page: Page, count: number) => {
+const prepare = async (page: Page, count: number, paired = false) => {
   await page.goto(`/lab?scenario=work-break-${count}`);
   await page.waitForFunction(() => window.__marsEngine?.ready);
   await page.evaluate(n => window.__marsEngine.runScenario(`work-break-${n}`, { paused: true }), count);
@@ -51,6 +51,7 @@ const prepare = async (page: Page, count: number) => {
     throw Error('talks never began');
   });
   await expect(button(page, 'Start purposeful routine')).toBeEnabled();
+  if (paired) await page.getByRole('checkbox', { name: 'Walk to lunch together before sharing food', exact: true }).check();
   await button(page, 'Start purposeful routine').click();
   return unfinished;
 };
@@ -197,4 +198,39 @@ test('ending a routine leaves the independent gathering running and the notes un
   expect(await page.evaluate(() => window.__marsEngine.records().some(r => r.verb === 'shared_food_break'))).toBe(false);
   await clean(page);
   await capture(page, 'purposeful-ended.png');
+});
+
+
+for (const count of [4, 8]) test(`paired lunch walk in ${count} room uses actual Play, pauses/resumes same trip, then same notes`, async ({ page }) => {
+  await prepare(page, count, true);
+  const trip = await page.evaluate(() => {
+    for (let i = 0; i < 16000; i++) {
+      const state = window.__marsEngine.purposefulRoutine();
+      if (state?.trip?.mode === 'walking' && state.trip.participants.every(p => p.progress > 1)) return state.trip;
+      if (state?.mode === 'waiting' || state?.status === 'failed') throw Error(JSON.stringify(state));
+      window.__marsEngine.step();
+    }
+    throw Error('Pair never physically walked');
+  });
+  await button(page, 'Play').click();
+  await page.waitForFunction(progress => {
+    const trip = window.__marsEngine.purposefulRoutine()?.trip;
+    return !!trip && trip.participants.every(p => p.progress > progress);
+  }, Math.max(...trip.participants.map(p => p.progress)) + 0.15);
+  await button(page, 'Pause').click();
+  const walking = await page.evaluate(() => window.__marsEngine.purposefulRoutine()!.trip!);
+  expect(walking.separation).toBeLessThanOrEqual(1.8);
+  expect(walking.action).toBe(trip.action);
+  await capture(page, `paired-${count}-walking.png`);
+  await button(page, 'Pause routine').click();
+  await advance(page, 'paused');
+  const paused = await page.evaluate(() => window.__marsEngine.purposefulRoutine()!.trip!);
+  expect(paused.mode).toBe('paused'); expect(paused.action).toBe(trip.action);
+  await button(page, 'Resume routine').click();
+  await advance(page, 'meal');
+  expect(await page.evaluate(() => window.__marsEngine.purposefulRoutine()!.trip!.participants.every(p => p.arrived))).toBe(true);
+  await capture(page, `paired-${count}-meal.png`);
+  await advance(page, 'completed');
+  expect(await page.evaluate(() => window.__marsEngine.purposefulRoutine()!.trip!.action)).toBe(trip.action);
+  await clean(page);
 });

@@ -11,8 +11,11 @@ import type { Spatial } from '../spatial/service.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { workBreakWorld, WORK_BREAK_BINDING } from '../scenarios/work-break.ts';
 import { classroomScene, classroomParams } from '../scenarios/classroom.ts';
-import { designStudioWorld, designStudioScene, designStudioBindings } from '../scenarios/design-studio.ts';
+import { designStudioWorld, designStudioScene, designStudioBindings, designStudioRoutineParams, designStudioContinuationParams } from '../scenarios/design-studio.ts';
 import { dist2 } from '../core/math.ts';
+import { readPurposefulRoutine } from '../activities/purposeful-routine.ts';
+import { readWorkstation } from '../objects/workstation.ts';
+import { pairedMealWalk } from '../scenarios/paired-meal-walk.ts';
 import { readClassroom } from '../activities/classroom.ts';
 import { pairedWalk, pairedWalkControl, readPairedWalk, PAIR_MAX_SEPARATION, PAIR_MAX_REGROUP_DISTANCE, type PairedWalkParams } from '../activities/paired-walk.ts';
 
@@ -234,4 +237,92 @@ test('a ground-to-ground route actually dependent on stairs refuses before movem
   const hash = rt.stateHash(), action = rt.submit(pairedWalk.verb, p, { preempt: false });
   assert.equal(action.status, 'failed'); assert.equal(action.diagnostic?.code, 'paired_walk.ground-route');
   assert.equal(rt.stateHash(), hash); assert.equal([...rt.records.values()].some(r => r.parent === action.id), false);
+});
+
+
+// Exact combined studio journey: ordinary session departure and the independently
+// owned reviewer discussion create the crossing; no actor pose/status is injected.
+function studioRegroupCrossing() {
+  const world = designStudioWorld(), b = designStudioBindings();
+  const rt = new Runtime(world, createRegistry(), servicesFor({ 'design-studio': designStudioScene() })(world), ENGINE_INVARIANTS);
+  const notes = submit(rt, 'work_at', b.workBreak.work);
+  until(rt, () => { const w = readWorkstation(rt, b.workBreak.work.station); return !('code' in w) && w.elapsed >= 2; });
+  rt.cancel(notes.id); until(rt, () => !rt.isActive(notes.id));
+  const session = submit(rt, 'classroom_session', b.session);
+  until(rt, () => readClassroom(rt, session.id)?.phase === 'presenting');
+  const params = designStudioRoutineParams(session.id);
+  params.trip = pairedMealWalk(b.roles.worker, b.roles.companion, -9);
+  const routine = submit(rt, 'purposeful_routine', params);
+  const continuations = designStudioContinuationParams(session.id, routine.id);
+  const followUp = submit(rt, 'gathering_continuation', continuations.work);
+  const discussion = submit(rt, 'gathering_continuation', continuations.discussion);
+  until(rt, () => readPurposefulRoutine(rt, routine.id)?.trip?.diagnostic?.code === 'paired_walk.regroup-traffic', 16000);
+  const trip = readPurposefulRoutine(rt, routine.id)!.trip!;
+  assert.equal(rt.tick, 2972); assert.equal(trip.mode, 'regrouping');
+  assert.equal(trip.diagnostic?.details?.cause && (trip.diagnostic.details.cause as { code: string }).code, 'traffic.person');
+  assert.match(trip.waitingReason!, /project-editor.*form-reviewer/);
+  const blocked = trip.ownedActions.find(id => rt.records.get(id)!.diagnostic?.code === 'traffic.person')!;
+  assert.ok(blocked); assert.equal(rt.records.get(blocked)!.parent, trip.action);
+  assert.equal(rt.isActive(discussion.id), true);
+  return { rt, b, params, routine, discussion, followUp, trip: rt.records.get(trip.action)!, blocked };
+}
+
+test('actual combined studio crossing retains the blocked ordinary child and completes the same trip, meal and notes', () => {
+  const { rt, b, routine, trip, blocked, discussion, followUp } = studioRegroupCrossing();
+  const children = [...readPairedWalk(rt, trip.id)!.ownedActions];
+  let recoverTicks = 0;
+  until(rt, () => {
+    recoverTicks++;
+    assert.notEqual(rt.records.get(blocked)!.status, 'cancelled');
+    return rt.records.get(blocked)!.status === 'executing' || rt.records.get(blocked)!.status === 'completed';
+  });
+  assert.ok(recoverTicks <= 100); assert.deepEqual(readPairedWalk(rt, trip.id)!.ownedActions, children);
+  until(rt, () => [routine, discussion, followUp].every(r => !rt.isActive(r.id)), 16000);
+  for (const r of [routine, trip, discussion, followUp]) assert.equal(r.status, 'completed', r.diagnostic?.message);
+  const done = readPurposefulRoutine(rt, routine.id)!;
+  assert.ok(done.trip!.participants.every(p => p.arrived));
+  assert.ok(done.progress.meal.every(p => p.served && p.consumed && p.returned));
+  assert.equal(done.progress.workElapsed, 30);
+  clean(rt, trip.id, [b.roles.worker, b.roles.companion]);
+  console.log('[studio-regroup]', JSON.stringify({ blockedTick: 2972, recoverTicks, finishedTick: rt.tick, hash: rt.stateHash(), blockedChild: blocked, trip: trip.id, violations: rt.violations.length }));
+});
+
+for (const intervention of ['pause-end', 'directive'] as const) test(`actual regroup traffic ${intervention} drains only paired children and preserves foreign discussion`, () => {
+  const { rt, b, routine, trip, discussion } = studioRegroupCrossing();
+  const foreign = [...rt.holder(`actor:${b.roles.audience[1]}`)]; assert.ok(foreign.length);
+  if (intervention === 'pause-end') {
+    control(rt, trip.id, 'pause'); until(rt, () => readPairedWalk(rt, trip.id)!.mode === 'paused');
+    control(rt, trip.id, 'end'); until(rt, () => !rt.isActive(trip.id));
+    assert.equal(trip.status, 'cancelled');
+  } else {
+    const direction = rt.submit('walk_to', { actor: b.roles.worker, x: 11, z: 11 });
+    assert.notEqual(direction.status, 'failed', direction.diagnostic?.message);
+    until(rt, () => readPairedWalk(rt, trip.id)!.mode === 'waiting');
+    assert.equal(readPairedWalk(rt, trip.id)!.diagnostic?.code, 'paired_walk.directed-away');
+    assert.equal(rt.isActive(direction.id), true);
+    assert.equal(rt.submit('paired_walk_control', { walk: trip.id, intent: 'resume' }).diagnostic?.code, 'paired_walk.actor-busy');
+  }
+  assert.equal(rt.isActive(discussion.id), true);
+  assert.deepEqual(rt.holder(`actor:${b.roles.audience[1]}`), foreign);
+  assert.ok(readPairedWalk(rt, trip.id)!.ownedActions.every(id => !rt.isActive(id)));
+  assert.ok(readPurposefulRoutine(rt, routine.id)!.progress.meal.every(p => !p.served));
+});
+
+// Deliberate nonprogress injection, as in the existing lag fixture: this tests
+// the coordinator's physical clock independently of the ordinary walker planner.
+for (const failure of [false, true]) test(`regroup ${failure ? 'hard failure drains immediately' : 'no progress retains the unchanged 100-tick bound'}`, () => {
+  const { rt, p } = setup(), registry = rt.registry;
+  const stopped: typeof walkTo = { ...walkTo, step(_rt, ex) {
+    if (failure && ex.actor === 'a') return { status: 'failed', diagnostic: { code: 'walk.obstacle', message: 'explicit hard failure', subjects: ['a'] } };
+    return { status: 'blocked', diagnostic: { code: 'traffic.person', message: `${ex.actor} waits for fixture blocker`, subjects: [ex.actor, 'fixture blocker'] } };
+  } }; registry.set('walk_to', stopped);
+  const action = submit(rt, pairedWalk.verb, p), dispatched = rt.tick;
+  until(rt, () => readPairedWalk(rt, action.id)!.mode === 'waiting');
+  const state = readPairedWalk(rt, action.id)!;
+  assert.equal(state.diagnostic?.code, failure ? 'paired_walk.child-stopped' : 'paired_walk.stalled');
+  if (!failure) { assert.match(state.waitingReason!, /100 ticks/); assert.equal(rt.tick - dispatched, 102); }
+  else { assert.equal(rt.tick - dispatched, 3); assert.equal((state.diagnostic!.details!.cause as { code: string }).code, 'walk.obstacle'); }
+  assert.ok(state.ownedActions.every(id => !rt.isActive(id)));
+  const records = rt.records.size; for (let i = 0; i < 40; i++) rt.step(); assert.equal(rt.records.size, records);
+  control(rt, action.id, 'end'); until(rt, () => !rt.isActive(action.id)); clean(rt, action.id);
 });
