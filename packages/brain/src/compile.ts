@@ -23,7 +23,7 @@ A Soul acts by playing **cards**. A card is a named, reusable action: when it is
 - \`link\`: must start from \`"$actor"\`. \`unlink\`: \`"$actor"\` must be one end.
 - \`say\`: from \`"$actor"\`.
 - \`set\`: on \`"$actor"\`, on \`"$new"\` (a thing this card just made), or on \`"$target"\`. Changing the target works at run time only if the actor controls it (has a control link to it), or made it and nobody controls it. Never another Soul. Never the world's own places: nobody can change or remove those.
-- A card can never create, move or change another Soul. **To get something from someone, ask.** Write one card that asks (\`say … "ask"\`) and a second card whose \`when\` requires their agreement: when a Soul plays the built-in card \`say yes\`, the world gets a link \`["agreed", <that Soul>, <the asker>]\` lasting thirty minutes. Agreement and speech come only from saying: a card can never link \`agreed\` or \`said\` itself.
+- A card can never create, move or change another Soul. **To get something from someone, ask.** Write one card that asks (\`say … "ask"\`) and a second card whose \`when\` requires their agreement: when a Soul plays the built-in card \`say yes\`, the world gets a link \`["agreed", <that Soul>, <the asker>]\` lasting thirty minutes. Agreement and speech come only from saying: a card can never link \`agreed\` or \`said\` itself. Agreement and speech come only from saying: a card can never link \`agreed\` or \`said\` itself.
 - A link kind declared with \`"control": true\` gives power over its target (setting its states, ending it). It can only be made on a thing the actor made itself, or when someone who already controls the thing has an \`agreed\` link to the actor.
 
 ## Card format (JSON)
