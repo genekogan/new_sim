@@ -37,6 +37,7 @@ export class Souls {
         else if (ev.kind === 'failed') this.wake(m.soulId, `could not complete: ${m.doing} (${ev.code ?? 'failed'})`);
       },
     });
+    this.carryOverDirections();
     setInterval(() => { const now = Date.now(); for (const [k, p] of this.pairings) if (p.expires < now) this.pairings.delete(k); }, 60_000).unref();
   }
 
@@ -73,6 +74,18 @@ export class Souls {
     const low = ref.toLowerCase().replace(/^the /, '');
     const hit = Object.values(k.things).find((t) => t.traits.body === ref || t.traits.entity === ref) ?? Object.values(k.things).find((t) => t.name.toLowerCase().replace(/^the /, '') === low);
     return hit?.id ?? null;
+  }
+
+  /** Souls directed before plans existed (a goal and a target, no agenda) keep their direction: the goal becomes a plan of base cards. */
+  carryOverDirections(): number {
+    let n = 0;
+    for (const m of this.host.minds.values()) {
+      if (m.agenda.length || !m.intent?.goal) continue;
+      const target = m.intent.target ? this.resolveThing(m.intent.target) : null;
+      if (m.intent.target && !target) continue;                                  // what it pointed at is gone
+      m.agenda = this.agendaFromGoal(m.intent.goal, target); m.agendaPos = 0; n++;
+    }
+    return n;
   }
 
   /** A legacy goal as a one- or two-step agenda of base cards. Deterministic. */

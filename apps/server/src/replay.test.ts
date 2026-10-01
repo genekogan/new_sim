@@ -5,7 +5,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { toyFactory } from '@sim/engine-toy';
+import { Brain } from './brain.ts';
+import { config } from './config.ts';
 import { Db } from './db.ts';
+import { Souls } from './souls.ts';
 import { kernelHash } from '@sim/kernel';
 import { initKernel, replayKernel } from './fold.ts';
 import { optionsFor } from './deck.ts';
@@ -69,7 +72,7 @@ test('restart: snapshot + fast-forward through later events equals the uninterru
   db.close();
 });
 
-test('a world from before the kernel existed is given one at boot, and replay from genesis still matches', () => {
+test('a world from before the kernel existed is given one at boot, and replay from genesis still matches', async () => {
   const db = new Db(join(mkdtempSync(join(tmpdir(), 'sim-')), 't.db'));
   const host = new WorldHost(db, toyFactory, 'old-world', 1e9); host.boot();
   births(host, ['a', 'b', 'c']);
@@ -92,11 +95,20 @@ test('a world from before the kernel existed is given one at boot, and replay fr
   assert.ok(boot, 'the bootstrap is in the log');
   assert.equal(host2.kernel.things['s_a'].at, 'campfire'); assert.equal(host2.kernel.things['s_b'].at, 'kiosk');
   assert.ok(host2.kernel.decks['s_c'].cards.includes('join'));
+  // a Soul that had been given a goal before plans existed keeps its direction, as a plan of base cards
+  host2.minds.get('s_a')!.intent = { goal: 'go', target: 'kiosk' }; host2.minds.get('s_b')!.intent = { goal: 'converse', target: 'h_c' };
+  const brain = new Brain(host2, db, { ...config, brainMode: 'fake', typesafeKey: undefined, anthropicKey: undefined }, { onCall() {}, onCamera() {}, onTicker() {}, onNarrative() {}, clients: () => 0 });
+  const souls = new Souls(host2, db, brain, config);
+  assert.deepEqual(host2.minds.get('s_a')!.agenda, [{ card: 'go to', target: 'kiosk' }]);
+  assert.deepEqual(host2.minds.get('s_b')!.agenda, [{ card: 'talk with', target: 's_c' }]);
+  assert.equal(souls.carryOverDirections(), 0, 'only once');
+  host2.minds.get('s_a')!.agenda = []; host2.minds.get('s_b')!.agenda = []; host2.minds.get('s_a')!.intent = null; host2.minds.get('s_b')!.intent = null;
   // life goes on with cards, and a replay from genesis (old events, the bootstrap, new plays) arrives at the same world
   drive(host2, 1500, (i) => i * 11);
   assert.ok(db.events(WORLD_ID).some((e) => e.kind === 'play'));
   const replayed = replayFromGenesis(toyFactory, 'old-world', db.events(WORLD_ID), host2.engine.world.tick);
   assert.equal(replayed.engine.stateHash(), host2.engine.stateHash());
   host2.kernel.tick = replayed.kernel.tick; assert.equal(kernelHash(replayed.kernel), kernelHash(host2.kernel));
+  await new Promise((r) => setTimeout(r, 200)); // words for what was said are written just after the play
   db.close();
 });
