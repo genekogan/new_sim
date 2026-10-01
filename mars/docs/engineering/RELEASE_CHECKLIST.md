@@ -1223,3 +1223,57 @@ Excluded: unreviewed futurehistoricalgallery/sourcevisibility/export corrections
 reading draft, chess/music/preparation/sleep, broad autonomy and fine anatomy.
 Next playable reading uses existingrig/support/seat execution and retainedbookmark.
 WholeMVP forecast40–70workinghours medium-lowconfidence, bounded scope required.
+
+## Production deploy 29 (2026-10-01): reading with a retained bookmark
+
+Live: https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=quiet-reading
+Version100% `4fc6d1d6-2eba-494e-afa3-1a6a78a4ea85`, deployed11:03:29.172043Z;
+exact functional09da6a000e445a7547d94dcdbb33031d823095ff. Rollback28
+657cce5b-14d4-467c-8550-26db10423d5f verified100% immediatelybeforepublish.
+
+| Required check | Executed result |
+|---|---|
+| Lint |zero warnings/errors |
+| Unit |206pass,0fail |
+| Engine |903pass,0fail;6skip/11TODO not proven |
+| Both TypeScript projects |0errors |
+| Browser |151pass,0fail;7documented skips,29m26s |
+| Flagship take |unchangedPASS |
+| Determinism probe |10901ticks, unchangedb746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local simulation |all36MCP/isolation/auth/body/method checksPASS |
+| Idle performance |originalpins/ceilingsPASS, exactpeak108.462ms/corridor50.968ms |
+
+Clean gate seated-reading/viewer/.cloudflare/gate/2026-10-01T10-14-00-959Z/report.json:
+HEAD09da,dirtyfalse,oktrue,interruptednull,cleanupnull. Guarded mainFF retains89
+ownerpendingfiles/status; music and future museum source/export work excluded.
+
+Now initiate reading at a real table/chair/book, interrupt safely, inspect retained
+page/progress and resume the same unfinished purpose. Two physical orientations and
+two independent readers have focused coverage; the exposed captured preset is one
+small ground arrangement. No held-book reading, finger contact, newrig/library/IK,
+arbitrary access links or active-session restoration. Safe quiescent JSON bookmark
+restore supports explicit same-person/task resumption. Generic unsafe-drop guard
+covers active reading equipment as well as computer work. Stair ankle correction
+and shared-walk/camera/museum checkpoint remain unchanged; no new anatomy work.
+
+Build/dry580assets8174.60KiB/1430.70gzip,28new/518existing uploads,87msstartup.
+Eightlargeobjects verified unchanged/8skipped/0R2writes. Immutable browsercache
+675f4beb/36ad67f7 copied before build, futureownerexports excluded. Exact selected
+139184Bcomputer and813Bcredit SHA pass. Production500assets19routes642requests,
+range/auth/allowlist and original equivalentgzip,deflate transport assertions PASS.
+FIRSTall36MCP/isolation/auth/invalidrequests PASS with documentedIPv4Node options;
+FIRSTdirector9stepsPASS13682ms. Safe131sampledtailoutcomesallok only29version,
+maxCPU823/maxWall937ms; not complete attribution or diagnosis of old25resourcefailure.
+Root actual published Play3/3PASS51.6s: reading/reset/firstStep/interrupt/resume,
+retained4/8work-food-return. All11PNGs/contactsheet inspected. Frozen camera and
+stairs have unchanged combined-gate coverage and earlier published27 proofs;
+not falsely counted as new29publicbrowser cases.
+
+Ignored receipts/logs in isolated mars-mvp-release29/viewer/.cloudflare/:
+release29-network-receipt.json,curl-29-ae/receipt.json, prepare/build/upload/dry/deploy/
+status/MCP/director/tail and production-reading-walk.log; captures in
+viewer/e2e/artifacts/release29-production. Generated EVIDENCE externalprovenance
+has not been regenerated in this receipt-only window; original partialflags remain.
+Music is a separate focused draft, chess/mealprep/sleep unstarted. Whole MVP40–70
+workinghours medium-low confidence, existingrig/bounded interactions; targetOct5
+requires surfacing newphysicalprerequisites early rather than expanding silently.

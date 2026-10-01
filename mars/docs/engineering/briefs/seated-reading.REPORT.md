@@ -42,7 +42,6 @@ Current seated hands retain their existing rest pose; bounded gaze, visible book
 secondary leaf and bookmark communicate the activity. Unsupported bindings refuse
 with named diagnostics rather than silently substitute or discard progress.
 
-Full clean combined gate, main integration and deployment remain pending. These
-focused passes do not claim this candidate is online. The next breadth remains
+Full clean combined gate passed on exact09da6a0:206unit,903engine PASS/0FAIL/6skip/11TODO,151browser PASS/0FAIL/7skip, bothTSc/lint/take/unchangedb746probe/all36localMCP. Original idle performance ceilings and pins pass. Guarded main integration preserves all89 owner-pending paths. Release29 was deployed4fc6d1d6 at11:03:29.172043Z; published3/3actualPlay checks pass51.6s: fresh Reset/Step, section2, safe interruption/stand-up and same-book24scompletion, plus retained4/8work-food-return journeys. Root inspected all11publicPNGs/contactsheet.500assets19routes642requests, FIRST36MCP/isolation/auth and FIRSTdirector9steps pass. Safe131eventtailallok is sampled evidence only. PublicURL: https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=quiet-reading . The next breadth remains
 bounded chess, music, meal preparation and supported sleep; this reading milestone
 must not expand into anatomy or a universal activity language.

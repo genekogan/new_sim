@@ -53,9 +53,9 @@ a claim for plywood/roof phases or fine construction anatomy.
 2. **Continuity increment — complete in release28, source9b85793:** recovered and validated saved paired-walk core and optional paired
    lunch/unfinished-work integration in Mars4/8 and studio, including departure,
    pause/resume/player handoff and cleanup. Actual studio crossing recovers through the same ordinary walker; authored ground/free-handed pair scope only. Original drafts remain preserved.
-3. **Next breadth/engineering batch — reading active:** bounded reading/chess/music and food/sleep
+3. **Next breadth/engineering batch — reading integrated, music active:** bounded reading/chess/music and food/sleep
    interactions plus one cross-experience resource/recovery/persistence improvement,
-   chosen after verifying existing implementations. Reading now has focused state/persistence checks and one inspected actual Play proof; not shipped. Do not commission all at once.
+   chosen after verifying existing implementations. Reading candidate09da6a0 has passed the clean combined full gate and guarded main integration; release29 is published and verified with actual Reset/Step/Play/interruption/resumption. Music is a separate bounded draft; chess, meal preparation and supported sleep remain unstarted. Do not commission all at once.
 
 ## Publication and finish
 
@@ -72,7 +72,7 @@ Checkpoint repairs and new interaction breadth dominate uncertainty. If they exp
 larger prerequisites, surface an explicit recommended scope cut early; do not silently
 substitute prerecorded scenes. This estimate is not the next-release ETA.
 
-Latest whole-MVP forecast after release28: **40–70 working hours**, medium-low confidence. Shared-walk continuity is published; seated reading remains a tested draft. Assumes bounded chess/music/meal-preparation/sleep and existing rigs, not universal planning or new anatomy. October5 remains feasible only under that bounded scope; surface any new physical prerequisite before expanding it.
+Latest whole-MVP forecast after release29: **40–70 working hours**, medium-low confidence. Shared-walk continuity is published; seated reading is published with same-book interruption/resumption and inspected runtime captures. Assumes bounded chess/music/meal-preparation/sleep and existing rigs, not universal planning or new anatomy. October5 remains feasible only under that bounded scope; surface any new physical prerequisite before expanding it.
 
 ---
 
