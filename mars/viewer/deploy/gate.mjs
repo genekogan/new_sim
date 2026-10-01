@@ -5,6 +5,7 @@
 // Output: .cloudflare/gate/<timestamp>/{<step>.log,report.json}. Exits non-zero on any failure.
 // simulation-integration always runs; SIM_BASE overrides the isolated local server.
 import { GateProcesses, nodeTestSummary, startLocalSimulation } from './gate-runtime.mjs';
+import { engineCommand, hash, sourceIdentity, validatePayload } from './engine-proof.mjs';
 import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +37,7 @@ const simulation = (out) => ({ summary: out.trim().split('\n').filter(Boolean).a
 const steps = [
   { name: 'lint', cmd: ['npm', 'run', 'lint', '--', '--max-warnings=0'], timeout: 5 * MIN, parse: (out) => ({ summary: /\b(?:error|warning)\b/.test(out) ? 'lint findings' : 'clean' }) },
   { name: 'test', cmd: ['npm', 'test'], timeout: 5 * MIN, parse: nodeTest },
-  { name: 'test-engine', cmd: ['npm', 'run', 'test:engine'], timeout: 15 * MIN, parse: nodeTest },
+  { name: 'test-engine', cmd: engineCommand(root), timeout: 15 * MIN, parse: nodeTest },
   { name: 'tsc', cmd: ['npx', 'tsc', '--noEmit', '-p', '.'], timeout: 5 * MIN, parse: tsc },
   { name: 'tsc-camera', cmd: ['npx', 'tsc', '--noEmit', '-p', 'cinematography/tsconfig.json'], timeout: 5 * MIN, parse: tsc },
   // The prior 140-pass suite took 1293.529s; required current build proofs now
@@ -74,6 +75,11 @@ function run(step, env = process.env) {
     const started = Date.now();
     let out = '';
     let timedOut = false;
+    const proofPath = join(outDir, 'engine-proof.json');
+    if (step.name === 'test-engine') {
+      writeFileSync(`${proofPath}.identity.json`, JSON.stringify(report.sourceIdentity));
+      env = { ...env, MARS_ENGINE_PROOF: proofPath };
+    }
     const child = processes.spawn(step.cmd[0], step.cmd.slice(1), { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
     const log = createWriteStream(logPath);
     log.write(`$ ${step.cmd.join(' ')}\n\n`);
@@ -96,8 +102,18 @@ function run(step, env = process.env) {
       if (timedOut) log.write(`\n[gate] timed out after ${step.timeout / 1000}s\n`);
       log.end(() => {
         const parsed = step.parse(out);
-        const ok = code === 0 && !timedOut && !error && !interrupted && (step.name !== 'determinism-probe' || Boolean(parsed.finalStateHash));
-        resolve({ step: step.name, command: step.cmd.join(" "), ...parsed, status: ok ? "pass" : "fail", exitCode: code, timedOut, durationMs, log: relative(root, logPath) });
+        let ok = code === 0 && !timedOut && !error && !interrupted && (step.name !== 'determinism-probe' || Boolean(parsed.finalStateHash));
+        let engineProof;
+        if (ok && step.name === 'test-engine') {
+          try {
+            const bytes = readFileSync(proofPath);
+            const proof = validatePayload(JSON.parse(bytes), sourceIdentity(root));
+            if (JSON.stringify(proof.identity) !== JSON.stringify(report.sourceIdentity)) throw new Error('source changed during engine execution');
+            for (const [key, field] of [['tests', 'tests'], ['pass', 'pass'], ['fail', 'fail'], ['skip', 'skipped'], ['todo', 'todo']]) if (Number(parsed[field]) !== proof.suite[key]) throw new Error('structured engine counts differ from native TAP');
+            engineProof = { path: relative(root, proofPath), sha256: hash(bytes) };
+          } catch (proofError) { ok = false; parsed.summary = `engine proof refused: ${proofError.message}`; }
+        }
+        resolve({ step: step.name, command: step.cmd.join(" "), ...parsed, ...(engineProof ? { engineProof } : {}), status: ok ? "pass" : "fail", exitCode: code, timedOut, durationMs, log: relative(root, logPath) });
       });
     };
     child.on('error', (e) => finish(null, e));
@@ -107,6 +123,7 @@ function run(step, env = process.env) {
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const report = { startedAt: new Date().toISOString(), node: process.version, package: `${pkg.name}@${pkg.version ?? ''}`, simBase: process.env.SIM_BASE ?? null, continue: keepGoing, steps: [] };
+report.sourceIdentity = sourceIdentity(root);
 try {
   const { execFileSync } = await import('node:child_process');
   report.gitHead = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
@@ -142,7 +159,8 @@ report.skipped = skipped;
 report.finishedAt = new Date().toISOString();
 report.interrupted = interrupted ?? null;
 report.cleanupError = cleanupError ?? null;
-report.ok = !interrupted && !cleanupError && report.steps.every((s) => s.status === 'pass') && skipped.length === 0;
+report.sourceChanged = JSON.stringify(report.sourceIdentity) !== JSON.stringify(sourceIdentity(root));
+report.ok = !interrupted && !cleanupError && !report.sourceChanged && report.steps.every((s) => s.status === 'pass') && skipped.length === 0;
 report.finalStateHash = report.steps.find((s) => s.step === 'determinism-probe')?.finalStateHash ?? null;
 const reportPath = join(outDir, 'report.json');
 writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');

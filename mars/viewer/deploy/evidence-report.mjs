@@ -13,6 +13,7 @@
 // every test; the TAP stream does not.
 import { run } from 'node:test';
 import { latestGate, externalProof, gateLogReader, evidenceStatus } from './evidence-gate.mjs';
+import { eventCollector, readEngineProof } from './engine-proof.mjs';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
@@ -32,33 +33,31 @@ const readGateLog = gateLogReader(viewer);
 
 // ---- 1. run the suite ------------------------------------------------------
 const files = readdirSync(testDir).filter((f) => f.endsWith('.test.ts')).sort().map((f) => join(testDir, f));
-const results = []; // { file, name, result: pass|fail|skip, durationMs, error? }
-const stdout = [];
-const fileErrors = [];
-const t0 = Date.now();
-console.error(`evidence: running ${files.length} engine test files…`);
-await new Promise((resolve, reject) => {
-  const stream = run({ files, concurrency: true });
-  const record = (result) => (d) => {
-    if (d.details?.type === 'suite') return;
-    const file = d.file ? basename(d.file) : '';
-    // a file that fails to load is reported as a failing test named after the file
-    if (d.nesting === 0 && d.file && d.name === d.file) { if (result === 'fail') fileErrors.push({ file, error: String(d.details?.error?.message ?? d.details?.error ?? '') }); return; }
-    const r = d.skip ? 'skip' : d.todo ? 'todo' : result;
-    results.push({ file, name: d.name, nesting: d.nesting, result: r, durationMs: Math.round(d.details?.duration_ms ?? 0), ...(result === 'fail' ? { error: String(d.details?.error?.cause?.message ?? d.details?.error?.message ?? '').split('\n')[0].slice(0, 300) } : {}) });
-  };
-  stream.on('test:pass', record('pass'));
-  stream.on('test:fail', record('fail'));
-  stream.on('test:stdout', (d) => stdout.push({ file: d.file ? basename(d.file) : '', message: d.message }));
-  stream.on('test:stderr', () => {});
-  stream.on('error', reject);
-  stream.on('end', resolve);
-  stream.resume?.();
-});
-const suiteMs = Date.now() - t0;
+let execution, engineProof = null;
+const hasProof = gate.report?.steps?.some((s) => s.step === 'test-engine' && s.engineProof);
+if (gateArg !== -1 || hasProof) {
+  // Explicit or discoverable proof must validate. Never mask a stale/tampered proof
+  // by silently running tests and presenting the invalid gate as reused evidence.
+  engineProof = readEngineProof(viewer, gate);
+  execution = engineProof;
+  console.error(`evidence: reusing exact-source engine execution ${engineProof.path}`);
+} else {
+  const collector = eventCollector(files.map((file) => basename(file)));
+  const t0 = Date.now();
+  console.error(`evidence: running ${files.length} engine test files…`);
+  await new Promise((resolve, reject) => {
+    const stream = run({ files, concurrency: true });
+    for (const type of ['test:pass', 'test:fail', 'test:stdout']) stream.on(type, (data) => collector.accept({ type, data }));
+    stream.on('test:stderr', () => {});
+    stream.on('error', reject);
+    stream.on('end', resolve);
+    stream.resume?.();
+  });
+  execution = collector.finish(Date.now() - t0);
+}
+const { results, stdout, fileErrors, suite } = execution;
+const suiteMs = suite.wallMs;
 const top = results.filter((r) => r.nesting === 0);
-const count = (k) => top.filter((r) => r.result === k).length;
-const suite = { files: files.length, tests: top.length, pass: count('pass'), fail: count('fail'), skip: count('skip'), todo: count('todo'), fileErrors: fileErrors.length, wallMs: suiteMs };
 console.error(`evidence: ${suite.tests} tests, ${suite.pass} pass, ${suite.fail} fail, ${suite.skip} skip, ${suite.todo} TODO (${(suiteMs / 1000).toFixed(1)} s)`);
 
 // ---- 2. flagship numbers + determinism probe --------------------------------
@@ -127,6 +126,7 @@ const report = {
   git: { head, dirtyEngineFiles: dirty.length },
   node: process.version,
   suite,
+  engineExecution: engineProof ? { kind: 'gate-proof', path: engineProof.path, sha256: engineProof.sha256, source: engineProof.identity.head, originalWallMs: suiteMs } : { kind: 'fresh-suite' },
   gate: { path: gate.path, reason: gate.reason || null, gitHead: gate.report?.gitHead ?? null, finishedAt: gate.report?.finishedAt ?? null, ok: gate.report?.ok ?? null, steps: gate.report?.steps ?? [] },
   flagship: { ...flagship, determinismProbe: probe },
   statusCounts: { rows: tally(rows), capabilities: tally(capabilities), milestones: tally(milestones) },
@@ -155,6 +155,7 @@ md.push('| | |', '| --- | --- |');
 md.push(`| Git HEAD | \`${head ?? 'unknown'}\`${dirty.length ? ` (${dirty.length} uncommitted file(s) under \`viewer/engine\` at run time)` : ' (engine tree clean)'} |`);
 md.push(`| Generated | ${report.generatedAt} · Node ${process.version} |`);
 md.push(`| Engine suite | ${suite.tests} tests in ${suite.files} files: ${suite.pass} pass, ${suite.fail} fail, ${suite.skip} skipped, ${suite.todo} TODO${suite.fileErrors ? `, ${suite.fileErrors} file(s) failed to load` : ''} · ${(suiteMs / 1000).toFixed(1)} s wall |`);
+md.push(`| Engine execution | ${engineProof ? `reused exact-source gate proof \`${engineProof.path}\`; wall time above is the original execution, not evidence regeneration` : 'fresh engine suite execution'} |`);
 md.push(`| External gate | ${gate.path ? `\`${gate.path}\`` : 'none'} — ${esc(gate.reason || 'current clean revision; statuses consumed per step')} |`);
 md.push(`| §28 rows | ${c.rows.PROVEN} PROVEN · ${c.rows.PARTIAL} PARTIAL · ${c.rows.UNPROVEN} UNPROVEN (of ${rows.length}) |`);
 md.push(`| Capabilities beyond §28 | ${c.capabilities.PROVEN} PROVEN · ${c.capabilities.PARTIAL} PARTIAL · ${c.capabilities.UNPROVEN} UNPROVEN (of ${capabilities.length}) |`);
