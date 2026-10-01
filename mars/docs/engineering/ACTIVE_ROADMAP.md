@@ -50,12 +50,12 @@ a claim for plywood/roof phases or fine construction anatomy.
    saved ready candidates, expose shipped experiences/camera in selector/tour.
    Clean combined full gate, inspected Play captures, local integration/deployment
    and production re-verification: **complete in release27**, source879c88a. Exclude unverified paired-day drafts; advance queue2 now.
-2. **Continuity increment:** validate saved paired-walk core and optional paired
+2. **Continuity increment — complete in release28, source9b85793:** recovered and validated saved paired-walk core and optional paired
    lunch/unfinished-work integration in Mars4/8 and studio, including departure,
-   pause/resume/player handoff and cleanup. Do not rebuild the saved drafts.
-3. **Next breadth/engineering batch:** bounded reading/chess/music and food/sleep
+   pause/resume/player handoff and cleanup. Actual studio crossing recovers through the same ordinary walker; authored ground/free-handed pair scope only. Original drafts remain preserved.
+3. **Next breadth/engineering batch — reading active:** bounded reading/chess/music and food/sleep
    interactions plus one cross-experience resource/recovery/persistence improvement,
-   chosen after verifying existing implementations. Do not commission all at once.
+   chosen after verifying existing implementations. Reading now has focused state/persistence checks and one inspected actual Play proof; not shipped. Do not commission all at once.
 
 ## Publication and finish
 
@@ -71,6 +71,8 @@ bounded chess/music/reading/sleep interactions and no new major physical prerequ
 Checkpoint repairs and new interaction breadth dominate uncertainty. If they expose
 larger prerequisites, surface an explicit recommended scope cut early; do not silently
 substitute prerecorded scenes. This estimate is not the next-release ETA.
+
+Latest whole-MVP forecast after release28: **40–70 working hours**, medium-low confidence. Shared-walk continuity is published; seated reading remains a tested draft. Assumes bounded chess/music/meal-preparation/sleep and existing rigs, not universal planning or new anatomy. October5 remains feasible only under that bounded scope; surface any new physical prerequisite before expanding it.
 
 ---
 

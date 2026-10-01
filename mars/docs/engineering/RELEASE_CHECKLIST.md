@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 27 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 28 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -1166,3 +1166,60 @@ Initial nativeNode HTTP sweeps failed before response with connectiontimeouts; a
 Included ready furniture/classroom/questions/rotation/conversation,4/8 unfinished-work→gathering→food/rest→return, independent fixed studio, computer and safe-drop/reset repairs, frozen museum, designated access and current-rig stair correction. Excluded: unverified paired-day integration and future historical/sourcevisibility corrections, broad autonomy/needs, reading/chess/music/mealpreparation/sleep breadth, fine anatomy and construction roof/plywood choreography. The aggregate stock-to-individual conversion is explicit; identity persists after extraction, not physical pile-removal fidelity. Whole Mars MVP estimate remains45–75workinghours,medium-lowconfidence; October5 is tight if a new physical prerequisite appears. Prefer bounded interactions over expanding rig/furniture fidelity. Paired regroup recovery is already under focused validation, not shipped in27.
 
 Evidence refresh:860PASS/0fail/6skip/11TODO; two stale citation names corrected to the actual unchanged source-era tests. Strict external-proof policy marks uncommitted viewer receipt/citation edits stale relative to the deployed879 gate: generated14PROVEN/3PARTIAL rows,18PROVEN/9PARTIAL/1UNPROVEN capabilities. Preserve that distinction; the exactclean879 gate and published proofs above remain valid. The next functional candidate’s clean gate will refresh current-document external provenance; no evidence guard was weakened.
+
+## Production deploy 28 (2026-10-01): shared-walk continuity
+
+- Live: https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=work-break-4
+- Version100%: `657cce5b-14d4-467c-8550-26db10423d5f`; deployed09:42:00.232051Z.
+- Exact functional source: `9b857930507a6bd03100d4d4ab5a9255888bc118`; rollback release27 `ef61dfc5-e0b7-469b-ab61-3b61f8b8b5cd`, verified100% immediately before publishing.
+- Clean gate: `paired-regroup-continuity/viewer/.cloudflare/gate/2026-10-01T08-57-39-002Z/report.json`, copied into isolated release28worktree; HEAD9b,dirtyfalse,oktrue,interruptednull,cleanupnull.
+
+| Required check | Executed result |
+|---|---|
+| Lint | zero warnings/errors |
+| Unit |206pass,0fail |
+| Engine |893pass,0fail;6skip,11TODO not proven |
+| Both TypeScript projects |0errors |
+| Browser |150pass,0fail;7documented skips,28.8min |
+| Flagship take |unchanged checkPASS |
+| Determinism probe |completed10901ticks, unchanged `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` |
+| Local simulation |all36MCP/isolation/auth/method/body checksPASS |
+| Idle performance |originalstress30state/0violations and250/120ms peak,3ms mean; everyyeargrid<1000msPASS |
+
+New playable scope: optional samefree-handedpair regroups/walks down the authored
+ground aisle before existing sharedmeal/rest and same unfinishednotes, Mars4/8 and
+independentstudio. Pause/Resume/playerhandoff/end retain coherent progress/cleanup.
+Only regroup's owned ordinary `traffic.person` walker waits for existing recovery;
+unchanged100tickno-progress failure/harddiagnostics prevent indefinite strands.
+No arbitrary escort, loaded/stairpair walking or guaranteed persistentcrowdcompletion.
+
+Prepare499files841.4MiB; dry580assets8161.90KiB/1428.22KiBgzip;4new542existing
+uploads,94msstartup. All8largeobjects unchangedSHA17a92…/8skipped/0R2writes.
+Exact27staged browsercache copied locally and SHAchecked; futureownerexport cache
+changes cannot affect this clean source release. Computer139184bytesSHA6f36…bf5
+and exact813byteCC-BY4.0credit preserved; sixcase18404144bytecamera replay freshly
+built/validated. Camera policies/experiments untouched.
+
+Production: root3/3actualPlay proofs (Mars4/8 plus actualstudio crossing),32.6s
+combined; all7captures/contactsheet inspected.500assets19routes642curlrequests,
+range/auth and exactcomputer+creditSHA PASS. FIRSTall36MCP/isolation/auth PASS using
+documented `--no-network-family-autoselection --dns-result-order=ipv4first`;
+FIRSTdirector9stepsPASS13388ms. Safe sampled186tailoutcomesallok exact657version,
+maxCPU929/maxWall1071ms. This sample is not a complete trace or proof of old25's
+precise resource cause. NativeNodeHTTPsweep not rerun; successfulcurl uses equivalent
+explicitAccept-Encodinggzip,deflate and original assertions.27transportREDs retained.
+
+Evidence: isolated `<mars-worktrees>/mars-mvp-release28/viewer/.cloudflare/`
+containsperf-release28.log, frozen-browser-cache.json, prepare/build/upload/dry/deploy/
+status/curl-verification-ae/mcp/mcp-tail/director-release-28 logs, curl-28-ae/receipt.json
+andtail-safe-release-28.jsonl; published3Play logs production-paired.log and
+production-studio-paired.log, PNGs e2e/artifacts/release28-production. Main89owner
+paths remain byte-identical/staged0; guardedsnapshot/audit in pairedcandidate
+.cloudflare/main-preservation-paired-20261001. Savedfailedrecovery/setup reports
+remain preserved. GeneratedEVIDENCE provenance has not been refreshed in this
+receipt-only window; retain its PARTIAL flags, with clean9b gate/publicproof separate.
+
+Excluded: unreviewed futurehistoricalgallery/sourcevisibility/export corrections,
+reading draft, chess/music/preparation/sleep, broad autonomy and fine anatomy.
+Next playable reading uses existingrig/support/seat execution and retainedbookmark.
+WholeMVP forecast40–70workinghours medium-lowconfidence, bounded scope required.

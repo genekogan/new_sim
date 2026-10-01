@@ -34,3 +34,16 @@ The previously failed new `take_slot` feeder fixtures were not copied or expande
 Actual UI Play3/3PASS30.3s on5493: both Mars4/8 paired lunch paths pause/resume the same trip and continue the same meal/notes; studio actual reviewer crossing waits coherently, ordinary child recovers, pair travels and all original/follow-up purposes finish. One correctedstudio-camera-only rerun1/1PASS15.9s framed the actualpair from their positions rather than leaving them offscreen; root inspected both physicallywalkingcurrentrigs. Initial browser launch3failedbeforetests because root-relativebrowserpath was used; correctedcwdviewer withoutsource/assertion changes and retainedlog. No interaction anatomy/camera-policy edits. Flagshiptakecheck unchangedPASS beforefullgate. Source/visual limits: one authored9.85m groundcorridor,0.9m spacing/freehands, explicitpair and alternatives/refusals; no stairescort, autonomouscompanion choice or arbitrarycorridor solver. ParentUI option is optin, normal routine unchanged. Completecombinedclean gate/main/publication remain pending.
 
 Root scopedlint invocation initially usedrepo-rootcwd and rejectednestedtypeAwareconfig; rerunningfromviewer passed unchanged6files. ViewerTScpassed. Candidate rebased onto receipt9638489 before combinedgate; no pin changes, flagship--check remainsgreen.
+
+## Root integration and release28 proof
+
+Recovered candidate9b85793 rebasedonto9638489; clean combined gate passes206unit,
+893engine/0fail/6skip/11TODO and150browser/0fail/7skip, lint/bothTSc/unchanged
+take/probe/all36localMCP; interruptednull/cleanupnull. Original worker notes above
+remain the focused-review provenance, not current shipment status. MainFF preserves
+all89pending owner paths byte-for-byte; no overlapping historical files were changed.
+Release28 version657cce5b is100% live from exact9bsource. Published actualPlay
+Mars4/8pair2/2PASS16.7s and independentstudio crossing/recovery1/1PASS15.9s.
+Root reviewed all7runtimePNG/contactsheet and full walking images. Production
+assets/API/director proofs and original performance ceilings pass; see release28
+record for scope, transport settings, skips and exact evidence locations.

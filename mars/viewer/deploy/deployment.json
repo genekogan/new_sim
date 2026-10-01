@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "ef61dfc5-e0b7-469b-ab61-3b61f8b8b5cd",
+  "version": "657cce5b-14d4-467c-8550-26db10423d5f",
   "published": "2026-10-01",
-  "verification": "../.cloudflare/curl-27-ae/receipt.json",
+  "verification": "../.cloudflare/curl-28-ae/receipt.json",
   "updated": "2026-10-01",
-  "feature": "release 27: verified frozen museum plus ready activities; designated WASD tiers, anatomical stair feet, supported current 2022 skeleton and attributed computer/reset repairs",
+  "feature": "release 28: shared lunch walks, ordinary regroup traffic recovery, retained communal and studio intentions; preserved verified museum and camera checkpoint",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,14 +17,14 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "ad241a52-e8d6-4c47-831e-557df9d5692a",
+  "rollback_version": "ef61dfc5-e0b7-469b-ab61-3b61f8b8b5cd",
   "lab_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/lab?scenario=work-break-4",
-  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-27-2026-10-01-verified-museum-and-playable-checkpoint",
+  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-28-2026-10-01-shared-walk-continuity",
   "questions_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/questions/",
-  "source_commit": "879c88ac0354b47eee81ce766401160d2503753d",
-  "release": 27,
+  "source_commit": "9b857930507a6bd03100d4d4ab5a9255888bc118",
+  "release": 28,
   "engine_evidence": "../../docs/engineering/EVIDENCE.md",
-  "gate_report": "../.cloudflare/gate/2026-10-01T07-18-41-571Z/report.json",
+  "gate_report": "../.cloudflare/gate/2026-10-01T08-57-39-002Z/report.json",
   "last_rollback": {
     "failed_release": 25,
     "failed_version": "2edcf368-baeb-4dbf-aea7-da48ccccee62",
@@ -69,5 +69,10 @@
       "limits": "sample only; does not diagnose failed release25 CPU versus memory cause"
     },
     "full_production_pass": true
+  },
+  "previous_verified_release": {
+    "release": 27,
+    "version": "ef61dfc5-e0b7-469b-ab61-3b61f8b8b5cd",
+    "source_commit": "879c88ac0354b47eee81ce766401160d2503753d"
   }
 }
