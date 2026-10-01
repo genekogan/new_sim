@@ -39,7 +39,7 @@ import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderA
 import { flightOf, gaitAt, stairFootTarget, type Flight, type Gait } from './stair-gait.ts';
 import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
 import { GIRDLE, LIP, PRONE_ACTS, engineTurn, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
-import { sleepGoal, sleepHands } from './sleep.ts';
+import { sleepGoal, sleepHands, sleepHeadPitch } from './sleep.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
@@ -668,6 +668,10 @@ export class HumanViews {
       if (fp.kind !== 'beam') closeHands(v, k);
     } else dangle(v, pz.bend, []);
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
+    if (v.sleepPose && pr && v.spine?.head) {
+      turn(v.spine.head, _right, sleepHeadPitch(pr));
+      h.updateMatrixWorld(true);
+    }
     // A bounded book gaze uses the existing rig adapter only; seat/body authority is unchanged.
     if (v.spine?.head && v.readingGaze && sitW > .9) {
       const head=v.spine.head;

@@ -15,7 +15,7 @@ for (const [scenario, actor, rig] of [['ground-sleep','sleeper','woman'], ['grou
     const button = (name: string) => page.getByRole('button', { name, exact: true });
     await button('Step').click();
     expect(await page.evaluate(() => window.__marsEngine.violations())).toEqual([]);
-    await page.evaluate(() => window.__marsEngine.recordTake());
+    const takeStartTick = await page.evaluate(() => window.__marsEngine.recordTake());
     await button('Start sleep').click(); await button('Play').click();
     await page.waitForFunction(id => { const b=window.__marsEngine.bones(id)[id]; return b?.activity==='sleep-lie-down' && !!b.prone && b.prone.r>1 && b.prone.r<2; }, actor);
     await button('Pause').click();
@@ -54,7 +54,8 @@ for (const [scenario, actor, rig] of [['ground-sleep','sleeper','woman'], ['grou
     expect(complete?.remaining).toBe(0);
     expect(await page.evaluate(() => window.__marsEngine.violations())).toEqual([]);
     await page.screenshot({ path:path.join(artifacts,`${scenario}-completed-return.png`) });
-    const replay = await page.evaluate(tick => window.__marsEngine.replayTake([], tick/20, true),restTick);
+    // Replay time is relative to the recorder start, after the initial Step.
+    const replay = await page.evaluate(tick => window.__marsEngine.replayTake([], tick/20, true),restTick-takeStartTick);
     expect(replay.bones[actor].template).toBe(rig); expect(replay.bones[actor].prone?.r).toBe(0);
     await page.screenshot({ path:path.join(artifacts,`${scenario}-replay-rest.png`) });
     await page.evaluate(() => window.__marsEngine.endReplay());

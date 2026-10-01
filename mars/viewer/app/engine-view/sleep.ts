@@ -14,6 +14,12 @@ export function sleepGoal(pose: SleepPose, yaw: number): ProneState {
   const bend = r < 1 ? (1 - r * r * (3 - 2 * r)) * Math.PI / 2 : 0;
   return { r, bend, turn: 0, yaw, w: 1, slide: 0 };
 }
+/** Slight chin lift for ground rest: the existing flat prone head faces into
+ * the floor. Fade this current-rig expression out before upright kneeling. */
+export function sleepHeadPitch(pr: ProneState): number {
+  const k = Math.max(0, Math.min(1, pr.r));
+  return 0.2 * (1 - k * k * (3 - 2 * k)) * pr.w;
+}
 /** Renderer-only free palm contacts on the ground, smoothly raised with the
  * shoulders during waking. These are not grips or authoritative hand leases.
  * Existing armTo + flatHand handle the current rigs; fingers remain approximate. */
