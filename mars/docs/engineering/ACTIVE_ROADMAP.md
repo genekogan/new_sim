@@ -8,7 +8,8 @@ not a claim that unimplemented features work.
 
 ## Required supported experiences and limits
 
-- Gathering: existing 4- and 8-person Mars classrooms, two physically usable
+- Gathering: existing Mars classrooms with 4 or 8 initial audience guests, host/two
+  presenters and two additional available people (9/13 total), two physically usable
   arrangements, presentations/questions/rotation/conversation/arrival/departure.
 - Pursuits: usable computer work, reading, paired ground walking, a two-player
   chess game at a usable table, and bounded music performance/listening. Each
@@ -30,6 +31,8 @@ Require continuous major-volume motion, valid ownership/support, owned-resource
 cleanup, named refusal/waiting, retained completed effects and unfinished intentions,
 and deterministic replay under recorded decisions. Document exact persistence:
 world/take replay does not imply arbitrary active logical activities survive reload.
+  Current routine Pause/Resume retains live intention; Reset replaces it, and active
+  routine reload restoration remains unsupported.
 Add active persistence only where implemented and tested; do not imply it works.
 Fine fingers/clothing/contact, advanced autonomy/needs/relationships, dogs/gardening,
 complex construction choreography, arbitrary stair carrying and universal planning
