@@ -185,7 +185,10 @@ test('rotated corner uses one circular-person gap for admission, invariant and w
   assert.ok(gapToSleep(sleeper, inside)! <= HUMAN_PROFILE.radius + SLEEP_BODY_MARGIN);
   rt.world.entities.visitor.pose.p = [inside[0], 0, inside[1]];
   assert.equal(sleepSafetyIssue(rt, sleeper)!.code, 'sleep.occupied', 'real circular-body overlap is refused');
-  rt.world.entities.visitor.pose.p = [6, 0, 4]; control(rt, rec.id, 'end'); until(rt, () => !rt.isActive(rec.id)); clean(rt, rec.id);
+  // Restore the unstepped safety probe to its original position. Moving it to
+  // the fixture's distant default would itself be an authoritative teleport.
+  rt.world.entities.visitor.pose.p = [outside[0], 0, outside[1]];
+  control(rt, rec.id, 'end'); until(rt, () => !rt.isActive(rec.id)); clean(rt, rec.id);
 });
 for (const verb of ['sleep', 'sleep_on_mat']) test(`refused repeated ${verb} cannot wake/cancel the active sleep purpose`, () => {
   const { rt, p } = setup(), rec = start(rt, p); until(rt, () => readSleep(rt, rec.id)!.mode === 'sleeping');
