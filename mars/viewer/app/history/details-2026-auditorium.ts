@@ -90,7 +90,7 @@ export function add2026AuditoriumDetails(root:T.Group){
   box('auditorium gallery pale backing panel',[1.38,1.02,.032],[u,1.73,11.595],'#d2c8b7');
   box('auditorium gallery small screen bezel',[.49,.32,.035],[u,1.78,11.56],'#262e32');
   box('auditorium gallery screen surface',[.445,.272,.012],[u,1.78,11.534],'#496470');
-  const source=new T.Mesh(new T.PlaneGeometry(1.30,.94),k.photo('/history/2026/accuracy/gallery-native-c80-'+i%3+'.webp'));source.position.set(u,1.73,-11.572);k.tag(g,source,'Chiba gallery native c80 installation panel '+i,layers.detail);source.userData.walkNoCollision=true;source.userData.source='c80 native installation crop; perspective retained. Panel order representative, not all exhibits claimed at identical date.';
+  const source=new T.Mesh(new T.PlaneGeometry(1.30,.94),k.photo(`/history/2026/accuracy/gallery-native-c80-${i%3}.webp`));source.position.set(u,1.73,-11.572);k.tag(g,source,'Chiba gallery native c80 installation panel '+i,layers.detail);source.userData.walkNoCollision=true;source.userData.source='c80 native installation crop; perspective retained. Panel order representative, not all exhibits claimed at identical date.';
   const hood=box('auditorium gallery angled panel hood',[1.43,.055,.25],[u,2.285,11.49],'#c9bda6');hood.rotation.x=.25;
  }
  // The recognizable upper-gallery portrait uses source pixels from c33334,

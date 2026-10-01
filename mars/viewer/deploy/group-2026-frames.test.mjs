@@ -61,3 +61,12 @@ test('non-nominal post height stays provisional and is never snapped to 16 ft', 
   assert.equal(data.frames[0].catalogDef, null);
   assert.equal(data.frames[0].confidence, 'provisional');
 });
+
+test('missing scene prism stays counted as manifest input with an explicit refusal', () => {
+  const data = groupRecords([{ ...candidate('beam_candidate-missing', 0, 0), pos: null }]);
+  assert.equal(data.counts.beamCandidates, 1);
+  assert.equal(data.counts.sceneBeamCandidateComponents, 0);
+  assert.equal(data.beams.length, 0);
+  assert.equal(data.unclassified[0].component, 'beam_candidate-missing');
+  assert.equal(data.unclassified[0].code, 'no-scene-prism');
+});

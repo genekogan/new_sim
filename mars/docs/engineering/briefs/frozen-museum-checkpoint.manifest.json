@@ -19,7 +19,7 @@
       "path": "viewer/app/history/details-2026-auditorium.ts",
       "bytes": 9816,
       "sha256": "b92e35a92babd4c9dbcdced15b177f680473828a67bf154cb7f255594bc35486",
-      "candidateSha256": "b92e35a92babd4c9dbcdced15b177f680473828a67bf154cb7f255594bc35486"
+      "candidateSha256": "4883b6dfcee82d0c480971faadcb55f6656d55aa93008716c0981e9eb7668df0"
     },
     {
       "path": "viewer/app/history/details-2026-chiba.ts",
@@ -31,7 +31,7 @@
       "path": "viewer/app/history/details-2026-compound.ts",
       "bytes": 47223,
       "sha256": "250997b5cd695998ceb72ac8bc2e66c1ce3bb41d16348a4255973b9423ff17f1",
-      "candidateSha256": "6e6f33be407f8a6d559ee4df538211d980b011f993aac918425d755d5f497c1b"
+      "candidateSha256": "114085ee1626af56a80e1e1b6611b29cf5cb794fa1744793727b1f90bb301820"
     },
     {
       "path": "viewer/app/history/details-2026-facade.ts",

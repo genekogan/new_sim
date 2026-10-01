@@ -2,7 +2,7 @@
   "schema": "mars-2026-frames/1",
   "source": {
     "scene": "viewer/public/engine/campus-2026.json",
-    "sceneContentHash": "0d980ad942b15d886e95f4b2739e3a9acff5af7217c1c873a0d57fe638a06af5",
+    "sceneContentHash": "73887062b6fbef27ff4593e4e3840cda61476f3f075579ca3ddf2acd29b0904b",
     "manifest": "viewer/public/modular/components.json"
   },
   "generator": "viewer/deploy/group-2026-frames.mjs",
@@ -2984,6 +2984,7 @@
     "rackMemberComponents": 667,
     "sceneRackMemberComponents": 660,
     "beamCandidates": 89,
+    "sceneBeamCandidateComponents": 83,
     "frames": 81,
     "beams": 12,
     "unclassified": 92,
@@ -3020,9 +3021,9 @@
     },
     "byReason": {
       "beam-end-miss": 12,
-      "panel-not-beam": 65,
-      "coincident-post": 8,
-      "no-scene-prism": 7
+      "panel-not-beam": 59,
+      "no-scene-prism": 13,
+      "coincident-post": 8
     }
   },
   "unclassified": [
@@ -3281,38 +3282,38 @@
     {
       "component": "beam_candidate-0055",
       "assembly": "northeast-compound",
-      "code": "panel-not-beam",
-      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
     },
     {
       "component": "beam_candidate-0056",
       "assembly": "northeast-compound",
-      "code": "panel-not-beam",
-      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
     },
     {
       "component": "beam_candidate-0057",
       "assembly": "northeast-compound",
-      "code": "panel-not-beam",
-      "reason": "CAD horizontal span 3.467 m is not a stock beam length; broad panel geometry"
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
     },
     {
       "component": "beam_candidate-0058",
       "assembly": "northeast-compound",
-      "code": "panel-not-beam",
-      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
     },
     {
       "component": "beam_candidate-0059",
       "assembly": "northeast-compound",
-      "code": "panel-not-beam",
-      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
     },
     {
       "component": "beam_candidate-0060",
       "assembly": "northeast-compound",
-      "code": "panel-not-beam",
-      "reason": "CAD horizontal span 3.486 m is not a stock beam length; broad panel geometry"
+      "code": "no-scene-prism",
+      "reason": "manifest component has no 2026 scene prism"
     },
     {
       "component": "beam_candidate-0061",
