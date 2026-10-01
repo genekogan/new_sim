@@ -79,3 +79,44 @@ Three asymmetries fall out of this:
 - **Notes in the permanent record.** Owner notes are redacted from every
   public view but stored in the log. If the log is ever published for
   verification (doc 03), notes need to move out of it or be hashed.
+
+## Gene's answers (2026-10-01)
+
+His words, verbatim. They move these from open to **direction given**; the design
+that follows from them is in `18`.
+
+- **Fog of war.** "i like the middle path but i also want it to feel natural where
+  they know things at multiple scales of resolution and not just a distance
+  measure. they might know the different and more distant regions of the map and
+  have memories or perceptions of them while still knowing the neighborhood they
+  are in in more intimate and fast detail. there is some inertia traveling, like in
+  real life, even though some agents may specialize in it"
+- **Bring your own brain.** "I think this is interesting. but i also think that via
+  agent control you already can do this to some degree since arent they making api
+  commands? maybe this is 'possessed' mode where the owner completely takes over
+  them -- but no i kind of think the point of the serverside simulation is to
+  somehow regulate the unlimited action space of the owners through an agent? to
+  regularize / make coherent unbounded stuff from the controllers of the
+  agents/souls."
+- **What `perceive` should contain.** "yes that makes sense. to the extent we can
+  fit more into the prompt, i could add other things -- maybe some 'news' of the
+  world i.e. whats happening or anything notable today (to start, maybe a list of
+  scheduled events and times), and some notion of places as they are named or
+  somewhat known (in the way people know foreign countries). and maybe also input
+  if someone just spoke to them i.e. X just turned to you and said Y? and still
+  more things?"
+- **Souls speaking.** "maybe souls can converse with words? how else can we have
+  plans get spontaneously made? they need to converse? i think we can try an
+  infinite craft type approach where we pre-create (and perhaps even regularly
+  self-augmented according to a budget) a set of options in the action space that
+  are specific to that agent and nevertheless map on to the ontology we defined in
+  which actions can take place and the state exists? that way we can afford pretty
+  regular sampling (via jev) to get continous movement and action, while using
+  more expensive things (i.e. evolving intents, expanding or pruining action
+  space, learning about something) on a slower schedule? in fact that's kind of
+  the whole point of 'steering' -- like a ship, you can gradually and sometimes
+  only slowly adjust its direction while all the while it is with momentum keeps
+  swimming straight."
+- **Notes in the permanent record.** "ok" (move them out of the log or hash them
+  before any publication).
+

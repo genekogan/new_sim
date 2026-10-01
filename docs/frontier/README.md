@@ -4,6 +4,14 @@ Started 2026-09-30 by Gene, from a discussion with the agent working on the Mars
 world engine. **This folder is a discussion in progress, not a plan.** Take it
 over: read, argue, extend, and record decisions in `DECISIONS.md` here.
 
+## Latest
+
+2026-10-01: Gene answered the agent-interface questions (`../eden4/17-AGENT-INTERFACE.md`,
+last section) and Claude proposed a design that responds to them and to his
+competing goals: `../eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md` (a small kernel of
+kinds and effects, an open minted action space of cards, speech acts, layered
+knowing, and levels of self-change). It awaits Gene's answers to its eight questions.
+
 ## What is in this folder
 
 - `../mars/SIMULATION_FRONTIER.md`, `../mars/SIMULATION_FRONTIER_APPLICATIONS.md`:

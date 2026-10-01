@@ -24,7 +24,7 @@ including mirrors of material whose working home is elsewhere.
 | [`GLOSSARY.md`](GLOSSARY.md) | Terms (Soul, mind, intent, activity, fold, governor, …) | here |
 | [`sim/`](sim/) | **How Sim works**: [architecture](sim/ARCHITECTURE.md), [engine contract](sim/ENGINE-CONTRACT.md), [protocol](sim/PROTOCOL.md), [API and MCP](sim/API.md), [brain](sim/BRAIN.md), [data](sim/DATA.md), [development](sim/DEVELOPMENT.md), [runbook](sim/RUNBOOK.md) | here |
 | [`mars/`](mars/README.md) | **The Mars engine**: Sim's survey ([ENGINE-SNAPSHOT](mars/ENGINE-SNAPSHOT.md)) plus mirrored engine docs (vision, roadmap, spec, subsystems, frontier) | mirror of `<mars-campus-repo>` |
-| [`eden4/`](eden4/README.md) | **Why and what**: the strategy notes `01`–`17` (vision, neutrality, economy, formalism, dials, specs, sprint, agent interface) and the decision ledger | mirror of `<eden4>` |
+| [`eden4/`](eden4/README.md) | **Why and what**: the strategy notes `01`–`18` (vision, neutrality, economy, formalism, dials, specs, sprint, agent interface) and the decision ledger | mirror of `<eden4>` |
 | [`frontier/`](frontier/README.md) | The open design discussion on where the simulation goes next, and its decision log | here |
 | [`ONBOARDING-CLOUD.md`](ONBOARDING-CLOUD.md) | Prompt for an agent taking over the frontier discussion from this repo alone | here |
 
@@ -39,7 +39,7 @@ including mirrors of material whose working home is elsewhere.
 | Work on prompts or model cost | [`sim/BRAIN.md`](sim/BRAIN.md) |
 | Understand or adopt the Mars engine | [`mars/ENGINE-SNAPSHOT.md`](mars/ENGINE-SNAPSHOT.md) → [`sim/ENGINE-CONTRACT.md`](sim/ENGINE-CONTRACT.md) → [`mars/README.md`](mars/README.md) |
 | Know what has been decided | [`eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md`](eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md), [`frontier/DECISIONS.md`](frontier/DECISIONS.md) |
-| Join the design discussion | [`frontier/README.md`](frontier/README.md), [`eden4/17-AGENT-INTERFACE.md`](eden4/17-AGENT-INTERFACE.md) |
+| Join the design discussion | [`frontier/README.md`](frontier/README.md), [`eden4/17-AGENT-INTERFACE.md`](eden4/17-AGENT-INTERFACE.md), [`eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md`](eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md) (latest proposal) |
 
 ## Which document wins
 

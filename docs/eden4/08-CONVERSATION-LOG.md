@@ -327,4 +327,14 @@ Compact record; Gene's decisions are in `06`, details in `14`–`17`.
   replication, staging, rollback, watchdog) and wrote `17`. Gene reserved the
   world ontology and topics for himself, and asked that the Sim repo hold all
   documentation for both heads of the project.
+- **Round 16 (2026-10-01).** Gene answered the open questions in `17` (layered
+  knowing rather than a distance cutoff; the server regularizes owners' unbounded
+  action space; richer `perceive` with news, known places and what was just said;
+  Souls should speak, with an "infinite craft" action space attuned to each Soul,
+  sampled often and reshaped slowly). He set out competing goals (an immutable
+  ledger of valuable action declarations, a boundary between mushy intent and
+  predictable change, a small ontology, a Soul under $1 a month, a world more
+  expressive than the engine) and asked whether Souls could change the world's
+  software. Claude proposed `18`: structure the effects and leave content open;
+  a small kernel; minted cards and per-Soul decks; self-change by level.
 

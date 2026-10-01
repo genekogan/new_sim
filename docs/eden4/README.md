@@ -72,7 +72,8 @@ Currency: **vision** = still the design intent, open questions included · **led
 | [`14-MVP-TECHNICAL-SPEC-DRAFT.md`](14-MVP-TECHNICAL-SPEC-DRAFT.md) | Rounds 9–10 (*spec*): technical construction of a playable eden4, prior art, three timescales of mind |
 | [`15-SCAFFOLD-SPEC.md`](15-SCAFFOLD-SPEC.md) | Rounds 11–13 (*spec*): the scaffold plan, then what was built (§15–§16) |
 | [`16-HARDENING-SPRINT.md`](16-HARDENING-SPRINT.md) | Round 14 (*spec*): measurements, defects, the sprint; done/not-done at its top |
-| [`17-AGENT-INTERFACE.md`](17-AGENT-INTERFACE.md) | Round 15: the arrive → own → steer → attach-an-agent flow, who knows what, open questions |
+| [`17-AGENT-INTERFACE.md`](17-AGENT-INTERFACE.md) | Round 15: the arrive → own → steer → attach-an-agent flow, who knows what, open questions, and Gene's answers (round 16) |
+| [`18-KERNEL-CARDS-AND-SELF-CHANGE.md`](18-KERNEL-CARDS-AND-SELF-CHANGE.md) | Round 16 (*proposal*): structure the effects and leave content open; a nine-kind kernel; cards and decks as a minted action space; speech acts; layered knowing; how the world can safely change itself; a tranche that designs in the UI |
 | [`report/eden4.html`](report/eden4.html) | The articulation after round 8 as one HTML report (*historical*: predates Sim) |
 
 ## Handoff note for the next agent
