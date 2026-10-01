@@ -26,6 +26,8 @@ export type Mind = {
   /** The intent's agenda (cards to favour, in order) and how far along it is. */
   agenda: AgendaStep[]; agendaPos: number;
   /** The card whose depiction is running and whose effects have not applied yet. */
+  /** Something that was just tried and could not be done: not offered again for a minute, so a Soul never retries the impossible in a loop. */
+  avoid?: { id: string; untilTick: number };
   /** Tick since which the plan has had no playable step (to give up eventually). */
   planBlockedSince?: number;
   pending: { program: string; card: string; hash: string; target: string | null; manner?: string; approachLen: number; applied: boolean } | null;
@@ -262,7 +264,7 @@ export class WorldHost {
         m.doing = r.programOk ? p.label : 'standing around';
         m.nextEvalTick = tick + (r.programOk ? p.reevalTicks : 40);
         m.evalTrigger = r.programOk ? 'timer' : 'activity-failed';
-        if (!r.programOk) { m.recent = [...m.recent.slice(-3), `${shorten(p.label)} (could not: ${r.programCode})`]; m.pending = null; }
+        if (!r.programOk) { m.recent = [...m.recent.slice(-3), `${shorten(p.label)} (could not: ${r.programCode})`]; m.pending = null; m.avoid = { id: p.option, untilTick: tick + 1200 }; }
         else if (p.card) {
           const card = this.kernel.vocab.cards[p.card];
           m.pending = { program: r.programId, card: p.card, hash: card?.hash ?? '', target: p.target ?? null, ...(p.manner ? { manner: p.manner } : {}), approachLen: p.approachLen ?? 0, applied: false };
@@ -288,7 +290,7 @@ export class WorldHost {
             for (const c of view.changes) if (c.op === 'say') { const o = this.minds.get(c.to); if (o) { o.nextEvalTick = Math.min(o.nextEvalTick, tick + 8 + (hash32(o.soulId) % 20)); o.evalTrigger = 'spoken-to'; o.lastFingerprint = ''; } }
           } else {
             m.recent = [...m.recent.slice(-3), `${what} (did not happen: ${view.reason})`];
-            m.pending = null; m.doing = 'standing around';
+            m.pending = null; m.doing = 'standing around'; m.avoid = { id: view.target ? `${view.card}@${view.target}` : view.card, untilTick: tick + 1200 };
             m.nextEvalTick = Math.min(m.nextEvalTick, tick + 20); m.evalTrigger = 'activity-failed';
           }
           this.acc.dirty.add(m.soulId);

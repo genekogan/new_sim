@@ -13,7 +13,7 @@ import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { WORLD_ID, energyWord, hash32, type Mind, type WorldHost } from './world.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
-import { candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
+import { awaiting, candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
 import { cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
 
 const TPS = 20;
@@ -204,12 +204,41 @@ export class Brain {
       else if (m.planBlockedSince === undefined) m.planBlockedSince = tick;
       else if (tick - m.planBlockedSince > TPS * 600) { m.recent = [...m.recent.slice(-3), `gave up on the plan at "${m.agenda[m.agendaPos].card}" (not possible for a long while)`]; m.agendaPos = m.agenda.length; m.planBlockedSince = undefined; host.markDirty(m.soulId); }
     }
+    if (m.avoid && m.avoid.untilTick > tick) ctx.options = ctx.options.filter((o) => o.id !== m.avoid!.id); else m.avoid = undefined;
+    const noBudgetNow = this.mode !== 'fake' && (this.overBudget || this.gov.waitSeconds('mid') > 0);
+    // Tier 1, reflex: what code already knows needs no model.
+    //  · Someone asked a question: the only options are to answer it (and if the owner's plan says to agree, agree).
+    //  · Options that serve the owner's plan exist: choose only among those (and if there is one, take it).
+    //  · This Soul asked something and the other has not answered: stay and wait.
+    const answers = ctx.options.filter((o) => o.card === 'say yes' || o.card === 'say no');
+    const serving = ctx.options.filter((o) => o.servesIntent && o.card !== 'wait');
+    let reflex: CardOption | undefined, why = '';
+    if (answers.length) {
+      ctx.options = answers; reflex = answers.find((o) => o.card === 'say yes' && o.servesIntent); why = 'someone asked, and the plan says to agree';
+      // a question is never left hanging for want of budget: without a model, yes two times in three
+      if (!reflex && noBudgetNow) { const yes = hash32(`${m.soulId}:${tick}:answer`) % 3 !== 0; reflex = answers.find((o) => o.card === (yes ? 'say yes' : 'say no')) ?? answers[0]; why = 'someone asked (no model budget just now)'; }
+    }
+    else if (serving.length) { ctx.options = serving; if (serving.length === 1) { reflex = serving[0]; why = 'the one thing that serves the plan'; } }
+    else if (awaiting(host, m.soulId).length) { reflex = ctx.options.find((o) => o.card === 'wait'); why = 'waiting for an answer'; }
+    if (reflex) {
+      const same = ctx.running && m.pending?.card === reflex.card && m.pending.target === reflex.cardTarget;
+      if (same) { m.nextEvalTick = tick + TPS * 10; m.evalTrigger = 'timer'; return; }          // already doing exactly that
+      const manners = Object.keys(ctx.manners ?? {}), manner = manners.length ? manners[hash32(`${m.soulId}:${tick}`) % manners.length] : undefined;
+      const callId = this.record({ tick, tier: 'mid', subject: m.name, soulId: m.soulId, model: 'reflex', request: { reflex: why, options: ctx.options.map((o) => o.id) }, response: null, applied: { trigger, option: reflex.id, label: reflex.label, card: reflex.card, target: reflex.cardTarget, manner, how: 'reflex', why }, ms: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, mode: 'fake' });
+      m.nextEvalTick = tick + TPS * 30; m.lastFingerprint = '';
+      void host.enqueue('decision', 'brain:reflex', {
+        soulId: m.soulId, entityId: m.entityId, option: reflex.id, label: reflex.label, steps: reflex.steps, mood: m.mood,
+        reevalTicks: (reflex.card === 'wait' ? 10 : durationFloor(reflex.durationHint)) * TPS, fallback: false, call: callId, trigger,
+        card: reflex.card, target: reflex.cardTarget, ...(manner ? { manner } : {}), approachLen: reflex.approachLen,
+      } satisfies DecisionPayload);
+      return;
+    }
     const fp = fingerprint(ctx);
     if (ctx.running && trigger === 'timer' && fp === m.lastFingerprint) { m.nextEvalTick = tick + TPS * 60; return; } // nothing changed: skip the call
     m.lastFingerprint = fp;
     // Governor: if the mid-brain share is spent for now, a busy soul simply waits; an idle soul takes a free default.
     const budgetOk = !this.overBudget && (this.mode === 'fake' || this.gov.allow('mid'));
-    if (!budgetOk && ctx.running) { m.nextEvalTick = tick + Math.max(20, this.gov.waitSeconds('mid')) * TPS; m.lastFingerprint = ''; return; }
+    if (!budgetOk && ctx.running && !URGENT.has(trigger)) { m.nextEvalTick = tick + Math.max(20, this.gov.waitSeconds('mid')) * TPS; m.lastFingerprint = ''; return; }
     this.inflight.add(m.soulId);
     const version = m.intentVersion;
     const seed = `${m.soulId}:${tick}`;

@@ -137,6 +137,15 @@ export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
   return scored.map((s) => s.o);
 }
 
+/** Who this Soul has asked something and not yet heard back from (they are here, and the question still hangs in the air). */
+export function awaiting(host: WorldHost, me: string): string[] {
+  const k = host.kernel; k.tick = host.engine.world.tick;
+  return linksFrom(k, me, 'said').filter((l) => (l.data as { act?: string } | undefined)?.act === 'ask').map((l) => l.to).filter((to) => {
+    const back = linked(k, 'said', to, me), act = (back?.data as { act?: string } | undefined)?.act;
+    return !linked(k, 'agreed', to, me) && !((act === 'agree' || act === 'decline') && back!.since >= linked(k, 'said', me, to)!.since) && samePlace(k, me, to);
+  });
+}
+
 /** The Soul's social situation in words, for its mind (and for agents through `perceive`). */
 export function situationOf(host: WorldHost, m: Mind): { situation: string[]; heard: { who: string; act: string; about?: string; from: string }[] } {
   const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
@@ -150,7 +159,8 @@ export function situationOf(host: WorldHost, m: Mind): { situation: string[]; he
     const roles = linksTo(k, g.id).filter((l) => !['attends', 'hosts', 'said', 'dancing at'].includes(l.kind)).map((l) => `${name(l.from)} ${l.kind}`);
     out.push(`${g.name} is ${here ? 'here' : `at ${g.at ? name(g.at) : 'somewhere'}`}: hosted by ${host_ ? (host_.from === me ? 'you' : name(host_.from)) : 'nobody'}, ${n} taking part${g.states.music === 'playing' ? ', music is playing' : ''}${roles.length ? `, ${roles.join(', ')}` : ''}${mine ? ' (you are part of it)' : ''}`);
   }
-  for (const l of linksFrom(k, me, 'said')) { const d = l.data as { act?: string; about?: string }; if (d?.act === 'ask') out.push(`you asked ${name(l.to)}${d.about ? ` about ${d.about}` : ''} and are waiting for an answer`); }
+  const waitingOn = awaiting(host, me);
+  for (const l of linksFrom(k, me, 'said')) { const d = l.data as { act?: string; about?: string }; if (d?.act === 'ask' && waitingOn.includes(l.to)) out.push(`you asked ${name(l.to)}${d.about ? ` about ${d.about}` : ''} and are waiting for an answer`); }
   for (const l of linksTo(k, me, 'agreed')) out.push(`${name(l.from)} agreed to your request`);
   const heard = linksTo(k, me, 'said').map((l) => { const d = l.data as { act?: string; about?: string }; return { who: name(l.from), from: l.from, act: d?.act ?? 'spoke', ...(d?.about ? { about: String(d.about) } : {}) }; });
   const step = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;
