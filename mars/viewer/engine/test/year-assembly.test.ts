@@ -1,4 +1,6 @@
 // Assembly graph of the canonical year scenes (engine/campus/assembly.ts; owner feedback §7 phase A).
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hashOf } from '../core/hash.ts';
@@ -9,16 +11,26 @@ import type { CampusScene } from '../campus/types.ts';
 import { def } from '../world/catalog.ts';
 import { defaultSortOrder } from '../core/order.ts';
 
-const scene = (y: number) => loadCampusYear(y, loadCampusFile(y) as CampusYearFile).base;
+// Preserve source-era geometry/count assertions on their exact input bytes.
+function sourceEraFile(y: number): CampusYearFile {
+  if (![2021, 2022, 2023, 2024].includes(y)) return loadCampusFile(y);
+  const root = new URL('./fixtures/campus-history-pre-review-7648dbf/', import.meta.url);
+  const manifest = JSON.parse(readFileSync(new URL('manifest.json', root), 'utf8')) as { years: Record<string, { sha256: string; contentHash: string }> };
+  const bytes = readFileSync(new URL(`campus-${y}.json`, root));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), manifest.years[String(y)].sha256);
+  const file = JSON.parse(bytes.toString()) as CampusYearFile;
+  assert.equal(file.contentHash, manifest.years[String(y)].contentHash); return file;
+}
+const scene = (y: number) => loadCampusYear(y, sourceEraFile(y)).base;
 
-test('assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part classified, deterministic', () => {
+test('byte-verified pre-review7648dbf assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part classified, deterministic', () => {
   const base = scene(2022);
   const g = assemblyGraph(2022, base);
   const c = graphCounts(g);
   assert.equal(c.kinds.upright, 48);
   assert.equal(c.kinds.beam, 216);
   assert.equal(c.unclassified, 0, JSON.stringify(g.unclassified.slice(0, 3)));
-  assert.equal(g.sceneHash, loadCampusFile(2022).contentHash);
+  assert.equal(g.sceneHash, sourceEraFile(2022).contentHash);
   assert.equal(hashOf(assemblyGraph(2022, scene(2022))), hashOf(g));
   const order = topoOrder(g);
   const pos = new Map(order.map((id, i) => [id, i]));
@@ -51,7 +63,7 @@ test('assembly graph 2022: 4 houses × (12 frames + 54 beams), every rack part c
   }
 });
 
-test('assembly graph: every year builds and orders; 2020 racks do not map onto catalog frames and are reported, not forced', () => {
+test('source-era assembly graph: every year builds and orders; 2020 racks do not map onto catalog frames and are reported, not forced', () => {
   for (const y of [2021, 2023, 2024, 2025]) {
     const g = assemblyGraph(y, scene(y));
     assert.ok(topoOrder(g).length === g.nodes.length);
@@ -92,4 +104,25 @@ test('assembly graph: deliberately broken geometry is reported with a reason, ne
   // catalog: the reconstruction frame keeps the stock seats and adds the Kit levels
   const seats = new Set((def('upright-16ft-kit').sockets ?? []).map((s) => s.local[1].toFixed(4)));
   for (const y of ['0.2200', '2.4800', '4.7568', '0.3048', '1.8288']) assert.ok(seats.has(y), y);
+});
+
+
+test('current public year graphs preserve actual rack identity/order and explicitly report unsupported components', () => {
+  for (const year of [2020, 2021, 2022, 2023, 2024, 2025]) {
+    const file = loadCampusFile(year), base = loadCampusYear(year, file).base, graph = assemblyGraph(year, base);
+    assert.equal(graph.sceneHash, file.contentHash);
+    assert.equal(topoOrder(graph).length, graph.nodes.length);
+    assert.equal(new Set(graph.nodes.map(n => n.id)).size, graph.nodes.length);
+    const components = new Set(base.obstacles.map(o => o.component));
+    for (const issue of graph.unclassified) {
+      assert.ok(components.has(issue.component), `${year}: refusal names actual component ${issue.component}`);
+      assert.ok(issue.reason.length > 10, `${year}: ${issue.component} has an explicit classification reason`);
+    }
+    if (year === 2022) for (const house of ['chiba', 'east-house', 'kitchen', 'west-house']) {
+      const selected = assemblyGraph(year, base, { assemblies: [house] });
+      assert.equal(selected.nodes.filter(n => n.kind === 'upright').length, 12, house);
+      assert.equal(selected.nodes.filter(n => n.kind === 'beam').length, 54, house);
+    }
+    console.log(`[current graph ${year}] ${JSON.stringify(graphCounts(graph))}`);
+  }
 });
