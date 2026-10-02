@@ -3086,3 +3086,27 @@ still requires exactly one Step, scripted journey starts from strict tick0 throu
 actual Play. Original assertions/timeouts remain. No application or tolerance change.
 Earlier first quarantine native-fieldset correction passed twice on clean0432b8c;
 remaining focused core proof inherits unchanged application source from a8a8630.
+
+## Alpha full-Play progress and bounded third-attempt review — 2026-10-02
+
+Clean107af96 actual31case run:7PASS/8FAIL/1interrupted/15unrun. All eight
+manual journeys reached actual execution: seven completed their meaningful effects,
+intervention, cleanup and Reset. Prepared-day-8 main purpose completed tick8671,
+but whole120s expired during independent follow-up. Timeout snapshot shows ordinary
+blocker recovery and completed presenter walk9069, working9081 with0.9/12s done;
+no stuck route/resource/invariant found. Independent Sol6.1 read-only review confirms
+existing UI8x changes accumulator speed only, preserving DT1/20 and every ordinary
+admission/physical tick. Only this layout now selects8x;120s/expect15s/retries0 and
+all completion assertions remain. This hypothesis still requires execution.
+
+Seven scripted presets failed shared cleanup matcher: garden().claims values are
+holder-ID arrays, so filter(Boolean) counted empty arrays. The exact-empty guarantee
+now flattens all IDs; stress retains original<=30 bound on real holder IDs. Campfire
+drain uses the same exact-empty check, Reset exactclaims equality unchanged. An
+independent read-only review verified hook/Runtime resource types before third run.
+Full original report/traces/attachments retained under ignored
+.cloudflare/alpha-journeys-107af96-completed; no failed/unrun case is PASS.
+
+Root inspected supported-sleep and shared-food captures alongside paired state.
+Garden due/full natural3stop gallery checks and canonical index navigation are
+integrated authored candidates; still unexecuted. Frozen combined validation follows.

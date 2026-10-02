@@ -343,7 +343,9 @@ for (const scenario of scenarios) {
       await button(page, 'Step').click(); // Exactly one fresh readiness tick; no journey stepping.
       await page
         .getByRole('combobox', { name: 'Speed', exact: true })
-        .selectOption('4');
+        // The eight-guest side-layout journey exceeds120s at4x after its
+        // main purpose finishes. Existing UI8x retains every fixed-DT step.
+        .selectOption(scenario === 'prepared-day-8' ? '8' : '4');
       const initial = await snapshot(page);
       checkpoints.initial = initial;
       expect(initial.state.scenario).toBe(scenario);

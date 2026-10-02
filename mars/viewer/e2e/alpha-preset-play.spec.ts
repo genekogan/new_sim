@@ -218,7 +218,7 @@ function effects(name: string, initial: Evidence, end: Evidence) {
     ).toBe(true);
   if (!['meal', 'campfire-evening'].includes(name)) {
     expect(end.held).toEqual([]);
-    expect(Object.values(end.claims).filter(Boolean)).toEqual([]);
+    expect(Object.values(end.claims).flat()).toEqual([]);
   }
   if (['build-bay', 'hand-up'].includes(name)) {
     expect(end.sequence.steps?.every((s) => s.status === 'completed')).toBe(
@@ -339,9 +339,7 @@ for (const name of [...scripted, 'incomplete-stairs', 'stress-30']) {
             'at most one walk per actual wanderer',
           ).toBeLessThanOrEqual(30);
           expect(live.every((r) => r.verb === 'walk_to')).toBe(true);
-          expect(
-            Object.values(d.claims).filter(Boolean).length,
-          ).toBeLessThanOrEqual(30);
+          expect(Object.values(d.claims).flat().length).toBeLessThanOrEqual(30);
           for (const c of d.state.checks) expect(c.ok, c.message).toBe(true);
           expect(d.records.some((r) => r.status === 'completed')).toBe(true);
         }
@@ -413,7 +411,7 @@ for (const name of [...scripted, 'incomplete-stairs', 'stress-30']) {
           ).toBe(true);
           expect(drained.held).toEqual([]);
           expect(drained.slots.filter((q) => q.claimedBy)).toEqual([]);
-          expect(Object.values(drained.claims).filter(Boolean)).toEqual([]);
+          expect(Object.values(drained.claims).flat()).toEqual([]);
           await reach(page, drained.state.tick + 40);
           checkpoints.usable = await capture(page, name, 'usable-after-end');
         }
