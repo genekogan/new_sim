@@ -2404,3 +2404,32 @@ Node/68combined worker checks PASS. Root adds two Lab selector/quick-tour entrie
 keyed HUD, detached gardenAfternoon hook and small camera allowlist/source facts.
 60presets on this future source; eight additions relative to release37. Authored
 strict actualPlay/captures pending serialized browser slot; no published claim.
+
+### Release37 published and verified; continued vocabulary expansion — 2026-10-02
+
+Functional ca6bb5d passed all9clean combinedgate stages:290deployment/1224enginePASS
+(6SKIP11TODO),241browserPASS(7SKIP), bothTSc/lint/take/probe/all36MCP. Hash/pins unchanged.
+MainFF preserves48other-owner paths byte/status/mode/mtime/staged0. Worker100%
+8c57ad5b-9dfd-46b2-9d60-47fdb021510f deployed10:57:13.198Z, rollback36fbbb874d.
+All69fresh sim.mars.college cases PASS0fail/skip/flaky28.6min, all70PNG inspected;
+root views representative creative/cleanup/music and both2022completed builds.
+Wholehouse automatic555/555steps66/66installed, zero violations, released crew.
+Worker originalHTTP522/24/696, publicMCP36/director9PASS. Gateway exactnewbundle/range
+PASS; missing HEADsize remains unresolved/unclaimed. Rejected oldpage404.
+
+Seven additions52total ship physicaldrawing, groundedwarm-up, same-stationjam,
+artsharing, independentcreativeafternoon and same-objectcleanup in two orientations.
+Music own-child history and earlyEndreadout fixes ship without anatomy/authority/
+outcome/pin changes. New-preset camera entry remains future; finecontact/framing
+limits explicit. Current docs/metadata now distinguish37online from8futurepresets.
+
+Future cleancea39b5 has103focusedPASS/TSc/lint and15actualPlay executed:11PASS4FAIL.
+Bothgallery fixes and all7cameraentry checks PASS; seedplanting2PASS. Garden2fails
+single15s wait covering multiple physical phases (same seeds/book complete, care
+still ordinarily walking); reading fails a full authoritative support versus kind-only renderer comparison,
+and rotated stationary renderer bounds by ~one floating-point unit. Failures/captures retained; no completion/releaseclaim.
+Root+Sol6.1 two bounded implementation/review lanes investigate, with anotherSol6.1
+reusing existingphysicalcleanup/setup/classroom for hypothetical roompreparation.
+Atmost3helpers, expensivebrowser/perfserialized. No broadinventoryaudit orEden.
+Next publication estimate2–4workinghours assumes boundedrepairs/fullgate/publicproof;
+continuousowner-authorized expansion has no fixedremainingtotal until Gene stops.

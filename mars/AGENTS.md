@@ -2,21 +2,24 @@
 
 ## Published checkpoint and current authorization
 
-The owner-authorized October2 living-world tranche is published and verified as
-**release36 at https://sim.mars.college/**, Worker
-`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`, functional source
-`cfea591083ac54d0280766809b2cbf1872bb012d`. Clean full gate and53fresh public cases
-pass; skipped/TODO legacy checks and gateway HEAD metadata remain explicit limits.
-The new connected independent days, flexible permitted bindings, music/dance,
-finite recurring garden care, camera observation and documentation are shipped.
+**Release37 is published and verified at https://sim.mars.college/**, Worker
+`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`, functional source
+`ca6bb5d1ed707f12fe9029720fbf1bdecc44f917`; rollback36
+`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`. All nine clean gate stages and69fresh public
+checks pass. There are52selectable presets. Skipped/TODO legacy checks, gateway
+HEAD metadata and new-preset camera-entry limitations remain explicit.
 
-Gene explicitly authorized continued Mars activity/scenario expansion on October 2
-if release36 finished before 8am Eastern; it did. Continue meaningful additions in
-priority order until Gene explicitly stops. Do not begin Eden automatically.
-Current bounded queue: physical drawing with retained artwork, a grounded guided
-warm-up, and open-jam performer handoffs. New labels alone are not new activities.
-Each increment needs ordinary physical execution, useful intervention, focused
-invalid/disruption coverage, inspected Play captures and combined release validation.
+Release36 completed the connected living-world/music-dance/garden-care tranche
+before8am Eastern. Gene explicitly authorized continuous meaningful Mars vocabulary
+expansion until he tells us to stop; do not stop at a release or begin Eden.
+Release37 adds physical drawing, guided standing warm-up, open-jam handoffs,
+artwork sharing, a connected creative afternoon and two table-cleanup layouts.
+Current candidate: gallery tours, reading circles, finite seed planting and two
+connected planting/care/reading afternoons, plus minimal read-only camera entry fixes.
+These eight additional presets are not yet public. A separate bounded room-preparation
+bridge reuses cleanup, physical movers and classroom; it remains in development.
+Each addition requires ordinary physical execution, useful intervention, valid/invalid
+checks, inspected actualPlay captures and clean combined release validation.
 
 Future agents should
 read [final handoff](docs/engineering/MARS_MVP_HANDOFF.md),

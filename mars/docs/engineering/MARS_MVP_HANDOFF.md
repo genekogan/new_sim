@@ -1,7 +1,10 @@
-> **Current direction (October 2):** release36 below is complete and remains the
-> verified baseline. Gene subsequently authorized continuous meaningful Mars activity
-> expansion until he explicitly stops; see [active roadmap](ACTIVE_ROADMAP.md).
-> Earlier stopping language records the completed contract, not the active mandate.
+> **Current direction (October2):** release37 is public at sim.mars.college with52
+> presets and69fresh publicPASS. Exact source `ca6bb5d1ed707f12fe9029720fbf1bdecc44f917`,
+> Worker `8c57ad5b-9dfd-46b2-9d60-47fdb021510f`, rollback36. Drawing/warm-up/jam,
+> artwork sharing/creative afternoon and cleanup are additional shipped vocabulary.
+> [Newest release record](RELEASE_CHECKLIST.md) owns current proof and limitations.
+> The release36 contract below remains dated acceptance provenance. Gene authorized
+> continued meaningful expansion until he stops it; old stopping language is superseded.
 
 # Mars MVP and living-world handoff — release36
 

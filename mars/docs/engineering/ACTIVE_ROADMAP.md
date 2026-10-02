@@ -1,54 +1,43 @@
-# Mars activity vocabulary — active expansion after release36
+# Mars activity vocabulary — active expansion after release37
 
-Published and verified at **https://sim.mars.college/** on2026-10-02. Functional
-source `cfea591083ac54d0280766809b2cbf1872bb012d`, Worker
-`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`; rollback35 `adaf98f2-65d1-43b3-9c5d-761d555f2d5e`.
-The owner-authorized24h tranche began03:23UTC and closed after its exact acceptance
-and public proof. [Final handoff](MARS_MVP_HANDOFF.md) owns current scope/evidence/limits.
+Published and verified at **https://sim.mars.college/**: functional source
+`ca6bb5d1ed707f12fe9029720fbf1bdecc44f917`, Worker
+`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`; rollback36
+`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`. All9clean gate stages pass:
+290deployment/1224enginePASS (6SKIP,11TODO),241browserPASS (7SKIP).
+Fresh public69PASS/0FAIL/0SKIP includes entire automatic current2022 builds.
+Skipped/TODO checks remain unproved. See [release record](RELEASE_CHECKLIST.md).
 
-Exit criteria passed: coherent independent living days in Mars and a separate
-hypothetical studio, retained notes/books/partial food/rest, permitted actor/resource
-bindings, live direction and Pause/Resume, bounded audible music/dance, finite
-recurring care, camera observation/manual precedence, all45presets discoverable in
-Lab, broad combined reliability audit, updated guides/index and public verification.
-Clean full gate: all9stages PASS,1130enginePASS/6SKIP/11TODO,225browserPASS/7SKIP;
-53fresh publicPASS/0FAIL/0SKIP. Skips/TODOs remain unproved. The source-era fixture
-refusals and current-source fully automatic builds are distinct proofs.
+## Current small queue
 
-## Current small queue — owner authorization October 2
+1. **Publish social/garden breadth:** two gallery tours, two reading circles, two
+   finite seed-planting layouts and two connected garden afternoons. Same original
+   book/bowls/seedbed purposes, ordinary physical execution, independent commitments,
+   explicit intervention/Resume and cleanup. Eight presets would bring52to60.
+   Candidate103focused engine checks pass; actualPlay11PASS/4FAIL exposes
+   two garden wait-phase gaps and two reading measurement-contract gaps. Not released; no completion claim.
+   Minimal read-only allowlist/embedded camera-entry fixes travel with this candidate.
+2. **Connected room preparation:** a hypothetical classroom-4 derivative clears the
+   same bowl/spoon to declared storage, physically moves its empty table and spare
+   chair, then uses the resulting room for talks and a late participant. Reuse existing
+   tidy_table/setup_room/classroom_session; no new universal furnishing planner.
+   Bounded implementation is separately owned. No actualPlay/full-session proof yet.
 
-Release36 completed before the owner's8am Eastern condition. Continue expanding
-meaningful Mars activities until Gene explicitly stops; saved candidates are not
-shipped features. Release36's45presets remain the public baseline.
+Release37's seven additions are online: drawing, warm-up, open jam, artwork sharing,
+creative afternoon and cleanup in two orientations. Continuous expansion remains
+owner-authorized until explicitly stopped; no fixed completion time. Next publication
+estimate2–4workinghours assumes no substantial Play/gate failure; reassess actual causes.
 
-1. **Combined vocabulary publication:** physical drawing with retained marks, guided
-   standing warm-up, open-jam performer exchange, tangible artwork sharing, a connected
-   creative afternoon and physical table cleanup in two orientations. Seven new presets,
-   52total. Focused checks and actualPlay pass; review all captures, rerun the complete
-   clean combined gate, preserve all48other-owner paths, deploy and verify public use.
-   The previous f095397 gate is RED (230browserPASS/one museum120s timeout/7SKIP);
-   unchanged focused museum retry passes84s. Original failure remains recorded.
-2. **Guided small gallery walk:** separately owned future candidate reusing actual
-   marked pads, ordinary arrivals/departures and shared attention at2–3stops. Fixed
-   flat-ground places, host+2required viewers and one declared optional joiner; leaving
-   persists, insufficient attendance waits with a reason. No silent reactivation.
+Exit per batch: initiate/intervene/resume/watch controls, named refusal/waiting,
+valid ownership/support/continuity, retained effects, focused disruptions/replay,
+inspected actualPlay captures, discoverable presets, clean combined fullgate and
+fresh public verification. Serialize expensive browser/performance checks; parallel
+implementation stays in isolated worktrees with at most three helpers.
 
-Use cited archive practices; staging, people and output remain hypothetical. Drawing
-Klerb/Open Jacks inspire practices; the neighbouring Bombay yoga notice is not Mars
-organization. Root owns shared wiring/integration/release. Sol6.1 workers use isolated
-files; serialize expensive browser/performance validation. No further inventory audit.
-
-Batch exit: useful initiate/intervene/resume/watch controls, valid/invalid/disruption
-proof, inspected realPlay captures, all shipped scenarios discoverable, a clean
-combined fullgate and fresh sim.mars.college verification. Then select another bounded
-activity in product-priority order without treating this release as the stopping point.
-Publication estimate2–4workinghours assumes no newgate/publicfailure; ongoing
-owner-authorized expansion has no fixed completion time.
-
-Active save/load, universal planning/psychology/terrain, rig/library migration, fine
-anatomy, fluid/growth and camera experiments remain deferred. ExistingPages gateway
-HEADsize limitation remains documented; exactGET/ranges/backend pass. Camera framing
-and denseHUD limits remain visible. All48other-owner pending paths stay excluded.
+All staging/participants/output remain hypothetical; archive inspiration is cited.
+No active save/load, rig migration, universal psychology/planning/terrain, growth/fluids
+or camera experiments. Fine anatomy and gateway HEAD metadata remain known limits.
+Preserve all48other-owner pending paths and prior failed validation receipts.
 
 ## Prior contracts and checkpoint provenance
 
