@@ -48,7 +48,11 @@ const steps = [
   // Release34 took2322.5s; supported sleep adds52.1s and prepared-day adds43.2s.
   // Their measured2417.8s sum exceeds the old2400s aggregate capacity. Allow
   // the complete serialized suite42min; all individual deadlines remain fixed.
-  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 42 * MIN, parse: playwright },
+  // Living-world required additions: selector audit198.9s, day110s, music52s,
+  // garden32s + prior release35 suite2255.4s already total2748.3s (>42min),
+  // before the two full camera runs. Allow60min aggregate serialized capacity;
+  // individual deadlines, runtime/performance ceilings and assertions unchanged.
+  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 60 * MIN, parse: playwright },
   { name: 'record-campus-take', cmd: ['node', 'deploy/record-campus-take.mjs', '--check'], timeout: 5 * MIN, parse: simulation },
   { name: 'determinism-probe', cmd: ['node', 'deploy/determinism-probe.mjs'], timeout: 5 * MIN, parse: probe },
 ];

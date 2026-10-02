@@ -34,7 +34,7 @@ are integrated candidates; focused programmatic variants and separate actual Pla
 proofs pass. The day audit has fixed truthful ending disposition and pre-start/
 refused music recovery, with eleven disruption regressions passing. A newly
 reproduced partial-preparation End still retains its spoon and is under bounded
-ordinary-action cleanup repair. Full45-preset startup audit is executing; automatic
+ordinary-action cleanup repair. All45 selectable presets passed fresh-load/Reset/first-Step (46cases incl parity,198.9s); automatic
 camera long-run proof remains incomplete because its test predicates were wrong,
 now corrected without changing camera policies. These are not public success claims.
 
@@ -42,7 +42,7 @@ Small remaining queue: (1) resolve exact acceptance failures and inspect correct
 camera/audit captures; (2) finish guide/index cleanup and scenario instructions;
 (3) freeze combined candidate, full established gate/idle limits, guarded local
 integration, public sim.mars.college verification and exact handoff. No new activity,
-active save/load or broader generalization. Estimated10–18 remaining working hours,
+active save/load or broader generalization. Estimated6–12 remaining working hours,
 medium confidence; deadline2026-10-03T03:23UTC. Update with measured validation results.
 
 ## Earlier five-day contract and checkpoint provenance

@@ -30,13 +30,12 @@ Before a performance-affecting release, also run `node deploy/perf-stress-budget
 
 ## Rollback target (record before deploying)
 
-| Source | Version id |
-|---|---|
-| `wrangler deployments status` (live, 100%, created 2026-09-26T22:45Z) | **`de2dddaa-0fab-477c-8b8f-cb1c579efba5`** |
-| `viewer/deploy/deployment.json` `version` | `763de986-3bdd-4947-a335-226f28a8ed79` (**stale**: 20:20Z deploy, superseded by `11817b82…` and then `de2dddaa…`) |
-
-Roll back to **`de2dddaa-0fab-477c-8b8f-cb1c579efba5`**. After the new deploy, update
-`deployment.json` so its `version` field holds the new id.
+Check normal Wrangler deployment status and record the live100% version before
+publication. Use `viewer/deploy/deployment.json` for the current verified release
+and rollback reference; reconcile unexpected live drift before deploying. Early
+September26 IDs and their stale metadata discussion belong to historical records,
+not current rollback instructions. Release35's verified predecessor is release34;
+a new release records35 as its rollback only after confirming that live version.
 
 ## Deploy (from `viewer/`)
 
@@ -67,25 +66,27 @@ the previous release, so `upload.mjs` will skip every object (`Already uploaded`
 
 ## Rollback
 
-Syntax taken from `wrangler rollback --help` and `wrangler versions deploy --help` (4.136.2):
+Run the repo-pinned Wrangler with its existing authorized login; never read
+credential files. Resolve the exact verified previous version from deployment
+metadata and confirm it against the newest dated release receipt:
 
 ```sh
 cd viewer
-WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback de2dddaa-0fab-477c-8b8f-cb1c579efba5 \
-  --name mars-campus-2026 -m "rollback: <reason>"
-# equivalent, via versions (100% traffic to the prior version):
-WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler versions deploy de2dddaa-0fab-477c-8b8f-cb1c579efba5@100 \
-  --name mars-campus-2026 -m "rollback: <reason>"
-# inspect
-./node_modules/.bin/wrangler versions list --name mars-campus-2026
-./node_modules/.bin/wrangler deployments list --name mars-campus-2026
+marsRollbackVersion=$(node -p "require('./deploy/deployment.json').rollback_version")
+WRANGLER_WRITE_LOGS=false ./node_modules/.bin/wrangler rollback "$marsRollbackVersion" \
+  --name mars-campus-2026 -m "rollback: <specific reason>"
+./node_modules/.bin/wrangler deployments status --name mars-campus-2026
 ```
 
-A rollback restores the Worker code and its static assets. It does not undo Durable Object
-storage writes or R2 objects. R2 keys are content-hashed, so the old version's large files are
-still present. The new release adds no DO migration: `migrations` still lists only
-`simulation-v1`. `engine_blobs` is created lazily by the engine code in the DO. Rolling back
-leaves those rows unread; they do no harm.
+A rollback restores Worker code/static assets, not Durable Object storage writes
+or R2 objects. R2 keys remain content-hashed. Verify actual HTTP/control behavior
+after rollback; command exit alone is not proof. Preserve failed release receipts.
+
+## Historical release implementation notes
+
+The following initial allowlist/upload discussion and dated release records are
+provenance. Current deployment configuration/manifests and latest receipt override
+old counts, release names and example source IDs.
 
 ## Allowlist change in this release
 

@@ -103,8 +103,8 @@ are actionable; intentional diagnostic demonstrations are explicitly labeled.
 `window.__marsEngine` offers scenario loading, fixed stepping, detached records/world,
 violations, intention/day/garden readouts and camera facts. Programmatic stepping
 is useful but does not establish natural rendering or automatic Play timing.
-The authored selector startup audit checks fresh-load/Reset/first-Step for all 45
-selectable presets; its executed result remains pending until the receipt is recorded; it is deliberately not completion evidence. See [current evidence index](INDEX.md).
+The selector startup audit passed fresh-load/Reset/first-Step for all45
+selectable presets (46cases including parity,198.9s); it is deliberately not completion evidence. See [current evidence index](INDEX.md).
 
 Local: `cd viewer && npm run dev`, then `/lab`. Contributor rules:
 [ENGINE_GUIDE](ENGINE_GUIDE.md). Required clean combined integration:
