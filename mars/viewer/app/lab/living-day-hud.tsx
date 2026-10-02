@@ -32,7 +32,7 @@ export function LivingDayHud({
     .map((r) => readLivingIntention(rt, r.id))
     .filter((s) => !!s);
   const submit = (verb: string, params: unknown) => {
-    const r = rt.submit(verb, params, { preempt: false });
+    const r = rt.submit(verb, params, { preempt: verb === 'walk_to' });
     setFeedback(
       r.diagnostic
         ? `${r.diagnostic.code}: ${r.diagnostic.message}`
