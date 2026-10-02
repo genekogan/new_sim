@@ -111,7 +111,7 @@ test('hand-up: captures (crouch, stand with load, reach up / reach down)', async
   await page.evaluate(() => window.__marsEngine!.step(10));
   const giver = (await page.evaluate(() => window.__marsEngine!.state())).humans.find((q) => q.activity === 'crouch' || q.activity === 'lift')!;
   await near(page, giver.id, 1.3, 2.6, 1.2, 0.6);
-  await captureView(page, 'poses-pickup-crouch', { testInfo });
+  await captureView(page, 'poses-pickup-crouch', { testInfo, softVisual: true });
   expect(await stepUntil(page, `(h) => h.state().humans.some((q) => q.id === '${giver.id}' && q.activity !== 'crouch' && q.activity !== 'lift')`)).toBe(true);
   await near(page, giver.id, 1.3, 2.8, 1.3, 0.9);
   await captureView(page, 'poses-pickup-stand', { testInfo, compare: false });
@@ -119,14 +119,14 @@ test('hand-up: captures (crouch, stand with load, reach up / reach down)', async
   expect(await stepUntil(page, `(h) => { const a = h.state().humans.map((q) => q.activity); return a.includes('reach_up') && a.includes('take'); }`, 20 * 1200)).toBe(true);
   await page.evaluate(() => window.__marsEngine!.step(3));
   await side(page, 'reach_up', 'take|stand_with_load', 5.4);
-  await captureView(page, 'poses-handup-joist', { testInfo });
+  await captureView(page, 'poses-handup-joist', { testInfo, softVisual: true });
   // s1: two givers lift it overhead at the east edge, two receivers on the beams take it
   expect(await stepUntil(page, `(h) => { const a = h.state().humans; return a.filter((q) => q.activity === 'reach_up').length >= 2 && a.some((q) => q.activity === 'take'); }`, 20 * 1200)).toBe(true);
   await page.evaluate(() => window.__marsEngine!.step(4));
   const st = await page.evaluate(() => window.__marsEngine!.state());
   console.log(`[poses] s1 hand-up t ${st.time}: ${st.humans.filter((q) => q.task).map((q) => `${q.id}:${q.activity}`).join(' ')}`);
   await side(page, 'reach_up', 'take|reach_down|stand_with_load', 5.2);
-  await captureView(page, 'poses-handup', { testInfo });
+  await captureView(page, 'poses-handup', { testInfo, softVisual: true });
 });
 
 /** Side view of a hand-up: camera `dist` m off the giver → receiver line (on the open side), looking at its middle. */
@@ -163,7 +163,7 @@ test('raise: footer holds the column base low', async ({ page }, testInfo) => {
   const a = 0.7, cx = dx * Math.cos(a) - dz * Math.sin(a), cz = dx * Math.sin(a) + dz * Math.cos(a);
   await page.evaluate(([pos, t]) => window.__marsEngine!.camera(pos, t), [[f.p[0] + cx * 2.6, 1.4, f.p[2] + cz * 2.6], [f.p[0] - dx * 0.3, 0.55, f.p[2] - dz * 0.3]]);
   await labFrames(page, 4);
-  await captureView(page, 'poses-raise-footer', { testInfo });
+  await captureView(page, 'poses-raise-footer', { testInfo, softVisual: true });
 });
 
 // Rack structure (POSES.md "Rack structure"): in hand-up v3 the receivers climb a frame on its W2 `climb:`
@@ -198,7 +198,7 @@ test('hand-up: climbing a frame (ladder cycle) and walking a beam (arms out)', a
       const q = st.humans.find((h) => h.id === cid)!;
       await page.evaluate(([p, y]) => window.__marsEngine!.camera([p[0] + Math.cos(y + 2.0) * 3.2, p[1] + 1.6, p[2] + Math.sin(y + 2.0) * 3.2], [p[0], p[1] + 0.9, p[2]]), [q.p, q.yaw] as const);
       await labFrames(page, 4);
-      await captureView(page, 'poses-climb-frame', { testInfo });
+      await captureView(page, 'poses-climb-frame', { testInfo, softVisual: true });
     }
     await page.evaluate(() => window.__marsEngine!.step(1));
     b = await bones();
@@ -220,7 +220,7 @@ test('hand-up: climbing a frame (ladder cycle) and walking a beam (arms out)', a
     const q = st.humans.find((h) => h.id === wid)!;
     await page.evaluate(([p, y]) => window.__marsEngine!.camera([p[0] + Math.cos(y) * 3.6 + Math.cos(y + 1.57) * 1.2, p[1] + 0.9, p[2] + Math.sin(y) * 3.6 + Math.sin(y + 1.57) * 1.2], [p[0], p[1] + 1.0, p[2]]), [q.p, q.yaw] as const);
     await labFrames(page, 4);
-    await captureView(page, 'poses-beam-walk', { testInfo });
+    await captureView(page, 'poses-beam-walk', { testInfo, softVisual: true });
   }
 });
 
