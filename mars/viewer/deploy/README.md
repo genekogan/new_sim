@@ -1,14 +1,21 @@
 # Cloudflare deployment
 
-The user authorized public Cloudflare hosting on 2026-09-05. No custom domain
-is configured. This publishes only the selected model/viewer deliverables;
-the original Mars archive remains local.
+The user authorized public Cloudflare hosting on2026-09-05 and final simulation
+publication at sim.mars.college on2026-10-02. The existing Pages gateway/CNAME
+already serves the Worker application; preserve it and verify exact new assets
+after publication. Its editable source/ownership is not yet established; do not
+replace it blindly. Only allowlisted viewer/model assets are public; the private
+Mars archive remains local. Current release truth is deployment.json and the
+[release checklist](../../docs/engineering/RELEASE_CHECKLIST.md).
 
 Run from the viewer directory:
 
 ```sh
-python3 deploy/browser-model.py
-node deploy/compress-browser.mjs
+# Required clean combined gate before functional main integration/publication:
+npm run gate
+# Rebuild browser CAD only for an intended model change; normally reuse verified assets.
+# python3 deploy/browser-model.py
+# node deploy/compress-browser.mjs
 python3 deploy/prepare.py
 CLOUDFLARE_RELEASE=1 npm run build
 WRANGLER_WRITE_LOGS=false node deploy/upload.mjs
@@ -33,10 +40,14 @@ R2 keys include the content hash, so uploading a new release cannot replace
 an older deployment's large model bytes. Upload receipts allow an interrupted
 upload to resume. Do not clear the bucket during deployment.
 
-The app routes include `/studio` (2026 editable model), `/studio/2020`
-(Brahman late-March 2020 evidence model), and `/` (2026 drone comparison).
-The 2020 scene exports a named-assembly GLB and links back to 2026.
-Browser layouts are downloaded JSON files. Shared simulation rooms are separate persistent Durable Objects; they use the baseline campus.
+Routes include `/studio` and `/studio/2020`–`/studio/2027` (year models),
+`/photo` (photogrammetry comparison), `/lab` (playable engine), and `/simulation-guide`.
+Worker `/` preserves the museum presentation. On sim.mars.college only, `/`
+selects the existing Lab/connected living day; query scenario selection still works.
+This domain-specific client entry is a candidate until its release/public receipt.
+No mars.college/simulation page is provided. Browser layouts are downloaded JSON.
+Shared server rooms are persistent Durable Objects using the baseline campus;
+that does not establish active browser Lab save/load, which is owner-deferred.
 
 The studio's **Walk · WASD** button enters first-person navigation. WASD moves; left/right arrows turn and up/down arrows look, Space jumps, Shift runs, and dragging looks around. Optional
 mouse locking allows continuous mouse look. Escape or **Exit walk** restores
