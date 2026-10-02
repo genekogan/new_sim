@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import type { EngineHook } from '../app/lab/hook.ts';
 import { openLab, labFrames } from './lab-helpers.ts';
 import { captureView, collectConsoleErrors } from './helpers.ts';
 
-test('delayed playback frames stop exactly at the scenario budget or completion', async ({ page }) => {
+test('delayed playback frames end scripted windows while the unchanged valid world clock continues', async ({ page }) => {
   await openLab(page, 'body');
   const result = await page.evaluate(async () => {
     const moduleUrl = '/app/lab/sim.ts';
@@ -10,6 +11,11 @@ test('delayed playback frames stop exactly at the scenario budget or completion'
     const budget = new LabSim();
     budget.load('body');
     budget.stepN(19);
+    const humans = structuredClone(budget.rt.world.entities);
+    let budgetBoundary: { tick: number; reason: string } | null = null;
+    budget.onTick = (rt: { tick: number }) => {
+      if (!budgetBoundary && budget.scriptStopReason) budgetBoundary = { tick: rt.tick, reason: budget.scriptStopReason };
+    };
     budget.advance(0.25);
     const first = budget.rt.tick;
     budget.advance(0.25);
@@ -17,10 +23,11 @@ test('delayed playback frames stop exactly at the scenario budget or completion'
     completion.load('body');
     completion.scenario = { ...completion.scenario, continuous: false, done: (rt: { tick: number }) => rt.tick >= 2 };
     completion.advance(0.25);
-    return { first, repeated: budget.rt.tick, done: budget.done(), violations: budget.rt.violations,
-      completion: completion.rt.tick, completed: completion.done() };
+    return { first, repeated: budget.rt.tick, budgetBoundary, done: budget.done(), scriptStopReason: budget.scriptStopReason, violations: budget.rt.violations,
+      unchanged: JSON.stringify(humans) === JSON.stringify(budget.rt.world.entities),
+      completion: completion.rt.tick, completed: completion.done(), completionReason: completion.scriptStopReason };
   });
-  expect(result).toEqual({ first: 20, repeated: 20, done: true, violations: [], completion: 2, completed: true });
+  expect(result).toEqual({ first: 24, repeated: 29, budgetBoundary: { tick: 20, reason: 'budget' }, done: true, scriptStopReason: 'budget', violations: [], unchanged: true, completion: 5, completed: true, completionReason: 'terminal' });
 });
 
 test('body probe selectable Step, Reset and Play validate a safe still world', async ({ page }, testInfo) => {
@@ -45,7 +52,16 @@ test('body probe selectable Step, Reset and Play validate a safe still world', a
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   expect(await page.evaluate(() => window.__marsEngine!.violations())).toEqual([]);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__marsEngine!.state().tick)).toBe(20);
+  await expect.poll(() => page.evaluate(() => (window.__marsEngine as unknown as EngineHook).state().scriptStopReason)).toBe('budget');
+  const budgetTick = await page.evaluate(() => window.__marsEngine!.state().tick);
+  expect(budgetTick).toBeGreaterThanOrEqual(20);
+  await expect.poll(() => page.evaluate(() => window.__marsEngine!.state().tick)).toBeGreaterThan(budgetTick + 3);
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const pausedTick = await page.evaluate(() => window.__marsEngine!.state().tick);
+  await labFrames(page, 4);
+  expect(await page.evaluate(() => window.__marsEngine!.state().tick)).toBe(pausedTick);
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  expect(await page.evaluate(() => window.__marsEngine!.state().tick)).toBe(pausedTick + 1);
   const played = await page.evaluate(() => window.__marsEngine!.state());
   expect(played.done).toBe(true);
   expect(played.humans).toEqual(fresh.humans);

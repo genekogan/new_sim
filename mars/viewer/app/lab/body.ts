@@ -20,14 +20,14 @@ const IDS = ['b1', 'b2', 'b0'];
 export const body: Scenario = {
   name: 'body',
   title: 'Body model probe (reach)',
-  description: 'Still scene for measuring the rendered body against the body model (rig.ts BODY_MODEL): b0–b2 at the east deck edge (3 m) facing out, g0–g2 on the ground below facing the deck. Play validates this still scene for one second; Step validates one fixed tick. The lab hook probe() poses them against synthetic hand targets (renderer only).',
+  description: 'Still scene for measuring the rendered body against the body model (rig.ts BODY_MODEL): b0–b2 at the east deck edge (3 m) facing out, g0–g2 on the ground below facing the deck. Play validates a one-second scripted window, then keeps the unchanged valid world clock usable. Pause stops real-time ticks; Step validates one fixed tick. The lab hook probe() poses them against synthetic hand targets (renderer only).',
   scene: () => provingGround(),
   humans: () => [
     ...IDS.map((id, i) => human(id, BODY_EDGE_X - 0.4, ZS[i], { level: 1, y: DECK_Y, yaw: 0 })),
     ...IDS.map((id, i) => human(`g${id.slice(1)}`, BODY_EDGE_X + 1.2, GROUND_ZS[i], { yaw: Math.PI })),
   ],
   start: () => {},
-  // Play rehearses one second of the same authoritative still scene; no actor is moved.
+  // The one-second authored validation window ends at tick 20; the safe world clock remains usable. No actor is moved.
   continuous: true,
   maxTicks: 20,
   focus: [14, 10, 7, 20],
