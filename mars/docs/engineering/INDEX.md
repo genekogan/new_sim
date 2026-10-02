@@ -6,11 +6,22 @@ not instructions to restart completed increments. Public/source truth comes from
 
 ## Current direction and play
 
+Release38 is verified at [sim.mars.college](https://sim.mars.college/):60 presets,
+eight new gallery/reading/planting/garden layouts,92fresh public checks and all nine
+clean gate stages. Functional source`5f1dc2e`, Worker`7616e47a-9149-4b71-ba14-2ea8e5bc6660`,
+rollback37`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`. See newest release checklist record
+for original gateway HEAD failure and executed/skipped scope. Lower candidate notes
+retain dated provenance; publication status is superseded by this notice. Room
+preparation/communal supper/garden circuit form the clean separate c8331ec next
+combined candidate: 63 presets, rules version `activities/29`, 185 focused Node
+checks passed. Actual Play is underway; completion remains unclaimed. These are
+not online release38 features.
+
 - [Agent context](../../AGENTS.md): ownership, authorized scope, hard boundaries.
 - [Active roadmap](ACTIVE_ROADMAP.md): current tranche and exit criteria.
 - [Simulation vision](SIMULATION_VISION.md): enduring Mars/Eden direction.
 - [Lab guide](LAB_GUIDE.md): individual and combined scenarios, controls and limitations.
-- [MVP handoff](MARS_MVP_HANDOFF.md): original release36 acceptance and current release37 notice, exact source, limits and Eden handoff.
+- [MVP handoff](MARS_MVP_HANDOFF.md): original release36 acceptance and dated release37 notice; current release38 truth is the newest release checklist record, exact source, limits and Eden handoff.
   Earlier baseline evidence is retained as dated provenance.
 
 ## Implement and validate

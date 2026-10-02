@@ -2,24 +2,30 @@
 
 ## Published checkpoint and current authorization
 
-**Release37 is published and verified at https://sim.mars.college/**, Worker
-`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`, functional source
-`ca6bb5d1ed707f12fe9029720fbf1bdecc44f917`; rollback36
-`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`. All nine clean gate stages and69fresh public
-checks pass. There are52selectable presets. Skipped/TODO legacy checks, gateway
-HEAD metadata and new-preset camera-entry limitations remain explicit.
+**Release38 is published and verified at https://sim.mars.college/**, Worker
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`, functional source
+`5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d`; rollback37
+`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`. All nine clean gate stages pass:
+294 deployment/1324 engine PASS (6 SKIP,11 TODO),264 browser PASS (7 FIXME).
+Fresh public92 PASS/0 FAIL/0 SKIP/0 flaky;60 selectable presets. Skipped/TODO/FIXME
+checks remain unproved. Original gateway browser/campus.glb HEAD length assertion
+still FAILS; modular HEAD/range and exact served bundle PASS. No DNS/gateway change.
 
-Release36 completed the connected living-world/music-dance/garden-care tranche
-before8am Eastern. Gene explicitly authorized continuous meaningful Mars vocabulary
-expansion until he tells us to stop; do not stop at a release or begin Eden.
-Release37 adds physical drawing, guided standing warm-up, open-jam handoffs,
-artwork sharing, a connected creative afternoon and two table-cleanup layouts.
-Current candidate: gallery tours, reading circles, finite seed planting and two
-connected planting/care/reading afternoons, plus minimal read-only camera entry fixes.
-These eight additional presets are not yet public. A separate bounded room-preparation
-bridge reuses cleanup, physical movers and classroom; it remains in development.
-Each addition requires ordinary physical execution, useful intervention, valid/invalid
-checks, inspected actualPlay captures and clean combined release validation.
+Release38 adds two gallery tours, two shared reading circles, two finite seed-planting
+layouts and two connected garden afternoons, plus read-only camera entry fixes.
+The afternoons use independent reading/care commitments, not a shared garden walk.
+Prior release37 drawing/warm-up/jam/art-sharing/creative/cleanup remain online.
+All staging is hypothetical; silent dialogue, current rigs/fine fingers, cropped
+care objects, no plant growth and camera-quality limitations remain explicit.
+Room preparation, communal supper and finite garden circuit are minimally wired
+in separate candidate `c8331ec`: 63 presets, rules version `activities/29`,
+185 focused Node checks passed. Focused actual Play is underway; completion and
+combined/public proof remain unclaimed. These are not public release38 features.
+Preserve their worktrees and all48 other-owner paths.
+Gene's continuous meaningful Mars vocabulary expansion remains authorized until
+explicitly stopped; do not stop at a release or begin Eden. Active save/load,
+rig migration/universal planning/terrain remain deferred. Each future addition
+requires ordinary execution, useful intervention and inspected actualPlay proof.
 
 Future agents should
 read [final handoff](docs/engineering/MARS_MVP_HANDOFF.md),

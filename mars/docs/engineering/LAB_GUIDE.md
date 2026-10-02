@@ -1,6 +1,6 @@
 # Lab play and inspection guide
 
-Current public checkpoint is **release37 at [sim.mars.college](https://sim.mars.college/)**.
+Current public checkpoint is **release38 at [sim.mars.college](https://sim.mars.college/)**.
 Living days, garden care, music/dance and longer automatic coverage are shipped.
 [Final handoff](MARS_MVP_HANDOFF.md) records exact source, validation and limits.
 
@@ -17,7 +17,7 @@ Release37 adds these three manual-start experiences:
 All staging and participants are hypothetical. Drawing Klerb/Open Jacks provide
 practice inspiration; neighbouring Bombay yoga is not attributed to Mars organizers.
 Focused checks, the clean combined gate and fresh public actualPlay pass.
-Release37 has52verified selectable presets.
+Release38 has60verified selectable presets; prior release37 experiences remain online.
 
 ## Published creative afternoon and table cleanup
 
@@ -41,12 +41,12 @@ remain. If both permitted return supports are blocked, real held ownership remai
 with a concrete waiting reason until a support is restored. No washing, deletion,
 large carrying, arbitrary storage or automatic ground drops.
 
-Clean combined gate and69fresh public cases pass, including these actualPlay journeys
-and all52presets' fresh-load/Reset/first-Step checks. All inspected captures and
-source/rollback details are recorded in the release checklist. Gallery tours, reading
-circles, seed planting and connected garden afternoons are future candidates, not public.
+Clean combined nine-stage gate and92fresh public cases pass, including actualPlay
+journeys and all60presets' fresh-load/Reset/first-Step checks. Gallery tours, shared
+reading, finite seed planting and connected garden afternoons are now published.
+Source/rollback and inspected captures are in the newest release checklist record.
 
-## Future guided gallery candidate (not yet public)
+## Published guided gallery
 
 `gallery-tour` and `gallery-tour-short` bind the same anonymous host and viewers
 across three or two actual pre-made marked pads. Start gallery tour, then Play;
@@ -58,9 +58,26 @@ Finished stop history, artwork identities and support remain unchanged.
 
 This is an authored flat-ground exhibition using hypothetical same-outline studies,
 not a historical exhibition or automatic artwork generation. End preserves partial
-history and reports ended, distinct from successful completion. Root wiring and
-focused checks are complete; authored two-case browser proof and inspected captures
-remain pending. No release, arbitrary exhibition planning or active reload claim.
+history and reports ended, distinct from successful completion. Both actualPlay variations and inspected captures pass at release38; no arbitrary
+exhibition planning or active reload claim.
+
+## Release38 social and garden controls
+
+| Published presets | Actual controls and bounded effects |
+| --- | --- |
+| `gallery-tour`, `gallery-tour-short` | Start, Ask/Answer/Floor, declared late Join/Leave, safe Pause/Resume/End and ordinary host direction; same supported premade pads and retained stop histories. |
+| `reading-circle`, `reading-circle-rotated` | Start shared reading; Ask/Answer/Floor, Join/Leave, Pause/Resume/End and reader direction. Same supported book/bookmark; unfinished End permits explicit same-book restart. |
+| `seed-planting`, `seed-planting-rotated` | Start plot A/B, safe cancellation/Continue, End retains material, ordinary planter direction after safe return. Same finite .5 seed bowl; four normalized deposit markers per completed .25 bed, no sprouts/growth. |
+| `garden-afternoon`, `garden-afternoon-rotated` | Independent gardener and reader intentions plant, use finite water and complete the same book. Local Pause/Resume/End retains each purpose; no synchronized shared garden walk. |
+
+Release38 includes read-only camera Follow/Return entry for the new families;
+entry facts preserve the same paused world and do not prove natural camera quality.
+Current rigs/fine fingers, silent dialogue and cropped care vessels remain limits.
+Lower dated candidate notes retain authoring provenance; this publication notice
+supersedes their old not-public status. Room preparation/supper/garden circuit
+remain separate candidate `c8331ec`: 63 presets, rules version `activities/29`,
+185 focused Node checks passed. Actual Play is underway; completion remains
+unclaimed. These are not online release38 features.
 
 ## Begin
 

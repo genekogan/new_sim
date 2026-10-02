@@ -1,53 +1,45 @@
-# Mars activity vocabulary — active expansion after release37
+# Mars activity vocabulary — active expansion after release38
 
-Published and verified at **https://sim.mars.college/**: functional source
-`ca6bb5d1ed707f12fe9029720fbf1bdecc44f917`, Worker
-`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`; rollback36
-`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`. All9clean gate stages pass:
-290deployment/1224enginePASS (6SKIP,11TODO),241browserPASS (7SKIP).
-Fresh public69PASS/0FAIL/0SKIP includes entire automatic current2022 builds.
-Skipped/TODO checks remain unproved. See [release record](RELEASE_CHECKLIST.md).
+**Release38 is published and verified at https://sim.mars.college/**, Worker
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`, functional source
+`5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d`; rollback37
+`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`. All nine clean gate stages pass:
+294 deployment/1324 engine PASS (6 SKIP,11 TODO),264 browser PASS (7 FIXME).
+Fresh public92 PASS/0 FAIL/0 SKIP/0 flaky;60 selectable presets. Skipped/TODO/FIXME
+checks remain unproved. Original gateway browser/campus.glb HEAD length assertion
+still FAILS; modular HEAD/range and exact served bundle PASS. No DNS/gateway change.
+
+See [release record](RELEASE_CHECKLIST.md#production-deploy-38-2026-10-02-social-and-garden-vocabulary).
+Release38's eight new presets retain actual pads/books/bowls/seed purposes, physical
+support, finite materials, independent commitments and explicit intervention/Resume.
+All60 presets' fresh-load/Reset/first-Step checks pass; fulljourney cases are separate
+proof. Same paused-world camera entry is read-only; no natural camera-quality claim.
 
 ## Current small queue
 
-1. **Publish social/garden breadth:** two gallery tours, two reading circles, two
-   finite seed-planting layouts and two connected garden afternoons. Same original
-   book/bowls/seedbed purposes, ordinary physical execution, independent commitments,
-   explicit intervention/Resume and cleanup. Eight presets would bring52to60.
-   Candidate103focused engine checks pass. Preserved initial Play11PASS/4FAIL exposed
-   garden phase-wait and reading measurement-contract gaps; corrected garden layouts
-   and rotated reading pass actual Play. Default reading exposed a real seated-direction
-   HUD preflight defect: ordinary authoritative handoff works after safe stand-up.
-   Its bounded UI correction passes27focused Node checks, including six handoff/refusal
-   regressions. Fresh6d618e4 focused Play5/5 passes default reader handoff/Resume,
-   both garden afternoons and two renderer-context checks; root inspected key captures.
-   Clean combined fullgate and public verification remain required. Not released.
-   Minimal read-only allowlist/embedded camera-entry fixes travel with this candidate.
-2. **Connected room preparation:** a hypothetical classroom-4 derivative clears the
-   same bowl/spoon to declared storage, physically moves its empty table and spare
-   chair, then uses the resulting room for talks and a late participant. Reuse existing
-   tidy_table/setup_room/classroom_session; no new universal furnishing planner.
-   Bounded implementation is separately owned. No actualPlay/full-session proof yet.
-3. **Meal continuity foundation:** retain actual served/consumed role receipts across
-   explicitly bound same-Runtime interruptions. Existing consumed-empty bowls must
-   not be mistaken for never-served portions. Bounded implementation is separate;
-   no new meal scenario or persistence claim until physical continuation is proved.
+1. **Connected room preparation:** separately saved/wired hypothetical classroom-4
+   derivative: ordinary same-item tidy, empty-table/chair moves and classroom session.
+   Next combined candidate, not online; actualPlay and combined/public acceptance remain required.
+2. **Communal supper:** separately saved finite preparation, retained same-meal
+   receipts and seven actual vessels returned to storage. Cancelled-only meal
+   continuation and safe End retry have focused proof; next combined candidate, not online.
+3. **Garden watering circuit:** separately saved supported pot resupply, same bowl
+   and three grounded beds; six finite care cycles preserve the600tick due interval.
+   Next combined candidate, not online; no growth/refill or universal garden planner.
 
-Release37's seven additions are online: drawing, warm-up, open jam, artwork sharing,
-creative afternoon and cleanup in two orientations. Continuous expansion remains
-owner-authorized until explicitly stopped; no fixed completion time. Next publication
-estimate2–4workinghours assumes no substantial Play/gate failure; reassess actual causes.
+The clean separate `c8331ec` next combined candidate contains all three additions:
+63 presets, rules version `activities/29`, 185 focused Node checks passed. Its18
+actual Play checks are underway; completion and combined/public proof are unclaimed.
 
-Exit per batch: initiate/intervene/resume/watch controls, named refusal/waiting,
-valid ownership/support/continuity, retained effects, focused disruptions/replay,
-inspected actualPlay captures, discoverable presets, clean combined fullgate and
-fresh public verification. Serialize expensive browser/performance checks; parallel
-implementation stays in isolated worktrees with at most three helpers.
+Owner-authorized expansion continues until explicitly stopped. Saved/wired drafts
+are not shipped; next batch publication depends on actual physical journeys, focused
+checks, inspected captures, clean combined gate and fresh public verification.
+Serialize expensive browser/performance lanes. Keep isolated ownership and at most
+three helpers. Preserve all48 other-owner main paths and failed-first receipts.
 
-All staging/participants/output remain hypothetical; archive inspiration is cited.
-No active save/load, rig migration, universal psychology/planning/terrain, growth/fluids
-or camera experiments. Fine anatomy and gateway HEAD metadata remain known limits.
-Preserve all48other-owner pending paths and prior failed validation receipts.
+All staging/participants/output remain hypothetical. Active save/load, rig migration,
+universal psychology/planning/terrain, growth/fluids and camera experiments remain
+deferred. Do not replace existing classroom/movers or reorganize legacy inventory.
 
 ## Prior contracts and checkpoint provenance
 
