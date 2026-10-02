@@ -122,3 +122,26 @@ zero walk weight, actual .53m chair/pelvis height and original .03m planted-sole
 limit. No simulation, renderer, expected outcome, timeout or tolerance change.
 Later lifecycle assertions remain mandatory and unproved until fresh actualPlay;
 original failures and missing later captures are retained.
+
+
+## Exact support and secondary-expression evidence — October2
+
+ActualPlay on clean cea39b5 passed11/15 overall and exposed two further reading
+measurement mistakes after the earlier seating repair. Default compared the full
+artifact support `{kind:resting-on,on:reading-table,slot:r0c2}` with the component
+hook's kind-only `resting-on` string. Compare exact declared table/slot/kind instead.
+Rotated compared all whole-mesh bounds to the initial book, differing by one floating
+unit at minX. The book's bookmark moves and its page turns intentionally as reading
+progress changes; whole animated bounds are not a fixed physical-pose guarantee.
+
+No simulation or renderer repair is needed: exact authoritative component ID/def/
+pose/corners/support-kind and fixture state remain equal, full artifact support is
+checked, and rendered bounds remain present/finite. The previous requirement that
+all secondary meshes remain frozen throughout reading is explicitly reclassified
+as incompatible with the existing supported page/bookmark expression. No numeric
+tolerance is introduced. New renderer regressions prove exact static bounds across
+interpolation alpha and all four quarter-turns; a progressed page/bookmark changes
+visible bounds while the same mesh root position/quaternion and authoritative
+pose/support remain exact. Both focused regressions PASS; original actualPlay
+failures/traces remain retained. Later interruption/turn/End/resume/completion and
+resource cleanup expectations are unchanged and need a fresh actualPlay run.

@@ -116,7 +116,17 @@ async function open(page: Page, scenario: string) {
   return inspect(page);
 }
 function sameBook(s: Evidence, initial: Evidence) {
-  expect(s.components).toEqual(initial.components);
+  // The book's secondary page turn and moving bookmark intentionally change
+  // rendered bounds. Compare exact authoritative geometry, not animated details.
+  const physical = (components: Evidence['components']) =>
+    components.map(({ rendered, ...component }) => {
+      expect(rendered).not.toBeNull();
+      expect([...rendered!.min, ...rendered!.max].every(Number.isFinite)).toBe(
+        true,
+      );
+      return component;
+    });
+  expect(physical(s.components)).toEqual(physical(initial.components));
   expect(s.fixtures).toEqual(initial.fixtures);
   expect(s.entities.map((e) => e.id).sort()).toEqual(
     initial.entities.map((e) => e.id).sort(),
@@ -125,9 +135,11 @@ function sameBook(s: Evidence, initial: Evidence) {
   expect(s.circle!.artifact!.pose).toEqual(
     initial.components.find((c) => c.id === 'book')!.pose,
   );
-  expect(s.circle!.artifact!.support).toEqual(
-    initial.components.find((c) => c.id === 'book')!.support,
-  );
+  expect(s.circle!.artifact!.support).toEqual({
+    kind: initial.components.find((c) => c.id === 'book')!.support,
+    on: 'reading-table',
+    slot: 'r0c2',
+  });
 }
 function listening(s: Evidence) {
   expect(s.circle!.attentionTarget?.entity).toBe('book');

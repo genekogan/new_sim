@@ -2433,3 +2433,23 @@ reusing existingphysicalcleanup/setup/classroom for hypothetical roompreparation
 Atmost3helpers, expensivebrowser/perfserialized. No broadinventoryaudit orEden.
 Next publication estimate2–4workinghours assumes boundedrepairs/fullgate/publicproof;
 continuousowner-authorized expansion has no fixedremainingtotal until Gene stops.
+
+
+### Reading expression/support contract correction; garden phase proof — October2
+
+Read native cea39b5 failures and inspected captures before editing expectations.
+Default reading compared full actual support to a kind-only renderer field;
+rotated compared animated page/bookmark bounds to initial frozen bounds. Exact
+book pose/corners/support/identity and fixture equality remain enforced; full
+expected table-slot support now explicit. Secondary bounds are not stationary
+geometry, so reclassify frozen-secondary requirement with report rationale; no
+numeric tolerance or production change. Two focused renderer tests PASS, proving
+stationary bounds exact and progressed expression leaves exact same root/authority.
+No claim of an actual renderer defect repaired. Later lifecycle still unproved.
+
+Reviewed e2a61f0 garden test-only phase repair adds exact supported seed return
+and real partial finite water deposition before unchanged final completion. Each
+phase15s and overall120s/retries0 remain; original failure states showed normal
+active care, complete book/planted bed and zero violations. No speed/layout/support/
+material/outcome changes. Fresh reading/garden actualPlay pending serialized lane.
+Publication37 metadata/docs inherited; all future paths stay unshipped.
