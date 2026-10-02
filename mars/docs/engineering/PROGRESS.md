@@ -2939,3 +2939,12 @@ Combined42 focused Node checks pass0fail/skip/todo in2321ms; viewer TypeScript
 and type-aware lint pass. Ordinary sequence/deadlock regressions are included.
 No browser, fullgate, public proof or universal future-input recovery is claimed.
 Release39 source remains frozen and separate while its gate runs.
+
+
+## Alpha discovery UI authoring — 2026-10-02
+
+One bounded UI regression maps all63 options and seven declared groups, opens
+connected-day instructions and follows the actual room-preparation quick-tour
+control to its supported Start button. Standalone strict browser TypeScript,
+lint, formatting and one-test discovery pass. Browser execution is pending the
+serialized release39 gate/public slot; this is authored coverage, not a UI PASS.
