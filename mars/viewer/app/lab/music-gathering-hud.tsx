@@ -1,3 +1,4 @@
+import { adoptLivingDayMusic } from '../../engine/scenarios/living-day.ts';
 import { useEffect, useRef, useState } from 'react';
 import type { LabSim } from './sim.ts';
 import { musicStation } from '../../engine/activities/computer-music.ts';
@@ -25,7 +26,8 @@ export function MusicGatheringHud({
     },
     [rt],
   );
-  if (sim.scenario.name !== 'music-dance') return null;
+  const connected = sim.scenario.name.startsWith('living-day-');
+  if (sim.scenario.name !== 'music-dance' && !connected) return null;
   const rec = [...rt.records.values()]
     .filter((r) => r.verb === 'music_gathering')
     .at(-1);
@@ -40,6 +42,7 @@ export function MusicGatheringHud({
         ? { ...session.bindings, resume: true, resumeFrom: session.action }
         : MUSIC_GATHERING_BINDING,
     );
+    if (connected && !next.diagnostic) adoptLivingDayMusic(rt, next.id);
     setFeedback(
       next.diagnostic
         ? `${next.diagnostic.code}: ${next.diagnostic.message}`
@@ -91,6 +94,13 @@ export function MusicGatheringHud({
       data-testid="music-gathering-hud"
     >
       <h3>Music and grounded dance</h3>
+      {connected && (
+        <p>
+          The independent gathering begins after the connected day reaches rest.
+          Enable sound now; Pause/Resume this gathering preserves its own score
+          while other commitments continue.
+        </p>
+      )}
       <p>
         Hypothetical four-person gathering with an original computer score, one
         seated listener and two authored dance places. Dance uses a planted
@@ -110,7 +120,10 @@ export function MusicGatheringHud({
         <button onClick={() => void audio()}>
           {enabled ? 'Mute sound' : 'Enable sound'}
         </button>
-        <button disabled={!!active || !!unfinished} onClick={() => begin()}>
+        <button
+          disabled={connected || !!active || !!unfinished}
+          onClick={() => begin()}
+        >
           Start music gathering
         </button>
         <button

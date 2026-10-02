@@ -4,24 +4,121 @@ import { entityCorners } from '../../engine/spatial/service.ts';
 import { readLivingIntention } from '../../engine/activities/living-intention.ts';
 import { readClassroom } from '../../engine/activities/classroom.ts';
 import { readMusicGathering } from '../../engine/activities/music-gathering.ts';
-import type { CameraActivityFact, CameraEntity } from '../../cinematography/activity-observation.ts';
+import type {
+  CameraActivityFact,
+  CameraEntity,
+} from '../../cinematography/activity-observation.ts';
 export function cameraEntities(rt: Runtime): CameraEntity[] {
-  const entities: CameraEntity[] = Object.values(rt.world.entities).map(e => ({id:e.id,kind:e.kind,pose:structuredClone(e.pose), ...(e.human ? {human:structuredClone(e.human)} : {corners:entityCorners(e)})}));
-  for (const r of Object.values(rt.world.regions)) entities.push({id:r.id,kind:'region',pose:{p:[r.polygon[0]?.[0] ?? 0,0,r.polygon[0]?.[1] ?? 0],yaw:0},corners:r.polygon.map(([x,z])=>[x,0,z])});
+  const entities: CameraEntity[] = Object.values(rt.world.entities).map(
+    (e) => ({
+      id: e.id,
+      kind: e.kind,
+      pose: structuredClone(e.pose),
+      ...(e.human
+        ? { human: structuredClone(e.human) }
+        : { corners: entityCorners(e) }),
+    }),
+  );
+  for (const r of Object.values(rt.world.regions))
+    entities.push({
+      id: r.id,
+      kind: 'region',
+      pose: { p: [r.polygon[0]?.[0] ?? 0, 0, r.polygon[0]?.[1] ?? 0], yaw: 0 },
+      corners: r.polygon.map(([x, z]) => [x, 0, z]),
+    });
   return entities;
 }
-export function cameraActivityReadout(rt: Runtime): {activities:CameraActivityFact[]} {
-  const activities: CameraActivityFact[]=[];
+export function cameraActivityReadout(rt: Runtime): {
+  activities: CameraActivityFact[];
+} {
+  const activities: CameraActivityFact[] = [];
   for (const r of rt.records.values()) {
     if (!rt.isActive(r.id)) continue;
-    const p=r.params as Record<string,unknown>;
-    const actors = [p.actor,p.performer,...(Array.isArray(p.actors)?p.actors:[])].filter((v):v is string=>typeof v==='string' && rt.world.entities[v]?.kind==='human');
-    let fact:CameraActivityFact={id:r.id,actors,phase:r.phase ?? r.verb,mode:r.status,status:r.status};
-    if (r.verb==='living_intention') {const s=readLivingIntention(rt,r.id);if(s) fact={...fact,actors:[s.actor],phase:s.phase ?? r.verb,mode:s.mode,purpose:s.purpose,waitingReason:s.diagnostic?.message};}
-    if (r.verb==='classroom_session') {const s=readClassroom(rt,r.id);if(s) fact={...fact,actors:s.participants.map(q=>q.actor),phase:s.phase ?? r.verb,focus:s.floorHolder ?? s.presenter,waitingReason:s.waitingReason};}
-    if (r.verb==='music_gathering') {const s=readMusicGathering(rt,r.id);if(s) fact={...fact,actors:[s.bindings.performer,...s.bindings.listeners.map(q=>q.actor),...s.dancers.filter(q=>!q.withdrawn).map(q=>q.actor)],phase:s.phase ?? r.verb,mode:s.mode,focus:s.floorHolder};}
-    if (r.diagnostic) fact.waitingReason=r.diagnostic.message;
-    if(fact.actors.length) activities.push(fact);
+    const p = r.params as Record<string, unknown>;
+    const actors = [
+      p.actor,
+      p.performer,
+      ...(Array.isArray(p.actors) ? p.actors : []),
+    ].filter(
+      (v): v is string =>
+        typeof v === 'string' && rt.world.entities[v]?.kind === 'human',
+    );
+    let fact: CameraActivityFact = {
+      id: r.id,
+      actors,
+      phase: r.phase ?? r.verb,
+      mode: r.status,
+      status: r.status,
+      objects: [
+        p.station,
+        p.book,
+        p.plant,
+        p.pot,
+        p.mat,
+        p.displayId,
+        p.item,
+      ].filter(
+        (v): v is string =>
+          typeof v === 'string' &&
+          !!(rt.world.entities[v] || rt.world.regions[v]),
+      ),
+    };
+    if (r.verb === 'living_intention') {
+      const s = readLivingIntention(rt, r.id);
+      if (s)
+        fact = {
+          ...fact,
+          actors: [s.actor],
+          phase: s.phase ?? r.verb,
+          mode: s.mode,
+          purpose: s.purpose,
+          objects: s.binding
+            ? [
+                s.binding.params.station,
+                s.binding.params.book,
+                s.binding.params.plant,
+                s.binding.params.mat,
+              ].filter((v): v is string => typeof v === 'string')
+            : [],
+          waitingReason: s.diagnostic?.message,
+        };
+    }
+    if (r.verb === 'classroom_session') {
+      const s = readClassroom(rt, r.id);
+      if (s)
+        fact = {
+          ...fact,
+          actors: s.participants
+            .filter((q) => q.state === 'participating')
+            .map((q) => q.actor),
+          departing: s.participants
+            .filter((q) => q.state === 'excluded')
+            .map((q) => q.actor),
+          presenter: s.presenter,
+          phase: s.phase ?? r.verb,
+          focus: s.floorHolder ?? s.presenter,
+          waitingReason: s.waitingReason,
+        };
+    }
+    if (r.verb === 'music_gathering') {
+      const s = readMusicGathering(rt, r.id);
+      if (s)
+        fact = {
+          ...fact,
+          actors: [
+            s.bindings.performer,
+            ...(s.music?.listeners
+              .filter((q) => q.state === 'listening')
+              .map((q) => q.actor) ?? []),
+            ...s.dancers.filter((q) => !q.withdrawn).map((q) => q.actor),
+          ],
+          phase: s.phase ?? r.verb,
+          mode: s.mode,
+          focus: s.floorHolder,
+        };
+    }
+    if (r.diagnostic) fact.waitingReason = r.diagnostic.message;
+    if (fact.actors.length) activities.push(fact);
   }
-  return structuredClone({activities});
+  return structuredClone({ activities });
 }
