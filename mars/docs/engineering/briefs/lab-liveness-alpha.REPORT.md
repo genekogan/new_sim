@@ -1,0 +1,25 @@
+# Lab liveness alpha — bounded stabilization candidate
+
+Base `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`, branch `codex/lab-liveness-alpha`, isolated worktree `<mars-worktrees>/lab-liveness-alpha`. This is a future stabilization candidate; the frozen release39 gate and deferred library-reading branch were untouched.
+
+## Reproduction and driver contract
+
+Native `LabSim` initially reproduced six failures among seven focused cases: an empty or refused script did not advance tick 0; custom terminal failure froze an unrelated ordinary walker; a real reading-child failure left automatic stepping frozen at tick 65; script callbacks could run again after terminal state through manual stepping; recorded invariant corruption did not halt the driver. Strengthening replay, sequence dispatch, fixed-DT frame caps and already-recorded corruption produced the saved final eleven-case baseline proof (ten fail; the unchanged preset outcome case passes) against the exact base `sim.ts`.
+
+The repair separates authored dispatch from authoritative world ticks. `done()` remains a latched script/helper termination result, including failed terminal outcomes; it is not a successful-world-completion claim. `scriptStopReason` is `admission-refused`, `terminal`, `budget`, or null. A finite script's terminal predicate or maxTicks ends new scenario dispatch. Custom sequences still poll their children while their own done predicate is false. Empty and refused scripts are not retried. Ordinary registered actions can finish or be newly directed while the unpaused world clock continues, including beyond an authored script budget.
+
+`advance()` retains fixed DT, frame elapsed clamp, speed, accumulator and maxSteps behavior. Manual Pause stops real-time advancement. The actual panel Step calls `sim.step()` directly and advances one authoritative fixed tick while paused, including after script budget exhaustion. `stepN()` and the hook's documented fast-forward `step(n)` retain their original scenario budget cap. Bounded runToEnd/runUntilSteps remain script validation helpers and now stop immediately on a real driver halt.
+
+## Corruption containment and observation
+
+Any recorded invariant violation causes a named `lab.invariant-halt` diagnostic containing the first original violation, tick, subjects and an explicit fresh-reset instruction. No subsequent Lab automatic or manual ticks run on that state. Script callbacks do not run on the violating tick; the tick's final state remains observed once for inspection. A custom builder with existing violation receipts is contained before scripted start. Original violations, action failures and diagnostics are retained. Reset constructs a fresh Runtime, clears driver halt/script status/accumulator and increments the existing scenario epoch; manual Pause preference is preserved.
+
+The minimal panel change shows world running/paused/halted separately from script outcome, disables only Play/Step during real halt, and exposes the reset instruction. The existing read-only hook adds scriptStopReason and a structured-cloned halt diagnostic. No second world control path, rig, camera, historical effect, scenario admission, ordinary action or Runtime contract was changed.
+
+## Focused proof and exclusions
+
+Eleven new pure Node tests exercise native LabSim and ordinary actions: empty/admission-refused liveness, missing-actor refusal plus another actor's walk, actual seated reading failure (`reading.seat-released`) with posture/resource cleanup and independent movement, script budget/manual Pause/Step distinction, no post-terminal dispatch, custom two-stage polling, deterministic replay for 220 authoritative ticks, fixed-DT accumulator/frame bounds, genuine collision-invariant containment/reset, pre-existing violation receipts with detached diagnostic subjects, and original wall/construction/incomplete-stairs preset outcomes. Fixtures are hypothetical and anonymous.
+
+Proof logs are ignored local receipts under `viewer/.cloudflare/lab-liveness-alpha-{red,green}.log`; the RED log uses the exact base driver with final strengthened tests. Final validation: 11/11 new liveness tests and 32/32 combined liveness/reading/walk/source-scan tests pass (1.72 seconds, no skipped or TODO cases); viewer TypeScript and owned-file type-aware lint pass. New-test formatter check and git diff --check pass. The base has no e2e/tsconfig.json; an attempted strict-browser config check reports missing path and is not counted as validation. No browser test source changed. Whole-file formatter checks identify the same three existing shared files on both untouched base and candidate; their existing compact style is preserved rather than introducing unrelated formatting churn. Baseline receipt: `.cloudflare/lab-liveness-alpha-baseline-format.log`.
+
+No browser, performance, full gate or deployment was run. Hook/panel browser interaction and broader preset compatibility remain unproved here. This is a Lab driver containment boundary, not backend/global Runtime recovery, automatic physical repair, or active save/load. Existing failed presets remain failed with their original diagnostics.

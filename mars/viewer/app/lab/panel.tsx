@@ -82,8 +82,8 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       </label>
       <p className="lab-desc">{s.description}</p>
       <div className="lab-row">
-        <button onClick={() => ((sim.paused = !sim.paused), refresh())}>{sim.paused ? 'Play' : 'Pause'}</button>
-        <button onClick={() => ((sim.paused = true), sim.step(), refresh())}>Step</button>
+        <button disabled={!!sim.halted} onClick={() => ((sim.paused = !sim.paused), refresh())}>{sim.paused ? 'Play' : 'Pause'}</button>
+        <button disabled={!!sim.halted} onClick={() => ((sim.paused = true), sim.step(), refresh())}>Step</button>
         <button onClick={() => onScenario(s.name)}>Reset</button>
         <select value={sim.speed} onChange={(e) => ((sim.speed = Number(e.target.value)), refresh())} aria-label="Speed">
           {SPEEDS.map((v) => (
@@ -99,8 +99,9 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         </button>
       )}
       <p className="lab-meta">
-        tick {sim.rt.tick} · t {sim.rt.time.toFixed(2)} s {sim.done() ? '· done' : sim.paused ? '· paused' : ''}
+        tick {sim.rt.tick} · t {sim.rt.time.toFixed(2)} s · world {sim.halted ? 'halted' : sim.paused ? 'paused' : 'running'}{sim.scriptStopReason ? ` · script ${sim.scriptStopReason}` : ''}
       </p>
+      {sim.halted && <p className="lab-meta" role="alert">{sim.halted.code}: {sim.halted.message}</p>}
       {s.name === 'design-studio' && <section className="lab-meta" data-testid="workstation-appearance">
         Computer appearance: <a href="https://sketchfab.com/3d-models/retro-computer-monitor-8926293078874194b551e74c40a3debf" target="_blank" rel="noopener">Retro Computer &amp; Monitor</a> by <a href="https://sketchfab.com/JasperTobias" target="_blank" rel="noopener">JasperTobias</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Scaled and rotated; screen shows live simulated work.
         {view.fixtures.workstationAppearanceStates().map(state => <div key={state.id}>

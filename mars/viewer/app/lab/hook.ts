@@ -77,6 +77,8 @@ export function installHook(view: LabView, notify: () => void) {
       tick: rt.tick,
       time: +rt.time.toFixed(3),
       done: sim.done(),
+      scriptStopReason: sim.scriptStopReason,
+      halted: sim.halted ? structuredClone(sim.halted) : null,
       paused: sim.paused,
       speed: sim.speed,
       humans: Object.values(rt.world.entities)
@@ -151,7 +153,7 @@ export function installHook(view: LabView, notify: () => void) {
     },
     /** Step until done or maxTicks; returns final state. */
     runToEnd(maxTicks = 20 * 600) {
-      for (let i = 0; i < maxTicks && !sim.done(); i++) sim.step();
+      for (let i = 0; i < maxTicks && !sim.halted && !sim.done(); i++) sim.step();
       notify();
       return state();
     },
@@ -163,7 +165,7 @@ export function installHook(view: LabView, notify: () => void) {
         const rows = sequenceRows(sim);
         return !!rows && ids.every((id) => rows.find((r) => r.id === id)?.status === status);
       };
-      for (let i = 0; i < maxTicks && !ok() && !sim.done(); i++) sim.step();
+      for (let i = 0; i < maxTicks && !sim.halted && !ok() && !sim.done(); i++) sim.step();
       notify();
       return { ...state(), reached: ok() };
     },
