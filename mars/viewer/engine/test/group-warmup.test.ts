@@ -288,3 +288,13 @@ test('instructor directive pauses retained progress and explicitly resumes after
   assert.equal(readGroupWarmup(rt, resumed.id)!.ended, true);
   clean(rt);
 });
+
+test('accepted Pause freezes instructor time at admission while physical hand lowering continues', () => {
+  const rt = groupWarmupRuntime(), r = rt.submit('group_warmup', groupWarmupBinding());
+  until(rt, () => readGroupWarmup(rt, r.id)!.elapsed >= 5);
+  const elapsed = readGroupWarmup(rt, r.id)!.elapsed;
+  const pause = rt.submit('group_warmup_control', { warmup: r.id, command: 'pause' });
+  until(rt, () => !rt.isActive(r.id));
+  assert.equal(pause.status, 'completed');
+  assert.equal(readGroupWarmup(rt, r.id)!.elapsed, elapsed); clean(rt);
+});

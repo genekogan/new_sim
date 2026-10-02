@@ -25,7 +25,15 @@ not instructions to restart completed increments. Public/source truth comes from
 - [Progress](PROGRESS.md): chronological work and failures, newest entries at the end.
 - [Live Lab repairs](LIVE_LAB_REPAIRS.md): Reach, stance and material continuity findings.
 
-## Current tranche evidence
+## Current vocabulary candidates
+
+- [Drawing work](briefs/drawing-work.REPORT.md): physical tools and retained marks.
+- [Guided warm-up](briefs/group-warmup.REPORT.md): instructor timing, floor safety and independent followers.
+
+These are implementation candidates until the release record proves integration,
+actual Play and publication. Current queue is in the active roadmap.
+
+## Release36 tranche evidence
 
 - [Connected day](briefs/living-day-acceptance.REPORT.md)
 - [Garden care](briefs/garden-care.REPORT.md)

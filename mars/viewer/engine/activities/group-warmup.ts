@@ -603,21 +603,29 @@ export const groupWarmupControl: ActionDef<
     }
     return { ok: true, program: null };
   },
-  start: (_rt, p) => p,
-  step(rt, p) {
+  start(rt, p) {
     const s = store(rt).get(p.warmup)!;
+    // Accepted intent is immediate; the ordinary participants still lower hands
+    // and release their physical ownership through subsequent fixed ticks.
     if (p.command === 'pause' || p.command === 'end') {
       s.ended = p.command === 'end';
       rt.cancel(s.id);
-    } else {
+    } else if (p.command === 'leave') {
+      const m = s.members.find(m => m.actor === p.actor)!;
+      m.withdrawn = true;
+      if (m.child && rt.isActive(m.child)) rt.cancel(m.child);
+    }
+    return p;
+  },
+  step(rt, p) {
+    if (p.command === 'join') {
+      const s = store(rt).get(p.warmup);
+      if (!s || !rt.isActive(s.id) || s.mode !== 'practice') return {
+        status: 'failed', diagnostic: issue('control-target', `${p.warmup} stopped before ${p.actor} could join`, [p.warmup, p.actor ?? 'missing actor']),
+      };
       const m = s.members.find((m) => m.actor === p.actor)!;
-      if (p.command === 'join') {
-        const bad = join(rt, s, m);
-        if (bad) return { status: 'failed', diagnostic: bad };
-      } else {
-        m.withdrawn = true;
-        if (m.child && rt.isActive(m.child)) rt.cancel(m.child);
-      }
+      const bad = join(rt, s, m);
+      if (bad) return { status: 'failed', diagnostic: bad };
     }
     return {
       status: 'completed',

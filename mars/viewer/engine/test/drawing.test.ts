@@ -289,3 +289,17 @@ test('occupied return slot blocks safe release, then drains after the explicit o
   assert.equal(a.status, 'cancelled');
   clean(rt);
 });
+
+test('repeated parent Cancel drains one physical pencil return without restarting cleanup', () => {
+  const rt = drawingWorkRuntime(), p = drawingWorkParams(), r = rt.submit('drawing_work', p);
+  until(rt, () => { const s = readDrawing(rt, p.pad); return !('code' in s) && s.ticks >= 31; });
+  const partial = readDrawing(rt, p.pad); assert.ok(!('code' in partial));
+  for (let i = 0; i < 200 && rt.isActive(r.id); i++) { rt.cancel(r.id); rt.step(); assert.deepEqual(rt.violations, []); }
+  assert.equal(r.status, 'cancelled');
+  assert.equal([...rt.records.values()].filter(q => q.verb === 'put_item').length, 1);
+  const stopped = readDrawing(rt, p.pad); assert.ok(!('code' in stopped));
+  assert.equal(stopped.ticks, partial.ticks);
+  assert.equal(stopped.status, 'unfinished');
+  assert.equal(rt.world.entities[p.pencil].support?.kind, 'resting-on');
+  assert.ok([...rt.records.values()].every(q => !rt.isActive(q.id)));
+});

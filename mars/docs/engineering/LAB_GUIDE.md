@@ -4,6 +4,21 @@ Current public checkpoint is **release36 at [sim.mars.college](https://sim.mars.
 Living days, garden care, music/dance and longer automatic coverage are shipped.
 [Final handoff](MARS_MVP_HANDOFF.md) records exact source, validation and limits.
 
+## Vocabulary expansion candidate (not yet public)
+
+The isolated activity-vocabulary branch adds three manual-start experiences:
+
+| Preset | Initiate, intervene and watch | Supported scope |
+| --- | --- | --- |
+| `drawing-work` | Take the same pencil, make retained visible marks, pause/direct away, resume the same pad and return the pencil. | Standing at a grounded table; one predefined shelter study, no erasing or freehand input. |
+| `group-warmup` | Guide plus four staggered followers practise settle/raise/open/lower; Join/Leave, safe Pause/Resume and guide direction. | Planted standing arm practice on clear ground, not floor yoga or a reconstructed historic class. |
+| `open-jam` | Two performers exchange the same computer/chair through ordinary exits, original audible scores and independent dancer departure; retained Pause/Resume. | Two digital performers, one listener, declared dance places; no acoustic instrument simulation. |
+
+All staging and participants are hypothetical. Drawing Klerb/Open Jacks provide
+practice inspiration; neighbouring Bombay yoga is not attributed to Mars organizers.
+Focused engine proof passes; actual Play, combined gate and publication are pending.
+Release36's45presets remain the verified public inventory until a new release record.
+
 ## Begin
 
 Choose a Scenario in `/lab`, or use its Quick tour. Play advances authoritative
