@@ -87,3 +87,7 @@ failed checks and distinguish local completion from public proof.
 Future room-preparation bridge: [finite physical composition](briefs/room-preparation.REPORT.md)
 and [Lab controls and authored Play proof](briefs/room-preparation-lab.REPORT.md).
 Core and shared wiring pass focused checks; browser/public proof remains pending.
+
+Future [shared-food continuation](briefs/shared-food-continuation.REPORT.md) retains
+cancelled same-Runtime serving/consumption receipts. Reviewed focused checks pass;
+connected supper integration and public proof remain pending.
