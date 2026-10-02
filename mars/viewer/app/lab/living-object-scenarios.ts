@@ -1,3 +1,4 @@
+import { communalSupperRuntime, communalSupperScene } from '../../engine/scenarios/communal-supper.ts';
 import { roomPreparationRuntime, roomPreparationScene } from '../../engine/scenarios/room-preparation.ts';
 import { gardenAfternoonRuntime, gardenAfternoonScene } from '../../engine/scenarios/garden-afternoon.ts';
 import { seedPlantingRuntime, seedPlantingScene } from '../../engine/scenarios/seed-planting.ts';
@@ -29,6 +30,13 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  {
+    name: 'communal-supper',
+    title: 'Communal supper · prepare, share and store (hypothetical)',
+    description: 'Start supper, then Play. An anonymous cook transfers two finite ingredients into the same pot; two people eat conserved servings with their own bowls and spoons, then physically store all seven original vessels. Pause, direct the cook away and explicitly Resume the same deposits or meal receipts. End drains held utensils; repeat End if a stopped return needs an explicit retry. Fixed ground tables and cold preparation only: no heat, washing, refill, replacement vessels or active reload restoration.',
+    scene: communalSupperScene, humans: () => [], build: communalSupperRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [2.5, 2, 16, 65], expect: checks,
+  },
   {
     name: 'room-preparation',
     title: 'Prepare and use a classroom · clear, carry, gather (hypothetical)',

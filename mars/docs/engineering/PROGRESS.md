@@ -2545,3 +2545,30 @@ not merely terminal status, before starting cleanup. Two Sol6.1 workers author f
 communal supper and its Lab proof in disjoint new files; no duplicate executor,
 food refill, new recipes, active persistence or camera policy. Root owns review and
 serialized combined/public proof after release38. No source changes to frozen38.
+
+
+### Future room and supper integration; release38 source remains frozen — October2
+
+Reviewed and imported communal supper core47c7ac8, HUD/specb6c3082, explicit End
+return recoveryd1846e1 and current-storage/history HUD20f221a into the isolated
+room-preparation-integration candidate. One hypothetical supper preset is now wired
+through the same canonical registry, keyed panel, detached hook, quick tour and
+minimal camera entry allowlist; room preparation plus supper would bring60to62.
+Rules stampactivities/28 records registered semantics, not an intended physics or
+baseline change. No continuous camera-quality claim from entry checks.
+
+Supper reuses ordinary cold prepare_food, same-Runtime shared_food_break receipts
+and two tidy_table batches: same seven original vessels and finite food, no refill,
+heat, washing or replacement. Pause during preparation retains deposits/mixing;
+meal Resume retains actual served/consumed receipts, including consumed empty bowls.
+End drains and physically returns held utensils; an explicitly retried stopped return
+keeps old records and uses ordinary stow, without overwriting ownership/support.
+Ordinary walk while active stow remains refused, as existing executor requires.
+
+Root focused combined90NodePASS/0FAIL/SKIP11.06s includes room, supper, shared-food
+continuation/originals and source scan. ViewerTSc passes after shared wiring. Strict
+actualPlay room/supper journeys and camera entries are authored but unexecuted.
+A separate read-only acceptance review checks exact retained bindings/support and
+interruption coverage. Full release38 gate remains the sole expensive browser lane;
+its frozen5f1dc2e tracked source is untouched. These future features are not public.
+Continuous owner authorization persists; no generalization/rig/save-load expansion.

@@ -1,3 +1,4 @@
+import { readCommunalSupper } from '../../engine/activities/communal-supper.ts';
 import { readRoomPreparation } from '../../engine/activities/room-preparation.ts';
 import { readGardenAfternoon } from '../../engine/scenarios/garden-afternoon.ts';
 import { readSeedPlanting } from '../../engine/activities/seed-planting.ts';
@@ -85,6 +86,7 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    communalSupper: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'communal_supper').at(-1); return r ? readCommunalSupper(sim.rt, r.id) ?? null : null; },
     roomPreparation: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'room_preparation').at(-1); return r ? readRoomPreparation(sim.rt, r.id) ?? null : null; },
     gardenAfternoon: () => readGardenAfternoon(sim.rt) ?? null,
     seedPlanting: () => {

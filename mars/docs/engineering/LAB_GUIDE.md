@@ -269,3 +269,20 @@ children; Reset creates the initial hypothetical world. Fixed flat layout and ni
 anonymous people, no automatic furnishing planner or active reload restoration.
 Focused Node and TypeScript checks pass; authored actual Play/camera-entry checks
 and visual inspection remain pending. Saved controls are not a released experience.
+
+
+## Future communal supper (local candidate; not release37)
+
+`communal-supper`: Start supper, then Play. Two anonymous people use the same pot,
+two ingredient bowls and their own bowls/spoons; cold preparation, conserved
+servings and physical supported storage use ordinary registered actions. Local
+Pause drains the current physical child; Direct cook away and explicit Resume retain
+deposits or actual serving/consumption receipts. Consumed empty bowls do not trigger
+another serving. End returns held utensils; a stopped return needs the named support
+or route restored, then an explicit End retry. Old attempts remain visible. Storage
+text describes current support separately from earlier completed transfers.
+
+Fixed authored ground tables, seven same original vessels, no heat/washing/refill or
+active reload. Focused Node/type checks pass; authored actualPlay journeys are pending.
+Room preparation and supper together would add two presets after release38's60;
+these future capabilities must not be presented as already online.

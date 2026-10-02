@@ -7,6 +7,7 @@ type Props = {
 export function CheckpointTour({ scenario, onScenario }: Props) {
   const living =
     scenario.startsWith('living-day-') ||
+    scenario === 'communal-supper' ||
     scenario === 'room-preparation' ||
     scenario === 'garden-care' ||
     scenario.startsWith('garden-afternoon') ||
@@ -54,6 +55,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
     >
       <h2 id="checkpoint-tour-heading">Quick tour · playable checkpoint</h2>
       <div className="lab-row">
+        <button onClick={() => onScenario('communal-supper')}>Prepare, share and store supper</button>
         <button onClick={() => onScenario('room-preparation')}>Clear, arrange and use a classroom</button>
         <button onClick={() => onScenario('living-day-4')}>
           Connected living day
