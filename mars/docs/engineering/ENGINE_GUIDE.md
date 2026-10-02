@@ -1,10 +1,11 @@
 # Mars engine — contributor guide (read before touching viewer/engine)
 
-The engine is a small, Mars-specific, deterministic world runtime in pure
+The engine is a bounded deterministic world/activity runtime in pure
 TypeScript (`viewer/engine/`). It runs unchanged in Node tests, the browser and
 the Cloudflare Durable Object. Spec: `SPEC.md`. Audit of the existing app:
 `AUDIT.md`. Owner decisions: `OWNER_DECISIONS.md`. Progress: `PROGRESS.md`.
-External contributors (Codex): `CODEX.md` (ownership map, worktree recipe, gates, merge protocol).
+Start at [engineering navigation](INDEX.md). External contributors: `CODEX.md`
+(worktree recipe, gates, merge protocol); current AGENTS.md supersedes older ownership maps.
 
 ## Hard rules
 - **Node strip-types compatible TS**: no parameter properties, no `enum`, no
@@ -65,7 +66,25 @@ External contributors (Codex): `CODEX.md` (ownership map, worktree recipe, gates
   additive, and described in your final report.
 - Commit only your own paths: `git add <your paths> && git commit -m "…"`; if `index.lock`
   exists, wait a few seconds and retry. End messages with
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never push.
+  the established co-author convention (`Co-Authored-By: Codex <noreply@openai.com>`
+  for Codex work), with genekogan as author. Never push/add remotes.
 - Run `npm run test:engine` and `npx tsc --noEmit -p .` before committing; don't commit red.
-- The network is flaky tonight: run long commands in the background with timeouts, write
-  docs incrementally, commit early.
+- Keep long validation logs/proof receipts on disk. Serialize expensive browser/performance
+  checks and freeze tracked source during the combined gate. Preserve failed evidence.
+
+## Activity and renderer boundary
+
+Reusable coordinators express purpose/roles/permitted bindings; ordinary registered
+actions own physical movement, posture, support and manipulation. Independent
+`living_intention` commitments retain bounded progress and explicitly resume after
+player/director interruption; `living-day` composes existing family mechanisms.
+Do not add a second movement controller or fabricate replacement objects. End and
+refusal must be distinguishable from successful completion.
+
+Object capabilities/state live separately from appearance: workstation, reading,
+food, garden and sleep modules expose explicit requirements and retained effects.
+Garden care uses finite normalized quantities, not a growth/fluids simulator.
+Rig-specific pose mapping stays in renderer adapters; no rig/library migration
+in this tranche. Cameras receive detached actual facts and have no world authority.
+Active save/load is owner-deferred; do not imply serializable JSON restores an
+active coordinator graph. See Lab guide for supported interactions and limitations.

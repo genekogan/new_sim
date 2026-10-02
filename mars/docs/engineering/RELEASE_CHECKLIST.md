@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 35 is live; Mars MVP complete.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release35 is live. Owner authorized a subsequent living-world tranche; its completion/publication is pending.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -10,7 +10,7 @@ Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated
 ## Release gate (required before deploying)
 
 A deploy must start from a green `npm run gate` report (run from `viewer/`). The gate runs, in
-order: zero-warning lint, `npm test`, `npm run test:engine`, `npx tsc --noEmit -p .`,
+order: zero-warning lint, `npm test`, `npm run test:engine`, `npx tsc --noEmit -p .`, the separate cinematography TypeScript check,
 `npm run e2e -- --workers=1`, `node deploy/record-campus-take.mjs --check` (flagship only; historical chapters remain parked),
 `node deploy/determinism-probe.mjs`, and `deploy/simulation-integration.mjs`.
 Without `SIM_BASE`, the gate starts an isolated local Wrangler server and cleans up its process group; an explicit `SIM_BASE` targets that server. It stops at the first failure

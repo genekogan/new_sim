@@ -1,15 +1,18 @@
-> Superseded owner disposition: release35 is a verified checkpoint, but the owner
-> has not accepted the MVP as complete and requested removal of the added
-> mars.college/simulation page/footer. Original publication evidence below is
-> historical; the Worker/Lab remains live unchanged. Do not recreate the website
-> entry or start the proposed next tranche without instruction. See ACTIVE_ROADMAP.
+> Current disposition: release35 is the verified public baseline. Gene subsequently
+> authorized the October2 living-world tranche, including connected independent days,
+> music/dance, recurring care, automatic coverage, self-audit and documentation.
+> See [active roadmap](ACTIVE_ROADMAP.md) and [engineering navigation](INDEX.md).
+> The removed mars.college/simulation page remains removed; final publication target
+> is the existing sim.mars.college deployment. The receipts below preserve release35
+> provenance; they do not prove the new candidates or withdraw current authorization.
 
 # Mars MVP handoff — verified bounded acceptance and publication
 
 The bounded runtime contract is accepted against the final source and representative
 proof below. This is contract acceptance, not a request for extra owner approval.
-**Website publication and production backend verification are complete against the
-receipts below. Mars feature expansion stops at this verified bounded MVP.**
+**Release35 backend and original publication were verified against the receipts below.
+The added website entry was later removed at owner request; current tranche status
+is recorded above.**
 Release 34 is the prior verified checkpoint; release 35 has fresh public browser proof at Worker version
 `adaf98f2-65d1-43b3-9c5d-761d555f2d5e`, source
 `9958ed4a97f2cb5c7189ea7796b6502a0b9910de`. The earlier `fafdb72` candidate is superseded.

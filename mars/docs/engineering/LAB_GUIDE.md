@@ -1,66 +1,110 @@
-# Seeing the engine: a user's guide (release 5, 2026-09-28)
+# Lab play and inspection guide
 
-Everything below is live at https://mars-campus-2026.<workers-subdomain>.workers.dev (release 5 = the checkpoint
-tree). Scenes marked HYPOTHETICAL are illustrative builds on open ground, never historical claims.
+Current public baseline is release35. **Living days, garden care, dance and expanded
+camera observations below are a locally tested candidate until the new combined
+release/public receipt is recorded.** Deployment truth is `viewer/deploy/deployment.json`.
+The final entry target is `https://sim.mars.college/lab`; the existing Worker `/lab`
+is the same application. Do not recreate the removed mars.college/simulation page.
+The [release5 guide](archive/LAB_GUIDE_release5.md) is preserved as historical evidence.
 
-## /lab — the Engine Lab
-The deterministic engine running in the browser at a fixed 1/20 s tick, rendered with the studio's animated people.
+## Begin
 
-**Controls (right panel):** Scenario picker · Play / Step / Reset · speed (1×–8×) · Expectations (the scenario's
-own pass/fail checks, computed from engine state, not pixels) · Overlays, all off by default · Log (action
-lifecycle: requested → validated → reserved → executing → completed, with `blocked` waits and their diagnostic
-text, e.g. `traffic.person: p1 is waiting for p5 to move out of the way`) · Top-down / Oblique cameras.
-Failures are shown as red banners; expected conflicts as amber.
+Choose a Scenario in `/lab`, or use its Quick tour. Play advances authoritative
+20Hz simulation; Step advances one fixed tick; Pause freezes the whole world.
+Speed changes playback rate, not timestep. Reset or loading another scenario
+replaces the current world, including all retained intentions and object states.
+Continuous activity presets require their own Start control. Scripted movement
+and construction presets start their sequence through Play.
 
-**Overlays:** Walkability/clearance heatmap · Routes + corridors · Single-file traffic · Agent discs + facing ·
-Obstacle footprints · Stair links (usable vs not) · Action phase labels · Violation markers · Prisms (year
-walkabouts) · Slots (social: claimed vs free seats / fire places).
+Individual Pause/Interrupt requests safe physical cleanup while others continue.
+Keep Play running until cleanup finishes. Resume is explicit after intervention.
+Director/player commands use the same admission, claims, support and execution;
+refusal explains the named resource or geometry. End retains partial effects and
+releases resources safely; it does not claim unfinished purposes completed.
+No active save/load or reload-restoration guarantee is provided.
 
-**Scenarios**
-- *Wall, U-trap, Narrow passage, Stairs, Deck→ground, Incomplete stairs, Construction, Trio* — the spec §28
-  proving-ground regressions. Incomplete stairs deliberately fails with the diagnostic naming the missing treads;
-  Construction lets you drop a panel into the gap mid-walk and watch the replan.
-- *Stress: 30 wanderers* — 30 people re-targeting continuously; watch violations stay at 0.
-- *Build a rack bay (flagship, HYPOTHETICAL)* — 43-step sequence: six people carry two 12 ft uprights and four
-  beams from piles, raise the frames (lifters walk the rising end up, footers at the base) and hold them, seat
-  beams at 0.5 m and 1.8 m, release only when the assembly rule passes, fix joists, lift plywood over the side
-  beam with the crew walking alongside, set the stair flight, install ten treads, then the visitor walks up.
-  The Sequence Timeline shows each step's status; the HUD shows every wait.
-- *Campfire evening (HYPOTHETICAL)* — social verbs: gather to the fire circle, converse, sit on chairs/benches
-  via approach points, stand, an 11th person refused on a full circle (expected conflict), a directed walk
-  pre-empting a circle member, ambient wandering. Seated and warming poses are procedural; talk/watch are Idle.
-- *Year 2020 … 2026 walkabouts* — the real procedural year scene with the engine's obstacle prisms as a
-  translucent overlay; four walkers cross the campus (2021 corridor between the two long buildings, 2022
-  courtyard corner passages, 2024 frontage). Prism build time is shown in the HUD. Known data findings:
-  2022 south-west corner is closed by the west-house table; trailers intrude into Chiba in 2023/2024.
+## Combined runs
 
-Test hook for scripts: `window.__marsEngine` (`runScenario`, `step`, `runToEnd`, `state`, `violations`,
-`records`, `setOverlay`, `camera`, `cameraPreset`, `perf`).
+| Selector name | What to initiate and watch | Supported variation |
+| --- | --- | --- |
+| `living-day-4`, `living-day-studio` | Start connected day: notes → gathering/questions/rotation/conversations → shared walk → cold preparation/two servings → sleep → same unfinished notes. Reader and carer have separate schedules; music/dance begins during rest. | Original worker or project assistant; room/auxiliary computer preferences with explicitly allowed alternative; Mars classroom or hypothetical independent studio. |
+| `prepared-day-4`, `prepared-day-8`, `prepared-day-studio` | Start notes, interrupt after progress, Start session, then Start purposeful routine during presentations. Optional attendee continuations retain separate discussion/follow-up work. | Authored room sizes/environment; eight-guest side layout requires physical setup described in the tour. |
+| `work-break-4`, `work-break-8` | Work, talks, shared food, quiet rest and return to the original project; separate guest continuations. | Two authored gathering sizes and furniture layouts. |
+| `design-studio` | Critique, questions, shared food and return to continuing projects. | Reuse of the same activity/object mechanisms in a non-Mars room. |
 
-## /studio (2026) — Replay take
-Bottom bar → **Replay take** → "Flagship rack bay at staging-east (HYPOTHETICAL)". The recorded campus take
-(608 s simulated, 0 violations) plays inside the real 2026 scene east of Chiba. Scrubber with moment markers,
-Play, speed, **Engine camera** (planned shot list: establishing, follow the carry, orbit the raise, beam close-up,
-wide on the deck, follow the visitor up the stair; readability verified against the render) — drag the view to
-take over, toggle back to return. Diagnostics readout shows violations/failed/blocked waits from the take. Ambient
-people are hidden while a take plays; poses are identical with either camera (spec §18).
+Living-day controls show each person's purpose, progress, waiting reason and
+completed/skipped blocks. Pause/direct the reader while plant care continues;
+Resume retains the same bookmark. Pause the main routine during preparation or
+sleep; Resume retains deposits and the same rest purpose. Music has separate
+Pause/Resume and audio controls. A refused day transition requires intervention
+and explicit Retry. An ended required commitment yields an explicitly ended
+partial day; Reset stages another one. Bindings are bounded authored choices,
+not arbitrary people/equipment, autonomous needs or a universal planner.
 
-## MCP / director workflow
-`/simulation-agent-guide.md` documents the 20 legacy tools and the 13 `engine_*` tools: `engine_list_verbs`,
-`engine_query_world`, `engine_edit_world` (design edits on a fork), `engine_bind_plan`, `engine_rehearse`,
-`engine_execute` (with `pauseAt`), `engine_resume`, `engine_fork`, `engine_log`, `engine_list`,
-`engine_delete_workspace`, `engine_get_take`, `engine_attach_camera_track`. Rooms exist per year 2020–2026
-(protected canonical `mars-<year>`; fork before editing or simulating).
-Worked example against production (creates a disposable room):
-`cd viewer && node deploy/director-demo.mjs --base https://mars-campus-2026.<workers-subdomain>.workers.dev`
-— 9 steps in ~7 s: query → bind an impossible plan → structured refusal → revise → rehearse → execute → take →
-camera track → fork → stale-plan refusal → pause/fork/resume. Transcript: DIRECTOR_DEMO.md.
+## Individual activities and objects
 
-## Engine-only for now (tests, no lab scene yet)
-EUC and bicycle riding (`mount`, `ride_to`, `ride_loop`, `dismount`), the forklift (`forklift_pick`,
-`forklift_deliver`), single-carrier loads up/down stairs, flagship v2 (forklift delivery + tread carried up the
-stair + campfire ending, 66 steps). Adding "Flagship v2" and a "Vehicles" scenario to /lab is the natural next
-lab task (see NEXT_SESSION_PROMPT.md).
+| Selector | Meaningful interaction | Bounded contract |
+| --- | --- | --- |
+| `classroom-4`, `classroom-8` | Audience approaches real seats, host/presenter floor, questions, rotation, smaller conversations, late joining/leaving. Move spare chair/cleared table and use the new arrangement. | Two authored ground layouts; occupied/reserved/hands-full furniture moves refuse. Table contents must be explicitly removed. |
+| `quiet-reading` | Seated reading and retained bookmark, player direction and explicit Resume. | Same flat book on grounded table; no held-book reading. |
+| `computer-music` | Seated performance, listeners and audible original score. | Enable sound through browser gesture; interrupted score retained, no acoustic instrument simulation. |
+| `music-dance` | Performer, seated listener and two invited dance places; late Join/Leave, attention, independent player directions. | Planted ground stance and rhythmic arms, not travelling choreography. Safe pause retains score and departures; same bound places on Resume. |
+| `garden-care` | Pick up the same finite water bowl, approach planter, reach/deposit water, return bowl; interrupt/resume and recurring care. | Ground planter, four total quarter-bowl cycles; care state and due time, no fluid/growth/refill simulation. |
+| `tabletop-chess` | Two physical players take turns moving the same pieces; captured pieces remain in tray. | Standing tabletop play; no castling or physical promotion. Select proposed moves for different games. |
+| `cold-preparation`, `cold-preparation-rotated` | Transfer two finite ingredients and mix the same pot; retained deposits, serve/eat and return utensils. | One cold recipe, two servings, grounded table; no heat/chopping. |
+| `ground-sleep`, `ground-sleep-rotated` | Approach mat, lie down, rest, wake; safe interruption and retained elapsed rest. | Flat grounded mat and current rigs; no bed or rig migration. |
 
-## Local
-`cd viewer && npm run dev` → http://127.0.0.1:5173/lab · `npm run gate` before any deploy · `npm run evidence`.
+All new staging/participants are hypothetical, not historical reconstruction.
+Objects retain identity/support/ownership; a visible prop alone is not a capability.
+Fine fingers/clothing and planted dance expression remain current-animation limits.
+
+## Camera and sound
+
+Live camera supports classroom, prepared/living days, garden care and music/dance.
+Choose Clear activity coverage or Restrained observation. It reads actual people,
+objects and phase facts; it never moves actors or owns their tasks. Follow activity
+person (Follow guest2 in classroom) takes operator precedence. Return camera to auto
+releases it. Dragging the view also takes temporary operator control. Global Pause
+freezes simulation; camera attachment must not mutate world/tick.
+
+Clear favors readable action; Restrained holds wider/longer coverage. These are
+bounded procedural editorial policies, not a human cinematographer or guaranteed
+close-up of every simultaneous event. Camera replay links are recorded demonstrations,
+not a second playable world. Enable sound requires a browser gesture; global Pause,
+Reset and disposed sessions silence audio. Music remains physically usable muted.
+
+## Diagnostics, probes and historical builds
+
+Movement presets cover wall/U-trap/narrow passage/stairs/deck, mid-walk obstruction,
+three walkers and continuous stress. `incomplete-stairs` intentionally refuses
+with `route.link-unusable`; this never excuses invariant violations.
+
+`body` is a renderer Reach measurement probe with an explicit synthetic/authoritative
+contract in its controls. Fresh load, Reset and first Step must be coherent. It is
+not evidence that arbitrary anatomy/interaction poses are valid.
+
+Year walkabouts use the loaded historical obstacle scene. Current 2022 first-bay
+and whole-house scenarios validate staging admission. If required current content
+is unsupported, they name omitted/blocking entities and do not start physical work.
+Supported current whole-house completion has separate executed browser coverage;
+old W51 FIXME fixtures remain unproved and must never be cited as passing evidence.
+Material pile/component identity and appearance continuity are engine/renderer
+contracts; historical colors/geometry must not be changed to conceal a defect.
+
+## Inspect and develop
+
+Overlays expose routes, clearance, actor/obstacle footprints, levels/stairs, slots,
+phases and violations. Logs distinguish requested/validated/reserved/executing/
+completed from blocked waits, refusals and cancellation. Red invariant/error banners
+are actionable; intentional diagnostic demonstrations are explicitly labeled.
+
+`window.__marsEngine` offers scenario loading, fixed stepping, detached records/world,
+violations, intention/day/garden readouts and camera facts. Programmatic stepping
+is useful but does not establish natural rendering or automatic Play timing.
+The selector startup audit covers fresh-load/Reset/first-Step for all 45 selectable
+presets; it is deliberately not completion evidence. See [current evidence index](INDEX.md).
+
+Local: `cd viewer && npm run dev`, then `/lab`. Contributor rules:
+[ENGINE_GUIDE](ENGINE_GUIDE.md). Required clean combined integration:
+[release checklist](RELEASE_CHECKLIST.md). MCP/director commands use the same runtime;
+see `/simulation-agent-guide.md` and `viewer/deploy/README.md`. Never Git push/add a remote.

@@ -27,6 +27,24 @@ care, watchable automaticcoverage/manualcamera precedence, documentedlimits,
 validated combined release publiclyaccessible. An authored choice-set is supported;
 constant random reselection/continuousLLMcalls/prerecorded success is not.
 
+## Current closing status — October2
+
+Release35 remains online. New living-day-4/studio, garden-care and music-dance
+are integrated candidates; focused programmatic variants and separate actual Play
+proofs pass. The day audit has fixed truthful ending disposition and pre-start/
+refused music recovery, with eleven disruption regressions passing. A newly
+reproduced partial-preparation End still retains its spoon and is under bounded
+ordinary-action cleanup repair. Full45-preset startup audit is executing; automatic
+camera long-run proof remains incomplete because its test predicates were wrong,
+now corrected without changing camera policies. These are not public success claims.
+
+Small remaining queue: (1) resolve exact acceptance failures and inspect corrected
+camera/audit captures; (2) finish guide/index cleanup and scenario instructions;
+(3) freeze combined candidate, full established gate/idle limits, guarded local
+integration, public sim.mars.college verification and exact handoff. No new activity,
+active save/load or broader generalization. Estimated10–18 remaining working hours,
+medium confidence; deadline2026-10-03T03:23UTC. Update with measured validation results.
+
 ## Earlier five-day contract and checkpoint provenance
 
 Owner mandate 2026-09-30; target October 5. This section supersedes earlier
@@ -46,7 +64,7 @@ clean full gate and production verification: complete in release33, functional7a
 Return immediately to the queue below after publication. This is presentation work,
 not a new activity/camera/animation subsystem or a change to the Mars/Eden boundary.
 
-## Current active queue (release34 verified)
+## Historical active queue (release34, superseded by October2 tranche)
 
 Online: proposed2027 open-rack concept with explicit proposal labels and2026 default;
 physical cold two-ingredient preparation, retained deposits and two ordinary conserved
@@ -332,6 +350,6 @@ Exit criteria: worker retains exact notes through gathering/meal/rest/return, se
 Limits: authoredchoices/onefixedstudioarrangement/existingprimitiveappearance; no autonomousneeds/sleep or activeGUI restore. Cameraobserver unchanged; originalcurrenthouse unsupported3/9refusal and7browser skips stay explicit. Remaining1–3workinghours for combinedrelease assuming no new gate/deploy failure. Next boundedappearance2–4h requires actualtransformedGLB preview/supportenvelope/loadcleanup/attribution proof; broader needs and relationships require a separate small playable increment rather than a universal psychology/asset framework.
 
 
-## Current release blocker (2026-09-30)
+## Historical release25 blocker (2026-09-30; subsequently resolved)
 
 Continuing attendee purposes and independent hypothetical design studio are saved at73eda39 and passed the complete local gate. Production25verification failed with Cloudflare1102 resource exhaustion, exact operation and CPU/memory cause unknown; production rolled back to verified24. This is the immediate correctness/release task, not a camera prerequisite or lost implementation. Fresh isolated24all36MCP verification passes. Preserve failure evidence and establish the host cause before retrying25; do not raise limits or equate local green with production success. Optional selected computer appearance is separate candidate5e0c474, pending runtime inspection. Continue purposeful routines/reuse after resolving this bounded release block, without another planning tranche.
