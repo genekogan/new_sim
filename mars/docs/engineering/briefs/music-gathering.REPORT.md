@@ -1,5 +1,9 @@
 # Music gathering — reviewed implementation candidate
 
+The browser proof addendum below supersedes the initial pending visual-proof
+notes. This remains an unpublished candidate, with integrated release validation
+owned by root.
+
 ## 2026-10-02 focused handoff
 
 Worktree `<mars-worktrees>/music-dance-world`, branch
@@ -98,3 +102,60 @@ PNGs to its run directory; none has been produced or personally inspected yet.
 Stop/escalate if believable medium-distance rhythm needs bespoke anatomy rather
 than a small current-rig expression. No new helper, full gate, main merge or deploy
 is authorized in this lane. All older worktrees and drafts remain intact.
+
+## 2026-10-02 actual Play proof — passed, browser slot returned
+
+Source implementation commit `6dfda9c905f703e3171b859ed83e94176eee9e03`;
+owned browser setup/attention assertion correction
+`f8a97ef0800ebb2951ee1bced1a97649630ac380`. Root integrated canonical registry,
+scenario/HUD and renderer attention into frozen runtime/shared source
+`5608442fa512bd3957ad1196f94817c4361910ec`.
+Detached capture worktree `<mars-worktrees>/music-play-proof` tested
+capture HEAD `6e9a0520eb094dc608b4f77499641796c51461ce`: frozen runtime/shared
+source plus only the owned spec fix (12 lines). Copied/frozen browser assets:
+`campus.glb` SHA256 `675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4`;
+`campus.glb.br` SHA256 `36ad67f72f9b1f1678a5293c735b5667cfb8053c3a1f8b6981d6340af436f304`.
+All original worktrees remain preserved.
+
+Exact command in capture `viewer/`:
+
+```sh
+E2E_VITE_PORT=62028 E2E_RUN=codex-music-play-proof-2 PLAYWRIGHT_JSON_OUTPUT_NAME=<mars-worktrees>/music-play-proof/viewer/.cloudflare/music-play-proof-2.json node_modules/.bin/playwright test -c e2e/playwright.config.ts e2e/music-gathering.spec.ts --reporter=list,json
+```
+
+**1 passed, 0 failed, 0 skipped, 0 flaky, 51.956s**; actual test 50.4s.
+Actual Play produces audio RMS >0.005; global Pause silences it below 0.001.
+Authoritative hands change to the score, both current-rig dancers publish rendered
+hand targets within the existing 1.02 arm-length reach boundary, and rendered floor
+attention has at least two targets including a dancer/performer. Late Join and
+individual Leave preserve other commitments; safe activity Pause lowers hands,
+stands seated participants and retains the unfinished bright score; Resume
+finishes the same score at exactly 36s. Zero invariants, empty seat/hand release,
+Reset audio-resource closure and empty records all pass. Director precedence and
+rotated reuse remain explicitly Node-focused proof, not new browser claims.
+
+Personally inspected all four captures in
+[evidence gallery](<mars-worktrees>/music-play-proof/viewer/e2e/artifacts/codex-music-play-proof-2/index.html):
+`music-dance-live-four-person.png`, `music-dance-grounded-pose.png`,
+`music-dance-safe-pause.png`, `music-dance-complete.png`. At medium distance,
+separated planted dancers visibly alternate bounded arm gestures while the
+performer/listener use supported chairs. Release shows lowered hands and standing
+participants; completion shows 36/36 retained score. This supports a deliberately
+limited upper-body rhythm, without travelling choreography, fine anatomy or a
+new torso/foot adapter. Sound was verified through browser audio measurements;
+this is not a claim of personally listening to a recording.
+
+[Machine receipt](<mars-worktrees>/music-play-proof/viewer/.cloudflare/music-play-proof-receipt.json)
+records exact source/test delta, commands, checks, asset hashes, captures and
+limits. First frozen 6af3cd2 attempt failed because the owned spec assumed a paused
+URL boot while Lab was already running, so Play was absent. Its log/JSON/a11y/trace
+remain preserved in the capture tree. Correction uses the established explicit
+`runScenario('music-dance', { paused:true })` initial setup, without weakening any
+behavior assertion. Source inspection also identified missing shared renderer
+attention aggregation; root added the approved `musicGatheringAttention` merge
+before this fresh passing run. No shared file was edited by this helper.
+
+Harness exited; isolated 62028 has no listener, and other sessions 5491/5493 were
+preserved. Capture tree is clean. Slot is returned; no passing rerun, full gate,
+deployment or further scope is performed here. Root owns subsequent integration
+and release proof.
