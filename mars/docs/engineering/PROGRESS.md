@@ -2158,3 +2158,16 @@ owner and waits for a real departure; unavailable music waits for the same allow
 station. Initial test wrongly treated slot cancellation as removing its standing
 body; corrected to require ordinary walk clear, with unchanged engine clearance.
 Actual Play/captures/fullgate/publication pending; release37 frozen gate unaffected.
+
+### Physical cleanup and future shared wiring — 2026-10-02
+
+Reviewed19-case same-object cleanup a34eeb1 and HUD bffcf42, integrated only in the
+future worktree. Ordinary take/put transfer existing bowls/books, retain completed
+placements and drain before player handoff; both declared return supports blocked
+keep real ownership and a named intervention reason. Rapid Pause/Resume/End and
+direction before a tick create no orphan children. Canonical activities/21 registry,
+four future selector entries (creative afternoon/art sharing/two cleanup orientations),
+HUDs/tour/read-only activity/camera facts are wired without rig or camera policy
+changes. Focused combined54PASS0fail/skip/TODO (~3.3s), TSc and lint pass. Browser
+checks/captures/fullgate/publication still pending; frozen release37 gate unchanged.
+No original outcome, assertion, baseline or performance ceiling weakened.

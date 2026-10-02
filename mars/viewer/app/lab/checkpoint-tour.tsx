@@ -8,7 +8,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const living =
     scenario.startsWith('living-day-') ||
     scenario === 'garden-care' ||
-    scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
+    scenario.startsWith('table-cleanup') || scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
   const eight =
     scenario === 'classroom-8' ||
@@ -60,6 +60,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('music-dance')}>
           Music and dancing
         </button>
+        <button onClick={() => onScenario('table-cleanup')}>Clear a communal table</button>
         <button onClick={() => onScenario('creative-afternoon')}>Creative afternoon</button>
         <button onClick={() => onScenario('art-sharing')}>Share art and ask questions</button>
         <button onClick={() => onScenario('drawing-work')}>Drawing and retained art</button>

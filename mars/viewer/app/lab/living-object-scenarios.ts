@@ -1,3 +1,4 @@
+import { tidyTableRuntime, tidyTableScene } from '../../engine/scenarios/table-cleanup.ts';
 import { artSharingRuntime, artSharingScene } from '../../engine/scenarios/art-sharing.ts';
 import { creativeAfternoonRuntime, creativeAfternoonScene, tickCreativeAfternoon } from '../../engine/scenarios/creative-afternoon.ts';
 import { drawingWorkRuntime, drawingWorkScene } from '../../engine/scenarios/drawing-work.ts';
@@ -23,6 +24,12 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
+    name: index ? 'table-cleanup-rotated' : 'table-cleanup', title: index ? 'Table cleanup · rotated setup (hypothetical)' : 'Table cleanup · same bowls and book (hypothetical)',
+    description: 'Start cleanup, then Play. One person physically carries three existing bowls/books between declared table slots; their identities and contents remain. Pause returns the held item safely; Resume keeps completed placements. Direct the tidier away or End. No deletion, washing, arbitrary storage planning or unsupported ground drops.',
+    scene: tidyTableScene, humans: () => [], build: () => tidyTableRuntime(yaw),
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, 0, 10, 65], expect: checks,
+  })),
   {
     name: 'creative-afternoon', title: 'Creative afternoon · make, share, return (hypothetical)',
     description: 'Start creative afternoon, then Play. The artist makes three actual marks, shares that same pad, joins a two-performer music exchange, then returns to finish the same shelter study. A reader and gardener keep independent commitments. Pause/resume one person, ask about the drawing, invite a late visitor or direct someone away. Fixed ground layout; no active reload restoration.',

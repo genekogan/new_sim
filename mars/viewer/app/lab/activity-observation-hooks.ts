@@ -1,3 +1,4 @@
+import { readTidyTable } from '../../engine/activities/table-cleanup.ts';
 import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { readGroupWarmup } from '../../engine/activities/group-warmup.ts';
 import { readOpenJam } from '../../engine/activities/open-jam.ts';
@@ -126,6 +127,12 @@ export function cameraActivityReadout(rt: Runtime): {
                   ? [s.bindings.work.station]
                   : [],
         };
+    }
+    if (r.verb === 'tidy_table') {
+      const s = readTidyTable(rt, r.id);
+      if (s) fact = { ...fact, actors: [s.actor], phase: s.phase, mode: s.mode, focus: s.actor,
+        objects: s.current ? [s.current.item, s.current.from.split('#')[0], s.current.to.split('#')[0]] : s.remaining.map(q => q.item),
+        waitingReason: s.waitingReason };
     }
     if (r.verb === 'art_sharing') {
       const s = readArtSharing(rt, r.id);

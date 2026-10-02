@@ -56,3 +56,7 @@ retains the replaced guide verbatim for historical claims and links. [Archived a
 superseded dated instructions. Older handoff,
 assessment and numbered reports remain traceable; use current guides for operation.
 Historical reconstruction and questions retain their separate content ownership.
+
+Vocabulary continuation candidates (unreleased): [creative afternoon](briefs/creative-afternoon.REPORT.md),
+[art sharing](briefs/art-sharing.REPORT.md), [physical cleanup](briefs/table-cleanup.REPORT.md).
+These reports distinguish focused proof, authored browser checks and publication.

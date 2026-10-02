@@ -1,3 +1,4 @@
+import { readTidyTable } from '../../engine/activities/table-cleanup.ts';
 import { readCreativeAfternoon } from '../../engine/scenarios/creative-afternoon.ts';
 import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { readDrawing } from '../../engine/objects/drawing.ts';
@@ -78,6 +79,7 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    tableCleanup: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'tidy_table').at(-1); return r ? readTidyTable(sim.rt, r.id) ?? null : null; },
     creativeAfternoon: () => readCreativeAfternoon(sim.rt) ?? null,
     artSharing: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'art_sharing').at(-1); return r ? readArtSharing(sim.rt, r.id) ?? null : null; },
     livingDay: () => readLivingDay(sim.rt),

@@ -19,6 +19,32 @@ practice inspiration; neighbouring Bombay yoga is not attributed to Mars organiz
 Focused engine proof passes; actual Play, combined gate and publication are pending.
 Release36's45presets remain the verified public inventory until a new release record.
 
+## Next vocabulary batch candidate (separate, not public)
+
+`creative-afternoon` starts with a blank pad, makes three actual marks, shares that
+same artwork, exchanges two original digital scores at one workstation, and returns
+to finish the same study. Reader/book break and finite care keep separate intentions.
+Use Start creative afternoon then Play; Pause/Resume individual commitments, direct
+the artist, or ask/join/leave through the sharing panel. Enable afternoon sound for
+original music. One fixed grounded arrangement; no arbitrary art tools or reload.
+
+`art-sharing` demonstrates the same viewing/turn-taking mechanism around an explicitly
+labelled pre-made hypothetical drawing. Start sharing then Play; Ask/Answer/Floor,
+late visitor Join/Leave and Pause/Resume use actual declared places. The combined
+preset creates its artwork; this standalone fixture does not claim to do so.
+
+`table-cleanup` and `table-cleanup-rotated` transfer three existing bowls/books between
+declared empty table slots using ordinary pickup, walking and placement. Start
+cleanup then Play; Pause returns a held object to a permitted support, Resume keeps
+completed placements, and player walking has precedence. Contents and identities
+remain. If both permitted return supports are blocked, real held ownership remains
+with a concrete waiting reason until a support is restored. No washing, deletion,
+large carrying, arbitrary storage or automatic ground drops.
+
+Focused combined54checks, TSc/lint/source scan pass. Play regressions are authored;
+actual execution/capture review, combined gate and publication remain required.
+These four selector entries are future candidates, not additions to release36.
+
 ## Begin
 
 Choose a Scenario in `/lab`, or use its Quick tour. Play advances authoritative
