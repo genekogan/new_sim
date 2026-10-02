@@ -286,3 +286,21 @@ Fixed authored ground tables, seven same original vessels, no heat/washing/refil
 active reload. Focused Node/type checks pass; authored actualPlay journeys are pending.
 Room preparation and supper together would add two presets after release38's60;
 these future capabilities must not be presented as already online.
+
+
+## Future finite garden circuit (local candidate; not yet public)
+
+`garden-circuit`: Start circuit, then Play. The same supported water pot fills the
+same bowl twice; one carer visits A,A,B,B,C,C. The second visit to each bed genuinely
+waits the ordinary 600-tick interval while the bowl rests on its table. Global Pause
+freezes the clock. Local Pause physically returns the bowl; safely paused ordinary
+Direct carer away and explicit Resume preserve its actual partial care purpose.
+End drains ownership and retains deposits/material, separately from completion.
+
+Vessel capacities are explicit: .25 pot supplies 1 bowl unit; .5 initial pot is two
+bowl units. Six .25 care cycles deliver 1.5, leaving .5 bowl with an empty same pot.
+Actual source/bowl support, pending purposes, care history and due diagnostics are
+visible. Fixed hypothetical ground layout, no growth, unlimited refill or active
+reload. This brings the isolated future candidate from62to63 presets and uses
+activities/29. Strict Play and camera-entry coverage is authored, not executed;
+publication requires root's separate combined/public validation.

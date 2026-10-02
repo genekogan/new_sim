@@ -31,7 +31,7 @@ const ACTIVITY_CAMERA_SCENARIOS = new Set([
   'reading-circle', 'reading-circle-rotated',
   'seed-planting', 'seed-planting-rotated',
   'garden-afternoon', 'garden-afternoon-rotated',
-  'room-preparation', 'communal-supper',
+  'room-preparation', 'communal-supper', 'garden-circuit',
 ]);
 export const activityCameraScenario = (name: string) => ACTIVITY_CAMERA_SCENARIOS.has(name);
 const finitePoint = (p: number[]): p is Vec3 => p.length === 3 && p.every(Number.isFinite);

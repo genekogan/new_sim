@@ -1,3 +1,4 @@
+import { gardenCircuitRuntime, gardenCircuitScene } from '../../engine/scenarios/garden-circuit.ts';
 import { communalSupperRuntime, communalSupperScene } from '../../engine/scenarios/communal-supper.ts';
 import { roomPreparationRuntime, roomPreparationScene } from '../../engine/scenarios/room-preparation.ts';
 import { gardenAfternoonRuntime, gardenAfternoonScene } from '../../engine/scenarios/garden-afternoon.ts';
@@ -30,6 +31,13 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  {
+    name: 'garden-circuit',
+    title: 'Finite garden circuit · resupply, care and due waits (hypothetical)',
+    description: 'Start circuit, then Play. One carer fills the same bowl twice from a supported finite water pot and performs A, A, B, B, C, C care. Each second visit waits the existing 600 ordinary ticks. Pause safely returns the bowl; direct the paused carer away and explicitly Resume retained partial care. End drains real ownership and preserves deposits. Initial .5 pot = two bowl units; six .25 cycles deliver 1.5 and leave .5 bowl. Fixed three-bed ground layout; no growth, unlimited refill, replacement source or active reload.',
+    scene: gardenCircuitScene, humans: () => [], build: gardenCircuitRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, 1, 12, 65], expect: checks,
+  },
   {
     name: 'communal-supper',
     title: 'Communal supper · prepare, share and store (hypothetical)',
