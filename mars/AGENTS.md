@@ -1,19 +1,25 @@
 # Mars Studio agent context
 
-## Verified release35 checkpoint — owner review pending
+## Authorized living-world tranche — 24-hour finish
 
-Release35 remains the tested public engine checkpoint, functional source
-`9958ed4a97f2cb5c7189ea7796b6502a0b9910de`. The owner rejected the added
-mars.college/simulation page and requested its removal; do not recreate that page
-or another website entry without an explicit request. Existing public Worker/Lab
-continues unchanged. The earlier MVP-complete declaration is superseded: the owner
-is reviewing the next improvement tranche before calling the MVP complete.
+Latest owner request supersedes the earlier stop/proposal state. Finish within
+24elapsedhours of2026-10-02T03:23UTC (deadline2026-10-03T03:23UTC): connected living
+days with independent intentions, flexible existing activity/object bindings and
+clear player/director handoff; bounded music+dance gathering; usable recurring
+garden care; review/adapt existing automaticcamera to long runs. Then perform
+broad reliability/disruption self-audit, fix actual failures, update/reorganize
+engineering docs/indexes without losing provenance, expose all scenarios and
+combined runs in /lab, and publish/verify the result at sim.mars.college.
 
-Do not begin Eden or start an unapproved feature tranche. Existing gates, receipts,
-safeguards, backlog and other-owner work remain preserved. See
-[ACTIVE_ROADMAP.md](docs/engineering/ACTIVE_ROADMAP.md) for the proposed next tranche;
-proposals are not implementation authorization. The handoff's original acceptance
-records remain evidence for release35, not a claim of final owner acceptance.
+Active save/load is explicitly excluded. No rig/library migration, universal
+planner/psychology, arbitrary terrain or automatic Eden start. Do not recreate
+mars.college/simulation or its footer link. Preserve historical-content ownership,
+all other-owner work, deterministic authority/continuous support/finite ownership,
+normal local-only Git, original assertions/limits, inspected captures and clean
+full combined release gate. Three helpersmaximum, Sol6.1 bounded workers;
+serialize browser/performance validation. Review discovered substantial blockers
+within30–60min and surface scope/time impact instead of silently expanding.
+Release35 remains the verified baseline; new candidates are not shipped features.
 
 The lasting product direction is **a playable, reusable simulation of life at Mars**.
 Read `docs/engineering/SIMULATION_VISION.md` and `ACTIVE_ROADMAP.md` before selecting

@@ -1,35 +1,31 @@
-# Release35 checkpoint — next tranche under owner review
+# Living-world tranche — authorized, 24-hour deadline
 
-The public Worker/Lab remains release35, functional source `9958ed4`.
-Owner rejected mars.college/simulation; page/footer removal supersedes the original
-website entry decision. Do not recreate or replace it without explicit instruction.
-The prior MVP-complete declaration is withdrawn pending owner review. Preserve
-all exact-source validation and existing activity capabilities.
+Baseline release35/source9958ed4; main metadata65cc0b8. Owner approved expanded
+tranche ending2026-10-03T03:23UTC. Preserve originalscope/receipts below as history;
+latestqueue supersedes all stop/proposal markers.
 
-## Proposed next bounded tranche — not yet commissioned
+1. Root: independent commitments and bounded activity/resource binding, one
+   mixed-control living day in two configurations, clear live actor/intention UI.
+2. Sol6.1 helpers: music+dance gathering; finite recurring planter watering;
+   existingautomaticcamera coverage of long activity runs. Separate worktrees,
+   shared registry/world/renderer/Lab wiring stays root-owned.
+3. Combined reliability audit: all exposed supportedjourneys, representative
+   disruptions, seeded repeatability, finite resources/claims/majorgeometry,
+   interruption/direction/resumption, actualPlay and inspectedcaptures; diagnose
+   and fix actualfailures, never weaken assertions or call skips passing.
+4. Documentation sprint after source stabilizes: current guides/catalog/index,
+   archive obsolete guidance with provenance, preserve historicalowner docs;
+   /lab exposes individual experiences and combined longer runs.
+5. Cleanfullgate, guardedlocalmainmerge, finalpublish/publicverification at
+   sim.mars.college using existinggateway ifappropriate; release/source/rollback/
+   limitations/handoff reported. No mars.college/simulation page.
 
-Make the current activities behave more like an intervenable world, rather than
-adding more preset demonstrations. A planning hypothesis is12–20workinghours,
-including integration/validation, with scope and confidence to be checked at start.
-
-1. Independent intentions for a small population using existing work, reading,
-   food/rest and social mechanisms: bounded authored choices/commitments,
-   staggered transitions, interruption and return to unfinished purpose.
-2. Bind an existing gathering/day to selected people and eligible existing objects;
-   local resource changes adjust only affected commitments. Reuse existing claims,
-   diagnostics and recovery; do not introduce a universal planner or new mover.
-3. Improve /lab live controls and social readability: compact participant/intent/
-   waiting readouts, direct/pause/resume handoff, floor/gaze and newcomer timing.
-   No public marketing page, camera expansion or rig migration.
-
-Exit: one small continuously playable day with independent commitments, two
-supported configurations, representative intervention and disruptions, finite
-resources/no leaked ownership, actualPlay capture inspection and fullgate/public
-verification. This is a proposal, not a fixed promise or approved scope.
-
-Follow-on alternative: bounded active save/load of existing day/preparation/sleep.
-Existing quiescent snapshots/takes do not restore those live coordination stores;
-validate codecs, claims and restoration before promising reload continuity.
+Explicitly deferred: active save/load, rigs/libraries redesign, broader Eden,
+fineanatomy, general terrain/planner and new camera experiments. Exit: coherent
+independent livingday, activitybinding variations, usable music/dance and recurring
+care, watchable automaticcoverage/manualcamera precedence, documentedlimits,
+validated combined release publiclyaccessible. An authored choice-set is supported;
+constant random reselection/continuousLLMcalls/prerecorded success is not.
 
 ## Earlier five-day contract and checkpoint provenance
 
