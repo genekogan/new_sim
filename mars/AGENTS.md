@@ -1,5 +1,26 @@
 # Mars Studio agent context
 
+## Closing mandate — supersedes earlier queue, allocation and estimates
+
+Mars MVP feature scope is frozen for the owner's 24 elapsed-hour closing window,
+ending **2026-10-03 01:31 UTC**. Finish the current sleep/prepared-day checkpoint,
+repair actual acceptance failures, clarify discovery/instructions, and produce
+final public proof, critical acceptance and handoff. The **12–23 remaining working
+hours with overlap** is a planning hypothesis, not a deadline guarantee. Current
+production is release 34; the focused-green sleep/day candidate is unpublished and
+its combined full gate is in progress. Do not call it complete.
+
+Defer discretionary engineering, new activities, fine anatomy, camera development
+and generalization without auditing the old inventory. Keep current rigs, source
+ownership, exact-source gates, physical guarantees and the three-helper limit.
+After verified acceptance/public proof, stop Mars expansion and record the handoff;
+do not begin Eden. [Closing brief](docs/engineering/briefs/mars-mvp-closing-sprint.md)
+owns the remaining scope and discovery review; the unchanged
+[vision](docs/engineering/SIMULATION_VISION.md) retains product direction, and the
+[acceptance matrix](docs/engineering/briefs/mars-mvp-acceptance-review.md) owns families
+and eight representative disruptions. Older instructions below retain provenance
+but do not reopen this closing scope.
+
 The lasting product direction is **a playable, reusable simulation of life at Mars**.
 Read `docs/engineering/SIMULATION_VISION.md` and `ACTIVE_ROADMAP.md` before selecting
 technical work. They supersede the former mandatory LAST_MILE wave/completion order.

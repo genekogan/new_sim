@@ -1,4 +1,24 @@
-# Mars MVP contract — five-day target
+# Mars MVP closing contract — scope frozen
+
+Owner's superseding 24 elapsed-hour window ends **2026-10-03 01:31 UTC**.
+Plan **12–23 remaining working hours with overlap**, subject to actual acceptance
+failures; this replaces the earlier five-day target and remaining-hours forecasts.
+Release 34 is published. Candidate `fafdb72` has focused sleep/day proof and a
+combined full gate in progress; it is unpublished and is not MVP acceptance.
+
+The only active queue is: finish that checkpoint and exact-source proof/public
+verification; close actual family/disruption acceptance failures; clarify essential
+discovery/instructions; record final critical public acceptance, limits and handoff.
+Retain all physical, ownership, interruption and gate requirements. Defer
+additional engineering, new activities, anatomy/camera refinements and
+generalization without an inventory audit. Stop Mars expansion after verified
+acceptance; do not begin Eden. The [closing brief](briefs/mars-mvp-closing-sprint.md)
+records the bounded work and discovery findings; the
+[acceptance matrix](briefs/mars-mvp-acceptance-review.md) remains the family/disruption
+contract. Older dated queues and estimates below preserve provenance and do not
+expand this mandate.
+
+## Earlier five-day contract and checkpoint provenance
 
 Owner mandate 2026-09-30; target October 5. This section supersedes earlier
 open-ended milestones and allocation below. **50% playable experiences / 30%
