@@ -6,13 +6,11 @@ import { classroomScene } from './classroom.ts';
 import { mealRegistry } from './meal.ts';
 import { addAll, emptyWorld, human } from '../world/factory.ts';
 import type { Entity } from '../world/types.ts';
-import type { AssetDef } from '../world/catalog.ts';
 import { itemEntity, placeOnSlot, surfaceSlot } from '../items/model.ts';
 import { gardenState, type GardenEntity } from '../objects/garden.ts';
 import { gardenCare, type GardenCareParams } from '../activities/garden-care.ts';
 
-export const GARDEN_PLANTER_ASSET: AssetDef = { id: 'garden-planter', label: 'hypothetical raised garden planter', category: 'fixture', size: [0.6, 0.8, 0.6], massKg: 15, color: '#865337', obstacle: true,
-  surfaceSlots: [{ id: 'care', local: [0, 0.8, 0] }], dims: { confidence: 'hypothetical', note: 'Bounded raised ground planter; care target at soil height, not a historical Mars fixture' } };
+export { GARDEN_PLANTER_ASSET } from '../world/catalog-garden.ts';
 export const GARDEN_PLANTS = ['plant-a', 'plant-b'] as const;
 export const gardenCareParams = (plant: string = 'plant-a'): GardenCareParams => ({ actor: 'carer', plant, water: 'water-bowl', returnSlot: 'water-table#r0c2' });
 export const gardenCareScene = classroomScene;

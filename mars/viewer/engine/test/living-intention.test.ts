@@ -4,11 +4,11 @@ import { Runtime } from '../runtime/runtime.ts';
 import { createRegistry, servicesFor, ENGINE_INVARIANTS } from '../api/registry.ts';
 import { classroomScene } from '../scenarios/classroom.ts';
 import { workBreakWorld, WORK_BREAK_BINDING } from '../scenarios/work-break.ts';
-import { LIVING_INTENTION_ACTIONS, readLivingIntention } from '../activities/living-intention.ts';
+import { readLivingIntention } from '../activities/living-intention.ts';
 import type { LivingIntentionParams } from '../activities/living-intention.ts';
 import { readWorkstation } from '../objects/workstation.ts';
 
-function runtime() { const world = workBreakWorld(); return new Runtime(world, createRegistry(LIVING_INTENTION_ACTIONS), servicesFor({ classroom: classroomScene() })(world), ENGINE_INVARIANTS); }
+function runtime() { const world = workBreakWorld(); return new Runtime(world, createRegistry(), servicesFor({ classroom: classroomScene() })(world), ENGINE_INVARIANTS); }
 function until(rt: Runtime, ready: () => boolean, max = 5000) { for (let i = 0; i < max && !ready(); i++) rt.step(); assert.ok(ready(), JSON.stringify([...rt.records.values()].map(r => [r.id, r.verb, r.status, r.diagnostic]))); assert.deepEqual(rt.violations, []); }
 const work = { verb: 'work_at' as const, params: { ...WORK_BREAK_BINDING.work } };
 const purpose: LivingIntentionParams = { actor: 'worker', objectives: [

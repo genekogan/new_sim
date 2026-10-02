@@ -1,3 +1,5 @@
+import { GardenCareHud } from './garden-care-hud.tsx';
+import { MusicGatheringHud } from './music-gathering-hud.tsx';
 import { SleepHud } from './sleep-hud.tsx';
 import { LabCameraControls } from './camera-controls.tsx';
 // Engine Lab side panel: scenario picker, transport, overlays, cameras,
@@ -108,6 +110,8 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <ReadingHud key={`reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <GardenCareHud key={`garden:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <MusicGatheringHud key={`dance:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <h2>Expectations</h2>
       <ul className={`lab-checks${s.admission?.(sim.rt) ? ' lab-admission-checks' : ''}`}>
         {checks.map((c, i) => (

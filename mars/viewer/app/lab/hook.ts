@@ -1,3 +1,6 @@
+import { cameraEntities, cameraActivityReadout } from './activity-observation-hooks.ts';
+import { GARDEN_PLANTS } from '../../engine/scenarios/garden-care.ts';
+import { readGarden } from '../../engine/objects/garden.ts';
 import { sleepReadout } from './sleep.ts';
 import { preparationReadout } from './preparation.ts';
 import { readFixtureMove } from '../../engine/carry/fixture.ts';
@@ -69,6 +72,7 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    garden: () => ({ plants: GARDEN_PLANTS.map(id => readGarden(sim.rt, id)), water: structuredClone(sim.rt.world.entities['water-bowl']), active: structuredClone([...sim.rt.records.values()].find(r => r.verb === 'garden_care' && sim.rt.isActive(r.id)) ?? null), claims: Object.fromEntries([...Object.keys(sim.rt.world.entities).flatMap(id => [`actor:${id}`, `entity:${id}`, `hand:${id}:right`, `hand:${id}:left`, `holds:${id}`]), 'surface:water-table#r0c2'].map(key => [key, sim.rt.holder(key)])) }),
     get ready() {
       return view.loaded && view.frames >= 3;
     },
@@ -77,6 +81,8 @@ export function installHook(view: LabView, notify: () => void) {
     },
     get scenarioEpoch() { return sim.scenarioEpoch; },
     /** Frozen clone cached by world identity and navigation geometry epoch. */
+    cameraEntities: () => cameraEntities(sim.rt),
+    cameraActivityReadout: () => cameraActivityReadout(sim.rt),
     cameraGeometry: () => cameraGeometry.read(sim.rt, sim.scenarioEpoch),
     get error() {
       return view.error;

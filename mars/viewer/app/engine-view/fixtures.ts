@@ -277,6 +277,18 @@ export class FixtureViews {
     let obj: THREE.Object3D;
     if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
+    else if (e.def === 'garden-planter') {
+      const planter = new THREE.Group();
+      for (const side of [-1, 1]) {
+        planter.add(this.box(color, side * (sx / 2 - 0.025), 0, 0, 0.05, sy, sz));
+        planter.add(this.box(color, 0, 0, side * (sz / 2 - 0.025), sx, sy, 0.05));
+      }
+      planter.add(this.box('#473421', 0, sy - 0.04, 0, sx - 0.1, 0.04, sz - 0.1));
+      // Small plant silhouette is expression only; authoritative care targets the soil at sy.
+      planter.add(this.box('#496c39', 0, sy, 0, 0.04, 0.2, 0.04));
+      planter.add(this.box('#6e914e', 0, sy + 0.08, 0, 0.2, 0.04, 0.13));
+      obj = planter;
+    }
     else if (e.def === 'campfire') obj = this.campfire(e.id, sx, v);
     else if (e.def === 'standing-display') obj = this.standingDisplay(sx, sy, sz, v);
     else if (e.def === 'computer-workstation') { v.workstation = workstationObject(this.box.bind(this), sx, sy, sz, this.workstationAppearances[e.id]); obj = v.workstation.obj; }
