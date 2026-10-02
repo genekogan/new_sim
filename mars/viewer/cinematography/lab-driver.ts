@@ -12,11 +12,15 @@ import { sweepCrossing } from '../engine/camera/quality.ts';
 import type { DirectorProvider, Policy, Observation } from './types.ts';
 import { Director } from './director.ts';
 import type { ProgramFrame } from './replay.ts';
+import { ActivityObserver, activityCameraScenario } from './activity-observation.ts';
+import type { CameraEntity, CameraActivityFact } from './activity-observation.ts';
 // Optional plumbing checkpoint d98d9e5; released older hooks retain labeled fallback.
 type CameraHook = Omit<EngineHook, 'camera' | 'cameraGeometry'> & {
   readonly scenarioEpoch?: number;
   cameraGeometry?: () => unknown;
   camera: (position: number[], target: number[], fov?: number) => unknown;
+  cameraEntities?: () => readonly CameraEntity[];
+  cameraActivityReadout?: () => { activities: readonly CameraActivityFact[] };
 };
 export function attachLabCamera(
   hook: CameraHook,
@@ -28,13 +32,15 @@ export function attachLabCamera(
     viewWindow = viewDocument.defaultView ?? window;
   const advisory = provider ? new Advisory(provider) : undefined,
     director = new Director(policy),
-    observer = new Observer();
+    observer = new Observer(),
+    activityObserver = new ActivityObserver();
   let scenario = hook.state().scenario,
     fixture = classroomWorld(scenario === 'classroom-8' ? 8 : 4),
     scene = cameraScene(fixture, classroomScene()),
     epoch = hook.scenarioEpoch,
     session = 1;
   observer.reset(`camera-review-${scenario}-${session}`);
+  activityObserver.reset(observer.session);
   director.reset(observer.session);
   const frames: ProgramFrame[] = [],
     observations: Observation[] = [],
@@ -118,6 +124,7 @@ export function attachLabCamera(
       fixture = classroomWorld(scenario === 'classroom-8' ? 8 : 4);
       scene = cameraScene(fixture, classroomScene());
       observer.reset(`camera-review-${scenario}-${++session}`);
+      activityObserver.reset(observer.session);
       director.reset(observer.session);
       frames.length = 0;
       observations.length = 0;
@@ -151,36 +158,47 @@ export function attachLabCamera(
     lastAspect = aspect;
     lastGeometryEpoch = geometry?.epoch ?? 0;
     lastTick = state.tick;
-    if (!state.scenario.startsWith('classroom-')) {
+    if (!state.scenario.startsWith('classroom-') && !activityCameraScenario(state.scenario)) {
       label.textContent =
-        'camera.unsupported-scenario: choose classroom-4 or classroom-8';
+        'camera.unsupported-scenario: choose a supported live activity';
       return;
     }
-    for (const h of state.humans) {
-      const e = fixture.entities[h.id];
-      if (e) {
-        e.pose.p = h.p as [number, number, number];
-        e.pose.yaw = h.yaw;
-        e.human!.activity = h.activity;
+    let o: Observation;
+    if (activityCameraScenario(state.scenario)) {
+      if (!hook.cameraEntities || !hook.cameraActivityReadout || !geometry?.scene) {
+        label.textContent = 'camera.activity.readout-unavailable: current activity/world hooks required';
+        return;
       }
+      o = activityObserver.read(hook.cameraEntities(), hook.cameraActivityReadout().activities,
+        state.tick, state.time, geometry.scene, geometry.epoch ?? 0, aspect);
+      for (const diagnostic of activityObserver.diagnostics) director.note(diagnostic);
+    } else {
+      for (const h of state.humans) {
+        const e = fixture.entities[h.id];
+        if (e) {
+          e.pose.p = h.p as [number, number, number];
+          e.pose.yaw = h.yaw;
+          e.human!.activity = h.activity;
+        }
+      }
+      if (geometry?.scene) scene = geometry.scene;
+      const screen = scene.obstacles.find((o) => o.id === 'screen');
+      if (screen)
+        fixture.entities.screen.pose.p = [
+          screen.obb.c[0],
+          screen.y0,
+          screen.obb.c[1],
+        ];
+      o = observer.read(
+        fixture,
+        state.tick,
+        state.time,
+        scene,
+        hook.classroom().session,
+        geometry?.epoch ?? 0,
+        aspect,
+      );
     }
-    if (geometry?.scene) scene = geometry.scene;
-    const screen = scene.obstacles.find((o) => o.id === 'screen');
-    if (screen)
-      fixture.entities.screen.pose.p = [
-        screen.obb.c[0],
-        screen.y0,
-        screen.obb.c[1],
-      ];
-    const o = observer.read(
-      fixture,
-      state.tick,
-      state.time,
-      scene,
-      hook.classroom().session,
-      geometry?.epoch ?? 0,
-      aspect,
-    );
     let actualManual: ProgramFrame['pose'] | undefined;
     if (manualActive) {
       const pose = hook.cameraPose() as ProgramFrame['pose'];
@@ -230,6 +248,9 @@ export function attachLabCamera(
   };
   raf = viewWindow.requestAnimationFrame(loop);
   return {
+    preferredSubject() {
+      return director.observation?.activity.focus ?? director.observation?.activity.members[0];
+    },
     takeover(subject: string, seconds = 5) {
       controlDirty = true;
       director.takeover({ subject, expires: hook.state().time + seconds });
