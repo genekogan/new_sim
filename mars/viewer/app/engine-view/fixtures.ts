@@ -254,7 +254,7 @@ export class FixtureViews {
   }
 
   /** Cutting station (catalog-stock.ts): in-feed and out-feed tables either side of a chop-saw bench. */
-  private cutting(sx: number, sy: number, sz: number, color: string) {
+  private cutting(sx: number, sy: number, sz: number, color: string, v: Partial<View>) {
     const g = new THREE.Group();
     const leg = '#3a3f44', top = 0.04;
     g.add(this.box('#b89a6a', 0, sy - top, 0, sx, top, sz * 0.7)); // table top (in-feed · saw · out-feed)
@@ -263,7 +263,9 @@ export class FixtureViews {
     // the saw: motor block on a turntable at the back of the middle, blade over the fence
     g.add(this.box(color, 0, sy, -sz * 0.18, 0.42, 0.06, 0.34, 0.3));
     g.add(this.box('#c43d2a', 0, sy + 0.06, -sz * 0.24, 0.16, 0.26, 0.22, 0.2));
-    const blade = new THREE.Mesh(this.keep(new THREE.CylinderGeometry(0.13, 0.13, 0.006, 24).rotateX(Math.PI / 2)), this.std('#cfd3d6', 0.4, 0.8));
+    const bladeGeometry = new THREE.CylinderGeometry(0.13, 0.13, 0.006, 24).rotateX(Math.PI / 2);
+    v.ownedGeometries = [bladeGeometry];
+    const blade = new THREE.Mesh(bladeGeometry, this.std('#cfd3d6', 0.4, 0.8));
     blade.position.set(0, sy + 0.17, -sz * 0.12);
     blade.castShadow = true;
     g.add(blade);
@@ -306,7 +308,7 @@ export class FixtureViews {
       obj.traverse(o => { if (o instanceof THREE.Mesh) v.ownedGeometries!.push(o.geometry); });
     }
     else if (BUNDLES[e.def]) obj = this.stack(e, sx, sy, sz, v);
-    else if (e.def === 'cutting-station') obj = this.cutting(sx, sy, sz, color);
+    else if (e.def === 'cutting-station') obj = this.cutting(sx, sy, sz, color, v);
     else obj = this.box(color, 0, 0, 0, sx, sy, sz);
     obj.name = e.id;
     v.obj = obj;

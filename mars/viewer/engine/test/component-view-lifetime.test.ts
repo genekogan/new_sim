@@ -136,3 +136,55 @@ test('campfire Reset releases each old stone/log geometry without disposing shar
     views.dispose();
   }
 });
+
+test('cutting station blade geometry is released on Reset, removal and full view disposal', () => {
+  const cutting = component('cutting', 'cutting-station', [0, 0, 0], 0, { kind: 'fixture' });
+  const bench = component('bench', 'bench-6ft', [4, 0, 0], 0, { kind: 'fixture' });
+  const world = { entities: { cutting, bench } };
+  const source = JSON.stringify(world);
+  const views = new FixtureViews();
+  const disposals = new Map<THREE.BufferGeometry, number>();
+  const blade = () => {
+    const cuttingView = views.group.children.find(child => child.name === 'cutting')!;
+    const mesh = cuttingView.children.find(obj => obj instanceof THREE.Mesh && obj.geometry.type === 'CylinderGeometry');
+    assert.ok(mesh instanceof THREE.Mesh);
+    return mesh;
+  };
+  const watch = () => {
+    const geometry = blade().geometry;
+    assert.ok(!disposals.has(geometry), 'rebuilt saws never retain old blade geometry');
+    disposals.set(geometry, 0);
+    geometry.addEventListener('dispose', () => disposals.set(geometry, disposals.get(geometry)! + 1));
+    return geometry;
+  };
+  try {
+    views.reset(world);
+    const material = blade().material;
+    const unit = (views.group.children.find(child => child.name === 'bench')!.children[0] as THREE.Mesh).geometry;
+    let unitDisposals = 0;
+    unit.addEventListener('dispose', () => unitDisposals++);
+    for (let cycle = 0; cycle < 3; cycle++) {
+      const old = watch();
+      views.onTick(world);
+      assert.equal(blade().geometry, old, 'ordinary ticks retain the blade');
+      assert.equal(disposals.get(old), 0);
+      views.reset(world);
+      assert.equal(disposals.get(old), 1, 'Reset releases the previous blade');
+      assert.equal(blade().material, material);
+      assert.equal(unitDisposals, 0, 'Reset preserves shared fixture geometry');
+    }
+    const removed = watch();
+    views.onTick({ entities: { bench } });
+    assert.equal(disposals.get(removed), 1, 'entity removal releases its blade');
+    assert.equal(views.group.children.length, 1);
+    views.onTick(world);
+    const final = watch();
+    views.dispose();
+    assert.equal(disposals.get(final), 1, 'full exit releases the rebuilt blade');
+    assert.equal(unitDisposals, 1);
+    for (const count of disposals.values()) assert.equal(count, 1, 'old blades are not retained for duplicate disposal');
+    assert.equal(JSON.stringify(world), source, 'renderer cleanup never changes authored entities');
+  } finally {
+    views.dispose();
+  }
+});

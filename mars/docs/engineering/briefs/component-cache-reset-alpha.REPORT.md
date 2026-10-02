@@ -83,3 +83,25 @@ and a completed authored `step:stand[0-9]` whose matching actor and
 (8/1/1 parent distribution), and every other record completed. Keep all sequence,
 support, physical outcome, held/slot/claim and violation checks. No broad terminal
 status allowance, unexpected failures or arbitrary cancellations are accepted.
+
+## Additive cutting-station blade correction
+
+Root's subsequent seven-case UI run reported five PASS and two strict Reset
+failures: solar-paint geometry 60→61 and year 2026 geometry 2886→33 before its async
+backdrop was ready. These are separate causes. Root owns the existing Reset helper
+waiting for the same backdrop readiness as open; no counter equality or time limit
+changes are made in this worktree.
+
+The cutting station allocated its fresh blade geometry via the lifetime-wide
+fixture `keep()` array on every rebuild, just like the old campfire stones/logs.
+`cutting()` now receives its existing `Partial<View>`, records the blade in
+`ownedGeometries`, and uses the ordinary view cleanup on Reset/removal/full exit.
+Shared unit geometry, materials and cutting appearance/dimensions are preserved.
+
+The new native regression was RED before this change (old blade disposal 0 rather
+than 1), then GREEN. It checks three repeated Reset lifetimes, ordinary tick reuse,
+fresh blade identity, source entities unchanged, material/shared-unit retention,
+entity removal and full disposal with every watched blade released exactly once.
+All four focused native regressions now PASS; TypeScript, lint and diff checks
+PASS. No browser, broad engine gate, deployment or candidate edits performed.
+Actual solar UI Reset proof remains root-owned and pending this integration.
