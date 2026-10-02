@@ -1,3 +1,4 @@
+import { readReadingCircle } from '../../engine/activities/reading-circle.ts';
 import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { groupWarmupAttention } from '../../engine/activities/group-warmup.ts';
 import { musicGatheringAttention } from '../../engine/activities/music-gathering.ts';
@@ -293,6 +294,19 @@ export class LabView {
       const speaker = sharing.floorHolder ? rt.world.entities[sharing.floorHolder] : undefined;
       for (const p of sharing.participants) if (p.physicallyViewing && p.hold && rt.holder(`actor:${p.actor}`).includes(p.hold))
         targets[p.actor] = speaker && p.actor !== sharing.floorHolder ? [speaker.pose.p[0], speaker.pose.p[2]] : [sharing.attentionTarget.point[0], sharing.attentionTarget.point[2]];
+    }
+    for (const action of rt.records.values()) {
+      if (action.verb !== 'reading_circle' || !rt.isActive(action.id)) continue;
+      const circle = readReadingCircle(rt, action.id);
+      if (!circle?.attentionTarget || !circle.floorHolder) continue;
+      const speaker = rt.world.entities[circle.floorHolder];
+      for (const p of [circle.reader, ...circle.participants]) {
+        const hold = 'action' in p ? p.action : p.hold;
+        if (!hold || !rt.holder(`actor:${p.actor}`).includes(hold)) continue;
+        targets[p.actor] = speaker && p.actor !== circle.floorHolder
+          ? [speaker.pose.p[0], speaker.pose.p[2]]
+          : [circle.attentionTarget.point[0], circle.attentionTarget.point[2]];
+      }
     }
     Object.assign(targets, chessAttention(rt));
     this.attentionTargets = targets;

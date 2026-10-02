@@ -1,3 +1,4 @@
+import { readReadingCircle } from '../../engine/activities/reading-circle.ts';
 import { readGalleryTour } from '../../engine/activities/gallery-tour.ts';
 import { readTidyTable } from '../../engine/activities/table-cleanup.ts';
 import { readArtSharing } from '../../engine/activities/art-sharing.ts';
@@ -134,6 +135,13 @@ export function cameraActivityReadout(rt: Runtime): {
       if (s) fact = { ...fact, actors: [s.actor], phase: s.phase, mode: s.mode, focus: s.actor,
         objects: s.current ? [s.current.item, s.current.from.split('#')[0], s.current.to.split('#')[0]] : s.remaining.map(q => q.item),
         waitingReason: s.waitingReason };
+    }
+    if (r.verb === 'reading_circle') {
+      const s = readReadingCircle(rt, r.id);
+      if (s) fact = { ...fact, actors: [s.reader.actor, ...s.participants.filter(q => q.active).map(q => q.actor)],
+        departing: s.participants.filter(q => !q.active && q.join !== false).map(q => q.actor),
+        phase: r.phase ?? s.mode, mode: s.mode, focus: s.floorHolder,
+        objects: [s.book], waitingReason: s.diagnostic?.message };
     }
     if (r.verb === 'gallery_tour') {
       const s = readGalleryTour(rt, r.id);

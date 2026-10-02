@@ -1,3 +1,4 @@
+import { readReadingCircle } from '../../engine/activities/reading-circle.ts';
 import { readGalleryTour } from '../../engine/activities/gallery-tour.ts';
 import { readTidyTable } from '../../engine/activities/table-cleanup.ts';
 import { readCreativeAfternoon } from '../../engine/scenarios/creative-afternoon.ts';
@@ -80,6 +81,7 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    readingCircle: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'reading_circle').at(-1); return r ? readReadingCircle(sim.rt, r.id) ?? null : null; },
     galleryTour: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'gallery_tour').at(-1); return r ? readGalleryTour(sim.rt, r.id) ?? null : null; },
     tableCleanup: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'tidy_table').at(-1); return r ? readTidyTable(sim.rt, r.id) ?? null : null; },
     creativeAfternoon: () => readCreativeAfternoon(sim.rt) ?? null,

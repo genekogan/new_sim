@@ -2266,3 +2266,14 @@ gallery paths and both datedprogress branches. Fresh focused29PASS/0FAIL/skip
 and viewerTSc PASS. Authored Play now verifies that detached camera facts report
 the actual currentpad/floor/active membership, alongside physical role/attention
 assertions; it makes no camera-policy or framing-quality claim. Browser pending.
+
+### Future reading circle shared boundary — 2026-10-02
+
+Reviewed/cherry-picked isolated fa0aee4 as019b4f6 into futuregallery candidate.
+Registers canonicalactivities/23, two ground orientations, detachedlatestcircle
+readout and camera facts, and a small claim-gated attention adapter through current
+rigs. Ordinary reading/seating/social holds retain all body/support authority.
+One reader remains an explicit supported limit; no audio/dialogue/handoff/saveLoad.
+Core paused-listener direction review exposed silent reactivation; worker is
+repairing it with focused regressions before future acceptance. HUD/Play authoring
+remains separately owned; no browser/fullgate/publicreadingcircle claim.

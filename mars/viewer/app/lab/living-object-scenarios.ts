@@ -1,3 +1,4 @@
+import { readingCircleRuntime, readingCircleScene } from '../../engine/scenarios/reading-circle.ts';
 import { galleryTourRuntime, galleryTourScene } from '../../engine/scenarios/gallery-tour.ts';
 import { tidyTableRuntime, tidyTableScene } from '../../engine/scenarios/table-cleanup.ts';
 import { artSharingRuntime, artSharingScene } from '../../engine/scenarios/art-sharing.ts';
@@ -25,6 +26,12 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
+    name: index ? 'reading-circle-rotated' : 'reading-circle', title: index ? 'Shared reading · rotated circle (hypothetical)' : 'Shared reading · book and questions (hypothetical)',
+    description: 'Start shared reading, then Play. One reader advances the same supported book while declared listeners occupy real places; interval questions and answers retain the actual page and bookmark. Pause/Resume, Join/Leave or direct the reader away; explicit continuation retains the same reader and book. End preserves unfinished progress for an explicit new circle. Authored ground-table arrangements, no reader handoff, speech generation or active reload restoration.',
+    scene: readingCircleScene, humans: () => [], build: () => readingCircleRuntime(yaw),
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, -0.5, 4, 110], expect: checks,
+  })),
   ...['gallery-tour', 'gallery-tour-short'].map((name): Scenario => ({
     name, title: name === 'gallery-tour-short' ? 'Guided gallery · two stops (hypothetical)' : 'Guided gallery · three stops (hypothetical)',
     description: 'Start gallery tour, then Play. Walk between actual pre-made drawing fixtures, form viewing circles and exchange questions. Pause/Resume, Join/Leave or direct the host away. Each new stop needs the host and two viewers; departures persist, with explicit late Join or End when attendance is insufficient. Same artwork and completed discussion history remain. Authored flat-ground gallery; no arbitrary exhibitions or active reload restoration.',
