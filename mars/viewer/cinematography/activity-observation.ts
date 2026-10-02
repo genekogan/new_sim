@@ -26,6 +26,9 @@ export interface CameraEntity {
 const ACTIVITY_CAMERA_SCENARIOS = new Set([
   'prepared-day-4', 'prepared-day-8', 'prepared-day-studio',
   'living-day-4', 'living-day-studio', 'music-dance', 'garden-care',
+  'drawing-work', 'group-warmup', 'open-jam', 'art-sharing', 'creative-afternoon',
+  'table-cleanup', 'table-cleanup-rotated', 'gallery-tour', 'gallery-tour-short',
+  'reading-circle', 'reading-circle-rotated',
 ]);
 export const activityCameraScenario = (name: string) => ACTIVITY_CAMERA_SCENARIOS.has(name);
 const finitePoint = (p: number[]): p is Vec3 => p.length === 3 && p.every(Number.isFinite);

@@ -48,11 +48,12 @@
       ><label id="jev-control"
         ><input type="checkbox" id="jev" />Bounded Jev bridge (local
         only)</label
-      ><small>Hypothetical classroom · observational camera prototype</small>
+      ><small id="scope">Hypothetical classroom · observational camera prototype</small>
     </header>
-    <iframe title="Live Mars Lab" src="/lab?scenario=classroom-4"></iframe>
+    <iframe title="Live Mars Lab"></iframe>
     <script type="module">
       import { attachLabCamera } from './lab-driver.ts';
+      import { activityCameraScenario } from './activity-observation.ts';
       import { BridgeProvider } from './jev-client.ts';
       const frame = document.querySelector('iframe');
       const localBridge =
@@ -88,12 +89,23 @@
       const requestedScenario = new URLSearchParams(location.search).get(
         'scenario',
       );
-      if (requestedScenario === 'classroom-8')
-        frame.src = '/lab?scenario=classroom-8';
+      const selectedScenario = requestedScenario === 'classroom-8' ||
+        (requestedScenario && activityCameraScenario(requestedScenario))
+        ? requestedScenario : 'classroom-4';
+      // Load only the selected authoritative world, after installing readiness.
+      frame.src = `/lab?scenario=${encodeURIComponent(selectedScenario)}`;
+      const classroom = selectedScenario.startsWith('classroom-');
+      if (!classroom) {
+        document.querySelector('#subject').textContent = 'Follow activity person for 6s';
+        document.querySelector('#scope').textContent =
+          `Hypothetical ${selectedScenario} · observational camera prototype`;
+      }
       document.querySelector('#policy').onchange = start;
       document.querySelector('#jev').onchange = start;
-      document.querySelector('#subject').onclick = () =>
-        camera?.takeover('guest2', 6);
+      document.querySelector('#subject').onclick = () => {
+        const subject = classroom ? 'guest2' : camera?.preferredSubject();
+        if (subject) camera?.takeover(subject, 6);
+      };
       document.querySelector('#auto').onclick = () => camera?.release();
       window.addEventListener('beforeunload', () => {
         clearInterval(ready);

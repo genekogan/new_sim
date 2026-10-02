@@ -359,6 +359,18 @@ test('two-stop actual Play Leave persists, named audience wait, declared late Jo
   await formed(page, 0);
   const first = await capture(page, 'gallery-short-first-viewers');
   viewing(first, 0);
+  const beforeCamera = await page.evaluate(() => ({
+    tick: window.__marsEngine.state().tick,
+    hash: window.__marsEngine.stateHash(),
+  }));
+  await page.getByRole('combobox', { name: 'Live camera', exact: true }).selectOption('clear');
+  await expect(page.getByText(/^AUTO · clear/)).toBeVisible();
+  expect(await page.evaluate(() => ({
+    tick: window.__marsEngine.state().tick,
+    hash: window.__marsEngine.stateHash(),
+  }))).toEqual(beforeCamera);
+  await page.getByRole('combobox', { name: 'Live camera', exact: true }).selectOption('off');
+  await expect(page.getByText(/^AUTO · clear/)).toHaveCount(0);
   await button(page, 'Leave art-visitor1').click();
   await play(page);
   await page.waitForFunction(() => {

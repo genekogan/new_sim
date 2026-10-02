@@ -2277,3 +2277,18 @@ One reader remains an explicit supported limit; no audio/dialogue/handoff/saveLo
 Core paused-listener direction review exposed silent reactivation; worker is
 repairing it with focused regressions before future acceptance. HUD/Play authoring
 remains separately owned; no browser/fullgate/publicreadingcircle claim.
+
+### Future activity/camera preset boundary — 2026-10-02
+
+Newseven vocabulary presets plus gallery/readingcircle now enter the existing
+Clear/Restrained observer through a bounded allowlist extension. Narrow camera-owned
+activity-observation/review-entry touches adapt the shared preset interface only:
+no shot policies, cinematography experiments or MP4 work. Separate review honors
+the same permitted requestedscenario instead of silently loadingclassroom4,
+loads the target once after readiness handlers, and follows an actual activity
+subject. Invalid names retain classroom4fallback. Futuregallery Play authoring
+asserts enable/disable does not change a paused authoritative hash or tick.
+
+This repair stays in futuregallery candidate; frozen release37ca6bb5d remains
+unchanged and currentnewseven cameraControls are not yet available. Focused
+checks/actualPlay/fullcombined/public verification remain required for the interface.
