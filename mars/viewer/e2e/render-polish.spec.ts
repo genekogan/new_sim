@@ -12,7 +12,7 @@ async function look(page: Page, pos: number[], target: number[]) {
 async function capture(page: Page, name: string, testInfo: Parameters<typeof captureView>[2]['testInfo']) {
   const n = await page.evaluate(() => window.__marsEngine!.info().calls);
   console.log(`[render-polish] ${name}: ${n} draw calls`);
-  await captureView(page, name, { testInfo });
+  await captureView(page, name, { testInfo, softVisual: true });
 }
 
 test('unknown mural name fails visibly and warns only once', () => {
