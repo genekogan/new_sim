@@ -55,6 +55,73 @@ Start at [engineering navigation](INDEX.md). External contributors: `CODEX.md`
 | `locomotion/walk.ts` | `walk_to` action (corridor following, stairs, yielding, replans) |
 | `scenes/proving-ground.ts` | synthetic regression scene (wall, U-trap, 1 m passage, 3 m deck, complete + incomplete stairs) |
 
+## Author an activity and expose a scenario
+
+Start with a bounded purpose: participants and roles, required object capabilities,
+permitted bindings/alternatives, resource ownership, observable progress, meaningful
+completion, ordinary cancellation and the effects that survive interruption. State
+unsupported conditions explicitly. A coordinator composes registered actions; it does
+not implement another mover, directly repair support, invent material or replace a
+missing participant. Routine execution is deterministic and requires no LLM calls.
+
+| Contract / module | Contributor responsibility |
+| --- | --- |
+| `actions/types.ts`: `ActionDef<Params, Program, Exec>` | Give the verb a strict zod schema; pure `plan(rt, params)` returns a program or named Diagnostic; `reservations(world, params)` declares exclusive/shared resources; `start` initializes execution once after admission and reservation; `step` advances with fixed `dt`; `cancel` reaches an allowed stop or explicitly refuses. |
+| `runtime/runtime.ts` | `rt.submit(verb, params, { parent?, preempt? })` performs authoritative admission/reservation; inspect the returned `ActionRecord`, not just its id. Child submissions identify their parent. `rt.cancel(id)` uses the action's cleanup contract; terminal statuses are completed/failed/cancelled, while blocked is still active. |
+| `objects/`, `items/`, `activities/` | Object capability/state and material/support validation belong to their existing modules. Activity coordinators own purpose/roles and child ids; children own physical writes under their reservations. Publish detached `read…(rt, action)` facts for progress, bindings, waiting reason and retained effects. |
+| `api/registry.ts` | Add physical/coordinator/control verbs to `ENGINE_ACTIONS`; add relevant invariants to `ENGINE_INVARIANTS`. `createRegistry` rejects duplicate verbs and sequence built-ins. `engineConfig`/`servicesFor` supply a world's own scene/services; semantic changes to verbs, DT or invariants require a rules-version change. |
+| `engine/scenarios/` | Construct the initial world, supported props, actors, binding factory and Runtime before execution. Initial fixture placement is authoring; runtime repositioning still requires ordinary actions. Use the shared registry/invariants/services rather than a parallel control plane. |
+| `app/lab/scenarios.ts` and family scenario modules | Register a stable id in `SELECTABLE_SCENARIOS` and `scenarioByName`. A `Scenario` declares title/limits, scene/humans or custom `build`, `start`, `maxTicks`, `expect`, optional read-only `admission`, `tick` and `done`. Default `buildRuntime` is the walk-only proving ground; a richer activity needs its appropriate custom Runtime. |
+| `app/lab/*-hud.tsx`, `panel.tsx`, `hook.ts` | Start/control buttons submit registered verbs; preview availability with pure plans and surface refusal diagnostics. Revalidate against the current Runtime before submission. Display detached readouts and distinguish accepted commands from completed physical work. Reset replaces the run; global Pause freezes it. Hooks expose observation and commands through the same authoritative Runtime, not another simulation. |
+| Renderer and camera adapters | Map actual authoritative state to poses and detached camera observations. `camera-observation.ts` may synchronize derived spatial caches, but has no authority over entities, claims, actions or outcomes. Camera policy/quality remains separately owned. |
+
+The authoritative selectable catalog and proof registry is
+[SCENARIO_COVERAGE.json](SCENARIO_COVERAGE.json). Add the preset's discovery group,
+start controls, contract reference (terminal effects and limits), named test references
+and honest source/proof status there. Generate only the UI contract text with
+`cd viewer && node deploy/scenario-contracts.mjs`; verify parity with
+`node deploy/scenario-contracts.mjs --check` and `engine/test/scenario-contracts.test.ts`.
+`app/lab/scenario-contracts.ts` is generated, not a second hand-maintained catalog.
+The inventory/gate acceptance is still alpha stabilization work; a catalog row or
+generated instruction is not proof that the preset completed on the current source.
+
+### Existing example: prepare and use a room
+
+`engine/activities/room-preparation.ts` defines `room_preparation` and
+`room_preparation_control`. `engine/scenarios/room-preparation.ts` provides the
+hypothetical world and `roomPreparationBinding()`; the Lab family module registers
+`room-preparation`, and `room-preparation-hud.tsx` exposes Start, supported local
+Pause/Resume, End and ordinary classroom controls. Start then Play advances actual
+work; selecting this manual preset alone does not start the preparation.
+
+The purpose has three stages: clear, arrange, gather. The worker stores the same
+`break-bowl` and `break-spoon` from `belongings-table` on `storage-table`; guest1/guest2
+carry that emptied table, guest3 carries existing `seat8`, and the existing classroom
+uses the room with a declared late visitor. These bindings require actual supported
+slots, a table/chair, available people and registered child actions. The coordinator
+reserves the exclusive `room-preparation` purpose resource, sets
+`drivesReservedHands: false`, and delegates to `tidy_table`, `setup_room` and
+`classroom_session`; their children own hands, movement and furniture handling.
+
+Admission checks the declared structure, actual fixtures/visitor and initial tidy
+plan. Later stage admission checks the then-current world; initial acceptance does
+not guarantee future availability. `readRoomPreparation` reports stage/mode, child
+readouts, actual placements/support and named waiting diagnostics. Success means
+real storage and furniture placement followed by the classroom ending, with physical
+children released; End is cancellation, not successful fulfillment of that purpose.
+Stored original items/material and completed furniture placements survive ordinary
+interruption. Payload or stored-support changes produce explicit waiting/refusal.
+
+Local Pause during clearing retains the tidy task; arranging waits for ordinary
+safe furniture cancellation. Resume requires an actually paused/waiting state and
+revalidates retained items and remaining moves, retrying only the unfinished setup
+from supported ground placements. A stopped tidy task or previously started classroom
+is not silently recreated. Gathering rejects local Pause with
+`room_preparation.session-pause-unsupported`; use global Pause or classroom controls.
+End requests deferred cancellation and drains existing physical children. This is
+same-Runtime continuation; the action explicitly refuses active reload restoration.
+The camera observes these actual stages and placements without advancing them.
+
 ## Tests
 - `cd viewer && npm run test:engine` (node:test over `engine/test/*.test.ts`).
 - `npm test` = existing deploy/*.test.mjs; `npm run typecheck`; `npm run e2e` = Playwright (see `viewer/e2e/README.md`).
@@ -137,9 +204,16 @@ this requirement is durable, not a claim that every current preset is already ce
 Terminal/refused/budget-ended finite scripts stop dispatching; ordinary children
 and later directions still receive fixed ticks. Manual Pause remains intentional.
 Recorded invariant violations produce `lab.invariant-halt`, retain diagnostics and
-disable Play/Step until a fresh Reset. Synthetic renderer probes remain detached.
-This is a supported driver boundary, not rollback of arbitrary partially mutated
-state or a proof that unknown JavaScript faults recover automatically.
+halt further stepping until a fresh Reset. The alpha candidate's unexpected
+host/executor guard records `lab.executor-fault` with phase/tick/error details,
+clears any successful script receipt and quarantines the actual world, records and
+claims as uncertain partial execution. It does not cancel children, release claims
+or invent a rollback; those mutations cannot be certified safe after an unknown fault.
+UI/control admission must respect the halt and leave inspection plus Reset available;
+that combined UI proof is pending. Synthetic renderer probes remain detached.
+These are bounded host safeguards, not recovery guarantees for arbitrary future
+inputs. The executor guard is an unreleased candidate change; source inspection
+and focused checks do not make it an online feature.
 
 The legacy `Scenario.continuous` flag also keeps manually started finite presets
 alive. True ongoing dispatch must additionally declare `execution: 'sustained'`;
@@ -156,3 +230,35 @@ checkpoint. Ordinary action failures retain their existing cleanup/onFail polici
 Low-level Runtime stepping is an internal mechanism; hosts must enforce these
 boundaries. These guards have focused deterministic proof, but combined gate and
 actual Play certification remain pending on the alpha candidate.
+
+
+## Persistence and extension acceptance
+
+Plain JSON world state, same-Runtime retained intentions and resumable runtime
+snapshots are separate guarantees. `history/store.ts` persists content-addressed
+world checkpoints/workspace ancestry; a world blob alone does not restore live
+coordinators, reservation graphs or services. `runtime/snapshot.ts` checks each live
+verb's `resumable` declaration/codec or verified subset and refuses unsupported
+state by name. A new verb requires tick-exact restore tests with its own services
+before opting in. The optional drop path still refuses held loads; it is not a
+recovery strategy for uncertain executor state. See
+[TAKES_AND_PLANS.md](TAKES_AND_PLANS.md) for existing checkpoint/take
+contracts and limitations. Active GUI save/load remains owner-deferred.
+
+For an extension, prove the declared purpose and boundaries: repeat seeded execution
+and terminal hashes/effects, deliberate invalid admission without acquired ownership,
+ordinary interruption/deferred cancellation and retained effects, and representative
+route/equipment/furniture/occupancy/departure disruptions. Verify supported retry or
+waiting/End with named diagnostics and continued unrelated-world activity; test
+invariant/unknown-fault quarantine separately from ordinary recovery. Never claim
+universal recovery, erase diagnostic failures or bypass support/ownership to make a
+journey finish.
+
+Actual UI Play must follow the preset's documented Start/control sequence to meaningful
+terminal effects for finite journeys, sustained progress for declared continuous worlds,
+all supported interactions for probes, or exact expected refusal plus surrounding-world
+usability for diagnostic demonstrations. Inspect captures of the physical effects.
+Record exact source, executed commands, original failures and limits in the inventory/
+evidence; deterministic Node checks, first-Step smoke, programmatic stepping and mixed
+completion remain distinct from actual Play. Required combined gates and current-source
+UI certification remain pending until the candidate is frozen, tested and accepted.

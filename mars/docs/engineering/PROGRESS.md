@@ -3001,3 +3001,27 @@ baseline formatting (oxfmt check reports the same three baseline paths); broad
 mechanical formatting was reverted to keep this candidate reviewable. Static logs
 are ignored under viewer/e2e/artifacts/alpha-control-quarantine-static/. No main
 integration, browser/performance execution, deployment or public proof occurred.
+
+## Alpha extension-contract guide — 2026-10-02
+
+Bounded documentation task on clean saved `f04368e` adds concrete action lifecycle,
+registry/services, scenario/UI/control and read-only renderer/camera authoring
+contracts to ENGINE_GUIDE. One existing room-preparation example follows actual
+bindings, children, retained effects, safe local Pause/Resume/End and explicit
+classroom/reload limits. SCENARIO_COVERAGE.json remains the single catalog and
+proof registry, with its UI generator linked rather than duplicated. Persistence
+separates plain world JSON, retained same-Runtime purpose and certified snapshot
+restoration; active GUI save/load stays deferred.
+
+Read-only source inspection includes the alpha owner's dirty sim.ts executor guard:
+unknown partial state/claims remain quarantined for inspection and fresh Reset,
+without unsafe cancellation/rollback. Ordinary failures keep the world clock
+advancing. Candidate host/UI guards and comprehensive coverage remain pending
+combined exact-source/actual Play proof; no new online claim or browser/perf edit.
+
+Validation PASS: generator `--check`, ENGINE_GUIDE relative Markdown target check,
+`git diff --check`, and saved-worktree `npm run typecheck`. Initial typecheck could
+not start (`tsc` absent); reused the sibling candidate's existing dependency tree
+through an ignored node_modules symlink, then typecheck exited0. No source changes
+or new browser/fullgate/public certification. See
+[bounded source/limits report](briefs/alpha-extension-contract.REPORT.md).
