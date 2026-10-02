@@ -219,3 +219,26 @@ The old7648 layout's3/9 staging refusals and the earlier supported whole-house
 fixture are separately source-verified. Neither certifies the loaded production
 layout. Skeleton completion does not establish plywood/roof construction, continuous
 aggregate extraction animation, or exhaustive anatomy clearance.
+
+## Current playable and diagnostic coverage
+
+See [Lab guide](../../docs/engineering/LAB_GUIDE.md) and
+[engineering index](../../docs/engineering/INDEX.md) for supported scope and
+source/release receipts. `living-day.spec.ts` checks actual Play with retained
+preparation/sleep/notes, independent reading/care and music in two environments.
+`living-camera.spec.ts` checks the same live activity facts, operator handoff and
+automatic coverage; inspected captures remain necessary for natural framing.
+`garden-care.spec.ts` and `music-gathering.spec.ts` cover physical object/social
+controls, identity, interruption and cleanup.
+
+`selectable-scenarios-audit.spec.ts` checks all selectable presets through fresh
+load, Reset and the first fixed Step. It distinguishes intentional diagnostics
+and unsupported admission; it does **not** establish full journey completion.
+Current supported 2022 build completion uses `year-build.spec.ts`; old FIXME
+fixtures remain unproved. Never report skipped/TODO/FIXME checks as passed proof.
+
+Serialize browser and idle performance runs. Use isolated ports and a fresh
+`E2E_RUN`; preserve failed traces in a separate run folder before another run
+can overwrite standard `test-results`. Freeze tracked source during the combined
+gate. Baseline update commands above require an explained intended visual change,
+actual capture inspection and preserved original expectations—not a green shortcut.
