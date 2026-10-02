@@ -250,3 +250,22 @@ A host direction pauses only this tour and requires explicit Resume. Fixed flat
 places and generic drawings, no arbitrary gallery planning or generated dialogue.
 Both actualPlay variations pass on cea39b5; inspected captures establish local
 continuity, not publication. Future combined fullgate/public verification required.
+
+## Room preparation candidate (not yet public)
+
+`room-preparation`: Start room preparation, then Play. A worker carries the same
+bowl/spoon from the table into declared storage. Two guests then carry the empty
+table, and another moves the spare chair. The resulting room hosts presentations,
+questions, presenter rotation and smaller conversations through ordinary classroom
+execution. Join visitor uses the actual relocated spare chair; Ask visitor and
+Advance presenter use that session's normal controls.
+
+Pause preparation safely returns a held item or sets down furniture. Resume retains
+the same cleanup task, or explicitly retries only unfinished fixture placements
+from their current ground poses. It does not undo the layout or repeat stored items.
+During the gathering local preparation Pause is unsupported and explains why;
+use global Pause, ordinary session controls or End preparation. End drains actual
+children; Reset creates the initial hypothetical world. Fixed flat layout and nine
+anonymous people, no automatic furnishing planner or active reload restoration.
+Focused Node and TypeScript checks pass; authored actual Play/camera-entry checks
+and visual inspection remain pending. Saved controls are not a released experience.

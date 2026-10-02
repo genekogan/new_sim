@@ -2507,73 +2507,26 @@ release checkpoints do not end expansion. All48other-owner paths/status/bytes/mo
 mtime preserved at main e61003a, staged0. Shared helpers3, no parallel browser/perf.
 
 
-## Production deploy 38 — 2026-10-02 social and garden vocabulary
+### Isolated room-preparation playable wiring — October2
 
-Release38 verified at https://sim.mars.college/: Worker
-`7616e47a-9149-4b71-ba14-2ea8e5bc6660`, functional source
-`5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d`, deployed2026-10-02T13:25:04.388Z;
-rollback37`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`.
-Eight additions bring52to60: gallery-tour/gallery-tour-short/reading-circle/
-reading-circle-rotated/seed-planting/seed-planting-rotated/garden-afternoon/
-garden-afternoon-rotated. Original identities, supported pads/books/bowls, finite
-seed/water material, turn/floor/effects and independent intentions remain actual.
+Reviewed finite core66b2c58 and HUD/spec4e27d20; both normal commits land only on
+room-preparation-integration derived from frozen release38 candidate5f1dc2e.
+Adds one hypothetical selectable preset, keyed HUD, detached actual readout and
+quick-tour entry. The canonical registry exposes the same two registered requests;
+rules stamp activities/26 reflects added semantics, not a changed physics outcome.
+Minimal read-only camera allowlist recognizes the preset and actual physical fixture
+IDs; no shot policy/experiment changes. Existing classroom child facts remain used.
 
-| Clean gate step | Result | Duration ms |
-| --- | --- | --- |
-| lint | clean | 2171 |
-| test | 294 pass / 0 fail / 0 skip / 0 todo | 4157 |
-| test-engine | 1324 pass / 0 fail / 6 skip / 11 todo | 173098 |
-| tsc | clean | 2383 |
-| tsc-camera | clean | 4333 |
-| e2e | 264 passed, 7 skipped | 3505271 |
-| record-campus-take | check        /engine/takes/flagship-campus-2026.json OK (take id, final state, c | 13578 |
-| determinism-probe | hash b746b0947e65… (completed) | 3212 |
-| simulation-integration | PASS: authenticate before body parsing, method restrictions, prototype keys and  | 7079 |
+Cleanup retains original bowl/spoon and task. Furniture Pause is safe set-down;
+Resume explicitly retries only actual remaining ground placements. The relocated
+chair is a declared late visitor seat, followed by ordinary question/rotation/group
+conversation/departure. Local gathering Pause remains explicitly unsupported;
+global Pause/ordinary classroom controls/End are available. Strict two-case Play and
+camera-entry checks are authored but not executed; no visible or release claim yet.
+Full validation remains serialized after38's frozen gate/public lane. Other-owner
+main paths remain untouched; no broad furniture/anatomy/universal-plan expansion.
 
-Gate source clean/exact5f; started12:14:17.939Z, finished13:16:14.943Z.
-Engine6SKIP/11TODO and browser7FIXME remain unproved, no assertion/timing/tolerance
-loosening. Final deterministic hash`b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3`.
-Generated exact-source EVIDENCE.md/evidence.json restored from saved gate proof:
-17/0/0rows,25/2/1capabilities,8/0/0milestones; partial/unproven remain honest.
-
-Fresh public **92PASS/0FAIL/0SKIP/0FLAKY**, native duration1991445.956ms.
-Includes all60selectable fresh-load/Reset/first-Step checks, new eight actualPlay
-journeys, existing social/creative/cleanup/day/music/care and camera entry cases,
-and two entire current2022 builds with original support/identity/reference assertions.
-First-Step readiness is not a full journey proof; entry camera tests are read-only
-same-world proof, not natural camera quality. Final public capture review personally
-inspected124images; receipts retain exactsource and zero major visible
-support/continuity findings. Gate review separately inspected53images/48pairedJSON+a11y;
-prior24focused reading/garden captures inherit6d618e4→5f docs-only source difference.
-
-Worker original HTTP **522assets/24routes/696requestsPASS**. Through gateway:
-MCP36PASS, director original9stepsPASS8991ms (missing DO timing headers are not
-measured zero). Exact gateway bundle`main-atFggpqx.js` and home/Lab PASS.
-Original gateway `/browser/campus.glb` HEAD assertion still **FAIL**: expected
-70772556B, actual0 missing content-length. Distinct `/modular/campus-components.glb`
-HEAD126892472B and12-byte GLTF2 range **PASS**, SHA
-`a03a17cb5d776c7f8ec3b3c0120d194cffa11cf1a7e99dc01a164a1318854797`.
-Initial root assertion wrongly compared modular asset to browser-campus manifest;
-diagnosis/failure retained, association corrected to exact original modular manifest.
-Browser-campus fullGET70772556B/SHA675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4
-inherits unchanged release36 large manifests. Gateway source/OAuthPages scope still
-unavailable; no DNS/gateway/page replacement. Rejected mars.college/simulation stays404.
-
-Eight unchanged hash-keyed large R2 objects were **re-put**, not skipped: fresh
-worktree upload cache was absent; no new geometry/assets keys/hashes. Static13new/
-555retained, startup136ms; dry9207.06KiB/gzip1620.21KiB. Silent social dialogue,
-current rigs/fine fingers, off-frame final objects and no seed growth remain limits.
-Garden afternoon ordinary walks/intentions are independent, not a shared garden walk.
-No active save/load/rig migration/arbitrary art/storage/garden planning claim.
-
-Room-preparation, communal-supper and garden-circuit remain separately saved/wired
-next combined c8331ec candidate63 presets / rules version activities/29,185 focused Node PASS only;
-focused actualPlay underway; completion unclaimed,
-not online release38. Preserve all48other-owner main paths and historical values.
-This docs-only publication receipt does not itself integrate main; root owns guarded
-preservation/integration. No push/remotes or legacy inventory reorganization.
-Receipts in seed-planting-integration/viewer/.cloudflare: release38-deploy-receipt.json,
-release38-network-receipt.json, release38-gateway-receipt.json, gateway assertion/range
-failed diagnoses, release38-public-capture-review.json, social-garden-public-results.json,
-release38-gate-capture-review.json and gate/2026-10-02T12-14-17-938Z/report.json.
-Owner-authorized meaningful vocabulary expansion continues until explicitly stopped.
+Wired candidate focused16NodePASS/0FAIL/0SKIP9.09s; viewerTSc, strict browserTSc,
+type-aware lint and diff checks PASS. No browser/performance/fullgate run in this
+lane; release38 browser validation remains sole expensive runner. Canonical registry
+uses the same verified core and filters local extras, avoiding duplicate verbs.

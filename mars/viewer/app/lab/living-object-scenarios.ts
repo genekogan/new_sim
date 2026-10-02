@@ -1,3 +1,4 @@
+import { roomPreparationRuntime, roomPreparationScene } from '../../engine/scenarios/room-preparation.ts';
 import { gardenAfternoonRuntime, gardenAfternoonScene } from '../../engine/scenarios/garden-afternoon.ts';
 import { seedPlantingRuntime, seedPlantingScene } from '../../engine/scenarios/seed-planting.ts';
 import { readingCircleRuntime, readingCircleScene } from '../../engine/scenarios/reading-circle.ts';
@@ -28,6 +29,13 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  {
+    name: 'room-preparation',
+    title: 'Prepare and use a classroom · clear, carry, gather (hypothetical)',
+    description: 'Start room preparation, then Play. Clear the same bowl and spoon into declared storage, physically move the empty table and spare chair, then use the room for presentations, questions and smaller conversations. Pause cleanup or safely stop furniture handling; Resume retries from actual supported placements. Invite the declared late visitor into the moved chair. During the gathering use global Pause or ordinary classroom controls; local session Pause/Resume is unsupported. Fixed ground arrangement with nine anonymous people, no automatic furnishing planner or active reload.',
+    scene: roomPreparationScene, humans: () => [], build: roomPreparationRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [4, 1, 20, 65], expect: checks,
+  },
   ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
     name: index ? 'garden-afternoon-rotated' : 'garden-afternoon',
     title: index ? 'Garden afternoon · rotated intentions (hypothetical)' : 'Garden afternoon · plant, break, care and read (hypothetical)',

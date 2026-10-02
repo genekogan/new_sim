@@ -83,3 +83,7 @@ Future social/garden candidates: [reading core](briefs/reading-circle.REPORT.md)
 [retained planting intentions](briefs/planting-intention.REPORT.md),
 [connected garden afternoon](briefs/garden-afternoon.REPORT.md). Reports retain
 failed checks and distinguish local completion from public proof.
+
+Future room-preparation bridge: [finite physical composition](briefs/room-preparation.REPORT.md)
+and [Lab controls and authored Play proof](briefs/room-preparation-lab.REPORT.md).
+Core and shared wiring pass focused checks; browser/public proof remains pending.

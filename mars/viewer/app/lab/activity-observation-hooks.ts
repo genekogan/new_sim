@@ -65,6 +65,7 @@ export function cameraActivityReadout(rt: Runtime): {
         p.mat,
         p.displayId,
         p.item,
+        p.fixture,
         p.pad,
         p.pencil,
       ].filter(

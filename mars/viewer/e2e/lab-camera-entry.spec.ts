@@ -80,6 +80,7 @@ for (const [scenario, startControl] of [
   ['reading-circle-rotated', 'Start shared reading'],
   ['seed-planting', 'Start plant A'],
   ['garden-afternoon', 'Start garden afternoon'],
+  ['room-preparation', 'Start room preparation'],
 ] as const) {
   test(`activity review retains requested ${scenario} and observes the same paused world`, async ({ page }) => {
     const errors: string[] = [];
