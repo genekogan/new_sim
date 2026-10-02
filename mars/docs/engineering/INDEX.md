@@ -60,3 +60,7 @@ Historical reconstruction and questions retain their separate content ownership.
 Vocabulary continuation candidates (unreleased): [creative afternoon](briefs/creative-afternoon.REPORT.md),
 [art sharing](briefs/art-sharing.REPORT.md), [physical cleanup](briefs/table-cleanup.REPORT.md).
 These reports distinguish focused proof, authored browser checks and publication.
+
+Future gallery candidate: [physical tour core](briefs/gallery-tour.REPORT.md) and
+[Lab controls/Play authoring](briefs/gallery-tour-lab.REPORT.md). Shared wiring is
+local; browser timing/captures and publication remain unproved.

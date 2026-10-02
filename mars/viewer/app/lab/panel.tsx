@@ -1,3 +1,4 @@
+import { GalleryTourHud } from './gallery-tour-hud.tsx';
 import { TableCleanupHud } from './table-cleanup-hud.tsx';
 import { ArtSharingHud } from './art-sharing-hud.tsx';
 import { CreativeAfternoonHud } from './creative-afternoon-hud.tsx';
@@ -117,6 +118,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <ReadingHud key={`reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <GalleryTourHud key={`gallery:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <TableCleanupHud key={`tidy:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ArtSharingHud key={`art:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <CreativeAfternoonHud key={`creative:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />

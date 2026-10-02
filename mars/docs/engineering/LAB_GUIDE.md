@@ -46,6 +46,22 @@ on61b236e (2.0min), covering sharing, connected afternoon and both cleanup layou
 Capture review is underway; a clean combined gate and public proof remain required.
 All seven new selector entries are candidates, not additions to online release36.
 
+## Future guided gallery candidate (not yet public)
+
+`gallery-tour` and `gallery-tour-short` bind the same anonymous host and viewers
+across three or two actual pre-made marked pads. Start gallery tour, then Play;
+Ask/Answer/Floor controls current attention, Pause/Resume retains discussion,
+and direct-host walking takes precedence. Leave remains effective at later stops.
+Each new stop requires the host and two active visitors: explicitly Join the
+fourth declared person when attendance is insufficient, or End coherently.
+Finished stop history, artwork identities and support remain unchanged.
+
+This is an authored flat-ground exhibition using hypothetical same-outline studies,
+not a historical exhibition or automatic artwork generation. End preserves partial
+history and reports ended, distinct from successful completion. Root wiring and
+focused checks are complete; authored two-case browser proof and inspected captures
+remain pending. No release, arbitrary exhibition planning or active reload claim.
+
 ## Begin
 
 Choose a Scenario in `/lab`, or use its Quick tour. Play advances authoritative

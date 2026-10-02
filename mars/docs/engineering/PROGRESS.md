@@ -2219,3 +2219,12 @@ fixtures are explicitly hypothetical; tours retain padIDs/stopdiscussion/departu
 Insufficient nextstop attendance requires declared lateJoin or End, not implicit
 reactivation. UI/actualPlay are separately being authored; no public/gallery claim.
 Current release37 candidate remains52presets/activities21 in creative-afternoon.
+
+### Future gallery controls wired — 2026-10-02
+
+Integrated bounded HUD/Play author8a2a15 into gallery-lab3fa68c5, mounted the
+scenario-restricted controls and added quick-tour discovery/instructions for both
+manual-start presets. Root shared-boundary typecheck, focused14gallery/scanner
+and type-aware lint PASS. Browser5409/8944 remains reserved for frozen release37
+6b04a8b fullgate; no gallery browser, capture, perf or publication claim yet.
+Gallery remains a separate future candidate, preserving current52presets/activities21.

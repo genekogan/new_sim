@@ -8,7 +8,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const living =
     scenario.startsWith('living-day-') ||
     scenario === 'garden-care' ||
-    scenario.startsWith('table-cleanup') || scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
+    scenario.startsWith('gallery-tour') || scenario.startsWith('table-cleanup') || scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
   const eight =
     scenario === 'classroom-8' ||
@@ -60,6 +60,8 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('music-dance')}>
           Music and dancing
         </button>
+        <button onClick={() => onScenario('gallery-tour')}>Guided gallery walk</button>
+        <button onClick={() => onScenario('gallery-tour-short')}>Two-stop gallery with late joining</button>
         <button onClick={() => onScenario('table-cleanup')}>Clear a communal table</button>
         <button onClick={() => onScenario('creative-afternoon')}>Creative afternoon</button>
         <button onClick={() => onScenario('art-sharing')}>Share art and ask questions</button>
@@ -112,6 +114,17 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         are hypothetical. Use Play and the activity controls below; Reset starts
         the selected room again.
       </p>
+      {scenario.startsWith('gallery-tour') && (
+        <p className="lab-desc">
+          Start gallery tour, then Play. The same people physically approach two
+          or three pre-made hypothetical studies, take turns and walk between
+          stops. Ask/Answer/Floor changes shared attention. Leave persists; each
+          new stop needs the host and two visitors. Join the declared late visitor
+          to resolve an attendance wait. Pause releases holds and retains the
+          discussion; direct the host away, then explicitly Resume. End preserves
+          completed stops without claiming the unfinished tour completed.
+        </p>
+      )}
       {living && (
         <p className="lab-desc">
           Connected living day / Living studio day: choose the main participant
