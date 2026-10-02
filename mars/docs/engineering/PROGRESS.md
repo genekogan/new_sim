@@ -2171,3 +2171,30 @@ HUDs/tour/read-only activity/camera facts are wired without rig or camera policy
 changes. Focused combined54PASS0fail/skip/TODO (~3.3s), TSc and lint pass. Browser
 checks/captures/fullgate/publication still pending; frozen release37 gate unchanged.
 No original outcome, assertion, baseline or performance ceiling weakened.
+
+
+### Combined vocabulary Play and retained red gate — 2026-10-02
+
+Frozen f095397 full gate records lint/unit290/engine1175/bothTSc PASS, then
+230browserPASS/1FAIL/7SKIP. Museum liveEUC→Aerial exhausts the unchanged120s
+totaldeadline; trace shows slow software-WebGL operations throughout, ~100s before
+finalclick. Original failure/traces/captures retained. Unchanged focused rerun
+passes1/1 in84s; no code cause, assertion/deadline/baseline/pin change or green-gate
+claim. Take/probe/MCP did not execute after the failed browser stage. Main/live36
+remain unchanged and all48other-owner paths retain status/bytes/mode/mtime/staged0.
+
+Creative/cleanup candidate61b236e executes6/6 actualPlay PASS2.0min: real partial
+drawing→sharing/questionturns→two-performer same-station exchange→samepad completion,
+independent paused reading and conserved care, bothcleanup orientations' same-ID
+pickup/placement, heldPause/Resume, playerhandoff, safeEnd/restart and Reset. All30
+freshPNG are being inspected; root alreadyviews artformation/question/pause, actual
+partialart, realheldbook/water, completedplacements and samechairsecondperformer.
+No anatomy migration or hidden failed records. Publication remains pending.
+
+Root batches these compatible verified candidates with the previous drawing/warmup/
+openjam source into one clean combined gate instead of two successive fullgates.
+Seven new presets (52total), canonicalactivities/21, existingcamera read-onlyfacts,
+continued authorization and proof reports retained. Guidedgallery is a separate
+futurecandidate; no active save/load/Eden/cameraexperiment expansion. Remaining
+publication estimate2–4workinghours assumes the freshgate and publicproof pass;
+continuous scenario expansion has no owner-set finish time.

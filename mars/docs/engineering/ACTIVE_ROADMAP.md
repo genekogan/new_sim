@@ -17,39 +17,38 @@ refusals and current-source fully automatic builds are distinct proofs.
 
 ## Current small queue — owner authorization October 2
 
-Release36 completed before the owner's 8am Eastern condition. Continue expanding
-meaningful Mars activities until Gene explicitly stops; release36 remains the
-published baseline, and saved candidates are not shipped features.
+Release36 completed before the owner's8am Eastern condition. Continue expanding
+meaningful Mars activities until Gene explicitly stops; saved candidates are not
+shipped features. Release36's45presets remain the public baseline.
 
-1. **Drawing/sketching:** a usable tabletop pad and pencil, deterministic retained
-   marks, physical pickup/release, coherent pause/resume and completed artwork.
-   This enables making something during a work session and sharing its result.
-2. **Guided standing warm-up:** instructor and followers on declared clear ground,
-   shared attention, bounded phased arm movements, staggered participation and
-   coherent departure/interruption. No advanced yoga/anatomy redesign.
-3. **Open-jam exchange:** ordinary handoffs between performers at the same computer,
-   retained sessions and independent listeners/dancers. No silently replaced props
-   or claim of acoustic instruments.
+1. **Combined vocabulary publication:** physical drawing with retained marks, guided
+   standing warm-up, open-jam performer exchange, tangible artwork sharing, a connected
+   creative afternoon and physical table cleanup in two orientations. Seven new presets,
+   52total. Focused checks and actualPlay pass; review all captures, rerun the complete
+   clean combined gate, preserve all48other-owner paths, deploy and verify public use.
+   The previous f095397 gate is RED (230browserPASS/one museum120s timeout/7SKIP);
+   unchanged focused museum retry passes84s. Original failure remains recorded.
+2. **Guided small gallery walk:** separately owned future candidate reusing actual
+   marked pads, ordinary arrivals/departures and shared attention at2–3stops. Fixed
+   flat-ground places, host+2required viewers and one declared optional joiner; leaving
+   persists, insufficient attendance waits with a reason. No silent reactivation.
 
-Use cited archive practices to select activities; staging, people and output remain
-explicitly hypothetical. Drawing Klerb and Open Jacks are Mars practices; the cited
-Bombay yoga notice is a neighbouring community activity, not Mars-organized history.
-Root owns shared wiring/rendering/Lab/integration; two Sol6.1 workers own bounded
-new engine modules/tests in isolated worktrees. Serialize browser/performance work.
+Use cited archive practices; staging, people and output remain hypothetical. Drawing
+Klerb/Open Jacks inspire practices; the neighbouring Bombay yoga notice is not Mars
+organization. Root owns shared wiring/integration/release. Sol6.1 workers use isolated
+files; serialize expensive browser/performance validation. No further inventory audit.
 
-Batch exit: each addition materially changes what can be initiated, interrupted,
-resumed and watched; valid/invalid/disruption tests, actual inspected Play captures,
-all scenarios discoverable, clean combined gate and verified sim.mars.college release.
-Then select the next useful bounded batch without a new backlog-wide audit.
-Active save/load, universal planning/psychology/terrain, rig/library migration,
-fine anatomy, fluid/growth and camera experiments remain deferred. LAST_MILE counts
-are not a measure of product progress.
+Batch exit: useful initiate/intervene/resume/watch controls, valid/invalid/disruption
+proof, inspected realPlay captures, all shipped scenarios discoverable, a clean
+combined fullgate and fresh sim.mars.college verification. Then select another bounded
+activity in product-priority order without treating this release as the stopping point.
+Publication estimate2–4workinghours assumes no newgate/publicfailure; ongoing
+owner-authorized expansion has no fixed completion time.
 
-Known publication limit: existing Pages gateway omits campus-model HEAD length;
-original gateway smoke failure retained, while exact fullGET/ranges and Worker
-522asset/24route checks pass. Camera recovery cuts/framing and dense HUD remain
-visible limitations, not hidden failures. All48other-owner pending paths preserved
-unchanged/excluded. This expansion is explicitly owner-authorized; review and safeguards remain required.
+Active save/load, universal planning/psychology/terrain, rig/library migration, fine
+anatomy, fluid/growth and camera experiments remain deferred. ExistingPages gateway
+HEADsize limitation remains documented; exactGET/ranges/backend pass. Camera framing
+and denseHUD limits remain visible. All48other-owner pending paths stay excluded.
 
 ## Prior contracts and checkpoint provenance
 

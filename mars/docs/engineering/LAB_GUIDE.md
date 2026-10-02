@@ -19,7 +19,7 @@ practice inspiration; neighbouring Bombay yoga is not attributed to Mars organiz
 Focused engine proof passes; actual Play, combined gate and publication are pending.
 Release36's45presets remain the verified public inventory until a new release record.
 
-## Next vocabulary batch candidate (separate, not public)
+## Combined creative/cleanup candidate (not yet public)
 
 `creative-afternoon` starts with a blank pad, makes three actual marks, shares that
 same artwork, exchanges two original digital scores at one workstation, and returns
@@ -41,9 +41,10 @@ remain. If both permitted return supports are blocked, real held ownership remai
 with a concrete waiting reason until a support is restored. No washing, deletion,
 large carrying, arbitrary storage or automatic ground drops.
 
-Focused combined54checks, TSc/lint/source scan pass. Play regressions are authored;
-actual execution/capture review, combined gate and publication remain required.
-These four selector entries are future candidates, not additions to release36.
+Focused combined54checks, TSc/lint/source scan pass. Six actual Play journeys pass
+on61b236e (2.0min), covering sharing, connected afternoon and both cleanup layouts.
+Capture review is underway; a clean combined gate and public proof remain required.
+All seven new selector entries are candidates, not additions to online release36.
 
 ## Begin
 
