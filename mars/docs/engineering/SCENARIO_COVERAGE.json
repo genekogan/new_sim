@@ -41,7 +41,15 @@
     "alphaRecordedScriptedPassed": 21,
     "alphaPendingTargetedScenarios": [],
     "alphaRecordedConditionalConstructionPassed": 2,
-    "alphaRecordedSupportedProbePassed": 1
+    "alphaRecordedSupportedProbePassed": 1,
+    "latestCombinedCandidateGate": {
+      "source": "f7f468a821783c34f24e1786ca9afdb429bf73be",
+      "status": "RED",
+      "browserPassed": 302,
+      "browserFailed": 17,
+      "browserSkipped": 7,
+      "proof": "All63 fresh load/Reset/firstStep passed; full alpha journeys and original functional checks passed where native case completed. Visual-aborted cases and skipped checks remain unproved for their later assertions."
+    }
   },
   "proofKinds": [
     "actual-ui-play-journey",
@@ -6618,10 +6626,44 @@
         "alpha solar-paint: fullPlay authored meaningful endpoint and retained supports"
       ],
       "interruptedCases": []
+    },
+    {
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/gate/2026-10-02T22-25-19-387Z/report.json",
+      "sha256": "40962e8150e59c8f12b3dd4f04b0bc46454114383a76fb13010f400a4b252b72",
+      "source": "f7f468a821783c34f24e1786ca9afdb429bf73be",
+      "gateResult": {
+        "browserPassed": 302,
+        "browserFailed": 17,
+        "browserSkipped": 7,
+        "browserDurationMs": 4958927,
+        "gateStatus": "RED",
+        "laterStages": "not run"
+      },
+      "cause": "All17 first errors are pixel-ratio comparisons, confirmed from preserved native traces; stale UI/older released canvas baselines. Hard comparisons cut off later original assertions. No baselines or thresholds changed; still-RED soft-visual cohort pending, then bounded reviewed golden window and clean full gate/public verification.",
+      "failedCases": [
+        "e2e/fire.spec.ts:75:1 \u203a lab campfire: animated, deterministic fire; people still; draw calls; dusk captures (3.7s)",
+        "e2e/lab-build-bay.spec.ts:64:1 \u203a lab build-bay: flagship sequence live, zero violations, rehearsal hash, key-moment captures (4.1s)",
+        "e2e/lab-social.spec.ts:73:1 \u203a lab campfire-evening: social verbs, expected conflict, pre-emption, zero violations, captures (3.6s)",
+        "e2e/lab-years.spec.ts:63:3 \u203a lab year-2021: engine scene builds in the browser, 4 walkers complete, zero violations, captures (9.1s)",
+        "e2e/lab-years.spec.ts:63:3 \u203a lab year-2022: engine scene builds in the browser, 4 walkers complete, zero violations, captures (9.0s)",
+        "e2e/lab-years.spec.ts:63:3 \u203a lab year-2024: engine scene builds in the browser, 4 walkers complete, zero violations, captures (10.9s)",
+        "e2e/lab.spec.ts:40:3 \u203a lab narrow-passage: completes as expected, zero violations, captures (3.4s)",
+        "e2e/lab.spec.ts:40:3 \u203a lab stairs: completes as expected, zero violations, captures (4.9s)",
+        "e2e/meal.spec.ts:91:1 \u203a meal: captures (sit, spoon at the mouth, legs crossed) (3.7s)",
+        "e2e/poses.spec.ts:104:1 \u203a hand-up: captures (crouch, stand with load, reach up / reach down) (5.5s)",
+        "e2e/poses.spec.ts:146:1 \u203a raise: footer holds the column base low (4.5s)",
+        "e2e/poses.spec.ts:172:1 \u203a hand-up: climbing a frame (ladder cycle) and walking a beam (arms out) (7.2s)",
+        "e2e/prone.spec.ts:284:1 \u203a prone: captures (lie down, reach with the sheet below, take, push-up, kneel-up, standing) (2.8s)",
+        "e2e/render-polish.spec.ts:31:1 \u203a paint reveal, mounted solar module and distinct equipment (3.1s)",
+        "e2e/render-polish.spec.ts:72:1 \u203a supported historical 2022 engine upright is green at eye level (6.0s)",
+        "e2e/solar-paint.spec.ts:25:1 \u203a solar-paint: paint bands as drawn = engine coverage, panel carried flat, stock and equipment, captures (20.2s)",
+        "e2e/stairs.spec.ts:75:1 \u203a stair foot IK: capture mid-flight (up) (1.7s)"
+      ],
+      "preservedNativeTraces": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-f7-red-native"
     }
   ],
   "topGaps": [
-    "Exact final combined alpha native gate/63selector/public acceptance unproved; no all63 certification.",
+    "Latest f7 clean combined gate RED:17 visual failures; bounded still-RED functional/capture review, new clean full gate and exact public63 acceptance remain pending.",
     "Earlier29manual and remaining dedicated historical journeys were not all freshly rerun by alpha107/40/731; preserve source boundaries and required final gate.",
     "Stress30 only bounded progress/safety through tick2017 is witnessed; indefinite fairness/starvation remains unproved."
   ],

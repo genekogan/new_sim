@@ -36,7 +36,10 @@ unverified workshop/library drafts.
    the approved activity-expansion queue under Gene's latest continuing authorization.
    Do not begin Eden.
 
-Latest whole v1 alpha planning range20–32workinghours, medium-low confidence. Main risks:
+Latest whole v1 alpha planning range **8–14 working hours**, medium confidence after the
+2026-10-02 f7 gate (302 browser PASS/17 visual FAIL/7 SKIP). This assumes a bounded
+reviewed snapshot window, another clean full gate and exact publication verification;
+no substantial new functional defect. The failed gate is retained in the coverage inventory. Main risks:
 full-journey proof gaps hidden behind startup/mixed stepping, local-failure isolation,
 legacy unsupported/fine-pose exclusions and public transport metadata. No general
 priority interview is needed. Surface a major prerequisite with smallest credible

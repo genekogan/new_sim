@@ -1,7 +1,8 @@
 # Tranche progress log
 
 Running log for the overnight simulation-engine tranche. Newest entries at the bottom.
-Budget: weekly usage meter (`<usage-tool>`) started at 11% used; hard stop ≈61%.
+Historical starting budget: weekly usage meter began at11%, hard stop≈61%.
+Superseded by Gene’s2026-10-02 authorization to continue using credits; old entries retain provenance.
 
 ## 2026-09-27 ~01:00 — Phase 0 started
 - Local git baseline committed (repo root = campus-2026-reconstruction/).
@@ -3237,3 +3238,35 @@ restores material. Root independently inspected endpoint/pairedJSON with crop
 limits explicit. Canonical inventory retains oldA-only proof and adds this exact
 spec-hash receipt;37candidate scenarios now have source-bound focused passes,
 not63combined/public certification. No engine/app/content changes or newpins.
+
+## 2026-10-02 23:53 UTC — frozen alpha f7 gate completed RED; preserve visual failures
+
+Sourcef7f468a stayed clean/frozen throughout. Lint and both TypeScript checks PASS;
+deployment295PASS; engine1465PASS/0FAIL/6SKIP/11TODO. Serialized browser302PASS,
+17FAIL,7SKIP in4958.927s (82.65min), no aggregate timeout. Final flagship/probe/MCP
+stages were not run after browser failure. No main merge, alpha deployment, baseline,
+tolerance, pin or physical-rule change. Canonical coverage retains exact report/hash,
+failed titles and preserved native traces; all17 first errors were pixel comparisons.
+
+All63 startup contracts passed; full alpha Play/effects/failure isolation, camera
+compatibility, supported sleep, actual Chiba access, resets and current construction
+completion passed where native cases completed. Current construction uses actual
+Play throughs0021 then bounded stepping; complete automatic proof remains the
+explicit033source-inherited receipt plus required fresh publication run. Seven
+legacy exclusions and six engineSKIP/elevenTODO remain unproved. Original visual
+failures aborted later assertions, so they are not counted as full functional proof.
+
+Reviewed bounded softVisual harness now integrated from Sol6.1’s separate worktree:
+only diff-ratio assertions become expect.soft, still native failures; all original
+checks,1.5% limit, dimensions/missing baselines, timeouts and images unchanged.
+No browser during helper work; initial typecheck completed before later deferral,
+existing targeted test-file lint diagnostics explicitly retained. Read-only source
+provenance shows affected action/rig/canvas sources unchanged40→f7; old baselines
+predate shipped changes. Root inspected paired images and current completed house.
+Next: still-RED serial cohort to execute later original assertions and inspect all
+captures before a bounded golden window; fresh clean full gate/public verification.
+
+Release40/homepage remains online. Main77ee’s48pending paths unchanged/staged0;
+all branches/worktrees preserved. Whole alpha remaining8–14workinghours, medium
+confidence; assumes no major functional defect after capture continuation. No quota
+pause or new priority interview; resume bounded vocabulary only after alpha closure.
