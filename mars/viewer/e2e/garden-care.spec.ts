@@ -191,7 +191,9 @@ test('garden-care: full UI Play due waits, four conserved care cycles and deplet
         return !s.active && s.plants.find(p => p.plant === plant)?.cycles === cycle;
       }, { plant, cycle });
       const end = await capture(`${plant}-cycle-${cycle}`);
-      expect(end.garden.plants.find(p => p.plant === plant)).toMatchObject({ cycles: cycle, waterReceived: cycle * 0.25, pending: undefined });
+      const completedPlant = end.garden.plants.find(p => p.plant === plant)!;
+      expect(completedPlant).toMatchObject({ cycles: cycle, waterReceived: cycle * 0.25 });
+      expect(completedPlant.pending).toBeUndefined();
       expect(end.garden.water.contents!.fraction).toBe(before.garden.water.contents!.fraction - 0.25);
       clean(end, initial);
     };
