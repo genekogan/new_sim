@@ -14,7 +14,9 @@ export class Db {
   constructor(path: string) {
     this.path = path;
     this.db = new DatabaseSync(path);
-    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;');
+    // busy_timeout: another process (Litestream checkpointing, a backup, a read-only tool) may hold the write lock for a
+    // moment. Without a timeout SQLite refuses at once and the tick loop dies; with one, the write waits its turn.
+    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
     this.migrated = migrate(this.db);
   }
   migrated: number[] = [];
