@@ -430,6 +430,12 @@ for (const rotated of [false, true])
       undefined,
       { timeout: 15_000 },
     );
+    await expect(page.getByTestId('garden-afternoon-gardener')).toContainText(
+      '· ended ·',
+    );
+    await expect(page.getByTestId('garden-afternoon-reader')).toContainText(
+      '· ended ·',
+    );
     const ended = await capture(page, `${name}-end-before-first-step`);
     expect({
       purpose: read(ended).seedbed.purpose,

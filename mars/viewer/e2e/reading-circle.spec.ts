@@ -336,6 +336,8 @@ test('default actual Play: exact partial bookmark Pause-Resume, declared Join-Le
   await expect(button(page, 'Floor listener-1')).toBeEnabled();
   await button(page, 'Floor listener-1').click();
   await controlsDone(page);
+  await play(page);
+  await expect(button(page, 'Leave listener-3')).toBeEnabled();
   await button(page, 'Leave listener-3').click();
   await play(page);
   await page.waitForFunction(() => {

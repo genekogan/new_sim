@@ -71,3 +71,10 @@ Repair candidate is separate worktree `codex/garden-afternoon-play-repair` from
 cea39b5; only spec and this report changed. TypeScript, focused lint, formatting
 and diff checks pass. Root will run serialized actual Play and inspect captures;
 no passing-browser or visual-quality claim is made for this repair.
+
+
+Capture review found logical cancellation's terminalmode completed was printed as
+completed for an ended branch with no achieved objectives. Root labels actual
+cancelled branches ended, preserving authoritative status/effects and Completed:none.
+Both End-before-step actualPlay checks assert the label; fresh focused proof pending.
+No cancellation/ownership/physics change.

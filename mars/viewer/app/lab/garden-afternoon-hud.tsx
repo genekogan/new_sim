@@ -96,7 +96,7 @@ export function GardenAfternoonHud({
             <h4>{branch}</h4>
             <p>
               {b
-                ? `${b.id} · ${b.intention?.mode} · ${b.intention?.label ?? 'finished'} · ${b.intention?.phase}`
+                ? `${b.id} · ${b.status === 'cancelled' ? 'ended' : b.intention?.mode} · ${b.intention?.label ?? 'finished'} · ${b.status === 'cancelled' ? 'ended' : b.intention?.phase}`
                 : 'Not started'}
             </p>
             <p>Completed: {b?.intention?.completed.join(' → ') || 'none'}</p>

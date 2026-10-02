@@ -63,4 +63,12 @@ These reports distinguish focused proof, authored browser checks and publication
 
 Future gallery candidate: [physical tour core](briefs/gallery-tour.REPORT.md) and
 [Lab controls/Play authoring](briefs/gallery-tour-lab.REPORT.md). Shared wiring is
-local; browser timing/captures and publication remain unproved.
+local; both actualPlay variations and inspected captures pass on cea39b5.
+Combined release/publication remain unproved.
+
+Future social/garden candidates: [reading core](briefs/reading-circle.REPORT.md),
+[reading Lab](briefs/reading-circle-lab.REPORT.md),
+[seed planting](briefs/seed-planting.REPORT.md),
+[retained planting intentions](briefs/planting-intention.REPORT.md),
+[connected garden afternoon](briefs/garden-afternoon.REPORT.md). Reports retain
+failed checks and distinguish local completion from public proof.

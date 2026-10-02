@@ -114,8 +114,13 @@ export function ReadingCircleHud({
     );
   };
   const direction = rot2([-0.15, -5], yaw),
-    walkParams = { actor: binding.reader, x: direction[0], z: direction[1] },
-    walkAdmission = rt.registry.get('walk_to')?.plan(rt, walkParams);
+    walkParams = { actor: binding.reader, x: direction[0], z: direction[1] };
+  const lastDirection = [...rt.records.values()].findLast(
+    (r) =>
+      r.verb === 'walk_to' &&
+      !r.parent &&
+      (r.params as { actor?: string }).actor === binding.reader,
+  );
   const directionPending = () =>
     [...rt.records.values()].some(
       (r) =>
@@ -130,8 +135,10 @@ export function ReadingCircleHud({
         state!.mode,
       ),
     paused = live && ['paused', 'waiting'].includes(state!.mode);
+  // Runtime.submit safely releases a seated hold before planning the route.
+  // A speculative plan at the seated pose would incorrectly reject its chair.
   const directReady =
-    running && !pending() && !directionPending() && walkAdmission?.ok === true;
+    running && !pending() && !directionPending() && rt.registry.has('walk_to');
   const problem =
     state?.diagnostic ??
     latest?.diagnostic ??
@@ -241,18 +248,24 @@ export function ReadingCircleHud({
               ].includes(readReadingCircle(rt, state.session)!.mode) ||
               pending() ||
               directionPending() ||
-              !rt.registry.get('walk_to')?.plan(rt, walkParams).ok
+              !rt.registry.has('walk_to')
             )
               return;
             reply(
               rt.submit('walk_to', walkParams),
-              'Reader direction requested. Existing actions safely release before walking; Resume circle is explicit.',
+              'Reader direction requested. Existing actions safely release before authoritative route admission; Resume circle is explicit.',
             );
           }}
         >
           Direct reader away
         </button>
       </div>
+      {lastDirection?.diagnostic && (
+        <p role="status">
+          Last reader direction: {lastDirection.diagnostic.code}:{' '}
+          {lastDirection.diagnostic.message}
+        </p>
+      )}
       {members.map((m) => {
         const leave: ReadingCircleIntent = {
           kind: 'leave',

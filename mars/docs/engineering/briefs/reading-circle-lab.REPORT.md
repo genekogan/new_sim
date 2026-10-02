@@ -162,3 +162,22 @@ enabled state, then issues the same ordinary Floor/Leave/direction/resume/comple
 sequence. Original15s assertion and120s case limits, zero retries and all later
 expectations remain. No production action/HUD change, forced click or support bypass.
 Fresh default-only actualPlay remains required; prior failures/traces are preserved.
+
+
+## Real reader-direction UI defect — October2
+
+The next default-only run on21e2809 clears Floor then fails at disabled Direct reader
+away. Exact saved tick669 shows reader seated/listening in an occupied discussion
+hold and book8.10/page3. Raw walk.plan refuses route.start-blocked at reading-chair;
+ordinary Runtime.submit first queues preemption, safely stands up, then plans from
+released valid support. Root reproduced both raw refusal and actual completed queued
+handoff, with zero violations. Independent Sol6.1 source/trace review confirms this.
+
+HUD now enables the bounded direction request during its supported live phases if
+no competing control/direction exists and walk_to is registered. Runtime.submit retains
+all physical release, claims, route admission and failure behavior; no forced walk,
+teleport or bypass. Last direction diagnostic is visible even when final admission
+happens after cleanup. Six Node regressions cover both orientations, occupied reading
+and discussion, exact bookmark/support/normal Resume, and infeasible destination
+refusal after actual stand-up. Also wait for ordinary Leave admission after the global
+Floor capture freeze. Original deadlines/outcomes preserved. Fresh actualPlay required.

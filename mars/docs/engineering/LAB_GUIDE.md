@@ -219,3 +219,17 @@ growth, refill or active save/load. Root mounts the HUD, detached readout and
 existing read-only automatic camera entry. Node tests pass on worker36c9fd2;
 fresh combined Play/visual/gate/public proof remain mandatory, so this is a
 saved candidate, not an online release37 feature.
+
+
+## Guided gallery candidate (not yet public)
+
+`gallery-tour` and `gallery-tour-short`: Start gallery tour, then Play. The host
+and two viewers physically visit three or two supported, pre-marked hypothetical
+artworks. Questions/answers share actual attention and floor; each stop drains
+ordinary departures before the next one binds. Pause/Resume/End retain visited
+artwork IDs and contributions. Leaving persists; below minimum attendance the
+tour waits with a reason until an explicitly declared late visitor joins or it ends.
+A host direction pauses only this tour and requires explicit Resume. Fixed flat
+places and generic drawings, no arbitrary gallery planning or generated dialogue.
+Both actualPlay variations pass on cea39b5; inspected captures establish local
+continuity, not publication. Future combined fullgate/public verification required.

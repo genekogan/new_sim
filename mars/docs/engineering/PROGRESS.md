@@ -2466,3 +2466,22 @@ pending ordinary floor-release. Fresh Sol6.1 review confirms zero violations and
 correct disabled Flooradmission until listener reacquires occupiedhold. Add explicit
 Play/enabled precondition with unchanged120s/15s/retries0/laterexpectations. No
 production repair required. Default-only actualPlay pending; original3/1 preserved.
+
+
+### Seated reader directive preflight fixed at UI boundary — October2
+
+Default21e2809 Play cleared originalFloorfreeze but exposed actualHUDdefect at
+Direct: rawwalkerpreflight insideoccupiedchair returnsroute.start-blocked, while
+normalRuntime.submit queuespreemption→ordinarystandup→validroute admission. Root
+probes both behaviors and Sol6.1 independentlyreviews exacttick669state/trace.
+Enable boundedrequest duringregistered/live/noncompeting phases; actualexecutor
+retainsallchecks, laterrealrefusalvisible. SixNodeoccupiedreading/discussion/
+invaliddestinationregressions authored forbothyaw; freshproofpending. No movement,
+rig, support, ownership, tolerance or taskoutcome change. GardenEndcancelledbranch
+readout nowended; actualauthority/cancellationunchanged, bothstrictEndassertionsadded.
+
+Candidateidleperformance PASS: exactpeak105.66ms/mean.674, corridor50.84/.528,
+allhistoricalgridbuilds157–294ms,0violations/originalpinsandceilingsunchanged.
+Futuregallery2/seed2/cameraentry7 actualPlaypassed; garden2/rotatedreading passed
+75aa970. Rootdocuments-onlyguide/index work during21focusedrun changed no runtime;
+futurecombined clean gate will freeze alltrackedpaths and establish currentproof.

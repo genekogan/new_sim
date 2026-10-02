@@ -14,14 +14,22 @@ Skipped/TODO checks remain unproved. See [release record](RELEASE_CHECKLIST.md).
    finite seed-planting layouts and two connected garden afternoons. Same original
    book/bowls/seedbed purposes, ordinary physical execution, independent commitments,
    explicit intervention/Resume and cleanup. Eight presets would bring52to60.
-   Candidate103focused engine checks pass; actualPlay11PASS/4FAIL exposes
-   two garden wait-phase gaps and two reading measurement-contract gaps. Not released; no completion claim.
+   Candidate103focused engine checks pass. Preserved initial Play11PASS/4FAIL exposed
+   garden phase-wait and reading measurement-contract gaps; corrected garden layouts
+   and rotated reading pass actual Play. Default reading exposed a real seated-direction
+   HUD preflight defect: ordinary authoritative handoff works after safe stand-up.
+   Its bounded UI correction passes27focused Node checks, including six handoff/refusal
+   regressions; final default Play and clean combined fullgate remain required. Not released.
    Minimal read-only allowlist/embedded camera-entry fixes travel with this candidate.
 2. **Connected room preparation:** a hypothetical classroom-4 derivative clears the
    same bowl/spoon to declared storage, physically moves its empty table and spare
    chair, then uses the resulting room for talks and a late participant. Reuse existing
    tidy_table/setup_room/classroom_session; no new universal furnishing planner.
    Bounded implementation is separately owned. No actualPlay/full-session proof yet.
+3. **Meal continuity foundation:** retain actual served/consumed role receipts across
+   explicitly bound same-Runtime interruptions. Existing consumed-empty bowls must
+   not be mistaken for never-served portions. Bounded implementation is separate;
+   no new meal scenario or persistence claim until physical continuation is proved.
 
 Release37's seven additions are online: drawing, warm-up, open jam, artwork sharing,
 creative afternoon and cleanup in two orientations. Continuous expansion remains
