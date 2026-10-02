@@ -5,7 +5,9 @@ import { DT, type Runtime } from '../runtime/runtime.ts';
 import { heldBy, surfaceSlot, slotOccupant, isItem } from '../items/model.ts';
 import { humanOf } from '../social/actions.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
-import { SERVING } from '../items/actions.ts';
+import { q6 } from '../core/math.ts';
+import { stableStringify } from '../core/hash.ts';
+import { SERVING, SPOONFUL } from '../items/actions.ts';
 import { createTurns, stepTurns, type TurnState } from './turns.ts';
 import type { Vec2 } from '../core/math.ts';
 import type { StowPlacement } from './stow.ts';
@@ -21,9 +23,35 @@ export interface SharedFoodBreakParams {
   pot: string;
   participants: [SharedFoodParticipant, SharedFoodParticipant];
   at: Vec2;
+  resumeFrom?: string;
 }
+/** Retained own-leaf material receipts, in bowl fractions (pot serving remains 1/4). */
+export interface SharedFoodReceipt {
+  actor: string;
+  bowl: string;
+  spoon: string;
+  food?: string;
+  served: boolean;
+  portion: number;
+  remaining: number;
+  consumed: number;
+  consumptionCompleted: boolean;
+  serves: string[];
+  eats: string[];
+}
+type Checkpoint = {
+  receipts: SharedFoodReceipt[];
+  items: Record<string, string>;
+  surfaces: Record<string, string>;
+  records: string[];
+};
+type Program = { source?: string };
 export interface SharedFoodBreakReadout {
   action: string;
+  purpose?: string;
+  resumeFrom?: string;
+  continuedBy?: string;
+  receipts?: SharedFoodReceipt[];
   status: ActionStatus;
   phase: string;
   current?: string;
@@ -58,6 +86,12 @@ type Exec = {
   turns: TurnState;
   stopping: boolean;
   error?: Diagnostic;
+  purpose: string;
+  baseReceipts: SharedFoodReceipt[];
+  potContents?: { food: string; fraction: number };
+  checkpoint?: Checkpoint;
+  checkpointIssue?: Diagnostic;
+  continuedBy?: string;
 };
 type Store = Record<string, Exec>;
 const store = (rt: Runtime): Store => (rt.services.sharedFoodBreaks ??= {});
@@ -81,6 +115,231 @@ const placed = (rt: Runtime, p: StowPlacement) => {
     support.slot === p.surfaceSlot.slice(split + 1)
   );
 };
+const fixedBinding = (p: SharedFoodBreakParams) => {
+  const { resumeFrom: _source, ...fixed } = p;
+  return stableStringify(fixed);
+};
+const utensils = (p: SharedFoodBreakParams) => [
+  p.pot,
+  ...p.participants.flatMap((m) => [m.bowl, m.spoon]),
+];
+// Held poses legitimately follow an independent player walk. Anchored material
+// must retain its exact placement; ownership/hand and all other payload stay fixed.
+function itemCheckpoint(rt: Runtime, id: string) {
+  const e = rt.world.entities[id];
+  if (!e) return JSON.stringify(null);
+  const { pose, phase: _phase, reservedBy: _reserved, ...payload } = e;
+  return JSON.stringify({
+    ...payload,
+    ...(e.support?.kind === 'in-hand' ? {} : { pose }),
+  });
+}
+function surfaceCheckpoints(rt: Runtime, p: SharedFoodBreakParams) {
+  const owners = new Set(
+    p.participants.flatMap((m) =>
+      m.returns.map((q) => q.surfaceSlot.split('#')[0]),
+    ),
+  );
+  const pot = rt.world.entities[p.pot];
+  if (pot?.support?.kind === 'resting-on') owners.add(pot.support.on);
+  return Object.fromEntries(
+    [...owners].map((id) => {
+      const e = rt.world.entities[id];
+      return [
+        id,
+        JSON.stringify(
+          e && {
+            id: e.id,
+            def: e.def,
+            kind: e.kind,
+            pose: e.pose,
+            support: e.support,
+          },
+        ),
+      ];
+    }),
+  );
+}
+function ownReceipts(rt: Runtime, ex: Exec): SharedFoodReceipt[] {
+  if (ex.checkpoint) return structuredClone(ex.checkpoint.receipts);
+  return ex.baseReceipts.map((base) => {
+    const receipt = structuredClone(base);
+    for (const id of ex.children) {
+      const r = rt.records.get(id),
+        p = r?.params as { actor?: string; bowl?: string } | undefined;
+      if (!r || p?.actor !== receipt.actor || p.bowl !== receipt.bowl) continue;
+      if (r.verb === 'serve' && r.history.some((h) => h.phase === 'back')) {
+        receipt.served = true;
+        receipt.portion = receipt.remaining = 1;
+        receipt.food = ex.potContents?.food;
+        receipt.serves.push(id);
+      }
+      if (r.verb === 'eat') {
+        let phase: string | undefined;
+        for (const h of r.history) {
+          // Ordinary eat commits only on dip→lift. Repeated cancellation/status
+          // entries at the same phase are not another spoonful.
+          if (h.phase === 'lift' && phase !== 'lift')
+            receipt.remaining = Math.max(0, q6(receipt.remaining - SPOONFUL));
+          phase = h.phase;
+        }
+        if (r.history.some((h) => h.status === 'executing'))
+          receipt.eats.push(id);
+      }
+    }
+    receipt.consumed = q6(receipt.portion - receipt.remaining);
+    receipt.consumptionCompleted = receipt.served && receipt.remaining <= 1e-9;
+    return receipt;
+  });
+}
+function receiptIssue(
+  rt: Runtime,
+  ex: Exec,
+  receipts: SharedFoodReceipt[],
+): Diagnostic | undefined {
+  for (const r of receipts) {
+    const e = rt.world.entities[r.bowl];
+    if (
+      !e ||
+      e.contents?.fraction !== r.remaining ||
+      (r.served && e.contents?.food !== r.food)
+    )
+      return diag(
+        'resume-material',
+        `${r.bowl} no longer matches its own committed serving/consumption receipt`,
+        [r.actor, r.bowl, ex.p.pot],
+      );
+  }
+  const served = receipts.reduce(
+      (n, r, i) => n + r.serves.length - ex.baseReceipts[i].serves.length,
+      0,
+    ),
+    pot = rt.world.entities[ex.p.pot]?.contents;
+  if (
+    pot &&
+    (!Number.isFinite(pot.fraction) || pot.fraction < 0 || pot.fraction > 1)
+  )
+    return diag(
+      'resume-material',
+      `${ex.p.pot} has invalid retained food material`,
+      [ex.p.pot, ex.id],
+    );
+  if (
+    JSON.stringify(pot) !==
+    JSON.stringify(
+      ex.potContents && {
+        food: ex.potContents.food,
+        fraction: q6(ex.potContents.fraction - served * SERVING),
+      },
+    )
+  )
+    return diag(
+      'resume-material',
+      `${ex.p.pot} changed outside this meal's committed servings`,
+      [ex.p.pot, ex.id],
+    );
+}
+function sealCheckpoint(rt: Runtime, ex: Exec) {
+  if (ex.checkpoint) return;
+  const receipts = ownReceipts(rt, ex);
+  ex.checkpointIssue = receiptIssue(rt, ex, receipts);
+  ex.checkpoint = {
+    receipts,
+    items: Object.fromEntries(
+      utensils(ex.p).map((id) => [id, itemCheckpoint(rt, id)]),
+    ),
+    surfaces: surfaceCheckpoints(rt, ex.p),
+    records: [...rt.records.keys()],
+  };
+}
+function continuationIssue(
+  rt: Runtime,
+  p: SharedFoodBreakParams,
+): Diagnostic | undefined {
+  if (!p.resumeFrom) return;
+  const source = (rt.services.sharedFoodBreaks as Store | undefined)?.[
+      p.resumeFrom
+    ],
+    record = rt.records.get(p.resumeFrom);
+  if (!source || record?.verb !== 'shared_food_break')
+    return diag(
+      'resume-missing',
+      `${p.resumeFrom} is not an existing same-Runtime shared food checkpoint`,
+      [p.resumeFrom],
+    );
+  if (
+    rt.isActive(p.resumeFrom) ||
+    record.status !== 'cancelled' ||
+    !source.checkpoint
+  )
+    return diag(
+      'resume-not-cancelled',
+      `${p.resumeFrom} must finish safe cancellation before continuation`,
+      [p.resumeFrom],
+    );
+  if (source.continuedBy)
+    return diag(
+      'resume-superseded',
+      `${p.resumeFrom} already continued as ${source.continuedBy}; use the latest safely cancelled checkpoint`,
+      [p.resumeFrom, source.continuedBy],
+    );
+  if (fixedBinding(p) !== fixedBinding(source.p))
+    return diag(
+      'resume-binding',
+      `${p.resumeFrom} requires the exact ordered participants, utensils, pot, service and return binding`,
+      [p.resumeFrom, p.pot],
+    );
+  if (source.checkpointIssue) return source.checkpointIssue;
+  for (const [id, expected] of Object.entries(source.checkpoint.items))
+    if (itemCheckpoint(rt, id) !== expected)
+      return diag(
+        'resume-material',
+        `${id}'s material, identity or physical support changed after ${p.resumeFrom}`,
+        [id, p.resumeFrom],
+      );
+  if (
+    JSON.stringify(surfaceCheckpoints(rt, p)) !==
+    JSON.stringify(source.checkpoint.surfaces)
+  )
+    return diag(
+      'resume-support',
+      `${p.resumeFrom}'s declared supporting fixtures moved or changed`,
+      [p.resumeFrom, p.pot],
+    );
+  const known = new Set(source.checkpoint.records),
+    ids = new Set(utensils(p));
+  for (const r of rt.records.values()) {
+    if (
+      known.has(r.id) ||
+      owned(rt, r.id, p.resumeFrom) ||
+      !r.history.some((h) => h.status === 'executing' || h.status === 'blocked')
+    )
+      continue;
+    const q = r.params as {
+      pot?: string;
+      bowl?: string;
+      spoon?: string;
+      item?: string;
+      placements?: StowPlacement[];
+      participants?: SharedFoodParticipant[];
+    };
+    if (
+      [
+        q.pot,
+        q.bowl,
+        q.spoon,
+        q.item,
+        ...(q.placements ?? []).map((q) => q.item),
+        ...(q.participants ?? []).flatMap((q) => [q.bowl, q.spoon]),
+      ].some((id) => !!id && ids.has(id))
+    )
+      return diag(
+        'resume-reused',
+        `${r.verb} ${r.id} used this meal's retained material after ${p.resumeFrom}`,
+        [p.resumeFrom, r.id, p.pot],
+      );
+  }
+}
 function stop(rt: Runtime, ex: Exec, error?: Diagnostic) {
   ex.stopping = true;
   ex.phase = 'stopping';
@@ -204,6 +463,7 @@ export function readSharedFoodBreak(
   const diagnostic =
     activeIssue ??
     ex?.error ??
+    ex?.checkpointIssue ??
     (ex?.child ? rt.records.get(ex.child)?.diagnostic : undefined) ??
     (group && rt.isActive(group.id) ? group.diagnostic : undefined) ??
     rec.diagnostic;
@@ -215,6 +475,10 @@ export function readSharedFoodBreak(
   }));
   return {
     action,
+    purpose: ex?.purpose,
+    resumeFrom: p.resumeFrom,
+    continuedBy: ex?.continuedBy,
+    receipts: ex ? ownReceipts(rt, ex) : undefined,
     status: rec.status,
     phase: ex?.phase ?? rec.phase ?? rec.status,
     current: ex?.child,
@@ -247,11 +511,8 @@ export function readSharedFoodBreak(
 }
 const id = z.string().min(1).max(160),
   xz = z.tuple([z.number(), z.number()]);
-export const sharedFoodBreak: ActionDef<
-  SharedFoodBreakParams,
-  Record<string, never>,
-  Exec
-> = {
+type SharedFoodDefinition = ActionDef<SharedFoodBreakParams, Program, Exec>;
+export const sharedFoodBreak: SharedFoodDefinition = {
   verb: 'shared_food_break',
   description:
     'Two explicit people take their own utensils, serve only empty bowls, converse/eat, release the group and return utensils through ordinary actions. Safe interruption preserves partial food/items; work resume is separate.',
@@ -278,6 +539,7 @@ export const sharedFoodBreak: ActionDef<
       }),
     ]),
     at: xz,
+    resumeFrom: id.optional(),
   }),
   drivesReservedHands: false,
   yieldTo: (_rt, self) => [self.id],
@@ -303,6 +565,12 @@ export const sharedFoodBreak: ActionDef<
         'Shared food supports ground-only arrangements without usable access links',
         p.participants.map((q) => q.actor),
       );
+    const badContinuation = continuationIssue(rt, p);
+    if (badContinuation) return { ok: false, diagnostic: badContinuation };
+    const source = p.resumeFrom
+        ? (rt.services.sharedFoodBreaks as Store)[p.resumeFrom]
+        : undefined,
+      receipts = source?.checkpoint?.receipts;
     const seen = new Set<string>(),
       destinations = new Set<string>();
     let need = 0;
@@ -387,7 +655,11 @@ export const sharedFoodBreak: ActionDef<
           `${person.bowl} has invalid food fraction ${fraction}`,
           [person.bowl],
         );
-      if (fraction <= 1e-9) need += SERVING;
+      if (
+        fraction <= 1e-9 &&
+        !receipts?.find((r) => r.actor === person.actor)?.served
+      )
+        need += SERVING;
       if (
         new Set(person.returns.map((q) => q.item)).size !== 2 ||
         ![person.bowl, person.spoon].every((item) =>
@@ -464,9 +736,31 @@ export const sharedFoodBreak: ActionDef<
         `${p.pot} needs ${need} remaining servings for empty bowls; has ${pot.contents?.fraction ?? 0}`,
         [p.pot, ...p.participants.map((q) => q.bowl)],
       );
-    return { ok: true, program: {} };
+    return { ok: true, program: { source: p.resumeFrom } };
   },
-  start(rt, p, _program, action) {
+  start(rt, p, program, action) {
+    const source = program.source
+      ? (rt.services.sharedFoodBreaks as Store)[program.source]
+      : undefined;
+    const baseReceipts = source
+      ? structuredClone(source.checkpoint!.receipts)
+      : p.participants.map((person) => {
+          const bowl = rt.world.entities[person.bowl],
+            remaining = bowl.contents?.fraction ?? 0;
+          return {
+            actor: person.actor,
+            bowl: person.bowl,
+            spoon: person.spoon,
+            food: bowl.contents?.food,
+            served: remaining > 1e-9,
+            portion: remaining,
+            remaining,
+            consumed: 0,
+            consumptionCompleted: false,
+            serves: [],
+            eats: [],
+          } satisfies SharedFoodReceipt;
+        });
     const queue: Step[] = [];
     for (const person of p.participants) {
       const held = heldBy(rt.world, person.actor),
@@ -492,7 +786,10 @@ export const sharedFoodBreak: ActionDef<
           },
           phase: 'taking',
         });
-      if ((rt.world.entities[person.bowl].contents?.fraction ?? 0) <= 1e-9) {
+      if (
+        (rt.world.entities[person.bowl].contents?.fraction ?? 0) <= 1e-9 &&
+        !baseReceipts.find((r) => r.actor === person.actor)!.served
+      ) {
         queue.push({
           verb: 'walk_to',
           params: {
@@ -523,13 +820,22 @@ export const sharedFoodBreak: ActionDef<
       groupEnding: false,
       turns: createTurns(0),
       stopping: false,
+      purpose: source?.purpose ?? action,
+      baseReceipts,
+      potContents: structuredClone(rt.world.entities[p.pot].contents),
     };
+    if (source) source.continuedBy = action;
     store(rt)[action] = ex;
     return ex;
   },
   step(rt, ex, dt) {
     if (!ex.stopping) {
-      const bad = intervention(rt, ex) ?? childProblem(rt, ex);
+      const bad =
+        (ex.p.resumeFrom
+          ? receiptIssue(rt, ex, ownReceipts(rt, ex))
+          : undefined) ??
+        intervention(rt, ex) ??
+        childProblem(rt, ex);
       if (bad) stop(rt, ex, bad);
       else if ((rt.tick - ex.started) * DT >= 180)
         stop(
@@ -546,6 +852,7 @@ export const sharedFoodBreak: ActionDef<
       for (const id of ex.children) if (rt.isActive(id)) rt.cancel(id);
       if (ex.children.some((id) => rt.isActive(id)))
         return { status: 'running', phase: 'stopping' };
+      sealCheckpoint(rt, ex);
       return ex.error
         ? { status: 'failed', diagnostic: ex.error }
         : { status: 'completed', outputs: { partial: true } };
@@ -576,7 +883,10 @@ export const sharedFoodBreak: ActionDef<
     if (!ex.group) {
       ex.group = dispatch(rt, ex, {
         verb: 'converse',
-        params: { actors: ex.p.participants.map((p) => p.actor), at: ex.p.at },
+        params: {
+          actors: ex.p.participants.map((p) => p.actor),
+          at: ex.p.at,
+        },
         phase: 'gathering',
       }).id;
       ex.child = undefined;
@@ -637,11 +947,14 @@ export const sharedFoodBreak: ActionDef<
       return { status: 'running', phase: 'stopping' };
     }
     ex.phase = 'completed';
+    sealCheckpoint(rt, ex);
     return {
       status: 'completed',
       outputs: {
         returned: ex.p.participants.flatMap((p) => p.returns),
         group: ex.group,
+        purpose: ex.purpose,
+        receipts: structuredClone(ex.checkpoint!.receipts),
       },
     };
   },
@@ -650,6 +963,6 @@ export const sharedFoodBreak: ActionDef<
     return { ok: true, deferred: true };
   },
   resumable:
-    'Active shared-food coordination is explicitly nonresumable; safely stop, persist quiescent food/items and explicitly retry.',
+    'Active reload is unsupported; explicit resumeFrom continues only the latest safely cancelled same-Runtime material checkpoint.',
 };
 export const SHARED_FOOD_ACTIONS: ActionDef[] = [sharedFoodBreak];
