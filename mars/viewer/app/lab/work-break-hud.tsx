@@ -12,6 +12,7 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   const [feedback, setFeedback] = useState('');
   if (!example) return null;
   const B = example.workBreak;
+  const preparedDay = sim.scenario.name.startsWith('prepared-day-');
   const rt = sim.rt, person = B.people.find(p => p.actor === actor)!;
   const records = [...rt.records.values()];
   const active = records.filter(r => rt.isActive(r.id));
@@ -43,13 +44,18 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
   const submit = (verb: string, params: unknown, text: string) => response(rt.submit(verb, params), text);
   return <div className="lab-hud lab-classroom" data-testid="work-break-hud">
     <div className="lab-hud-head">HYPOTHETICAL · work and shared food · one continuing world</div>
-    <ol>
+    {preparedDay ? <ol>
+      <li>Start notes, then Interrupt notes after some progress. Wait for safe stand-up.</li>
+      <li>Start session, then Start purposeful routine above during presentations or questions, before manually joining {B.work.actor}.</li>
+      <li>That routine prepares the finite cold dish, shares it, sleeps on the grounded mat and finishes the same notes.</li>
+      <li>Use Pause routine and Resume routine for this intention. Manual work and shared-food controls below are separate interventions.</li>
+    </ol> : <ol>
       <li>Start notes, then interrupt after some progress. Wait for safe stand-up.</li>
       <li>Use the classroom controls above: start the session, join {B.work.actor}, ask a question, watch both talks and conversations, and wait for departure.</li>
       <li>Start shared food break: both people take utensils, serve, gather, eat and return them.</li>
       <li>Stop anytime. After safe stopping, restart to use retained utensils and partial portions.</li>
       <li>When hands are free, resume the same notes, or use the quiet-rest controls below and get up before resuming. Individual food controls remain available below.</li>
-    </ol>
+    </ol>}
     <div data-testid="break-work-readout">Notes: {'code' in work ? work.message : `${work.status} · ${work.task ?? B.work.task ?? 'Notes'} · ${work.user ?? 'unassigned'} · ${work.elapsed.toFixed(1)}/${work.duration}s · ${work.phase ?? 'ready'}`}</div>
     <div className="lab-classroom-controls">
       <button disabled={workBusy || stationBusy || !('code' in work) && work.status === 'unfinished'} onClick={() => submit('work_at', B.work, 'Starting notes')}>Start notes</button>
@@ -92,6 +98,8 @@ export function WorkBreakHud({ sim, refresh }: { sim: LabSim; refresh: () => voi
     </details>
     <div data-testid="break-action-readout">{active.filter(r => !r.parent).map(r => <div key={r.id}>{r.verb} · {r.status} · {r.phase}{r.diagnostic && ` · ${r.diagnostic.code}: ${r.diagnostic.message}`}</div>)}</div>
     <div role="status" data-testid="break-feedback">{feedback}</div>
-    <small>Standing shared meal, explicit instructions and returns. Missing food, movement, full hands and resource conflicts refuse with named diagnostics. Quiet seated rest uses the spare chair through the controls below; get up or Stop and wait for release before resuming work. Sleep, autonomous scheduling and seated meals are later increments.</small>
+    <small>{preparedDay
+      ? 'The purposeful routine handles preparation, the shared meal, grounded sleep and return to the same notes. Its controls above retain that intention; manual controls can interrupt it. One cold recipe and one flat mat with the current rigs; Reset replaces the world and active reload restoration is unsupported.'
+      : 'Standing shared meal, explicit instructions and returns. Missing food, movement, full hands and resource conflicts refuse with named diagnostics. Quiet seated rest uses the spare chair through the controls below; get up or Stop and wait for release before resuming work. Sleep, autonomous scheduling and seated meals are later increments.'}</small>
   </div>;
 }
