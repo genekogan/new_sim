@@ -3215,3 +3215,16 @@ TypeScript, zero-warning lint, registration parity and13 focused gate/lifetime c
 PASS; main48other-owner paths preserved byte/mode/mtime/status, staged0. Candidate
 branding is local only until the frozen clean full gate and public verification.
 Evidence will regenerate from that gate’s exact engine execution before publication.
+
+## Alpha final acceptance review — 2026-10-02
+
+Early43d07ec gate deliberately interrupted after lint/deployment PASS, while engine
+execution was incomplete: SIGINT, cleanupError null, later stages unrun. Receipt
+.cloudflare/gate/2026-10-02T22-14-57-663Z/report.json remains non-green. Concrete
+coverage gap: rotated planting test preserves interruptions/completesA but its
+declared two-plot terminal contract lacksB completion. A bounded added normal-UI
+Play witness is being prepared separately; no original assertions/contracts narrowed.
+Final architecture review found no consequential boundary blocker; clarified End
+as requested safe cleanup with retained blocked ownership, dated the old52startup
+count and separated Scenario.continuous from healthy world-clock liveness.
+No candidate acceptance/publication or unrestricted recovery claim.

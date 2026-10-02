@@ -107,8 +107,10 @@ not attempt to continue uncertain state. See the [failure model](ENGINE_GUIDE.md
 Individual Pause/Interrupt requests safe physical cleanup while others continue.
 Keep Play running until cleanup finishes. Resume is explicit after intervention.
 Director/player commands use the same admission, claims, support and execution;
-refusal explains the named resource or geometry. End retains partial effects and
-releases resources safely; it does not claim unfinished purposes completed.
+refusal explains the named resource or geometry. End requests ordinary safe cleanup
+and retains partial effects. If a permitted return is blocked, the actor retains
+actual ownership with an explained wait; unblock the support and use the activity’s
+documented retry. End does not claim unfinished purposes completed.
 No active save/load or reload-restoration guarantee is provided.
 
 ## Combined runs
@@ -193,8 +195,9 @@ are actionable; intentional diagnostic demonstrations are explicitly labeled.
 `window.__marsEngine` offers scenario loading, fixed stepping, detached records/world,
 violations, intention/day/garden readouts and camera facts. Programmatic stepping
 is useful but does not establish natural rendering or automatic Play timing.
-The selector startup audit passed fresh-load/Reset/first-Step for all52
-selectable presets (53cases including parity); it is deliberately not completion evidence. See [current evidence index](INDEX.md).
+The dated release37 startup audit covered52 selectable presets (53cases including
+parity). Current registration/contract/proof counts are in [scenario coverage](SCENARIO_COVERAGE.json).
+Fresh-load/Reset/first-Step checks are deliberately not completion evidence.
 
 Local: `cd viewer && npm run dev`, then `/lab`. Contributor rules:
 [ENGINE_GUIDE](ENGINE_GUIDE.md). Required clean combined integration:

@@ -226,8 +226,9 @@ These are bounded host safeguards, not recovery guarantees for arbitrary future
 inputs. The executor guard is an unreleased candidate change; source inspection
 and focused checks do not make it an online feature.
 
-The legacy `Scenario.continuous` flag also keeps manually started finite presets
-alive. True ongoing dispatch must additionally declare `execution: 'sustained'`;
+The legacy `Scenario.continuous` flag affects authored completion/budget for
+manually started finite presets; healthy world stepping continues independently
+of that flag. True ongoing dispatch must additionally declare `execution: 'sustained'`;
 only that declared class keeps authoring commitments after `maxTicks`, which bounds
 its validation window. The production stress preset declares this explicitly.
 Fixed DT, seeded choices, bounded per-frame advancement and manual Pause are unchanged.
