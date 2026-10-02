@@ -2239,6 +2239,31 @@ PASS, viewerTSc/lint. Integrates worker ef5a1ce as e28f035; adds exact browseras
 that completedfirst7s performance stays7s duringsecondperformer use. FreshactualPlay
 recheck and cleancombinedgate remain required; no releasedrepairclaim yet.
 
+### Combined gate startup exclusion repaired, not waived — 2026-10-02
+
+Frozen6b04a8b gate09:28PASS lint/unit290/engine1224 (6SKIP/11TODO)/bothTSc,
+then separatecamera entry failed its15s selector assertion: iframe assets200,
+correct classroom8 DOM present in finaltrace, asynchronous bootstrap not awaited.
+Unchanged focused casePASS14.8s/16.3soverall. Root retained failuretrace/context
+under .cloudflare/vocabulary-camera-entry-failure and ended alreadyREDgate with
+SIGINT (reportsourceChangedfalse/gitDirtyfalse/cleanupnull); not a fullgreenclaim.
+
+Focused test now waits explicit embeddedengine.ready AND requestedclassroom8 before
+the same selector/session/frames/noJev/noerror assertions. Original120s testcase
+and15s assertions remain unchanged; this is a bootstrap precondition, not a
+startup-performance guarantee. No productioncamera policy or authoritative engine
+change. Fresh focused proof and clean fullgate remain required before publication.
+All48other-owner paths remain exactpreserved; gallery/readingcircle remain future.
+
+### Embedded Lab focused readiness proof — 2026-10-02
+
+Readiness-first camera entry and same-world pause/dispose/reset2/2PASS19.5s on
+30ab791; root personally inspected both actualPNGs. Earlier originaltest14.8s
+pass and failed24.6s trace remain separate. Focused type-aware lint additionally
+exposed pre-existing missing Node type context in this browserfile; add the
+standard triple-slash reference, no runtime/dependency/assertion change. Full
+combinedgate restart remains required; no publicnewactivity claim.
+
 ### Future guided gallery shared boundary — 2026-10-02
 
 Separate gallery-lab integrates13-case gallery core2e6a185 (29focused checksPASS),

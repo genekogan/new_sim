@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -15,6 +16,15 @@ test('classroom links to a live camera view of the selected arrangement', async 
   await page.getByRole('link', { name: 'Open a separate classroom camera review' }).click();
   const camera = await next;
   const frame = camera.frameLocator('iframe');
+  // The embedded Lab boots asynchronously (models, hook, then React controls).
+  // Use its explicit readiness contract before asserting selected-arrangement UI;
+  // neither the 120s journey deadline nor the original 15s assertions change.
+  await camera.waitForFunction(() => {
+    const embedded = document.querySelector<HTMLIFrameElement>('iframe')?.contentWindow as
+      | (Window & { __marsEngine?: { ready: boolean; state(): { scenario: string } } })
+      | null;
+    return embedded?.__marsEngine?.ready && embedded.__marsEngine.state().scenario === 'classroom-8';
+  });
   await expect(frame.getByRole('combobox', { name: 'Scenario' })).toHaveValue('classroom-8');
   await frame.getByRole('button', { name: 'Start session', exact: true }).click();
   await camera.waitForFunction(() => {
