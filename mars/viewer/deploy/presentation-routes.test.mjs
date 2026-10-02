@@ -13,8 +13,8 @@ const main = transformSync(
     jsxFactory: 'createElement',
   },
 ).code;
-function renderRoute(path) {
-  const url = new URL(path, 'https://mars.example');
+function renderRoute(path, origin = 'https://mars.example') {
+  const url = new URL(path, origin);
   const components = ['Studio', 'Reconstruction', 'Guide', 'Lab'];
   let tree;
   vm.runInNewContext(main, {
@@ -159,5 +159,29 @@ test('generated Worker admits photo/presentation routes and retains method/unkno
       404,
       path,
     );
+  }
+});
+
+test('simulation domain keeps the campus homepage at root and Lab on its explicit route', () => {
+  for (const origin of [
+    'https://sim.mars.college',
+    'https://mars-campus-2026.<workers-subdomain>.workers.dev',
+    'http://127.0.0.1:5391',
+  ]) {
+    for (const [path, year] of [
+      ['/', 2026],
+      ['/?year=2020', 2020],
+      ['/?scenario=living-day-4', 2026],
+    ]) {
+      const root = renderRoute(path, origin);
+      assert.equal(root.type, 'Studio', `${origin}${path}`);
+      assert.equal(root.props.presentation, true);
+      assert.equal(root.props.year, year);
+    }
+    for (const path of ['/lab', '/lab/', '/lab?scenario=living-day-4']) {
+      const lab = renderRoute(path, origin);
+      assert.equal(lab.type, 'Lab', `${origin}${path}`);
+      assert.equal(lab.props?.defaultScenario, undefined);
+    }
   }
 });

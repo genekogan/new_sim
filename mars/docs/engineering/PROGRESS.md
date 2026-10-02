@@ -2784,3 +2784,8 @@ whole-alpha estimate20–36workinghours, medium-low confidence, subject to actua
 coverage/liveness/performance findings. Preserve original history/assets/pins.
 Deployed `2026-10-02T15:28:48.809Z`, finally verified `2026-10-02T15:48:49.365124Z`; rollback38
 `7616e47a-9149-4b71-ba14-2ea8e5bc6660`. Public bundle `main-Bx4z1zKg.js`. No push/remotes.
+
+
+## 2026-10-02 — owner-requested root homepage repair (candidate)
+
+Removed the hostname-specific sim.mars.college root-to-Lab shortcut. The root now uses the established campus presentation homepage with its year query; Lab remains /lab and its explicit scenario query. This corrects an unauthorized interpretation of publishing the simulator domain, without changing engine/activity/camera mechanics or historical values. Added exact-host route regression covering root/year/scenario queries and explicit Lab aliases. Focused checks and clean full gate/public verification remain required before release; alpha stabilization and vocabulary expansion remain paused.

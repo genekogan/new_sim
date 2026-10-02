@@ -28,8 +28,6 @@ class ErrorBoundary extends Component<
   }
 }
 const route = location.pathname.replace(/\/$/, '') || '/';
-// The explicitly requested simulation domain opens the existing Lab, not a new site.
-const simulationHome = route === '/' && location.hostname === 'sim.mars.college';
 const requestedYear = new URLSearchParams(location.search).get('year');
 const presentationYear =
   requestedYear && /^202[0-7]$/.test(requestedYear)
@@ -48,8 +46,8 @@ createRoot(document.getElementById('root')!).render(
         <Studio
           year={route === '/studio' ? 2026 : Number(route.split('/')[2])}
         />
-      ) : route === '/lab' || simulationHome ? (
-        <Lab defaultScenario={simulationHome ? 'living-day-4' : undefined} />
+      ) : route === '/lab' ? (
+        <Lab />
       ) : route === '/simulation-guide' ? (
         <Guide />
       ) : route === '/' ? (
