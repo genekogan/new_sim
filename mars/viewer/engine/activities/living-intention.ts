@@ -6,6 +6,7 @@ import { DT, type Runtime } from '../runtime/runtime.ts';
 import { readWorkstation } from '../objects/workstation.ts';
 import { readBook } from '../objects/reading.ts';
 import { readDrawing } from '../objects/drawing.ts';
+import { readSeedbed } from '../objects/planting.ts';
 
 const verbs = [
   'work_at',
@@ -15,6 +16,7 @@ const verbs = [
   'sleep',
   'garden_care',
   'drawing_work',
+  'seed_planting',
 ] as const;
 export interface IntentionBinding {
   verb: (typeof verbs)[number];
@@ -114,7 +116,38 @@ function progress(rt: Runtime, b?: IntentionBinding): number {
         : undefined;
   return r && !('code' in r) ? r.elapsed : 0;
 }
+function sameSeedBinding(
+  state: { actor?: string; source?: string; returnSlot?: string },
+  b: IntentionBinding,
+) {
+  return (
+    state.actor === b.params.actor &&
+    state.source === b.params.seeds &&
+    state.returnSlot === b.params.returnSlot
+  );
+}
+function completedSeed(rt: Runtime, b: IntentionBinding) {
+  if (b.verb !== 'seed_planting') return false;
+  const state = readSeedbed(rt, String(b.params.plant));
+  return (
+    !('code' in state) &&
+    state.completed &&
+    !!state.purpose &&
+    sameSeedBinding(state, b)
+  );
+}
 function continued(rt: Runtime, b: IntentionBinding): IntentionBinding {
+  if (b.verb === 'seed_planting') {
+    const state = readSeedbed(rt, String(b.params.plant));
+    if (
+      !('code' in state) &&
+      state.purpose &&
+      !state.completed &&
+      sameSeedBinding(state, b)
+    )
+      return { verb: b.verb, params: { ...b.params, resume: true } };
+    return structuredClone(b);
+  }
   if (b.verb === 'drawing_work') {
     const state = readDrawing(rt, String(b.params.pad));
     if (
@@ -237,7 +270,24 @@ export const livingIntention: ActionDef<LivingIntentionParams, null, Exec> = {
           [p.actor],
         ),
       };
-    for (const objective of p.objectives)
+    for (const objective of p.objectives) {
+      if (
+        objective.sliceSeconds !== undefined &&
+        objective.alternatives.some((b) => b.verb === 'seed_planting')
+      )
+        return {
+          ok: false,
+          diagnostic: diagnostic(
+            'seed-slice',
+            `${objective.label} deposits finite seed fractions; sliceSeconds cannot measure planting. Use safe Pause and explicit Resume for partial deposits.`,
+            [
+              p.actor,
+              ...objective.alternatives
+                .filter((b) => b.verb === 'seed_planting')
+                .map((b) => String(b.params.plant)),
+            ],
+          ),
+        };
       for (const b of objective.alternatives) {
         const def = rt.registry.get(b.verb);
         if (
@@ -254,6 +304,7 @@ export const livingIntention: ActionDef<LivingIntentionParams, null, Exec> = {
             ),
           };
       }
+    }
     return { ok: true, program: null };
   },
   start(rt, p, _program, action) {
@@ -342,6 +393,21 @@ export const livingIntention: ActionDef<LivingIntentionParams, null, Exec> = {
       return ex.diagnostic
         ? { status: 'blocked', diagnostic: ex.diagnostic }
         : { status: 'running', phase: 'waiting' };
+    // Safe interruption can catch a fully deposited seedbed during leaf cleanup.
+    // Record that material effect after release instead of asking the leaf to repeat.
+    const fixed = ex.chosen[goal.purpose];
+    const retained = (fixed ? [fixed] : goal.alternatives).find((b) =>
+      completedSeed(rt, b),
+    );
+    if (retained) {
+      ex.chosen[goal.purpose] ??= structuredClone(retained);
+      ex.completed.push(goal.label);
+      ex.index++;
+      ex.mode = 'running';
+      ex.diagnostic = undefined;
+      ex.retryTick = rt.tick;
+      return { status: 'running', phase: 'retained-seed-checkpoint' };
+    }
     const result = choose(rt, ex);
     ex.retryTick = rt.tick + 1 / DT;
     if ('diagnostic' in result) {
