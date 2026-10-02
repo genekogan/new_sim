@@ -165,3 +165,22 @@ Local: `cd viewer && npm run dev`, then `/lab`. Contributor rules:
 [ENGINE_GUIDE](ENGINE_GUIDE.md). Required clean combined integration:
 [release checklist](RELEASE_CHECKLIST.md). MCP/director commands use the same runtime;
 see `/simulation-agent-guide.md` and `viewer/deploy/README.md`. Never Git push/add a remote.
+
+
+## Shared reading candidate (not yet public)
+
+`reading-circle` and `reading-circle-rotated` use the same flat, supported book
+and reader. Start shared reading then Play: ordinary seated reading advances a
+real bookmark, then listeners gather attention around a silent discussion before
+the reader returns to the same purpose. Ask/Answer/Floor retain linked contributions
+at the actual bookmark; a declared late listener can Join or Leave. Pause releases
+physical holds without discarding progress; directing the reader safely interrupts
+reading and requires explicit Resume. End releases resources and preserves the
+unfinished book. Resume unfinished book then creates a new circle around that same
+reader/task/book, retaining earlier contributions; completed books cannot restart.
+
+Two authored grounded arrangements, two initial listeners and one declared late
+listener; no arbitrary reader replacement, held-book reading, speech or historical
+text. Ordinary controls, selector/quick tour, shared attention and camera facts are
+wired; focused engine/type checks pass. Actual Play, inspected captures, combined
+gate and publication remain required before a supported public claim.

@@ -2325,3 +2325,15 @@ scenario and initiate its actual activity, then verify camera follow/auto leaves
 same paused authoritative tick/hash/violations. Existing classicalcamera assertions
 remain intact;120s/15s limits and no retries unchanged. No policy/quality/MP4claim;
 all three executions/captures await the serializedbrowser slot after release37gate.
+
+
+### Shared reading future Lab integration — 2026-10-02
+
+Reviewed Sol6.1 core fa0aee4/paused-membership repair0d4372f and HUD/spec c7a8900.
+Mount the guarded real reading-circle panel, add both arrangements to the quick
+tour, and explain live Resume versus a new circle continuing the same unfinished
+book after End. Detached hooks, claim-gated attention and read-only camera facts
+use the registered parent/ordinary children; existing reading rig remains unchanged.
+The source is separate from frozen release37 ca6bb5d. Focused engine59PASS and
+camera observer8PASS preceded this mount; two strict actualPlay cases/ten planned
+captures and combined/public proof remain pending. Not shipped or visually proven.

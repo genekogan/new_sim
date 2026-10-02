@@ -8,7 +8,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const living =
     scenario.startsWith('living-day-') ||
     scenario === 'garden-care' ||
-    scenario.startsWith('gallery-tour') || scenario.startsWith('table-cleanup') || scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
+    scenario.startsWith('reading-circle') || scenario.startsWith('gallery-tour') || scenario.startsWith('table-cleanup') || scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
   const eight =
     scenario === 'classroom-8' ||
@@ -60,6 +60,8 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('music-dance')}>
           Music and dancing
         </button>
+        <button onClick={() => onScenario('reading-circle')}>Read and discuss the same book</button>
+        <button onClick={() => onScenario('reading-circle-rotated')}>Rotated reading circle</button>
         <button onClick={() => onScenario('gallery-tour')}>Guided gallery walk</button>
         <button onClick={() => onScenario('gallery-tour-short')}>Two-stop gallery with late joining</button>
         <button onClick={() => onScenario('table-cleanup')}>Clear a communal table</button>
@@ -114,6 +116,18 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         are hypothetical. Use Play and the activity controls below; Reset starts
         the selected room again.
       </p>
+      {scenario.startsWith('reading-circle') && (
+        <p className="lab-desc">
+          Start shared reading, then Play. The same reader physically reads a
+          supported book, pauses for questions and returns to its retained
+          bookmark. Ask/Answer/Floor changes shared attention; late Join and Leave
+          use ordinary movement. Pause or direct the reader away, then explicitly
+          Resume. After End safely releases the circle, Resume unfinished book
+          starts a new circle around that same unfinished purpose. A completed
+          book cannot silently restart. These are silent hypothetical discussions,
+          not generated dialogue or a historical text.
+        </p>
+      )}
       {scenario.startsWith('gallery-tour') && (
         <p className="lab-desc">
           Start gallery tour, then Play. The same people physically approach two
