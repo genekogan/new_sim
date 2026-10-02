@@ -995,15 +995,17 @@ export function readArtSharing(rt: Runtime, session: string) {
       membership: m.state,
       state: !m.active
         ? m.state
-        : ['paused', 'waiting', 'draining'].includes(ex.mode)
-          ? 'paused'
-          : floor === m.actor
-            ? 'speaking'
-            : m.hold &&
-                rt.isActive(m.hold) &&
-                rt.records.get(m.hold)?.phase === 'occupied'
-              ? 'listening'
-              : 'arriving',
+        : ['ending', 'completed'].includes(ex.mode)
+          ? 'ended'
+          : ['paused', 'waiting', 'draining'].includes(ex.mode)
+            ? 'paused'
+            : floor === m.actor
+              ? 'speaking'
+              : m.hold &&
+                  rt.isActive(m.hold) &&
+                  rt.records.get(m.hold)?.phase === 'occupied'
+                ? 'listening'
+                : 'arriving',
       active: m.active,
       hold: m.hold,
       departure: m.departure,

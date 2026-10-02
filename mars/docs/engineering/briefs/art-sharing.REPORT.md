@@ -75,7 +75,7 @@ floor holder, current turn, pending question, completed effects and per-role
 participants. Participant facts include declared slot, active membership,
 physical hold, ordinary departure, actual viewing/speaking and states
 `invited`, `arriving`, `listening`, `speaking`, `paused`, `left`,
-`directed-away`. Mark arrays and effects are detached.
+`directed-away`, `ended`. Mark arrays and effects are detached.
 
 `scenarios/art-sharing.ts` exports `artSharingScene()`,
 `artSharingWorld(premade = true)`, `artSharingBinding()`,

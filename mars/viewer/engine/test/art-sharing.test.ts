@@ -101,6 +101,11 @@ test('host and visitors physically view the actual retained pad, take floors and
   assert.equal(a.status, 'completed', a.diagnostic?.message);
   const ended = read(rt, a.id);
   assert.equal(ended.finished, true);
+  assert.ok(
+    ended.participants
+      .filter((m) => m.active)
+      .every((m) => m.state === 'ended'),
+  );
   assert.equal(ended.elapsed, 32);
   assert.equal(ended.floorHolder, undefined);
   assert.equal(ended.attentionTarget, undefined);
