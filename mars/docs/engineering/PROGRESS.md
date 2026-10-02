@@ -2317,3 +2317,11 @@ asserts enable/disable does not change a paused authoritative hash or tick.
 This repair stays in futuregallery candidate; frozen release37ca6bb5d remains
 unchanged and currentnewseven cameraControls are not yet available. Focused
 checks/actualPlay/fullcombined/public verification remain required for the interface.
+
+### Future shared camera entry regression authoring — 2026-10-02
+
+Three actual-browser authored cases preserve requestedcreative/gallery/rotatedreading
+scenario and initiate its actual activity, then verify camera follow/auto leaves the
+same paused authoritative tick/hash/violations. Existing classicalcamera assertions
+remain intact;120s/15s limits and no retries unchanged. No policy/quality/MP4claim;
+all three executions/captures await the serializedbrowser slot after release37gate.

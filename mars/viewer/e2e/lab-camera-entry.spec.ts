@@ -72,3 +72,47 @@ test('optional camera observes the current paused Lab and disposes before reset'
   await expect(page.getByTestId('classroom-hud')).toContainText('ready');
   expect(errors).toEqual([]);
 });
+
+// Preset discovery is a shared engine/camera interface, independent of shot policy.
+for (const [scenario, startControl] of [
+  ['creative-afternoon', 'Start creative afternoon'],
+  ['gallery-tour', 'Start gallery tour'],
+  ['reading-circle-rotated', 'Start shared reading'],
+] as const) {
+  test(`activity review retains requested ${scenario} and observes the same paused world`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(`/cinematography/review.html?scenario=${scenario}`);
+    await page.waitForFunction((name) => {
+      const embedded = document.querySelector<HTMLIFrameElement>('iframe')?.contentWindow as
+        | (Window & { __marsEngine?: { ready: boolean; state(): { scenario: string } } }) | null;
+      return embedded?.__marsEngine?.ready && embedded.__marsEngine.state().scenario === name;
+    }, scenario);
+    const frame = page.frameLocator('iframe');
+    await expect(frame.getByRole('combobox', { name: 'Scenario', exact: true })).toHaveValue(scenario);
+    await frame.getByRole('button', { name: startControl, exact: true }).click();
+    await page.waitForFunction(() => ((window as unknown as {
+      __cameraReview?: { report(): { frames: unknown[] } }
+    }).__cameraReview?.report().frames.length ?? 0) > 2);
+    await frame.getByRole('button', { name: 'Pause', exact: true }).click();
+    const evidence = await frame.locator('body').evaluate(() => {
+      const h = (window as unknown as { __marsEngine: {
+        state(): { tick: number; scenario: string }; stateHash(): string; violations(): unknown[]
+      } }).__marsEngine;
+      return { tick: h.state().tick, scenario: h.state().scenario, hash: h.stateHash(), violations: h.violations() };
+    });
+    await page.getByRole('button', { name: 'Follow activity person for 6s', exact: true }).click();
+    await page.getByRole('button', { name: 'Return to auto', exact: true }).click();
+    expect(await frame.locator('body').evaluate(() => {
+      const h = (window as unknown as { __marsEngine: {
+        state(): { tick: number; scenario: string }; stateHash(): string; violations(): unknown[]
+      } }).__marsEngine;
+      return { tick: h.state().tick, scenario: h.state().scenario, hash: h.stateHash(), violations: h.violations() };
+    })).toEqual(evidence);
+    expect(evidence.violations).toEqual([]);
+    expect(errors).toEqual([]);
+    const artifacts = path.resolve('e2e/artifacts', process.env.E2E_RUN ?? 'lab-camera-entry');
+    mkdirSync(artifacts, { recursive: true });
+    await page.screenshot({ path: path.join(artifacts, `same-world-review-${scenario}.png`) });
+  });
+}
