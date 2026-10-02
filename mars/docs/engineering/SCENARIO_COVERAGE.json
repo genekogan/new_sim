@@ -22,20 +22,28 @@
       "conditional-construction": 2
     },
     "recordedCoverageGrades": {
-      "recorded-actual-ui-play": 29,
-      "recorded-step-or-mixed-completion": 8,
-      "recorded-programmatic-effects-or-completion": 20,
+      "recorded-actual-ui-play": 56,
       "recorded-exact-diagnostic": 1,
-      "terminal-gap-metrics-only": 1,
-      "liveness-gap-metrics-only": 1,
+      "recorded-ui-play-bounded-liveness": 1,
       "recorded-still-probe": 1,
+      "recorded-programmatic-effects-or-completion": 2,
       "recorded-actual-ui-play-supported-layout": 2
     },
     "exactCurrentSourceNativeFullGatePassed": false,
     "exactFunctionalInheritedFocusedUiJourneys": 3,
-    "sustainedLivenessProven": 0,
-    "current39Gate": "RUNNING at authoring; explicitly not counted passed",
-    "countMeaning": "Recorded historical/native coverage grades, not63 current-release accepted presets. Unsupported admission and skipped/FIXME/TODO never become activity PASS."
+    "sustainedLivenessProven": 1,
+    "current39Gate": "Historical39 state preserved in proof refs; alpha033 combined native gate/public validation pending.",
+    "countMeaning": "Recorded source-bound historical/candidate coverage grades, not63 current-release accepted presets. Alpha native failures/skips retained; current entire yearbuild, solar/year2026 targeted and final gate/public proof pending.",
+    "sustainedLivenessMeaning": "One bounded stress30 witness through tick2017; not indefinite liveness.",
+    "reconciledAtSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
+    "alphaRecordedPassedScenarioCount": 31,
+    "alphaRecordedManualPassed": 8,
+    "alphaRecordedAdditionalManualFullJourneys": 2,
+    "alphaRecordedScriptedPassed": 19,
+    "alphaPendingTargetedScenarios": [
+      "solar-paint",
+      "year-2026"
+    ]
   },
   "proofKinds": [
     "actual-ui-play-journey",
@@ -226,20 +234,177 @@
       "sha256": "9c019ad60420f67096de62fc06d1b7bd124acc78adc11d7a5bd6e55ae1eb3eac",
       "result": "60 fresh-load/Reset/firstStep + parity; completionProven:false",
       "currentSourceRelationship": "older60 inventory; new3 have focused journeys but full63 parity current gate pending"
+    },
+    "alphaCore": {
+      "kind": "native-local-focused-browser",
+      "source": "a8a863087b340dac65da45575f04ce74bd0b4a03",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-core-play-results.json",
+      "sha256": "873c4c049a2ecf5326fb0ffa92d85077bdae2736e7564629fd97cacfe87b79e2",
+      "result": {
+        "startTime": "2026-10-02T20:21:47.695Z",
+        "duration": 74306.621,
+        "expected": 10,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "Executed at the named source, not freshly executed at033f8cb. Engine runtime/scenario authority unchanged; later renderer lifetime changes mean Reset/resource assertions are not blanket inherited. No full gate or public alpha acceptance.",
+      "sourceAttribution": "Root capture-review source entries and PROGRESS alpha first serialized execution; report config itself does not embed Git SHA.",
+      "caseStatusCounts": {
+        "failed": 1,
+        "passed": 10
+      },
+      "exactCaseNamesInReport": true
+    },
+    "alphaControls": {
+      "kind": "native-local-focused-browser",
+      "source": "0432b8cbc0c53bf798417fe89b082966b8995c7e",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-controls-results.json",
+      "sha256": "bc22c47709596d1e6393303f47ab4c3ea890b1127b290ad2189ffbf0b7b5a08f",
+      "result": {
+        "startTime": "2026-10-02T20:25:55.020Z",
+        "duration": 13092.87,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "Executed at the named source, not freshly executed at033f8cb. Engine runtime/scenario authority unchanged; later renderer lifetime changes mean Reset/resource assertions are not blanket inherited. No full gate or public alpha acceptance.",
+      "sourceAttribution": "Root capture-review control image source0432b8c and PROGRESS paired controls2PASS. repeats2 are the same first quarantine case, not2distinct cases.",
+      "caseStatusCounts": {
+        "passed": 2
+      },
+      "exactCaseNamesInReport": true
+    },
+    "alpha043": {
+      "kind": "native-local-focused-browser",
+      "source": "0432b8cbc0c53bf798417fe89b082966b8995c7e",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-results.json",
+      "sha256": "d6b6e4f54458f86884ca6dbc17a3dff9c4ddfbd830c58dd21553711c60f5ea43",
+      "result": {
+        "startTime": "2026-10-02T20:28:49.635Z",
+        "duration": 207977.129,
+        "expected": 0,
+        "skipped": 15,
+        "unexpected": 16,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "Executed at the named source, not freshly executed at033f8cb. Engine runtime/scenario authority unchanged; later renderer lifetime changes mean Reset/resource assertions are not blanket inherited. No full gate or public alpha acceptance.",
+      "caseStatusCounts": {
+        "failed": 16,
+        "interrupted": 1
+      },
+      "exactCaseNamesInReport": true,
+      "unrunCaseNames": [
+        "alpha prone: fullPlay authored meaningful endpoint and retained supports",
+        "alpha prone-forks: fullPlay authored meaningful endpoint and retained supports",
+        "alpha campfire-evening: fullPlay authored meaningful endpoint and retained supports",
+        "alpha meal: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2020: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2021: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2022: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2023: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2024: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2025: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2026: fullPlay authored meaningful endpoint and retained supports",
+        "alpha solar-paint: fullPlay authored meaningful endpoint and retained supports",
+        "alpha incomplete-stairs: fullPlay named refusal and usable world",
+        "alpha stress-30: fullPlay sustained retargeting beyond60s"
+      ]
+    },
+    "alpha107": {
+      "kind": "native-local-focused-browser",
+      "source": "107af9695913b69253b057cbefc1a3c270545fc3",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-results.json",
+      "sha256": "e363bd9d814c75ef9bd60195ddc6fd0cc947c1a70af02feebcf3c07f110a63e4",
+      "result": {
+        "startTime": "2026-10-02T20:37:14.769Z",
+        "duration": 711969.096,
+        "expected": 7,
+        "skipped": 16,
+        "unexpected": 8,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "Executed at the named source, not freshly executed at033f8cb. Engine runtime/scenario authority unchanged; later renderer lifetime changes mean Reset/resource assertions are not blanket inherited. No full gate or public alpha acceptance.",
+      "caseStatusCounts": {
+        "failed": 7,
+        "interrupted": 1,
+        "passed": 7,
+        "timedOut": 1
+      },
+      "exactCaseNamesInReport": true,
+      "unrunCaseNames": [
+        "alpha hand-up: fullPlay authored meaningful endpoint and retained supports",
+        "alpha prone: fullPlay authored meaningful endpoint and retained supports",
+        "alpha prone-forks: fullPlay authored meaningful endpoint and retained supports",
+        "alpha campfire-evening: fullPlay authored meaningful endpoint and retained supports",
+        "alpha meal: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2020: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2021: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2022: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2023: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2024: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2025: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2026: fullPlay authored meaningful endpoint and retained supports",
+        "alpha solar-paint: fullPlay authored meaningful endpoint and retained supports",
+        "alpha incomplete-stairs: fullPlay named refusal and usable world",
+        "alpha stress-30: fullPlay sustained retargeting beyond60s"
+      ]
+    },
+    "alpha40": {
+      "kind": "native-local-focused-browser",
+      "source": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-results.json",
+      "sha256": "8c9c708bf5e3b735bb8e0f1aae958c6c7ed71ee16bcbb1f740a6ac0a40a12584",
+      "result": {
+        "startTime": "2026-10-02T20:52:02.691Z",
+        "duration": 715128.0549999999,
+        "expected": 19,
+        "skipped": 0,
+        "unexpected": 7,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "Executed at the named source, not freshly executed at033f8cb. Engine runtime/scenario authority unchanged; later renderer lifetime changes mean Reset/resource assertions are not blanket inherited. No full gate or public alpha acceptance.",
+      "caseStatusCounts": {
+        "failed": 7,
+        "passed": 19
+      },
+      "exactCaseNamesInReport": true
+    },
+    "alpha731": {
+      "kind": "native-local-focused-browser",
+      "source": "7316a1949c304981ac064e676904e84dc010f0aa",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-results.json",
+      "sha256": "925af7de6bb2207e0558fffd4adf1bcb127a495be2e241dac22181151f3b5ee0",
+      "result": {
+        "startTime": "2026-10-02T21:10:06.739Z",
+        "duration": 294931.159,
+        "expected": 5,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "Executed at the named source, not freshly executed at033f8cb. Engine runtime/scenario authority unchanged; later renderer lifetime changes mean Reset/resource assertions are not blanket inherited. No full gate or public alpha acceptance.",
+      "caseStatusCounts": {
+        "failed": 2,
+        "passed": 5
+      },
+      "exactCaseNamesInReport": true
     }
   },
   "tests": {
     "t002": {
       "file": "viewer/e2e/garden-care.spec.ts",
       "name": "garden-care: actual Play partial return, both plants, repeat due, finite exhaustion and director handoff",
-      "method": "actual-ui-play-journey",
+      "method": "mixed-ui-play-and-programmatic-step-completion",
       "outcome": "passed",
       "proofRefs": [
         "public36",
         "public37",
         "public38",
         "gate38"
-      ]
+      ],
+      "proofScopeNotes": "Physical care cycles use UI Play; due-clock waits use hook.step at lines76/83. Historical public proofs remain mixed; alpha-garden-care-full separately proves whole Play."
     },
     "t003": {
       "file": "viewer/e2e/living-day.spec.ts",
@@ -1064,6 +1229,1468 @@
       "proofRefs": [
         "focused39"
       ]
+    },
+    "alpha-core-0": {
+      "file": "viewer/e2e/alpha-control-quarantine.spec.ts",
+      "name": "alpha quarantine: actual Lab activity controls and every hook mutator preserve halted authority until Reset",
+      "method": "focused-browser-contract",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore",
+        "alphaControls"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alphaControls",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        },
+        {
+          "proofRef": "alphaControls",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-core-1": {
+      "file": "viewer/e2e/alpha-control-quarantine.spec.ts",
+      "name": "alpha quarantine: future unclassified hook methods default to refusal and healthy API is unchanged",
+      "method": "focused-browser-contract",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-core-2": {
+      "file": "viewer/e2e/alpha-control-quarantine.spec.ts",
+      "name": "alpha quarantine: year-build inspection detaches pile coordinates and sequence HUD avoids halted admission reentry",
+      "method": "focused-browser-contract",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-core-3": {
+      "file": "viewer/e2e/alpha-discovery.spec.ts",
+      "name": "all shipped registrations are grouped and longer experiences expose real start and intervention instructions",
+      "method": "focused-browser-contract",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-core-4": {
+      "file": "viewer/e2e/alpha-liveness.spec.ts",
+      "name": "alpha actual Play: empty terminal script retains a usable world and independent ordinary walk",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-core-5": {
+      "file": "viewer/e2e/alpha-liveness.spec.ts",
+      "name": "alpha actual Play: refusal terminal script retains a usable world and independent ordinary walk",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-core-6": {
+      "file": "viewer/e2e/alpha-liveness.spec.ts",
+      "name": "alpha actual Play: real reading child failure keeps explanation, cleanup and unrelated movement",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-core-7": {
+      "file": "viewer/e2e/alpha-liveness.spec.ts",
+      "name": "alpha actual Play: genuine invalid fixture visibly halts, then explicit fresh valid Reset restores clock",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-body-0": {
+      "file": "viewer/e2e/body-probe-safety.spec.ts",
+      "name": "delayed playback frames end scripted windows while the unchanged valid world clock continues",
+      "method": "still-world-ui-play-and-renderer-probe",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-body-1": {
+      "file": "viewer/e2e/body-probe-safety.spec.ts",
+      "name": "body probe selectable Step, Reset and Play validate a safe still world",
+      "method": "still-world-ui-play-and-renderer-probe",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-body-2": {
+      "file": "viewer/e2e/body-probe-safety.spec.ts",
+      "name": "synthetic body probe does not change authoritative world or Step outcome",
+      "method": "still-world-ui-play-and-renderer-probe",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCore"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaCore",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ]
+    },
+    "alpha-manual-prepared-day-4": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "prepared-day-4: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-completed/test-results/alpha-manual-play-prepared-1d00e-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-b2d5a5ef47d168bc2609363e0636fd0138ae6a07.json",
+        "sha256": "b19ab1bcd14ab7fbbef1daff52bbeb303bbb3ae5529f60b4bca50e8fff16d611",
+        "source": {
+          "head": "107af9695913b69253b057cbefc1a3c270545fc3",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "7edc35554fbf25df1a48f0e59a4c0c91ca9684f956eb0098262398539d606151"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "unfinished",
+        "preparation",
+        "paused",
+        "sleep",
+        "completed",
+        "followUps",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-manual-prepared-day-8": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "prepared-day-8: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "timedOut",
+          "semanticOutcome": "not-completed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-manual-play-prepared-70325-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-fd7f6452cef1c5dbb0708fa2938921997e9eb5ce.json",
+        "sha256": "b4d5ef748d2cc6873db574f7143820ef8a094749bdb7ee8f254c63ec0d180986",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "8ad162debaa91c4574adc8f60e5f8da658f4fc4932c80f2b1376a73b0af87c22"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "unfinished",
+        "preparation",
+        "sleep",
+        "completed",
+        "followUps",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-manual-prepared-day-studio": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "prepared-day-studio: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-completed/test-results/alpha-manual-play-prepared-59e63-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-97668e019464765e8902eed12e73fa9b042214ff.json",
+        "sha256": "d04fb71dbd09e6b07db53fcffe4d24f248dc422b3594327cb1b080f4fe1a25a4",
+        "source": {
+          "head": "107af9695913b69253b057cbefc1a3c270545fc3",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "7edc35554fbf25df1a48f0e59a4c0c91ca9684f956eb0098262398539d606151"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "unfinished",
+        "preparation",
+        "sleep",
+        "paused",
+        "completed",
+        "followUps",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-manual-design-studio": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "design-studio: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-completed/test-results/alpha-manual-play-design-s-16d72-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-bbe0d47b4f7d3b3c19e6beae1cf3c1ad9a8676b3.json",
+        "sha256": "ea9b9f336c63e7b3bb2e41694ebf3e1a2560cf9fba576cca609a7564127384ce",
+        "source": {
+          "head": "107af9695913b69253b057cbefc1a3c270545fc3",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "7edc35554fbf25df1a48f0e59a4c0c91ca9684f956eb0098262398539d606151"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "unfinished",
+        "question",
+        "completed",
+        "followUps",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-manual-classroom-4": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "classroom-4: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-completed/test-results/alpha-manual-play-classroo-1b06a-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-50ce43afbaa624a0c9d2c78a01d9d9a2eb4032c5.json",
+        "sha256": "75219edcedaedce8599d8c14fbc08bab2a9d6b5941dff2bf451c45a3ab38704d",
+        "source": {
+          "head": "107af9695913b69253b057cbefc1a3c270545fc3",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "7edc35554fbf25df1a48f0e59a4c0c91ca9684f956eb0098262398539d606151"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "presenting",
+        "question",
+        "second",
+        "groups",
+        "ended",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-manual-classroom-8": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "classroom-8: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-completed/test-results/alpha-manual-play-classroo-4ec0f-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-21314687012ee570b7ebcf33547b22f33fa26a8c.json",
+        "sha256": "ae575f297259090f25c9bcc5333382ad397c74066cc33768d78497d457a22047",
+        "source": {
+          "head": "107af9695913b69253b057cbefc1a3c270545fc3",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "7edc35554fbf25df1a48f0e59a4c0c91ca9684f956eb0098262398539d606151"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "presenting",
+        "question",
+        "second",
+        "groups",
+        "ended",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-manual-work-break-4": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "work-break-4: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-completed/test-results/alpha-manual-play-work-bre-2f0d3-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-e4d121b8f00a528d4c3d4f8a20ae519f12c4f5f4.json",
+        "sha256": "5bc8582ced853a066edd3a490712b4d3222ee3beb5dd3cfc260c52e7abf8e1c2",
+        "source": {
+          "head": "107af9695913b69253b057cbefc1a3c270545fc3",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "7edc35554fbf25df1a48f0e59a4c0c91ca9684f956eb0098262398539d606151"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "unfinished",
+        "seated",
+        "question",
+        "groups",
+        "eating",
+        "food",
+        "completed",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-manual-work-break-8": {
+      "file": "viewer/e2e/alpha-manual-play.spec.ts",
+      "name": "work-break-8: full UI Play supported effects, retained intervention and clean terminal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": "full-ui-play-completed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-completed/test-results/alpha-manual-play-work-bre-97877-rvention-and-clean-terminal/attachments/alpha-full-ui-play-proof-9e225b8a51ff8be7dac4d9e235d8dfacc27b2110.json",
+        "sha256": "21fd4aa3886e5ecbda5c39ec0efc3452f4f94a8ac06eb342c216d0a30067b0d6",
+        "source": {
+          "head": "107af9695913b69253b057cbefc1a3c270545fc3",
+          "base": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+          "specSha256": "7edc35554fbf25df1a48f0e59a4c0c91ca9684f956eb0098262398539d606151"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "unfinished",
+        "seated",
+        "question",
+        "groups",
+        "eating",
+        "food",
+        "completed",
+        "clean",
+        "reset"
+      ]
+    },
+    "alpha-preset-wall": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha wall: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-wa-e3f06-point-and-retained-supports/attachments/actual-Play-proof-bb48ddba06cb3c6abb50150341297e759e77f68c.json",
+        "sha256": "f41bc197c21c43ca24044d601b53d3d8073f3ad7b8b03f5c9e61e05636a7cf23",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-u-trap": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha u-trap: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-u--73b7c-point-and-retained-supports/attachments/actual-Play-proof-f9e724741ab514f260ff9d264c44983ebfdfd9e0.json",
+        "sha256": "ad6d917ad40b29d28d2f99264522396f8dc223d51f7c8d93955abf5e5ab80d34",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-narrow-passage": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha narrow-passage: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-na-5e642-point-and-retained-supports/attachments/actual-Play-proof-2d1a5c41abafaf0f72a441fe6543c612dd4cb40a.json",
+        "sha256": "79b050fec8fbde1dd0daf92de289f9d7b84c9028fd90efb6f02f1f74b59a090b",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-stairs": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha stairs: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-st-7b04f-point-and-retained-supports/attachments/actual-Play-proof-549134e5ecfffbb51bb5403831d507265d8432bc.json",
+        "sha256": "37bb5cf841859beb15600155896aa5588bc2c55b148fd56116e779020c0af67a",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-deck-to-ground": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha deck-to-ground: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-de-38e10-point-and-retained-supports/attachments/actual-Play-proof-972f771ca2412bb832b4966fb2058fe526a820be.json",
+        "sha256": "06ccb67ea4636c82c3d4c20eee9a201f850b9aedb87f41bd327ee250f3b23fbe",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-construction": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha construction: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40",
+        "alpha731"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha731",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-co-0d858-point-and-retained-supports/attachments/actual-Play-proof-fa472045f271407f910354c680dec8fce5de77ce.json",
+        "sha256": "924c60f2906aa2213bbec9a803091c26c65af6dd44d582a0d0c45b2d4b2b327b",
+        "source": {
+          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "lifetime-2",
+        "lifetime-3",
+        "final"
+      ]
+    },
+    "alpha-preset-trio": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha trio: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-tr-e1afb-point-and-retained-supports/attachments/actual-Play-proof-ba43b4bea4d2e3ca155677bc643f7f84dc66f54b.json",
+        "sha256": "e5064a192f868c530a29ced26693b1d3f9edc517e1ede015929c3bab40b515a1",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-build-bay": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha build-bay: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha107",
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha107",
+          "nativeStatus": "skipped",
+          "resultStatus": "interrupted"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-bu-5c5a5-point-and-retained-supports/attachments/actual-Play-proof-253dfbd56a514a25ff4950a76cdf04590177bea2.json",
+        "sha256": "7fd81e6d57c204fd422694e4e9ed913360823afcec5fb135a3efd2470e3e006a",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-hand-up": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha hand-up: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha043",
+        "alpha40",
+        "alpha731"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha043",
+          "nativeStatus": "skipped",
+          "resultStatus": "interrupted"
+        },
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha731",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-ha-1440d-point-and-retained-supports/attachments/actual-Play-proof-51c68245f66bff1edc1c182ac72d57e8bb3ec140.json",
+        "sha256": "02ddea7a4a992b711c749af8cd820823dfa8616a680660f69c0e2a1f1d10ebc5",
+        "source": {
+          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-prone": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha prone: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-pr-63a78-point-and-retained-supports/attachments/actual-Play-proof-77dd53fb27ead46870f8b865a0cef54306292eec.json",
+        "sha256": "8bbcb5b1c2b8f6c4673cb3309e04b60c28253504c481c2f395022905a5ade813",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-prone-forks": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha prone-forks: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-pr-a481d-point-and-retained-supports/attachments/actual-Play-proof-f5c936b44e0dcdddd931390c22a03bd7861c1eeb.json",
+        "sha256": "24f41bea713fd72b8c0a2c6d72df8fa8b7d68a3bd067ff7977a1f3d4fe49a030",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-campfire-evening": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha campfire-evening: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40",
+        "alpha731"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha731",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-ca-8ea3d-point-and-retained-supports/attachments/actual-Play-proof-45cdb83d468306d2f981e0d4d7c4e71e5dd0a437.json",
+        "sha256": "1588b9ecdbd2d444ad462de2687f5460550caad46f24349ea2f841ef5388fc90",
+        "source": {
+          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "drained",
+        "usable",
+        "final"
+      ]
+    },
+    "alpha-preset-meal": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha meal: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40",
+        "alpha731"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha731",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-me-30a40-point-and-retained-supports/attachments/actual-Play-proof-d2167d8d1ba6f75f067ed40903593dda0ed54cff.json",
+        "sha256": "bcd040354d65dea3f4fbd309af8d623b27267e855f09d550c6e4d8af6acd7d6a",
+        "source": {
+          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-year-2020": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha year-2020: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40",
+        "alpha731"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha731",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-ye-ca986-point-and-retained-supports/attachments/actual-Play-proof-469f458b8eb0b96d6f30a8670b6b564e8fcae736.json",
+        "sha256": "8f1933e1390308057f742656872db3eb654077ca1c23787242205c2f1be57532",
+        "source": {
+          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-year-2021": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha year-2021: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-ye-9883d-point-and-retained-supports/attachments/actual-Play-proof-c8d81b7de468a4779399eb074ec5e1a03f3127b5.json",
+        "sha256": "d21474621e3d362f48c50597250b26fbd3c84876634930012258e49d227d0755",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-year-2022": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha year-2022: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-ye-64f0a-point-and-retained-supports/attachments/actual-Play-proof-08ddb272cdcf8bd85ea4c3178705e2fc73c01b4a.json",
+        "sha256": "5a6fc9b21eebfc9bf2715c0d9b43fdb83b45dcf3bcb02856d1b791dfcd5acc62",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-year-2023": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha year-2023: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-ye-edae9-point-and-retained-supports/attachments/actual-Play-proof-a2844065604ccad69207f868fb90d0346464c218.json",
+        "sha256": "cc1c86c3257c1f1a02c26d3cbe11a58a8f550af451f42fc2f1d66be6d6f1aa7c",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-year-2024": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha year-2024: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-ye-2d303-point-and-retained-supports/attachments/actual-Play-proof-b1000ca11436c9ec62b29bfd3f0b0c1145309ef7.json",
+        "sha256": "5b3da1ab63705832d4fd455f07ddb048f5036212346e2109ed20a49d5de88f95",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-year-2025": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha year-2025: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-ye-9ecb9-point-and-retained-supports/attachments/actual-Play-proof-8494ea1383aef72ebc71bbe3d4db5aa1f655732d.json",
+        "sha256": "d21a4ebce77885422312f9709feaf99a28823a3a35d0928316ca138b2d6323e7",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-year-2026": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha year-2026: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "failed",
+      "proofRefs": [
+        "alpha40",
+        "alpha731"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha731",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-ye-fbe6c-point-and-retained-supports/attachments/actual-Play-proof-54cdb4374719561e18f566fbbde4392a5f70fd50.json",
+        "sha256": "5569a2af791c20bb778f2e33fc538c6cb8bd551b12dd622ac082823273fa3f55",
+        "source": {
+          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-solar-paint": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha solar-paint: fullPlay authored meaningful endpoint and retained supports",
+      "method": "actual-ui-play-journey",
+      "outcome": "failed",
+      "proofRefs": [
+        "alpha40",
+        "alpha731"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alpha731",
+          "nativeStatus": "unexpected",
+          "resultStatus": "failed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-so-70153-point-and-retained-supports/attachments/actual-Play-proof-5b7287520260e17307445b4133c4c5decf7be20e.json",
+        "sha256": "526399475f270ce07794f2e17091c6812fe6f0819799f6ca83c2888ec4423bcf",
+        "source": {
+          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "final"
+      ]
+    },
+    "alpha-preset-incomplete-stairs": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha incomplete-stairs: fullPlay named refusal and usable world",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-in-7310a-ed-refusal-and-usable-world/attachments/actual-Play-proof-c896e844e083e25c248b271946f3d3e224061f38.json",
+        "sha256": "78bf6319c4a9bf2eee84860a7cc031cfccd0586134d47ea374d342faef96e475",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "progress",
+        "endpoint",
+        "usable",
+        "final"
+      ]
+    },
+    "alpha-preset-stress-30": {
+      "file": "viewer/e2e/alpha-preset-play.spec.ts",
+      "name": "alpha stress-30: fullPlay sustained retargeting beyond60s",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed"
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/alpha-preset-play-alpha-st-5c30a-ained-retargeting-beyond60s/attachments/actual-Play-proof-7fba1c4f897a9b455918e7cea765e680e2e850e9.json",
+        "sha256": "7f6ae1788d32840d6dec0eeb6068c6a060f9dacc4048651dd6217fd3db00c538",
+        "source": {
+          "head": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+          "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
+          "specSha256": "e3532fd779bd30673309ee67efd18f984038789f226b399f277c8b5ad169829e"
+        }
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "live-600",
+        "live-1250",
+        "live-2000",
+        "final"
+      ]
+    },
+    "alpha-gallery-tour-natural": {
+      "file": "viewer/e2e/gallery-tour.spec.ts",
+      "name": "three-stop gallery: natural full UI Play completion retains all artwork and releases every child",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": true
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/gallery-tour-three-stop-ga-63b46-rk-and-releases-every-child/attachments/gallery-natural-three-proof-48fdbe9877a3445aaa368a41407641fd289cf92e.json",
+        "sha256": "7bc8e8b702c2e15a91c059126c8a0206a940c6aaeaac11c0e23d87005d16cc84",
+        "source": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "stop-1",
+        "stop-2",
+        "stop-3",
+        "complete",
+        "reset"
+      ]
+    },
+    "alpha-garden-care-full": {
+      "file": "viewer/e2e/garden-care.spec.ts",
+      "name": "garden-care: full UI Play due waits, four conserved care cycles and depleted reservoir refusal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "alpha40"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alpha40",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "semanticOutcome": true
+        }
+      ],
+      "latestAttachment": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-completed/test-results/garden-care-garden-care-fu-a9d73--depleted-reservoir-refusal/attachments/garden-full-ui-play-proof-bcc8dc6be32a86f0af01771c9ad3700444822458.json",
+        "sha256": "80108d7c53bd877d0791883a9384e9acba4ec8034ff82ff26a7ed605931ffe51",
+        "source": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
+      },
+      "latestCheckpointNames": [
+        "initial",
+        "plant-a-cycle-1",
+        "plant-b-cycle-1",
+        "repeat-a-due",
+        "plant-a-cycle-2",
+        "repeat-b-due",
+        "plant-b-cycle-2",
+        "depleted-a-due",
+        "depleted-refusal",
+        "reset"
+      ]
     }
   },
   "nodeFixtureCatalog": {
@@ -1597,7 +3224,8 @@
         "insufficient-attendance wait",
         "End/Reset"
       ],
-      "limits": "Authored ground gallery; no arbitrary exhibitions."
+      "limits": "Authored ground gallery; no arbitrary exhibitions.",
+      "proofScopeNotes": "Natural3stop finished=true/history3/ownedchildrencomplete recorded in alpha40; t017 remains explicit third-stop cancellation and t018 natural2stop."
     },
     "table-cleanup": {
       "terminal": "Three original props at declared destination supports; completed transfer receipts, empty hands/claims.",
@@ -1701,7 +3329,8 @@
         "exhaustion refusal",
         "Reset"
       ],
-      "limits": "No growth/refill or indefinite continuity."
+      "limits": "No growth/refill or indefinite continuity.",
+      "proofScopeNotes": "Whole UI Play due intervals/four cycles/depletion refusal recorded in alpha40; historical t002 remains mixed."
     },
     "music-dance": {
       "terminal": "Digital score finishes with grounded floor participation and released equipment/audio.",
@@ -1731,13 +3360,16 @@
         "joining/withdrawal/room setup in supplementary step tests",
         "Reset"
       ],
-      "limits": "Four/eight authored ground rooms; full UI Play completion gap."
+      "limits": "Four/eight authored ground rooms; silent discussion and fixed casting.",
+      "proofScopeNotes": "Full UI Play question/presenter/groups/session completion and cleanup recorded in alpha107; original stepped t052/t053 remain distinct.",
+      "priorLimitsAtInventorySource": "Four/eight authored ground rooms; full UI Play completion gap."
     },
     "work-break": {
-      "terminal": "Original notes interrupted then classroom/shared food/returns/quiet rest, same notes finish and independent continuations release.",
+      "terminal": "Original notes interrupted, classroom question/discussions end, shared food consumed and original utensils returned, then the same notes complete30s with released physical resources.",
       "retainedEffects": [
         "same world/epoch/notes30s",
-        "same utensils/food receipts"
+        "same utensils/food receipts",
+        "classroom question/discussion history"
       ],
       "disruptionsWithRecordedChecks": [
         "held refusal",
@@ -1746,7 +3378,8 @@
         "routine End/Resume",
         "Reset"
       ],
-      "limits": "Manual choices; full UI Play end-to-end gap, prepared side layout required8."
+      "limits": "Direct manual work/classroom/shared-food flow; side layout first8. This flow does not invoke sleep, quiet rest or independent follow-up commitments; active reload remains deferred.",
+      "proofScopeNotes": "t262/t263 retain the original stepped direct-food flow; new alpha-manual cases additionally prove classroom and managed shared-food flow by UI Play. Neither certifies optional routine sleep/rest/follow-ups."
     },
     "prepared-day": {
       "terminal": "Notes30s complete after talks/question/discussion, companion walk, recipe, two meals,18s mat sleep and independent follow-ups.",
@@ -1761,7 +3394,9 @@
         "studio sleep Pause/wake/Resume",
         "Reset"
       ],
-      "limits": "Mixed proof only; full end-to-end UI Play completion needed, side layout first8."
+      "limits": "Fixed castings with a cold finite recipe and grounded mat sleep; side layout first8; no heat/chopping/refill or active reload.",
+      "proofScopeNotes": "Full UI Play recorded for4/studio in alpha107 and8 in alpha40 (existing8xUI, original120s/retries0); main and independent follow-ups all complete. Historical mixed cases remain distinct.",
+      "priorLimitsAtInventorySource": "Mixed proof only; full end-to-end UI Play completion needed, side layout first8."
     },
     "quiet-reading": {
       "terminal": "Original supported book completes retained reading after actual seated interruption and same-book resumption.",
@@ -1818,7 +3453,9 @@
         "reviewer crossing",
         "Reset"
       ],
-      "limits": "Mixed UI/step completion, not full UI Play proof."
+      "limits": "Fixed independent casting, equipment and project; silent critique and no active reload.",
+      "proofScopeNotes": "Full UI Play recorded in alpha107; original mixed cases remain distinct.",
+      "priorLimitsAtInventorySource": "Mixed UI/step completion, not full UI Play proof."
     },
     "sleep": {
       "terminal": "Original18s sleep purpose completes, safe wake returns actor; exact Reset resource counts/replay.",
@@ -2149,9 +3786,12 @@
         "seeded deterministic choices"
       ],
       "disruptionsWithRecordedChecks": [
-        "6s realtime replay metrics plus1200tick step budget"
+        "6s realtime replay metrics plus1200tick step budget",
+        "alpha40 actual UI Play:618/1267/2017ticks; newpost1250walkscomplete; Reset"
       ],
-      "limits": "Existing perf case reports metrics and only asserts console errors; sustained progress/safety assertions missing."
+      "limits": "Actual progress/safety recorded through tick2017 only; no indefinite starvation-freedom certification.",
+      "proofScopeNotes": "Bounded actual UI progress/safety now proven through2017ticks; historical perf metrics remain separate. No indefinite liveness certification.",
+      "priorLimitsAtInventorySource": "Existing perf case reports metrics and only asserts console errors; sustained progress/safety assertions missing."
     }
   },
   "scenarios": [
@@ -2551,9 +4191,10 @@
       "setupNotes": [],
       "contractRef": "gallery-tour",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t017"
+        "t017",
+        "alpha-gallery-tour-natural"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -2565,11 +4206,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "activities"
+      "discoveryGroup": "activities",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "gallery-tour-short",
@@ -2861,9 +4506,10 @@
       "setupNotes": [],
       "contractRef": "garden-care",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t002"
+        "t002",
+        "alpha-garden-care-full"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -2874,11 +4520,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "activities"
+      "discoveryGroup": "activities",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "music-dance",
@@ -2927,10 +4577,11 @@
       ],
       "setupNotes": [],
       "contractRef": "classroom",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t052"
+        "t052",
+        "alpha-manual-classroom-4"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -2944,12 +4595,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "activities"
+      "discoveryGroup": "activities",
+      "latestAlphaProofRef": "alpha107",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3"
     },
     {
       "id": "classroom-8",
@@ -2965,10 +4619,11 @@
       ],
       "setupNotes": [],
       "contractRef": "classroom",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t053"
+        "t053",
+        "alpha-manual-classroom-8"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -2982,12 +4637,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "activities"
+      "discoveryGroup": "activities",
+      "latestAlphaProofRef": "alpha107",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3"
     },
     {
       "id": "work-break-4",
@@ -3008,10 +4666,11 @@
       ],
       "setupNotes": [],
       "contractRef": "work-break",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t262"
+        "t262",
+        "alpha-manual-work-break-4"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3022,12 +4681,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "connected"
+      "discoveryGroup": "connected",
+      "latestAlphaProofRef": "alpha107",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3"
     },
     {
       "id": "work-break-8",
@@ -3050,10 +4712,11 @@
         "For8: Take break bowl/spoon, Prepare side layout, Put belongings away before notes/session."
       ],
       "contractRef": "work-break",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t263"
+        "t263",
+        "alpha-manual-work-break-8"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3064,12 +4727,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "connected"
+      "discoveryGroup": "connected",
+      "latestAlphaProofRef": "alpha107",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3"
     },
     {
       "id": "prepared-day-4",
@@ -3089,10 +4755,11 @@
       ],
       "setupNotes": [],
       "contractRef": "prepared-day",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t116"
+        "t116",
+        "alpha-manual-prepared-day-4"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3104,15 +4771,18 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "supplementaryProofRefs": [
         "public35"
       ],
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "connected"
+      "discoveryGroup": "connected",
+      "latestAlphaProofRef": "alpha107",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3"
     },
     {
       "id": "prepared-day-8",
@@ -3134,10 +4804,11 @@
         "For8: Take break bowl/spoon, Prepare side layout, Put belongings away before notes/session."
       ],
       "contractRef": "prepared-day",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t117"
+        "t117",
+        "alpha-manual-prepared-day-8"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3149,15 +4820,18 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "supplementaryProofRefs": [
         "public35"
       ],
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "connected"
+      "discoveryGroup": "connected",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "prepared-day-studio",
@@ -3177,10 +4851,11 @@
       ],
       "setupNotes": [],
       "contractRef": "prepared-day",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t118"
+        "t118",
+        "alpha-manual-prepared-day-studio"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3192,15 +4867,18 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "supplementaryProofRefs": [
         "public35"
       ],
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "connected"
+      "discoveryGroup": "connected",
+      "latestAlphaProofRef": "alpha107",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3"
     },
     {
       "id": "quiet-reading",
@@ -3321,12 +4999,13 @@
       ],
       "setupNotes": [],
       "contractRef": "design-studio",
-      "coverageGrade": "recorded-step-or-mixed-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t059",
         "t060",
-        "t061"
+        "t061",
+        "alpha-manual-design-studio"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3337,15 +5016,18 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "supplementaryProofRefs": [
         "public35"
       ],
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "connected"
+      "discoveryGroup": "connected",
+      "latestAlphaProofRef": "alpha107",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3"
     },
     {
       "id": "ground-sleep",
@@ -3503,10 +5185,11 @@
       ],
       "setupNotes": [],
       "contractRef": "wall",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t083"
+        "t083",
+        "alpha-preset-wall"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3515,12 +5198,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "u-trap",
@@ -3536,10 +5222,11 @@
       ],
       "setupNotes": [],
       "contractRef": "u-trap",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t084"
+        "t084",
+        "alpha-preset-u-trap"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3548,12 +5235,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "narrow-passage",
@@ -3569,11 +5259,12 @@
       ],
       "setupNotes": [],
       "contractRef": "narrow-passage",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t085",
-        "t093"
+        "t093",
+        "alpha-preset-narrow-passage"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3582,12 +5273,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "stairs",
@@ -3603,13 +5297,14 @@
       ],
       "setupNotes": [],
       "contractRef": "stairs",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t086",
         "t090",
         "t091",
-        "t094"
+        "t094",
+        "alpha-preset-stairs"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3618,12 +5313,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "deck-to-ground",
@@ -3639,11 +5337,12 @@
       ],
       "setupNotes": [],
       "contractRef": "deck-to-ground",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t087",
-        "t092"
+        "t092",
+        "alpha-preset-deck-to-ground"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3652,12 +5351,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "incomplete-stairs",
@@ -3674,9 +5376,10 @@
       "setupNotes": [],
       "contractRef": "incomplete-stairs",
       "coverageGrade": "recorded-exact-diagnostic",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t088"
+        "t088",
+        "alpha-preset-incomplete-stairs"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3685,11 +5388,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "diagnostics"
+      "discoveryGroup": "diagnostics",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "construction",
@@ -3705,10 +5412,11 @@
       ],
       "setupNotes": [],
       "contractRef": "construction",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t089"
+        "t089",
+        "alpha-preset-construction"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3719,12 +5427,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha731",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
     },
     {
       "id": "trio",
@@ -3740,10 +5451,11 @@
       ],
       "setupNotes": [],
       "contractRef": "trio",
-      "coverageGrade": "terminal-gap-metrics-only",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t095"
+        "t095",
+        "alpha-preset-trio"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3752,12 +5464,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "stress-30",
@@ -3773,10 +5488,11 @@
       ],
       "setupNotes": [],
       "contractRef": "stress",
-      "coverageGrade": "liveness-gap-metrics-only",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-ui-play-bounded-liveness",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t095"
+        "t095",
+        "alpha-preset-stress-30"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3784,17 +5500,25 @@
       "nodeFixtureFiles": [],
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": {
-        "required": true,
-        "proven": false,
-        "note": "6s live metrics and1200tick stepping; no repeated progress assertions."
+        "proofRef": "alpha40",
+        "source": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+        "bounded": true,
+        "observedTick": 2017,
+        "completedWalks": 73,
+        "completedWalksRequestedAfterTick1250": 11,
+        "terminalRequired": false,
+        "limits": "Through100.85 simulated seconds only; no indefinite fairness/starvation guarantee."
       },
       "missingProof": [
-        "Assert multi-window continued movement/completed actions, finite poses/0violations/resource bounds; metrics alone do not prove sustained liveness.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "Assert multi-window continued movement/completed actions, finite poses/0violations/resource bounds; metrics alone do not prove sustained liveness.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "continuous"
+      "discoveryGroup": "continuous",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "build-bay",
@@ -3810,11 +5534,12 @@
       ],
       "setupNotes": [],
       "contractRef": "build-bay",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t071",
-        "t072"
+        "t072",
+        "alpha-preset-build-bay"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3827,12 +5552,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "hand-up",
@@ -3848,12 +5576,13 @@
       ],
       "setupNotes": [],
       "contractRef": "hand-up",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t109",
         "t110",
-        "t112"
+        "t112",
+        "alpha-preset-hand-up"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3862,12 +5591,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha731",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
     },
     {
       "id": "prone",
@@ -3883,12 +5615,13 @@
       ],
       "setupNotes": [],
       "contractRef": "prone",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t128",
         "t130",
-        "t131"
+        "t131",
+        "alpha-preset-prone"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3897,12 +5630,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "prone-forks",
@@ -3918,10 +5654,11 @@
       ],
       "setupNotes": [],
       "contractRef": "prone-forks",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t129"
+        "t129",
+        "alpha-preset-prone-forks"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3930,12 +5667,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "campfire-evening",
@@ -3951,10 +5691,11 @@
       ],
       "setupNotes": [],
       "contractRef": "campfire-evening",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t075"
+        "t075",
+        "alpha-preset-campfire-evening"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -3963,12 +5704,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha731",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
     },
     {
       "id": "meal",
@@ -3984,12 +5728,13 @@
       ],
       "setupNotes": [],
       "contractRef": "meal",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
         "t101",
         "t102",
-        "t103"
+        "t103",
+        "alpha-preset-meal"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4000,12 +5745,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha731",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
     },
     {
       "id": "body",
@@ -4022,11 +5770,14 @@
       "setupNotes": [],
       "contractRef": "body",
       "coverageGrade": "recorded-still-probe",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "Bounded still-probe/core assertions executed at a8a8630; preserved application implementation through043 matcher fix; no meaningful activity or all63/current033 certification.",
       "testRefs": [
         "t035",
         "t036",
-        "t037"
+        "t037",
+        "alpha-body-0",
+        "alpha-body-1",
+        "alpha-body-2"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4038,11 +5789,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact final033 combined validation pending; bounded still-probe PASS is not an activity journey."
       ],
-      "boundedNextTest": "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI.",
+      "boundedNextTest": "Preserve still-probe classification and source-bound core proof; require final combined alpha validation.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "probes"
+      "discoveryGroup": "probes",
+      "latestAlphaProofRef": "alphaCore",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "a8a863087b340dac65da45575f04ce74bd0b4a03"
     },
     {
       "id": "year-2020",
@@ -4058,10 +5813,11 @@
       ],
       "setupNotes": [],
       "contractRef": "year-2020",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t076"
+        "t076",
+        "alpha-preset-year-2020"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4070,12 +5826,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha731",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
     },
     {
       "id": "year-2021",
@@ -4091,10 +5850,11 @@
       ],
       "setupNotes": [],
       "contractRef": "year-2021",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t077"
+        "t077",
+        "alpha-preset-year-2021"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4103,12 +5863,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "year-2022",
@@ -4124,10 +5887,11 @@
       ],
       "setupNotes": [],
       "contractRef": "year-2022",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t078"
+        "t078",
+        "alpha-preset-year-2022"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4136,12 +5900,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "year-2023",
@@ -4157,10 +5924,11 @@
       ],
       "setupNotes": [],
       "contractRef": "year-2023",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t079"
+        "t079",
+        "alpha-preset-year-2023"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4169,12 +5937,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "year-2024",
@@ -4190,10 +5961,11 @@
       ],
       "setupNotes": [],
       "contractRef": "year-2024",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t080"
+        "t080",
+        "alpha-preset-year-2024"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4202,12 +5974,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "year-2025",
@@ -4223,10 +5998,11 @@
       ],
       "setupNotes": [],
       "contractRef": "year-2025",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t081"
+        "t081",
+        "alpha-preset-year-2025"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4235,12 +6011,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Preserve this source-bound native PASS; execute required combined gate and public validation on the frozen final candidate. No new activity redesign required.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha40",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c"
     },
     {
       "id": "year-2026",
@@ -4257,9 +6036,10 @@
       "setupNotes": [],
       "contractRef": "year-2026",
       "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t082"
+        "t082",
+        "alpha-preset-year-2026"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4268,12 +6048,17 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Native alpha case remains unexpected after7316a19; meaningful endpoint checkpoints do not certify failed Reset/resource lifetime assertions.",
+        "Root targeted solar/year2026 proof pending at033f8cb; do not count renderer fixes or Node lifecycle tests as UI PASS.",
+        "Exact final combined gate/public alpha acceptance pending."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Root executes the unchanged meaningful endpoint and exact Reset assertions after the bounded renderer/backdrop repairs; no tolerance increase.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha731",
+      "latestAlphaNativeStatus": "unexpected",
+      "latestAlphaResultStatus": "failed",
+      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
     },
     {
       "id": "year-build-2022",
@@ -4290,7 +6075,7 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "historical supported-layout public38 proof; current entire automatic alpha Play pending",
       "testRefs": [
         "t006",
         "t268"
@@ -4309,9 +6094,10 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Current entire automatic construction journey through all authored steps remains pending; historical public38 supported-layout PASS and exact unsupported refusal remain source-bound.",
+        "Exact final033 combined/public alpha validation pending."
       ],
-      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "boundedNextTest": "Root executes current entire automatic Play construction for each supported2022 profile, asserting every authored step/part/crew/support and final resource cleanup; keep unsupported admission refusal separate.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "construction"
     },
@@ -4330,7 +6116,7 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "historical supported-layout public38 proof; current entire automatic alpha Play pending",
       "testRefs": [
         "t007",
         "t269"
@@ -4349,9 +6135,10 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Current entire automatic construction journey through all authored steps remains pending; historical public38 supported-layout PASS and exact unsupported refusal remain source-bound.",
+        "Exact final033 combined/public alpha validation pending."
       ],
-      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "boundedNextTest": "Root executes current entire automatic Play construction for each supported2022 profile, asserting every authored step/part/crew/support and final resource cleanup; keep unsupported admission refusal separate.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "construction"
     },
@@ -4370,9 +6157,10 @@
       "setupNotes": [],
       "contractRef": "solar-paint",
       "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
       "testRefs": [
-        "t216"
+        "t216",
+        "alpha-preset-solar-paint"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -4381,12 +6169,17 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Native alpha case remains unexpected after7316a19; meaningful endpoint checkpoints do not certify failed Reset/resource lifetime assertions.",
+        "Root targeted solar/year2026 proof pending at033f8cb; do not count renderer fixes or Node lifecycle tests as UI PASS.",
+        "Exact final combined gate/public alpha acceptance pending."
       ],
-      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "boundedNextTest": "Root executes the unchanged meaningful endpoint and exact Reset assertions after the bounded renderer/backdrop repairs; no tolerance increase.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "scripted"
+      "discoveryGroup": "scripted",
+      "latestAlphaProofRef": "alpha731",
+      "latestAlphaNativeStatus": "unexpected",
+      "latestAlphaResultStatus": "failed",
+      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
     }
   ],
   "unprovedLegacyChecks": {
@@ -4468,21 +6261,145 @@
     {
       "receipt": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/release38-gateway-assertion-diagnosis.json",
       "cause": "Original campus.glb HEAD length assertion FAIL; modular HEAD/range exact served bundle pass. No gateway/DNS repair or blanket pass."
+    },
+    {
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-core-play-results.json",
+      "sha256": "873c4c049a2ecf5326fb0ffa92d85077bdae2736e7564629fd97cacfe87b79e2",
+      "source": "a8a863087b340dac65da45575f04ce74bd0b4a03",
+      "nativeResult": {
+        "startTime": "2026-10-02T20:21:47.695Z",
+        "duration": 74306.621,
+        "expected": 10,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "cause": "Retain unexpected failures and interrupted/skipped/unrun distinctions exactly; later successful reruns do not relabel this report.",
+      "failedCases": [
+        "alpha quarantine: actual Lab activity controls and every hook mutator preserve halted authority until Reset"
+      ],
+      "interruptedCases": []
+    },
+    {
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-results.json",
+      "sha256": "d6b6e4f54458f86884ca6dbc17a3dff9c4ddfbd830c58dd21553711c60f5ea43",
+      "source": "0432b8cbc0c53bf798417fe89b082966b8995c7e",
+      "nativeResult": {
+        "startTime": "2026-10-02T20:28:49.635Z",
+        "duration": 207977.129,
+        "expected": 0,
+        "skipped": 15,
+        "unexpected": 16,
+        "flaky": 0
+      },
+      "cause": "Retain unexpected failures and interrupted/skipped/unrun distinctions exactly; later successful reruns do not relabel this report.",
+      "failedCases": [
+        "prepared-day-4: full UI Play supported effects, retained intervention and clean terminal",
+        "prepared-day-8: full UI Play supported effects, retained intervention and clean terminal",
+        "prepared-day-studio: full UI Play supported effects, retained intervention and clean terminal",
+        "design-studio: full UI Play supported effects, retained intervention and clean terminal",
+        "classroom-4: full UI Play supported effects, retained intervention and clean terminal",
+        "classroom-8: full UI Play supported effects, retained intervention and clean terminal",
+        "work-break-4: full UI Play supported effects, retained intervention and clean terminal",
+        "work-break-8: full UI Play supported effects, retained intervention and clean terminal",
+        "alpha wall: fullPlay authored meaningful endpoint and retained supports",
+        "alpha u-trap: fullPlay authored meaningful endpoint and retained supports",
+        "alpha narrow-passage: fullPlay authored meaningful endpoint and retained supports",
+        "alpha stairs: fullPlay authored meaningful endpoint and retained supports",
+        "alpha deck-to-ground: fullPlay authored meaningful endpoint and retained supports",
+        "alpha construction: fullPlay authored meaningful endpoint and retained supports",
+        "alpha trio: fullPlay authored meaningful endpoint and retained supports",
+        "alpha build-bay: fullPlay authored meaningful endpoint and retained supports"
+      ],
+      "interruptedCases": [
+        "alpha hand-up: fullPlay authored meaningful endpoint and retained supports"
+      ]
+    },
+    {
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-journeys-107af96-results.json",
+      "sha256": "e363bd9d814c75ef9bd60195ddc6fd0cc947c1a70af02feebcf3c07f110a63e4",
+      "source": "107af9695913b69253b057cbefc1a3c270545fc3",
+      "nativeResult": {
+        "startTime": "2026-10-02T20:37:14.769Z",
+        "duration": 711969.096,
+        "expected": 7,
+        "skipped": 16,
+        "unexpected": 8,
+        "flaky": 0
+      },
+      "cause": "Retain unexpected failures and interrupted/skipped/unrun distinctions exactly; later successful reruns do not relabel this report.",
+      "failedCases": [
+        "prepared-day-8: full UI Play supported effects, retained intervention and clean terminal",
+        "alpha wall: fullPlay authored meaningful endpoint and retained supports",
+        "alpha u-trap: fullPlay authored meaningful endpoint and retained supports",
+        "alpha narrow-passage: fullPlay authored meaningful endpoint and retained supports",
+        "alpha stairs: fullPlay authored meaningful endpoint and retained supports",
+        "alpha deck-to-ground: fullPlay authored meaningful endpoint and retained supports",
+        "alpha construction: fullPlay authored meaningful endpoint and retained supports",
+        "alpha trio: fullPlay authored meaningful endpoint and retained supports"
+      ],
+      "interruptedCases": [
+        "alpha build-bay: fullPlay authored meaningful endpoint and retained supports"
+      ]
+    },
+    {
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-remaining-40a6739-results.json",
+      "sha256": "8c9c708bf5e3b735bb8e0f1aae958c6c7ed71ee16bcbb1f740a6ac0a40a12584",
+      "source": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
+      "nativeResult": {
+        "startTime": "2026-10-02T20:52:02.691Z",
+        "duration": 715128.0549999999,
+        "expected": 19,
+        "skipped": 0,
+        "unexpected": 7,
+        "flaky": 0
+      },
+      "cause": "Retain unexpected failures and interrupted/skipped/unrun distinctions exactly; later successful reruns do not relabel this report.",
+      "failedCases": [
+        "alpha construction: fullPlay authored meaningful endpoint and retained supports",
+        "alpha hand-up: fullPlay authored meaningful endpoint and retained supports",
+        "alpha campfire-evening: fullPlay authored meaningful endpoint and retained supports",
+        "alpha meal: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2020: fullPlay authored meaningful endpoint and retained supports",
+        "alpha year-2026: fullPlay authored meaningful endpoint and retained supports",
+        "alpha solar-paint: fullPlay authored meaningful endpoint and retained supports"
+      ],
+      "interruptedCases": []
+    },
+    {
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-results.json",
+      "sha256": "925af7de6bb2207e0558fffd4adf1bcb127a495be2e241dac22181151f3b5ee0",
+      "source": "7316a1949c304981ac064e676904e84dc010f0aa",
+      "nativeResult": {
+        "startTime": "2026-10-02T21:10:06.739Z",
+        "duration": 294931.159,
+        "expected": 5,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      },
+      "cause": "Retain unexpected failures and interrupted/skipped/unrun distinctions exactly; later successful reruns do not relabel this report.",
+      "failedCases": [
+        "alpha year-2026: fullPlay authored meaningful endpoint and retained supports",
+        "alpha solar-paint: fullPlay authored meaningful endpoint and retained supports"
+      ],
+      "interruptedCases": []
     }
   ],
   "topGaps": [
-    "Eight manual preset rows complete through stepped/mixed harnesses, not full UI Play; prepared-day3/design-studio and classroom/work-break2 each.",
-    "Stress30 has elapsed frames/step metrics but no sustained repeated progress/safety assertions; trioperf also does not assert terminaldone/checks.",
-    "Legacy scripted scenes largely have programmatic pose/effect/completion evidence; real-time videos cover only narrow/stairs completion and buildbay partial. Need bounded UI Play/disruption witnesses.",
-    "New3 current focused journeys inherited exactly fromc833, but combined63parity/gate39/public39 stillpending.",
-    "Per-case selectors isolate startup failures; scene imports/deps remain shared prerequisite. Preserve per-case finally artifacts for journey failures so one failure never implies later checkpoints."
+    "Solar-paint and year-2026 remain native unexpected on7316a19 despite meaningful endpoints; root targeted exact Reset/resource proof pending on033.",
+    "Current entire automatic year-build-2022 and year-build-2022-house completion pending; older public38 supported-layout PASS and unsupported refusal remain distinct.",
+    "Exact final combined alpha native gate/63selector/public acceptance unproved; no all63 certification.",
+    "Earlier29manual and remaining dedicated historical journeys were not all freshly rerun by alpha107/40/731; preserve source boundaries and required final gate.",
+    "Stress30 only bounded progress/safety through tick2017 is witnessed; indefinite fairness/starvation remains unproved."
   ],
   "schemaNotes": {
     "contracts": "Supported semantic contracts and listed disruptions are bounded to named tests; not all disruptions use UI Play. Consult each test method.",
     "nodeFixtureCatalog": "Exact literal name samples/filerefs only; dynamic names and remaining filecases are intentionally not reproduced. Node tests never fill UI journey gaps.",
-    "sourceInheritance": "No blanket current coverage claimed. 5f\u2192b712 changes shared-food-break/registry/UI; c833\u2192b712 app/engine/e2e byte-diff empty. No gate39 success assumed.",
+    "sourceInheritance": "No blanket current coverage claimed. 5f\u2192b712 changes shared-food-break/registry/UI; c833\u2192b712 app/engine/e2e byte-diff empty. No gate39 success assumed. Alpha evidence records exact107/40/731 source and native status; git diff verifies engine/scenario authority unchanged to033 but renderer lifetime fixes are not blanket Reset proof inheritance.",
     "category": "Conditional construction means source/layout admission is checked before actions. Both current2022 profiles completed public38; refused unsupported layouts remain distinct.",
-    "registration": "One row and declared contract/test mapping are required for every SELECTABLE_SCENARIOS registration. Generated UI metadata is checked against this inventory in the ordinary engine test path. Authored mappings do not establish executed proof."
+    "registration": "One row and declared contract/test mapping are required for every SELECTABLE_SCENARIOS registration. Generated UI metadata is checked against this inventory in the ordinary engine test path. Authored mappings do not establish executed proof.",
+    "generatedContractStatus": "Generator/app untouched by this metadata owner; root must regenerate at integration boundary for corrected work-break and resolved historical gap scope labels."
   },
   "discoveryGroups": [
     {
