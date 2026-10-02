@@ -243,7 +243,7 @@ export const LAB_CONTRACTS = {
       "Play"
     ],
     "outcome": "Presenters rotate, questions/formed discussions occur, departure/End releases seats/display/floor.",
-    "scope": "Four/eight authored ground rooms; full UI Play completion gap."
+    "scope": "Four/eight authored ground rooms; silent discussion and fixed casting."
   },
   "classroom-8": {
     "group": "activities",
@@ -252,7 +252,7 @@ export const LAB_CONTRACTS = {
       "Play"
     ],
     "outcome": "Presenters rotate, questions/formed discussions occur, departure/End releases seats/display/floor.",
-    "scope": "Four/eight authored ground rooms; full UI Play completion gap."
+    "scope": "Four/eight authored ground rooms; silent discussion and fixed casting."
   },
   "work-break-4": {
     "group": "connected",
@@ -265,8 +265,8 @@ export const LAB_CONTRACTS = {
       "Start shared food break after departure",
       "Resume notes"
     ],
-    "outcome": "Original notes interrupted then classroom/shared food/returns/quiet rest, same notes finish and independent continuations release.",
-    "scope": "Manual choices; full UI Play end-to-end gap, prepared side layout required8."
+    "outcome": "Original notes interrupted, classroom question/discussions end, shared food consumed and original utensils returned, then the same notes complete30s with released physical resources.",
+    "scope": "Direct manual work/classroom/shared-food flow; side layout first8. This flow does not invoke sleep, quiet rest or independent follow-up commitments; active reload remains deferred."
   },
   "work-break-8": {
     "group": "connected",
@@ -279,8 +279,8 @@ export const LAB_CONTRACTS = {
       "Start shared food break after departure",
       "Resume notes"
     ],
-    "outcome": "Original notes interrupted then classroom/shared food/returns/quiet rest, same notes finish and independent continuations release.",
-    "scope": "Manual choices; full UI Play end-to-end gap, prepared side layout required8."
+    "outcome": "Original notes interrupted, classroom question/discussions end, shared food consumed and original utensils returned, then the same notes complete30s with released physical resources.",
+    "scope": "Direct manual work/classroom/shared-food flow; side layout first8. This flow does not invoke sleep, quiet rest or independent follow-up commitments; active reload remains deferred."
   },
   "prepared-day-4": {
     "group": "connected",
@@ -293,7 +293,7 @@ export const LAB_CONTRACTS = {
       "Commit attendee continuations"
     ],
     "outcome": "Notes30s complete after talks/question/discussion, companion walk, recipe, two meals,18s mat sleep and independent follow-ups.",
-    "scope": "Mixed proof only; full end-to-end UI Play completion needed, side layout first8."
+    "scope": "Fixed castings with a cold finite recipe and grounded mat sleep; side layout first8; no heat/chopping/refill or active reload."
   },
   "prepared-day-8": {
     "group": "connected",
@@ -306,7 +306,7 @@ export const LAB_CONTRACTS = {
       "Commit attendee continuations"
     ],
     "outcome": "Notes30s complete after talks/question/discussion, companion walk, recipe, two meals,18s mat sleep and independent follow-ups.",
-    "scope": "Mixed proof only; full end-to-end UI Play completion needed, side layout first8."
+    "scope": "Fixed castings with a cold finite recipe and grounded mat sleep; side layout first8; no heat/chopping/refill or active reload."
   },
   "prepared-day-studio": {
     "group": "connected",
@@ -319,7 +319,7 @@ export const LAB_CONTRACTS = {
       "Commit attendee continuations"
     ],
     "outcome": "Notes30s complete after talks/question/discussion, companion walk, recipe, two meals,18s mat sleep and independent follow-ups.",
-    "scope": "Mixed proof only; full end-to-end UI Play completion needed, side layout first8."
+    "scope": "Fixed castings with a cold finite recipe and grounded mat sleep; side layout first8; no heat/chopping/refill or active reload."
   },
   "quiet-reading": {
     "group": "activities",
@@ -361,7 +361,7 @@ export const LAB_CONTRACTS = {
       "Commit attendee continuations"
     ],
     "outcome": "Critique, meal, quiet rest, original project30s plus independent12s/20s follow-ups complete.",
-    "scope": "Mixed UI/step completion, not full UI Play proof."
+    "scope": "Fixed independent casting, equipment and project; silent critique and no active reload."
   },
   "ground-sleep": {
     "group": "activities",
@@ -478,7 +478,7 @@ export const LAB_CONTRACTS = {
       "Play"
     ],
     "outcome": "No terminal; continuously select reachable seeded goals, repeatedly complete walking while finite poses/no ownership leaks/violations.",
-    "scope": "Existing perf case reports metrics and only asserts console errors; sustained progress/safety assertions missing."
+    "scope": "Actual progress/safety recorded through tick2017 only; no indefinite starvation-freedom certification."
   },
   "build-bay": {
     "group": "scripted",

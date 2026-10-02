@@ -3162,3 +3162,30 @@ same backdropReady contract and original60s limit used at fresh entry before
 strict counters. No assertion, loading limit, physical outcome or historical
 content changed. Combined frozen targeted verification follows; alpha gate and
 publication still pending.
+
+## Alpha full current construction Play and bounded integration — 2026-10-02
+
+Frozen033f8cb YEAR_BUILD_FULL=1 current-source cases completed2PASS/0FAIL/0skip/
+flaky in19.0min (firstbay4.7, wholehouse14.3). Both actual Play throughs0021 and
+full completion,24/66canonical supported parts, everysequence row complete, crew
+groundedidle/clear, zero invariant violations, exact firststop receipt parity with
+the currently loaded Node rehearsal and continued healthy worldclock afterward.
+This is current-source parity, not a new golden pin. OldW51 FIXMEs remain unproved.
+Canonical2022 contentHash9521eb1e…/fileSHAff666901… matchespublished38/40 exactly;
+older2be1325/46283/141772 report is dated source-era evidence. Retained19min report/
+traces in.cloudflare/alpha-year-build-full-033f8cb-completed. Root inspected firstbay
+completion; wholehouse capture review follows.
+
+Year2026 actual Play/Reset target1PASS/0FAIL/0skip/flaky101.856s at033f8cb; original
+60s backdrop readiness and exact geometry/texture counts retained. Solar geometry
+passed, but oldsingleton mural cache retained44→45textures afterReset. Reviewed
+5e9e9ba8 and integrated5adbf71: shared overlay leases retain aliases/ordinaryupdates,
+lastuser release/disposal handles pendingimage completion without revival. Native
+5lifetime+3registration checks PASS; actual strict solar browser target pending.
+No physical execution/content/material assets/golden outcomes changed.
+
+Integrated bounded contract critiquec8c4f53 and coveragemetadatac09a8bf:31distinct
+source-bound alpha passes, retained failures/skips, noall63gate/publicacceptance.
+Regenerated9UI contract rows from authoritative inventory, correcting directworkbreak
+to its actualwork/classroom/food/return flow and distinguishing boundedstress proof
+from indefinite liveness. Clean combined alpha gate/publication remain pending.
