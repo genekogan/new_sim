@@ -1,3 +1,8 @@
+> Release36 update: integrated functional source `cfea591` passed the clean combined
+> gate and fresh public acceptance. [Final handoff](../MARS_MVP_HANDOFF.md) and the
+> latest release receipt own current status; earlier local/candidate/RED claims
+> below are preserved provenance, not the final public disposition.
+
 # Living activity camera review
 
 > Final local actualPlay: 2/2 PASS,0fail/skip/retry,5.4min on clean911c525.

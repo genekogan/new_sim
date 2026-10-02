@@ -1,49 +1,36 @@
-# Living-world tranche — authorized, 24-hour deadline
+# Mars living-world checkpoint — complete, release36
 
-Baseline release35/source9958ed4; main metadata65cc0b8. Owner approved expanded
-tranche ending2026-10-03T03:23UTC. Preserve originalscope/receipts below as history;
-latestqueue supersedes all stop/proposal markers.
+Published and verified at **https://sim.mars.college/** on2026-10-02. Functional
+source `cfea591083ac54d0280766809b2cbf1872bb012d`, Worker
+`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`; rollback35 `adaf98f2-65d1-43b3-9c5d-761d555f2d5e`.
+The owner-authorized24h tranche began03:23UTC and closed after its exact acceptance
+and public proof. [Final handoff](MARS_MVP_HANDOFF.md) owns current scope/evidence/limits.
 
-1. Root: independent commitments and bounded activity/resource binding, one
-   mixed-control living day in two configurations, clear live actor/intention UI.
-2. Sol6.1 helpers: music+dance gathering; finite recurring planter watering;
-   existingautomaticcamera coverage of long activity runs. Separate worktrees,
-   shared registry/world/renderer/Lab wiring stays root-owned.
-3. Combined reliability audit: all exposed supportedjourneys, representative
-   disruptions, seeded repeatability, finite resources/claims/majorgeometry,
-   interruption/direction/resumption, actualPlay and inspectedcaptures; diagnose
-   and fix actualfailures, never weaken assertions or call skips passing.
-4. Documentation sprint after source stabilizes: current guides/catalog/index,
-   archive obsolete guidance with provenance, preserve historicalowner docs;
-   /lab exposes individual experiences and combined longer runs.
-5. Cleanfullgate, guardedlocalmainmerge, finalpublish/publicverification at
-   sim.mars.college using existinggateway ifappropriate; release/source/rollback/
-   limitations/handoff reported. No mars.college/simulation page.
+Exit criteria passed: coherent independent living days in Mars and a separate
+hypothetical studio, retained notes/books/partial food/rest, permitted actor/resource
+bindings, live direction and Pause/Resume, bounded audible music/dance, finite
+recurring care, camera observation/manual precedence, all45presets discoverable in
+Lab, broad combined reliability audit, updated guides/index and public verification.
+Clean full gate: all9stages PASS,1130enginePASS/6SKIP/11TODO,225browserPASS/7SKIP;
+53fresh publicPASS/0FAIL/0SKIP. Skips/TODOs remain unproved. The source-era fixture
+refusals and current-source fully automatic builds are distinct proofs.
 
-Explicitly deferred: active save/load, rigs/libraries redesign, broader Eden,
-fineanatomy, general terrain/planner and new camera experiments. Exit: coherent
-independent livingday, activitybinding variations, usable music/dance and recurring
-care, watchable automaticcoverage/manualcamera precedence, documentedlimits,
-validated combined release publiclyaccessible. An authored choice-set is supported;
-constant random reselection/continuousLLMcalls/prerecorded success is not.
+**Active queue: empty. Stop Mars feature expansion; do not start Eden automatically.**
+Remaining accepted implementation hours0. No discretionary engineering or activity
+expansion is commissioned. Preserve deferred work in the existing backlog without
+another inventory audit: active save/load, broader planning/terrain/psychology,
+rig/library migration, fine anatomy, travelling dance/fluid/growth and camera polish.
+Legacy LAST_MILE counts were not re-audited and are not a measure of this completion.
 
-## Current closing status — October2
+Known publication limit: existing Pages gateway omits campus-model HEAD length;
+original gateway smoke failure retained, while exact fullGET/ranges and Worker
+522asset/24route checks pass. Camera recovery cuts/framing and dense HUD remain
+visible limitations, not hidden failures. All48other-owner pending paths preserved
+unchanged/excluded. Future work needs explicit owner scope, review and safeguards.
 
-Release35 remains online. New living-day-4/studio, garden-care and music-dance
-are integrated candidates; focused programmatic variants and separate actual Play
-proofs pass. The day audit has fixed truthful ending disposition and pre-start/
-refused music recovery, with eleven disruption regressions passing. A newly
-reproduced partial-preparation End still retains its spoon and is under bounded
-ordinary-action cleanup repair. All45 selectable presets passed fresh-load/Reset/first-Step (46cases incl parity,198.9s); automatic
-camera actualPlay now passes both configurations (2cases5.4min,20 inspected PNGs)
-after exact predicate fixes without changing camera policies. These are not public success claims.
+## Prior contracts and checkpoint provenance
 
-Small remaining queue: (1) resolve exact acceptance failures and inspect corrected
-camera/audit captures; (2) finish guide/index cleanup and scenario instructions;
-(3) freeze combined candidate, full established gate/idle limits, guarded local
-integration, public sim.mars.college verification and exact handoff. No new activity,
-active save/load or broader generalization. Estimated6–12 remaining working hours,
-medium confidence; deadline2026-10-03T03:23UTC. Update with measured validation results.
+The dated entries below are retained history, not an active implementation queue.
 
 ## Earlier five-day contract and checkpoint provenance
 

@@ -1,3 +1,8 @@
+> Release36 update: integrated functional source `cfea591` passed the clean combined
+> gate and fresh public acceptance. [Final handoff](../MARS_MVP_HANDOFF.md) and the
+> latest release receipt own current status; earlier local/candidate/RED claims
+> below are preserved provenance, not the final public disposition.
+
 # Independent intentions — focused source checkpoint
 
 One logical commitment per actor binds a bounded authored queue to ordinary

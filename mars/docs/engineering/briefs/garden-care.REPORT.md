@@ -1,3 +1,8 @@
+> Release36 update: integrated functional source `cfea591` passed the clean combined
+> gate and fresh public acceptance. [Final handoff](../MARS_MVP_HANDOFF.md) and the
+> latest release receipt own current status; earlier local/candidate/RED claims
+> below are preserved provenance, not the final public disposition.
+
 # Bounded garden care candidate
 
 Source base: `65cc0b8`, branch `codex/garden-care-world`. Unpublished candidate; root owns catalog, shared types, renderer, Lab wiring, combined validation and deployment. No historical placement or real Mars horticultural claim.

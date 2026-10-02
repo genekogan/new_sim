@@ -44,7 +44,9 @@ Routes include `/studio` and `/studio/2020`–`/studio/2027` (year models),
 `/photo` (photogrammetry comparison), `/lab` (playable engine), and `/simulation-guide`.
 Worker `/` preserves the museum presentation. On sim.mars.college only, `/`
 selects the existing Lab/connected living day; query scenario selection still works.
-This domain-specific client entry is a candidate until its release/public receipt.
+This domain-specific entry is verified in release36, including full connected Play.
+The existing gateway omits campus-model HEAD size metadata; exact fullGET/ranges
+and backend controls are verified. See the final handoff for this retained limitation.
 No mars.college/simulation page is provided. Browser layouts are downloaded JSON.
 Shared server rooms are persistent Durable Objects using the baseline campus;
 that does not establish active browser Lab save/load, which is owner-deferred.

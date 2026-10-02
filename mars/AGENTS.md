@@ -1,27 +1,27 @@
 # Mars Studio agent context
 
-## Current authorized tranche and stopping point
+## Completed checkpoint and stopping point
 
-Gene authorized a 24-hour living-world tranche beginning **2026-10-02 03:23 UTC**,
-ending **2026-10-03 03:23 UTC**. Complete connected days with independent intentions,
-flexible existing activity/object bindings, visible social behavior and live
-intervention; bounded music/dance and recurring garden care; existing automatic
-camera coverage of longer activities. Then perform broad scenario/disruption
-self-audit, repair actual failures, update engineering guides/indexes, expose all
-individual and combined runs in `/lab`, and publish/verify **sim.mars.college**.
+The owner-authorized October2 living-world tranche is published and verified as
+**release36 at https://sim.mars.college/**, Worker
+`fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3`, functional source
+`cfea591083ac54d0280766809b2cbf1872bb012d`. Clean full gate and53fresh public cases
+pass; skipped/TODO legacy checks and gateway HEAD metadata remain explicit limits.
+The new connected independent days, flexible permitted bindings, music/dance,
+finite recurring garden care, camera observation and documentation are shipped.
 
-Active save/load is expressly excluded. No rig/animation-library migration,
-universal planner/psychology/terrain, arbitrary activities or automatic Eden start.
-Do not recreate the rejected mars.college/simulation page or footer link. The
-simulation domain uses the existing application; preserve the museum and current
-routing/gateway unless a concrete publication blocker requires a change.
+**Stop feature expansion. Do not begin Eden automatically.** Future agents should
+read [final handoff](docs/engineering/MARS_MVP_HANDOFF.md),
+[active roadmap](docs/engineering/ACTIVE_ROADMAP.md),
+[engineering navigation](docs/engineering/INDEX.md), recent progress and deployment
+metadata. Saved drafts are not shipped features. Preserve the48other-owner pending
+paths and all worktrees/branches; integrating them needs separate review/validation.
 
-Release35 is the verified public baseline. Saved living-world commits and local
-proofs remain candidates until the combined gate and public release receipt.
-After acceptance, final publication and handoff, stop feature expansion; do not
-begin Eden. Read [active roadmap](docs/engineering/ACTIVE_ROADMAP.md),
-[engineering navigation](docs/engineering/INDEX.md), recent
-[progress](docs/engineering/PROGRESS.md) and deployment metadata before acting.
+Active save/load remains explicitly deferred, along with rig/library migration,
+universal planning/psychology/terrain and new camera experiments. The rejected
+mars.college/simulation page remains removed. Preserve the historical museum and
+existing simulation gateway; no DNS/site replacement was made. New scope requires
+an explicit owner request, not an old dated queue or a legacy completion count.
 
 ## Durable product direction
 

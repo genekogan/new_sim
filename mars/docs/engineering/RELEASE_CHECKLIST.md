@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release35 is live. Owner authorized a subsequent living-world tranche; its completion/publication is pending.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release36 is live and the authorized living-world tranche is complete at sim.mars.college.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -1542,3 +1542,58 @@ freshpublicproof; unavailabledisplay isNode-only. Hypotheticalstaging is explici
 **Mars MVP complete. Remaining accepted implementation hours0. Stop feature
 expansion; do not start Eden.** Final proof/publication completed within the24h
 window ending2026-10-03T01:31UTC. Legacy rowcounts do not define this acceptance.
+
+
+## Production deploy 36 (2026-10-02, living-world)
+
+Public **https://sim.mars.college/**, existing Lab/home/gateway; no new website or
+DNS. Worker100% **fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3**, deployed06:18:54.039Z;
+exact clean functional **cfea591083ac54d0280766809b2cbf1872bb012d**.
+Verified rollback35 **adaf98f2-65d1-43b3-9c5d-761d555f2d5e**. Final documentation-only
+commits inherit this source without changing runtime/assets.
+
+| Validation | Executed result |
+| --- | --- |
+| Clean full gate | `.cloudflare/gate/2026-10-02T05-15-31-251Z/report.json`, all9PASS, gitDirtyfalse |
+| Lint / viewerTSc / cameraTSc | PASS,0warnings/errors |
+| Deployment tests | 290PASS,0FAIL/skip |
+| Engine | 1130PASS,0FAIL,6SKIP,11TODO; skipped/TODO remain unproved |
+| Browser | 225PASS,0FAIL,7SKIP,55min; legacyW51FIXMEs unproved |
+| Flagship take / determinism | PASS; hash b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 unchanged |
+| Local MCP | All36tools/isolation/auth/invalidrequests PASS |
+| Idle ceilings/pins | PASS; exactpeak139.965ms/mean.889, corridor68.313/.711, gridsmax378.645ms;0violations, originallimits/pins unchanged |
+| Exact-source evidence | PASS, reused original gate execution; initial Node26/options mismatch refused/retained, corrected exact Node22/options PASS |
+| Public sim browser | 53PASS,0FAIL/skip/flaky,25.3min; home/livecamera, livingday2, garden1, music/dance1, selector45+parity, fullautomatic2022build2 |
+| Inspected captures | All30publicPNG; root publicsleep/wholefinal, helperall30. Local camera20PNG previously inspected; no unseen fine-anatomy claim |
+| Worker original HTTP | 522assets/24routes/696requests PASS, ranges/access denial; curlgzip/deflate originalassertions, nativeNodesweep notrerun |
+| sim MCP / director | All36tools PASS; original9stepsPASS5565ms. Gateway timing headers missing, transcript0in-DO is not measured zero |
+| Existing gateway | Exactnewbundle home/Lab; fullcampusGET70772556B SHA675f4beb… matches release; rangedGLBGET PASS. Original HEADsizeassertion fails: gateway omitscampus content-length; failure retained, not green |
+| Rejected old page | mars.college/simulation404; no footer/site recreation |
+
+Normal gate uses automatic2022Play through s0021, then responsive batchedcompletion.
+Public YEAR_BUILD_FULL=1 proves entire automaticfirstbay4.6min/wholehouse14.5min,
+exact referencehashes,24/66supported installedentities and groundedidlecrew.
+OldFIXMEs/source-era refusal fixtures do not prove this currentjourney.
+
+Build521allowlistedfiles842.3MiB;605distfiles;8largehashkeys exactlyunchanged,
+8skip/0R2writes. Dry9042.48KiB/1586.97gzip;28newstaticassets540retained,
+startup137ms. Clean gate/source fingerprint verified immediatelybeforedeploy.
+MainFF65cc0b8→cfea591 preserves48otherowner paths/status/SHA/bytes/mode/mtime,
+staged0/nooverlap; finaldocsFF repeats preservation check. No stash/reset/push/remote.
+
+Receipts under living-world/viewer/.cloudflare: release36-deploy-receipt.json,
+release36-network-receipt.json, release36-public-capture-review.json,
+living-world-public-results.json, release36-domain/model-delivery.json and exact
+build/dry/upload/HTTP/MCP/director/browser logs. Initial gatewayHEAD/evidenceenvironment
+failures remain separate. ExistingPages source unresolved/OAuthPages scope unavailable;
+metadata limitation does not corrupt verifiedGET. No unauthorizedgateway replacement.
+
+[Final handoff](MARS_MVP_HANDOFF.md) owns scope/limits/source inheritance and Eden
+seams. Independent commitments/permittedbindings/liveintervention, retainedfood/rest/
+notes/books, finitecare, planted dance and cameraobservation are shipped. No active
+save/load, newriglibrary, universalplanner/psychology/terrain, fluid/growth/travelling
+dance or camera experiments. Frequentcuts/unevenframing/denseHUD remain explicit.
+Documentation/index/guide sprint complete; earlier agent/guide/handoff archived,
+original inventory and48unfinishedother-owner drafts preserved/excluded.
+**Mars MVP/living-world tranche complete. Remaining accepted hours0; stop feature
+expansion and do not automatically begin Eden.**

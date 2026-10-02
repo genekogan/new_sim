@@ -1,3 +1,8 @@
+> Release36 update: integrated functional source `cfea591` passed the clean combined
+> gate and fresh public acceptance. [Final handoff](../MARS_MVP_HANDOFF.md) and the
+> latest release receipt own current status; earlier local/candidate/RED claims
+> below are preserved provenance, not the final public disposition.
+
 # Music gathering — reviewed implementation candidate
 
 The browser proof addendum below supersedes the initial pending visual-proof

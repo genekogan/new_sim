@@ -1,3 +1,8 @@
+> Release36 update: integrated functional source `cfea591` passed the clean combined
+> gate and fresh public acceptance. [Final handoff](../MARS_MVP_HANDOFF.md) and the
+> latest release receipt own current status; earlier local/candidate/RED claims
+> below are preserved provenance, not the final public disposition.
+
 # Connected living-day disruption acceptance
 
 Latest local acceptance: frozen `c20fc34` passes both actual-Play cases; all 12 final captures personally inspected. Full combined gate and public verification remain root-owned. Earlier failures below are retained as provenance.

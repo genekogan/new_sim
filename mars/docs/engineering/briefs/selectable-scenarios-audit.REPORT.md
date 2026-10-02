@@ -1,3 +1,8 @@
+> Release36 update: integrated functional source `cfea591` passed the clean combined
+> gate and fresh public acceptance. [Final handoff](../MARS_MVP_HANDOFF.md) and the
+> latest release receipt own current status; earlier local/candidate/RED claims
+> below are preserved provenance, not the final public disposition.
+
 # Selectable scenarios: boot smoke audit
 
 Authored inventory base: `c7ae4868e47a20fb717ccd3eba18d8e99579424e`. Serialized browser smoke ran against frozen runtime `dbc18bfa60519315e0563af4584671be4b2aedec` plus the owned test-only fix `03e1a929d9002243498abb644ec4208982e09a8c` (capture HEAD `b256e2e5694b76faa2dae593fbf2392ecdaa4eef`). **46 cases passed; this is initial-state smoke, not journey completion.** No broad runtime suite, performance audit, or build ran in this lane.

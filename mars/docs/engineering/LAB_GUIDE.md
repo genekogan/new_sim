@@ -1,11 +1,8 @@
 # Lab play and inspection guide
 
-Current public baseline is release35. **Living days, garden care, dance and expanded
-camera observations below are a locally tested candidate until the new combined
-release/public receipt is recorded.** Deployment truth is `viewer/deploy/deployment.json`.
-The final entry target is `https://sim.mars.college/lab`; the existing Worker `/lab`
-is the same application. Do not recreate the removed mars.college/simulation page.
-The [release5 guide](archive/LAB_GUIDE_release5.md) is preserved as historical evidence.
+Current public checkpoint is **release36 at [sim.mars.college](https://sim.mars.college/)**.
+Living days, garden care, music/dance and longer automatic coverage are shipped.
+[Final handoff](MARS_MVP_HANDOFF.md) records exact source, validation and limits.
 
 ## Begin
 

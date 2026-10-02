@@ -10,8 +10,8 @@ not instructions to restart completed increments. Public/source truth comes from
 - [Active roadmap](ACTIVE_ROADMAP.md): current tranche and exit criteria.
 - [Simulation vision](SIMULATION_VISION.md): enduring Mars/Eden direction.
 - [Lab guide](LAB_GUIDE.md): individual and combined scenarios, controls and limitations.
-- [MVP handoff](MARS_MVP_HANDOFF.md): release35 baseline and inherited acceptance evidence.
-  The subsequent living-world tranche remains a candidate until its release receipt.
+- [MVP handoff](MARS_MVP_HANDOFF.md): release36 public acceptance, exact source, limits and Eden handoff.
+  Earlier baseline evidence is retained as dated provenance.
 
 ## Implement and validate
 
