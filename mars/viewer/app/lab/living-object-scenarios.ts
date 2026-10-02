@@ -1,3 +1,4 @@
+import { openJamRuntime } from '../../engine/scenarios/open-jam.ts';
 import type { Scenario } from './scenarios.ts';
 import { Runtime } from '../../engine/runtime/runtime.ts';
 import {
@@ -18,6 +19,12 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  {
+    name: 'open-jam', title: 'Open jam · performer exchange (hypothetical)',
+    description: 'Start a two-performer digital sound exchange at the same computer. Play watches real chair release and physical handoff; pause/resume a retained round or direct its performer away. Original scores and completed rounds remain distinct; no acoustic instrument simulation.',
+    scene: () => READING_SCENE, humans: () => [], build: () => openJamRuntime(),
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [-1, 0, 10, 65], expect: checks,
+  },
   {
     name: 'garden-care',
     title: 'Garden care · finite water (hypothetical)',

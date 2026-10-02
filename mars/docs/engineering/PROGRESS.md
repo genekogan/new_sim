@@ -2081,3 +2081,18 @@ hypothetical, with no misattributed historical participants/organization. Two bo
 Sol6.1 implementation workers are planned; root owns shared wiring/release. No new
 feature is yet validated or published. Save/load, rig migration and Eden remain out
 of this authorization.
+
+### Open-jam performer exchange candidate — 2026-10-02
+
+New open_jam composes ordinary music_gathering and walk_to: two original digital
+scores use the same workstation/chair; each performer physically clears it before
+next admission. Completed round history and unfinished score survive explicit
+Pause/Resume; player performer direction pauses the retained commitment, and dancer
+withdrawal is respected in later rounds. Later occupied seats/unavailable equipment
+wait with concrete diagnostics, without repeated failed submissions. Eleven focused
+Node checks PASS, both room orientations/replay/End/resource cleanup included; viewer
+TSc and lint PASS. One harness assertion initially compared a paused world's clock
+as well as its entities; corrected to require unchanged entities while time advances.
+No behavioral baseline/limit changed. Lab selector/tour, HUD/audio and detached camera
+facts are wired; actual Play/full combined gate/publication remain pending. Staging
+is hypothetical Open Jacks-inspired sound practice, not historical performance.

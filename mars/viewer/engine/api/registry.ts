@@ -1,3 +1,4 @@
+import { OPEN_JAM_ACTIONS } from '../activities/open-jam.ts';
 import { gardenCare } from '../activities/garden-care.ts';
 import { MUSIC_GATHERING_ACTIONS } from '../activities/music-gathering.ts';
 import { LIVING_INTENTION_ACTIONS } from '../activities/living-intention.ts';
@@ -39,7 +40,7 @@ import type { WorldState } from '../world/types.ts';
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
 export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/18`;
 
-export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...PREPARATION_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS, ...SLEEP_ACTIONS, gardenCare, ...MUSIC_GATHERING_ACTIONS, ...LIVING_INTENTION_ACTIONS];
+export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...PREPARATION_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS, ...SLEEP_ACTIONS, gardenCare, ...MUSIC_GATHERING_ACTIONS, ...LIVING_INTENTION_ACTIONS, ...OPEN_JAM_ACTIONS];
 export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS, ...FRAMING_INVARIANTS];
 
 export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> {

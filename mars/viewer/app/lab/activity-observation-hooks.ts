@@ -1,3 +1,4 @@
+import { readOpenJam } from '../../engine/activities/open-jam.ts';
 import { readPurposefulRoutine } from '../../engine/activities/purposeful-routine.ts';
 // Detached camera facts derived from authoritative records, never camera execution.
 import type { Runtime } from '../../engine/runtime/runtime.ts';
@@ -119,6 +120,14 @@ export function cameraActivityReadout(rt: Runtime): {
                   ? [s.bindings.work.station]
                   : [],
         };
+    }
+    if (r.verb === 'open_jam') {
+      const s = readOpenJam(rt, r.id);
+      if (s) fact = { ...fact, actors: s.bindings.rounds.map(q => q.actor),
+        phase: s.phase ?? r.verb, mode: s.mode,
+        focus: s.bindings.rounds[s.index]?.actor,
+        objects: [s.bindings.station, s.bindings.seat.split('#')[0]],
+        waitingReason: s.diagnostic?.message };
     }
     if (r.verb === 'music_gathering') {
       const s = readMusicGathering(rt, r.id);
