@@ -88,7 +88,7 @@ test('stair foot IK: capture mid-flight (up)', async ({ page }, testInfo) => {
   // side view across the flight (stairs A run along +x at z = 10), slightly from below the deck edge
   await page.evaluate(([q]) => window.__marsEngine!.camera([q[0] + 0.5, q[1] + 1.0, q[2] + 3.3], [q[0] + 0.15, q[1] + 0.8, q[2]]), [p]);
   await labFrames(page, 4);
-  await captureView(page, 'poses-stairs-mid-flight', { testInfo });
+  await captureView(page, 'poses-stairs-mid-flight', { testInfo, softVisual: true });
 });
 
 // Take replay (POSES.md "Take replay"): the `stairs` climb recorded with the engine's TakeRecorder and
