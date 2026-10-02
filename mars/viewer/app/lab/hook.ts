@@ -53,6 +53,103 @@ import type { WorldState } from '../../engine/world/types.ts';
 
 export type EngineHook = ReturnType<typeof installHook>;
 
+/** Explicit observers/reset/presentation controls; every other function is fenced by default. */
+const QUARANTINE_ALLOWED = new Set([
+  'gardenCircuit',
+  'communalSupper',
+  'roomPreparation',
+  'gardenAfternoon',
+  'seedPlanting',
+  'seedMarkers',
+  'readingCircle',
+  'galleryTour',
+  'tableCleanup',
+  'creativeAfternoon',
+  'artSharing',
+  'livingDay',
+  'garden',
+  'cameraEntities',
+  'cameraActivityReadout',
+  'cameraGeometry',
+  'scenarios',
+  'scenarioHud',
+  'sequence',
+  'components',
+  'fixtures',
+  'fixtureMove',
+  'drawing',
+  'warmup',
+  'openJam',
+  'musicAudio',
+  'music',
+  'reading',
+  'chess',
+  'sleep',
+  'preparation',
+  'chessTokens',
+  'workstation',
+  'activityExample',
+  'workstationAppearances',
+  'classroomAttention',
+  'sharedFood',
+  'activityAttention',
+  'activityAttentionTargets',
+  'classroom',
+  'purposefulRoutine',
+  'gatheringContinuations',
+  'stateHash',
+  'stacks',
+  'paints',
+  'yearBuild',
+  'slots',
+  'social',
+  'state',
+  'violations',
+  'records',
+  'log',
+  'overlays',
+  'cameraPose',
+  'info',
+  'perf',
+  'bones',
+  'meshPoints',
+  'heldItems',
+  'humanFields',
+  'bodyModel',
+  'stairs',
+  // These operate on a fresh world or presentation, never the quarantined runtime.
+  'runScenario',
+  'camera',
+  'cameraPreset',
+  'setOverlay',
+]);
+
+/** Fence before invoking controls: no extra diagnostic/event is written into the frozen world. */
+export function fenceLabControls<T extends object>(
+  hook: T,
+  halted: () => { code: string; message: string } | null,
+): T {
+  for (const [name, descriptor] of Object.entries(
+    Object.getOwnPropertyDescriptors(hook),
+  )) {
+    if (typeof descriptor.value !== 'function' || QUARANTINE_ALLOWED.has(name))
+      continue;
+    const call = descriptor.value;
+    Object.defineProperty(hook, name, {
+      ...descriptor,
+      value: function (this: unknown, ...args: unknown[]) {
+        const reason = halted();
+        if (reason)
+          throw new Error(
+            `lab.control-quarantined: ${name} refused while ${reason.code}: ${reason.message}. Reset or choose a new scenario before continuing.`,
+          );
+        return Reflect.apply(call, this, args);
+      },
+    });
+  }
+  return hook;
+}
+
 export function installHook(view: LabView, notify: () => void) {
   const sim = view.sim;
   const cameraGeometry = new LabCameraGeometryCache();
@@ -144,7 +241,7 @@ export function installHook(view: LabView, notify: () => void) {
       return view.staticsReady;
     },
     /** The scenario's panel HUD lines (year walkabouts: file size, fetch/parse/build ms). */
-    scenarioHud: () => sim.scenario.hud?.(sim.rt) ?? [],
+    scenarioHud: () => sim.halted ? [] : sim.scenario.hud?.(sim.rt) ?? [],
     /** Fast-forward n fixed ticks synchronously (stops at the scenario's tick budget). */
     step(n = 1) {
       sim.stepN(n);
@@ -158,7 +255,7 @@ export function installHook(view: LabView, notify: () => void) {
       return state();
     },
     /** Sequence presets: per-step status/phase/blocked diagnostics, plus the blocked/failed/violation log. */
-    sequence: () => ({ steps: sequenceRows(sim), diagnostics: sim.diagnostics.slice() }),
+    sequence: () => ({ steps: sequenceRows(sim), diagnostics: structuredClone(sim.diagnostics) }),
     /** Fast-forward until every named sequence step has `status` (default completed), or done / maxTicks. */
     runUntilSteps(ids: string[], status = 'completed', maxTicks = 20 * 600) {
       const ok = () => {
@@ -201,7 +298,7 @@ export function installHook(view: LabView, notify: () => void) {
     sharedFood: () => structuredClone([...sim.rt.records.values()].filter(r => r.verb === 'shared_food_break').map(r => readSharedFoodBreak(sim.rt, r.id))),
     activityAttention: () => view.humans.attention(),
     activityAttentionTargets: () => structuredClone(view.attentionTargets),
-    classroom: () => { const id = classroomSessionId(sim.rt); return { session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, activityExample(sim.scenario.name)?.session.displayId ?? 'screen') }; },
+    classroom: () => { const id = classroomSessionId(sim.rt); return structuredClone({ session: id ? readClassroom(sim.rt, id) : undefined, display: displayReadout(sim.rt, activityExample(sim.scenario.name)?.session.displayId ?? 'screen') }); },
     purposefulRoutine: (action?: string) => {
       const id = action ?? [...sim.rt.records.values()].findLast(r => r.verb === 'purposeful_routine')?.id;
       const state = id ? readPurposefulRoutine(sim.rt, id) : undefined;
@@ -230,14 +327,14 @@ export function installHook(view: LabView, notify: () => void) {
         admission: yearBuildSupportDiagnostic(b),
         setupMs: +info.setupMs.toFixed(0),
         fetchMs: +info.fetchMs.toFixed(0),
-        centre: info.centre,
+        centre: [...info.centre],
         steps: info.setup.plan.steps.map((st) => {
           const q = st.params as Record<string, unknown>;
           return { id: st.id, verb: st.verb, beam: q.beam ?? null, item: q.item ?? q.upright ?? null, height: typeof q.height === 'number' ? q.height : null, relay: Array.isArray(q.relay) && q.relay.length > 0 };
         }),
         piles: Object.values(sim.rt.world.entities)
           .filter((e) => e.kind === 'fixture')
-          .map((e) => ({ id: e.id, def: e.def, p: e.pose.p, yaw: e.pose.yaw, count: (e.contents as { count?: number } | undefined)?.count ?? null })),
+          .map((e) => ({ id: e.id, def: e.def, p: [...e.pose.p], yaw: e.pose.yaw, count: (e.contents as { count?: number } | undefined)?.count ?? null })),
         compare: { n: cmp.length, ok: cmp.filter((c) => c.ok).length, maxMm: +(cmp.reduce((m, c) => Math.max(m, Number.isFinite(c.dist) ? c.dist : 0), 0) * 1000).toFixed(2) },
         unplaced: reasons,
         blocked: blockedLog(sim.rt),
@@ -263,7 +360,7 @@ export function installHook(view: LabView, notify: () => void) {
       notify();
     },
     state,
-    violations: () => sim.rt.violations.map((v) => ({ ...v })),
+    violations: () => structuredClone(sim.rt.violations),
     records: () => [...sim.rt.records.values()].map((r) => JSON.parse(JSON.stringify(r))),
     /** Cancel through the runtime's normal safety/deferred-stop contract (no pose mutation). */
     cancelAction(id: string) {
@@ -271,7 +368,7 @@ export function installHook(view: LabView, notify: () => void) {
       notify();
       return JSON.parse(JSON.stringify(result));
     },
-    log: () => sim.log.slice(),
+    log: () => structuredClone(sim.log),
     setOverlay(name: OverlayName, on: boolean) {
       view.setOverlay(name, on);
       notify();
@@ -299,7 +396,7 @@ export function installHook(view: LabView, notify: () => void) {
           const s = e.support as { by: string; hand: 'left' | 'right' };
           const palm = new THREE.Vector3();
           const ok = view.humans.palmOf(s.by, s.hand, palm);
-          return { id: e.id, def: e.def, by: s.by, hand: s.hand, rendered: view.components.positionOf(e.id), engine: e.pose.p, palm: ok ? palm.toArray() : null, fraction: e.contents?.fraction ?? null };
+          return { id: e.id, def: e.def, by: s.by, hand: s.hand, rendered: view.components.positionOf(e.id), engine: [...e.pose.p], palm: ok ? palm.toArray() : null, fraction: e.contents?.fraction ?? null };
         }),
     /**
      * Body-model probe (preset `body` only): set a person's activity and hand points directly — renderer
@@ -390,6 +487,7 @@ export function installHook(view: LabView, notify: () => void) {
     /** Stair flights the renderer uses (tread centres along the axis and tread-top heights). */
     stairs: () => view.humans.stairs(),
   };
+  fenceLabControls(hook, () => sim.halted);
   (window as { __marsEngine?: unknown }).__marsEngine = hook;
   return hook;
 }

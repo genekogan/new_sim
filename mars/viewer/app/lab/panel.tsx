@@ -96,7 +96,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         <button disabled={!!sim.halted} onClick={() => ((sim.paused = !sim.paused), refresh())}>{sim.paused ? 'Play' : 'Pause'}</button>
         <button disabled={!!sim.halted} onClick={() => ((sim.paused = true), sim.step(), refresh())}>Step</button>
         <button onClick={() => onScenario(s.name)}>Reset</button>
-        <select value={sim.speed} onChange={(e) => ((sim.speed = Number(e.target.value)), refresh())} aria-label="Speed">
+        <select disabled={!!sim.halted} value={sim.speed} onChange={(e) => ((sim.speed = Number(e.target.value)), refresh())} aria-label="Speed">
           {SPEEDS.map((v) => (
             <option key={v} value={v}>
               {v}×
@@ -105,7 +105,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         </select>
       </div>
       {onDrop && (
-        <button className="lab-drop" onClick={onDrop}>
+        <button disabled={!!sim.halted} className="lab-drop" onClick={onDrop}>
           Drop panel into the gap now
         </button>
       )}
@@ -119,13 +119,17 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
           {state.status === 'failed' ? <span role="alert">{state.diagnostic} · Using the primitive computer appearance.</span> : `Appearance: ${state.status}`}
         </div>)}
       </section>}
-      {s.hud && (
+      {!sim.halted && s.hud && (
         <ul className="lab-meta lab-hud" data-testid="lab-scenario-hud">
           {s.hud(sim.rt).map((l, i) => (
             <li key={i}>{l}</li>
           ))}
         </ul>
       )}
+      {sim.halted && <p role="status" data-testid="lab-control-quarantine">
+        Activity controls are unavailable while this world is halted: {sim.halted.code} · {sim.halted.message}. Reset or choose a new scenario to continue. Camera and inspection controls remain available.
+      </p>}
+      <fieldset disabled={!!sim.halted} aria-label="Activity controls" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <PurposefulRoutineHud key={`purposeful-routine:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <GatheringContinuationHud key={`continuation:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ClassroomHud key={s.name} sim={sim} refresh={refresh} />
@@ -152,8 +156,9 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <GroupWarmupHud key={`warmup:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <OpenJamHud key={`jam:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <MusicGatheringHud key={`dance:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      </fieldset>
       <h2>Expectations</h2>
-      <ul className={`lab-checks${s.admission?.(sim.rt) ? ' lab-admission-checks' : ''}`}>
+      <ul className={`lab-checks${!sim.halted && s.admission?.(sim.rt) ? ' lab-admission-checks' : ''}`}>
         {checks.map((c, i) => (
           <li key={i} className={c.ok ? 'ok' : 'bad'}>
             {c.ok ? '✓' : '✗'} {c.message}

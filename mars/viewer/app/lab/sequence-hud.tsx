@@ -40,7 +40,7 @@ export function SequenceHud({ sim }: { sim: LabSim }) {
       ))}
       {!active.length && <div className="lab-hud-step">{done === rows.length ? 'sequence complete' : 'no step running'}</div>}
       {diags.length > 0 && (
-        <ol className={`lab-hud-diags${sim.scenario.admission?.(sim.rt) ? ' lab-admission-diags' : ''}`} aria-label="Recent diagnostics">
+        <ol className={`lab-hud-diags${!sim.halted && sim.scenario.admission?.(sim.rt) ? ' lab-admission-diags' : ''}`} aria-label="Recent diagnostics">
           {diags.map((d, i) => (
             <li key={i} className={d.level}>
               <span>{fmt(d.tick)}</span> {d.text}

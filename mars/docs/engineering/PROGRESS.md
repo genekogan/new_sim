@@ -2976,3 +2976,28 @@ and focused type-aware lint PASS. RED and PASS logs are preserved in ignored
 .cloudflare/alpha-resume-native-before.log and alpha-terminal-native.log. Browser
 terminal parity, new control quarantine and complete production coverage remain
 pending; focused native checks are not release or actual-Play proof.
+
+## Alpha Lab control quarantine candidate — 2026-10-02
+
+Bounded hook and panel guards refuse mutation controls while a serious halt is
+retained. Unclassified installed hook functions default to refusal; explicit
+inspection, fresh scenario/reset and camera/overlay controls remain available.
+The panel disables activity controls, Drop and Speed; scenario HUD/admission and
+on-canvas sequence admission styling do not reenter callbacks after containment.
+Confirmed returned aliases are detached at the hook boundary: nested violations,
+log/sequence diagnostics, classroom errors, year-build pile/centre coordinates
+and held-item engine positions. This is a supported control boundary, not a
+universal DevTools sandbox or arbitrary JavaScript recovery guarantee.
+
+Viewer TypeScript, standalone strict browser-spec TypeScript and focused type-aware
+lint pass. All12 existing native Lab liveness/sustained checks pass,0fail/skip/todo.
+Three browser cases are authored and discovered, unexecuted pending root's
+serialized integrated browser slot: actual activity UI/API quarantine and reset,
+default refusal for a future method, and year-build aliases/sequence callback
+reentry. Fixtures deliberately corrupt test-only runtimes; they do not certify
+production preset failure or actual Play. Original timeouts/performance limits
+remain intact. New spec format passes; the three existing app files retain dense
+baseline formatting (oxfmt check reports the same three baseline paths); broad
+mechanical formatting was reverted to keep this candidate reviewable. Static logs
+are ignored under viewer/e2e/artifacts/alpha-control-quarantine-static/. No main
+integration, browser/performance execution, deployment or public proof occurred.
