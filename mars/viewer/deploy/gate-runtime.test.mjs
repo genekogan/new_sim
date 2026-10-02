@@ -55,18 +55,26 @@ test('gate cleanup terminates descendants as well as wrapper processes', () => f
 
 
 test('SIGINT writes an interrupted gate report and closes a detached descendant server', { timeout: 15000 }, async () => {
-  const { spawn } = await import('node:child_process');
+  const { spawn, execFileSync } = await import('node:child_process');
   const { setTimeout: delay } = await import('node:timers/promises');
-  const dir = await mkdtemp(join(tmpdir(), 'mars-gate-interrupt-'));
+  const repository = await mkdtemp(join(tmpdir(), 'mars-gate-interrupt-'));
+  const dir = join(repository, 'viewer');
   const port = await unusedPort();
   let gate;
   try {
-    await mkdir(join(dir, 'deploy'));
-    for (const file of ['gate.mjs', 'gate-runtime.mjs']) await copyFile(new URL(file, import.meta.url), join(dir, 'deploy', file));
-    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'gate-interrupt-fixture', scripts: { lint: 'node fixture.cjs' } }));
+    await mkdir(join(dir, 'deploy'), { recursive: true });
+    for (const file of ['gate.mjs', 'gate-runtime.mjs', 'engine-proof.mjs', 'engine-proof-reporter.mjs']) await copyFile(new URL(file, import.meta.url), join(dir, 'deploy', file));
+    await mkdir(join(dir, 'engine/test'), { recursive: true });
+    await writeFile(join(dir, 'engine/test/fixture.test.ts'), "import test from 'node:test';test('fixture',()=>{});\n");
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'gate-interrupt-fixture', scripts: { lint: 'node fixture.cjs', 'test:engine': 'node --test engine/test/*.test.ts' } }));
     await writeFile(join(dir, 'fixture.cjs'), `const {spawn}=require('child_process');
 const code="process.on('SIGTERM',()=>{});require('http').createServer((q,r)=>r.end('ready')).listen(${port},'127.0.0.1',()=>require('fs').writeFileSync('ready',String(process.pid)))";
 spawn(process.execPath,['-e',code],{detached:true,stdio:'ignore'});setInterval(()=>{},1000);`);
+    // Exercise the actual gate's new source-bound reporting in a real, clean
+    // temporary repository. Never replace git or bypass hooks for this fixture.
+    execFileSync('git', ['init', '--quiet'], { cwd: repository });
+    execFileSync('git', ['add', 'viewer'], { cwd: repository });
+    execFileSync('git', ['-c', 'user.name=genekogan', '-c', 'user.email=1335251+genekogan@users.noreply.github.com', 'commit', '--quiet', '-m', 'Gate interruption fixture', '-m', 'Co-Authored-By: Codex <noreply@openai.com>'], { cwd: repository });
     gate = spawn(process.execPath, ['deploy/gate.mjs'], { cwd: dir, stdio: 'ignore' });
     const closed = new Promise((resolve) => gate.once('close', (code) => resolve(code)));
     let pid;
@@ -86,12 +94,11 @@ spawn(process.execPath,['-e',code],{detached:true,stdio:'ignore'});setInterval((
     assert.ok(report.finishedAt);
     assert.ok(report.skipped.length > 0);
     await assert.rejects(fetch(`http://127.0.0.1:${port}`));
-    const { execFileSync } = await import('node:child_process');
     let state = '';
     try { state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim(); } catch { /* reaped */ }
     assert.ok(state === '' || state.startsWith('Z'), `detached descendant still running: ${state}`);
   } finally {
     gate?.kill('SIGKILL');
-    await rm(dir, { recursive: true, force: true });
+    await rm(repository, { recursive: true, force: true });
   }
 });

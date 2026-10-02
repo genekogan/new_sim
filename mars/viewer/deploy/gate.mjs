@@ -45,7 +45,10 @@ const steps = [
   // serialized suite capacity; per-test and performance limits stay unchanged.
   // Release29 serialized browser proof took1766s; required music adds39.6s.
   // Capacity for the complete suite only: per-test deadlines/assertions are unchanged.
-  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 40 * MIN, parse: playwright },
+  // Release34 took2322.5s; supported sleep adds52.1s and prepared-day adds43.2s.
+  // Their measured2417.8s sum exceeds the old2400s aggregate capacity. Allow
+  // the complete serialized suite42min; all individual deadlines remain fixed.
+  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 42 * MIN, parse: playwright },
   { name: 'record-campus-take', cmd: ['node', 'deploy/record-campus-take.mjs', '--check'], timeout: 5 * MIN, parse: simulation },
   { name: 'determinism-probe', cmd: ['node', 'deploy/determinism-probe.mjs'], timeout: 5 * MIN, parse: probe },
 ];

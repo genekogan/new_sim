@@ -79,3 +79,26 @@ installation or deployment was run. No new helper agents. Root must critically
 review the source and verify full-gate generation/reuse with the next playable
 combined candidate. This bounded engineering change does not certify sleep,
 prepared-day continuity or any previously skipped historical journey.
+
+## Combined candidate first gate and fixture repair
+
+Frozen3561907 first gate stopped with lintPASS,289unitPASS/1FAIL. The SIGINT
+fixture copied onlygate/gate-runtime: the newengine-proof import was absent,
+and its flat non-Git directory did not supply the strict clean source identity.
+No engine/browser/integration checks executed; original RED report remains
+`viewer/.cloudflare/gate/2026-10-01T22-08-50-305Z/report.json`.
+
+Keep production gate identity strict. The fixture now constructs a real temporary
+repository with viewer subtree, exacttest:engine script, inert test and both new
+helper files. Normal Git hooks are retained. Original SIGINT readiness, report,
+descendant socket/process cleanup assertions and deadlines are unchanged. Combined
+proof/external-evidence/gate-lifetime focused16/16PASS0skip,1.727s; real interrupted
+fixture closes its detached descendant and writes non-green report.
+
+Measured release34 serialized browser duration2322.5s plus newly executed sleep52.1s
+and prepared-day43.2s gives2417.8s, beyond old2400s aggregatecapacity. Allow42minutes
+for the complete requiredsuite; individual120s test deadlines, assertions, original
+performance limits/pins and all cases remain unchanged. Root explicitly reported
+this capacity change before the next fullgate; no per-case inflation/baseline edit.
+An initial documentation append used viewer cwd with repository-relative paths;
+no files were written there. Corrected before the clean candidate freeze.
