@@ -211,7 +211,36 @@ function effects(name: string, initial: Evidence, end: Evidence) {
     expect(end.backdropReady).toBe(true);
     expect(end.records).toHaveLength(4);
   }
-  if (!['meal', 'campfire-evening'].includes(name))
+  if (name === 'hand-up') {
+    // Occupied take_slot children end by cancellation from authored stand steps.
+    // Require exactly the ten declared releases; every other record completes.
+    const released = end.records.filter((r) => r.status === 'cancelled');
+    expect(released).toHaveLength(10);
+    expect(released.filter((r) => r.parent === 'step:fire')).toHaveLength(8);
+    for (const parent of ['step:sit0', 'step:sit1'])
+      expect(released.filter((r) => r.parent === parent)).toHaveLength(1);
+    for (const held of released) {
+      expect(held.verb).toBe('take_slot');
+      expect(
+        held.history.some((h: { phase?: string }) => h.phase === 'occupied'),
+      ).toBe(true);
+      const stand = end.records.filter(
+        (r) =>
+          /^step:stand[0-9]$/.test(r.id) && r.outputs?.released === held.id,
+      );
+      expect(stand).toHaveLength(1);
+      expect(stand[0]).toMatchObject({
+        verb: 'stand',
+        status: 'completed',
+        params: { actor: held.params.actor },
+      });
+    }
+    expect(
+      end.records
+        .filter((r) => !released.includes(r))
+        .every((r) => r.status === 'completed'),
+    ).toBe(true);
+  } else if (!['meal', 'campfire-evening'].includes(name))
     expect(
       end.records.every((r) => r.status === 'completed'),
       'all ordinary physical children completed',
@@ -417,6 +446,16 @@ for (const name of [...scripted, 'incomplete-stairs', 'stress-30']) {
         }
       }
       await reset(page, name, checkpoints.initial);
+      if (name === 'construction') {
+        // Three real panel lifetimes must return to the identical fresh counters.
+        for (const cycle of [2, 3]) {
+          await reach(page, 'endpoint');
+          const end = await capture(page, name, `lifetime-${cycle}-endpoint`);
+          checkpoints[`lifetime-${cycle}`] = end;
+          effects(name, checkpoints.initial, end);
+          await reset(page, name, checkpoints.initial);
+        }
+      }
       expect(errors).toEqual([]);
     } catch (error) {
       failure = error;

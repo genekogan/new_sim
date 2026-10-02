@@ -3110,3 +3110,34 @@ Full original report/traces/attachments retained under ignored
 Root inspected supported-sleep and shared-food captures alongside paired state.
 Garden due/full natural3stop gallery checks and canonical index navigation are
 integrated authored candidates; still unexecuted. Frozen combined validation follows.
+
+## Alpha remaining journey execution and real Reset fixes — 2026-10-02
+
+Clean40a6739 selected26cases completed19PASS/7FAIL/0skip/flaky. Prepared-day-8
+now completes all purposes/cleanup/Reset at existingUI8x within original120s. Stress
+passed through>2000ticks with completed fresh walks requested after original60s;
+incomplete-stairs proved exactrefusal plususableclock; fullgarden due/exhaustion and
+natural3stop gallery passed. Retained report/traces in ignored
+.cloudflare/alpha-remaining-40a6739-completed. Root inspected paired gallery-stop3,
+finite-water refusal and sustained crowd captures. None certifies fine anatomy.
+
+Failures exposed actualrenderer-owned lifetime defects: transient component geometry
+pool survived worldReset; campfire stone/log geometry accumulated with fixture rebuilds;
+year2020 LineSegments were omitted from backdrop disposal. Isolated ac33f22 review
+and3nativeRED→GREEN lifecycle tests cover repeated disposal/retained sharing and no
+world mutations; integrated1b16b0c. Historicalcontentvalues/geometry unchanged; only
+renderer resource mechanics. Strict browser geometry/textures resetassertions retained.
+
+Hand-up authored88steps allcompleted, but10 temporary take_slot children legitimately
+cancel when matching authored stands release them. Newblanketcompleted assertion was
+incorrect: it now requires exactly8fire+1sit0+1sit1 cancellations, each previously
+occupied and explicitlyreleased by matching completed stand0–9; everyotherrecord
+mustcomplete. Claims/held/installation/sequence/invariant assertions unchanged.
+Original failure retained; targeted verification pending, not relabeledPASS.
+
+Year2026 failed because recoveredalphaWT missed CODEX's ignoredcampusGLB links,
+not because productionmodel was absent. Restored links to frozenverified40model;
+70,772,556bytes hash675f4bebe… matchespublicationmanifestkey exactly. Original
+missing-modelHTMLparseerror/60s readiness failure retained; no loadinglimit increase,
+tracked model/content change or historicalasset guess. Final targetedUI verification
+still required for all7failedcases and combinedreleasegate/publication remains pending.
