@@ -2365,3 +2365,29 @@ Seed/garden/cleanup/scanner72PASS after canonical registration; renderer6PASS,
 TSc/type-awarefocusedlint PASS. Both authored actualPlay cases/nine normal captures,
 new camera entry and combined/public proof remain pending; not shipped. Frozen
 release37 ca6bb5d remains untouched and all48other-owner paths preserved.
+
+
+### Future social/garden Play gaps and retained planting — October2
+
+Exact clean ce2213c actualPlay:9PASS/3FAIL,4.2min. Gallery3-stop and all6same-world
+camera entries passed; both finite-seed variations passed actual conservation/
+safe cleanup/direction/repeated continuation. Short-gallery authored host endpoint
+[-10,-8] intersects left-wall: ordinary admission correctly disables it. Reviewed
+01a4727 selects physically clear[-8,-8], displays real refusal and adds exact
+ordinary-directive/retained-clock/effects/history regression14PASS.
+
+Both reading-circle cases fail an unrelated bones.on assertion at first seating.
+It is rack-link ownership, not chair support; both actual seated captures and
+book/slot/sit-child state inspected by root/helper. f268ca3 replaces that mistaken
+measurement with stricter actual chair ownership/child/position/pose/height/planted
+sole checks. Later lifecycle Play evidence is still missing; original failures kept.
+No simulation/rig bypass, timeout increase or tolerance inflation.
+
+Reviewed43dfffe integrates bounded seed_planting through existing living intentions:
+same actor/source/return binding, exact partial continuation and retained completed
+material only after physical cleanup. Reject seconds-slicing finite fractions with
+intention.seed-slice. Seventeen new checks and80focused original/new tests pass on
+worker0081ad9; no browser/fullgate/public claim. Canonical rules activities/25 makes
+changed intention semantics explicit. Root-owned future connected garden UI uses
+this existing leaf; no generalplanner or material growth. Release37 public checks
+run separately on unchanged ca6bb5d source. Future58presets remain unshipped.
