@@ -2878,3 +2878,10 @@ release40-root-garden-review.json, release40-upload-cache-receipt.json.
 Gene lifted the temporary quota pause after verified repair40; resume saved v1 alpha
 stabilization first (coverage/recovery/performance/docs), then useful activity expansion,
 with no Eden or automatic handoff. Excluded unfinished drafts remain preserved.
+
+## Owner-authorized continuation after release40 — 2026-10-02
+
+The homepage repair is publicly verified. Gene lifted the quota pause, authorized
+credits and continued execution. Stabilization stays first; its accepted publication
+closes that tranche, then work returns to useful Mars activities rather than stopping
+all development. The current roadmap now says this explicitly; Eden remains deferred.

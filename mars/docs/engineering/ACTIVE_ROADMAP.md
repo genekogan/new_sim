@@ -1,6 +1,7 @@
 # Mars World v1 alpha — stabilization after verified homepage repair
 
-Owner mandate2026-10-02 supersedes indefinite vocabulary expansion.
+Stabilization remains the immediate priority. Gene's latest authorization lifts the
+quota pause and permits useful activity expansion after the verified alpha checkpoint.
 
 **Release40 is verified: [campus presentation](https://sim.mars.college/) is restored at `/`; [Engine Lab](https://sim.mars.college/lab) remains explicit at `/lab`.**
 Worker `bb946d3c-934d-4d2c-8d50-8ae74e087146`, functional source `05370e8c727d44e52e2db510f022dac53b748417`; rollback39
@@ -43,7 +44,9 @@ crop/HUD limits, no plant growth and independent garden-afternoon walks remain.
 4. **Canonical publication:** critically review complete supported scenario suite and
    architecture, clean combined full gate, inspected Play/disruptions, second deployment
    and public verification. Mark UI/docs Mars World v1 alpha; record exact source/version,
-   rollback/evidence/limits/Eden handoff. Then stop; no automatic vocabulary/Eden work.
+   rollback/evidence/limits/Eden handoff. Close this stabilization tranche, then resume
+   the approved activity-expansion queue under Gene's latest continuing authorization.
+   Do not begin Eden.
 
 Initial whole v1 alpha remaining20–36workinghours, medium-low confidence. Main risks:
 full-journey proof gaps hidden behind startup/mixed stepping, local-failure isolation,
