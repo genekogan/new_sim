@@ -4,6 +4,7 @@ import { ActivityObserver } from './activity-observation.ts';
 import type { CameraEntity, CameraActivityFact } from './activity-observation.ts';
 import { Director } from './director.ts';
 import { poseValid } from './physical.ts';
+import { feasibleShots } from './shots.ts';
 import type { SpatialScene } from '../engine/spatial/types.ts';
 
 const scene: SpatialScene = { bounds: [-30, -30, 30, 30], levels: [], surfaces: [], obstacles: [], links: [] };
@@ -42,6 +43,31 @@ void test('floor, companion walking and wait edges use current authoritative ide
   assert.equal(r.read(entities, [{ ...fact, phase: 'walk-to-lunch' }], 2, .1, scene).activity.phase, 'walking');
   const wait = { ...fact, id: 'waiting', focus: 'editor-new', waitingReason: 'computer occupied', mode: 'waiting' };
   assert.equal(r.read(entities, [question, wait], 3, .15, scene).activity.focus, 'editor-new');
+});
+void test('a paused or waiting actor gets bounded edge attention then running activity regains coverage', () => {
+  for (const mode of ['paused', 'waiting']) {
+    const r = observer(), d = new Director('clear');d.reset('test');
+    const stopped = { ...fact, id: 'a-stopped', actors: ['editor-new'], mode, waitingReason: 'unfinished project retained' };
+    const active = { ...fact, id: 'b-active', actors: ['reviewer-new'], focus: 'reviewer-new', phase: 'working' };
+    const start = r.read(entities, [stopped, active], 0, 0, scene);
+    assert.equal(start.activity.focus, 'editor-new');d.update(start);
+    const next = r.read(entities, [stopped, active], 100, 5, scene);
+    assert.equal(next.activity.focus, 'reviewer-new');d.update(next);
+    assert.equal(d.current?.subjects[0], 'reviewer-new');
+    assert.equal(r.read(entities, [stopped, active], 1000, 50, scene).activity.focus, 'reviewer-new');
+    assert.equal(r.read(entities, [stopped, active], 1000, 50, scene).semanticVersion, next.semanticVersion);
+  }
+});
+void test('question coverage pairs the questioner with the exact presenter and excludes withdrawn/missing participants', () => {
+  const q = [...entities, { id: 'aaa-other', kind: 'human', pose: { p: [-2, 0, 0], yaw: 0 }, human: { activity: 'sit' } }];
+  const question = { ...fact, actors: ['editor-new', 'reviewer-new', 'aaa-other', 'missing'], phase: 'question', focus: 'reviewer-new', presenter: 'editor-new', departing: ['aaa-other'], objects: ['missing-pot', 'pot-new'] };
+  const o = observer().read(q, [question], 1, .05, scene);
+  assert.deepEqual(o.activity.members, ['editor-new', 'reviewer-new']);
+  assert.deepEqual(o.activity.departing, ['aaa-other']);
+  assert.equal(o.activity.display, 'pot-new');
+  assert.equal(o.activity.presenter, 'editor-new');
+  const pair = feasibleShots(o).find(s => s.intention === 'two-person');
+  assert.deepEqual(pair?.subjects, ['reviewer-new', 'editor-new']);
 });
 void test('sleep framing observes authored mat corners rather than standing head points', () => {
   const q = structuredClone(entities);q[0].human!.sleepPose = { mat: 'mat-new', standingFraction: 0 };

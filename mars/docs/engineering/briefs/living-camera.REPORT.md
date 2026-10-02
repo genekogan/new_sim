@@ -106,6 +106,19 @@ type exports are `CameraEntity`, `CameraActivityFact`, `ActivityObserver` and
 `activityCameraScenario` from `cinematography/activity-observation.ts`.
 Actual long-day browser evidence is pending root wiring and serialized slot release.
 
+Root hook review exposed three concrete gaps before browser validation: permanent
+paused/waiting priority, absent object targets, and classroom excluded/presenter
+semantics. Root owns object and participation normalization. The adapter now gives
+an interruption edge at most four simulation seconds of elevated salience, then
+places still-paused/waiting commitments below running activities. Authored delayed
+starts also remain below active work. Existing editorial holds may defer or omit
+a short edge; no cut/hold/manual policy is bypassed. Optional `presenter` and
+`departing` fields retain the exact question pair and exclude withdrawn/missing
+people from the active group. Eight new plus 27 existing camera checks pass:
+**35 PASS, zero failures/skips/TODOs** (544.1 ms), including actual Director return
+from paused/waiting actor A to busy actor B, exact questioner/presenter pair and
+supported object target. Cinematography TypeScript and scoped lint pass.
+
 ## Acceptance still required
 
 Deterministic repeated observations/decisions, stable semantic versions on paused

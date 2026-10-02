@@ -10,6 +10,8 @@ export interface CameraActivityFact {
   mode: string;
   status: string;
   focus?: string;
+  presenter?: string;
+  departing?: string[];
   objects?: string[];
   purpose?: string;
   waitingReason?: string;
@@ -38,9 +40,11 @@ function phase(f: CameraActivityFact): string {
   // Preparation, music, rest and original work use existing focused activity shots.
   return 'working';
 }
-function priority(f: CameraActivityFact): number {
+const interruption = (f: CameraActivityFact) => !!f.waitingReason || ['waiting', 'paused', 'draining', 'ending'].includes(f.mode);
+function priority(f: CameraActivityFact, freshInterruption: boolean): number {
   if (['completed', 'cancelled', 'failed'].includes(f.status)) return -1;
-  if (f.waitingReason || ['waiting', 'paused', 'draining', 'ending'].includes(f.mode)) return 6;
+  if (interruption(f)) return freshInterruption ? 6 : 0;
+  if (['committed-wait', 'between-purposes', 'waiting', 'paused'].includes(f.phase)) return 0;
   if (phase(f) === 'question') return 5;
   if (phase(f) === 'presenting') return 4;
   return f.focus ? 3 : 2;
@@ -52,11 +56,13 @@ export class ActivityObserver {
   cursor = 0;
   fingerprint = '';
   diagnostics: string[] = [];
+  private interruptions = new Map<string, { fingerprint: string; since: number }>();
   reset(session: string) {
     this.session = session;
     this.version = this.cursor = 0;
     this.fingerprint = '';
     this.diagnostics = [];
+    this.interruptions.clear();
   }
   read(entities: readonly CameraEntity[], facts: readonly CameraActivityFact[],
     tick: number, time: number, scene: SpatialScene, geometryVersion = 0,
@@ -88,17 +94,32 @@ export class ActivityObserver {
         ...(human ? { kind: 'human' as const } : {}) };
     }
     const available = (id: string) => !!subjects[id];
-    const ordered = [...facts].filter(f => priority(f) >= 0 && f.actors.some(available))
-      .sort((a, b) => priority(b) - priority(a) || a.id.localeCompare(b.id));
+    const presentIds = new Set(facts.map(f => f.id));
+    for (const id of this.interruptions.keys()) if (!presentIds.has(id)) this.interruptions.delete(id);
+    const grades = new Map<CameraActivityFact, number>();
+    for (const f of facts) {
+      if (!interruption(f)) this.interruptions.delete(f.id);
+      else {
+        const fingerprint = JSON.stringify([f.phase, f.mode, f.purpose, f.waitingReason]);
+        const previous = this.interruptions.get(f.id);
+        if (previous?.fingerprint !== fingerprint || time < previous.since)
+          this.interruptions.set(f.id, { fingerprint, since: time });
+      }
+      const edge = this.interruptions.get(f.id);
+      grades.set(f, priority(f, !!edge && time - edge.since < 4));
+    }
+    const ordered = [...facts].filter(f => grades.get(f)! >= 0 && f.actors.some(available))
+      .sort((a, b) => grades.get(b)! - grades.get(a)! || a.id.localeCompare(b.id));
     const f = ordered[0];
-    const members = f ? [...new Set(f.actors)].filter(available).sort()
+    const members = f ? [...new Set(f.actors)].filter(id => available(id) && !f.departing?.includes(id)).sort()
       : entities.filter(e => e.kind === 'human' && available(e.id)).map(e => e.id).sort();
-    const focus = f?.focus && available(f.focus) ? f.focus : members[0];
+    const focus = f?.focus && members.includes(f.focus) ? f.focus : members[0];
     const semantic: Observation['activity'] = {
       phase: f ? phase(f) : 'idle', members,
       ...(focus ? { focus, speaker: focus } : {}),
+      ...(f?.presenter && available(f.presenter) ? { presenter: f.presenter } : {}),
       ...(f?.objects?.find(available) ? { display: f.objects.find(available) } : {}),
-      departing: f && phase(f) === 'departing' ? members : [],
+      departing: f?.departing?.filter(available).sort() ?? (f && phase(f) === 'departing' ? members : []),
     };
     // Identity, purpose and interruption edges matter; elapsed quantities do not.
     const fp = JSON.stringify([semantic, ordered.map(q => [q.id, q.phase, q.mode, q.status, q.purpose, q.waitingReason]), geometryVersion, aspect]);
