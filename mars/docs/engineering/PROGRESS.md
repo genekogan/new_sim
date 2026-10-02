@@ -2348,3 +2348,20 @@ Four new renderer checks plus two existingfixture checks PASS; TSc/focusedlint P
 Core/HUD authoring remain in two Sol6.1 isolated lanes, no browsers alongside the
 frozen release37 gate. The separate social gallery/reading candidate remains
 ready for its first actualPlay, not public. No current candidate/main edits.
+
+
+### Finite planting combined future candidate — 2026-10-02
+
+Review core bc86ed7 and guarded HUD/spec f9c10de; integrate in a separate planting
+worktree atop future gallery/reading35538e4 and root seedbed renderer61af377.
+Register ordinary seed_planting in the canonical registry (activities/24), expose
+both oriented presets/quick-tour instructions, detached real beds/source/action
+and actual marker geometry, and read-only seed-bowl/soil camera facts. Physical
+leaf cancellation and explicit same-purpose continuation are honest controls;
+source commitment persists until the retained planting finishes. No parent pause
+coordinator, refill, growth, new plant entity or historical content changes.
+
+Seed/garden/cleanup/scanner72PASS after canonical registration; renderer6PASS,
+TSc/type-awarefocusedlint PASS. Both authored actualPlay cases/nine normal captures,
+new camera entry and combined/public proof remain pending; not shipped. Frozen
+release37 ca6bb5d remains untouched and all48other-owner paths preserved.

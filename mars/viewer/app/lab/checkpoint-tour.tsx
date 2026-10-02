@@ -8,6 +8,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const living =
     scenario.startsWith('living-day-') ||
     scenario === 'garden-care' ||
+    scenario.startsWith('seed-planting') ||
     scenario.startsWith('reading-circle') || scenario.startsWith('gallery-tour') || scenario.startsWith('table-cleanup') || scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
   const eight =
@@ -71,6 +72,8 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('group-warmup')}>Guided warm-up</button>
         <button onClick={() => onScenario('open-jam')}>Open jam exchange</button>
         <button onClick={() => onScenario('garden-care')}>Garden care</button>
+        <button onClick={() => onScenario('seed-planting')}>Plant finite seeds</button>
+        <button onClick={() => onScenario('seed-planting-rotated')}>Rotated seed beds</button>
         <button onClick={() => onScenario('classroom-4')}>
           Load 4-guest room
         </button>
@@ -116,6 +119,17 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         are hypothetical. Use Play and the activity controls below; Reset starts
         the selected room again.
       </p>
+      {scenario.startsWith('seed-planting') && (
+        <p className="lab-desc">
+          Start plant A, then Play. The same finite seed bowl physically
+          approaches the soil, deposits four bounded fractions and returns to
+          its supported slot. Pause planting or direct the planter away safely;
+          Continue plant A explicitly keeps the same unfinished purpose and material.
+          Finish A before starting B from the remaining seeds. End safely stops
+          the action but preserves planted material and its unfinished purpose.
+          Soil markers show retained seed deposits, not seedlings or growth.
+        </p>
+      )}
       {scenario.startsWith('reading-circle') && (
         <p className="lab-desc">
           Start shared reading, then Play. The same reader physically reads a
@@ -336,7 +350,8 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
       </p>
       <p className="lab-meta">
         Live automatic camera controls cover classroom, prepared/living days,
-        music and care: choose Live camera and a Clear or Restrained style.
+        music, care/planting, drawing/sharing, warm-up, cleanup, gallery walks and shared
+        reading: choose Live camera and a Clear or Restrained style.
         Follow activity person takes manual precedence; Return camera to auto
         releases it. Camera observes actual activity and never directs people.
         The recorded replay is a camera demonstration, not a playable world.

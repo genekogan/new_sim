@@ -60,6 +60,7 @@ export function cameraActivityReadout(rt: Runtime): {
         p.station,
         p.book,
         p.plant,
+        p.seeds,
         p.pot,
         p.mat,
         p.displayId,

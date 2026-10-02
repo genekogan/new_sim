@@ -184,3 +184,22 @@ listener; no arbitrary reader replacement, held-book reading, speech or historic
 text. Ordinary controls, selector/quick tour, shared attention and camera facts are
 wired; focused engine/type checks pass. Actual Play, inspected captures, combined
 gate and publication remain required before a supported public claim.
+
+
+## Seed planting candidate (not yet public)
+
+`seed-planting` and `seed-planting-rotated`: Start plant A, then Play. The same
+finite bowl travels to supported soil, deposits four conserved fractions and
+returns to its table slot. Soil deposit markers show retained material; they are
+not seedlings or a growth claim. Pause planting / End planting safely cancel the
+physical action while retaining its partial purpose and same source. Continue
+plant A explicitly continues it after return; starting B from this bowl refuses
+while A remains unfinished. Complete A then B from the original half-bowl supply.
+Direct planter away performs the same safe return before ordinary walking.
+
+Two authored grounded orientations, one anonymous actor and the same two planters.
+No growth, refill, new plant entities, source/actor substitution, arbitrary planting
+geometry or active reload restoration. Root shared registration, selector, real
+hooks, actual visible marker inspection and camera facts are wired. Focused core/
+renderer checks pass; two actual Play cases, inspected captures, combined gate and
+publication remain required.

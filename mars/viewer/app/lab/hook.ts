@@ -1,3 +1,5 @@
+import { readSeedPlanting } from '../../engine/activities/seed-planting.ts';
+import { readSeedbed } from '../../engine/objects/planting.ts';
 import { readReadingCircle } from '../../engine/activities/reading-circle.ts';
 import { readGalleryTour } from '../../engine/activities/gallery-tour.ts';
 import { readTidyTable } from '../../engine/activities/table-cleanup.ts';
@@ -81,6 +83,13 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    seedPlanting: () => {
+      const r = [...sim.rt.records.values()].filter(r => r.verb === 'seed_planting').at(-1);
+      return { action: r ? readSeedPlanting(sim.rt, r.id) ?? null : null,
+        beds: ['planter-a', 'planter-b'].map(id => readSeedbed(sim.rt, id)),
+        source: structuredClone(sim.rt.world.entities['seed-bowl']) };
+    },
+    seedMarkers: () => view.fixtures.seedMarkers(),
     readingCircle: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'reading_circle').at(-1); return r ? readReadingCircle(sim.rt, r.id) ?? null : null; },
     galleryTour: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'gallery_tour').at(-1); return r ? readGalleryTour(sim.rt, r.id) ?? null : null; },
     tableCleanup: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'tidy_table').at(-1); return r ? readTidyTable(sim.rt, r.id) ?? null : null; },

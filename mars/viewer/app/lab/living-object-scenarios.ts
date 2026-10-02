@@ -1,3 +1,4 @@
+import { seedPlantingRuntime, seedPlantingScene } from '../../engine/scenarios/seed-planting.ts';
 import { readingCircleRuntime, readingCircleScene } from '../../engine/scenarios/reading-circle.ts';
 import { galleryTourRuntime, galleryTourScene } from '../../engine/scenarios/gallery-tour.ts';
 import { tidyTableRuntime, tidyTableScene } from '../../engine/scenarios/table-cleanup.ts';
@@ -26,6 +27,13 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
+    name: index ? 'seed-planting-rotated' : 'seed-planting',
+    title: index ? 'Seed planting · rotated beds (hypothetical)' : 'Seed planting · finite material and retained purpose (hypothetical)',
+    description: 'Start planting one bed, then Play. Carry the same finite seed bowl, deposit material into supported soil and return the bowl. Pause or direct the planter away safely; explicitly continue the same partial purpose. Complete A then B from the remaining seeds. Planted material remains after End; no growth, refill, replacement actor or active reload restoration.',
+    scene: seedPlantingScene, humans: () => [], build: () => seedPlantingRuntime(yaw),
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, 0, 10, 70], expect: checks,
+  })),
   ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
     name: index ? 'reading-circle-rotated' : 'reading-circle', title: index ? 'Shared reading · rotated circle (hypothetical)' : 'Shared reading · book and questions (hypothetical)',
     description: 'Start shared reading, then Play. One reader advances the same supported book while declared listeners occupy real places; interval questions and answers retain the actual page and bookmark. Pause/Resume, Join/Leave or direct the reader away; explicit continuation retains the same reader and book. End preserves unfinished progress for an explicit new circle. Authored ground-table arrangements, no reader handoff, speech generation or active reload restoration.',

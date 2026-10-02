@@ -1,3 +1,4 @@
+import { SeedPlantingHud } from './seed-planting-hud.tsx';
 import { ReadingCircleHud } from './reading-circle-hud.tsx';
 import { GalleryTourHud } from './gallery-tour-hud.tsx';
 import { TableCleanupHud } from './table-cleanup-hud.tsx';
@@ -119,6 +120,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <ReadingHud key={`reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <SeedPlantingHud key={`seed-planting:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <ReadingCircleHud key={`reading-circle:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <GalleryTourHud key={`gallery:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <TableCleanupHud key={`tidy:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
