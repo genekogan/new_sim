@@ -277,7 +277,7 @@ function musicParams(rt: Runtime, p: MusicGatheringParams): MusicParams {
     score: p.score,
     period: p.period,
     duration: p.duration,
-    ...(p.resume ? { resume: true } : {}),
+    ...(p.resume && old ? { resume: true } : {}),
   };
 }
 function preflight(rt: Runtime, p: MusicGatheringParams): Diagnostic | null {
@@ -678,3 +678,13 @@ export const MUSIC_GATHERING_ACTIONS: ActionDef[] = [
   musicGatheringControl,
   groundedDance,
 ];
+
+/** Admission failures have no stored session and must not replace retained bindings. */
+export function latestMusicGathering(rt: Runtime) {
+  for (const r of [...rt.records.values()].reverse()) {
+    if (r.verb !== 'music_gathering') continue;
+    const session = readMusicGathering(rt, r.id);
+    if (session) return session;
+  }
+  return undefined;
+}

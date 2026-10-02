@@ -2,7 +2,7 @@ import { adoptLivingDayMusic } from '../../engine/scenarios/living-day.ts';
 import { useEffect, useRef, useState } from 'react';
 import type { LabSim } from './sim.ts';
 import { musicStation } from '../../engine/activities/computer-music.ts';
-import { readMusicGathering } from '../../engine/activities/music-gathering.ts';
+import { latestMusicGathering } from '../../engine/activities/music-gathering.ts';
 import { MUSIC_GATHERING_BINDING } from '../../engine/scenarios/music-gathering.ts';
 import { MusicSound } from './music-sound.ts';
 export function MusicGatheringHud({
@@ -28,11 +28,10 @@ export function MusicGatheringHud({
   );
   const connected = sim.scenario.name.startsWith('living-day-');
   if (sim.scenario.name !== 'music-dance' && !connected) return null;
-  const rec = [...rt.records.values()]
-    .filter((r) => r.verb === 'music_gathering')
-    .at(-1);
-  const session = rec ? readMusicGathering(rt, rec.id) : undefined,
+  const session = latestMusicGathering(rt),
+    rec = session ? rt.records.get(session.action) : undefined,
     active = rec && rt.isActive(rec.id);
+  const unstarted = session?.mode === 'ended' && !session.music;
   const state = musicStation(rt, MUSIC_GATHERING_BINDING.station),
     unfinished = state && !('code' in state) && state.status === 'unfinished';
   const begin = (resume = false) => {
@@ -138,7 +137,10 @@ export function MusicGatheringHud({
         >
           Pause gathering
         </button>
-        <button disabled={!!active || !unfinished} onClick={() => begin(true)}>
+        <button
+          disabled={!!active || (!unfinished && !unstarted)}
+          onClick={() => begin(true)}
+        >
           Resume gathering
         </button>
       </div>

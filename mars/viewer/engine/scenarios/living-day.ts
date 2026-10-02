@@ -110,6 +110,7 @@ type Day = {
     | 'gathering'
     | 'connected-routine'
     | 'completed'
+    | 'ended'
     | 'waiting';
   initial: string;
   session?: string;
@@ -126,7 +127,7 @@ export function readLivingDay(rt: Runtime) {
   return d
     ? structuredClone({
         ...d,
-        musicState: d.music ? readMusicGathering(rt,d.music) : undefined,
+        musicState: d.music ? readMusicGathering(rt, d.music) : undefined,
         intentions: d.independent.map((id) => readLivingIntention(rt, id)),
       })
     : undefined;
@@ -325,6 +326,16 @@ export function retryLivingDay(rt: Runtime) {
         'Only a refused day transition can be retried; use individual Resume for retained activities.',
       subjects: [],
     };
+  if (d.routine && d.session && !rt.isActive(d.session)) {
+    d.phase = 'ended';
+    d.diagnostic = {
+      code: 'day.gathering-ended',
+      message:
+        'The gathering ended before this refused commitment could join. Retained work and independent activities remain; Reset to stage another day.',
+      subjects: [d.session, d.routine],
+    };
+    return d.diagnostic;
+  }
   d.diagnostic = undefined;
   d.phase = d.routine ? 'gathering' : 'initial-work';
   tickLivingDay(rt);
@@ -332,8 +343,31 @@ export function retryLivingDay(rt: Runtime) {
 }
 export function tickLivingDay(rt: Runtime) {
   const d = state(rt);
-  if (!d || ['completed', 'waiting'].includes(d.phase)) return;
+  if (!d || ['completed', 'ended', 'waiting'].includes(d.phase)) return;
   const initial = rt.records.get(d.initial)!;
+  const ended = (id: string) => {
+    const r = rt.records.get(id);
+    return (
+      !!r &&
+      (r.outputs?.ended === true || ['cancelled', 'failed'].includes(r.status))
+    );
+  };
+  const stop = (ids: string[]) => {
+    d.phase = 'ended';
+    d.diagnostic = {
+      code: 'day.commitment-ended',
+      message:
+        'A required commitment ended before its purpose was completed. Retained effects and other running commitments remain; Reset to stage another day.',
+      subjects: ids,
+    };
+  };
+  if (
+    ended(d.initial) ||
+    (d.phase === 'connected-routine' && d.routine && ended(d.routine))
+  ) {
+    stop([d.routine && ended(d.routine) ? d.routine : d.initial]);
+    return;
+  }
   if (d.phase === 'initial-work' && initial.status === 'completed') {
     const session = rt.submit(
       'classroom_session',
@@ -465,7 +499,12 @@ export function tickLivingDay(rt: Runtime) {
     rt.records.get(d.routine)?.status === 'completed' &&
     !!d.music &&
     rt.records.get(d.music)?.status === 'completed' &&
-    d.independent.every((id) => rt.records.get(id)?.status === 'completed')
-  )
-    d.phase = 'completed';
+    d.independent.every(
+      (id) => rt.records.get(id)?.status === 'completed' || ended(id),
+    )
+  ) {
+    const partial = d.independent.filter(ended);
+    if (partial.length) stop(partial);
+    else d.phase = 'completed';
+  }
 }
