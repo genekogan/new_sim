@@ -128,8 +128,67 @@ unverified/deferred and were not resumed by this audit.
 
 ## Validation and disposition
 
-Docs-only audit: source reads, saved-receipt inspection, small unauthenticated HTTP
+Initial docs-only audit: source reads, saved-receipt inspection, small unauthenticated HTTP
 metadata/range checks, explicit source-inheritance diff and `git diff --check`.
-No TypeScript/test run is appropriate for this Markdown-only change. Runtime
+No TypeScript/test run was appropriate for that initial Markdown-only checkpoint. Runtime
 cold/warm/frame/memory/server performance remains unmeasured pending the serialized
 pass. No functional recommendation is approved or implemented here.
+
+## Prepared executable harness (not executed)
+
+`viewer/deploy/performance-alpha.mjs` is separate from the app and normal gate.
+Its default/`--plan` path only prints the plan; Chromium is dynamically imported
+and launched only with explicit `--execute`. Root must grant the serialized slot
+after publication. No functional optimization has been added.
+
+The execution contract requires a full published SHA matching supplied deployment
+metadata, the frozen deployed Vite build and its large-assets manifest. It records
+input hashes, harness SHA/source, publication version, timestamps and browser/GPU
+profile. Operator-supplied publication provenance is explicit: HTTP does not
+independently attest a Worker version. Existing body content hashes for large
+models stay inherited manifest evidence. The script verifies already-fetched
+small same-origin JS response hashes against the frozen build and refuses missing
+fetched asset scripts; it never fetches GLBs just to hash them.
+
+Fixed scope is two Lab worlds, `design-studio` and `living-day-studio`, each with
+one isolated cold context followed by an ordinary warm reload in that same
+context. No route interception or cache bypass is used. CDP cache-disabled is
+explicitly false. Request receipts retain server headers, validators, disk-cache/
+service-worker flags, timings and encoded transfer lengths alongside Resource
+Timing (whose zero values can reflect cache/TAO restrictions). Readiness separates
+DOMContentLoaded, actual hook-render readiness, backdrop/imported appearance
+readiness and network-idle wall times. These are observation milestones, not CPU.
+
+Warm worlds sample eight seconds paused, start ordinary notes/connected-day
+controls, and sample eight seconds of actual Play through UI buttons. No fixed
+ticks are injected. Paused ticks must stay fixed, actual Play must advance, and
+errors/violations must stay clear. RAF scheduling intervals and median/p95 are
+reported separately from rendered hook-frame deltas, renderer calls/triangles,
+long tasks and optional JS heap. The profile is fixed 1280×800/DPR1, headless,
+reduced motion; SwiftShader is default to match existing tests. Explicit native
+renderer is a separate profile whose results must not be treated as equivalent.
+
+Design studio adds three ordinary resets against a fresh same-world baseline,
+with the original strict geometry/texture ceilings and zero violations. This does
+not replace or claim execution of the existing delayed-load regression. The final
+isolated museum cold visit is `/studio/2022` once, waits for real scene frames and
+adaptive pixel ratio, and records a short static sample. There is no second cold
+museum, warm museum or stress loop. Aggregate encoded data observed is capped at
+300 MiB by stopping the context without retry; bytes in flight may exceed that
+threshold slightly. Each visit has JSON, PNG and a11y receipts; failure evidence is
+saved, and output directories with an existing result cannot be overwritten.
+
+Run from `viewer/` only after root supplies the exact newly verified release inputs:
+
+```sh
+node deploy/performance-alpha.mjs --execute --base https://sim.mars.college \
+  --deployment /absolute/verified/deployment.json --source FULL_PUBLISHED_SHA \
+  --build-root /absolute/frozen/viewer/dist \
+  --large-manifest /absolute/frozen/viewer/.cloudflare/large-assets.json
+```
+
+Preparation checks: `node --check`, safe `--plan`, focused oxlint and oxfmt checks,
+and diff check PASS. This harness is authored and statically checked, not browser
+validated. Its practical timings/tool compatibility will be diagnosed in the
+single authorized baseline pass; no automatic retry or blanket timeout change.
+No backend calls or server CPU sampling are hidden in this browser harness.
