@@ -128,3 +128,29 @@ Play capture must follow serialized browser-slot authorization, include concurre
 commitments and interruption, and be personally inspected for useful natural
 coverage rather than only counting shots. Focused source validation is complete;
 combined integration, actual long-day coverage and release remain unproved.
+
+## First actual long-day camera attempt (2026-10-02)
+
+Frozen integrated source `c20fc34`, ports 5404/8924, original Playwright configuration
+and browser cache: two new actual Play proof cases reached notes, independent
+reader interruption, talk, preparation and worker follow. Both failed the new
+harness assertion requiring a fresh `source=operator` Decision (59.3/58.4 seconds).
+The existing Director intentionally records only a changed selected shot, cut or
+external decision; operator takeover of the already-selected worker retains the
+same shot. Both personally inspected worker-follow PNGs show OPERATOR, and paused
+authoritative hash/tick assertions passed. This is a harness false-negative, not
+evidence warranting a Director change. The corrected check requires the actual
+OPERATOR indicator, unchanged hash/tick, six simulation-second expiry to AUTO and
+explicit release. Reports, diagnostics and final state are now retained in finally,
+including on subsequent failure. Strict focused e2e TypeScript passes.
+
+Original RED log is `viewer/.cloudflare/living-camera-c20fc34.log`; two failure traces
+remain under `viewer/test-results/`. All ten original PNGs in
+`viewer/e2e/artifacts/living-camera-c20fc34/` were personally inspected via three
+ignored contact sheets. Clear notes/worker shots are close, talk frames the host
+without the display; Restrained talk shows audience/display, while its preparation
+view leaves the pot/workers small. Both interruption captures cover other activity
+after five simulation seconds. These are observed framing limitations, not a visual
+quality acceptance claim. Sleep, concurrent music and completion remain unobserved;
+the corrected full journey awaits the next exclusive browser slot. No camera policy,
+baseline, world activity or geometry changed in response to this result.
