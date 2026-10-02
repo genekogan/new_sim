@@ -319,6 +319,20 @@ export class Brain {
     // cards are checked against the vocabulary as it will be once the link kinds proposed alongside them exist
     const staged = { ...k, vocab: { ...k.vocab, links: { ...k.vocab.links, ...newLinks } } };
     const verdicts: MintVerdict[] = []; let first = true;
+    // Declarations ride along with the first minted card. Only the ones a valid card really uses are kept, a few per call,
+    // and the vocabulary as a whole is bounded: otherwise one request could add thousands of permanent words.
+    const used = new Set<string>(), usedKinds = new Set<string>();
+    for (const raw of cards.slice(0, 4)) { const v = validateCard(raw, staged, verbs); if (!v.ok) continue;
+      for (const c of v.card.when) { if ('linked' in c) used.add(c.linked[0]); if ('notLinked' in c) used.add(c.notLinked[0]); if ('noneLinkedTo' in c) used.add(c.noneLinkedTo[0]); }
+      for (const st of v.card.then) { if ('link' in st) used.add(st.link[0]); if ('unlink' in st) used.add(st.unlink[0]); if ('appear' in st) { usedKinds.add(st.appear.kind); if (st.linkFromActor) used.add(st.linkFromActor); } }
+      for (const dv of Object.values(v.card.derive ?? {})) used.add(dv.link);
+      if (v.card.target) usedKinds.add(v.card.target.kind);
+    }
+    const room = (have: number) => Math.max(0, Math.min(8, MAX_VOCAB_WORDS - have));
+    for (const n of Object.keys(newLinks)) if (!used.has(n) || !newLinks[n].summary.trim()) delete newLinks[n];
+    for (const n of Object.keys(newLinks).slice(room(Object.keys(k.vocab.links).length))) delete newLinks[n];
+    for (const n of Object.keys(newKinds)) if (!usedKinds.has(n) || !newKinds[n].summary.trim()) delete newKinds[n];
+    for (const n of Object.keys(newKinds).slice(room(Object.keys(k.vocab.kinds).length))) delete newKinds[n];
     for (const raw of cards.slice(0, 4)) {
       const v = validateCard(raw, staged, verbs); const name = String((raw as { name?: unknown })?.name ?? '?');
       if (!v.ok) { verdicts.push({ name, ok: false, problems: v.problems }); continue; }
@@ -509,7 +523,7 @@ export class Brain {
       ...(near ? [{ id: 'two-shot', text: `Two-shot with ${near.who}`, why: 'Someone is right next to them', spec: { kind: 'frameGroup', subjects: [id, near.id], azimuth: 0.8, elevation: 0.25, padding: 1.6 } } as ShotCandidate] : []),
     ];
     const request = buildShotRequest({ name: m.name, doing: m.doing }, cands);
-    if (this.mode === 'live' && (this.overBudget || !this.gov.allow('user'))) return { id: 'wide-follow', text: cands[1].text + ' (default: brain budget spent for now)', spec: cands[1].spec };
+    if (this.mode === 'live' && (this.overBudget || !this.gov.allow('director'))) return { id: 'wide-follow', text: cands[1].text + ' (default: brain budget spent for now)', spec: cands[1].spec };
     const r = await this.jev.ask(request);
     const pick = cands.find((c) => c.id === (r.response.answers.shot as ChoiceA).choice) ?? cands[1];
     this.record({ tick, tier: 'shot', subject: m.name, soulId: m.soulId, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { shot: pick.id, spec: pick.spec }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
@@ -571,6 +585,8 @@ export class Brain {
 
 // ---------------------------------------------------------------- helpers
 /** Triggers after which the question is "what now?", not "should I keep going?". */
+/** The most kinds of link, and kinds of thing, a world's vocabulary may hold. */
+const MAX_VOCAB_WORDS = 400;
 const URGENT = new Set(['new-intent', 'plan-advanced', 'spoken-to']);
 const prio = (trigger: string) => ({ 'new-intent': 0, 'spoken-to': 0, 'plan-advanced': 0, 'activity-failed': 1, 'activity-ended': 1, birth: 1, 'narrator-beat': 2 } as Record<string, number>)[trigger] ?? 3;
 const durationFloor = (h: string) => (h === 'seconds' ? 8 : h === 'minute' ? 20 : 30);

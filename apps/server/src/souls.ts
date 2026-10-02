@@ -45,7 +45,7 @@ export class Souls {
   invited(u: UserRow): boolean { return !this.cfg.inviteRequired || u.role === 'admin' || !!u.invited_by; }
   requireInvited(u: UserRow) { if (!this.invited(u)) throw new ApiError(403, 'invite-required', 'an invite code is needed during the alpha'); }
   redeemInvite(u: UserRow, code: string) {
-    if (this.invited(u)) return;
+    if (this.invited(this.db.user(u.id) ?? u)) return;
     const lim = this.limits.allow(`invite:${u.id}`, 10, 3600_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many attempts', { retry_after: lim.retryAfter });
     if (!this.db.useInvite(code.trim())) throw new ApiError(404, 'invite-invalid', 'that invite code is not valid or is used up');
     this.db.setInvited(u.id, code.trim());
@@ -104,7 +104,7 @@ export class Souls {
 
   /** Set the standing intent. Resolves once the tick has accepted it (blocking mutation). */
   async setIntent(soul: SoulRow, input: unknown, source: IntentPayload['source']): Promise<{ event: LogEvent; intent: WireIntent; text: string }> {
-    const lim = this.limits.allow(`intent:${soul.id}`, 20, 60_000);
+    const lim = this.limits.allow(`intent:${soul.owner}`, 20, 60_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many intents; slow down', { retry_after: lim.retryAfter });
     const p = intentSchema.safeParse(input);
     if (!p.success) throw new ApiError(400, 'invalid-intent', p.error.issues.map((i) => `${i.path.join('.') || 'intent'}: ${i.message}`).join('; '));
@@ -126,7 +126,7 @@ export class Souls {
 
   /** A wish in plain words. The compiler turns it into an agenda (minting cards if needed); without a compiler, the small translator picks a goal. */
   async command(soul: SoulRow, text: string, source: IntentPayload['source'] = 'web') {
-    const lim = this.limits.allow(`cmd:${soul.id}`, 20, 60_000);
+    const lim = this.limits.allow(`cmd:${soul.owner}`, 20, 60_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many commands; slow down', { retry_after: lim.retryAfter });
     const mind = this.host.minds.get(soul.id);
     if (!mind) throw new ApiError(409, 'not-in-world', 'this soul is not in the world yet');
@@ -147,7 +147,7 @@ export class Souls {
 
   /** An owner's agent proposes cards for its Soul's deck. Validated like any other card; no model involved. */
   async proposeCards(soul: SoulRow, input: unknown) {
-    const lim = this.limits.allow(`cards:${soul.id}`, 12, 3600_000);
+    const lim = this.limits.allow(`cards:${soul.owner}`, 12, 3600_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many card proposals this hour', { retry_after: lim.retryAfter });
     const p = proposeCardsSchema.safeParse(input);
     if (!p.success) throw new ApiError(400, 'invalid', 'body must be { cards: [card, …], links?: {name: {summary, control?}}, kinds?: {name: {summary}} }; see /cards.md');

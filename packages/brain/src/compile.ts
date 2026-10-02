@@ -146,7 +146,7 @@ export type CompileOut = { understood: boolean; reason?: string; agenda: { card:
 
 /** User-written text placed in a prompt: one line, and unable to open or close a tag. */
 const plain = (v: unknown, max = 200) => String(v ?? '').replace(/[<>\r\n]+/g, ' ').slice(0, max);
-const cardLine = (c: MintedCard) => `- "${c.name}"${c.target ? ` (on a ${c.target.kind})` : ''}: ${c.summary}`;
+const cardLine = (c: MintedCard) => `- "${plain(c.name, 60)}"${c.target ? ` (on a ${plain(c.target.kind, 40)})` : ''}: ${plain(c.summary, 160)}`;
 
 /** The uncached part: this Soul, its wish, what it holds, what exists. */
 export function compileUser(k: KState, soulId: string, wish: string, known: string[]): string {

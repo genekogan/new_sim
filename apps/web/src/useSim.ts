@@ -28,7 +28,7 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
       onLog: (ev) => { const seen = new Set(st.log.map((e) => e.seq)); st.log = [...st.log, ...ev.filter((e) => !seen.has(e.seq))].slice(-400); },
       onBrain: (calls) => { const seen = new Set(st.brain.map((c) => c.id)); st.brain = [...st.brain, ...calls.filter((c) => !seen.has(c.id))].slice(-300); },
       onCamera: (l) => { st.camera = l; },
-      onTicker: (l) => { st.ticker = [...st.ticker, ...l].slice(-40); },
+      onTicker: (l) => { const seen = new Set(st.ticker.map((x) => `${x.tick}:${x.text}`)); st.ticker = [...st.ticker, ...l.filter((x) => !seen.has(`${x.tick}:${x.text}`))].slice(-40); },
       onNarrative: (v) => { st.narratives = { ...st.narratives, [v.region]: v }; },
       onStats: (x) => { st.stats = x; },
       onKernel: (v) => { st.kernel = v; },
@@ -58,10 +58,12 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
 
 export function makeApi(getToken: () => Promise<string | null>) {
   return async function api<T = any>(path: string, body?: unknown, method?: string): Promise<{ status: number; data: T }> {
-    const token = await getToken();
-    const r = await fetch(path, { method: method ?? (body !== undefined ? 'POST' : 'GET'), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, body: body !== undefined ? JSON.stringify(body) : undefined });
-    const text = await r.text(); let data: any; try { data = JSON.parse(text); } catch { data = text; }
-    return { status: r.status, data };
+    try {
+      const token = await getToken();
+      const r = await fetch(path, { method: method ?? (body !== undefined ? 'POST' : 'GET'), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, body: body !== undefined ? JSON.stringify(body) : undefined });
+      const text = await r.text(); let data: any; try { data = JSON.parse(text); } catch { data = r.ok ? text : { message: `the server answered ${r.status}` }; }
+      return { status: r.status, data };
+    } catch { return { status: 0, data: { message: 'could not reach the server; try again' } as any }; }
   };
 }
 export type Api = ReturnType<typeof makeApi>;

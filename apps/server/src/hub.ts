@@ -11,12 +11,14 @@ import type { Db } from './db.ts';
 import { WORLD_ID, type WorldHost } from './world.ts';
 
 const clientMsg = z.discriminatedUnion('t', [
-  z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional() }),
+  z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional() }),
   z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
 const MAX_PER_IP = 30, MAX_CLIENTS = 2000;
-type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number };
+type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number };
+/** What anyone may see of the server's numbers: spend is for admins. */
+const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: st.brain.mode, callsToday: st.brain.callsToday, inflight: st.brain.inflight, jevMsAvg: st.brain.jevMsAvg } });
 const MAX_BUFFERED = 1_000_000;
 
 export class Hub {
@@ -24,6 +26,8 @@ export class Hub {
   clients = new Set<Client>();
   brain!: Brain;
   startedAt = Date.now();
+  /** Changes with every start of the process: a client may resume only from batches this process sent. */
+  epoch = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   build = 'dev';
   host: WorldHost; auth: Auth; db: Db;
 
@@ -41,14 +45,16 @@ export class Hub {
       onPlay: (p) => this.broadcast({ t: 'plays', plays: [p] }),
     });
     setInterval(() => this.sweep(), 15_000).unref();
-    setInterval(() => this.broadcast({ t: 'stats', stats: this.stats() }), 2_000).unref();
+    setInterval(() => { const full = this.stats(); this.broadcast({ t: 'stats', stats: full }, (c) => c.me?.role === 'admin'); this.broadcast({ t: 'stats', stats: publicStats(full) }, (c) => c.me?.role !== 'admin'); }, 2_000).unref();
+    // a socket that never introduces itself is not a viewer
+    setInterval(() => { const now = Date.now(); for (const c of this.clients) if (!c.ready && now - c.joinedAt > 15_000) { c.ws.close(1008, 'no hello'); this.clients.delete(c); } }, 5_000).unref();
   }
 
   private onConnect(ws: WebSocket, req: IncomingMessage) {
     const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim();
     let sameIp = 0; for (const x of this.clients) if (x.ip === ip) sameIp++;
     if (this.clients.size >= MAX_CLIENTS || sameIp >= MAX_PER_IP) { ws.close(1013, 'too many connections'); return; }
-    const c: Client = { ws, me: null, ready: false, alive: true, joinedAt: Date.now(), resyncs: 0, sent: 0, ip, msgs: 0, windowStart: Date.now() };
+    const c: Client = { ws, me: null, ready: false, alive: true, joinedAt: Date.now(), resyncs: 0, sent: 0, ip, msgs: 0, windowStart: Date.now(), lastHello: 0, lastSnapshot: 0 };
     this.clients.add(c);
     ws.on('pong', () => (c.alive = true));
     ws.on('close', () => this.clients.delete(c));
@@ -65,16 +71,20 @@ export class Hub {
 
   private async onMessage(c: Client, m: ClientMsg) {
     if (m.t === 'ping') return this.send(c, { t: 'pong', n: m.n, serverTime: Date.now() });
+    // joining and resyncing each build a full view of the world: once every few seconds per socket is plenty
+    const now = Date.now();
+    if (m.t === 'resync') { if (now - c.lastSnapshot < 2_000) return; c.lastSnapshot = now; }
+    if (m.t === 'hello') { if (now - c.lastHello < 3_000) return; c.lastHello = now; c.lastSnapshot = now; }
     if (m.t === 'resync') { c.resyncs++; return this.send(c, { t: 'snapshot', reason: `resync: ${String(m.reason).slice(0, 80)}`, ...this.host.snapshotView() }); }
     if (m.t === 'hello') {
-      if (m.proto !== PROTO) return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` });
+      if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: WORLD_ID, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       c.me = u ? this.auth.me(u) : null;
       const e = this.host.engine;
-      this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: WORLD_ID, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now() });
+      this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: WORLD_ID, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now(), epoch: this.epoch, paused: this.host.paused });
       // resume from the ring buffer if the client only missed a little; otherwise a full snapshot
       const ring = this.host.ring;
-      const canResume = typeof m.since === 'number' && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
+      const canResume = typeof m.since === 'number' && m.epoch === this.epoch && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
       if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b, log: b.log.map(publicEvent) }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
       this.send(c, { t: 'log', events: this.db.tailEvents(WORLD_ID, 150).map(publicEvent) });
@@ -85,7 +95,7 @@ export class Hub {
       if (this.brain.ticker.length) this.send(c, { t: 'ticker', lines: this.brain.ticker.slice(-20) });
       for (const v of this.brain.narratives.values()) this.send(c, { t: 'narrative', view: v });
       if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(40, { soulIds: c.me.role === 'admin' ? null : c.me.souls }) });
-      this.send(c, { t: 'stats', stats: this.stats() });
+      this.send(c, { t: 'stats', stats: c.me?.role === 'admin' ? this.stats() : publicStats(this.stats()) });
       c.ready = true;
     }
   }

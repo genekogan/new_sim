@@ -40,7 +40,7 @@ export class Replica {
       else if (field === 'on') { if (value === null) delete e.human.on; else e.human.on = value as string; }
       else if (field === 'task') { if (value === null) delete e.human.task; else e.human.task = value as string; }
     }
-    for (const p of b.paths) { this.settle(p.entity, p.startTick); this.paths.set(p.entity, p); }
+    for (const p of b.paths) { if (!this.entities[p.entity]) continue; this.settle(p.entity, p.startTick); this.paths.set(p.entity, p); }   // (a body removed in this batch has no path)
     for (const s of b.souls) this.souls.set(s.id, s);
     for (const id of b.removedSouls) this.souls.delete(id);
     this.seq = b.seq; this.tick = b.toTick;
@@ -76,7 +76,7 @@ export type ConnState = 'connecting' | 'open' | 'closed';
 export type ConnStats = { state: ConnState; resyncs: number; reconnects: number; heartbeats: number; lastCheck: string; lastHash: string; myHash: string; bytesIn: number; msgsIn: number; rttMs: number; lastHeartbeatTick: number; snapshots: number };
 export type Handlers = {
   onChange?(): void; onLog?(e: LogEvent[]): void; onBrain?(c: BrainCall[]): void; onCamera?(l: CameraLine): void; onTicker?(l: TickerLine[]): void;
-  onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onKernel?(v: KernelView): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
+  onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onKernel?(v: KernelView): void; onError?(code: string, message: string): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
 };
 type WSLike = { send(s: string): void; close(): void; readyState: number; onopen: any; onmessage: any; onclose: any; onerror: any };
 
@@ -93,6 +93,11 @@ export class Connection {
   private retry = 0;
   private pendingHb: Heartbeat | null = null;
   private pingTimer: any = null;
+  private reconnectTimer: any = null;
+  private lastMessageAt = 0;
+  private resyncing = 0;
+  /** The server process this replica was built from (batch numbers restart when the server does). */
+  private epoch: string | null = null;
   url: string; getToken: () => Promise<string | null>; handlers: Handlers; make: (url: string) => WSLike; now: () => number;
 
   constructor(url: string, getToken: () => Promise<string | null>, handlers: Handlers, make: (url: string) => WSLike, now: () => number = () => Date.now()) {
@@ -100,31 +105,52 @@ export class Connection {
   }
 
   connect() {
-    this.closed = false; this.stats.state = 'connecting'; this.handlers.onChange?.();
+    this.closed = false; this.open();
+  }
+  private open() {
+    if (this.closed) return;
+    clearTimeout(this.reconnectTimer);
+    this.stats.state = 'connecting'; this.handlers.onChange?.();
     const ws = (this.ws = this.make(this.url));
+    const mine = () => this.ws === ws && !this.closed;      // a socket that has been replaced or closed must not touch the replica
     ws.onopen = async () => {
-      this.stats.state = 'open'; this.retry = 0;
+      if (!mine()) return;
+      this.stats.state = 'open'; this.lastMessageAt = this.now(); this.resyncing = 0;
       const token = await this.getToken().catch(() => null);
-      const hello: ClientMsg = { t: 'hello', proto: PROTO, ...(token ? { token } : {}), ...(this.replica.ready ? { since: this.replica.seq } : {}) };
+      if (!mine() || ws.readyState !== 1) return;
+      // resume only from the same server process: batch numbers start again after a restart
+      const hello: ClientMsg = { t: 'hello', proto: PROTO, ...(token ? { token } : {}), ...(this.replica.ready && this.epoch ? { since: this.replica.seq, epoch: this.epoch } : {}) };
       ws.send(JSON.stringify(hello));
       clearInterval(this.pingTimer);
-      this.pingTimer = setInterval(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping', n: this.now() })); }, 5000);
+      this.pingTimer = setInterval(() => {
+        if (!mine()) return;
+        // the server speaks every two seconds; long silence means the socket is dead even if the browser has not noticed
+        if (this.now() - this.lastMessageAt > 12_000) { try { ws.close(); } catch { /* already closed */ } return; }
+        if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping', n: this.now() }));
+      }, 5000);
       this.handlers.onChange?.();
     };
-    ws.onmessage = (ev: { data: unknown }) => { const s = String(ev.data); this.stats.bytesIn += s.length; this.stats.msgsIn++; this.onMessage(JSON.parse(s) as ServerMsg); };
+    ws.onmessage = (ev: { data: unknown }) => { if (!mine()) return; const s = String(ev.data); this.stats.bytesIn += s.length; this.stats.msgsIn++; this.lastMessageAt = this.now(); this.onMessage(JSON.parse(s) as ServerMsg); };
     ws.onclose = () => {
+      if (this.ws !== ws) return;
       clearInterval(this.pingTimer); this.stats.state = 'closed'; this.handlers.onChange?.();
       if (this.closed) return;
       this.stats.reconnects++;
-      // exponential backoff with jitter, so a restart does not bring every client back on the same millisecond
-      setTimeout(() => this.connect(), Math.min(15_000, 500 * 2 ** this.retry++) * (0.5 + Math.random()));
+      // exponential backoff with jitter, so a restart does not bring every client back on the same millisecond.
+      // (`retry` is reset only once the server has actually welcomed us: a server that accepts and then closes must not be hammered.)
+      this.reconnectTimer = setTimeout(() => this.open(), Math.min(15_000, 500 * 2 ** this.retry++) * (0.5 + Math.random()));
     };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
   }
-  close() { this.closed = true; clearInterval(this.pingTimer); this.ws?.close(); }
+  close() { this.closed = true; clearInterval(this.pingTimer); clearTimeout(this.reconnectTimer); this.ws?.close(); }
   /** Re-send hello (for example after signing in or out) on the same socket. */
   rehello() { this.ws?.close(); }
-  resync(reason: string) { this.stats.resyncs++; this.ws?.send(JSON.stringify({ t: 'resync', reason } satisfies ClientMsg)); }
+  /** Ask for a full snapshot. One request at a time: every batch that arrives before the snapshot is another gap, not another reason to ask. */
+  resync(reason: string) {
+    if (this.resyncing && this.now() - this.resyncing < 5_000) return;
+    this.resyncing = this.now(); this.stats.resyncs++;
+    try { this.ws?.send(JSON.stringify({ t: 'resync', reason } satisfies ClientMsg)); } catch { /* socket closing; reconnect will resume */ }
+  }
   /** Test hook: drop the socket without the caller asking, as a network failure would. */
   dropForTest() { this.ws?.close(); }
 
@@ -139,9 +165,10 @@ export class Connection {
   private onMessage(m: ServerMsg) {
     const r = this.replica, h = this.handlers;
     switch (m.t) {
-      case 'welcome': this.welcome = m; h.onWelcome?.(m.you, m); break;
-      case 'snapshot': r.applySnapshot(m); this.stats.snapshots++; this.setAnchor(m.tick); this.pendingHb = null; break;
+      case 'welcome': this.welcome = m; this.retry = 0; this.epoch = m.epoch ?? null; h.onWelcome?.(m.you, m); break;
+      case 'snapshot': r.applySnapshot(m); this.stats.snapshots++; this.setAnchor(m.tick); this.pendingHb = null; this.resyncing = 0; break;
       case 'batch': {
+        if (this.resyncing && this.now() - this.resyncing < 5_000) break;      // a snapshot is on its way
         if (!r.applyBatch(m)) { this.resync(`gap: have ${r.seq}, got ${m.seq}`); break; }
         this.setAnchor(m.toTick);
         if (m.log.length) h.onLog?.(m.log);
@@ -159,7 +186,7 @@ export class Connection {
       case 'plays': h.onPlays?.(m.plays); break;
       case 'talk': h.onTalk?.(m.lines); break;
       case 'pong': this.stats.rttMs = this.now() - m.n; break;
-      case 'error': console.warn('[sim] server error', m.code, m.message); break;
+      case 'error': console.warn('[sim] server error', m.code, m.message); h.onError?.(m.code, m.message); break;
     }
     h.onChange?.();
   }

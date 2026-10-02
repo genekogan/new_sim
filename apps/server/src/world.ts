@@ -345,7 +345,7 @@ export class WorldHost {
     void this.enqueue('rules', author, { clockRate: rate, why });
   }
   setPaused(p: boolean, author: string) {
-    if (p) { void this.enqueue('admin', author, { action: 'pause' }); this.tickOnceForQueue(); this.paused = true; }
+    if (p) { void this.enqueue('admin', author, { action: 'pause' }); this.tickOnceForQueue(); this.paused = true; this.flush(); this.heartbeat(); }   // tell clients now: no tick will
     else { this.paused = false; this.last = performance.now(); this.carry = 0; void this.enqueue('admin', author, { action: 'resume' }); }
   }
   private tickOnceForQueue() { if (!this.paused) this.tickOnce(); }
@@ -380,6 +380,7 @@ export class WorldHost {
     };
   }
 
+  private kernelSentTick = -1000;
   private resetAcc() { this.acc = { paths: [], changes: [], log: [], dirty: new Set(), removed: [], plays: [], fromTick: this.engine.world.tick }; }
   private flush() {
     const b: Batch = {
@@ -392,7 +393,9 @@ export class WorldHost {
     this.ring.push(b); if (this.ring.length > RING_BATCHES) this.ring.shift();
     for (const l of this.listeners) l.onBatch?.(b);
     // links such as "just said" lapse with time, so the view also refreshes periodically
-    if (this.kernelDirty || plays.length || this.engine.world.tick % 200 === 0) { this.kernelDirty = false; sweep(this.kernel); const v = this.kernelView(); for (const l of this.listeners) l.onKernel?.(v); }
+    // the whole kernel is large; what changed is already in the plays, so the full view goes out at most every two seconds
+    if (plays.length) this.kernelDirty = true;
+    if ((this.kernelDirty && this.engine.world.tick - this.kernelSentTick >= 40) || this.engine.world.tick % 200 === 0) { this.kernelDirty = false; this.kernelSentTick = this.engine.world.tick; sweep(this.kernel); const v = this.kernelView(); for (const l of this.listeners) l.onKernel?.(v); }
   }
   markDirty(soulId: string) { this.acc.dirty.add(soulId); }
   get currentBatchSeq() { return this.batchSeq; }

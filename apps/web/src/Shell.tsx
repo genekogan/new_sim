@@ -17,7 +17,7 @@ export type AuthCtx = {
 type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; inviteRequired?: boolean; build?: string };
 const TABS = ['watch', 'my soul', 'grammar', 'notebook', 'world', 'brain', 'story', 'sync', 'spend', 'admin', 'architecture', 'everything'] as const;
 const ADMIN_TABS = new Set<string>(['spend', 'admin']);
-const hashTab = (): { tab: Tab; pair: string | null } => { const h = decodeURIComponent(location.hash.slice(1)); if (h.startsWith('pair/')) return { tab: 'my soul', pair: h.slice(5) }; return { tab: (TABS as readonly string[]).includes(h) ? (h as Tab) : 'watch', pair: null }; };
+const hashTab = (): { tab: Tab; pair: string | null } => { let h = ''; try { h = decodeURIComponent(location.hash.slice(1)); } catch { /* a mangled link: fall back to the first tab */ } if (h.startsWith('pair/')) return /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(h.slice(5)) ? { tab: 'my soul', pair: h.slice(5) } : { tab: 'my soul', pair: null }; return { tab: (TABS as readonly string[]).includes(h) ? (h as Tab) : 'watch', pair: null }; };
 type Tab = (typeof TABS)[number];
 
 export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {

@@ -66,11 +66,25 @@ export function HeardPanel({ sim, soulId }: { sim: Sim; soulId?: string }) {
   );
 }
 
+type KLink = KernelView['links'][string];
+/** Links by their ends, built once per kernel message (the page re-renders five times a second). "knows" is left out: it is shown as a count. */
+const indexCache = new WeakMap<object, { from: Map<string, KLink[]>; to: Map<string, KLink[]> }>();
+function linkIndex(k: KernelView) {
+  let ix = indexCache.get(k.links);
+  if (!ix) {
+    ix = { from: new Map(), to: new Map() };
+    for (const l of Object.values(k.links)) { if (l.kind === 'knows') continue; (ix.from.get(l.from) ?? ix.from.set(l.from, []).get(l.from)!).push(l); (ix.to.get(l.to) ?? ix.to.set(l.to, []).get(l.to)!).push(l); }
+    indexCache.set(k.links, ix);
+  }
+  return ix;
+}
+
 export function ThingsPanel({ sim }: { sim: Sim }) {
   const k = sim.kernel; if (!k) return <section><h2>Things</h2><span className="dim">loading…</span></section>;
   const name = nameIn(k);
   const things = Object.values(k.things).sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
   const links = Object.values(k.links);
+  const { from, to } = linkIndex(k);
   return (
     <section className="wide">
       <h2>Things — everything that exists ({things.length}), where it is, and how it is connected</h2>
@@ -82,8 +96,8 @@ export function ThingsPanel({ sim }: { sim: Sim }) {
               <tr key={t.id}>
                 <td className="dim">{t.kind}</td><td><b>{t.name}</b></td><td>{t.at ? name(t.at) : <span className="dim">—</span>}</td>
                 <td className="wrap">{Object.entries(t.states).map(([key, v]) => <span key={key} style={{ marginRight: 10 }}><span className="dim">{key}</span> {val(v)}</span>)}</td>
-                <td className="wrap">{links.filter((l) => l.from === t.id && l.kind !== 'knows').map((l, i) => <span key={i} style={{ marginRight: 10 }}><span className={k.vocab.links[l.kind]?.control ? 'acc' : 'dim'}>{l.kind}</span> {name(l.to)}</span>)}</td>
-                <td className="wrap">{links.filter((l) => l.to === t.id && l.kind !== 'knows').map((l, i) => <span key={i} style={{ marginRight: 10 }}>{name(l.from)} <span className={k.vocab.links[l.kind]?.control ? 'acc' : 'dim'}>{l.kind}</span></span>)}</td>
+                <td className="wrap">{(from.get(t.id) ?? []).map((l, i) => <span key={i} style={{ marginRight: 10 }}><span className={k.vocab.links[l.kind]?.control ? 'acc' : 'dim'}>{l.kind}</span> {name(l.to)}</span>)}</td>
+                <td className="wrap">{(to.get(t.id) ?? []).map((l, i) => <span key={i} style={{ marginRight: 10 }}>{name(l.from)} <span className={k.vocab.links[l.kind]?.control ? 'acc' : 'dim'}>{l.kind}</span></span>)}</td>
               </tr>
             ))}
           </tbody>

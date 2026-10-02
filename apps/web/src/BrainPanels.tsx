@@ -30,18 +30,24 @@ function Prompt({ v, api }: { v: any; api?: Api }) {
 
 export function Call({ c, open, api }: { c: BrainCall; open?: boolean; api?: Api }) {
   const req = c.request as any, res = c.response as any, a = c.applied as any;
+  const [shown, setShown] = useState(!!open);   // the body is built only once opened: it serialises whole requests
+  const jev = c.tier === 'mid' && !!req?.questions?.next;
   return (
-    <details className="call" open={open}>
+    <details className="call" open={open} onToggle={(e) => setShown((e.target as HTMLDetailsElement).open)}>
       <summary>
         <span className={`tag ${c.tier}`}>{c.tier}</span><b>{c.subject}</b> <span className="dim">t{c.tick} · {c.model} · {c.ms.toFixed(0)} ms · {c.inputTokens} in{c.outputTokens ? ` / ${c.outputTokens} out` : ''}{c.cachedTokens ? ` (${c.cachedTokens} cached)` : ''} · {usd(c.costUsd)}{a?.trigger ? ` · trigger: ${a.trigger}` : ''}</span>
         {c.error && <span className="bad"> · {c.error}</span>}
         <div style={{ paddingLeft: 12 }}>→ {appliedSummary(c)}</div>
       </summary>
-      <div style={{ padding: '6px 0 6px 12px' }}>
-        {c.tier === 'mid' && req && <>
+      {shown && <div style={{ padding: '6px 0 6px 12px' }}>
+        {c.tier === 'mid' && !jev && <>
+          <p className="dim">{a?.how === 'reflex' ? `Decided by reflex, with no model call: ${a?.why ?? ''}.` : 'Decided without a model call.'}</p><J v={req} />
+          <p className="dim">APPLIED: becomes a logged decision event</p><J v={a} />
+        </>}
+        {jev && <>
           <p className="dim">1. CONTEXT we gave Jev (the state: word-bucketed, no numbers, at most 8 nearby things; user-written text sits in named fields)</p><J v={req.state} />
           <p className="dim">2. OPTIONS the engine enumerated as feasible now, each with when it is right and when it is not. Jev may only pick one of these; the verb params were bound by code.</p><J v={req.questions.next} />
-          {res && <><p className="dim">3. ANSWER: a calibrated probability per option (confidence {(res.answers.next.confidence * 100).toFixed(0)}%). Policy: {a?.how === 'continue' ? `keep going (keep_going ${(a.keepGoing * 100).toFixed(0)}% ≥ 70%)` : a?.how === 'argmax' ? `take the top option (top ${(a.topP * 100).toFixed(0)}% ≥ threshold)` : a?.how === 'sampled' ? `near-tie: sample among ${a.pool?.length} plausible options (never ones Jev rated near zero)` : a?.how}</p>
+          {res?.answers?.next && <><p className="dim">3. ANSWER: a calibrated probability per option (confidence {(res.answers.next.confidence * 100).toFixed(0)}%). Policy: {a?.how === 'continue' ? `keep going (keep_going ${(a.keepGoing * 100).toFixed(0)}% ≥ 70%)` : a?.how === 'argmax' ? `take the top option (top ${(a.topP * 100).toFixed(0)}% ≥ threshold)` : a?.how === 'sampled' ? `near-tie: sample among ${a.pool?.length} plausible options (never ones Jev rated near zero)` : a?.how}</p>
             <Probs p={res.answers.next.probabilities} chosen={Object.entries(a?.optionKeys ?? {}).find(([, id]) => id === a?.option)?.[0]} />
             <p className="dim">riding along in the same request (separate, narrow judgments):</p>
             <div className="kv"><span>pace (Score)</span><span>{res.answers.pace?.score?.toFixed(2)} → rethink in {a?.reevalSeconds}s</span>
@@ -61,7 +67,7 @@ export function Call({ c, open, api }: { c: BrainCall; open?: boolean; api?: Api
           <p className="dim">RESPONSE</p><J v={res?.answers ?? res} />
           <p className="dim">APPLIED</p><J v={a} />
         </>}
-      </div>
+      </div>}
     </details>
   );
 }
@@ -77,7 +83,7 @@ export function BrainPanel({ sim, authed, selected, api, isAdmin }: { sim: Sim; 
       <h2>Brain — every model call: what it was given, what it answered, what we did with it</h2>
       {b && <div className="kv" style={{ marginBottom: 8 }}>
         <span>mode</span><span>{b.mode} · {b.inflight} in flight</span>
-        <span>last 24 h</span><span>{b.callsToday} calls · {usd(b.costToday)} of ${b.budget.toFixed(2)} budget{b.costToday >= b.budget ? <b className="bad"> · OVER BUDGET: deterministic fallback</b> : ''}</span>
+        <span>last 24 h</span><span>{b.callsToday} calls{b.costToday !== undefined && b.budget !== undefined ? <> · {usd(b.costToday)} of ${b.budget.toFixed(2)} budget{b.costToday >= b.budget ? <b className="bad"> · OVER BUDGET: deterministic fallback</b> : ''}</> : null}</span>
         <span>Jev latency</span><span>{b.jevMsAvg.toFixed(0)} ms average</span>
         <span>mid-brain cadence</span><span>{recent.length} calls in the last 5 min{sim.stats?.souls ? ` ≈ one per soul every ${recent.length ? Math.round((300 * sim.stats.souls) / recent.length) : '∞'} s` : ''}</span>
       </div>}

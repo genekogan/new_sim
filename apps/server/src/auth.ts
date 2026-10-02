@@ -10,10 +10,15 @@ import { ownerShort } from './world.ts';
 
 export class Auth {
   private key: CryptoKey | null = null;
+  private profileAt = new Map<string, number>();
   ready = false;
   devAuth: boolean;
   cfg: Config; db: Db;
-  constructor(cfg: Config, db: Db) { this.cfg = cfg; this.db = db; this.devAuth = process.env.DEV_AUTH === '1'; }
+  constructor(cfg: Config, db: Db) {
+    this.cfg = cfg; this.db = db; this.devAuth = process.env.DEV_AUTH === '1';
+    // "Bearer dev:admin" is an admin when dev auth is on. It must never be on for a public site.
+    if (this.devAuth && cfg.publicUrl.startsWith('https://')) throw new Error('DEV_AUTH=1 with a public https PUBLIC_URL: refusing to start');
+  }
 
   private basic() { return 'Basic ' + Buffer.from(`${this.cfg.privyAppId}:${this.cfg.privyAppSecret}`).toString('base64'); }
 
@@ -45,13 +50,19 @@ export class Auth {
     } catch { return null; }
     let u = this.db.user(did);
     // (re)fetch the profile on first sight, or hourly, so a wallet created later shows up on the debug page
-    if (!u || Date.now() - u.last_seen > 3600_000 || (!u.email && !u.wallet)) {
+    const fetched = this.profileAt.get(did) ?? 0;
+    if (!u || Date.now() - fetched > 3600_000) {
+      this.profileAt.set(did, Date.now());
       const prof = await this.fetchProfile(did).catch(() => null);
       const email = prof?.email ?? u?.email ?? null;
       const role = email && this.cfg.adminEmails.includes(email.toLowerCase()) ? 'admin' : 'user';
       this.db.upsertUser({ id: did, email, wallet: prof?.wallet ?? u?.wallet ?? null, role });
       u = this.db.user(did)!;
-    } else this.db.touchUser(did);
+    } else {
+      // the admin list is read on every request, so removing someone takes effect at once
+      const role = u.email && this.cfg.adminEmails.includes(u.email.toLowerCase()) ? 'admin' : 'user';
+      if (role !== u.role) { this.db.upsertUser({ id: did, email: u.email, wallet: u.wallet, role }); u = this.db.user(did)!; } else this.db.touchUser(did);
+    }
     return u;
   }
 
@@ -79,12 +90,14 @@ export const hashToken = (t: string) => createHash('sha256').update(t).digest('h
 
 /** Tiny sliding-window rate limiter. */
 export class RateLimit {
-  private hits = new Map<string, number[]>();
+  private hits = new Map<string, number[]>(); private calls = 0;
   allow(key: string, max: number, windowMs: number): { ok: true } | { ok: false; retryAfter: number } {
     const now = Date.now();
     const arr = (this.hits.get(key) ?? []).filter((t) => now - t < windowMs);
     if (arr.length >= max) { this.hits.set(key, arr); return { ok: false, retryAfter: Math.ceil((windowMs - (now - arr[0])) / 1000) }; }
     arr.push(now); this.hits.set(key, arr);
+    // forget keys nobody has used for over an hour (the longest window), so the map does not grow with every address seen
+    if (++this.calls % 2000 === 0) for (const [k, a] of this.hits) if (!a.length || now - a[a.length - 1] > 3600_000) this.hits.delete(k);
     return { ok: true };
   }
 }

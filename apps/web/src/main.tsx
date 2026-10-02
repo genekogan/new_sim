@@ -33,11 +33,12 @@ function WithDev({ cfg }: { cfg: Cfg }) {
 function Root() {
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { fetch('/v1/config').then((r) => r.json()).then(setCfg).catch((e) => setErr(String(e))); }, []);
+  useEffect(() => { let tries = 0; const go = () => { fetch('/v1/config').then((r) => { if (!r.ok) throw new Error(`the server answered ${r.status}`); return r.json(); }).then(setCfg).catch((e) => { if (++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
   if (err) return <pre>cannot reach the server: {err}</pre>;
   if (!cfg) return <pre>connecting…</pre>;
   const useDev = cfg.devAuth && new URLSearchParams(location.search).has('dev');
-  if (!cfg.privyAppId || useDev) return <WithDev cfg={cfg} />;
+  if (useDev || (!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
+  if (!cfg.privyAppId) return <Shell cfg={cfg} auth={{ ready: true, authed: false, label: null, login: () => alert('Sign-in is not configured on this server.'), logout: () => {}, getToken: async () => null, debug: { privyUserId: null, wallet: null, linked: [] } }} />;
   return (
     <PrivyProvider appId={cfg.privyAppId} config={{ embeddedWallets: { ethereum: { createOnLogin: 'users-without-wallets' }, showWalletUIs: false }, appearance: { theme: 'dark' } }}>
       <WithPrivy cfg={cfg} />

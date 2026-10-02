@@ -19,6 +19,8 @@ export function SoulHome({ sim, auth, api, selected, onSelect, pairCode, clearPa
   const [creating, setCreating] = useState(false);
   const refresh = async () => { const r = await api('/v1/me'); if (r.status === 200) { setSouls(r.data.souls); setMe(r.data.me); setMaxSouls(r.data.maxSouls); } };
   useEffect(() => { if (auth.authed) void refresh(); else { setSouls(null); setMe(null); } }, [auth.authed]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a failed first load (the server restarting, a token not ready yet) is retried rather than left at "loading…"
+  useEffect(() => { if (!auth.authed || souls) return; const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [auth.authed, souls]); // eslint-disable-line react-hooks/exhaustive-deps
   const mine = souls?.find((s) => s.id === selected) ?? null;
   useEffect(() => { if (souls?.length && !mine) onSelect(souls[0].id); }, [souls]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -75,7 +77,7 @@ function Create({ api, first, done, cancel }: { api: Api; first: boolean; done(i
       <h2>{first ? 'Step 2 of 3 — create your Soul' : 'Create another Soul'}</h2>
       <p>A Soul is an inhabitant of the world that belongs to you. Give it a name and one line about who it is. That line is its personality: its own mind reads it every time it decides what to do, so “a shy gardener who loves fire and music” behaves differently from “a loud fisherman with endless stories”.</p>
       <ol style={{ margin: '6px 0 10px 18px', padding: 0 }}>
-        <li>It arrives at the gate on the south edge and starts living straight away.</li>
+        <li>It arrives in the world and starts living straight away.</li>
         <li>It keeps living when you close this page. You do not control it; you give it direction.</li>
         <li>Everyone can see its name and description, so keep them friendly.</li>
       </ol>
@@ -89,16 +91,15 @@ function Create({ api, first, done, cancel }: { api: Api; first: boolean; done(i
 }
 
 function PairApprove({ api, code, souls, done }: { api: Api; code: string; souls: MySoul[]; done(): void }) {
-  const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [soulId, setSoulId] = useState(souls[0]?.id ?? ''); const [ok, setOk] = useState(false);
-  useEffect(() => { void api(`/v1/pair/${code}`).then((r) => (r.status === 200 ? setInfo(r.data) : setErr(r.data.message ?? 'invalid'))); }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!soulId && souls[0]) setSoulId(souls[0].id); }, [souls]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [soulId, setSoulId] = useState(''); const [ok, setOk] = useState(false);
+  useEffect(() => { void api(`/v1/pair/${encodeURIComponent(code)}`).then((r) => (r.status === 200 ? setInfo(r.data) : setErr(r.data.message ?? 'invalid'))); }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="wide" style={{ borderColor: 'var(--accent)' }}>
       <h2>An agent is asking to steer one of your Souls</h2>
       {err ? <p className="warn">{err} <button onClick={done}>dismiss</button></p> : !info ? <p className="dim">checking…</p> : ok ? <p className="ok">Approved. Your agent can carry on. <button onClick={done}>close</button></p> : souls.length === 0 ? <p>Create a Soul first (below), then come back to this link.</p> : <>
-        <p><b>{info.agent}</b> wants permission to look through and steer a Soul (code {info.code}). Only approve if you just asked your own assistant to do this.</p>
-        <div className="row"><span>Soul:</span><select value={soulId} onChange={(e) => setSoulId(e.target.value)}>{souls.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-          <button className="primary" onClick={async () => { const r = await api('/v1/pair/approve', { code, soulId }); if (r.status === 200) setOk(true); else setErr(r.data.message ?? 'failed'); }}>approve</button><button onClick={done}>not now</button></div>
+        <p>An agent calling itself “{String(info.agent ?? 'unnamed').slice(0, 60)}” is asking for permission to see through and steer one of your Souls. <b>Approve only if you started this yourself, just now, with your own assistant</b>, and it showed you the code <b>{String(info.code ?? '')}</b>. Anyone can send a link like this one; the name above is whatever they chose to type.</p>
+        <div className="row"><span>Soul:</span><select value={soulId} onChange={(e) => setSoulId(e.target.value)}><option value="">choose…</option>{souls.map((s) => <option key={s.id} value={s.id}>{s.name}{s.hasToken ? ' (has an agent now; it will be disconnected)' : ''}</option>)}</select>
+          <button className="primary" disabled={!soulId} onClick={async () => { const r = await api('/v1/pair/approve', { code, soulId }); if (r.status === 200) setOk(true); else setErr(r.data.message ?? 'failed'); }}>approve</button><button onClick={done}>not now</button></div>
         <p className="dim">This replaces any agent already attached to that Soul. You can revoke it at any time.</p></>}
     </section>
   );
@@ -112,7 +113,8 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
   const [shot, setShot] = useState<any>(null); const [openCall, setOpenCall] = useState<BrainCall | null>(null);
   useEffect(() => {
     let live = true;
-    const load = async () => { const [a, b] = await Promise.all([api(`/v1/souls/${soul.id}`), api(`/v1/souls/${soul.id}/timeline?limit=60`)]); if (!live) return; if (a.status === 200) setD(a.data); if (b.status === 200) setTl(b.data.events); };
+    let latest = 0;
+    const load = async () => { const mine = ++latest; const [a, b] = await Promise.all([api(`/v1/souls/${soul.id}`), api(`/v1/souls/${soul.id}/timeline?limit=60`)]); if (!live || mine !== latest) return; if (a.status === 200) setD(a.data); if (b.status === 200) setTl(b.data.events); };
     void load(); const t = setInterval(load, 3000); return () => { live = false; clearInterval(t); };
   }, [soul.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const s = d?.status;
@@ -121,6 +123,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
   const send = async () => {
     if (!text.trim()) return; const t = text; setText(''); setBusy(true);
     const r = await api(`/v1/souls/${soul.id}/command`, { text: t }); setBusy(false);
+    if (r.status !== 200) setText((cur) => cur || t);
     const reply = r.status !== 200 ? (r.data.message ?? 'failed') : r.data.ok ? `the plan: ${r.data.text}${r.data.minted?.length ? ` · new card${r.data.minted.length > 1 ? 's' : ''} made for this: ${r.data.minted.join(', ')}` : ''}` : `could not: ${r.data.reason}`;
     setReplies((h) => [...h, { text: t, reply, ok: r.status === 200 && r.data.ok }].slice(-6));
   };
@@ -151,7 +154,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
 
       <section>
         <h2>Step 3 — give {soul.name} direction</h2>
-        <div className="row"><input placeholder={`tell ${soul.name} what to do, in plain words`} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} maxLength={280} /><button className="primary" disabled={busy || !text.trim()} onClick={() => void send()}>send</button></div>
+        <div className="row"><input placeholder={`tell ${soul.name} what to do, in plain words`} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void send(); }} maxLength={280} /><button className="primary" disabled={busy || !text.trim()} onClick={() => void send()}>send</button></div>
         <details><summary className="dim">or pick exactly</summary>
           <div className="row"><select value={goal} onChange={(e) => setGoal(e.target.value)}>{GOALS.map((g) => <option key={g}>{g}</option>)}</select>
             <select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">(no target)</option>{targets.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
@@ -173,7 +176,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
         <p>Paste this one line into Claude, ChatGPT, Codex or any agent that can make web requests:</p>
         {pair ? <>
           <pre className="json" style={{ fontSize: 13 }}>{pair.prompt}</pre>
-          <div className="row"><button className="primary" onClick={() => { void navigator.clipboard.writeText(pair.prompt); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? 'copied' : 'copy'}</button><span className="dim">The code works once and expires in 15 minutes. Pairing replaces any agent already attached.</span></div>
+          <div className="row"><button className="primary" onClick={() => { void navigator.clipboard?.writeText(pair.prompt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {}); }}>{copied ? 'copied' : 'copy'}</button><span className="dim">The code works once and expires in 15 minutes. Pairing replaces any agent already attached.</span></div>
         </> : <div className="row"><button className="primary" onClick={async () => { const r = await api(`/v1/souls/${soul.id}/pair`, {}); if (r.status === 200) { setPair(r.data); setPairAt(Date.now()); } }}>{d?.agent.attached ? 'make a new one-line prompt (replaces the attached agent)' : 'show my one-line prompt'}</button></div>}
         <p className="note">What happens: your assistant reads <a href="/skill.md" target="_blank" rel="noreferrer">{base.replace(/^https?:\/\//, '')}/skill.md</a>, trades the code for a key that works for this one Soul, and saves the instructions as a small skill. From then on you can just tell it things like “have {soul.name} go find someone to talk to” or “what has {soul.name} been up to?”. It sees what {soul.name} perceives, and it sets the same kind of direction you set above.</p>
       </section>
@@ -203,7 +206,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
         <h2>More</h2>
         <div className="row"><button onClick={async () => { const r = await api(`/v1/souls/${soul.id}/shot`, {}); setShot(r.data.shot ?? r.data); }}>ask for the most cinematic camera shot of {soul.name}</button></div>
         {shot && <pre className="json">{JSON.stringify(shot, null, 2)}</pre>}
-        <div className="row"><button onClick={async () => { if (confirm(`Retire ${soul.name}? They leave the world for good.`)) { await api(`/v1/souls/${soul.id}`, undefined, 'DELETE'); onGone(); } }}>retire {soul.name}</button></div>
+        <div className="row"><button onClick={async () => { if (confirm(`Retire ${soul.name}? They leave the world for good.`)) { const r = await api(`/v1/souls/${soul.id}`, undefined, 'DELETE'); if (r.status === 200) onGone(); } }}>retire {soul.name}</button></div>
       </section>
     </>
   );

@@ -70,6 +70,10 @@ export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive
 /** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
 export function publicEvent(e: LogEvent): LogEvent {
   if (e.kind === 'intent' && (e.payload?.intent?.note || e.payload?.intent?.text)) return { ...e, payload: { ...e.payload, intent: publicIntent(e.payload.intent) } };
+  // who owns a Soul is an account id: the public sees only whether it is the world's or a person's
+  if (e.kind === 'birth' && e.payload?.owner && e.payload.owner !== 'system') return { ...e, payload: { ...e.payload, owner: 'someone' } };
+  // budgets and brain mode are the operator's business
+  if (e.kind === 'admin') return { ...e, payload: { action: e.payload?.action } };
   return e;
 }
 
@@ -98,7 +102,7 @@ export type NarrativeView = { id: number; region: string; tick: number; summary:
 
 // ---------------------------------------------------------------- websocket
 export type ClientMsg =
-  | { t: 'hello'; proto: number; token?: string; since?: number }
+  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string }
   | { t: 'resync'; reason: string }
   | { t: 'ping'; n: number };
 
@@ -115,7 +119,7 @@ export type Batch = {
 export type Heartbeat = { tick: number; seq: number; viewHash: string; keyframes: Record<string, PoseSample>; clients: number; clockRate: number; paused: boolean };
 
 export type ServerMsg =
-  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number }
+  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean }
   | ({ t: 'snapshot'; reason: string } & Snapshot)
   | ({ t: 'batch' } & Batch)
   | ({ t: 'heartbeat' } & Heartbeat)
@@ -135,7 +139,8 @@ export type Me = { userId: string; short: string; email: string | null; wallet: 
 export type ServerStats = {
   tick: number; tickMsAvg: number; tickMsMax: number; clients: number; entities: number; souls: number; liveActions: number;
   seq: number; logEvents: number; lastSnapshotTick: number; snapshotMs: { capture: number; persist: number }; dbBytes: number; uptimeSec: number; build: string;
-  brain: { mode: string; callsToday: number; costToday: number; budget: number; inflight: number; jevMsAvg: number };
+  /** `costToday` and `budget` are sent to admins only. */
+  brain: { mode: string; callsToday: number; costToday?: number; budget?: number; inflight: number; jevMsAvg: number };
 };
 
 // ---------------------------------------------------------------- view hash (the gradual-sync check)
