@@ -290,7 +290,7 @@ test('prone: captures (lie down, reach with the sheet below, take, push-up, knee
     await view(page, kind);
     const st = await page.evaluate(() => window.__marsEngine!.state());
     console.log(`[prone] ${name} tick ${st.tick}: ${st.humans.map((q) => `${q.id}:${q.activity}`).join(' ')}`);
-    await captureView(page, name, { testInfo, compare });
+    await captureView(page, name, { testInfo, compare, softVisual: compare });
   };
   // lying down: half way from kneeling to the deck
   expect(await stepUntil(page, act('p3', 'lie-down'))).toBe(true);
