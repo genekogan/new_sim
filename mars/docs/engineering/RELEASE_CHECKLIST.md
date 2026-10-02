@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 34 is live.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release 35 is live; Mars MVP complete.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -1459,3 +1459,85 @@ in main `.cloudflare/main-preservation-release34`. LocalGit only; noDNS/remotech
 Sleep and prepared-day drafts remain separate/excluded. WholeMarsMVP40–70working
 hours,medium-low confidence; next supported sleep and connected unfinishedpurpose
 proof, no MarsMVP completion or Eden expansion claim.
+
+## Production deploy 35 (2026-10-02): Mars MVP
+
+Mars MVP accepted against the owner-approved bounded closing contract, publicly
+accessible at **https://mars.college/simulation**. Worker release35 is100%
+`adaf98f2-65d1-43b3-9c5d-761d555f2d5e`, published2026-10-02T02:39:46.918Z;
+functional source `9958ed4a97f2cb5c7189ea7796b6502a0b9910de`.
+Website source `1e3f005630bb9ea5aafb339904244c315b3df9a4`, deployment
+https://mars-v2-pweg6frsu-gene-kogans-projects.vercel.app, aliasedmars.college.
+Rollback: verified34 `515f3742-d764-4804-b545-f32b2e3cc22d`, existing
+Wrangler rollback / versions deploy procedure; do not deploy a dirty working tree.
+
+| Required final check | Executed result |
+| --- | --- |
+| Lint / viewer TSc / camera TSc | PASS, lint0 |
+| Unit | 290PASS,0FAIL,0SKIP |
+| Engine | 1053PASS,0FAIL,6SKIP,11TODO;122files |
+| Browser | 173PASS,0FAIL,7SKIP;2255.404s |
+| Take / determinism | PASS; b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local and public MCP | PASS; all36original tools/isolation/auth/invalid cases |
+| Public director | Original9stepsPASS6458ms |
+| Public HTTP | 522assets/24routes/696requests; GLBrange/authPASS |
+| Fresh public browser | 8PASS,0FAIL,0SKIP:3prepared days,2sleep rigs,busycomputer,2stairs |
+| Website | Build10routesPASS; public11links/footer/3actualdaynavigations/desktop+mobile/errors0PASS |
+
+Exact clean nine-stage gate:
+`viewer/.cloudflare/gate/2026-10-02T01-51-54-812Z/report.json`; source unchanged,
+dirtyfalse, interruption/cleanupnull. Frozen CAD675f4beb/36ad67f retained.
+Original assertions, individual deadlines, performance limits and planning pins
+unchanged. The aggregate browser allowance was42minutes, justified before gate
+by measured extra95.3s exceeding prior40minute capacity. Sixengine skips/11TODO
+and sevenbrowser skips (including twolegacyW51FIXMEs) remain unproved; a green
+total is not proof for them. Current-source firstbay/whole-house tests execute;
+fullautomatic public33 proof is inherited, not rerun35. Production loaded-layout
+unsupported preflight remains explicit; no arbitrary historical geometry guarantee.
+
+Idle exact/corridor max112.032/54.444ms and historicalgridmax298.441ms pass original
+ceilings,0violations. Strict exact-source native engine-proofSHA
+`6fb2a96fe289d03aa9fc4503a10ff865a87200f40d3433d86abf9b3a5d02058a` permits evidence
+regeneration4.167s reusing actual159.444s execution, not an inferred test pass.
+Generated evidence references functional995, not the following metadata-only commit.
+Initial RED356 SIGINTfixture failure and intermediate faf gate/evidence are retained;
+fixture prerequisites repaired without weakening interrupt/cleanup assertions.
+
+New supported sleep uses ordinary walking, grounded mat claims,2.1s lie/wake,
+retained18s rest, coherent safe interruptions/directives and take replay. Three
+prepared-day presets retain the same notes2s→30s through gathering, pairedwalk,
+actual finite two-ingredient preparation/two shared meals/sleep, with independent
+12s/20s discussion/work continuations. Mars8 physically prepares its side layout;
+the independent studio shares mechanisms with distinct people/objects/project.
+Repeated Reset keeps21geometry/22texture counts for bothsleep rigs. Stairposing
+retains209samples in eachdirection and originalanatomical bounds; authorityunchanged.
+The depletion label and conflicting prepared-day instructions are resolved.
+
+Root/helper inspected all27 fresh enginePNGs+2liveinstructioncaptures, all7website
+PNGs+4mobilecrops. Receipts/logs: `viewer/.cloudflare/release35-network-receipt.json`,
+`release35-production-browser-receipt.json`, `release35-website-public/receipt.json`,
+`prepared-day-final9958ed4-validation-receipt.json`, and release35deploy/build/HTTP/
+MCP/director/website logs. Original normalCLI nonTTYauth rejection is retained as
+context; existingOAuth TTYdeploy/status succeeded, no credentialfiles read/changed.
+Extra-check mistaken nonexistent2027 URL/rawreferences comparison corrected to
+real stagedallowlist bytes, no content edit. Exactcomputer139184B/credit813BSHA
+match. NativeNodeHTTPsweep not rerun; curlgzip,deflate executes originalassertions.
+
+Build521allowlistedfiles842.3MiB;8largeobject hashkeys/manifests exactly unchanged,
+8skip/0R2writes. Dry605files8995.46KiB/1576.95gzip;29newassets539retained,134msstartup.
+Website normalVercelbuild/IndexNow200PASS, noDNS/newproject/librarydependency.
+Guarded functional mainFF62b→995 preserved48otherowner paths/status/SHA/bytes/mode/
+mtime/staged0; final docs-only FF re-verifies same manifest. No stash/reset/push/remote.
+Otherowner history/camera/testdrafts remain excluded/preserved, not called shipped.
+
+[Final handoff](MARS_MVP_HANDOFF.md) records allfamilies/eightdisruptions, inherited
+publicsource provenance, limits and reusable seams. Authored4/8groundlayouts,
+coldfood, onegroundmat/currentrigs, standingboundedchess and computer-audio are
+supported; arbitrary rooms/terrain, heat/chopping, active-sessionreload, universal
+planning/autonomousneeds/fineanatomy remain deferred. Completed sleepreturn is
+asserted but outofthefixedmatcamera; no destinationvisualclaim. Busycomputer is
+freshpublicproof; unavailabledisplay isNode-only. Hypotheticalstaging is explicit.
+
+**Mars MVP complete. Remaining accepted implementation hours0. Stop feature
+expansion; do not start Eden.** Final proof/publication completed within the24h
+window ending2026-10-03T01:31UTC. Legacy rowcounts do not define this acceptance.

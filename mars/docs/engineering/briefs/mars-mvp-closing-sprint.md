@@ -1,3 +1,8 @@
+> Closed 2026-10-02: release35 public acceptance and website publication verified.
+> Final authority: [MVP handoff](../MARS_MVP_HANDOFF.md). The text below preserves
+> the original closing plan and resolved copy defect; it does not reopen work.
+> Stop Mars feature expansion. No automatic Eden work.
+
 # Mars MVP closing sprint — frozen scope
 
 Owner mandate: **24 elapsed hours ending 2026-10-03 01:31 UTC**. Plan **12–23

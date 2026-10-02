@@ -8,16 +8,17 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `5111019` (engine tree clean) |
-| Generated | 2026-10-01T21:36:39.360Z · Node v22.20.0 |
-| Engine suite | 1004 tests in 117 files: 987 pass, 0 fail, 6 skipped, 11 TODO · 155.5 s wall |
-| External gate | `.cloudflare/gate/2026-10-01T20-02-20-385Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `9958ed4` (engine tree clean) |
+| Generated | 2026-10-02T02:34:02.237Z · Node v22.20.0 |
+| Engine suite | 1070 tests in 122 files: 1053 pass, 0 fail, 6 skipped, 11 TODO · 159.4 s wall |
+| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T01-51-54-812Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
+| External gate | `.cloudflare/gate/2026-10-02T01-51-54-812Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 6050 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 9057 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 18581 ms compute (cropped 8886 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 5986 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 9161 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 19609 ms compute (cropped 9030 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -269,7 +270,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -292,7 +293,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -308,7 +309,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -447,7 +448,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -477,7 +478,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -503,7 +504,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -521,7 +522,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -706,7 +707,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -754,10 +755,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -782,8 +783,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -802,9 +803,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-01T20-02-20-385Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T01-51-54-812Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -1031,56 +1032,78 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `7a2c826` (2026-10-01T18:17:50.549Z): 44 added, 0 removed.
+Compared with the report at `5111019` (2026-10-01T21:36:39.360Z): 66 added, 0 removed.
 
-- added: food-preparation.test.ts :: cancel after deposit retains exact conserved retry progress
-- added: food-preparation.test.ts :: cancel before deposit retains exact conserved retry progress
-- added: food-preparation.test.ts :: cancel during mixing drains owned children and releases preparation resources
-- added: food-preparation.test.ts :: cancel during scooping drains owned children and releases preparation resources
-- added: food-preparation.test.ts :: cancel during taking drains owned children and releases preparation resources
-- added: food-preparation.test.ts :: cancel during to-pot drains owned children and releases preparation resources
-- added: food-preparation.test.ts :: cancel during to-source drains owned children and releases preparation resources
-- added: food-preparation.test.ts :: changed ingredient quantity on retry refuses without silently replenishing it
-- added: food-preparation.test.ts :: deterministic recorded preparation and already complete refusal
-- added: food-preparation.test.ts :: director walk drains preparation children, then runs; explicit retry preserves deposit
-- added: food-preparation.test.ts :: foreign actor reservation refuses and does not cancel independent walk
-- added: food-preparation.test.ts :: foreign spoon ownership refuses explicitly
-- added: food-preparation.test.ts :: held spoon continuity through cancel at depositing
-- added: food-preparation.test.ts :: held spoon continuity through cancel at mix-entry
-- added: food-preparation.test.ts :: held spoon continuity through cancel at mixing
-- added: food-preparation.test.ts :: held spoon continuity through cancel at returning
-- added: food-preparation.test.ts :: held spoon continuity through cancel at scooping
-- added: food-preparation.test.ts :: held spoon continuity through cancel at taking-held
-- added: food-preparation.test.ts :: held spoon continuity through cancel at to-pot
-- added: food-preparation.test.ts :: held spoon continuity through complete at complete
-- added: food-preparation.test.ts :: held spoon continuity through directive at depositing
-- added: food-preparation.test.ts :: held spoon continuity through directive at mix-entry
-- added: food-preparation.test.ts :: held spoon continuity through directive at mixing
-- added: food-preparation.test.ts :: held spoon continuity through directive at returning
-- added: food-preparation.test.ts :: held spoon continuity through directive at scooping
-- added: food-preparation.test.ts :: held spoon continuity through directive at taking-held
-- added: food-preparation.test.ts :: held spoon continuity through directive at to-pot
-- added: food-preparation.test.ts :: missing beans refuses without mutation
-- added: food-preparation.test.ts :: missing spoon refuses without mutation
-- added: food-preparation.test.ts :: moved support rejects active preparation and preserves partial contents
-- added: food-preparation.test.ts :: partial mixing survives quiescent JSON persistence and explicit retry
-- added: food-preparation.test.ts :: prepared food uses both ordinary servings and preserves their vessels at yaw 0
-- added: food-preparation.test.ts :: prepared food uses both ordinary servings and preserves their vessels at yaw 1.5707963267948966
-- added: food-preparation.test.ts :: two finite bowls prepare same supported pot at yaw 0
-- added: food-preparation.test.ts :: two finite bowls prepare same supported pot at yaw 1.5707963267948966
-- added: food-preparation.test.ts :: wrong pot support, nonempty pot and partial source refuse named arrangements
-- added: meal.test.ts :: cancelled serving retains food conservation, deposited=false
-- added: meal.test.ts :: cancelled serving retains food conservation, deposited=true
-- added: meal.test.ts :: concurrent serving rechecks the shared pot at deposit and conserves its last portion
-- added: meal.test.ts :: serve cannot create a full bowl from less than one serving
-- added: meal.test.ts :: serve refuses to overwrite a nonempty bowl, preserving both contents
-- added: meal.test.ts :: serving rechecks preparation completion at physical deposit without consuming food
-- added: meal.test.ts :: unfinished preparation refuses serving at admission, pot=0
-- added: meal.test.ts :: unfinished preparation refuses serving at admission, pot=0.5
+- added: prepared-day-core.test.ts :: End during preparation drains the physical recipe and preserves deposited food and held spoon
+- added: prepared-day-core.test.ts :: changed paused preparation refuses Resume without replacing retained quantities
+- added: prepared-day-core.test.ts :: director sleep interruption retains elapsed rest and End drains owned sleep without finishing notes
+- added: prepared-day-core.test.ts :: parent pause during lying-down retains the same sleep and safely releases physics
+- added: prepared-day-core.test.ts :: parent pause during sleeping retains the same sleep and safely releases physics
+- added: prepared-day-core.test.ts :: parent pause during waking retains the same sleep and safely releases physics
+- added: prepared-day-core.test.ts :: pause/retry retains partial preparation and its held spoon without replaying deposits
+- added: prepared-day-core.test.ts :: prepared day retains the same notes through gathering, pair, conserved dish and ground sleep
+- added: prepared-day-core.test.ts :: routine refuses preparation-actor without physical effects
+- added: prepared-day-core.test.ts :: routine refuses preparation-pot without physical effects
+- added: prepared-day-core.test.ts :: routine refuses preparation-spoon without physical effects
+- added: prepared-day-core.test.ts :: routine refuses sleep-actor without physical effects
+- added: prepared-day-scenarios.test.ts :: prepared-day authoring is detached, deterministic and preserves original finite quantities
+- added: prepared-day-scenarios.test.ts :: prepared-day-4 conserves identities and completes distinct continuing commitments
+- added: prepared-day-scenarios.test.ts :: prepared-day-8 conserves identities and completes distinct continuing commitments
+- added: prepared-day-scenarios.test.ts :: prepared-day-studio conserves identities and completes distinct continuing commitments
+- added: sleep-take.test.ts :: supported sleep semantic take/replay and cleanup yaw=0
+- added: sleep-take.test.ts :: supported sleep semantic take/replay and cleanup yaw=0.63
+- added: sleep-walk.test.ts :: destination inside head volume refuses without acquiring visitor at yaw 0
+- added: sleep-walk.test.ts :: destination inside head volume refuses without acquiring visitor at yaw 0.63
+- added: sleep-walk.test.ts :: destination inside head volume refuses without acquiring visitor at yaw 1.5707963267948966
+- added: sleep-walk.test.ts :: late occupied destination waits at full body boundary and cancellation releases visitor
+- added: sleep-walk.test.ts :: mat activates after route planning, then walker safely recovers at yaw 0
+- added: sleep-walk.test.ts :: mat activates after route planning, then walker safely recovers at yaw 0.63
+- added: sleep-walk.test.ts :: mat activates after route planning, then walker safely recovers at yaw 1.5707963267948966
+- added: sleep-walk.test.ts :: ordinary walker passes feet outside old disc at yaw 0
+- added: sleep-walk.test.ts :: ordinary walker passes feet outside old disc at yaw 0.63
+- added: sleep-walk.test.ts :: ordinary walker passes feet outside old disc at yaw 1.5707963267948966
+- added: sleep-walk.test.ts :: ordinary walker passes head outside old disc at yaw 0
+- added: sleep-walk.test.ts :: ordinary walker passes head outside old disc at yaw 0.63
+- added: sleep-walk.test.ts :: ordinary walker passes head outside old disc at yaw 1.5707963267948966
+- added: sleep-walk.test.ts :: read-only sleep invariant rejects invalid progress, missing active owner and changed mat binding
+- added: sleep-walk.test.ts :: rotated corner route stays clear at yaw 0
+- added: sleep-walk.test.ts :: rotated corner route stays clear at yaw 0.63
+- added: sleep-walk.test.ts :: rotated corner route stays clear at yaw 1.5707963267948966
+- added: sleep-walk.test.ts :: temporary sleep rectangle is never squeezed or cached as the old standing disc
+- added: sleep.test.ts :: End during approach cancels the actual child without stranding actor or mat leases
+- added: sleep.test.ts :: Pause in lying-down wakes continuously, frees the mat and resumes only unfinished sleep/return
+- added: sleep.test.ts :: Pause in returning wakes continuously, frees the mat and resumes only unfinished sleep/return
+- added: sleep.test.ts :: Pause in sleeping wakes continuously, frees the mat and resumes only unfinished sleep/return
+- added: sleep.test.ts :: Pause in waking wakes continuously, frees the mat and resumes only unfinished sleep/return
+- added: sleep.test.ts :: Resume refuses a newly obstructed mat while retaining unfinished sleep and no physical leases
+- added: sleep.test.ts :: a moved mat blocks further posture change and wake keeps physical claims until the mat is restored
+- added: sleep.test.ts :: director movement waits for wake, then owns actor; unfinished rest/return needs explicit Resume
+- added: sleep.test.ts :: foreign mat admission refuses before owned effects
+- added: sleep.test.ts :: ground sleep at yaw 0 walks, lies, sleeps, wakes and physically returns
+- added: sleep.test.ts :: ground sleep at yaw 0.63 walks, lies, sleeps, wakes and physically returns
+- added: sleep.test.ts :: ground sleep at yaw 1.5707963267948966 walks, lies, sleeps, wakes and physically returns
+- added: sleep.test.ts :: head-blocked mat admission refuses before owned effects
+- added: sleep.test.ts :: held mat admission refuses before owned effects
+- added: sleep.test.ts :: identical sleep/director/resume sequence hashes deterministically
+- added: sleep.test.ts :: level mat admission refuses before owned effects
+- added: sleep.test.ts :: missing mat admission refuses before owned effects
+- added: sleep.test.ts :: no-floor mat admission refuses before owned effects
+- added: sleep.test.ts :: occupied mat refuses a second sleeper and holds exclusive ownership through waking
+- added: sleep.test.ts :: other-person mat admission refuses before owned effects
+- added: sleep.test.ts :: refused Resume and unknown controls leave the current owned physical sleep unchanged
+- added: sleep.test.ts :: refused repeated sleep cannot wake/cancel the active sleep purpose
+- added: sleep.test.ts :: refused repeated sleep_on_mat cannot wake/cancel the active sleep purpose
+- added: sleep.test.ts :: rotated corner uses one circular-person gap for admission, invariant and walker contact threshold
+- added: sleep.test.ts :: skewed mat admission refuses before owned effects
+- added: sleep.test.ts :: sleep safety envelope covers head and feet beyond the unchanged anchor
+- added: sleep.test.ts :: small mat admission refuses before owned effects
+- added: sleep.test.ts :: small view adapter reuses existing prone frame with flat ground rest and continuous rise
+- added: sleep.test.ts :: two separated floor patches cannot masquerade as continuous body support
+- added: sleep.test.ts :: wall mat admission refuses before owned effects
 
 ## Tests not cited by any row or milestone
 
-677 of 1004 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+743 of 1070 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1522,6 +1545,22 @@ Compared with the report at `7a2c826` (2026-10-01T18:17:50.549Z): 44 added, 0 re
 - `planning.test.ts` pass: corridor planner (opt-in): failures identical to exact, successes clear and near-optimal
 - `planning.test.ts` pass: Spatial.sync rebuilds on every navigation-relevant edit and on nothing else
 - `planning.test.ts` pass: Spatial.sync change test === former sha256 key over 1,500 seeded random edits
+- `prepared-day-core.test.ts` pass: prepared day retains the same notes through gathering, pair, conserved dish and ground sleep
+- `prepared-day-core.test.ts` pass: pause/retry retains partial preparation and its held spoon without replaying deposits
+- `prepared-day-core.test.ts` pass: parent pause during lying-down retains the same sleep and safely releases physics
+- `prepared-day-core.test.ts` pass: parent pause during sleeping retains the same sleep and safely releases physics
+- `prepared-day-core.test.ts` pass: parent pause during waking retains the same sleep and safely releases physics
+- `prepared-day-core.test.ts` pass: director sleep interruption retains elapsed rest and End drains owned sleep without finishing notes
+- `prepared-day-core.test.ts` pass: routine refuses preparation-actor without physical effects
+- `prepared-day-core.test.ts` pass: routine refuses preparation-pot without physical effects
+- `prepared-day-core.test.ts` pass: routine refuses preparation-spoon without physical effects
+- `prepared-day-core.test.ts` pass: routine refuses sleep-actor without physical effects
+- `prepared-day-core.test.ts` pass: changed paused preparation refuses Resume without replacing retained quantities
+- `prepared-day-core.test.ts` pass: End during preparation drains the physical recipe and preserves deposited food and held spoon
+- `prepared-day-scenarios.test.ts` pass: prepared-day-4 conserves identities and completes distinct continuing commitments
+- `prepared-day-scenarios.test.ts` pass: prepared-day-8 conserves identities and completes distinct continuing commitments
+- `prepared-day-scenarios.test.ts` pass: prepared-day-studio conserves identities and completes distinct continuing commitments
+- `prepared-day-scenarios.test.ts` pass: prepared-day authoring is detached, deterministic and preserves original finite quantities
 - `progressive.test.ts` pass: determinism: identical final state hash across runs
 - `progressive.test.ts` pass: swept lift: blocked straight and lifted over is refused with lift.path-blocked naming both obstacles
 - `progressive.test.ts` pass: lift crew: a joist lift keeps the holder beside its hand point (≤ 1.0 m, ≤ 2.4 m up) every tick
@@ -1636,6 +1675,56 @@ Compared with the report at `7a2c826` (2026-10-01T18:17:50.549Z): 44 added, 0 re
 - `shared-food-break.test.ts` pass: deadline drains a nonprogressing ground child; active snapshot explicitly refuses
 - `shared-food-break.test.ts` pass: actual group release and parent cancellation wait for terminal child before stow/cleanup
 - `shared-food-break.test.ts` pass: already filled bowls need no pot portions; elevated returns refuse in preflight
+- `sleep-take.test.ts` pass: supported sleep semantic take/replay and cleanup yaw=0
+- `sleep-take.test.ts` pass: supported sleep semantic take/replay and cleanup yaw=0.63
+- `sleep-walk.test.ts` pass: ordinary walker passes feet outside old disc at yaw 0
+- `sleep-walk.test.ts` pass: ordinary walker passes head outside old disc at yaw 0
+- `sleep-walk.test.ts` pass: rotated corner route stays clear at yaw 0
+- `sleep-walk.test.ts` pass: destination inside head volume refuses without acquiring visitor at yaw 0
+- `sleep-walk.test.ts` pass: mat activates after route planning, then walker safely recovers at yaw 0
+- `sleep-walk.test.ts` pass: ordinary walker passes feet outside old disc at yaw 1.5707963267948966
+- `sleep-walk.test.ts` pass: ordinary walker passes head outside old disc at yaw 1.5707963267948966
+- `sleep-walk.test.ts` pass: rotated corner route stays clear at yaw 1.5707963267948966
+- `sleep-walk.test.ts` pass: destination inside head volume refuses without acquiring visitor at yaw 1.5707963267948966
+- `sleep-walk.test.ts` pass: mat activates after route planning, then walker safely recovers at yaw 1.5707963267948966
+- `sleep-walk.test.ts` pass: ordinary walker passes feet outside old disc at yaw 0.63
+- `sleep-walk.test.ts` pass: ordinary walker passes head outside old disc at yaw 0.63
+- `sleep-walk.test.ts` pass: rotated corner route stays clear at yaw 0.63
+- `sleep-walk.test.ts` pass: destination inside head volume refuses without acquiring visitor at yaw 0.63
+- `sleep-walk.test.ts` pass: mat activates after route planning, then walker safely recovers at yaw 0.63
+- `sleep-walk.test.ts` pass: temporary sleep rectangle is never squeezed or cached as the old standing disc
+- `sleep-walk.test.ts` pass: read-only sleep invariant rejects invalid progress, missing active owner and changed mat binding
+- `sleep-walk.test.ts` pass: late occupied destination waits at full body boundary and cancellation releases visitor
+- `sleep.test.ts` pass: ground sleep at yaw 0 walks, lies, sleeps, wakes and physically returns
+- `sleep.test.ts` pass: ground sleep at yaw 1.5707963267948966 walks, lies, sleeps, wakes and physically returns
+- `sleep.test.ts` pass: ground sleep at yaw 0.63 walks, lies, sleeps, wakes and physically returns
+- `sleep.test.ts` pass: missing mat admission refuses before owned effects
+- `sleep.test.ts` pass: small mat admission refuses before owned effects
+- `sleep.test.ts` pass: skewed mat admission refuses before owned effects
+- `sleep.test.ts` pass: level mat admission refuses before owned effects
+- `sleep.test.ts` pass: no-floor mat admission refuses before owned effects
+- `sleep.test.ts` pass: wall mat admission refuses before owned effects
+- `sleep.test.ts` pass: head-blocked mat admission refuses before owned effects
+- `sleep.test.ts` pass: other-person mat admission refuses before owned effects
+- `sleep.test.ts` pass: held mat admission refuses before owned effects
+- `sleep.test.ts` pass: foreign mat admission refuses before owned effects
+- `sleep.test.ts` pass: occupied mat refuses a second sleeper and holds exclusive ownership through waking
+- `sleep.test.ts` pass: Pause in lying-down wakes continuously, frees the mat and resumes only unfinished sleep/return
+- `sleep.test.ts` pass: Pause in sleeping wakes continuously, frees the mat and resumes only unfinished sleep/return
+- `sleep.test.ts` pass: Pause in waking wakes continuously, frees the mat and resumes only unfinished sleep/return
+- `sleep.test.ts` pass: Pause in returning wakes continuously, frees the mat and resumes only unfinished sleep/return
+- `sleep.test.ts` pass: director movement waits for wake, then owns actor; unfinished rest/return needs explicit Resume
+- `sleep.test.ts` pass: End during approach cancels the actual child without stranding actor or mat leases
+- `sleep.test.ts` pass: Resume refuses a newly obstructed mat while retaining unfinished sleep and no physical leases
+- `sleep.test.ts` pass: a moved mat blocks further posture change and wake keeps physical claims until the mat is restored
+- `sleep.test.ts` pass: two separated floor patches cannot masquerade as continuous body support
+- `sleep.test.ts` pass: identical sleep/director/resume sequence hashes deterministically
+- `sleep.test.ts` pass: sleep safety envelope covers head and feet beyond the unchanged anchor
+- `sleep.test.ts` pass: small view adapter reuses existing prone frame with flat ground rest and continuous rise
+- `sleep.test.ts` pass: rotated corner uses one circular-person gap for admission, invariant and walker contact threshold
+- `sleep.test.ts` pass: refused repeated sleep cannot wake/cancel the active sleep purpose
+- `sleep.test.ts` pass: refused repeated sleep_on_mat cannot wake/cancel the active sleep purpose
+- `sleep.test.ts` pass: refused Resume and unknown controls leave the current owned physical sleep unchanged
 - `social-resume.test.ts` pass: standalone sit and seated take_slot physically return to the exact resolved seat after a successful directive
 - `social-resume.test.ts` pass: a newer explicit directive supersedes the queued return, including a refused newer instruction
 - `social-resume.test.ts` pass: cancelled or failed directives explicitly skip returning, including cancellation during stand-up

@@ -1,25 +1,20 @@
 # Mars Studio agent context
 
-## Closing mandate — supersedes earlier queue, allocation and estimates
+## Mars MVP published — stop feature expansion
 
-Mars MVP feature scope is frozen for the owner's 24 elapsed-hour closing window,
-ending **2026-10-03 01:31 UTC**. Finish the current sleep/prepared-day checkpoint,
-repair actual acceptance failures, clarify discovery/instructions, and produce
-final public proof, critical acceptance and handoff. The **12–23 remaining working
-hours with overlap** is a planning hypothesis, not a deadline guarantee. Current
-production is release 34; the focused-green sleep/day candidate is unpublished and
-its combined full gate is in progress. Do not call it complete.
+The owner-approved bounded MVP is complete at **release35**, functional source
+`9958ed4a97f2cb5c7189ea7796b6502a0b9910de`, published 2026-10-02.
+Public entry: **https://mars.college/simulation**. The final clean full gate,
+public acceptance, source inheritance, inspected captures, limitations and rollback
+are recorded in [MARS_MVP_HANDOFF.md](docs/engineering/MARS_MVP_HANDOFF.md) and
+[RELEASE_CHECKLIST.md](docs/engineering/RELEASE_CHECKLIST.md).
 
-Defer discretionary engineering, new activities, fine anatomy, camera development
-and generalization without auditing the old inventory. Keep current rigs, source
-ownership, exact-source gates, physical guarantees and the three-helper limit.
-After verified acceptance/public proof, stop Mars expansion and record the handoff;
-do not begin Eden. [Closing brief](docs/engineering/briefs/mars-mvp-closing-sprint.md)
-owns the remaining scope and discovery review; the unchanged
-[vision](docs/engineering/SIMULATION_VISION.md) retains product direction, and the
-[acceptance matrix](docs/engineering/briefs/mars-mvp-acceptance-review.md) owns families
-and eight representative disruptions. Older instructions below retain provenance
-but do not reopen this closing scope.
+**Stop Mars feature expansion. Do not begin Eden automatically.** Further feature
+work requires a new explicit owner request. Preserve all existing other-owner work,
+legacy inventory and deferred branches; do not treat parked/skipped checks as proof.
+The handoff defines the accepted bounded scope and supersedes earlier open queues,
+allocation percentages and forecasts below. The broader vision remains direction,
+not authorization to implement Eden or reopen the Mars tranche.
 
 The lasting product direction is **a playable, reusable simulation of life at Mars**.
 Read `docs/engineering/SIMULATION_VISION.md` and `ACTIVE_ROADMAP.md` before selecting

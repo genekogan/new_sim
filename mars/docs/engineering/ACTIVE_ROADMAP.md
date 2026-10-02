@@ -1,22 +1,25 @@
-# Mars MVP closing contract — scope frozen
+# Mars MVP — accepted and published
 
-Owner's superseding 24 elapsed-hour window ends **2026-10-03 01:31 UTC**.
-Plan **12–23 remaining working hours with overlap**, subject to actual acceptance
-failures; this replaces the earlier five-day target and remaining-hours forecasts.
-Release 34 is published. Candidate `fafdb72` has focused sleep/day proof and a
-combined full gate in progress; it is unpublished and is not MVP acceptance.
+The closing contract is complete at **release35**, functional source
+`9958ed4a97f2cb5c7189ea7796b6502a0b9910de`. Public entry:
+**https://mars.college/simulation**. Website source `1e3f005630bb9ea5aafb339904244c315b3df9a4`.
 
-The only active queue is: finish that checkpoint and exact-source proof/public
-verification; close actual family/disruption acceptance failures; clarify essential
-discovery/instructions; record final critical public acceptance, limits and handoff.
-Retain all physical, ownership, interruption and gate requirements. Defer
-additional engineering, new activities, anatomy/camera refinements and
-generalization without an inventory audit. Stop Mars expansion after verified
-acceptance; do not begin Eden. The [closing brief](briefs/mars-mvp-closing-sprint.md)
-records the bounded work and discovery findings; the
-[acceptance matrix](briefs/mars-mvp-acceptance-review.md) remains the family/disruption
-contract. Older dated queues and estimates below preserve provenance and do not
-expand this mandate.
+**Active feature queue: empty. Stop Mars expansion; do not begin Eden.**
+The [final handoff](MARS_MVP_HANDOFF.md) records family/disruption acceptance,
+supported counts/layouts/capabilities, exact receipts and limitations. Further
+feature work requires a new explicit owner request. Preserve deferred work in
+[RAINY_DAY_BACKLOG.md](RAINY_DAY_BACKLOG.md); no row audit or completion-score claim.
+
+The full nine-stage clean gate passed before functional integration; fresh public
+sleep/day/stair/busy-computer checks passed8/8, assets/MCP/director passed, and
+website/footer/three-day navigation were verified. Six engine skips, eleven TODOs
+and seven browser skips remain unproved and outside accepted featured journeys.
+Live Pause/Resume is supported; active-session reload restoration is not. Meals
+are finite cold preparation; sleep uses one ground mat/current rigs; rooms are
+authored4/8 layouts. See handoff before interpreting older scope below.
+
+Remaining implementation hours for the accepted MVP: **0**. The 24-hour closing
+window ended2026-10-03 01:31UTC; publication and final proof completed beforehand.
 
 ## Earlier five-day contract and checkpoint provenance
 
