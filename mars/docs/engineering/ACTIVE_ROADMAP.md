@@ -19,7 +19,9 @@ Skipped/TODO checks remain unproved. See [release record](RELEASE_CHECKLIST.md).
    and rotated reading pass actual Play. Default reading exposed a real seated-direction
    HUD preflight defect: ordinary authoritative handoff works after safe stand-up.
    Its bounded UI correction passes27focused Node checks, including six handoff/refusal
-   regressions; final default Play and clean combined fullgate remain required. Not released.
+   regressions. Fresh6d618e4 focused Play5/5 passes default reader handoff/Resume,
+   both garden afternoons and two renderer-context checks; root inspected key captures.
+   Clean combined fullgate and public verification remain required. Not released.
    Minimal read-only allowlist/embedded camera-entry fixes travel with this candidate.
 2. **Connected room preparation:** a hypothetical classroom-4 derivative clears the
    same bowl/spoon to declared storage, physically moves its empty table and spare

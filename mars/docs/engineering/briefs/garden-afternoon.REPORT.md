@@ -78,3 +78,7 @@ completed for an ended branch with no achieved objectives. Root labels actual
 cancelled branches ended, preserving authoritative status/effects and Completed:none.
 Both End-before-step actualPlay checks assert the label; fresh focused proof pending.
 No cancellation/ownership/physics change.
+
+Fresh clean6d618e4 both actualPlay variations PASS37.3/41.9s, including finite seed
+and water effects, originalbook24, ordinary cleanup, honest ended label and Reset.
+Root inspects rotated completion and pre-firsttick End; full combined/public pending.

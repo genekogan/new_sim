@@ -181,3 +181,8 @@ happens after cleanup. Six Node regressions cover both orientations, occupied re
 and discussion, exact bookmark/support/normal Resume, and infeasible destination
 refusal after actual stand-up. Also wait for ordinary Leave admission after the global
 Floor capture freeze. Original deadlines/outcomes preserved. Fresh actualPlay required.
+
+Fresh clean6d618e4 default actualPlay passes33.1s: ordinary seated-reader directive
+retains8.10/page3 and exact supported book, explicit Resume completes12/page4 with
+six contributions and no live claims. Root inspects actual directed/final captures.
+Earlier failures remain preserved; combined fullgate/public verification pending.

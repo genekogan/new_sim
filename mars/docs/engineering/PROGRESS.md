@@ -2485,3 +2485,23 @@ allhistoricalgridbuilds157–294ms,0violations/originalpinsandceilingsunchanged.
 Futuregallery2/seed2/cameraentry7 actualPlaypassed; garden2/rotatedreading passed
 75aa970. Rootdocuments-onlyguide/index work during21focusedrun changed no runtime;
 futurecombined clean gate will freeze alltrackedpaths and establish currentproof.
+
+### Reader handoff and garden final checks green — October2
+
+Clean6d618e4 focused five-case run passes5/5 in1.9min, retries0/original deadlines:
+default reading actual Play now directs from the occupied discussion hold via ordinary
+stand-up, retains book8.10/page3, resumes to12/page4 and six retained contributions;
+both garden afternoons complete conserved planting/care and book24, independent
+interruption, honest ended/Completed:none before first tick and clean Reset.
+Two renderer-context cases separately establish exact physical book root/support
+while permitted page/bookmark expression changes bounds; these are not browser journeys.
+Root personally inspects directed/completed reading, rotated garden completion and
+pre-firsttick End PNGs. Sol6.1 reviews all paired captures separately. Logs/artifacts
+reading-garden-handoff retain exact source; prior native failures remain untouched.
+27focused Node/TSc/type-aware lint pass. No pins/tolerances/physical authority edits.
+
+Eight new selectable presets remain local until clean combined gate and publication.
+Queue is release38 verification, isolated room-preparation bridge, then bounded
+same-Runtime meal continuation receipts. Continuous owner authorization persists;
+release checkpoints do not end expansion. All48other-owner paths/status/bytes/mode/
+mtime preserved at main e61003a, staged0. Shared helpers3, no parallel browser/perf.
