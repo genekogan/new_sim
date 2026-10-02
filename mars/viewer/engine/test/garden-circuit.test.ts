@@ -355,3 +355,59 @@ test('changed finite material waits for explicit restoration and never manufactu
   control(rt, r.id, 'resume');
   finish(rt, r.id);
 });
+
+test('missing serve after actual empty-bowl take waits by name without throw or failed-record spam', () => {
+  const { rt, r } = begin();
+  const original = rt.registry.get('serve')!;
+  until(rt, () => rt.world.entities['water-bowl'].support?.kind === 'in-hand');
+  rt.registry.delete('serve');
+  assert.doesNotThrow(() =>
+    until(rt, () => r.diagnostic?.code === 'garden_circuit.action-missing'),
+  );
+  assert.equal(view(rt, r.id).mode, 'waiting');
+  assert.equal(rt.world.entities['water-pot'].contents!.fraction, 0.5);
+  assert.equal(rt.world.entities['water-bowl'].contents!.fraction, 0);
+  assert.equal(heldBy(rt.world, 'carer')[0].item.id, 'water-bowl');
+  const count = rt.records.size;
+  for (let i = 0; i < 40; i++) checked(rt);
+  assert.equal(rt.records.size, count);
+  assert.equal(
+    [...rt.records.values()].filter((r) => r.status === 'failed').length,
+    0,
+  );
+  rt.registry.set('serve', original);
+  control(rt, r.id, 'resume');
+  finish(rt, r.id);
+  assert.equal(serves(rt).length, 2);
+});
+test('six committed deposits still require physical release after final-care Pause and ordinary bowl take', () => {
+  const { rt, r } = begin();
+  until(
+    rt,
+    () =>
+      (rt.world.entities['plant-c'] as GardenEntity).gardenCare!.cycles === 2,
+  );
+  pause(rt, r.id);
+  assert.equal(view(rt, r.id).index, 6);
+  assert.equal(view(rt, r.id).finished, false);
+  const take = rt.submit('take_item', {
+    actor: 'carer',
+    item: 'water-bowl',
+    hand: 'right',
+  });
+  assert.notEqual(take.status, 'failed', take.diagnostic?.message);
+  until(rt, () => rt.world.entities['water-bowl'].support?.kind === 'in-hand');
+  assert.equal(view(rt, r.id).finished, false);
+  assert.ok(rt.isActive(r.id));
+  until(rt, () => view(rt, r.id).mode === 'paused' && !rt.isActive(take.id));
+  assert.equal(take.status, 'completed');
+  assert.equal(heldBy(rt.world, 'carer').length, 0);
+  assert.equal(view(rt, r.id).finished, false);
+  assert.ok(
+    view(rt, r.id).history.some(
+      (c) => c?.verb === 'put_item' && c.status === 'completed',
+    ),
+  );
+  control(rt, r.id, 'resume');
+  finish(rt, r.id);
+});

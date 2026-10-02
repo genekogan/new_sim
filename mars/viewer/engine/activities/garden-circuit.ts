@@ -488,6 +488,35 @@ export const gardenCircuit: ActionDef<
         ),
       );
     if (ex.index === 6) {
+      // Completed deposits are not a physical-release certificate.
+      if (foreignActor(rt, ex))
+        return blocked(
+          ex,
+          issue(
+            'actor-directed',
+            `${ex.p.actor} must finish the ordinary directive before circuit completion`,
+            [ex.p.actor],
+          ),
+        );
+      if (water.support?.kind === 'in-hand')
+        return dispatch(rt, ex, 'put_item', {
+          actor: ex.p.actor,
+          item: ex.p.water,
+          surfaceSlot: ex.p.returnSlot,
+        });
+      if (
+        water.support?.kind !== 'resting-on' ||
+        `${water.support.on}#${water.support.slot}` !== ex.p.returnSlot ||
+        heldBy(rt.world, ex.p.actor).length
+      )
+        return blocked(
+          ex,
+          issue(
+            'completion-release',
+            `${ex.p.water} must physically rest at ${ex.p.returnSlot} with ${ex.p.actor}'s hands free before completion`,
+            [ex.p.water, ex.p.returnSlot, ex.p.actor],
+          ),
+        );
       ex.finished = true;
       ex.mode = 'completed';
       return {
@@ -535,7 +564,16 @@ export const gardenCircuit: ActionDef<
         ex.p.source,
       );
       if ('code' in st) return blocked(ex, st);
-      const def = rt.registry.get('serve')!;
+      const def = rt.registry.get('serve');
+      if (!def)
+        return blocked(
+          ex,
+          issue(
+            'action-missing',
+            'serve must be registered before the same empty water bowl can be filled',
+            ['serve', ex.p.source, ex.p.water],
+          ),
+        );
       const params = { actor: ex.p.actor, pot: ex.p.source, bowl: ex.p.water };
       const plan = def.plan(rt, params);
       if (!plan.ok && plan.diagnostic.code === 'item.out-of-reach')

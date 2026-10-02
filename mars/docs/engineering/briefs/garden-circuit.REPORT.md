@@ -77,12 +77,36 @@ never overrides a blocked physical executor or claims cleanup from a child flag.
 
 ## Focused evidence
 
-24 new Node cases cover full chain/replay, every-tick conserved material/support
+26 new Node cases cover full chain/replay, every-tick conserved material/support
 and zero violations, both sides of serve commit, partial care, accepted direction,
 600-tick waiting, End beforeStep/serve/care/due, occupied return restoration,
 unavailable planter, changed source support/material, seven invalid bindings,
 detached readout, active End idempotence, stopped return explicit retry and physical
 independent return. Ordinary garden-care and meal regression suites run alongside.
-Focused combined result: **57/57 pass**, zero failures/skips/todos, 1.84s
-(24 new circuit + existing garden-care/meal cases). Viewer TSc, own-file
+Focused combined result: **59/59 pass**, zero failures/skips/todos, 2.09s
+(26 new circuit + existing garden-care/meal cases). Viewer TSc, own-file
 type-aware lint, formatter and diff checks **PASS**. Actual Play/HUD/camera/public proof remains root-owned and unexecuted here.
+
+## Root review follow-up
+
+The resupply reach preview originally dereferenced `registry.get('serve')!`
+before dispatch's missing-action guard. Removing serve after the ordinary empty
+bowl take could therefore throw. It now enters named
+`garden_circuit.action-missing` waiting with the same actual held empty bowl and
+full `.5` pot, no throw or failed-record spam. Restoring the exact action and
+explicit Resume completes the conserved/supported journey with two servings.
+
+Existing `garden_care` cannot terminate normally before its declared physical
+return, and an ordinary external take/walk claims the actor, causing this parent
+to pause/drain rather than continue to completion. No ordinary accepted path was
+found that leaves final held water in running mode. Nevertheless completion now
+explicitly requires the declared resting-on bowl support, no held items and no
+foreign actor action. If actual final water is held, a normal `put_item` is
+dispatched; completion is checked again after it drains. No support overwrite.
+A regression pauses after the sixth committed care cycle, takes the same final
+bowl through an ordinary external action, verifies unfinished parent while held,
+then observes the ordinary safe return and explicit Resume before clean completion.
+
+Review follow-up: two added regressions, **59/59 combined Node PASS**, 2.09s;
+viewer TSc, own-file type-aware lint, formatting and diff checks PASS. No browser,
+performance, shared file or dependency changes.
