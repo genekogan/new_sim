@@ -31,6 +31,7 @@ import { SELECTABLE_SCENARIOS, type Check } from './scenarios.ts';
 import { OVERLAYS, type LabView, type OverlayName } from './lab-view.ts';
 import { SequencePanel } from './sequence-hud.tsx';
 import { CheckpointTour } from './checkpoint-tour.tsx';
+import { LAB_CONTRACTS, LAB_SCENARIO_GROUPS } from './scenario-contracts.ts';
 
 const SPEEDS = [0.25, 0.5, 1, 2, 4, 8];
 const OVERLAY_LABEL: Record<OverlayName, string> = {
@@ -61,6 +62,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
   const s = sim.scenario;
   const st = sim.stats();
   const info = view.info();
+  const contract = LAB_CONTRACTS[s.name as keyof typeof LAB_CONTRACTS];
   return (
     <aside className="lab-panel">
       <h1>Engine Lab</h1>
@@ -73,14 +75,23 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         Scenario
         <select value={s.name} onChange={(e) => onScenario(e.target.value)} aria-label="Scenario">
           {!SELECTABLE_SCENARIOS.some((x) => x.name === s.name) && <option value={s.name}>{s.title}</option>}
-          {SELECTABLE_SCENARIOS.map((x) => (
-            <option key={x.name} value={x.name}>
-              {x.title}
-            </option>
+          {LAB_SCENARIO_GROUPS.map((group) => (
+            <optgroup key={group.id} label={group.title}>
+              {SELECTABLE_SCENARIOS.filter((x) => LAB_CONTRACTS[x.name as keyof typeof LAB_CONTRACTS]?.group === group.id).map((x) => (
+                <option key={x.name} value={x.name}>{x.title}</option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>
       <p className="lab-desc">{s.description}</p>
+      {contract && <details className="lab-meta" data-testid="scenario-contract">
+        <summary>How to run this experience</summary>
+        <p>{contract.start.join(' → ')}</p>
+        <p>Outcome: {contract.outcome}</p>
+        <p>Supported scope: {contract.scope}</p>
+        <p>Global Pause stops the world. Activity controls affect their own purpose. Refusals remain in the log; Reset loads a fresh world.</p>
+      </details>}
       <div className="lab-row">
         <button disabled={!!sim.halted} onClick={() => ((sim.paused = !sim.paused), refresh())}>{sim.paused ? 'Play' : 'Pause'}</button>
         <button disabled={!!sim.halted} onClick={() => ((sim.paused = true), sim.step(), refresh())}>Step</button>

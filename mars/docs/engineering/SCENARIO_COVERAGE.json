@@ -19,7 +19,7 @@
       "diagnostic": 1,
       "continuous": 1,
       "probe": 1,
-      "conditional-unsupported": 2
+      "conditional-construction": 2
     },
     "recordedCoverageGrades": {
       "recorded-actual-ui-play": 29,
@@ -887,7 +887,7 @@
     },
     "t128": {
       "file": "viewer/e2e/prone.spec.ts",
-      "name": "prone: prone receivers — hands on the engine points, lying on the deck (not in it), shoulders over the edge",
+      "name": "prone: prone receivers \u2014 hands on the engine points, lying on the deck (not in it), shoulders over the edge",
       "method": "browser-programmatic-step-pose-and-effects",
       "outcome": "passed",
       "proofRefs": [
@@ -896,7 +896,7 @@
     },
     "t129": {
       "file": "viewer/e2e/prone.spec.ts",
-      "name": "prone-forks: prone receivers — hands on the engine points, lying on the deck (not in it), shoulders over the edge",
+      "name": "prone-forks: prone receivers \u2014 hands on the engine points, lying on the deck (not in it), shoulders over the edge",
       "method": "browser-programmatic-step-pose-and-effects",
       "outcome": "passed",
       "proofRefs": [
@@ -905,7 +905,7 @@
     },
     "t130": {
       "file": "viewer/e2e/prone.spec.ts",
-      "name": "prone: deterministic — the same run twice gives the same receivers' bones every tick",
+      "name": "prone: deterministic \u2014 the same run twice gives the same receivers' bones every tick",
       "method": "browser-programmatic-step-pose-and-effects",
       "outcome": "passed",
       "proofRefs": [
@@ -959,7 +959,7 @@
     },
     "t262": {
       "file": "viewer/e2e/work-break.spec.ts",
-      "name": "one continuing world 4: notes → shared food → explicit returns → same notes",
+      "name": "one continuing world 4: notes \u2192 shared food \u2192 explicit returns \u2192 same notes",
       "method": "browser-programmatic-step-completion",
       "outcome": "passed",
       "proofRefs": [
@@ -968,7 +968,7 @@
     },
     "t263": {
       "file": "viewer/e2e/work-break.spec.ts",
-      "name": "one continuing world 8: notes → shared food → explicit returns → same notes",
+      "name": "one continuing world 8: notes \u2192 shared food \u2192 explicit returns \u2192 same notes",
       "method": "browser-programmatic-step-completion",
       "outcome": "passed",
       "proofRefs": [
@@ -1082,7 +1082,7 @@
       "file": "viewer/engine/test/year-build-b.test.ts",
       "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
       "authoredNameSample": [
-        "year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged",
+        "year build 2022 east-house A+B: plan \u2014 material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged",
         "year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)",
         "set-part lift crews never walk through a bystander: the crew holds the part (setpart.path-occupied) and an idle person in the way is asked to step aside; 0 violations"
       ],
@@ -1168,7 +1168,7 @@
       "file": "viewer/engine/test/work-break.test.ts",
       "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
       "authoredNameSample": [
-        "same-world ${count}: work → shared serving/talking/eating → explicit returns → same work",
+        "same-world ${count}: work \u2192 shared serving/talking/eating \u2192 explicit returns \u2192 same work",
         "authored extension preserves classroom entities and validates returns/service geometry",
         "unavailable food and full hands refuse without replacing support or duplicating food"
       ],
@@ -1190,8 +1190,8 @@
       "file": "viewer/engine/test/year-build.test.ts",
       "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
       "authoredNameSample": [
-        "year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic",
-        "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned",
+        "year build 2022 east-house, phase A: plan \u2014 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic",
+        "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (\u2264 1 cm / 1\u00b0), pinned",
         "year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)"
       ],
       "authoredLiteralNameCount": 3,
@@ -1247,7 +1247,7 @@
       "authoredNameSample": [
         "body model = the measured rig (W9, poses.spec.ts \"body model\", within 2 cm)",
         "body model is internally consistent: overhead, caps vs envelopes, bands from the rig, landmarks",
-        "prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise"
+        "prone receiver + rise (owner feedback \u00a713; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise"
       ],
       "authoredLiteralNameCount": 3,
       "namesAreSamplesNotExhaustive": true
@@ -1331,8 +1331,8 @@
       "file": "viewer/engine/test/year-build-houses.test.ts",
       "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
       "authoredNameSample": [
-        "year build 2022: the four rack houses are one template (12 frames of 16 ft × 3 ft in 4 lines × 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m) — phase B split rules apply unchanged",
-        "year build 2022, all four houses A+B: plans through the same rules — counts by kind, unplaced with reasons, the yard clear of the neighbours\\",
+        "year build 2022: the four rack houses are one template (12 frames of 16 ft \u00d7 3 ft in 4 lines \u00d7 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m) \u2014 phase B split rules apply unchanged",
+        "year build 2022, all four houses A+B: plans through the same rules \u2014 counts by kind, unplaced with reasons, the yard clear of the neighbours\\",
         "year build 2022 ${h}, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned"
       ],
       "authoredLiteralNameCount": 4,
@@ -1439,7 +1439,7 @@
       "file": "viewer/engine/test/build-bay-v2.test.ts",
       "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
       "authoredNameSample": [
-        "flagship v2: forklift sheet, stairs carry, campfire ending — rehearse, execute, canonical untouched",
+        "flagship v2: forklift sheet, stairs carry, campfire ending \u2014 rehearse, execute, canonical untouched",
         "flagship v2 layout: the forklift cannot stage s2 on the half-built deck (so it stages it beside the bay)",
         "forklift_deliver"
       ],
@@ -1614,7 +1614,7 @@
       "limits": "No deletion/washing/general storage planner."
     },
     "creative-afternoon": {
-      "terminal": "Artist returns to same pad from3→8marks after sharing and two-performer music; independent reading/care remain coherent.",
+      "terminal": "Artist returns to same pad from3\u21928marks after sharing and two-performer music; independent reading/care remain coherent.",
       "retainedEffects": [
         "same pencil/pad",
         "first music completed7/7 note:null while second progresses",
@@ -2108,7 +2108,7 @@
       "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
     },
     "year-build": {
-      "terminal": "Supported preflight then entire skeleton sequence completes: firstbay201/20124parts, whole555/55566parts, piles→samepart→connected installation; crew grounded/released.",
+      "terminal": "Supported preflight then entire skeleton sequence completes: firstbay201/20124parts, whole555/55566parts, piles\u2192samepart\u2192connected installation; crew grounded/released.",
       "retainedEffects": [
         "same extracted parts/pile counts",
         "canonical installed corners .41/.94mm max inpublic38"
@@ -2157,7 +2157,7 @@
   "scenarios": [
     {
       "id": "living-day-4",
-      "title": "Living day · Mars classroom (hypothetical)",
+      "title": "Living day \u00b7 Mars classroom (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2188,11 +2188,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "living-day-studio",
-      "title": "Living day · independent studio (hypothetical)",
+      "title": "Living day \u00b7 independent studio (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2223,11 +2224,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "garden-circuit",
-      "title": "Finite garden circuit · resupply, care and due waits (hypothetical)",
+      "title": "Finite garden circuit \u00b7 resupply, care and due waits (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2255,11 +2257,12 @@
         "Full63 selector parity, combined gate39 and fresh public39 pending."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "communal-supper",
-      "title": "Communal supper · prepare, share and store (hypothetical)",
+      "title": "Communal supper \u00b7 prepare, share and store (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2288,11 +2291,12 @@
         "Full63 selector parity, combined gate39 and fresh public39 pending."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "room-preparation",
-      "title": "Prepare and use a classroom · clear, carry, gather (hypothetical)",
+      "title": "Prepare and use a classroom \u00b7 clear, carry, gather (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2321,11 +2325,12 @@
         "Full63 selector parity, combined gate39 and fresh public39 pending."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "garden-afternoon",
-      "title": "Garden afternoon · plant, break, care and read (hypothetical)",
+      "title": "Garden afternoon \u00b7 plant, break, care and read (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2354,11 +2359,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "garden-afternoon-rotated",
-      "title": "Garden afternoon · rotated intentions (hypothetical)",
+      "title": "Garden afternoon \u00b7 rotated intentions (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2387,11 +2393,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "seed-planting",
-      "title": "Seed planting · finite material and retained purpose (hypothetical)",
+      "title": "Seed planting \u00b7 finite material and retained purpose (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2421,11 +2428,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "seed-planting-rotated",
-      "title": "Seed planting · rotated beds (hypothetical)",
+      "title": "Seed planting \u00b7 rotated beds (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2455,11 +2463,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "reading-circle",
-      "title": "Shared reading · book and questions (hypothetical)",
+      "title": "Shared reading \u00b7 book and questions (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2489,11 +2498,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "reading-circle-rotated",
-      "title": "Shared reading · rotated circle (hypothetical)",
+      "title": "Shared reading \u00b7 rotated circle (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2523,11 +2533,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "gallery-tour",
-      "title": "Guided gallery · three stops (hypothetical)",
+      "title": "Guided gallery \u00b7 three stops (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2557,11 +2568,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "gallery-tour-short",
-      "title": "Guided gallery · two stops (hypothetical)",
+      "title": "Guided gallery \u00b7 two stops (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2591,11 +2603,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "table-cleanup",
-      "title": "Table cleanup · same bowls and book (hypothetical)",
+      "title": "Table cleanup \u00b7 same bowls and book (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2625,11 +2638,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "table-cleanup-rotated",
-      "title": "Table cleanup · rotated setup (hypothetical)",
+      "title": "Table cleanup \u00b7 rotated setup (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2659,11 +2673,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "creative-afternoon",
-      "title": "Creative afternoon · make, share, return (hypothetical)",
+      "title": "Creative afternoon \u00b7 make, share, return (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2692,11 +2707,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "art-sharing",
-      "title": "Art sharing · questions around a retained drawing (hypothetical)",
+      "title": "Art sharing \u00b7 questions around a retained drawing (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2725,7 +2741,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "drawing-work",
@@ -2756,7 +2773,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "group-warmup",
@@ -2789,11 +2807,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "open-jam",
-      "title": "Open jam · performer exchange (hypothetical)",
+      "title": "Open jam \u00b7 performer exchange (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2823,11 +2842,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "garden-care",
-      "title": "Garden care · finite water (hypothetical)",
+      "title": "Garden care \u00b7 finite water (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2857,7 +2877,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "music-dance",
@@ -2889,11 +2910,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "classroom-4",
-      "title": "Playable classroom · 4 guests (hypothetical)",
+      "title": "Playable classroom \u00b7 4 guests (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2926,11 +2948,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "classroom-8",
-      "title": "Playable classroom · 8 guests (hypothetical)",
+      "title": "Playable classroom \u00b7 8 guests (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -2963,11 +2986,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "work-break-4",
-      "title": "Work → talks → shared food · 4-guest room (hypothetical)",
+      "title": "Work \u2192 talks \u2192 shared food \u00b7 4-guest room (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3002,11 +3026,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "work-break-8",
-      "title": "Work → talks → shared food · 8-guest room (hypothetical)",
+      "title": "Work \u2192 talks \u2192 shared food \u00b7 8-guest room (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3043,11 +3068,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "prepared-day-4",
-      "title": "Prepared continuing day · 4-guest room (hypothetical)",
+      "title": "Prepared continuing day \u00b7 4-guest room (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3085,11 +3111,12 @@
       "supplementaryProofRefs": [
         "public35"
       ],
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "prepared-day-8",
-      "title": "Prepared continuing day · 8-guest room (hypothetical)",
+      "title": "Prepared continuing day \u00b7 8-guest room (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3129,11 +3156,12 @@
       "supplementaryProofRefs": [
         "public35"
       ],
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "prepared-day-studio",
-      "title": "Prepared continuing day · independent studio (hypothetical)",
+      "title": "Prepared continuing day \u00b7 independent studio (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3171,11 +3199,12 @@
       "supplementaryProofRefs": [
         "public35"
       ],
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "quiet-reading",
-      "title": "Quiet reading · retained bookmark (hypothetical)",
+      "title": "Quiet reading \u00b7 retained bookmark (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3202,11 +3231,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "computer-music",
-      "title": "Computer music · performer and listeners (hypothetical)",
+      "title": "Computer music \u00b7 performer and listeners (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3236,11 +3266,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "tabletop-chess",
-      "title": "Tabletop chess · two physical players (hypothetical)",
+      "title": "Tabletop chess \u00b7 two physical players (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3269,11 +3300,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "design-studio",
-      "title": "Independent design studio · critique and continuing projects (hypothetical)",
+      "title": "Independent design studio \u00b7 critique and continuing projects (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3312,11 +3344,12 @@
       "supplementaryProofRefs": [
         "public35"
       ],
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
     },
     {
       "id": "ground-sleep",
-      "title": "Supported ground sleep · retained purpose (hypothetical)",
+      "title": "Supported ground sleep \u00b7 retained purpose (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3350,11 +3383,12 @@
       "supplementaryProofRefs": [
         "public35"
       ],
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "ground-sleep-rotated",
-      "title": "Supported ground sleep · rotated mat (hypothetical)",
+      "title": "Supported ground sleep \u00b7 rotated mat (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3388,11 +3422,12 @@
       "supplementaryProofRefs": [
         "public35"
       ],
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "cold-preparation",
-      "title": "Cold meal preparation · retained quantities (hypothetical)",
+      "title": "Cold meal preparation \u00b7 retained quantities (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3419,11 +3454,12 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "cold-preparation-rotated",
-      "title": "Cold meal preparation · rotated table (hypothetical)",
+      "title": "Cold meal preparation \u00b7 rotated table (hypothetical)",
       "category": "manual-journey",
       "engineContinuousFlag": true,
       "sourceFiles": [
@@ -3450,7 +3486,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     },
     {
       "id": "wall",
@@ -3482,7 +3519,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "u-trap",
@@ -3514,7 +3552,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "narrow-passage",
@@ -3547,7 +3586,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "stairs",
@@ -3582,7 +3622,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "deck-to-ground",
@@ -3615,7 +3656,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "incomplete-stairs",
@@ -3646,7 +3688,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "diagnostics"
     },
     {
       "id": "construction",
@@ -3680,7 +3723,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "trio",
@@ -3712,7 +3756,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "stress-30",
@@ -3748,7 +3793,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Assert multi-window continued movement/completed actions, finite poses/0violations/resource bounds; metrics alone do not prove sustained liveness.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "continuous"
     },
     {
       "id": "build-bay",
@@ -3785,7 +3831,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "hand-up",
@@ -3819,7 +3866,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "prone",
@@ -3853,7 +3901,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "prone-forks",
@@ -3885,7 +3934,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "campfire-evening",
@@ -3917,7 +3967,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "meal",
@@ -3953,7 +4004,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "body",
@@ -3989,7 +4041,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "probes"
     },
     {
       "id": "year-2020",
@@ -4021,7 +4074,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "year-2021",
@@ -4053,7 +4107,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "year-2022",
@@ -4085,7 +4140,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "year-2023",
@@ -4117,7 +4173,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "year-2024",
@@ -4149,7 +4206,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "year-2025",
@@ -4181,7 +4239,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "year-2026",
@@ -4213,12 +4272,13 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     },
     {
       "id": "year-build-2022",
       "title": "2022 east-house: skeleton from piles (first bay)",
-      "category": "conditional-unsupported",
+      "category": "conditional-construction",
       "engineContinuousFlag": false,
       "sourceFiles": [
         "viewer/app/lab/year-build.ts"
@@ -4252,12 +4312,13 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "construction"
     },
     {
       "id": "year-build-2022-house",
       "title": "2022 east-house: skeleton from piles (whole house)",
-      "category": "conditional-unsupported",
+      "category": "conditional-construction",
       "engineContinuousFlag": false,
       "sourceFiles": [
         "viewer/app/lab/year-build.ts"
@@ -4291,7 +4352,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "construction"
     },
     {
       "id": "solar-paint",
@@ -4323,7 +4385,8 @@
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
       "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
-      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "scripted"
     }
   ],
   "unprovedLegacyChecks": {
@@ -4338,7 +4401,7 @@
       },
       {
         "file": "viewer/e2e/questions-captures.spec.ts",
-        "name": "question captures › capture every question picture",
+        "name": "question captures \u203a capture every question picture",
         "proofRefs": [
           "gate38"
         ],
@@ -4346,7 +4409,7 @@
       },
       {
         "file": "viewer/e2e/studio-build.spec.ts",
-        "name": "watch it being built (east-house-bay1): year picker → piles to standing structure, log, final checks, hands",
+        "name": "watch it being built (east-house-bay1): year picker \u2192 piles to standing structure, log, final checks, hands",
         "proofRefs": [
           "gate38"
         ],
@@ -4354,7 +4417,7 @@
       },
       {
         "file": "viewer/e2e/studio-build.spec.ts",
-        "name": "watch it being built (east-house): year picker → piles to standing structure, log, final checks, hands",
+        "name": "watch it being built (east-house): year picker \u2192 piles to standing structure, log, final checks, hands",
         "proofRefs": [
           "gate38"
         ],
@@ -4417,7 +4480,38 @@
   "schemaNotes": {
     "contracts": "Supported semantic contracts and listed disruptions are bounded to named tests; not all disruptions use UI Play. Consult each test method.",
     "nodeFixtureCatalog": "Exact literal name samples/filerefs only; dynamic names and remaining filecases are intentionally not reproduced. Node tests never fill UI journey gaps.",
-    "sourceInheritance": "No blanket current coverage claimed. 5f→b712 changes shared-food-break/registry/UI; c833→b712 app/engine/e2e byte-diff empty. No gate39 success assumed.",
-    "category": "conditional-unsupported means inspect admission before execution, not currently refused. Both real2022 public38 profiles admitted and completed; historical refused layouts remain distinct."
-  }
+    "sourceInheritance": "No blanket current coverage claimed. 5f\u2192b712 changes shared-food-break/registry/UI; c833\u2192b712 app/engine/e2e byte-diff empty. No gate39 success assumed.",
+    "category": "Conditional construction means source/layout admission is checked before actions. Both current2022 profiles completed public38; refused unsupported layouts remain distinct.",
+    "registration": "One row and declared contract/test mapping are required for every SELECTABLE_SCENARIOS registration. Generated UI metadata is checked against this inventory in the ordinary engine test path. Authored mappings do not establish executed proof."
+  },
+  "discoveryGroups": [
+    {
+      "id": "connected",
+      "title": "Longer connected experiences"
+    },
+    {
+      "id": "activities",
+      "title": "Individual and shared activities"
+    },
+    {
+      "id": "continuous",
+      "title": "Continuous simulations"
+    },
+    {
+      "id": "scripted",
+      "title": "Automatically started journeys"
+    },
+    {
+      "id": "probes",
+      "title": "Manual renderer probes"
+    },
+    {
+      "id": "diagnostics",
+      "title": "Intentional diagnostic demonstrations"
+    },
+    {
+      "id": "construction",
+      "title": "Source-checked construction journeys"
+    }
+  ]
 }

@@ -53,6 +53,7 @@ paths; this publication does not merge all future branches or certify old invent
 - [Planning budgets](PLANNING_BUDGET.md): measured ceilings/pins, change rules.
 - [Release checklist](RELEASE_CHECKLIST.md): clean combined gate, deployment and rollback.
 - [Evidence](EVIDENCE.md): machine-linked checks, distinguish skipped/TODO from proof.
+- [Scenario coverage](SCENARIO_COVERAGE.json): authoritative per-preset execution contracts, discovery and source-bound proof; currently a stabilization draft, not full acceptance.
 - [Progress](PROGRESS.md): chronological work and failures, newest entries at the end.
 - [Live Lab repairs](LIVE_LAB_REPAIRS.md): Reach, stance and material continuity findings.
 

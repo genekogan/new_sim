@@ -2902,3 +2902,19 @@ Sol6.1 lanes: coverageinventory, boundedLab-livenessrepro/repair, performancepre
 rootrelease/criticalreview. Browser/performance serialized, no newcamera/rig/Eden scope.
 Initial wholealpha20–36workinghours medium-lowconfidence; first-Step and mixedcompletion
 proof gaps mustbe measured honestly. No current alphaacceptance/publication claim.
+
+
+## Alpha registration and discovery candidate — 2026-10-02
+
+SCENARIO_COVERAGE.json now owns63 registration contracts and discovery groups;
+small generated UI metadata excludes historical proof paths. The selector groups
+longer connected runs, activities, continuous worlds, automatic journeys, probes,
+diagnostic demos and source-checked construction. Expandable instructions declare
+start/outcome/scope and manual versus local Pause. Current2022 supported profiles
+are conditional construction, not mislabeled unsupported; alternate admission
+refusals remain explicit. Normal engine checks require exact selectable parity,
+valid contract/start/test mapping and byte-exact generated metadata. Named duplicate/
+missing/incomplete/unmapped cases refuse generation. Three focused registration
+checks, viewer TypeScript and type-aware lint pass; browser discovery is unexecuted.
+Authored test mappings are not executed proof. This alpha-only candidate does not
+change frozen release39, publish a feature or certify the historical coverage rows.
