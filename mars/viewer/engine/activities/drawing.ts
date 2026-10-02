@@ -88,8 +88,11 @@ function clearHand(rt: Runtime, ex: Exec) {
   if (a.human.hands) delete a.human.hands.right;
 }
 function stop(rt: Runtime, ex: Exec, error?: Diagnostic) {
-  ex.stopping = true;
   ex.error ??= error;
+  // Parents may repeat Cancel while waiting for safe release. Do not cancel
+  // this action's later return child and restart its physical cleanup.
+  if (ex.stopping) return;
+  ex.stopping = true;
   if (ex.child && rt.isActive(ex.child)) rt.cancel(ex.child);
 }
 function dispatch(

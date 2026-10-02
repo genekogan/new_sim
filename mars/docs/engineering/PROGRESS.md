@@ -2106,3 +2106,21 @@ retained pad marks into bounded paper/pencil meshes; warm-up gaze and camera fac
 read actual participants without movement authority. Combined focused39checks PASS,
 0fail/skip/TODO, viewer TSc/lint clean. No baseline/limit changed. Actual browser Play
 and inspected captures remain required; all are candidates, release36 remains online.
+
+### Actual vocabulary Play found and repaired admission/cleanup gaps — 2026-10-02
+
+Frozen a711aaf browser proof: drawing passes; warm-up Pause clock advances one tick
+before queued control acceptance; rapid dancer Leave then performer directive fails
+music-gathering.control-target and loses the accepted departure. Original failed run,
+seven inspected captures and traces retained in vocabulary-play-proof. Root commits
+accepted leave/pause/end intentions at start (matching existing intention controls),
+while physical lowering/release stays fixed-tick; Join rechecks its active warm-up
+before creating a child. No reordered browser actions or weaker assertions.
+
+A separate future drawing-intention probe exposes repeated parent Cancel restarting
+put_item every tick. Drawing stop is now idempotent once draining, preserving its
+later physical return child. Dedicated repeated-Cancel regression requires exactly
+one return and retained marks; rapid Leave→direction and exact Pause-clock regressions
+pass. Focused41checks PASS0fail/skip/TODO, TSc/lint clean. Future intention adapter and
+art-sharing remain separate/unshipped; repaired first batch still awaits fresh Play
+and combined gate. No support/ownership/admission or test limit was loosened.

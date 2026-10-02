@@ -588,8 +588,20 @@ export const musicGatheringControl: ActionDef<
     }
     return { ok: true, program: null };
   },
-  start: (_rt, p) => p,
+  start(rt, p) {
+    if (p.command === 'leave') {
+      // Commit the accepted departure before a subsequent directive can stop
+      // this gathering. Lowering/release remains ordinary fixed-tick execution.
+      const ex = store(rt).get(p.gathering)!, member = ex.members.find(m => m.actor === p.actor)!;
+      member.withdrawn = true;
+      member.invited = false;
+      if (member.child && rt.isActive(member.child)) rt.cancel(member.child);
+      rt.mark('music-gathering.leave', { gathering: ex.id, actor: member.actor });
+    }
+    return p;
+  },
   step(rt, p) {
+    if (p.command === 'leave') return { status: 'completed', outputs: { actor: p.actor, command: p.command } };
     const ex = store(rt).get(p.gathering),
       member = ex?.members.find((m) => m.actor === p.actor);
     if (!ex || !member || !rt.isActive(ex.id) || ex.mode !== 'gathering')
@@ -604,14 +616,6 @@ export const musicGatheringControl: ActionDef<
     if (p.command === 'join') {
       const bad = join(rt, ex, member);
       if (bad) return { status: 'failed', diagnostic: bad };
-    } else {
-      member.withdrawn = true;
-      member.invited = false;
-      if (member.child && rt.isActive(member.child)) rt.cancel(member.child);
-      rt.mark('music-gathering.leave', {
-        gathering: ex.id,
-        actor: member.actor,
-      });
     }
     return {
       status: 'completed',

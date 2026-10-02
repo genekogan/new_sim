@@ -270,3 +270,17 @@ test('Pause at a completed-child boundary never repeats the finished score', () 
   );
   clean(rt);
 });
+test('rapid accepted dancer Leave then performer direction retains departure across rounds', () => {
+  const rt = openJamRuntime(), r = rt.submit('open_jam', openJamBinding());
+  until(rt, () => readOpenJam(rt, r.id)?.current?.dancers[0].state === 'dancing');
+  const leave = rt.submit('music_gathering_control', { gathering: readOpenJam(rt, r.id)!.current!.action, actor: 'dancer-a', command: 'leave' });
+  const directed = rt.submit('walk_to', { actor: 'musician', x: 6, z: -4 });
+  until(rt, () => directed.status === 'completed' && readOpenJam(rt, r.id)?.mode === 'paused');
+  assert.equal(leave.status, 'completed', leave.diagnostic?.message);
+  assert.ok(readOpenJam(rt, r.id)!.departed.includes('dancer-a'));
+  rt.submit('open_jam_control', { jam: r.id, command: 'resume' });
+  until(rt, () => readOpenJam(rt, r.id)!.index === 1 && readOpenJam(rt, r.id)!.mode === 'playing');
+  assert.equal(readOpenJam(rt, r.id)!.current!.bindings.dancers[0].join, false);
+  assert.deepEqual(rt.holder('actor:dancer-a'), []);
+  until(rt, () => !rt.isActive(r.id)); assert.equal(r.status, 'completed'); clean(rt);
+});
