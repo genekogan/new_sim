@@ -1,3 +1,4 @@
+import { readPurposefulRoutine } from '../../engine/activities/purposeful-routine.ts';
 // Detached camera facts derived from authoritative records, never camera execution.
 import type { Runtime } from '../../engine/runtime/runtime.ts';
 import { entityCorners } from '../../engine/spatial/service.ts';
@@ -98,6 +99,25 @@ export function cameraActivityReadout(rt: Runtime): {
           phase: s.phase ?? r.verb,
           focus: s.floorHolder ?? s.presenter,
           waitingReason: s.waitingReason,
+        };
+    }
+    if (r.verb === 'purposeful_routine') {
+      const s = readPurposefulRoutine(rt, r.id);
+      if (s)
+        fact = {
+          ...fact,
+          phase: s.phase,
+          mode: s.mode,
+          focus: s.bindings.actor,
+          waitingReason: s.waitingReason,
+          objects:
+            s.phase === 'preparation' || s.phase === 'food'
+              ? [s.bindings.food.pot]
+              : s.phase === 'sleep' && s.bindings.sleep
+                ? [s.bindings.sleep.mat]
+                : s.phase === 'work'
+                  ? [s.bindings.work.station]
+                  : [],
         };
     }
     if (r.verb === 'music_gathering') {
