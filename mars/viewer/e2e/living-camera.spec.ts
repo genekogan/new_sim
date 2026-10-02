@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { test, expect } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -79,6 +80,22 @@ for (const [scenario, policy, worker, workstation] of [
       await page.screenshot({
         path: path.join(artifacts, `${scenario}-${policy}-${label}.png`),
       });
+      writeFileSync(
+        path.join(artifacts, `${scenario}-${policy}-partial-proof.json`),
+        JSON.stringify(
+          {
+            scenario,
+            policy,
+            stages,
+            report: await page.evaluate(() =>
+              window.__livingCameraProof.report(),
+            ),
+            errors,
+          },
+          null,
+          2,
+        ),
+      );
       await button('Play').click();
     };
     try {
@@ -159,9 +176,18 @@ for (const [scenario, policy, worker, workstation] of [
         await page.evaluate(() => window.__marsEngine.state().tick),
       ).toBeGreaterThan(authority.tick);
       await button('Play').click();
-      await page.waitForFunction(() =>
-        window.__marsEngine.purposefulRoutine()?.phase.startsWith('food-'),
-      );
+      await page.waitForFunction(() => {
+        const h = window.__marsEngine,
+          routine = h.purposefulRoutine();
+        const child =
+          routine && h.records().find((r) => r.id === routine.child);
+        return (
+          child?.verb === 'shared_food_break' &&
+          child.status === 'executing' &&
+          ['gathering', 'eating'].includes(child.phase ?? '') &&
+          routine!.progress.meal.some((p) => p.served || p.consumed)
+        );
+      });
       await capture('meal');
       await page.waitForFunction(
         () =>
@@ -207,39 +233,57 @@ for (const [scenario, policy, worker, workstation] of [
       ).toEqual([]);
       expect(errors).toEqual([]);
     } finally {
-      await page.evaluate(() => window.__marsEngine.pause(true));
-      const report = await page.evaluate(() =>
-        window.__livingCameraProof.report(),
-      );
-      const finalState = await page.evaluate(() => ({
-        day: window.__marsEngine.livingDay(),
-        routine: window.__marsEngine.purposefulRoutine(),
-        violations: window.__marsEngine.violations(),
-      }));
-      writeFileSync(
-        path.join(artifacts, `${scenario}-${policy}-proof.json`),
-        JSON.stringify(
-          {
-            scenario,
-            policy,
-            worker,
-            workstation,
-            stages,
-            report,
-            finalState,
-            errors,
-          },
-          null,
-          2,
-        ),
-      );
-      const beforeDispose = await page.evaluate(() =>
-        window.__marsEngine.stateHash(),
-      );
-      await page.evaluate(() => window.__livingCameraProof.dispose());
-      expect(await page.evaluate(() => window.__marsEngine.stateHash())).toBe(
-        beforeDispose,
-      );
+      if (page.isClosed()) {
+        writeFileSync(
+          path.join(artifacts, `${scenario}-${policy}-interrupted.json`),
+          JSON.stringify(
+            {
+              scenario,
+              policy,
+              stages,
+              errors,
+              limitation:
+                'Browser closed during interruption; latest periodic partial report retained.',
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        await page.evaluate(() => window.__marsEngine.pause(true));
+        const report = await page.evaluate(() =>
+          window.__livingCameraProof.report(),
+        );
+        const finalState = await page.evaluate(() => ({
+          day: window.__marsEngine.livingDay(),
+          routine: window.__marsEngine.purposefulRoutine(),
+          violations: window.__marsEngine.violations(),
+        }));
+        writeFileSync(
+          path.join(artifacts, `${scenario}-${policy}-proof.json`),
+          JSON.stringify(
+            {
+              scenario,
+              policy,
+              worker,
+              workstation,
+              stages,
+              report,
+              finalState,
+              errors,
+            },
+            null,
+            2,
+          ),
+        );
+        const beforeDispose = await page.evaluate(() =>
+          window.__marsEngine.stateHash(),
+        );
+        await page.evaluate(() => window.__livingCameraProof.dispose());
+        expect(await page.evaluate(() => window.__marsEngine.stateHash())).toBe(
+          beforeDispose,
+        );
+      }
     }
   });
 }

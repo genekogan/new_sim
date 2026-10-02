@@ -144,8 +144,11 @@ OPERATOR indicator, unchanged hash/tick, six simulation-second expiry to AUTO an
 explicit release. Reports, diagnostics and final state are now retained in finally,
 including on subsequent failure. Strict focused e2e TypeScript passes.
 
-Original RED log is `viewer/.cloudflare/living-camera-c20fc34.log`; two failure traces
-remain under `viewer/test-results/`. All ten original PNGs in
+Original RED log is `viewer/.cloudflare/living-camera-c20fc34.log`; its two traces
+were generated in the shared `viewer/test-results/` output, which the next native
+run replaced. Those first traces are no longer retained; the original log and all
+ten PNGs remain. Subsequent attempts use separately preserved ignored trace outputs.
+All ten original PNGs in
 `viewer/e2e/artifacts/living-camera-c20fc34/` were personally inspected via three
 ignored contact sheets. Clear notes/worker shots are close, talk frames the host
 without the display; Restrained talk shows audience/display, while its preparation
@@ -154,3 +157,34 @@ after five simulation seconds. These are observed framing limitations, not a vis
 quality acceptance claim. Sleep, concurrent music and completion remain unobserved;
 the corrected full journey awaits the next exclusive browser slot. No camera policy,
 baseline, world activity or geometry changed in response to this result.
+
+Two later attempts still did not prove later camera coverage. The `c800958` run
+was deliberately interrupted at a known impossible meal phase predicate: parent
+routine forwards the real child phases `gathering`/`eating`/`stowing`, not `food-*`.
+Native result: one INTERRUPTED, one NOT RUN, exit 130. Five PNGs and trace are
+retained under `living-camera-c800958` and
+`viewer/.cloudflare/living-camera-c800958-interrupted-traces/`.
+
+The next `living-camera-meal-corrected` attempt used the correct active-child
+identity and meal progress but wrongly required ActionRecord status `running`.
+Actual ActionStatus is `executing` (distinct from routine mode `running`). Native
+result: Mars timeout at 360 seconds, studio deliberately interrupted, exit 130;
+zero PASS. The timeout's actual DOM shows the Mars day COMPLETED, notes 30/30,
+meal 2/2 eaten, sleep 18/18, independent intentions completed and music 36/36
+silent. This proves the impossible checkpoint missed the completed run, not a
+camera or activity failure. It does not prove the missed camera views. Both traces
+remain under `viewer/.cloudflare/living-camera-meal-corrected-traces/`; ten PNGs,
+periodic partial camera reports and interruption markers remain in the matching
+artifact run. Browser closure on timeout/SIGINT prevented final page reads; periodic
+reports preserve the last captured stage but not final camera state. All fifteen
+later PNGs were personally inspected, with framing limitations consistent with
+the first run. No sleep/music/completion camera PNG exists yet.
+
+The final owned harness uses exact `shared_food_break` child status `executing`,
+real `gathering`/`eating` phase and actual served/consumed progress. Other waits were
+checked against current API: living-day initial-work/completed, classroom presenting,
+sleep mode sleeping, music-and-dance phase, reader elapsed and actual simulation
+time. Strict focused TypeScript and zero-warning scoped lint pass; the Node types
+reference matches other e2e files. Browser acceptance remains incomplete pending
+the combined gate. Source camera policies, world authority and all existing
+assertions/baselines are unchanged; no equal-priority rotation is justified yet.
