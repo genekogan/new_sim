@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';

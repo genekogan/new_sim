@@ -2254,3 +2254,12 @@ and15s assertions remain unchanged; this is a bootstrap precondition, not a
 startup-performance guarantee. No productioncamera policy or authoritative engine
 change. Fresh focused proof and clean fullgate remain required before publication.
 All48other-owner paths remain exactpreserved; gallery/readingcircle remain future.
+
+### Embedded Lab focused readiness proof — 2026-10-02
+
+Readiness-first camera entry and same-world pause/dispose/reset2/2PASS19.5s on
+30ab791; root personally inspected both actualPNGs. Earlier originaltest14.8s
+pass and failed24.6s trace remain separate. Focused type-aware lint additionally
+exposed pre-existing missing Node type context in this browserfile; add the
+standard triple-slash reference, no runtime/dependency/assertion change. Full
+combinedgate restart remains required; no publicnewactivity claim.
