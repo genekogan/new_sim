@@ -44,6 +44,7 @@ status, then implement under normal safeguards. Do not restart the whole invento
 
 [Original engineering assessment](ENGINEERING.md) describes the September27 starting
 architecture and planned migration, not the current runtime. [Release5 Lab guide](archive/LAB_GUIDE_release5.md)
-retains the replaced guide verbatim for historical claims and links. Older handoff,
+retains the replaced guide verbatim for historical claims and links. [Archived agent context](archive/AGENTS_pre_living_world_close.md) retains
+superseded dated instructions. Older handoff,
 assessment and numbered reports remain traceable; use current guides for operation.
 Historical reconstruction and questions retain their separate content ownership.

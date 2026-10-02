@@ -1,111 +1,97 @@
 # Mars Studio agent context
 
-## Authorized living-world tranche — 24-hour finish
+## Current authorized tranche and stopping point
 
-Latest owner request supersedes the earlier stop/proposal state. Finish within
-24elapsedhours of2026-10-02T03:23UTC (deadline2026-10-03T03:23UTC): connected living
-days with independent intentions, flexible existing activity/object bindings and
-clear player/director handoff; bounded music+dance gathering; usable recurring
-garden care; review/adapt existing automaticcamera to long runs. Then perform
-broad reliability/disruption self-audit, fix actual failures, update/reorganize
-engineering docs/indexes without losing provenance, expose all scenarios and
-combined runs in /lab, and publish/verify the result at sim.mars.college.
+Gene authorized a 24-hour living-world tranche beginning **2026-10-02 03:23 UTC**,
+ending **2026-10-03 03:23 UTC**. Complete connected days with independent intentions,
+flexible existing activity/object bindings, visible social behavior and live
+intervention; bounded music/dance and recurring garden care; existing automatic
+camera coverage of longer activities. Then perform broad scenario/disruption
+self-audit, repair actual failures, update engineering guides/indexes, expose all
+individual and combined runs in `/lab`, and publish/verify **sim.mars.college**.
 
-Active save/load is explicitly excluded. No rig/library migration, universal
-planner/psychology, arbitrary terrain or automatic Eden start. Do not recreate
-mars.college/simulation or its footer link. Preserve historical-content ownership,
-all other-owner work, deterministic authority/continuous support/finite ownership,
-normal local-only Git, original assertions/limits, inspected captures and clean
-full combined release gate. Three helpersmaximum, Sol6.1 bounded workers;
-serialize browser/performance validation. Review discovered substantial blockers
-within30–60min and surface scope/time impact instead of silently expanding.
-Release35 remains the verified baseline; new candidates are not shipped features.
+Active save/load is expressly excluded. No rig/animation-library migration,
+universal planner/psychology/terrain, arbitrary activities or automatic Eden start.
+Do not recreate the rejected mars.college/simulation page or footer link. The
+simulation domain uses the existing application; preserve the museum and current
+routing/gateway unless a concrete publication blocker requires a change.
 
-The lasting product direction is **a playable, reusable simulation of life at Mars**.
-Read `docs/engineering/SIMULATION_VISION.md` and `ACTIVE_ROADMAP.md` before selecting
-technical work. They supersede the former mandatory LAST_MILE wave/completion order.
-`RAINY_DAY_BACKLOG.md` owns current dispositions; `LAST_MILE.md` retains original
-inventory/provenance. Never call deferred or unreleased candidate work completed.
+Release35 is the verified public baseline. Saved living-world commits and local
+proofs remain candidates until the combined gate and public release receipt.
+After acceptance, final publication and handoff, stop feature expansion; do not
+begin Eden. Read [active roadmap](docs/engineering/ACTIVE_ROADMAP.md),
+[engineering navigation](docs/engineering/INDEX.md), recent
+[progress](docs/engineering/PROGRESS.md) and deployment metadata before acting.
 
-Confirmed play priorities: semi-planned events adapted by runtime and live
-intervention; develop complete experiences / usable activities and objects /
-visible social behavior together at approximately 50/30/20. Continue in /lab with
-simple maps; historical Studio is the museum side for now.
+## Durable product direction
 
-Interview Gene before choices needing his preferences, especially effort priorities;
-then proceed autonomously within his answers. Prefer GPT-6.1 Sol for bounded workers,
-Astra for hard architecture/review, Luna for mechanical tasks; max three helpers.
+Mars is a bounded, opinionated simulation of life at Mars College, using reusable
+activity/object/execution mechanisms. Eden is a separate future general simulator.
+The measure is what Gene can initiate, modify, interrupt, resume and watch—not
+completion of legacy technical rows.
 
-Retain `ENGINE_GUIDE.md` hard rules, appropriate tests/visual inspection, the full
-release gate and RELEASE_CHECKLIST. Local Git only; never push/add remotes. Preserve
-all existing worktrees/branches/dirty changes and historical-agent ownership.
-No invented historical facts; hypothetical scenarios must be explicit. Primary work
-is in `viewer/`. Small reviewed commits, genekogan author and established co-author.
+Semi-planned scenarios express intentions, roles, constraints and permitted
+alternatives; runtime binds actual people, resources and usable positions. Keep
+independent commitments and retained completed/unfinished effects. All player,
+director, scenario and autonomous execution shares one authoritative world.
+Develop complete experiences, usable objects/activities and social believability
+together; do not exhaust furniture/anatomical precision before advancing activity.
+Use `/lab` and simple configurable hypothetical environments; historical Studio
+is the museum. Never present hypothetical staging or participants as historical fact.
 
-A separate autonomous-camera task owns live cinematography/editor policies, a bounded
-Typesafe/Jev experiment, camera-specific tests and periodic MP4 progress demos.
-Activity/world-engine work retains default main integration and deployment. Gene
-authorizes the two tasks to message each other about ownership, ports, minimal
-read-only activity/camera interfaces, shared Lab hooks and integration timing.
-Coordinate the maximum three active helpers across both tasks; do not each allocate
-three independently. Shared Lab edits require agreement; camera observes authoritative
-activity/world state and must not move actors or own a second execution path.
+[Simulation vision](docs/engineering/SIMULATION_VISION.md) holds lasting direction.
+[Rainy-day backlog](docs/engineering/RAINY_DAY_BACKLOG.md) owns dispositions;
+[LAST_MILE](docs/engineering/LAST_MILE.md) preserves original inventory/provenance,
+not a mandatory wave/completion queue. Deferred work is not completed. Verify
+partial/near-complete work before commissioning a replacement.
 
-Camera readiness must not block playable engine milestones. Freeze agreed read-only
-interfaces where practical; coordinate in batches around blockers, interface changes
-and reviewed commits. Integrate camera at a convenient green boundary or release
-engine improvements independently. Camera implementation, experiments and MP4
-production stay with its owner; do not expand activity integration to absorb them.
+## Engineering safeguards and ownership
 
-Gene's next confirmed playable priority (after release17): physical chair/table
-moving and usable room setup first. See ACTIVE_ROADMAP for bounded supported stages.
+- Work primarily in `viewer/`. Local Git only: never push or add a remote.
+  Preserve all worktrees, branches, dirty changes and other owners' paths.
+- Each task uses an isolated worktree, small reviewed commits, genekogan author
+  and `Co-Authored-By: Codex <noreply@openai.com>` for Codex work. Review diffs
+  before explicit staging; never commit secrets or bypass normal hooks.
+- Read [ENGINE_GUIDE](docs/engineering/ENGINE_GUIDE.md): strip-types TypeScript,
+  zod-only engine dependency, fixed DT=1/20, deterministic core math/RNG and
+  named diagnostics. Never bypass support/ownership/admission or move through
+  forbidden geometry; no teleport or silently spawned replacements.
+- Activity intent/coordination uses ordinary physical actions. Renderer rig pose
+  adapters and cameras observe state; they never own a second movement path.
+  Keep existing rigs; defer fine anatomy and obscure construction choreography.
+- Engine/app mechanics do not own historical content values, campus-year JSON,
+  ID migration, reconciliation/owner question files or per-house build history.
+  Touch historical files only for agreed mechanics and explicitly record why.
+- Focused checks during implementation; clean combined full established gate,
+  original assertions/limits, appropriate actual Play and inspected captures
+  before functional main integration. Freeze tracked candidate during its gate.
+  Skipped/FIXME/TODO checks are unproved. Source inheritance must be explicit.
+- Use [release checklist](docs/engineering/RELEASE_CHECKLIST.md); publish meaningful
+  green milestones, verify public behavior, record source/release/rollback/evidence
+  and limitations. Do not alter golden baselines without intended-change proof.
 
-Further camera development is independently owned: do not routinely review or manage
-its iterations. Handle necessary shared-interface decisions and batch integration.
-Gene retired the original camera session on 2026-09-30 after release18. Preserve its
-worktree/artifacts; `docs/engineering/briefs/autonomous-camera.md` is the durable
-resume entry. Further camera work requires Gene's request and never blocks activities.
-At meaningful green milestones report playable actions/interventions, constraints,
-next outcome and real blocker, validation/release and a remaining-hours range with
-assumptions. Furniture support must remain bounded so classroom/social experience
-advances, then connected communal routines and reuse in another environment.
+## Workers, coordination and communication
 
-Current owner priority (2026-09-30): first repair exposed Lab Reach first-Step
-invariants, east-house orphan climb/staging failure and pile/component appearance
-continuity. See docs/engineering/LIVE_LAB_REPAIRS.md. A green gate does not prove
-skipped/FIXME scenarios work. Preserve exact historical staging dependencies and
-make unsupported production journeys explicit. After this bounded repair milestone,
-continue purposeful communal-day routines autonomously; Gene has approved that
-priority and the earlier interview is resolved. Do not stop at the repair release.
+At most three helpers shared across tasks; prefer Sol6.1 for bounded implementation.
+Give explicit files, deliverable, dependencies, validation and escalation condition.
+Serialize expensive browser/performance checks. Parallel changes stay in separate
+worktrees; batch review/integration at a clear frozen boundary. Timebox narrow
+investigations30–60minutes; surface a substantial prerequisite/time impact rather
+than silently expanding.
 
-Owner allocation update (2026-09-30): roughly 60% playable experiences/object/social
-mechanisms, 30% high/medium-leverage engineering across experiences, 10% polish/evidence.
-Retain 50/30/20 within product work. Keep one playable increment, one bounded
-engineering improvement and optional one object/social improvement active; verify
-existing work before commissioning rather than auditing the entire legacy inventory.
-Explicit access structures (including auditorium/bleacher steps intended to reach
-levels) should support WASD auto-step through narrow traversal metadata; do not
-generalize this to furniture or alter historical appearance/placement to hide defects.
+Camera development/experiments/MP4 production remain separately owned. The current
+request permits bounded automatic activity coverage review/adaptation; preserve
+existing policies except reviewed actual defects. Camera readiness must not block
+engine releases. Coordinate only blockers, minimal read-only interfaces and reviewed
+commits at convenient boundaries, not routine management. Gene authorizes messaging
+camera/Mars Campus owners for necessary shared files, ports and deployment preservation.
 
-## Mars MVP boundary — owner mandate 2026-09-30
+Proceed autonomously within the confirmed priorities. No general priority interview
+is pending. Surface consequential scope decisions or major required-experience blockers.
+Report meaningful visible capabilities, constraints, engineering fixes, actual
+validation/release status, remaining whole-tranche hours and deadline threats.
 
-Target a reviewed, tested, website-accessible Mars MVP in five days (October 5).
-Mars is a bounded, opinionated life simulation; Eden is a separate future project.
-After agreed MVP acceptance and website publication, stop Mars feature expansion;
-record the reusable mechanisms and deferred work for Eden, do not start Eden.
-Current allocation supersedes earlier percentages: 50% playable experiences,
-30% high/medium-leverage engineering, 20% polish/evidence/maintenance/documentation.
-Retain 50/30/20 among complete experiences/object breadth/social behavior within
-product work. The contract and supported scope are in ACTIVE_ROADMAP.md.
-First finish actual designated Mars WASD stepped access and the selected-computer
-asset/reset release blockers, then verified checkpoint and sustained MVP work.
-Saved drafts are not shipped features. Preserve all other agents' work.
-
-Animation boundary (owner 2026-10-01): retain the current rigs and animation
-libraries through Mars MVP. Fix severe poses/facing in featured journeys, including
-crossed ankles during stair descent, in renderer pose adapters; preserve authoritative
-movement/support/ownership and activity semantics. Spend at most 2–4 hours checking
-this boundary, making only small improvements that reduce repeated implementation.
-Record current limitations and a bounded post-MVP Eden comparison of existing posing
-versus authored motions with constrained IK. Escalate repeated bespoke anatomy
-requirements rather than expanding into an animation redesign.
+Earlier dated instructions are preserved in
+[archived agent context](docs/engineering/archive/AGENTS_pre_living_world_close.md)
+for provenance; current instructions above supersede their old allocations,
+queues, stop markers and release assertions.
