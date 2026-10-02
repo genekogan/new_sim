@@ -437,6 +437,9 @@ for (const rotated of [false, true]) {
       finished: false,
       completed: [],
     });
+    await expect(page.getByTestId('table-cleanup-readout')).toContainText(
+      'cancelled · ended',
+    );
     initialItems(ended);
     expect(ended.components).toEqual(initial.components);
     expect(

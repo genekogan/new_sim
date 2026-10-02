@@ -127,7 +127,7 @@ export function TableCleanupHud({
       </p>
       <div data-testid="table-cleanup-readout">
         {state
-          ? `${state.task} · ${state.status} · ${state.mode} · ${state.completed.length}/${state.bindings.transfers.length} actual transfers retained`
+          ? `${state.task} · ${state.status} · ${state.mode === 'completed' && !state.finished ? 'ended' : state.mode} · ${state.completed.length}/${state.bindings.transfers.length} actual transfers retained`
           : 'Not started · source-table → destination-table'}
       </div>
       <div className="lab-classroom-controls">

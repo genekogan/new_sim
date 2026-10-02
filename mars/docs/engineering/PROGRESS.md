@@ -2198,3 +2198,12 @@ continued authorization and proof reports retained. Guidedgallery is a separate
 futurecandidate; no active save/load/Eden/cameraexperiment expansion. Remaining
 publication estimate2–4workinghours assumes the freshgate and publicproof pass;
 continuous scenario expansion has no owner-set finish time.
+
+
+### Early-End readout honesty — 2026-10-02
+
+Inspected End captures exposed ambiguous HUD text: cancelled activities called their
+physically drained modecompleted even with0/3transfers. Art-sharing/cleanup readouts
+now label the same released-but-unfinished stateended; authoritative status, effects,
+support and execution remain unchanged. Add stricter actualPlay DOM assertions for
+both kinds of earlyEnd. ViewerTSc/lint pass; focused browser recheck/fullgate pending.

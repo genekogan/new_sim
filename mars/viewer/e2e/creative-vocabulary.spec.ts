@@ -296,6 +296,9 @@ test('standalone sharing: premade actual pad, physical turns/question-answer/lat
   const ended = await capture(page, 'art-sharing-explicit-end-retained-pad');
   clean(ended);
   expect(ended.sharing!.finished).toBe(false);
+  await expect(page.getByTestId('art-sharing-readout')).toContainText(
+    'cancelled · ended',
+  );
   expect(
     ended
       .sharing!.participants.filter((p) => p.active)

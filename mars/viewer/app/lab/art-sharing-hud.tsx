@@ -101,7 +101,7 @@ export function ArtSharingHud({
       </div>
       <div data-testid="art-sharing-readout">
         {state
-          ? `${state.status} · ${state.mode} · ${state.elapsed.toFixed(1)}/${state.duration}s · ${state.effects.length} retained contributions`
+          ? `${state.status} · ${state.mode === 'completed' && !state.finished ? 'ended' : state.mode} · ${state.elapsed.toFixed(1)}/${state.duration}s · ${state.effects.length} retained contributions`
           : standalone
             ? 'Artwork and declared viewing places ready.'
             : 'Sharing awaits the afternoon’s drawn artifact.'}
