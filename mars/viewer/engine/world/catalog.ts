@@ -1,3 +1,4 @@
+import { DRAWING_ASSETS } from './catalog-drawing.ts';
 import { GARDEN_ASSETS } from './catalog-garden.ts';
 // Mars construction vocabulary (spec §6). Dimensions are data with their own
 // confidence: Gene confirmed rack sizes 8/9/12/19 ft and that an "upright" is
@@ -343,6 +344,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
     ...GARDEN_ASSETS,
+    ...DRAWING_ASSETS,
     ...ACTIVITY_ASSETS,
     ...ITEM_ASSETS,
     ...CHESS_ASSETS,

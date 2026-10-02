@@ -1,3 +1,4 @@
+import { drawingItemObject } from './drawing.ts';
 // Small hand-held items and the folding table (owner feedback §12, engine/world/catalog-items.ts,
 // ITEMS.md) as simple meshes inside their catalog boxes, local origin at the base centre (as every
 // component). Containers get a food disc whose height follows `contents.fraction` (0 = hidden).
@@ -8,7 +9,7 @@ import { chessTokenObject } from './chess.ts';
 
 export const FOOD_COLOR: Record<string, string> = { stew: '#7b4a22' };
 
-export type ItemObject = { obj: THREE.Object3D; fill?: THREE.Mesh; fillSpan?: [number, number, number, number]; leaf?: THREE.Group; bookmark?: THREE.Object3D };
+export type ItemObject = { obj: THREE.Object3D; fill?: THREE.Mesh; fillSpan?: [number, number, number, number]; leaf?: THREE.Group; bookmark?: THREE.Object3D; drawingMarks?: THREE.Mesh[] };
 
 export type Kit = { mat: (color: string, side?: THREE.Side) => THREE.Material; geo: (key: string, make: () => THREE.BufferGeometry) => THREE.BufferGeometry };
 
@@ -39,6 +40,8 @@ function vessel(r0: number, r1: number, h: number, t: number, seg = 20) {
  * `fillSpan` = [y at empty, y at full, radius at empty, radius at full] of the food disc.
  */
 export function itemObject(def: string, size: [number, number, number], color: string, kit: Kit): ItemObject | null {
+  const drawing = drawingItemObject(def, size, color, kit);
+  if (drawing) return drawing;
   const chess = chessTokenObject(def, size, color, kit);
   if (chess) return chess;
   const [sx, sy] = size;

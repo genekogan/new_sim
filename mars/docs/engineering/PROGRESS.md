@@ -2096,3 +2096,13 @@ as well as its entities; corrected to require unchanged entities while time adva
 No behavioral baseline/limit changed. Lab selector/tour, HUD/audio and detached camera
 facts are wired; actual Play/full combined gate/publication remain pending. Staging
 is hypothetical Open Jacks-inspired sound practice, not historical performance.
+
+### Vocabulary batch shared wiring candidate — 2026-10-02
+
+Reviewed/integrated drawing cb0b828 and standing warm-up 7b604a8 into the isolated
+candidate. Canonical activities/19 registry and hypothetical drawing catalog support
+all hosts; Lab exposes three new manual-start presets/HUDs/tour links. Renderer reads
+retained pad marks into bounded paper/pencil meshes; warm-up gaze and camera facts
+read actual participants without movement authority. Combined focused39checks PASS,
+0fail/skip/TODO, viewer TSc/lint clean. No baseline/limit changed. Actual browser Play
+and inspected captures remain required; all are candidates, release36 remains online.

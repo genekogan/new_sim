@@ -1,3 +1,5 @@
+import { readDrawing } from '../../engine/objects/drawing.ts';
+import { latestGroupWarmup } from '../../engine/activities/group-warmup.ts';
 import { latestOpenJam } from '../../engine/activities/open-jam.ts';
 import { readLivingDay } from '../../engine/scenarios/living-day.ts';
 import { cameraEntities, cameraActivityReadout } from './activity-observation-hooks.ts';
@@ -149,6 +151,8 @@ export function installHook(view: LabView, notify: () => void) {
       return Object.values(sim.rt.world.entities).filter((e) => e.kind === 'fixture').map((e) => ({ id: e.id, def: e.def, phase: e.phase, support: e.support?.kind, pose: structuredClone(e.pose), rendered: rendered.get(e.id) }));
     },
     fixtureMove: () => { const id = [...sim.rt.records.values()].filter((r) => r.verb === 'move_fixture').at(-1)?.id; return id ? readFixtureMove(sim.rt, id) : undefined; },
+    drawing: () => structuredClone(readDrawing(sim.rt, 'sketch-pad')),
+    warmup: () => latestGroupWarmup(sim.rt) ?? null,
     openJam: () => latestOpenJam(sim.rt) ?? null,
     musicAudio: () => structuredClone(musicSoundState()),
     music: () => structuredClone({station:musicStation(sim.rt,'music-computer'),sessions:[...sim.rt.records.values()].filter(r=>r.verb==='computer_music').map(r=>readComputerMusic(sim.rt,r.id))}),

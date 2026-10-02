@@ -1,3 +1,4 @@
+import { setDrawing } from './drawing.ts';
 // World components → meshes. One persistent mesh per entity; poses are
 // snapshotted after every fixed tick and interpolated between the last two
 // ticks (like humans.ts), so a carried beam moves with its carriers instead of
@@ -227,6 +228,7 @@ export class ComponentViews {
       if (v.item) {
         setFill(v.item, e.contents?.fraction);
         const readable=CATALOG[e.def]?.capabilities?.readable;
+        setDrawing(v.item, e.equipment?.config);
         if (readable) setReading(v.item,e.equipment?.config,readable.pages);
       }
       if (e.paint || v.paint) (v.paint ??= new PaintOverlay(v.obj)).update(e);

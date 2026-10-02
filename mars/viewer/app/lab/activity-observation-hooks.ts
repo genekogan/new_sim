@@ -1,3 +1,4 @@
+import { readGroupWarmup } from '../../engine/activities/group-warmup.ts';
 import { readOpenJam } from '../../engine/activities/open-jam.ts';
 import { readPurposefulRoutine } from '../../engine/activities/purposeful-routine.ts';
 // Detached camera facts derived from authoritative records, never camera execution.
@@ -59,6 +60,8 @@ export function cameraActivityReadout(rt: Runtime): {
         p.mat,
         p.displayId,
         p.item,
+        p.pad,
+        p.pencil,
       ].filter(
         (v): v is string =>
           typeof v === 'string' &&
@@ -120,6 +123,13 @@ export function cameraActivityReadout(rt: Runtime): {
                   ? [s.bindings.work.station]
                   : [],
         };
+    }
+    if (r.verb === 'group_warmup') {
+      const s = readGroupWarmup(rt, r.id);
+      if (s) fact = { ...fact, actors: s.participants.filter(q => !!q.child && rt.isActive(q.child)).map(q => q.actor),
+        departing: s.participants.filter(q => q.withdrawn).map(q => q.actor),
+        phase: s.phase ?? r.verb, mode: s.mode, focus: s.bindings.instructor.actor,
+        waitingReason: s.diagnostic?.message };
     }
     if (r.verb === 'open_jam') {
       const s = readOpenJam(rt, r.id);

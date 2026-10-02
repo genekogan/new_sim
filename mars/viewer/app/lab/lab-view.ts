@@ -1,3 +1,4 @@
+import { groupWarmupAttention } from '../../engine/activities/group-warmup.ts';
 import { musicGatheringAttention } from '../../engine/activities/music-gathering.ts';
 import { SleepMatView } from './sleep-mat.ts';
 import { chessAttention } from './chess.ts';
@@ -282,6 +283,7 @@ export class LabView {
         if (listener.state === 'listening' && listener.child && rt.holder(`actor:${listener.actor}`).includes(listener.child))
           targets[listener.actor] = [performer.pose.p[0],performer.pose.p[2]];
     }
+    for (const action of rt.records.values()) if (action.verb === 'group_warmup' && rt.isActive(action.id)) Object.assign(targets, groupWarmupAttention(rt, action.id));
     for (const action of rt.records.values()) if (action.verb === 'music_gathering' && rt.isActive(action.id)) Object.assign(targets, musicGatheringAttention(rt, action.id));
     Object.assign(targets, chessAttention(rt));
     this.attentionTargets = targets;

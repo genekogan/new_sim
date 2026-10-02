@@ -1,3 +1,5 @@
+import { DrawingHud } from './drawing-hud.tsx';
+import { GroupWarmupHud } from './group-warmup-hud.tsx';
 import { OpenJamHud } from './open-jam-hud.tsx';
 import { LivingDayHud } from './living-day-hud.tsx';
 import { GardenCareHud } from './garden-care-hud.tsx';
@@ -114,6 +116,8 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <LivingDayHud key={`day:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <GardenCareHud key={`garden:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <DrawingHud key={`drawing:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <GroupWarmupHud key={`warmup:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <OpenJamHud key={`jam:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <MusicGatheringHud key={`dance:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <h2>Expectations</h2>

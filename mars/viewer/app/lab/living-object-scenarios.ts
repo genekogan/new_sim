@@ -1,3 +1,5 @@
+import { drawingWorkRuntime, drawingWorkScene } from '../../engine/scenarios/drawing-work.ts';
+import { groupWarmupRuntime } from '../../engine/scenarios/group-warmup.ts';
 import { openJamRuntime } from '../../engine/scenarios/open-jam.ts';
 import type { Scenario } from './scenarios.ts';
 import { Runtime } from '../../engine/runtime/runtime.ts';
@@ -19,6 +21,18 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  {
+    name: 'drawing-work', title: 'Drawing Klerb-inspired sketching (hypothetical)',
+    description: 'Start drawing, then Play. A real pencil makes retained marks on the same supported pad. Pause or direct the sketcher away, then Resume the unfinished study. One bounded standing/tabletop outline; no arbitrary art tools.',
+    scene: drawingWorkScene, humans: () => [], build: drawingWorkRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, 0, 5, 70], expect: checks,
+  },
+  {
+    name: 'group-warmup', title: 'Guided standing warm-up (hypothetical)',
+    description: 'Start a guide and four staggered followers on a clear floor. Play watches planted settle/raise/open/lower phases, independent response delay and shared attention. Join/Leave, Pause/Resume and player direction retain coherent timing. Not a historical yoga reconstruction.',
+    scene: () => READING_SCENE, humans: () => [], build: () => groupWarmupRuntime(),
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, 0, 9, 60], expect: checks,
+  },
   {
     name: 'open-jam', title: 'Open jam · performer exchange (hypothetical)',
     description: 'Start a two-performer digital sound exchange at the same computer. Play watches real chair release and physical handoff; pause/resume a retained round or direct its performer away. Original scores and completed rounds remain distinct; no acoustic instrument simulation.',
