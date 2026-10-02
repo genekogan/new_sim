@@ -2789,3 +2789,42 @@ Deployed `2026-10-02T15:28:48.809Z`, finally verified `2026-10-02T15:48:49.36512
 ## 2026-10-02 — owner-requested root homepage repair (candidate)
 
 Removed the hostname-specific sim.mars.college root-to-Lab shortcut. The root now uses the established campus presentation homepage with its year query; Lab remains /lab and its explicit scenario query. This corrects an unauthorized interpretation of publishing the simulator domain, without changing engine/activity/camera mechanics or historical values. Added exact-host route regression covering root/year/scenario queries and explicit Lab aliases. Focused checks and clean full gate/public verification remain required before release; alpha stabilization and vocabulary expansion remain paused.
+
+## Release40 gate prerequisite — atomic committed-refill observation (2026-10-02)
+
+The clean homepage repair candidate `4eb7826` gate stopped at the garden-circuit
+browser assertion: the first committed serve was observed in `back`, but the
+separate UI global-Pause click arrived after that child had completed. Its captured
+next child was ordinary garden care; pot `.25`, bowl `1`, actual right-hand support
+and zero violations remained correct. The serve back lasts exactly `.4` simulated
+seconds/eight fixed ticks, approximately100ms at4x. This was a test observation race,
+not evidence of incorrect water transfer or a changed physical executor.
+
+Only the two first-refill captures now opt into atomic observation plus the existing
+clock-pause hook. They use ordinary UI1x/Play until current serve `back` plus exact
+committed fractions/right-hand ownership are observed, pause in that same browser
+task, then restore UI4x before the unchanged local Pause/End controls and Play.
+The hook uses the same `sim.paused`/notification path as global Pause; it neither
+ticks nor changes poses, support or material. All exact phase/material/support,
+same-serve cancellation, six-care conservation, End and cleanup assertions and
+original120s/15s deadlines/retries0 remain unchanged. Default waits stay read-only:
+the End test's later refill→due wait must keep running. Second refill remains the
+original read-only/material assertion scope.
+
+Both actual-Play cases repeated three times: native6PASS/0fail/skip/flaky/errors[],
+234485.807ms, start18:37:24.497Z; first-journey-only earlier3PASS also retained.
+Focused strict E2E TypeScript, type-aware lint, format and diff checks pass.
+Final repeated-run captures show first serve `a5` executing `back` at tick89,
+then that same `a5` cancelled with supported bowl at tick113; full completion has
+six care cycles, source0, same supported bowl`.5`, no violations. End's read-only
+wait reaches due tick415; explicit End retains actual`.75` bowl/`.25` pot without
+pretending completion. Shared capture filenames retain the final repetition only;
+native results preserve all six complete executions. Captures retain crop/current
+rig limits and cannot alone prove numeric effects.
+
+Ignored receipts: `viewer/.cloudflare/release40-refill-both-{results.json,log}` and
+`viewer/e2e/artifacts/release40-refill-both/`. Initial missing frozen-asset RED,
+dirty temporary-bundle interrupted gate, and the original strict capture-race RED
+remain in their exact gate directories. No engine changes, relaxed assertions,
+baseline updates, publication or complete-green-gate claim; a new clean full gate
+is required before release40 integration/deployment.

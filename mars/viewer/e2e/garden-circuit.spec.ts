@@ -143,20 +143,28 @@ type Phase =
   | 'due-c'
   | 'completed'
   | 'ended';
-async function wait(p: Page, phase: Phase) {
+async function wait(p: Page, phase: Phase, freezeAtRefill = false) {
   await p.waitForFunction(
-    (phase) => {
+    ({ phase, freezeAtRefill }) => {
       const c = (window.__marsEngine as CircuitHook).gardenCircuit();
       if (!c) return false;
       const g = (id: string) =>
         c.plants.find((g) => !('code' in g) && g.plant === id);
-      if (phase === 'refill')
-        return (
+      if (phase === 'refill') {
+        const support = c.water.support;
+        const committed =
           c.current?.verb === 'serve' &&
           c.current.phase === 'back' &&
           c.source.contents?.fraction === 0.25 &&
-          c.water.contents?.fraction === 1
-        );
+          c.water.contents?.fraction === 1 &&
+          support?.kind === 'in-hand' &&
+          support.by === 'carer' &&
+          support.hand === 'right';
+        // Observe and freeze the actual transient in one browser task. The
+        // normal pause hook freezes the clock; it does not tick or write poses.
+        if (committed && freezeAtRefill) window.__marsEngine.pause();
+        return committed;
+      }
       if (phase === 'paused') return c.mode === 'paused';
       if (phase === 'partial-care') {
         const a = g('plant-a');
@@ -196,7 +204,7 @@ async function wait(p: Page, phase: Phase) {
         );
       return a.cycles === 2;
     },
-    phase,
+    { phase, freezeAtRefill },
     { timeout: 15_000 },
   );
 }
@@ -268,8 +276,13 @@ test('finite two-refill six-care circuit retains real material across Pause, dir
     initialWater = read(initial).water,
     ids = initial.entities.map((e) => e.id).sort(),
     circuit = read(initial).circuit;
+  // The ordinary serve back lasts 0.4 simulated seconds: observe its first
+  // committed deposit at normal speed, then return to the authored 4x journey.
+  await page
+    .getByRole('combobox', { name: 'Speed', exact: true })
+    .selectOption('1');
   await play(page);
-  await wait(page, 'refill');
+  await wait(page, 'refill', true);
   const filled = await capture(
     page,
     'finite-first-refill-actual-committed-water',
@@ -287,6 +300,9 @@ test('finite two-refill six-care circuit retains real material across Pause, dir
     phase: 'back',
   });
   const firstServe = read(filled).current!.id;
+  await page
+    .getByRole('combobox', { name: 'Speed', exact: true })
+    .selectOption('4');
   await button(page, 'Pause circuit').click();
   await play(page);
   await wait(page, 'paused');
@@ -561,8 +577,11 @@ test('End before step, while holding committed refill and during actual due wait
   await button(page, 'Step').click();
   expect((await inspect(page)).records).toEqual([]);
   await button(page, 'Start circuit').click();
+  await page
+    .getByRole('combobox', { name: 'Speed', exact: true })
+    .selectOption('1');
   await play(page);
-  await wait(page, 'refill');
+  await wait(page, 'refill', true);
   const held = await capture(page, 'end-reset-held-real-committed-water');
   conserved(held);
   expect(read(held).water.support).toEqual({
@@ -570,6 +589,9 @@ test('End before step, while holding committed refill and during actual due wait
     by: 'carer',
     hand: 'right',
   });
+  await page
+    .getByRole('combobox', { name: 'Speed', exact: true })
+    .selectOption('4');
   await button(page, 'End circuit').click();
   await play(page);
   await wait(page, 'ended');
