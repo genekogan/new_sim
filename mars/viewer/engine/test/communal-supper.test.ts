@@ -559,3 +559,151 @@ test('completed first storage cannot drift while later cleanup runs; safe wait a
   control(rt, a.id, 'resume');
   complete(rt, a.id);
 });
+function activeEndReturn() {
+  const { rt, a } = start();
+  until(rt, () => read(rt, a.id).meal?.phase === 'eating');
+  control(rt, a.id, 'end');
+  let stow: string | undefined;
+  until(rt, () => {
+    stow = [...rt.records.values()].find(
+      (r) =>
+        r.parent === a.id &&
+        r.verb === 'stow_items' &&
+        rt.isActive(r.id) &&
+        r.phase === 'stowing',
+    )?.id;
+    return !!stow;
+  });
+  return { rt, a, stow: stow! };
+}
+test('repeated End while ordinary return active is idempotent and direct walk honestly refuses stow ownership', () => {
+  const { rt, a, stow } = activeEndReturn();
+  const returned = read(rt, a.id).returnAttempts.map((r) => r!.id),
+    before = structuredClone(rt.records.get(stow));
+  control(rt, a.id, 'end');
+  control(rt, a.id, 'end');
+  assert.deepEqual(
+    read(rt, a.id).returnAttempts.map((r) => r!.id),
+    returned,
+  );
+  assert.deepEqual(rt.records.get(stow), before);
+  const w = rt.submit('walk_to', { actor: 'cook', x: -4, z: -3 });
+  assert.equal(w.status, 'failed');
+  assert.ok(rt.isActive(stow));
+  until(rt, () => !rt.isActive(a.id));
+  assert.equal(a.status, 'cancelled');
+  clean(rt);
+});
+test('cancelled End return drains, preserves ordinary walk, then explicit End retries only actual remaining held utensils', () => {
+  const { rt, a, stow } = activeEndReturn();
+  assert.notEqual(rt.cancel(stow).status, 'failed');
+  until(
+    rt,
+    () =>
+      !rt.isActive(stow) &&
+      read(rt, a.id).diagnostic?.code === 'communal_supper.return-stopped',
+  );
+  const old = structuredClone(rt.records.get(stow)),
+    w = rt.submit('walk_to', { actor: 'cook', x: -4, z: -3 });
+  assert.notEqual(w.status, 'failed', w.diagnostic?.message);
+  const busy = communalSupperControl.plan(rt, { supper: a.id, intent: 'end' });
+  assert.equal(busy.ok, false);
+  if (!busy.ok)
+    assert.equal(
+      busy.diagnostic.code,
+      'communal_supper.return-retry-unavailable',
+    );
+  until(rt, () => !rt.isActive(w.id));
+  assert.deepEqual(rt.world.entities.cook.pose.p, [-4, 0, -3]);
+  const n = rt.records.size;
+  for (let i = 0; i < 25; i++) rt.step();
+  assert.equal(rt.records.size, n);
+  assert.ok(rt.isActive(a.id));
+  control(rt, a.id, 'end');
+  until(rt, () => !rt.isActive(a.id));
+  assert.equal(a.status, 'cancelled');
+  assert.equal(read(rt, a.id).finished, false);
+  assert.deepEqual(rt.records.get(stow), old);
+  assert.ok(read(rt, a.id).returnAttempts.length >= 3);
+  clean(rt);
+});
+test('cancelled return Retry End refuses occupied destination without child spam and requires explicit restored retry', () => {
+  const { rt, a, stow } = activeEndReturn();
+  assert.notEqual(rt.cancel(stow).status, 'failed');
+  until(
+    rt,
+    () =>
+      !rt.isActive(stow) &&
+      read(rt, a.id).diagnostic?.code === 'communal_supper.return-stopped',
+  );
+  const e = rt.world.entities.beans,
+    original = structuredClone(e);
+  e.support = { kind: 'resting-on', on: 'meal-table', slot: 'r1c0' };
+  e.pose = { p: [4.25, 0.75, 0], yaw: 0 };
+  const count = rt.records.size;
+  for (let i = 0; i < 3; i++) {
+    const p = communalSupperControl.plan(rt, { supper: a.id, intent: 'end' });
+    assert.equal(p.ok, false);
+    if (!p.ok)
+      assert.equal(
+        p.diagnostic.code,
+        'communal_supper.return-retry-unavailable',
+      );
+  }
+  for (let i = 0; i < 25; i++) rt.step();
+  assert.equal(rt.records.size, count);
+  assert.ok(read(rt, a.id).held.some((q) => q.items.length));
+  rt.world.entities.beans = original;
+  for (let i = 0; i < 10; i++) rt.step();
+  assert.equal(rt.records.size, count);
+  control(rt, a.id, 'end');
+  until(rt, () => !rt.isActive(a.id));
+  clean(rt);
+});
+test('independent ordinary return physically satisfies cancelled history; End waits foreign withdrawal then completes honestly', () => {
+  const { rt, a, stow } = activeEndReturn();
+  assert.notEqual(rt.cancel(stow).status, 'failed');
+  until(
+    rt,
+    () =>
+      !rt.isActive(stow) &&
+      read(rt, a.id).diagnostic?.code === 'communal_supper.return-stopped',
+  );
+  const original = structuredClone(rt.records.get(stow)),
+    p = communalSupperBinding().meal.participants[0];
+  const own = rt.submit('stow_items', {
+    actor: p.actor,
+    placements: p.returns.filter(
+      (t) => rt.world.entities[t.item].support?.kind === 'in-hand',
+    ),
+  });
+  assert.notEqual(own.status, 'failed', own.diagnostic?.message);
+  until(rt, () => !rt.isActive(a.id) && !rt.isActive(own.id));
+  assert.equal(own.status, 'completed');
+  assert.deepEqual(rt.records.get(stow), original);
+  assert.equal(a.status, 'cancelled');
+  clean(rt);
+});
+test('failed End return child retains its failed record and explicitly retries normal remaining stow', () => {
+  const { rt, a, stow } = activeEndReturn();
+  const put = [...rt.records.values()].find(
+    (r) => r.parent === stow && r.verb === 'put_item' && rt.isActive(r.id),
+  );
+  assert.ok(put);
+  rt.cancel(put.id);
+  until(
+    rt,
+    () =>
+      !rt.isActive(stow) &&
+      read(rt, a.id).diagnostic?.code === 'communal_supper.return-stopped',
+  );
+  assert.equal(rt.records.get(stow)!.status, 'failed');
+  const original = structuredClone(rt.records.get(stow)),
+    w = rt.submit('walk_to', { actor: 'cook', x: -4, z: -3 });
+  assert.notEqual(w.status, 'failed', w.diagnostic?.message);
+  until(rt, () => !rt.isActive(w.id));
+  control(rt, a.id, 'end');
+  until(rt, () => !rt.isActive(a.id));
+  assert.deepEqual(rt.records.get(stow), original);
+  clean(rt);
+});

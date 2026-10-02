@@ -19,7 +19,7 @@ import {
   type TidyTableParams,
 } from './table-cleanup.ts';
 import { stowItems, type StowParams } from './stow.ts';
-import { heldBy } from '../items/model.ts';
+import { heldBy, surfaceSlot } from '../items/model.ts';
 export interface CommunalSupperParams {
   preparation: PrepareFoodParams;
   meal: SharedFoodBreakParams;
@@ -51,6 +51,7 @@ type Exec = {
   identities: string;
   payloads?: string;
   returns: string[];
+  returnCursor: number;
   materialTotal: number;
   ingredientFoods: string;
   stored: Record<string, string>;
@@ -306,6 +307,61 @@ function actualClaims(rt: Runtime) {
     .map((resource) => ({ resource, holders: rt.holder(resource) }))
     .filter((q) => q.holders.length);
 }
+function placedReturn(rt: Runtime, p: StowParams['placements'][number]) {
+  const e = rt.world.entities[p.item],
+    i = p.surfaceSlot.lastIndexOf('#'),
+    slot = surfaceSlot(rt.world, p.surfaceSlot);
+  if ('code' in slot) return false;
+  return (
+    e?.support?.kind === 'resting-on' &&
+    e.support.on === p.surfaceSlot.slice(0, i) &&
+    e.support.slot === p.surfaceSlot.slice(i + 1) &&
+    e.pose.p.every((value, index) => Math.abs(value - slot.p[index]) < 1e-6)
+  );
+}
+function unresolvedReturn(rt: Runtime, ex: Exec) {
+  return ex.returns.slice(ex.returnCursor).find((id) => {
+    const r = rt.records.get(id);
+    return (
+      !r ||
+      (r.params as StowParams).placements.some((p) => !placedReturn(rt, p))
+    );
+  });
+}
+function retryEndIssue(rt: Runtime, ex: Exec): Diagnostic | undefined {
+  for (const id of ex.returns.slice(ex.returnCursor)) {
+    const r = rt.records.get(id);
+    if (!r)
+      return issue(
+        'return-history-unavailable',
+        'Original return record must remain available before retrying End',
+        [id],
+      );
+    const p = r.params as StowParams;
+    for (const q of p.placements) {
+      const e = rt.world.entities[q.item];
+      if (
+        !placedReturn(rt, q) &&
+        !(e?.support?.kind === 'in-hand' && e.support.by === p.actor)
+      )
+        return issue(
+          'return-not-ready',
+          `${q.item} must be held by ${p.actor} or physically returned to ${q.surfaceSlot} before retrying End`,
+          [q.item, p.actor, q.surfaceSlot],
+        );
+    }
+  }
+  for (const p of returnParams(rt, ex)) {
+    const r = stowItems.plan(rt, p);
+    if (!r.ok)
+      return issue(
+        'return-retry-unavailable',
+        `Finish the independent directive and restore approved support before retrying End: ${r.diagnostic.message}`,
+        [p.actor],
+        r.diagnostic,
+      );
+  }
+}
 export function readCommunalSupper(rt: Runtime, id: string) {
   const ex = find(rt, id),
     rec = rt.records.get(id);
@@ -324,6 +380,7 @@ export function readCommunalSupper(rt: Runtime, id: string) {
     current: ex.child,
     ownedActions: ex.children,
     claims: actualClaims(rt),
+    returnAttempts: ex.returns.map((id) => rt.records.get(id)),
     diagnostic:
       ex.diagnostic ??
       (ex.child
@@ -413,6 +470,7 @@ export const communalSupper: ActionDef<CommunalSupperParams, null, Exec> = {
       binding: binding(rt, p),
       identities: identity(rt, p),
       returns: [],
+      returnCursor: 0,
       stored: {},
       materialTotal: materialTotal(rt, p),
       ingredientFoods: JSON.stringify(
@@ -430,15 +488,13 @@ export const communalSupper: ActionDef<CommunalSupperParams, null, Exec> = {
         return { status: 'running', phase: 'ending' };
       if (ex.returns.some((id) => rt.isActive(id)))
         return { status: 'running', phase: 'returning' };
-      const stopped = ex.returns.find(
-        (id) => rt.records.get(id)?.status !== 'completed',
-      );
+      const stopped = unresolvedReturn(rt, ex);
       if (stopped)
         return {
           status: 'blocked',
           diagnostic: issue(
             'return-stopped',
-            'Ordinary utensil return stopped; retained held ownership remains truthful',
+            'Ordinary utensil return stopped or its placement changed; finish the independent directive, then explicitly retry End, or physically return the same utensils to approved slots',
             [stopped],
           ),
         };
@@ -461,6 +517,18 @@ export const communalSupper: ActionDef<CommunalSupperParams, null, Exec> = {
         ex.children.push(r.id);
         return { status: 'running', phase: 'returning' };
       }
+      const busy = ex.p.meal.participants.find(
+        (q) => rt.holder(`actor:${q.actor}`).length,
+      );
+      if (busy)
+        return {
+          status: 'blocked',
+          diagnostic: issue(
+            'return-directive-active',
+            'Wait for the independent participant directive or ordinary return to finish before End releases its logical claim',
+            [busy.actor],
+          ),
+        };
       ex.mode = 'completed';
       return { status: 'completed', outputs: { finished: false } };
     }
@@ -572,17 +640,31 @@ export const communalSupperControl: ActionDef<
   reservations: () => [],
   plan(rt, p) {
     const ex = find(rt, p.supper);
-    if (
-      !ex ||
-      !rt.isActive(p.supper) ||
-      ['ending', 'completed'].includes(ex.mode)
-    )
+    if (!ex || !rt.isActive(p.supper) || ex.mode === 'completed')
       return {
         ok: false,
         diagnostic: issue('inactive', 'Supper is no longer controllable', [
           p.supper,
         ]),
       };
+    if (ex.mode === 'ending') {
+      if (p.intent !== 'end')
+        return {
+          ok: false,
+          diagnostic: issue(
+            'ending',
+            'Only an explicit End retry is available while draining supported returns',
+            [p.supper],
+          ),
+        };
+      if (
+        (ex.child && rt.isActive(ex.child)) ||
+        ex.returns.some((id) => rt.isActive(id))
+      )
+        return { ok: true, program: null };
+      const d = retryEndIssue(rt, ex);
+      return d ? { ok: false, diagnostic: d } : { ok: true, program: null };
+    }
     if (p.intent === 'resume') {
       if (!['paused', 'waiting'].includes(ex.mode))
         return {
@@ -609,8 +691,17 @@ export const communalSupperControl: ActionDef<
   },
   start(rt, p) {
     const ex = find(rt, p.supper)!;
-    if (p.intent === 'end') rt.cancel(ex.id);
-    else if (p.intent === 'pause') {
+    if (p.intent === 'end') {
+      if (ex.mode === 'ending') {
+        if (
+          !(ex.child && rt.isActive(ex.child)) &&
+          !ex.returns.some((id) => rt.isActive(id))
+        ) {
+          ex.returnCursor = ex.returns.length;
+          ex.diagnostic = undefined;
+        }
+      } else rt.cancel(ex.id);
+    } else if (p.intent === 'pause') {
       ex.mode = 'pausing';
       controlChild(rt, ex, 'pause');
     } else {
