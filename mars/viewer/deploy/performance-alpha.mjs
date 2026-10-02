@@ -15,6 +15,7 @@ node deploy/performance-alpha.mjs --execute --base https://sim.mars.college \
   --deployment /absolute/verified/deployment.json --source FULL_PUBLISHED_SHA \
   --build-root /absolute/frozen/viewer/dist --large-manifest /absolute/large-assets.json
 Optional --out ignored-receipt-directory; --renderer swiftshader|native (default swiftshader).
+--museum-2026-only measures only the actual campus homepage cold then ordinary warm reload.
 Two isolated Lab contexts (design-studio, living-day-studio), each cold then ordinary warm reload;
 three strict design-studio resets; one isolated cold museum /studio/2022 visit.
 No retries, cache disabling, request interception, programmatic engine ticks or backend calls.
@@ -27,6 +28,7 @@ if (!args.includes('--execute')) {
 }
 
 async function execute() {
+  const museum2026Only = args.includes('--museum-2026-only');
   for (const name of [
     '--base',
     '--deployment',
@@ -120,6 +122,9 @@ async function execute() {
       'Supplied frozen publication receipts identify source/version; HTTP alone does not attest a Worker version. Large body hashes are inherited manifest evidence, not newly downloaded hashes.',
     profile: {
       renderer,
+      selection: museum2026Only
+        ? 'museum-2026-cold-warm'
+        : 'lab-and-museum-2022',
       viewport: { width: 1280, height: 800 },
       dpr: 1,
       reducedMotion: 'reduce',
@@ -134,7 +139,9 @@ async function execute() {
       'No server CPU measurements/backend calls; network wall time is not CPU.',
       'Resource counters/JS heap are not native GPU memory proof; no forced GC.',
       'RAF intervals are browser scheduling; hook-frame deltas separately identify rendered frames.',
-      'One cold museum visit only; no repeated full model GET or warm museum claim.',
+      museum2026Only
+        ? 'Ordinary cold/warm campus visit; no model body materialization or newly computed GLB hash.'
+        : 'One cold museum2022 visit only; no warm full-model claim.',
     ],
   };
   const save = () =>
@@ -162,7 +169,9 @@ async function execute() {
   report.browser = browser.version();
   let budgetExceeded = false;
   try {
-    for (const scenario of ['design-studio', 'living-day-studio', null]) {
+    for (const scenario of museum2026Only
+      ? [null]
+      : ['design-studio', 'living-day-studio', null]) {
       const context = await browser.newContext({
         viewport: report.profile.viewport,
         deviceScaleFactor: 1,
@@ -266,9 +275,12 @@ async function execute() {
         const r = requests.get(e.requestId);
         if (r) Object.assign(r, { failed: e.errorText, cancelled: e.canceled });
       });
-      for (const temperature of scenario ? ['cold', 'warm'] : ['cold']) {
+      for (const temperature of scenario || museum2026Only
+        ? ['cold', 'warm']
+        : ['cold']) {
         active = {
-          scenario: scenario ?? 'museum-2022',
+          scenario:
+            scenario ?? (museum2026Only ? 'museum-2026' : 'museum-2022'),
           temperature,
           startedAtUtc: new Date().toISOString(),
           requests: [],
@@ -278,7 +290,11 @@ async function execute() {
         save();
         const started = performance.now();
         const url = new URL(
-          scenario ? `/lab?scenario=${scenario}` : '/studio/2022',
+          scenario
+            ? `/lab?scenario=${scenario}`
+            : museum2026Only
+              ? '/'
+              : '/studio/2022',
           base,
         ).href;
         if (temperature === 'warm')
@@ -311,6 +327,11 @@ async function execute() {
               { timeout: 45000 },
             );
         } else {
+          assert.equal(
+            await page.evaluate(() => window.__marsStudio.year),
+            museum2026Only ? 2026 : 2022,
+            'Wrong museum year loaded',
+          );
           await page.waitForFunction(
             () =>
               !!document.querySelector('.studio canvas')?.dataset.pixelRatio,
