@@ -1,3 +1,4 @@
+import { gardenAfternoonRuntime, gardenAfternoonScene } from '../../engine/scenarios/garden-afternoon.ts';
 import { seedPlantingRuntime, seedPlantingScene } from '../../engine/scenarios/seed-planting.ts';
 import { readingCircleRuntime, readingCircleScene } from '../../engine/scenarios/reading-circle.ts';
 import { galleryTourRuntime, galleryTourScene } from '../../engine/scenarios/gallery-tour.ts';
@@ -27,6 +28,13 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
+    name: index ? 'garden-afternoon-rotated' : 'garden-afternoon',
+    title: index ? 'Garden afternoon · rotated intentions (hypothetical)' : 'Garden afternoon · plant, break, care and read (hypothetical)',
+    description: 'Start garden afternoon, then Play. A gardener plants from the same finite seed bowl, takes an ordinary courtyard break and waters the same bed. An independent reader begins a book, walks separately and returns to the same unfinished bookmark. Pause, direct, Resume or End each person independently; safe cleanup retains actual bowls, deposits and intentions. Two authored ground layouts; no shared-walk synchronization, growth, refill or active reload restoration.',
+    scene: gardenAfternoonScene, humans: () => [], build: () => gardenAfternoonRuntime(yaw),
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [2, 2, 18, 65], expect: checks,
+  })),
   ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
     name: index ? 'seed-planting-rotated' : 'seed-planting',
     title: index ? 'Seed planting · rotated beds (hypothetical)' : 'Seed planting · finite material and retained purpose (hypothetical)',

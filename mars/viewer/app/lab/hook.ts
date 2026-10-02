@@ -1,3 +1,4 @@
+import { readGardenAfternoon } from '../../engine/scenarios/garden-afternoon.ts';
 import { readSeedPlanting } from '../../engine/activities/seed-planting.ts';
 import { readSeedbed } from '../../engine/objects/planting.ts';
 import { readReadingCircle } from '../../engine/activities/reading-circle.ts';
@@ -83,6 +84,7 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    gardenAfternoon: () => readGardenAfternoon(sim.rt) ?? null,
     seedPlanting: () => {
       const r = [...sim.rt.records.values()].filter(r => r.verb === 'seed_planting').at(-1);
       return { action: r ? readSeedPlanting(sim.rt, r.id) ?? null : null,

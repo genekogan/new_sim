@@ -203,3 +203,17 @@ geometry or active reload restoration. Root shared registration, selector, real
 hooks, actual visible marker inspection and camera facts are wired. Focused core/
 renderer checks pass; two actual Play cases, inspected captures, combined gate and
 publication remain required.
+
+
+## Future connected garden candidate — not public
+
+`garden-afternoon` and its90-degree rotated arrangement compose the same finite
+seed leaf, ordinary care and retained reading intentions. Start garden afternoon,
+then Play. Pause/direct/Resume the gardener while the reader advances; later
+water the same bed and return to the same unfinished book. Each branch has a
+permanent End control. Nearby courtyard walks are independent, not a shared walk
+or conversation. Same finite seed/water bowls return to declared supports; no
+growth, refill or active save/load. Root mounts the HUD, detached readout and
+existing read-only automatic camera entry. Node tests pass on worker36c9fd2;
+fresh combined Play/visual/gate/public proof remain mandatory, so this is a
+saved candidate, not an online release37 feature.

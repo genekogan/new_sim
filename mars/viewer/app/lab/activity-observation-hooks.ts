@@ -87,6 +87,8 @@ export function cameraActivityReadout(rt: Runtime): {
                 s.binding.params.station,
                 s.binding.params.book,
                 s.binding.params.plant,
+                s.binding.params.seeds,
+                s.binding.params.water,
                 s.binding.params.mat,
                 s.binding.params.pad,
                 s.binding.params.pencil,

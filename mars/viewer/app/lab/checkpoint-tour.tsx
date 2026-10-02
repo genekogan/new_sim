@@ -8,6 +8,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const living =
     scenario.startsWith('living-day-') ||
     scenario === 'garden-care' ||
+    scenario.startsWith('garden-afternoon') ||
     scenario.startsWith('seed-planting') ||
     scenario.startsWith('reading-circle') || scenario.startsWith('gallery-tour') || scenario.startsWith('table-cleanup') || scenario === 'art-sharing' || scenario === 'creative-afternoon' || scenario === 'music-dance' || scenario === 'open-jam' || scenario === 'drawing-work' || scenario === 'group-warmup';
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
@@ -71,6 +72,8 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         <button onClick={() => onScenario('drawing-work')}>Drawing and retained art</button>
         <button onClick={() => onScenario('group-warmup')}>Guided warm-up</button>
         <button onClick={() => onScenario('open-jam')}>Open jam exchange</button>
+        <button onClick={() => onScenario('garden-afternoon')}>Connected garden and reading</button>
+        <button onClick={() => onScenario('garden-afternoon-rotated')}>Rotated garden afternoon</button>
         <button onClick={() => onScenario('garden-care')}>Garden care</button>
         <button onClick={() => onScenario('seed-planting')}>Plant finite seeds</button>
         <button onClick={() => onScenario('seed-planting-rotated')}>Rotated seed beds</button>
@@ -119,6 +122,18 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
         are hypothetical. Use Play and the activity controls below; Reset starts
         the selected room again.
       </p>
+      {scenario.startsWith('garden-afternoon') && (
+        <p>
+          Start garden afternoon, then Play. Pause or direct the gardener during
+          planting while the reader keeps an independent commitment. Keep Play
+          running for safe bowl return, then explicitly Resume that same purpose.
+          The gardener later walks and waters the same bed; the reader takes a
+          separate break and returns to the same unfinished book. End stops only
+          the chosen branch permanently. Finite bowls and material remain; no
+          refill, growth or active reload restoration. These are independent
+          courtyard walks, not a shared conversation.
+        </p>
+      )}
       {scenario.startsWith('seed-planting') && (
         <p className="lab-desc">
           Start plant A, then Play. The same finite seed bowl physically
@@ -350,7 +365,7 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
       </p>
       <p className="lab-meta">
         Live automatic camera controls cover classroom, prepared/living days,
-        music, care/planting, drawing/sharing, warm-up, cleanup, gallery walks and shared
+        music, care/planting and garden afternoons, drawing/sharing, warm-up, cleanup, gallery walks and shared
         reading: choose Live camera and a Clear or Restrained style.
         Follow activity person takes manual precedence; Return camera to auto
         releases it. Camera observes actual activity and never directs people.

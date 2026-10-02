@@ -2391,3 +2391,16 @@ worker0081ad9; no browser/fullgate/public claim. Canonical rules activities/25 m
 changed intention semantics explicit. Root-owned future connected garden UI uses
 this existing leaf; no generalplanner or material growth. Release37 public checks
 run separately on unchanged ca6bb5d source. Future58presets remain unshipped.
+
+
+### Connected finite garden candidate wired — October2
+
+Reviewed34c5311 integrates worker36c9fd2's two ordinary independent intentions,
+not a new tick coordinator: retained seed planting→courtyard walk→same-bed care,
+while independent reading4s→separate break walk→same24s book task completes.
+Both0/90-degree layouts keep actual bowl/book IDs, support and material; local
+Pause/direct/Resume and permanent branch End preserve retained effects.10new
+Node/68combined worker checks PASS. Root adds two Lab selector/quick-tour entries,
+keyed HUD, detached gardenAfternoon hook and small camera allowlist/source facts.
+60presets on this future source; eight additions relative to release37. Authored
+strict actualPlay/captures pending serialized browser slot; no published claim.
