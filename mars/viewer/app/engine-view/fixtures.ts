@@ -13,6 +13,7 @@ import { tableObject } from './items.ts';
 import { chessBoardObject } from './chess.ts';
 import { workstationObject, type WorkstationVisual, type WorkstationAppearanceOptions } from './workstation.ts';
 import { rendererColor } from './palette.ts';
+import { seedbedObject, type SeedbedVisual } from './seedbed.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
 type Stack = { group: THREE.Group; count: number };
@@ -21,7 +22,7 @@ type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: num
 const poseOf = (e: Entity): Pose => ({ p: [...e.pose.p], yaw: e.pose.yaw, pitch: e.pose.pitch ?? 0, roll: e.pose.roll ?? 0 });
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
-type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual; ownedGeometries?: THREE.BufferGeometry[] };
+type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual; seedbed?: SeedbedVisual; ownedGeometries?: THREE.BufferGeometry[] };
 
 /** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
 const DUNNAGE = 0.1;
@@ -277,6 +278,10 @@ export class FixtureViews {
     let obj: THREE.Object3D;
     if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
+    else if (e.def === 'garden-planter' && (e as Entity & { planting?: { kind: string } }).planting?.kind === 'seedbed-v1') {
+      v.seedbed = seedbedObject(this.box.bind(this), sx, sy, sz, color);
+      obj = v.seedbed.obj;
+    }
     else if (e.def === 'garden-planter') {
       const planter = new THREE.Group();
       for (const side of [-1, 1]) {
@@ -354,6 +359,7 @@ export class FixtureViews {
       }
       if (v.screen) this.drawScreen(e, v.screen);
       v.workstation?.update(e);
+      v.seedbed?.update(e);
     }
     for (const [id, v] of this.views)
       if (!world.entities[id]) {
@@ -387,6 +393,12 @@ export class FixtureViews {
   /** Detached rendered poses for physical interaction inspection; never writes the world. */
   poses() {
     return [...this.views].map(([id, v]) => ({ id, p: v.obj.position.toArray(), yaw: -v.obj.rotation.y }));
+  }
+
+  /** Actual visible seed-deposit geometry, detached for inspection. */
+  seedMarkers() {
+    return [...this.views].filter(([, v]) => v.seedbed)
+      .map(([plant, v]) => ({ plant, ...v.seedbed!.inspection() }));
   }
 
   dispose() {

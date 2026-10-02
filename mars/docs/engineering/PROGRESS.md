@@ -2337,3 +2337,14 @@ use the registered parent/ordinary children; existing reading rig remains unchan
 The source is separate from frozen release37 ca6bb5d. Focused engine59PASS and
 camera observer8PASS preceded this mount; two strict actualPlay cases/ten planned
 captures and combined/public proof remain pending. Not shipped or visually proven.
+
+
+### Seedbed renderer boundary saved separately — 2026-10-02
+
+Prepare a bounded future physical seed-planting visual: existing soil/wood box
+without decorative plant silhouette;0–4visible deposit markers from exact retained
+material, actual detached geometry inspection, no simulation entity creation/growth.
+Four new renderer checks plus two existingfixture checks PASS; TSc/focusedlint PASS.
+Core/HUD authoring remain in two Sol6.1 isolated lanes, no browsers alongside the
+frozen release37 gate. The separate social gallery/reading candidate remains
+ready for its first actualPlay, not public. No current candidate/main edits.
