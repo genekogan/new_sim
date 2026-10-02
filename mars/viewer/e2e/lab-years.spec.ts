@@ -50,7 +50,7 @@ async function shot(page: Page, name: string, cam: 'top' | 'oblique' | [number[]
   await overlays(page, names);
   // a different scenario means the dev server reloaded the page (a file changed on disk mid-test)
   expect(await page.evaluate(() => window.__marsEngine!.state().scenario), 'page was not reloaded mid-test').toBe(/^lab-year-(\d+)/.exec(name)![0].slice(4));
-  await captureView(page, name, { testInfo, compare: BASELINES.has(name) });
+  await captureView(page, name, { testInfo, softVisual: true, compare: BASELINES.has(name) });
 }
 
 const summary: Record<string, unknown> = {};

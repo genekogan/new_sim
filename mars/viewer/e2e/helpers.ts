@@ -121,11 +121,13 @@ export type CaptureResult = { file: string; baseline: string; diffRatio: number 
  * next to the capture when pixels differ. E2E_UPDATE_BASELINES=1 (or
  * `npm run e2e:update-baselines`) rewrites the baseline instead of comparing.
  * Pass `compare: false` to capture without a baseline (exploratory shots).
+ * `softVisual: true` records a failing diff-ratio assertion while allowing later
+ * functional assertions to run; missing baselines and size mismatches stay hard.
  */
 export async function captureView(
   page: Page,
   name: string,
-  { compare = true, testInfo }: { compare?: boolean; testInfo?: TestInfo } = {},
+  { compare = true, softVisual = false, testInfo }: { compare?: boolean; softVisual?: boolean; testInfo?: TestInfo } = {},
 ): Promise<CaptureResult> {
   fs.mkdirSync(ARTIFACTS, { recursive: true });
   const file = path.join(ARTIFACTS, `${name}.png`);
@@ -150,7 +152,8 @@ export async function captureView(
   });
   const diffRatio = pixels / (actual.width * actual.height);
   if (pixels > 0) fs.writeFileSync(path.join(ARTIFACTS, `${name}.diff.png`), PNG.sync.write(diff));
-  expect(diffRatio, `${name}: ${(diffRatio * 100).toFixed(2)}% pixels differ from baseline`).toBeLessThanOrEqual(
+  const visualExpect = softVisual ? expect.soft : expect;
+  visualExpect(diffRatio, `${name}: ${(diffRatio * 100).toFixed(2)}% pixels differ from baseline`).toBeLessThanOrEqual(
     DIFF.maxDiffPixelRatio,
   );
   return { file, baseline, diffRatio, updated: false };

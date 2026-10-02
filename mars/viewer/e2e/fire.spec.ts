@@ -88,16 +88,16 @@ test('lab campfire: animated, deterministic fire; people still; draw calls; dusk
     const n = await calls(page);
     console.log(`[fire] ${cam}: ${n} draw calls (W3 reference ${REFERENCE_CALLS[cam]})`);
     expect(n, `${cam} draw calls within +2 of W3`).toBeLessThanOrEqual(REFERENCE_CALLS[cam] + 2);
-    await captureView(page, cam === 'top' ? 'fire-top' : 'fire-dusk-oblique', { testInfo });
+    await captureView(page, cam === 'top' ? 'fire-top' : 'fire-dusk-oblique', { testInfo, softVisual: true });
   }
   await view(page, ...CLOSE);
   const nClose = await calls(page);
   console.log(`[fire] close: ${nClose} draw calls (W3 reference ${REFERENCE_CALLS.close})`);
   expect(nClose, 'close-up draw calls within +2 of W3').toBeLessThanOrEqual(REFERENCE_CALLS.close + 2);
-  await captureView(page, 'fire-dusk-close', { testInfo });
+  await captureView(page, 'fire-dusk-close', { testInfo, softVisual: true });
   const a = { close: await shot(page), oblique: Buffer.alloc(0) };
   await view(page, ...TOP_CLOSE);
-  await captureView(page, 'fire-top-close', { testInfo });
+  await captureView(page, 'fire-top-close', { testInfo, softVisual: true });
   const topA = await shot(page);
   await view(page, ...OBLIQUE);
   a.oblique = await shot(page);

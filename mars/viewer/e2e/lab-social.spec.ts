@@ -34,7 +34,7 @@ async function shots(page: Page, base: string, testInfo: TestInfo) {
     for (const debug of [false, true]) {
       await overlays(page, debug);
       const name = `${base}-${cam}${debug ? '-debug' : ''}`;
-      await captureView(page, name, { testInfo, compare: BASELINES.has(name) });
+      await captureView(page, name, { testInfo, softVisual: true, compare: BASELINES.has(name) });
     }
   }
   await overlays(page, false);

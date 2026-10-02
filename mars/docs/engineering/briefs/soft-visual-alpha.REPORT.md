@@ -1,0 +1,11 @@
+# Preserve visual failures while completing functional checks
+
+Base: `f7f468a821783c34f24e1786ca9afdb429bf73be`; isolated branch `codex/soft-visual-alpha`.
+
+`captureView` accepts optional `softVisual` (default false). When explicitly true, only the final diff-ratio assertion uses Playwright `expect.soft`; its error remains a native test failure while later original functional assertions can execute. Missing baselines, PNG reading, screenshot dimensions and capture errors stay hard. Pixelmatch threshold 0.2 and maximum different-pixel ratio 0.015 are unchanged. Comparisons, diff images, attachments, baseline-update behavior and return values are unchanged.
+
+Opt-in is limited to baseline-comparison capture calls in the requested fire, lab-build-bay, lab-social, lab-years and lab specs. Exploratory `compare: false` calls remain unchanged; wrappers still use their existing baseline-name sets. All original physical, terminal, hash, timing, draw-call and console-error assertions remain unchanged. No baseline, app, engine or content changes. This change does not make visual differences acceptable or certify intentional changes; each visual assertion must still fail until separately reviewed.
+
+Validation: `npm run typecheck` PASS before the subsequent instruction to defer further TypeScript work during root's timing tests. `git diff --check` PASS. Targeted oxlint on the six modified e2e files FAILS with four existing diagnostics: fire.spec.ts lines 103 and 136 Buffer generic assignments (TS2322); lab.spec.ts line 151 duplicate ticks (TS2783); lab-build-bay.spec.ts line 194 missing Hook.setSpeed (TS2339). Read-only base contents linted through temporary adjacent files reproduce exactly those four diagnostics; temporary files removed. No unrelated diagnostic fixes included.
+
+Source review of installed Playwright confirms `expect.soft` marks failed matcher steps with `softError` and records test errors, rather than throwing out of the test body. No browser, performance or native heavy execution ran here; the affected cohort's still-RED outcome and later original assertion execution require root's serialized focused run. No baseline acceptance or functional PASS is claimed.

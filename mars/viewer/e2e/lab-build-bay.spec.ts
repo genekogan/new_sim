@@ -41,7 +41,7 @@ async function shoot(page: Page, name: string, testInfo: TestInfo, cams: Cams = 
     }, labels);
     await labFrames(page);
     const n = `build-bay-${name}-${cam}`;
-    await captureView(page, n, { testInfo, compare: BASELINES.has(n) });
+    await captureView(page, n, { testInfo, softVisual: true, compare: BASELINES.has(n) });
   }
 }
 
