@@ -1,0 +1,4423 @@
+{
+  "schemaVersion": 1,
+  "status": "authoritative-coverage-draft",
+  "inventorySource": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+  "selectorSource": "viewer/app/lab/scenarios.ts:SELECTABLE_SCENARIOS",
+  "authoredAtUtc": "2026-10-02T14:37:04.420395+00:00",
+  "parity": {
+    "method": "Prior executed60 selector inventory + exact3 new literal factoryIDs; gitdiff verifies no other selector module changes and exact addedIDs; no app execution during this task.",
+    "priorInventoryPath": "<mars-worktrees>/seed-planting-integration/viewer/e2e/artifacts/release38-sim-public/selectable-audit/summary.json",
+    "priorInventorySha256": "9c019ad60420f67096de62fc06d1b7bd124acc78adc11d7a5bd6e55ae1eb3eac",
+    "expected63": true,
+    "unique63": true
+  },
+  "summary": {
+    "totalSelectable": 63,
+    "categories": {
+      "manual-journey": 37,
+      "scripted": 21,
+      "diagnostic": 1,
+      "continuous": 1,
+      "probe": 1,
+      "conditional-unsupported": 2
+    },
+    "recordedCoverageGrades": {
+      "recorded-actual-ui-play": 29,
+      "recorded-step-or-mixed-completion": 8,
+      "recorded-programmatic-effects-or-completion": 20,
+      "recorded-exact-diagnostic": 1,
+      "terminal-gap-metrics-only": 1,
+      "liveness-gap-metrics-only": 1,
+      "recorded-still-probe": 1,
+      "recorded-actual-ui-play-supported-layout": 2
+    },
+    "exactCurrentSourceNativeFullGatePassed": false,
+    "exactFunctionalInheritedFocusedUiJourneys": 3,
+    "sustainedLivenessProven": 0,
+    "current39Gate": "RUNNING at authoring; explicitly not counted passed",
+    "countMeaning": "Recorded historical/native coverage grades, not63 current-release accepted presets. Unsupported admission and skipped/FIXME/TODO never become activity PASS."
+  },
+  "proofKinds": [
+    "actual-ui-play-journey",
+    "browser-live-loop-programmatic-start",
+    "browser-programmatic-step-completion",
+    "mixed-ui-play-and-programmatic-step-completion",
+    "node-fixture",
+    "first-step-smoke",
+    "still-probe",
+    "exact-diagnostic",
+    "skipped-unproved"
+  ],
+  "proofs": {
+    "public36": {
+      "kind": "native-public-browser",
+      "source": "cfea591083ac54d0280766809b2cbf1872bb012d",
+      "path": "<mars-worktrees>/living-world/viewer/.cloudflare/living-world-public-results.json",
+      "sha256": "39397cdb64711824a76edd802b8e4f8b153af9dd0a2d1d8edbe3e61fac968427",
+      "result": {
+        "startTime": "2026-10-02T06:21:46.734Z",
+        "duration": 1520404.6060000001,
+        "expected": 53,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "historical; current combined gate pending",
+      "captureReview": {
+        "path": "<mars-worktrees>/living-world/viewer/.cloudflare/release36-public-capture-review.json",
+        "sha256": "b742b4f2e919b246c0cd1ee77f552529c94d45f1705317fc6d964bc370db0d0a"
+      }
+    },
+    "public37": {
+      "kind": "native-public-browser",
+      "source": "ca6bb5d1ed707f12fe9029720fbf1bdecc44f917",
+      "path": "<mars-worktrees>/creative-afternoon/viewer/.cloudflare/vocabulary-public-results.json",
+      "sha256": "e9aeffd48729ee53a7a9aa8a94fd4048dd701a76aff408942934843288c662dc",
+      "result": {
+        "startTime": "2026-10-02T10:59:28.394Z",
+        "duration": 1713777.92,
+        "expected": 69,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "historical; current combined gate pending",
+      "captureReview": {
+        "path": "<mars-worktrees>/creative-afternoon/viewer/.cloudflare/release37-public-capture-review.json",
+        "sha256": "dbd5cab573873cc1605d88075e2e78ddc99d718cd5a3315d5470f2608efcb8cb"
+      }
+    },
+    "public38": {
+      "kind": "native-public-browser",
+      "source": "5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d",
+      "path": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/social-garden-public-results.json",
+      "sha256": "55aa0ce019cd900854fc13fc02083d1c77f211cd6f9c9b9203529dc53d0bd6c5",
+      "result": {
+        "startTime": "2026-10-02T13:26:29.051Z",
+        "duration": 1991445.956,
+        "expected": 92,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "currentSourceRelationship": "historical; current combined gate pending",
+      "captureReview": {
+        "path": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/release38-public-capture-review.json",
+        "sha256": "8167836aa2d8e52545adf9b1026e0a193eefe8a852a359063895a1aff8f08da7"
+      }
+    },
+    "gate38": {
+      "kind": "native-clean-nine-stage-gate",
+      "source": "5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d",
+      "path": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/gate/2026-10-02T12-14-17-938Z/report.json",
+      "sha256": "fb7d24fe3b297555343bb063f5c225efe865d55d62a2c2b317d4324ae1f5205e",
+      "result": {
+        "ok": true,
+        "engine": {
+          "pass": 1324,
+          "skip": 6,
+          "todo": 11
+        },
+        "browser": {
+          "pass": 264,
+          "skipOrFixme": 7
+        },
+        "steps": [
+          {
+            "step": "lint",
+            "status": "pass",
+            "durationMs": 2171,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/lint.log"
+          },
+          {
+            "step": "test",
+            "status": "pass",
+            "durationMs": 4157,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/test.log"
+          },
+          {
+            "step": "test-engine",
+            "status": "pass",
+            "durationMs": 173098,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/test-engine.log"
+          },
+          {
+            "step": "tsc",
+            "status": "pass",
+            "durationMs": 2383,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/tsc.log"
+          },
+          {
+            "step": "tsc-camera",
+            "status": "pass",
+            "durationMs": 4333,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/tsc-camera.log"
+          },
+          {
+            "step": "e2e",
+            "status": "pass",
+            "durationMs": 3505271,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log"
+          },
+          {
+            "step": "record-campus-take",
+            "status": "pass",
+            "durationMs": 13578,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/record-campus-take.log"
+          },
+          {
+            "step": "determinism-probe",
+            "status": "pass",
+            "durationMs": 3212,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/determinism-probe.log"
+          },
+          {
+            "step": "simulation-integration",
+            "status": "pass",
+            "durationMs": 7079,
+            "log": ".cloudflare/gate/2026-10-02T12-14-17-938Z/simulation-integration.log"
+          }
+        ]
+      },
+      "currentSourceRelationship": "historical; current combined gate pending",
+      "captureReview": {
+        "path": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/release38-gate-capture-review.json",
+        "sha256": "968a8a5b52a33687f40caa667887dbbb43fea3dfa500cf496e2ed8750551fe19"
+      },
+      "browserLog": {
+        "path": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log",
+        "sha256": "11b4cbb79754beb69713c3efc0b8121fc48233fbb8fd1bdf37e54058125ff84d"
+      }
+    },
+    "focused39": {
+      "kind": "native-local-focused-browser",
+      "source": "c8331ecfb4aecc382c2807fa2320dec627748d97",
+      "path": "<mars-worktrees>/room-preparation-integration/viewer/.cloudflare/room-supper-circuit-focused-browser.log",
+      "sha256": "303b6a11600cc1d2126f1edb3853e73ce283cb8af00064e016850753ef731a52",
+      "result": {
+        "passed": 18,
+        "failed": 0,
+        "reportedDuration": "5.0min",
+        "retries": 0
+      },
+      "currentSourceRelationship": "personally verified empty git diff c8331ec..b712825 for viewer/app, viewer/engine, viewer/e2e; docs/deployment/gate-capacity metadata differs. Full gate39 RUNNING, not passed.",
+      "captureReview": {
+        "path": "<mars-worktrees>/room-preparation-integration/viewer/.cloudflare/room-supper-circuit-focused-capture-review.json",
+        "sha256": "9e409168f87d29fa3756367d7753e8c2bb4eea6558afa68372616f952720bd5d"
+      }
+    },
+    "public35": {
+      "kind": "structured-public-browser-receipt",
+      "source": "9958ed4a97f2cb5c7189ea7796b6502a0b9910de",
+      "path": "<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/release35-production-browser-receipt.json",
+      "sha256": "5dd8f62c5c7b5e3ec417a94cfbb859406ffb0c4dd549e4ec6ff9a14734a5b1da",
+      "result": {
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0,
+        "reportedDuration": "2.4m"
+      },
+      "currentSourceRelationship": "historical; current combined gate pending"
+    },
+    "selector38": {
+      "kind": "native-selector-smoke",
+      "source": "5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d",
+      "path": "<mars-worktrees>/seed-planting-integration/viewer/e2e/artifacts/release38-sim-public/selectable-audit/summary.json",
+      "sha256": "9c019ad60420f67096de62fc06d1b7bd124acc78adc11d7a5bd6e55ae1eb3eac",
+      "result": "60 fresh-load/Reset/firstStep + parity; completionProven:false",
+      "currentSourceRelationship": "older60 inventory; new3 have focused journeys but full63 parity current gate pending"
+    }
+  },
+  "tests": {
+    "t002": {
+      "file": "viewer/e2e/garden-care.spec.ts",
+      "name": "garden-care: actual Play partial return, both plants, repeat due, finite exhaustion and director handoff",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public36",
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t003": {
+      "file": "viewer/e2e/living-day.spec.ts",
+      "name": "living-day-4: actual Play independent direction and retained preparation/sleep with original casting",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public36",
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t004": {
+      "file": "viewer/e2e/living-day.spec.ts",
+      "name": "living-day-studio: actual Play independent direction and retained preparation/sleep with assistant casting",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public36",
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t005": {
+      "file": "viewer/e2e/music-gathering.spec.ts",
+      "name": "music dance: actual audible Play, grounded rhythm, late Join/Leave, same score Pause/Resume and Reset",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public36",
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t006": {
+      "file": "viewer/e2e/year-build.spec.ts",
+      "name": "year-build-2022: current source completes with automatic Play through s0021 and canonical continuity",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public36",
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t007": {
+      "file": "viewer/e2e/year-build.spec.ts",
+      "name": "year-build-2022-house: current source completes with automatic Play through s0021 and canonical continuity",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public36",
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t008": {
+      "file": "viewer/e2e/activity-vocabulary.spec.ts",
+      "name": "drawing actual Play retains partial strokes and same pencil; Resume finishes eight visible marks and returns pencil",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t009": {
+      "file": "viewer/e2e/activity-vocabulary.spec.ts",
+      "name": "warm-up actual Play phases five rigs; Leave/Join and Pause/Resume retain instructor clock",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t010": {
+      "file": "viewer/e2e/activity-vocabulary.spec.ts",
+      "name": "open jam audible actual Play; directive retains first score, same computer/chair handoff and later withdrawal",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t011": {
+      "file": "viewer/e2e/creative-vocabulary.spec.ts",
+      "name": "standalone sharing: premade actual pad, physical turns/question-answer/late Join-Leave and explicit Pause-Resume-End",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t012": {
+      "file": "viewer/e2e/creative-vocabulary.spec.ts",
+      "name": "connected creative afternoon: actual drawn partial artifact, independent retained reader/care, physical music exchange and same-pad return",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t013": {
+      "file": "viewer/e2e/table-cleanup.spec.ts",
+      "name": "table cleanup base: actual Play pickup, supported Pause/Resume, player direction and same-object completion",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t014": {
+      "file": "viewer/e2e/table-cleanup.spec.ts",
+      "name": "table cleanup base: held End releases resources, same-binding restart admits, Reset removes old task and restores original props",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t015": {
+      "file": "viewer/e2e/table-cleanup.spec.ts",
+      "name": "table cleanup rotated: actual Play pickup, supported Pause/Resume, player direction and same-object completion",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t016": {
+      "file": "viewer/e2e/table-cleanup.spec.ts",
+      "name": "table cleanup rotated: held End releases resources, same-binding restart admits, Reset removes old task and restores original props",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public37",
+        "public38",
+        "gate38"
+      ]
+    },
+    "t017": {
+      "file": "viewer/e2e/gallery-tour.spec.ts",
+      "name": "three-stop actual Play continuity, physical question-answer, exact Pause-Resume and explicit End-Reset",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t018": {
+      "file": "viewer/e2e/gallery-tour.spec.ts",
+      "name": "two-stop actual Play Leave persists, named audience wait, declared late Join, host directive Resume and final cleanup",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t019": {
+      "file": "viewer/e2e/garden-afternoon.spec.ts",
+      "name": "default actual Play garden and same-book afternoon",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t020": {
+      "file": "viewer/e2e/garden-afternoon.spec.ts",
+      "name": "rotated actual Play garden and same-book afternoon",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t028": {
+      "file": "viewer/e2e/reading-circle.spec.ts",
+      "name": "default actual Play: exact partial bookmark Pause-Resume, declared Join-Leave, real question-answer and reader direction then complete",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t029": {
+      "file": "viewer/e2e/reading-circle.spec.ts",
+      "name": "rotated actual Play: End partial retains page/effects, explicit same-book new circle starts at exact bookmark and completes",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t030": {
+      "file": "viewer/e2e/seed-planting.spec.ts",
+      "name": "default actual Play: partial conserved deposits, safe Pause and same-purpose Continue complete both plots without refill",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t031": {
+      "file": "viewer/e2e/seed-planting.spec.ts",
+      "name": "rotated actual Play: directive safe return, exact retained material, explicit Continue then End partial and complete same purpose",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "public38",
+        "gate38"
+      ]
+    },
+    "t035": {
+      "file": "viewer/e2e/body-probe-safety.spec.ts",
+      "name": "delayed playback frames stop exactly at the scenario budget or completion",
+      "method": "still-world-ui-play-and-renderer-probe",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t036": {
+      "file": "viewer/e2e/body-probe-safety.spec.ts",
+      "name": "body probe selectable Step, Reset and Play validate a safe still world",
+      "method": "still-world-ui-play-and-renderer-probe",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t037": {
+      "file": "viewer/e2e/body-probe-safety.spec.ts",
+      "name": "synthetic body probe does not change authoritative world or Step outcome",
+      "method": "still-world-ui-play-and-renderer-probe",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t044": {
+      "file": "viewer/e2e/chess.spec.ts",
+      "name": "physical tabletop chess: fresh Step, four actual Play turns, checkmate and same-token reset",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t045": {
+      "file": "viewer/e2e/chess.spec.ts",
+      "name": "physical chess: interruption returns the original pawn, legal alternatives capture without spawning",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t052": {
+      "file": "viewer/e2e/classroom.spec.ts",
+      "name": "live classroom questions, speaker rotation and director intervention",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t053": {
+      "file": "viewer/e2e/classroom.spec.ts",
+      "name": "eight guests transition into smaller conversations and leave cleanly",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t059": {
+      "file": "viewer/e2e/design-studio.spec.ts",
+      "name": "independent design studio reuses complete activities with its own people, objects and project",
+      "method": "mixed-ui-play-and-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t060": {
+      "file": "viewer/e2e/design-studio.spec.ts",
+      "name": "studio local pause and terminal End preserve other commitments, then reset and switch back to Mars example bindings",
+      "method": "mixed-ui-play-and-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t061": {
+      "file": "viewer/e2e/design-studio.spec.ts",
+      "name": "studio shared lunch walk recovers actual reviewer crossing during Play and finishes the same intentions",
+      "method": "mixed-ui-play-and-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t071": {
+      "file": "viewer/e2e/lab-build-bay.spec.ts",
+      "name": "lab build-bay: flagship sequence live, zero violations, rehearsal hash, key-moment captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t072": {
+      "file": "viewer/e2e/lab-build-bay.spec.ts",
+      "name": "lab build-bay: 2x video of raise + beams",
+      "method": "browser-live-loop-partial-sequence",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t075": {
+      "file": "viewer/e2e/lab-social.spec.ts",
+      "name": "lab campfire-evening: social verbs, expected conflict, pre-emption, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t076": {
+      "file": "viewer/e2e/lab-years.spec.ts",
+      "name": "lab year-2020: engine scene builds in the browser, 4 walkers complete, zero violations",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t077": {
+      "file": "viewer/e2e/lab-years.spec.ts",
+      "name": "lab year-2021: engine scene builds in the browser, 4 walkers complete, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t078": {
+      "file": "viewer/e2e/lab-years.spec.ts",
+      "name": "lab year-2022: engine scene builds in the browser, 4 walkers complete, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t079": {
+      "file": "viewer/e2e/lab-years.spec.ts",
+      "name": "lab year-2023: engine scene builds in the browser, 4 walkers complete, zero violations",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t080": {
+      "file": "viewer/e2e/lab-years.spec.ts",
+      "name": "lab year-2024: engine scene builds in the browser, 4 walkers complete, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t081": {
+      "file": "viewer/e2e/lab-years.spec.ts",
+      "name": "lab year-2025: engine scene builds in the browser, 4 walkers complete, zero violations",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t082": {
+      "file": "viewer/e2e/lab-years.spec.ts",
+      "name": "lab year-2026: engine scene builds in the browser, 4 walkers complete, zero violations",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t083": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab wall: completes as expected, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t084": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab u-trap: completes as expected, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t085": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab narrow-passage: completes as expected, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t086": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab stairs: completes as expected, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t087": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab deck-to-ground: completes as expected, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t088": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab incomplete-stairs: completes as expected, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t089": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab construction: completes as expected, zero violations, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t090": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab stairs: climber is on the steps, facing up-stair, rising continuously",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t091": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab stairs: no horizontal teleport at stair ends",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t092": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab deck-to-ground: no horizontal teleport at stair ends",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t093": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab narrow-passage: real-time video",
+      "method": "browser-live-loop-completion-programmatic-start",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t094": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab stairs: real-time video",
+      "method": "browser-live-loop-completion-programmatic-start",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t095": {
+      "file": "viewer/e2e/lab.spec.ts",
+      "name": "lab perf: step cost + render stats for trio and stress-30",
+      "method": "bounded-live-loop-metrics-no-progress-assertion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t101": {
+      "file": "viewer/e2e/meal.spec.ts",
+      "name": "meal: everyone eats, hands on the engine hand points, items in the hands",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t102": {
+      "file": "viewer/e2e/meal.spec.ts",
+      "name": "meal: captures (sit, spoon at the mouth, legs crossed)",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t103": {
+      "file": "viewer/e2e/meal.spec.ts",
+      "name": "meal: take replay with the recorded hands / baseActivity poses as in the lab",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t104": {
+      "file": "viewer/e2e/music.spec.ts",
+      "name": "computer music: audible Play, independent departure, interruption and reset resource lifetime",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t109": {
+      "file": "viewer/e2e/poses.spec.ts",
+      "name": "hand-up: rig-reachable hands on the engine hand points, arms never stretched",
+      "method": "browser-programmatic-step-pose-and-effects",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t110": {
+      "file": "viewer/e2e/poses.spec.ts",
+      "name": "hand-up: captures (crouch, stand with load, reach up / reach down)",
+      "method": "browser-programmatic-step-pose-and-effects",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t112": {
+      "file": "viewer/e2e/poses.spec.ts",
+      "name": "hand-up: climbing a frame (ladder cycle) and walking a beam (arms out)",
+      "method": "browser-programmatic-step-pose-and-effects",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t114": {
+      "file": "viewer/e2e/preparation.spec.ts",
+      "name": "cold-preparation: fresh Step, retained deposits, actual Play completion and three reset lifetimes",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t115": {
+      "file": "viewer/e2e/preparation.spec.ts",
+      "name": "cold-preparation-rotated: fresh Step, retained deposits, actual Play completion and three reset lifetimes",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t116": {
+      "file": "viewer/e2e/prepared-day.spec.ts",
+      "name": "prepared-day-4: unfinished purpose through a real prepared meal and sleep",
+      "method": "mixed-ui-play-and-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t117": {
+      "file": "viewer/e2e/prepared-day.spec.ts",
+      "name": "prepared-day-8: unfinished purpose through a real prepared meal and sleep",
+      "method": "mixed-ui-play-and-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t118": {
+      "file": "viewer/e2e/prepared-day.spec.ts",
+      "name": "prepared-day-studio: unfinished purpose through a real prepared meal and sleep",
+      "method": "mixed-ui-play-and-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t128": {
+      "file": "viewer/e2e/prone.spec.ts",
+      "name": "prone: prone receivers — hands on the engine points, lying on the deck (not in it), shoulders over the edge",
+      "method": "browser-programmatic-step-pose-and-effects",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t129": {
+      "file": "viewer/e2e/prone.spec.ts",
+      "name": "prone-forks: prone receivers — hands on the engine points, lying on the deck (not in it), shoulders over the edge",
+      "method": "browser-programmatic-step-pose-and-effects",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t130": {
+      "file": "viewer/e2e/prone.spec.ts",
+      "name": "prone: deterministic — the same run twice gives the same receivers' bones every tick",
+      "method": "browser-programmatic-step-pose-and-effects",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t131": {
+      "file": "viewer/e2e/prone.spec.ts",
+      "name": "prone: captures (lie down, reach with the sheet below, take, push-up, kneel-up, standing)",
+      "method": "browser-programmatic-step-pose-and-effects",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t145": {
+      "file": "viewer/e2e/reading.spec.ts",
+      "name": "quiet reading: fresh Step, actual Play, interrupted bookmark and same-book completion",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t214": {
+      "file": "viewer/e2e/sleep.spec.ts",
+      "name": "ground-sleep: actual supported lie/rest/wake, retained interruption, replay and reset",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t215": {
+      "file": "viewer/e2e/sleep.spec.ts",
+      "name": "ground-sleep-rotated: actual supported lie/rest/wake, retained interruption, replay and reset",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t216": {
+      "file": "viewer/e2e/solar-paint.spec.ts",
+      "name": "solar-paint: paint bands as drawn = engine coverage, panel carried flat, stock and equipment, captures",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t262": {
+      "file": "viewer/e2e/work-break.spec.ts",
+      "name": "one continuing world 4: notes → shared food → explicit returns → same notes",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t263": {
+      "file": "viewer/e2e/work-break.spec.ts",
+      "name": "one continuing world 8: notes → shared food → explicit returns → same notes",
+      "method": "browser-programmatic-step-completion",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t268": {
+      "file": "viewer/e2e/year-build.spec.ts",
+      "name": "year-build-2022: source-era unsupported layout refuses Play, Step and Reset before physical actions",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t269": {
+      "file": "viewer/e2e/year-build.spec.ts",
+      "name": "year-build-2022-house: source-era unsupported layout refuses Play, Step and Reset before physical actions",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "gate38"
+      ]
+    },
+    "t273": {
+      "file": "viewer/e2e/communal-supper.spec.ts",
+      "name": "retained preparation and consumed meal continue to actual seven-vessel storage under Play",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    },
+    "t274": {
+      "file": "viewer/e2e/communal-supper.spec.ts",
+      "name": "end before first step and held meal draining preserve material without orphan actions, then Reset releases everything",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    },
+    "t275": {
+      "file": "viewer/e2e/communal-supper.spec.ts",
+      "name": "retry End after ordinary return cancellation retains history and safely returns the same remaining utensils",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    },
+    "t276": {
+      "file": "viewer/e2e/garden-circuit.spec.ts",
+      "name": "finite two-refill six-care circuit retains real material across Pause, direction and due waiting under Play",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    },
+    "t277": {
+      "file": "viewer/e2e/garden-circuit.spec.ts",
+      "name": "End before step, while holding committed refill and during actual due waiting retains water then Reset releases all state",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    },
+    "t281": {
+      "file": "viewer/e2e/room-preparation.spec.ts",
+      "name": "connected actual Play: held bowl safe Pause, carried table safe retry, same stored objects and moved-seat classroom questions through full finish",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    },
+    "t282": {
+      "file": "viewer/e2e/room-preparation.spec.ts",
+      "name": "pre-first-tick End uses actual Play cleanup then Reset firstStep leaves no children or stale preparation",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    },
+    "t283": {
+      "file": "viewer/e2e/room-preparation.spec.ts",
+      "name": "active held-table End uses actual Play ground setdown and drains without starting classroom or claiming finished",
+      "method": "actual-ui-play-journey",
+      "outcome": "passed",
+      "proofRefs": [
+        "focused39"
+      ]
+    }
+  },
+  "nodeFixtureCatalog": {
+    "group-warmup.test.ts": {
+      "file": "viewer/engine/test/group-warmup.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "four independent followers complete phased planted warm-up yaw ${yaw}",
+        "group_warmup",
+        "continuous hands and interruption lower before foreign walking takes actor"
+      ],
+      "authoredLiteralNameCount": 31,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "year-build-b.test.ts": {
+      "file": "viewer/engine/test/year-build-b.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged",
+        "year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)",
+        "set-part lift crews never walk through a bystander: the crew holds the part (setpart.path-occupied) and an idle person in the way is asked to step aside; 0 violations"
+      ],
+      "authoredLiteralNameCount": 7,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "art-sharing.test.ts": {
+      "file": "viewer/engine/test/art-sharing.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "art_sharing",
+        "art_sharing_control",
+        "host and visitors physically view the actual retained pad, take floors and keep completed discussion effects"
+      ],
+      "authoredLiteralNameCount": 30,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "year-build-occupied-hierarchy.test.ts": {
+      "file": "viewer/engine/test/year-build-occupied-hierarchy.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "pre-build removes explicitly attached occupied descendants and retains every independent neighbor",
+        "attached descendants are resolved transitively without removing unrelated hierarchy"
+      ],
+      "authoredLiteralNameCount": 2,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "sleep-take.test.ts": {
+      "file": "viewer/engine/test/sleep-take.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "supported sleep semantic take/replay and cleanup yaw=${yaw}",
+        "sleep"
+      ],
+      "authoredLiteralNameCount": 2,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "sleep-walk.test.ts": {
+      "file": "viewer/engine/test/sleep-walk.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "sleep",
+        "sleep_control",
+        "ordinary walker passes ${forward < 0 ? 'feet' : 'head'} outside old disc at yaw ${yaw}"
+      ],
+      "authoredLiteralNameCount": 14,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "gallery-tour-direction.test.ts": {
+      "file": "viewer/engine/test/gallery-tour-direction.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "short gallery late Join admits clear host direction, retains discussion and completes after explicit Resume",
+        "gallery_tour",
+        "gallery_tour_control"
+      ],
+      "authoredLiteralNameCount": 4,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "living-day-disruptions.test.ts": {
+      "file": "viewer/engine/test/living-day-disruptions.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "${name}: routine Pause/Resume preserves partial preparation and the same sleep purpose",
+        "${name}: directing reader away retains the bookmark while carer continues independently",
+        "walk_to"
+      ],
+      "authoredLiteralNameCount": 19,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "gallery-tour.test.ts": {
+      "file": "viewer/engine/test/gallery-tour.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "gallery_tour_control",
+        "gallery_tour",
+        "three supported real artifacts: arrivals, actual attention/turns, ordinary departures, stable identities and deterministic replay"
+      ],
+      "authoredLiteralNameCount": 23,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "work-break.test.ts": {
+      "file": "viewer/engine/test/work-break.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "same-world ${count}: work → shared serving/talking/eating → explicit returns → same work",
+        "authored extension preserves classroom entities and validates returns/service geometry",
+        "unavailable food and full hands refuse without replacing support or duplicating food"
+      ],
+      "authoredLiteralNameCount": 5,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "body-probe-safety.test.ts": {
+      "file": "viewer/engine/test/body-probe-safety.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "body probe fresh selection and first fixed tick preserve a safe still world",
+        "body probe Play ticks the same still world and reset repeats its first tick",
+        "original invalid deck-edge and stair admissions remain loud named violations"
+      ],
+      "authoredLiteralNameCount": 3,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "year-build.test.ts": {
+      "file": "viewer/engine/test/year-build.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic",
+        "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned",
+        "year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)"
+      ],
+      "authoredLiteralNameCount": 3,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "sleep.test.ts": {
+      "file": "viewer/engine/test/sleep.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "sleep",
+        "sleep_control",
+        "ground sleep at yaw ${yaw} walks, lies, sleeps, wakes and physically returns"
+      ],
+      "authoredLiteralNameCount": 25,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "open-jam.test.ts": {
+      "file": "viewer/engine/test/open-jam.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "two ordinary performer handoffs preserve computer/chair at ${yaw}",
+        "open_jam",
+        "pause/resume retains current score and completed round history"
+      ],
+      "authoredLiteralNameCount": 38,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "classroom-turns.test.ts": {
+      "file": "viewer/engine/test/classroom-turns.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "turn utility is deterministic and only clocks talking members (${size})",
+        "bounded groups have distinct periods and floor only among eligible members",
+        "classroom_session"
+      ],
+      "authoredLiteralNameCount": 7,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "communal-supper.test.ts": {
+      "file": "viewer/engine/test/communal-supper.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "communal_supper",
+        "communal_supper_control",
+        "same seven vessels prepare once, converse/eat and store empty with exact replay and detached readout"
+      ],
+      "authoredLiteralNameCount": 35,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "body-model.test.ts": {
+      "file": "viewer/engine/test/body-model.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "body model = the measured rig (W9, poses.spec.ts \"body model\", within 2 cm)",
+        "body model is internally consistent: overhead, caps vs envelopes, bands from the rig, landmarks",
+        "prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise"
+      ],
+      "authoredLiteralNameCount": 3,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "year-build-ui-contract.test.ts": {
+      "file": "viewer/engine/test/year-build-ui-contract.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "year-build choices remain readable before asynchronous scene preparation"
+      ],
+      "authoredLiteralNameCount": 1,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "prepared-day-core.test.ts": {
+      "file": "viewer/engine/test/prepared-day-core.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "work_at",
+        "classroom_session",
+        "purposeful_routine"
+      ],
+      "authoredLiteralNameCount": 15,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "room-preparation.test.ts": {
+      "file": "viewer/engine/test/room-preparation.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "room_preparation",
+        "room_preparation_control",
+        "connected whole session uses same stored items, physically moved table and late visitor chair/question; replay is exact"
+      ],
+      "authoredLiteralNameCount": 23,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "table-cleanup.test.ts": {
+      "file": "viewer/engine/test/table-cleanup.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "physical ${count}-item transfer retains identities, payloads and support at yaw ${yaw}",
+        "tidy_table",
+        "pause while second item is held retains first transfer and resumes same remaining objects"
+      ],
+      "authoredLiteralNameCount": 52,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "garden-care.test.ts": {
+      "file": "viewer/engine/test/garden-care.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "garden_care",
+        "two planters conserve finite water, identity and supported ordinary take/walk/put",
+        "Pause in ${phase} drains safely and retains exact partial care"
+      ],
+      "authoredLiteralNameCount": 17,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "construction.test.ts": {
+      "file": "viewer/engine/test/construction.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "supported bay: raise, hold, premature release refused, beams, stable release",
+        "walk_to",
+        "release_support"
+      ],
+      "authoredLiteralNameCount": 27,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "computer-music.test.ts": {
+      "file": "viewer/engine/test/computer-music.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "ordinary computer execution and optional listening complete with coherent score at yaw ${yaw}",
+        "computer_music",
+        "interruption safely releases children and quiescent JSON restore resumes the same recorded program"
+      ],
+      "authoredLiteralNameCount": 44,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "year-build-houses.test.ts": {
+      "file": "viewer/engine/test/year-build-houses.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "year build 2022: the four rack houses are one template (12 frames of 16 ft × 3 ft in 4 lines × 3 rows, 54 beams of 12 ft at 0.22 / 2.48 / 4.757 m) — phase B split rules apply unchanged",
+        "year build 2022, all four houses A+B: plans through the same rules — counts by kind, unplaced with reasons, the yard clear of the neighbours\\",
+        "year build 2022 ${h}, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned"
+      ],
+      "authoredLiteralNameCount": 4,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "design-studio.test.ts": {
+      "file": "viewer/engine/test/design-studio.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "fresh studio runs ordinary critique, real question/rotation/discussion, lunch/rest and same unfinished project plus follow-up",
+        "local direction in studio pauses only the same bound reviewer pair and resumes remaining talk",
+        "occupied studio computer and foreign unfinished task refuse without overwriting them"
+      ],
+      "authoredLiteralNameCount": 10,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "classroom-joining.test.ts": {
+      "file": "viewer/engine/test/classroom-joining.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "classroom_session",
+        "late human joins through a spare seat during a live talk and can ask a question",
+        "classroom_control"
+      ],
+      "authoredLiteralNameCount": 21,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "creative-afternoon.test.ts": {
+      "file": "viewer/engine/test/creative-afternoon.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "produce, share and finish the same actual drawing alongside independent reading and care",
+        "player direction pauses only the unfinished sketch; Resume completes the combined afternoon",
+        "walk_to"
+      ],
+      "authoredLiteralNameCount": 11,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "classroom-map.test.ts": {
+      "file": "viewer/engine/test/classroom-map.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "playable classroom real catalog/display cycle (${count} guests)",
+        "classroom_session",
+        "classroom_control"
+      ],
+      "authoredLiteralNameCount": 9,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "seed-planting.test.ts": {
+      "file": "viewer/engine/test/seed-planting.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "seed_planting",
+        "same bowl, supported right-hand reach and four conserved seed deposits at ${angle}",
+        "seed_planting"
+      ],
+      "authoredLiteralNameCount": 44,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "meal.test.ts": {
+      "file": "viewer/engine/test/meal.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "unfinished preparation refuses serving at admission, pot=${fraction}",
+        "serve",
+        "serving rechecks preparation completion at physical deposit without consuming food"
+      ],
+      "authoredLiteralNameCount": 40,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "reading-circle-direction.test.ts": {
+      "file": "viewer/engine/test/reading-circle-direction.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "reading_circle",
+        "reader handoff from occupied ${phase} at ${yaw} plans only after ordinary stand-up",
+        "walk_to"
+      ],
+      "authoredLiteralNameCount": 7,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "living-day.test.ts": {
+      "file": "viewer/engine/test/living-day.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "${name}: ${worker} independent day returns to unfinished purpose"
+      ],
+      "authoredLiteralNameCount": 1,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "garden-afternoon.test.ts": {
+      "file": "viewer/engine/test/garden-afternoon.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "connected retained seeds/care and sliced book finish at yaw ${angle}",
+        "partial seed Pause, local player direction, explicit Resume at yaw ${angle}",
+        "walk_to"
+      ],
+      "authoredLiteralNameCount": 10,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "build-bay-v2.test.ts": {
+      "file": "viewer/engine/test/build-bay-v2.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "flagship v2: forklift sheet, stairs carry, campfire ending — rehearse, execute, canonical untouched",
+        "flagship v2 layout: the forklift cannot stage s2 on the half-built deck (so it stages it beside the bay)",
+        "forklift_deliver"
+      ],
+      "authoredLiteralNameCount": 5,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "year-build-stance-repair.test.ts": {
+      "file": "viewer/engine/test/year-build-stance-repair.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "byte-verified pre-review7648dbf east-house reports every unsupported skeleton part without acquiring it or abandoning a stance",
+        "exact pre-W51 east-house source supports all 66 skeleton parts without changing the historical plan",
+        "exact historical source whole skeleton: completion, support, cleanup, unchanged pin"
+      ],
+      "authoredLiteralNameCount": 4,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "reading-circle.test.ts": {
+      "file": "viewer/engine/test/reading-circle.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "reading_circle",
+        "reading_circle_control",
+        "real supported book reading intervals and physical questions/answers at ${yaw}"
+      ],
+      "authoredLiteralNameCount": 32,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "classroom-activity.test.ts": {
+      "file": "viewer/engine/test/classroom-activity.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "classroom completes physical cycle, questions and attention: arrangement ${arrangement}, audience ${size}",
+        "classroom_session",
+        "classroom_control"
+      ],
+      "authoredLiteralNameCount": 55,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "build-bay-v3.test.ts": {
+      "file": "viewer/engine/test/build-bay-v3.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "flagship v3: deck handed up (joists + s1 by hand to two on the beams, s2 off the forklift), 0 violations, rehearse = execute, pinned",
+        "flagship v3 is origin-independent: completes with 0 violations at open-ground origins that used to fail (step-off target reading 0.25 m; spare tread at the s1/s2 corner)",
+        "beam_walk step-off: a deck target whose cell reads < 0.28 m lands on the nearest spot with room within 0.15 m; a target truly at the edge is still refused (beam.no-room)"
+      ],
+      "authoredLiteralNameCount": 4,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "prepared-day-scenarios.test.ts": {
+      "file": "viewer/engine/test/prepared-day-scenarios.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "work_at",
+        "classroom_session",
+        "${name} conserves identities and completes distinct continuing commitments"
+      ],
+      "authoredLiteralNameCount": 7,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "garden-circuit.test.ts": {
+      "file": "viewer/engine/test/garden-circuit.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "garden_circuit",
+        "garden_circuit_control",
+        "six real care cycles, two real resupplies, original identities and deterministic replay"
+      ],
+      "authoredLiteralNameCount": 24,
+      "namesAreSamplesNotExhaustive": true
+    },
+    "build-bay.test.ts": {
+      "file": "viewer/engine/test/build-bay.test.ts",
+      "proofStatus": "Authored fixture name samples only; aggregate gate38 engine proof applies at5f. Not individually attributed to currentb712 in this bounded draft; never UI Play proof.",
+      "authoredNameSample": [
+        "flagship: rehearse the full build from material piles, then execute it"
+      ],
+      "authoredLiteralNameCount": 1,
+      "namesAreSamplesNotExhaustive": true
+    }
+  },
+  "contracts": {
+    "living-day": {
+      "terminal": "Independent main day, reading, care and music commitments complete/end truthfully; no held items or claims.",
+      "retainedEffects": [
+        "same notes after meal/sleep",
+        "same book bookmark",
+        "finite recipe/water",
+        "independent music during rest"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "individual Pause/Resume",
+        "ordinary direction",
+        "safe End",
+        "Reset"
+      ],
+      "limits": "Two fixed castings, permitted equipment/floor alternatives; no needs autonomy or active reload."
+    },
+    "garden-afternoon": {
+      "terminal": "Planting/courtyard/care intention and independent reader both complete; bowls returned/book24.",
+      "retainedEffects": [
+        "same seed/water bowls",
+        "seed4/water.25 on same bed",
+        "same book24"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "individual Pause/direction/Resume",
+        "End before tick",
+        "Reset"
+      ],
+      "limits": "Independent commitments; no shared-walk synchronization/growth/refill."
+    },
+    "seed-planting": {
+      "terminal": "Both supported plots receive finite deposits; same bowl returned, purpose complete.",
+      "retainedEffects": [
+        "actual planted marker counts",
+        "material conservation",
+        "same bowl/provenance/support"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "partial Pause/Continue",
+        "direction",
+        "partial End then continuation",
+        "Reset"
+      ],
+      "limits": "Two flat soil layouts, normalized finite stock; no growth/refill."
+    },
+    "reading-circle": {
+      "terminal": "Same reader/book completes12s retained reading and ordered question-answer effects, safe End/newcircle/Reset.",
+      "retainedEffects": [
+        "same supported book/page/bookmark/effects",
+        "real reader/listener place occupancy"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause/Resume",
+        "declared Join/Leave",
+        "Floor",
+        "ordinary reader direction",
+        "partial End/newcircle",
+        "Reset"
+      ],
+      "limits": "Silent discussion; no reader replacement or active reload."
+    },
+    "gallery-tour": {
+      "terminal": "Two/three stop tour ends with retained artwork/discussion history and released floor/participants.",
+      "retainedEffects": [
+        "same pre-made artwork",
+        "completed question-answer/stop history"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause/Resume",
+        "Join/Leave",
+        "host direction",
+        "insufficient-attendance wait",
+        "End/Reset"
+      ],
+      "limits": "Authored ground gallery; no arbitrary exhibitions."
+    },
+    "table-cleanup": {
+      "terminal": "Three original props at declared destination supports; completed transfer receipts, empty hands/claims.",
+      "retainedEffects": [
+        "same bowl/book IDs/contents",
+        "completed placements"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "held Pause/Resume",
+        "direction",
+        "held End/restart",
+        "Reset"
+      ],
+      "limits": "No deletion/washing/general storage planner."
+    },
+    "creative-afternoon": {
+      "terminal": "Artist returns to same pad from3→8marks after sharing and two-performer music; independent reading/care remain coherent.",
+      "retainedEffects": [
+        "same pencil/pad",
+        "first music completed7/7 note:null while second progresses",
+        "same book and finite water"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "individual Pause/Resume",
+        "direction",
+        "late invitation/questions",
+        "safe End/Reset"
+      ],
+      "limits": "Fixed anonymous cast; no arbitrary art or active reload."
+    },
+    "art-sharing": {
+      "terminal": "Explicit End drains supported viewing group while retaining artwork/question effects.",
+      "retainedEffects": [
+        "same pre-made pad",
+        "actual floor and silent question-answer history"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause/Resume",
+        "Join/Leave",
+        "Floor",
+        "Ask/Answer",
+        "End/Reset"
+      ],
+      "limits": "Social interaction ends explicitly, not infinite healthy liveness; fixed viewing places."
+    },
+    "drawing-work": {
+      "terminal": "Eight retained segments on original pad; pencil returned to original supported slot.",
+      "retainedEffects": [
+        "same pencil/pad",
+        "partial and committed marks"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause",
+        "direction",
+        "Resume same study",
+        "Reset"
+      ],
+      "limits": "One authored shelter outline; overlapping segments, not arbitrary freehand."
+    },
+    "group-warmup": {
+      "terminal": "Guide/four followers finish planted phases and release hands/claims.",
+      "retainedEffects": [
+        "guide clock",
+        "individual arrival/phase delay",
+        "shared attention"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Leave/Join",
+        "Pause/Resume exact clock",
+        "direction",
+        "End/Reset"
+      ],
+      "limits": "Standing gestures only, not advanced yoga/anatomy proof."
+    },
+    "open-jam": {
+      "terminal": "Two performers physically exchange same computer/chair; two rounds complete, no active audio/resources after Reset.",
+      "retainedEffects": [
+        "first score complete7/7 remains silent",
+        "second score progress",
+        "withdrawn dancer stays withdrawn"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause/Resume",
+        "performer direction",
+        "Leave",
+        "End/Reset"
+      ],
+      "limits": "Original digital notes, not acoustic improvisation."
+    },
+    "garden-care": {
+      "terminal": "Four finite .25 cycles (two per planter) exhaust same bowl, return safely and preserve due clocks.",
+      "retainedEffects": [
+        "finite deposits",
+        "same bowl/plant",
+        "600tick due interval"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "partial Pause/Resume",
+        "direction",
+        "due wait",
+        "exhaustion refusal",
+        "Reset"
+      ],
+      "limits": "No growth/refill or indefinite continuity."
+    },
+    "music-dance": {
+      "terminal": "Digital score finishes with grounded floor participation and released equipment/audio.",
+      "retainedEffects": [
+        "same score/bookmark",
+        "declared membership"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "late Join/Leave",
+        "Pause/Resume",
+        "direction",
+        "Reset"
+      ],
+      "limits": "Reserved planted gestures only, no locomoting choreography."
+    },
+    "classroom": {
+      "terminal": "Presenters rotate, questions/formed discussions occur, departure/End releases seats/display/floor.",
+      "retainedEffects": [
+        "same actors/furniture",
+        "question/discussion history"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "question",
+        "Next presenter",
+        "direction",
+        "End",
+        "joining/withdrawal/room setup in supplementary step tests",
+        "Reset"
+      ],
+      "limits": "Four/eight authored ground rooms; full UI Play completion gap."
+    },
+    "work-break": {
+      "terminal": "Original notes interrupted then classroom/shared food/returns/quiet rest, same notes finish and independent continuations release.",
+      "retainedEffects": [
+        "same world/epoch/notes30s",
+        "same utensils/food receipts"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "held refusal",
+        "safe note interruption",
+        "food Pause/retry",
+        "routine End/Resume",
+        "Reset"
+      ],
+      "limits": "Manual choices; full UI Play end-to-end gap, prepared side layout required8."
+    },
+    "prepared-day": {
+      "terminal": "Notes30s complete after talks/question/discussion, companion walk, recipe, two meals,18s mat sleep and independent follow-ups.",
+      "retainedEffects": [
+        "same unfinished notes",
+        "recipe two original ingredients",
+        "same sleep purpose/elapsed",
+        "meal receipts"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "partial recipe Pause",
+        "studio sleep Pause/wake/Resume",
+        "Reset"
+      ],
+      "limits": "Mixed proof only; full end-to-end UI Play completion needed, side layout first8."
+    },
+    "quiet-reading": {
+      "terminal": "Original supported book completes retained reading after actual seated interruption and same-book resumption.",
+      "retainedEffects": [
+        "same book/bookmark",
+        "same actor/duration"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "interruption/direction",
+        "same-book Resume",
+        "Reset"
+      ],
+      "limits": "One reader/current chair, no speech."
+    },
+    "computer-music": {
+      "terminal": "Same score progresses to complete with performer safely released and audio disposed.",
+      "retainedEffects": [
+        "same score/bookmark",
+        "independent remaining listeners"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "listener departure",
+        "performer interruption/Resume",
+        "direction",
+        "Reset/context lifetime"
+      ],
+      "limits": "Digital score, no arbitrary acoustic music."
+    },
+    "tabletop-chess": {
+      "terminal": "Physical proposed legal moves commit only after same-token placement; four-turn mate and alternative capture supported.",
+      "retainedEffects": [
+        "32 stable pieces",
+        "captured same token supported in tray",
+        "original turn on interrupted restoration"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "invalid move refusals",
+        "interruption/explicit restoration",
+        "player direction",
+        "Reset"
+      ],
+      "limits": "No castling/physical promotion/repetition clocks; bounded actual four-turn proof."
+    },
+    "design-studio": {
+      "terminal": "Critique, meal, quiet rest, original project30s plus independent12s/20s follow-ups complete.",
+      "retainedEffects": [
+        "same non-Mars roles/equipment/project",
+        "same meal receipts"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "local pause",
+        "End",
+        "busy computer branch",
+        "reviewer crossing",
+        "Reset"
+      ],
+      "limits": "Mixed UI/step completion, not full UI Play proof."
+    },
+    "sleep": {
+      "terminal": "Original18s sleep purpose completes, safe wake returns actor; exact Reset resource counts/replay.",
+      "retainedEffects": [
+        "same purpose/elapsed",
+        "same grounded mat"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause wakes/releases physical lease",
+        "Resume same sleep",
+        "replay",
+        "threeReset"
+      ],
+      "limits": "Current woman/casual rig adapters; -.03major-volume bound, no fine anatomy."
+    },
+    "preparation": {
+      "terminal": "Both finite original ingredients deposit1 each, mix60ticks, yield exactly two servings; ordinary returns and later meals conserve material.",
+      "retainedEffects": [
+        "same pot/ingredient IDs",
+        "retained partial deposits/mixing"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause/Resume",
+        "ordinary direction",
+        "missing/unsupported refusal Node fixtures",
+        "threeReset"
+      ],
+      "limits": "Cold two-ingredient recipe; no heat/chopping/refill."
+    },
+    "room-preparation": {
+      "terminal": "Clear same bowl/spoon, safely carry empty table/spare chair, run classroom incl moved-seat visitor and finish released.",
+      "retainedEffects": [
+        "same stored items",
+        "actual fixture supported partial/final placements",
+        "session history"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "held bowl Pause/Resume",
+        "table safe stop/retry",
+        "pre-tick End",
+        "held-table End/no subsequent session",
+        "Reset"
+      ],
+      "limits": "Fixed ground layout, global Pause/classroom controls during gathering; local session Pause unsupported."
+    },
+    "communal-supper": {
+      "terminal": "Actual two-ingredient prepare, two servings consumed, all7original vessels physically stored and released.",
+      "retainedEffects": [
+        "same7IDs",
+        "meal purpose/serves/eats receipts",
+        "finite conservation2bowl units"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "preparation/meal/held-cleanup Pause",
+        "direction",
+        "Resume",
+        "pre-tick/held End",
+        "cancelled return then explicit End retry",
+        "Reset"
+      ],
+      "limits": "Cold dish, fixed supported tables, no washing/refill/replacements."
+    },
+    "garden-circuit": {
+      "terminal": "A,A,B,B,C,C actual care6cycles; same supported bowl.5 remains, pot0, eachplant.5deposit, no physical claims.",
+      "retainedEffects": [
+        "two finite ordinary serves",
+        "same pot/bowl",
+        "partial deposits",
+        "600tick due waits"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Pause/Resume during committed serve/partial care",
+        "direction",
+        "End beforetick/held/duewait",
+        "Reset"
+      ],
+      "limits": "Three grounded static planters;2bowl units conserved, no unlimited refill/growth."
+    },
+    "wall": {
+      "terminal": "p1 reaches opposite side by routing around8mwall.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "u-trap": {
+      "terminal": "p1 exits cup opening then reaches goal behind wall.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "narrow-passage": {
+      "terminal": "n1/s1 cross1m opposing gap by yielding without overlap.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "stairs": {
+      "terminal": "p1 approaches/climbs real stairsA and finishes deck level1.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "deck-to-ground": {
+      "terminal": "p1 descends stairsA to ground below; no fall-through/teleport.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "construction": {
+      "terminal": "Panel installed at authored tick invalidates route; p1 replans around obstacle and completes.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "trio": {
+      "terminal": "Three walkers complete goals with no collisions; deterministic terminal hash.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "build-bay": {
+      "terminal": "43sequence steps complete; uprights/deck installed, connected visitor climbs decklevel4, crew released.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "hand-up": {
+      "terminal": "Authored frame/beam/deck material handup sequence completes with installed supported parts and released crew.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "prone": {
+      "terminal": "Same sheets1 transferred by prone receivers then staged resting on joists; all authored steps complete.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "prone-forks": {
+      "terminal": "Forks presents same sheets1 .70m below2.902mdeck; prone receivers transfer then safely stage it on joists.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "campfire-evening": {
+      "terminal": "Authored social/food/fire sequence completes with only declared full-circle refusals; no invariant violations.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "meal": {
+      "terminal": "All authored diners eat with original bowls/spoons and terminal actions; finite contents/support retained.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "solar-paint": {
+      "terminal": "Finite paint bands match engine coverage, panel transported flat/installed and counted stock stays coherent.",
+      "retainedEffects": [
+        "same authored actors/material IDs and supported effects"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/replay or programmatic pose sampling; full UI Pause/intervention not established by generic completion"
+      ],
+      "limits": "Scripted fixture; browser stepping is not UI Play completion."
+    },
+    "year-2020": {
+      "terminal": "Four authored walkers reach year-specific destinations with expected via/route checks and zero violations.",
+      "retainedEffects": [
+        "fixed campus-2020 scene identity"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/deterministic stepping"
+      ],
+      "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
+    },
+    "year-2021": {
+      "terminal": "Four authored walkers reach year-specific destinations with expected via/route checks and zero violations.",
+      "retainedEffects": [
+        "fixed campus-2021 scene identity"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/deterministic stepping"
+      ],
+      "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
+    },
+    "year-2022": {
+      "terminal": "Four authored walkers reach year-specific destinations with expected via/route checks and zero violations.",
+      "retainedEffects": [
+        "fixed campus-2022 scene identity"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/deterministic stepping"
+      ],
+      "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
+    },
+    "year-2023": {
+      "terminal": "Four authored walkers reach year-specific destinations with expected via/route checks and zero violations.",
+      "retainedEffects": [
+        "fixed campus-2023 scene identity"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/deterministic stepping"
+      ],
+      "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
+    },
+    "year-2024": {
+      "terminal": "Four authored walkers reach year-specific destinations with expected via/route checks and zero violations.",
+      "retainedEffects": [
+        "fixed campus-2024 scene identity"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/deterministic stepping"
+      ],
+      "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
+    },
+    "year-2025": {
+      "terminal": "Four authored walkers reach year-specific destinations with expected via/route checks and zero violations.",
+      "retainedEffects": [
+        "fixed campus-2025 scene identity"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/deterministic stepping"
+      ],
+      "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
+    },
+    "year-2026": {
+      "terminal": "Four authored walkers reach year-specific destinations with expected via/route checks and zero violations.",
+      "retainedEffects": [
+        "fixed campus-2026 scene identity"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Reset/deterministic stepping"
+      ],
+      "limits": "Historical walkabout geometry, not an autonomous campus or build;2026crop only."
+    },
+    "year-build": {
+      "terminal": "Supported preflight then entire skeleton sequence completes: firstbay201/20124parts, whole555/55566parts, piles→samepart→connected installation; crew grounded/released.",
+      "retainedEffects": [
+        "same extracted parts/pile counts",
+        "canonical installed corners .41/.94mm max inpublic38"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "automatic Play throughs0021 with capturePause/restart",
+        "Reset",
+        "unsupported admission named refusal/no actions"
+      ],
+      "limits": "Conditional on real loaded staging; old unsupported layout is refusal, not successful construction.7historical browserFIXMEs unproved."
+    },
+    "incomplete-stairs": {
+      "terminal": "Named route.link-unusable refusal names stairs; no movement/action acquisition or invariant violation.",
+      "retainedEffects": [
+        "unchanged actor/world"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "fresh load/Reset/firstStep",
+        "programmatic exact refusal"
+      ],
+      "limits": "Diagnostic acceptance, never activity completion."
+    },
+    "body": {
+      "terminal": "One-second actual Play of safe still scene; synthetic renderer reach probe leaves authoritative state unchanged.",
+      "retainedEffects": [
+        "unchanged actor/world"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Step/Reset/Play budget",
+        "synthetic probe"
+      ],
+      "limits": "Probe only; no meaningful activity journey."
+    },
+    "stress": {
+      "terminal": "No terminal; continuously select reachable seeded goals, repeatedly complete walking while finite poses/no ownership leaks/violations.",
+      "retainedEffects": [
+        "same30actors",
+        "seeded deterministic choices"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "6s realtime replay metrics plus1200tick step budget"
+      ],
+      "limits": "Existing perf case reports metrics and only asserts console errors; sustained progress/safety assertions missing."
+    }
+  },
+  "scenarios": [
+    {
+      "id": "living-day-4",
+      "title": "Living day · Mars classroom (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-day.ts"
+      ],
+      "startControls": [
+        "Choose main participant/equipment",
+        "Start connected day",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "living-day",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t003"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "living-day-disruptions.test.ts",
+        "living-day.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "living-day-studio",
+      "title": "Living day · independent studio (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-day.ts"
+      ],
+      "startControls": [
+        "Choose main participant/equipment",
+        "Start connected day",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "living-day",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t004"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "living-day-disruptions.test.ts",
+        "living-day.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "garden-circuit",
+      "title": "Finite garden circuit · resupply, care and due waits (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start circuit",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "garden-circuit",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "exact-functional-inheritance-focused39",
+      "testRefs": [
+        "t276",
+        "t277"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "garden-circuit.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Full63 selector parity, combined gate39 and fresh public39 pending."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "communal-supper",
+      "title": "Communal supper · prepare, share and store (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start supper",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "communal-supper",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "exact-functional-inheritance-focused39",
+      "testRefs": [
+        "t273",
+        "t274",
+        "t275"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "communal-supper.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Full63 selector parity, combined gate39 and fresh public39 pending."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "room-preparation",
+      "title": "Prepare and use a classroom · clear, carry, gather (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start room preparation",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "room-preparation",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "exact-functional-inheritance-focused39",
+      "testRefs": [
+        "t281",
+        "t282",
+        "t283"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "room-preparation.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Full63 selector parity, combined gate39 and fresh public39 pending."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "garden-afternoon",
+      "title": "Garden afternoon · plant, break, care and read (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start garden afternoon",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "garden-afternoon",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t019"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "garden-afternoon.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "garden-afternoon-rotated",
+      "title": "Garden afternoon · rotated intentions (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start garden afternoon",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "garden-afternoon",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t020"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "garden-afternoon.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "seed-planting",
+      "title": "Seed planting · finite material and retained purpose (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Choose bed",
+        "Start plant A / Start plant B",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "seed-planting",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t030"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "seed-planting.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "seed-planting-rotated",
+      "title": "Seed planting · rotated beds (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Choose bed",
+        "Start plant A / Start plant B",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "seed-planting",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t031"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "seed-planting.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "reading-circle",
+      "title": "Shared reading · book and questions (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start shared reading",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "reading-circle",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t028"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "reading-circle-direction.test.ts",
+        "reading-circle.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "reading-circle-rotated",
+      "title": "Shared reading · rotated circle (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start shared reading",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "reading-circle",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t029"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "reading-circle-direction.test.ts",
+        "reading-circle.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "gallery-tour",
+      "title": "Guided gallery · three stops (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start gallery tour",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "gallery-tour",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t017"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "gallery-tour-direction.test.ts",
+        "gallery-tour.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "gallery-tour-short",
+      "title": "Guided gallery · two stops (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start gallery tour",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "gallery-tour",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t018"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "gallery-tour-direction.test.ts",
+        "gallery-tour.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "table-cleanup",
+      "title": "Table cleanup · same bowls and book (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start cleanup",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "table-cleanup",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t013",
+        "t014"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "table-cleanup.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "table-cleanup-rotated",
+      "title": "Table cleanup · rotated setup (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start cleanup",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "table-cleanup",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t015",
+        "t016"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "table-cleanup.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "creative-afternoon",
+      "title": "Creative afternoon · make, share, return (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start creative afternoon",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "creative-afternoon",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t012"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "creative-afternoon.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "art-sharing",
+      "title": "Art sharing · questions around a retained drawing (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start sharing",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "art-sharing",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t011"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "art-sharing.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "drawing-work",
+      "title": "Drawing Klerb-inspired sketching (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start drawing",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "drawing-work",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t008"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "group-warmup",
+      "title": "Guided standing warm-up (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start warm-up",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "group-warmup",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t009"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "group-warmup.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "open-jam",
+      "title": "Open jam · performer exchange (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start open jam",
+        "Enable sound",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "open-jam",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t010"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "open-jam.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "garden-care",
+      "title": "Garden care · finite water (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Choose planter",
+        "Care for selected plant",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "garden-care",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t002"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "garden-care.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "music-dance",
+      "title": "Music and grounded dancing (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts"
+      ],
+      "startControls": [
+        "Start music gathering",
+        "Enable sound",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "music-dance",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t005"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "classroom-4",
+      "title": "Playable classroom · 4 guests (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/classroom.ts"
+      ],
+      "startControls": [
+        "Start session",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "classroom",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t052"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "classroom-turns.test.ts",
+        "classroom-joining.test.ts",
+        "classroom-map.test.ts",
+        "classroom-activity.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "classroom-8",
+      "title": "Playable classroom · 8 guests (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/classroom.ts"
+      ],
+      "startControls": [
+        "Start session",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "classroom",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t053"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "classroom-turns.test.ts",
+        "classroom-joining.test.ts",
+        "classroom-map.test.ts",
+        "classroom-activity.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "work-break-4",
+      "title": "Work → talks → shared food · 4-guest room (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/work-break.ts"
+      ],
+      "startControls": [
+        "Start notes",
+        "Play",
+        "Interrupt notes; wait stand-up",
+        "Start session",
+        "Join worker during talks",
+        "Start shared food break after departure",
+        "Resume notes"
+      ],
+      "setupNotes": [],
+      "contractRef": "work-break",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t262"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "work-break.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "work-break-8",
+      "title": "Work → talks → shared food · 8-guest room (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/work-break.ts"
+      ],
+      "startControls": [
+        "Start notes",
+        "Play",
+        "Interrupt notes; wait stand-up",
+        "Start session",
+        "Join worker during talks",
+        "Start shared food break after departure",
+        "Resume notes"
+      ],
+      "setupNotes": [
+        "For8: Take break bowl/spoon, Prepare side layout, Put belongings away before notes/session."
+      ],
+      "contractRef": "work-break",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t263"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "work-break.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "prepared-day-4",
+      "title": "Prepared continuing day · 4-guest room (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/prepared-day.ts"
+      ],
+      "startControls": [
+        "Start notes",
+        "Play",
+        "Interrupt notes; wait stand-up",
+        "Start session",
+        "Start purposeful routine during talks",
+        "Commit attendee continuations"
+      ],
+      "setupNotes": [],
+      "contractRef": "prepared-day",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t116"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "prepared-day-core.test.ts",
+        "prepared-day-scenarios.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "supplementaryProofRefs": [
+        "public35"
+      ],
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "prepared-day-8",
+      "title": "Prepared continuing day · 8-guest room (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/prepared-day.ts"
+      ],
+      "startControls": [
+        "Start notes",
+        "Play",
+        "Interrupt notes; wait stand-up",
+        "Start session",
+        "Start purposeful routine during talks",
+        "Commit attendee continuations"
+      ],
+      "setupNotes": [
+        "For8: Take break bowl/spoon, Prepare side layout, Put belongings away before notes/session."
+      ],
+      "contractRef": "prepared-day",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t117"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "prepared-day-core.test.ts",
+        "prepared-day-scenarios.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "supplementaryProofRefs": [
+        "public35"
+      ],
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "prepared-day-studio",
+      "title": "Prepared continuing day · independent studio (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/prepared-day.ts"
+      ],
+      "startControls": [
+        "Start notes",
+        "Play",
+        "Interrupt notes; wait stand-up",
+        "Start session",
+        "Start purposeful routine during talks",
+        "Commit attendee continuations"
+      ],
+      "setupNotes": [],
+      "contractRef": "prepared-day",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t118"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "prepared-day-core.test.ts",
+        "prepared-day-scenarios.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "supplementaryProofRefs": [
+        "public35"
+      ],
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "quiet-reading",
+      "title": "Quiet reading · retained bookmark (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/reading.ts"
+      ],
+      "startControls": [
+        "Start reading",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "quiet-reading",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t145"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "computer-music",
+      "title": "Computer music · performer and listeners (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/music.ts"
+      ],
+      "startControls": [
+        "Start music session",
+        "Enable sound",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "computer-music",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t104"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "computer-music.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "tabletop-chess",
+      "title": "Tabletop chess · two physical players (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/chess.ts"
+      ],
+      "startControls": [
+        "Choose legal proposal",
+        "Play proposed move",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "tabletop-chess",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t044",
+        "t045"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "design-studio",
+      "title": "Independent design studio · critique and continuing projects (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/design-studio.ts"
+      ],
+      "startControls": [
+        "Start notes",
+        "Play",
+        "Interrupt notes; wait stand-up",
+        "Start session",
+        "Start purposeful routine",
+        "Commit attendee continuations"
+      ],
+      "setupNotes": [],
+      "contractRef": "design-studio",
+      "coverageGrade": "recorded-step-or-mixed-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t059",
+        "t060",
+        "t061"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "design-studio.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Complete full supported journey by UI Play without programmatic advancement; retain native result and checkpoint/resource proofs.",
+      "supplementaryProofRefs": [
+        "public35"
+      ],
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "ground-sleep",
+      "title": "Supported ground sleep · retained purpose (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/sleep.ts"
+      ],
+      "startControls": [
+        "Start sleep",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "sleep",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t214"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "sleep-take.test.ts",
+        "sleep-walk.test.ts",
+        "sleep.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "supplementaryProofRefs": [
+        "public35"
+      ],
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "ground-sleep-rotated",
+      "title": "Supported ground sleep · rotated mat (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/sleep.ts"
+      ],
+      "startControls": [
+        "Start sleep",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "sleep",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t215"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "sleep-take.test.ts",
+        "sleep-walk.test.ts",
+        "sleep.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "supplementaryProofRefs": [
+        "public35"
+      ],
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "cold-preparation",
+      "title": "Cold meal preparation · retained quantities (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/preparation.ts"
+      ],
+      "startControls": [
+        "Start preparation",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "preparation",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t114"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "cold-preparation-rotated",
+      "title": "Cold meal preparation · rotated table (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/preparation.ts"
+      ],
+      "startControls": [
+        "Start preparation",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "preparation",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t115"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "wall",
+      "title": "Wall avoidance",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "wall",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t083"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "u-trap",
+      "title": "U-shaped trap",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "u-trap",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t084"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "narrow-passage",
+      "title": "Narrow passage, two walkers",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "narrow-passage",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t085",
+        "t093"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "stairs",
+      "title": "Stairs, oblique approach",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "stairs",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t086",
+        "t090",
+        "t091",
+        "t094"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "deck-to-ground",
+      "title": "Multi-level: deck to ground below",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "deck-to-ground",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t087",
+        "t092"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "incomplete-stairs",
+      "title": "Incomplete stairs (expected failure)",
+      "category": "diagnostic",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "incomplete-stairs",
+      "coverageGrade": "recorded-exact-diagnostic",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t088"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "construction",
+      "title": "Construction mid-walk",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "construction",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t089"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "construction.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "trio",
+      "title": "Three walkers (perf baseline)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "trio",
+      "coverageGrade": "terminal-gap-metrics-only",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t095"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "stress-30",
+      "title": "Stress: 30 wanderers",
+      "category": "continuous",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/scenarios.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "stress",
+      "coverageGrade": "liveness-gap-metrics-only",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t095"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": {
+        "required": true,
+        "proven": false,
+        "note": "6s live metrics and1200tick stepping; no repeated progress assertions."
+      },
+      "missingProof": [
+        "Assert multi-window continued movement/completed actions, finite poses/0violations/resource bounds; metrics alone do not prove sustained liveness.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Assert multi-window continued movement/completed actions, finite poses/0violations/resource bounds; metrics alone do not prove sustained liveness.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "build-bay",
+      "title": "Build a rack bay (flagship sequence)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/build-bay.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "build-bay",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t071",
+        "t072"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "build-bay-v2.test.ts",
+        "build-bay-v3.test.ts",
+        "build-bay.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "hand-up",
+      "title": "Hand-up: deck materials go up by hand and forklift (flagship v3)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/hand-up.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "hand-up",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t109",
+        "t110",
+        "t112"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "prone",
+      "title": "Prone hand-up (2.750 m deck)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/prone.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "prone",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t128",
+        "t130",
+        "t131"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "prone-forks",
+      "title": "Prone hand-up off the forks (2.902 m deck, 0.70 m below)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/prone.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "prone-forks",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t129"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "campfire-evening",
+      "title": "Campfire evening (HYPOTHETICAL, illustrative)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/campfire-evening.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "campfire-evening",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t075"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "meal",
+      "title": "Meal round the fire (tables, bowls, eating)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/meal.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "meal",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t101",
+        "t102",
+        "t103"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "meal.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "body",
+      "title": "Body model probe (reach)",
+      "category": "probe",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/body.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "body",
+      "coverageGrade": "recorded-still-probe",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t035",
+        "t036",
+        "t037"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "body-probe-safety.test.ts",
+        "body-model.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-2020",
+      "title": "Year walkabout 2020",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-walkabout.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-2020",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t076"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-2021",
+      "title": "Year walkabout 2021",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-walkabout.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-2021",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t077"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-2022",
+      "title": "Year walkabout 2022",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-walkabout.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-2022",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t078"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-2023",
+      "title": "Year walkabout 2023",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-walkabout.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-2023",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t079"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-2024",
+      "title": "Year walkabout 2024",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-walkabout.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-2024",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t080"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-2025",
+      "title": "Year walkabout 2025",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-walkabout.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-2025",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t081"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-2026",
+      "title": "Year walkabout 2026",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-walkabout.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-2026",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t082"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-build-2022",
+      "title": "2022 east-house: skeleton from piles (first bay)",
+      "category": "conditional-unsupported",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-build.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-build",
+      "coverageGrade": "recorded-actual-ui-play-supported-layout",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t006",
+        "t268"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "year-build-b.test.ts",
+        "year-build-occupied-hierarchy.test.ts",
+        "year-build.test.ts",
+        "year-build-ui-contract.test.ts",
+        "year-build-houses.test.ts",
+        "year-build-stance-repair.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "year-build-2022-house",
+      "title": "2022 east-house: skeleton from piles (whole house)",
+      "category": "conditional-unsupported",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/year-build.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "year-build",
+      "coverageGrade": "recorded-actual-ui-play-supported-layout",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t007",
+        "t269"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [
+        "year-build-b.test.ts",
+        "year-build-occupied-hierarchy.test.ts",
+        "year-build.test.ts",
+        "year-build-ui-contract.test.ts",
+        "year-build-houses.test.ts",
+        "year-build-stance-repair.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    },
+    {
+      "id": "solar-paint",
+      "title": "Solar, paint and stock (renderer showcase)",
+      "category": "scripted",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/solar-paint.ts"
+      ],
+      "startControls": [
+        "Select scenario (authors initial intent)",
+        "Play"
+      ],
+      "setupNotes": [],
+      "contractRef": "solar-paint",
+      "coverageGrade": "recorded-programmatic-effects-or-completion",
+      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "testRefs": [
+        "t216"
+      ],
+      "selectorProofRefs": [
+        "selector38"
+      ],
+      "nodeFixtureFiles": [],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "boundedNextTest": "UI Play terminal + one meaningful supported interruption/Reset; stepped completion or partial live video does not close this.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true
+    }
+  ],
+  "unprovedLegacyChecks": {
+    "browserSkippedFixme": [
+      {
+        "file": "viewer/e2e/lab.spec.ts",
+        "name": "lab: year-build \"Oblique yard\" view = the whole-skeleton take's opening camera",
+        "proofRefs": [
+          "gate38"
+        ],
+        "outcome": "unproved-skipped"
+      },
+      {
+        "file": "viewer/e2e/questions-captures.spec.ts",
+        "name": "question captures › capture every question picture",
+        "proofRefs": [
+          "gate38"
+        ],
+        "outcome": "unproved-skipped"
+      },
+      {
+        "file": "viewer/e2e/studio-build.spec.ts",
+        "name": "watch it being built (east-house-bay1): year picker → piles to standing structure, log, final checks, hands",
+        "proofRefs": [
+          "gate38"
+        ],
+        "outcome": "unproved-skipped"
+      },
+      {
+        "file": "viewer/e2e/studio-build.spec.ts",
+        "name": "watch it being built (east-house): year picker → piles to standing structure, log, final checks, hands",
+        "proofRefs": [
+          "gate38"
+        ],
+        "outcome": "unproved-skipped"
+      },
+      {
+        "file": "viewer/e2e/studio-build.spec.ts",
+        "name": "watch it being built (chapter set 8ce33bee): one entry, chapter bar, continuity at the seams, stair, walls, final A+B checks",
+        "proofRefs": [
+          "gate38"
+        ],
+        "outcome": "unproved-skipped"
+      },
+      {
+        "file": "viewer/e2e/year-build.spec.ts",
+        "name": "year-build 2022 east-house (first bay): live = rehearsal pin, rack poses on the bracing, captures",
+        "proofRefs": [
+          "gate38"
+        ],
+        "outcome": "unproved-skipped"
+      },
+      {
+        "file": "viewer/e2e/year-build.spec.ts",
+        "name": "year-build 2022 east-house, whole house (YEAR_BUILD_FULL=1): live = rehearsal pin, timed, skeleton captures",
+        "proofRefs": [
+          "gate38"
+        ],
+        "outcome": "unproved-skipped"
+      }
+    ],
+    "engineSkipped": 6,
+    "engineTodo": 11,
+    "note": "Neither aggregate green nor selector smoke certifies omitted checks. PreserveW51 historical2022 pinned-take exclusions separately from current canonical automatic construction PASS."
+  },
+  "retainedFailures": [
+    {
+      "receipt": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/social-seed-capture-review.json",
+      "cause": "ce2213c9PASS3FAIL: default/rotated reading used unrelated human.on seat proof; short-gallery endpoint hit left wall; not green."
+    },
+    {
+      "receipt": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/social-garden-cea39b5-capture-review.json",
+      "cause": "11PASS4FAIL: stationarygeometry float/shape assertion and finalcare15s prerequisite; preserved."
+    },
+    {
+      "receipt": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/default-reading-admission-review.json",
+      "cause": "21e2809 default UI current-pose walk preflight blocked seated direction even though ordinary Runtime deferred stand-up then completed; repaired before release38."
+    },
+    {
+      "receipt": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/release38-gateway-assertion-diagnosis.json",
+      "cause": "Original campus.glb HEAD length assertion FAIL; modular HEAD/range exact served bundle pass. No gateway/DNS repair or blanket pass."
+    }
+  ],
+  "topGaps": [
+    "Eight manual preset rows complete through stepped/mixed harnesses, not full UI Play; prepared-day3/design-studio and classroom/work-break2 each.",
+    "Stress30 has elapsed frames/step metrics but no sustained repeated progress/safety assertions; trioperf also does not assert terminaldone/checks.",
+    "Legacy scripted scenes largely have programmatic pose/effect/completion evidence; real-time videos cover only narrow/stairs completion and buildbay partial. Need bounded UI Play/disruption witnesses.",
+    "New3 current focused journeys inherited exactly fromc833, but combined63parity/gate39/public39 stillpending.",
+    "Per-case selectors isolate startup failures; scene imports/deps remain shared prerequisite. Preserve per-case finally artifacts for journey failures so one failure never implies later checkpoints."
+  ],
+  "schemaNotes": {
+    "contracts": "Supported semantic contracts and listed disruptions are bounded to named tests; not all disruptions use UI Play. Consult each test method.",
+    "nodeFixtureCatalog": "Exact literal name samples/filerefs only; dynamic names and remaining filecases are intentionally not reproduced. Node tests never fill UI journey gaps.",
+    "sourceInheritance": "No blanket current coverage claimed. 5f→b712 changes shared-food-break/registry/UI; c833→b712 app/engine/e2e byte-diff empty. No gate39 success assumed.",
+    "category": "conditional-unsupported means inspect admission before execution, not currently refused. Both real2022 public38 profiles admitted and completed; historical refused layouts remain distinct."
+  }
+}
