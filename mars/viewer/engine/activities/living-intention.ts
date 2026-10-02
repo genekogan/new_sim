@@ -112,7 +112,8 @@ export const livingIntention: ActionDef<LivingIntentionParams, null, Exec> = {
       }
       ex.child = undefined;
       if (c.status === 'completed') { ex.completed.push(goal.label); ex.index++; ex.retryTick = rt.tick; return { status: 'running', phase: 'between-purposes' }; }
-      ex.mode = 'waiting'; ex.diagnostic = c.diagnostic ?? diagnostic('interrupted-child', `${c.verb} ${c.id} stopped before ${goal.label}; retry preserves unfinished effects`, [c.id, ex.p.actor]); ex.retryTick = rt.tick + 1 / DT;
+      ex.mode = 'paused'; ex.diagnostic = c.diagnostic ?? diagnostic('interrupted-child', `${c.verb} ${c.id} stopped before ${goal.label}; explicit Resume preserves unfinished effects`, [c.id, ex.p.actor]);
+      return { status: 'running', phase: 'paused' };
     }
     if (rt.tick < ex.startedTick + (goal.afterSeconds ?? 0) / DT) return { status: 'running', phase: 'committed-wait' };
     if (rt.tick < ex.retryTick) return ex.diagnostic ? { status: 'blocked', diagnostic: ex.diagnostic } : { status: 'running', phase: 'waiting' };

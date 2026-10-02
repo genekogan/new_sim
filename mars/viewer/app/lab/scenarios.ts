@@ -1,3 +1,4 @@
+import { LIVING_DAY_SCENARIOS } from './living-day.ts';
 import { LIVING_OBJECT_SCENARIOS } from './living-object-scenarios.ts';
 import { SLEEP_SCENARIOS } from './sleep.ts';
 // Engine Lab scenarios: proving-ground regressions (engine/test/walk.test.ts)
@@ -308,7 +309,7 @@ export function stress(n: number): Scenario {
 }
 
 // Explicit proof fixture: available by name/URL without changing the established probe scenario set.
-export const scenarioByName = (name: string) => name === raiseCancel.name ? raiseCancel : [...LIVING_OBJECT_SCENARIOS, ...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, ...PREPARED_DAY_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS].find((s) => s.name === name);
+export const scenarioByName = (name: string) => name === raiseCancel.name ? raiseCancel : [...LIVING_DAY_SCENARIOS, ...LIVING_OBJECT_SCENARIOS, ...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, ...PREPARED_DAY_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS].find((s) => s.name === name);
 
 /** Product presets are selectable without altering legacy probe scenarios/baselines. */
-export const SELECTABLE_SCENARIOS = [...LIVING_OBJECT_SCENARIOS, ...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, ...PREPARED_DAY_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS];
+export const SELECTABLE_SCENARIOS = [...LIVING_DAY_SCENARIOS, ...LIVING_OBJECT_SCENARIOS, ...CLASSROOM_SCENARIOS, ...WORK_BREAK_SCENARIOS, ...PREPARED_DAY_SCENARIOS, READING_SCENARIO, MUSIC_SCENARIO, CHESS_SCENARIO, DESIGN_STUDIO, ...SCENARIOS];

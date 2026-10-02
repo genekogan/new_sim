@@ -76,3 +76,12 @@ test('a busy foreign workstation keeps its owner and uncommitted people can wait
   assert.ok(readLivingIntention(rt, a.id)?.diagnostic); rt.cancel(a.id); until(rt, () => !rt.isActive(a.id));
   until(rt, () => !rt.isActive(foreign.id)); const state = readWorkstation(rt, 'workstation'); assert.ok(!('code' in state)); assert.equal(state.user, 'visitor');assert.equal(state.task, 'Visitor notes');assert.equal(state.elapsed,30);
 });
+
+test('unexpected execution failure pauses instead of endlessly submitting failed children', () => {
+  const rt=runtime(), original=rt.registry.get('walk_to')!;
+  rt.registry.set('walk_to',{...original,step:()=>({status:'failed',diagnostic:{code:'fixture.execution-failed',message:'Injected execution failure after valid admission',subjects:['worker']}})});
+  const a=rt.submit('living_intention',{actor:'worker',objectives:[{purpose:'trip',label:'Walk safely',alternatives:[{verb:'walk_to',params:{actor:'worker',x:8,z:8}}]}]});
+  until(rt,()=>readLivingIntention(rt,a.id)?.mode==='paused');
+  const count=rt.records.size;for(let i=0;i<100;i++)rt.step();assert.equal(rt.records.size,count);assert.equal(readLivingIntention(rt,a.id)?.diagnostic?.code,'fixture.execution-failed');
+  rt.registry.set('walk_to',original);rt.submit('living_intention_control',{intention:a.id,intent:'resume'});until(rt,()=>!rt.isActive(a.id));assert.equal(rt.records.get(a.id)?.status,'completed');
+});

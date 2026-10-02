@@ -5,6 +5,7 @@ type Props = {
 
 /** Discovery only: existing scenario loading and classroom controls own every action. */
 export function CheckpointTour({ scenario, onScenario }: Props) {
+  const living = scenario.startsWith('living-day-') || scenario === 'garden-care' || scenario === 'music-dance';
   const classroom = scenario === 'classroom-4' || scenario === 'classroom-8';
   const eight = scenario === 'classroom-8' || scenario === 'work-break-8' || scenario === 'prepared-day-8';
   const studio = scenario === 'design-studio';
@@ -17,12 +18,16 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
   const gathering = classroom || scenario === 'work-break-4' || scenario === 'work-break-8';
   // Keep measurement/construction controls in their established compact layout.
   // Every newly playable room retains the tour when switching between experiences.
-  if (!gathering && !studio && !reading && !music && !chess && !preparation && !sleep && !preparedDay) return null;
+  if (!living && !gathering && !studio && !reading && !music && !chess && !preparation && !sleep && !preparedDay) return null;
   const cameraScenario = eight ? 'classroom-8' : 'classroom-4';
   return (
     <section aria-labelledby="checkpoint-tour-heading" data-testid="checkpoint-tour">
       <h2 id="checkpoint-tour-heading">Quick tour · playable checkpoint</h2>
       <div className="lab-row">
+        <button onClick={() => onScenario('living-day-4')}>Connected living day</button>
+        <button onClick={() => onScenario('living-day-studio')}>Living studio day</button>
+        <button onClick={() => onScenario('music-dance')}>Music and dancing</button>
+        <button onClick={() => onScenario('garden-care')}>Garden care</button>
         <button onClick={() => onScenario('classroom-4')}>Load 4-guest room</button>
         <button onClick={() => onScenario('classroom-8')}>Load 8-guest room</button>
         <button onClick={() => onScenario('design-studio')}>Try an independent design studio</button>

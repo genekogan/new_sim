@@ -1,3 +1,4 @@
+import { readLivingDay } from '../../engine/scenarios/living-day.ts';
 import { cameraEntities, cameraActivityReadout } from './activity-observation-hooks.ts';
 import { GARDEN_PLANTS } from '../../engine/scenarios/garden-care.ts';
 import { readGarden } from '../../engine/objects/garden.ts';
@@ -72,6 +73,7 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    livingDay: () => readLivingDay(sim.rt),
     garden: () => ({ plants: GARDEN_PLANTS.map(id => readGarden(sim.rt, id)), water: structuredClone(sim.rt.world.entities['water-bowl']), active: structuredClone([...sim.rt.records.values()].find(r => r.verb === 'garden_care' && sim.rt.isActive(r.id)) ?? null), claims: Object.fromEntries([...Object.keys(sim.rt.world.entities).flatMap(id => [`actor:${id}`, `entity:${id}`, `hand:${id}:right`, `hand:${id}:left`, `holds:${id}`]), 'surface:water-table#r0c2'].map(key => [key, sim.rt.holder(key)])) }),
     get ready() {
       return view.loaded && view.frames >= 3;
