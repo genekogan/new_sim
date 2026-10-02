@@ -3141,3 +3141,24 @@ not because productionmodel was absent. Restored links to frozenverified40model;
 missing-modelHTMLparseerror/60s readiness failure retained; no loadinglimit increase,
 tracked model/content change or historicalasset guess. Final targetedUI verification
 still required for all7failedcases and combinedreleasegate/publication remains pending.
+
+## Alpha targeted Reset verification and remaining repairs — 2026-10-02
+
+Clean7316a19 targeted seven actual-Play journeys:5PASS/2FAIL/0skip/flaky.
+Construction passed three complete Play/Reset lifetimes with strict geometry/texture
+counts; hand-up passed exact10 authored slot releases; campfire, meal and year2020
+passed their original Reset assertions. Retained report/traces under ignored
+.cloudflare/alpha-reset-repairs-7316a19-completed. No failure is counted as proof.
+
+Solar retained one cutting-station blade geometry on Reset. Reviewed isolated
+7b0ab812 and integrated668d795: per-view geometry ownership now releases blades on
+Reset, removal and full disposal, while ordinary ticks/shared materials remain.
+Four native lifecycle tests PASS locally, including RED→GREEN worker proof; renderer
+cleanup leaves authoritative entities unchanged. Actual solar Play proof pending.
+
+Year2026 completed meaningful journey effects but compared Reset geometry before
+its replacement asynchronous backdrop loaded (2886→33). Reset now waits for the
+same backdropReady contract and original60s limit used at fresh entry before
+strict counters. No assertion, loading limit, physical outcome or historical
+content changed. Combined frozen targeted verification follows; alpha gate and
+publication still pending.

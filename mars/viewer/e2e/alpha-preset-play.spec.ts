@@ -332,6 +332,12 @@ async function reset(page: Page, name: string, initial: Evidence) {
     name,
     { timeout: 15000 },
   );
+  // Reset rebuilds the same asynchronously prepared backdrop as fresh entry.
+  // Compare exact counters only once that real asset lifetime has loaded.
+  if (name.startsWith('year-'))
+    await page.waitForFunction(() => window.__marsEngine.backdropReady, null, {
+      timeout: 60000,
+    });
   const fresh = await capture(page, name, 'reset');
   expect(fresh.state.humans).toEqual(initial.state.humans);
   expect(fresh.components).toEqual(initial.components);
