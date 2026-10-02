@@ -20,6 +20,9 @@ test('music dance: actual audible Play, grounded rhythm, late Join/Leave, same s
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/lab?scenario=music-dance');
   await page.waitForFunction(() => window.__marsEngine?.ready);
+  await page.evaluate(() =>
+    window.__marsEngine.runScenario('music-dance', { paused: true }),
+  );
   const button = (name: string) =>
     page.getByRole('button', { name, exact: true });
   await button('Enable sound').click();
@@ -62,6 +65,15 @@ test('music dance: actual audible Play, grounded rhythm, late Join/Leave, same s
       page.evaluate(() => window.__marsEngine.musicAudio().voices[0]?.rms),
     )
     .toBeLessThan(0.001);
+  const attention = await page.evaluate(() =>
+    window.__marsEngine.activityAttentionTargets(),
+  );
+  expect(Object.keys(attention).length).toBeGreaterThanOrEqual(2);
+  expect(
+    Object.keys(attention).some(
+      (actor) => actor === 'musician' || actor.startsWith('dancer-'),
+    ),
+  ).toBe(true);
   const grounded = await page.evaluate(() =>
     ['dancer-a', 'dancer-b'].map((id) => window.__marsEngine.bones(id)[id]),
   );
