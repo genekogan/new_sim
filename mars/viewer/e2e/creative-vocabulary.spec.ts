@@ -339,16 +339,24 @@ test('connected creative afternoon: actual drawn partial artifact, independent r
   );
   await button(page, 'Start creative afternoon').click();
   await play(page);
+  // The reader's first four-second slice finishes before a reliable joint
+  // artist/reader observation window. Pause it early through the actual HUD.
+  await page.waitForFunction(() => {
+    const b = window.__marsEngine.reading();
+    return !('code' in b) && b.elapsed >= 1 && b.elapsed < 2;
+  });
+  await freeze(page);
+  await button(page, 'Pause reader').click();
+  await play(page);
   await page.waitForFunction(() => {
     const d = window.__marsEngine.drawing(),
-      b = window.__marsEngine.reading();
+      afternoon = window.__marsEngine.creativeAfternoon();
     return (
+      afternoon?.commitments.find((c) => c?.actor === 'reader')?.mode ===
+        'paused' &&
       !('code' in d) &&
       d.ticks >= 22 &&
-      d.ticks < 50 &&
-      !('code' in b) &&
-      b.elapsed > 0 &&
-      b.elapsed < 4
+      d.ticks < 50
     );
   });
   const partial = await capture(page, 'creative-actual-partial-artist-reader');
@@ -356,7 +364,8 @@ test('connected creative afternoon: actual drawn partial artifact, independent r
     partial.held.some((v) => v.id === 'sketch-pencil' && v.by === 'sketcher'),
   ).toBe(true);
   expect(drawing(partial).completedMarks.length).toBeGreaterThan(0);
-  await button(page, 'Pause reader').click();
+  expect(book(partial).elapsed).toBeGreaterThan(0);
+  expect(book(partial).elapsed).toBeLessThan(4);
   await button(page, 'Direct artist away').click();
   await play(page);
   await page.waitForFunction(() => {

@@ -79,3 +79,20 @@ Limits: timing windows, enabled controls, actual visual mark visibility, discuss
 turn scheduling and final cleanup are authored expectations until actual Play
 runs and personally inspected captures establish them. No active save/load or new
 rig behavior is claimed.
+
+## Authored timing correction
+
+Root's compact Node timing measurement found the original simultaneous predicate
+at tick 128: drawing 22 ticks and reader 3.8 seconds, with the reader slice ending at
+4 seconds. The overlap was only 0.2 simulated seconds (about 50 ms at 4x Play), so it
+was too fragile for browser polling. This is measured engine ordering supplied
+by root, not a browser run in this worktree.
+
+The connected test now first waits during actual Play for reader progress in
+[1, 2) seconds, globally pauses, requests the HUD's Pause reader, then Plays until
+that independent commitment is safely paused and drawing lies in the original
+[22, 50) tick range. It captures this retained partial state before directing the
+artist away; the redundant second reader Pause is removed. Exact subsequent
+book/drawing retention comparisons, independent gardener completion, all later
+physical/effect assertions and the 120-second timeout are preserved. This changes
+only test orchestration. Browser verification remains pending the reserved slot.
