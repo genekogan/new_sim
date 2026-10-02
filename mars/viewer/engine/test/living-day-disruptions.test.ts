@@ -7,7 +7,7 @@ import { readPurposefulRoutine } from '../activities/purposeful-routine.ts';
 import { readLivingIntention } from '../activities/living-intention.ts';
 import { readBook } from '../objects/reading.ts';
 import { readGarden } from '../objects/garden.ts';
-import { readMusicGathering } from '../activities/music-gathering.ts';
+import { readMusicGathering, latestMusicGathering } from '../activities/music-gathering.ts';
 import { musicStation } from '../activities/computer-music.ts';
 import { readWorkstation } from '../objects/workstation.ts';
 import { heldBy } from '../items/model.ts';
@@ -123,4 +123,32 @@ test('living-day floor: both permitted layouts wait without failed-action spam, 
   assert.notEqual(clearA.status,'failed',JSON.stringify(clearA.diagnostic));assert.notEqual(clearB.status,'failed',JSON.stringify(clearB.diagnostic));
   until(rt,()=>clearA.status==='completed'&&clearB.status==='completed'&&!!readLivingDay(rt)?.music);
   finished(rt);assert.equal([...rt.records.values()].filter(r=>r.verb==='music_gathering'&&r.status==='failed').length,0);
+});
+
+test('living-day recovery: rejected music Resume preserves latest real session, restoration retries original score',()=>{
+  const rt=setup('living-day-4');start(rt,'living-day-4');
+  until(rt,()=>{const m=musicStation(rt,'music-computer');return !!m&&!('code'in m)&&m.elapsed>1&&m.elapsed<10;});
+  const old=readLivingDay(rt)!.music!;rt.cancel(old);until(rt,()=>!rt.isActive(old));
+  const retained=readMusicGathering(rt,old)!;const score=structuredClone(musicStation(rt,'music-computer'));assert.ok(score&&!('code'in score));assert.equal(score.status,'unfinished');
+  const computer=rt.world.entities['music-computer'];delete rt.world.entities['music-computer'];
+  const refused=rt.submit('music_gathering',{...retained.bindings,resume:true,resumeFrom:old},{preempt:false});
+  assert.equal(refused.status,'failed');assert.equal(readMusicGathering(rt,refused.id),undefined);assert.equal(latestMusicGathering(rt)?.action,old);adoptLivingDayMusic(rt,refused.id);assert.equal(readLivingDay(rt)?.music,old);
+  rt.world.entities['music-computer']=computer;assert.deepEqual(musicStation(rt,'music-computer'),score);
+  const original=latestMusicGathering(rt)!;const retry=rt.submit('music_gathering',{...original.bindings,resume:true,resumeFrom:original.action},{preempt:false});
+  assert.notEqual(retry.status,'failed',JSON.stringify(retry.diagnostic));adoptLivingDayMusic(rt,retry.id);assert.equal(latestMusicGathering(rt)?.action,retry.id);
+  finished(rt);const done=musicStation(rt,'music-computer');assert.ok(done&&!('code'in done));assert.equal(done.task,score.task);assert.equal(done.elapsed,done.duration);
+});
+test('living-day recovery: End partial main routine reports ended while independent care finishes',()=>{
+  const rt=setup('living-day-4');start(rt,'living-day-4');until(rt,()=>(routine(rt)?.preparation?.ingredients[0].deposited??0)>0);
+  const id=readLivingDay(rt)!.routine!,carer=readLivingDay(rt)!.independent[1];control(rt,'purposeful_routine_control',{routine:id,intent:'end'});until(rt,()=>!rt.isActive(id));
+  assert.equal(rt.records.get(id)?.outputs?.ended,true);assert.equal(readLivingDay(rt)?.phase,'ended');assert.equal(routine(rt)?.preparation?.complete,false);
+  until(rt,()=>rt.records.get(carer)?.status==='completed');const garden=readGarden(rt,'plant-a');assert.ok(!('code'in garden));assert.equal(garden.cycles,2);assert.equal(readLivingDay(rt)?.phase,'ended');
+  assert.deepEqual(rt.holder('actor:worker'),[]);assert.deepEqual(heldBy(rt.world,'worker'),[]);
+});
+test('living-day recovery: expired gathering gives named ended disposition on explicit refused transition retry',()=>{
+  const rt=setup('living-day-4'),potId=livingDayBindings('living-day-4').workBreak.pot,pot=rt.world.entities[potId];delete rt.world.entities[potId];start(rt,'living-day-4');
+  until(rt,()=>readLivingDay(rt)?.phase==='waiting'&&!!readLivingDay(rt)?.routine);const refused=readLivingDay(rt)!;
+  assert.equal(rt.records.get(refused.routine!)?.status,'failed');assert.equal(rt.isActive(refused.session!),true);
+  until(rt,()=>!rt.isActive(refused.session!));rt.world.entities[potId]=pot;
+  assert.equal(retryLivingDay(rt)?.code,'day.gathering-ended');assert.equal(readLivingDay(rt)?.phase,'ended');assert.equal(readLivingDay(rt)?.routine,refused.routine);assert.equal(readLivingDay(rt)?.session,refused.session);
 });
