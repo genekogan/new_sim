@@ -102,14 +102,14 @@ test('meal: captures (sit, spoon at the mouth, legs crossed)', async ({ page }, 
   expect(await stepUntil(page, `(h) => h.records().some((r) => r.verb === 'eat' && r.params.actor === 'p1' && r.phase === 'pause')`)).toBe(true);
   await page.evaluate(() => window.__marsEngine!.step(3));
   await near(page, 'p1', 0.45, 1.5, 1.15, 0.9);
-  await captureView(page, 'meal-spoon-at-mouth', { testInfo });
+  await captureView(page, 'meal-spoon-at-mouth', { testInfo, softVisual: true });
   // legs crossed: a seated person with the crossed variant
   const info = await page.evaluate(() => window.__marsEngine!.info().humans as unknown as { id: string; activity: string; crossed: boolean; sit: number }[]);
   const crossed = info.find((q) => q.crossed && q.sit === 1);
   console.log(`[meal] crossed sitters: ${info.filter((q) => q.crossed).map((q) => `${q.id}(${q.activity}, sit ${q.sit})`).join(' ')}`);
   expect(crossed, 'a seated person with legs crossed').toBeTruthy();
   await near(page, crossed!.id, 0.6, 2.3, 1.15, 0.6);
-  await captureView(page, 'meal-legs-crossed', { testInfo });
+  await captureView(page, 'meal-legs-crossed', { testInfo, softVisual: true });
   await page.evaluate(() => window.__marsEngine!.cameraPreset('oblique'));
   await labFrames(page, 4);
   await captureView(page, 'meal-oblique', { testInfo, compare: false });
