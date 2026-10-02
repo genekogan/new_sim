@@ -199,7 +199,9 @@ function departuresBeforeNext(s: Evidence) {
   }
 }
 test.afterEach(async ({ page }, info) => {
-  const name = info.title.startsWith('three')
+  const name = info.title.includes('natural full UI Play')
+    ? 'gallery-natural-three'
+    : info.title.startsWith('three')
     ? 'gallery-default'
     : 'gallery-short';
   save(`${name}-result`, {
@@ -484,4 +486,73 @@ test('two-stop actual Play Leave persists, named audience wait, declared late Jo
     resumed,
     complete,
   });
+});
+
+// Preserve the explicit-End regression; this separate case must finish stop3.
+test('three-stop gallery: natural full UI Play completion retains all artwork and releases every child', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  logs.set(page, errors);
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  const checkpoints: Record<string, Evidence> = {};
+  let completed = false;
+  try {
+    mkdirSync(directory, { recursive: true });
+    await page.goto('/lab?scenario=gallery-tour');
+    await page.waitForFunction(() => window.__marsEngine?.ready);
+    await freeze(page);
+    await button(page, 'Reset').click();
+    await page.waitForFunction(() => window.__marsEngine.ready && window.__marsEngine.state().paused && window.__marsEngine.state().tick === 0);
+    await page.getByRole('combobox', { name: 'Speed', exact: true }).selectOption('4');
+    const initial = await capture(page, 'gallery-natural-three-initial');
+    checkpoints.initial = initial;
+    expect(initial.state.scenario).toBe('gallery-tour');
+    expect(initial.tour).toBeNull();
+    expect(initial.records).toEqual([]);
+    await button(page, 'Start gallery tour').click();
+    for (const index of [0, 1, 2]) {
+      await play(page);
+      await formed(page, index);
+      const stop = await capture(page, `gallery-natural-three-stop-${index + 1}`);
+      checkpoints[`stop-${index + 1}`] = stop;
+      viewing(stop, index);
+      sameArt(stop, initial);
+      expect(stop.tour!.history).toHaveLength(index);
+      expect(stop.records.filter(r => r.status === 'failed')).toEqual([]);
+      departuresBeforeNext(stop);
+    }
+    await play(page);
+    await page.waitForFunction(() => {
+      const h = window.__marsEngine as GalleryHook;
+      if (h.error || h.violations().length || h.records().some(r => r.status === 'failed')) throw Error('natural gallery journey halted or failed');
+      const tour = h.galleryTour();
+      return tour?.finished === true && tour.mode === 'completed' && tour.status === 'completed';
+    });
+    const final = await capture(page, 'gallery-natural-three-complete');
+    checkpoints.complete = final;
+    clean(final);
+    sameArt(final, initial);
+    expect(final.tour!.index).toBe(3);
+    expect(final.tour!.history.map(h => h.pad)).toEqual(['gallery1-sketch-pad', 'gallery2-sketch-pad', 'gallery3-sketch-pad']);
+    expect(final.tour!.history.every(h => h.sharing.finished && h.sharing.status === 'completed' && h.sharing.artifact?.marks.length === 8)).toBe(true);
+    expect(final.records.find(r => r.id === final.tour!.tour)).toMatchObject({ status: 'completed', outputs: { finished: true } });
+    expect(final.tour!.ownedActions.length).toBeGreaterThan(0);
+    for (const id of final.tour!.ownedActions) expect(final.records.find(r => r.id === id)?.status, id).toBe('completed');
+    expect(final.slots.filter(s => s.occupant !== null)).toEqual([]);
+    expect(final.records.filter(r => r.status === 'failed')).toEqual([]);
+    departuresBeforeNext(final);
+    await button(page, 'Reset').click();
+    await page.waitForFunction(() => window.__marsEngine.ready && window.__marsEngine.state().paused && window.__marsEngine.state().tick === 0);
+    const fresh = await capture(page, 'gallery-natural-three-reset');
+    checkpoints.reset = fresh;
+    expect(fresh.tour).toBeNull();
+    expect(fresh.records).toEqual([]);
+    sameArt(fresh, initial);
+    clean(fresh);
+    expect(errors).toEqual([]);
+    completed = true;
+  } finally {
+    save('gallery-natural-three-proof', { test: testInfo.title, completed, nativeStatusAtFinally: testInfo.status, advancement: 'UI Play only; no hook stepping, reload, mutation or Step', checkpoints, final: await inspect(page).catch(() => null), errors });
+    await testInfo.attach('gallery-natural-three-proof', { path: path.join(directory, 'gallery-natural-three-proof.json'), contentType: 'application/json' });
+  }
 });
