@@ -99,6 +99,7 @@ export class LabSim {
   }
 
   private finishScriptIfDone() {
+    if (this.scenario.execution === 'sustained') return;
     if (this.scriptFinished || !this.done()) return;
     this.scriptFinished = true;
     this.scriptStopReason = this.overBudget() ? 'budget' : 'terminal';

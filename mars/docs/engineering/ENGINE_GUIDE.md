@@ -129,3 +129,30 @@ progress; probes prove full supported controls; diagnostic demos prove exact exp
 refusal and surrounding-world usability. Startup/mixed stepping/FIXME are not substitutes.
 The authoritative coverage inventory and normal gate enforcement are stabilization work;
 this requirement is durable, not a claim that every current preset is already certified.
+
+
+### Hosting boundaries under stabilization
+
+`app/lab/sim.ts` separates the authored script outcome from world stepping.
+Terminal/refused/budget-ended finite scripts stop dispatching; ordinary children
+and later directions still receive fixed ticks. Manual Pause remains intentional.
+Recorded invariant violations produce `lab.invariant-halt`, retain diagnostics and
+disable Play/Step until a fresh Reset. Synthetic renderer probes remain detached.
+This is a supported driver boundary, not rollback of arbitrary partially mutated
+state or a proof that unknown JavaScript faults recover automatically.
+
+The legacy `Scenario.continuous` flag also keeps manually started finite presets
+alive. True ongoing dispatch must additionally declare `execution: 'sustained'`;
+only that declared class keeps authoring commitments after `maxTicks`, which bounds
+its validation window. The production stress preset declares this explicitly.
+Fixed DT, seeded choices, bounded per-frame advancement and manual Pause are unchanged.
+
+`engine/sequence/runner.ts` quarantines a recorded invariant at its first tick.
+It does not continue, cancel or settle invalid state, and returns an aborted report
+with `sequence.invariant-halt` plus the original violation. Normal execute/pause/
+resume therefore retains an inspectable failed take while leaving the valid
+workspace head unchanged. An invalid private take is evidence, never a resumable
+checkpoint. Ordinary action failures retain their existing cleanup/onFail policies.
+Low-level Runtime stepping is an internal mechanism; hosts must enforce these
+boundaries. These guards have focused deterministic proof, but combined gate and
+actual Play certification remain pending on the alpha candidate.

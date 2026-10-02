@@ -2918,3 +2918,24 @@ missing/incomplete/unmapped cases refuse generation. Three focused registration
 checks, viewer TypeScript and type-aware lint pass; browser discovery is unexecuted.
 Authored test mappings are not executed proof. This alpha-only candidate does not
 change frozen release39, publish a feature or certify the historical coverage rows.
+
+
+## Alpha containment and sustained-life candidate — 2026-10-02
+
+Bounded control-plane regressions reproduced three failures: unpaused invalid
+private runs kept stepping; pauseAt0.05 and1 saved invalid resumable heads. A
+SequenceRunner guard now stops at the first recorded invariant, retains original
+violation plus named sequence.invariant-halt, avoids invalid-state cleanup and
+refuses workspace mutation through execute/pause/resume. Four specific checks
+include valid-pause→failed-resume preservation and subsequent healthy execution.
+Original RED logs remain ignored evidence. No physical law/admission/ownership
+check was bypassed, and no expected outcome or golden pin moved.
+
+Explicit sustained execution fixes overloaded continuous flags: stress keeps
+ordinary seeded requests/completions after its60simsec validation window; finite
+manual/probe scripts still stop authored dispatch while their world stays usable.
+A1600tick two-person replay verifies postbudget commitments and manual Pause.
+Combined42 focused Node checks pass0fail/skip/todo in2321ms; viewer TypeScript
+and type-aware lint pass. Ordinary sequence/deadlock regressions are included.
+No browser, fullgate, public proof or universal future-input recovery is claimed.
+Release39 source remains frozen and separate while its gate runs.

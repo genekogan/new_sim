@@ -48,6 +48,8 @@ export type Scenario = {
   tick?: (rt: Runtime) => void;
   /** Never completes on its own (stress). */
   continuous?: boolean;
+  /** True ongoing world dispatch; maxTicks bounds validation, not authored life. */
+  execution?: 'sustained';
   /** Custom runtime (own registry/invariants/services), replacing the walk_to proving-ground default. */
   build?: () => Runtime;
   /** Custom completion test (e.g. a sequence), instead of "every action terminal". */
@@ -302,6 +304,7 @@ export function stress(n: number): Scenario {
       for (const e of Object.values(rt.world.entities)) if (e.kind === 'human' && !e.human!.task) pick(rt, e.id);
     },
     continuous: true,
+    execution: 'sustained',
     maxTicks: 20 * 60,
     focus: [0, 0, 30],
     expect: (rt) => [noViolations(rt)],

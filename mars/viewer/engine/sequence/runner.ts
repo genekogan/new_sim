@@ -171,8 +171,12 @@ export class SequenceRunner {
 
   /** One tick of `run()`: step the runtime, mirror records into reports, submit newly ready steps. */
   tick() {
+    if (this.rt.violations.length) return;
     this.blockedDiagnostic = undefined;
     this.rt.step();
+    // Invariant corruption is distinct from an ordinary action refusal/failure.
+    // Do not dispatch, cancel, settle or save a resumable invalid state.
+    if (this.rt.violations.length) return;
     const eventCursor = this.rt.events.length;
     this.poll();
     if (this.hasTimeouts) this.checkTimeouts();
@@ -258,6 +262,7 @@ export class SequenceRunner {
   }
 
   get done(): boolean {
+    if (this.rt.violations.length) return true;
     if (this.blockedDiagnostic) return true;
     if (this.aborted || this.timedOut) return !this.reports.some((r) => r.status === 'executing' || r.status === 'blocked');
     return this.reports.every((r) => DONE.has(r.status));
@@ -265,7 +270,7 @@ export class SequenceRunner {
 
   /** Submit every step whose start condition holds now; skip steps whose condition can never hold. */
   advance() {
-    if (this.aborted || this.timedOut) return;
+    if (this.aborted || this.timedOut || this.rt.violations.length) return;
     let changed = true;
     while (changed && !this.aborted) {
       changed = false;
@@ -328,9 +333,10 @@ export class SequenceRunner {
    */
   private settle(budget: number) {
     let n = 0;
-    while (n < budget && this.liveActions().length) {
+    while (n < budget && this.liveActions().length && !this.rt.violations.length) {
       this.rt.step();
       n++;
+      if (this.rt.violations.length) break;
       this.poll();
       if (n % RETRY_CANCEL_TICKS === 0)
         for (const r of this.reports) {
@@ -372,7 +378,11 @@ export class SequenceRunner {
 
   result(): SequenceResult {
     const unsettled = this.unsettledReasons();
-    const status: SequenceStatus = this.blockedDiagnostic ? 'blocked' : this.timedOut
+    const corruption = this.rt.violations[0];
+    const halt: Diagnostic[] = corruption ? [{ code: 'sequence.invariant-halt',
+      message: `run quarantined at tick ${corruption.tick} after ${corruption.code}: ${corruption.message}; invalid state was not continued or committed`,
+      subjects: corruption.subjects ? [...corruption.subjects] : undefined }] : [];
+    const status: SequenceStatus = corruption ? 'aborted' : this.blockedDiagnostic ? 'blocked' : this.timedOut
       ? 'timeout'
       : this.aborted
         ? 'aborted'
@@ -382,8 +392,8 @@ export class SequenceRunner {
     return {
       status,
       steps: this.reports.map((r) => ({ ...r })),
-      violations: this.rt.violations.slice(this.violationStart),
-      diagnostics: [...this.diagnostics, ...(this.blockedDiagnostic ? [this.blockedDiagnostic] : [])],
+      violations: this.rt.violations.slice(corruption ? 0 : this.violationStart),
+      diagnostics: [...this.diagnostics, ...halt, ...(this.blockedDiagnostic ? [this.blockedDiagnostic] : [])],
       startTick: this.t0,
       endTick: this.rt.tick,
       ticks: this.rt.tick - this.t0,
