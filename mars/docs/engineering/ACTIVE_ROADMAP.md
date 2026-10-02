@@ -35,8 +35,8 @@ proofs pass. The day audit has fixed truthful ending disposition and pre-start/
 refused music recovery, with eleven disruption regressions passing. A newly
 reproduced partial-preparation End still retains its spoon and is under bounded
 ordinary-action cleanup repair. All45 selectable presets passed fresh-load/Reset/first-Step (46cases incl parity,198.9s); automatic
-camera long-run proof remains incomplete because its test predicates were wrong,
-now corrected without changing camera policies. These are not public success claims.
+camera actualPlay now passes both configurations (2cases5.4min,20 inspected PNGs)
+after exact predicate fixes without changing camera policies. These are not public success claims.
 
 Small remaining queue: (1) resolve exact acceptance failures and inspect corrected
 camera/audit captures; (2) finish guide/index cleanup and scenario instructions;

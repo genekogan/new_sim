@@ -1,5 +1,10 @@
 # Living activity camera review
 
+> Final local actualPlay: 2/2 PASS,0fail/skip/retry,5.4min on clean911c525.
+> All20 final captures personally inspected by camera helper; root inspected sustained
+> music and studio sleep. Prior failed harness attempts below remain historical.
+> Combined gate/public verification still pending; policy unchanged.
+
 Source audit starts from main `65cc0b8`. This is a bounded activity adapter over
 the shipped camera policy, not a new camera engine or a released improvement.
 
@@ -188,3 +193,25 @@ time. Strict focused TypeScript and zero-warning scoped lint pass; the Node type
 reference matches other e2e files. Browser acceptance remains incomplete pending
 the combined gate. Source camera policies, world authority and all existing
 assertions/baselines are unchanged; no equal-priority rotation is justified yet.
+
+## Final corrected actual Play — October2
+
+Exact runtime911c525 in living-camera-final; corrected food/action-status predicates
+now reach actual meals, mat sleep, overlapping music/dance and completed original
+notes. Both Clear/Mars and Restrained/studio pass: zero page errors, camera
+diagnostics and authoritative violations. Sleep18/18 and notes30/30 complete;
+operator attach/follow/dispose leave authoritative hash/tick guarantees intact.
+Clear778 finite frames/95 decisions94cuts; Restrained767 finiteframes/34decisions33cuts.
+Each observed12actual focus IDs. No permanent lexical focus starvation was observed,
+so no speculative rotation or policy redesign was added.
+
+Twenty PNGs inspected via six contact sheets, two final and two periodic JSON proofs.
+Limitations: frequent visibility recovery cuts, uneven tight/wide framing; Clear
+can retain a host view during presenter focus, Restrained preparation can be small.
+This proves bounded watchable procedural coverage, not polished human filmmaking
+or visibility of every simultaneous event.
+
+Receipt: <mars-worktrees>/living-camera-final/viewer/.cloudflare/living-camera-final911c525-receipt.json.
+Log has same prefix; captures in e2e/artifacts/living-camera-final911c525 in that checkout.
+No final failure traces were generated under retain-on-failure. Original wrong
+predicate failures and surviving earlier artifacts remain documented above.
