@@ -2124,3 +2124,21 @@ one return and retained marks; rapid Leave→direction and exact Pause-clock reg
 pass. Focused41checks PASS0fail/skip/TODO, TSc/lint clean. Future intention adapter and
 art-sharing remain separate/unshipped; repaired first batch still awaits fresh Play
 and combined gate. No support/ownership/admission or test limit was loosened.
+
+### Vocabulary Play proof and repeated-cancellation repair — 2026-10-02
+
+Fresh actual Play on65ee693 passes3/3 (drawing12.7s, warm-up17.9s, open jam38.3s);
+all10captures personally inspected by helper and root. Same pencil/pad retain marks,
+five participants keep independent warm-up timing, and both performers exchange the
+same actual workstation/chair. Original failing admission run remains preserved.
+Proof metadata now records the actual full tested Git HEAD instead of a fixed source.
+
+A repeated-parent-Cancel regression reproduces garden cleanup restarting indefinitely.
+Runtime now calls an accepted deferred cancellation hook once; ordinary cleanup
+children finish under fixed ticks, while refused cancellation remains retryable.
+Four regressions cover accepted/refused cancellation, garden bowl return and the
+existing preparation Pause contract (retained spoon/hold_items, then ordinary put).
+Initial failures and corrected focused94/94PASS logs are retained; viewer TSc and
+lint pass. No existing assertion, support rule, outcome or performance limit changed.
+This general repair is still unpublished and requires the clean combined gate.
+Art sharing and connected creative-afternoon work remain separate future candidates.

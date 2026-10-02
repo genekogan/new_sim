@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { test, expect, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import type { EngineHook } from '../app/lab/hook.ts';
 declare global {
@@ -12,6 +13,7 @@ type WarmupSample = {
   tick: number;
   participants: { actor: string; state?: string }[];
 };
+const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const artifacts = path.resolve(
   'e2e/artifacts',
   process.env.E2E_RUN ?? 'activity-vocabulary',
@@ -76,7 +78,7 @@ function proof(n: string, v: object) {
   writeFileSync(
     path.join(artifacts, `${n}.json`),
     JSON.stringify(
-      { source: '65ee693', run: process.env.E2E_RUN, ...v },
+      { source, run: process.env.E2E_RUN, ...v },
       null,
       2,
     ),
