@@ -195,19 +195,51 @@ export function CommunalSupperHud({
             ))}
           </div>
           <div data-testid="communal-supper-storage">
-            {binding.cleanup.flatMap((batch) =>
-              batch.transfers.map((t) => (
-                <p key={t.item}>
-                  {t.item} · {t.from} → {t.to} ·{' '}
-                  {state.cleanup.some((c) =>
-                    c?.completed.some((q) => q.item === t.item),
-                  )
-                    ? 'actual transfer retained'
-                    : 'remaining'}
-                </p>
-              )),
+            {state.bindings.cleanup.flatMap((batch) =>
+              batch.transfers.map((t) => {
+                const support = state.items.find(
+                  (e) => e?.id === t.item,
+                )?.support;
+                const split = t.to.lastIndexOf('#');
+                const stored =
+                  support?.kind === 'resting-on' &&
+                  support.on === t.to.slice(0, split) &&
+                  support.slot === t.to.slice(split + 1);
+                const completed = state.cleanup.some((c) =>
+                  c?.completed.some((q) => q.item === t.item && q.to === t.to),
+                );
+                return (
+                  <p key={t.item}>
+                    {t.item} · {t.from} → {t.to} ·{' '}
+                    {stored
+                      ? 'currently stored on declared destination'
+                      : 'not currently on declared destination'}{' '}
+                    ·{' '}
+                    {completed
+                      ? 'past transfer completed'
+                      : 'no completed transfer recorded'}
+                  </p>
+                );
+              }),
             )}
           </div>
+          {state.returnAttempts.length > 0 && (
+            <div data-testid="communal-supper-return-attempts">
+              <p>Retained End return attempts</p>
+              {state.returnAttempts.map(
+                (r) =>
+                  r && (
+                    <p key={r.id}>
+                      {r.id} · {r.verb} · {r.status} ·{' '}
+                      {r.phase ?? 'no physical phase'}
+                      {r.diagnostic
+                        ? ` · ${r.diagnostic.code}: ${r.diagnostic.message}`
+                        : ''}
+                    </p>
+                  ),
+              )}
+            </div>
+          )}
           <div data-testid="communal-supper-items">
             {state.items.map((e) => (
               <p key={e?.id ?? 'missing'}>
@@ -262,9 +294,11 @@ export function CommunalSupperHud({
         empty bowls. Cleanup Pause safely supports the held transfer and keeps
         completed placements. End drains and returns held utensils to declared
         supports, preserving food and finished effects; keep Play running until
-        truly released. Reset stages a fresh hypothetical world. No heat,
-        washing, deletion, refill, replacement vessels or active reload
-        restoration.
+        truly released. If an End return stops, restore the named support or
+        route and explicitly press End again; the same remaining held utensils
+        are retried and prior attempts stay in history. Reset stages a fresh
+        hypothetical world. No heat, washing, deletion, refill, replacement
+        vessels or active reload restoration.
       </p>
     </section>
   );

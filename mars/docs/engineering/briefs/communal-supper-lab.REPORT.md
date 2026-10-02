@@ -88,3 +88,23 @@ browser, performance or full-gate tests. Selector/panel/hook wiring remains root
 
 Only this final three-path commit is the UI/spec contribution to integrate after the
 foundation and core; do not cherry the duplicated dependency commits again.
+
+
+## Current storage and explicit End recovery follow-up
+
+Dependency `d1846e1` (local cherry `eb68464`) adds reviewed End recovery and detached
+`returnAttempts`. Storage rows now compare each same-ID item's **current**
+`resting-on` owner and slot from `state.items` against its declared destination
+from `state.bindings`. A completed tidy receipt alone never claims present storage
+if that object has moved; the row labels retained past completion separately.
+
+The HUD lists actual End return attempt IDs, verbs, terminal/running status, physical
+phase and concrete diagnostic, preserving stopped attempts visibly. A concise
+instruction explains that restoring the named support/route and pressing End again
+explicitly retries remaining actual held utensils. The existing End button still
+uses core control admission and pending/freshness checks. No support/pose writes,
+engine changes, e2e changes, weakened assertions or new persistence claim were added.
+The browser remains unexecuted in this lane; root owns the serialized release38 gate.
+
+Follow-up validation: viewer TypeScript, focused type-aware lint, formatting and
+diff whitespace checks all passed. No browser, performance or Node rerun was made.
