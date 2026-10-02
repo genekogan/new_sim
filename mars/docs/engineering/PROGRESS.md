@@ -3072,3 +3072,17 @@ mutators, unchanged state/claims, detached aliases and Reset assertions remain. 
 original failure trace/context/results are retained under ignored
 .cloudflare/alpha-core-a8a8630-failed. No application or tolerance change was made.
 The failed full control case still requires execution through its remaining assertions.
+
+## Alpha journey setup correction — 2026-10-02
+
+Clean0432b8c serialized31-case run stopped after confirmed shared setup errors:
+16FAIL,1interrupted,14unrun,0PASS (report skipped15 includes interruption).
+Eight manual cases assumed fresh Reset paused and observed ticks6–12 instead of1;
+eight scripted cases expected Play while healthy fresh loads actually show Pause.
+Partial report, logs and traces retained in ignored
+.cloudflare/alpha-journeys-0432b8c-failed. No production journey certification follows.
+Both entry helpers now use ordinary healthy UI Pause before Reset; manual readiness
+still requires exactly one Step, scripted journey starts from strict tick0 through
+actual Play. Original assertions/timeouts remain. No application or tolerance change.
+Earlier first quarantine native-fieldset correction passed twice on clean0432b8c;
+remaining focused core proof inherits unchanged application source from a8a8630.

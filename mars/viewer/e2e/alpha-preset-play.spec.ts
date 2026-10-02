@@ -140,6 +140,12 @@ async function open(page: Page, name: string, speed = 4) {
       .getByRole('combobox', { name: 'Scenario', exact: true })
       .inputValue(),
   ).toBe(name);
+  // Restart the healthy automatically playing load through ordinary controls,
+  // then prove the complete selected journey from a fresh paused world.
+  if (await button(page, 'Pause').count()) await button(page, 'Pause').click();
+  await button(page, 'Reset').click();
+  await page.waitForFunction(() => window.__marsEngine?.ready);
+  expect((await snapshot(page)).state.tick).toBe(0);
   await expect(button(page, 'Play')).toBeEnabled();
   await page
     .getByRole('combobox', { name: 'Speed', exact: true })

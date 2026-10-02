@@ -335,6 +335,10 @@ for (const scenario of scenarios) {
     try {
       await page.goto(`/lab?scenario=${scenario}`);
       await page.waitForFunction(() => window.__marsEngine?.ready);
+      // Healthy fresh loads play automatically; pause through the actual UI
+      // before Reset so the first readiness Step is exactly one tick.
+      if (await button(page, 'Pause').count())
+        await button(page, 'Pause').click();
       await button(page, 'Reset').click();
       await button(page, 'Step').click(); // Exactly one fresh readiness tick; no journey stepping.
       await page
