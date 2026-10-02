@@ -2258,3 +2258,11 @@ manual-start presets. Root shared-boundary typecheck, focused14gallery/scanner
 and type-aware lint PASS. Browser5409/8944 remains reserved for frozen release37
 6b04a8b fullgate; no gallery browser, capture, perf or publication claim yet.
 Gallery remains a separate future candidate, preserving current52presets/activities21.
+
+### Gallery combined inheritance and observer proof — 2026-10-02
+
+Futuregallery f84f7c2 merges exact release37candidate6b04a8b while retaining all
+gallery paths and both datedprogress branches. Fresh focused29PASS/0FAIL/skip
+and viewerTSc PASS. Authored Play now verifies that detached camera facts report
+the actual currentpad/floor/active membership, alongside physical role/attention
+assertions; it makes no camera-policy or framing-quality claim. Browser pending.

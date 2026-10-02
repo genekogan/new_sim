@@ -40,6 +40,7 @@ async function inspect(page: Page) {
       hands: h.humanFields(),
       bones: h.bones(),
       attention: h.activityAttentionTargets(),
+      cameraFacts: h.cameraActivityReadout(),
       audio: h.musicAudio(),
     };
   });
@@ -136,6 +137,15 @@ function viewing(s: Evidence, index: number) {
   });
   expect(circle.attentionTarget?.entity).toBe(circle.pad);
   expect(circle.floorHolder).toBeDefined();
+  const fact = s.cameraFacts.activities.find((a) => a.id === s.tour!.tour);
+  expect(fact).toMatchObject({
+    mode: s.tour!.mode,
+    focus: circle.floorHolder,
+    objects: [circle.pad],
+  });
+  expect(fact!.actors.slice().sort()).toEqual(
+    s.tour!.members.filter((m) => m.active).map((m) => m.actor).sort(),
+  );
   for (const m of circle.participants.filter((m) => m.active)) {
     expect(m.physicallyViewing).toBe(true);
     expect(s.attention[m.actor]).toBeDefined();
