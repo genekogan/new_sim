@@ -2828,3 +2828,53 @@ dirty temporary-bundle interrupted gate, and the original strict capture-race RE
 remain in their exact gate directories. No engine changes, relaxed assertions,
 baseline updates, publication or complete-green-gate claim; a new clean full gate
 is required before release40 integration/deployment.
+
+## Production deploy40 — 2026-10-02 — restore campus homepage
+
+Owner-requested repair restores the established presentation at `https://sim.mars.college/`
+(default2026, valid year query, invalid query fallback); Lab stays explicit at `/lab`.
+Functional source `05370e8c727d44e52e2db510f022dac53b748417`; Worker `bb946d3c-934d-4d2c-8d50-8ae74e087146`, deployed19:50:39.261Z;
+rollback39 `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`. Verified 2026-10-02T20:00:14.854075+00:00.
+
+Clean gate `.cloudflare/gate/2026-10-02T18-43-03-123Z/report.json`:
+all9 PASS, unchanged deterministic hash `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3`;
+engine1424 PASS/6 SKIP/11 TODO, deployment295 PASS/0 SKIP,
+browser278 PASS/7 SKIP. Stage durations in order: lint2.461s, deployment5.034s,
+engine182.814s, TypeScript2.926s, camera TypeScript4.977s, browser3696.213s,
+record-campus13.952s, determinism3.288s, simulation integration7.142s.
+Exact `NODE_OPTIONS='--no-network-family-autoselection --dns-result-order=ipv4first'`.
+Evidence regenerated from the exact green source, saved ignored, restored for clean
+build, then committed byte-for-byte. No assertions, pins or tolerances relaxed.
+
+Initial missing worktree CAD assets and the transient serve-back capture RED remain
+in ignored receipts. Test orchestration observes actual first refill at1x and freezes
+synchronously through existing pause control only on exact committed serve-back
+material/support state; normal4x resumes afterward. Both unchanged journeys repeated
+three times:6 PASS, original120s/15s/retries0. Same first serve cancellation and all
+six care cycles remain required. First public harness3 PASS/1 FAIL assumed Lab was
+initially paused; corrected ignored harness pauses when running without source changes.
+Fresh native public4 PASS/0 FAIL/0 SKIP/0 flaky/errors[],36.023s, exact bundle
+`main-CzMxBXeQ.js`; five PNG/JSON/a11y sets inspected, root independently reviewed
+homepage and actual Lab camera controls. This is bounded route/control proof, not
+all63 full journeys or cinematic camera quality.
+
+Original Worker HTTP522 assets/24 routes/696 requests PASS; MCP36 tools/security
+PASS; director9 steps PASS,7942ms wall. In-DO printed0 is missing-metadata fallback,
+not measured CPU. Gateway HTML routes200/exact bundle; modular HEAD126892472B and
+20612-byte glTF2 header PASS. Original browser/campus.glb HEAD length FAIL remains.
+Eight large hash keys exactly unchanged; verified39 upload cache reused:8 skips,
+0 R2 writes. Static3 new/565 retained; Worker startup135ms, unrelated to browser
+readiness or DO CPU. No DNS/gateway/museum or physical-driver changes.
+
+Current gate year build uses automatic Play throughs0021 then bounded programmatic
+full completion. Entire current-house automatic Play remains release38 unchanged
+source inheritance; inherited39 activity proof is separate. Skips/TODO/FIXME,
+fine fingers/crops/silent dialogue/no growth and independent garden walks remain.
+Main's48 other-owner paths preserved byte/mode/mtime/status; no unrelated staging.
+
+Ignored receipts: release40-network-receipt.json, release40-public-results.json,
+release40-public-capture-review.json, release40-root-public-capture-review.json,
+release40-root-garden-review.json, release40-upload-cache-receipt.json.
+Gene lifted the temporary quota pause after verified repair40; resume saved v1 alpha
+stabilization first (coverage/recovery/performance/docs), then useful activity expansion,
+with no Eden or automatic handoff. Excluded unfinished drafts remain preserved.

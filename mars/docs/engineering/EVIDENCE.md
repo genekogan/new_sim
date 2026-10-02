@@ -8,17 +8,17 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `b712825` (engine tree clean) |
-| Generated | 2026-10-02T15:24:27.314Z · Node v22.20.0 |
-| Engine suite | 1441 tests in 146 files: 1424 pass, 0 fail, 6 skipped, 11 TODO · 170.3 s wall |
-| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T14-18-47-563Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
-| External gate | `.cloudflare/gate/2026-10-02T14-18-47-563Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `05370e8` (engine tree clean) |
+| Generated | 2026-10-02T19:48:49.799Z · Node v22.20.0 |
+| Engine suite | 1441 tests in 146 files: 1424 pass, 0 fail, 6 skipped, 11 TODO · 182.6 s wall |
+| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T18-43-03-123Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
+| External gate | `.cloudflare/gate/2026-10-02T18-43-03-123Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 6191 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 8835 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 20246 ms compute (cropped 8955 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 7168 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 10468 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 21992 ms compute (cropped 10449 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -270,7 +270,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -293,7 +293,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -309,7 +309,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -448,7 +448,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -478,7 +478,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -504,7 +504,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -522,7 +522,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -707,7 +707,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -755,10 +755,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -783,8 +783,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -803,9 +803,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -1032,108 +1032,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `5f1dc2e` (2026-10-02T13:18:12.035Z): 100 added, 0 removed.
+Compared with the report at `b712825` (2026-10-02T15:24:27.314Z): 0 added, 0 removed.
 
-- added: communal-supper.test.ts :: End before drains all physical work without claiming finished
-- added: communal-supper.test.ts :: End preparing drains all physical work without claiming finished
-- added: communal-supper.test.ts :: End refuses occupied utensil return truthfully with held claims, then drains after actual support restored
-- added: communal-supper.test.ts :: End sharing drains all physical work without claiming finished
-- added: communal-supper.test.ts :: End storing-mealware drains all physical work without claiming finished
-- added: communal-supper.test.ts :: End storing-prepware drains all physical work without claiming finished
-- added: communal-supper.test.ts :: cancelled End return drains, preserves ordinary walk, then explicit End retries only actual remaining held utensils
-- added: communal-supper.test.ts :: cancelled return Retry End refuses occupied destination without child spam and requires explicit restored retry
-- added: communal-supper.test.ts :: changed fixture binding and unavailable cleanup surface wait without failed child spam; explicit restoration
-- added: communal-supper.test.ts :: completed first storage cannot drift while later cleanup runs; safe wait and explicit exact restoration
-- added: communal-supper.test.ts :: exact completed meal Pause boundary advances receipts without trying a fresh empty-pot meal
-- added: communal-supper.test.ts :: exact completed preparation Pause boundary advances checkpoint rather than rerunning recipe
-- added: communal-supper.test.ts :: external material refill during safe meal Pause is a named conservation refusal, never a fresh serving
-- added: communal-supper.test.ts :: failed End return child retains its failed record and explicitly retries normal remaining stow
-- added: communal-supper.test.ts :: independent ordinary return physically satisfies cancelled history; End waits foreign withdrawal then completes honestly
-- added: communal-supper.test.ts :: meal consumed safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
-- added: communal-supper.test.ts :: meal partial safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
-- added: communal-supper.test.ts :: meal stowing safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
-- added: communal-supper.test.ts :: missing ingredient and malformed storage coverage refuse before any physical child
-- added: communal-supper.test.ts :: occupied storage waits with named admission and never preempts foreign vessel or emits repeated failed children
-- added: communal-supper.test.ts :: ordinary cleanup direction preserves independent walk and yields retained task until explicit Resume
-- added: communal-supper.test.ts :: partial preparation Pause/Resume retains deposited material and retries existing pot recipe
-- added: communal-supper.test.ts :: preparation safe Pause then ordinary cook direction uses same ingredients and explicit retained retry
-- added: communal-supper.test.ts :: repeated End while ordinary return active is idempotent and direct walk honestly refuses stow ownership
-- added: communal-supper.test.ts :: safe cancelled meal permits ordinary direction then same receipt explicit Resume
-- added: communal-supper.test.ts :: same seven vessels prepare once, converse/eat and store empty with exact replay and detached readout
-- added: communal-supper.test.ts :: storing-mealware partial cleanup safe Pause retains same persistent task
-- added: communal-supper.test.ts :: storing-prepware partial cleanup safe Pause retains same persistent task
-- added: communal-supper.test.ts :: uncancelled ordinary meal direction preserves player action but failed meal source is an explicit continuation refusal
-- added: garden-circuit.test.ts :: End in before-step safely returns actual bowl and keeps finite history
-- added: garden-circuit.test.ts :: End in care safely returns actual bowl and keeps finite history
-- added: garden-circuit.test.ts :: End in due safely returns actual bowl and keeps finite history
-- added: garden-circuit.test.ts :: End in serve safely returns actual bowl and keeps finite history
-- added: garden-circuit.test.ts :: Pause after serve deposit before back completes never serves the nonempty bowl again
-- added: garden-circuit.test.ts :: Pause before serving deposit retains empty bowl and exactly retries unfinished resupply
-- added: garden-circuit.test.ts :: active care directive drains ordinary care before walking and does not resurrect circuit
-- added: garden-circuit.test.ts :: bad-return refuses admission with no physical effects/claims
-- added: garden-circuit.test.ts :: changed finite material waits for explicit restoration and never manufactures resupply
-- added: garden-circuit.test.ts :: changed source support refuses and exact restoration permits continuation
-- added: garden-circuit.test.ts :: due wait preserves original 600 tick interval without failed child spam
-- added: garden-circuit.test.ts :: duplicate-plant refuses admission with no physical effects/claims
-- added: garden-circuit.test.ts :: exhausted-source refuses admission with no physical effects/claims
-- added: garden-circuit.test.ts :: independent ordinary return satisfies stopped End physically without rewriting failed history
-- added: garden-circuit.test.ts :: missing serve after actual empty-bowl take waits by name without throw or failed-record spam
-- added: garden-circuit.test.ts :: missing-plant refuses admission with no physical effects/claims
-- added: garden-circuit.test.ts :: missing-source refuses admission with no physical effects/claims
-- added: garden-circuit.test.ts :: nonempty-bowl refuses admission with no physical effects/claims
-- added: garden-circuit.test.ts :: occupied return retains real hand/support, waits without children spam, restoration permits ordinary release
-- added: garden-circuit.test.ts :: partial care purpose and material survive safe Pause, ordinary direction and explicit Resume
-- added: garden-circuit.test.ts :: readout is detached and repeat End during active ordinary return is idempotent
-- added: garden-circuit.test.ts :: six committed deposits still require physical release after final-care Pause and ordinary bowl take
-- added: garden-circuit.test.ts :: six real care cycles, two real resupplies, original identities and deterministic replay
-- added: garden-circuit.test.ts :: stopped ordinary End return requires explicit retry, retains source history, no child spam
-- added: garden-circuit.test.ts :: unavailable planter waits until explicit restored Resume; no automatic child failures
-- added: garden-circuit.test.ts :: unsupported-plant refuses admission with no physical effects/claims
-- added: room-preparation.test.ts :: End before first physical tick releases parent with no children or purpose resurrection
-- added: room-preparation.test.ts :: End during arranging drains all actual children and preserves supported same objects
-- added: room-preparation.test.ts :: End during clearing drains all actual children and preserves supported same objects
-- added: room-preparation.test.ts :: End during gathering drains all actual children and preserves supported same objects
-- added: room-preparation.test.ts :: Pause held table safely grounds partial placement; explicit retry starts at real pose without retidying
-- added: room-preparation.test.ts :: Pause while second item held drains safely, retains first storage and explicitly continues same tidy child
-- added: room-preparation.test.ts :: changed destination support after storage waits and safely stops setup; explicit restoration continues same items
-- added: room-preparation.test.ts :: completed setup changed during boundary Pause waits for explicit remaining-fixture retry rather than repeating tidy/table
-- added: room-preparation.test.ts :: completed table placement remains retained when chair move stops and explicit retry skips the table
-- added: room-preparation.test.ts :: connected whole session uses same stored items, physically moved table and late visitor chair/question; replay is exact
-- added: room-preparation.test.ts :: occupied moved chair causes named wait without dispatch spam/preemption, then explicit restored retry
-- added: room-preparation.test.ts :: ordinary tidier direction waits with retained transfers until explicit Resume, without failed record spam
-- added: room-preparation.test.ts :: original classroom edge-slot capacity limit is unchanged; malformed definition and missing item refuse before dispatch
-- added: room-preparation.test.ts :: pre-tick Pause and exact tidy completion boundary preserve original payload and require explicit restored Resume
-- added: room-preparation.test.ts :: session local Pause is a named honest refusal; existing participant direction/exclusion and explicit rejoin still work
-- added: shared-food-continuation.test.ts :: a later unrelated meal cannot reuse the older cancelled receipts or recreate food
-- added: shared-food-continuation.test.ts :: accepted continuation cancelled before its first step produces no phantom serving or orphan children
-- added: shared-food-continuation.test.ts :: after-first-return cancellation resumes exact remaining serving/food and returns same utensils
-- added: shared-food-continuation.test.ts :: after-one-serving cancellation resumes exact remaining serving/food and returns same utensils
-- added: shared-food-continuation.test.ts :: before-first-step cancellation resumes exact remaining serving/food and returns same utensils
-- added: shared-food-continuation.test.ts :: before-serve-deposit cancellation resumes exact remaining serving/food and returns same utensils
-- added: shared-food-continuation.test.ts :: consumed empty bowls continue same cancelled meal without another serving, then ordinary stow releases resources
-- added: shared-food-continuation.test.ts :: corrupted retained contents during a running continuation stop with a material diagnostic rather than consume replacement food
-- added: shared-food-continuation.test.ts :: explicit continuation refuses changed at binding
-- added: shared-food-continuation.test.ts :: explicit continuation refuses changed ordered-actors binding
-- added: shared-food-continuation.test.ts :: explicit continuation refuses changed pot binding
-- added: shared-food-continuation.test.ts :: explicit continuation refuses changed return-order binding
-- added: shared-food-continuation.test.ts :: explicit continuation refuses changed service binding
-- added: shared-food-continuation.test.ts :: legacy uncancelled directive fails the parent and cannot become a continuation source
-- added: shared-food-continuation.test.ts :: missing, active, completed and wrong-verb sources refuse without state writes
-- added: shared-food-continuation.test.ts :: one consumed participant and one retained partial serving continue without topping up either
-- added: shared-food-continuation.test.ts :: partial-eating cancellation resumes exact remaining serving/food and returns same utensils
-- added: shared-food-continuation.test.ts :: repeated safe continuation uses latest cancellation checkpoint and original purpose without duplicate serving
-- added: shared-food-continuation.test.ts :: retained material checkpoint rejects anchored-pose tampering
-- added: shared-food-continuation.test.ts :: retained material checkpoint rejects definition tampering
-- added: shared-food-continuation.test.ts :: retained material checkpoint rejects fixture tampering
-- added: shared-food-continuation.test.ts :: retained material checkpoint rejects material tampering
-- added: shared-food-continuation.test.ts :: retained material checkpoint rejects quantity tampering
-- added: shared-food-continuation.test.ts :: retained material checkpoint rejects support tampering
-- added: shared-food-continuation.test.ts :: return destination occupancy preserves same checkpoint; ordinary removal permits explicit continuation
-- added: shared-food-continuation.test.ts :: same chained cancellations replay world, actions, own receipts and events
-- added: shared-food-continuation.test.ts :: same world in a different Runtime has no material checkpoint provenance
-- added: shared-food-continuation.test.ts :: taking cancellation resumes exact remaining serving/food and returns same utensils
-- added: shared-food-continuation.test.ts :: unrelated later material use cannot restore then reuse an older cancelled purpose
-- added: shared-food-continuation.test.ts :: voluntary cancellation then ordinary player direction permits continuation after the independent walk finishes
 
 ## Tests not cited by any row or milestone
 

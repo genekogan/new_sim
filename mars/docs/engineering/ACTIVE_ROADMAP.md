@@ -1,30 +1,31 @@
-# Mars World v1 alpha — stabilization paused after verification
+# Mars World v1 alpha — stabilization after verified homepage repair
 
 Owner mandate2026-10-02 supersedes indefinite vocabulary expansion.
 
-**Release39 is published and verified at https://sim.mars.college/**,
-Worker `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`, functional source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; rollback38
-`7616e47a-9149-4b71-ba14-2ea8e5bc6660`. 63 selectable presets; rules version `activities/29`
-(a rules stamp, not an activity count). All nine gate stages PASS; engine
-1424 PASS/6 SKIP/11 TODO. Fresh native public
-85 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; exact bundle `main-Bx4z1zKg.js`.
-Skipped/TODO/FIXME checks remain unproved. All 63 first-Step smoke is not all 63
-full-Play proof; execution contracts and missing coverage remain stabilization work.
+**Release40 is verified: [campus presentation](https://sim.mars.college/) is restored at `/`; [Engine Lab](https://sim.mars.college/lab) remains explicit at `/lab`.**
+Worker `bb946d3c-934d-4d2c-8d50-8ae74e087146`, functional source `05370e8c727d44e52e2db510f022dac53b748417`; rollback39
+`95a8f9a8-9d3c-4de4-8365-346fcf1df33d`. Exact bundle `main-CzMxBXeQ.js`.
+All nine clean gate stages PASS: engine1424 PASS/6 SKIP/11 TODO,
+deployment295 PASS, browser278 PASS/7 SKIP. Fresh bounded public repair proof:
+4 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; default2026, valid2024 and invalid-year
+fallback homepage, plus explicit Lab Play/Pause/Reset and camera controls.
+63 presets/rules version `activities/29`; this repair does not claim all63 full-Play proof.
+Five public captures inspected, with root independently reviewing homepage and Lab.
 
-New hypothetical room preparation, communal supper and finite garden circuit use
-ordinary same-object physical actions, supported returns and retained partial effects.
-Gene requests a temporary quota pause after this verification: no further alpha/performance,
-vocabulary or Eden work until explicitly resumed. Saved stabilization direction and
-unfinished work remain available after resume; no automated resume, handoff or follow-up.
-Release38 whole-current-build proof is inherited; no fresh release39 whole-build
-execution is claimed unless separately identified in final public scope.
-Original gateway browser/campus.glb HEAD-length failure remains; no DNS/gateway fix.
-Silent dialogue, current rigs/fine fingers, crop/HUD limits and no plant growth remain.
-Garden-afternoon walks are independent, not a coordinated shared garden walk.
+Gene lifted the temporary quota pause and authorized continued work after this
+verified homepage repair. Resume saved Mars World v1 alpha stabilization first:
+coverage/recovery, bounded performance and documentation, then useful activity
+expansion. Preserve unfinished workshop/library work; no automatic Eden work.
+Release39's activity proof and release38's entire current-house automatic Play remain
+separate source inheritance. Current gate year-build proof is automatic Play through
+s0021 followed by bounded programmatic full completion, not an entire automatic build.
+Skipped/TODO/FIXME remain unproved. Original gateway browser/campus.glb HEAD-length
+failure remains; no DNS/gateway change. Silent dialogue, current rigs/fine fingers,
+crop/HUD limits, no plant growth and independent garden-afternoon walks remain.
 
-## Saved queue and exit criteria — resume only on owner request
+## Saved queue and exit criteria — owner-authorized resume after release40
 
-1. **Latest verified checkpoint:** retain verified39 proof and preserve main's48other-owner paths;
+1. **Latest verified checkpoint:** retain verified40 repair and inherited39 proof and preserve main's48other-owner paths;
    use this shipped checkpoint for stabilization. Expose
    all shipped presets and longer runs honestly. Exclude unverified workshop/library
    work; retain their branches/reports without claiming implementation.
