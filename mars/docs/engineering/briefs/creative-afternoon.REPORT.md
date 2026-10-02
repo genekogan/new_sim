@@ -24,8 +24,10 @@ Nine creative-afternoon cases cover actual production/sharing/music/return, inde
 book/care effects, interruption, sharing/music retained Pause/Resume, End cleanup,
 replay, occupied place and unavailable equipment. Two drawing-intention regressions
 cover exact partial progress and player direction. Root requires actual Play,
-inspected captures, combined gate and public proof before release. No browser evidence
-exists yet; this candidate does not change online release36/release37 gate source.
+inspected captures, combined gate and public proof before release. Actual Play now passes2/2 on61b236e: standalone sharing13.8s and connected
+afternoon44.5s; all14 sharing/afternoon captures inspected by root/helper. The
+samepad/book/care results and both real performers are proved. Still not public;
+release36 remains online. The oldf095397 gate is retainedRED, not release proof.
 
 Supported limits: one fixed flat-ground arrangement, one bounded shelter study,
 predefined original digital scores, finite plant care, no arbitrary art tools,

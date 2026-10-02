@@ -2207,3 +2207,22 @@ physically drained modecompleted even with0/3transfers. Art-sharing/cleanup read
 now label the same released-but-unfinished stateended; authoritative status, effects,
 support and execution remain unchanged. Add stricter actualPlay DOM assertions for
 both kinds of earlyEnd. ViewerTSc/lint pass; focused browser recheck/fullgate pending.
+
+
+### Combined source capture review and bounded history gap — 2026-10-02
+
+All30fresh61b236e PNG plusJSON/a11y personally inspected by Sol6.1 helper; root
+inspects13representative art/independent care/performer/cleanup/final images. No
+major visible ownership/support/continuity/clipping break. Actualmarkedpad29→60→
+69→160ticks, samebookmark1.35→20s, finitecare0→1cycle/water1→.75, physicalsamechair
+performerexchange and same3cleanupobjects/supports/contents are asserted. Fine
+fingers/sparsegestures/off-frame care/direction and occludedfinalbook remain limits.
+New early-End label assertions pass3/3 actualPlay26.6s on11cb5d6; root views all3
+newEnd readouts. Idle original stress/gridceilings pass,0violations/pinsunchanged.
+
+Audit catches oldcompleted music session elapsed following nextcomputeruser; actual
+openjam finished-round history remainscorrect. A bounded own-child history repair
+and regressions are underway before finalcombinedsource freeze. Existing failed
+f095gate/museum84sunchanged focusedretry remain distinct. No merger/deployyet;
+all48other-owner pendingpaths staypreserved. Futuregallerycore13checks/29combined
+PASS is savedseparately, notpartofthispublicationcandidate.
