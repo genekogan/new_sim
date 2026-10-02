@@ -3228,3 +3228,12 @@ Final architecture review found no consequential boundary blocker; clarified End
 as requested safe cleanup with retained blocked ownership, dated the old52startup
 count and separated Scenario.continuous from healthy world-clock liveness.
 No candidate acceptance/publication or unrestricted recovery claim.
+
+Rotated two-plot gap closed by reviewed a862b2b9/integrated3c3f5d7: one actual
+UI Play case PASS43.157s, original120s/15s/zero retries and all earlierA interruption/
+B-untouched assertions retained. Normal StartB→Play completes bothplots (.25/4),
+same empty bowl returns, supported fixtures/observedclaims clean; freshReset
+restores material. Root independently inspected endpoint/pairedJSON with crop
+limits explicit. Canonical inventory retains oldA-only proof and adds this exact
+spec-hash receipt;37candidate scenarios now have source-bound focused passes,
+not63combined/public certification. No engine/app/content changes or newpins.

@@ -32,10 +32,10 @@
     "exactFunctionalInheritedFocusedUiJourneys": 3,
     "sustainedLivenessProven": 1,
     "current39Gate": "Historical39 state preserved; completed targeted alpha receipts do not establish final combined native gate/public validation.",
-    "countMeaning": "Recorded source-bound historical/candidate coverage grades, not63 current-release accepted presets.36 distinct alpha-recorded passes span named sources through9a543c1; earlier failures/skips retained. Final combined gate/public proof pending.",
+    "countMeaning": "Recorded source-bound historical/candidate coverage grades, not63 current-release accepted presets.37 distinct alpha-recorded passes now include actual UI completion of both rotated plots; earlier failures/skips retained. Final combined gate/public proof pending.",
     "sustainedLivenessMeaning": "One bounded stress30 witness through tick2017; not indefinite liveness.",
     "reconciledAtSource": "c09a8bf77fe909c7639aabc089375be81fec63bc",
-    "alphaRecordedPassedScenarioCount": 36,
+    "alphaRecordedPassedScenarioCount": 37,
     "alphaRecordedManualPassed": 8,
     "alphaRecordedAdditionalManualFullJourneys": 2,
     "alphaRecordedScriptedPassed": 21,
@@ -462,6 +462,28 @@
       },
       "exactCaseNamesInReport": true,
       "currentSourceRelationship": "Executed at named frozen source; metadata reconciliation is not a new execution. Final combined gate/public alpha acceptance pending."
+    },
+    "alphaRotatedBothPlots": {
+      "kind": "native-local-focused-browser",
+      "source": "43d07ec plus reviewed test diff; committed a862b2b9d9c4b8486ab2994380e4c5ebb6afd2de, integrated3c3f5d7",
+      "testedSpecSha256": "4fa21562651c71d612019d5e5b47f844dde140703585558ac7c6796965ab4f84",
+      "path": "<mars-worktrees>/seed-rotated-both-alpha/viewer/e2e/artifacts/codex-seed-rotated-both-alpha-2/native-playwright-result.json",
+      "sha256": "0f3ed0adba2665858a28aa5b0abaa219d5bd605c7903c978b0ce7be55e1b48d8",
+      "result": {
+        "startTime": "2026-10-02T22:20:34.616Z",
+        "duration": 44792.517,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "caseStatusCounts": {
+        "passed": 1
+      },
+      "currentSourceRelationship": "Focused normal UI Play after unchanged A intervention/retention assertions; final clean combined gate/public alpha acceptance still pending. No engine/app/content edits.",
+      "effects": "Both plots .25 in4deposits completed at tick1501, distinct purposes, originalA exact retention; same empty bowl resting on original table slot; original fixtures/support retained; freshReset tick1 restores .5 bowl and empty plots. Observed actor/entity/hands/holds claim aliases empty, not arbitrary registry proof.",
+      "captureReview": "Root independently inspected endpoint and pairedJSON; image crops A/bowl, so paired authoritative assertions establish those effects, not imagealone.",
+      "report": "docs/engineering/briefs/seed-rotated-both-alpha.REPORT.md"
     }
   },
   "tests": {
@@ -709,13 +731,16 @@
     },
     "t031": {
       "file": "viewer/e2e/seed-planting.spec.ts",
-      "name": "rotated actual Play: directive safe return, exact retained material, explicit Continue then End partial and complete same purpose",
+      "name": "rotated actual Play: directive safe return, exact retained material, explicit Continue then End partial and complete same purpose then both plots",
       "method": "actual-ui-play-journey",
       "outcome": "passed",
       "proofRefs": [
         "public38",
-        "gate38"
-      ]
+        "gate38",
+        "alphaRotatedBothPlots"
+      ],
+      "historicalName": "rotated actual Play: directive safe return, exact retained material, explicit Continue then End partial and complete same purpose",
+      "historicalProofLimit": "Original gate38/public38 case completedA and intentionally leftB untouched; it is retained interruption proof, not the full two-plot terminal witness."
     },
     "t035": {
       "file": "viewer/e2e/body-probe-safety.spec.ts",
@@ -4269,7 +4294,7 @@
       "setupNotes": [],
       "contractRef": "seed-planting",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "historical-proof-current-integration-pending",
+      "currentSourceProofRelationship": "focused-both-plot-ui-proof-integrated3c3f5d7-final-combined-public-pending",
       "testRefs": [
         "t031"
       ],
@@ -4282,11 +4307,14 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+        "Final clean combined alpha gate/public acceptance remains pending."
       ],
-      "boundedNextTest": "Execute mapped dedicated UI Play cases unchanged on frozen current source; inspect retained effects and final resource cleanup. New scenario-specific test only if a named gap/failure remains.",
+      "boundedNextTest": "Run unchanged extended test in frozen combined gate; verify published scenario under same supported finite planting contract.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "activities"
+      "discoveryGroup": "activities",
+      "proofRefs": [
+        "alphaRotatedBothPlots"
+      ]
     },
     {
       "id": "reading-circle",
