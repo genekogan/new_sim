@@ -91,9 +91,10 @@ export function galleryTourBinding(): GalleryTourParams {
   };
 }
 export function galleryTourRuntime() {
+  const common = createRegistry();
   return new Runtime(
     galleryTourWorld(),
-    createRegistry(GALLERY_TOUR_ACTIONS),
+    createRegistry(GALLERY_TOUR_ACTIONS.filter(a => !common.has(a.verb))),
     { spatial: new Spatial(galleryTourScene()) },
     ENGINE_INVARIANTS,
   );

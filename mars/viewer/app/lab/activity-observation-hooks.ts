@@ -1,3 +1,4 @@
+import { readGalleryTour } from '../../engine/activities/gallery-tour.ts';
 import { readTidyTable } from '../../engine/activities/table-cleanup.ts';
 import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { readGroupWarmup } from '../../engine/activities/group-warmup.ts';
@@ -133,6 +134,13 @@ export function cameraActivityReadout(rt: Runtime): {
       if (s) fact = { ...fact, actors: [s.actor], phase: s.phase, mode: s.mode, focus: s.actor,
         objects: s.current ? [s.current.item, s.current.from.split('#')[0], s.current.to.split('#')[0]] : s.remaining.map(q => q.item),
         waitingReason: s.waitingReason };
+    }
+    if (r.verb === 'gallery_tour') {
+      const s = readGalleryTour(rt, r.id);
+      if (s) fact = { ...fact, actors: s.members.filter(q => q.active).map(q => q.actor),
+        departing: s.members.filter(q => q.state === 'left' || q.state === 'directed-away').map(q => q.actor),
+        phase: r.phase ?? s.mode, mode: s.mode, focus: s.current?.floorHolder,
+        objects: s.pad ? [s.pad] : [], waitingReason: s.diagnostic?.message };
     }
     if (r.verb === 'art_sharing') {
       const s = readArtSharing(rt, r.id);

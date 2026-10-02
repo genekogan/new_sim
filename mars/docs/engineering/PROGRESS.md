@@ -2207,3 +2207,15 @@ physically drained modecompleted even with0/3transfers. Art-sharing/cleanup read
 now label the same released-but-unfinished stateended; authoritative status, effects,
 support and execution remain unchanged. Add stricter actualPlay DOM assertions for
 both kinds of earlyEnd. ViewerTSc/lint pass; focused browser recheck/fullgate pending.
+
+
+### Future guided gallery shared boundary — 2026-10-02
+
+Separate gallery-lab integrates13-case gallery core2e6a185 (29focused checksPASS),
+adds canonicalactivities/22, two manual-start selector entries and detachedgallery
+readout/camera facts. Actual art_sharing children supply currentrig gaze/turn-taking;
+parent never moves anyone or adjusts camera policy. Two/three pre-made same-outline
+fixtures are explicitly hypothetical; tours retain padIDs/stopdiscussion/departures.
+Insufficient nextstop attendance requires declared lateJoin or End, not implicit
+reactivation. UI/actualPlay are separately being authored; no public/gallery claim.
+Current release37 candidate remains52presets/activities21 in creative-afternoon.

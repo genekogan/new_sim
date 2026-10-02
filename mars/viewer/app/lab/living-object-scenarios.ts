@@ -1,3 +1,4 @@
+import { galleryTourRuntime, galleryTourScene } from '../../engine/scenarios/gallery-tour.ts';
 import { tidyTableRuntime, tidyTableScene } from '../../engine/scenarios/table-cleanup.ts';
 import { artSharingRuntime, artSharingScene } from '../../engine/scenarios/art-sharing.ts';
 import { creativeAfternoonRuntime, creativeAfternoonScene, tickCreativeAfternoon } from '../../engine/scenarios/creative-afternoon.ts';
@@ -24,6 +25,12 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  ...['gallery-tour', 'gallery-tour-short'].map((name): Scenario => ({
+    name, title: name === 'gallery-tour-short' ? 'Guided gallery · two stops (hypothetical)' : 'Guided gallery · three stops (hypothetical)',
+    description: 'Start gallery tour, then Play. Walk between actual pre-made drawing fixtures, form viewing circles and exchange questions. Pause/Resume, Join/Leave or direct the host away. Each new stop needs the host and two viewers; departures persist, with explicit late Join or End when attendance is insufficient. Same artwork and completed discussion history remain. Authored flat-ground gallery; no arbitrary exhibitions or active reload restoration.',
+    scene: galleryTourScene, humans: () => [], build: galleryTourRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, 1, 22, 55], expect: checks,
+  })),
   ...[0, Math.PI / 2].map((yaw, index): Scenario => ({
     name: index ? 'table-cleanup-rotated' : 'table-cleanup', title: index ? 'Table cleanup · rotated setup (hypothetical)' : 'Table cleanup · same bowls and book (hypothetical)',
     description: 'Start cleanup, then Play. One person physically carries three existing bowls/books between declared table slots; their identities and contents remain. Pause returns the held item safely; Resume keeps completed placements. Direct the tidier away or End. No deletion, washing, arbitrary storage planning or unsupported ground drops.',
