@@ -50,6 +50,7 @@ async function inspect(page: Page) {
       entities: h.cameraEntities(),
       slots: h.slots(),
       held: h.heldItems(),
+      claims: h.garden().claims,
       hands: h.humanFields(),
       bones: h.bones(),
       activity: h.cameraActivityReadout(),
@@ -412,7 +413,7 @@ test('default actual Play: partial conserved deposits, safe Pause and same-purpo
   });
 });
 
-test('rotated actual Play: directive safe return, exact retained material, explicit Continue then End partial and complete same purpose', async ({
+test('rotated actual Play: directive safe return, exact retained material, explicit Continue then End partial and complete same purpose then both plots', async ({
   page,
 }) => {
   const initial = await open(page, 'seed-planting-rotated');
@@ -527,7 +528,46 @@ test('rotated actual Play: directive safe return, exact retained material, expli
     deposited: 0,
   });
   expect(complete.planting.source?.contents?.fraction).toBe(0.25);
+  await expect(button(page, 'Start plant B')).toBeEnabled();
+  await button(page, 'Start plant B').click();
+  await play(page);
+  await terminal(page, 'completed');
+  await freeze(page);
+  const finished = await inspect(page);
+  await page.evaluate(
+    (target) => window.__marsEngine.camera(
+      [target[0] + 2.8, target[1] + 2.3, target[2] - 4], target,
+    ),
+    bed(finished, 'planter-b').target,
+  );
+  const completedB = await capture(
+    page,
+    'seed-planting-rotated-both-plots-empty-finite-bowl',
+  );
+  clean(completedB);
+  returned(completedB, initial);
+  conservation(completedB);
+  markers(completedB);
+  sameFixtures(completedB, initial);
+  expect(Object.values(completedB.claims).flat()).toEqual([]);
+  expect(completedB.planting.action?.bindings).toMatchObject({
+    actor: 'planter', plant: 'planter-b', seeds: 'seed-bowl',
+  });
+  expect(bed(completedB, 'planter-a')).toEqual(bed(complete, 'planter-a'));
+  expect(bed(completedB, 'planter-b')).toMatchObject({
+    deposited: 0.25, deposits: 4, completed: true,
+    actor: 'planter', source: 'seed-bowl',
+  });
+  expect(bed(completedB, 'planter-b').purpose).not.toBe(original.purpose);
+  expect(completedB.planting.source?.contents?.fraction).toBe(0);
+  await expect(button(page, 'Start plant A')).toBeDisabled();
+  await expect(button(page, 'Start plant B')).toBeDisabled();
   await reset(page);
+  const resetBoth = await capture(page, 'seed-planting-rotated-both-plots-reset');
+  clean(resetBoth);
+  returned(resetBoth, initial);
+  sameFixtures(resetBoth, initial);
+  expect(Object.values(resetBoth.claims).flat()).toEqual([]);
   expect(errors.get(page)).toEqual([]);
   save('seed-planting-rotated-proof', {
     initial,
@@ -537,5 +577,7 @@ test('rotated actual Play: directive safe return, exact retained material, expli
     ended,
     admitted,
     complete,
+    completedB,
+    resetBoth,
   });
 });
