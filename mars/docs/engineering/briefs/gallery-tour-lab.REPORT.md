@@ -92,3 +92,37 @@ Viewer typecheck, focused type-aware HUD/spec lint, formatting and diff whitespa
 checks: PASS. Browser/performance/full gate: intentionally not run. Root integration,
 actual Play, personally inspected captures and release validation remain necessary
 before this future candidate can be called shipped or visually proved.
+
+## Bounded director endpoint repair (future source ce2213c)
+
+The first actual Play short-tour run on frozen `ce2213c` timed out after 120 seconds
+at tick 526, globally paused just after the declared late visitor physically joined
+stop two. The failure JSON/a11y showed the host's ordinary viewing hold, zero
+violations/page errors, and a disabled Direct host away button; no director walk
+record had been admitted. Failed-first artifacts remain under
+`viewer/e2e/artifacts/social-seed-ce2213c/gallery-short-{failure,result}` in the
+root-owned frozen candidate.
+
+Focused deterministic reproduction identified the concrete cause: the HUD's
+`[-10,-8]` endpoint intersects `left-wall`, producing `route.goal-blocked` because
+there is no standing room for the 0.34 m-radius actor. Admission and the disabled
+control were correct; the authored destination was infeasible. The HUD now uses
+`[-8,-8]`, which admits through ordinary walk planning from all three formed
+stops. It also displays the real route diagnostic when direction is unavailable.
+The Play assertion changes only the exact expected endpoint to `[-8,0,-8]`;
+original timing, retained discussion comparisons, resource/identity checks and
+other assertions remain unchanged. No engine planner, geometry, refusal or tour
+semantics were changed.
+
+A new focused Node regression reproduces Leave → named insufficient audience →
+declared late Join at stop two, verifies the old wall endpoint still refuses,
+then executes the new ordinary direction. It asserts exact paused clock/effects/
+history, actual final host pose, persistent withdrawn visitor, explicit Resume,
+two supported same-artifact history entries and final actor/slot/artwork claim
+cleanup. Fourteen gallery checks pass in about 1.2 seconds, with zero violations.
+Viewer TypeScript, focused type-aware lint, formatter and diff checks pass.
+
+Repair work is isolated in `codex/gallery-direction-fix` from `ce2213c`; the
+candidate being browser-tested was not modified. No browser/performance/full gate
+ran for this repair. Root must integrate it and execute the unchanged strict
+actual Play journey on a newly frozen source before claiming repaired visual proof.

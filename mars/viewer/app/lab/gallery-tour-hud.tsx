@@ -76,7 +76,7 @@ export function GalleryTourHud({
     !state && rt.registry.has('gallery_tour')
       ? galleryTour.plan(rt, binding)
       : undefined;
-  const walkParams = { actor: host, x: -10, z: -8 },
+  const walkParams = { actor: host, x: -8, z: -8 },
     walkAdmission = rt.registry.get('walk_to')?.plan(rt, walkParams);
   const directionPending = () =>
     [...rt.records.values()].some(
@@ -112,6 +112,15 @@ export function GalleryTourHud({
           ? `${state.tour} · ${state.status} · ${state.mode === 'completed' && !state.finished ? 'ended' : state.mode} · ${state.history.length}/${binding.stops.length} completed stops`
           : 'Not started'}
       </div>
+      {live &&
+        state?.mode === 'sharing' &&
+        walkAdmission &&
+        !walkAdmission.ok && (
+          <p role="status" data-testid="gallery-tour-direction-diagnostic">
+            Host direction unavailable: {walkAdmission.diagnostic.code}:{' '}
+            {walkAdmission.diagnostic.message}
+          </p>
+        )}
       <div data-testid="gallery-tour-artifact">
         {state?.mode === 'completed'
           ? 'Tour retained its artwork history.'

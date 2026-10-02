@@ -438,7 +438,7 @@ test('two-stop actual Play Leave persists, named audience wait, declared late Jo
     joined.tour!.current!.effects,
   );
   expect(directed.state.humans.find((h) => h.id === 'sketcher')?.p).toEqual([
-    -10, 0, -8,
+    -8, 0, -8,
   ]);
   await button(page, 'Resume tour').click();
   await play(page);
