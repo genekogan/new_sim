@@ -230,6 +230,13 @@ export class Runtime {
       return rec;
     }
     if (!l) return rec;
+    // Once accepted, a deferred stop owns its cleanup until step() finishes it.
+    // Repeated parent Cancel must not restart that cleanup or cancel children
+    // admitted specifically to return an owned item. Refused stops remain retryable.
+    if (l.cancelling) {
+      if (reason) l.reason = reason;
+      return rec;
+    }
     const r = l.def.cancel(this, l.exec);
     if (!r.ok) {
       rec.diagnostic = r.diagnostic;

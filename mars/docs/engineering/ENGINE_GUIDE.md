@@ -81,7 +81,11 @@ actions own physical movement, posture, support and manipulation. Independent
 `living_intention` commitments retain bounded progress and explicitly resume after
 player/director interruption; `living-day` composes existing family mechanisms.
 Do not add a second movement controller or fabricate replacement objects. End and
-refusal must be distinguishable from successful completion.
+refusal must be distinguishable from successful completion. Once an action accepts
+a deferred cancellation, its fixed-step cleanup runs once; repeated parent requests
+do not restart it or cancel item-return children. A refused cancellation stays
+retryable. Activity-specific Pause contracts may retain a held tool deliberately;
+End and ordinary put actions must still provide coherent physical release.
 
 Object capabilities/state live separately from appearance: workstation, reading,
 food, garden and sleep modules expose explicit requirements and retained effects.
