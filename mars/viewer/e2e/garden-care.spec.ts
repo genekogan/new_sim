@@ -94,7 +94,7 @@ test('garden-care: actual Play partial return, both plants, repeat due, finite e
   await button('Direct carer away').click(); await button('Play').click();
   await page.waitForFunction(() => {
     const hook = window.__marsEngine as GardenHook;
-    return !hook.garden().active && hook.records().filter(r => r.verb === 'walk_to').at(-1)?.status === 'completed';
+    return !hook.garden().active && hook.records().filter(r => r.verb === 'walk_to' && !r.parent).at(-1)?.status === 'completed';
   });
   await button('Pause').click(); const handoff = await assertClean();
   expect(handoff.plants[0].pending).toEqual(handoffPartial.plants[0].pending);
