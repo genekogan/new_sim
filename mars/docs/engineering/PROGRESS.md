@@ -3053,3 +3053,22 @@ valid support/zero violations, exact subsequent Step and actual UI Reset checks 
 A test-local hook type replaces a conflicting global declaration; combined strict
 spec TypeScript and focused lint pass with the repo's esnext/DOM libraries. Browser
 execution remains the next serialized check; none of these authored cases is yet PASS.
+
+
+## Alpha first serialized UI execution — 2026-10-02
+
+Clean a8a8630 focused UI run executed11cases:10PASS/1FAIL, no skips/flaky.
+Empty/refused authored endpoints left independent walking usable; a real reading
+child failure released posture/claims while another walker completed; a deliberately
+invalid fixture stayed visibly contained and actual fresh UI Reset restored a valid
+world. Body first-Step/Reset/actual Play/synthetic contract and grouped discovery
+passed. This is focused candidate proof, not full63coverage or a public release.
+
+One control case failed because Playwright toBeDisabled does not recognize fieldset
+as a disable-able control, though the trace repeatedly shows its disabled attribute
+and individual buttons had already passed disabled checks. The assertion now checks
+the native fieldset.disabled property exactly; all individual buttons,13blocked hook
+mutators, unchanged state/claims, detached aliases and Reset assertions remain. The
+original failure trace/context/results are retained under ignored
+.cloudflare/alpha-core-a8a8630-failed. No application or tolerance change was made.
+The failed full control case still requires execution through its remaining assertions.

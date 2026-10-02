@@ -147,7 +147,7 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
     ).toBeDisabled();
     await expect(
       page.getByRole('group', { name: 'Activity controls', exact: true }),
-    ).toBeDisabled();
+    ).toHaveJSProperty('disabled', true);
     await expect(
       page.getByRole('button', { name: 'Reset', exact: true }),
     ).toBeEnabled();
