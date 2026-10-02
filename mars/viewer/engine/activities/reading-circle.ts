@@ -437,9 +437,25 @@ export const readingCircle: ActionDef<ReadingCircleParams, null, Exec> = {
     if (
       ancestors.includes(ex.id) ||
       by.verb === 'reading_circle_control' ||
-      ['pausing', 'paused', 'waiting', 'ending', 'completed'].includes(ex.mode)
+      ['ending', 'completed'].includes(ex.mode)
     )
       return;
+    // A released physical hold is still a declared invitation. Player direction
+    // withdraws it even while paused, so Resume cannot silently re-invite anyone.
+    for (const m of ex.members)
+      if (m.active && claims.some((c) => c.resource === `actor:${m.actor}`)) {
+        m.active = false;
+        stopChild(rt, m.hold);
+        m.hold = undefined;
+        rt.mark('reading_circle.listener-directed', {
+          session: ex.id,
+          actor: m.actor,
+          directive: by.id,
+        });
+      }
+    // Reader direction while already released preserves the existing pause stage.
+    // Ordinary admission will refuse Resume until that independent task releases.
+    if (['pausing', 'paused', 'waiting'].includes(ex.mode)) return;
     if (claims.some((c) => c.resource === `actor:${ex.p.reader}`)) {
       release(
         rt,
@@ -451,14 +467,7 @@ export const readingCircle: ActionDef<ReadingCircleParams, null, Exec> = {
           [by.id, ex.p.reader, ex.p.book],
         ),
       );
-      return;
     }
-    for (const m of ex.members)
-      if (m.active && claims.some((c) => c.resource === `actor:${m.actor}`)) {
-        m.active = false;
-        stopChild(rt, m.hold);
-        m.hold = undefined;
-      }
   },
   step(rt, ex, dt): StepResult {
     updateProgress(rt, ex);
@@ -794,6 +803,12 @@ export const readingCircleControl: ActionDef<
       const m = ex.members.find((m) => m.actor === i.actor);
       if (i.kind === 'join') {
         m!.active = true;
+        if (
+          ex.mode === 'discussion' &&
+          ex.readerHold &&
+          rt.isActive(ex.readerHold)
+        )
+          m!.hold = hold(rt, ex, m!.actor, m!.slot, 'listen');
       } else if (i.kind === 'leave') {
         m!.active = false;
         stopChild(rt, m!.hold);

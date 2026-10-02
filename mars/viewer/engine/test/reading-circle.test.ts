@@ -371,3 +371,126 @@ test('requested floor yields completed ordinary occupied contribution about actu
   until(rt, () => !rt.isActive(a.id));
   clean(rt, a.id);
 });
+for (const stage of ['pausing', 'paused', 'waiting'] as const)
+  test(`listener directed during ${stage} stays withdrawn through explicit Resume and Join`, () => {
+    const { rt, a } = start();
+    until(rt, () => book(rt).phase === 'reading' && book(rt).elapsed >= 1);
+    if (stage === 'waiting') {
+      const readerWalk = rt.submit('walk_to', {
+        actor: 'reader',
+        x: -4,
+        z: -4,
+        level: 0,
+      });
+      assert.notEqual(readerWalk.status, 'failed');
+      until(
+        rt,
+        () => read(rt, a.id).mode === 'waiting' && !rt.isActive(readerWalk.id),
+      );
+    } else {
+      control(rt, a.id, { kind: 'pause' });
+      if (stage === 'paused') until(rt, () => read(rt, a.id).mode === 'paused');
+    }
+    const walk = rt.submit('walk_to', {
+      actor: 'listener-1',
+      x: -6,
+      z: -6,
+      level: 0,
+    });
+    assert.notEqual(walk.status, 'failed', walk.diagnostic?.message);
+    assert.equal(
+      read(rt, a.id).participants.find((m) => m.actor === 'listener-1')?.active,
+      false,
+    );
+    until(rt, () => ['paused', 'waiting'].includes(read(rt, a.id).mode));
+    control(rt, a.id, { kind: 'resume' });
+    assert.equal(rt.isActive(walk.id), true);
+    assert.equal(
+      read(rt, a.id).participants.find((m) => m.actor === 'listener-1')?.active,
+      false,
+    );
+    const refused = rt.submit('reading_circle_control', {
+      session: a.id,
+      intent: { kind: 'join', actor: 'listener-1' },
+    });
+    assert.equal(refused.status, 'failed');
+    assert.equal(rt.isActive(walk.id), true);
+    until(rt, () => !rt.isActive(walk.id));
+    assert.equal(walk.status, 'completed');
+    assert.equal(
+      read(rt, a.id).participants.find((m) => m.actor === 'listener-1')?.active,
+      false,
+    );
+    assert.equal(
+      read(rt, a.id).participants.find((m) => m.actor === 'listener-1')?.hold,
+      undefined,
+    );
+    control(rt, a.id, { kind: 'join', actor: 'listener-1' });
+    until(
+      rt,
+      () =>
+        read(rt, a.id).participants.find((m) => m.actor === 'listener-1')
+          ?.state === 'listening',
+    );
+    assert.equal(
+      read(rt, a.id).participants.find((m) => m.actor === 'listener-1')?.active,
+      true,
+    );
+    control(rt, a.id, { kind: 'end' });
+    until(rt, () => !rt.isActive(a.id));
+    clean(rt, a.id);
+  });
+test('directing every active listener retains withdrawals while waiting, and Join plus Resume restores only selected listener', () => {
+  const { rt, a } = start();
+  until(rt, () => book(rt).phase === 'reading' && book(rt).elapsed >= 1);
+  const first = rt.submit('walk_to', {
+      actor: 'listener-1',
+      x: -6,
+      z: -6,
+      level: 0,
+    }),
+    second = rt.submit('walk_to', {
+      actor: 'listener-2',
+      x: 6,
+      z: -6,
+      level: 0,
+    });
+  assert.notEqual(first.status, 'failed');
+  assert.notEqual(second.status, 'failed');
+  until(rt, () => read(rt, a.id).mode === 'waiting');
+  assert.equal(read(rt, a.id).diagnostic?.code, 'reading_circle.audience-left');
+  assert.equal(read(rt, a.id).participants.filter((m) => m.active).length, 0);
+  const refused = rt.submit('reading_circle_control', {
+    session: a.id,
+    intent: { kind: 'resume' },
+  });
+  assert.equal(refused.status, 'failed');
+  assert.equal(refused.diagnostic?.code, 'reading_circle.audience-left');
+  assert.equal(rt.isActive(first.id), true);
+  assert.equal(rt.isActive(second.id), true);
+  control(rt, a.id, { kind: 'join', actor: 'listener-3' });
+  control(rt, a.id, { kind: 'resume' });
+  assert.deepEqual(
+    read(rt, a.id)
+      .participants.filter((m) => m.active)
+      .map((m) => m.actor),
+    ['listener-3'],
+  );
+  until(
+    rt,
+    () =>
+      !rt.isActive(a.id) && !rt.isActive(first.id) && !rt.isActive(second.id),
+  );
+  assert.equal(first.status, 'completed');
+  assert.equal(second.status, 'completed');
+  assert.equal(book(rt).elapsed, 12);
+  assert.equal(
+    read(rt, a.id).participants.find((m) => m.actor === 'listener-1')?.active,
+    false,
+  );
+  assert.equal(
+    read(rt, a.id).participants.find((m) => m.actor === 'listener-2')?.active,
+    false,
+  );
+  clean(rt, a.id);
+});
