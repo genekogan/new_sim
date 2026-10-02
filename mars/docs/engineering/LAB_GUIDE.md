@@ -1,8 +1,34 @@
 # Lab play and inspection guide
 
-Current public checkpoint is **release38 at [sim.mars.college](https://sim.mars.college/)**.
-Living days, garden care, music/dance and longer automatic coverage are shipped.
-[Final handoff](MARS_MVP_HANDOFF.md) records exact source, validation and limits.
+**Release39 is published and verified at https://sim.mars.college/**,
+Worker `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`, functional source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; rollback38
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`. 63 selectable presets; rules version `activities/29`
+(a rules stamp, not an activity count). All nine gate stages PASS; engine
+1424 PASS/6 SKIP/11 TODO. Fresh native public
+85 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; exact bundle `main-Bx4z1zKg.js`.
+Skipped/TODO/FIXME checks remain unproved. All 63 first-Step smoke is not all 63
+full-Play proof; execution contracts and missing coverage remain stabilization work.
+
+New hypothetical room preparation, communal supper and finite garden circuit use
+ordinary same-object physical actions, supported returns and retained partial effects.
+Gene requests a temporary quota pause after this verification: no further alpha/performance,
+vocabulary or Eden work until explicitly resumed. Saved stabilization direction and
+unfinished work remain available after resume; no automated resume, handoff or follow-up.
+Release38 whole-current-build proof is inherited; no fresh release39 whole-build
+execution is claimed unless separately identified in final public scope.
+Original gateway browser/campus.glb HEAD-length failure remains; no DNS/gateway fix.
+Silent dialogue, current rigs/fine fingers, crop/HUD limits and no plant growth remain.
+Garden-afternoon walks are independent, not a coordinated shared garden walk.
+
+## Published room preparation, supper and garden circuit
+
+| Preset | Initiate and intervene | Physical/continuation boundary |
+| --- | --- | --- |
+| `room-preparation` | Start room preparation then Play; Pause/Resume cleanup or setup, End, Join visitor, Ask and ordinary classroom floor/phase controls. | Same bowl/spoon stored; empty table and seat8 physically moved; visitor uses moved chair. Resume retries remaining actual setup without re-tidying. During session local Pause is named unsupported: use global Pause; ordinary session controls/End remain. |
+| `communal-supper` | Start supper then Play; Pause/Resume retained preparation/meal/cleanup, direct safely paused cook, End; retry End explicitly if an ordinary return was stopped. | Finite cold ingredients/preparation once; same two meal receipts continue only from safely cancelled checkpoint; consumed empty bowls never receive a fresh serving. Same seven empty vessels stored after completion; End returns held utensils but retains uneaten material, and blocked returns wait truthfully. |
+| `garden-circuit` | Start circuit then Play; Pause returns held bowl safely, direction and explicit Resume retain partial care; End drains real ownership. | Same supported pot/bowl and three grounded beds; .25 pot =1 bowl capacity unit, .5 pot initially=2 bowl units; six .25 care cycles deliver1.5 and leave .5 in same bowl, source0. Existing600tick due interval waits; no growth/refill. |
+
+## Prior release37/38 walkthroughs — retained behavior, dated proof counts
 
 ## Published drawing, warm-up and jam
 

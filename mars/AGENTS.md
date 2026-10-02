@@ -1,6 +1,73 @@
 # Mars Studio agent context
 
-## Published checkpoint and current authorization
+## Immediate priority — Mars World v1 alpha stabilization (2026-10-02)
+
+Gene superseded continuous vocabulary expansion. The bounded room-preparation/communal-supper/garden-circuit increment is
+published as39. Gene requests a temporary pause after verification; preserve all
+saved work and resume stabilization only when explicitly requested. Preserve workshop/library candidates and all unfinished work; do not
+resume them automatically or begin Eden.
+
+The authoritative saved plan is [ACTIVE_ROADMAP](docs/engineering/ACTIVE_ROADMAP.md).
+Order: latest verified deployment → comprehensive production-preset execution and
+failure-isolation coverage → bounded80/20 performance audit → documentation and
+extension-contract cleanup → second verified publication marked Mars World v1 alpha.
+Stop this stabilization tranche after publication/acceptance and report completion.
+
+A local activity refusal/failure must not stop the simulation clock, UI or unrelated
+actors. Supported recovery uses relevant replanning/permitted alternatives, explained
+waiting with defined intervention/retry, ordinary safe cleanup/cancellation and
+retained unfinished intentions. Never bypass geometry/support/ownership or suppress
+errors. Serious invariant corruption remains visible and contained; do not step
+invalid authoritative state to claim liveness. See the engine guide for the durable
+failure model; its implementation and proof are current stabilization work.
+
+Every selectable preset needs a declared execution contract and exact-source proof:
+actual Play to meaningful terminal effects for finite journeys, sustained liveness
+for continuous worlds, complete supported probe interactions, and expected diagnostic
+plus surrounding-world usability for diagnostic demonstrations. First-Step smoke,
+Node fixtures, authored tests, skipped/FIXME cases and partial Play remain distinct.
+One authoritative coverage inventory is being prepared; do not manufacture proof.
+
+Keep at most three Sol6.1 helpers, isolated ownership and serialized expensive
+browser/performance validation. No tracked changes to a frozen candidate during its gate. Main's48other-owner paths remain protected. Camera remains
+separately owned and cannot block engine publication. No broad rewrite, rig migration,
+active save/load or new Eden systems. Initial whole-tranche estimate20–36workinghours,
+medium-low confidence; update from actual coverage/recovery findings, not a promise.
+
+Earlier expansion/stop instructions below are dated provenance and are superseded
+by this owner mandate for immediate work.
+
+## Latest published checkpoint39
+
+**Release39 is published and verified at https://sim.mars.college/**,
+Worker `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`, functional source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; rollback38
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`. 63 selectable presets; rules version `activities/29`
+(a rules stamp, not an activity count). All nine gate stages PASS; engine
+1424 PASS/6 SKIP/11 TODO. Fresh native public
+85 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; exact bundle `main-Bx4z1zKg.js`.
+Skipped/TODO/FIXME checks remain unproved. All 63 first-Step smoke is not all 63
+full-Play proof; execution contracts and missing coverage remain stabilization work.
+
+New hypothetical room preparation, communal supper and finite garden circuit use
+ordinary same-object physical actions, supported returns and retained partial effects.
+Gene requests a temporary quota pause after this verification: no further alpha/performance,
+vocabulary or Eden work until explicitly resumed. Saved stabilization direction and
+unfinished work remain available after resume; no automated resume, handoff or follow-up.
+Release38 whole-current-build proof is inherited; no fresh release39 whole-build
+execution is claimed unless separately identified in final public scope.
+Original gateway browser/campus.glb HEAD-length failure remains; no DNS/gateway fix.
+Silent dialogue, current rigs/fine fingers, crop/HUD limits and no plant growth remain.
+Garden-afternoon walks are independent, not a coordinated shared garden walk.
+
+Computer workshop remains an excluded UNVERIFIED draft at `3316a74` in
+`codex/computer-workshop`: three untracked activity/scenario/brief files; first
+submit refused `classroom.display-unavailable`, no journey/tests/TSc/lint proof.
+Library reading is excluded docs-only `319429c`, no core/scenario/tests or physical
+bookmark-continuation proof. Preserve these worktrees and all48 other-owner main
+paths; this publication does not merge all future branches or certify old inventory.
+
+## Earlier release38/expansion instructions — dated provenance, superseded above
+
 
 **Release38 is published and verified at https://sim.mars.college/**, Worker
 `7616e47a-9149-4b71-ba14-2ea8e5bc6660`, functional source

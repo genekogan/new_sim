@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "7616e47a-9149-4b71-ba14-2ea8e5bc6660",
+  "version": "95a8f9a8-9d3c-4de4-8365-346fcf1df33d",
   "published": "2026-10-02",
-  "verification": "../.cloudflare/release38-network-receipt.json",
+  "verification": "<mars-worktrees>/room-preparation-integration/viewer/.cloudflare/release39-network-receipt.json",
   "updated": "2026-10-02",
-  "feature": "release38: eight playable gallery/shared-reading/finite-planting/independent-garden presets; retained same-object effects and physical support; read-only camera entry; museum preserved",
+  "feature": "release39: supported room preparation, retained communal supper and finite resupply/care circuit; same objects and safe intervention",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://sim.mars.college/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,14 +17,14 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "8c57ad5b-9dfd-46b2-9d60-47fdb021510f",
-  "lab_url": "https://sim.mars.college/lab?scenario=garden-afternoon",
-  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-38-2026-10-02-social-and-garden-vocabulary",
+  "rollback_version": "7616e47a-9149-4b71-ba14-2ea8e5bc6660",
+  "lab_url": "https://sim.mars.college/lab?scenario=room-preparation",
+  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy-39-2026-10-02-room-supper-and-finite-garden",
   "questions_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/questions/",
-  "source_commit": "5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d",
-  "release": 38,
+  "source_commit": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+  "release": 39,
   "engine_evidence": "../../docs/engineering/EVIDENCE.md",
-  "gate_report": "<mars-worktrees>/seed-planting-integration/viewer/.cloudflare/gate/2026-10-02T12-14-17-938Z/report.json",
+  "gate_report": "<mars-worktrees>/room-preparation-integration/viewer/.cloudflare/gate/2026-10-02T14-18-47-563Z/report.json",
   "last_rollback": {
     "failed_release": 25,
     "failed_version": "2edcf368-baeb-4dbf-aea7-da48ccccee62",
@@ -48,42 +48,68 @@
     "version": "ad241a52-e8d6-4c47-831e-557df9d5692a",
     "source_commit": "7648dbf plus isolated current historical working snapshot"
   },
-  "deployed_at": "2026-10-02T13:25:04.388Z",
-  "status": "verified release38; continuous meaningful Mars vocabulary expansion active; original gateway HEAD failure and current-rig/camera limits retained",
+  "deployed_at": "2026-10-02T15:28:48.809Z",
+  "status": "verified bounded release39; owner-requested temporary quota pause after verification; no automated resume or handoff; alpha stabilization saved for explicit resume",
   "production_verification": {
-    "worker_assets": 522,
-    "worker_html_routes": 24,
-    "worker_http_requests": 696,
-    "worker_original_http_smoke_pass": true,
-    "sim_gateway_original_http_smoke_pass": false,
-    "gateway_limitation": "Original /browser/campus.glb HEAD omits content-length: expected70772556 actual0. Modular126892472B HEAD/range PASS. Initial wrong asset-manifest association diagnosed/retained. Browser-campus fullGET unchanged manifest inheritance from36; gateway source/Pages scope unavailable; no DNS/gateway change.",
-    "browser_passed": 92,
+    "verified_at": "2026-10-02T15:48:49.365124Z",
+    "browser_passed": 85,
     "browser_failed": 0,
     "browser_skipped": 0,
     "browser_flaky": 0,
-    "browser_duration_ms": 1991445.956,
-    "browser_scope": "all60 startup/reset/firstStep; eight new full Play journeys; existing social/creative/cleanup/day/music/care; same-world camera entry; both entire automatic current2022 builds",
-    "MCP": "all36 through sim.mars.college PASS; local gate PASS",
-    "director": "original9steps through sim.mars.college PASS8991ms; missing DO timing headers not measured zero",
-    "native_http_sweeps": "Worker original522assets/24routes/696requestsPASS; gateway original browser-campus HEAD FAIL retained; modular HEAD/range and exact bundle PASS",
-    "current_build": "fresh public full automatic Play2PASS, original reference identities/support/crew/hash assertions unchanged; legacyW51FIXMEs unproved",
-    "sim_home_exact_bundle": "main-atFggpqx.js",
-    "campus_gateway_GET_bytes": 70772556,
-    "campus_gateway_GET_sha256": "675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4",
-    "supported_activity_acceptance": true,
+    "browser_duration_ms": 627473.521,
+    "browser_scope": "all63 selectable fresh-load/Reset/first-Step plus selector parity; eight room/supper/garden-circuit actual Play and End/retry cases; connected living-day4/studio independent commitments and completion; ten camera-entry/control checks and home discovery. Initial smoke is not all63 full-journey proof; camera entry is not cinematic quality proof; release38 unchanged-source full-current2022 Play inherited separately",
+    "captures_inspected": 60,
+    "gate_captures_inspected": 60,
+    "sim_home_exact_bundle": "main-Bx4z1zKg.js",
+    "whole_current_build": "Whole-current-build proof remains release38 source inheritance, not fresh release39 execution.",
+    "network_receipt": {
+      "path": "<mars-worktrees>/room-preparation-integration/viewer/.cloudflare/release39-network-receipt.json",
+      "sha256": "fc806672c5103b245c482b8823923755a1ba08f48e3a097337cf0b23f63057bb"
+    },
+    "gateway_limitation": "Original browser/campus.glb gateway HEAD length assertion FAIL retained; no DNS/gateway change",
     "active_browser_save_load": "owner-deferred, not implemented",
-    "verified_at": "2026-10-02T14:02:14.669898+00:00",
-    "new_presets_camera_entry": "New families read-only same-paused-world entry PASS; no natural camera quality/continuous coverage claim",
-    "captures_inspected": 124,
-    "modular_gateway_HEAD_bytes": 126892472,
-    "modular_gateway_range_bytes": 12
+    "worker_http": {
+      "status": "PASS",
+      "assets": 522,
+      "routes": 24,
+      "requests": 696,
+      "log": ".cloudflare/release39-worker-http.log"
+    },
+    "MCP": {
+      "status": "PASS",
+      "tools": 36,
+      "security": "PASS",
+      "log": ".cloudflare/release39-public-mcp.log",
+      "serverExecutionMetrics": "unavailable; printed 0 is missing-metadata fallback, not measured CPU"
+    },
+    "director": {
+      "status": "PASS",
+      "steps": 9,
+      "log": ".cloudflare/release39-public-director.log",
+      "serverExecutionMetrics": "unavailable; wall time only"
+    },
+    "whole_build_source_inheritance": {
+      "from": "5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d",
+      "to": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
+      "checked": "2026-10-02",
+      "emptyDiffPaths": [
+        "viewer/public/engine/campus-2022.json",
+        "viewer/app/lab/year-build.ts",
+        "viewer/engine/scenarios/year-build.ts",
+        "viewer/engine/frame",
+        "viewer/engine/sequence",
+        "viewer/engine/runtime",
+        "viewer/e2e/year-build.spec.ts"
+      ],
+      "proof": "release38 full automatic current-source Play; not fresh release39 completion"
+    }
   },
   "previous_verified_release": {
-    "release": 37,
-    "version": "8c57ad5b-9dfd-46b2-9d60-47fdb021510f",
-    "source_commit": "ca6bb5d1ed707f12fe9029720fbf1bdecc44f917",
-    "deployed_at": "2026-10-02T10:57:13.198Z",
-    "verification": "../.cloudflare/release37-network-receipt.json"
+    "release": 38,
+    "version": "7616e47a-9149-4b71-ba14-2ea8e5bc6660",
+    "source_commit": "5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d",
+    "deployed_at": "2026-10-02T13:25:04.388Z",
+    "verification": "../.cloudflare/release38-network-receipt.json"
   },
   "photo_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/photo",
   "draft_2027_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2027",
@@ -91,34 +117,24 @@
   "website_entry_disposition": "owner requested added /simulation page and footer removal; do not recreate",
   "simulation_url": "https://sim.mars.college/",
   "publication_assets": {
-    "unchanged_large_hash_keys": 8,
-    "R2_reputs": 8,
-    "R2_skipped": 0,
-    "new_static": 13,
-    "retained_static": 555,
-    "startup_ms": 136,
-    "dry_KiB": 9207.06,
-    "gzip_KiB": 1620.21
+    "unchangedLargeHashKeys": 8,
+    "R2skipped": 8,
+    "R2writes": 0,
+    "newStatic": 9,
+    "retainedStatic": 559,
+    "startupMs": 129,
+    "dryKiB": 9274.2,
+    "gzipKiB": 1635.54
   },
-  "selectable_presets": 60,
-  "separate_future_candidate": {
-    "selectable_presets": 63,
-    "rules_version": "activities/29",
-    "status": "clean c8331ec next combined candidate;185 focused Node PASS only,focused actualPlay underway; completion unclaimed; not online release38",
-    "presets": [
-      "room-preparation",
-      "communal-supper",
-      "garden-circuit"
-    ]
-  },
+  "selectable_presets": 63,
   "new_presets": [
-    "gallery-tour",
-    "gallery-tour-short",
-    "reading-circle",
-    "reading-circle-rotated",
-    "seed-planting",
-    "seed-planting-rotated",
-    "garden-afternoon",
-    "garden-afternoon-rotated"
+    "room-preparation",
+    "communal-supper",
+    "garden-circuit"
+  ],
+  "rules_version": "activities/29",
+  "excluded_drafts": [
+    "computer-workshop UNVERIFIED classroom.display-unavailable; three untracked files",
+    "library-reading docs-only319429c"
   ]
 }

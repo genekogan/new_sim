@@ -1,21 +1,41 @@
 # Engineering navigation
 
-Start here for current simulation work. Dated release records and briefs are evidence,
-not instructions to restart completed increments. Public/source truth comes from
-`viewer/deploy/deployment.json` and the newest verified release record.
+Authoritative current status is deployment metadata and the latest verified release record.
+Earlier candidate/release sections below retain provenance and are superseded by this notice.
 
-## Current direction and play
+## Mars World v1 alpha — stabilization
 
-Release38 is verified at [sim.mars.college](https://sim.mars.college/):60 presets,
-eight new gallery/reading/planting/garden layouts,92fresh public checks and all nine
-clean gate stages. Functional source`5f1dc2e`, Worker`7616e47a-9149-4b71-ba14-2ea8e5bc6660`,
-rollback37`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`. See newest release checklist record
-for original gateway HEAD failure and executed/skipped scope. Lower candidate notes
-retain dated provenance; publication status is superseded by this notice. Room
-preparation/communal supper/garden circuit form the clean separate c8331ec next
-combined candidate: 63 presets, rules version `activities/29`, 185 focused Node
-checks and18 focused Play/camera-entry checks passed. Clean combined gate/public
-proof remain pending; these are not online release38 features.
+**Release39 is published and verified at https://sim.mars.college/**,
+Worker `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`, functional source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; rollback38
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`. 63 selectable presets; rules version `activities/29`
+(a rules stamp, not an activity count). All nine gate stages PASS; engine
+1424 PASS/6 SKIP/11 TODO. Fresh native public
+85 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; exact bundle `main-Bx4z1zKg.js`.
+Skipped/TODO/FIXME checks remain unproved. All 63 first-Step smoke is not all 63
+full-Play proof; execution contracts and missing coverage remain stabilization work.
+
+New hypothetical room preparation, communal supper and finite garden circuit use
+ordinary same-object physical actions, supported returns and retained partial effects.
+Gene requests a temporary quota pause after this verification: no further alpha/performance,
+vocabulary or Eden work until explicitly resumed. Saved stabilization direction and
+unfinished work remain available after resume; no automated resume, handoff or follow-up.
+Release38 whole-current-build proof is inherited; no fresh release39 whole-build
+execution is claimed unless separately identified in final public scope.
+Original gateway browser/campus.glb HEAD-length failure remains; no DNS/gateway fix.
+Silent dialogue, current rigs/fine fingers, crop/HUD limits and no plant growth remain.
+Garden-afternoon walks are independent, not a coordinated shared garden walk.
+
+Owner mandate supersedes indefinite vocabulary expansion: comprehensive execution/failure
+isolation → bounded measured performance → documentation/extension contracts → second
+verified canonical alpha publication, then stop. Initial whole-alpha 20–36 working hours,
+medium-low confidence; no all-63 full Play or final-alpha-accepted claim.
+
+Computer workshop remains an excluded UNVERIFIED draft at `3316a74` in
+`codex/computer-workshop`: three untracked activity/scenario/brief files; first
+submit refused `classroom.display-unavailable`, no journey/tests/TSc/lint proof.
+Library reading is excluded docs-only `319429c`, no core/scenario/tests or physical
+bookmark-continuation proof. Preserve these worktrees and all48 other-owner main
+paths; this publication does not merge all future branches or certify old inventory.
 
 - [Agent context](../../AGENTS.md): ownership, authorized scope, hard boundaries.
 - [Active roadmap](ACTIVE_ROADMAP.md): current tranche and exit criteria.

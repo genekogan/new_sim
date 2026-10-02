@@ -1,3 +1,85 @@
+# Mars World v1 alpha — stabilization paused after verification
+
+Owner mandate2026-10-02 supersedes indefinite vocabulary expansion.
+
+**Release39 is published and verified at https://sim.mars.college/**,
+Worker `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`, functional source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; rollback38
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`. 63 selectable presets; rules version `activities/29`
+(a rules stamp, not an activity count). All nine gate stages PASS; engine
+1424 PASS/6 SKIP/11 TODO. Fresh native public
+85 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; exact bundle `main-Bx4z1zKg.js`.
+Skipped/TODO/FIXME checks remain unproved. All 63 first-Step smoke is not all 63
+full-Play proof; execution contracts and missing coverage remain stabilization work.
+
+New hypothetical room preparation, communal supper and finite garden circuit use
+ordinary same-object physical actions, supported returns and retained partial effects.
+Gene requests a temporary quota pause after this verification: no further alpha/performance,
+vocabulary or Eden work until explicitly resumed. Saved stabilization direction and
+unfinished work remain available after resume; no automated resume, handoff or follow-up.
+Release38 whole-current-build proof is inherited; no fresh release39 whole-build
+execution is claimed unless separately identified in final public scope.
+Original gateway browser/campus.glb HEAD-length failure remains; no DNS/gateway fix.
+Silent dialogue, current rigs/fine fingers, crop/HUD limits and no plant growth remain.
+Garden-afternoon walks are independent, not a coordinated shared garden walk.
+
+## Saved queue and exit criteria — resume only on owner request
+
+1. **Latest verified checkpoint:** retain verified39 proof and preserve main's48other-owner paths;
+   use this shipped checkpoint for stabilization. Expose
+   all shipped presets and longer runs honestly. Exclude unverified workshop/library
+   work; retain their branches/reports without claiming implementation.
+2. **World liveness and coverage:** declare every production preset's execution
+   contract/proof in one authoritative inventory; close full-Play/sustained/probe/
+   diagnostic and representative disruption gaps. A failed local purpose must not
+   freeze the clock/unrelated actors. Recover or explain/wait/clean up through ordinary
+   actions; serious invariant corruption stays visible and quarantined. Prove failure
+   isolation, effects/ownership/support/retained intentions and bounded retries.
+3. **Bounded performance + handoff:** measure cold/warm caching/versioning/readiness,
+   frame behavior/resource lifetime and server execution. Implement only material,
+   low-risk improvements. Update existing guides/indexes, authoring/extension contracts,
+   failure model/control precedence/determinism/persistence/validation/deployment
+   documentation; remove/date stale instructions and retain unfinished provenance.
+4. **Canonical publication:** critically review complete supported scenario suite and
+   architecture, clean combined full gate, inspected Play/disruptions, second deployment
+   and public verification. Mark UI/docs Mars World v1 alpha; record exact source/version,
+   rollback/evidence/limits/Eden handoff. Then stop; no automatic vocabulary/Eden work.
+
+Initial whole v1 alpha remaining20–36workinghours, medium-low confidence. Main risks:
+full-journey proof gaps hidden behind startup/mixed stepping, local-failure isolation,
+legacy unsupported/fine-pose exclusions and public transport metadata. No general
+priority interview is needed. Surface a major prerequisite with smallest credible
+repair/time impact/recommended scope decision. Do not silently remove required scope.
+
+Three separable Sol6.1 lanes: execution coverage inventory, bounded Lab liveness
+repair, performance audit preparation; root owns current release and critical review.
+Browser/performance execution remains serialized. No active save/load, character-rig
+migration, universal planning or arbitrary future-input recovery promise.
+
+## Deferred expansion checkpoints
+
+- Room/supper/garden: bounded increment shipped39; local controls retain the explicit contracts below.
+- Computer workshop: codex/computer-workshop at3316a74, three untracked core/scenario/
+  brief files. UNVERIFIED; first submit refused missing classroom-display service.
+  No tests/TSc/lint/journey proof. Preserve draft; do not register as working.
+- Library reading: codex/library-reading docs-only319429c, clean report. No core/scenario/
+  tests; same-book physical relocation/bookmark continuation remains unverified.
+- All other-owner worktrees/48mainpending paths and legacy backlog remain preserved.
+
+| Preset | Initiate and intervene | Physical/continuation boundary |
+| --- | --- | --- |
+| `room-preparation` | Start room preparation then Play; Pause/Resume cleanup or setup, End, Join visitor, Ask and ordinary classroom floor/phase controls. | Same bowl/spoon stored; empty table and seat8 physically moved; visitor uses moved chair. Resume retries remaining actual setup without re-tidying. During session local Pause is named unsupported: use global Pause; ordinary session controls/End remain. |
+| `communal-supper` | Start supper then Play; Pause/Resume retained preparation/meal/cleanup, direct safely paused cook, End; retry End explicitly if an ordinary return was stopped. | Finite cold ingredients/preparation once; same two meal receipts continue only from safely cancelled checkpoint; consumed empty bowls never receive a fresh serving. Same seven empty vessels stored after completion; End returns held utensils but retains uneaten material, and blocked returns wait truthfully. |
+| `garden-circuit` | Start circuit then Play; Pause returns held bowl safely, direction and explicit Resume retain partial care; End drains real ownership. | Same supported pot/bowl and three grounded beds; .25 pot =1 bowl capacity unit, .5 pot initially=2 bowl units; six .25 care cycles deliver1.5 and leave .5 in same bowl, source0. Existing600tick due interval waits; no growth/refill. |
+
+Computer workshop remains an excluded UNVERIFIED draft at `3316a74` in
+`codex/computer-workshop`: three untracked activity/scenario/brief files; first
+submit refused `classroom.display-unavailable`, no journey/tests/TSc/lint proof.
+Library reading is excluded docs-only `319429c`, no core/scenario/tests or physical
+bookmark-continuation proof. Preserve these worktrees and all48 other-owner main
+paths; this publication does not merge all future branches or certify old inventory.
+
+## Previous expansion roadmap — superseded by alpha mandate and release39 notice
+
 # Mars activity vocabulary — active expansion after release38
 
 **Release38 is published and verified at https://sim.mars.college/**, Worker

@@ -8,17 +8,17 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `5f1dc2e` (engine tree clean) |
-| Generated | 2026-10-02T13:18:12.035Z · Node v22.20.0 |
-| Engine suite | 1341 tests in 142 files: 1324 pass, 0 fail, 6 skipped, 11 TODO · 173.0 s wall |
-| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T12-14-17-938Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
-| External gate | `.cloudflare/gate/2026-10-02T12-14-17-938Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `b712825` (engine tree clean) |
+| Generated | 2026-10-02T15:24:27.314Z · Node v22.20.0 |
+| Engine suite | 1441 tests in 146 files: 1424 pass, 0 fail, 6 skipped, 11 TODO · 170.3 s wall |
+| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T14-18-47-563Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
+| External gate | `.cloudflare/gate/2026-10-02T14-18-47-563Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 6206 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 9340 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 22203 ms compute (cropped 9326 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 6191 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 8835 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 20246 ms compute (cropped 8955 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -270,7 +270,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -293,7 +293,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -309,7 +309,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -448,7 +448,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -478,7 +478,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -504,7 +504,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -522,7 +522,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -707,7 +707,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -755,10 +755,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -783,8 +783,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -803,9 +803,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T12-14-17-938Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T14-18-47-563Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -1032,112 +1032,112 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `ca6bb5d` (2026-10-02T10:54:41.961Z): 100 added, 0 removed.
+Compared with the report at `5f1dc2e` (2026-10-02T13:18:12.035Z): 100 added, 0 removed.
 
-- added: gallery-tour-direction.test.ts :: short gallery late Join admits clear host direction, retains discussion and completes after explicit Resume
-- added: gallery-tour.test.ts :: Leave persists at later stops, named insufficient audience waits without record spam, declared optional Join restores tour
-- added: gallery-tour.test.ts :: Pause at completed-stop boundary and during departure preserves history without repeating a stop
-- added: gallery-tour.test.ts :: Pause preserves exact circle clock/history; Resume same circle; End differs from completed tour and releases everything
-- added: gallery-tour.test.ts :: declared late Join is physically admitted and End cancels its ordinary Leave without orphan claims
-- added: gallery-tour.test.ts :: directed host safely waits for explicit Resume with exact retained circle; directed visitor is withdrawn at next stop
-- added: gallery-tour.test.ts :: invalid duplicate artwork and undeclared Join refuse explicitly without movement
-- added: gallery-tour.test.ts :: missing artwork has named bounded wait and no child record spam
-- added: gallery-tour.test.ts :: occupied viewing place waits with named cause and bounded retry without preemption or failed children
-- added: gallery-tour.test.ts :: physical question and answer are retained per stop
-- added: gallery-tour.test.ts :: three supported real artifacts: arrivals, actual attention/turns, ordinary departures, stable identities and deterministic replay
-- added: gallery-tour.test.ts :: two-stop bounded definition also completes and detached readout cannot mutate retained history
-- added: gallery-tour.test.ts :: unavailable artifact waits instead of skipping; explicit End releases tour without creating circles
-- added: gallery-tour.test.ts :: visitor directed during Pause is not automatically reclaimed when circle resumes
-- added: garden-afternoon.test.ts :: End during partial sowing safely retains effects and cannot silently Resume an ended intention
-- added: garden-afternoon.test.ts :: blocked cleanup exposes the physical refusal while holding the same finite bowl; clearing the slot permits safe Pause and Resume
-- added: garden-afternoon.test.ts :: connected retained seeds/care and sliced book finish at yaw 0
-- added: garden-afternoon.test.ts :: connected retained seeds/care and sliced book finish at yaw 1.5707963267948966
-- added: garden-afternoon.test.ts :: partial seed Pause, local player direction, explicit Resume at yaw 0
-- added: garden-afternoon.test.ts :: partial seed Pause, local player direction, explicit Resume at yaw 1.5707963267948966
-- added: garden-afternoon.test.ts :: rapid Pause/End before first tick creates no seed purpose, leaves reader active, and releases ended branch
-- added: garden-afternoon.test.ts :: reader direction pauses only its commitment and retains same bookmark; gardener finishes independently
-- added: garden-afternoon.test.ts :: same interruption decisions replay exact world, records and events
-- added: garden-afternoon.test.ts :: unavailable source waits without failed child spam while reader advances; repair continues finite original bowl
-- added: planting-intention.test.ts :: End during blocked seed cleanup cannot finish or lose held ownership before safe return
-- added: planting-intention.test.ts :: End during partial planting retains effects; a new explicitly authored intention continues original leaf purpose
-- added: planting-intention.test.ts :: Pause after dispatch but before seed leaf first step creates no phantom purpose on Resume
-- added: planting-intention.test.ts :: Pause and End accepted before first step produce no phantom seed purpose or leaf
-- added: planting-intention.test.ts :: Pause through blocked safe cleanup retains actual held bowl until support clears
-- added: planting-intention.test.ts :: already completed same seedbed checkpoint advances a newly authored chain without consuming seeds again
-- added: planting-intention.test.ts :: changed original physical planting binding waits rather than rebinding completed or partial effects
-- added: planting-intention.test.ts :: chosen seed source cannot switch to another authored bowl after partial interruption
-- added: planting-intention.test.ts :: completed seed material interrupted before purpose advancement is a checkpoint, never another leaf
-- added: planting-intention.test.ts :: direct planter command pauses only its own branch and independent reading progresses
-- added: planting-intention.test.ts :: finite seed objective refuses seconds slicing without mutation or starting children
-- added: planting-intention.test.ts :: local Pause during partial deposits leaves independent reading progressing; Resume uses same source and purpose
-- added: planting-intention.test.ts :: occupied-source waits with named bounded retry and no failed leaf children
-- added: planting-intention.test.ts :: rapid accepted Pause then End before next tick dispatches no seed child
-- added: planting-intention.test.ts :: same connected decisions replay conserved seed/water/world and action/event provenance
-- added: planting-intention.test.ts :: seed → ordinary break walk → finite water care shares ordinary execution with independent reading
-- added: planting-intention.test.ts :: unavailable-material waits with named bounded retry and no failed leaf children
-- added: reading-circle-direction.test.ts :: infeasible directed destination still refuses after supported release at 0
-- added: reading-circle-direction.test.ts :: infeasible directed destination still refuses after supported release at 1.5707963267948966
-- added: reading-circle-direction.test.ts :: reader handoff from occupied discussion at 0 plans only after ordinary stand-up
-- added: reading-circle-direction.test.ts :: reader handoff from occupied discussion at 1.5707963267948966 plans only after ordinary stand-up
-- added: reading-circle-direction.test.ts :: reader handoff from occupied reading at 0 plans only after ordinary stand-up
-- added: reading-circle-direction.test.ts :: reader handoff from occupied reading at 1.5707963267948966 plans only after ordinary stand-up
-- added: reading-circle.test.ts :: End during real reading retains unfinished progress and drains claims
-- added: reading-circle.test.ts :: Leave/late Join and requested question keep real participant and artifact state
-- added: reading-circle.test.ts :: Pause at final completed answer boundary resumes completion without reading reset
-- added: reading-circle.test.ts :: Pause safely retains same reader bookmark and explicit Resume finishes
-- added: reading-circle.test.ts :: Pause within final discussion preserves unfinished turn rather than resetting completed book
-- added: reading-circle.test.ts :: all listeners Leave names waiting intervention; declared Join permits explicit Resume
-- added: reading-circle.test.ts :: blocked listening place and facing error refuse exact declared resources
-- added: reading-circle.test.ts :: directing every active listener retains withdrawals while waiting, and Join plus Resume restores only selected listener
-- added: reading-circle.test.ts :: listener directed during paused stays withdrawn through explicit Resume and Join
-- added: reading-circle.test.ts :: listener directed during pausing stays withdrawn through explicit Resume and Join
-- added: reading-circle.test.ts :: listener directed during waiting stays withdrawn through explicit Resume and Join
-- added: reading-circle.test.ts :: missing book, occupied listener and unsupported book reject without fabricated progress
-- added: reading-circle.test.ts :: rapid Pause then End before next tick dispatches no orphan reading child
-- added: reading-circle.test.ts :: reader directive safely pauses, preserves book and resumes only after director releases
-- added: reading-circle.test.ts :: real supported book reading intervals and physical questions/answers at 0
-- added: reading-circle.test.ts :: real supported book reading intervals and physical questions/answers at 1.5707963267948966
-- added: reading-circle.test.ts :: requested floor yields completed ordinary occupied contribution about actual book
-- added: reading-circle.test.ts :: same decisions replay exact world and discussion history
-- added: reading-circle.test.ts :: unavailable book pauses explicitly and restores remaining same-book reading
-- added: reading-circle.test.ts :: unfinished book rejects reader replacement rather than resetting bookmark
-- added: seed-planting.test.ts :: admitted source changed before first tick refuses before writing a planting purpose
-- added: seed-planting.test.ts :: bad-seedbed refuses without state writes
-- added: seed-planting.test.ts :: cancel accepted before first tick creates no child or planting purpose
-- added: seed-planting.test.ts :: cancel in putting returns same bowl and explicit continuation retains exact purpose
-- added: seed-planting.test.ts :: cancel in reaching returns same bowl and explicit continuation retains exact purpose
-- added: seed-planting.test.ts :: cancel in sowing returns same bowl and explicit continuation retains exact purpose
-- added: seed-planting.test.ts :: cancel in taking returns same bowl and explicit continuation retains exact purpose
-- added: seed-planting.test.ts :: cancel in walking returns same bowl and explicit continuation retains exact purpose
-- added: seed-planting.test.ts :: empty refuses without state writes
-- added: seed-planting.test.ts :: execution rejects material without another deposit and returns actual same bowl
-- added: seed-planting.test.ts :: execution rejects missing-contents without another deposit and returns actual same bowl
-- added: seed-planting.test.ts :: execution rejects refill without another deposit and returns actual same bowl
-- added: seed-planting.test.ts :: foreign planter claim and blocked route refuse without stealing or initializing a purpose
-- added: seed-planting.test.ts :: late contents replacement during ordinary return cannot report silent conserved success
-- added: seed-planting.test.ts :: missing-plant refuses without state writes
-- added: seed-planting.test.ts :: missing-source refuses without state writes
-- added: seed-planting.test.ts :: moving target stops deposits and supported same-bowl return; restored binding resumes retained purpose
-- added: seed-planting.test.ts :: new blocked return route retains actual held bowl until route restored
-- added: seed-planting.test.ts :: newly occupied return slot keeps real held seeds and ownership until explicit clearance
-- added: seed-planting.test.ts :: occupied-return refuses without state writes
-- added: seed-planting.test.ts :: ordinary garden care coexists without changing retained planting material or purpose
-- added: seed-planting.test.ts :: partial source, actor and refill changes refuse instead of discarding retained seeds
-- added: seed-planting.test.ts :: player directive safely returns seeds before actor leaves, then same-source explicit continuation
-- added: seed-planting.test.ts :: same bowl, supported right-hand reach and four conserved seed deposits at 0
-- added: seed-planting.test.ts :: same bowl, supported right-hand reach and four conserved seed deposits at 1.5707963267948966
-- added: seed-planting.test.ts :: same commands replay exact seed state, world, deposits and action provenance
-- added: seed-planting.test.ts :: unavailable refuses without state writes
-- added: seed-planting.test.ts :: unavailable target safely returns bowl and preserves independent garden and planting effects
-- added: seed-planting.test.ts :: unfinished purpose reserves its source across stopped actions and other planter admission
-- added: seed-planting.test.ts :: unsupported return table refuses release while keeping true held seed ownership
-- added: seed-planting.test.ts :: unsupported-plant refuses without state writes
-- added: seed-planting.test.ts :: unsupported-source refuses without state writes
-- added: seed-planting.test.ts :: wrong-material refuses without state writes
+- added: communal-supper.test.ts :: End before drains all physical work without claiming finished
+- added: communal-supper.test.ts :: End preparing drains all physical work without claiming finished
+- added: communal-supper.test.ts :: End refuses occupied utensil return truthfully with held claims, then drains after actual support restored
+- added: communal-supper.test.ts :: End sharing drains all physical work without claiming finished
+- added: communal-supper.test.ts :: End storing-mealware drains all physical work without claiming finished
+- added: communal-supper.test.ts :: End storing-prepware drains all physical work without claiming finished
+- added: communal-supper.test.ts :: cancelled End return drains, preserves ordinary walk, then explicit End retries only actual remaining held utensils
+- added: communal-supper.test.ts :: cancelled return Retry End refuses occupied destination without child spam and requires explicit restored retry
+- added: communal-supper.test.ts :: changed fixture binding and unavailable cleanup surface wait without failed child spam; explicit restoration
+- added: communal-supper.test.ts :: completed first storage cannot drift while later cleanup runs; safe wait and explicit exact restoration
+- added: communal-supper.test.ts :: exact completed meal Pause boundary advances receipts without trying a fresh empty-pot meal
+- added: communal-supper.test.ts :: exact completed preparation Pause boundary advances checkpoint rather than rerunning recipe
+- added: communal-supper.test.ts :: external material refill during safe meal Pause is a named conservation refusal, never a fresh serving
+- added: communal-supper.test.ts :: failed End return child retains its failed record and explicitly retries normal remaining stow
+- added: communal-supper.test.ts :: independent ordinary return physically satisfies cancelled history; End waits foreign withdrawal then completes honestly
+- added: communal-supper.test.ts :: meal consumed safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
+- added: communal-supper.test.ts :: meal partial safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
+- added: communal-supper.test.ts :: meal stowing safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
+- added: communal-supper.test.ts :: missing ingredient and malformed storage coverage refuse before any physical child
+- added: communal-supper.test.ts :: occupied storage waits with named admission and never preempts foreign vessel or emits repeated failed children
+- added: communal-supper.test.ts :: ordinary cleanup direction preserves independent walk and yields retained task until explicit Resume
+- added: communal-supper.test.ts :: partial preparation Pause/Resume retains deposited material and retries existing pot recipe
+- added: communal-supper.test.ts :: preparation safe Pause then ordinary cook direction uses same ingredients and explicit retained retry
+- added: communal-supper.test.ts :: repeated End while ordinary return active is idempotent and direct walk honestly refuses stow ownership
+- added: communal-supper.test.ts :: safe cancelled meal permits ordinary direction then same receipt explicit Resume
+- added: communal-supper.test.ts :: same seven vessels prepare once, converse/eat and store empty with exact replay and detached readout
+- added: communal-supper.test.ts :: storing-mealware partial cleanup safe Pause retains same persistent task
+- added: communal-supper.test.ts :: storing-prepware partial cleanup safe Pause retains same persistent task
+- added: communal-supper.test.ts :: uncancelled ordinary meal direction preserves player action but failed meal source is an explicit continuation refusal
+- added: garden-circuit.test.ts :: End in before-step safely returns actual bowl and keeps finite history
+- added: garden-circuit.test.ts :: End in care safely returns actual bowl and keeps finite history
+- added: garden-circuit.test.ts :: End in due safely returns actual bowl and keeps finite history
+- added: garden-circuit.test.ts :: End in serve safely returns actual bowl and keeps finite history
+- added: garden-circuit.test.ts :: Pause after serve deposit before back completes never serves the nonempty bowl again
+- added: garden-circuit.test.ts :: Pause before serving deposit retains empty bowl and exactly retries unfinished resupply
+- added: garden-circuit.test.ts :: active care directive drains ordinary care before walking and does not resurrect circuit
+- added: garden-circuit.test.ts :: bad-return refuses admission with no physical effects/claims
+- added: garden-circuit.test.ts :: changed finite material waits for explicit restoration and never manufactures resupply
+- added: garden-circuit.test.ts :: changed source support refuses and exact restoration permits continuation
+- added: garden-circuit.test.ts :: due wait preserves original 600 tick interval without failed child spam
+- added: garden-circuit.test.ts :: duplicate-plant refuses admission with no physical effects/claims
+- added: garden-circuit.test.ts :: exhausted-source refuses admission with no physical effects/claims
+- added: garden-circuit.test.ts :: independent ordinary return satisfies stopped End physically without rewriting failed history
+- added: garden-circuit.test.ts :: missing serve after actual empty-bowl take waits by name without throw or failed-record spam
+- added: garden-circuit.test.ts :: missing-plant refuses admission with no physical effects/claims
+- added: garden-circuit.test.ts :: missing-source refuses admission with no physical effects/claims
+- added: garden-circuit.test.ts :: nonempty-bowl refuses admission with no physical effects/claims
+- added: garden-circuit.test.ts :: occupied return retains real hand/support, waits without children spam, restoration permits ordinary release
+- added: garden-circuit.test.ts :: partial care purpose and material survive safe Pause, ordinary direction and explicit Resume
+- added: garden-circuit.test.ts :: readout is detached and repeat End during active ordinary return is idempotent
+- added: garden-circuit.test.ts :: six committed deposits still require physical release after final-care Pause and ordinary bowl take
+- added: garden-circuit.test.ts :: six real care cycles, two real resupplies, original identities and deterministic replay
+- added: garden-circuit.test.ts :: stopped ordinary End return requires explicit retry, retains source history, no child spam
+- added: garden-circuit.test.ts :: unavailable planter waits until explicit restored Resume; no automatic child failures
+- added: garden-circuit.test.ts :: unsupported-plant refuses admission with no physical effects/claims
+- added: room-preparation.test.ts :: End before first physical tick releases parent with no children or purpose resurrection
+- added: room-preparation.test.ts :: End during arranging drains all actual children and preserves supported same objects
+- added: room-preparation.test.ts :: End during clearing drains all actual children and preserves supported same objects
+- added: room-preparation.test.ts :: End during gathering drains all actual children and preserves supported same objects
+- added: room-preparation.test.ts :: Pause held table safely grounds partial placement; explicit retry starts at real pose without retidying
+- added: room-preparation.test.ts :: Pause while second item held drains safely, retains first storage and explicitly continues same tidy child
+- added: room-preparation.test.ts :: changed destination support after storage waits and safely stops setup; explicit restoration continues same items
+- added: room-preparation.test.ts :: completed setup changed during boundary Pause waits for explicit remaining-fixture retry rather than repeating tidy/table
+- added: room-preparation.test.ts :: completed table placement remains retained when chair move stops and explicit retry skips the table
+- added: room-preparation.test.ts :: connected whole session uses same stored items, physically moved table and late visitor chair/question; replay is exact
+- added: room-preparation.test.ts :: occupied moved chair causes named wait without dispatch spam/preemption, then explicit restored retry
+- added: room-preparation.test.ts :: ordinary tidier direction waits with retained transfers until explicit Resume, without failed record spam
+- added: room-preparation.test.ts :: original classroom edge-slot capacity limit is unchanged; malformed definition and missing item refuse before dispatch
+- added: room-preparation.test.ts :: pre-tick Pause and exact tidy completion boundary preserve original payload and require explicit restored Resume
+- added: room-preparation.test.ts :: session local Pause is a named honest refusal; existing participant direction/exclusion and explicit rejoin still work
+- added: shared-food-continuation.test.ts :: a later unrelated meal cannot reuse the older cancelled receipts or recreate food
+- added: shared-food-continuation.test.ts :: accepted continuation cancelled before its first step produces no phantom serving or orphan children
+- added: shared-food-continuation.test.ts :: after-first-return cancellation resumes exact remaining serving/food and returns same utensils
+- added: shared-food-continuation.test.ts :: after-one-serving cancellation resumes exact remaining serving/food and returns same utensils
+- added: shared-food-continuation.test.ts :: before-first-step cancellation resumes exact remaining serving/food and returns same utensils
+- added: shared-food-continuation.test.ts :: before-serve-deposit cancellation resumes exact remaining serving/food and returns same utensils
+- added: shared-food-continuation.test.ts :: consumed empty bowls continue same cancelled meal without another serving, then ordinary stow releases resources
+- added: shared-food-continuation.test.ts :: corrupted retained contents during a running continuation stop with a material diagnostic rather than consume replacement food
+- added: shared-food-continuation.test.ts :: explicit continuation refuses changed at binding
+- added: shared-food-continuation.test.ts :: explicit continuation refuses changed ordered-actors binding
+- added: shared-food-continuation.test.ts :: explicit continuation refuses changed pot binding
+- added: shared-food-continuation.test.ts :: explicit continuation refuses changed return-order binding
+- added: shared-food-continuation.test.ts :: explicit continuation refuses changed service binding
+- added: shared-food-continuation.test.ts :: legacy uncancelled directive fails the parent and cannot become a continuation source
+- added: shared-food-continuation.test.ts :: missing, active, completed and wrong-verb sources refuse without state writes
+- added: shared-food-continuation.test.ts :: one consumed participant and one retained partial serving continue without topping up either
+- added: shared-food-continuation.test.ts :: partial-eating cancellation resumes exact remaining serving/food and returns same utensils
+- added: shared-food-continuation.test.ts :: repeated safe continuation uses latest cancellation checkpoint and original purpose without duplicate serving
+- added: shared-food-continuation.test.ts :: retained material checkpoint rejects anchored-pose tampering
+- added: shared-food-continuation.test.ts :: retained material checkpoint rejects definition tampering
+- added: shared-food-continuation.test.ts :: retained material checkpoint rejects fixture tampering
+- added: shared-food-continuation.test.ts :: retained material checkpoint rejects material tampering
+- added: shared-food-continuation.test.ts :: retained material checkpoint rejects quantity tampering
+- added: shared-food-continuation.test.ts :: retained material checkpoint rejects support tampering
+- added: shared-food-continuation.test.ts :: return destination occupancy preserves same checkpoint; ordinary removal permits explicit continuation
+- added: shared-food-continuation.test.ts :: same chained cancellations replay world, actions, own receipts and events
+- added: shared-food-continuation.test.ts :: same world in a different Runtime has no material checkpoint provenance
+- added: shared-food-continuation.test.ts :: taking cancellation resumes exact remaining serving/food and returns same utensils
+- added: shared-food-continuation.test.ts :: unrelated later material use cannot restore then reuse an older cancelled purpose
+- added: shared-food-continuation.test.ts :: voluntary cancellation then ordinary player direction permits continuation after the independent walk finishes
 
 ## Tests not cited by any row or milestone
 
-1014 of 1341 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+1114 of 1441 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1349,6 +1349,35 @@ Compared with the report at `ca6bb5d` (2026-10-02T10:54:41.961Z): 100 added, 0 r
 - `classroom-turns.test.ts` pass: formed classroom groups turn and cancellation clears speakers (8 guests)
 - `classroom-turns.test.ts` pass: departing group floor holder never remains eligible or a ghost speaker
 - `classroom-turns.test.ts` pass: classroom floor marks repeat deterministically
+- `communal-supper.test.ts` pass: same seven vessels prepare once, converse/eat and store empty with exact replay and detached readout
+- `communal-supper.test.ts` pass: partial preparation Pause/Resume retains deposited material and retries existing pot recipe
+- `communal-supper.test.ts` pass: meal partial safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
+- `communal-supper.test.ts` pass: meal consumed safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
+- `communal-supper.test.ts` pass: meal stowing safe Pause resumes same purpose and receipts without preparing or serving eaten bowls again
+- `communal-supper.test.ts` pass: storing-mealware partial cleanup safe Pause retains same persistent task
+- `communal-supper.test.ts` pass: storing-prepware partial cleanup safe Pause retains same persistent task
+- `communal-supper.test.ts` pass: End before drains all physical work without claiming finished
+- `communal-supper.test.ts` pass: End preparing drains all physical work without claiming finished
+- `communal-supper.test.ts` pass: End sharing drains all physical work without claiming finished
+- `communal-supper.test.ts` pass: End storing-mealware drains all physical work without claiming finished
+- `communal-supper.test.ts` pass: End storing-prepware drains all physical work without claiming finished
+- `communal-supper.test.ts` pass: ordinary cleanup direction preserves independent walk and yields retained task until explicit Resume
+- `communal-supper.test.ts` pass: safe cancelled meal permits ordinary direction then same receipt explicit Resume
+- `communal-supper.test.ts` pass: changed fixture binding and unavailable cleanup surface wait without failed child spam; explicit restoration
+- `communal-supper.test.ts` pass: missing ingredient and malformed storage coverage refuse before any physical child
+- `communal-supper.test.ts` pass: exact completed preparation Pause boundary advances checkpoint rather than rerunning recipe
+- `communal-supper.test.ts` pass: exact completed meal Pause boundary advances receipts without trying a fresh empty-pot meal
+- `communal-supper.test.ts` pass: preparation safe Pause then ordinary cook direction uses same ingredients and explicit retained retry
+- `communal-supper.test.ts` pass: uncancelled ordinary meal direction preserves player action but failed meal source is an explicit continuation refusal
+- `communal-supper.test.ts` pass: occupied storage waits with named admission and never preempts foreign vessel or emits repeated failed children
+- `communal-supper.test.ts` pass: End refuses occupied utensil return truthfully with held claims, then drains after actual support restored
+- `communal-supper.test.ts` pass: external material refill during safe meal Pause is a named conservation refusal, never a fresh serving
+- `communal-supper.test.ts` pass: completed first storage cannot drift while later cleanup runs; safe wait and explicit exact restoration
+- `communal-supper.test.ts` pass: repeated End while ordinary return active is idempotent and direct walk honestly refuses stow ownership
+- `communal-supper.test.ts` pass: cancelled End return drains, preserves ordinary walk, then explicit End retries only actual remaining held utensils
+- `communal-supper.test.ts` pass: cancelled return Retry End refuses occupied destination without child spam and requires explicit restored retry
+- `communal-supper.test.ts` pass: independent ordinary return physically satisfies cancelled history; End waits foreign withdrawal then completes honestly
+- `communal-supper.test.ts` pass: failed End return child retains its failed record and explicitly retries normal remaining stow
 - `computer-music.test.ts` pass: ordinary computer execution and optional listening complete with coherent score at yaw 0
 - `computer-music.test.ts` pass: ordinary computer execution and optional listening complete with coherent score at yaw 1.5707963267948966
 - `computer-music.test.ts` pass: interruption safely releases children and quiescent JSON restore resumes the same recorded program
@@ -1565,6 +1594,32 @@ Compared with the report at `ca6bb5d` (2026-10-02T10:54:41.961Z): 100 added, 0 r
 - `garden-care.test.ts` pass: foreign planter lease refuses without cancelling owner
 - `garden-care.test.ts` pass: same commands repeat exact care state and action provenance deterministically
 - `garden-care.test.ts` pass: a newly occupied return slot retains held water and claims until the obstacle clears
+- `garden-circuit.test.ts` pass: six real care cycles, two real resupplies, original identities and deterministic replay
+- `garden-circuit.test.ts` pass: Pause after serve deposit before back completes never serves the nonempty bowl again
+- `garden-circuit.test.ts` pass: Pause before serving deposit retains empty bowl and exactly retries unfinished resupply
+- `garden-circuit.test.ts` pass: partial care purpose and material survive safe Pause, ordinary direction and explicit Resume
+- `garden-circuit.test.ts` pass: active care directive drains ordinary care before walking and does not resurrect circuit
+- `garden-circuit.test.ts` pass: due wait preserves original 600 tick interval without failed child spam
+- `garden-circuit.test.ts` pass: End in before-step safely returns actual bowl and keeps finite history
+- `garden-circuit.test.ts` pass: End in serve safely returns actual bowl and keeps finite history
+- `garden-circuit.test.ts` pass: End in care safely returns actual bowl and keeps finite history
+- `garden-circuit.test.ts` pass: End in due safely returns actual bowl and keeps finite history
+- `garden-circuit.test.ts` pass: occupied return retains real hand/support, waits without children spam, restoration permits ordinary release
+- `garden-circuit.test.ts` pass: unavailable planter waits until explicit restored Resume; no automatic child failures
+- `garden-circuit.test.ts` pass: changed source support refuses and exact restoration permits continuation
+- `garden-circuit.test.ts` pass: missing-source refuses admission with no physical effects/claims
+- `garden-circuit.test.ts` pass: exhausted-source refuses admission with no physical effects/claims
+- `garden-circuit.test.ts` pass: missing-plant refuses admission with no physical effects/claims
+- `garden-circuit.test.ts` pass: unsupported-plant refuses admission with no physical effects/claims
+- `garden-circuit.test.ts` pass: duplicate-plant refuses admission with no physical effects/claims
+- `garden-circuit.test.ts` pass: bad-return refuses admission with no physical effects/claims
+- `garden-circuit.test.ts` pass: nonempty-bowl refuses admission with no physical effects/claims
+- `garden-circuit.test.ts` pass: readout is detached and repeat End during active ordinary return is idempotent
+- `garden-circuit.test.ts` pass: stopped ordinary End return requires explicit retry, retains source history, no child spam
+- `garden-circuit.test.ts` pass: independent ordinary return satisfies stopped End physically without rewriting failed history
+- `garden-circuit.test.ts` pass: changed finite material waits for explicit restoration and never manufactures resupply
+- `garden-circuit.test.ts` pass: missing serve after actual empty-bowl take waits by name without throw or failed-record spam
+- `garden-circuit.test.ts` pass: six committed deposits still require physical release after final-care Pause and ordinary bowl take
 - `gathering-continuation.test.ts` pass: real 4 departure supports concurrent discussion and exact-notes follow-up work
 - `gathering-continuation.test.ts` pass: real 8 departure supports concurrent discussion and exact-notes follow-up work
 - `gathering-continuation.test.ts` pass: directed guest movement pauses only discussion, then resumes remaining real talk with same partner
@@ -1877,6 +1932,21 @@ Compared with the report at `ca6bb5d` (2026-10-02T10:54:41.961Z): 100 added, 0 r
 - `reading.test.ts` pass: two independent readers share table support without sharing books, chairs or progress
 - `room-campus-2026.test.ts` pass: room 2026: incompatible year/file pairs refuse; omitted loader preserves synthetic-only test setup
 - `room-campus-2026.test.ts` pass: room 2026: legacy workspace id collision refuses without replacing user work
+- `room-preparation.test.ts` pass: connected whole session uses same stored items, physically moved table and late visitor chair/question; replay is exact
+- `room-preparation.test.ts` pass: End before first physical tick releases parent with no children or purpose resurrection
+- `room-preparation.test.ts` pass: Pause while second item held drains safely, retains first storage and explicitly continues same tidy child
+- `room-preparation.test.ts` pass: ordinary tidier direction waits with retained transfers until explicit Resume, without failed record spam
+- `room-preparation.test.ts` pass: Pause held table safely grounds partial placement; explicit retry starts at real pose without retidying
+- `room-preparation.test.ts` pass: completed table placement remains retained when chair move stops and explicit retry skips the table
+- `room-preparation.test.ts` pass: End during clearing drains all actual children and preserves supported same objects
+- `room-preparation.test.ts` pass: End during arranging drains all actual children and preserves supported same objects
+- `room-preparation.test.ts` pass: End during gathering drains all actual children and preserves supported same objects
+- `room-preparation.test.ts` pass: session local Pause is a named honest refusal; existing participant direction/exclusion and explicit rejoin still work
+- `room-preparation.test.ts` pass: occupied moved chair causes named wait without dispatch spam/preemption, then explicit restored retry
+- `room-preparation.test.ts` pass: changed destination support after storage waits and safely stops setup; explicit restoration continues same items
+- `room-preparation.test.ts` pass: original classroom edge-slot capacity limit is unchanged; malformed definition and missing item refuse before dispatch
+- `room-preparation.test.ts` pass: pre-tick Pause and exact tidy completion boundary preserve original payload and require explicit restored Resume
+- `room-preparation.test.ts` pass: completed setup changed during boundary Pause waits for explicit remaining-fixture retry rather than repeating tidy/table
 - `room-setup.test.ts` pass: serial real moves own physical resources themselves and finish usable explicit layout
 - `room-setup.test.ts` pass: actual authored classroom4 default/side setup uses existing fixtures
 - `room-setup.test.ts` pass: actual authored classroom8 default/side setup uses existing fixtures
@@ -1961,6 +2031,36 @@ Compared with the report at `ca6bb5d` (2026-10-02T10:54:41.961Z): 100 added, 0 r
 - `shared-food-break.test.ts` pass: deadline drains a nonprogressing ground child; active snapshot explicitly refuses
 - `shared-food-break.test.ts` pass: actual group release and parent cancellation wait for terminal child before stow/cleanup
 - `shared-food-break.test.ts` pass: already filled bowls need no pot portions; elevated returns refuse in preflight
+- `shared-food-continuation.test.ts` pass: consumed empty bowls continue same cancelled meal without another serving, then ordinary stow releases resources
+- `shared-food-continuation.test.ts` pass: before-first-step cancellation resumes exact remaining serving/food and returns same utensils
+- `shared-food-continuation.test.ts` pass: taking cancellation resumes exact remaining serving/food and returns same utensils
+- `shared-food-continuation.test.ts` pass: before-serve-deposit cancellation resumes exact remaining serving/food and returns same utensils
+- `shared-food-continuation.test.ts` pass: after-one-serving cancellation resumes exact remaining serving/food and returns same utensils
+- `shared-food-continuation.test.ts` pass: partial-eating cancellation resumes exact remaining serving/food and returns same utensils
+- `shared-food-continuation.test.ts` pass: after-first-return cancellation resumes exact remaining serving/food and returns same utensils
+- `shared-food-continuation.test.ts` pass: one consumed participant and one retained partial serving continue without topping up either
+- `shared-food-continuation.test.ts` pass: repeated safe continuation uses latest cancellation checkpoint and original purpose without duplicate serving
+- `shared-food-continuation.test.ts` pass: voluntary cancellation then ordinary player direction permits continuation after the independent walk finishes
+- `shared-food-continuation.test.ts` pass: missing, active, completed and wrong-verb sources refuse without state writes
+- `shared-food-continuation.test.ts` pass: explicit continuation refuses changed ordered-actors binding
+- `shared-food-continuation.test.ts` pass: explicit continuation refuses changed return-order binding
+- `shared-food-continuation.test.ts` pass: explicit continuation refuses changed service binding
+- `shared-food-continuation.test.ts` pass: explicit continuation refuses changed pot binding
+- `shared-food-continuation.test.ts` pass: explicit continuation refuses changed at binding
+- `shared-food-continuation.test.ts` pass: retained material checkpoint rejects quantity tampering
+- `shared-food-continuation.test.ts` pass: retained material checkpoint rejects material tampering
+- `shared-food-continuation.test.ts` pass: retained material checkpoint rejects definition tampering
+- `shared-food-continuation.test.ts` pass: retained material checkpoint rejects support tampering
+- `shared-food-continuation.test.ts` pass: retained material checkpoint rejects anchored-pose tampering
+- `shared-food-continuation.test.ts` pass: retained material checkpoint rejects fixture tampering
+- `shared-food-continuation.test.ts` pass: unrelated later material use cannot restore then reuse an older cancelled purpose
+- `shared-food-continuation.test.ts` pass: return destination occupancy preserves same checkpoint; ordinary removal permits explicit continuation
+- `shared-food-continuation.test.ts` pass: same chained cancellations replay world, actions, own receipts and events
+- `shared-food-continuation.test.ts` pass: legacy uncancelled directive fails the parent and cannot become a continuation source
+- `shared-food-continuation.test.ts` pass: same world in a different Runtime has no material checkpoint provenance
+- `shared-food-continuation.test.ts` pass: a later unrelated meal cannot reuse the older cancelled receipts or recreate food
+- `shared-food-continuation.test.ts` pass: accepted continuation cancelled before its first step produces no phantom serving or orphan children
+- `shared-food-continuation.test.ts` pass: corrupted retained contents during a running continuation stop with a material diagnostic rather than consume replacement food
 - `sleep-take.test.ts` pass: supported sleep semantic take/replay and cleanup yaw=0
 - `sleep-take.test.ts` pass: supported sleep semantic take/replay and cleanup yaw=0.63
 - `sleep-walk.test.ts` pass: ordinary walker passes feet outside old disc at yaw 0

@@ -1738,3 +1738,82 @@ release38-network-receipt.json, release38-gateway-receipt.json, gateway assertio
 failed diagnoses, release38-public-capture-review.json, social-garden-public-results.json,
 release38-gate-capture-review.json and gate/2026-10-02T12-14-17-938Z/report.json.
 Owner-authorized meaningful vocabulary expansion continues until explicitly stopped.
+
+
+<a id="production-deploy-39-2026-10-02-room-supper-and-finite-garden"></a>
+
+## Production deploy39 — 2026-10-02 room supper and finite garden
+
+**Release39 is published and verified at https://sim.mars.college/**,
+Worker `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`, functional source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; rollback38
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`. 63 selectable presets; rules version `activities/29`
+(a rules stamp, not an activity count). All nine gate stages PASS; engine
+1424 PASS/6 SKIP/11 TODO. Fresh native public
+85 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; exact bundle `main-Bx4z1zKg.js`.
+Skipped/TODO/FIXME checks remain unproved. All 63 first-Step smoke is not all 63
+full-Play proof; execution contracts and missing coverage remain stabilization work.
+
+New hypothetical room preparation, communal supper and finite garden circuit use
+ordinary same-object physical actions, supported returns and retained partial effects.
+Gene requests a temporary quota pause after this verification: no further alpha/performance,
+vocabulary or Eden work until explicitly resumed. Saved stabilization direction and
+unfinished work remain available after resume; no automated resume, handoff or follow-up.
+Release38 whole-current-build proof is inherited; no fresh release39 whole-build
+execution is claimed unless separately identified in final public scope.
+Original gateway browser/campus.glb HEAD-length failure remains; no DNS/gateway fix.
+Silent dialogue, current rigs/fine fingers, crop/HUD limits and no plant growth remain.
+Garden-afternoon walks are independent, not a coordinated shared garden walk.
+
+| Preset | Initiate and intervene | Physical/continuation boundary |
+| --- | --- | --- |
+| `room-preparation` | Start room preparation then Play; Pause/Resume cleanup or setup, End, Join visitor, Ask and ordinary classroom floor/phase controls. | Same bowl/spoon stored; empty table and seat8 physically moved; visitor uses moved chair. Resume retries remaining actual setup without re-tidying. During session local Pause is named unsupported: use global Pause; ordinary session controls/End remain. |
+| `communal-supper` | Start supper then Play; Pause/Resume retained preparation/meal/cleanup, direct safely paused cook, End; retry End explicitly if an ordinary return was stopped. | Finite cold ingredients/preparation once; same two meal receipts continue only from safely cancelled checkpoint; consumed empty bowls never receive a fresh serving. Same seven empty vessels stored after completion; End returns held utensils but retains uneaten material, and blocked returns wait truthfully. |
+| `garden-circuit` | Start circuit then Play; Pause returns held bowl safely, direction and explicit Resume retain partial care; End drains real ownership. | Same supported pot/bowl and three grounded beds; .25 pot =1 bowl capacity unit, .5 pot initially=2 bowl units; six .25 care cycles deliver1.5 and leave .5 in same bowl, source0. Existing600tick due interval waits; no growth/refill. |
+
+Computer workshop remains an excluded UNVERIFIED draft at `3316a74` in
+`codex/computer-workshop`: three untracked activity/scenario/brief files; first
+submit refused `classroom.display-unavailable`, no journey/tests/TSc/lint proof.
+Library reading is excluded docs-only `319429c`, no core/scenario/tests or physical
+bookmark-continuation proof. Preserve these worktrees and all48 other-owner main
+paths; this publication does not merge all future branches or certify old inventory.
+
+
+| Clean gate stage | Result | Duration ms |
+| --- | --- | --- |
+| lint | clean | 2204 |
+| test | 294 pass / 0 fail / 0 skip / 0 todo | 4230 |
+| test-engine | 1424 pass / 0 fail / 6 skip / 11 todo | 170407 |
+| tsc | clean | 2503 |
+| tsc-camera | clean | 4339 |
+| e2e | 278 passed, 7 skipped | 3673626 |
+| record-campus-take | check        /engine/takes/flagship-campus-2026.json OK (take id, final state, c | 13412 |
+| determinism-probe | hash b746b0947e65… (completed) | 3288 |
+| simulation-integration | PASS: authenticate before body parsing, method restrictions, prototype keys and  | 6943 |
+
+Gate source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; gate finished `2026-10-02T15:23:30.282Z`.
+Fresh native public scope: all63 selectable fresh-load/Reset/first-Step plus selector parity; eight room/supper/garden-circuit actual Play and End/retry cases; connected living-day4/studio independent commitments and completion; ten camera-entry/control checks and home discovery. Initial smoke is not all63 full-journey proof; camera entry is not cinematic quality proof; release38 unchanged-source full-current2022 Play inherited separately; duration627473.521ms,
+start `2026-10-02T15:30:09.657Z`. Whole-current-build proof remains release38 source inheritance, not fresh release39 execution.
+Gate review inspected 60 paired images; final public review inspected
+60 images. Crop/HUD limits retained; images do not prove numeric effects,
+claims or object identities without detached actual state. No camera-quality claim.
+
+Original Worker HTTP: 522 assets/24 routes/696 requests PASS; public MCP36 and
+security PASS; director9 PASS. Missing server execution metrics remain unavailable;
+printed0 is not measured CPU. Eight unchanged hash-keyed R2 assets skipped/0writes;
+9new/559retained static assets, Worker startup129ms.
+
+Worker/network/asset details are exact final receipts linked in deployment metadata,
+not copied release38 measurements. Worker startup is distinct from browser readiness;
+network wall time is not server CPU. Original gateway HEAD-length assertion remains
+FAIL; modular HEAD/range is separate evidence. No DNS/gateway ownership change.
+Evidence pair is copied byte-for-byte from root-generated exact-source gate proof;
+partial/unproven capabilities and six engine SKIP/11TODO/seven browser FIXME are
+not promoted. Rules stamp `activities/29` is not a count of 29 activities.
+
+Alpha stabilization remains the saved direction after explicit resume; work is
+currently paused after verification. This is the
+bounded current39 checkpoint, not completion of the entire alpha tranche. Initial
+whole-alpha estimate20–36workinghours, medium-low confidence, subject to actual
+coverage/liveness/performance findings. Preserve original history/assets/pins.
+Deployed `2026-10-02T15:28:48.809Z`, finally verified `2026-10-02T15:48:49.365124Z`; rollback38
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`. Public bundle `main-Bx4z1zKg.js`. No push/remotes.
