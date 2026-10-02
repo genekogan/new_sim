@@ -1,4 +1,81 @@
-# Mars World alpha performance audit — preparation only
+# Mars World alpha performance audit
+
+## Executed bounded pass — published release40, 2026-10-02
+
+Measurements target the exact frozen published40 source05370e8c, Workerbb946d3c,
+served small-JS hashes verified against its frozen build. They are published40
+observations, not an alpha publication claim. Canonical release/source/rollback
+remain in [release checklist](../RELEASE_CHECKLIST.md). All browser/performance
+execution was serialized; assets, quality and physical outcomes stayed unchanged.
+
+| Context | Cold transferred / ready | Ordinary warm transferred / ready | Interpretation |
+| --- | --- | --- | --- |
+| Design studio, isolated Chromium |3.47MB /3.63s|5.2KB /2.60s|27cached responses;3strict resets within original resource ceilings|
+| Living-day studio, isolated Chromium |3.33MB /2.90s|2.5KB /2.61s|27cached responses; actualPlay advances fixed ticks without violations|
+| Historical2022, isolated Chromium |14.27MB /6.11s|Not measured|Cold backdrop/request graph only|
+| Campus2026, non-persistent Chromium |48.88MB /10.63s|38.51MB /9.95s|Large38.5MB compressed model downloaded again; retained finding|
+| Campus2026, fresh persistent profile |Model38.5MB /11.53s|Model0B /9.51s|Same-version model fromDiskCache true; no cache-size override|
+
+Transfers are CDP encoded-length observations including response overhead; ready
+is browser asset/adaptive-resolution readiness, not Worker startup. Byte-hashes
+for large assets remain inherited verified manifest evidence; no audit model-body
+materialization. Fresh context isolates cache; ordinary warm reload never disables
+or artificially enlarges it. Persistent probe uses its own ignored profile, never
+Gene's browser. One dependency-path launch failed before any page/request; retained
+separately, not counted as a passing observation.
+
+The context distinction matters: [Playwright's non-persistent contexts](https://playwright.dev/docs/api/class-browsercontext)
+do not write browsing data to disk. Persistent-profile proof demonstrates effective
+repeat-visit model delivery here, without assuming every browser/cache policy will
+retain a large object. Current model URL revision20260922b and manifest keys are
+unchanged across38/40; stable URLs must receive a revision bump when model bytes
+change. Do not make stable model paths immutable. HTML revalidates; hashed JS
+uses long-lived caching; R2 model streams use one-hour ETags/Brotli/ranges.
+
+8s SwiftShader windows: design studio218paused/210Play frames,33.4ms median and
+~50ms p95 RAF intervals; living-day139/139frames,66.6/66.7ms. Campus2026 rendered
+24frames/~416.6ms intervals with1354calls/880566triangles. These are CPU software
+rendering observations, not Gene's hardware FPS. Rendered-frame counts are separate
+from RAF intervals and authoritative fixed ticks. Heap samples varied (no forced
+GC/native-GPU-byte measurement); they do not establish a long-run memory plateau.
+No frame/bundle/mesh optimization is justified by these isolated measurements alone.
+Existing route chunk splitting works; largest frozen chunk727549B, shared Three
+module/core343807/280284B are separate modules, not established duplication.
+
+Material repairs completed in the alpha candidate: world-owned transient component
+geometries, campfire stone/log geometries, historicalLineSegments, cutting blades
+and paint-overlay image leases now release at the correct lifecycle boundaries.
+Native disposal/alias/late-load/repeated-world regressions pass; actual strict
+Play/Reset counters pass on construction, fire, meal, solar and historical worlds.
+No claimed FPS gain; no original assets, attribution or historical values changed.
+Verified upload-cache reuse already avoids8same-key R2 writes at release40.
+
+Direct Worker MCP/security integration36tools PASS. Observed representative remote
+wall times: rehearsal561ms, execution496ms, camera819ms; these include network and
+are not CPU. Printed operation elapsed0 is unusable for CPU accounting: synchronous
+engine-room timing usesperformance.now(), and [Cloudflare's production timers](https://developers.cloudflare.com/workers/runtime-apis/performance/)
+advance only after I/O. Local workerd/native measurements remain separate. Existing
+isolated stress and historical-grid budgets PASS unchanged (exact stress mean
+~.688ms; all6year grid builds<1000ms), pinned state/zero violations. Production
+platform CPU distribution remains unknown; no inferred zero or billing estimate.
+Release40's135ms Wrangler startup remains a deployment statistic.
+
+Ignored exact receipts in alphaWT viewer/.cloudflare: performance-alpha/
+release40-baseline/result.json; release40-campus-cold-warm/result.json;
+release40-campus-persistent-fresh/result.json; performance-alpha-release40-server.log;
+alpha-perf-stress-budget.log. Harness hashes/browser/profile/timestamps/requests
+and captures retained. Root inspected the warm campus, design-studio and
+living-day captures against paired measurements; no missing scene or major visible
+support/continuity issue. These capture observations do not establish anatomical
+precision or social quality. Final alpha gate/publication remain pending.
+
+Deferred: broad dirty-render/parsed-model caching, scenario chunk refactoring,
+texture/mesh reductions and productionCPU observability changes. Current assets
+are accepted; profiling did not establish a bounded low-risk material frame fix.
+Gateway modelHEAD-length limitation remains unchanged and explicit.
+
+## Earlier preparation — dated source/provenance, superseded by executed pass
+
 
 Audit source: `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`, isolated
 `codex/performance-alpha` worktree. Inspected 2026-10-02. Public evidence belongs

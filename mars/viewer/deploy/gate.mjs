@@ -54,9 +54,13 @@ const steps = [
   // individual deadlines, runtime/performance ceilings and assertions unchanged.
   // Release38 ran3505.271s. Measured required room/supper/circuit journeys add
   // 259.2s, plus7.9s camera entry and three startup audits: already >60min.
-  // Allow70min for the expanded serialized suite only; keep every per-test
+  // The release39 allowance was70min; keep every per-test
   // deadline, assertion, performance ceiling and golden baseline unchanged.
-  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 70 * MIN, parse: playwright },
+  // Verified40 used3696.213s.37 additional alpha cases actually passed in
+  // 1254.995s:4951.208s before remaining solar/garden/gallery/quarantine cases.
+  // Give the expanded serialized cohort95min; individual test deadlines,
+  // performance ceilings, assertions and golden outcomes remain unchanged.
+  { name: 'e2e', cmd: ['npm', 'run', 'e2e', '--', '--workers=1'], timeout: 95 * MIN, parse: playwright },
   { name: 'record-campus-take', cmd: ['node', 'deploy/record-campus-take.mjs', '--check'], timeout: 5 * MIN, parse: simulation },
   { name: 'determinism-probe', cmd: ['node', 'deploy/determinism-probe.mjs'], timeout: 5 * MIN, parse: probe },
 ];

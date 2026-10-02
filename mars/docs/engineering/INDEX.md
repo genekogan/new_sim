@@ -11,6 +11,9 @@ release40 homepage repair. The alpha candidate is unreleased; coverage execution
 is ongoing and all63 selectable presets are not certified. Use
 [deployment metadata](../../viewer/deploy/deployment.json) and the
 [latest verified release record](RELEASE_CHECKLIST.md) for publication status.
+The [bounded performance audit](briefs/performance-alpha.REPORT.md) owns actual
+cold/warm/frame/resource measurements and their limitations; do not infer CPU
+from Worker timers or hardware FPS from software WebGL.
 The release39/pause notice below records an earlier checkpoint; its pause is
 superseded by the current roadmap's owner-authorized resume.
 

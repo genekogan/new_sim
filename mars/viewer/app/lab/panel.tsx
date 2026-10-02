@@ -69,7 +69,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <CheckpointTour scenario={s.name} onScenario={onScenario} />
       <LabCameraControls view={view} />
       <p className="lab-sub">
-        Deterministic engine · fixed tick 1/20 s · <a href="/studio">studio</a>
+        Mars World v1 alpha · deterministic engine · fixed tick 1/20 s · <a href="/studio">studio</a>
       </p>
       <label className="lab-field">
         Scenario

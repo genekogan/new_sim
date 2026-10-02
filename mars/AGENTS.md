@@ -38,26 +38,7 @@ by this owner mandate for immediate work.
 
 ## Latest published checkpoint40
 
-**Release40 is verified: [campus presentation](https://sim.mars.college/) is restored at `/`; [Engine Lab](https://sim.mars.college/lab) remains explicit at `/lab`.**
-Worker `bb946d3c-934d-4d2c-8d50-8ae74e087146`, functional source `05370e8c727d44e52e2db510f022dac53b748417`; rollback39
-`95a8f9a8-9d3c-4de4-8365-346fcf1df33d`. Exact bundle `main-CzMxBXeQ.js`.
-All nine clean gate stages PASS: engine1424 PASS/6 SKIP/11 TODO,
-deployment295 PASS, browser278 PASS/7 SKIP. Fresh bounded public repair proof:
-4 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; default2026, valid2024 and invalid-year
-fallback homepage, plus explicit Lab Play/Pause/Reset and camera controls.
-63 presets/rules version `activities/29`; this repair does not claim all63 full-Play proof.
-Five public captures inspected, with root independently reviewing homepage and Lab.
-
-Gene lifted the temporary quota pause and authorized continued work after this
-verified homepage repair. Resume saved Mars World v1 alpha stabilization first:
-coverage/recovery, bounded performance and documentation, then useful activity
-expansion. Preserve unfinished workshop/library work; no automatic Eden work.
-Release39's activity proof and release38's entire current-house automatic Play remain
-separate source inheritance. Current gate year-build proof is automatic Play through
-s0021 followed by bounded programmatic full completion, not an entire automatic build.
-Skipped/TODO/FIXME remain unproved. Original gateway browser/campus.glb HEAD-length
-failure remains; no DNS/gateway change. Silent dialogue, current rigs/fine fingers,
-crop/HUD limits, no plant growth and independent garden-afternoon walks remain.
+The [campus homepage](https://sim.mars.college/) remains `/`; [Engine Lab](https://sim.mars.college/lab) is explicit `/lab`. Exact current release/source/rollback and executed publication proof belong in [deployment metadata](viewer/deploy/deployment.json) and the [latest release record](docs/engineering/RELEASE_CHECKLIST.md). The alpha candidate has focused source-bound proof in [SCENARIO_COVERAGE](docs/engineering/SCENARIO_COVERAGE.json), but no final gate/public acceptance yet. Legacy FIXMEs/TODOs and source-era construction reports remain unproved for their original guarantees.
 
 Computer workshop remains an excluded UNVERIFIED draft at `3316a74` in
 `codex/computer-workshop`: three untracked activity/scenario/brief files; first

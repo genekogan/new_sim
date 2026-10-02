@@ -3,26 +3,14 @@
 Stabilization remains the immediate priority. Gene's latest authorization lifts the
 quota pause and permits useful activity expansion after the verified alpha checkpoint.
 
-**Release40 is verified: [campus presentation](https://sim.mars.college/) is restored at `/`; [Engine Lab](https://sim.mars.college/lab) remains explicit at `/lab`.**
-Worker `bb946d3c-934d-4d2c-8d50-8ae74e087146`, functional source `05370e8c727d44e52e2db510f022dac53b748417`; rollback39
-`95a8f9a8-9d3c-4de4-8365-346fcf1df33d`. Exact bundle `main-CzMxBXeQ.js`.
-All nine clean gate stages PASS: engine1424 PASS/6 SKIP/11 TODO,
-deployment295 PASS, browser278 PASS/7 SKIP. Fresh bounded public repair proof:
-4 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; default2026, valid2024 and invalid-year
-fallback homepage, plus explicit Lab Play/Pause/Reset and camera controls.
-63 presets/rules version `activities/29`; this repair does not claim all63 full-Play proof.
-Five public captures inspected, with root independently reviewing homepage and Lab.
-
-Gene lifted the temporary quota pause and authorized continued work after this
-verified homepage repair. Resume saved Mars World v1 alpha stabilization first:
-coverage/recovery, bounded performance and documentation, then useful activity
-expansion. Preserve unfinished workshop/library work; no automatic Eden work.
-Release39's activity proof and release38's entire current-house automatic Play remain
-separate source inheritance. Current gate year-build proof is automatic Play through
-s0021 followed by bounded programmatic full completion, not an entire automatic build.
-Skipped/TODO/FIXME remain unproved. Original gateway browser/campus.glb HEAD-length
-failure remains; no DNS/gateway change. Silent dialogue, current rigs/fine fingers,
-crop/HUD limits, no plant growth and independent garden-afternoon walks remain.
+Published release/source/rollback and executed validation are canonical in
+[deployment metadata](../../viewer/deploy/deployment.json) and the
+[release checklist](RELEASE_CHECKLIST.md). Keep `/` as the campus homepage and
+`/lab` as the simulation entry. The alpha candidate remains unpublished pending
+combined gate/public verification; [scenario coverage](SCENARIO_COVERAGE.json)
+tracks exact-source proof and gaps, and the [performance audit](briefs/performance-alpha.REPORT.md)
+records bounded measurements/limits. Preserve camera/historical ownership and
+unverified workshop/library drafts.
 
 ## Saved queue and exit criteria — owner-authorized resume after release40
 
@@ -48,7 +36,7 @@ crop/HUD limits, no plant growth and independent garden-afternoon walks remain.
    the approved activity-expansion queue under Gene's latest continuing authorization.
    Do not begin Eden.
 
-Initial whole v1 alpha remaining20–36workinghours, medium-low confidence. Main risks:
+Latest whole v1 alpha planning range20–32workinghours, medium-low confidence. Main risks:
 full-journey proof gaps hidden behind startup/mixed stepping, local-failure isolation,
 legacy unsupported/fine-pose exclusions and public transport metadata. No general
 priority interview is needed. Surface a major prerequisite with smallest credible

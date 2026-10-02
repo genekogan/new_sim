@@ -508,3 +508,18 @@ the gate; seven legacy exclusions remain unproved. No pin is moved or re-recorde
 Focused Play sourcec8331ec is preserved; rebase3316a74 changes only publication
 docs/deployment metadata, with byte-identical viewer runtime and test files.
 Full clean combined gate and publication remain pending.
+
+## 2026-10-02 — alpha browser cohort capacity, no pin change
+
+Verified release40's278 executed passes/7exclusions used3696.213s. Across exact
+retained native reports,37 distinct newly added alpha test cases actually passed
+in1254.995s: measured inherited+added cohort4951.208s already exceeds the4200s
+aggregate stage allowance. Solar, new whole garden/gallery and remaining quarantine
+cases add further required execution. Receipt: alphaWT viewer/.cloudflare/
+alpha-browser-capacity-evidence.json (per-case durations/source reports retained).
+
+Allow5700s (95min) for the expanded serialized software-WebGL cohort. This is
+whole-suite capacity, not relaxed performance acceptance: original120s/15s/zero
+retry and special construction per-test deadlines, peak/mean/work ceilings,
+assertions/tolerances and golden pins remain. No take or outcome is re-recorded.
+The expanded clean combined gate is pending; failures still fail admission/release.

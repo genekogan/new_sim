@@ -1,12 +1,25 @@
 # Exposed Lab repair milestone
 
+Current verification: published40 and the alpha candidate use canonical2022
+contentHash9521eb1e… (fileSHAff666901…), byte-identical to published38/40. Candidate
+033f8cb actual automaticPlay passes both24/66-part builds throughs0021 and full
+completion, with supported identities, clean crew, zero violations and exact
+current-source Node boundary parity. The combined alpha gate/publication remain
+pending. [Scenario coverage](SCENARIO_COVERAGE.json) owns exact current proof;
+[release checklist](RELEASE_CHECKLIST.md) owns online/source status.
+
+The following original reports and all their “current/production” references are
+dated source-era evidence, not the latest configuration. Original four probe
+diagnostics, orphan-stance causes, old3/9staging refusals and W51 fidelity exclusions
+remain recoverable. PhaseB and animated aggregate extraction remain unproved.
+
 Owner report: 2026-09-30. This bounded correctness/usability milestone precedes
 purposeful communal-day routines; it does not restore LAST_MILE queue ordering.
 
 | ID | Reproduced cause | Repair and coverage contract | Status |
 | --- | --- | --- | --- |
 | PROBE-01 | Tick1: b0/b1/b2 at x13.8 overlap deck edge (0.15m clearance); g2 at15.2,10 overlaps stairs-b-body (0m). Initial tick0 never ran invariants. Existing pose sweeps never pressed Step. | Valid initial placements; normal Step/Play/reset; detached synthetic measurement poses must not mutate authoritative world. | Released in 23 |
-| BUILD-01 | Planner emits beam take/climbs before staging feasibility; rejected beam leaves m4/m5 on orphan stances, then s0021 attempts another climb. | Preflight before any acquisition/climb. Current layout has9 blocked whole-house beams /3 first-bay beams. Preserve admission and collision checks; expose named unsupported-layout diagnostic if no supported choreography exists. | Released orphan-climb repair; current layout unsupported |
+| BUILD-01 | Planner emits beam take/climbs before staging feasibility; rejected beam leaves m4/m5 on orphan stances, then s0021 attempts another climb. | Preflight before any acquisition/climb. Current layout has9 blocked whole-house beams /3 first-bay beams. Preserve admission and collision checks; expose named unsupported-layout diagnostic if no supported choreography exists. | Orphan-climb repair released; source-era layout unsupported. Current canonical phaseA automaticPlay passes, see notice above. |
 | PILE-01 | Aggregate uprights use catalog blue, extracted components use shared renderer frame palette. Count decreases when extraction completes and individual identity begins; no evidence of duplicate authoritative stock. | Shared renderer palette without historical-value edits. Validate count conservation, provenance and persistent identity/support through pickup/install. Extraction is currently an unanimated aggregate-to-individual transition, not individual pre-existing stack entities. | Released palette/identity proof; pull animation deferred |
 
 Original production reproduction: release22, viewer/e2e/artifacts/live-reported-original

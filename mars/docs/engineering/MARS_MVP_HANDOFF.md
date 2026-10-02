@@ -1,4 +1,23 @@
-> **Current direction (October2):** release37 is public at sim.mars.college with52
+# Current Mars entry and alpha handoff
+
+Use [the campus homepage](https://sim.mars.college/) for the museum and
+[the Lab](https://sim.mars.college/lab) for activities/connected runs. Current
+source/release/rollback and exact published validation live in
+[deployment metadata](../../viewer/deploy/deployment.json) and the
+[release checklist](RELEASE_CHECKLIST.md). The alpha candidate remains pending
+combined gate/publication; [scenario coverage](SCENARIO_COVERAGE.json) distinguishes
+actual Play, mixed/programmatic execution, retained failures and exclusions.
+
+For another agent: [INDEX](INDEX.md) → [AGENTS](../../AGENTS.md) →
+[ENGINE_GUIDE](ENGINE_GUIDE.md) → [LAB_GUIDE](LAB_GUIDE.md) and the
+[active roadmap](ACTIVE_ROADMAP.md). Reusable mechanisms may be forked into Eden
+after the accepted checkpoint; do not start Eden here. Active GUI save/load and
+rig migration remain deferred. Existing drafts/worktrees and other owners' paths
+must be preserved.
+
+## Dated MVP/living-world acceptance — release36/37 provenance
+
+> **Dated release37 notice (superseded above):** release37 is public at sim.mars.college with52
 > presets and69fresh publicPASS. Exact source `ca6bb5d1ed707f12fe9029720fbf1bdecc44f917`,
 > Worker `8c57ad5b-9dfd-46b2-9d60-47fdb021510f`, rollback36. Drawing/warm-up/jam,
 > artwork sharing/creative afternoon and cleanup are additional shipped vocabulary.
@@ -8,7 +27,7 @@
 
 # Mars MVP and living-world handoff — release36
 
-Start at [sim.mars.college](https://sim.mars.college/). The existing Lab opens
+For this dated walkthrough use [the Lab](https://sim.mars.college/lab). Choose
 `living-day-4`; choose **Start connected day**, then **Play**. For automatic
 coverage choose **Live camera → Clear** or **Restrained**. The quick tour and
 scenario selector expose all 45 individual/combined presets. Hypothetical staging

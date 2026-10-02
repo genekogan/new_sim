@@ -1,25 +1,11 @@
 # Lab play and inspection guide
 
-**Release40 is verified: [campus presentation](https://sim.mars.college/) is restored at `/`; [Engine Lab](https://sim.mars.college/lab) remains explicit at `/lab`.**
-Worker `bb946d3c-934d-4d2c-8d50-8ae74e087146`, functional source `05370e8c727d44e52e2db510f022dac53b748417`; rollback39
-`95a8f9a8-9d3c-4de4-8365-346fcf1df33d`. Exact bundle `main-CzMxBXeQ.js`.
-All nine clean gate stages PASS: engine1424 PASS/6 SKIP/11 TODO,
-deployment295 PASS, browser278 PASS/7 SKIP. Fresh bounded public repair proof:
-4 PASS/0 FAIL/0 SKIP/0 flaky/errors[]; default2026, valid2024 and invalid-year
-fallback homepage, plus explicit Lab Play/Pause/Reset and camera controls.
-63 presets/rules version `activities/29`; this repair does not claim all63 full-Play proof.
-Five public captures inspected, with root independently reviewing homepage and Lab.
-
-Gene lifted the temporary quota pause and authorized continued work after this
-verified homepage repair. Resume saved Mars World v1 alpha stabilization first:
-coverage/recovery, bounded performance and documentation, then useful activity
-expansion. Preserve unfinished workshop/library work; no automatic Eden work.
-Release39's activity proof and release38's entire current-house automatic Play remain
-separate source inheritance. Current gate year-build proof is automatic Play through
-s0021 followed by bounded programmatic full completion, not an entire automatic build.
-Skipped/TODO/FIXME remain unproved. Original gateway browser/campus.glb HEAD-length
-failure remains; no DNS/gateway change. Silent dialogue, current rigs/fine fingers,
-crop/HUD limits, no plant growth and independent garden-afternoon walks remain.
+Published checkpoint: [campus homepage](https://sim.mars.college/) at `/`,
+[Engine Lab](https://sim.mars.college/lab) at `/lab`. Exact current release/source,
+validation and rollback are authoritative in [deployment metadata](../../viewer/deploy/deployment.json)
+and the [latest release record](RELEASE_CHECKLIST.md). The alpha candidate is
+unreleased pending its combined gate/public verification; focused candidate proof
+is tracked in [scenario coverage](SCENARIO_COVERAGE.json), never inferred from smoke.
 
 ## Published room preparation, supper and garden circuit
 
@@ -102,9 +88,8 @@ entry facts preserve the same paused world and do not prove natural camera quali
 Current rigs/fine fingers, silent dialogue and cropped care vessels remain limits.
 Lower dated candidate notes retain authoring provenance; this publication notice
 supersedes their old not-public status. Room preparation/supper/garden circuit
-remain separate candidate `c8331ec`: 63 presets, rules version `activities/29`,
-185 focused Node checks and18 focused Play/camera-entry checks passed. Combined
-gate/public proof remain pending; these are not online release38 features.
+shipped in release39 and remain online at release40; their supported controls are
+in the table above. Dated release38 proof does not certify those later additions.
 
 ## Begin
 
@@ -112,8 +97,12 @@ Choose a Scenario in `/lab`, or use its Quick tour. Play advances authoritative
 20Hz simulation; Step advances one fixed tick; Pause freezes the whole world.
 Speed changes playback rate, not timestep. Reset or loading another scenario
 replaces the current world, including all retained intentions and object states.
-Continuous activity presets require their own Start control. Scripted movement
-and construction presets start their sequence through Play.
+Manually started activity presets require their own Start control. Scripted movement
+and construction presets start their sequence through Play. The alpha candidate
+separates authored terminal/refused/budget outcomes from the ongoing world clock;
+manual Pause still freezes intentionally. Its serious invariant/unknown-executor
+fault quarantine preserves inspection/camera and requires a fresh Reset; it does
+not attempt to continue uncertain state. See the [failure model](ENGINE_GUIDE.md#durable-failure-model-and-world-liveness-owner-mandate2026-10-02).
 
 Individual Pause/Interrupt requests safe physical cleanup while others continue.
 Keep Play running until cleanup finishes. Resume is explicit after intervention.
@@ -128,7 +117,7 @@ No active save/load or reload-restoration guarantee is provided.
 | --- | --- | --- |
 | `living-day-4`, `living-day-studio` | Start connected day: notes → gathering/questions/rotation/conversations → shared walk → cold preparation/two servings → sleep → same unfinished notes. Reader and carer have separate schedules; music/dance begins during rest. | Original worker or project assistant; room/auxiliary computer preferences with explicitly allowed alternative; Mars classroom or hypothetical independent studio. |
 | `prepared-day-4`, `prepared-day-8`, `prepared-day-studio` | Start notes, interrupt after progress, Start session, then Start purposeful routine during presentations. Optional attendee continuations retain separate discussion/follow-up work. | Authored room sizes/environment; eight-guest side layout requires physical setup described in the tour. |
-| `work-break-4`, `work-break-8` | Work, talks, shared food, quiet rest and return to the original project; separate guest continuations. | Two authored gathering sizes and furniture layouts. |
+| `work-break-4`, `work-break-8` | Direct work → talks/questions/discussions → shared food/utensil returns → same unfinished notes. | Two authored gathering sizes; optional routine/follow-up controls are separate from this proven direct flow. |
 | `design-studio` | Critique, questions, shared food and return to continuing projects. | Reuse of the same activity/object mechanisms in a non-Mars room. |
 
 Living-day controls show each person's purpose, progress, waiting reason and

@@ -3189,3 +3189,29 @@ source-bound alpha passes, retained failures/skips, noall63gate/publicacceptance
 Regenerated9UI contract rows from authoritative inventory, correcting directworkbreak
 to its actualwork/classroom/food/return flow and distinguishing boundedstress proof
 from indefinite liveness. Clean combined alpha gate/publication remain pending.
+
+## Alpha coverage/performance closure and candidate preparation — 2026-10-02
+
+Integrated b12e1ec metadata followup:36distinct source-bound candidate scenarios
+proved across focused runs, including current automatic2022builds, year2026, solar
+strictReset and fullsupportedbodyprobe contract; older failures/skips retained.
+Root regeneratedcontractparity remains green. Noall63currentgate/publicclaim.
+
+Bounded serialized published40 performance pass executed; measurements/limits and
+primary timer/cache references are canonical in briefs/performance-alpha.REPORT.md.
+Persistentprofile modelwarm transfer0B resolves isolated-context repeateddownload
+finding without changing delivery/assets. DirectWorker36tools/security and original
+isolatedstress/historical-grid performance budgets PASS. No frame/bundle rewrites.
+
+Candidate UI marks Mars World v1 alpha; this is unreleased pending clean combined
+gate/publicverification. Expanded aggregate browserstage95min follows measured
+4951.208s inherited+37new-pass workload; everyindividualdeadline/physicalassertion/
+performanceceiling/golden remains. See PLANNING_BUDGET, no pin or take moves.
+
+Candidate navigation cleanup removes duplicated release receipts in favor of canonical
+deployment/release/coverage links and explicitly dates old handoff instructions.
+Root inspected campus/design/living-day performance captures against paired receipts.
+TypeScript, zero-warning lint, registration parity and13 focused gate/lifetime checks
+PASS; main48other-owner paths preserved byte/mode/mtime/status, staged0. Candidate
+branding is local only until the frozen clean full gate and public verification.
+Evidence will regenerate from that gate’s exact engine execution before publication.

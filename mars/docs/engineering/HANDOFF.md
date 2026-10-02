@@ -2,9 +2,10 @@
 
 > Current resume entry: [engineering navigation](INDEX.md), [active roadmap](ACTIVE_ROADMAP.md)
 > and newest [progress](PROGRESS.md)/[release receipt](RELEASE_CHECKLIST.md).
-> Release35 is public; the October2 living-world tranche remains locally validated,
-> pending combined gate/publication. Check deployment metadata before acting.
-> Numbered checkpoints below describe their dates, not the latest branch state.
+> Publication status is authoritative in [deployment metadata](../../viewer/deploy/deployment.json).
+> Release40 restores the campus homepage at `/`; simulation entry is `/lab`.
+> Alpha stabilization is a later unpublished candidate, not the old release35 queue.
+> Numbered checkpoints and branch lists below describe their dates, not current instructions.
 
 > **Current product direction — Gene, 2026-09-29:** read
 > [SIMULATION_VISION.md](SIMULATION_VISION.md), then
