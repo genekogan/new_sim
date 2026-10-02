@@ -206,7 +206,7 @@ async function wait(p: Page, phase: Phase) {
       if (phase === 'meal-transfer')
         return (
           a.stage === 'storing-mealware' &&
-          a.cleanup.some((c) => c?.current?.held)
+          a.cleanup.some((c) => c?.current?.held && c.completed.length >= 1)
         );
       if (phase === 'meal-stored')
         return a.cleanup.some(
@@ -256,7 +256,11 @@ function errors(p: Page) {
 }
 test.afterEach(async ({ page }, info) => {
   mkdirSync(directory, { recursive: true });
-  const name = info.title.startsWith('retained') ? 'retained' : 'end-reset';
+  const name = info.title.startsWith('retained')
+    ? 'retained'
+    : info.title.startsWith('retry')
+      ? 'end-retry'
+      : 'end-reset';
   if (info.status !== info.expectedStatus) {
     try {
       await capture(page, `${name}-failure`, 'conversation');
@@ -495,6 +499,34 @@ test('retained preparation and consumed meal continue to actual seven-vessel sto
   );
   conserved(transferring);
   expect(read(transferring).cleanup.some((c) => c?.current?.held)).toBe(true);
+  const heldCleanup = read(transferring).cleanup.find((c) => c?.current?.held)!;
+  const heldTransfer = heldCleanup.current!;
+  expect(heldCleanup.completed.length).toBeGreaterThanOrEqual(1);
+  await button(page, 'Pause supper').click();
+  await play(page);
+  await wait(page, 'paused');
+  const cleanupPaused = await capture(
+    page,
+    'retained-held-cleanup-safe-local-pause',
+    'meal-table',
+  );
+  conserved(cleanupPaused);
+  const pausedCleanup = read(cleanupPaused).cleanup.find(
+    (c) => c?.task === heldCleanup.task,
+  )!;
+  expect(pausedCleanup.mode).toBe('paused');
+  expect(pausedCleanup.completed).toEqual(heldCleanup.completed);
+  expect(read(cleanupPaused).current).toBe(heldCleanup.task);
+  expect(item(cleanupPaused, heldTransfer.item).support).toEqual({
+    kind: 'resting-on',
+    on: heldTransfer.from.split('#')[0],
+    slot: heldTransfer.from.split('#')[1],
+  });
+  expect(cleanupPaused.held.some((h) => h.id === heldTransfer.item)).toBe(
+    false,
+  );
+  await button(page, 'Resume supper').click();
+  expect(read(await inspect(page)).current).toBe(heldCleanup.task);
   await play(page);
   await wait(page, 'meal-stored');
   const mealStored = await capture(
@@ -503,6 +535,14 @@ test('retained preparation and consumed meal continue to actual seven-vessel sto
     'ware-store',
   );
   conserved(mealStored);
+  const completedCleanup = read(mealStored).cleanup.find(
+    (c) => c?.task === heldCleanup.task,
+  )!;
+  expect(completedCleanup.finished).toBe(true);
+  expect(
+    completedCleanup.completed.slice(0, heldCleanup.completed.length),
+  ).toEqual(heldCleanup.completed);
+
   for (const t of read(mealStored).bindings.cleanup[0].transfers)
     expect(item(mealStored, t.item).support).toEqual({
       kind: 'resting-on',
@@ -654,6 +694,155 @@ test('end before first step and held meal draining preserve material without orp
   });
   expect(reset.entities.map((e) => e.id).sort()).toEqual(
     held.entities.map((e) => e.id).sort(),
+  );
+  expect(consoleErrors).toEqual([]);
+});
+test('retry End after ordinary return cancellation retains history and safely returns the same remaining utensils', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const consoleErrors = errors(page);
+  await setup(page);
+  await button(page, 'Start supper').click();
+  await play(page);
+  await wait(page, 'partial-preparation');
+  await wait(page, 'prepared');
+  await wait(page, 'served');
+  const served = await capture(
+    page,
+    'end-retry-actual-held-meal-material',
+    'conversation',
+  );
+  conserved(served);
+  expect(read(served).held.map((h) => h.items.length)).toEqual([2, 2]);
+  const materials = read(served).items.map((e) => ({
+    id: e!.id,
+    def: e!.def,
+    contents: e!.contents,
+    provenance: e!.provenance,
+  }));
+  const leaves = served.records
+    .filter((r) => ['prepare_food', 'serve', 'eat'].includes(r.verb))
+    .map((r) => r.id);
+  await button(page, 'End supper').click();
+  await play(page);
+  await page.waitForFunction(
+    () => {
+      const a = (window.__marsEngine as SupperHook).communalSupper();
+      return (
+        a?.mode === 'ending' &&
+        a.returnAttempts.some(
+          (r) =>
+            r?.verb === 'stow_items' &&
+            !['completed', 'cancelled', 'failed'].includes(r.status),
+        )
+      );
+    },
+    undefined,
+    { timeout: 15_000 },
+  );
+  const returning = await capture(
+    page,
+    'end-retry-real-ordinary-stow-before-cancellation',
+    'meal-table',
+  );
+  const attempt = read(returning).returnAttempts.find(
+    (r) =>
+      r?.verb === 'stow_items' &&
+      !['completed', 'cancelled', 'failed'].includes(r.status),
+  )!;
+  expect(attempt.parent).toBe(read(returning).action);
+  expect(read(returning).held.some((h) => h.items.length > 0)).toBe(true);
+  const cancelled = await page.evaluate(
+    (id) => window.__marsEngine.cancelAction(id),
+    attempt.id,
+  );
+  expect(cancelled.id).toBe(attempt.id);
+  await play(page);
+  await page.waitForFunction(
+    (id) => {
+      const h = window.__marsEngine as SupperHook,
+        a = h.communalSupper();
+      const r = h.records().find((r) => r.id === id),
+        parent = h.records().find((r) => r.id === a?.action);
+      return (
+        r?.status === 'cancelled' &&
+        a?.mode === 'ending' &&
+        parent?.diagnostic?.code === 'communal_supper.return-stopped' &&
+        a.returnAttempts.every(
+          (r) => r && ['completed', 'cancelled', 'failed'].includes(r.status),
+        )
+      );
+    },
+    attempt.id,
+    { timeout: 15_000 },
+  );
+  const stopped = await capture(
+    page,
+    'end-retry-drained-stopped-attempt-and-real-held-ownership',
+    'meal-table',
+  );
+  conserved(stopped);
+  expect(read(stopped).finished).toBe(false);
+  expect(read(stopped).held.some((h) => h.items.length > 0)).toBe(true);
+  expect(
+    read(stopped).returnAttempts.find((r) => r?.id === attempt.id)?.status,
+  ).toBe('cancelled');
+  await expect(
+    page.getByTestId('communal-supper-return-attempts'),
+  ).toContainText(attempt.id);
+  await expect(
+    page.getByTestId('communal-supper-return-attempts'),
+  ).toContainText('cancelled');
+  await expect(page.getByTestId('communal-supper-diagnostic')).toContainText(
+    'communal_supper.return-stopped',
+  );
+  await expect(button(page, 'End supper')).toBeEnabled();
+  await button(page, 'End supper').click();
+  await play(page);
+  await wait(page, 'ended');
+  const final = await capture(
+    page,
+    'end-retry-same-remaining-utensils-returned-and-history-retained',
+    'meal-table',
+  );
+  conserved(final);
+  released(final);
+  expect(read(final).finished).toBe(false);
+  expect(
+    read(final).items.map((e) => ({
+      id: e!.id,
+      def: e!.def,
+      contents: e!.contents,
+      provenance: e!.provenance,
+    })),
+  ).toEqual(materials);
+  expect(
+    read(final).returnAttempts.find((r) => r?.id === attempt.id)?.status,
+  ).toBe('cancelled');
+  expect(
+    read(final).returnAttempts.filter((r) => r?.status === 'completed').length,
+  ).toBeGreaterThanOrEqual(1);
+  expect(
+    read(final).returnAttempts.some(
+      (r) => r?.id !== attempt.id && r?.status === 'completed',
+    ),
+  ).toBe(true);
+  for (const role of read(final).bindings.meal.participants)
+    for (const t of role.returns)
+      expect(item(final, t.item).support).toEqual({
+        kind: 'resting-on',
+        on: 'meal-table',
+        slot: t.surfaceSlot.split('#')[1],
+      });
+  expect(
+    final.records
+      .filter((r) => ['prepare_food', 'serve', 'eat'].includes(r.verb))
+      .map((r) => r.id),
+  ).toEqual(leaves);
+  expect(final.records.filter((r) => r.verb === 'tidy_table')).toEqual([]);
+  await expect(page.getByTestId('communal-supper-state')).toContainText(
+    'ended',
   );
   expect(consoleErrors).toEqual([]);
 });

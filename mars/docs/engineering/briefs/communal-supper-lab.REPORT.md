@@ -43,7 +43,7 @@ stages a fresh hypothetical world.
 
 ## Authored acceptance journeys — unexecuted
 
-Two actualPlay tests use a fixed ordinary 4x speed, 120-second whole-test limit,
+Three actualPlay tests now use a fixed ordinary 4x speed, 120-second whole-test limit,
 15-second named phase waits, retries zero and fresh load/Reset/readiness Step.
 After readiness, all preparation, eating, turns, cleanup and safe stopping advance
 through actual Play. No programmatic stepping, runtime pose/material writes,
@@ -108,3 +108,32 @@ The browser remains unexecuted in this lane; root owns the serialized release38 
 
 Follow-up validation: viewer TypeScript, focused type-aware lint, formatting and
 diff whitespace checks all passed. No browser, performance or Node rerun was made.
+
+
+## Authored cleanup Pause and stopped End retry acceptance follow-up
+
+The existing retained journey now waits for a genuine held mealware transfer after
+at least one completed placement. It clicks local Pause, keeps ordinary Play running
+for safe support on that transfer's declared source slot, checks the same tidy task
+ID and unchanged completed history, then clicks Resume and proves the same task
+finishes with its prior completed prefix retained. This adds a supported cleanup Pause capture without
+changing 4x speed, the original 120-second total deadline, 15-second phase waits or
+final exact material/support/identity/claim assertions.
+
+A third narrowly scoped actualPlay case prepares and serves the original finite
+material, clicks End, and observes an **actual active End-owned stow_items record**.
+It calls the existing `__marsEngine.cancelAction(attemptId)` normal safety command,
+then advances Play until the attempt is terminal cancelled and the parent reports
+`communal_supper.return-stopped`. Captures and UI assertions require the old attempt
+row, its cancelled status, real remaining held utensils and the named diagnostic.
+Pressing the existing End button explicitly retries; final assertions require the
+same remaining utensils on exact approved meal return slots, unchanged material/
+definition/provenance, retained original cancelled attempt plus successful later
+returns, no extra preparation/serve/eat records, no tidy stage, zero held/actions/
+claims/violations, and ended rather than finished status. The case has its own
+failure/result receipt names so it cannot overwrite the original End/Reset proof.
+
+All three browser cases remain **authored, not executed**. No admission bypass,
+raw state writes, alternate executor, browser/performance run or weakened assertion
+was introduced. Strict e2e TypeScript with project libraries, viewer TypeScript,
+focused type-aware lint, formatting and diff checks passed for this follow-up.
