@@ -26,7 +26,7 @@ export class LabSim {
   speed = 1;
   /** Changes on every successful world load, including same-id/same-tick resets. */
   scenarioEpoch = 0;
-  /** Recorded invariant corruption requires a fresh load; Play and Step cannot bypass it. */
+  /** Invariant corruption or unexpected host/executor fault requires a fresh load. */
   halted: Diagnostic | null = null;
   scriptStopReason: 'admission-refused' | 'terminal' | 'budget' | null = null;
   private scriptFinished = false;
@@ -56,24 +56,34 @@ export class LabSim {
     this.routes.clear();
     this.acc = 0;
     this.rt.observers.push({ onEvent: (_rt, e) => this.record(e) });
-    this.onReset(this.rt);
-    // A custom build may already have stepped; do not dispatch into recorded corruption.
     this.seen = 0;
-    this.harvest();
-    this.containViolations();
-    if (this.halted) return;
-    const refusal = s.admission?.(this.rt);
-    if (refusal) {
-      const line: LogLine = { tick: 0, level: 'warn', text: `${refusal.code}: ${refusal.message}` };
-      this.log.push(line);
-      this.diagnostics.push(line);
-      this.scriptFinished = true;
-      this.scriptStopReason = 'admission-refused';
-    } else s.start(this.rt);
-    this.finishScriptIfDone();
-    // violations are pushed to rt.events without an observer callback
-    this.harvest();
-    this.containViolations();
+    let phase = 'lab.onReset';
+    try {
+      this.onReset(this.rt);
+      // A custom build may already have stepped; do not dispatch into recorded corruption.
+      this.harvest();
+      this.containViolations();
+      if (this.halted) return;
+      phase = 'scenario.admission';
+      const refusal = s.admission?.(this.rt);
+      if (refusal) {
+        const line: LogLine = { tick: 0, level: 'warn', text: `${refusal.code}: ${refusal.message}` };
+        this.log.push(line);
+        this.diagnostics.push(line);
+        this.scriptFinished = true;
+        this.scriptStopReason = 'admission-refused';
+      } else {
+        phase = 'scenario.start';
+        s.start(this.rt);
+      }
+      phase = 'scenario.done';
+      this.finishScriptIfDone();
+      // violations are pushed to rt.events without an observer callback
+      this.harvest();
+      this.containViolations();
+    } catch (error) {
+      this.containExecutorFault(phase, error);
+    }
   }
 
   private seen = 0;
@@ -119,27 +129,74 @@ export class LabSim {
     this.acc = 0;
   }
 
+  private executorFaulted() { return this.halted?.code === 'lab.executor-fault'; }
+
+  private containExecutorFault(phase: string, error: unknown) {
+    if (this.executorFaulted()) return;
+    const priorHalt = this.halted;
+    let name = 'NonErrorThrow', message: string, stack: string | null = null;
+    try {
+      if (error instanceof Error) {
+        name = String(error.name);
+        message = String(error.message);
+        const trace = error.stack;
+        stack = typeof trace === 'string' ? trace : null;
+      } else message = String(error);
+    } catch {
+      message = 'thrown value could not be safely described';
+    }
+    const diagnostic: Diagnostic = {
+      code: 'lab.executor-fault',
+      message: `${phase} threw ${name}: ${message} at tick ${this.rt.tick}; partial execution state is unknown; reset to a fresh world before stepping`,
+      subjects: [this.scenario.name],
+      details: { phase, scenario: this.scenario.name, tick: this.rt.tick, name, message, stack, state: 'unknown-partial-execution' },
+    };
+    if (priorHalt) priorHalt.details = { ...priorHalt.details, executorFault: diagnostic.details };
+    else this.halted = diagnostic;
+    const line: LogLine = { tick: this.rt.tick, level: 'error', text: `${diagnostic.code}: ${diagnostic.message}${stack ? `\n${stack}` : ''}` };
+    this.log.push(line);
+    this.diagnostics.push(line);
+    // Preserve actual world/records/claims; cancellation or rollback cannot be certified here.
+    this.acc = 0;
+  }
+
   /** One authoritative tick, even after the authored script ends; manual Step ignores UI Pause. */
   step() {
-    this.harvest();
-    this.containViolations();
-    if (this.halted) return;
-    this.finishScriptIfDone();
-    const t0 = performance.now();
-    this.rt.step();
-    this.harvest();
-    this.containViolations();
-    // Terminal outcome/budget stops authored dispatch, not ordinary runtime children.
-    // Custom sequences can still poll their final child until their own done() becomes true.
-    this.finishScriptIfDone();
-    if (!this.halted && !this.scriptFinished) this.scenario.tick?.(this.rt);
-    this.finishScriptIfDone();
-    this.costs.push(performance.now() - t0);
-    if (this.costs.length > 2000) this.costs.splice(0, 1000);
-    this.harvest();
-    this.containViolations();
-    this.watchRoutes();
-    this.onTick(this.rt);
+    let phase = 'lab.events';
+    try {
+      this.harvest();
+      this.containViolations();
+      if (this.halted) return;
+      phase = 'scenario.done';
+      this.finishScriptIfDone();
+      if (this.halted) return;
+      const t0 = performance.now();
+      phase = 'runtime.step';
+      this.rt.step();
+      phase = 'lab.events';
+      this.harvest();
+      this.containViolations();
+      // Terminal outcome/budget stops authored dispatch, not ordinary runtime children.
+      // Custom sequences can still poll their final child until their own done() becomes true.
+      phase = 'scenario.done';
+      this.finishScriptIfDone();
+      if (this.executorFaulted()) return;
+      phase = 'scenario.tick';
+      if (!this.halted && !this.scriptFinished) this.scenario.tick?.(this.rt);
+      phase = 'scenario.done';
+      this.finishScriptIfDone();
+      if (this.executorFaulted()) return;
+      this.costs.push(performance.now() - t0);
+      if (this.costs.length > 2000) this.costs.splice(0, 1000);
+      this.harvest();
+      this.containViolations();
+      phase = 'lab.routes';
+      this.watchRoutes();
+      phase = 'lab.onTick';
+      this.onTick(this.rt);
+    } catch (error) {
+      this.containExecutorFault(phase, error);
+    }
   }
 
   private routes = new Map<string, Route>();
@@ -176,7 +233,11 @@ export class LabSim {
   }
 
   pending() {
-    if (this.scenario.done) return !this.scenario.done(this.rt);
+    if (this.halted) return true;
+    if (this.scenario.done) {
+      try { return !this.scenario.done(this.rt); }
+      catch (error) { this.containExecutorFault('scenario.done', error); return true; }
+    }
     return [...this.rt.records.values()].some((r) => !TERMINAL.has(r.status));
   }
   overBudget() {
@@ -184,14 +245,20 @@ export class LabSim {
   }
   /** Authored script result/budget only; this does not stop the usable world clock. */
   done() {
-    return this.scriptFinished || (this.scenario.continuous ? this.overBudget() : !this.pending() || this.overBudget());
+    if (this.halted) return false;
+    const finished = this.scriptFinished || (this.scenario.continuous ? this.overBudget() : !this.pending() || this.overBudget());
+    return !this.halted && finished;
   }
 
   checks(): Check[] {
-    const c = this.scenario.expect(this.rt);
-    if (this.halted) c.unshift({ ok: false, message: `${this.halted.code}: ${this.halted.message}` });
+    // A quarantined callback/state is not safe to re-enter merely to refresh the UI.
+    const haltedCheck = (): Check[] => [{ ok: false, message: `${this.halted!.code}: ${this.halted!.message}` }];
+    if (this.halted) return haltedCheck();
+    let c: Check[];
+    try { c = [...this.scenario.expect(this.rt)]; }
+    catch (error) { this.containExecutorFault('scenario.expect', error); return haltedCheck(); }
     if (!this.scenario.continuous && this.pending()) c.unshift({ ok: false, message: `still running at tick ${this.rt.tick}` });
-    return c;
+    return this.halted ? haltedCheck() : c;
   }
 
   stats() {
