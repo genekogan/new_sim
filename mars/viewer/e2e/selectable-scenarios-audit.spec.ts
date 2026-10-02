@@ -93,7 +93,7 @@ async function snapshot(page: Page) {
       violations: h.violations(),
       admission: h.yearBuild()?.admission ?? null,
       diagnostics: h.sequence().diagnostics,
-      cameraError: h.error ?? null,
+      cameraError: h.error,
     };
   });
 }
@@ -103,7 +103,7 @@ function assertSafety(s: Snapshot, name: string) {
   expect(s.state.paused, 'smoke never silently runs the journey').toBe(true);
   // Intentional action refusals never excuse authoritative invariant violations.
   expect(s.violations, `${name}: authoritative violations`).toEqual([]);
-  expect(s.cameraError, `${name}: renderer/bootstrap error`).toBeNull();
+  expect(s.cameraError, `${name}: renderer/bootstrap error`).toBe('');
 }
 function assertDiagnostics(s: Snapshot, mode: Mode, name: string) {
   if (s.admission) {
