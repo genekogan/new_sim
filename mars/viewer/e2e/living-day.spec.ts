@@ -22,12 +22,18 @@ for(const [scenario,worker,workstation] of [['living-day-4','original','preferre
   await page.waitForFunction(()=>{const r=window.__marsEngine.reading();return !('code'in r)&&r.elapsed>1&&r.elapsed<5;});
   await button('Pause').click();
   const initial=await day(),beforeReader=await page.evaluate(()=>window.__marsEngine.reading());
-  await button('Direct reader away').click();await button('Play').click();
-  await page.waitForFunction(()=>{
+  await button('Direct reader away').click();
+  const direction=await page.evaluate(()=>window.__marsEngine.records().filter(r=>{
+    const p=r.params as {actor?:string;x?:number;z?:number};
+    return r.verb==='walk_to'&&!r.parent&&p.actor==='reader'&&p.x===14&&p.z===7;
+  }).at(-1)!);
+  expect(direction).toBeDefined();expect(direction.status).not.toBe('failed');
+  await button('Play').click();
+  await page.waitForFunction(id=>{
    const h=window.__marsEngine,reader=h.livingDay()?.intentions.find(i=>i?.actor==='reader');
-   const direction=h.records().filter(r=>r.verb==='walk_to'&&!r.parent&&(r.params as {actor?:string}).actor==='reader').at(-1);
+   const direction=h.records().find(r=>r.id===id);
    return reader?.mode==='paused'&&direction?.status==='completed';
-  });
+  },direction.id);
   await button('Pause').click();const readerPaused=await day(),bookmark=await page.evaluate(()=>window.__marsEngine.reading());
   expect('code'in bookmark).toBe(false);if('code'in bookmark)throw Error(bookmark.message);
   expect(bookmark.status).toBe('unfinished');expect(bookmark.elapsed).toBeGreaterThan(0);
@@ -59,7 +65,7 @@ for(const [scenario,worker,workstation] of [['living-day-4','original','preferre
   await page.waitForFunction(()=>window.__marsEngine.purposefulRoutine()?.mode==='paused');
   await button('Pause').click();const sleepPaused=await routine();
   expect(sleepPaused.sleep!.action).toBe(sleeping.sleep!.action);expect(sleepPaused.sleep!.elapsed).toBe(sleeping.sleep!.elapsed);
-  expect(await page.evaluate(id=>window.__marsEngine.bones(id)[id].prone,sleeping.bindings.actor)).toBeUndefined();
+  expect(await page.evaluate(id=>window.__marsEngine.bones(id)[id].prone,sleeping.bindings.actor)).toBeNull();
   await button('Play').click();
   await page.waitForFunction(()=>{
     const h=window.__marsEngine,m=h.livingDay()?.musicState;
