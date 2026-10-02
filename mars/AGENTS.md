@@ -1,20 +1,19 @@
 # Mars Studio agent context
 
-## Mars MVP published — stop feature expansion
+## Verified release35 checkpoint — owner review pending
 
-The owner-approved bounded MVP is complete at **release35**, functional source
-`9958ed4a97f2cb5c7189ea7796b6502a0b9910de`, published 2026-10-02.
-Public entry: **https://mars.college/simulation**. The final clean full gate,
-public acceptance, source inheritance, inspected captures, limitations and rollback
-are recorded in [MARS_MVP_HANDOFF.md](docs/engineering/MARS_MVP_HANDOFF.md) and
-[RELEASE_CHECKLIST.md](docs/engineering/RELEASE_CHECKLIST.md).
+Release35 remains the tested public engine checkpoint, functional source
+`9958ed4a97f2cb5c7189ea7796b6502a0b9910de`. The owner rejected the added
+mars.college/simulation page and requested its removal; do not recreate that page
+or another website entry without an explicit request. Existing public Worker/Lab
+continues unchanged. The earlier MVP-complete declaration is superseded: the owner
+is reviewing the next improvement tranche before calling the MVP complete.
 
-**Stop Mars feature expansion. Do not begin Eden automatically.** Further feature
-work requires a new explicit owner request. Preserve all existing other-owner work,
-legacy inventory and deferred branches; do not treat parked/skipped checks as proof.
-The handoff defines the accepted bounded scope and supersedes earlier open queues,
-allocation percentages and forecasts below. The broader vision remains direction,
-not authorization to implement Eden or reopen the Mars tranche.
+Do not begin Eden or start an unapproved feature tranche. Existing gates, receipts,
+safeguards, backlog and other-owner work remain preserved. See
+[ACTIVE_ROADMAP.md](docs/engineering/ACTIVE_ROADMAP.md) for the proposed next tranche;
+proposals are not implementation authorization. The handoff's original acceptance
+records remain evidence for release35, not a claim of final owner acceptance.
 
 The lasting product direction is **a playable, reusable simulation of life at Mars**.
 Read `docs/engineering/SIMULATION_VISION.md` and `ACTIVE_ROADMAP.md` before selecting

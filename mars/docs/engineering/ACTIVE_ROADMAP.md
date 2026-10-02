@@ -1,25 +1,35 @@
-# Mars MVP — accepted and published
+# Release35 checkpoint — next tranche under owner review
 
-The closing contract is complete at **release35**, functional source
-`9958ed4a97f2cb5c7189ea7796b6502a0b9910de`. Public entry:
-**https://mars.college/simulation**. Website source `1e3f005630bb9ea5aafb339904244c315b3df9a4`.
+The public Worker/Lab remains release35, functional source `9958ed4`.
+Owner rejected mars.college/simulation; page/footer removal supersedes the original
+website entry decision. Do not recreate or replace it without explicit instruction.
+The prior MVP-complete declaration is withdrawn pending owner review. Preserve
+all exact-source validation and existing activity capabilities.
 
-**Active feature queue: empty. Stop Mars expansion; do not begin Eden.**
-The [final handoff](MARS_MVP_HANDOFF.md) records family/disruption acceptance,
-supported counts/layouts/capabilities, exact receipts and limitations. Further
-feature work requires a new explicit owner request. Preserve deferred work in
-[RAINY_DAY_BACKLOG.md](RAINY_DAY_BACKLOG.md); no row audit or completion-score claim.
+## Proposed next bounded tranche — not yet commissioned
 
-The full nine-stage clean gate passed before functional integration; fresh public
-sleep/day/stair/busy-computer checks passed8/8, assets/MCP/director passed, and
-website/footer/three-day navigation were verified. Six engine skips, eleven TODOs
-and seven browser skips remain unproved and outside accepted featured journeys.
-Live Pause/Resume is supported; active-session reload restoration is not. Meals
-are finite cold preparation; sleep uses one ground mat/current rigs; rooms are
-authored4/8 layouts. See handoff before interpreting older scope below.
+Make the current activities behave more like an intervenable world, rather than
+adding more preset demonstrations. A planning hypothesis is12–20workinghours,
+including integration/validation, with scope and confidence to be checked at start.
 
-Remaining implementation hours for the accepted MVP: **0**. The 24-hour closing
-window ended2026-10-03 01:31UTC; publication and final proof completed beforehand.
+1. Independent intentions for a small population using existing work, reading,
+   food/rest and social mechanisms: bounded authored choices/commitments,
+   staggered transitions, interruption and return to unfinished purpose.
+2. Bind an existing gathering/day to selected people and eligible existing objects;
+   local resource changes adjust only affected commitments. Reuse existing claims,
+   diagnostics and recovery; do not introduce a universal planner or new mover.
+3. Improve /lab live controls and social readability: compact participant/intent/
+   waiting readouts, direct/pause/resume handoff, floor/gaze and newcomer timing.
+   No public marketing page, camera expansion or rig migration.
+
+Exit: one small continuously playable day with independent commitments, two
+supported configurations, representative intervention and disruptions, finite
+resources/no leaked ownership, actualPlay capture inspection and fullgate/public
+verification. This is a proposal, not a fixed promise or approved scope.
+
+Follow-on alternative: bounded active save/load of existing day/preparation/sleep.
+Existing quiescent snapshots/takes do not restore those live coordination stores;
+validate codecs, claims and restoration before promising reload continuity.
 
 ## Earlier five-day contract and checkpoint provenance
 

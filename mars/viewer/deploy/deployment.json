@@ -49,7 +49,7 @@
     "source_commit": "7648dbf plus isolated current historical working snapshot"
   },
   "deployed_at": "2026-10-02T02:39:46.918Z",
-  "status": "Mars MVP complete: exact-source full gate, public35 engine/assets/MCP/director and Mars website entry/navigation verified",
+  "status": "verified release35 engine checkpoint; final MVP acceptance pending owner review",
   "production_verification": {
     "assets": 522,
     "html_routes": 24,
@@ -72,8 +72,5 @@
   "photo_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/photo",
   "draft_2027_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2027",
   "presentation_2027_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/?year=2027",
-  "website_url": "https://mars.college/simulation",
-  "website_source_commit": "1e3f005630bb9ea5aafb339904244c315b3df9a4",
-  "website_deployment": "https://mars-v2-pweg6frsu-gene-kogans-projects.vercel.app",
-  "website_verification": "../.cloudflare/release35-website-public/receipt.json"
+  "website_entry_disposition": "owner requested added /simulation page and footer removal; do not recreate"
 }

@@ -1,3 +1,9 @@
+> Superseded owner disposition: release35 is a verified checkpoint, but the owner
+> has not accepted the MVP as complete and requested removal of the added
+> mars.college/simulation page/footer. Original publication evidence below is
+> historical; the Worker/Lab remains live unchanged. Do not recreate the website
+> entry or start the proposed next tranche without instruction. See ACTIVE_ROADMAP.
+
 # Mars MVP handoff — verified bounded acceptance and publication
 
 The bounded runtime contract is accepted against the final source and representative
