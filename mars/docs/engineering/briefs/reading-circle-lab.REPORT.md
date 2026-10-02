@@ -145,3 +145,20 @@ visible bounds while the same mesh root position/quaternion and authoritative
 pose/support remain exact. Both focused regressions PASS; original actualPlay
 failures/traces remain retained. Later interruption/turn/End/resume/completion and
 resource cleanup expectations are unchanged and need a fresh actualPlay run.
+
+
+## Paused floor-transition precondition — October2
+
+75aa970 actualPlay batch3PASS/1FAIL: both complete garden layouts and rotated
+reading End/restart/cleanup pass. Default recording an answer effect then froze
+at tick544 while reader's ordinary stand-up/floor release remained active; it clicked
+a disabled Floor listener-1 until the original120s case deadline. The listener
+had not yet regained an occupied hold, so existing admission correctly returned
+reading_circle.not-listening. Zero violations, valid retained answer and supports.
+A fresh Sol6.1 reviewer independently confirmed source/trace/state diagnosis.
+
+Test now resumes actualPlay before waiting for the existing Floor control's valid
+enabled state, then issues the same ordinary Floor/Leave/direction/resume/completion
+sequence. Original15s assertion and120s case limits, zero retries and all later
+expectations remain. No production action/HUD change, forced click or support bypass.
+Fresh default-only actualPlay remains required; prior failures/traces are preserved.

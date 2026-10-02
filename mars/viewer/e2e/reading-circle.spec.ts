@@ -330,6 +330,10 @@ test('default actual Play: exact partial bookmark Pause-Resume, declared Join-Le
         e.actor === 'listener-2' && e.kind === 'answer' && e.replyTo === qi,
     ),
   ).toBe(true);
+  // Recording the answer precedes ordinary floor-release/reoccupation. Let
+  // that physical transition finish before asking an eligible listener to speak.
+  await play(page);
+  await expect(button(page, 'Floor listener-1')).toBeEnabled();
   await button(page, 'Floor listener-1').click();
   await controlsDone(page);
   await button(page, 'Leave listener-3').click();

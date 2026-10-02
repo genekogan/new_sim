@@ -2453,3 +2453,16 @@ phase15s and overall120s/retries0 remain; original failure states showed normal
 active care, complete book/planted bed and zero violations. No speed/layout/support/
 material/outcome changes. Fresh reading/garden actualPlay pending serialized lane.
 Publication37 metadata/docs inherited; all future paths stay unshipped.
+
+
+### Actual garden completion and reading floor transition — October2
+
+75aa970 actual4-casePlay finishes3PASS/1FAIL4min: garden both41.4/45s pass physical
+same-purpose seedreturn, actual finitewaterdeposit, book24completion, allcleanup,
+pre-firsttickEnd and Reset; rotatedreading Endpartial/newcircle exactbookmark and
+completion passes. Root personally inspects bothwatering and finalgarden captures.
+Default reading records questions/answers then authored globalfreeze strands its
+pending ordinary floor-release. Fresh Sol6.1 review confirms zero violations and
+correct disabled Flooradmission until listener reacquires occupiedhold. Add explicit
+Play/enabled precondition with unchanged120s/15s/retries0/laterexpectations. No
+production repair required. Default-only actualPlay pending; original3/1 preserved.
