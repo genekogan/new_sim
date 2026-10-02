@@ -22,28 +22,26 @@
       "conditional-construction": 2
     },
     "recordedCoverageGrades": {
-      "recorded-actual-ui-play": 56,
+      "recorded-actual-ui-play": 58,
       "recorded-exact-diagnostic": 1,
       "recorded-ui-play-bounded-liveness": 1,
       "recorded-still-probe": 1,
-      "recorded-programmatic-effects-or-completion": 2,
       "recorded-actual-ui-play-supported-layout": 2
     },
     "exactCurrentSourceNativeFullGatePassed": false,
     "exactFunctionalInheritedFocusedUiJourneys": 3,
     "sustainedLivenessProven": 1,
-    "current39Gate": "Historical39 state preserved in proof refs; alpha033 combined native gate/public validation pending.",
-    "countMeaning": "Recorded source-bound historical/candidate coverage grades, not63 current-release accepted presets. Alpha native failures/skips retained; current entire yearbuild, solar/year2026 targeted and final gate/public proof pending.",
+    "current39Gate": "Historical39 state preserved; completed targeted alpha receipts do not establish final combined native gate/public validation.",
+    "countMeaning": "Recorded source-bound historical/candidate coverage grades, not63 current-release accepted presets.36 distinct alpha-recorded passes span named sources through9a543c1; earlier failures/skips retained. Final combined gate/public proof pending.",
     "sustainedLivenessMeaning": "One bounded stress30 witness through tick2017; not indefinite liveness.",
-    "reconciledAtSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
-    "alphaRecordedPassedScenarioCount": 31,
+    "reconciledAtSource": "c09a8bf77fe909c7639aabc089375be81fec63bc",
+    "alphaRecordedPassedScenarioCount": 36,
     "alphaRecordedManualPassed": 8,
     "alphaRecordedAdditionalManualFullJourneys": 2,
-    "alphaRecordedScriptedPassed": 19,
-    "alphaPendingTargetedScenarios": [
-      "solar-paint",
-      "year-2026"
-    ]
+    "alphaRecordedScriptedPassed": 21,
+    "alphaPendingTargetedScenarios": [],
+    "alphaRecordedConditionalConstructionPassed": 2,
+    "alphaRecordedSupportedProbePassed": 1
   },
   "proofKinds": [
     "actual-ui-play-journey",
@@ -390,6 +388,80 @@
         "passed": 5
       },
       "exactCaseNamesInReport": true
+    },
+    "alphaYear2026": {
+      "kind": "native-local-focused-browser",
+      "source": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-year2026-reset-033f8cb-completed/alpha-year2026-reset-results.json",
+      "sha256": "f770fd8a66b973d0e32112854f8ead70b1cab7c304c74d44003cfafe73b4930e",
+      "result": {
+        "startTime": "2026-10-02T21:24:49.823Z",
+        "duration": 103491.808,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "caseStatusCounts": {
+        "passed": 1
+      },
+      "exactCaseNamesInReport": true,
+      "currentSourceRelationship": "Executed at named frozen source; metadata reconciliation is not a new execution. Final combined gate/public alpha acceptance pending."
+    },
+    "alphaYearBuildFull": {
+      "kind": "native-local-focused-browser",
+      "source": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-year-build-full-033f8cb-completed/alpha-year-build-full-033f8cb-results.json",
+      "sha256": "06f86484b70428f4d9e90648426374afaf660bd4135743b18a502ea9835c38b4",
+      "result": {
+        "startTime": "2026-10-02T21:26:47.796Z",
+        "duration": 1142801.335,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "caseStatusCounts": {
+        "passed": 2
+      },
+      "exactCaseNamesInReport": true,
+      "currentSourceRelationship": "Executed at named frozen source; metadata reconciliation is not a new execution. Final combined gate/public alpha acceptance pending.",
+      "executionMode": "YEAR_BUILD_FULL=1",
+      "sourceAttribution": "Root serialized frozen-run record; inline attachments do not embed source.head. Saved test/source bytes unchanged from033f8cb to metadata baselinec09a8bf.",
+      "canonicalCampus2022": {
+        "file": "viewer/public/engine/campus-2022.json",
+        "sha256": "ff6669018d1bd0d5bac5fb977504cad9b3232cd0d8f713e6f7e92c619a0a075d",
+        "contentHash": "9521eb1e582a072ab3ee6776c430a84ff21d36120cb9a763137c0c3141800ae5",
+        "byteIdenticalPublishedSources": [
+          "5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d",
+          "05370e8c727d44e52e2db510f022dac53b748417"
+        ]
+      },
+      "receiptMeaning": "First terminal script receipt matches exact current Node rehearsal; continued healthy world ticks leave receipt unchanged. No new golden pin. Older2be/46283/141772 source-era receipts remain historical.",
+      "captureReview": "Root personally inspected first-bay and whole-house captures; metadata reviewer did not inspect images.",
+      "perTestTimeoutMs": {
+        "year-build-2022": 600000,
+        "year-build-2022-house": 1200000
+      }
+    },
+    "alphaSolarTexture": {
+      "kind": "native-local-focused-browser",
+      "source": "9a543c1f701e29b5540b92973a0a34af11926da4",
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-solar-texture-release-9a543c1-completed/alpha-solar-texture-release-results.json",
+      "sha256": "0622c9bf66083dc9dfbdc5b60cd73909e781daf4cd7fd2406ea4f3d74fe9b02e",
+      "result": {
+        "startTime": "2026-10-02T21:47:35.412Z",
+        "duration": 14066.222,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "caseStatusCounts": {
+        "passed": 1
+      },
+      "exactCaseNamesInReport": true,
+      "currentSourceRelationship": "Executed at named frozen source; metadata reconciliation is not a new execution. Final combined gate/public alpha acceptance pending."
     }
   },
   "tests": {
@@ -2494,10 +2566,11 @@
       "file": "viewer/e2e/alpha-preset-play.spec.ts",
       "name": "alpha year-2026: fullPlay authored meaningful endpoint and retained supports",
       "method": "actual-ui-play-journey",
-      "outcome": "failed",
+      "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alpha731"
+        "alpha731",
+        "alphaYear2026"
       ],
       "nativeResults": [
         {
@@ -2509,15 +2582,21 @@
           "proofRef": "alpha731",
           "nativeStatus": "unexpected",
           "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alphaYear2026",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "durationMs": 101856
         }
       ],
       "latestAttachment": {
-        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-ye-fbe6c-point-and-retained-supports/attachments/actual-Play-proof-54cdb4374719561e18f566fbbde4392a5f70fd50.json",
-        "sha256": "5569a2af791c20bb778f2e33fc538c6cb8bd551b12dd622ac082823273fa3f55",
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-year2026-reset-033f8cb-completed/test-results/alpha-preset-play-alpha-ye-fbe6c-point-and-retained-supports/attachments/actual-Play-proof-cf7ad77f088281a8f5e998958d44b1ecd7a4ed53.json",
+        "sha256": "b87884ed134bc6bb3f3ffee36abe4c8e08c462a3df397de9fe63ede88c763741",
         "source": {
-          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "head": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
           "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
-          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+          "specSha256": "2835aa2328dd6201f84e31a766f1fb8a0451bbef759626cc942f64391b0b2503"
         }
       },
       "latestCheckpointNames": [
@@ -2531,10 +2610,11 @@
       "file": "viewer/e2e/alpha-preset-play.spec.ts",
       "name": "alpha solar-paint: fullPlay authored meaningful endpoint and retained supports",
       "method": "actual-ui-play-journey",
-      "outcome": "failed",
+      "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alpha731"
+        "alpha731",
+        "alphaSolarTexture"
       ],
       "nativeResults": [
         {
@@ -2546,15 +2626,21 @@
           "proofRef": "alpha731",
           "nativeStatus": "unexpected",
           "resultStatus": "failed"
+        },
+        {
+          "proofRef": "alphaSolarTexture",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "durationMs": 12440
         }
       ],
       "latestAttachment": {
-        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-reset-repairs-7316a19-completed/test-results/alpha-preset-play-alpha-so-70153-point-and-retained-supports/attachments/actual-Play-proof-5b7287520260e17307445b4133c4c5decf7be20e.json",
-        "sha256": "526399475f270ce07794f2e17091c6812fe6f0819799f6ca83c2888ec4423bcf",
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-solar-texture-release-9a543c1-completed/test-results/alpha-preset-play-alpha-so-70153-point-and-retained-supports/attachments/actual-Play-proof-9bba347e4db47f593cd38ab52831c03c1c0f6b8b.json",
+        "sha256": "5af8b3c4661ae69db38905e276196b3c63b16f68ad323317a638a1a5a6903e46",
         "source": {
-          "head": "7316a1949c304981ac064e676904e84dc010f0aa",
+          "head": "9a543c1f701e29b5540b92973a0a34af11926da4",
           "base": "470e9c54d21d8351d91a95555e9d1eb0f8d061fa",
-          "specSha256": "c4ea0b07db227e8512b6e4fad1a1f464a5f454d6c90ee9b89de9d6dfc470a572"
+          "specSha256": "2835aa2328dd6201f84e31a766f1fb8a0451bbef759626cc942f64391b0b2503"
         }
       },
       "latestCheckpointNames": [
@@ -2562,7 +2648,17 @@
         "progress",
         "endpoint",
         "final"
-      ]
+      ],
+      "exactResetResources": {
+        "initial": {
+          "geometries": 59,
+          "textures": 44
+        },
+        "final": {
+          "geometries": 59,
+          "textures": 44
+        }
+      }
     },
     "alpha-preset-incomplete-stairs": {
       "file": "viewer/e2e/alpha-preset-play.spec.ts",
@@ -2691,6 +2787,92 @@
         "depleted-refusal",
         "reset"
       ]
+    },
+    "alpha-year-build-2022-full": {
+      "file": "viewer/e2e/year-build.spec.ts",
+      "name": "year-build-2022: current source completes with automatic Play through s0021 and canonical continuity",
+      "method": "actual-ui-play-journey",
+      "executionMode": "YEAR_BUILD_FULL=1",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaYearBuildFull"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaYearBuildFull",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "durationMs": 281202
+        }
+      ],
+      "latestAttachment": {
+        "reportPath": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-year-build-full-033f8cb-completed/alpha-year-build-full-033f8cb-results.json",
+        "name": "current-source-build-completion",
+        "encoding": "inline-base64",
+        "sha256": "4c12a819f35ddd48324939b70880a1a0c3e9dedfdb8b7182377cc94bc8072762",
+        "sourceAttribution": "Root frozen-run record identifies033f8cb; attachment does not embed source.head.",
+        "receipt": {
+          "automaticCompletion": true,
+          "capturePauseAfterS0021": true,
+          "scriptResult": {
+            "tick": 39347,
+            "time": 1967.3500000000001,
+            "stateHash": "462a2f4a9feefec238d3cbbca1e99b90194ca0d9e6b0bf4162182448b747f645",
+            "reason": "terminal"
+          },
+          "worldTick": 39406,
+          "rows": 201,
+          "components": 24,
+          "compare": {
+            "n": 24,
+            "ok": 24,
+            "maxMm": 0.41
+          }
+        }
+      }
+    },
+    "alpha-year-build-2022-house-full": {
+      "file": "viewer/e2e/year-build.spec.ts",
+      "name": "year-build-2022-house: current source completes with automatic Play through s0021 and canonical continuity",
+      "method": "actual-ui-play-journey",
+      "executionMode": "YEAR_BUILD_FULL=1",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaYearBuildFull"
+      ],
+      "nativeResults": [
+        {
+          "proofRef": "alphaYearBuildFull",
+          "nativeStatus": "expected",
+          "resultStatus": "passed",
+          "durationMs": 859645
+        }
+      ],
+      "latestAttachment": {
+        "reportPath": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-year-build-full-033f8cb-completed/alpha-year-build-full-033f8cb-results.json",
+        "name": "current-source-build-completion",
+        "encoding": "inline-base64",
+        "sha256": "3265764f79a089973886b1e378b9401d4519d320eb53bccbd583af0e3f5717f6",
+        "sourceAttribution": "Root frozen-run record identifies033f8cb; attachment does not embed source.head.",
+        "receipt": {
+          "automaticCompletion": true,
+          "capturePauseAfterS0021": true,
+          "scriptResult": {
+            "tick": 123818,
+            "time": 6190.900000000001,
+            "stateHash": "8c57862eaeb66bc13000329475329db24639ec549bf6b036ca9cb8d2f0b2ee68",
+            "reason": "terminal"
+          },
+          "worldTick": 123869,
+          "rows": 555,
+          "components": 66,
+          "compare": {
+            "n": 66,
+            "ok": 66,
+            "maxMm": 0.94
+          }
+        }
+      }
     }
   },
   "nodeFixtureCatalog": {
@@ -5770,7 +5952,7 @@
       "setupNotes": [],
       "contractRef": "body",
       "coverageGrade": "recorded-still-probe",
-      "currentSourceProofRelationship": "Bounded still-probe/core assertions executed at a8a8630; preserved application implementation through043 matcher fix; no meaningful activity or all63/current033 certification.",
+      "currentSourceProofRelationship": "Three supported-probe contract tests PASS at a8a8630: actual selectable Step/Reset/Play/Pause/Step, budget receipt with continued safe still-world clock, and detached synthetic probe. Historical still-probe grade retained; no activity journey/all63 current gate claim.",
       "testRefs": [
         "t035",
         "t036",
@@ -5789,15 +5971,35 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Exact final033 combined validation pending; bounded still-probe PASS is not an activity journey."
+        "Exact final combined gate/public alpha acceptance pending; no moving-body activity or fine anatomy certification."
       ],
-      "boundedNextTest": "Preserve still-probe classification and source-bound core proof; require final combined alpha validation.",
+      "boundedNextTest": "Final combined validation of supported probe controls; no activity redesign.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "probes",
       "latestAlphaProofRef": "alphaCore",
       "latestAlphaNativeStatus": "expected",
       "latestAlphaResultStatus": "passed",
-      "latestAlphaExecutedSource": "a8a863087b340dac65da45575f04ce74bd0b4a03"
+      "latestAlphaExecutedSource": "a8a863087b340dac65da45575f04ce74bd0b4a03",
+      "latestSupportedProbeProof": {
+        "proofRef": "alphaCore",
+        "nativePassedCases": 3,
+        "controls": [
+          "Scenario selection",
+          "Step",
+          "Reset",
+          "Play",
+          "Pause",
+          "Step after Pause"
+        ],
+        "assertions": [
+          "script budget20 receipt matches current Node reference",
+          "world clock continues after budget",
+          "Pause freezes world clock",
+          "unchanged still humans",
+          "all checks ok and zero violations/errors",
+          "synthetic reach probe leaves authoritative state/hash unchanged"
+        ]
+      }
     },
     {
       "id": "year-2020",
@@ -6035,8 +6237,8 @@
       ],
       "setupNotes": [],
       "contractRef": "year-2026",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "Exact named-source targeted native PASS; no final combined current-source gate/public acceptance claimed.",
       "testRefs": [
         "t082",
         "alpha-preset-year-2026"
@@ -6048,17 +6250,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Native alpha case remains unexpected after7316a19; meaningful endpoint checkpoints do not certify failed Reset/resource lifetime assertions.",
-        "Root targeted solar/year2026 proof pending at033f8cb; do not count renderer fixes or Node lifecycle tests as UI PASS.",
-        "Exact final combined gate/public alpha acceptance pending."
+        "Exact final combined gate/63selector/public alpha acceptance pending."
       ],
-      "boundedNextTest": "Root executes the unchanged meaningful endpoint and exact Reset assertions after the bounded renderer/backdrop repairs; no tolerance increase.",
+      "boundedNextTest": "Final frozen combined validation and public acceptance; preserve original supported-layout and failure/refusal evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
-      "latestAlphaProofRef": "alpha731",
-      "latestAlphaNativeStatus": "unexpected",
-      "latestAlphaResultStatus": "failed",
-      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
+      "latestAlphaProofRef": "alphaYear2026",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014"
     },
     {
       "id": "year-build-2022",
@@ -6075,10 +6275,11 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "historical supported-layout public38 proof; current entire automatic alpha Play pending",
+      "currentSourceProofRelationship": "Exact named-source targeted native PASS; no final combined current-source gate/public acceptance claimed.",
       "testRefs": [
         "t006",
-        "t268"
+        "t268",
+        "alpha-year-build-2022-full"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -6094,12 +6295,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current entire automatic construction journey through all authored steps remains pending; historical public38 supported-layout PASS and exact unsupported refusal remain source-bound.",
-        "Exact final033 combined/public alpha validation pending."
+        "Exact final combined gate/63selector/public alpha acceptance pending."
       ],
-      "boundedNextTest": "Root executes current entire automatic Play construction for each supported2022 profile, asserting every authored step/part/crew/support and final resource cleanup; keep unsupported admission refusal separate.",
+      "boundedNextTest": "Final frozen combined validation and public acceptance; preserve original supported-layout and failure/refusal evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "construction"
+      "discoveryGroup": "construction",
+      "latestAlphaProofRef": "alphaYearBuildFull",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014"
     },
     {
       "id": "year-build-2022-house",
@@ -6116,10 +6320,11 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "historical supported-layout public38 proof; current entire automatic alpha Play pending",
+      "currentSourceProofRelationship": "Exact named-source targeted native PASS; no final combined current-source gate/public acceptance claimed.",
       "testRefs": [
         "t007",
-        "t269"
+        "t269",
+        "alpha-year-build-2022-house-full"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -6135,12 +6340,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Current entire automatic construction journey through all authored steps remains pending; historical public38 supported-layout PASS and exact unsupported refusal remain source-bound.",
-        "Exact final033 combined/public alpha validation pending."
+        "Exact final combined gate/63selector/public alpha acceptance pending."
       ],
-      "boundedNextTest": "Root executes current entire automatic Play construction for each supported2022 profile, asserting every authored step/part/crew/support and final resource cleanup; keep unsupported admission refusal separate.",
+      "boundedNextTest": "Final frozen combined validation and public acceptance; preserve original supported-layout and failure/refusal evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
-      "discoveryGroup": "construction"
+      "discoveryGroup": "construction",
+      "latestAlphaProofRef": "alphaYearBuildFull",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014"
     },
     {
       "id": "solar-paint",
@@ -6156,8 +6364,8 @@
       ],
       "setupNotes": [],
       "contractRef": "solar-paint",
-      "coverageGrade": "recorded-programmatic-effects-or-completion",
-      "currentSourceProofRelationship": "source-bound-alpha-native-evidence; engine/runtime unchanged through033f8cb, renderer Reset inheritance bounded; exact033fullgate unproved",
+      "coverageGrade": "recorded-actual-ui-play",
+      "currentSourceProofRelationship": "Exact named-source targeted native PASS; no final combined current-source gate/public acceptance claimed.",
       "testRefs": [
         "t216",
         "alpha-preset-solar-paint"
@@ -6169,17 +6377,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Native alpha case remains unexpected after7316a19; meaningful endpoint checkpoints do not certify failed Reset/resource lifetime assertions.",
-        "Root targeted solar/year2026 proof pending at033f8cb; do not count renderer fixes or Node lifecycle tests as UI PASS.",
-        "Exact final combined gate/public alpha acceptance pending."
+        "Exact final combined gate/63selector/public alpha acceptance pending."
       ],
-      "boundedNextTest": "Root executes the unchanged meaningful endpoint and exact Reset assertions after the bounded renderer/backdrop repairs; no tolerance increase.",
+      "boundedNextTest": "Final frozen combined validation and public acceptance; preserve original supported-layout and failure/refusal evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
-      "latestAlphaProofRef": "alpha731",
-      "latestAlphaNativeStatus": "unexpected",
-      "latestAlphaResultStatus": "failed",
-      "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa"
+      "latestAlphaProofRef": "alphaSolarTexture",
+      "latestAlphaNativeStatus": "expected",
+      "latestAlphaResultStatus": "passed",
+      "latestAlphaExecutedSource": "9a543c1f701e29b5540b92973a0a34af11926da4"
     }
   ],
   "unprovedLegacyChecks": {
@@ -6387,8 +6593,6 @@
     }
   ],
   "topGaps": [
-    "Solar-paint and year-2026 remain native unexpected on7316a19 despite meaningful endpoints; root targeted exact Reset/resource proof pending on033.",
-    "Current entire automatic year-build-2022 and year-build-2022-house completion pending; older public38 supported-layout PASS and unsupported refusal remain distinct.",
     "Exact final combined alpha native gate/63selector/public acceptance unproved; no all63 certification.",
     "Earlier29manual and remaining dedicated historical journeys were not all freshly rerun by alpha107/40/731; preserve source boundaries and required final gate.",
     "Stress30 only bounded progress/safety through tick2017 is witnessed; indefinite fairness/starvation remains unproved."
@@ -6396,10 +6600,10 @@
   "schemaNotes": {
     "contracts": "Supported semantic contracts and listed disruptions are bounded to named tests; not all disruptions use UI Play. Consult each test method.",
     "nodeFixtureCatalog": "Exact literal name samples/filerefs only; dynamic names and remaining filecases are intentionally not reproduced. Node tests never fill UI journey gaps.",
-    "sourceInheritance": "No blanket current coverage claimed. 5f\u2192b712 changes shared-food-break/registry/UI; c833\u2192b712 app/engine/e2e byte-diff empty. No gate39 success assumed. Alpha evidence records exact107/40/731 source and native status; git diff verifies engine/scenario authority unchanged to033 but renderer lifetime fixes are not blanket Reset proof inheritance.",
+    "sourceInheritance": "No blanket current coverage claimed. 5f\u2192b712 changes shared-food-break/registry/UI; c833\u2192b712 app/engine/e2e byte-diff empty. No gate39 success assumed. Alpha evidence records exact107/40/731 source and native status; git diff verifies engine/scenario authority unchanged to033 but renderer lifetime fixes are not blanket Reset proof inheritance. Targeted year2026/full automatic yearbuild033 and solar9a completed receipts are separately source-bound; previous731 unexpected failures remain retained.",
     "category": "Conditional construction means source/layout admission is checked before actions. Both current2022 profiles completed public38; refused unsupported layouts remain distinct.",
     "registration": "One row and declared contract/test mapping are required for every SELECTABLE_SCENARIOS registration. Generated UI metadata is checked against this inventory in the ordinary engine test path. Authored mappings do not establish executed proof.",
-    "generatedContractStatus": "Generator/app untouched by this metadata owner; root must regenerate at integration boundary for corrected work-break and resolved historical gap scope labels."
+    "generatedContractStatus": "Isolatedc09a8bf baseline generated parity remains stale. Root reviewed/committed nine-row regeneration at9a543c1 and reports8native lifetime/registration PASS; root735f5c1 parity remains green. This follow-up changes no generated consumer contract fields."
   },
   "discoveryGroups": [
     {
