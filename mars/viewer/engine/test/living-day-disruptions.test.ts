@@ -107,3 +107,20 @@ test('living-day terminal: unstarted canceled music explicitly retries the same 
   assert.equal(readLivingDay(rt)?.music,retry.id);assert.deepEqual(readMusicGathering(rt,retry.id)?.bindings.dancers,group.bindings.dancers);
   until(rt,()=>readLivingDay(rt)?.phase==='completed');assert.equal(rt.records.get(retry.id)?.status,'completed');
 });
+
+test('living-day floor: both permitted layouts wait without failed-action spam, then ordinary actor departure admits music',()=>{
+  const w=livingDayWorld('living-day-4');
+  for(const [id,x,z] of [['floor-blocker-a',10,10],['floor-blocker-b',14,11]] as const){
+    const e=structuredClone(w.entities['day-editor']);e.id=id;e.pose.p=[x,0,z];w.entities[id]=e;
+  }
+  const rt=new Runtime(w,createRegistry(),servicesFor({[w.base.campus]:livingDayScene('living-day-4')})(w),ENGINE_INVARIANTS);start(rt,'living-day-4');
+  until(rt,()=>!!readLivingDay(rt)?.musicReady&&readLivingDay(rt)?.diagnostic?.code==='music-gathering.floor-occupied');
+  for(let i=0;i<80;i++){rt.step();tickLivingDay(rt);}
+  assert.equal(readLivingDay(rt)?.music,undefined);assert.deepEqual(rt.violations,[]);
+  assert.equal([...rt.records.values()].filter(r=>r.verb==='music_gathering').length,0);
+  const clearA=rt.submit('walk_to',{actor:'floor-blocker-a',x:8,z:15},{preempt:false});
+  const clearB=rt.submit('walk_to',{actor:'floor-blocker-b',x:10,z:15},{preempt:false});
+  assert.notEqual(clearA.status,'failed',JSON.stringify(clearA.diagnostic));assert.notEqual(clearB.status,'failed',JSON.stringify(clearB.diagnostic));
+  until(rt,()=>clearA.status==='completed'&&clearB.status==='completed'&&!!readLivingDay(rt)?.music);
+  finished(rt);assert.equal([...rt.records.values()].filter(r=>r.verb==='music_gathering'&&r.status==='failed').length,0);
+});
