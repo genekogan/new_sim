@@ -28,8 +28,13 @@ proof. Same paused-world camera entry is read-only; no natural camera-quality cl
    Next combined candidate, not online; no growth/refill or universal garden planner.
 
 The clean separate `c8331ec` next combined candidate contains all three additions:
-63 presets, rules version `activities/29`, 185 focused Node checks passed. Its18
-actual Play checks are underway; completion and combined/public proof are unclaimed.
+63 presets, rules version `activities/29`, 185 focused Node checks and18 focused
+actual Play/camera-entry checks passed in5.0min on preservedc8331ec. Rebased3316a74
+retains byte-identical viewer runtime/tests except release metadata. Room3/supper3/
+garden2 journeys and camera entry10 pass with original deadlines/retries. Root
+inspected six key physical captures; independent review inspected all62PNG,
+64JSON and52a11y snapshots with no major visible support/continuity defect.
+Clean combined gate and fresh public proof remain required before release39.
 
 Owner-authorized expansion continues until explicitly stopped. Saved/wired drafts
 are not shipped; next batch publication depends on actual physical journeys, focused

@@ -2669,3 +2669,39 @@ zero failures/skips/todos,10.51s. Viewer TSc, strict garden/room/supper/camera-e
 browser TSc and focused type-aware lint PASS. Garden HUD/spec Oxfmt checks and
 shared diff-whitespace checks PASS; existing shared formatting is preserved to keep
 this integration minimal. No browser/performance/full-gate/deploy run here.
+
+
+### Room, supper and recurring care Play boundary — October2
+
+All18 focused Play/camera-entry checks PASS in5.0min on cleanc8331ec:
+room3, communal-supper3, garden-circuit2 and camera-entry10. Ordinary physical
+Pause/Resume/End, table setdown, relocated visitor seating/questions/rotation,
+retained ingredient/eating receipts, cancelled-return explicit retry, finite
+resupply, actual600tick waits and same-object release are exercised. Original
+120s test/15s expectation/zero retry limits unchanged. Logs/artifacts in
+room-preparation-integration/viewer/.cloudflare and e2e/artifacts/room-supper-circuit-focused.
+185 focused Node cases PASS10.51s, viewer/strict browserTSc/type-aware lint pass;
+294 deployment cases PASS3.93s after aggregate gate allowance change.
+
+Rebased onto main2c6f7db release38 publication metadata at3316a74. Original
+c8331ec branch remains codex/room-supper-circuit-focused-preserved-c8331ec;
+all viewer runtime/assets/tests byte-identical except deploy/deployment.json,
+verified by empty Git diff. All original release38+future PROGRESS paragraphs
+retained; docs status conflicts resolved to current published38 plus future39.
+Root personally inspects six actual physical frames; helper inspected all62fresh
+PNG,64source-verifiedJSON and52a11y snapshots. No major support/continuity
+defect; original assertions and same-object material/claim facts pass. Cropped
+final props/actors do not prove fine hand contact. Fine fingers/current rigs, cold preparation,
+fixed ground layouts, normalized finite water and no growth/reload remain limits.
+
+Release38 verified online92/92,124fresh inspected PNG, mainmetadata2c6f7db
+preserves48other-owner paths/status/bytes/mode/mtime/staged0. New63preset batch
+remains LOCAL. Full clean combined gate and publication are next; no pin moves.
+Measured3505.271s inherited suite +259.2s eight new journeys +7.9s new camera
+entry already exceeds60min. Aggregate suite allowance70min; individual deadlines,
+assertions/performance ceilings/baselines unchanged; reason in PLANNING_BUDGET.
+
+Shared workers: Sol6.1 bounded garden integration/review and physical capture
+review; separate future computer-workshop core starts beside root release lane,
+no shared-source edits or competing browser/perf. Continuous owner mandate remains
+active; no newrig/save-load/universalplanner/Eden expansion.

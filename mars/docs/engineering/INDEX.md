@@ -14,8 +14,8 @@ for original gateway HEAD failure and executed/skipped scope. Lower candidate no
 retain dated provenance; publication status is superseded by this notice. Room
 preparation/communal supper/garden circuit form the clean separate c8331ec next
 combined candidate: 63 presets, rules version `activities/29`, 185 focused Node
-checks passed. Actual Play is underway; completion remains unclaimed. These are
-not online release38 features.
+checks and18 focused Play/camera-entry checks passed. Clean combined gate/public
+proof remain pending; these are not online release38 features.
 
 - [Agent context](../../AGENTS.md): ownership, authorized scope, hard boundaries.
 - [Active roadmap](ACTIVE_ROADMAP.md): current tranche and exit criteria.

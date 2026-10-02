@@ -490,3 +490,21 @@ The same one-window take refresh covers flagship and campus build-bay-v3. Both r
 Engine owner authorized bounded canonical-source repin after independent physical checks. Final corrected 2026 campus content hash `256ac4954e7e2f00eef5146165933bb6bab52ef53305d35ac918cd5f542de25a`; full/crop flagship changes from intermediate `6e3b36c1c0cd44125e83a99917db541d1a0ab50d075d08f8cc0f6ce59e81e6e0` to `58dd8e0fb35b6a53ffa88d7847c990499b38e33f4f0527b7eced6fc068876f38`. Both complete43steps/11460ticks (573s), zero violations, identical entities/support/discrete states and human positions, visitor on deck, replay/execute identical and canonical unchanged. Prepin RED preserved `/tmp/mars-oct1-candidate-prepin-proof.log`; unchanged exact-pin assertion moved after physical assertions to expose evidence. Corrected photo-derived model changes world identity; no engine movement tolerances or physical assertions weakened. Independent determinism probe `b746b094…7f0c3` and unrelated historical pins must remain unchanged. Final post-repin focused tests/take regeneration pending at this record.
 
 Post-repin focused full/crop/grid tests:9/9 PASS, exact source-era hash above; original independent determinism assertion retained unchanged. Generated frame source count654 (was660): six kitchen internal diagonal receivers0263/0308/0399/0400/0444/0445 now have no collision prism after bounded photographic aisle clearance; all667 manifest rack IDs remain enumerated exactly once, six exact absent-prism provenance assertions added.
+
+
+## 2026-10-02 — expanded browser suite capacity
+
+Release38 clean gate executed264 passing browser checks plus7 excluded FIXMEs
+in3505.271seconds. The next eight room/supper/garden-circuit journeys actually
+passed under unchanged120second test /15second expectation /zero-retry limits:
+room57.9+4.3+16.4s, supper60.0+26.0+25.8s, garden58.0+10.8s =259.2s.
+Three required camera-entry checks add3.2+2.4+2.3=7.9s, plus three new selectable
+startup/reset/first-Step audits. The measured inherited+new lower bound3772.371s
+already exceeds3600s aggregate capacity. Whole-suite allowance becomes4200s
+(70min) so serial software-WebGL validation can execute all required checks.
+This changes no individual timeout, assertion, runtime/performance ceiling,
+tolerance, expected outcome, take or golden hash. Native failed results still fail
+the gate; seven legacy exclusions remain unproved. No pin is moved or re-recorded.
+Focused Play sourcec8331ec is preserved; rebase3316a74 changes only publication
+docs/deployment metadata, with byte-identical viewer runtime and test files.
+Full clean combined gate and publication remain pending.

@@ -19,8 +19,9 @@ All staging is hypothetical; silent dialogue, current rigs/fine fingers, cropped
 care objects, no plant growth and camera-quality limitations remain explicit.
 Room preparation, communal supper and finite garden circuit are minimally wired
 in separate candidate `c8331ec`: 63 presets, rules version `activities/29`,
-185 focused Node checks passed. Focused actual Play is underway; completion and
-combined/public proof remain unclaimed. These are not public release38 features.
+185 focused Node checks and all18 focused Play/camera-entry checks passed.
+The rebase preserves byte-identical activity/runtime/test files. Clean combined
+gate and public proof remain pending; these are not public release38 features.
 Preserve their worktrees and all48 other-owner paths.
 Gene's continuous meaningful Mars vocabulary expansion remains authorized until
 explicitly stopped; do not stop at a release or begin Eden. Active save/load,

@@ -76,8 +76,8 @@ Current rigs/fine fingers, silent dialogue and cropped care vessels remain limit
 Lower dated candidate notes retain authoring provenance; this publication notice
 supersedes their old not-public status. Room preparation/supper/garden circuit
 remain separate candidate `c8331ec`: 63 presets, rules version `activities/29`,
-185 focused Node checks passed. Actual Play is underway; completion remains
-unclaimed. These are not online release38 features.
+185 focused Node checks and18 focused Play/camera-entry checks passed. Combined
+gate/public proof remain pending; these are not online release38 features.
 
 ## Begin
 
