@@ -216,7 +216,9 @@ async function waitMode(page: Page, mode: 'paused' | 'completed') {
 test.afterEach(async ({ page }, info) => {
   const name = info.title.startsWith('connected')
     ? 'room-preparation-connected'
-    : 'room-preparation-early-end';
+    : info.title.startsWith('active')
+      ? 'room-preparation-active-end'
+      : 'room-preparation-early-end';
   save(`${name}-result`, {
     status: info.status,
     errors: info.errors.map((e) => e.message),
@@ -592,5 +594,102 @@ test('pre-first-tick End uses actual Play cleanup then Reset firstStep leaves no
     admitted,
     ended,
     resetState,
+  });
+});
+
+test('active held-table End uses actual Play ground setdown and drains without starting classroom or claiming finished', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const initial = await open(page);
+  await button(page, 'Start room preparation').click();
+  const admitted = await inspect(page);
+  await play(page);
+  await page.waitForFunction(
+    () => {
+      const s = (window.__marsEngine as RoomHook).roomPreparation();
+      return (
+        s?.stage === 'arranging' &&
+        s.setup?.current?.phase === 'move' &&
+        s.setup.current.fixture === 'belongings-table' &&
+        s.setup.current.held &&
+        !!s.placements.find(
+          (p) =>
+            p.fixture === 'belongings-table' &&
+            p.pose &&
+            Math.hypot(p.pose.p[0] - 10, p.pose.p[2] + 5) > 0.1,
+        )
+      );
+    },
+    undefined,
+    { timeout: 15_000 },
+  );
+  await freeze(page);
+  const moving = await inspect(page),
+    table = room(moving).placements.find(
+      (p) => p.fixture === 'belongings-table',
+    )!;
+  await camera(
+    page,
+    [table.pose!.p[0] + 3, 3, table.pose!.p[2] + 4],
+    [table.pose!.p[0], 0.8, table.pose!.p[2]],
+  );
+  const heldTable = await capture(page, 'room-preparation-End-held-table');
+  unchanged(heldTable, initial, admitted);
+  stored(heldTable);
+  expect(room(heldTable).setup?.current?.crew).toEqual(['guest1', 'guest2']);
+  expect(
+    room(heldTable).placements.find((p) => p.fixture === 'belongings-table')
+      ?.support,
+  ).toEqual({ kind: 'held', by: ['guest1', 'guest2'] });
+  expect(
+    heldTable.fixtures.find((e) => e.id === 'belongings-table')?.rendered?.p[1],
+  ).toBeGreaterThan(0);
+  for (const actor of ['guest1', 'guest2'])
+    expect(heldTable.bones[actor].activity).toBe('carry');
+  await button(page, 'End preparation').click();
+  expect(room(await inspect(page)).mode).toBe('ending');
+  await expect(button(page, 'Resume preparation')).toBeDisabled();
+  await play(page);
+  await waitMode(page, 'completed');
+  const ended = await capture(page, 'room-preparation-End-supported-ground');
+  unchanged(ended, initial, admitted);
+  stored(ended);
+  clean(ended);
+  expect(room(ended).status).toBe('cancelled');
+  expect(room(ended).finished).toBe(false);
+  expect(room(ended).setup?.partial).toBe(true);
+  expect(room(ended).session).toBeUndefined();
+  expect(ended.records.filter((r) => r.verb === 'classroom_session')).toEqual(
+    [],
+  );
+  const grounded = room(ended).placements.find(
+    (p) => p.fixture === 'belongings-table',
+  )!;
+  expect(grounded.support).toEqual({ kind: 'ground' });
+  expect(grounded.pose?.p[1]).toBe(0);
+  expect(grounded.atTarget).toBe(false);
+  await expect(page.getByTestId('room-preparation-readout')).toContainText(
+    'ended',
+  );
+  await play(page);
+  await page.waitForFunction(
+    (tick) => window.__marsEngine.state().tick >= tick + 12,
+    ended.state.tick,
+    { timeout: 15_000 },
+  );
+  await freeze(page);
+  const retained = await inspect(page);
+  expect(retained.records).toEqual(ended.records);
+  expect(retained.fixtures).toEqual(ended.fixtures);
+  expect(room(retained).storedItems).toEqual(room(ended).storedItems);
+  clean(retained);
+  expect(errors.get(page)).toEqual([]);
+  save('room-preparation-active-End-proof', {
+    initial,
+    admitted,
+    heldTable,
+    ended,
+    retained,
   });
 });
