@@ -64,7 +64,9 @@ Live camera supports classroom, prepared/living days, garden care and music/danc
 Choose Clear activity coverage or Restrained observation. It reads actual people,
 objects and phase facts; it never moves actors or owns their tasks. Follow activity
 person (Follow guest2 in classroom) takes operator precedence. Return camera to auto
-releases it. Dragging the view also takes temporary operator control. Global Pause
+releases it. Dragging the view also takes temporary operator control. Manual control expires
+after six simulation seconds; while paused, that clock does not advance. Escape
+or Return camera to auto releases it immediately. Global Pause
 freezes simulation; camera attachment must not mutate world/tick.
 
 Clear favors readable action; Restrained holds wider/longer coverage. These are
@@ -101,8 +103,8 @@ are actionable; intentional diagnostic demonstrations are explicitly labeled.
 `window.__marsEngine` offers scenario loading, fixed stepping, detached records/world,
 violations, intention/day/garden readouts and camera facts. Programmatic stepping
 is useful but does not establish natural rendering or automatic Play timing.
-The selector startup audit covers fresh-load/Reset/first-Step for all 45 selectable
-presets; it is deliberately not completion evidence. See [current evidence index](INDEX.md).
+The authored selector startup audit checks fresh-load/Reset/first-Step for all 45
+selectable presets; its executed result remains pending until the receipt is recorded; it is deliberately not completion evidence. See [current evidence index](INDEX.md).
 
 Local: `cd viewer && npm run dev`, then `/lab`. Contributor rules:
 [ENGINE_GUIDE](ENGINE_GUIDE.md). Required clean combined integration:

@@ -21,8 +21,8 @@ Start at [engineering navigation](INDEX.md). External contributors: `CODEX.md`
   naming concrete objects (e.g. "the 19 ft upright u3 intersects wall
   passage-e during the 90° turn at (14.8, -15.0)"). Never "succeed" by clipping,
   floating or teleporting.
-- **World state is plain JSON** (`world/types.ts`). All mutation happens inside
-  action `step()` on the fixed tick. Renderers/cameras only read.
+- **World state is plain JSON** (`world/types.ts`). Deterministic Runtime/action lifecycle
+  owns mutation; physical movement advances inside fixed-step execution. Renderers/cameras only read.
 
 ## Conventions
 - Metres, Y up, ground plane (x, z). `Vec2 = [x, z]`.
@@ -68,7 +68,9 @@ Start at [engineering navigation](INDEX.md). External contributors: `CODEX.md`
   exists, wait a few seconds and retry. End messages with
   the established co-author convention (`Co-Authored-By: Codex <noreply@openai.com>`
   for Codex work), with genekogan as author. Never push/add remotes.
-- Run `npm run test:engine` and `npx tsc --noEmit -p .` before committing; don't commit red.
+- Run focused checks appropriate to the change and TypeScript before committing.
+  The full established gate is required on the clean combined release candidate
+  before main integration; do not merge known failures or claim skips as proof.
 - Keep long validation logs/proof receipts on disk. Serialize expensive browser/performance
   checks and freeze tracked source during the combined gate. Preserve failed evidence.
 

@@ -9,7 +9,7 @@ import { SequenceHud } from './sequence-hud.tsx';
 import { SocialHud } from './social-hud.tsx';
 import './lab.css';
 
-export default function Lab() {
+export default function Lab({ defaultScenario }: { defaultScenario?: string }) {
   const host = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<LabView | null>(null);
   const [acknowledged, setAcknowledged] = useState<{ epoch: number; ids: string[] }>({ epoch: -1, ids: [] });
@@ -18,7 +18,7 @@ export default function Lab() {
   useEffect(() => {
     const v = new LabView(host.current!);
     const initial =
-      new URLSearchParams(location.search).get('scenario') ?? SCENARIOS[0].name;
+      new URLSearchParams(location.search).get('scenario') ?? defaultScenario ?? SCENARIOS[0].name;
     const first = scenarioByName(initial) ?? SCENARIOS[0];
     let live = true;
     // scenarios with async data (year walkabouts) start on the default preset until it arrives
@@ -38,7 +38,7 @@ export default function Lab() {
       removeHook();
       v.dispose();
     };
-  }, []);
+  }, [defaultScenario]);
 
   const sim = view?.sim;
   const checks = sim ? sim.checks() : [];

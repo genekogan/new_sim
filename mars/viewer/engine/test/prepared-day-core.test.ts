@@ -152,7 +152,7 @@ test('changed paused preparation refuses Resume without replacing retained quant
   assert.equal(rt.stateHash(), before); assert.deepEqual(readPurposefulRoutine(rt, routine.id)!.preparation, prior);
   control(rt, routine.id, 'end'); until(rt, () => !rt.isActive(routine.id));
 });
-test('End during preparation drains the physical recipe and preserves deposited food and held spoon', () => {
+test('End during preparation preserves deposited food and returns the same spoon through ordinary put', () => {
   const { rt, routine } = start();
   until(rt, () => (readFoodPreparation(rt, B.pot)?.ingredients[0].deposited ?? 0) > 0);
   control(rt, routine.id, 'end'); until(rt, () => !rt.isActive(routine.id));
@@ -161,6 +161,10 @@ test('End during preparation drains the physical recipe and preserves deposited 
   assert.equal(readFoodPreparation(rt, B.pot)!.complete, false);
   assert.deepEqual(rt.holder('actor:worker'), []);
   assert.deepEqual(rt.holder(`entity:${B.pot}`), []);
-  assert.deepEqual(heldBy(rt.world, 'worker').map(h => h.item.id), [B.people[0].spoon]);
+  assert.deepEqual(heldBy(rt.world, 'worker').map(h => h.item.id), []);
+  const spoon = rt.world.entities[B.people[0].spoon];
+  assert.equal(spoon.id, B.people[0].spoon);
+  assert.deepEqual(spoon.support, { kind: 'resting-on', on: B.table, slot: 'r2c1' });
+  assert.ok([...rt.records.values()].some(r => r.verb === 'put_item' && r.status === 'completed' && (r.params as { item?: string; surfaceSlot?: string }).item === spoon.id && (r.params as { surfaceSlot?: string }).surfaceSlot === `${B.table}#r2c1`));
   assert.equal([...rt.records.values()].some(r => r.verb === 'sleep'), false);
 });
