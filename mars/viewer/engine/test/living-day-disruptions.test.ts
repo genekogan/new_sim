@@ -2,11 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../runtime/runtime.ts';
 import { createRegistry, servicesFor, ENGINE_INVARIANTS } from '../api/registry.ts';
-import { livingDayWorld, livingDayScene, livingDayBindings, startLivingDay, tickLivingDay, readLivingDay, retryLivingDay, type LivingDayName } from '../scenarios/living-day.ts';
+import { livingDayWorld, livingDayScene, livingDayBindings, startLivingDay, tickLivingDay, readLivingDay, retryLivingDay, adoptLivingDayMusic, type LivingDayName } from '../scenarios/living-day.ts';
 import { readPurposefulRoutine } from '../activities/purposeful-routine.ts';
 import { readLivingIntention } from '../activities/living-intention.ts';
 import { readBook } from '../objects/reading.ts';
 import { readGarden } from '../objects/garden.ts';
+import { readMusicGathering } from '../activities/music-gathering.ts';
+import { musicStation } from '../activities/computer-music.ts';
+import { readWorkstation } from '../objects/workstation.ts';
 import { heldBy } from '../items/model.ts';
 
 function setup(name: LivingDayName) {
@@ -72,3 +75,35 @@ for(const name of ['living-day-4','living-day-studio'] as LivingDayName[]) {
     assert.equal(retryLivingDay(rt),null);assert.equal(readLivingDay(rt)?.initial,refused.initial);assert.notEqual(readLivingDay(rt)?.session,refused.session);finished(rt);
   });
 }
+
+// Closing-sprint regressions: owner-required terminal dispositions, not nominal completion.
+test('living-day terminal: End initial commitment reports ended rather than false completion',()=>{
+  const rt=setup('living-day-4');const initial=start(rt,'living-day-4');
+  control(rt,'living_intention_control',{intention:initial.id,intent:'end'});
+  until(rt,()=>!rt.isActive(initial.id));assert.equal(initial.status,'cancelled');
+  assert.equal(readLivingDay(rt)?.routine,undefined);assert.equal(readLivingDay(rt)?.phase,'ended');
+  assert.deepEqual(rt.holder('actor:worker'),[]);
+});
+test('living-day terminal: End reader permits main and carer to finish, final partial day is explicitly ended',()=>{
+  const rt=setup('living-day-4');start(rt,'living-day-4');
+  until(rt,()=>{const b=readBook(rt,'book');return !('code'in b)&&b.elapsed>1&&b.elapsed<5;});
+  const reader=readLivingDay(rt)!.independent[0],carer=readLivingDay(rt)!.independent[1];
+  control(rt,'living_intention_control',{intention:reader,intent:'end'});until(rt,()=>!rt.isActive(reader));
+  assert.equal(rt.records.get(reader)?.status,'cancelled');const retained=structuredClone(readBook(rt,'book'));assert.ok(!('code'in retained));assert.equal(retained.status,'unfinished');
+  until(rt,()=>routine(rt)?.status==='completed'&&rt.records.get(carer)?.status==='completed'&&readLivingDay(rt)?.musicState?.status==='completed');
+  assert.deepEqual(readBook(rt,'book'),retained);assert.equal(routine(rt)!.progress.workElapsed,routine(rt)!.bindings.work.duration);
+  const garden=readGarden(rt,'plant-a');assert.ok(!('code'in garden));assert.equal(garden.cycles,2);
+  assert.equal(readLivingDay(rt)?.phase,'ended');assert.deepEqual(rt.holder('actor:reader'),[]);
+});
+test('living-day terminal: unstarted canceled music explicitly retries the same bound places without fake unfinished score',()=>{
+  const rt=setup('living-day-4');start(rt,'living-day-4');until(rt,()=>!!readLivingDay(rt)?.music);
+  const old=readLivingDay(rt)!.music!,group=readMusicGathering(rt,old)!;assert.equal(group.music,undefined);
+  const before=readWorkstation(rt,'music-computer');assert.ok(!('code'in before));assert.equal(before.elapsed,0);assert.equal(before.status,'idle');assert.equal(musicStation(rt,'music-computer'),undefined);
+  rt.cancel(old);until(rt,()=>!rt.isActive(old));assert.equal(rt.records.get(old)?.status,'cancelled');
+  const after=readWorkstation(rt,'music-computer');assert.deepEqual(after,before);
+  // Explicitly resume the retained gathering; its unstarted computer must stay idle until the real child starts.
+  const retry=rt.submit('music_gathering',{...group.bindings,resume:true,resumeFrom:old},{preempt:false});
+  assert.notEqual(retry.status,'failed',JSON.stringify(retry.diagnostic));adoptLivingDayMusic(rt,retry.id);
+  assert.equal(readLivingDay(rt)?.music,retry.id);assert.deepEqual(readMusicGathering(rt,retry.id)?.bindings.dancers,group.bindings.dancers);
+  until(rt,()=>readLivingDay(rt)?.phase==='completed');assert.equal(rt.records.get(retry.id)?.status,'completed');
+});
