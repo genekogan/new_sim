@@ -195,6 +195,9 @@ export class ComponentViews {
 
   reset(world: Pick<WorldState, 'entities'>) {
     this.clear();
+    // Shared geometry belongs to one world lifetime, including parts added mid-run.
+    for (const g of this.geos.values()) g.dispose();
+    this.geos.clear();
     this.onTick(world);
   }
 

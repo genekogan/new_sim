@@ -107,7 +107,7 @@ export class FixtureViews {
   private campfire(id: string, sx: number, v: Partial<View>) {
     const g = new THREE.Group();
     const r = sx / 2 - 0.1, n = 11;
-    const stone = this.keep(new THREE.DodecahedronGeometry(0.1, 0));
+    const stone = new THREE.DodecahedronGeometry(0.1, 0);
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2;
       const m = new THREE.Mesh(stone, this.std('#77716a', 1));
@@ -117,7 +117,8 @@ export class FixtureViews {
       m.castShadow = m.receiveShadow = true;
       g.add(m);
     }
-    const log = this.keep(new THREE.CylinderGeometry(0.05, 0.06, r * 1.5, 7).rotateZ(Math.PI / 2));
+    const log = new THREE.CylinderGeometry(0.05, 0.06, r * 1.5, 7).rotateZ(Math.PI / 2);
+    v.ownedGeometries = [stone, log];
     for (const a of [0.4, -0.5, 1.6]) {
       const m = new THREE.Mesh(log, this.std('#4a2e1a', 1));
       m.position.y = 0.08;

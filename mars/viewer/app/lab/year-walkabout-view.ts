@@ -17,11 +17,11 @@ export type Backdrop = { group: THREE.Group; dispose(): void; ready?: () => bool
 
 const GROUND = new THREE.MeshStandardMaterial({ color: '#c8b08a', roughness: 1 });
 
-function disposeTree(root: THREE.Object3D) {
+export function disposeTree(root: THREE.Object3D) {
   const geos = new Set<THREE.BufferGeometry>(), mats = new Set<THREE.Material>(), texs = new Set<THREE.Texture>();
   root.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (!m.isMesh) return;
+    if (!m.isMesh && !(o instanceof THREE.LineSegments)) return;
     geos.add(m.geometry);
     for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
       if (mat === GROUND) continue;
