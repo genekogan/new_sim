@@ -15,6 +15,7 @@ type FixtureBridge = {
   declareValidReset: () => void;
   inspect: () => {
     generation: number;
+    builtAt: { tick: number; time: number };
     scriptTicks: number;
     book: Entity | null;
     claims: { resource: string; holders: string[] }[];
@@ -140,6 +141,7 @@ async function open(page: Page, mode: Mode) {
     )) as typeof import('../engine/locomotion/walk.ts');
     let rt: Runtime,
       generation = 0,
+      builtAt = { tick: -1, time: -1 },
       scriptTicks = 0,
       invalidFixture = mode === 'invariant';
     const scenario: Scenario = {
@@ -168,6 +170,7 @@ async function open(page: Page, mode: Mode) {
                 DEFAULT_INVARIANTS,
               )
             : reading.readingRuntime();
+        builtAt = { tick: rt.tick, time: rt.time };
         return rt;
       },
       start: (rt) => {
@@ -230,6 +233,7 @@ async function open(page: Page, mode: Mode) {
       },
       inspect: () => ({
         generation,
+        builtAt: { ...builtAt },
         scriptTicks,
         book: rt.world.entities.book
           ? structuredClone(rt.world.entities.book)
@@ -476,19 +480,18 @@ test('alpha actual Play: genuine invalid fixture visibly halts, then explicit fr
   await page.evaluate(() => {
     const w = window as unknown as AlphaWindow;
     w.__alphaLivenessFixture.declareValidReset(); // explicit next fixture declaration, no live repair
-    w.__marsEngine.pause(true); // keep the fresh reset inspectable at tick0
   });
   await button(page, 'Reset').click();
   const reset = await capture(page, 'invariant-fresh-valid-reset');
   expect(reset.fixture.generation).toBe(halt.fixture.generation + 1);
-  expect(reset.state.tick).toBe(0);
+  expect(reset.fixture.builtAt).toEqual({ tick: 0, time: 0 });
   expect(reset.state.paused).toBe(true);
   expect(reset.state.halted).toBeNull();
   expect(reset.violations).toEqual([]);
   expect(reset.records).toEqual([]);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await button(page, 'Step').click();
-  expect((await inspect(page)).state.tick).toBe(1);
+  expect((await inspect(page)).state.tick).toBe(reset.state.tick + 1);
   await play(page);
   await expect
     .poll(async () => (await inspect(page)).state.tick)

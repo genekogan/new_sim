@@ -72,7 +72,7 @@ type H = {
   step(n: number): { tick: number; done: boolean };
   runToEnd(max: number): { tick: number; done: boolean };
   stateHash(): string;
-  state(): { tick: number; time: number; done: boolean; humans: { id: string; p: number[]; yaw: number; activity: string; level: number }[]; checks: { ok: boolean; message: string }[] };
+  state(): { tick: number; time: number; done: boolean; scriptResult: { tick: number; time: number; stateHash: string; reason: string } | null; humans: { id: string; p: number[]; yaw: number; activity: string; level: number }[]; checks: { ok: boolean; message: string }[] };
   components(): { id: string; def: string; phase?: string; support?: string; pose: { p: number[]; yaw: number; pitch?: number; roll?: number } }[];
   camera(pos: number[], target: number[]): void;
   bones(): Record<string, Bone>;
@@ -160,8 +160,19 @@ for (const [scenario, bays, parts] of [['year-build-2022', 1, 24], ['year-build-
       const h = window.__marsEngine as unknown as H;
       return { state: h.state(), hash: h.stateHash(), yb: h.yearBuild()!, components: h.components(), rows: h.sequence().steps!, bones: h.bones(), violations: window.__marsEngine!.violations() };
     });
-    expect(result.state.tick).toBe(reference.ticks);
-    expect(result.hash).toBe(reference.hash);
+    expect(result.state.scriptResult).not.toBeNull();
+    expect(result.state.scriptResult!.reason).toBe('terminal');
+    expect({ tick: result.state.scriptResult!.tick, hash: result.state.scriptResult!.stateHash }).toEqual({ tick: reference.ticks, hash: reference.hash });
+    if (automaticCompletion) {
+      // The exact authored boundary is unchanged; the healthy world is allowed to tick afterward.
+      expect(result.state.tick).toBeGreaterThanOrEqual(reference.ticks);
+      await page.waitForFunction((tick) => window.__marsEngine!.state().tick > tick, result.state.tick);
+      expect(await page.evaluate(() => (window.__marsEngine as unknown as H).state().scriptResult)).toEqual(result.state.scriptResult);
+      await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    } else {
+      expect(result.state.tick).toBe(reference.ticks);
+      expect(result.hash).toBe(reference.hash);
+    }
     expect(result.yb.compare.n).toBe(parts); expect(result.yb.compare.ok).toBe(parts);
     expect(result.rows.every(row => row.status === 'completed')).toBe(true);
     expect(result.violations).toEqual([]);

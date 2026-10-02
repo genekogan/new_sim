@@ -169,19 +169,23 @@ export function installHook(view: LabView, notify: () => void) {
   };
   const state = () => {
     const rt = sim.rt;
+    // Finish guarded observations before publishing halt/result fields from this snapshot.
+    const done = sim.done();
+    const checks = sim.checks();
     return {
       scenario: sim.scenario.name,
       tick: rt.tick,
       time: +rt.time.toFixed(3),
-      done: sim.done(),
+      done: !sim.halted && done,
       scriptStopReason: sim.scriptStopReason,
+      scriptResult: sim.scriptResult ? structuredClone(sim.scriptResult) : null,
       halted: sim.halted ? structuredClone(sim.halted) : null,
       paused: sim.paused,
       speed: sim.speed,
       humans: Object.values(rt.world.entities)
         .filter((e) => e.kind === 'human')
         .map((e) => ({ id: e.id, p: e.pose.p.map((x) => +x.toFixed(4)), yaw: +e.pose.yaw.toFixed(4), level: e.human!.level, activity: e.human!.activity, task: e.human!.task ?? null })),
-      checks: sim.checks(),
+      checks,
       stats: sim.stats(),
     };
   };

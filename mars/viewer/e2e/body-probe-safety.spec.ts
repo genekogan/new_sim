@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { EngineHook } from '../app/lab/hook.ts';
+import { LabSim } from '../app/lab/sim.ts';
 import { openLab, labFrames } from './lab-helpers.ts';
 import { captureView, collectConsoleErrors } from './helpers.ts';
 
@@ -31,6 +32,10 @@ test('delayed playback frames end scripted windows while the unchanged valid wor
 });
 
 test('body probe selectable Step, Reset and Play validate a safe still world', async ({ page }, testInfo) => {
+  const reference = new LabSim();
+  reference.load('body');
+  reference.stepN(20);
+  expect(reference.scriptResult?.tick).toBe(20);
   const errors = collectConsoleErrors(page);
   await openLab(page);
   await page.evaluate(() => window.__marsEngine!.pause(true));
@@ -63,6 +68,7 @@ test('body probe selectable Step, Reset and Play validate a safe still world', a
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   expect(await page.evaluate(() => window.__marsEngine!.state().tick)).toBe(pausedTick + 1);
   const played = await page.evaluate(() => window.__marsEngine!.state());
+  expect((played as ReturnType<EngineHook['state']>).scriptResult).toEqual(reference.scriptResult);
   expect(played.done).toBe(true);
   expect(played.humans).toEqual(fresh.humans);
   expect(played.checks.every(c => c.ok)).toBe(true);

@@ -5,11 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import type { EngineHook } from '../app/lab/hook.ts';
-declare global {
-  interface Window {
-    __marsEngine: EngineHook;
-  }
-}
+type QuarantineWindow = { __marsEngine: EngineHook };
 const source = {
   head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
   base: '33c7a06eda783d997b5b73595446f80df3bc9cb6',
@@ -23,7 +19,7 @@ const artifacts = path.resolve(
 );
 async function frozen(page: Page) {
   return page.evaluate(() => {
-    const e = window.__marsEngine,
+    const e = (window as unknown as QuarantineWindow).__marsEngine,
       info = e.info();
     return {
       hash: e.stateHash(),
@@ -46,7 +42,15 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
 }, testInfo) => {
   test.setTimeout(120000);
   await page.goto('/lab?scenario=classroom-4');
-  await page.waitForFunction(() => window.__marsEngine?.ready);
+  await page.waitForFunction(
+    () => (window as unknown as QuarantineWindow).__marsEngine?.ready,
+  );
+  if (
+    !(await page.evaluate(
+      () => (window as unknown as QuarantineWindow).__marsEngine.state().paused,
+    ))
+  )
+    await page.getByRole('button', { name: 'Pause', exact: true }).click();
   // Deliberate test-only invariant: this is a quarantine fixture, never a
   // production scenario failure. It uses the real loaded controller and panel.
   await page.evaluate(async () => {
@@ -113,7 +117,9 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
   try {
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
     await page.waitForFunction(
-      () => window.__marsEngine.ready && window.__marsEngine.state().tick === 0,
+      () =>
+        (window as unknown as QuarantineWindow).__marsEngine.ready &&
+        (window as unknown as QuarantineWindow).__marsEngine.state().tick === 0,
     );
     await expect(
       page.getByRole('button', { name: 'Start session', exact: true }),
@@ -123,7 +129,7 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
       .click();
     expect(
       await page.evaluate(() =>
-        window.__marsEngine
+        (window as unknown as QuarantineWindow).__marsEngine
           .records()
           .some((r) => r.verb === 'classroom_session'),
       ),
@@ -151,7 +157,7 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
     const before = await frozen(page);
     checkpoints.halted = before;
     const aliases = await page.evaluate(() => {
-      const e = window.__marsEngine;
+      const e = (window as unknown as QuarantineWindow).__marsEngine;
       const classroom = e.classroom();
       const retainedClassroom = structuredClone(classroom);
       if (!classroom.session?.diagnostic?.subjects)
@@ -173,7 +179,7 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
     expect(await frozen(page)).toEqual(before);
     checkpoints.aliases = aliases;
     const refused = await page.evaluate(() => {
-      const e = window.__marsEngine;
+      const e = (window as unknown as QuarantineWindow).__marsEngine;
       const calls: [string, unknown[]][] = [
         ['startClassroom', []],
         ['cancelAction', [e.records()[0].id]],
@@ -219,7 +225,7 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
     checkpoints.refused = refused;
     // Read-only actual facts and manual camera remain usable after containment.
     const reads = await page.evaluate(() => {
-      const e = window.__marsEngine;
+      const e = (window as unknown as QuarantineWindow).__marsEngine;
       e.cameraPreset('top');
       e.camera([14, 10, 14], [0, 0, 0]);
       return {
@@ -260,19 +266,26 @@ test('alpha quarantine: actual Lab activity controls and every hook mutator pres
     });
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
     await page.waitForFunction(
-      () => window.__marsEngine.ready && window.__marsEngine.state().tick === 0,
+      () =>
+        (window as unknown as QuarantineWindow).__marsEngine.ready &&
+        (window as unknown as QuarantineWindow).__marsEngine.state().tick === 0,
     );
     expect(
-      await page.evaluate(() => window.__marsEngine.state().halted),
+      await page.evaluate(
+        () =>
+          (window as unknown as QuarantineWindow).__marsEngine.state().halted,
+      ),
     ).toBeNull();
-    expect(await page.evaluate(() => window.__marsEngine.violations())).toEqual(
-      [],
-    );
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as QuarantineWindow).__marsEngine.violations(),
+      ),
+    ).toEqual([]);
     await expect(
       page.getByRole('button', { name: 'Start session', exact: true }),
     ).toBeEnabled();
     const started = await page.evaluate(() =>
-      window.__marsEngine.startClassroom(),
+      (window as unknown as QuarantineWindow).__marsEngine.startClassroom(),
     );
     expect(started.id).toBeTruthy();
     expect(started.status).not.toBe('failed');
@@ -311,7 +324,9 @@ test('alpha quarantine: future unclassified hook methods default to refusal and 
   page,
 }) => {
   await page.goto('/lab?scenario=wall');
-  await page.waitForFunction(() => window.__marsEngine?.ready);
+  await page.waitForFunction(
+    () => (window as unknown as QuarantineWindow).__marsEngine?.ready,
+  );
   const result = await page.evaluate(async () => {
     const modulePath = '/app/lab/hook.ts';
     const { fenceLabControls } = (await import(
@@ -358,7 +373,9 @@ test('alpha quarantine: year-build inspection detaches pile coordinates and sequ
   page,
 }) => {
   await page.goto('/lab?scenario=year-build-2022');
-  await page.waitForFunction(() => window.__marsEngine?.ready);
+  await page.waitForFunction(
+    () => (window as unknown as QuarantineWindow).__marsEngine?.ready,
+  );
   await page.evaluate(async () => {
     const modulePath = '/app/lab/scenarios.ts';
     const m = (await import(
@@ -390,7 +407,7 @@ test('alpha quarantine: year-build inspection detaches pile coordinates and sequ
   );
   await expect(page.getByTestId('sequence-hud')).toBeVisible();
   const result = await page.evaluate(() => {
-    const e = window.__marsEngine;
+    const e = (window as unknown as QuarantineWindow).__marsEngine;
     const before = {
       hash: e.stateHash(),
       year: e.yearBuild(),

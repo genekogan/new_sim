@@ -3025,3 +3025,31 @@ not start (`tsc` absent); reused the sibling candidate's existing dependency tre
 through an ignored node_modules symlink, then typecheck exited0. No source changes
 or new browser/fullgate/public certification. See
 [bounded source/limits report](briefs/alpha-extension-contract.REPORT.md).
+
+
+## Alpha combined observation/control preparation — 2026-10-02
+
+Saved implementation was rebased onto verified release40 metadata77ee5f4. A backup
+branch preserves the original source; engine/sequence/activity/Sim/new native-test
+bytes were verified unchanged across rebase. Current homepage/roadmap direction and
+all dated progress were retained; main's48other-owner paths remain untouched.
+Bounded control-quarantine ecb7adb and authoring-guide b060398 candidates are now
+combined locally, not published. Confirmed readout aliases are detached; ordinary
+controls remain fenced during serious halt, with inspection/camera/fresh-world Reset.
+
+Hook state exposes detached exact ScriptResult after guarded observations, so a
+newly detected callback fault cannot return stale successful-result/halt fields.
+Current-year-build Auto proof keeps the original exact rehearsal tick/hash on that
+first boundary, while separately proving the current world advances and retains
+actual installed/support/crew effects. Programmatic paused parity remains exact;
+no golden/tolerance change. Actual probe Play also compares its20tick result to a
+deterministic Node reference while checking post-window continuity and manual Pause.
+
+Authoring review corrected test setup assumptions before browser execution: pause
+a healthy classroom before installing its deliberate fault, never call a quarantined
+pause mutator to prepare Reset, and record the exact fresh Runtime birth tick0 while
+a normally running Reset may advance before capture. The original generation+1,
+valid support/zero violations, exact subsequent Step and actual UI Reset checks stay.
+A test-local hook type replaces a conflicting global declaration; combined strict
+spec TypeScript and focused lint pass with the repo's esnext/DOM libraries. Browser
+execution remains the next serialized check; none of these authored cases is yet PASS.
