@@ -5,6 +5,7 @@ import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
 import { readWorkstation } from '../objects/workstation.ts';
 import { readBook } from '../objects/reading.ts';
+import { readDrawing } from '../objects/drawing.ts';
 
 const verbs = [
   'work_at',
@@ -13,6 +14,7 @@ const verbs = [
   'converse',
   'sleep',
   'garden_care',
+  'drawing_work',
 ] as const;
 export interface IntentionBinding {
   verb: (typeof verbs)[number];
@@ -100,6 +102,10 @@ function participant(p: Record<string, unknown>, actor: string) {
   );
 }
 function progress(rt: Runtime, b?: IntentionBinding): number {
+  if (b?.verb === 'drawing_work') {
+    const state = readDrawing(rt, String(b.params.pad));
+    return 'code' in state ? 0 : state.ticks * DT;
+  }
   const r =
     b?.verb === 'work_at'
       ? readWorkstation(rt, String(b.params.station))
@@ -109,6 +115,18 @@ function progress(rt: Runtime, b?: IntentionBinding): number {
   return r && !('code' in r) ? r.elapsed : 0;
 }
 function continued(rt: Runtime, b: IntentionBinding): IntentionBinding {
+  if (b.verb === 'drawing_work') {
+    const state = readDrawing(rt, String(b.params.pad));
+    if (
+      !('code' in state) &&
+      state.status === 'unfinished' &&
+      state.user === b.params.actor &&
+      state.task === (b.params.task ?? 'shelter-study') &&
+      state.pencil === b.params.pencil
+    )
+      return { verb: b.verb, params: { ...b.params, resume: true } };
+    return structuredClone(b);
+  }
   const r =
     b.verb === 'work_at'
       ? readWorkstation(rt, String(b.params.station))

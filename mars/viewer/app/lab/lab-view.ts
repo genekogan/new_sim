@@ -1,3 +1,4 @@
+import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { groupWarmupAttention } from '../../engine/activities/group-warmup.ts';
 import { musicGatheringAttention } from '../../engine/activities/music-gathering.ts';
 import { SleepMatView } from './sleep-mat.ts';
@@ -285,6 +286,14 @@ export class LabView {
     }
     for (const action of rt.records.values()) if (action.verb === 'group_warmup' && rt.isActive(action.id)) Object.assign(targets, groupWarmupAttention(rt, action.id));
     for (const action of rt.records.values()) if (action.verb === 'music_gathering' && rt.isActive(action.id)) Object.assign(targets, musicGatheringAttention(rt, action.id));
+    for (const action of rt.records.values()) {
+      if (action.verb !== 'art_sharing' || !rt.isActive(action.id)) continue;
+      const sharing = readArtSharing(rt, action.id);
+      if (!sharing?.attentionTarget) continue;
+      const speaker = sharing.floorHolder ? rt.world.entities[sharing.floorHolder] : undefined;
+      for (const p of sharing.participants) if (p.physicallyViewing && p.hold && rt.holder(`actor:${p.actor}`).includes(p.hold))
+        targets[p.actor] = speaker && p.actor !== sharing.floorHolder ? [speaker.pose.p[0], speaker.pose.p[2]] : [sharing.attentionTarget.point[0], sharing.attentionTarget.point[2]];
+    }
     Object.assign(targets, chessAttention(rt));
     this.attentionTargets = targets;
     this.humans.setAttention(targets);

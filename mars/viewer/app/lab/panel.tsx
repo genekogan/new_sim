@@ -1,3 +1,5 @@
+import { ArtSharingHud } from './art-sharing-hud.tsx';
+import { CreativeAfternoonHud } from './creative-afternoon-hud.tsx';
 import { DrawingHud } from './drawing-hud.tsx';
 import { GroupWarmupHud } from './group-warmup-hud.tsx';
 import { OpenJamHud } from './open-jam-hud.tsx';
@@ -114,6 +116,8 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <ReadingHud key={`reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <WorkBreakHud key={sim.scenarioEpoch} sim={sim} refresh={refresh} />
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <ArtSharingHud key={`art:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <CreativeAfternoonHud key={`creative:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <LivingDayHud key={`day:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <GardenCareHud key={`garden:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <DrawingHud key={`drawing:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />

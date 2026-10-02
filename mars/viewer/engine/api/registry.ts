@@ -1,3 +1,4 @@
+import { ART_SHARING_ACTIONS } from '../activities/art-sharing.ts';
 import { DRAWING_ACTIONS } from '../activities/drawing.ts';
 import { GROUP_WARMUP_ACTIONS } from '../activities/group-warmup.ts';
 import { OPEN_JAM_ACTIONS } from '../activities/open-jam.ts';
@@ -40,9 +41,9 @@ import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
-export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/19`;
+export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/20`;
 
-export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...PREPARATION_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS, ...SLEEP_ACTIONS, gardenCare, ...MUSIC_GATHERING_ACTIONS, ...LIVING_INTENTION_ACTIONS, ...OPEN_JAM_ACTIONS, ...DRAWING_ACTIONS, ...GROUP_WARMUP_ACTIONS];
+export const ENGINE_ACTIONS: ActionDef[] = [walkTo, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...PREPARATION_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS, ...SLEEP_ACTIONS, gardenCare, ...MUSIC_GATHERING_ACTIONS, ...LIVING_INTENTION_ACTIONS, ...OPEN_JAM_ACTIONS, ...DRAWING_ACTIONS, ...GROUP_WARMUP_ACTIONS, ...ART_SHARING_ACTIONS];
 export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS, ...FRAMING_INVARIANTS];
 
 export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> {

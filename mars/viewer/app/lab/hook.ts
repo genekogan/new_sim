@@ -1,3 +1,5 @@
+import { readCreativeAfternoon } from '../../engine/scenarios/creative-afternoon.ts';
+import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { readDrawing } from '../../engine/objects/drawing.ts';
 import { latestGroupWarmup } from '../../engine/activities/group-warmup.ts';
 import { latestOpenJam } from '../../engine/activities/open-jam.ts';
@@ -76,6 +78,8 @@ export function installHook(view: LabView, notify: () => void) {
     };
   };
   const hook = {
+    creativeAfternoon: () => readCreativeAfternoon(sim.rt) ?? null,
+    artSharing: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'art_sharing').at(-1); return r ? readArtSharing(sim.rt, r.id) ?? null : null; },
     livingDay: () => readLivingDay(sim.rt),
     garden: () => ({ plants: GARDEN_PLANTS.map(id => readGarden(sim.rt, id)), water: structuredClone(sim.rt.world.entities['water-bowl']), active: structuredClone([...sim.rt.records.values()].find(r => r.verb === 'garden_care' && sim.rt.isActive(r.id)) ?? null), claims: Object.fromEntries([...Object.keys(sim.rt.world.entities).flatMap(id => [`actor:${id}`, `entity:${id}`, `hand:${id}:right`, `hand:${id}:left`, `holds:${id}`]), 'surface:water-table#r0c2'].map(key => [key, sim.rt.holder(key)])) }),
     get ready() {

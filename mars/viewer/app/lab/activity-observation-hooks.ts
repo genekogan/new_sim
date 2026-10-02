@@ -1,3 +1,4 @@
+import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { readGroupWarmup } from '../../engine/activities/group-warmup.ts';
 import { readOpenJam } from '../../engine/activities/open-jam.ts';
 import { readPurposefulRoutine } from '../../engine/activities/purposeful-routine.ts';
@@ -83,6 +84,8 @@ export function cameraActivityReadout(rt: Runtime): {
                 s.binding.params.book,
                 s.binding.params.plant,
                 s.binding.params.mat,
+                s.binding.params.pad,
+                s.binding.params.pencil,
               ].filter((v): v is string => typeof v === 'string')
             : [],
           waitingReason: s.diagnostic?.message,
@@ -123,6 +126,13 @@ export function cameraActivityReadout(rt: Runtime): {
                   ? [s.bindings.work.station]
                   : [],
         };
+    }
+    if (r.verb === 'art_sharing') {
+      const s = readArtSharing(rt, r.id);
+      if (s) fact = { ...fact, actors: s.participants.filter(q => q.physicallyViewing).map(q => q.actor),
+        departing: s.participants.filter(q => q.membership === 'left' || q.membership === 'directed-away').map(q => q.actor),
+        phase: r.phase ?? r.verb, mode: s.mode, focus: s.floorHolder, objects: [s.pad],
+        waitingReason: s.diagnostic?.message };
     }
     if (r.verb === 'group_warmup') {
       const s = readGroupWarmup(rt, r.id);

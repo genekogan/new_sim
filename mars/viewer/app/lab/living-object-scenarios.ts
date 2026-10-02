@@ -1,3 +1,5 @@
+import { artSharingRuntime, artSharingScene } from '../../engine/scenarios/art-sharing.ts';
+import { creativeAfternoonRuntime, creativeAfternoonScene, tickCreativeAfternoon } from '../../engine/scenarios/creative-afternoon.ts';
 import { drawingWorkRuntime, drawingWorkScene } from '../../engine/scenarios/drawing-work.ts';
 import { groupWarmupRuntime } from '../../engine/scenarios/group-warmup.ts';
 import { openJamRuntime } from '../../engine/scenarios/open-jam.ts';
@@ -21,6 +23,18 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  {
+    name: 'creative-afternoon', title: 'Creative afternoon · make, share, return (hypothetical)',
+    description: 'Start creative afternoon, then Play. The artist makes three actual marks, shares that same pad, joins a two-performer music exchange, then returns to finish the same shelter study. A reader and gardener keep independent commitments. Pause/resume one person, ask about the drawing, invite a late visitor or direct someone away. Fixed ground layout; no active reload restoration.',
+    scene: creativeAfternoonScene, humans: () => [], build: creativeAfternoonRuntime,
+    start: () => {}, tick: tickCreativeAfternoon, continuous: true, maxTicks: 36000, focus: [0, 0, 22, 65], expect: checks,
+  },
+  {
+    name: 'art-sharing', title: 'Art sharing · questions around a retained drawing (hypothetical)',
+    description: 'Start sharing, then Play. A host and two visitors physically gather around a clearly labelled pre-made drawing fixture. Ask questions, change the floor, invite a late visitor, leave, pause or resume. The connected creative-afternoon preset makes its actual artwork first. Grounded tabletop viewing places only.',
+    scene: artSharingScene, humans: () => [], build: artSharingRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, 0, 8, 65], expect: checks,
+  },
   {
     name: 'drawing-work', title: 'Drawing Klerb-inspired sketching (hypothetical)',
     description: 'Start drawing, then Play. A real pencil makes retained marks on the same supported pad. Pause or direct the sketcher away, then Resume the unfinished study. One bounded standing/tabletop outline; no arbitrary art tools.',

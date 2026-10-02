@@ -2142,3 +2142,19 @@ Initial failures and corrected focused94/94PASS logs are retained; viewer TSc an
 lint pass. No existing assertion, support rule, outcome or performance limit changed.
 This general repair is still unpublished and requires the clean combined gate.
 Art sharing and connected creative-afternoon work remain separate future candidates.
+
+### Creative afternoon and tangible art sharing candidate — 2026-10-02
+
+Separate future worktree integrates bounded art sharing395922c/417d560 and HUD
+e9fcb19. Same actual partial pad supports physical viewing, questions/answers/floor,
+late arrival/departure and retained discussion effects. Root adds drawing progress
+adapter and creative afternoon: actual three-mark drawing→sharing→two-performer
+music→same unfinished study completion; reader/book break and finite care have
+independent commitments. Ordinary physical execution and explicit controls remain
+shared; camera hooks add detached actual facts only. No fabricated artwork in the
+combined run; standalone pre-made artwork is explicitly labelled hypothetical.
+Focused34PASS0fail/skip/TODO, TSc/lint clean. Occupied-place regression preserves the
+owner and waits for a real departure; unavailable music waits for the same allowed
+station. Initial test wrongly treated slot cancellation as removing its standing
+body; corrected to require ordinary walk clear, with unchanged engine clearance.
+Actual Play/captures/fullgate/publication pending; release37 frozen gate unaffected.
