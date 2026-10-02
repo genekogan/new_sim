@@ -27,10 +27,16 @@ test('body probe Play ticks the same still world and reset repeats its first tic
   assert.equal(sim.done(), true);
   assert.deepEqual(sim.rt.violations, []);
   assert.deepEqual(sim.rt.world.entities, initial);
+  const result = { tick: body.maxTicks, time: body.maxTicks * 0.05, stateHash: sim.rt.stateHash(), reason: 'budget' };
+  assert.deepEqual(sim.scriptResult, result, 'the original one-second validation window remains exact');
   sim.advance(0.25);
-  assert.equal(sim.rt.tick, body.maxTicks);
+  assert.equal(sim.rt.tick, body.maxTicks + 5, 'authored-window completion no longer freezes the surrounding world');
+  assert.deepEqual(sim.scriptResult, result);
+  assert.deepEqual(sim.rt.world.entities, initial);
+  assert.deepEqual(sim.rt.violations, []);
   sim.load('body');
   assert.equal(sim.rt.tick, 0);
+  assert.equal(sim.scriptResult, null);
   assert.deepEqual(sim.rt.world.entities, initial);
   sim.step();
   assert.equal(sim.rt.tick, 1);

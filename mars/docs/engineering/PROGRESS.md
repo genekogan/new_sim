@@ -2948,3 +2948,31 @@ connected-day instructions and follows the actual room-preparation quick-tour
 control to its supported Start button. Standalone strict browser TypeScript,
 lint, formatting and one-test discovery pass. Browser execution is pending the
 serialized release39 gate/public slot; this is authored coverage, not a UI PASS.
+
+
+## Alpha exact terminal observations and resumed native checks — 2026-10-02
+
+Release40 is publicly verified; the owner lifted the quota pause and authorized
+continued stabilization followed by useful Mars activities. Saved alpha work remains
+unreleased. A read-only frozen ScriptResult captures the exact first authored
+terminal/refusal/budget tick, time and hash while the same real frame may keep ticking
+the world. It survives ordinary continued work, clears on Reset or serious quarantine,
+and cannot certify uncertain partial execution. Fresh-world construction now finishes
+before publishing the scenario/runtime pair; a failed builder leaves the previous
+valid pair and commitments intact rather than mixing a new scenario with an old world.
+
+Native baseline24PASS/1FAIL exposed the old body-probe expectation that the world
+clock freezes at20ticks. That clock-stop requirement is explicitly superseded by
+Gene's whole-world liveness mandate, already reflected in the alpha probe description.
+The one-second validation boundary is preserved strictly: exact20tick/hash receipt,
+then exact25worldticks with unchanged entities/zero violations, explicit Pause and
+fresh Reset. No geometry/admission/fidelity tolerance is changed to hide a failure.
+Original first-Step and four invalid-placement diagnostics stay intact.
+
+Six new regressions prove same-frame deterministic terminal parity, empty/refused
+boundaries, budget/Pause/Reset, invariant/fault invalidation and failed-builder
+continuity. Combined31nativePASS/0FAIL/SKIP/TODO in665ms, viewer strict TypeScript
+and focused type-aware lint PASS. RED and PASS logs are preserved in ignored
+.cloudflare/alpha-resume-native-before.log and alpha-terminal-native.log. Browser
+terminal parity, new control quarantine and complete production coverage remain
+pending; focused native checks are not release or actual-Play proof.

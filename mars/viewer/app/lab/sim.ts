@@ -14,6 +14,8 @@ export function liveRoutes(rt: Runtime): { id: string; actor: string; route: Rou
   return [...live.entries()].filter(([, l]) => l.exec?.route).map(([id, l]) => ({ id, actor: l.exec.actor!, route: l.exec.route!, leg: l.exec.leg ?? 0 }));
 }
 
+export type ScriptResult = Readonly<{ tick: number; time: number; stateHash: string; reason: 'admission-refused' | 'terminal' | 'budget' }>;
+
 export type LogLine = { tick: number; level: 'info' | 'warn' | 'error'; text: string };
 
 export class LabSim {
@@ -29,6 +31,8 @@ export class LabSim {
   /** Invariant corruption or unexpected host/executor fault requires a fresh load. */
   halted: Diagnostic | null = null;
   scriptStopReason: 'admission-refused' | 'terminal' | 'budget' | null = null;
+  /** Exact first authored stop boundary; ordinary world ticks continue afterward. */
+  scriptResult: ScriptResult | null = null;
   private scriptFinished = false;
   private acc = 0;
   private costs: number[] = [];
@@ -44,14 +48,17 @@ export class LabSim {
   load(name: string) {
     const s = scenarioByName(name);
     if (!s) throw Error(`unknown scenario "${name}" (have ${SCENARIOS.map((x) => x.name).join(', ')})`);
+    // Build before publishing a new scenario/runtime pair; a failed builder preserves the old world.
+    const nextRuntime = buildRuntime(s);
     this.scenario = s;
-    this.rt = buildRuntime(s);
+    this.rt = nextRuntime;
     this.scenarioEpoch++;
     this.log = [{ tick: 0, level: 'info', text: `scenario ${s.name}: ${s.description}` }];
     this.diagnostics = [];
     this.halted = null;
     this.scriptFinished = false;
     this.scriptStopReason = null;
+    this.scriptResult = null;
     this.costs = [];
     this.routes.clear();
     this.acc = 0;
@@ -72,6 +79,7 @@ export class LabSim {
         this.diagnostics.push(line);
         this.scriptFinished = true;
         this.scriptStopReason = 'admission-refused';
+        this.captureScriptResult();
       } else {
         phase = 'scenario.start';
         s.start(this.rt);
@@ -113,10 +121,17 @@ export class LabSim {
     if (this.scriptFinished || !this.done()) return;
     this.scriptFinished = true;
     this.scriptStopReason = this.overBudget() ? 'budget' : 'terminal';
+    this.captureScriptResult();
+  }
+
+  private captureScriptResult() {
+    if (this.scriptResult || !this.scriptStopReason || this.halted || this.rt.violations.length) return;
+    this.scriptResult = Object.freeze({ tick: this.rt.tick, time: this.rt.time, stateHash: this.rt.stateHash(), reason: this.scriptStopReason });
   }
 
   private containViolations() {
     if (this.halted || !this.rt.violations.length) return;
+    this.scriptResult = null;
     const first = this.rt.violations[0];
     this.halted = {
       code: 'lab.invariant-halt',
@@ -134,6 +149,7 @@ export class LabSim {
   private containExecutorFault(phase: string, error: unknown) {
     if (this.executorFaulted()) return;
     const priorHalt = this.halted;
+    this.scriptResult = null;
     let name = 'NonErrorThrow', message: string, stack: string | null = null;
     try {
       if (error instanceof Error) {
