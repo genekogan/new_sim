@@ -8,17 +8,17 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `cfea591` (engine tree clean) |
-| Generated | 2026-10-02T06:16:44.498Z · Node v22.20.0 |
-| Engine suite | 1147 tests in 127 files: 1130 pass, 0 fail, 6 skipped, 11 TODO · 228.3 s wall |
-| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T05-15-31-251Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
-| External gate | `.cloudflare/gate/2026-10-02T05-15-31-251Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `ca6bb5d` (engine tree clean) |
+| Generated | 2026-10-02T10:54:41.961Z · Node v22.20.0 |
+| Engine suite | 1241 tests in 135 files: 1224 pass, 0 fail, 6 skipped, 11 TODO · 164.8 s wall |
+| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T09-52-10-874Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
+| External gate | `.cloudflare/gate/2026-10-02T09-52-10-874Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 10817 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 15168 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 30846 ms compute (cropped 15204 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 6427 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 9522 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 19802 ms compute (cropped 9396 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -270,7 +270,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -293,7 +293,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -309,7 +309,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -448,7 +448,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -478,7 +478,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -504,7 +504,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -522,7 +522,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -707,7 +707,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -755,10 +755,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -783,8 +783,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -803,9 +803,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T05-15-31-251Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T09-52-10-874Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -1032,91 +1032,106 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 removed.
+Compared with the report at `cfea591` (2026-10-02T06:16:44.498Z): 94 added, 0 removed.
 
-- added: garden-care.test.ts :: Pause in putting drains safely and retains exact partial care
-- added: garden-care.test.ts :: Pause in reaching drains safely and retains exact partial care
-- added: garden-care.test.ts :: Pause in taking drains safely and retains exact partial care
-- added: garden-care.test.ts :: Pause in walking drains safely and retains exact partial care
-- added: garden-care.test.ts :: Pause in watering drains safely and retains exact partial care
-- added: garden-care.test.ts :: a newly occupied return slot retains held water and claims until the obstacle clears
-- added: garden-care.test.ts :: bad-state refuses before any physical effect
-- added: garden-care.test.ts :: director handoff returns bowl before independent walk; explicit retry keeps the purpose
-- added: garden-care.test.ts :: empty-water refuses before any physical effect
-- added: garden-care.test.ts :: foreign planter lease refuses without cancelling owner
-- added: garden-care.test.ts :: foreign-held refuses before any physical effect
-- added: garden-care.test.ts :: missing-plant refuses before any physical effect
-- added: garden-care.test.ts :: missing-water refuses before any physical effect
-- added: garden-care.test.ts :: occupied-return refuses before any physical effect
-- added: garden-care.test.ts :: repeat due is deterministic elapsed time; four cycles exhaust water without refill
-- added: garden-care.test.ts :: same commands repeat exact care state and action provenance deterministically
-- added: garden-care.test.ts :: two planters conserve finite water, identity and supported ordinary take/walk/put
-- added: garden-care.test.ts :: unsupported-plant refuses before any physical effect
-- added: garden-care.test.ts :: wrong-water refuses before any physical effect
-- added: living-day-disruptions.test.ts :: living-day End cleanup: occupied spoon return remains coherently held and retries only after restoration
-- added: living-day-disruptions.test.ts :: living-day floor: both permitted layouts wait without failed-action spam, then ordinary actor departure admits music
-- added: living-day-disruptions.test.ts :: living-day recovery: End partial main routine reports ended while independent care finishes
-- added: living-day-disruptions.test.ts :: living-day recovery: expired gathering gives named ended disposition on explicit refused transition retry
-- added: living-day-disruptions.test.ts :: living-day recovery: rejected music Resume preserves latest real session, restoration retries original score
-- added: living-day-disruptions.test.ts :: living-day terminal: End initial commitment reports ended rather than false completion
-- added: living-day-disruptions.test.ts :: living-day terminal: End reader permits main and carer to finish, final partial day is explicitly ended
-- added: living-day-disruptions.test.ts :: living-day terminal: unstarted canceled music explicitly retries the same bound places without fake unfinished score
-- added: living-day-disruptions.test.ts :: living-day-4: directing reader away retains the bookmark while carer continues independently
-- added: living-day-disruptions.test.ts :: living-day-4: missing display declines transition, restoration requires explicit retry
-- added: living-day-disruptions.test.ts :: living-day-4: occupied preferred computer selects only permitted auxiliary binding and preserves owner
-- added: living-day-disruptions.test.ts :: living-day-4: routine Pause/Resume preserves partial preparation and the same sleep purpose
-- added: living-day-disruptions.test.ts :: living-day-studio: directing reader away retains the bookmark while carer continues independently
-- added: living-day-disruptions.test.ts :: living-day-studio: missing display declines transition, restoration requires explicit retry
-- added: living-day-disruptions.test.ts :: living-day-studio: occupied preferred computer selects only permitted auxiliary binding and preserves owner
-- added: living-day-disruptions.test.ts :: living-day-studio: routine Pause/Resume preserves partial preparation and the same sleep purpose
-- added: living-day.test.ts :: living-day-4: assistant independent day returns to unfinished purpose
-- added: living-day.test.ts :: living-day-4: original independent day returns to unfinished purpose
-- added: living-day.test.ts :: living-day-studio: assistant independent day returns to unfinished purpose
-- added: living-day.test.ts :: living-day-studio: original independent day returns to unfinished purpose
-- added: living-intention.test.ts :: a busy foreign workstation keeps its owner and uncommitted people can wait without losing their purposes
-- added: living-intention.test.ts :: director takes precedence, another person continues, explicit Resume retains the original purpose
-- added: living-intention.test.ts :: independent intention digresses then finishes the same conserved notes
-- added: living-intention.test.ts :: invalid participants and unsupported or foreign actor bindings fail admission without claims
-- added: living-intention.test.ts :: pausing a work slice retains its initial budget and returns without repeating it
-- added: living-intention.test.ts :: resource alternatives bind an available object; missing preferred equipment waits only when no permitted alternative fits
-- added: living-intention.test.ts :: same decisions reproduce independent intentions exactly and readouts are detached
-- added: living-intention.test.ts :: unexpected execution failure pauses instead of endlessly submitting failed children
-- added: music-gathering.test.ts :: active gathering refuses logical snapshot restoration explicitly
-- added: music-gathering.test.ts :: admission refuses duplicate participant before effects
-- added: music-gathering.test.ts :: admission refuses floor edge before effects
-- added: music-gathering.test.ts :: admission refuses foreign actor claim before effects
-- added: music-gathering.test.ts :: admission refuses missing actor before effects
-- added: music-gathering.test.ts :: admission refuses missing computer before effects
-- added: music-gathering.test.ts :: admission refuses obstructed dance floor before effects
-- added: music-gathering.test.ts :: admission refuses occupied dance floor before effects
-- added: music-gathering.test.ts :: admission refuses overlapping envelopes before effects
-- added: music-gathering.test.ts :: admission refuses unsupported level before effects
-- added: music-gathering.test.ts :: cancellation at approaching-floor drains only owned resources
-- added: music-gathering.test.ts :: cancellation at awaiting-score drains only owned resources
-- added: music-gathering.test.ts :: cancellation at dancing drains only owned resources
-- added: music-gathering.test.ts :: complete four-person gathering at orientation 0
-- added: music-gathering.test.ts :: complete four-person gathering at orientation 1.5707963267948966
-- added: music-gathering.test.ts :: dancer directive lowers hands then leaves other commitments uninterrupted; explicit join after walk
-- added: music-gathering.test.ts :: direct dance admission refuses overlapping active floor intentions before either arrives
-- added: music-gathering.test.ts :: foreign unfinished computer task never overwritten
-- added: music-gathering.test.ts :: grounded dance refuses a missing workstation rather than holding a silent invented score
-- added: music-gathering.test.ts :: held utensil refuses dance and remains physically owned
-- added: music-gathering.test.ts :: individual late join and leave preserve steady performer/listener/other dancer progress
-- added: music-gathering.test.ts :: late Join refuses foreign claim without disrupting existing score
-- added: music-gathering.test.ts :: listener director departure remains withdrawn after gathering Pause/Resume
-- added: music-gathering.test.ts :: per-tick grounded arm continuity through dance and director safe release
-- added: music-gathering.test.ts :: performer directive safely stops gathering; retained score and withdrawals resume explicitly
-- added: music-gathering.test.ts :: resume refuses a changed original duration or dance binding
-- added: music-gathering.test.ts :: retained withdrawn dancer remains under foreign directive while score resumes
-- added: music-gathering.test.ts :: safe Pause and same-score Resume after 0s
-- added: music-gathering.test.ts :: safe Pause and same-score Resume after 4s
-- added: music-gathering.test.ts :: two exact executions retain deterministic worlds, records and floor sequence
-- added: prepared-day-core.test.ts :: End during preparation preserves deposited food and returns the same spoon through ordinary put
-- removed: prepared-day-core.test.ts :: End during preparation drains the physical recipe and preserves deposited food and held spoon
+- added: art-sharing.test.ts :: artifact intervention pauses and refuses silent rebind, preserving committed discussion
+- added: art-sharing.test.ts :: four declared visitors and host form safely around the same artwork with no shared body places
+- added: art-sharing.test.ts :: host and visitors ask, answer and request the floor about this artifact
+- added: art-sharing.test.ts :: host and visitors physically view the actual retained pad, take floors and keep completed discussion effects
+- added: art-sharing.test.ts :: identical controls reproduce actual world, effects and action records
+- added: art-sharing.test.ts :: invalid controls and incomplete formation refuse without changing membership or retained artwork
+- added: art-sharing.test.ts :: invalid, missing, blank, active or unavailable artwork refuses without physical mutation
+- added: art-sharing.test.ts :: late visitor joins the actual declared place; floor holder can leave by an independent ordinary walk
+- added: art-sharing.test.ts :: loss of all visitors pauses until explicit declared rejoin and resume
+- added: art-sharing.test.ts :: occupied, claimed, blocked and wrongly facing viewing places fail before anyone walks
+- added: art-sharing.test.ts :: pause and host directive preserve partial discussion and explicitly resume the same artwork
+- added: art-sharing.test.ts :: rotated physical table and declared places keep correct artifact-facing headings
+- added: art-sharing.test.ts :: same physical drawing action produces the pad shared next, including safely unfinished drawings
+- added: art-sharing.test.ts :: unavailable artifact drains all physical holds and requires explicit resource repair before continuation
+- added: art-sharing.test.ts :: visitor directive releases only that participant and session cleanup leaves the foreign directive intact
+- added: cancellation-idempotence.test.ts :: a refused cancellation remains retryable, and later accepted cleanup preserves its reason
+- added: cancellation-idempotence.test.ts :: an accepted deferred cancellation starts safe cleanup once, despite repeated parent requests
+- added: cancellation-idempotence.test.ts :: repeated parent Cancel preserves garden ownership until ordinary item cleanup finishes
+- added: cancellation-idempotence.test.ts :: repeated parent Cancel preserves preparation ownership until ordinary item cleanup finishes
+- added: computer-music.test.ts :: completed music readout stays with its own child under different performer station reuse
+- added: computer-music.test.ts :: completed same-person identical-label music history does not inherit later duration or pulses
+- added: computer-music.test.ts :: interrupted session retains its exact bookmark under explicit same-purpose continuation
+- added: computer-music.test.ts :: music terminal outputs retain own work result during later ordinary station reuse and listener drain
+- added: creative-afternoon.test.ts :: End drains safely without replacement props or discarded marks
+- added: creative-afternoon.test.ts :: an occupied artwork viewing place waits without cancelling its owner or spawning failed circles
+- added: creative-afternoon.test.ts :: music Pause/Resume retains child identity and final artwork
+- added: creative-afternoon.test.ts :: player direction pauses only the unfinished sketch; Resume completes the combined afternoon
+- added: creative-afternoon.test.ts :: produce, share and finish the same actual drawing alongside independent reading and care
+- added: creative-afternoon.test.ts :: recorded afternoon decisions produce the same deterministic world
+- added: creative-afternoon.test.ts :: sharing Pause/Resume retains child identity and final artwork
+- added: creative-afternoon.test.ts :: unavailable music equipment retains the partial artwork and retries only its permitted binding
+- added: creative-afternoon.test.ts :: unstarted or repeated afternoon control gives useful refusal
+- added: drawing-intention.test.ts :: an authored sketch purpose retains exact partial marks through a digression and return
+- added: drawing-intention.test.ts :: player direction pauses the stable sketch purpose and explicit Resume continues it
+- added: drawing.test.ts :: blocked drawing table names obstacle before taking any resource
+- added: drawing.test.ts :: busy pencil and occupied hands never steal resources
+- added: drawing.test.ts :: cancel before grasp drains and retains zero progress for continuation
+- added: drawing.test.ts :: cancel retains exact partial stroke, returns pencil and explicitly resumes same artwork
+- added: drawing.test.ts :: missing, wrong, unsupported, unavailable and occupied resources refuse with named diagnostics without mutation
+- added: drawing.test.ts :: occupied return slot blocks safe release, then drains after the explicit obstruction is removed
+- added: drawing.test.ts :: ordinary take, approach, moving pencil strokes and put retain same identities and completed artwork
+- added: drawing.test.ts :: preempting with ordinary walk waits for safe pencil return and retains unfinished marks
+- added: drawing.test.ts :: repeated parent Cancel drains one physical pencil return without restarting cleanup
+- added: drawing.test.ts :: same decisions replay identically
+- added: drawing.test.ts :: unavailable or moved pad during strokes safely drains physical ownership retaining marks
+- added: group-warmup.test.ts :: Pause releases claims, Resume retains timing/withdrawals; End prevents Resume
+- added: group-warmup.test.ts :: accepted Pause freezes instructor time at admission while physical hand lowering continues
+- added: group-warmup.test.ts :: cancellation during approaching-place drains ownership
+- added: group-warmup.test.ts :: cancellation during lower drains ownership
+- added: group-warmup.test.ts :: cancellation during open drains ownership
+- added: group-warmup.test.ts :: cancellation during raise drains ownership
+- added: group-warmup.test.ts :: cancellation during settle drains ownership
+- added: group-warmup.test.ts :: continuous hands and interruption lower before foreign walking takes actor
+- added: group-warmup.test.ts :: deterministic replay including pause/resume and detached readout
+- added: group-warmup.test.ts :: four independent followers complete phased planted warm-up yaw 0
+- added: group-warmup.test.ts :: four independent followers complete phased planted warm-up yaw 1.5707963267948966
+- added: group-warmup.test.ts :: instructor directive pauses retained progress and explicitly resumes after ordinary departure
+- added: group-warmup.test.ts :: leave and rejoin use independent safe release while instructor continues
+- added: group-warmup.test.ts :: refuses busy follower without effects
+- added: group-warmup.test.ts :: refuses obstacle without effects
+- added: group-warmup.test.ts :: refuses occupied place without effects
+- added: group-warmup.test.ts :: refuses overlapping places without effects
+- added: group-warmup.test.ts :: refuses unsupported floor without effects
+- added: open-jam.test.ts :: Pause at a completed-child boundary never repeats the finished score
+- added: open-jam.test.ts :: a dancer who leaves is not silently invited into the next round
+- added: open-jam.test.ts :: an occupied next chair waits truthfully, then ordinary handoff recovers
+- added: open-jam.test.ts :: directing a performer pauses the jam until explicit resumption
+- added: open-jam.test.ts :: duplicate performers and unavailable equipment decline before acquiring resources
+- added: open-jam.test.ts :: end releases physical children while retaining completed/unfinished effects
+- added: open-jam.test.ts :: pause/resume retains current score and completed round history
+- added: open-jam.test.ts :: rapid accepted dancer Leave then performer direction retains departure across rounds
+- added: open-jam.test.ts :: same decisions reproduce same authoritative world and round history
+- added: open-jam.test.ts :: two ordinary performer handoffs preserve computer/chair at 0
+- added: open-jam.test.ts :: two ordinary performer handoffs preserve computer/chair at 1.5707963267948966
+- added: open-jam.test.ts :: unavailable equipment between rounds waits with retained completion
+- added: table-cleanup.test.ts :: actual overhanging source and destination footprints refuse admission
+- added: table-cleanup.test.ts :: both permitted supports occupied preserves true held ownership until explicit intervention
+- added: table-cleanup.test.ts :: held return refusal remains coherent during End, then drains when declared support restored
+- added: table-cleanup.test.ts :: invalid resources and ground routes name actual failing items/supports
+- added: table-cleanup.test.ts :: occupied task is exclusive while approved fixture claims remain shared
+- added: table-cleanup.test.ts :: ordinary player walk takes precedence after supported release and explicit resume succeeds
+- added: table-cleanup.test.ts :: pause while second item is held retains first transfer and resumes same remaining objects
+- added: table-cleanup.test.ts :: paused item contents change refuses resume, preserves source and names item intervention
+- added: table-cleanup.test.ts :: physical 2-item transfer retains identities, payloads and support at yaw 0
+- added: table-cleanup.test.ts :: physical 2-item transfer retains identities, payloads and support at yaw 1.5707963267948966
+- added: table-cleanup.test.ts :: physical 3-item transfer retains identities, payloads and support at yaw 0
+- added: table-cleanup.test.ts :: physical 3-item transfer retains identities, payloads and support at yaw 1.5707963267948966
+- added: table-cleanup.test.ts :: physical 4-item transfer retains identities, payloads and support at yaw 0
+- added: table-cleanup.test.ts :: physical 4-item transfer retains identities, payloads and support at yaw 1.5707963267948966
+- added: table-cleanup.test.ts :: player direction before first tick followed by End leaves the player walk independent
+- added: table-cleanup.test.ts :: rapid accepted controls before a tick cannot dispatch orphan physical children
+- added: table-cleanup.test.ts :: repeated End/cancel drains held object once without active leaks
+- added: table-cleanup.test.ts :: same pause/resume decisions replay identically
+- added: table-cleanup.test.ts :: source occupied during pause uses only declared destination fallback and retains its completed transfer
 
 ## Tests not cited by any row or milestone
 
-820 of 1147 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+914 of 1241 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1159,6 +1174,21 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `api.test.ts` pass: sequence built-ins over the op API (LM-016): list_verbs describes mark/cancel; a plan cancels a walk at 2 s and marks the take
 - `api.test.ts` pass: one control path (LM-014): every legacy tool is classified — an engine equivalent that exists, or viewer-only with a reason — and fails in one envelope
 - `api.test.ts` pass: current reviewed 2024 API refuses removed sink by name and resolves the actual Chiba kitchen counter without mutation
+- `art-sharing.test.ts` pass: host and visitors physically view the actual retained pad, take floors and keep completed discussion effects
+- `art-sharing.test.ts` pass: same physical drawing action produces the pad shared next, including safely unfinished drawings
+- `art-sharing.test.ts` pass: host and visitors ask, answer and request the floor about this artifact
+- `art-sharing.test.ts` pass: late visitor joins the actual declared place; floor holder can leave by an independent ordinary walk
+- `art-sharing.test.ts` pass: visitor directive releases only that participant and session cleanup leaves the foreign directive intact
+- `art-sharing.test.ts` pass: pause and host directive preserve partial discussion and explicitly resume the same artwork
+- `art-sharing.test.ts` pass: invalid, missing, blank, active or unavailable artwork refuses without physical mutation
+- `art-sharing.test.ts` pass: occupied, claimed, blocked and wrongly facing viewing places fail before anyone walks
+- `art-sharing.test.ts` pass: rotated physical table and declared places keep correct artifact-facing headings
+- `art-sharing.test.ts` pass: artifact intervention pauses and refuses silent rebind, preserving committed discussion
+- `art-sharing.test.ts` pass: identical controls reproduce actual world, effects and action records
+- `art-sharing.test.ts` pass: invalid controls and incomplete formation refuse without changing membership or retained artwork
+- `art-sharing.test.ts` pass: unavailable artifact drains all physical holds and requires explicit resource repair before continuation
+- `art-sharing.test.ts` pass: loss of all visitors pauses until explicit declared rejoin and resume
+- `art-sharing.test.ts` pass: four declared visitors and host form safely around the same artwork with no shared body places
 - `blocked-tails.test.ts` pass: tail proof is a fixed point over completion gates; started gates are not completion gates
 - `blocked-tails.test.ts` pass: malformed or unknown dependency graphs cannot certify pending work inert
 - `body-model.test.ts` pass: prone receiver + rise (owner feedback §13; W32): the model is the measured rig lying at the edge (woman template), bands derived from it and consistent through the rise
@@ -1249,6 +1279,10 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `campus.test.ts` pass: staging-east is clear for a 4-person 19 ft upright carry at any heading
 - `campus.test.ts` pass: flagship inventory lies inside its pile regions, on clear ground, not overlapping
 - `campus.test.ts` pass: a walker can route from every pile to staging (±40 m crop)
+- `cancellation-idempotence.test.ts` pass: an accepted deferred cancellation starts safe cleanup once, despite repeated parent requests
+- `cancellation-idempotence.test.ts` pass: a refused cancellation remains retryable, and later accepted cleanup preserves its reason
+- `cancellation-idempotence.test.ts` pass: repeated parent Cancel preserves garden ownership until ordinary item cleanup finishes
+- `cancellation-idempotence.test.ts` pass: repeated parent Cancel preserves preparation ownership until ordinary item cleanup finishes
 - `carry.test.ts` pass: carry past walkers stopping beside / on its path: 0 human-human violations over 42 stop positions, everyone arrives
 - `chess-physical.test.ts` pass: ordinary item transfers at an actual chess board/table retain identity and support, yaw 0
 - `chess-physical.test.ts` pass: ordinary item transfers at an actual chess board/table retain identity and support, yaw 1.5707963267948966
@@ -1321,6 +1355,10 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `computer-music.test.ts` pass: a human-readable work label alone does not create a music capability or audible output
 - `computer-music.test.ts` pass: completed music metadata cannot turn a later identically labelled ordinary task into performance
 - `computer-music.test.ts` pass: resuming remaining invitations preserves an explicitly departed listener and its ongoing player command
+- `computer-music.test.ts` pass: completed music readout stays with its own child under different performer station reuse
+- `computer-music.test.ts` pass: completed same-person identical-label music history does not inherit later duration or pulses
+- `computer-music.test.ts` pass: interrupted session retains its exact bookmark under explicit same-purpose continuation
+- `computer-music.test.ts` pass: music terminal outputs retain own work result during later ordinary station reuse and listener drain
 - `converse-return.test.ts` pass: three-person conversation retains two talking while one walks a directive and physically rejoins
 - `converse-return.test.ts` pass: conversation return skips failed/cancelled/newer directives and ended/deleted/occupied/held cases
 - `converse-return.test.ts` pass: conversation departure and returning walk snapshots continue identically and corrupt queues refuse
@@ -1332,6 +1370,15 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `converse-return.test.ts` pass: a refusing social cancellation leaves selective conversation membership and ownership unchanged
 - `converse-return.test.ts` pass: completed small-item pickup refuses conversation return while retaining hand support
 - `core.test.ts` pass: reconstruction edits and simulation events are distinct causes
+- `creative-afternoon.test.ts` pass: produce, share and finish the same actual drawing alongside independent reading and care
+- `creative-afternoon.test.ts` pass: player direction pauses only the unfinished sketch; Resume completes the combined afternoon
+- `creative-afternoon.test.ts` pass: sharing Pause/Resume retains child identity and final artwork
+- `creative-afternoon.test.ts` pass: music Pause/Resume retains child identity and final artwork
+- `creative-afternoon.test.ts` pass: End drains safely without replacement props or discarded marks
+- `creative-afternoon.test.ts` pass: recorded afternoon decisions produce the same deterministic world
+- `creative-afternoon.test.ts` pass: unstarted or repeated afternoon control gives useful refusal
+- `creative-afternoon.test.ts` pass: an occupied artwork viewing place waits without cancelling its owner or spawning failed circles
+- `creative-afternoon.test.ts` pass: unavailable music equipment retains the partial artwork and retries only its permitted binding
 - `deadlock-recovery.test.ts` pass: acyclic stationary sink, one recovery attempt, snapshot retains exhausted timer and cap
 - `deadlock-recovery.test.ts` pass: moving sink resets the cumulative progress anchor; stationary unknown actions prevent early stopping
 - `deadlock-recovery.test.ts` pass: anchored reporting tolerance ignores bounded jitter and code alternation, but resets for cumulative translation, rotation and changed blockers
@@ -1355,6 +1402,19 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `design-studio.test.ts` pass: factory and bindings reset independently without legacy actor IDs or shared mutable state
 - `design-studio.test.ts` pass: fresh studio and same timed commands reproduce full authoritative state/actions/attention marks
 - `design-studio.test.ts` pass: same paired trip and continuing purposes work in independent studio without Mars actor IDs
+- `drawing-intention.test.ts` pass: an authored sketch purpose retains exact partial marks through a digression and return
+- `drawing-intention.test.ts` pass: player direction pauses the stable sketch purpose and explicit Resume continues it
+- `drawing.test.ts` pass: ordinary take, approach, moving pencil strokes and put retain same identities and completed artwork
+- `drawing.test.ts` pass: cancel retains exact partial stroke, returns pencil and explicitly resumes same artwork
+- `drawing.test.ts` pass: preempting with ordinary walk waits for safe pencil return and retains unfinished marks
+- `drawing.test.ts` pass: same decisions replay identically
+- `drawing.test.ts` pass: missing, wrong, unsupported, unavailable and occupied resources refuse with named diagnostics without mutation
+- `drawing.test.ts` pass: busy pencil and occupied hands never steal resources
+- `drawing.test.ts` pass: unavailable or moved pad during strokes safely drains physical ownership retaining marks
+- `drawing.test.ts` pass: cancel before grasp drains and retains zero progress for continuation
+- `drawing.test.ts` pass: blocked drawing table names obstacle before taking any resource
+- `drawing.test.ts` pass: occupied return slot blocks safe release, then drains after the explicit obstruction is removed
+- `drawing.test.ts` pass: repeated parent Cancel drains one physical pencil return without restarting cleanup
 - `edit-static.test.ts` pass: static edits (LM-002): sequential add/update/remove; invalid bounds, support, overlaps and missing ids refuse atomically with named diagnostics
 - `edit-static.test.ts` pass: static edits (LM-002): a post supporting a walkable deck cannot be removed or moved
 - `edit-static.test.ts` pass: static edits (LM-002): supported corners across disconnected floors do not permit a floating span
@@ -1494,6 +1554,24 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `gathering-continuation.test.ts` pass: shared logical claims prevent overlapping commitments and readout cannot mutate authority
 - `gathering-continuation.test.ts` pass: same timed discussion intervention reproduces world, children, marks and readouts exactly
 - `grid-incremental.test.ts` pass: grids of different bounds share one lattice: same cell centres, free cells and routes
+- `group-warmup.test.ts` pass: four independent followers complete phased planted warm-up yaw 0
+- `group-warmup.test.ts` pass: four independent followers complete phased planted warm-up yaw 1.5707963267948966
+- `group-warmup.test.ts` pass: continuous hands and interruption lower before foreign walking takes actor
+- `group-warmup.test.ts` pass: leave and rejoin use independent safe release while instructor continues
+- `group-warmup.test.ts` pass: Pause releases claims, Resume retains timing/withdrawals; End prevents Resume
+- `group-warmup.test.ts` pass: cancellation during approaching-place drains ownership
+- `group-warmup.test.ts` pass: cancellation during settle drains ownership
+- `group-warmup.test.ts` pass: cancellation during raise drains ownership
+- `group-warmup.test.ts` pass: cancellation during open drains ownership
+- `group-warmup.test.ts` pass: cancellation during lower drains ownership
+- `group-warmup.test.ts` pass: refuses overlapping places without effects
+- `group-warmup.test.ts` pass: refuses unsupported floor without effects
+- `group-warmup.test.ts` pass: refuses obstacle without effects
+- `group-warmup.test.ts` pass: refuses occupied place without effects
+- `group-warmup.test.ts` pass: refuses busy follower without effects
+- `group-warmup.test.ts` pass: deterministic replay including pause/resume and detached readout
+- `group-warmup.test.ts` pass: instructor directive pauses retained progress and explicitly resumes after ordinary departure
+- `group-warmup.test.ts` pass: accepted Pause freezes instructor time at admission while physical hand lowering continues
 - `handup-prone.test.ts` pass: prone receivers at the tallest deck the rig reaches from (2.75 m): kneeling cannot reach (0.5 m), two people lying at the deck edge, turned toward the grips, take it ≈ 0.67 m below the deck and get up holding it; 0 violations, hands continuous
 - `handup-prone.test.ts` pass: one prone receiver takes a 4x6 sheet alone (carry crew 1–2); determinism: the same run twice is bit-identical
 - `handup-prone.test.ts` pass: the lying body is checked at its heading (toes 0.75 m behind S, half-width 0.20 m) against people and parts on the deck: where the only place a receiver can lie is taken, refused naming who / what is there
@@ -1606,6 +1684,18 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `object-capabilities.test.ts` pass: presenter can claim and reach the lectern through the existing social verb
 - `object-capabilities.test.ts` pass: validated standalone command persists on/off content in world state and rejects invalid objects/content
 - `object-capabilities.test.ts` pass: session focus and cleanup require the exact live display claim; a competing command conflicts
+- `open-jam.test.ts` pass: two ordinary performer handoffs preserve computer/chair at 0
+- `open-jam.test.ts` pass: two ordinary performer handoffs preserve computer/chair at 1.5707963267948966
+- `open-jam.test.ts` pass: pause/resume retains current score and completed round history
+- `open-jam.test.ts` pass: end releases physical children while retaining completed/unfinished effects
+- `open-jam.test.ts` pass: duplicate performers and unavailable equipment decline before acquiring resources
+- `open-jam.test.ts` pass: same decisions reproduce same authoritative world and round history
+- `open-jam.test.ts` pass: directing a performer pauses the jam until explicit resumption
+- `open-jam.test.ts` pass: an occupied next chair waits truthfully, then ordinary handoff recovers
+- `open-jam.test.ts` pass: unavailable equipment between rounds waits with retained completion
+- `open-jam.test.ts` pass: a dancer who leaves is not silently invited into the next round
+- `open-jam.test.ts` pass: Pause at a completed-child boundary never repeats the finished score
+- `open-jam.test.ts` pass: rapid accepted dancer Leave then performer direction retains departure across rounds
 - `paired-walk.test.ts` pass: authored vertical pair regroups, walks visibly together and jointly arrives
 - `paired-walk.test.ts` pass: authored horizontal pair regroups, walks visibly together and jointly arrives
 - `paired-walk.test.ts` pass: duplicate invitation refuses before effects or owned children
@@ -1857,6 +1947,25 @@ Compared with the report at `9958ed4` (2026-10-02T02:34:02.237Z): 78 added, 1 re
 - `stow-items.test.ts` pass: explicit snapshot drop preserves cancelled readout when active exec is omitted
 - `stow-items.test.ts` pass: final completion refuses an earlier placement changed while second put executes
 - `stow-items.test.ts` pass: quiescent partial cancellation preserves historical completed and remaining readout on restore
+- `table-cleanup.test.ts` pass: physical 2-item transfer retains identities, payloads and support at yaw 0
+- `table-cleanup.test.ts` pass: physical 3-item transfer retains identities, payloads and support at yaw 0
+- `table-cleanup.test.ts` pass: physical 4-item transfer retains identities, payloads and support at yaw 0
+- `table-cleanup.test.ts` pass: physical 2-item transfer retains identities, payloads and support at yaw 1.5707963267948966
+- `table-cleanup.test.ts` pass: physical 3-item transfer retains identities, payloads and support at yaw 1.5707963267948966
+- `table-cleanup.test.ts` pass: physical 4-item transfer retains identities, payloads and support at yaw 1.5707963267948966
+- `table-cleanup.test.ts` pass: pause while second item is held retains first transfer and resumes same remaining objects
+- `table-cleanup.test.ts` pass: repeated End/cancel drains held object once without active leaks
+- `table-cleanup.test.ts` pass: ordinary player walk takes precedence after supported release and explicit resume succeeds
+- `table-cleanup.test.ts` pass: both permitted supports occupied preserves true held ownership until explicit intervention
+- `table-cleanup.test.ts` pass: source occupied during pause uses only declared destination fallback and retains its completed transfer
+- `table-cleanup.test.ts` pass: invalid resources and ground routes name actual failing items/supports
+- `table-cleanup.test.ts` pass: same pause/resume decisions replay identically
+- `table-cleanup.test.ts` pass: paused item contents change refuses resume, preserves source and names item intervention
+- `table-cleanup.test.ts` pass: held return refusal remains coherent during End, then drains when declared support restored
+- `table-cleanup.test.ts` pass: occupied task is exclusive while approved fixture claims remain shared
+- `table-cleanup.test.ts` pass: actual overhanging source and destination footprints refuse admission
+- `table-cleanup.test.ts` pass: rapid accepted controls before a tick cannot dispatch orphan physical children
+- `table-cleanup.test.ts` pass: player direction before first tick followed by End leaves the player walk independent
 - `table-move.test.ts` pass: two real people continuously lift/carry/lower an upright table and ordinary put uses relocated top
 - `table-move.test.ts` pass: table cancellation gather retains support until safe release
 - `table-move.test.ts` pass: table cancellation lift retains support until safe release

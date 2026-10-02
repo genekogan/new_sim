@@ -10,7 +10,7 @@ not instructions to restart completed increments. Public/source truth comes from
 - [Active roadmap](ACTIVE_ROADMAP.md): current tranche and exit criteria.
 - [Simulation vision](SIMULATION_VISION.md): enduring Mars/Eden direction.
 - [Lab guide](LAB_GUIDE.md): individual and combined scenarios, controls and limitations.
-- [MVP handoff](MARS_MVP_HANDOFF.md): release36 public acceptance, exact source, limits and Eden handoff.
+- [MVP handoff](MARS_MVP_HANDOFF.md): original release36 acceptance and current release37 notice, exact source, limits and Eden handoff.
   Earlier baseline evidence is retained as dated provenance.
 
 ## Implement and validate
@@ -25,13 +25,13 @@ not instructions to restart completed increments. Public/source truth comes from
 - [Progress](PROGRESS.md): chronological work and failures, newest entries at the end.
 - [Live Lab repairs](LIVE_LAB_REPAIRS.md): Reach, stance and material continuity findings.
 
-## Current vocabulary candidates
+## Published release37 vocabulary
 
 - [Drawing work](briefs/drawing-work.REPORT.md): physical tools and retained marks.
 - [Guided warm-up](briefs/group-warmup.REPORT.md): instructor timing, floor safety and independent followers.
 
-These are implementation candidates until the release record proves integration,
-actual Play and publication. Current queue is in the active roadmap.
+Release37's combined gate, actual public Play and inspected captures prove these
+additions. Current unreleased queue is in the active roadmap.
 
 ## Release36 tranche evidence
 
@@ -57,6 +57,6 @@ superseded dated instructions. Older handoff,
 assessment and numbered reports remain traceable; use current guides for operation.
 Historical reconstruction and questions retain their separate content ownership.
 
-Vocabulary continuation candidates (unreleased): [creative afternoon](briefs/creative-afternoon.REPORT.md),
+Published release37 continuation: [creative afternoon](briefs/creative-afternoon.REPORT.md),
 [art sharing](briefs/art-sharing.REPORT.md), [physical cleanup](briefs/table-cleanup.REPORT.md).
 These reports distinguish focused proof, authored browser checks and publication.

@@ -1,12 +1,12 @@
 # Lab play and inspection guide
 
-Current public checkpoint is **release36 at [sim.mars.college](https://sim.mars.college/)**.
+Current public checkpoint is **release37 at [sim.mars.college](https://sim.mars.college/)**.
 Living days, garden care, music/dance and longer automatic coverage are shipped.
 [Final handoff](MARS_MVP_HANDOFF.md) records exact source, validation and limits.
 
-## Vocabulary expansion candidate (not yet public)
+## Published drawing, warm-up and jam
 
-The isolated activity-vocabulary branch adds three manual-start experiences:
+Release37 adds these three manual-start experiences:
 
 | Preset | Initiate, intervene and watch | Supported scope |
 | --- | --- | --- |
@@ -16,10 +16,10 @@ The isolated activity-vocabulary branch adds three manual-start experiences:
 
 All staging and participants are hypothetical. Drawing Klerb/Open Jacks provide
 practice inspiration; neighbouring Bombay yoga is not attributed to Mars organizers.
-Focused engine proof passes; actual Play, combined gate and publication are pending.
-Release36's45presets remain the verified public inventory until a new release record.
+Focused checks, the clean combined gate and fresh public actualPlay pass.
+Release37 has52verified selectable presets.
 
-## Combined creative/cleanup candidate (not yet public)
+## Published creative afternoon and table cleanup
 
 `creative-afternoon` starts with a blank pad, makes three actual marks, shares that
 same artwork, exchanges two original digital scores at one workstation, and returns
@@ -41,10 +41,10 @@ remain. If both permitted return supports are blocked, real held ownership remai
 with a concrete waiting reason until a support is restored. No washing, deletion,
 large carrying, arbitrary storage or automatic ground drops.
 
-Focused combined54checks, TSc/lint/source scan pass. Six actual Play journeys pass
-on61b236e (2.0min), covering sharing, connected afternoon and both cleanup layouts.
-Capture review is underway; a clean combined gate and public proof remain required.
-All seven new selector entries are candidates, not additions to online release36.
+Clean combined gate and69fresh public cases pass, including these actualPlay journeys
+and all52presets' fresh-load/Reset/first-Step checks. All inspected captures and
+source/rollback details are recorded in the release checklist. Gallery tours, reading
+circles, seed planting and connected garden afternoons are future candidates, not public.
 
 ## Begin
 
@@ -100,6 +100,8 @@ Fine fingers/clothing and planted dance expression remain current-animation limi
 ## Camera and sound
 
 Live camera supports classroom, prepared/living days, garden care and music/dance.
+Release37's seven new presets still need the next candidate's allowlist/embedded-entry
+fix; do not interpret a fallback classroom review link as camera proof for them.
 Choose Clear activity coverage or Restrained observation. It reads actual people,
 objects and phase facts; it never moves actors or owns their tasks. Follow activity
 person (Follow guest2 in classroom) takes operator precedence. Return camera to auto
@@ -142,8 +144,8 @@ are actionable; intentional diagnostic demonstrations are explicitly labeled.
 `window.__marsEngine` offers scenario loading, fixed stepping, detached records/world,
 violations, intention/day/garden readouts and camera facts. Programmatic stepping
 is useful but does not establish natural rendering or automatic Play timing.
-The selector startup audit passed fresh-load/Reset/first-Step for all45
-selectable presets (46cases including parity,198.9s); it is deliberately not completion evidence. See [current evidence index](INDEX.md).
+The selector startup audit passed fresh-load/Reset/first-Step for all52
+selectable presets (53cases including parity); it is deliberately not completion evidence. See [current evidence index](INDEX.md).
 
 Local: `cd viewer && npm run dev`, then `/lab`. Contributor rules:
 [ENGINE_GUIDE](ENGINE_GUIDE.md). Required clean combined integration:

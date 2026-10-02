@@ -1,6 +1,6 @@
 # Release checklist: Mars Studio Worker (`mars-campus-2026`)
 
-Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release36 is live and the authorized living-world tranche is complete at sim.mars.college.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
+Current deployment metadata is `viewer/deploy/deployment.json`; the latest dated production record below is authoritative. **Release37 is verified at sim.mars.college; owner-authorized vocabulary expansion continues.** Initial preparation results and older rollback examples are retained as historical records; use the latest release record for the current rollback target.
 
 - Worker: `mars-campus-2026` at https://mars-campus-2026.<workers-subdomain>.workers.dev
 - R2 bucket: `mars-campus-2026-models`
@@ -1597,3 +1597,72 @@ Documentation/index/guide sprint complete; earlier agent/guide/handoff archived,
 original inventory and48unfinishedother-owner drafts preserved/excluded.
 **Mars MVP/living-world tranche complete. Remaining accepted hours0; stop feature
 expansion and do not automatically begin Eden.**
+
+
+## Production deploy 37 (2026-10-02, creative vocabulary)
+
+Public **https://sim.mars.college/**, existing Lab/museum/gateway preserved. Worker100%
+**8c57ad5b-9dfd-46b2-9d60-47fdb021510f**, deployed10:57:13.198Z; clean functional
+source **ca6bb5d1ed707f12fe9029720fbf1bdecc44f917**. Verified rollback36
+**fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3**. Final documentation-only publication
+commit changes no runtime/assets and inherits this exact source.
+
+| Validation | Executed result |
+| --- | --- |
+| Clean combined full gate | All9PASS; report `.cloudflare/gate/2026-10-02T09-52-10-874Z/report.json`; gitDirtyfalse/sourceChangedfalse |
+| Lint / viewerTSc / cameraTSc | PASS, no errors |
+| Deployment tests | 290PASS,0FAIL/SKIP/TODO |
+| Engine | 1224PASS,0FAIL,6SKIP,11TODO; excluded checks unproved |
+| Browser | 241PASS,0FAIL,7SKIP,52.3min; legacy W51 FIXMEs unproved |
+| Flagship take / deterministic probe | PASS; unchanged hash b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3 |
+| Local MCP | All36tools/security/isolation/invalid requests PASS |
+| Public sim browser | 69PASS/0FAIL/SKIP/flaky,28.6min; all52preset startups/parity, old living/garden/music/home, new drawing/warm-up/jam/art/creative/cleanup, both entire automatic current2022 builds |
+| Visual inspection | All70publicPNG personally inspected by helper; root personally inspected representative creative/cleanup/music and first-bay/wholehouse completion captures |
+| Worker original HTTP | 522assets/24HTMLroutes/696requests PASS, GLB ranges/auth; unchanged assertions via curl gzip/deflate transport |
+| Public MCP / director | All36PASS through sim.mars.college; original9stepsPASS5818ms |
+| Existing gateway | Exact main-B1SqcUwf.js, fresh12-byte glTF rangedGET PASS; unchanged fullasset SHA inherited from36. Original HEADsizeassertion still fails; missing Content-Length remains documented |
+| Idle/performance | Original idle/stress/grid ceilings pass on11cb5d6,0violations/pins unchanged; subsequent music-history/test-only changes do not alter idle planner |
+| Exact-source evidence | Gate-engine proof reused successfully;17/0/0rows,25/2/1capabilities,8/0/0milestones; skipped/TODO not converted into proof |
+| Rejected page | mars.college/simulation fresh404; no page/footer/DNS recreation |
+
+New seven presets,52total: drawing-work/group-warmup/open-jam/art-sharing/
+creative-afternoon/table-cleanup/table-cleanup-rotated. The creative afternoon makes
+three marks, shares the same artwork, exchanges two actual computer performances
+then finishes the same eight-mark pad; independent reader/book and finite garden
+care retain their own progress. Cleanup moves the same three bowls/books through
+ordinary pickup/walk/put, safe Pause/End/direction and declared supports. Early-End
+HUD saysended without claiming unfinished work complete. Completed music history
+now stays bound to its own child even when the computer is reused; inactive note=null.
+
+Current-source first-bay201/201steps24/24installed (.41mm), wholehouse555/555steps
+66/66installed (.94mm), zero violations, grounded released crew. Public YEAR_BUILD_FULL=1
+executes the entire automatic Play run (4.6/14.3min), retaining original identity/support/
+reference-hash assertions. Normal gate Play throughs0021 plus programmatic completion
+is separate proof. Old source-era refusal fixtures and W51 fine-pose FIXMEs remain
+unproved; supported skeleton does not claim roofs/plywood or all anatomical fidelity.
+
+All staging/people/music/drawings remain hypothetical. Fine fingers/sparse gesture,
+book occlusion, off-frame care and partly overlay-obscured build crew remain visual
+limits. New seven presets' embedded camera allowlist/entry fix is a future candidate;
+existing supported day/classroom/garden/music controls remain. No claim of new-preset
+camera coverage or natural cinematic quality. No active save/load, rig migration,
+acoustic instruments, travelling dance, arbitrary art/storage or plant growth.
+
+Build521allowlistedfiles842.3MiB; eight largeasset keys unchanged,8skip/0R2writes.
+Dry9142.83KiB/gzip1609.06;28new/540retained assets;startup130ms. GuardedmainFF
+preserves all48other-owner paths/status/bytes/mode/mtime/staged0; docs-onlyFF repeats
+that preservation check. No stash/reset/push/remote. Future gallery/reading/planting/
+garden-afternoon/room-preparation drafts and other-owner work remain excluded.
+
+Receipts/logs in creative-afternoon/viewer/.cloudflare: release37-deploy-receipt.json,
+release37-network-receipt.json, release37-public-capture-review.json, vocabulary-public-results.json,
+release37-worker-http-smoke.json, build/dry/upload/status/HTTP/MCP/director/browser logs.
+Failed f095 museum and6b embedded readiness gates remain retained; unchanged museum
+focused84s passes, explicit embedded readiness repair passes focused checks and this
+fullgate. No timeout, tolerance, original outcome or baseline was weakened.
+
+**Owner-authorized vocabulary expansion continues until Gene explicitly stops.**
+Release36 completed the bounded tranche before8am Eastern; neither this release nor
+legacy row counts end the new continuous mandate. Next batch8social/garden presets
+has103focusedPASS, but actualPlay exposed4failures; it remains unshipped pending
+cause-specific repairs and a fresh clean combined gate/public proof.
