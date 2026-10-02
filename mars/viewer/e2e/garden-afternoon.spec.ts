@@ -88,7 +88,13 @@ async function capture(page: Page, name: string) {
 }
 async function wait(
   page: Page,
-  condition: 'partial' | 'paused' | 'reader-return' | 'completed',
+  condition:
+    | 'partial'
+    | 'paused'
+    | 'reader-return'
+    | 'seed-return'
+    | 'water-deposit'
+    | 'completed',
   before = 0,
 ) {
   await page.waitForFunction(
@@ -113,6 +119,30 @@ async function wait(
           a.book.status === 'active' &&
           a.book.elapsed > 4 &&
           a.book.elapsed < 24
+        );
+      if (condition === 'seed-return')
+        return (
+          a.seedbed.completed &&
+          a.seeds.support?.kind === 'resting-on' &&
+          a.seeds.support.on === 'seed-table' &&
+          a.seeds.support.slot === 'r0c2'
+        );
+      if (condition === 'water-deposit')
+        return (
+          !('code' in a.garden) &&
+          a.garden.waterReceived > 0 &&
+          a.garden.waterReceived < 0.25 &&
+          a.water.support?.kind === 'in-hand' &&
+          a.water.support.by === 'planter' &&
+          a.water.support.hand === 'right' &&
+          window.__marsEngine
+            .records()
+            .some(
+              (r) =>
+                r.verb === 'garden_care' &&
+                r.parent === a.gardener &&
+                r.phase === 'watering',
+            )
         );
       return a.phase === 'completed';
     },
@@ -271,6 +301,85 @@ for (const rotated of [false, true])
     const readerPaused = await capture(page, `${name}-reader-local-pause`),
       bookmark = read(readerPaused).book.elapsed;
     await button(page, 'Resume reader').click();
+    await play(page);
+    // These are separate serial physical obligations. Each retains the original
+    // 15-second phase deadline; final completion still needs supported return.
+    await wait(page, 'seed-return');
+    await page.evaluate(() => {
+      const table = window.__marsEngine
+        .cameraEntities()
+        .find((e) => e.id === 'seed-table');
+      if (table) {
+        const t: [number, number, number] = [
+          table.pose.p[0],
+          table.pose.p[1] + 0.8,
+          table.pose.p[2],
+        ];
+        window.__marsEngine.camera([t[0] + 3, t[1] + 2.4, t[2] - 4], t);
+      }
+    });
+    const seedReturned = await capture(
+        page,
+        `${name}-completed-seeds-supported-return`,
+      ),
+      seedEffect = read(seedReturned);
+    conserved(seedReturned);
+    expect({
+      purpose: seedEffect.seedbed.purpose,
+      source: seedEffect.seedbed.source,
+      deposited: seedEffect.seedbed.deposited,
+      completed: seedEffect.seedbed.completed,
+      bowl: seedEffect.seeds.id,
+      remainder: seedEffect.seeds.contents?.fraction,
+      support: seedEffect.seeds.support,
+    }).toEqual({
+      purpose: a.seedbed.purpose,
+      source: 'seed-bowl',
+      deposited: 0.25,
+      completed: true,
+      bowl: 'seed-bowl',
+      remainder: 0.25,
+      support: { kind: 'resting-on', on: 'seed-table', slot: 'r0c2' },
+    });
+    await play(page);
+    await wait(page, 'water-deposit');
+    await page.evaluate(() => {
+      const a = (window.__marsEngine as GardenHook).gardenAfternoon();
+      if (a && !('code' in a.garden)) {
+        const t = a.garden.target;
+        window.__marsEngine.camera([t[0] + 3, t[1] + 2.4, t[2] - 4], t);
+      }
+    });
+    const watering = await capture(page, `${name}-actual-finite-water-deposit`),
+      care = read(watering);
+    conserved(watering);
+    expect({
+      purpose: care.seedbed.purpose,
+      planted: care.seedbed.deposited,
+      bowl: care.water.id,
+      support: care.water.support,
+      material: care.water.contents?.food,
+      received: care.garden.waterReceived,
+      remainder: care.water.contents?.fraction,
+      cycles: care.garden.cycles,
+      plant: care.garden.plant,
+      pendingSource: care.garden.pending?.water,
+      bones: watering.bones.planter.activity,
+    }).toEqual({
+      purpose: a.seedbed.purpose,
+      planted: 0.25,
+      bowl: 'water-bowl',
+      support: { kind: 'in-hand', by: 'planter', hand: 'right' },
+      material: 'water',
+      received: care.garden.pending!.delivered,
+      remainder: 0.5 - care.garden.pending!.delivered,
+      cycles: 0,
+      plant: 'planter-a',
+      pendingSource: 'water-bowl',
+      bones: 'reach',
+    });
+    expect(care.garden.waterReceived).toBeGreaterThan(0);
+    expect(care.garden.waterReceived).toBeLessThan(0.25);
     await play(page);
     await wait(page, 'completed');
     const final = await capture(page, `${name}-completed-finite-care-and-book`),
