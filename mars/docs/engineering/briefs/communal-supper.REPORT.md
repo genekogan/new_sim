@@ -1,0 +1,31 @@
+# Communal supper — future bounded core
+
+Base `5f1dc2e`, isolated `codex/communal-supper`; shared-food continuation dependency `ca3a105` is installed locally as cherry-pick `2bff641`. Only four new owned paths implement the connected core, fixed hypothetical scenario, focused tests and this report. Registry, Lab controls, selectors, renderer/camera and public integration remain root-owned. This is not a historical supper, cooking/species claim or published preset.
+
+## Actual connected activity
+
+`communalSupper` (`communal_supper`) coordinates one retained preparation, a finite two-person shared meal, four mealware transfers, then three preparation-vessel transfers. It owns only `communal-supper`; registered `prepare_food`, `shared_food_break`, `tidy_table`, ordinary controls and `stow_items` own all movement, hands, support and material writes. Completed preparation never re-runs after consumption. Meal success requires actual diagnostic-free served/consumptionCompleted receipts, zero remaining servings and both ordinary returns per participant before cleanup; status alone is insufficient.
+
+Exports: `CommunalSupperParams {preparation,meal,cleanup:[mealware,prepware]}`, `communalSupper`, `communalSupperControl` (`communal_supper_control`, `{supper,intent:'pause'|'resume'|'end'}`), `readCommunalSupper`, `COMMUNAL_SUPPER_ACTIONS`; scenario `communalSupperBinding/World/Scene/Runtime`. The local factory registers only extras absent from the canonical registry.
+
+Detached readout exposes actual action/status, stage (`preparing`, `sharing`, `storing-mealware`, `storing-prepware`), mode, finished/prepared/mealComplete checkpoints, retained bindings, current child, owned records, preparation recipe, latest meal purpose/receipts/attention/returns, both persistent cleanup readouts, same seven actual items, each participant's held items, named diagnostics/wait reason and actual claimed resources/holders. Claims are read from Runtime holders over registered record reservation resources, never fabricated cleanup flags.
+
+## Fixed supported hypothetical layout
+
+Two anonymous roles `cook` and `guest`; original preparation `pot`, `beans`, `greens`, `spoon`, plus `cook-bowl`, `guest-bowl`, `guest-spoon`. Initial source ingredients each contain one bowl fraction; pot and meal bowls are empty. Original quarter-pot/full-bowl serving ratio and eight conserved preparation deposits/60 mixing ticks remain unchanged.
+
+Ground fixtures: `table [0,0,0]`, `meal-table [5,0,0]`, `ware-store [0,0,6]`, `prep-store [5,0,6]`. Before Runtime creation only, original ingredients/pot/spoon are staged at table `r1c1/r1c3/r1c2/r1c4`, with explicit yaw0. Mealware returns and storage use `r1c0/r1c1/r1c4/r1c5`; prepware storage uses `r1c1/r1c2/r1c3`. Interior staging meets unchanged full-footprint cleanup checks; original edge fixtures, historical values and capacities are untouched. Same IDs are stored empty through real supported transfers; no runtime fixture/item replacement.
+
+## Interruption contract
+
+Preparation Pause drains its ordinary child and may retain the genuinely held supported spoon. Explicit Resume retries the retained pot recipe, without restoring consumed ingredients. Meal Pause drains to a safely cancelled checkpoint; Resume passes latest child `resumeFrom`, preserving original purpose and per-role serving/consumption receipts, including consumed-empty bowls and partial/during-stow returns. Cleanup Pause safely releases its current object; Resume uses the same persistent tidy task and retained placements. Boundary Pause after true leaf completion advances that checkpoint rather than recreating it.
+
+Safe Pause followed by ordinary director walking and explicit Resume is covered for preparation and meal. Ordinary cleanup direction yields the same task and preserves the player walk. An uncancelled meal directive retains the existing failed-source exclusion: named `shared_food.resume-not-cancelled` through `communal_supper.stage-unavailable`; End can drain, but the coordinator does not pretend failed meal continuation is supported.
+
+End first drains active ordinary children, then serially returns genuinely held meal utensils (including preparation spoon) through declared ordinary stow actions before terminal cancellation. Occupied return admission remains `communal_supper.return-unavailable`, with live held ownership; clearing the actual obstruction allows safe End to finish. A stopped/failed return child is an explicit blocked condition, not a claimed clean end or silent reconstruction. Fixture/binding/identity changes, conserved material changes, unavailable/occupied stages and stopped cleanup wait without spawning repeated failed children. Explicit restoration/Resume is required during normal work. No automatic participant resurrection, refill, fresh serving of eaten bowls, material/pose writes, general planner, alternate executor or active graph save/load is added.
+
+## Focused proof and remaining release work
+
+24 new cases plus original shared-food, continuation, preparation and cleanup suites: **124/124 PASS**, approximately12seconds, retained log `viewer/.cloudflare/communal-supper-focused.log`. New cases include whole chain/exact replay/detached readout; per-tick same supported identities and invariant checks; exact remaining-plus-consumed conservation; completed storage pose/support retention; partial preparation/director continuation; partial/consumed/stowing same-meal continuation with no new serve/preparation; both persistent cleanup interruptions and ordinary direction; End-before-Step and all four stages with actual zero held resources; completion boundaries; missing/malformed definitions; changed fixtures/material/nonfinite quantities/labels; occupied storage/returns and honest recovery. Default happy chain completed tick4066 (203.3 simulation seconds); this is a functional timing observation, not a performance benchmark.
+
+Viewer TypeScript, focused type-aware/type-check lint, formatter and diff checks pass. No browser, performance run, full gate, helpers or public proof ran. Root-owned integration, usable HUD, actual Play screenshots/inspection and combined release validation remain pending. Current rig limits remain unchanged; no fine fingers, heat/growth, arbitrary orientation, unsupported floors or universal recipes are claimed.
