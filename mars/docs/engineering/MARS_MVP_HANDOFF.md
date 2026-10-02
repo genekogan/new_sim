@@ -1,3 +1,8 @@
+> **Current direction (October 2):** release36 below is complete and remains the
+> verified baseline. Gene subsequently authorized continuous meaningful Mars activity
+> expansion until he explicitly stops; see [active roadmap](ACTIVE_ROADMAP.md).
+> Earlier stopping language records the completed contract, not the active mandate.
+
 # Mars MVP and living-world handoff — release36
 
 Start at [sim.mars.college](https://sim.mars.college/). The existing Lab opens

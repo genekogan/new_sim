@@ -2068,3 +2068,16 @@ Clean frozen cfea591 fullgate9/9PASS: lint0,290deploymentPASS,1130enginePASS/0FA
 Worker36 fbbb874d-a4be-4a18-9f7d-8f4c1a9057b3 at100%06:18:54.039Z, rollback35 adaf98f2-65d1-43b3-9c5d-761d555f2d5e. Existing sim.mars.college root/Lab serve exactnewbundle; public53/53PASS0fail/skip/flaky25.3min. Bothfullautomatic currentbuilds PASS4.6/14.5min with referenceidentity/support/hash/crewassertions; normalgate auto throughs0021 thenbatchedrest explicitlydistinguished. All30publicPNGs inspectedbyhelper, root sleep/wholefinal alsoinspected, no majorvisible continuitybreak. New livingday2/music/garden/homecamera plus45startup/parity pass; noall-obscure-combination proof. Public36MCP/9stepdirector5565ms PASS. WorkerHTTP522assets24routes696requests PASS usingoriginalcurltransport/assertions. ExistingPagesgateway HEADcampus-size failure retained; fullGET70772556B/SHA675f4beb… exactmatch and rangePASS, metadata-only limitation documented. NoPagesOAuthscope/sourcefound; noDNS/gatewayreplacement. Oldmars.college/simulation404.
 
 Finaldocs: currentAGENTS/roadmap stopmarker, release/source/rollbackmetadata, rewrittenhandoff and preserved35snapshot, currentLabguide/index/deployguide, latestpublicdispositions on focusedbriefs, exactsourceEVIDENCE. Activequeueempty; allagreedfamilies andnewboundedtranche acceptedwith explicit limits. NoactiveSaveLoad/rigmigration/Edenstart. OriginalLAST_MILEinventory/counts notreaudited; deferred andunfinishedother-owner work notcalledcomplete. Remainingacceptedhours0; finalpubliccheckpoint completewithin24hwindow. Stopfeatureexpansion pendingnewexplicitownerscope.
+
+### Owner-authorized vocabulary expansion after release36 — 2026-10-02
+
+Release36 completed and verified before8am Eastern, satisfying the owner's condition
+for continuous scenario/activity expansion until explicit stop. New clean isolated
+activity-vocabulary worktree starts atfc712be; all48other-owner pending paths and
+release proofs remain preserved. Small first queue: physical drawing/retained art,
+grounded guided warm-up, and open-jam performer handoffs. Archive dossiers consulted
+for Drawing Klerb, Open Jacks and neighbouring Bombay yoga; all new staging will be
+hypothetical, with no misattributed historical participants/organization. Two bounded
+Sol6.1 implementation workers are planned; root owns shared wiring/release. No new
+feature is yet validated or published. Save/load, rig migration and Eden remain out
+of this authorization.

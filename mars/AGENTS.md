@@ -1,6 +1,6 @@
 # Mars Studio agent context
 
-## Completed checkpoint and stopping point
+## Published checkpoint and current authorization
 
 The owner-authorized October2 living-world tranche is published and verified as
 **release36 at https://sim.mars.college/**, Worker
@@ -10,7 +10,15 @@ pass; skipped/TODO legacy checks and gateway HEAD metadata remain explicit limit
 The new connected independent days, flexible permitted bindings, music/dance,
 finite recurring garden care, camera observation and documentation are shipped.
 
-**Stop feature expansion. Do not begin Eden automatically.** Future agents should
+Gene explicitly authorized continued Mars activity/scenario expansion on October 2
+if release36 finished before 8am Eastern; it did. Continue meaningful additions in
+priority order until Gene explicitly stops. Do not begin Eden automatically.
+Current bounded queue: physical drawing with retained artwork, a grounded guided
+warm-up, and open-jam performer handoffs. New labels alone are not new activities.
+Each increment needs ordinary physical execution, useful intervention, focused
+invalid/disruption coverage, inspected Play captures and combined release validation.
+
+Future agents should
 read [final handoff](docs/engineering/MARS_MVP_HANDOFF.md),
 [active roadmap](docs/engineering/ACTIVE_ROADMAP.md),
 [engineering navigation](docs/engineering/INDEX.md), recent progress and deployment
@@ -20,8 +28,8 @@ paths and all worktrees/branches; integrating them needs separate review/validat
 Active save/load remains explicitly deferred, along with rig/library migration,
 universal planning/psychology/terrain and new camera experiments. The rejected
 mars.college/simulation page remains removed. Preserve the historical museum and
-existing simulation gateway; no DNS/site replacement was made. New scope requires
-an explicit owner request, not an old dated queue or a legacy completion count.
+existing simulation gateway; no DNS/site replacement was made. The current owner request authorizes this vocabulary expansion, not the deferred
+save/load, rig migration or Eden scope. Legacy completion counts do not set priority.
 
 ## Durable product direction
 

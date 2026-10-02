@@ -1,4 +1,4 @@
-# Mars living-world checkpoint — complete, release36
+# Mars activity vocabulary — active expansion after release36
 
 Published and verified at **https://sim.mars.college/** on2026-10-02. Functional
 source `cfea591083ac54d0280766809b2cbf1872bb012d`, Worker
@@ -15,18 +15,41 @@ Clean full gate: all9stages PASS,1130enginePASS/6SKIP/11TODO,225browserPASS/7SKI
 53fresh publicPASS/0FAIL/0SKIP. Skips/TODOs remain unproved. The source-era fixture
 refusals and current-source fully automatic builds are distinct proofs.
 
-**Active queue: empty. Stop Mars feature expansion; do not start Eden automatically.**
-Remaining accepted implementation hours0. No discretionary engineering or activity
-expansion is commissioned. Preserve deferred work in the existing backlog without
-another inventory audit: active save/load, broader planning/terrain/psychology,
-rig/library migration, fine anatomy, travelling dance/fluid/growth and camera polish.
-Legacy LAST_MILE counts were not re-audited and are not a measure of this completion.
+## Current small queue — owner authorization October 2
+
+Release36 completed before the owner's 8am Eastern condition. Continue expanding
+meaningful Mars activities until Gene explicitly stops; release36 remains the
+published baseline, and saved candidates are not shipped features.
+
+1. **Drawing/sketching:** a usable tabletop pad and pencil, deterministic retained
+   marks, physical pickup/release, coherent pause/resume and completed artwork.
+   This enables making something during a work session and sharing its result.
+2. **Guided standing warm-up:** instructor and followers on declared clear ground,
+   shared attention, bounded phased arm movements, staggered participation and
+   coherent departure/interruption. No advanced yoga/anatomy redesign.
+3. **Open-jam exchange:** ordinary handoffs between performers at the same computer,
+   retained sessions and independent listeners/dancers. No silently replaced props
+   or claim of acoustic instruments.
+
+Use cited archive practices to select activities; staging, people and output remain
+explicitly hypothetical. Drawing Klerb and Open Jacks are Mars practices; the cited
+Bombay yoga notice is a neighbouring community activity, not Mars-organized history.
+Root owns shared wiring/rendering/Lab/integration; two Sol6.1 workers own bounded
+new engine modules/tests in isolated worktrees. Serialize browser/performance work.
+
+Batch exit: each addition materially changes what can be initiated, interrupted,
+resumed and watched; valid/invalid/disruption tests, actual inspected Play captures,
+all scenarios discoverable, clean combined gate and verified sim.mars.college release.
+Then select the next useful bounded batch without a new backlog-wide audit.
+Active save/load, universal planning/psychology/terrain, rig/library migration,
+fine anatomy, fluid/growth and camera experiments remain deferred. LAST_MILE counts
+are not a measure of product progress.
 
 Known publication limit: existing Pages gateway omits campus-model HEAD length;
 original gateway smoke failure retained, while exact fullGET/ranges and Worker
 522asset/24route checks pass. Camera recovery cuts/framing and dense HUD remain
 visible limitations, not hidden failures. All48other-owner pending paths preserved
-unchanged/excluded. Future work needs explicit owner scope, review and safeguards.
+unchanged/excluded. This expansion is explicitly owner-authorized; review and safeguards remain required.
 
 ## Prior contracts and checkpoint provenance
 
