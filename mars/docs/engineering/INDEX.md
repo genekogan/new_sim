@@ -3,7 +3,18 @@
 Authoritative current status is deployment metadata and the latest verified release record.
 Earlier candidate/release sections below retain provenance and are superseded by this notice.
 
-## Mars World v1 alpha — stabilization
+## Current agent entry — 2026-10-02
+
+Read [agent context](../../AGENTS.md) for ownership and the
+[active roadmap](ACTIVE_ROADMAP.md) for resumed alpha priorities after the verified
+release40 homepage repair. The alpha candidate is unreleased; coverage execution
+is ongoing and all63 selectable presets are not certified. Use
+[deployment metadata](../../viewer/deploy/deployment.json) and the
+[latest verified release record](RELEASE_CHECKLIST.md) for publication status.
+The release39/pause notice below records an earlier checkpoint; its pause is
+superseded by the current roadmap's owner-authorized resume.
+
+## Dated release39 checkpoint and pause notice — 2026-10-02
 
 **Release39 is published and verified at https://sim.mars.college/**,
 Worker `95a8f9a8-9d3c-4de4-8365-346fcf1df33d`, functional source `b7128256a196cd0a4a9d7eef422e51d3a9e68d39`; rollback38
@@ -41,19 +52,18 @@ paths; this publication does not merge all future branches or certify old invent
 - [Active roadmap](ACTIVE_ROADMAP.md): current tranche and exit criteria.
 - [Simulation vision](SIMULATION_VISION.md): enduring Mars/Eden direction.
 - [Lab guide](LAB_GUIDE.md): individual and combined scenarios, controls and limitations.
-- [MVP handoff](MARS_MVP_HANDOFF.md): original release36 acceptance and dated release37 notice; current release38 truth is the newest release checklist record, exact source, limits and Eden handoff.
-  Earlier baseline evidence is retained as dated provenance.
+- [MVP handoff](MARS_MVP_HANDOFF.md): original release36 acceptance and dated later notices, exact source, limits and Eden handoff. Read the newest verified release record for current publication status; earlier baseline evidence is dated provenance.
 
 ## Implement and validate
 
-- [Engine contributor guide](ENGINE_GUIDE.md): deterministic TypeScript and module map.
+- [Engine contributor guide](ENGINE_GUIDE.md): canonical deterministic TypeScript, module boundaries and extension contracts. Start with [activity/scenario authoring](ENGINE_GUIDE.md#author-an-activity-and-expose-a-scenario), [activity/renderer ownership](ENGINE_GUIDE.md#activity-and-renderer-boundary), [failure/world-liveness model](ENGINE_GUIDE.md#durable-failure-model-and-world-liveness-owner-mandate2026-10-02) and [persistence/acceptance limits](ENGINE_GUIDE.md#persistence-and-extension-acceptance).
 - [Specification](SPEC.md), [owner decisions](OWNER_DECISIONS.md),
   [feedback](OWNER_FEEDBACK_2026-09-28.md): requirements with dated provenance.
 - [Worktrees and integration](CODEX.md): local-only Git and guarded integration.
 - [Planning budgets](PLANNING_BUDGET.md): measured ceilings/pins, change rules.
 - [Release checklist](RELEASE_CHECKLIST.md): clean combined gate, deployment and rollback.
 - [Evidence](EVIDENCE.md): machine-linked checks, distinguish skipped/TODO from proof.
-- [Scenario coverage](SCENARIO_COVERAGE.json): authoritative per-preset execution contracts, discovery and source-bound proof; currently a stabilization draft, not full acceptance.
+- [Scenario coverage](SCENARIO_COVERAGE.json): authoritative per-preset execution contracts, discovery and source-bound proof; currently a stabilization draft, not full acceptance. Its [UI contract generator](../../viewer/deploy/scenario-contracts.mjs) derives instructions from this inventory; use the [active roadmap](ACTIVE_ROADMAP.md) for remaining acceptance work.
 - [Progress](PROGRESS.md): chronological work and failures, newest entries at the end.
 - [Live Lab repairs](LIVE_LAB_REPAIRS.md): Reach, stance and material continuity findings.
 
@@ -92,6 +102,11 @@ Historical reconstruction and questions retain their separate content ownership.
 Published release37 continuation: [creative afternoon](briefs/creative-afternoon.REPORT.md),
 [art sharing](briefs/art-sharing.REPORT.md), [physical cleanup](briefs/table-cleanup.REPORT.md).
 These reports distinguish focused proof, authored browser checks and publication.
+
+### Dated candidate reports — 2026-10-02
+
+The candidate/publication statements below describe each report's original checkpoint.
+They preserve provenance; current source/publication status comes from the entry links above.
 
 Future gallery candidate: [physical tour core](briefs/gallery-tour.REPORT.md) and
 [Lab controls/Play authoring](briefs/gallery-tour-lab.REPORT.md). Shared wiring is
