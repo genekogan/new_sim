@@ -1,11 +1,12 @@
-# Mars MVP handoff — DRAFT, acceptance pending
+# Mars MVP handoff — verified bounded acceptance and publication
 
-**Not a completion or publication receipt.** Root must finish the final clean gate,
-public acceptance review and website publication/verification before finalizing
-this handoff. Production remains **release 34**. This draft is authored from the
-closing documentation/UI worktree at `9958ed4`; that candidate is not a published
-release. The separately frozen sleep/day gate candidate was `fafdb72`; neither
-identifier substitutes for the final verified source or release.
+The bounded runtime contract is accepted against the final source and representative
+proof below. This is contract acceptance, not a request for extra owner approval.
+**Website publication and production backend verification are complete against the
+receipts below. Mars feature expansion stops at this verified bounded MVP.**
+Release 34 is the prior verified checkpoint; release 35 has fresh public browser proof at Worker version
+`adaf98f2-65d1-43b3-9c5d-761d555f2d5e`, source
+`9958ed4a97f2cb5c7189ea7796b6502a0b9910de`. The earlier `fafdb72` candidate is superseded.
 
 Authority: [closing scope/deadline](briefs/mars-mvp-closing-sprint.md),
 [family/disruption acceptance matrix](briefs/mars-mvp-acceptance-review.md),
@@ -15,17 +16,19 @@ Focused evidence and limits: [prepared day](briefs/prepared-day-play.REPORT.md),
 [Backlog](RAINY_DAY_BACKLOG.md) retains deferred dispositions; this is not a new
 inventory audit or planning tranche.
 
-## Final verified receipts — root fills after proof
+## Final verified receipts
 
 | Field | Value |
 | --- | --- |
-| Final release / publication time / deployed version | **PENDING** |
-| Exact final functional source / rule version / clean gate receipt | **PENDING** |
-| Idle performance and exact-source evidence reuse receipts | **PENDING** |
-| Public website entry and verification receipts for all three day presets | **PENDING** |
-| Final critical family/disruption review and owner acceptance | **PENDING** |
-| Inspected final public captures / logs / retained failures | **PENDING** |
-| Verified rollback target and procedure | **PENDING** |
+| Runtime source / activity rule | `9958ed4a97f2cb5c7189ea7796b6502a0b9910de`; registry activity rules `activities/17` |
+| Full combined gate | [final clean gate](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/gate/2026-10-02T01-51-54-812Z/report.json): all nine stages pass; 290 unit; 1053 engine pass / 6 skip / 11 TODO; 173 browser pass / 7 skip; 36 local MCP tools. Skips/TODOs remain unproved. |
+| Idle performance / exact-source evidence reuse | [validation/evidence receipt](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/prepared-day-final9958ed4-validation-receipt.json): unchanged stress/grid ceilings pass; bound engine proof reused successfully, regeneration 4.167s; no fresh duplicate full-engine execution. |
+| Public runtime browser proof | [public browser receipt](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/release35-production-browser-receipt.json): release 35 version above, 8 passed / 0 failed / 0 skipped, 2.4min; three day presets, two sleep rigs, studio busy-computer branch and anatomical stairs. |
+| Critical family/disruption review | Contract accepted within the authored limits; representative inherited/current evidence matrix below. |
+| Inspected public captures / retained limitations | Root inspected all 27 release35-production PNGs plus 2 instruction/footer captures in the public receipt. Standalone completed-return actors are outside the fixed mat camera; no visual destination claim. Original failure receipts remain in linked reports. |
+| Rollback reference | Prior verified release 34 Worker `515f3742-d764-4804-b545-f32b2e3cc22d`; use existing [release procedure](RELEASE_CHECKLIST.md), not an unexecuted rollback-success claim. |
+| Website publication / final website entry receipt | [public website receipt](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/release35-website-public/receipt.json): [mars.college/simulation](https://mars.college/simulation), website source `1e3f005630bb9ea5aafb339904244c315b3df9a4`, aliased [Vercel deployment](https://mars-v2-pweg6frsu-gene-kogans-projects.vercel.app). All 11 Worker links, desktop/mobile footer and three day links pass with correct selector/engine readiness and no errors; root inspected 7 PNGs plus 4 mobile crops. Full activities are covered by the separate public runtime proof. |
+| Production backend verification receipt | [network receipt](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/release35-network-receipt.json): 522 assets / 24 routes / 696 requests, GLB range and anonymous-state denial pass; all 36 original MCP checks and original 9-step director proof (6458ms) pass. Computer model (139184B) and credit (813B) match deployed allowlist SHA. Original HTTP assertions used curl gzip/deflate transport; native Node HTTP sweep was not rerun. |
 
 ## Supported scope and persistence boundary
 
@@ -67,23 +70,24 @@ posing versus authored motions with constrained IK, as already scoped in the
 left/right and the authoritative activity/renderer boundary. No animation redesign,
 camera work or Eden implementation is commissioned by this handoff.
 
-## Final eight-disruption proof checklist — root records verified evidence
+## Accepted eight-disruption representative proof
 
-Existing test names below locate supported assertions, not proof of a new run or
-public coverage. Fill exact inherited/current source receipts and the representative
-runtime outcome required by the acceptance matrix for every row; passing totals or skipped cases do not close these boxes.
+The [acceptance matrix](briefs/mars-mvp-acceptance-review.md) records inherited
+public evidence and its current clean-gate coverage. These are bounded
+representatives, not every disruption in every activity. Node-only display refusal,
+original skips/TODOs and excluded breadth remain explicitly distinct.
 
-| Required disruption | Existing proof location/name; final receipt |
+| Disruption | Executed representative / provenance |
 | --- | --- |
-| Late arrival | [classroom-life.spec.ts](../../viewer/e2e/classroom-life.spec.ts): “worker interrupts notes, joins and leaves class, resumes; late visitor actually joins”. **PENDING final receipt**. |
-| Occupied seat | [classroom-activity.test.ts](../../viewer/engine/test/classroom-activity.test.ts): “occupied seat uses spare eligible fixture, insufficient seats refuse”; [purposeful-routine.test.ts](../../viewer/engine/test/purposeful-routine.test.ts): “late foreign occupied rest seat waits without cancelling its occupant or repeating failed requests”. **PENDING understandable visible wait/refusal**. |
-| Unavailable equipment | [design-studio.test.ts](../../viewer/engine/test/design-studio.test.ts): “occupied studio computer and foreign unfinished task refuse without overwriting them” and “unavailable required studio display refuses before claiming people; restoring it admits the same critique”. **PENDING actual public busy-computer branch, named refusal and preserved foreign work; still required**. |
-| Blocked route | [classroom-activity.test.ts](../../viewer/engine/test/classroom-activity.test.ts): “failed arrival route names the obstruction and leaves no committed session claims”. **PENDING visible representative route refusal/wait and cleanup receipt**. |
-| Moved furniture | [room-setup.test.ts](../../viewer/engine/test/room-setup.test.ts): “cancelled partial physical placement is visible without undo; later changed completed layout loses readiness”. **PENDING final inherited/current physical placement receipt**. |
-| Departure | [classroom-activity.test.ts](../../viewer/engine/test/classroom-activity.test.ts): “registered departure and cancellation wait for safe seat stops”. **PENDING public safe release and remaining participants' continuation**. |
-| Player precedence | [sleep.test.ts](../../viewer/engine/test/sleep.test.ts): “director movement waits for wake, then owns actor; unfinished rest/return needs explicit Resume”; [purposeful-routine.test.ts](../../viewer/engine/test/purposeful-routine.test.ts): “directing the companion during a routine trip preserves foreign movement and explicit regroup”. **PENDING final handoff receipt**. |
-| Interruption/resumption | [prepared-day.spec.ts](../../viewer/e2e/prepared-day.spec.ts): each “prepared-day-4/8/studio: unfinished purpose through a real prepared meal and sleep” case; [sleep proof](briefs/sleep-play.REPORT.md). **PENDING final partial recipe/same-sleep/original-notes identity and Reset receipt**. |
+| Late arrival | [classroom-life.spec.ts](../../viewer/e2e/classroom-life.spec.ts): worker joins/leaves/resumes and late visitor actually joins; inherited public classroom-life proof, executed again in the final clean gate. |
+| Occupied seat | [quiet-rest.spec.ts](../../viewer/e2e/quiet-rest.spec.ts): reserved/occupied classroom seating refuses without controlling foreign occupants; release 22 public rest proof, retained in the final gate. |
+| Unavailable equipment | [design-studio.spec.ts](../../viewer/e2e/design-studio.spec.ts): fresh release 35 public studio follow-up holds the computer for ceramic-designer; worker Start/Interrupt/Resume notes controls are disabled and the foreign task completes unchanged. Named unavailable-display admission remains Node-only, not a public display-failure claim. |
+| Blocked route | [design-studio.spec.ts](../../viewer/e2e/design-studio.spec.ts): actual reviewer crossing interrupts shared lunch walking and ordinary walker recovery finishes the same intentions; release 28 public studio crossing, retained in the final gate. No universal blocked-route completion guarantee. |
+| Moved furniture | [room-setup.spec.ts](../../viewer/e2e/room-setup.spec.ts): physical side-layout stop/retry then complete classroom journey in both room sizes; release 19 public room-setup proof, retained in the final gate. Partial placements remain physical, not teleported or undone. |
+| Departure | [music.spec.ts](../../viewer/e2e/music.spec.ts): audible Play with independent listener departure, interruption and Reset; release 30 public music proof, retained in the final gate. Other commitments continue. |
+| Player precedence | [quiet-rest.spec.ts](../../viewer/e2e/quiet-rest.spec.ts): cancellation/temporary directive respect physical release and permanent departure gets up first; release 22 public proof, retained in the final gate. Fresh release 35 sleep Pause/wake retains the same purpose and releases ordinary physical claims. |
+| Interruption/resumption | [prepared-day.spec.ts](../../viewer/e2e/prepared-day.spec.ts) and [sleep.spec.ts](../../viewer/e2e/sleep.spec.ts): fresh release 35 public Mars4/Mars8/studio partial recipe and same-sleep Pause/Resume, original notes completion, independent follow-ups and strict Reset; both rigs' sleep replay/retention also pass. |
 
-After verified MVP acceptance and publication, **stop Mars feature expansion**.
+With MVP acceptance and publication verified, **Mars feature expansion stops here**.
 Preserve this handoff, receipts and deferred work; do not start Eden automatically.
 Further feature work requires a new explicit owner request.

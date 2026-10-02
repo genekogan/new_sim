@@ -1,49 +1,82 @@
-# Mars MVP acceptance review — 2026-10-01
+# Mars MVP acceptance review — final runtime contract, 2026-10-02
 
-Source review against [vision](../SIMULATION_VISION.md#bounded-mars-mvp-and-eden-handoff-2026-09-30), [current contract](../ACTIVE_ROADMAP.md), [progress](../PROGRESS.md) and [release receipts](../RELEASE_CHECKLIST.md). This is a bounded acceptance map, not a LAST_MILE inventory audit. No tests or application code were executed or changed for this review.
+**Contract accepted within the supported scope below.** This is a critical runtime
+acceptance review, not an extra owner-approval step. Website publication and
+production backend verification are complete in the linked [handoff receipts](../MARS_MVP_HANDOFF.md).
+Mars feature expansion stops at this verified bounded MVP.
 
-Production remains release34: functional source `511101939f52a1d77814d4682331d5d125aee04e`, Worker version `515f3742-d764-4804-b545-f32b2e3cc22d`, published 2026-10-01T20:47:17.403580Z. Its clean full gate records 286 unit passes, 987 engine passes / 6 skips / 11 TODOs, and 168 browser passes / 7 skips. Skips and TODOs are not executed acceptance. Original performance limits and outcome pins passed. [Release34](../RELEASE_CHECKLIST.md#production-deploy-34-2026-10-01-proposed2027-and-conserved-cold-preparation) records the public preparation, proposed2027, presentation, HTTP, MCP and director proofs; three initial presentation network failures remain preserved alongside the fresh unchanged 3/3 passing retry.
+Final functional source `9958ed4a97f2cb5c7189ea7796b6502a0b9910de` passed the exact-source
+[final clean gate](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/gate/2026-10-02T01-51-54-812Z/report.json): all nine stages green, 290 unit passes, 1053 engine passes / 6 skips /
+11 TODOs, 173 browser passes / 7 skips and 36 local MCP tools. Source stayed clean
+and unchanged; cleanup error and interruption are null. Original skipped/TODO cases
+remain unproved, not accepted coverage. The [validation/evidence receipt](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/prepared-day-final9958ed4-validation-receipt.json) records passing unchanged
+idle stress/grid ceilings and successful bound engine-evidence reuse.
 
-The prepared-day worktree was reviewed at `3e85be5` plus the root-owned acceptance edits in progress. Sleep, prepared-day adapters and engine proof reuse are **local candidates**, absent from release34. The root reports new 4/4 production-factory Node cases (5.726s), 3/3 actual browser cases (43.2s), viewer/e2e type checks and scoped lint passing, with all 11 browser PNGs personally inspected. This relay is focused evidence, not an exact-source full gate or public acceptance receipt. The first scenario assertion failure concerning live completed-trip distance is preserved in `viewer/.cloudflare/prepared-day-variations-first.log`; the corrected new test compares retained bindings, progress, recipe and sleep identity while allowing live separation to change.
+Release 34 remains the prior verified checkpoint. Fresh release 35 public runtime
+proof at Worker `adaf98f2-65d1-43b3-9c5d-761d555f2d5e` has **8/8 passed, 0 skipped,
+2.4 minutes**: three prepared-day presets, two current-rig sleep cases, studio
+follow-up/busy-computer protection and two anatomical stair cases. Root inspected
+all 27 public PNGs plus two prepared-day/legacy instruction-footer captures;
+[public browser receipt](<mars-worktrees>/prepared-day-mvp/viewer/.cloudflare/release35-production-browser-receipt.json) retains exact outcomes and limitations. Source `fafdb72` was an earlier
+candidate, not the final source. This review read receipts only and ran no checks.
+
+Authority: [closing mandate](mars-mvp-closing-sprint.md),
+[roadmap](../ACTIVE_ROADMAP.md), [handoff](../MARS_MVP_HANDOFF.md) and
+[release history](../RELEASE_CHECKLIST.md). Original focused failures remain in
+[prepared-day](prepared-day-play.REPORT.md) and [sleep](sleep-play.REPORT.md) reports.
 
 ## Required experience matrix
 
-All shipped rows below are inherited by release34; cited earlier releases identify when the behavior was publicly proven. Counts and layouts are supported examples, not general capacity guarantees.
+Earlier rows are inherited from release 34 and re-executed by the final gate; cited releases identify their public proof. Sleep/day now have fresh release 35 public runtime proof. Counts and layouts are supported examples, not general capacity guarantees.
 
 | Required experience | Supported representative scope | Executed proof and remaining boundary |
 | --- | --- | --- |
-| Gathering / learning | 4 or 8 initial audience guests; host, two presenters and two extra people give 9 / 13 total. Authored default and physically prepared side layouts; talks, questions, presenter rotation, formed conversations, arrival and departure. | Releases19/21 and subsequent clean gates; `classroom.spec.ts`, `classroom-life.spec.ts`, `classroom-turns.spec.ts`, `continuing-day.spec.ts`. Late visitor uses an eligible spare seat, not unlimited membership or arbitrary arrangements. |
-| Room preparation | Registered empty ground-floor chair/table moves; two free table carriers; usable moved furniture; partial physical placement and safe stop/retry. | Release19 public 22 browser cases, inspected captures; `room-setup.spec.ts` and `room-setup.test.ts`. Occupied, reserved or loaded furniture refuses. No arbitrary room optimizer or contents migration. |
-| Computer work / reading | One real seated workstation with unfinished task identity; one seated table/book arrangement with retained bookmark. | Releases27/29; reading source `09da6a000e445a7547d94dcdbb33031d823095ff`, public 3/3 Play cases 51.6s. `classroom-life.spec.ts`, `reading.spec.ts`. Quiet work is visible; fine typing or held-book performance is not required proof. |
-| Shared walking | Same free-handed pair on authored ground aisles, regroup and explicit interruption/resumption, Mars4 / Mars8 and independent studio. | Release28 source `9b857930507a6bd03100d4d4ab5a9255888bc118`; 3 public Play cases, 7 inspected captures. `purposeful-routine.spec.ts`, `design-studio.spec.ts`. No arbitrary escort, loaded stair pair or crowd guarantee. |
+| Gathering / learning | 4 or 8 initial audience guests; host, two presenters and two extra people give 9 / 13 total. Authored default and physically prepared side layouts; talks, questions, presenter rotation, formed conversations, arrival and departure. | Releases19/21 and subsequent clean gates; `classroom.spec.ts`, [classroom-life.spec.ts](../../../viewer/e2e/classroom-life.spec.ts), `classroom-turns.spec.ts`, `continuing-day.spec.ts`. Late visitor uses an eligible spare seat, not unlimited membership or arbitrary arrangements. |
+| Room preparation | Registered empty ground-floor chair/table moves; two free table carriers; usable moved furniture; partial physical placement and safe stop/retry. | Release19 public 22 browser cases, inspected captures; [room-setup.spec.ts](../../../viewer/e2e/room-setup.spec.ts) and `room-setup.test.ts`. Occupied, reserved or loaded furniture refuses. No arbitrary room optimizer or contents migration. |
+| Computer work / reading | One real seated workstation with unfinished task identity; one seated table/book arrangement with retained bookmark. | Releases27/29; reading source `09da6a000e445a7547d94dcdbb33031d823095ff`, public 3/3 Play cases 51.6s. [classroom-life.spec.ts](../../../viewer/e2e/classroom-life.spec.ts), `reading.spec.ts`. Quiet work is visible; fine typing or held-book performance is not required proof. |
+| Shared walking | Same free-handed pair on authored ground aisles, regroup and explicit interruption/resumption, Mars4 / Mars8 and independent studio. | Release28 source `9b857930507a6bd03100d4d4ab5a9255888bc118`; 3 public Play cases, 7 inspected captures. `purposeful-routine.spec.ts`, [design-studio.spec.ts](../../../viewer/e2e/design-studio.spec.ts). No arbitrary escort, loaded stair pair or crowd guarantee. |
 | Chess | Standing two-player physical board, 32 token identities, legal alternatives and captured-token tray; cancellation/rollback and quiescent board persistence. | Release32 source `084f4929fcf7c6d01113d99a4746d88bc47cdf1a`; public 2/2 Play cases 34.2s, 5 inspected captures; `chess.spec.ts`. Castling, physical promotion, seated chess and strong AI remain outside bounded acceptance. |
-| Music / listening | Computer music with actual audible notes, mute / Pause; 0–2 independent listeners; two ground table orientations and retained score progress. | Release30 source `479329689780bf30079bdc4bb54f2d35396fc006`; public music + reading 2/2 with 6 inspected captures; `music.spec.ts`. Acoustic instruments and finger performance are deferred. |
+| Music / listening | Computer music with actual audible notes, mute / Pause; 0–2 independent listeners; two ground table orientations and retained score progress. | Release30 source `479329689780bf30079bdc4bb54f2d35396fc006`; public music + reading 2/2 with 6 inspected captures; [music.spec.ts](../../../viewer/e2e/music.spec.ts). Acoustic instruments and finger performance are deferred. |
 | Preparation / sharing / seated break | One cold recipe, two finite ingredients, held spoon, retained partial deposits, two conserved ordinary servings. Existing 4 / 8 food-break and quiet seated-rest journeys retain unfinished notes. | Releases20/22/24 plus release34 preparation public 2/2 across both table orientations, including actual take/serve/eat/put and strict Reset lifetimes; `preparation.spec.ts`, `shared-food-break.spec.ts`, `purposeful-routine.spec.ts`. No heating/chopping, seated dining or nutritional needs claim. |
-| Lie / sleep / wake | Existing woman and casual rigs, origin / rotated ground mat; ordinary approach, lie, 18s retained sleep, wake and return; phase interruptions, deterministic replay and Reset. | Local integrated `caed682` lineage; standalone 50 focused checks, actual Play 2/2 in 52.1s, 12 inspected PNGs. [Sleep report](sleep-play.REPORT.md), `sleep.spec.ts`, `sleep.test.ts`, `sleep-walk.test.ts`. Unreleased; no arbitrary beds or active-session reload. |
-| Connected day / independent commitments / reuse | Three presets: Mars4, physically prepared Mars8 side layout, independent hypothetical non-Mars studio. Same unfinished notes → gathering → companion walk → cold preparation → two servings → retained sleep → original notes; independent pair discussion and presenter follow-up computer work. | Local core `919afb1` / adapters `e7f6ce2`; 93 focused regression cases, then 4 production-factory and 3 actual browser cases reported above. `prepared-day-scenarios.test.ts`, `prepared-day.spec.ts`, [candidate report](prepared-day-play.REPORT.md). Partial recipe Pause/Resume and studio same-sleep interruption are exercised. Combined clean gate, proof reuse, public entry and final public review remain pending. |
+| Lie / sleep / wake | Existing woman and casual rigs, origin / rotated ground mat; ordinary approach, lie, 18s retained sleep, wake and return; phase interruptions, deterministic replay and Reset. | Local integrated `caed682` lineage; standalone 50 focused checks, actual Play 2/2 in 52.1s, 12 inspected PNGs. [Sleep report](sleep-play.REPORT.md), [sleep.spec.ts](../../../viewer/e2e/sleep.spec.ts), `sleep.test.ts`, `sleep-walk.test.ts`. Final clean gate plus fresh release 35 public proof; no arbitrary beds or active-session reload. |
+| Connected day / independent commitments / reuse | Three presets: Mars4, physically prepared Mars8 side layout, independent hypothetical non-Mars studio. Same unfinished notes → gathering → companion walk → cold preparation → two servings → retained sleep → original notes; independent pair discussion and presenter follow-up computer work. | Local core `919afb1` / adapters `e7f6ce2`; 93 focused regression cases, then 4 production-factory and 3 initial browser cases documented in the candidate report. `prepared-day-scenarios.test.ts`, [prepared-day.spec.ts](../../../viewer/e2e/prepared-day.spec.ts), [candidate report](prepared-day-play.REPORT.md). Partial recipe Pause/Resume and studio same-sleep interruption are exercised. Final clean gate, successful bound proof reuse and fresh release 35 public proof across all three presets; final website/backend receipts are verified in the handoff. |
 
-## Required disruption matrix
+## Accepted disruption matrix
 
-Release34's engine gate executes the inherited classroom, room, food and routine tests below; sleep tests belong to the focused local candidate. These names establish bounded assertions; they do not imply every activity has every disruption or every refusal has a public screenshot. Final acceptance must record a representative actual runtime case for each row, reusing existing evidence where source inheritance is clear.
+The following real browser representatives satisfy the bounded eight-disruption
+contract, with inherited public receipts linked in [release history](../RELEASE_CHECKLIST.md)
+and retained execution in the final clean gate. They do not imply every activity
+supports every disruption. Fresh public busy-computer protection closes the
+previous equipment evidence gap; missing-display refusal remains Node-only.
 
-| Disruption | Existing asserted behavior / evidence | Acceptance boundary |
-| --- | --- | --- |
-| Late arrival | `classroom-joining.test.ts`: live talk spare-seat join, question, busy/loaded refusal and cleanup; public classroom-life late visitor. | One eligible spare seat, finite lifetime membership. |
-| Occupied seat | `classroom-activity.test.ts`: alternative eligible fixture or named refusal; `purposeful-routine.test.ts`: late occupied rest seat waits without evicting occupant. | Confirm the occupied-seat waiting/refusal is understandable at final entry; no forced relocation. |
-| Unavailable equipment | `classroom-map.test.ts`, `classroom-activity.test.ts`, `design-studio.test.ts`: display refusal before effects and safe cleanup; studio occupied computer preserves foreign unfinished work. | Explicit availability is authored state; no autonomous equipment repair. |
-| Blocked route | Classroom seat-route refusal; shared-food blocked child cleanup; `sleep-walk.test.ts` full-body occupied-destination waiting/cancellation. | Bounded authored ground paths and named waiting/refusal, not universal replanning. Final review must identify which visible representative covers the contract. |
-| Moved furniture | `room-setup.test.ts`: lowering blocked until clear; retained partial placements; later layout change invalidates readiness. `sleep.test.ts`: moved mat holds safe physical claims until restored. | Shipped room case is proof; sleep-mat case is local focused proof awaiting combined/public validation. |
-| Departure | Public classroom formed groups / independent listener departures and continuation cases; remaining people continue rather than being globally cancelled. | Finite authored departure goals and role admissions. |
-| Player precedence | Directed classroom exclusion, independent ordinary commands and routine cleanup; food/preparation partial effects survive. | Verify the final combined day preserves priority and drains only owned actions; active-session reload remains unsupported. |
-| Interruption / resumption | Public same notes/book/score, paired walk and partial recipe continuity; local sleep all posture phases and prepared-day partial recipe / same-sleep identity. | Pause/Resume retains runtime intentions; terminal End does not silently restart. Local new branches still need exact-source combined/public proof. |
+| Disruption | Executed representative / provenance |
+| --- | --- |
+| Late arrival | [classroom-life.spec.ts](../../../viewer/e2e/classroom-life.spec.ts): worker joins/leaves/resumes and late visitor actually joins; inherited public classroom-life proof, executed again in the final clean gate. |
+| Occupied seat | [quiet-rest.spec.ts](../../../viewer/e2e/quiet-rest.spec.ts): reserved/occupied classroom seating refuses without controlling foreign occupants; release 22 public rest proof, retained in the final gate. |
+| Unavailable equipment | [design-studio.spec.ts](../../../viewer/e2e/design-studio.spec.ts): fresh release 35 public studio follow-up holds the computer for ceramic-designer; worker Start/Interrupt/Resume notes controls are disabled and the foreign task completes unchanged. Named unavailable-display admission remains Node-only, not a public display-failure claim. |
+| Blocked route | [design-studio.spec.ts](../../../viewer/e2e/design-studio.spec.ts): actual reviewer crossing interrupts shared lunch walking and ordinary walker recovery finishes the same intentions; release 28 public studio crossing, retained in the final gate. No universal blocked-route completion guarantee. |
+| Moved furniture | [room-setup.spec.ts](../../../viewer/e2e/room-setup.spec.ts): physical side-layout stop/retry then complete classroom journey in both room sizes; release 19 public room-setup proof, retained in the final gate. Partial placements remain physical, not teleported or undone. |
+| Departure | [music.spec.ts](../../../viewer/e2e/music.spec.ts): audible Play with independent listener departure, interruption and Reset; release 30 public music proof, retained in the final gate. Other commitments continue. |
+| Player precedence | [quiet-rest.spec.ts](../../../viewer/e2e/quiet-rest.spec.ts): cancellation/temporary directive respect physical release and permanent departure gets up first; release 22 public proof, retained in the final gate. Fresh release 35 sleep Pause/wake retains the same purpose and releases ordinary physical claims. |
+| Interruption/resumption | [prepared-day.spec.ts](../../../viewer/e2e/prepared-day.spec.ts) and [sleep.spec.ts](../../../viewer/e2e/sleep.spec.ts): fresh release 35 public Mars4/Mars8/studio partial recipe and same-sleep Pause/Resume, original notes completion, independent follow-ups and strict Reset; both rigs' sleep replay/retention also pass. |
 
-## Remaining acceptance work
+## Closure and deliberate limits
 
-1. Freeze the combined candidate, finish the unchanged full gate and idle performance, and exercise evidence reuse against its real successful exact-source engine artifact. Reject stale, changed, failed or tampered proof. Focused proof-reuse fixtures do not substitute for this integration.
-2. Resolve any actual failure within the current contract; retain all initial failure receipts. Publish only after required checks, then verify accessible prepared-day / sleep entry, all three representative presets, retained partial preparation and sleep, original-work completion and independent follow-ups. Inspect public major-volume captures using the existing rigs.
-3. Complete one concise critical review across this matrix and all representative disruptions. Any missing executed representative becomes a small acceptance task, not a broad runner, anatomy or autonomous-day redesign. Record exact source/version, evidence, supported counts/layouts, refusals, skipped/TODO exclusions and rollback.
-4. Accept only after that review and public evidence are complete; record the Mars→Eden handoff and stop Mars feature expansion. Historical museum and current supported construction retain their separate provenance. Release33's actual public first-bay / whole-skeleton completion is proof for its supported source; old W51 FIXMEs and earlier named current-layout refusals are not plywood/roof acceptance.
+The [handoff](../MARS_MVP_HANDOFF.md) records verified website publication and
+production backend receipts alongside the final runtime/public proof. Runtime
+family/disruption acceptance is complete within this contract; passing totals
+alone did not establish it.
 
-The immediate blockers are combined/public validation and closing any representative disruption evidence gaps discovered there. No inspected source establishes a need for a new rig, arbitrary room planning or broader autonomy. Fine fingers/clothing, precise typing, nutrition, unconstrained terrain/beds/crowds, arbitrary assembly and logical activity restoration after reload are deferred fidelity or excluded breadth. Proposed2027 remains explicitly hypothetical, with 2026 the default historical view.
+Authored ground layouts, finite portions, current rigs and bounded physical
+interruption/cleanup remain the supported scope. Standalone sleep's return actor
+is outside the fixed mat camera: exact return is asserted, not visually certified
+by that empty-mat capture. Fine fingers/clothing/contact, precise typing, nutrition,
+arbitrary terrain/beds/crowds/assembly, broader autonomy and active logical reload
+restoration remain deferred/excluded. Existing historical source-era staging
+refusals and W51 FIXMEs are not roof/plywood acceptance. Proposed2027 stays hypothetical.
 
-Planning estimate: **24–45 remaining working hours, medium-low confidence**, after the focused prepared-day successes, assuming the full gate finds no shared physical prerequisite and existing public proofs can be inherited with exact-source provenance. Allow roughly 6–12h for combined/public validation and receipts, 10–20h for bounded failure/disruption closure, and 8–13h for final critical review, entry polish and handoff. This is a source-review forecast, not a throughput quota or deadline guarantee. Retain the roadmap's conservative **40–70h** envelope if a new physical prerequisite, repeated integration failure or materially missing disruption behavior appears; do not silently broaden the contract or claim MVP completion from passing totals alone.
+The [closing scope](mars-mvp-closing-sprint.md) supersedes older forecasts and
+allocations; no further planning tranche or inventory audit follows. With MVP
+acceptance/publication verified, Mars feature expansion stops; preserve handoff and
+limitations. Do not start Eden automatically; further feature work requires a new
+explicit owner request.
