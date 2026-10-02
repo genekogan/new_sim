@@ -2226,3 +2226,15 @@ and regressions are underway before finalcombinedsource freeze. Existing failed
 f095gate/museum84sunchanged focusedretry remain distinct. No merger/deployyet;
 all48other-owner pendingpaths staypreserved. Futuregallerycore13checks/29combined
 PASS is savedseparately, notpartofthispublicationcandidate.
+
+
+### Music history ownership repair before combined freeze — 2026-10-02
+
+Capture-derived oldsession progress now comes from its own ordinary work child's
+terminal workedSeconds/finished outputs, with owned-live progress retained for safe
+interruption. It no longer follows a later stationuser, including sameperson/samelabel
+reuse while earlier listeners drain. Inactive sessions expose note=null; current
+stationaudio/physics unchanged. Four new RED→GREEN regressions and focused67/67
+PASS, viewerTSc/lint. Integrates worker ef5a1ce as e28f035; adds exact browserassertion
+that completedfirst7s performance stays7s duringsecondperformer use. FreshactualPlay
+recheck and cleancombinedgate remain required; no releasedrepairclaim yet.
