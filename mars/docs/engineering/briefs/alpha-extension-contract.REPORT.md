@@ -30,3 +30,34 @@ Validation: `git diff --check`, relative Markdown target check,
 worktree. All pass. Initial typecheck lacked `tsc`; an ignored symlink to the
 sibling candidate’s existing node_modules enabled the successful check. No new
 browser/gate/public proof.
+
+
+## Final bounded contract critique — 2026-10-02
+
+Read-only audit against unreleased root candidate `033f8cb`: canonical guide/index,
+coverage status, `app/lab/sim.ts`, `hook.ts`, `panel.tsx`,
+`engine/runtime/snapshot.ts`, `engine/test/lab-terminal-result.test.ts` and authored
+`e2e/alpha-control-quarantine.spec.ts`. Four proved documentation gaps corrected:
+
+- Frozen first `scriptResult` boundary was undocumented: live hashes may advance;
+  terminal/refusal/budget receipt or `done()` alone is not successful effects proof.
+  Later faults invalidate the receipt, and Reset begins a fresh run.
+- Control quarantine was worded only as a future requirement, although candidate
+  panel/hook fences exist. Describe implemented fences while keeping combined UI
+  certification pending.
+- Future hook registration lacked the actual default fence/allowlist rule: new
+  methods are fenced; allowlisting requires detached-read or presentation/fresh-world
+  proof rather than permitting another path into halted authority.
+- Snapshot-drop limits named only held loads, omitting existing action-owned active
+  equipment refusal and the need for an ordinary safe task stop preserving progress.
+
+Existing full UI Play, deterministic/disruption, sustained/probe/diagnostic contracts,
+canonical inventory links and deferred GUI save/load limits remain accurate; no new
+parallel catalog or broad rewrite. INDEX and coverage remain untouched. The inventory
+still records draft/current-source acceptance pending; all63 certification and alpha
+acceptance are unclaimed. Authored tests/source inspection are not fresh execution or
+public acceptance evidence.
+
+Validation: relative Markdown targets and `git diff --check` PASS; documentation-only
+source cross-check, no browser/fullgate or new runtime test. Prior typecheck remains
+prior evidence, not a check of candidate033f8cb. Only ENGINE_GUIDE and this report change.

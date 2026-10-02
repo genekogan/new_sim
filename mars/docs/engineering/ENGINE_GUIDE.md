@@ -203,14 +203,25 @@ this requirement is durable, not a claim that every current preset is already ce
 `app/lab/sim.ts` separates the authored script outcome from world stepping.
 Terminal/refused/budget-ended finite scripts stop dispatching; ordinary children
 and later directions still receive fixed ticks. Manual Pause remains intentional.
+`scriptResult` freezes the first authored stop tick/time/stateHash and its reason
+(`terminal`, `admission-refused` or `budget`); later ordinary ticks may change the
+live world hash. Neither `done()` nor a stop receipt alone proves successful purpose
+effects. Compare deterministic boundary hashes with that receipt and verify declared
+effects separately; budget exhaustion is not journey completion. A later invariant
+or executor fault invalidates the receipt; Reset starts a new run.
 Recorded invariant violations produce `lab.invariant-halt`, retain diagnostics and
 halt further stepping until a fresh Reset. The alpha candidate's unexpected
 host/executor guard records `lab.executor-fault` with phase/tick/error details,
 clears any successful script receipt and quarantines the actual world, records and
 claims as uncertain partial execution. It does not cancel children, release claims
 or invent a rollback; those mutations cannot be certified safe after an unknown fault.
-UI/control admission must respect the halt and leave inspection plus Reset available;
-that combined UI proof is pending. Synthetic renderer probes remain detached.
+The candidate panel disables execution/activity controls while halted, retaining
+Reset/scenario selection, inspection and camera controls. `hook.ts` applies
+`fenceLabControls` before invoking non-allowlisted methods, refusing with
+`lab.control-quarantined` without new world events/claims. New hook methods inherit
+that fence; add to `QUARANTINE_ALLOWED` only after proving the method returns detached
+observations or operates solely on presentation/a fresh world. Current-source
+combined UI certification remains pending. Synthetic renderer probes remain detached.
 These are bounded host safeguards, not recovery guarantees for arbitrary future
 inputs. The executor guard is an unreleased candidate change; source inspection
 and focused checks do not make it an online feature.
@@ -240,8 +251,10 @@ world checkpoints/workspace ancestry; a world blob alone does not restore live
 coordinators, reservation graphs or services. `runtime/snapshot.ts` checks each live
 verb's `resumable` declaration/codec or verified subset and refuses unsupported
 state by name. A new verb requires tick-exact restore tests with its own services
-before opting in. The optional drop path still refuses held loads; it is not a
-recovery strategy for uncertain executor state. See
+before opting in. The optional drop path refuses held loads and action-owned active
+equipment task state (`snapshot.drop-unsafe`); safely finish the ordinary owning-task
+stop before omitting its progress. It is not a recovery strategy for uncertain
+executor state. See
 [TAKES_AND_PLANS.md](TAKES_AND_PLANS.md) for existing checkpoint/take
 contracts and limitations. Active GUI save/load remains owner-deferred.
 
