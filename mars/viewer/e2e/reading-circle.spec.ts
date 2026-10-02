@@ -149,7 +149,33 @@ function seatedReading(s: Evidence) {
   expect(s.slots.find((v) => v.id === 'reading-chair#seat')?.occupant).toBe(
     'reader',
   );
-  expect(s.bones.reader.on).not.toBeNull();
+  // bones.on describes an elevated rack link, not chair support. Prove the
+  // actual occupied seat, owned sit child and rendered seated posture instead.
+  const seat = s.slots.find((v) => v.id === 'reading-chair#seat')!;
+  expect(seat).toMatchObject({
+    state: 'occupied',
+    claimant: 'reader',
+    claimedBy: book(s).action,
+  });
+  const reader = s.state.humans.find((h) => h.id === 'reader')!;
+  const sit = s.records.find((r) => r.id === reader.task)!;
+  expect(sit).toMatchObject({
+    verb: 'sit',
+    parent: book(s).action,
+    status: 'executing',
+    phase: 'occupied',
+    params: { actor: 'reader', slot: 'reading-chair#seat' },
+  });
+  expect(reader.activity).toBe('sit');
+  expect([reader.p[0], reader.p[2]]).toEqual(seat.p);
+  expect(s.bones.reader).toMatchObject({
+    activity: 'sit',
+    base: 'sit',
+    walkW: 0,
+  });
+  // Existing camp-chair fabric height .44m + seated pelvis offset .09m.
+  expect(s.bones.reader.hipY).toBeCloseTo(0.53, 4);
+  expect(Math.abs(Math.min(...s.bones.reader.soles))).toBeLessThanOrEqual(0.03);
   expect(s.attention.reader).toBeDefined();
   listening(s);
 }

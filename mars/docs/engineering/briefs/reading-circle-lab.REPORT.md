@@ -104,3 +104,21 @@ controls, timing windows and rendered attention/seated reading remain unverified
 until root integration and actual Play. Existing seated reading poses are reused;
 no hand-held reading gestures, dialogue text, speech synthesis, reader handoff or
 active save/load is claimed.
+
+
+## First integrated Play diagnosis — October2
+
+Clean ce2213c actualPlay failed both variants at the first seating measurement,
+not the authoritative read action. `bones.on` is explicitly the rack-structure
+link stood on (`humans.ts`), and ordinary social seating intentionally does not
+publish that field. Saved same-book progress, claimed/occupied chair, actual
+owned occupied sit child and rendered seated posture were valid. Root and helper
+inspected both partial/failure images; the existing crossed-leg sitting variant
+remains a visual limitation, not a new posing redesign.
+
+Replace the unrelated rack-link assertion with stricter actual seat claimant/
+claim owner, owned occupied sit child, exact seat position, activity/base sit,
+zero walk weight, actual .53m chair/pelvis height and original .03m planted-sole
+limit. No simulation, renderer, expected outcome, timeout or tolerance change.
+Later lifecycle assertions remain mandatory and unproved until fresh actualPlay;
+original failures and missing later captures are retained.
