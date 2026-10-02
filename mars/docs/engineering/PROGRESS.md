@@ -2885,3 +2885,20 @@ The homepage repair is publicly verified. Gene lifted the quota pause, authorize
 credits and continued execution. Stabilization stays first; its accepted publication
 closes that tranche, then work returns to useful Mars activities rather than stopping
 all development. The current roadmap now says this explicitly; Eden remains deferred.
+
+### Owner reorientation to Mars World v1 alpha — October2
+
+Continuous expansion paused after finishing current bounded39 room/supper/garden
+release. Owner requires latest verified publication, full production-preset execution/
+failure-isolation coverage, bounded80/20performance, existing documentation/extension
+contract cleanup, second canonical alpha publication, then stop. Durable instructions
+saved in AGENTS/ACTIVE_ROADMAP/ENGINE_GUIDE on isolatedworld-alpha-stabilization;
+current39frozen source and main's48other-owner pending paths remain untouched.
+
+Workshop UNVERIFIEDdraft preserved atcodex/computer-workshop3316a74, threeuntracked
+ownedfiles; first admissionrefusedmissingdisplayservice, nojourney/tests/TSc/lint.
+Library docs-only319429c report preserved, noimplementation. Noautomaticresumption.
+Sol6.1 lanes: coverageinventory, boundedLab-livenessrepro/repair, performancepreparation;
+rootrelease/criticalreview. Browser/performance serialized, no newcamera/rig/Eden scope.
+Initial wholealpha20–36workinghours medium-lowconfidence; first-Step and mixedcompletion
+proof gaps mustbe measured honestly. No current alphaacceptance/publication claim.

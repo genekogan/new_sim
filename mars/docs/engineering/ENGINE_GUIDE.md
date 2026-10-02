@@ -94,3 +94,38 @@ Rig-specific pose mapping stays in renderer adapters; no rig/library migration
 in this tranche. Cameras receive detached actual facts and have no world authority.
 Active save/load is owner-deferred; do not imply serializable JSON restores an
 active coordinator graph. See Lab guide for supported interactions and limitations.
+
+
+## Durable failure model and world liveness (owner mandate2026-10-02)
+
+A local activity failure must not freeze the whole world. Authored journey completion,
+refusal or exhausted script budget is distinct from authoritative world-clock liveness.
+Manual Pause freezes intentionally. Unrelated actors and UI remain usable after a
+local purpose ends. Do not keep dispatching a terminal script or retrying failures each
+frame; continuation needs an explicit supported condition or bounded recovery policy.
+
+- **Expected admission refusal:** named Diagnostic, no acquired physical ownership or
+  fabricated effects. The world still steps; other actors may act normally.
+- **Recoverable execution problem:** relevant reroute/replan or explicitly permitted
+  substitute; otherwise explained waiting with sensible physical state and a defined
+  retry/intervention condition, or ordinary safe cancellation/release. Retain actual
+  completed effects and unfinished purpose. No deadlock/starvation/error-loop promises
+  beyond the declared supported model; test representative disruptions and isolation.
+- **Serious invariant corruption/uncertain executor fault:** visibly preserve concrete
+  diagnostics/state and contain further unsafe execution. Inspection/reset/recovery
+  must be explicit; continuing invalid authoritative state is not liveness. An unexpected
+  failure remains a failing test, never relabelled as an intentional demonstration.
+
+Intent/coordination owns logical commitments; registered physical actions own movement,
+posture, support, object/material writes and cleanup. Renderer/UI/camera observe detached
+readouts. Player/director intervention follows ordinary authoritative handoff; paused
+intentions resume only under their documented binding/ownership/retained-effect rules.
+
+Required validation: each selectable preset's declared execution contract and exact
+production-source proof, actual UI Play plus deterministic checks, representative blocked
+routes/equipment/furniture/occupancy/departure/player interruption and failure isolation.
+Finite journeys prove meaningful terminal effects; continuous worlds prove sustained
+progress; probes prove full supported controls; diagnostic demos prove exact expected
+refusal and surrounding-world usability. Startup/mixed stepping/FIXME are not substitutes.
+The authoritative coverage inventory and normal gate enforcement are stabilization work;
+this requirement is durable, not a claim that every current preset is already certified.
