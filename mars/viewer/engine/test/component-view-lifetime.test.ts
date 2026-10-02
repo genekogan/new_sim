@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { build } from 'esbuild';
 import { ComponentViews } from '../../app/engine-view/components.ts';
 import { FixtureViews } from '../../app/engine-view/fixtures.ts';
+import { PaintOverlay } from '../../app/engine-view/paint.ts';
 import { component } from '../world/factory.ts';
 
 function mesh(views: ComponentViews, id: string) {
@@ -56,6 +57,72 @@ test('world Reset releases transient component geometry and rebuilds fresh geome
     assert.equal(JSON.stringify({ initial, expanded }), source, 'renderer lifetimes never alter authoritative entities');
   } finally {
     views.dispose();
+  }
+});
+
+test('paint image leases share aliases, survive band updates and release on clearing and repeated world Reset', t => {
+  const loads: { path: string; image: THREE.Texture; disposed: number; finish(): void }[] = [];
+  t.mock.method(THREE.TextureLoader.prototype, 'load', (path: string, onLoad?: (image: THREE.Texture) => void) => {
+    const image = new THREE.Texture();
+    const load = { path, image, disposed: 0, finish() { image.image = { width: 2, height: 2 }; onLoad?.(image); } };
+    image.addEventListener('dispose', () => load.disposed++);
+    loads.push(load);
+    return image;
+  });
+  const sheet = component('sheet', 'plywood-4x8', [0, 1.2192, 0], 0, {
+    pose: { p: [0, 1.2192, 0], yaw: 0, roll: Math.PI / 2 },
+    paint: { face: 'front', texture: 'flower-mural-2024', coverage: 1, bands: [{ from: 0.5, to: 1, coverage: 1 }] },
+  });
+  const alias = structuredClone(sheet);
+  alias.paint!.texture = 'flower-mural';
+  const a = new PaintOverlay(new THREE.Group()), b = new PaintOverlay(new THREE.Group());
+  const views = new ComponentViews();
+  try {
+    a.update(sheet);
+    b.update(alias);
+    assert.equal(loads.length, 1, 'canonical aliases share one image');
+    const shared = loads[0];
+    sheet.paint!.bands[0].coverage = 0.7;
+    sheet.pose.p[2] = 1;
+    a.update(sheet);
+    assert.equal(loads.length, 1, 'ordinary paint progress and pose updates retain the lease');
+    a.dispose();
+    assert.equal(shared.disposed, 0, 'one remaining overlay keeps the shared image alive');
+    delete alias.paint;
+    b.update(alias);
+    assert.equal(shared.disposed, 1, 'clearing the last paint user releases its image');
+    b.dispose();
+    const unpainted = structuredClone(sheet);
+    delete unpainted.paint;
+    const initial = { entities: { sheet: unpainted } };
+    const painted = { entities: { sheet } };
+    const source = JSON.stringify({ initial, painted });
+    views.reset(initial);
+    for (let cycle = 0; cycle < 3; cycle++) {
+      views.onTick(painted);
+      assert.equal(loads.length, cycle + 2, 'a fresh world acquires a fresh image');
+      const load = loads.at(-1)!;
+      assert.notEqual(load.image, shared.image);
+      if (cycle === 0) {
+        shared.finish();
+        assert.equal(shared.disposed, 1, 'late load completion does not double-dispose');
+        assert.equal(shared.image.image, null, 'a late image cannot revive a released texture');
+        b.update(sheet);
+        assert.equal(loads.length, 2, 'old completion cannot replace the fresh shared cache entry');
+        b.dispose();
+        assert.equal(load.disposed, 0, 'the new world retains its own lease');
+      }
+      load.finish();
+      views.onTick(painted);
+      assert.equal(load.disposed, 0);
+      views.reset(initial);
+      assert.equal(load.disposed, 1, 'Reset releases the old painted world texture');
+    }
+    views.dispose();
+    assert.ok(loads.every(load => load.disposed === 1));
+    assert.equal(JSON.stringify({ initial, painted }), source);
+  } finally {
+    a.dispose(); b.dispose(); views.dispose();
   }
 });
 

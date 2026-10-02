@@ -24,7 +24,8 @@ export const PAINT_TEXTURES: Readonly<Record<string, string>> = Object.freeze({
   'swirls-2023': '/history/2023/swirls.webp',
   'cafe-front-2023': '/history/2023/cafe-front.webp',
 });
-const loaded = new Map<string, THREE.Texture>();
+type SharedImage = { image: THREE.Texture; users: number };
+const loaded = new Map<string, SharedImage>();
 const warned = new Set<string>();
 export function paintTexturePath(name: string): string | null {
   const path = PAINT_TEXTURES[name];
@@ -34,17 +35,21 @@ export function paintTexturePath(name: string): string | null {
   }
   return path;
 }
-function imageFor(name: string): THREE.Texture | null {
-  const path = paintTexturePath(name);
-  if (!path) return null;
-  let image = loaded.get(path);
-  if (!image) {
-    image = new THREE.TextureLoader().load(path);
+function acquireImage(path: string): SharedImage {
+  let shared = loaded.get(path);
+  if (!shared) {
+    const image = new THREE.TextureLoader().load(path, (texture: THREE.Texture) => {
+      // TextureLoader assigns the decoded image before this callback. A former
+      // world may have released its last user while that request was pending.
+      if (shared?.users === 0) texture.source.data = null;
+    });
     image.colorSpace = THREE.SRGBColorSpace;
     image.anisotropy = 4;
-    loaded.set(path, image);
+    shared = { image, users: 0 };
+    loaded.set(path, shared);
   }
-  return image;
+  shared.users++;
+  return shared;
 }
 
 /** Colour of a paint state: its CSS colour, else a stable colour hashed from the texture name. */
@@ -66,6 +71,7 @@ export class PaintOverlay {
   private key = '';
   private mat?: THREE.MeshStandardMaterial;
   private stripe?: THREE.MeshStandardMaterial;
+  private image?: { path: string; shared: SharedImage };
   /** What is drawn (tests): face, colour, per band the drawn width fraction. */
   state?: { face: string; color: string; texture: string | null; bands: { from: number; to: number; coverage: number; drawn: number }[] };
 
@@ -81,15 +87,20 @@ export class PaintOverlay {
     this.key = key;
     this.clearMeshes();
     this.state = undefined;
-    if (!p) return;
+    if (!p) { this.releaseImage(); return; }
     const F = faceOf(e, p.face);
-    if ('code' in F) return; // not upright (lying sheet): nothing to paint on in the engine either
+    if ('code' in F) { this.releaseImage(); return; } // lying sheet: no upright paint face
     // world → the object's local frame at the engine pose (the object is posed with the same Euler)
     const inv = new THREE.Matrix4().compose(new THREE.Vector3(...e.pose.p), new THREE.Quaternion().setFromEuler(new THREE.Euler(e.pose.pitch ?? 0, -e.pose.yaw, e.pose.roll ?? 0, 'YXZ')), new THREE.Vector3(1, 1, 1)).invert();
     const toLocal = (w: number[]) => new THREE.Vector3(w[0], w[1], w[2]).applyMatrix4(inv);
     const nrm = new THREE.Vector3(...F.N).multiplyScalar(OFF);
     const at = (u: number, h: number) => toLocal([F.B[0] + F.U[0] * u + F.V[0] * h + nrm.x, F.B[1] + F.U[1] * u + F.V[1] * h + nrm.y, F.B[2] + F.U[2] * u + F.V[2] * h + nrm.z]);
-    const image = p.texture ? imageFor(p.texture) : null;
+    const path = p.texture ? paintTexturePath(p.texture) : null;
+    if (path !== (this.image?.path ?? null)) {
+      this.releaseImage();
+      if (path) this.image = { path, shared: acquireImage(path) };
+    }
+    const image = this.image?.shared.image ?? null;
     const color = image ? new THREE.Color('#ffffff') : paintColor(p);
     this.mat = new THREE.MeshStandardMaterial({ color, map: image, roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     if (p.texture && !image) this.stripe = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.35), roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
@@ -124,8 +135,20 @@ export class PaintOverlay {
     this.mat = this.stripe = undefined;
   }
 
+  private releaseImage() {
+    if (!this.image) return;
+    const { path, shared } = this.image;
+    this.image = undefined;
+    if (--shared.users === 0) {
+      shared.image.dispose();
+      shared.image.source.data = null;
+      loaded.delete(path);
+    }
+  }
+
   dispose() {
     this.clearMeshes();
+    this.releaseImage();
     this.group.removeFromParent();
   }
 }

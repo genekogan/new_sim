@@ -105,3 +105,39 @@ entity removal and full disposal with every watched blade released exactly once.
 All four focused native regressions now PASS; TypeScript, lint and diff checks
 PASS. No browser, broad engine gate, deployment or candidate edits performed.
 Actual solar UI Reset proof remains root-owned and pending this integration.
+
+## Additive paint image lifetime correction
+
+Root's actual UI `033f8cb` solar run subsequently passed strict geometry Reset
+and failed strict textures 44→45. Saved `alpha-final-resets` captures show initial
+tick 0 geometry 59/textures 44/no paint, progress 47 textures 44 with a zero-coverage
+flower mural, endpoint 442 textures 45 with the mural drawn, and reset/failure tick 0
+geometry 59/textures 45/no paint overlays. This is not an initial asset-readiness
+arrival: the additional texture is requested by runtime paint and retained after
+the painted world is gone.
+
+The prior singleton paint image map legitimately shared canonical paths/aliases
+across overlays and retained a finite cache for the module lifetime; it did not
+provide the world-resource release required by this strict Reset contract.
+`PaintOverlay` now leases a path-keyed shared image. Band/pose updates keep the
+same lease; paint clearing, an unusable face, texture changes or overlay disposal
+release it. The final user disposes the texture exactly once and removes the
+cache entry. Other simultaneous overlays keep their image alive. Canonical image
+files, path aliases, material construction and paint geometry/coverage behavior
+are preserved.
+
+If the final release happens before asynchronous image decoding finishes, the
+loader callback clears that released texture's decoded source. It neither
+disposes twice nor reinserts/replaces any newly acquired cache entry. A pending
+load may finish normally; no request cancellation or model-asset ownership change
+is introduced.
+
+The native paint regression was RED before the fix (last-user disposal 0 instead
+of 1), then GREEN. It verifies alias sharing, stable band/pose update ownership,
+last-user clearing, delayed completion after a new world acquires the same path,
+no stale-cache revival/double disposal, three actual ComponentViews Reset cycles,
+and unchanged source entities. Initial TypeScript/lint checks caught the loader's
+non-null HTMLImageElement generic; typing the callback with the shared lease
+Texture type and clearing its source corrected that without a cast. Final five focused native tests,
+TypeScript, lint and diff checks PASS. No browser or broad gate run; actual solar
+texture Reset proof remains root-owned and unverified after this change.
