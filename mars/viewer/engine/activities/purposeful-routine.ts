@@ -54,7 +54,7 @@ export interface PurposefulRoutineControlParams { routine: string; intent: 'paus
 type Meal = { actor: string; served: boolean; consumed: boolean; returned: boolean; fraction: number };
 type Exec = {
   id: string; p: PurposefulRoutineParams; mode: RoutineMode; phase: 'classroom' | 'trip' | 'preparation' | 'food' | 'rest' | 'sleep' | 'work';
-  child?: string; trip?: string; sleep?: string; preparation?: FoodPreparation; children: string[]; departureChild?: string; error?: Diagnostic;
+  child?: string; trip?: string; sleep?: string; preparation?: FoodPreparation; children: string[]; departureChild?: string; cleanupChild?: string; error?: Diagnostic;
   questionQueued: boolean; questionAsked: boolean; presenters: string[]; conversationSeen: boolean;
   foodStarted: boolean; foodGroup?: string; foodEats: string[]; foodReleasing: boolean;
   meal: Meal[]; restSeconds: number; restSit?: string; standing?: string; workElapsed: number;
@@ -183,7 +183,7 @@ function drain(rt: Runtime, ex: Exec): StepResult {
     if (rec.status === 'failed') ex.error = diagnostic('sleep-pause', rec.diagnostic?.message ?? 'Sleep pause refused', [ex.sleep], rec.diagnostic);
   }
   for (const id of ex.children) {
-    if (id === ex.departureChild || !rt.isActive(id) || ((id === ex.trip || id === ex.sleep) && !ex.ending)) continue;
+    if (id === ex.departureChild || id === ex.cleanupChild || !rt.isActive(id) || ((id === ex.trip || id === ex.sleep) && !ex.ending)) continue;
     if (!ex.ending && ['paired_walk_control', 'sleep_control'].includes(rt.records.get(id)?.verb ?? '')) continue;
     rt.cancel(id);
   }
@@ -193,14 +193,47 @@ function drain(rt: Runtime, ex: Exec): StepResult {
   const sleepDrained = !ex.sleep || !rt.isActive(ex.sleep) || (!!currentSleep && ['paused', 'waiting'].includes(currentSleep.mode) && currentSleep.ownedActions.every(id => !rt.isActive(id)));
   observePreparation(rt, ex);
   observeMeal(rt, ex);
-  if (!sleepDrained || !tripDrained || ex.children.some(id => rt.isActive(id) && ((id !== ex.trip && id !== ex.sleep) || ex.ending)) || (member && rt.isActive(ex.p.session)))
+  if (!sleepDrained || !tripDrained || ex.children.some(id => id !== ex.cleanupChild && rt.isActive(id) && ((id !== ex.trip && id !== ex.sleep) || ex.ending)) || (member && rt.isActive(ex.p.session)))
     return { status: 'running', phase: ex.ending ? 'ending' : 'draining' };
   ex.child = undefined; ex.restSit = undefined; ex.standing = undefined;
   ex.foodGroup = undefined; ex.foodEats = []; ex.foodReleasing = false;
   ex.questionAsked ||= rt.events.some(e => e.type === 'mark' && e.name === 'classroom.question' && (e.data as { session?: string; actor?: string })?.session === ex.p.session && (e.data as { actor?: string })?.actor === ex.p.actor);
   if (!ex.questionAsked) ex.questionQueued = false;
   // Safe cleanup can leave the committed person physically departing under the session's directive.
-  if (ex.ending) { ex.mode = 'completed'; return { status: 'completed', outputs: { ended: true } }; }
+  if (ex.ending) {
+    // Preparation Pause retains its spoon. Terminal End returns only the spoon
+    // actually acquired by this routine, through the ordinary physical put action.
+    const spoon = ex.p.preparation?.spoon;
+    const acquired = spoon && [...rt.records.values()].some(r =>
+      owned(rt, r.id, ex.id) && r.verb === 'take_item' && running(r) && (r.params as { item?: string }).item === spoon);
+    if (ex.cleanupChild && rt.isActive(ex.cleanupChild)) {
+      const child = rt.records.get(ex.cleanupChild)!;
+      return child.diagnostic ? { status: 'blocked', diagnostic: diagnostic('end-return', child.diagnostic.message, [ex.p.actor, child.id], child.diagnostic) }
+        : { status: 'running', phase: 'ending-return' };
+    }
+    if (ex.phase === 'preparation' && acquired && heldBy(rt.world, ex.p.actor).some(h => h.item.id === spoon)) {
+      const target = ex.p.food.participants.find(p => p.actor === ex.p.actor)?.returns.find(q => q.item === spoon);
+      const params = { actor: ex.p.actor, item: spoon, surfaceSlot: target?.surfaceSlot };
+      if (!target) {
+        ex.error = diagnostic('end-return', `No declared return slot for ${spoon}`, [ex.id, spoon]);
+        return { status: 'blocked', diagnostic: ex.error };
+      }
+      const def = rt.registry.get('put_item')!, parsed = def.schema.parse(params);
+      const plan = def.plan(rt, parsed);
+      const reserved = def.reservations(rt.world, parsed).find(c => rt.holder(c.resource).some(id => !owned(rt, id, ex.id)));
+      if (!plan.ok || reserved) {
+        ex.error = !plan.ok ? diagnostic('end-return', plan.diagnostic.message, [ex.id, spoon, target.surfaceSlot], plan.diagnostic)
+          : diagnostic('end-return', `${spoon} waits for ${reserved!.resource} before returning to ${target.surfaceSlot}`, [ex.id, spoon, reserved!.resource]);
+        return { status: 'blocked', diagnostic: ex.error };
+      }
+      const rec = rt.submit('put_item', params, { parent: ex.id, preempt: false });
+      ex.children.push(rec.id); ex.cleanupChild = rec.id;
+      if (rec.diagnostic) { ex.error = diagnostic('end-return', rec.diagnostic.message, [ex.id, spoon, rec.id], rec.diagnostic); return { status: 'blocked', diagnostic: ex.error }; }
+      ex.error = undefined;
+      return { status: 'running', phase: 'ending-return' };
+    }
+    ex.mode = 'completed'; return { status: 'completed', outputs: { ended: true } };
+  }
   if (ex.phase === 'food') ex.foodCheckpoint = Object.fromEntries(ex.p.food.participants.flatMap(p => [p.bowl, p.spoon]).map(item => {
     const e = rt.world.entities[item]; return [item, stableStringify({ def: e?.def, support: e?.support, food: e?.contents?.food })];
   }));

@@ -10,6 +10,7 @@ import { readGarden } from '../objects/garden.ts';
 import { readMusicGathering, latestMusicGathering } from '../activities/music-gathering.ts';
 import { musicStation } from '../activities/computer-music.ts';
 import { readWorkstation } from '../objects/workstation.ts';
+import { surfaceSlot, placeOnSlot } from '../items/model.ts';
 import { heldBy } from '../items/model.ts';
 
 function setup(name: LivingDayName) {
@@ -151,4 +152,21 @@ test('living-day recovery: expired gathering gives named ended disposition on ex
   assert.equal(rt.records.get(refused.routine!)?.status,'failed');assert.equal(rt.isActive(refused.session!),true);
   until(rt,()=>!rt.isActive(refused.session!));rt.world.entities[potId]=pot;
   assert.equal(retryLivingDay(rt)?.code,'day.gathering-ended');assert.equal(readLivingDay(rt)?.phase,'ended');assert.equal(readLivingDay(rt)?.routine,refused.routine);assert.equal(readLivingDay(rt)?.session,refused.session);
+});
+
+test('living-day End cleanup: occupied spoon return remains coherently held and retries only after restoration',()=>{
+  const rt=setup('living-day-4');start(rt,'living-day-4');until(rt,()=>(routine(rt)?.preparation?.ingredients[0].deposited??0)>0);
+  const id=readLivingDay(rt)!.routine!,bindings=routine(rt)!.bindings,spoon=bindings.preparation!.spoon;
+  const target=bindings.food.participants[0].returns.find(q=>q.item===spoon)!.surfaceSlot;
+  const slot=surfaceSlot(rt.world,target);assert.ok(!('code'in slot));
+  const blocker=structuredClone(rt.world.entities[spoon]);blocker.id='return-blocker';rt.world.entities[blocker.id]=blocker;placeOnSlot(blocker,slot,0);
+  control(rt,'purposeful_routine_control',{routine:id,intent:'end'});until(rt,()=>routine(rt)?.diagnostic?.code==='routine.end-return');
+  assert.equal(rt.isActive(id),true);assert.equal(routine(rt)?.mode,'ending');assert.equal(rt.records.get(id)?.outputs,undefined);
+  assert.ok(heldBy(rt.world,'worker').some(h=>h.item.id===spoon));
+  const attempts=()=>[...rt.records.values()].filter(r=>r.parent===id&&r.verb==='put_item');
+  assert.equal(attempts().length,0);for(let i=0;i<40;i++){rt.step();tickLivingDay(rt);}assert.equal(attempts().length,0);
+  delete rt.world.entities[blocker.id];until(rt,()=>!rt.isActive(id));
+  assert.equal(rt.records.get(id)?.outputs?.ended,true);assert.deepEqual(heldBy(rt.world,'worker'),[]);
+  assert.equal(attempts().length,1);assert.equal(attempts()[0].status,'completed');
+  const support=rt.world.entities[spoon].support;assert.ok(support?.kind==='resting-on');assert.equal(`${support.on}#${support.slot}`,target);
 });
