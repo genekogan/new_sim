@@ -2209,6 +2209,36 @@ support and execution remain unchanged. Add stricter actualPlay DOM assertions f
 both kinds of earlyEnd. ViewerTSc/lint pass; focused browser recheck/fullgate pending.
 
 
+### Combined source capture review and bounded history gap — 2026-10-02
+
+All30fresh61b236e PNG plusJSON/a11y personally inspected by Sol6.1 helper; root
+inspects13representative art/independent care/performer/cleanup/final images. No
+major visible ownership/support/continuity/clipping break. Actualmarkedpad29→60→
+69→160ticks, samebookmark1.35→20s, finitecare0→1cycle/water1→.75, physicalsamechair
+performerexchange and same3cleanupobjects/supports/contents are asserted. Fine
+fingers/sparsegestures/off-frame care/direction and occludedfinalbook remain limits.
+New early-End label assertions pass3/3 actualPlay26.6s on11cb5d6; root views all3
+newEnd readouts. Idle original stress/gridceilings pass,0violations/pinsunchanged.
+
+Audit catches oldcompleted music session elapsed following nextcomputeruser; actual
+openjam finished-round history remainscorrect. A bounded own-child history repair
+and regressions are underway before finalcombinedsource freeze. Existing failed
+f095gate/museum84sunchanged focusedretry remain distinct. No merger/deployyet;
+all48other-owner pendingpaths staypreserved. Futuregallerycore13checks/29combined
+PASS is savedseparately, notpartofthispublicationcandidate.
+
+
+### Music history ownership repair before combined freeze — 2026-10-02
+
+Capture-derived oldsession progress now comes from its own ordinary work child's
+terminal workedSeconds/finished outputs, with owned-live progress retained for safe
+interruption. It no longer follows a later stationuser, including sameperson/samelabel
+reuse while earlier listeners drain. Inactive sessions expose note=null; current
+stationaudio/physics unchanged. Four new RED→GREEN regressions and focused67/67
+PASS, viewerTSc/lint. Integrates worker ef5a1ce as e28f035; adds exact browserassertion
+that completedfirst7s performance stays7s duringsecondperformer use. FreshactualPlay
+recheck and cleancombinedgate remain required; no releasedrepairclaim yet.
+
 ### Future guided gallery shared boundary — 2026-10-02
 
 Separate gallery-lab integrates13-case gallery core2e6a185 (29focused checksPASS),

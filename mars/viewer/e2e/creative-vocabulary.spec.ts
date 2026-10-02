@@ -502,6 +502,17 @@ test('connected creative afternoon: actual drawn partial artifact, independent r
     actor: 'sketcher',
     playedSeconds: 7,
   });
+  const completedFirstMusic = musicSecond.music.sessions.find(
+    (session) =>
+      session?.bindings.performer === 'sketcher' &&
+      session.status === 'completed',
+  );
+  expect(completedFirstMusic).toMatchObject({
+    status: 'completed',
+    elapsed: 7,
+    duration: 7,
+    note: null,
+  });
   await play(page);
   await page.waitForFunction(() => {
     const d = window.__marsEngine.creativeAfternoon(),

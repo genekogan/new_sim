@@ -39,6 +39,7 @@ interface Exec {
   mode: 'starting' | 'performing' | 'stopping' | 'completed';
   error?: Diagnostic;
   interrupted: boolean;
+  elapsed: number;
 }
 const sessions = new WeakMap<Runtime, Map<string, Exec>>();
 function store(rt: Runtime) {
@@ -208,22 +209,60 @@ function stop(ex: Exec, error?: Diagnostic) {
   ex.mode = 'stopping';
   ex.error ??= error;
 }
+/** Session history belongs to its work child, even after this station is reused. */
+function sessionProgress(rt: Runtime, ex: Exec) {
+  const child = ex.work ? rt.records.get(ex.work) : undefined;
+  const outputs = child?.parent === ex.id ? child.outputs : undefined;
+  const ownResult =
+    outputs?.station === ex.p.station &&
+    outputs?.task === workParams(ex.p).task &&
+    typeof outputs.workedSeconds === 'number' &&
+    Number.isFinite(outputs.workedSeconds)
+      ? outputs
+      : undefined;
+  const station = musicStation(rt, ex.p.station);
+  const config = rt.world.entities[ex.p.station]?.equipment?.config;
+  const ownsLiveStation =
+    child?.parent === ex.id &&
+    rt.isActive(child.id) &&
+    station &&
+    !('code' in station) &&
+    station.action === child.id &&
+    config?.programAction === child.id &&
+    station.user === ex.p.performer &&
+    station.task === workParams(ex.p).task;
+  const elapsed = ownResult
+    ? (ownResult.workedSeconds as number)
+    : ownsLiveStation
+      ? station.elapsed
+      : ex.elapsed;
+  return {
+    elapsed,
+    duration: ex.p.duration,
+    pulse: Math.floor((elapsed + 1e-9) / ex.p.period),
+    note:
+      rt.isActive(ex.id) && ex.mode === 'performing' && ownsLiveStation
+        ? station.note
+        : null,
+    finished: ownResult?.finished === true,
+  };
+}
 function drain(rt: Runtime, ex: Exec): StepResult {
+  ex.elapsed = sessionProgress(rt, ex).elapsed;
   for (const id of ex.children)
     if (rt.records.get(id)?.parent === ex.id && rt.isActive(id)) rt.cancel(id);
   if (ex.children.some((id) => rt.isActive(id)))
     return { status: 'running', phase: 'stopping' };
   if (ex.error) return { status: 'failed', diagnostic: ex.error };
   ex.mode = 'completed';
-  const work = readWorkstation(rt, ex.p.station);
+  const progress = sessionProgress(rt, ex);
   return {
     status: 'completed',
     outputs: {
       station: ex.p.station,
       score: ex.p.score,
-      finished:
-        !ex.interrupted && !('code' in work) && work.status === 'completed',
-      playedSeconds: 'code' in work ? 0 : work.elapsed,
+      finished: !ex.interrupted && progress.finished,
+      playedSeconds: progress.elapsed,
     },
   };
 }
@@ -279,6 +318,7 @@ export const computerMusic: ActionDef<MusicParams, null, Exec> = {
       : { ok: true, program: null };
   },
   start(rt, p, _program, action) {
+    const bookmark = readWorkstation(rt, p.station);
     const ex: Exec = {
       id: action,
       p: structuredClone(p),
@@ -286,6 +326,7 @@ export const computerMusic: ActionDef<MusicParams, null, Exec> = {
       children: [],
       listeners: p.listeners.map((l) => ({ ...l, departed: false })),
       interrupted: false,
+      elapsed: p.resume && !('code' in bookmark) ? bookmark.elapsed : 0,
     };
     store(rt).set(action, ex);
     return ex;
@@ -348,6 +389,7 @@ export const computerMusic: ActionDef<MusicParams, null, Exec> = {
       return { status: 'running', phase: 'arriving' };
     }
     publish(rt, ex);
+    ex.elapsed = sessionProgress(rt, ex).elapsed;
     for (const l of ex.listeners) {
       if (!l.child) continue;
       const child = rt.records.get(l.child)!;
@@ -404,21 +446,17 @@ export function readComputerMusic(rt: Runtime, action: string) {
   const ex = sessions.get(rt)?.get(action),
     rec = rt.records.get(action);
   if (!ex || !rec) return;
-  const w = musicStation(rt, ex.p.station);
+  const progress = sessionProgress(rt, ex);
   return {
     action,
     status: rec.status,
     mode: ex.mode,
     phase: rec.phase,
     bindings: structuredClone(ex.p),
-    ...(w && !('code' in w)
-      ? {
-          elapsed: w.elapsed,
-          duration: w.duration,
-          note: w.note,
-          pulse: w.pulse,
-        }
-      : {}),
+    elapsed: progress.elapsed,
+    duration: progress.duration,
+    note: progress.note,
+    pulse: progress.pulse,
     listeners: ex.listeners.map((l) => ({
       actor: l.actor,
       seat: l.seat,

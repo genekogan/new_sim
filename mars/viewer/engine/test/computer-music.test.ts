@@ -306,3 +306,132 @@ test('resuming remaining invitations preserves an explicitly departed listener a
   assert.equal(readComputerMusic(rt, resumed.id)!.bindings.listeners.length, 1);
   clean(rt);
 });
+
+function liveProgress(
+  rt: Runtime,
+  user: string,
+  duration: number,
+  elapsed: number,
+) {
+  const s = musicStation(rt, MUSIC_BINDING.station);
+  return (
+    !!s &&
+    !('code' in s) &&
+    s.status === 'active' &&
+    s.user === user &&
+    s.duration === duration &&
+    s.elapsed >= elapsed
+  );
+}
+test('completed music readout stays with its own child under different performer station reuse', () => {
+  const rt = musicRuntime(),
+    a = rt.submit('computer_music', {
+      ...MUSIC_BINDING,
+      listeners: [],
+      duration: 3,
+      score: 'bright',
+      period: 0.5,
+    });
+  until(rt, () => !rt.isActive(a.id));
+  const prior = readComputerMusic(rt, a.id)!;
+  assert.equal(prior.elapsed, 3);
+  assert.equal(prior.note, null);
+  const b = rt.submit('computer_music', {
+    ...MUSIC_BINDING,
+    performer: 'listener-a',
+    listeners: [],
+    duration: 6,
+    score: 'gentle',
+    period: 0.75,
+  });
+  until(rt, () => liveProgress(rt, 'listener-a', 6, 1));
+  assert.deepEqual(readComputerMusic(rt, a.id), prior);
+  assert.equal(readComputerMusic(rt, b.id)!.note, station(rt).note);
+  assert.equal(readComputerMusic(rt, b.id)!.duration, 6);
+  assert.equal(a.outputs?.playedSeconds, 3);
+  until(rt, () => !rt.isActive(b.id));
+  assert.deepEqual(readComputerMusic(rt, a.id), prior);
+  assert.equal(b.outputs?.playedSeconds, 6);
+  clean(rt);
+});
+test('completed same-person identical-label music history does not inherit later duration or pulses', () => {
+  const rt = musicRuntime(),
+    a = rt.submit('computer_music', {
+      ...MUSIC_BINDING,
+      listeners: [],
+      duration: 2,
+    });
+  until(rt, () => !rt.isActive(a.id));
+  const prior = readComputerMusic(rt, a.id)!;
+  const b = rt.submit('computer_music', {
+    ...MUSIC_BINDING,
+    listeners: [],
+    duration: 5,
+  });
+  until(rt, () => liveProgress(rt, 'musician', 5, 0.75) && rt.isActive(b.id));
+  assert.deepEqual(readComputerMusic(rt, a.id), prior);
+  assert.equal(prior.elapsed, 2);
+  assert.equal(prior.duration, 2);
+  assert.equal(prior.pulse, 4);
+  assert.equal(prior.note, null);
+  assert.equal(readComputerMusic(rt, b.id)!.note, station(rt).note);
+  until(rt, () => !rt.isActive(b.id));
+  assert.deepEqual(readComputerMusic(rt, a.id), prior);
+  assert.equal(b.outputs?.playedSeconds, 5);
+  clean(rt);
+});
+test('interrupted session retains its exact bookmark under explicit same-purpose continuation', () => {
+  const rt = musicRuntime(),
+    a = rt.submit('computer_music', {
+      ...MUSIC_BINDING,
+      listeners: [],
+      duration: 5,
+    });
+  until(rt, () => liveProgress(rt, 'musician', 5, 1.25));
+  const bookmark = station(rt).elapsed;
+  rt.cancel(a.id);
+  until(rt, () => !rt.isActive(a.id));
+  const prior = readComputerMusic(rt, a.id)!;
+  assert.equal(prior.elapsed, bookmark);
+  assert.equal(prior.note, null);
+  assert.equal(a.outputs?.playedSeconds, bookmark);
+  assert.equal(a.outputs?.finished, false);
+  const b = rt.submit('computer_music', {
+    ...MUSIC_BINDING,
+    listeners: [],
+    duration: 5,
+    resume: true,
+  });
+  until(rt, () => liveProgress(rt, 'musician', 5, 2.25));
+  assert.deepEqual(readComputerMusic(rt, a.id), prior);
+  assert.equal(readComputerMusic(rt, b.id)!.note, station(rt).note);
+  assert.equal(readComputerMusic(rt, b.id)!.elapsed, station(rt).elapsed);
+  until(rt, () => !rt.isActive(b.id));
+  assert.deepEqual(readComputerMusic(rt, a.id), prior);
+  assert.equal(b.outputs?.playedSeconds, 5);
+  clean(rt);
+});
+test('music terminal outputs retain own work result during later ordinary station reuse and listener drain', () => {
+  const rt = musicRuntime(),
+    a = rt.submit('computer_music', { ...MUSIC_BINDING, duration: 2 });
+  until(
+    rt,
+    () => readComputerMusic(rt, a.id)?.mode === 'stopping' && rt.isActive(a.id),
+  );
+  const later = rt.submit('work_at', {
+    actor: 'musician',
+    station: MUSIC_BINDING.station,
+    seat: MUSIC_BINDING.seat,
+    duration: 5,
+    task: 'Later ordinary work',
+  });
+  assert.notEqual(later.status, 'failed', later.diagnostic?.message);
+  until(rt, () => !rt.isActive(a.id));
+  assert.equal(a.outputs?.finished, true);
+  assert.equal(a.outputs?.playedSeconds, 2);
+  assert.equal(readComputerMusic(rt, a.id)!.elapsed, 2);
+  assert.equal(readComputerMusic(rt, a.id)!.note, null);
+  rt.cancel(later.id);
+  until(rt, () => !rt.isActive(later.id));
+  clean(rt);
+});

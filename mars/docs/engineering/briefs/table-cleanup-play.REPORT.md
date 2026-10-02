@@ -1,3 +1,13 @@
+> Parent verification update2026-10-02: actualPlay on61b236e passes all6
+> combined sharing/creative/cleanup cases in2.0min; all30PNG and matching JSON/a11y
+> inspected by helper, root personally inspects13representative images. No major
+> support/continuity/clipping failure; sparse gestures/finefingers/off-frame events
+> remain explicit. Read-only End label fix11cb5d6 passes stricter3/3Play recheck26.6s;
+> root inspects all3new early-End readouts. Full combinedgate/publication pending.
+> Music history readout inconsistency is being repaired separately before freeze.
+> The original authoring-only statements below are dated provenance, superseded
+> by this parent execution receipt, not claims of current missing evidence.
+
 # Table cleanup Play regressions — authored, not browser-verified
 
 New `viewer/e2e/table-cleanup.spec.ts` is authored from integrated candidate `9c97618` in isolated branch `codex/table-cleanup-play`. Only this spec and report are owned here. No browser/performance/full gate ran: the parent retains the serialized release gate/public-proof slot. Runtime, shared hooks, HUD, registry, scenarios and physical actions are unchanged.
