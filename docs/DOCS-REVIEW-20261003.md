@@ -11,6 +11,8 @@ manifests; living mandates versus Toy agendas; reflection/narrator cadence;
 phase-aware snapshots, graceful accepted-head replay and rollback capability;
 world/Lab/asset boundaries; and physical rooms/construction versus deferred design.
 The Toy-only kernel verifier is now labeled rather than suggested for another world.
+The old five-release retention claim is removed: current deployment does not prune
+release directories automatically; selected rollback targets must be preserved.
 
 The former accumulating STATUS page is retained in
 [dated milestone history](MERGE-MILESTONES-20261003.md). Original RED native gate,

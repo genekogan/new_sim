@@ -73,7 +73,9 @@ mandates, `build_lookout` and `quietSeatCourtesy`. The inactive courtesy reader
 is preferable after later docs-only releases. Older sleep-only readers are refused.
 Never erase accepted events or restore a DB just to make old code work. A release
 without later worlds may stop their units but must retain their databases.
-Keep the compatible rollback directory; normal deploy retains the five newest.
+Keep the compatible rollback directory. The current deploy script does not
+automatically prune release directories; retention is an operator task, and must
+preserve the selected production/staging/previous targets.
 
 Check actual identity/health (public read-only):
 
