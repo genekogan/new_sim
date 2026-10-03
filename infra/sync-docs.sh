@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 EDEN4="${EDEN4_DIR:-<eden4>}"
-MARS="${MARS_DIR:-<mars-campus-repo>}"
+MARS="${MARS_DIR:-$(pwd)/mars}"
 
 mkdir -p docs/eden4/report docs/mars
 cp "$EDEN4"/*.md docs/eden4/

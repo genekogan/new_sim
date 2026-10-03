@@ -1,3 +1,15 @@
+# Successor fork context (Gene, 2026-10-03)
+
+This tree is the hard fork inside Eden Sim, imported from Mars alpha
+`75d022308e944128335b9c0c1ef84e2c1e51e54c`. Gene explicitly authorized
+successor development, new files, Eden integration and private-repository
+pushes in `<eden4>/23-MERGE-KICKOFF-PROMPT.md`. Original Mars and
+Little Martians source trees remain read-only. Historical duties below
+that prohibit this authorized successor work apply to the original checkout.
+Keep engine determinism, geometry, validation and evidence safeguards.
+
+---
+
 # Mars Studio agent context
 
 ## Current priority — accepted Mars World v1 alpha42 and useful expansion (2026-10-03)

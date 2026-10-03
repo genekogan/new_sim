@@ -7,7 +7,7 @@ import type { Brain } from './brain.ts';
 import { tickerText } from './brain.ts';
 import type { Config } from './config.ts';
 import type { Db, SoulRow, UserRow } from './db.ts';
-import { WORLD_ID, energyWord, type WorldHost } from './world.ts';
+import { energyWord, type WorldHost } from './world.ts';
 
 export class ApiError extends Error {
   status: number; code: string; extra?: Record<string, unknown>;
@@ -56,9 +56,9 @@ export class Souls {
     const p = createSoulSchema.safeParse(input);
     if (!p.success) throw new ApiError(400, 'invalid', p.error.issues.map((i) => i.message).join('; '));
     if (!native && this.db.soulsOf(owner).length >= this.cfg.maxSoulsPerUser) throw new ApiError(409, 'too-many', `at most ${this.cfg.maxSoulsPerUser} souls per account`);
-    if (this.db.soulByName(WORLD_ID, p.data.name)) throw new ApiError(409, 'name-taken', `a soul named ${p.data.name} already exists`);
+    if (this.db.soulByName(this.host.worldId, p.data.name)) throw new ApiError(409, 'name-taken', `a soul named ${p.data.name} already exists`);
     const id = newId('s'); const entityId = `h_${id.slice(2)}`;
-    this.db.createSoul({ id, worldId: WORLD_ID, owner, entityId, name: p.data.name, description: p.data.description, native });
+    this.db.createSoul({ id, worldId: this.host.worldId, owner, entityId, name: p.data.name, description: p.data.description, native });
     await this.host.enqueue('birth', native ? 'world' : `soul:${id}`, { soulId: id, entityId, name: p.data.name, description: p.data.description, owner } satisfies BirthPayload);
     return this.db.soul(id)!;
   }
@@ -211,9 +211,9 @@ export class Souls {
     const label = (id: string) => this.host.nameOf(id);
     // things that have since vanished keep the name they had when they were played on
     const past = new Map<string, string>(); for (const pl of this.host.recentPlays) if (pl.target && pl.targetName) past.set(pl.target, pl.targetName);
-    const own = this.db.soulEvents(WORLD_ID, soul.id, limit);
+    const own = this.db.soulEvents(this.host.worldId, soul.id, limit);
     const since = own[0]?.seq ?? 0;
-    const beats = this.db.recentKind(WORLD_ID, 'scene', 300).filter((e) => e.seq >= since && Array.isArray(e.payload?.beat?.targets) && e.payload.beat.kind !== 'scene' && e.payload.beat.targets.includes(soul.name));
+    const beats = this.db.recentKind(this.host.worldId, 'scene', 300).filter((e) => e.seq >= since && Array.isArray(e.payload?.beat?.targets) && e.payload.beat.kind !== 'scene' && e.payload.beat.targets.includes(soul.name));
     return [...own, ...beats].sort((a, b) => a.seq - b.seq).slice(-limit).map((e) => {
       const p = e.payload;
       const text = e.kind === 'birth' ? 'arrived in the world'
@@ -231,7 +231,7 @@ export class Souls {
   worldSummary() {
     const e = this.host.engine, w = e.world;
     return {
-      world: WORLD_ID, tick: w.tick, time: w.env.datetime, rules_version: e.rulesVersion, size_m: 100,
+      world: this.host.worldId, tick: w.tick, time: w.env.datetime, rules_version: e.rulesVersion, size_m: 100,
       goals: ['wander', 'go', 'follow', 'attend', 'gather', 'converse', 'rest', 'perform'],
       regions: Object.values(w.regions).map((r) => ({ id: r.id, label: r.label })),
       places: Object.values(w.entities).filter((x) => x.kind === 'fixture').map((x) => ({ id: x.id, label: x.label, x: x.pose.p[0], z: x.pose.p[2] })),
@@ -241,7 +241,7 @@ export class Souls {
   }
 
   soulLog(soul: SoulRow, limit = 30) {
-    return this.db.soulEvents(WORLD_ID, soul.id, limit).map((e) => ({ seq: e.seq, tick: e.tick, kind: e.kind, text: tickerText(e, this.host) }));
+    return this.db.soulEvents(this.host.worldId, soul.id, limit).map((e) => ({ seq: e.seq, tick: e.tick, kind: e.kind, text: tickerText(e, this.host) }));
   }
 
   // ------------------------------------------------------------ waiting (long-poll for agents)

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 const simulation = `http://127.0.0.1:${process.env.MARS_SIMULATION_PORT || 8797}`;
 export default defineConfig({
+  base: process.env.SIM_STATIC === '1' ? '/mars-assets/' : '/',
   plugins: [react()],
   publicDir:
     process.env.CLOUDFLARE_RELEASE === '1' ? '.cloudflare/public' : 'public',

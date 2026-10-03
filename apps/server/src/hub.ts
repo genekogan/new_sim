@@ -8,7 +8,7 @@ import { PROTO, publicEvent, type BrainCall, type ClientMsg, type Me, type Serve
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Db } from './db.ts';
-import { WORLD_ID, type WorldHost } from './world.ts';
+import { type WorldHost } from './world.ts';
 
 const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional() }),
@@ -77,17 +77,17 @@ export class Hub {
     if (m.t === 'hello') { if (now - c.lastHello < 3_000) return; c.lastHello = now; c.lastSnapshot = now; }
     if (m.t === 'resync') { c.resyncs++; return this.send(c, { t: 'snapshot', reason: `resync: ${String(m.reason).slice(0, 80)}`, ...this.host.snapshotView() }); }
     if (m.t === 'hello') {
-      if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: WORLD_ID, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
+      if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       c.me = u ? this.auth.me(u) : null;
       const e = this.host.engine;
-      this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: WORLD_ID, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now(), epoch: this.epoch, paused: this.host.paused });
+      this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now(), epoch: this.epoch, paused: this.host.paused });
       // resume from the ring buffer if the client only missed a little; otherwise a full snapshot
       const ring = this.host.ring;
       const canResume = typeof m.since === 'number' && m.epoch === this.epoch && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
       if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b, log: b.log.map(publicEvent) }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
-      this.send(c, { t: 'log', events: this.db.tailEvents(WORLD_ID, 150).map(publicEvent) });
+      this.send(c, { t: 'log', events: this.db.tailEvents(this.host.worldId, 150).map(publicEvent) });
       this.send(c, { t: 'kernel', view: this.host.kernelView() });
       this.send(c, { t: 'plays', plays: this.host.recentPlays.slice(-60) });
       this.send(c, { t: 'talk', lines: this.db.recentTalk(40) });

@@ -27,7 +27,8 @@ class ErrorBoundary extends Component<
     );
   }
 }
-const route = location.pathname.replace(/\/$/, '') || '/';
+const requestedRoute = location.pathname.replace(/\/$/, '') || '/';
+const route = requestedRoute === '/l/mars' ? '/lab' : requestedRoute.replace(/^\/w\/mars\/(202[0-7])$/, '/studio/$1');
 const requestedYear = new URLSearchParams(location.search).get('year');
 const presentationYear =
   requestedYear && /^202[0-7]$/.test(requestedYear)

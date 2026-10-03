@@ -9,11 +9,13 @@
   "scripts": {
     "dev": "pnpm -r --parallel --filter ./apps/* dev",
     "build": "pnpm --filter @sim/web build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter '!mars-campus-viewer' test && pnpm test:mars",
     "test:replay": "pnpm --filter @sim/server test:replay",
     "start": "node --experimental-strip-types apps/server/src/main.ts",
     "typecheck": "pnpm -r exec tsc --noEmit -p .",
-    "check": "pnpm typecheck && pnpm test"
+    "check": "pnpm typecheck && pnpm test",
+    "test:mars": "pnpm --filter mars-campus-viewer test:engine",
+    "test:mars:release": "pnpm --filter mars-campus-viewer gate"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

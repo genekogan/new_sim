@@ -125,3 +125,34 @@ The Mars tests skip where there is no Mars checkout (CI).
 
 Waiting on Gene: the questions at the end of `eden4/18` and `eden4/19`. The earlier design
 discussion is in `frontier/`.
+# Eden4 merge candidate — 2026-10-03
+
+Preflight passed, including existing-owner admin browser login. Canonical
+checkout now `<repo>`; original sources read-only. Exact Mars alpha
+`75d022308e944128335b9c0c1ef84e2c1e51e54c` imported with filtered history
+under `mars/` (`ac5613c`), whole-history secret scan clean. Runtime takes,
+baselines and required fixtures restored from exact Git bytes.
+
+First unified candidate: `/` world list; `/w/toy` preserves toy identity and
+behavior; `/w/mars` four owned Souls on the proving ground, server-recorded
+3D take stream and existing panels; `/l/mars` original browser-only Lab;
+`/w/mars/2020`…`2027` static Studio pages. New-world template, scoped Caddy
+routes, data directories, replication/watchdog and staged deploy flow.
+
+Validation: workspace typecheck, Sim suite and Mars engine tests pass
+(1467 passes, 6 upstream skips, 11 upstream TODOs). Standalone fresh-Runtime
+compaction after supper preserves world and continuation hashes; quiet
+snapshot + log replay matches mid-supper. Building helper deliverable reviewed
+and GLB checks pass; previews are ready for early visual review. Full Mars
+historical release gate remains due at tranche end with derivative fixtures.
+
+Live still original `4597ddf` until this candidate passes staging and is
+promoted; consult health endpoints and MERGE-LOG for the exact live receipt.
+Next: persistent Mars camp, day/customs/needs/journal decisions and reflection,
+steering mandate, faults and 48-day soak; floater integration and Eden field.
+Mars closing delta still awaits its final publication receipt.
+
+Deferred: economy/ontology/plugins, terrain, talking faces, other owners,
+2026 campus live world, Worker/DNS redirect and engine package restructure.
+
+---

@@ -12,7 +12,8 @@ import type { Hub } from './hub.ts';
 import { cardGrammar } from '@sim/brain';
 import { skillMd } from './skill.ts';
 import { ApiError, type Souls } from './souls.ts';
-import { WORLD_ID, type WorldHost } from './world.ts';
+import { mountMarsStatic } from './mars-static.ts';
+import { type WorldHost } from './world.ts';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls };
 
@@ -25,7 +26,7 @@ export function buildApp(d: Deps) {
   const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); return s; };
   const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token; pair again (see /skill.md)'); return s; };
   /** Public base URL as the caller reached us (works on any hostname pointing at the box). */
-  const baseOf = (c: Context) => { const host = c.req.header('x-forwarded-host') ?? c.req.header('host'); const proto = c.req.header('x-forwarded-proto') ?? (host?.startsWith('localhost') || host?.startsWith('127.') ? 'http' : 'https'); return host ? `${proto}://${host}` : d.cfg.publicUrl; };
+  const baseOf = (c: Context) => { const host = c.req.header('x-forwarded-host') ?? c.req.header('host'); const proto = c.req.header('x-forwarded-proto') ?? (host?.startsWith('localhost') || host?.startsWith('127.') ? 'http' : 'https'); return host ? `${proto}://${host}${d.cfg.worldPath}` : d.cfg.publicUrl; };
   /** A whole number from the query string, clamped at both ends (to SQLite, LIMIT -1 means no limit at all). */
   const intQ = (c: Context, name: string, def: number, min: number, max: number) => { const n = Math.floor(Number(c.req.query(name) ?? def)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def; };
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
@@ -41,16 +42,17 @@ export function buildApp(d: Deps) {
   app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
 
   // ---- public
-  app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build }));
-  app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldId: WORLD_ID, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
+  app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
+  app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
+  app.get('/v1/take', c => c.json({ serverTick: d.host.engine.world.tick, chunks: d.host.engine.takeChunks?.(intQ(c, 'after', -1, -1, Number.MAX_SAFE_INTEGER)) ?? [] }, 200, { 'Cache-Control': 'no-store' }));
   app.get('/v1/kernel', (c) => c.json(d.host.kernelView()));
   app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/v1/talk', (c) => c.json({ lines: d.db.recentTalk(intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/cards.md', (c) => c.text(cardGrammar(d.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity')), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' }));
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
-  app.get('/v1/log', (c) => c.json({ events: d.db.events(WORLD_ID, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
+  app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
   const skill = (c: Context) => c.text(skillMd(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
   app.get('/skill.md', skill);
   app.get('/v1/skill.md', skill);
@@ -119,7 +121,7 @@ export function buildApp(d: Deps) {
       case 'clock_rate': d.host.setClockRate(a.rate, who, 'admin'); break;
       case 'narrate': void d.brain.narrate(a.region, 'admin'); break;
       case 'brain_mode': d.brain.setMode(a.mode); void d.host.enqueue('admin', who, { action: 'brain_mode', mode: a.mode }); break;
-      case 'budget': d.brain.budget = a.usdPerDay; void d.host.enqueue('admin', who, { action: 'budget', usdPerDay: a.usdPerDay }); break;
+      case 'budget': d.brain.budget = Math.min(1, a.usdPerDay); void d.host.enqueue('admin', who, { action: 'budget', usdPerDay: a.usdPerDay }); break;
       case 'snapshot': return c.json({ ok: true, snapshot: d.host.saveSnapshot() });
       case 'adopt_vocabulary': { const e = await d.host.adoptVocabulary(who); return c.json({ ok: true, tick: e.tick, seq: e.seq }); }
       case 'attune': { for (const m of d.host.minds.values()) void d.brain.attune(m); break; }
@@ -155,6 +157,10 @@ export function buildApp(d: Deps) {
   app.post('/v1/agent/release', (c) => { const s = agentSoul(c); d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
 
   // ---- static web app (SPA)
+  const worldAssets = new URL('../../../worlds', import.meta.url).pathname;
+  app.get('/world-assets/*', serveStatic({ root: worldAssets, rewriteRequestPath: p => p.replace(/^\/world-assets/, '') }));
+  app.get('/buildings', c => c.html(`<main style="max-width:1100px;margin:auto;font:18px system-ui;padding:24px"><a href="/">Sim worlds</a><h1>Ceramic Tower and Minaret Temple</h1><p>First procedural versions, rebuilt after Vanessa Rosa's ceramics. Open rooms and shafts are sized for floating heads.</p><img style="width:100%" src="/world-assets/littlemartians/buildings/previews/both.jpg" alt="Ceramic Tower and Minaret Temple"/><h2>Inside the rooms</h2><img style="width:48%" src="/world-assets/littlemartians/buildings/previews/ceramic-tower-inside-L1.jpg" alt="Tower second room"/><img style="width:48%" src="/world-assets/littlemartians/buildings/previews/minaret-temple-inside-L1.jpg" alt="Temple domed room"/></main>`));
+  if (existsSync(d.cfg.marsWebDir)) mountMarsStatic(app, d.cfg.marsWebDir);
   if (existsSync(d.cfg.webDir)) {
     const index = readFileSync(join(d.cfg.webDir, 'index.html'), 'utf8');
     app.use('/assets/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable'); });

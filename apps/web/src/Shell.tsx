@@ -1,3 +1,4 @@
+import { apiPath, worldPath } from './world-path.ts';
 import { useEffect, useMemo, useState } from 'react';
 import type { LogEvent } from '@sim/protocol';
 import { describeIntent } from '@sim/protocol';
@@ -6,6 +7,7 @@ import { BrainPanel, BroadcastPanel, NarrativePanel } from './BrainPanels.tsx';
 import { AdminPanel } from './AdminPanel.tsx';
 import { SoulHome } from './SoulHome.tsx';
 import { ArchPanel } from './Arch.tsx';
+import { LiveWorld } from './LiveWorld.tsx';
 import { SpendPanel } from './Spend.tsx';
 import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, ThingsPanel, VocabularyPanel } from './Grammar.tsx';
 
@@ -35,7 +37,7 @@ export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
   return (
     <>
       <header>
-        <h1>SIM</h1>
+        <a href="/" className="world-home">SIM</a><a href="/l/mars">lab</a>
         <span className="dim">{cfg.worldId}</span>
         <span>tick <b>{Math.floor(sim.conn.displayTick())}</b></span>
         <span>{r.env?.datetime.replace('T', ' ') ?? ''}</span>
@@ -52,6 +54,7 @@ export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
       <main>
         <div className="grid">
           {tab === 'watch' && <Intro authed={auth.authed} login={auth.login} go={() => setTab('my soul')} souls={r.souls.size} />}
+          {show('watch', 'world') && cfg.worldId !== 'toy-1' && <LiveWorld sim={sim} selected={selected} onSelect={setSelected} />}
           {show('watch', 'world') && <WorldPanel sim={sim} mine={mine} selected={selected} onSelect={setSelected} />}
           {show('watch', 'world', 'story') && <BroadcastPanel sim={sim} />}
           {tab === 'watch' && <HeardPanel sim={sim} />}
@@ -81,7 +84,7 @@ function Intro({ authed, login, go, souls }: { authed: boolean; login(): void; g
   return (
     <section className="wide">
       <h2>You are watching Sim, live</h2>
-      <p style={{ maxWidth: 820 }}>Sim is one small world that never stops. {souls} <b>Souls</b> live in it right now. Each has a name, a personality and a mind of its own; some belong to people, who give them direction now and then. Everyone who opens this page sees the same world at the same moment. There are no graphics yet: the map below is the world, drawn in letters.</p>
+      <p style={{ maxWidth: 820 }}>This world keeps living when you close the page. {souls} <b>Souls</b> live in it right now. Each has a name, a personality and a mind of its own; some belong to people, who give them direction now and then. Everyone who opens this page sees the same world at the same moment.</p>
       <div className="row">{authed ? <button className="primary" onClick={go}>go to my Soul</button> : <button className="primary" onClick={login}>sign in to create a Soul</button>}<span className="dim">Watching is free and needs no account.</span></div>
     </section>
   );
@@ -216,7 +219,7 @@ function LogPanel({ log, sim }: { log: LogEvent[]; sim: Sim }) {
     <section className="wide">
       <h2>Event log — the canonical record (append-only; the world is the fold of this)</h2>
       <div className="row">{['all', 'birth', 'intent', 'decision', 'scene', 'rules', 'admin', 'retire'].map((k) => <button key={k} className={k === kind ? 'primary' : ''} onClick={() => setKind(k)}>{k}</button>)}
-        <a href="/v1/log?limit=1000" target="_blank" rel="noreferrer">raw json</a></div>
+        <a href={apiPath('/v1/log?limit=1000')} target="_blank" rel="noreferrer">raw json</a></div>
       <div className="scroll"><table><tbody>
         {rows.map((e) => <tr key={e.seq}><td className="dim">#{e.seq}</td><td className="dim">t{e.tick}</td><td><span className={`tag ${e.kind === 'decision' ? 'mid' : e.kind === 'scene' ? 'narrator' : e.kind === 'intent' ? 'translate' : ''}`}>{e.kind}</span></td><td className="dim">{e.author}</td><td className="wrap">{eventText(e, sim)}</td></tr>)}
       </tbody></table></div>

@@ -125,7 +125,7 @@ export function BroadcastPanel({ sim }: { sim: Sim }) {
       {c ? <><div><b>CAMERA</b> {c.text} <span className="dim">(held {c.heldSec}s, chosen at t{c.tick})</span></div><pre className="json" style={{ maxHeight: 110 }}>{JSON.stringify(c.shot)}</pre></> : <p className="dim">The director runs while at least one client is connected; first shot arrives within a few seconds.</p>}
       <div style={{ marginTop: 8 }}><b>TICKER</b></div>
       <div className="scroll" style={{ maxHeight: 180 }}>{sim.ticker.length ? sim.ticker.slice().reverse().map((l, i) => <div key={i}><span className="dim">t{l.tick}</span> {l.text}</div>) : <span className="dim">nothing announced yet</span>}</div>
-      <p className="note">The shot is a Mars-engine ShotSpec chosen by Jev among code-enumerated candidates. There is no renderer yet, so it is shown as data.</p>
+      <p className="note">The shot is a Mars-engine ShotSpec chosen by Jev among code-enumerated candidates. The suggested shot is shown here as data; use the follow control to follow a Soul in the scene.</p>
     </section>
   );
 }

@@ -10,7 +10,8 @@
     "test": "node --test src/*.test.ts"
   },
   "dependencies": {
-    "@sim/engine-contract": "workspace:*"
+    "@sim/engine-contract": "workspace:*",
+    "mars-campus-viewer": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.19.19"

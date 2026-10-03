@@ -2,16 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import type { CampusYearFile } from '../campus/history.ts';
 import { loadCampusFile } from '../campus/history-node.ts';
 import { compareToCanonical, yearBuildSetup, yearBuildSupportDiagnostic } from '../scenarios/year-build.ts';
 import { groupStability, isSupported } from '../construction/rules.ts';
 import { rehearse } from '../rehearsal/rehearse.ts';
 
-const LEGACY_SOURCE = 'a0c347e0374b473876c97f536dc44dba42399521:viewer/public/engine/campus-2022.json';
+// Exact upstream a0c347e fixture: Git identities changed during the reviewed history filter.
 function historicalFile(): CampusYearFile {
-  return JSON.parse(execFileSync('git', ['show', LEGACY_SOURCE], { encoding: 'utf8' })) as CampusYearFile;
+  return JSON.parse(readFileSync(new URL('./fixtures/campus-history-pre-w51/campus-2022.json', import.meta.url), 'utf8')) as CampusYearFile;
 }
 
 test('byte-verified pre-review7648dbf east-house reports every unsupported skeleton part without acquiring it or abandoning a stance', () => {

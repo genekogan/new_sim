@@ -1,0 +1,12 @@
+{
+  "id": "mars", "worldId": "mars-1", "name": "Mars", "engine": "mars",
+  "capabilities": ["humanoid", "construction", "meals", "garden"], "dayTicks": 72000,
+  "scene": "proving-ground",
+  "customs": ["First light is a chance to begin again.", "Anyone may host supper or invite others to the fire."],
+  "cast": [
+    {"name": "Alice", "description": "A patient gardener who enjoys preparing food and welcoming people."},
+    {"name": "Bob", "description": "A curious builder who learns by making useful things from the yard's materials."},
+    {"name": "Carol", "description": "A thoughtful reader and teacher who likes sharing ideas and quiet company."},
+    {"name": "David", "description": "A lively musician and storyteller who brings people together around the fire."}
+  ], "cardPack": "base"
+}

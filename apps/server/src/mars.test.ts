@@ -1,3 +1,4 @@
+const WORLD_ID = 'toy-1';
 // The same shell on the Mars engine: replay, restart, client sync and the DJ story,
 // with Mars bodies doing the walking, sitting and talking. Skipped without a Mars checkout.
 import { test, before, after } from 'node:test';
@@ -13,7 +14,7 @@ import { kernelHash } from '@sim/kernel';
 import { Db } from './db.ts';
 import { optionsFor } from './deck.ts';
 import { initKernel, replayKernel } from './fold.ts';
-import { WORLD_ID, WorldHost, replayFromGenesis } from './world.ts';
+import { WorldHost, replayFromGenesis } from './world.ts';
 
 if (!marsAvailable()) test('the shell on the Mars engine (skipped: no Mars checkout on this machine)', { skip: true }, () => {});
 else {

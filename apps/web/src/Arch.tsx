@@ -1,3 +1,4 @@
+import { apiPath, worldPath } from './world-path.ts';
 import type { Sim } from './useSim.ts';
 
 export function ArchPanel({ sim, cfg }: { sim: Sim; cfg: { publicUrl: string; worldId: string } }) {

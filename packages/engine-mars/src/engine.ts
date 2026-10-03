@@ -82,12 +82,15 @@ export class MarsEngine implements Engine {
   private ons = new Map<string, string | null>();
   private leaving: string[] = [];                    // bodies to remove once nothing holds them
   private out: { paths: PathCommit[]; changes: ChangeEvent[]; programs: ProgramEvent[] } = { paths: [], changes: [], programs: [] };
+  private recorder: any;
+  private chunks: { fromTick: number; toTick: number; take: unknown }[] = [];
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }) {
     this.m = m; this.rt = rt; this.cfg = cfg; this.registry = rt.registry;
     this.schema = rt.world.schema; this.rulesVersion = `sim-mars/1+${m.rulesVersion}`;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     this.cursor = rt.events.length;
+    this.recorder = new m.TakeRecorder(rt, { rulesVersion: this.rulesVersion });
     const self = this;
     this.runtime = {
       get tick() { return rt.tick as number; },
@@ -111,6 +114,12 @@ export class MarsEngine implements Engine {
     this.rt.step();
     const tick: number = this.rt.tick;
     for (const p of [...this.programs.values()]) this.advance(p);
+    if (tick - this.recorder.startTick >= 20) {
+      const take = this.recorder.finish();
+      this.chunks.push({ fromTick: take.startTick, toTick: tick, take });
+      if (this.chunks.length > 12) this.chunks.shift();
+      this.recorder = new this.m.TakeRecorder(this.rt, { rulesVersion: this.rulesVersion });
+    }
     if (this.leaving.length) this.leaving = this.leaving.filter((id) => !this.tryRemove(id));
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
     for (const id of Object.keys(this.ents)) {
@@ -387,9 +396,14 @@ export class MarsEngine implements Engine {
   // ------------------------------------------------------------------ checkpoints
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
-    const mars = this.rt.snapshot({ allowDrop: true });
+    const mars = this.rt.snapshot();
     return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg });
   }
+  canSnapshot(): boolean {
+    for (const r of this.rt.records.values()) if (this.rt.isActive(r.id) && this.m.nonResumableReason(this.registry.get(r.verb))) return false;
+    return true;
+  }
+  takeChunks(afterTick: number) { return this.chunks.filter(c => c.toTick > afterTick); }
 }
 
 function centroid(poly: [number, number][]): [number, number] { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [r3(x / poly.length), r3(z / poly.length)]; }

@@ -83,3 +83,47 @@ the same way.
 - Pairing codes, pending approvals and agents' `wait` calls live in memory: a
   restart or deploy cancels them, and agents mid-pairing must start again.
 - Privy's free tier ends at 499 monthly users.
+# Eden4 successor milestone — 2026-10-03
+
+Canonical checkout is `<repo>`; `<old-sim-repo>` stays in place.
+Mars engine is required in-repo at `mars/viewer/engine`. No production
+dependency on Gene's original Mars checkout or MARS_ENGINE_DIR.
+
+Release flow: `infra/deploy.sh --stage`, review its browser proof, then
+`infra/deploy.sh --promote <build>`. Each release is committed first; the
+stage receipt pins the same build. If `pnpm check` just passed for this code,
+the lead may set `SIM_CHECKS_ALREADY_PASSED=1` with its logged proof to avoid
+rerunning three minutes of unchanged engine tests. Smoke always runs on stage.
+Browser cache must be explicit (see E2E.md). Deployment does not run box-setup.
+
+| World | Production | Staging | Data | Unit |
+|---|---|---|---|---|
+| Toy | 4500 | 4501 | `/srv/sim-data/sim.db` | existing `sim` / `sim-staging` |
+| Mars | 4502 | 4512 | `/srv/sim-data/mars/sim.db` | `sim-world@mars` / `sim-world-staging@mars` |
+
+Toy's existing units remain selected to preserve its data/service identity;
+new worlds use the template. Per-world env overrides live in
+`/home/sim/worlds/` and contain the verified owner ID, port and data directory.
+No DEV_AUTH on a public host. All stage minds are fake. World API and WS
+prefixes are `/w/<id>/`; original root toy API aliases remain compatible.
+
+`/l/mars` and `/w/mars/2020`…`2027` are the original static app. Large
+campus derivatives are streamed through a restricted same-origin proxy to
+the existing public Worker; no Worker/DNS edits. Never run the original
+Mars prepare script against archive symlinks. Current takes/baselines are
+vendored, and historical release packaging needs its separate fixture cache.
+
+Ops receipts/consistent pre-release toy backup: `/srv/sim/ops/<build>/`.
+Rollback: preserve new-world data, flip `/srv/sim/current` to the previous
+release, restart toy and any world supported by that release; if reverting
+to pre-merge Sim, stop Mars and restore `caddy.before-promote` from the
+receipt before validating/reloading Caddy. Do not restore the toy DB unless
+Gene explicitly authorizes a destructive data rollback. `infra/rollback.sh`
+handles code/service rollback only. Keep at least the rollback release.
+
+Snapshots now defer non-resumable activities instead of dropping them.
+Compaction from WorldState is separately proven only when every controller
+has released. `eat` and `hold_items` in this alpha are resumable. Server
+TakeRecorder chunks render with TakePeople; no browser Runtime on live pages.
+
+---

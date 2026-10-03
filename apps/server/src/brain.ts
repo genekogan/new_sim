@@ -11,7 +11,7 @@ import {
 import { GOALS, describeIntent, publicIntent, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
-import { WORLD_ID, energyWord, hash32, type Mind, type WorldHost } from './world.ts';
+import { energyWord, hash32, type Mind, type WorldHost } from './world.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
 import { SPEECH_LINKS, cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
@@ -73,7 +73,7 @@ export class Brain {
     // long system prompts are stored once and referenced by hash
     const sys = (full.request as any)?.system?.[0];
     if (sys?.text && sys.text.length > 2000) full.request = { ...(full.request as object), system: [{ ...sys, text: this.db.internPrompt(sys.text) }] };
-    const id = this.db.saveBrainCall(WORLD_ID, full);
+    const id = this.db.saveBrainCall(this.host.worldId, full);
     this.spentToday += c.costUsd; this.callsToday++;
     if (c.mode === 'live') this.gov.charge(tierOf(c.tier), c.costUsd);
     if (c.tier === 'mid' && c.mode === 'live') this.jevMsAvg = this.jevMsAvg ? this.jevMsAvg * 0.9 + c.ms * 0.1 : c.ms;
@@ -459,7 +459,7 @@ export class Brain {
     const out: TalkLine[] = lines.map((l) => {
       const speaker = l.who === 'speaker';
       const line = { tick, at: Date.now(), from: speaker ? from : to, to: speaker ? to : from, fromName: speaker ? a.name : b.name, toName: speaker ? b.name : a.name, act, ...(manner && speaker ? { manner } : {}), text: l.text, place: a.at };
-      return { ...line, id: this.db.saveTalk(WORLD_ID, line) };
+      return { ...line, id: this.db.saveTalk(this.host.worldId, line) };
     });
     for (const l of out) this.lastWords.set(`${l.from}>${l.to}`, l.text);
     this.sink.onTalk?.(out);
@@ -540,7 +540,7 @@ export class Brain {
     const places = Object.values(w.entities).filter((e) => e.kind === 'fixture' && e.id !== 'gate' && eng.regionAt(e.pose.p) === region)
       .map((e) => { const n = Object.values(w.entities).filter((x) => x.human?.on === e.id).length; return { id: e.id, name: e.label ?? e.id, state: n ? `${n} souls here` : 'empty' }; });
     const names = new Set(here.map((m) => m.name));
-    const recent = this.db.tailEvents(WORLD_ID, 120).filter((e) => e.kind === 'decision' || e.kind === 'birth' || e.kind === 'intent').map((e) => tickerText(e, this.host)).filter((t): t is string => !!t && [...names].some((n) => t.startsWith(n))).slice(-25);
+    const recent = this.db.tailEvents(this.host.worldId, 120).filter((e) => e.kind === 'decision' || e.kind === 'birth' || e.kind === 'intent').map((e) => tickerText(e, this.host)).filter((t): t is string => !!t && [...names].some((n) => t.startsWith(n))).slice(-25);
     const others = this.regions().filter((r) => r !== region).map((r) => { const n = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === r).length; return `${nameOf(r)}: ${n} souls`; });
     return {
       region, label: nameOf(region), time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), places,
@@ -567,7 +567,7 @@ export class Brain {
       const now = this.host.engine.world.tick;
       const beats = r.plan.beats.map((b) => ({ ...b, fired: false, fireTick: now + Math.round(Math.min(5, Math.max(0, b.at_min)) * 60 * TPS) }));
       const view: Omit<NarrativeView, 'id'> = { region, tick: now, summary: r.plan.summary, beats, nextRunTick: ns.nextRun[region] };
-      const id = this.db.saveNarrative(WORLD_ID, region, now, view);
+      const id = this.db.saveNarrative(this.host.worldId, region, now, view);
       const full = { ...view, id };
       this.narratives.set(region, full);
       ns.lastSummary[region] = r.plan.summary;

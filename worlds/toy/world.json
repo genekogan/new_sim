@@ -1,0 +1,5 @@
+{
+  "id": "toy", "worldId": "toy-1", "name": "Toy", "engine": "toy",
+  "capabilities": ["humanoid"], "dayTicks": 72000,
+  "scene": "toy-genesis", "customs": [], "cast": [], "cardPack": "base"
+}

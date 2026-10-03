@@ -71,6 +71,9 @@ export interface Engine {
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
   snapshot(): EngineSnapshot;
+  /** Recorded rendering chunks; no browser Runtime. Optional for engines without takes. */
+  takeChunks?(afterTick: number): { fromTick: number; toTick: number; take: unknown }[];
+  canSnapshot?(): boolean;
   /** Spawn a human entity for a Soul at the arrival point; returns the entity id. */
   spawnHuman(args: { id: string; label: string; soul: string }): string;
   removeEntity(id: string): void;

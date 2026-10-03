@@ -11,7 +11,8 @@ import { buildApp } from './http.ts';
 import { Hub } from './hub.ts';
 import { handleMcp } from './mcp.ts';
 import { Souls } from './souls.ts';
-import { WORLD_ID, WorldHost } from './world.ts';
+import { WorldHost } from './world.ts';
+import { worldDefinition } from './world-config.ts';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
 const NATIVES: { name: string; description: string }[] = [
@@ -24,12 +25,13 @@ const NATIVES: { name: string; description: string }[] = [
 ];
 
 const db = new Db(join(config.dataDir, 'sim.db'));
+const definition = worldDefinition(config.worldKey);
 if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(', ')}`);
-// Which engine runs the bodies. `mars` imports the Mars world simulator from a local checkout (see packages/engine-mars).
+// Each process owns one world and imports its engine from this release.
 const factory = config.engine === 'mars' ? await (await import('@sim/engine-mars')).marsFactory() : toyFactory;
-const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks);
+const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId);
 const boot = host.boot();
-console.log(`[world] ${WORLD_ID} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
+console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
 
 const auth = new Auth(config, db);
 await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
@@ -46,19 +48,32 @@ const brain = new Brain(host, db, config, {
 const souls = new Souls(host, db, brain, config);
 
 const server = createServer();
+const stripWorldPath = (url: string | undefined) => {
+  if (!url || /^\/w\/mars\/202[0-7](?:[/?]|$)/.test(url)) return url;
+  if (url === config.worldPath) return '/';
+  return url.startsWith(config.worldPath + '/') ? url.slice(config.worldPath.length) : url;
+};
+server.on('upgrade', req => { req.url = stripWorldPath(req.url); });
 hub = new Hub(server, host, auth, db);
 hub.brain = brain; hub.build = config.build;
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls });
 const listener = getRequestListener(app.fetch);
 server.on('request', (req, res) => {
+  req.url = stripWorldPath(req.url);
   if (req.url?.startsWith('/mcp')) { handleMcp(req, res, souls).catch((e) => { console.error('[mcp]', e); if (!res.headersSent) res.writeHead(500).end(); }); return; }
   void listener(req, res);
 });
 
 host.start();
-if (config.seedNatives && db.liveSouls(WORLD_ID).length === 0) {
-  for (const n of NATIVES) await souls.create('system', n, true);
-  console.log(`[world] seeded ${NATIVES.length} native souls`);
+if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
+  if (config.worldKey === 'toy') {
+    for (const n of NATIVES) await souls.create('system', n, true);
+  } else {
+    if (!config.ownerId) throw new Error('WORLD_OWNER_ID is required before seeding a new world');
+    db.upsertUser({ id: config.ownerId, email: config.adminEmails[0] ?? null, wallet: null, role: 'admin' });
+    for (const n of definition.cast) await souls.create(config.ownerId, n);
+  }
+  console.log(`[world] seeded ${host.minds.size} souls`);
 }
 
 server.listen(config.port, config.host, () => console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`));

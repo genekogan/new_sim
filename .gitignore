@@ -9,3 +9,4 @@ dist
 data/
 .DS_Store
 BUILD
+.e2e/

@@ -1,3 +1,4 @@
+const WORLD_ID = 'toy-1';
 // The fold: replaying the event log from genesis must reproduce the live world.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ import { Souls } from './souls.ts';
 import { kernelHash } from '@sim/kernel';
 import { initKernel, pinnedVocabulary, replayKernel } from './fold.ts';
 import { optionsFor } from './deck.ts';
-import { WORLD_ID, WorldHost, replayFromGenesis } from './world.ts';
+import { WorldHost, replayFromGenesis } from './world.ts';
 
 function drive(host: WorldHost, ticks: number, pick: (i: number) => number) {
   for (let i = 0; i < ticks; i++) {

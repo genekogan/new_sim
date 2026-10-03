@@ -13,7 +13,6 @@ import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pi
 import { frontier, stepIndex } from './deck.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
-export const WORLD_ID = 'toy-1';
 
 /** A Soul's mind: everything about it that is not the engine's body state. */
 export type Mind = {
@@ -80,21 +79,23 @@ export class WorldHost {
   baseRate = 1;
   private kfCursor = 0;
   db: Db; factory: EngineFactory; seed: string; snapshotEvery: number;
+  readonly worldId: string;
 
-  constructor(db: Db, factory: EngineFactory, seed: string, snapshotEvery: number) {
+  constructor(db: Db, factory: EngineFactory, seed: string, snapshotEvery: number, worldId = 'toy-1') {
+    this.worldId = worldId;
     this.db = db; this.factory = factory; this.seed = seed; this.snapshotEvery = snapshotEvery;
   }
 
   // ------------------------------------------------------------ boot
   /** Load the latest snapshot and fast-forward through later log events, or start from genesis. */
   boot(): { from: 'genesis' | 'snapshot'; replayed: number } {
-    let w = this.db.world(WORLD_ID);
+    let w = this.db.world(this.worldId);
     if (!w) {
-      this.db.createWorld({ id: WORLD_ID, schema: 'pending', rules_version: this.factory.rulesVersion, dt: 1 / 20, seed: this.seed });
-      w = this.db.world(WORLD_ID)!;
+      this.db.createWorld({ id: this.worldId, schema: 'pending', rules_version: this.factory.rulesVersion, dt: 1 / 20, seed: this.seed });
+      w = this.db.world(this.worldId)!;
     }
     this.clockRate = this.baseRate = w.clock_rate;
-    const snap = this.db.latestSnapshot(WORLD_ID);
+    const snap = this.db.latestSnapshot(this.worldId);
     let from: 'genesis' | 'snapshot' = 'genesis';
     if (snap && snap.rulesVersion === this.factory.rulesVersion) {
       const body = snap.body as SnapshotBody;
@@ -105,16 +106,16 @@ export class WorldHost {
       // A snapshot from before the kernel existed: build the kernel from the Souls that are there.
       this.kernel = body.kernel ?? this.bootstrapKernel();
       // (a kernel bootstrapped by an earlier build recorded every Soul as born at tick 0; a replay says otherwise)
-      if (body.kernel) { const born = this.db.birthTicks(WORLD_ID); for (const t of Object.values(this.kernel.things)) if (t.kind === 'soul' && t.born === 0 && born[t.id]) t.born = born[t.id]; }
+      if (body.kernel) { const born = this.db.birthTicks(this.worldId); for (const t of Object.values(this.kernel.things)) if (t.kind === 'soul' && t.born === 0 && born[t.id]) t.born = born[t.id]; }
       this.seq = body.seq;
       this.lastSnapshotTick = snap.tick;
       from = 'snapshot';
     } else {
       this.engine = this.factory.create(this.factory.genesis(w.seed));
-      this.kernel = initKernel(this.engine, pinnedVocabulary(this.db.rulesEvents(WORLD_ID)));
+      this.kernel = initKernel(this.engine, pinnedVocabulary(this.db.rulesEvents(this.worldId)));
     }
     // fast-forward: replay events logged after the snapshot, stepping the engine to their ticks
-    const later = this.db.events(WORLD_ID, this.seq);
+    const later = this.db.events(this.worldId, this.seq);
     for (const e of later) {
       while (this.engine.world.tick < e.tick) { const out = this.engine.step(); this.afterPrograms(out.programs, true); }
       this.apply(e, true);
@@ -123,7 +124,7 @@ export class WorldHost {
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
     // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
-    if (!this.db.hasVocabulary(WORLD_ID)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
+    if (!this.db.hasVocabulary(this.worldId)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
     if (this.pendingBootstrap) { void this.enqueue('rules', 'system', { kernelBootstrap: this.pendingBootstrap, why: 'the kernel begins here for a world that predates it' }); this.pendingBootstrap = null; }
     return { from, replayed: later.length };
   }
@@ -133,7 +134,7 @@ export class WorldHost {
   private pendingBootstrap: { at: Record<string, string | null> } | null = null;
   /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
   private bootstrapKernel(): KState {
-    const k = initKernel(this.engine), at: Record<string, string | null> = {}, born = this.db.birthTicks(WORLD_ID);
+    const k = initKernel(this.engine), at: Record<string, string | null> = {}, born = this.db.birthTicks(this.worldId);
     for (const m of this.minds.values()) {
       // as a replay from genesis would have it (arrived, never moved); the logged bootstrap event then places each Soul where it stands
       soulThing(k, { soulId: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: m.owner }, arrivalPlace(k));
@@ -185,7 +186,7 @@ export class WorldHost {
     const pending = this.queue.splice(0);
     for (const p of pending) {
       const e: LogEvent = { seq: ++this.seq, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
-      this.db.appendEvent(WORLD_ID, e);
+      this.db.appendEvent(this.worldId, e);
       this.apply(e, false);
       this.acc.log.push(e);
       for (const l of this.listeners) l.onApplied?.(e);
@@ -341,7 +342,7 @@ export class WorldHost {
   addMind(m: Mind) { this.minds.set(m.soulId, m); this.mindByEntity.set(m.entityId, m); }
 
   setClockRate(rate: number, author: string, why: string) {
-    this.clockRate = this.baseRate = rate; this.db.setClockRate(WORLD_ID, rate);
+    this.clockRate = this.baseRate = rate; this.db.setClockRate(this.worldId, rate);
     void this.enqueue('rules', author, { clockRate: rate, why });
   }
   setPaused(p: boolean, author: string) {
@@ -414,13 +415,14 @@ export class WorldHost {
   snapshotMs = { capture: 0, persist: 0 };
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
   saveSnapshot(sync = true) {
+    if (this.engine.canSnapshot && !this.engine.canSnapshot()) return { pending: true, tick: this.lastSnapshotTick };
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
     const body: SnapshotBody = { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra), kernel: structuredClone(this.kernel), counts: { ...this.counts } };
     const meta = { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body };
     this.snapshotMs.capture = performance.now() - t0;
     this.lastSnapshotTick = runtime.tick;
-    const persist = () => { const t1 = performance.now(); this.db.saveSnapshot(WORLD_ID, meta); this.snapshotMs.persist = performance.now() - t1; };
+    const persist = () => { const t1 = performance.now(); this.db.saveSnapshot(this.worldId, meta); this.snapshotMs.persist = performance.now() - t1; };
     if (sync) persist(); else setImmediate(persist);
     return { tick: runtime.tick, stateHash: runtime.stateHash };
   }

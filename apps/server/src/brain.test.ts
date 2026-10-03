@@ -1,3 +1,4 @@
+const WORLD_ID = 'toy-1';
 // Fair mid-brain scheduling: with a budget that affords few calls, every Soul
 // should get its turn; a fixed iteration order must not starve anyone.
 import { test } from 'node:test';
@@ -9,7 +10,7 @@ import { toyFactory } from '@sim/engine-toy';
 import { Brain } from './brain.ts';
 import { config } from './config.ts';
 import { Db } from './db.ts';
-import { WORLD_ID, WorldHost } from './world.ts';
+import { WorldHost } from './world.ts';
 
 test('mid-brain calls are shared fairly across Souls', async () => {
   const db = new Db(join(mkdtempSync(join(tmpdir(), 'sim-fair-')), 't.db'));

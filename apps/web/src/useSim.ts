@@ -1,3 +1,4 @@
+import { apiPath, worldPath } from './world-path.ts';
 import { useEffect, useRef, useState } from 'react';
 import { Connection } from '@sim/client';
 import type { BrainCall, CameraLine, KernelView, LogEvent, Me, NarrativeView, PlayView, ServerStats, TalkLine, TickerLine } from '@sim/protocol';
@@ -19,7 +20,7 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
   if (!s.current.conn) {
     const st = s.current;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    st.conn = new Connection(`${proto}://${location.host}/ws`, () => tokenRef.current(), {
+    st.conn = new Connection(`${proto}://${location.host}${worldPath}/ws`, () => tokenRef.current(), {
       onWelcome: (me, w) => {
         st.me = me;
         // after a deploy, a page still running the old bundle reloads itself (once)
@@ -39,7 +40,7 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
   useEffect(() => {
     const st = s.current; st.conn!.connect();
     // what happened before this page opened (all public)
-    const get = (path: string) => fetch(path).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const get = (path: string) => fetch(apiPath(path)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     void get('/v1/kernel').then((v) => { if (v && !st.kernel) st.kernel = v; });
     void get('/v1/plays?limit=200').then((v) => { if (v?.plays) { const seen = new Set(st.plays.map((x) => x.seq)); st.plays = [...(v.plays as PlayView[]).filter((x) => !seen.has(x.seq)), ...st.plays].slice(-300); } });
     void get('/v1/talk?limit=120').then((v) => { if (v?.lines) { const seen = new Set(st.talk.map((x) => x.id)); st.talk = [...(v.lines as TalkLine[]).filter((x) => !seen.has(x.id)).sort((a, b) => a.id - b.id), ...st.talk].slice(-300); } });
@@ -60,7 +61,7 @@ export function makeApi(getToken: () => Promise<string | null>) {
   return async function api<T = any>(path: string, body?: unknown, method?: string): Promise<{ status: number; data: T }> {
     try {
       const token = await getToken();
-      const r = await fetch(path, { method: method ?? (body !== undefined ? 'POST' : 'GET'), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, body: body !== undefined ? JSON.stringify(body) : undefined });
+      const r = await fetch(apiPath(path), { method: method ?? (body !== undefined ? 'POST' : 'GET'), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, body: body !== undefined ? JSON.stringify(body) : undefined });
       const text = await r.text(); let data: any; try { data = JSON.parse(text); } catch { data = r.ok ? text : { message: `the server answered ${r.status}` }; }
       return { status: r.status, data };
     } catch { return { status: 0, data: { message: 'could not reach the server; try again' } as any }; }

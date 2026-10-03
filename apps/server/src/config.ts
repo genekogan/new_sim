@@ -2,7 +2,14 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const env = process.env;
+const worldKey = env.WORLD_KEY ?? 'toy';
+if (!['toy', 'mars', 'littlemartians', 'eden'].includes(worldKey)) throw new Error('invalid WORLD_KEY');
 export const config = {
+  worldKey,
+  worldId: env.WORLD_ID ?? (worldKey === 'toy' ? 'toy-1' : `${worldKey}-1`),
+  worldPath: env.WORLD_PATH ?? `/w/${worldKey}`,
+  ownerId: env.WORLD_OWNER_ID ?? (env.DEV_AUTH === '1' ? 'dev:admin' : ''),
+  marsWebDir: resolve(env.MARS_WEB_DIR ?? new URL('../../../mars/viewer/dist/client', import.meta.url).pathname),
   port: Number(env.PORT ?? 4500),
   host: env.HOST ?? '127.0.0.1',
   dataDir: resolve(env.DATA_DIR ?? './data'),
@@ -14,7 +21,7 @@ export const config = {
   anthropicKey: env.ANTHROPIC_API_KEY || undefined,
   adminEmails: (env.ADMIN_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
   brainMode: (env.BRAIN_MODE === 'fake' ? 'fake' : 'live') as 'live' | 'fake',
-  budgetUsdPerDay: Number(env.BRAIN_BUDGET_USD_PER_DAY ?? 0.5),
+  budgetUsdPerDay: Math.min(1, Math.max(0, Number(env.BRAIN_BUDGET_USD_PER_DAY ?? 0.5))),
   narratorModel: env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
   compilerModel: env.COMPILER_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
   talkModel: env.TALK_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
