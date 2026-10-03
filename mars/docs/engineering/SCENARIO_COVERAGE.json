@@ -28,11 +28,11 @@
       "recorded-still-probe": 1,
       "recorded-actual-ui-play-supported-layout": 2
     },
-    "exactCurrentSourceNativeFullGatePassed": false,
+    "exactCurrentSourceNativeFullGatePassed": true,
     "exactFunctionalInheritedFocusedUiJourneys": 3,
     "sustainedLivenessProven": 1,
-    "current39Gate": "Historical release39 proof remains source-bound. Release41 passed its exact clean combined gate; final public acceptance and reviewed test-repair gate remain pending.",
-    "countMeaning": "All 63 registrations have exactly named passing mapped tests in the clean release41 local gate. Per-test execution methods are explicit; this is not 63 fresh public full-Play passes. The public cohort remains running with one retained supper observation failure; final alpha acceptance is pending.",
+    "current39Gate": "Historical release39 and release41 proofs remain source-bound. Final clean 043 combined gate passed; release42 publication/public acceptance remain pending.",
+    "countMeaning": "All 63 registrations have exactly named passing mapped tests in clean 043 gate, with per-test methods retained. Public41 completed 111 PASS / 1 FAIL; corrected whole supper journey 3 PASS separately. Full public41 automatic construction passes in YEAR_BUILD_FULL=1 mode. This is not 63 fresh release42 public full-Play passes; final acceptance pending.",
     "sustainedLivenessMeaning": "One bounded stress30 witness through tick2017; not indefinite liveness.",
     "reconciledAtSource": "c09a8bf77fe909c7639aabc089375be81fec63bc",
     "alphaRecordedPassedScenarioCount": 37,
@@ -43,12 +43,15 @@
     "alphaRecordedConditionalConstructionPassed": 2,
     "alphaRecordedSupportedProbePassed": 1,
     "latestCombinedCandidateGate": {
-      "source": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+      "source": "043957e8a061868836eacd811d2651e8589bad7d",
       "status": "GREEN",
       "browserPassed": 319,
       "browserFailed": 0,
       "browserSkipped": 7,
-      "proof": "Exact clean source, all nine stages PASS. All 63 exactly named mapped tests pass, with per-test methods retained. Skipped checks and public acceptance are not promoted."
+      "enginePassed": 1465,
+      "engineSkipped": 6,
+      "engineTodo": 11,
+      "proof": "Exact clean source, all nine stages PASS. Default construction mixed; full automatic public41 proofs separate. Legacy exclusions unproved; final42 public acceptance pending."
     },
     "reviewedVisualWindow": {
       "capturedSource": "0fcc0904ba6c805880bab141e5160281fe7d3674",
@@ -57,9 +60,20 @@
       "secondaryReview": "../../briefs/alpha-coverage-review.REPORT.md",
       "meaning": "All 34 old/candidate pairs were inspected and only those baselines replaced for verified intended UI and already-released visual changes. Original limits and assertions remain unchanged; subsequent native release41 full gate passes. Original failed receipts remain retained."
     },
-    "nativeFullGateFunctionalSource": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+    "nativeFullGateFunctionalSource": "043957e8a061868836eacd811d2651e8589bad7d",
     "verifiedGateSourceNativeFullGatePassed": true,
-    "currentRepairCandidateGate": "Pending: the reviewed supper test changed after the recorded clean 00bd041 gate. That source-bound gate remains valid; it does not certify the changed test candidate."
+    "currentRepairCandidateGate": "GREEN at exact clean 043; all nine stages PASS, repaired supper included. Metadata-only follow-up does not constitute a fresh gate at its own future commit.",
+    "completedPublic41": {
+      "source": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+      "proofRef": "alphaPublic41Completed",
+      "passed": 111,
+      "failed": 1,
+      "skipped": 0,
+      "flaky": 0,
+      "repairedSupperProofRef": "alphaSupperPublicRepeat043",
+      "repairedSupperPassed": 3,
+      "meaning": "Separate completed native receipts, not a rewritten cohort outcome."
+    }
   },
   "proofKinds": [
     "actual-ui-play-journey",
@@ -516,6 +530,72 @@
         "skipped": 7
       },
       "proofScopeNotes": "All nine stages pass on exact clean source. Every one of 63 registrations has an exactly named passing mapped test. Execution methods remain per-test; default current construction is mixed after UI Play through s0021. Public full-automatic construction and alpha acceptance remain pending. Skips/TODOs are unproved."
+    },
+    "alphaCombinedGate043": {
+      "kind": "native-local-full-gate",
+      "source": "043957e8a061868836eacd811d2651e8589bad7d",
+      "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/gate/2026-10-03T02-44-23-325Z/report.json",
+      "sha256": "09f736da2fae6847c63f9b28dc6de033e3fc9a1a02ea65dbfa41426abf69e245",
+      "browserLog": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log",
+      "browserLogSha256": "6a03a3a3ddb4c7b3fb2008beb43d7c8ecc125dc42d73dd0488acfadf3ae2a777",
+      "result": {
+        "passed": 319,
+        "failed": 0,
+        "skipped": 7
+      },
+      "engineResult": {
+        "passed": 1465,
+        "failed": 0,
+        "skipped": 6,
+        "todo": 11
+      },
+      "proofScopeNotes": "All nine stages PASS on exact clean 043 source, including the reviewed supper observation repair. All 63 registrations have exactly named passing mapped tests. Default construction uses UI Play through s0021 then programmatic completion; separate public41 YEAR_BUILD_FULL=1 receipts prove whole automatic Play. Historical t035 renamed semantics remain unpromoted; legacy exclusions are unproved. Final release42 public verification/acceptance pending."
+    },
+    "alphaPublic41Completed": {
+      "kind": "native-public-browser-cohort",
+      "source": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+      "release": 41,
+      "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-public-results.json",
+      "sha256": "d28b98653d5233fcb5dfd714299ed7c7a80f30cc7880a32734b0e3d7f80d0617",
+      "result": {
+        "startTime": "2026-10-03T01:48:34.817Z",
+        "duration": 3010884.465,
+        "expected": 111,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "executionMode": "YEAR_BUILD_FULL=1",
+      "proofScopeNotes": "Completed 111 PASS / 1 FAIL / 0 skip / 0 flaky; original supper observation failure remains retained. Attach only exact basename/title native PASS matches. This is not all 63 public journey proof or release42 verification. Runtime app/engine/simulation unchanged 00bd\u2192043 by direct Git diff; root separately verified all 48 built JS/CSS identical. Default-construction test rows retain mixed method; separate FULL=1 rows record the actual public mode.",
+      "constructionReceipt": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-public-current-builds-receipt.json",
+        "sha256": "c15ac89145290c6b29ae72fdd142fc23ba8280fc6c9175fac8dfbbceb1e3fbe0"
+      },
+      "byteReceipt": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-public-byte-receipt.json",
+        "sha256": "3a612418f2153083aa5ea566e2f944eb2e69d3a15b9b9464f80c9478da20de99"
+      }
+    },
+    "alphaSupperPublicRepeat043": {
+      "kind": "native-public-focused-browser",
+      "testSource": "043957e8a061868836eacd811d2651e8589bad7d",
+      "deployedRuntimeSource": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+      "release": 41,
+      "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-supper-repeat-results.json",
+      "sha256": "5b33225fbd0abb998048576a706e203f68797316a30ce56c7c0ead105a5f7749",
+      "result": {
+        "startTime": "2026-10-03T02:39:49.122Z",
+        "duration": 187156.89200000002,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "receipt": {
+        "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-supper-public-repeat-receipt.json",
+        "sha256": "0899ff7ddaeaaa4843c5e580c7b23bec50b267c6c5aefffc7e28ba430df64364"
+      },
+      "proofScopeNotes": "Same original whole supper journey, three serial actual UI Play repetitions, no retries, after atomic pause at unchanged supported-return predicate. Original 111 PASS / 1 FAIL public cohort remains RED; these 3 PASS are separate evidence. Clean043 combined gate separately passes repaired test. No final42 public acceptance claimed."
     }
   },
   "tests": {
@@ -529,7 +609,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ],
       "proofScopeNotes": "Physical care cycles use UI Play; due-clock waits use hook.step at lines76/83. Historical public proofs remain mixed; alpha-garden-care-full separately proves whole Play."
     },
@@ -543,7 +624,9 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t004": {
@@ -556,7 +639,9 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t005": {
@@ -569,7 +654,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t006": {
@@ -582,7 +668,9 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "proofScopeNotes": "Default gate uses automatic UI Play through s0021 followed by programmatic completion. YEAR_BUILD_FULL=1 runs the same named case entirely through automatic UI Play. Proofs must record the actual mode; retained full-Play receipts are separate."
     },
@@ -596,7 +684,9 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "proofScopeNotes": "Default gate uses automatic UI Play through s0021 followed by programmatic completion. YEAR_BUILD_FULL=1 runs the same named case entirely through automatic UI Play. Proofs must record the actual mode; retained full-Play receipts are separate."
     },
@@ -609,7 +699,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t009": {
@@ -621,7 +712,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t010": {
@@ -633,7 +725,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t011": {
@@ -645,7 +738,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t012": {
@@ -657,7 +751,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t013": {
@@ -669,7 +764,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t014": {
@@ -681,7 +777,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t015": {
@@ -693,7 +790,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t016": {
@@ -705,7 +803,8 @@
         "public37",
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t017": {
@@ -716,7 +815,8 @@
       "proofRefs": [
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t018": {
@@ -727,7 +827,8 @@
       "proofRefs": [
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t019": {
@@ -738,7 +839,8 @@
       "proofRefs": [
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t020": {
@@ -749,7 +851,8 @@
       "proofRefs": [
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t028": {
@@ -760,7 +863,8 @@
       "proofRefs": [
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t029": {
@@ -771,7 +875,8 @@
       "proofRefs": [
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t030": {
@@ -782,7 +887,9 @@
       "proofRefs": [
         "public38",
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t031": {
@@ -794,7 +901,9 @@
         "public38",
         "gate38",
         "alphaRotatedBothPlots",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "historicalName": "rotated actual Play: directive safe return, exact retained material, explicit Continue then End partial and complete same purpose",
       "historicalProofLimit": "Original gate38/public38 case completedA and intentionally leftB untouched; it is retained interruption proof, not the full two-plot terminal witness."
@@ -815,7 +924,9 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t037": {
@@ -825,7 +936,9 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t044": {
@@ -835,7 +948,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t045": {
@@ -845,7 +959,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t052": {
@@ -855,7 +970,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t053": {
@@ -865,7 +981,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t059": {
@@ -875,7 +992,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t060": {
@@ -885,7 +1003,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t061": {
@@ -895,7 +1014,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t071": {
@@ -905,7 +1025,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t072": {
@@ -915,7 +1036,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t075": {
@@ -925,7 +1047,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t076": {
@@ -935,7 +1058,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t077": {
@@ -945,7 +1069,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t078": {
@@ -955,7 +1080,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t079": {
@@ -965,7 +1091,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t080": {
@@ -975,7 +1102,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t081": {
@@ -985,7 +1113,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t082": {
@@ -995,7 +1124,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t083": {
@@ -1005,7 +1135,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t084": {
@@ -1015,7 +1146,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t085": {
@@ -1025,7 +1157,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t086": {
@@ -1035,7 +1168,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t087": {
@@ -1045,7 +1179,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t088": {
@@ -1055,7 +1190,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t089": {
@@ -1065,7 +1201,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t090": {
@@ -1075,7 +1212,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t091": {
@@ -1085,7 +1223,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t092": {
@@ -1095,7 +1234,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t093": {
@@ -1105,7 +1245,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t094": {
@@ -1115,7 +1256,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t095": {
@@ -1125,7 +1267,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t101": {
@@ -1135,7 +1278,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t102": {
@@ -1145,7 +1289,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t103": {
@@ -1155,7 +1300,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t104": {
@@ -1165,7 +1311,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t109": {
@@ -1175,7 +1322,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t110": {
@@ -1185,7 +1333,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t112": {
@@ -1195,7 +1344,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t114": {
@@ -1205,7 +1355,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t115": {
@@ -1215,7 +1366,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t116": {
@@ -1225,7 +1377,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t117": {
@@ -1235,7 +1388,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t118": {
@@ -1245,7 +1399,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t128": {
@@ -1255,7 +1410,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t129": {
@@ -1265,7 +1421,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t130": {
@@ -1275,7 +1432,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t131": {
@@ -1285,7 +1443,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t145": {
@@ -1295,7 +1454,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t214": {
@@ -1305,7 +1465,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t215": {
@@ -1315,7 +1476,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t216": {
@@ -1325,7 +1487,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t262": {
@@ -1335,7 +1498,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t263": {
@@ -1345,7 +1509,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t268": {
@@ -1355,7 +1520,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t269": {
@@ -1365,7 +1531,8 @@
       "outcome": "passed",
       "proofRefs": [
         "gate38",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ]
     },
     "t273": {
@@ -1375,7 +1542,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaSupperPublicRepeat043"
       ]
     },
     "t274": {
@@ -1385,7 +1554,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t275": {
@@ -1395,7 +1566,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t276": {
@@ -1405,7 +1578,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t277": {
@@ -1415,7 +1590,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t281": {
@@ -1425,7 +1602,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t282": {
@@ -1435,7 +1614,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "t283": {
@@ -1445,7 +1626,9 @@
       "outcome": "passed",
       "proofRefs": [
         "focused39",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ]
     },
     "alpha-core-0": {
@@ -1455,7 +1638,8 @@
       "outcome": "passed",
       "proofRefs": [
         "alphaCore",
-        "alphaControls"
+        "alphaControls",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1481,7 +1665,8 @@
       "method": "focused-browser-contract",
       "outcome": "passed",
       "proofRefs": [
-        "alphaCore"
+        "alphaCore",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1497,7 +1682,8 @@
       "method": "focused-browser-contract",
       "outcome": "passed",
       "proofRefs": [
-        "alphaCore"
+        "alphaCore",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1513,7 +1699,9 @@
       "method": "focused-browser-contract",
       "outcome": "passed",
       "proofRefs": [
-        "alphaCore"
+        "alphaCore",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1529,7 +1717,8 @@
       "method": "actual-ui-play-journey",
       "outcome": "passed",
       "proofRefs": [
-        "alphaCore"
+        "alphaCore",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1545,7 +1734,8 @@
       "method": "actual-ui-play-journey",
       "outcome": "passed",
       "proofRefs": [
-        "alphaCore"
+        "alphaCore",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1561,7 +1751,8 @@
       "method": "actual-ui-play-journey",
       "outcome": "passed",
       "proofRefs": [
-        "alphaCore"
+        "alphaCore",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1577,7 +1768,8 @@
       "method": "actual-ui-play-journey",
       "outcome": "passed",
       "proofRefs": [
-        "alphaCore"
+        "alphaCore",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1594,7 +1786,8 @@
       "outcome": "passed",
       "proofRefs": [
         "alphaCore",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -1611,7 +1804,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alphaCore",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1628,7 +1823,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alphaCore",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1646,7 +1843,9 @@
       "proofRefs": [
         "alpha043",
         "alpha107",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1691,7 +1890,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1740,7 +1941,9 @@
       "proofRefs": [
         "alpha043",
         "alpha107",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1784,7 +1987,9 @@
       "proofRefs": [
         "alpha043",
         "alpha107",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1826,7 +2031,9 @@
       "proofRefs": [
         "alpha043",
         "alpha107",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1869,7 +2076,9 @@
       "proofRefs": [
         "alpha043",
         "alpha107",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1912,7 +2121,9 @@
       "proofRefs": [
         "alpha043",
         "alpha107",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -1957,7 +2168,9 @@
       "proofRefs": [
         "alpha043",
         "alpha107",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2003,7 +2216,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2047,7 +2262,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2091,7 +2308,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2135,7 +2354,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2179,7 +2400,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2224,7 +2447,9 @@
         "alpha107",
         "alpha40",
         "alpha731",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2275,7 +2500,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2319,7 +2546,9 @@
         "alpha043",
         "alpha107",
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2363,7 +2592,9 @@
         "alpha043",
         "alpha40",
         "alpha731",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2405,7 +2636,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2437,7 +2670,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2470,7 +2705,9 @@
       "proofRefs": [
         "alpha40",
         "alpha731",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2510,7 +2747,9 @@
       "proofRefs": [
         "alpha40",
         "alpha731",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2548,7 +2787,9 @@
       "proofRefs": [
         "alpha40",
         "alpha731",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2585,7 +2826,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2617,7 +2860,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2649,7 +2894,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2681,7 +2928,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2713,7 +2962,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2747,7 +2998,9 @@
         "alpha40",
         "alpha731",
         "alphaYear2026",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2792,7 +3045,9 @@
         "alpha40",
         "alpha731",
         "alphaSolarTexture",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2845,7 +3100,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2878,7 +3135,9 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -2911,7 +3170,8 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -2942,7 +3202,8 @@
       "outcome": "passed",
       "proofRefs": [
         "alpha40",
-        "alphaCombinedGate41"
+        "alphaCombinedGate41",
+        "alphaCombinedGate043"
       ],
       "nativeResults": [
         {
@@ -2977,7 +3238,8 @@
       "executionMode": "YEAR_BUILD_FULL=1",
       "outcome": "passed",
       "proofRefs": [
-        "alphaYearBuildFull"
+        "alphaYearBuildFull",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -3020,7 +3282,8 @@
       "executionMode": "YEAR_BUILD_FULL=1",
       "outcome": "passed",
       "proofRefs": [
-        "alphaYearBuildFull"
+        "alphaYearBuildFull",
+        "alphaPublic41Completed"
       ],
       "nativeResults": [
         {
@@ -3055,6 +3318,16 @@
           }
         }
       }
+    },
+    "alpha-delayed-frames043": {
+      "file": "viewer/e2e/body-probe-safety.spec.ts",
+      "name": "delayed playback frames end scripted windows while the unchanged valid world clock continues",
+      "method": "browser-programmatic-delayed-frame-clock-check",
+      "outcome": "passed",
+      "proofRefs": [
+        "alphaCombinedGate043"
+      ],
+      "proofScopeNotes": "Current exact named native gate PASS. Programmatic LabSim advance validates script boundary and continued valid world clock; this is not the old stop-at-budget semantics or an actual UI Play journey."
     }
   },
   "nodeFixtureCatalog": {
@@ -4175,7 +4448,7 @@
       "setupNotes": [],
       "contractRef": "living-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t003"
       ],
@@ -4189,13 +4462,17 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t003"
       ]
     },
     {
@@ -4214,7 +4491,7 @@
       "setupNotes": [],
       "contractRef": "living-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t004"
       ],
@@ -4228,13 +4505,17 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t004"
       ]
     },
     {
@@ -4252,7 +4533,7 @@
       "setupNotes": [],
       "contractRef": "garden-circuit",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t276",
         "t277"
@@ -4264,13 +4545,18 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Full63 selector parity, combined gate39 and fresh public39 pending."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t276",
+        "t277"
       ]
     },
     {
@@ -4288,7 +4574,7 @@
       "setupNotes": [],
       "contractRef": "communal-supper",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t273",
         "t274",
@@ -4301,14 +4587,20 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Full63 selector parity, combined gate39 and fresh public39 pending."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t274",
+        "t275"
+      ],
+      "public41RepairedJourneyProofRef": "alphaSupperPublicRepeat043"
     },
     {
       "id": "room-preparation",
@@ -4325,7 +4617,7 @@
       "setupNotes": [],
       "contractRef": "room-preparation",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t281",
         "t282",
@@ -4338,13 +4630,19 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Full63 selector parity, combined gate39 and fresh public39 pending."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t281",
+        "t282",
+        "t283"
       ]
     },
     {
@@ -4362,7 +4660,7 @@
       "setupNotes": [],
       "contractRef": "garden-afternoon",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t019"
       ],
@@ -4375,14 +4673,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "garden-afternoon-rotated",
@@ -4399,7 +4698,7 @@
       "setupNotes": [],
       "contractRef": "garden-afternoon",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t020"
       ],
@@ -4412,14 +4711,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "seed-planting",
@@ -4437,7 +4737,7 @@
       "setupNotes": [],
       "contractRef": "seed-planting",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t030"
       ],
@@ -4450,13 +4750,17 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t030"
       ]
     },
     {
@@ -4475,7 +4779,7 @@
       "setupNotes": [],
       "contractRef": "seed-planting",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t031"
       ],
@@ -4488,9 +4792,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "proofRefs": [
@@ -4498,6 +4802,10 @@
       ],
       "priorMissingProofAtInventory": [
         "Final clean combined alpha gate/public acceptance remains pending."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t031"
       ]
     },
     {
@@ -4515,7 +4823,7 @@
       "setupNotes": [],
       "contractRef": "reading-circle",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t028"
       ],
@@ -4529,14 +4837,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "reading-circle-rotated",
@@ -4553,7 +4862,7 @@
       "setupNotes": [],
       "contractRef": "reading-circle",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t029"
       ],
@@ -4567,14 +4876,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "gallery-tour",
@@ -4591,7 +4901,7 @@
       "setupNotes": [],
       "contractRef": "gallery-tour",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t017",
         "alpha-gallery-tour-natural"
@@ -4606,9 +4916,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha40",
@@ -4617,7 +4927,8 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "gallery-tour-short",
@@ -4634,7 +4945,7 @@
       "setupNotes": [],
       "contractRef": "gallery-tour",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t018"
       ],
@@ -4648,14 +4959,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "table-cleanup",
@@ -4672,7 +4984,7 @@
       "setupNotes": [],
       "contractRef": "table-cleanup",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t013",
         "t014"
@@ -4686,14 +4998,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "table-cleanup-rotated",
@@ -4710,7 +5023,7 @@
       "setupNotes": [],
       "contractRef": "table-cleanup",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t015",
         "t016"
@@ -4724,14 +5037,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "creative-afternoon",
@@ -4748,7 +5062,7 @@
       "setupNotes": [],
       "contractRef": "creative-afternoon",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t012"
       ],
@@ -4761,14 +5075,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "art-sharing",
@@ -4785,7 +5100,7 @@
       "setupNotes": [],
       "contractRef": "art-sharing",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t011"
       ],
@@ -4798,14 +5113,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "drawing-work",
@@ -4822,7 +5138,7 @@
       "setupNotes": [],
       "contractRef": "drawing-work",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t008"
       ],
@@ -4833,14 +5149,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "group-warmup",
@@ -4857,7 +5174,7 @@
       "setupNotes": [],
       "contractRef": "group-warmup",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t009"
       ],
@@ -4870,14 +5187,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "open-jam",
@@ -4895,7 +5213,7 @@
       "setupNotes": [],
       "contractRef": "open-jam",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t010"
       ],
@@ -4908,14 +5226,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "garden-care",
@@ -4933,7 +5252,7 @@
       "setupNotes": [],
       "contractRef": "garden-care",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t002",
         "alpha-garden-care-full"
@@ -4947,9 +5266,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha40",
@@ -4958,7 +5277,8 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "music-dance",
@@ -4976,7 +5296,7 @@
       "setupNotes": [],
       "contractRef": "music-dance",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t005"
       ],
@@ -4987,14 +5307,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "classroom-4",
@@ -5011,7 +5332,7 @@
       "setupNotes": [],
       "contractRef": "classroom",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t052",
         "alpha-manual-classroom-4"
@@ -5028,9 +5349,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha107",
@@ -5039,6 +5360,10 @@
       "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-classroom-4"
       ]
     },
     {
@@ -5056,7 +5381,7 @@
       "setupNotes": [],
       "contractRef": "classroom",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t053",
         "alpha-manual-classroom-8"
@@ -5073,9 +5398,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha107",
@@ -5084,6 +5409,10 @@
       "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-classroom-8"
       ]
     },
     {
@@ -5106,7 +5435,7 @@
       "setupNotes": [],
       "contractRef": "work-break",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t262",
         "alpha-manual-work-break-4"
@@ -5120,9 +5449,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "latestAlphaProofRef": "alpha107",
@@ -5131,6 +5460,10 @@
       "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-work-break-4"
       ]
     },
     {
@@ -5155,7 +5488,7 @@
       ],
       "contractRef": "work-break",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t263",
         "alpha-manual-work-break-8"
@@ -5169,9 +5502,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "latestAlphaProofRef": "alpha107",
@@ -5180,6 +5513,10 @@
       "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-work-break-8"
       ]
     },
     {
@@ -5201,7 +5538,7 @@
       "setupNotes": [],
       "contractRef": "prepared-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t116",
         "alpha-manual-prepared-day-4"
@@ -5216,9 +5553,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5230,6 +5567,10 @@
       "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-prepared-day-4"
       ]
     },
     {
@@ -5253,7 +5594,7 @@
       ],
       "contractRef": "prepared-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t117",
         "alpha-manual-prepared-day-8"
@@ -5268,9 +5609,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5282,6 +5623,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-prepared-day-8"
       ]
     },
     {
@@ -5303,7 +5648,7 @@
       "setupNotes": [],
       "contractRef": "prepared-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t118",
         "alpha-manual-prepared-day-studio"
@@ -5318,9 +5663,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5332,6 +5677,10 @@
       "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-prepared-day-studio"
       ]
     },
     {
@@ -5349,7 +5698,7 @@
       "setupNotes": [],
       "contractRef": "quiet-reading",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t145"
       ],
@@ -5360,14 +5709,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "computer-music",
@@ -5385,7 +5735,7 @@
       "setupNotes": [],
       "contractRef": "computer-music",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t104"
       ],
@@ -5398,14 +5748,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "tabletop-chess",
@@ -5423,7 +5774,7 @@
       "setupNotes": [],
       "contractRef": "tabletop-chess",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t044",
         "t045"
@@ -5435,14 +5786,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "design-studio",
@@ -5463,7 +5815,7 @@
       "setupNotes": [],
       "contractRef": "design-studio",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t059",
         "t060",
@@ -5479,9 +5831,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5493,6 +5845,10 @@
       "latestAlphaExecutedSource": "107af9695913b69253b057cbefc1a3c270545fc3",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-manual-design-studio"
       ]
     },
     {
@@ -5510,7 +5866,7 @@
       "setupNotes": [],
       "contractRef": "sleep",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t214"
       ],
@@ -5525,9 +5881,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5535,7 +5891,8 @@
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "ground-sleep-rotated",
@@ -5552,7 +5909,7 @@
       "setupNotes": [],
       "contractRef": "sleep",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t215"
       ],
@@ -5567,9 +5924,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5577,7 +5934,8 @@
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "cold-preparation",
@@ -5594,7 +5952,7 @@
       "setupNotes": [],
       "contractRef": "preparation",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t114"
       ],
@@ -5605,14 +5963,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "cold-preparation-rotated",
@@ -5629,7 +5988,7 @@
       "setupNotes": [],
       "contractRef": "preparation",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t115"
       ],
@@ -5640,14 +5999,15 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
-      ]
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043"
     },
     {
       "id": "wall",
@@ -5664,7 +6024,7 @@
       "setupNotes": [],
       "contractRef": "wall",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t083",
         "alpha-preset-wall"
@@ -5676,9 +6036,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -5687,6 +6047,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-wall"
       ]
     },
     {
@@ -5704,7 +6068,7 @@
       "setupNotes": [],
       "contractRef": "u-trap",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t084",
         "alpha-preset-u-trap"
@@ -5716,9 +6080,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -5727,6 +6091,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-u-trap"
       ]
     },
     {
@@ -5744,7 +6112,7 @@
       "setupNotes": [],
       "contractRef": "narrow-passage",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t085",
         "t093",
@@ -5757,9 +6125,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -5768,6 +6136,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-narrow-passage"
       ]
     },
     {
@@ -5785,7 +6157,7 @@
       "setupNotes": [],
       "contractRef": "stairs",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t086",
         "t090",
@@ -5800,9 +6172,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -5811,6 +6183,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-stairs"
       ]
     },
     {
@@ -5828,7 +6204,7 @@
       "setupNotes": [],
       "contractRef": "deck-to-ground",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t087",
         "t092",
@@ -5841,9 +6217,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -5852,6 +6228,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-deck-to-ground"
       ]
     },
     {
@@ -5869,7 +6249,7 @@
       "setupNotes": [],
       "contractRef": "incomplete-stairs",
       "coverageGrade": "recorded-exact-diagnostic",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t088",
         "alpha-preset-incomplete-stairs"
@@ -5881,9 +6261,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "diagnostics",
       "latestAlphaProofRef": "alpha40",
@@ -5892,6 +6272,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-incomplete-stairs"
       ]
     },
     {
@@ -5909,7 +6293,7 @@
       "setupNotes": [],
       "contractRef": "construction",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t089",
         "alpha-preset-construction"
@@ -5923,9 +6307,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -5934,6 +6318,10 @@
       "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-construction"
       ]
     },
     {
@@ -5951,7 +6339,7 @@
       "setupNotes": [],
       "contractRef": "trio",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t095",
         "alpha-preset-trio"
@@ -5963,9 +6351,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -5974,6 +6362,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-trio"
       ]
     },
     {
@@ -5991,7 +6383,7 @@
       "setupNotes": [],
       "contractRef": "stress",
       "coverageGrade": "recorded-ui-play-bounded-liveness",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t095",
         "alpha-preset-stress-30"
@@ -6012,9 +6404,9 @@
         "limits": "Through100.85 simulated seconds only; no indefinite fairness/starvation guarantee."
       },
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "continuous",
       "latestAlphaProofRef": "alpha40",
@@ -6023,6 +6415,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-stress-30"
       ]
     },
     {
@@ -6040,7 +6436,7 @@
       "setupNotes": [],
       "contractRef": "build-bay",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t071",
         "t072",
@@ -6057,9 +6453,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6068,6 +6464,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-build-bay"
       ]
     },
     {
@@ -6085,7 +6485,7 @@
       "setupNotes": [],
       "contractRef": "hand-up",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t109",
         "t110",
@@ -6099,9 +6499,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6110,6 +6510,10 @@
       "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-hand-up"
       ]
     },
     {
@@ -6127,7 +6531,7 @@
       "setupNotes": [],
       "contractRef": "prone",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t128",
         "t130",
@@ -6141,9 +6545,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6152,6 +6556,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-prone"
       ]
     },
     {
@@ -6169,7 +6577,7 @@
       "setupNotes": [],
       "contractRef": "prone-forks",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t129",
         "alpha-preset-prone-forks"
@@ -6181,9 +6589,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6192,6 +6600,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-prone-forks"
       ]
     },
     {
@@ -6209,7 +6621,7 @@
       "setupNotes": [],
       "contractRef": "campfire-evening",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t075",
         "alpha-preset-campfire-evening"
@@ -6221,9 +6633,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6232,6 +6644,10 @@
       "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-campfire-evening"
       ]
     },
     {
@@ -6249,7 +6665,7 @@
       "setupNotes": [],
       "contractRef": "meal",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t101",
         "t102",
@@ -6265,9 +6681,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6276,6 +6692,10 @@
       "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-meal"
       ]
     },
     {
@@ -6293,14 +6713,15 @@
       "setupNotes": [],
       "contractRef": "body",
       "coverageGrade": "recorded-still-probe",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t035",
         "t036",
         "t037",
         "alpha-body-0",
         "alpha-body-1",
-        "alpha-body-2"
+        "alpha-body-2",
+        "alpha-delayed-frames043"
       ],
       "selectorProofRefs": [
         "selector38"
@@ -6312,9 +6733,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "probes",
       "latestAlphaProofRef": "alphaCore",
@@ -6343,6 +6764,13 @@
       },
       "priorMissingProofAtInventory": [
         "Exact final combined gate/public alpha acceptance pending; no moving-body activity or fine anatomy certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t036",
+        "t037",
+        "alpha-body-1",
+        "alpha-body-2"
       ]
     },
     {
@@ -6360,7 +6788,7 @@
       "setupNotes": [],
       "contractRef": "year-2020",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t076",
         "alpha-preset-year-2020"
@@ -6372,9 +6800,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6383,6 +6811,10 @@
       "latestAlphaExecutedSource": "7316a1949c304981ac064e676904e84dc010f0aa",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-year-2020"
       ]
     },
     {
@@ -6400,7 +6832,7 @@
       "setupNotes": [],
       "contractRef": "year-2021",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t077",
         "alpha-preset-year-2021"
@@ -6412,9 +6844,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6423,6 +6855,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-year-2021"
       ]
     },
     {
@@ -6440,7 +6876,7 @@
       "setupNotes": [],
       "contractRef": "year-2022",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t078",
         "alpha-preset-year-2022"
@@ -6452,9 +6888,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6463,6 +6899,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-year-2022"
       ]
     },
     {
@@ -6480,7 +6920,7 @@
       "setupNotes": [],
       "contractRef": "year-2023",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t079",
         "alpha-preset-year-2023"
@@ -6492,9 +6932,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6503,6 +6943,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-year-2023"
       ]
     },
     {
@@ -6520,7 +6964,7 @@
       "setupNotes": [],
       "contractRef": "year-2024",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t080",
         "alpha-preset-year-2024"
@@ -6532,9 +6976,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6543,6 +6987,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-year-2024"
       ]
     },
     {
@@ -6560,7 +7008,7 @@
       "setupNotes": [],
       "contractRef": "year-2025",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t081",
         "alpha-preset-year-2025"
@@ -6572,9 +7020,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6583,6 +7031,10 @@
       "latestAlphaExecutedSource": "40a67391fc9993d72c80e4339dd0dbf4959d4a8c",
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-year-2025"
       ]
     },
     {
@@ -6600,7 +7052,7 @@
       "setupNotes": [],
       "contractRef": "year-2026",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t082",
         "alpha-preset-year-2026"
@@ -6612,9 +7064,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alphaYear2026",
@@ -6623,6 +7075,10 @@
       "latestAlphaExecutedSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
       "priorMissingProofAtInventory": [
         "Exact final combined gate/63selector/public alpha acceptance pending."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-year-2026"
       ]
     },
     {
@@ -6640,7 +7096,7 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t006",
         "t268",
@@ -6660,9 +7116,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "construction",
       "latestAlphaProofRef": "alphaYearBuildFull",
@@ -6671,6 +7127,11 @@
       "latestAlphaExecutedSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
       "priorMissingProofAtInventory": [
         "Exact final combined gate/63selector/public alpha acceptance pending."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t006",
+        "alpha-year-build-2022-full"
       ]
     },
     {
@@ -6688,7 +7149,7 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t007",
         "t269",
@@ -6708,9 +7169,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "construction",
       "latestAlphaProofRef": "alphaYearBuildFull",
@@ -6719,6 +7180,11 @@
       "latestAlphaExecutedSource": "033f8cbcbbf2a7334c13276b40ae3535e9daf014",
       "priorMissingProofAtInventory": [
         "Exact final combined gate/63selector/public alpha acceptance pending."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "t007",
+        "alpha-year-build-2022-house-full"
       ]
     },
     {
@@ -6736,7 +7202,7 @@
       "setupNotes": [],
       "contractRef": "solar-paint",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-functional-source00bd-full-gate-passed-final-public-alpha-pending",
+      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
       "testRefs": [
         "t216",
         "alpha-preset-solar-paint"
@@ -6748,9 +7214,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final published alpha/source verification remains pending. Public supper has a retained observation failure; the reviewed atomic-pause repair needs repeated proof and a combined gate. Per-test modes and legacy exclusions remain explicit."
+        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
       ],
-      "boundedNextTest": "Complete source-bound public verification, then validate the reviewed supper test repair and combined candidate. Do not rebuild unrelated partial work.",
+      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alphaSolarTexture",
@@ -6759,6 +7225,10 @@
       "latestAlphaExecutedSource": "9a543c1f701e29b5540b92973a0a34af11926da4",
       "priorMissingProofAtInventory": [
         "Exact final combined gate/63selector/public alpha acceptance pending."
+      ],
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "public41PassingTestRefs": [
+        "alpha-preset-solar-paint"
       ]
     }
   ],
@@ -7058,14 +7528,23 @@
       "failedCase": "communal-supper: retained preparation and consumed meal continue to actual seven-vessel storage under Play",
       "cause": "Exact supported meal return occurred at tick2368; ordinary cleanup then picked up the original bowl before a separately scheduled Pause click captured tick2400. Zero invariant violations. Atomic pause at the unchanged original return predicate is reviewed but unverified; no assertion/support/identity/outcome change.",
       "repairCommit": "54fb8472ccbafcfe07ab9fec24d8b3b86ad28136",
-      "status": "retained native failure; focused repeats and combined repair gate pending"
+      "status": "retained native failure; focused repeats and combined repair gate pending",
+      "repairValidation": {
+        "proofRefs": [
+          "alphaSupperPublicRepeat043",
+          "alphaCombinedGate043"
+        ],
+        "status": "three public repaired journey repetitions PASS and clean 043 combined gate PASS; original failure retained",
+        "finalPublicAcceptance": "pending-release42"
+      }
     }
   ],
   "topGaps": [
-    "Final release41 public112 results, full automatic current 2022 construction Play and capture review remain pending.",
-    "Supper observation repair needs repeated public proof and a clean combined gate; the original failure is retained.",
-    "Bounded sustained stress through 2017 ticks is not indefinite fairness or starvation proof.",
-    "Legacy 7 browser SKIP, 6 engine SKIP and 11 TODO remain unproved; original visual and functional failures are retained."
+    "Final release42 published-source HTTP/MCP/byte and critical actual Play acceptance pending; root owns publication.",
+    "Public41 cohort remains 111 PASS / 1 FAIL; repaired supper 3 PASS and clean 043 gate are separate source-bound receipts, not an all 63 fresh public42 gate.",
+    "Bounded sustained stress through 2017 ticks is not indefinite fairness/starvation proof.",
+    "Legacy 7 browser SKIP, 6 engine SKIP and 11 TODO remain unproved; original visual/functional failures and historical t035 stop-at-budget proof retained.",
+    "Root reports final42 focused harness included four dev-only liveness fixtures importing unpublished source modules; native failures are retained, with no runtime defect inferred. Public synthetic-fixture proof is not claimed; exact clean 043 local Vite proof remains separate."
   ],
   "schemaNotes": {
     "contracts": "Supported semantic contracts and listed disruptions are bounded to named tests; not all disruptions use UI Play. Consult each test method.",
@@ -7073,7 +7552,8 @@
     "sourceInheritance": "No blanket current coverage claimed. 5f\u2192b712 changes shared-food-break/registry/UI; c833\u2192b712 app/engine/e2e byte-diff empty. No gate39 success assumed. Alpha evidence records exact107/40/731 source and native status; git diff verifies engine/scenario authority unchanged to033 but renderer lifetime fixes are not blanket Reset proof inheritance. Targeted year2026/full automatic yearbuild033 and solar9a completed receipts are separately source-bound; previous731 unexpected failures remain retained.",
     "category": "Conditional construction means source/layout admission is checked before actions. Both current2022 profiles completed public38; refused unsupported layouts remain distinct.",
     "registration": "One row and declared contract/test mapping are required for every SELECTABLE_SCENARIOS registration. Generated UI metadata is checked against this inventory in the ordinary engine test path. Authored mappings do not establish executed proof.",
-    "generatedContractStatus": "Isolatedc09a8bf baseline generated parity remains stale. Root reviewed/committed nine-row regeneration at9a543c1 and reports8native lifetime/registration PASS; root735f5c1 parity remains green. This follow-up changes no generated consumer contract fields."
+    "generatedContractStatus": "Consumer contract fields unchanged; lightweight scenario-contracts --check validates exact generated parity on this metadata follow-up.",
+    "finalSourceInheritance": "Exact clean 043 local gate PASS; direct Git diff confirms app/engine/simulation unchanged 00bd\u2192043. Root verified all 48 built JS/CSS identical; public41 PASS rows inherited only with exact native basename/title and mode. Atomic-pause supper test-only repair is verified separately 3 public PASS and clean 043gate. Final42 published-source verification/acceptance pending."
   },
   "discoveryGroups": [
     {
