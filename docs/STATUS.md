@@ -326,8 +326,8 @@ validation; answered entries render only their text, so unused old image
 paths no longer require local source copies. Generated questions HTML is unchanged.
 
 All 296 native deployment tests and the changed legacy photo-entry browser
-journey passed. The full native gate is running separately at its pinned source
-commit; any failed step and its focused repair remain recorded in MERGE-LOG.
+journey passed. The full native gate completed on pinned source; its original RED
+report and passing bounded repair receipts remain recorded in MERGE-LOG.
 No geometry/performance assertion, baseline or native physical engine code changed.
 
 ## Quiet seat courtesy reader
@@ -367,7 +367,7 @@ browser/Worker implementation and stable serialization remain unchanged.
 Unicode, block boundaries and real state/program/take comparisons are identical.
 An isolated 20,000-tick late-camp comparison measured 1.180→0.976 ms/tick.
 Construction v4 completed all 48 days physically but failed the unchanged 20%
-timing limit narrowly (20.71%); fresh v5 qualification is pending. Full native
+timing limit narrowly (20.71%); fresh v5 was stopped unqualified after 11 days. Full native
 gate retains its original report and focused repairs; this hash-only source
 change receives equivalence and full native-engine validation separately.
 
@@ -384,9 +384,9 @@ world and is not serialized or added to its rules/state.
 
 Matched unprofiled 20,000-tick late-state copies measured 0.758379→0.595700 ms,
 with identical world, kernel and recorded-take hashes and zero invariants. Three
-structural mutation/error regressions pass; full suites then fresh v6 are pending.
-This derived-check acceleration and the native hash provider are the only native
-engine source changes after the original full gate.
+structural mutation/error regressions and full suites pass. Fresh v6 completed
+48 days physically but failed timing; the sleep change below is the third native
+source change after the original full gate.
 
 ## Duplicate supported-sleep clearance candidate
 
@@ -396,4 +396,15 @@ The published sleep pose's safety function already includes full clearance; the
 step no longer repeats it on success before any world change. Before first
 publication the direct clearance check remains, and the independent end-of-tick
 invariant remains active. All 50 existing sleep/visitor/take cases pass. Matched
-A/B, full suites and fresh v7 are pending. No performance limit was weakened.
+A/B passed at 0.774711→0.697979 ms with 12,288 sleeping ticks and identical
+world/kernel/take hashes. Full suites and fresh v7 remain pending. No performance
+limit was weakened.
+
+## Sync test resource repair
+
+The full check failed a pre-existing corruption/resync race: an ordinary activity
+delta repaired the test's corrupted field before the heartbeat could detect it.
+Its failed assertion then left a reconnect timer running. Test corruption now adds
+a phantom body that only a full snapshot removes, and every test closes its
+clients even on assertion failure. All six real-server sync journeys passed and
+exited cleanly. Production connection behavior and protocol assertions are unchanged.

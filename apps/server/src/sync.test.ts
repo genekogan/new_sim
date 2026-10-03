@@ -1,7 +1,7 @@
 // End-to-end sync: a real server process, real WebSocket clients, fake brain.
 // Asserts that replicas agree with the server's view hash, survive a dropped
 // socket by resuming from the ring buffer, and that the agent API steers.
-import { test, before, after } from 'node:test';
+import { test, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
@@ -14,7 +14,8 @@ const PORT = 4600 + Math.floor(Math.random() * 300);
 const BASE = `http://127.0.0.1:${PORT}`;
 let proc: ChildProcess;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const client = (token: string | null = null) => { const c = new Connection(`ws://127.0.0.1:${PORT}/ws`, async () => token, {}, (u) => new WebSocket(u) as any); c.connect(); return c; };
+const clients = new Set<Connection>();
+const client = (token: string | null = null) => { const c = new Connection(`ws://127.0.0.1:${PORT}/ws`, async () => token, {}, (u) => new WebSocket(u) as any); clients.add(c); c.connect(); return c; };
 const api = async (path: string, token: string, body?: unknown, method?: string) => {
   const r = await fetch(BASE + path, { method: method ?? (body ? 'POST' : 'GET'), headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   const t = await r.text(); try { return { status: r.status, body: JSON.parse(t) }; } catch { return { status: r.status, body: t as any }; }
@@ -29,6 +30,7 @@ before(async () => {
   throw new Error('server did not start');
 });
 after(() => { proc?.kill('SIGTERM'); });
+afterEach(() => { for (const c of clients) c.close(); clients.clear(); });
 
 test('two clients joining at different times agree with the server', async () => {
   const a = client(); await sleep(3000);
@@ -61,12 +63,15 @@ test('a dropped socket resumes from the ring buffer without a new snapshot and c
 test('a corrupted replica detects the mismatch and resyncs', async () => {
   const c = client(); await sleep(6000);
   const id = Object.keys(c.replica.entities).find((k) => c.replica.entities[k].kind === 'human')!;
-  c.replica.entities[id].human!.activity = 'corrupted';
-  c.replica.paths.delete(id);
+  // Ordinary activity/path deltas can repair a corrupted field before a
+  // heartbeat checks it. An extra body persists until the full resync snapshot.
+  const phantom = 'corrupted-replica-body';
+  c.replica.entities[phantom] = { ...structuredClone(c.replica.entities[id]), id: phantom };
   await sleep(11000);
   assert.ok(c.stats.resyncs >= 1, 'asked for a resync');
   assert.ok(c.stats.snapshots >= 2);
   assert.equal(c.stats.lastCheck, 'ok');
+  assert.equal(c.replica.entities[phantom], undefined, 'snapshot removed the corrupted body');
   c.close();
 });
 
