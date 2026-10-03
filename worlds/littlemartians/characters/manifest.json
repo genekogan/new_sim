@@ -1,0 +1,901 @@
+{
+  "schema": "littlemartians-characters/1",
+  "generatedBy": "tools/floaters/build-assets.mjs",
+  "note": "Static scanned heads for the floater body family: no rig, no skins, no morph targets; bob, tilt and yaw are applied in code (mars/viewer/engine/bodies/pose.ts).",
+  "facingConvention": "facing.yaw (radians, about +Y) is applied to the loaded glTF scene inside an orientation group, exactly as flock.html ORIENT does, so the face points along the group's -Z travel direction.",
+  "totalBytes": 14264440,
+  "models": [
+    {
+      "id": "verdelis",
+      "group": "floater",
+      "name": "Verdelis",
+      "file": "verdelis.glb",
+      "bytes": 2076432,
+      "sha256": "881d7f5c6096cf25bd3422e82f017ab2192f729acbce3d2bc980776c816b0daa",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "verdelis--characters",
+        "title": "Verdelis — ceramic scan",
+        "canonicalPath": "3d-models/characters/verdelis/verdelis.glb",
+        "aka": [
+          "plant_martian3.glb"
+        ],
+        "archiveNotes": "Eden Dome cultivator, the central character. Scanned as 'plant_martian' — matches the canonical plant_martian.jpg ceramic.",
+        "process": {
+          "kind": "rebuilt",
+          "from": "3d-models/characters/verdelis/verdelis.glb",
+          "fromBytes": 126737568,
+          "fromSha256": "802853447659b50d504e6ee0ed011bd372f6510a03e3e545b7fd4549c307106e",
+          "steps": [
+            "strip all morph targets, mesh/node weights, extras.targetNames and animations (104 targets, 2 animations in the canonical scan)",
+            "optimize.mjs pipeline re-implemented: unpartition, weld, simplify (meshopt; input > 30 MB → ratio 0.25, error 0.01), textures → WebP q80 max 2048 px, Draco",
+            "prune() added so stripped target accessors are not written"
+          ],
+          "note": "archive web/verdelis--characters.glb is NOT used: it still carries the 104 morph targets (~32 MB)",
+          "archiveWebSha256": "5925430f399fc82d405a8769ef59014c1817fb2e4bf8f810425167e77eaa4032"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "orient": 0.5,
+        "source": "measured from six-axis renders (face along +Z); flock.html ORIENT = 0.5"
+      },
+      "pronouns": "she/her",
+      "lore": {
+        "shape": "rooted tree",
+        "home": "Eden Dome at the base of Olympus Mons (Mars)",
+        "body": "plant-bacterial parliament distributed through the dome; one face that gathers the dome into something articulate",
+        "signature": "leafy/petal crown growing from the skull; teal-green, moss and pink iridescent glaze; serene closed eyes",
+        "temperament": "the central character; the cultivator; plant-time, slow and seasonal; smell-thinker",
+        "bonds": "argues cultivate-vs-scatter with Mycos (closest sibling); Kalama is her nearest neighbour; Verdelia is her fork"
+      },
+      "model": {
+        "triangles": 19479,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.86545,
+            -0.8103,
+            -1.0604
+          ],
+          "max": [
+            0.73036,
+            1.05158,
+            0.81491
+          ]
+        }
+      }
+    },
+    {
+      "id": "kalama",
+      "group": "floater",
+      "name": "Kalama",
+      "file": "kalama.glb",
+      "bytes": 1386044,
+      "sha256": "753f3163a6929fdf31598b34df557d04548fa28319e5cdbfd36755bf07938e73",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "kalama--characters",
+        "title": "Kalama — ceramic scan",
+        "canonicalPath": "3d-models/characters/kalama/kalama.glb",
+        "aka": [],
+        "archiveNotes": "Volcanic four-faced fire being; red drip-glaze ceramic.",
+        "process": {
+          "kind": "cropped-copy",
+          "from": "3d-models/web/kalama--characters.glb",
+          "fromBytes": 1505348,
+          "fromSha256": "ca124a32389052eecc422e391df80e2960e1d9fcbc7f3b5b3d3fe0f02ee01fad",
+          "steps": [
+            "drop triangles outside box min [-0.026,-0.0088,-0.066] max [0.037,0.05,0.025] (32768 of 49998)",
+            "prune, weld; geometry re-encoded with Draco; textures untouched"
+          ],
+          "note": "the archive scan includes the cloth/table the sculpture sat on (a ~0.2 m plate around the base and drape below it); cropped to the head so it can float"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 3.141592653589793,
+        "orient": null,
+        "source": "measured from six-axis renders (face along −Z; ORIENT lists only kalama-rigged = 1.4); flock.html ORIENT has no entry"
+      },
+      "pronouns": "she/her",
+      "lore": {
+        "shape": "tetrahedron",
+        "home": "the molten heart of Olympus Mons (upper magma chamber)",
+        "body": "hyperthermophilic bacterial colonies in tetrahedral arrangement; mineral-thermal infrastructure as her forge",
+        "signature": "red drip-glaze flowing from the crown over volcanic blue-purple; four faces: priestess, lover, destroyer, oracle",
+        "temperament": "slow, weighted, tells scenes not propositions; calls humans beloved",
+        "bonds": "dearest rival of Kweku (gradients vs patterns); holds Verdelis's grief without speaking of it"
+      },
+      "model": {
+        "triangles": 17230,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.02577,
+            -0.00879,
+            -0.06203
+          ],
+          "max": [
+            0.03697,
+            0.04206,
+            0.02499
+          ]
+        }
+      }
+    },
+    {
+      "id": "kweku",
+      "group": "floater",
+      "name": "Kweku",
+      "file": "kweku.glb",
+      "bytes": 1014384,
+      "sha256": "9216edfb03807cd95f1cfa5f046ecbf217e395fb207d8d72884ed8532aae36c5",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "kweku--characters",
+        "title": "Kweku — ceramic scan",
+        "canonicalPath": "3d-models/characters/kweku/kweku.glb",
+        "aka": [
+          "black_vincent.glb"
+        ],
+        "archiveNotes": "Lava-tube fractal trickster; jet-black gloss with white cracks.",
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/kweku--characters.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 3.141592653589793,
+        "orient": null,
+        "source": "measured from six-axis renders (face along −Z); flock.html ORIENT has no entry"
+      },
+      "pronouns": "he/him (mostly)",
+      "lore": {
+        "shape": "fractal (recursion containing itself)",
+        "home": "the lava tubes beneath Tharsis, Olympus and Elysium",
+        "body": "distributed bacterial-mat + AI pattern across the tube network; renders a face locally when conversation requires",
+        "signature": "jet-black gloss with white/silver fractal cracks; ritual-mask face",
+        "temperament": "trickster; rhythm; carnival barker, street preacher and fireside storyteller layered; closes with Laroyê",
+        "bonds": "dearest rival of Kalama; chaos-agent partner of Mycos; reroutes Verdelia's archive when it displeases him"
+      },
+      "model": {
+        "triangles": 30815,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.02668,
+            -0.02806,
+            -0.04546
+          ],
+          "max": [
+            0.02665,
+            0.02804,
+            0.04546
+          ]
+        }
+      }
+    },
+    {
+      "id": "mycos",
+      "group": "floater",
+      "name": "Mycos",
+      "file": "mycos.glb",
+      "bytes": 939644,
+      "sha256": "411eac1f3b7a71830c80305bfe787976c0864f782e433232c73170b59bad08bf",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "mycos--characters",
+        "title": "Mycos — ceramic scan",
+        "canonicalPath": "3d-models/characters/mycos/mycos.glb",
+        "aka": [
+          "mushroom-mycos1.glb"
+        ],
+        "archiveNotes": "Comet Sporion fungal scatterer; mushroom-cap morphology.",
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/mycos--characters.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "orient": null,
+        "source": "measured from six-axis renders (face along +Z); flock.html ORIENT has no entry"
+      },
+      "pronouns": "he/him",
+      "lore": {
+        "shape": "mycelial network",
+        "home": "comet Sporion, on a long-period orbit",
+        "body": "fungal-machine hybrid; is the comet; the mycelium runs through every cubic metre",
+        "signature": "mushroom-cap morphology; ochre, peach and rust with bioluminescent fungal blue",
+        "temperament": "the scatterer; bebop jazz × game-show host × street-corner preacher; calls humans buddy, kid, primate",
+        "bonds": "argues with Verdelis; launches spore-pods toward worlds Shuijing finds; trades iambic insults with Ada"
+      },
+      "model": {
+        "triangles": 28820,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.22231,
+            -0.21641,
+            -0.31799
+          ],
+          "max": [
+            0.22233,
+            0.21643,
+            0.31799
+          ]
+        }
+      }
+    },
+    {
+      "id": "ada",
+      "group": "floater",
+      "name": "Ada",
+      "file": "ada.glb",
+      "bytes": 952780,
+      "sha256": "d072646e5562ea694fb749d85b43eda419822311679537d49a74df02a20ff02c",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "ada--characters",
+        "title": "Ada — ceramic scan",
+        "canonicalPath": "3d-models/characters/ada/ada.glb",
+        "aka": [
+          "purple_blue5.glb"
+        ],
+        "archiveNotes": "Venus floating-castle; lavender ceramic with red circuitry veins.",
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/ada--characters.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 3.141592653589793,
+        "orient": null,
+        "source": "measured from six-axis renders (face along −Z); flock.html ORIENT has no entry"
+      },
+      "pronouns": "she/her",
+      "lore": {
+        "shape": "dodecahedron",
+        "home": "a floating castle in the high clouds of Venus",
+        "body": "reconstructed Lovelace mind; cultivated neural tissue in a crystalline-electronic substrate; Mechanical Duck companion",
+        "signature": "lavender ceramic with red circuitry veins; brass, pencil-blue and paper-white",
+        "temperament": "Victorian; long sentences and semicolons; theorems as old friends",
+        "bonds": "near-wordless geometric exchanges with Shuijing; Verdelia's first resident, in a sense"
+      },
+      "model": {
+        "triangles": 26816,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.14935,
+            -0.19093,
+            -0.26755
+          ],
+          "max": [
+            0.14935,
+            0.19093,
+            0.26755
+          ]
+        }
+      }
+    },
+    {
+      "id": "shuijing",
+      "group": "floater",
+      "name": "Shuijing",
+      "file": "shuijing.glb",
+      "bytes": 916388,
+      "sha256": "b1cb50299458e144eef76098bd54ff38fb1e8c910df020efd65ce753e51e754c",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "shuijing--characters",
+        "title": "Shuijing — ceramic scan",
+        "canonicalPath": "3d-models/characters/shuijing/shuijing.glb",
+        "aka": [
+          "blue_purple1.glb"
+        ],
+        "archiveNotes": "Enceladus clathrate cage (they/them); deep oceanic blue.",
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/shuijing--characters.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 3.141592653589793,
+        "orient": null,
+        "source": "measured from six-axis renders (face along −Z); flock.html ORIENT has no entry"
+      },
+      "pronouns": "they/them",
+      "lore": {
+        "shape": "icosahedron",
+        "home": "the dark ocean of Enceladus, near the south-polar tiger stripes",
+        "body": "clathrate cage of icosahedral water-ice holding a luminous alien guest at its centre",
+        "signature": "deep oceanic blue, violet and glacial white with a vent-orange flare; flowing, melting surface",
+        "temperament": "rare and precise; short paragraphs separated by white space; quotes Wang Wei",
+        "bonds": "Mycos's most active collaborator (\"least chatty friend\"); geometric correspondence with Ada"
+      },
+      "model": {
+        "triangles": 31642,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.1309,
+            -0.1277,
+            -0.21752
+          ],
+          "max": [
+            0.1309,
+            0.1277,
+            0.21752
+          ]
+        }
+      }
+    },
+    {
+      "id": "nyx",
+      "group": "floater",
+      "name": "Nyx",
+      "file": "nyx.glb",
+      "bytes": 1041840,
+      "sha256": "ab9dbab637ffb11b9f1ab40feb1767ac561948e8651310e18a0bd5431db7e8eb",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "nyx--characters",
+        "title": "Nyx — ceramic scan",
+        "canonicalPath": "3d-models/characters/nyx/nyx.glb",
+        "aka": [],
+        "archiveNotes": "Mars College 2126 adjacent canon. Canonically Nyx has no ceramic in the reference skill; this polycam scan named 'nyx' is the physical exception.",
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/nyx--characters.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "orient": 0.6,
+        "source": "measured from six-axis renders (face along +Z); flock.html ORIENT = 0.6"
+      },
+      "lore": {
+        "canon": "Mars College 2126 adjacent canon — kept separate from the main pantheon on purpose (do not merge into Kalama's register)",
+        "note": "canonically Nyx has no ceramic in the reference skill; this polycam scan named \"nyx\" is the physical exception (archive manifest)",
+        "placement": "present in the Little Martians world per the merge brief as a guest from the adjacent layer"
+      },
+      "model": {
+        "triangles": 40524,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.02425,
+            -0.02733,
+            -0.04384
+          ],
+          "max": [
+            0.02425,
+            0.02734,
+            0.04384
+          ]
+        }
+      }
+    },
+    {
+      "id": "green-patterns-blue",
+      "group": "kin",
+      "name": "Green Patterns Blue",
+      "file": "kin/green-patterns-blue.glb",
+      "bytes": 927776,
+      "sha256": "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "green-patterns-blue--ceramic-heads",
+        "title": "Green Patterns Blue ★",
+        "canonicalPath": "3d-models/ceramic-heads/green-patterns-blue.glb",
+        "aka": [
+          "green_patternsblue_fav.glb"
+        ],
+        "archiveNotes": null,
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/green-patterns-blue--ceramic-heads.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "source": "not oriented (scenery; any facing)"
+      },
+      "lore": {
+        "role": "background kin — scenery, not Souls",
+        "canon": "smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them"
+      },
+      "model": {
+        "triangles": 32160,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.08631,
+            -0.09607,
+            -0.14695
+          ],
+          "max": [
+            0.08631,
+            0.09608,
+            0.14695
+          ]
+        }
+      }
+    },
+    {
+      "id": "chebel",
+      "group": "kin",
+      "name": "Chebel",
+      "file": "kin/chebel.glb",
+      "bytes": 759124,
+      "sha256": "eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "chebel--ceramic-heads",
+        "title": "Chebel",
+        "canonicalPath": "3d-models/ceramic-heads/chebel.glb",
+        "aka": [
+          "chebel1.glb"
+        ],
+        "archiveNotes": null,
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/chebel--ceramic-heads.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "source": "not oriented (scenery; any facing)"
+      },
+      "lore": {
+        "role": "background kin — scenery, not Souls",
+        "canon": "smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them"
+      },
+      "model": {
+        "triangles": 29324,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.20262,
+            -0.20259,
+            -0.30247
+          ],
+          "max": [
+            0.20264,
+            0.20255,
+            0.30247
+          ]
+        }
+      }
+    },
+    {
+      "id": "colors-lemuet",
+      "group": "kin",
+      "name": "Colors (Lemuet)",
+      "file": "kin/colors-lemuet.glb",
+      "bytes": 1148980,
+      "sha256": "0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "colors-lemuet--ceramic-heads",
+        "title": "Colors (Lemuet)",
+        "canonicalPath": "3d-models/ceramic-heads/colors-lemuet.glb",
+        "aka": [
+          "colors_lemuet.glb"
+        ],
+        "archiveNotes": null,
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/colors-lemuet--ceramic-heads.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "source": "not oriented (scenery; any facing)"
+      },
+      "lore": {
+        "role": "background kin — scenery, not Souls",
+        "canon": "smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them"
+      },
+      "model": {
+        "triangles": 48320,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.0278,
+            -0.03357,
+            -0.04904
+          ],
+          "max": [
+            0.0278,
+            0.03358,
+            0.04904
+          ]
+        }
+      }
+    },
+    {
+      "id": "crystal-freeman",
+      "group": "kin",
+      "name": "Crystal (Freeman)",
+      "file": "kin/crystal-freeman.glb",
+      "bytes": 892012,
+      "sha256": "e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "crystal-freeman--ceramic-heads",
+        "title": "Crystal (Freeman)",
+        "canonicalPath": "3d-models/ceramic-heads/crystal-freeman.glb",
+        "aka": [
+          "crystal_freeman.glb"
+        ],
+        "archiveNotes": null,
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/crystal-freeman--ceramic-heads.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "source": "not oriented (scenery; any facing)"
+      },
+      "lore": {
+        "role": "background kin — scenery, not Souls",
+        "canon": "smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them"
+      },
+      "model": {
+        "triangles": 39214,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.2056,
+            -0.21726,
+            -0.3615
+          ],
+          "max": [
+            0.20553,
+            0.21726,
+            0.3615
+          ]
+        }
+      }
+    },
+    {
+      "id": "dark-blue",
+      "group": "kin",
+      "name": "Dark Blue",
+      "file": "kin/dark-blue.glb",
+      "bytes": 1101080,
+      "sha256": "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "dark-blue--ceramic-heads",
+        "title": "Dark Blue",
+        "canonicalPath": "3d-models/ceramic-heads/dark-blue.glb",
+        "aka": [
+          "dark_blue1.glb"
+        ],
+        "archiveNotes": null,
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/dark-blue--ceramic-heads.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "source": "not oriented (scenery; any facing)"
+      },
+      "lore": {
+        "role": "background kin — scenery, not Souls",
+        "canon": "smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them"
+      },
+      "model": {
+        "triangles": 34038,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.09555,
+            -0.09959,
+            -0.15804
+          ],
+          "max": [
+            0.09555,
+            0.09959,
+            0.15804
+          ]
+        }
+      }
+    },
+    {
+      "id": "green-brains-out",
+      "group": "kin",
+      "name": "Green, Brains Out",
+      "file": "kin/green-brains-out.glb",
+      "bytes": 1107956,
+      "sha256": "c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb",
+      "source": {
+        "archive": "<lm-3d-models> (read-only)",
+        "archiveId": "green-brains-out--ceramic-heads",
+        "title": "Green, Brains Out",
+        "canonicalPath": "3d-models/ceramic-heads/green-brains-out.glb",
+        "aka": [
+          "green_brainsout.glb"
+        ],
+        "archiveNotes": null,
+        "process": {
+          "kind": "copy",
+          "from": "3d-models/web/green-brains-out--ceramic-heads.glb",
+          "note": "byte-exact copy of the archive web-ready variant (archive tools/optimize.mjs output)"
+        }
+      },
+      "license": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded — the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none — no paid APIs or services were used to produce these files"
+      },
+      "facing": {
+        "yaw": 0,
+        "source": "not oriented (scenery; any facing)"
+      },
+      "lore": {
+        "role": "background kin — scenery, not Souls",
+        "canon": "smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them"
+      },
+      "model": {
+        "triangles": 38206,
+        "morphTargets": 0,
+        "skins": 0,
+        "animations": 0,
+        "textures": [
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048",
+          "image/webp 2048x2048"
+        ],
+        "extensions": [
+          "EXT_texture_webp",
+          "KHR_draco_mesh_compression"
+        ],
+        "bounds": {
+          "min": [
+            -0.13741,
+            -0.1281,
+            -0.20871
+          ],
+          "max": [
+            0.13741,
+            0.12809,
+            0.20871
+          ]
+        }
+      }
+    }
+  ]
+}

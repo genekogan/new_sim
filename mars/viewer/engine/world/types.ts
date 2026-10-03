@@ -95,6 +95,13 @@ export type FoodPreparation = {
   complete: boolean;
 };
 
+/**
+ * Body family of a person-like entity (engine/bodies). Absent = 'humanoid' (every existing human), so
+ * worlds, takes and hashes without the field are unchanged. A 'floater' is a static scanned head that
+ * hovers at `hoverHeight` above its ground pose with radius `radius`; `model` names its GLB.
+ */
+export type Body = { family: 'humanoid' | 'floater'; model?: string; radius?: number; hoverHeight?: number };
+
 export type Entity = {
   id: string;
   def: string; // AssetDef id
@@ -110,6 +117,8 @@ export type Entity = {
   assembly?: string;
   /** Humans */
   human?: HumanState;
+  /** Optional body family (engine/bodies); absent = humanoid. */
+  body?: Body;
   /** Owning action while reserved/held. */
   reservedBy?: string;
   /** Containers (bowl, pot…; catalog-items.ts CONTAINERS): what food is in it and how full (0..1). */

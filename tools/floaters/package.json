@@ -1,0 +1,28 @@
+{
+  "name": "floaters-tools",
+  "private": true,
+  "type": "module",
+  "description": "Isolated asset + preview tooling for the Little Martians floater body family (not part of the pnpm workspace).",
+  "scripts": {
+    "assets": "node build-assets.mjs",
+    "policy": "node policy-table.mjs",
+    "preview": "node preview.mjs",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "cd ../../mars/viewer && node --test engine/test/floaters.test.ts"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "4.4.1",
+    "@gltf-transform/extensions": "4.4.1",
+    "@gltf-transform/functions": "4.4.1",
+    "@types/node": "^22.19.19",
+    "@types/three": "^0.185.4",
+    "draco3dgltf": "^1.5.7",
+    "esbuild": "^0.28.1",
+    "meshoptimizer": "^1.2.0",
+    "playwright-core": "^1.63.0",
+    "sharp": "^0.35.3",
+    "three": "0.185.1",
+    "typescript": "^5.9.3",
+    "zod": "4.6.5"
+  }
+}

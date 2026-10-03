@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["dom", "dom.iterable", "esnext"], "skipLibCheck": true, "strict": true, "noEmit": true,
+    "esModuleInterop": true, "module": "esnext", "moduleResolution": "bundler", "types": ["node"], "resolveJsonModule": true,
+    "isolatedModules": true, "allowImportingTsExtensions": true
+  },
+  "files": [
+    "../../mars/viewer/engine/bodies/index.ts",
+    "../../mars/viewer/engine/test/floaters.test.ts",
+    "../../mars/viewer/app/engine-view/floaters.ts",
+    "preview-entry.ts"
+  ]
+}
