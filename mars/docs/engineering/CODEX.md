@@ -1,9 +1,15 @@
 # CODEX.md: guide for the external Codex contributor
 
-Codex works on bounded areas of the Mars College 3D Studio simulation engine, on `codex/<topic>` branches in its
-own git worktree. The Claude lead re-gates and merges. This file is the contract: read it and your brief
-(`docs/engineering/briefs/codex-*.md`) before touching anything. Decision record: OWNER_DECISIONS.md, Gene
-2026-09-29 "External Codex split" (the ownership map below is the final, corrected version of it).
+Use isolated `codex/<topic>` worktrees for bounded implementation. Current ownership,
+integration responsibility, helper limits and validation requirements are authoritative
+in [AGENTS](../../AGENTS.md), [ACTIVE_ROADMAP](ACTIVE_ROADMAP.md) and the
+[release checklist](RELEASE_CHECKLIST.md). Gene has authorized the main engine agent
+to run the full gate, integrate locally and deploy.
+
+The external-contributor split, Claude-lead-only gate/merge rules and ownership map
+below are **dated 2026-09-29 provenance**, superseded by those current instructions.
+The worktree recipe and engineering safeguards remain useful. Follow a current bounded
+brief where one applies; do not infer that old pending work is shipped.
 
 Repo: `<mars-campus-repo>`. It is a local git repo only, with author genekogan and
 no remote. **Never push. Never add a remote.** The app and engine live in `viewer/`. Engine hard rules:
@@ -68,9 +74,9 @@ Claude workers run Vite and Playwright concurrently on this machine. The default
   Randomness comes from `core/rng.ts`, seeded, with its state in `world.rng`.
 - **No host transcendentals in `viewer/engine/**`.** `Math.sin/cos/tan/asin/acos/atan/atan2/…/exp/log/pow/cbrt`
   and **`Math.hypot`** are forbidden. Use `core/math.ts`: `dsin dcos dtan datan datan2 dasin dacos dexp dlog`,
-  plus `hypot`, `len2` and `dist2`. The source-scan test `engine/test/core.test.ts:292-313` enforces this over
-  every file under `engine/`. It does **not yet** catch the `**` operator (the tooling brief adds that).
-  Do not use `**` in engine code either.
+  plus `hypot`, `len2` and `dist2`. `engine/test/source-scan.test.ts` enforces host
+  transcendentals and new `**`/`**=` sites, retaining only its exact reviewed legacy
+  allowlist. Do not introduce exponent operators in engine code.
 - **Determinism.** Fixed tick `DT = 1/20 s`. Iterate in insertion or sorted order. No wall clock. Renderers and
   cameras only read world state.
 - **Fail loudly.** Refusals are structured `Diagnostic { code, message, subjects, at }` naming concrete objects.
