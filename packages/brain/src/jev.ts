@@ -1,3 +1,4 @@
+import { paidJson, PaidHttpError, type PaidGate } from './paid.ts';
 // TypeSafe System One (Jev) client. Text in, typed judgments out.
 // https://docs.typesafe.ai/api.md — POST /v1/systemone { model, state, questions }.
 // Question formats follow docs.typesafe.ai/primitives/*.md:
@@ -25,6 +26,7 @@ export const JEV_MODEL = 'jev-1.13.0';
 export type JevResult = { response: JevResponse; ms: number; costUsd: number; mode: 'live' | 'fake' };
 
 export class JevClient {
+  gate?: PaidGate;
   apiKey: string | undefined;
   mode: 'live' | 'fake';
   constructor(apiKey: string | undefined, mode: 'live' | 'fake') { this.apiKey = apiKey; this.mode = apiKey ? mode : 'fake'; }
@@ -32,24 +34,18 @@ export class JevClient {
   async ask(req: JevRequest, timeoutMs = 6000): Promise<JevResult> {
     if (this.mode === 'fake' || !this.apiKey) return fakeJev(req);
     const t0 = performance.now();
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetch('https://api.typesafe.ai/v1/systemone', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(req),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      // docs: back off on 429 (rate limit) and 529 (overloaded)
-      if ((res.status === 429 || res.status === 529) && attempt < 2) {
-        const ra = Number(res.headers.get('retry-after'));
-        await new Promise((r) => setTimeout(r, Number.isFinite(ra) && ra > 0 ? ra * 1000 : 400 * 2 ** attempt));
-        continue;
+    let response!: JevResponse;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        response = await paidJson('jev', req, { method: 'POST', headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(timeoutMs) }, this.gate) as JevResponse;
+        break;
+      } catch (e) {
+        if (!(e instanceof PaidHttpError) || ![429, 529].includes(e.status) || attempt === 2) throw e;
+        await new Promise(r => setTimeout(r, e.retryAfter > 0 ? Math.min(5000, e.retryAfter * 1000) : 400 * 2 ** attempt));
       }
-      if (!res.ok) throw new Error(`jev ${res.status}: ${(await res.text()).slice(0, 300)}`);
-      const response = (await res.json()) as JevResponse;
-      for (const a of Object.values(response.answers)) if (a.type !== 'noul') a.probabilities = normalize(a.probabilities);
-      return { response, ms: performance.now() - t0, costUsd: response.usage.input_tokens * JEV_USD_PER_INPUT_TOKEN, mode: 'live' };
     }
+    for (const a of Object.values(response.answers)) if (a.type !== 'noul') a.probabilities = normalize(a.probabilities);
+    return { response, ms: performance.now() - t0, costUsd: response.usage.input_tokens * JEV_USD_PER_INPUT_TOKEN, mode: 'live' };
   }
 }
 

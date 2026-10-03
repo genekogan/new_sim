@@ -41,6 +41,7 @@ function takeHands(e: Entity): TakeHands | undefined {
 }
 
 const FIELDS: [string, (e: Entity) => unknown][] = [
+  ['attention', e => e.human?.attention],
   ['activity', (e) => e.human?.activity],
   ['level', (e) => e.human?.level],
   ['task', (e) => e.human?.task],
@@ -57,6 +58,9 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['on', (e) => e.human?.on], // the rack link (beam:… / climb:…) someone stands on
   ['speed', (e) => (e.human?.speed === undefined ? undefined : q(e.human.speed, SPEED_Q))], // integer cm/s (walk_to)
   ['sleepPose', (e) => e.human?.sleepPose], // additive semantic lie/wake state; renderer owns rig coordinates
+  ['planting', e => e.planting],
+  ['gardenCare', e => e.gardenCare],
+  ['foodPreparation', e => e.foodPreparation],
   ['contents', (e) => e.contents], // bowl / pot / cup fill (items)
   ['proneYaw', (e) => (e.human?.proneYaw === undefined ? undefined : q(e.human.proneYaw, ANG_Q))], ['phaseK', (e) => (e.human?.phaseK === undefined ? undefined : q(e.human.phaseK, 100))], // prone receiver: lying heading (mrad), phase progress (%)
 ];

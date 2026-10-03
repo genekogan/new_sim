@@ -12,6 +12,8 @@ import { Hub } from './hub.ts';
 import { handleMcp } from './mcp.ts';
 import { Souls } from './souls.ts';
 import { WorldHost } from './world.ts';
+import { LivingWorld } from './living.ts';
+import { CampCards } from './camp.ts';
 import { worldDefinition } from './world-config.ts';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
@@ -35,6 +37,16 @@ console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engin
 
 const auth = new Auth(config, db);
 await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
+
+const living = config.worldKey === 'mars' && config.livingWorld ? new LivingWorld(host) : null;
+if (living) { living.camp = true; void living.install(definition.customs); }
+const campCards = living ? new CampCards(host) : null;
+void campCards;
+const oldCharacters = ['A patient gardener who enjoys preparing food and welcoming people.', 'A curious builder who learns by making useful things from the yard’s materials.', 'A thoughtful reader and teacher who likes sharing ideas and quiet company.', 'A lively musician and storyteller who brings people together around the fire.'];
+if (living) for (const [i, n] of definition.cast.entries()) {
+  const m = [...host.minds.values()].find(m => m.name === n.name);
+  if (m && (m.description === oldCharacters[i] || (i === 1 && m.description === oldCharacters[i].replace('’', "'")))) void host.enqueue('rules','world',{soulId:m.soulId,character:n.description,why:'adopt the four characters from merge plan section 4.9'});
+}
 
 let hub!: Hub;
 const brain = new Brain(host, db, config, {

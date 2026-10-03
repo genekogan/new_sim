@@ -5,7 +5,7 @@ import {
   JEV_MODEL, JevClient, buildDirectorRequest, buildMidRequest, buildShotRequest, buildTranslateRequest, callNarrator, buildNarratorRequest, fallbackMid, fingerprint,
   haikuTranslate, interpretDirector, interpretMid, interpretTranslate, sanitize,
   buildAttuneRequest, interpretAttune, callTool, cardGrammar, cleanLines, compileUser, plainLine, talkUser, COMPILER_PREAMBLE, COMPILE_TOOL, TALK_SYSTEM, TALK_TOOL,
-  type CompileOut, type SpokenLine, type TalkInput,
+  type CompileOut, type SpokenLine, type TalkInput, type PaidGate, clockAt, reflectInCode,
   type DirectorContext, type MidContext, type RegionDigest, type ShotCandidate, type Target, type Translation, type ChoiceA,
 } from '@sim/brain';
 import { GOALS, describeIntent, publicIntent, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
@@ -30,10 +30,11 @@ export class Brain {
   jev: JevClient;
   mode: 'live' | 'fake';
   gov: Governor;
-  /** The hard cap counts spend in the rolling 24 h, but only since the current budget took effect. */
-  capSince = Date.now();
+  /** The hard cap counts durable cost reservations in the rolling real 24 hours. */
+  capSince = 0;
   get budget() { return this.gov.budget; }
-  set budget(b: number) { this.gov.setBudget(b); this.capSince = Date.now(); this.spentToday = 0; }
+  set budget(b: number) { this.gov.setBudget(Number.isFinite(b) ? Math.max(0, Math.min(1, b)) : 0); }
+  readonly paidGate: PaidGate;
   inflight = new Set<string>();
   /** The latest rendered words from one Soul to another (colour for the listener's mind). */
   private lastWords = new Map<string, string>();
@@ -47,21 +48,24 @@ export class Brain {
   private pendingBeats: { fireTick: number; region: string; narrative: number; beat: Beat; index: number }[] = [];
   private narrating = new Set<string>();
   private directing = false;
+  private reflecting = new Set<string>();
   private tickerCandidates: { id: string; text: string; tick: number }[] = [];
   host: WorldHost; db: Db; cfg: Config; sink: BrainSink;
 
   constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
     this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
+    this.paidGate = (bound, model) => db.reserveCost(bound, model, this.budget);
     db.backfillSpend();
     this.jev = new JevClient(cfg.typesafeKey, this.mode);
+    this.jev.gate = this.paidGate;
     const t = db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.jevMsAvg = t.jevMs;
     host.listeners.push({ afterTick: (tick) => this.afterTick(tick), onApplied: (e) => this.onApplied(e), onPlay: (v) => { for (const c of v.changes) if (c.op === 'say' && host.kernel.things[c.to]?.kind === 'soul') void this.speak(c.from, c.to, c.act, typeof c.about === 'string' ? c.about : undefined, c.manner); } });
     setInterval(() => { const t = this.db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.db.pruneBrainCalls(); }, 60_000).unref();
   }
 
   setMode(m: 'live' | 'fake') { this.mode = m; this.jev.mode = this.cfg.typesafeKey ? m : 'fake'; }
-  get overBudget() { return this.spentToday >= this.budget; }
+  get overBudget() { return this.db.paidCost() >= this.budget; }
   private get narratorState(): NarratorState {
     const x = this.host.extra as { narrator?: NarratorState };
     if (!x.narrator) x.narrator = { nextRun: Object.fromEntries(this.regions().map((r, i) => [r, this.host.engine.world.tick + TPS * (40 + 150 * i)])), lastSummary: {} };
@@ -115,7 +119,7 @@ export class Brain {
       byTierPerDay: Object.fromEntries((Object.keys(SHARES) as Tier[]).map((t) => [t, Math.min((actual.last1h.byTier[t]?.cost ?? 0) * 24, this.gov.perDay(t))])),
     };
     return {
-      at: now, budgetPerDay: this.budget, mode: this.mode, hardCapHit: this.overBudget, capSpent: this.spentToday, capSince: this.capSince,
+      at: now, budgetPerDay: this.budget, mode: this.mode, hardCapHit: this.overBudget, capSpent: this.db.paidCost(), capSince: this.capSince,
       actual, projected, governor: this.gov.view(),
       hourly: this.db.spendHourly(24).map((r) => ({ ...r, tier: tierOf(r.tier) })),
       byModel: this.db.spendByModel(),
@@ -131,7 +135,7 @@ export class Brain {
     // so a fixed iteration order can never let a few Souls take the whole mid-brain share.
     if (this.inflight.size < MAX_INFLIGHT) {
       const due: Mind[] = [];
-      for (const m of this.host.minds.values()) if (m.nextEvalTick <= tick && !this.inflight.has(m.soulId) && w.entities[m.entityId]) due.push(m);
+      for (const m of this.host.minds.values()) if (!this.host.quietBarrier && m.nextEvalTick <= tick && !this.inflight.has(m.soulId) && w.entities[m.entityId] && !(m.life && this.host.engine.actorBorrowed?.(m.entityId) && !URGENT.has(m.evalTrigger))) due.push(m);
       if (due.length) {
         due.sort((a, b) => prio(a.evalTrigger) - prio(b.evalTrigger) || (this.lastServed.get(a.soulId) ?? 0) - (this.lastServed.get(b.soulId) ?? 0) || (a.soulId < b.soulId ? -1 : 1));
         for (const m of due) { if (this.inflight.size >= MAX_INFLIGHT) break; void this.evaluate(m, m.evalTrigger || 'timer'); }
@@ -147,8 +151,13 @@ export class Brain {
       if (v && v.id === b.narrative && v.beats[b.index]) { v.beats[b.index].fired = true; this.db.updateNarrative(v.id, v); this.sink.onNarrative(v); }
     }
     // Tier 3: narrator per region, staggered
-    const ns = this.narratorState;
-    for (const region of this.regions()) if ((ns.nextRun[region] ?? 0) <= tick && !this.narrating.has(region)) void this.narrate(region, 'schedule');
+    if (!this.host.living) { const ns = this.narratorState;
+      for (const region of this.regions()) if ((ns.nextRun[region] ?? 0) <= tick && !this.narrating.has(region)) void this.narrate(region, 'schedule');
+    }
+    if (this.host.living) {
+      const c = clockAt(tick, this.host.living.origin, this.host.living.dayTicks);
+      if (c.phase >= 0.55) for (const m of this.host.minds.values()) if (m.life && m.life.reflectedDay < c.day && !this.reflecting.has(m.soulId)) void this.reflect(m, c.day);
+    }
     // Tier 2b: director + ticker, only while someone is watching
     if (tick % DIRECTOR_EVERY === 0 && !this.directing && this.sink.clients() > 0) void this.direct();
   }
@@ -168,11 +177,13 @@ export class Brain {
     const sit = situationOf(this.host, m);
     const deck = k.decks[m.soulId];
     return {
-      world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: s.happening },
+      world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: this.host.living?.event ?? s.happening },
+      ...(this.host.living ? { customs: this.host.living.customs } : {}),
       soul: {
         name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.text ?? m.intent?.note ?? null, hasIntent: !!m.intent && m.agendaPos < Math.max(1, m.agenda.length),
-        intentIsNew: URGENT.has(trigger), energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
-        doing: eng.programOf(m.entityId) ? m.doing : 'standing around', recent: m.recent.slice(-3),
+        intentIsNew: m.life ? ['new-intent','plan-advanced'].includes(trigger) : URGENT.has(trigger), energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
+        doing: eng.programOf(m.entityId) ? m.doing : ent?.human?.activity ?? 'standing around', recent: m.recent.slice(-3),
+        ...(m.life ? { needs: m.life.needs, journal: m.life.journal } : {}),
       },
       nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
       nudge: m.nudge?.text ?? null,
@@ -186,6 +197,7 @@ export class Brain {
   }
 
   private updateEnergy(m: Mind, ent: Entity, tick: number) {
+    if (m.life) { m.energy = m.life.needs.energy; return; }
     const dt = (tick - m.lastEnergyTick) / TPS; m.lastEnergyTick = tick;
     const a = ent.human!.activity;
     // activity names differ by engine: the toy says rest/gather, Mars says sit/warm/watch/listen/talk/eat
@@ -198,14 +210,13 @@ export class Brain {
     const ent = host.engine.world.entities[m.entityId];
     this.updateEnergy(m, ent, tick);
     const ctx = this.midContext(m, trigger);
+    if (m.avoid && m.avoid.untilTick > tick) ctx.options = ctx.options.filter((o) => o.id !== m.avoid!.id); else m.avoid = undefined;
     if (ctx.options.length === 0) { m.nextEvalTick = tick + TPS * 20; return; }
     // A plan that has been impossible for ten minutes is given up, so a Soul is never stuck waiting for ever.
     if (m.agendaPos < m.agenda.length) {
-      if (ctx.options.some((o) => o.servesIntent && o.card !== 'wait')) m.planBlockedSince = undefined;
-      else if (m.planBlockedSince === undefined) m.planBlockedSince = tick;
-      else if (tick - m.planBlockedSince > TPS * 600) { m.recent = [...m.recent.slice(-3), `gave up on the plan at "${m.agenda[m.agendaPos].card}" (not possible for a long while)`]; m.agendaPos = m.agenda.length; m.planBlockedSince = undefined; host.markDirty(m.soulId); }
+      if (!ctx.options.some((o) => o.servesIntent && o.card !== 'wait') && m.planBlockedSince === undefined) m.planBlockedSince = tick;
+      if (m.planBlockedSince !== undefined && tick - m.planBlockedSince > TPS * 600) { m.recent = [...m.recent.slice(-3), `gave up on the plan at "${m.agenda[m.agendaPos].card}" (not possible for a long while)`]; m.agendaPos = m.agenda.length; m.planBlockedSince = undefined; host.markDirty(m.soulId); }
     }
-    if (m.avoid && m.avoid.untilTick > tick) ctx.options = ctx.options.filter((o) => o.id !== m.avoid!.id); else m.avoid = undefined;
     const noBudgetNow = this.mode !== 'fake' && (this.overBudget || this.gov.waitSeconds('mid') > 0);
     // Tier 1, reflex: what code already knows needs no model.
     //  · Someone asked a question: the only options are to answer it (and if the owner's plan says to agree, agree).
@@ -219,7 +230,7 @@ export class Brain {
       // a question is never left hanging for want of budget: without a model, yes two times in three
       if (!reflex && noBudgetNow) { const yes = hash32(`${m.soulId}:${tick}:answer`) % 3 !== 0; reflex = answers.find((o) => o.card === (yes ? 'say yes' : 'say no')) ?? answers[0]; why = 'someone asked (no model budget just now)'; }
     }
-    else if (serving.length) { ctx.options = serving; if (serving.length === 1) { reflex = serving[0]; why = 'the one thing that serves the plan'; } }
+    else if (serving.length && !m.life) { ctx.options = serving; if (serving.length === 1) { reflex = serving[0]; why = 'the one thing that serves the plan'; } }
     else if (awaiting(host, m.soulId).length) { reflex = ctx.options.find((o) => o.card === 'wait'); why = 'waiting for an answer'; }
     if (reflex) {
       const same = ctx.running && m.pending?.card === reflex.card && m.pending.target === reflex.cardTarget;
@@ -246,7 +257,7 @@ export class Brain {
     const { request, keys } = buildMidRequest(ctx);
     let decision, response: unknown = null, ms = 0, cost = 0, tokens = 0, mode: 'live' | 'fake' = 'fake', error: string | undefined, usedFallback = false;
     try {
-      if (!budgetOk) { decision = fallbackMid(ctx, seed); usedFallback = true; error = this.overBudget ? 'over daily budget: deterministic fallback' : 'mid-brain share spent for now (governor): deterministic fallback'; }
+      if (!budgetOk || (this.mode === 'fake' && m.life)) { decision = fallbackMid(ctx, seed); usedFallback = true; error = !budgetOk ? 'model budget unavailable: seeded needs and journal choice' : undefined; }
       else {
         this.lastServed.set(m.soulId, tick);
         const r = await this.jev.ask(request);
@@ -255,9 +266,9 @@ export class Brain {
       }
     } catch (e) { decision = fallbackMid(ctx, seed); usedFallback = true; error = String((e as Error).message ?? e); }
     this.inflight.delete(m.soulId);
-    if (!host.minds.has(m.soulId)) return;
+    if (host.minds.get(m.soulId) !== m) return;
     const now = host.engine.world.tick;
-    const stale = m.intentVersion !== version;
+    const stale = m.intentVersion !== version || host.quietBarrier;
     const opt = ctx.options.find((o) => o.id === decision.option);
     const policy = { how: decision.how, pool: decision.pool, topP: decision.topP, keepGoing: decision.keepGoing, sociable: decision.sociable, optionKeys: Object.fromEntries(keys) };
     const applied = stale ? { dropped: 'intent changed during the call; re-evaluating' } : opt
@@ -266,7 +277,11 @@ export class Brain {
     const callId = this.record({ tick, tier: 'mid', subject: m.name, soulId: m.soulId, model: mode === 'live' ? JEV_MODEL : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
     if (stale) { m.nextEvalTick = now + 1; m.evalTrigger = 'new-intent'; return; }
     m.wantsCompany = decision.sociable;
-    if (!opt) { m.mood = decision.mood; m.nextEvalTick = now + decision.reevalSeconds * TPS; m.evalTrigger = 'timer'; host.markDirty(m.soulId); return; }
+    if (!opt) {
+      m.nextEvalTick = now + decision.reevalSeconds * TPS;
+      void host.enqueue('decision','brain:mid',{soulId:m.soulId,entityId:m.entityId,option:'continue',label:m.doing,steps:[],continue:true,mood:decision.mood,reevalTicks:decision.reevalSeconds*TPS,fallback:usedFallback,call:callId,trigger});
+      return;
+    }
     m.nextEvalTick = now + TPS * 30; // provisional; the decision event sets the real one when applied
     if (m.nudge) m.nudge = null;    // a nudge is offered once
     void host.enqueue('decision', 'brain:mid', {
@@ -274,6 +289,24 @@ export class Brain {
       reevalTicks: Math.max(decision.reevalSeconds, durationFloor(opt.durationHint)) * TPS, fallback: usedFallback, call: callId, trigger,
       card: opt.card, target: opt.cardTarget, ...(decision.manner ? { manner: decision.manner } : {}), approachLen: opt.approachLen,
     } satisfies DecisionPayload);
+  }
+
+  async reflect(m: Mind, day: number) {
+    if (!m.life) return;
+    this.reflecting.add(m.soulId);
+    let journal = reflectInCode(m.name, m.life, m.agenda.slice(m.agendaPos).map(a => a.card));
+    if (this.mode === 'live' && this.cfg.anthropicKey && !this.overBudget && this.gov.allow('narrator')) {
+      try {
+        const r = await callTool<{ journal: string }>({ gate: this.paidGate, apiKey: this.cfg.anthropicKey, model: this.cfg.narratorModel,
+          system: 'Write a short first-person journal for this Soul: what happened, what remains unfinished, tendencies noticed, and what it wants tomorrow. Keep habits in prose. No timetable, schedule, executable plan or invented events. Never quote private owner instructions.',
+          messages: [{ role: 'user', content: JSON.stringify({ name: m.name, character: m.description, journal: m.life.journal, needs: m.life.needs, acts: m.life.acts, unfinishedCards: m.agenda.slice(m.agendaPos).map(a => a.card) }) }],
+          tool: { name: 'reflect', description: 'Write the journal', input_schema: { type: 'object', properties: { journal: { type: 'string', maxLength: 1200 } }, required: ['journal'] } }, maxTokens: 350 });
+        if (typeof r.out.journal === 'string' && r.out.journal.trim()) journal = r.out.journal.slice(0, 1200);
+        this.record({ tick: this.host.engine.world.tick, tier: 'reflection', subject: m.name, soulId: m.soulId, model: this.cfg.narratorModel, request: r.request, response: r.raw, applied: { day }, ms: r.ms, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens, costUsd: r.costUsd, mode: 'live' });
+      } catch { /* code reflection keeps the day moving */ }
+    }
+    if (this.host.minds.get(m.soulId) === m) await this.host.enqueue('rules', `soul:${m.soulId}`, { soulId: m.soulId, reflection: { day, journal } });
+    this.reflecting.delete(m.soulId);
   }
 
   // ------------------------------------------------------------ web console: text → intent
@@ -300,7 +333,7 @@ export class Brain {
     }
     // second pass: a small LLM with a tool schema
     try {
-      const h = await haikuTranslate(this.cfg.anthropicKey!, this.cfg.narratorModel, text, m.name, targets.map((t) => ({ id: t.id, name: t.name })), GOALS);
+      const h = await haikuTranslate(this.cfg.anthropicKey!, this.cfg.narratorModel, text, m.name, targets.map((t) => ({ id: t.id, name: t.name })), GOALS, this.paidGate);
       const valid = h.out && (GOALS as readonly string[]).includes(h.out.goal) && (h.out.target === null || targets.some((t) => t.id === h.out.target));
       const res: Translation = valid ? { ok: true, confidence: 0.7, intent: { goal: h.out.goal as WireIntent['goal'], target: h.out.target, note: sanitize(text) } } : { ok: false, confidence: 0, reason: 'not understood as something to do' };
       this.record({ tick, tier: 'translate', subject: m.name, soulId: m.soulId, model: this.cfg.narratorModel, request: h.request, response: h.raw, applied: res, ms: h.ms, inputTokens: h.inputTokens, outputTokens: h.outputTokens, cachedTokens: 0, costUsd: h.costUsd, mode: 'live' });
@@ -362,7 +395,7 @@ export class Brain {
     let cost = 0, ms = 0, inTok = 0, outTok = 0, cached = 0; const attempts: unknown[] = [];
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
-        const r = await callTool<CompileOut>({ apiKey: this.cfg.anthropicKey, model: this.cfg.compilerModel, system, cacheSystem: true, messages, tool: COMPILE_TOOL, maxTokens: 1800 });
+        const r = await callTool<CompileOut>({ gate: this.paidGate, apiKey: this.cfg.anthropicKey, model: this.cfg.compilerModel, system, cacheSystem: true, messages, tool: COMPILE_TOOL, maxTokens: 1800 });
         cost += r.costUsd; ms += r.ms; inTok += r.inputTokens; outTok += r.outputTokens; cached += r.cachedTokens;
         const out = r.out;
         if (!out.understood) {
@@ -448,7 +481,7 @@ export class Brain {
     const live = this.mode === 'live' && !!this.cfg.anthropicKey && !this.overBudget && (matters || (this.sink.clients() > 0 && spare)) && this.gov.allow('talk');
     if (live) {
       try {
-        const r = await callTool<{ lines: SpokenLine[] }>({ apiKey: this.cfg.anthropicKey!, model: this.cfg.talkModel, system: TALK_SYSTEM, messages: [{ role: 'user', content: talkUser(input) }], tool: TALK_TOOL, maxTokens: 300, timeoutMs: 20000 });
+        const r = await callTool<{ lines: SpokenLine[] }>({ gate: this.paidGate, apiKey: this.cfg.anthropicKey!, model: this.cfg.talkModel, system: TALK_SYSTEM, messages: [{ role: 'user', content: talkUser(input) }], tool: TALK_TOOL, maxTokens: 300, timeoutMs: 20000 });
         lines = cleanLines(r.out.lines, act);
         this.record({ tick, tier: 'talk', subject: a.name, soulId: from, model: this.cfg.talkModel, request: r.request, response: r.raw, applied: { to: b.name, act, lines }, ms: r.ms, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens, costUsd: r.costUsd, mode: 'live' });
       } catch (e) {
@@ -563,7 +596,7 @@ export class Brain {
     this.narrating.add(region);
     const request = buildNarratorRequest(d, this.cfg.narratorModel);
     try {
-      const r = await callNarrator(this.cfg.anthropicKey, this.mode, d, this.cfg.narratorModel);
+      const r = await callNarrator(this.cfg.anthropicKey, this.mode, d, this.cfg.narratorModel, this.paidGate);
       const now = this.host.engine.world.tick;
       const beats = r.plan.beats.map((b) => ({ ...b, fired: false, fireTick: now + Math.round(Math.min(5, Math.max(0, b.at_min)) * 60 * TPS) }));
       const view: Omit<NarrativeView, 'id'> = { region, tick: now, summary: r.plan.summary, beats, nextRunTick: ns.nextRun[region] };

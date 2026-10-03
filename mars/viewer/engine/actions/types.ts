@@ -103,6 +103,8 @@ export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> 
 }
 
 export type ActionRecord = {
+  /** An automatic locomotion accommodation, never an independent owner directive. */
+  internalCause?: 'traffic.make-way';
   id: string;
   verb: string;
   params: unknown;

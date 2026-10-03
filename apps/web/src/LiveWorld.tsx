@@ -149,6 +149,7 @@ export function LiveWorld({ sim, selected, onSelect }: { sim: Sim; selected: str
     });
 
     // the static layout: once, retried with backoff while the server is unreachable
+    let dayTicks: number | null = null;
     let base: ReturnType<typeof parseSceneInfo>['scene'] = null, sceneSettled = false, people: TakePeople | null = null;
     const loadScene = async () => {
       for (let attempt = 0; !abort.signal.aborted; attempt++) {
@@ -157,7 +158,7 @@ export function LiveWorld({ sim, selected, onSelect }: { sim: Sim; selected: str
           if (!res.ok) throw Error(String(res.status));
           const info = parseSceneInfo(await res.json());
           if (abort.signal.aborted) return;
-          base = info.scene;
+          base = info.scene; dayTicks = info.clock?.dayTicks ?? null;
           geometry.dispose();
           geometry = new WorldGeometry(base);
           scene.add(geometry.group);
@@ -289,9 +290,9 @@ export function LiveWorld({ sim, selected, onSelect }: { sim: Sim; selected: str
             for (const m of [...standIns.children]) if (!seen.has(m.name)) standIns.remove(m);
           }
           // world clock at the moment shown (the sim's clock, moved back by how far behind it we are)
-          const clock = s.conn.replica.env?.datetime ?? take.finalState.env?.datetime ?? null;
-          const ref = s.conn.replica.env ? s.conn.displayTick() : take.startTick + take.ticks;
-          const datetime = clock ? shiftIso(clock, (tick - ref) * dt) : null;
+          const clock = take.finalState.env?.datetime ?? null;
+          const ref = take.startTick + take.ticks;
+          const datetime = clock ? shiftIso(clock, (tick - ref) * (dayTicks ? 86400 / dayTicks : dt)) : null;
           light.update(datetime);
           shown.current = { tick, datetime, take, entities: sampled.entities };
           brokenTake = null;

@@ -9,6 +9,7 @@ import {
   type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
 import type { Db } from './db.ts';
+import { advanceNeeds, newLife, type Life } from '@sim/brain';
 import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pinnedVocabulary, soulThing, type Vocabulary } from './fold.ts';
 import { frontier, stepIndex } from './deck.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
@@ -17,6 +18,7 @@ export { replayFromGenesis, replayKernel } from './fold.ts';
 /** A Soul's mind: everything about it that is not the engine's body state. */
 export type Mind = {
   soulId: string; entityId: string; name: string; description: string; owner: string; native: boolean;
+  life?: Life;
   intent: WireIntent | null; intentVersion: number;
   mood: string; energy: number; wantsCompany: number;
   recent: string[]; doing: string;
@@ -29,8 +31,9 @@ export type Mind = {
   /** Tick since which the plan has had no playable step (to give up eventually). */
   planBlockedSince?: number;
   /** The card whose depiction is running and whose effects have not applied yet. */
-  pending: { program: string; card: string; hash: string; target: string | null; manner?: string; approachLen: number; applied: boolean } | null;
+  pending: { program: string; card: string; hash: string; target: string | null; option?: string; manner?: string; approachLen: number; applied: boolean } | null;
 };
+export type RecoveryRecipe = { baseline: SnapshotBody; events: LogEvent[]; untilTick: number; faults: Record<string,number>; excluded: string[]; reason: string };
 type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
@@ -71,6 +74,7 @@ export class WorldHost {
   private acc = { paths: [] as PathCommit[], changes: [] as ChangeEvent[], log: [] as LogEvent[], dirty: new Set<string>(), removed: [] as string[], plays: [] as PlayView[], fromTick: 0 };
   private batchSeq = 0;
   private timer: NodeJS.Timeout | null = null;
+  private recoveryBaseline: SnapshotBody | null = null;
   private last = 0;
   private carry = 0;
   private overruns = 0;
@@ -115,14 +119,18 @@ export class WorldHost {
       this.kernel = initKernel(this.engine, pinnedVocabulary(this.db.rulesEvents(this.worldId)));
     }
     // fast-forward: replay events logged after the snapshot, stepping the engine to their ticks
-    const later = this.db.events(this.worldId, this.seq);
+    let later = this.db.events(this.worldId, this.seq);
+    let repaired = -1; for (let i=0;i<later.length;i++) if (later[i].kind === 'rules' && later[i].payload?.recovery) repaired=i;
+    if (repaired >= 0) { this.apply(later[repaired], true); this.seq = later[repaired].seq; later = later.slice(repaired + 1); }
     for (const e of later) {
-      while (this.engine.world.tick < e.tick) { const out = this.engine.step(); this.afterPrograms(out.programs, true); }
+      while (this.engine.world.tick < e.tick) { const out = this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs, true); }
       this.apply(e, true);
       this.seq = e.seq;
     }
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
+    if (snap) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
+    else if (!this.engine.canSnapshot || this.engine.canSnapshot()) this.recoveryBaseline = this.captureBody();
     // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
     if (!this.db.hasVocabulary(this.worldId)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
     if (this.pendingBootstrap) { void this.enqueue('rules', 'system', { kernelBootstrap: this.pendingBootstrap, why: 'the kernel begins here for a world that predates it' }); this.pendingBootstrap = null; }
@@ -183,17 +191,14 @@ export class WorldHost {
     const t0 = performance.now();
     const tick = this.engine.world.tick;
     // 1. apply queued inputs at this tick, logging them
-    const pending = this.queue.splice(0);
-    for (const p of pending) {
-      const e: LogEvent = { seq: ++this.seq, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
-      this.db.appendEvent(this.worldId, e);
-      this.apply(e, false);
-      this.acc.log.push(e);
-      for (const l of this.listeners) l.onApplied?.(e);
-      p.resolve?.(e);
-    }
+    this.drainInputs();
     // 2. step the engine
-    const out = this.engine.step();
+    let out: ReturnType<Engine['step']>;
+    try { out = this.engine.step(); if (this.engine.runtime.violations.length) throw new Error(JSON.stringify(this.engine.runtime.violations)); }
+    catch (error) { this.recoverFault(error); return; }
+    this.advanceLives();
+    this.kernel.tick = this.engine.world.tick;
+    sweep(this.kernel);
     this.acc.paths.push(...out.paths);
     this.acc.changes.push(...out.changes);
     for (const c of out.changes) { const m = this.mindByEntity.get(c[1]); if (m) this.acc.dirty.add(m.soulId); }
@@ -207,6 +212,21 @@ export class WorldHost {
     if (now - this.lastSnapshotTick >= this.snapshotEvery) this.saveSnapshot(false);
     this.tickMs.push(performance.now() - t0);
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
+  }
+
+  /** Finish already accepted inputs without advancing the engine or starting new mind work. */
+  drainInputs() {
+    const tick = this.engine.world.tick;
+    const pending = this.queue.splice(0);
+    for (const p of pending) {
+      const e: LogEvent = { seq: ++this.seq, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
+      this.db.appendEvent(this.worldId, e);
+      let recovered = false;
+      try { this.apply(e, false); } catch (error) { this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true; }
+      if (!recovered) this.acc.log.push(e);
+      for (const l of this.listeners) l.onApplied?.(e);
+      p.resolve?.(e);
+    }
   }
 
   /** React to the engine's progress on depiction programs: apply a card's effects when its approach is done. */
@@ -227,6 +247,8 @@ export class WorldHost {
         // a program replaced by a newer decision, or stopped because its card was refused, is not news
         if (ev.kind === 'failed' || (ev.kind === 'completed' && !mine) || (ev.kind === 'cancelled' && mine && ev.code !== 'program.stopped')) m.recent = [...m.recent.slice(-3), `${shorten(m.doing)} (${outcome})`];
         if (mine) m.pending = null;
+        if (mine && ev.kind === 'failed') m.avoid = { id: mine.option ?? (mine.target ? `${mine.card}@${mine.target}` : mine.card), untilTick: ev.tick + 1200 };
+        if (mine && ev.kind === 'failed' && m.agendaPos < m.agenda.length) m.planBlockedSince ??= ev.tick;
         if (ev.kind !== 'cancelled') {
           m.doing = 'standing around';
           // re-evaluate shortly after an activity ends; jitter by soul so they do not all think on the same tick
@@ -251,6 +273,8 @@ export class WorldHost {
     // where the actor's plan stood just before this play (a play further down the plan must not skip a step that was possible)
     const pm = e.kind === 'play' ? this.minds.get((e.payload as PlayPayload).soulId) : undefined;
     const reach = pm && pm.agendaPos < pm.agenda.length ? frontier(this, pm) : -1;
+    const matchedStep = pm ? stepIndex(this, pm, (e.payload as PlayPayload).card, (e.payload as PlayPayload).target) : -1;
+    if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
     switch (e.kind) {
       case 'birth': {
@@ -260,26 +284,29 @@ export class WorldHost {
           intent: null, intentVersion: 0, mood: 'curious', energy: 80, wantsCompany: 0.5, recent: ['arrived (done)'], doing: 'standing around',
           nextEvalTick: tick + 20 + (hash32(p.soulId) % 40), evalTrigger: 'birth', lastEnergyTick: tick, lastFingerprint: '', nudge: null,
           agenda: [], agendaPos: 0, pending: null,
+          ...(this.extra.living ? { life: newLife(tick) } : {}),
         });
         this.acc.dirty.add(p.soulId); this.kernelDirty = true;
         break;
       }
       case 'intent': {
         const p = e.payload as IntentPayload; const m = this.minds.get(p.soulId);
-        if (m) { m.intent = p.intent; m.agenda = p.intent.agenda ?? []; m.agendaPos = 0; m.intentVersion++; m.nextEvalTick = tick + 1; m.evalTrigger = 'new-intent'; m.lastFingerprint = ''; this.acc.dirty.add(m.soulId); }
+        if (m) { m.intent = p.intent; m.agenda = p.intent.agenda ?? []; m.agendaPos = 0; m.planBlockedSince = undefined; m.intentVersion++; m.nextEvalTick = tick + 1; m.evalTrigger = 'new-intent'; m.lastFingerprint = ''; this.acc.dirty.add(m.soulId); }
         break;
       }
       case 'decision': {
         const p = e.payload as DecisionPayload; const m = this.minds.get(p.soulId);
-        if (!m || r.programId === undefined) break;
+        if (!m) break;
+        if (p.continue) { if (p.mood) m.mood = p.mood; m.nextEvalTick = tick + p.reevalTicks; m.evalTrigger = 'timer'; this.acc.dirty.add(m.soulId); break; }
+        if (r.programId === undefined) break;
         if (p.mood) m.mood = p.mood;
         m.doing = r.programOk ? p.label : 'standing around';
         m.nextEvalTick = tick + (r.programOk ? p.reevalTicks : 40);
         m.evalTrigger = r.programOk ? 'timer' : 'activity-failed';
-        if (!r.programOk) { m.recent = [...m.recent.slice(-3), `${shorten(p.label)} (could not: ${r.programCode})`]; m.pending = null; m.avoid = { id: p.option, untilTick: tick + 1200 }; }
+        if (!r.programOk) { m.recent = [...m.recent.slice(-3), `${shorten(p.label)} (could not: ${r.programCode})`]; m.pending = null; m.avoid = { id: p.option, untilTick: tick + 1200 }; if (m.agendaPos < m.agenda.length) m.planBlockedSince ??= tick; }
         else if (p.card) {
           const card = this.kernel.vocab.cards[p.card];
-          m.pending = { program: r.programId, card: p.card, hash: card?.hash ?? '', target: p.target ?? null, ...(p.manner ? { manner: p.manner } : {}), approachLen: p.approachLen ?? 0, applied: false };
+          m.pending = { program: r.programId, card: p.card, hash: card?.hash ?? '', target: p.target ?? null, option: p.option, ...(p.manner ? { manner: p.manner } : {}), approachLen: p.approachLen ?? 0, applied: false };
         } else m.pending = null;
         this.acc.dirty.add(m.soulId);
         break;
@@ -292,7 +319,8 @@ export class WorldHost {
           const what = `${view.card}${view.targetName ? ` → ${view.targetName}` : ''}`;
           if (view.ok) {
             m.recent = [...m.recent.slice(-3), `${what} (done)`];
-            const idx = stepIndex(this, m, view.card, view.target);
+            if (m.life) { m.life.acts.push(what); if (m.life.acts.length > 100) m.life.acts.shift(); }
+            const idx = matchedStep;
             if (idx >= 0 && idx <= Math.max(reach, m.agendaPos)) {
               m.agendaPos = idx + 1; m.planBlockedSince = undefined;
               // the plan moved on: think again now, rather than sitting out the rest of this activity
@@ -304,6 +332,7 @@ export class WorldHost {
           } else {
             m.recent = [...m.recent.slice(-3), `${what} (did not happen: ${view.reason})`];
             m.pending = null; m.doing = 'standing around'; m.avoid = { id: view.target ? `${view.card}@${view.target}` : view.card, untilTick: tick + 1200 };
+            if (m.agendaPos < m.agenda.length) m.planBlockedSince ??= tick;
             m.nextEvalTick = Math.min(m.nextEvalTick, tick + 20); m.evalTrigger = 'activity-failed';
           }
           this.acc.dirty.add(m.soulId);
@@ -334,12 +363,86 @@ export class WorldHost {
         this.kernelDirty = true;
         break;
       }
-      case 'rules': if ((e.payload as { kernelBootstrap?: unknown; vocabulary?: unknown } | null)?.kernelBootstrap || (e.payload as { vocabulary?: unknown } | null)?.vocabulary) this.kernelDirty = true; break; // otherwise clock rate, pause, dilation: recorded, no world effect
+      case 'rules': {
+        const p = e.payload;
+        if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp) this.kernelDirty = true;
+        if (p?.dayConfig) { this.extra.living = { ...p.dayConfig, lastDay: -1, event: 'a new place', quiet: false }; for (const m of this.minds.values()) m.life ??= newLife(tick); }
+        const day = this.living;
+        if (p?.quiet && day) { day.quiet = true; day.quietDay = p.day; }
+        if (p?.compact && day) { day.quiet = false; day.lastDay = p.day; if (p.firstLight) day.event = 'first light'; }
+        if (p?.worldEvent && day) {
+          day.event = p.worldEvent.text;
+          if (p.worldEvent.day !== undefined) ((this.extra.moments ??= {}) as Record<string, number>)[p.worldEvent.id] = p.worldEvent.day;
+          for (const m of this.minds.values()) { m.nextEvalTick = Math.min(m.nextEvalTick, tick + 1 + hash32(m.soulId) % 20); m.evalTrigger = 'world-event'; m.lastFingerprint = ''; }
+        }
+        if (p?.reflection) { const m = this.minds.get(p.soulId); if (m?.life) { m.life.journal = String(p.reflection.journal).slice(0, 1200); m.life.reflectedDay = p.reflection.day; m.life.acts = []; this.acc.dirty.add(m.soulId); } }
+        if (p?.character) { const m = this.minds.get(p.soulId); if (m) { m.description = p.character; this.kernel.things[m.soulId].traits.about = p.character; if (!replay) this.db.db.prepare('UPDATE souls SET description = ? WHERE id = ?').run(p.character, m.soulId); this.kernelDirty = true; } }
+        break;
+      }
       case 'admin': break;
     }
   }
 
   addMind(m: Mind) { this.minds.set(m.soulId, m); this.mindByEntity.set(m.entityId, m); }
+
+  get living(): { origin: number; dayTicks: number; customs: string[]; lastDay: number; event: string; quiet: boolean; quietDay?: number } | undefined { return this.extra.living as any; }
+  get quietBarrier() { return !!this.living?.quiet; }
+  private advanceLives() {
+    const tick = this.engine.world.tick;
+    for (const m of this.minds.values()) {
+      if (!m.life) continue;
+      const e = this.engine.world.entities[m.entityId]; if (!e?.human) continue;
+      const nearby = [...this.mindByEntity.values()].some(other => { const b = this.engine.world.entities[other.entityId]; return other !== m && b && Math.hypot(e.pose.p[0] - b.pose.p[0], e.pose.p[2] - b.pose.p[2]) < 4; });
+      advanceNeeds(m.life, tick, e.human.activity, nearby); m.energy = m.life.needs.energy;
+    }
+  }
+
+  private captureBody(runtime = this.engine.snapshot()): SnapshotBody {
+    return { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra), kernel: structuredClone(this.kernel), counts: {...this.counts} };
+  }
+  private restoreBody(body: SnapshotBody) {
+    this.engine = this.factory.restore(structuredClone(body.runtime)); this.minds.clear(); this.mindByEntity.clear();
+    for (const m of structuredClone(body.minds)) this.addMind(m);
+    this.kernel = structuredClone(body.kernel!); this.extra = structuredClone(body.extra); this.counts = {...body.counts};
+    this.seq = body.seq;
+  }
+  private restoreRecovery(recipe: RecoveryRecipe) {
+    this.restoreBody(recipe.baseline);
+    // The baseline may contain a resumable program whose later tick proved faulty.
+    for (const m of this.minds.values()) if (m.pending && recipe.excluded.includes(m.pending.card)) { this.engine.stop(m.pending.program); m.pending=null; }
+    for (const e of recipe.events) {
+      while (this.engine.world.tick < e.tick) { const out=this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs,true); }
+      this.apply(e,true); this.seq=e.seq;
+    }
+    while (this.engine.world.tick < recipe.untilTick) { const out=this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs,true); }
+    if (this.engine.runtime.violations.length) throw new Error('recovery replay still violates the engine');
+    this.extra.cardFaults = {...recipe.faults};
+    this.extra.cardCooldown = {...this.extra.cardCooldown as Record<string,number>, ...Object.fromEntries(recipe.excluded.map(card=>[card,recipe.untilTick+1200]))};
+    for (const m of this.minds.values()) { m.nextEvalTick=this.engine.world.tick+1; m.evalTrigger='activity-failed'; m.lastFingerprint=''; if (m.pending && recipe.excluded.includes(m.pending.card)) m.pending=null; }
+    this.kernel.tick=this.engine.world.tick; sweep(this.kernel); this.kernelDirty=true;
+  }
+  private recoverFault(error: unknown, cardHint?: string) {
+    const baseline=this.recoveryBaseline; if (!baseline) throw new Error(`No resumable recovery baseline: ${String(error)}`);
+    const untilTick=this.engine.world.tick, originalSeq=this.seq, all=this.db.events(this.worldId,baseline.seq);
+    const pending=[...this.minds.values()].filter(m=>m.pending).map(m=>m.pending!.card);
+    const latest=[...all].reverse().find(e=>e.kind==='decision' && pending.includes(e.payload.card));
+    const excluded=cardHint ? [cardHint] : latest?.payload.card ? [latest.payload.card as string] : [...new Set(pending)];
+    if (!excluded.length) throw new Error(`Engine fault has no attributable card: ${String(error)}`);
+    const faults={...this.extra.cardFaults as Record<string,number>};
+    for (let attempt=0;attempt<2;attempt++) {
+      for (const card of excluded) faults[card]=(faults[card]??0)+1;
+      const events=all.filter(e=>!(['decision','play'].includes(e.kind) && excluded.includes(e.payload?.card)));
+      const recipe: RecoveryRecipe={baseline:structuredClone(baseline),events,untilTick,faults:{...faults},excluded:[...excluded],reason:String(error).slice(0,800)};
+      try { this.restoreRecovery(recipe); }
+      catch (replayError) { if (attempt===1) throw replayError; for (const card of pending) if (!excluded.includes(card)) excluded.push(card); continue; }
+      this.seq=originalSeq;
+      const e: LogEvent={seq:++this.seq,tick:untilTick,kind:'rules',author:'world:recovery',payload:{recovery:recipe},at:Date.now()};
+      this.db.appendEvent(this.worldId,e); this.resetAcc(); this.acc.log.push(e); this.ring=[];
+      for (const m of this.minds.values()) this.acc.dirty.add(m.soulId);
+      for (const l of this.listeners) l.onApplied?.(e);
+      this.flush(); this.heartbeat(); return;
+    }
+  }
 
   setClockRate(rate: number, author: string, why: string) {
     this.clockRate = this.baseRate = rate; this.db.setClockRate(this.worldId, rate);
@@ -396,7 +499,7 @@ export class WorldHost {
     // links such as "just said" lapse with time, so the view also refreshes periodically
     // the whole kernel is large; what changed is already in the plays, so the full view goes out at most every two seconds
     if (plays.length) this.kernelDirty = true;
-    if ((this.kernelDirty && this.engine.world.tick - this.kernelSentTick >= 40) || this.engine.world.tick % 200 === 0) { this.kernelDirty = false; this.kernelSentTick = this.engine.world.tick; sweep(this.kernel); const v = this.kernelView(); for (const l of this.listeners) l.onKernel?.(v); }
+    if ((this.kernelDirty && this.engine.world.tick - this.kernelSentTick >= 40) || this.engine.world.tick % 200 === 0) { this.kernelDirty = false; this.kernelSentTick = this.engine.world.tick; const v = this.kernelView(); for (const l of this.listeners) l.onKernel?.(v); }
   }
   markDirty(soulId: string) { this.acc.dirty.add(soulId); }
   get currentBatchSeq() { return this.batchSeq; }
@@ -415,10 +518,12 @@ export class WorldHost {
   snapshotMs = { capture: 0, persist: 0 };
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
   saveSnapshot(sync = true) {
+    this.drainInputs();
     if (this.engine.canSnapshot && !this.engine.canSnapshot()) return { pending: true, tick: this.lastSnapshotTick };
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
-    const body: SnapshotBody = { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra), kernel: structuredClone(this.kernel), counts: { ...this.counts } };
+    const body = this.captureBody(runtime);
+    this.recoveryBaseline = structuredClone(body);
     const meta = { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body };
     this.snapshotMs.capture = performance.now() - t0;
     this.lastSnapshotTick = runtime.tick;

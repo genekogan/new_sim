@@ -188,6 +188,7 @@ export class Souls {
       id: soul.id, name: soul.name, description: soul.description, in_world: true, tick: e.world.tick, time: e.world.env.datetime,
       position: { x: ent.pose.p[0], z: ent.pose.p[2], region: s.region }, activity: ent.human!.activity, doing: e.programOf(m.entityId) ? m.doing : 'standing around',
       mood: m.mood, energy: energyWord(m.energy), wants_company: m.wantsCompany,
+      ...(m.life ? { needs: m.life.needs, journal: m.life.journal, reflected_day: m.life.reflectedDay, customs: this.host.living?.customs } : {}),
       intent: m.intent, intent_text: describeIntent(m.intent, nameOf), agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ? this.host.nameOf(a.target) : null, done: i < m.agendaPos })), recent: m.recent, nearby: s.nearby, happening: s.happening,
       storyteller_suggests: m.nudge?.text ?? null,
       next_think_in_s: Math.max(0, Math.round((m.nextEvalTick - e.world.tick) / 20)),

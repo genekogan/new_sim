@@ -82,7 +82,7 @@ function Create({ api, first, done, cancel }: { api: Api; first: boolean; done(i
         <li>Everyone can see its name and description, so keep them friendly.</li>
       </ol>
       <div className="row"><input placeholder="name (2–32 characters)" value={name} maxLength={32} onChange={(e) => setName(e.target.value)} /></div>
-      <div className="row"><input placeholder="who are they? one line, up to 200 characters" value={desc} maxLength={200} onChange={(e) => setDesc(e.target.value)} /></div>
+      <div className="row"><input placeholder="who are they? up to 1200 characters" value={desc} maxLength={1200} onChange={(e) => setDesc(e.target.value)} /></div>
       <div className="row">
         <button className="primary" disabled={busy || name.trim().length < 2 || desc.trim().length < 3} onClick={async () => { setBusy(true); setMsg(''); const r = await api('/v1/souls', { name, description: desc }); setBusy(false); if (r.status === 200) done(r.data.soul.id); else setMsg(r.data.message ?? 'failed'); }}>bring them to life</button>
         {cancel && <button onClick={cancel}>cancel</button>}<span className="warn">{msg}</span></div>
@@ -154,6 +154,8 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
 
       <section>
         <h2>Step 3 — give {soul.name} direction</h2>
+        {s?.needs && <div className="kv">{Object.entries(s.needs).map(([name, value]) => <div key={name}>{name}: {Math.round(Number(value))} / 100</div>)}</div>}
+        {s?.journal && <details open><summary>Journal</summary><p>{s.journal}</p></details>}
         <div className="row"><input placeholder={`tell ${soul.name} what to do, in plain words`} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void send(); }} maxLength={280} /><button className="primary" disabled={busy || !text.trim()} onClick={() => void send()}>send</button></div>
         <details><summary className="dim">or pick exactly</summary>
           <div className="row"><select value={goal} onChange={(e) => setGoal(e.target.value)}>{GOALS.map((g) => <option key={g}>{g}</option>)}</select>

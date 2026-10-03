@@ -29,16 +29,25 @@ export class Hub {
   /** Changes with every start of the process: a client may resume only from batches this process sent. */
   epoch = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   build = 'dev';
+  private lastTakeTick = -1;
   host: WorldHost; auth: Auth; db: Db;
 
   constructor(server: Server, host: WorldHost, auth: Auth, db: Db) {
     this.host = host; this.auth = auth; this.db = db;
-    this.wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: false });
+    this.wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: {threshold: 1024, clientNoContextTakeover: true, serverNoContextTakeover: true, concurrencyLimit: 4} });
     server.on('upgrade', (req, socket, head) => {
       if (!req.url?.startsWith('/ws')) { socket.destroy(); return; }
       this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnect(ws, req));
     });
     host.listeners.push({
+      onApplied: e => { if (e.kind === 'rules' && e.payload?.recovery) { this.lastTakeTick=host.engine.world.tick; this.epoch=`${Date.now().toString(36)}-repair`; for (const c of this.clients) c.ws.close(1012, 'world restored; reconnect'); } },
+      afterTick: tick => {
+        const chunks = host.engine.takeChunks?.(this.lastTakeTick) ?? [];
+        if (!chunks.length) return;
+        this.lastTakeTick = chunks.at(-1)!.toTick;
+        for (const chunk of chunks) db.saveTake(host.worldId, chunk);
+        if (chunks.length) this.broadcast({t: 'takes', serverTick: tick, chunks});
+      },
       onBatch: (b) => this.broadcast({ t: 'batch', ...b, log: b.log.map(publicEvent) }),
       onHeartbeat: (h) => this.broadcast({ t: 'heartbeat', ...h, clients: this.clients.size }),
       onKernel: (view) => this.broadcast({ t: 'kernel', view }),
@@ -96,6 +105,7 @@ export class Hub {
       for (const v of this.brain.narratives.values()) this.send(c, { t: 'narrative', view: v });
       if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(40, { soulIds: c.me.role === 'admin' ? null : c.me.souls }) });
       this.send(c, { t: 'stats', stats: c.me?.role === 'admin' ? this.stats() : publicStats(this.stats()) });
+      this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: e.takeChunks?.(e.world.tick - 40) ?? []});
       c.ready = true;
     }
   }

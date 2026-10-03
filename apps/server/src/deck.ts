@@ -39,7 +39,7 @@ export function resolveParams(host: WorldHost, v: unknown, b: Record<string, str
     return engineRef(host, id) ?? id;
   }
   if (Array.isArray(v)) return v.map((x) => resolveParams(host, x, b));
-  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, resolveParams(host, x, b)]));
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k.startsWith('$') ? String(resolveParams(host, k, b)) : k, resolveParams(host, x, b)]));
   return v;
 }
 
@@ -91,10 +91,13 @@ export const serves = (host: WorldHost, m: Mind, card: string, target: string | 
 
 /** The options the mind chooses among: playable cards, physically feasible, ranked and capped. */
 export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
+  if (m.life && cap === 12) cap = 24;
   const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
   const fr = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;
   const servesNow = (card: string, target: string | null) => matchesStep(host, fr, card, target);
-  const all = playable(k, me, candidatesFor(host, me));
+  const faults = (host.extra.cardFaults ?? {}) as Record<string,number>;
+  const cooldown = (host.extra.cardCooldown ?? {}) as Record<string,number>;
+  const all = playable(k, me, candidatesFor(host, me)).filter(p => (faults[p.card.name] ?? 0) < 3 && (cooldown[p.card.name] ?? 0) <= k.tick);
   // Looking one step ahead: if the plan's step cannot be played yet, any play that brings it closer serves the plan
   // (going where it happens, leaving what stands in the way). Nobody has to write those steps down.
   let travel = new Set<string>();
@@ -113,7 +116,17 @@ export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
     if (t && samePlace(k, me, t.id)) score += 40;
     if (t?.kind === 'gathering') score += 25;
     if (!t) score += 10;
-    if (p.card.name === 'wait') score += 200;                                                 // always on offer
+    if (p.card.name === 'wait') score += m.life ? 5 : 200;                                                 // always on offer
+    if (m.life) {
+      const text = `${p.card.name} ${p.card.summary} ${p.card.good_when ?? ''}`.toLowerCase(), n = m.life.needs;
+      if (p.card.by === 'world' && p.card.origin !== 'base') score += 45;
+      if (/sleep/.test(text)) score += (100-n.energy)/2 - (n.energy > 60 ? 80 : 0);
+      if (/eat a bowl|share a meal|finish the bowl|join .*supper/.test(text)) score += n.hunger/2;
+      if (/rest|sit/.test(text)) score += (100-n.energy)/5;
+      if (/talk|fire|music|class/.test(text)) score += n.company/10;
+      if (/garden|work|read|draw|walk|wander/.test(text)) score += n.restlessness/10;
+      if (m.recent.some(a => a.startsWith(p.card.name))) score -= 40;
+    }
     score -= Math.min(30, d / 3);
     return { p, t, score };
   }).sort((a, b) => b.score - a.score || (a.p.id < b.p.id ? -1 : 1));

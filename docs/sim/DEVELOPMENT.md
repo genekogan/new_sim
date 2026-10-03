@@ -27,7 +27,7 @@ off, so a typed wish goes to the translator; agendas and card proposals still wo
 | `packages/kernel` | meaning: things, links, the five changes, the coherence rule, cards, base vocabulary |
 | `packages/engine-contract` | the engine interface, scaffold runtime, hashing, RNG, kinematics, conformance suite |
 | `packages/engine-toy` | the toy engine (default) |
-| `packages/engine-mars` | the Mars adapter; imports the Mars engine from a local checkout |
+| `packages/engine-mars` | the Mars adapter; imports the hard-forked Mars engine under `mars/` |
 | `packages/brain` | request builders and interpreters for every model call; the card grammar text |
 | `packages/protocol` | everything that crosses a process boundary |
 | `packages/client` | replica and connection, for browsers and Node |
@@ -47,12 +47,13 @@ Read in `apps/server/src/config.ts`, except `DEV_AUTH` (`auth.ts`) and
 | `ADMIN_EMAILS` | none | comma-separated admin emails |
 | `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY` | none | Jev and the Anthropic models; without a key that tier runs fake or is off |
 | `BRAIN_MODE` | `live` | `fake` = no model calls. Any other value means live |
-| `BRAIN_BUDGET_USD_PER_DAY` | 0.5 | governor budget |
+| `BRAIN_BUDGET_USD_PER_DAY` | 0.5 | rolling real-24-hour budget; clamped to $0–$1, reserved before provider calls |
+| `ENABLE_LIVING_WORLD` | off | `1` enables the qualified living camp in the Mars process |
 | `NARRATOR_MODEL` | `claude-haiku-4-5-20251001` | narrator, and the translator's second pass |
 | `COMPILER_MODEL` | `NARRATOR_MODEL` | the compiler |
 | `TALK_MODEL` | `NARRATOR_MODEL` | spoken words |
 | `ENGINE` | `toy` | `mars` runs the Mars adapter; any other value means toy |
-| `MARS_ENGINE_DIR` | `<mars-campus-repo>/viewer/engine` | where the Mars engine checkout is |
+| `MARS_ENGINE_DIR` | the bundled `mars/viewer/engine` | where the Mars engine checkout is |
 | `INVITE_REQUIRED` | on (`0` disables) | invite gate |
 | `MAX_SOULS_PER_USER` | 5 | |
 | `SNAPSHOT_EVERY_TICKS` | 6000 | 5 minutes at rate 1 |

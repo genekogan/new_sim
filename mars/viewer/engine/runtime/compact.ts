@@ -22,6 +22,7 @@ export function compactRuntime(rt: Runtime, services: (world: WorldState) => Run
   if (issue) throw new Error(`compaction.not-quiet: ${issue}`);
   const world = structuredClone(rt.world);
   const next = new Runtime(world, rt.registry as Map<string, ActionDef>, services(world), rt.invariants as Invariant[]);
+  next.beginActionEpoch();
   if (next.stateHash() !== rt.stateHash()) throw new Error('compaction.state-changed');
   return next;
 }

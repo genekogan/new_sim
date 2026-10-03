@@ -1,12 +1,39 @@
 {
-  "id": "mars", "worldId": "mars-1", "name": "Mars", "engine": "mars",
-  "capabilities": ["humanoid", "construction", "meals", "garden"], "dayTicks": 72000,
-  "scene": "proving-ground",
-  "customs": ["First light is a chance to begin again.", "Anyone may host supper or invite others to the fire."],
+  "id": "mars",
+  "worldId": "mars-1",
+  "name": "Mars",
+  "engine": "mars",
+  "capabilities": [
+    "humanoid",
+    "construction",
+    "meals",
+    "garden"
+  ],
+  "dayTicks": 72000,
+  "scene": "eden-camp",
+  "customs": [
+    "People often warm up or tend the garden after first light. These are invitations, never requirements.",
+    "Anyone may host supper in the kitchen when the light turns gold, or invite others to the fire. The supper bell is only a reminder.",
+    "Reading, music, drawing, classroom conversations and building are open whenever someone feels like them.",
+    "People rest when tired. Sleep is welcome at night, and quiet work is welcome too."
+  ],
   "cast": [
-    {"name": "Alice", "description": "A patient gardener who enjoys preparing food and welcoming people."},
-    {"name": "Bob", "description": "A curious builder who learns by making useful things from the yard's materials."},
-    {"name": "Carol", "description": "A thoughtful reader and teacher who likes sharing ideas and quiet company."},
-    {"name": "David", "description": "A lively musician and storyteller who brings people together around the fire."}
-  ], "cardPack": "base"
+    {
+      "name": "Alice",
+      "description": "Exact, quiet, up first. Finishes what she starts and is bothered by what others leave half done. Shows care by fixing things. Dislikes noise and being watched while she works. Enjoys garden, building, tidying, eating early and sleeping early."
+    },
+    {
+      "name": "Bob",
+      "description": "Warm, loud, generous. Cannot bear an empty table. Cooks too much, invites everyone, remembers what each person likes. Bad at being alone and bad at finishing chores. Enjoys cooking, hosting supper, the fire and conversations."
+    },
+    {
+      "name": "Carol",
+      "description": "Restless and funny, a night person. Starts five things and abandons four. Plays music whenever there is an instrument. Argues for sport and is late to everything, including supper. Enjoys music, drawing, walks and the fire, and sleeping late."
+    },
+    {
+      "name": "David",
+      "description": "Slow, dry, sceptical. Reads, plays chess, works at a computer for long stretches. Needs solitude after company. Teaches well when asked and never volunteers. Enjoys reading, chess, computer work, giving a class when asked, and leaving gatherings first."
+    }
+  ],
+  "cardPack": "base"
 }

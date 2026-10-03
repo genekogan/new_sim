@@ -15,6 +15,7 @@ if [ "$MODE" = --stage ]; then
   if [ "${SIM_CHECKS_ALREADY_PASSED:-0}" != 1 ]; then pnpm check; fi
   BUILD_ID="$BUILD" pnpm --filter @sim/web build >/dev/null
   SIM_STATIC=1 pnpm --filter mars-campus-viewer build:static >/dev/null
+  node infra/copy-decoders.mjs
   echo "$BUILD" > BUILD
   ssh "$HOST" "install -d -o sim -g sim -m 750 /srv/sim/releases $REL"
   rsync -az --delete --link-dest=/srv/sim/current/ \
@@ -74,8 +75,10 @@ ssh "$HOST" "test -f /srv/sim/ops/$BUILD/staging-qualified && test \"\$(readlink
 ssh "$HOST" "python3 - '$BUILD' <<'PYREMOTE'
 import sqlite3,pathlib,sys
 folder=pathlib.Path('/srv/sim/ops')/sys.argv[1]
-source=sqlite3.connect('file:/srv/sim-data/sim.db?mode=ro',uri=True)
-target=sqlite3.connect(folder/'toy-before.db');source.backup(target);target.close();source.close()
+for name,path in [('toy','/srv/sim-data/sim.db'),('mars','/srv/sim-data/mars/sim.db')]:
+    if pathlib.Path(path).exists():
+        source=sqlite3.connect('file:'+path+'?mode=ro',uri=True)
+        target=sqlite3.connect(folder/(name+'-before.db'));source.backup(target);target.close();source.close()
 PYREMOTE
   cp /etc/caddy/sites/sim.caddy /srv/sim/ops/$BUILD/caddy.before-promote;
   prev=\$(readlink /srv/sim/current); echo \"\$prev\" > /srv/sim/ops/$BUILD/production.previous;
@@ -84,8 +87,8 @@ PYREMOTE
 for attempt in $(seq 1 30); do
   if ssh "$HOST" "curl -fsS http://127.0.0.1:4500/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4502/healthz | grep -q '$BUILD'"; then break; fi
   if [ "$attempt" = 30 ]; then
-    ssh "$HOST" "prev=\$(cat /srv/sim/ops/$BUILD/production.previous); ln -sfn \"\$prev\" /srv/sim/current; systemctl restart sim; systemctl stop sim-world@mars"
-    echo 'production health failed; toy rolled back'; exit 1
+    ssh "$HOST" "prev=\$(cat /srv/sim/ops/$BUILD/production.previous); ln -sfn \"\$prev\" /srv/sim/current; systemctl restart sim; systemctl restart sim-world@mars"
+    echo 'production health failed; code rolled back for toy and Mars'; exit 1
   fi
   sleep 1
 done

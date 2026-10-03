@@ -1,21 +1,49 @@
 # Status
 
-As of **2026-10-01** (the live build id is at `/healthz`). Update this file when the state changes;
-it is the single place that says what is true now.
+As of **2026-10-03**, canonical checkout `<repo>`. Sources
+`<old-sim-repo>`, `~/Mars` and `~/Dev/littlemartians` stay read-only. The exact deployed
+build is returned by `/healthz` and recorded in `<eden4>/MERGE-LOG.md`.
 
-## Live
+## Live deployment contract
 
-| | |
+| Surface | State |
 |---|---|
-| Production | https://sim.eden.art (eden2 Hetzner box), also https://<eden2-sslip-host> |
-| Staging | https://<staging-host> (fake brain, separate data) |
-| Repo | github.com/genekogan/sim (private); CI green |
-| World | `toy-1` on the **toy engine**, running continuously since 2026-09-30 05:09 UTC; six native Souls (Oda, Pim, Rowan, Tamsin, Juno, Basil) plus owners' Souls |
-| Access | invite codes required to create or steer a Soul; watching is open; one admin (Gene) |
-| Model spend | capped at $0.50/day by the governor |
-| Durability | Litestream → R2 every 10 s (restore tested), hourly on-box backups, watchdog timer, release folders with rollback |
+| Production | https://sim.eden.art; staging first, immutable release directories and code-only rollback |
+| Staging | https://<staging-host>; independent data and fake minds |
+| Worlds | `/` list, `/w/toy` preserves `toy-1`, `/w/mars` independent four-Soul Mars process |
+| Static | `/l/mars` original browser Lab; `/w/mars/2020`–`2027` Studio, public campus assets through an allowlisted same-origin proxy |
+| Ownership | All new-world Souls owned by Gene; existing Privy sign-in/admin; public watching |
+| Durability | Per-world SQLite, accepted event log, resumable checkpoints plus deterministic replay; Litestream/R2 and on-box backups |
+| Budget | Durable admission reservations and rolling real-24-hour ledger; absolute maximum $1/world; existing $0.50 setting retained |
 
-## Built
+## October 3 playback milestone
+
+The shared Mars view draws actual scene walls, openings, fixtures and server-recorded
+people. Selection, following, daylight and the last-hour rewind use TakePeople/sampleTake;
+there is no client Runtime. WebSocket chunks are compressed and retained in SQLite.
+Measured camp take storage is about 13 KB per simulated second; archival is the next
+storage task, rather than assuming the plan's unmeasured 1 KB/s estimate.
+
+Replay regressions F1–F8 and the intentional F9 frontier behavior have focused tests.
+The next living-camp milestone is implemented behind `ENABLE_LIVING_WORLD=1` and remains
+**off** until its 48-day camp qualification passes. This playback release can already
+read the newer camp checkpoints, providing a compatible rollback for that activation.
+The camp has an additive place, individual needs/journals, logged choices, independently
+chosen supper hosting/joining, quiet checkpoints, daily fresh Runtime and durable fault
+recovery/quarantine. No routine or timetable controls a Soul. Reflection and owner words
+remain private. The local live mind proof spent $0.003215808 and its server was stopped.
+
+Current checks: workspace typecheck; 30 server tests passed; Mars engine 1,489 passed,
+6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
+has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
+
+Mandates, the active Little Martians and Eden worlds, construction from the piles, and
+the published Mars closing delta remain ahead. All four bounded Opus helpers finished;
+building pictures are available at `/buildings`.
+
+## Retained shell capabilities
+
+
 
 **The shell**
 
@@ -113,7 +141,7 @@ The Mars tests skip where there is no Mars checkout (CI).
 - On the Mars engine, only eight verbs resume exactly from a snapshot; the body language
   uses only those (`eden4/19` §6).
 
-## Next
+## Earlier shell roadmap
 
 1. **Take over the Mars engine** (Gene, from 2026-10-02): decide where its code lives; run
    staging on `ENGINE=mars`; a furnished campus world; the first scene; a Mars vocabulary
@@ -125,34 +153,3 @@ The Mars tests skip where there is no Mars checkout (CI).
 
 Waiting on Gene: the questions at the end of `eden4/18` and `eden4/19`. The earlier design
 discussion is in `frontier/`.
-# Eden4 merge candidate — 2026-10-03
-
-Preflight passed, including existing-owner admin browser login. Canonical
-checkout now `<repo>`; original sources read-only. Exact Mars alpha
-`75d022308e944128335b9c0c1ef84e2c1e51e54c` imported with filtered history
-under `mars/` (`ac5613c`), whole-history secret scan clean. Runtime takes,
-baselines and required fixtures restored from exact Git bytes.
-
-First unified candidate: `/` world list; `/w/toy` preserves toy identity and
-behavior; `/w/mars` four owned Souls on the proving ground, server-recorded
-3D take stream and existing panels; `/l/mars` original browser-only Lab;
-`/w/mars/2020`…`2027` static Studio pages. New-world template, scoped Caddy
-routes, data directories, replication/watchdog and staged deploy flow.
-
-Validation: workspace typecheck, Sim suite and Mars engine tests pass
-(1467 passes, 6 upstream skips, 11 upstream TODOs). Standalone fresh-Runtime
-compaction after supper preserves world and continuation hashes; quiet
-snapshot + log replay matches mid-supper. Building helper deliverable reviewed
-and GLB checks pass; previews are ready for early visual review. Full Mars
-historical release gate remains due at tranche end with derivative fixtures.
-
-Live still original `4597ddf` until this candidate passes staging and is
-promoted; consult health endpoints and MERGE-LOG for the exact live receipt.
-Next: persistent Mars camp, day/customs/needs/journal decisions and reflection,
-steering mandate, faults and 48-day soak; floater integration and Eden field.
-Mars closing delta still awaits its final publication receipt.
-
-Deferred: economy/ontology/plugins, terrain, talking faces, other owners,
-2026 campus live world, Worker/DNS redirect and engine package restructure.
-
----

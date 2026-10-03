@@ -5,7 +5,7 @@
 // Used identically by the live loop, the restart fast-forward and replay tests.
 import type { Engine } from '@sim/engine-contract';
 import {
-  applyAll, bind, changesOf, emptyKernel, kernelHash, seedVocabulary, whyNot, BASE_DECK, BASE_MANNERS,
+  applyAll, bind, changesOf, emptyKernel, kernelHash, seedVocabulary, sweep, whyNot, BASE_MANNERS,
   type Change, type KState, type Thing,
 } from '@sim/kernel';
 import type { BirthPayload, DecisionPayload, DeckPayload, LogEvent, MintPayload, PlayPayload, PlayView } from '@sim/protocol';
@@ -39,13 +39,13 @@ export function initKernel(engine: Engine, pinned?: Vocabulary | null): KState {
 
 const hash32 = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 /** Three starting manners, picked deterministically from the Soul's id until its deck is attuned to its description. */
-export const defaultManners = (soulId: string): string[] => { const all = Object.keys(BASE_MANNERS).sort(); const h = hash32(soulId); return [all[h % all.length], all[(h >>> 8) % all.length], all[(h >>> 16) % all.length]].filter((m, i, a) => a.indexOf(m) === i); };
+export const defaultManners = (soulId: string, manners = BASE_MANNERS): string[] => { const all = Object.keys(manners).sort(); if (!all.length) return []; const h = hash32(soulId); return [all[h % all.length], all[(h >>> 8) % all.length], all[(h >>> 16) % all.length]].filter((m, i, a) => a.indexOf(m) === i); };
 
 export function soulThing(k: KState, p: BirthPayload, at: string | null): void {
   if (k.things[p.soulId]) return;
   const r = applyAll(k, [{ op: 'appear', id: p.soulId, kind: 'soul', name: p.name, at, traits: { body: p.entityId, about: p.description } }], 'world');
   if (!r.ok) throw new Error(`kernel birth: ${r.message}`);
-  k.decks[p.soulId] = { cards: [...BASE_DECK], manners: defaultManners(p.soulId) };
+  k.decks[p.soulId] = { cards: Object.values(k.vocab.cards).filter(c => c.origin === 'base').map(c => c.name), manners: defaultManners(p.soulId, k.vocab.manners) };
 }
 
 /** The most cards a Soul's deck holds. */
@@ -56,6 +56,7 @@ export type FoldResult = { play?: PlayView; programId?: string; programOk?: bool
 /** Apply one logged event to the engine and the kernel. Deterministic; returns what happened for the host's bookkeeping. */
 export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record<string, number>): FoldResult {
   k.tick = e.tick;
+  sweep(k);
   switch (e.kind) {
     case 'birth': {
       const p = e.payload as BirthPayload;
@@ -65,7 +66,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
     }
     case 'decision': {
       const p = e.payload as DecisionPayload;
-      if (!engine.world.entities[p.entityId]) return {};
+      if (!engine.world.entities[p.entityId] || p.continue) return {};
       const r = engine.perform({ actor: p.entityId, label: p.label, steps: p.steps });
       return { programId: r.id, programOk: r.ok, programCode: r.diagnostic?.code };
     }
@@ -118,6 +119,19 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       return {};
     }
     case 'rules': {
+      const rules = e.payload as { dayConfig?: { origin: number; dayTicks: number }; quiet?: boolean; compact?: boolean; adoptCamp?: boolean; restockCamp?: boolean; anchors?: import('@sim/engine-contract').Anchor[]; soulId?: string; character?: string };
+      if (rules?.dayConfig) engine.configureClock?.(rules.dayConfig);
+      if (rules?.quiet) engine.beginQuiet?.();
+      if (rules?.adoptCamp) {
+        engine.adoptCamp?.();
+        for (const a of rules.anchors ?? []) if (!k.things[a.id]) {
+          const result = applyAll(k,[{op:'appear',id:a.id,kind:a.kind === 'region'?'region':'place',name:a.name,at:a.in??null,traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');
+          if (!result.ok) throw new Error(`camp.anchor:${result.message}`);
+        }
+      }
+      if (rules?.character && rules.soulId && k.things[rules.soulId]) k.things[rules.soulId].traits.about = rules.character;
+      if (rules?.restockCamp) engine.restockCamp?.();
+      if (rules?.compact) engine.compact?.();
       // A world that began before the kernel existed is given one once, and where each Soul was is written into the log,
       // so a replay from genesis arrives at the same kernel.
       const voc = (e.payload as { vocabulary?: Vocabulary } | null)?.vocabulary;
@@ -131,16 +145,25 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
 }
 
 /** Pure replay of the log from genesis. Returns the engine and the kernel; neither calls a model. */
-export function replayFromGenesis(factory: { genesis(seed: string): unknown; create(world: any): Engine }, seed: string, events: LogEvent[], untilTick: number): { engine: Engine; kernel: KState; counts: Record<string, number> } {
-  const engine = factory.create(factory.genesis(seed));
-  const kernel = initKernel(engine, pinnedVocabulary(events)); const counts: Record<string, number> = {};
-  let i = 0;
+export function replayFromGenesis(factory: { genesis(seed: string): unknown; create(world: any): Engine; restore?(snap: import('@sim/engine-contract').EngineSnapshot): Engine }, seed: string, events: LogEvent[], untilTick: number): { engine: Engine; kernel: KState; counts: Record<string, number> } {
+  const repairs=events.filter(e=>e.tick<=untilTick && e.kind==='rules' && e.payload?.recovery), repair=repairs.at(-1);
+  let engine: Engine, kernel: KState, counts: Record<string,number>, suffix=events;
+  if (repair) {
+    const recipe=repair.payload.recovery as import('./world.ts').RecoveryRecipe;
+    if (!factory.restore) throw new Error('recovery requires a checkpoint factory');
+    engine=factory.restore(structuredClone(recipe.baseline.runtime)); kernel=structuredClone(recipe.baseline.kernel!); counts={...recipe.baseline.counts};
+    for (const m of recipe.baseline.minds) if (m.pending && recipe.excluded.includes(m.pending.card)) engine.stop(m.pending.program);
+    for (const e of recipe.events) { while (engine.world.tick<e.tick) engine.step(); foldEvent(engine,kernel,e,counts); }
+    while (engine.world.tick<recipe.untilTick) engine.step();
+    suffix=events.filter(e=>e.seq>repair.seq);
+  } else { engine=factory.create(factory.genesis(seed)); kernel=initKernel(engine,pinnedVocabulary(events)); counts={}; }
+  let i=0;
   while (engine.world.tick < untilTick) {
-    while (i < events.length && events[i].tick === engine.world.tick) foldEvent(engine, kernel, events[i++], counts);
+    while (i<suffix.length && suffix[i].tick===engine.world.tick) foldEvent(engine,kernel,suffix[i++],counts);
     engine.step();
   }
-  kernel.tick = engine.world.tick;
-  return { engine, kernel, counts };
+  kernel.tick=engine.world.tick; sweep(kernel);
+  return {engine,kernel,counts};
 }
 
 /** Replay the kernel alone from the log: meaning needs no engine. `places` are the genesis anchors. */
@@ -148,7 +171,10 @@ export function replayKernel(genesis: KState, events: LogEvent[]): KState {
   const k: KState = structuredClone(genesis); const counts: Record<string, number> = {};
   const pin = pinnedVocabulary(events); if (pin) { k.vocab = { kinds: {}, links: {}, cards: {}, manners: {} }; setVocabulary(k, pin); }
   const noEngine = { world: { entities: {} as Record<string, unknown> }, spawnHuman() { return ''; }, removeEntity() {}, programOf() { return null; }, stop() {}, perform() { return { id: '', ok: true }; } } as unknown as Engine;
-  for (const e of events) if (e.kind === 'birth' || e.kind === 'play' || e.kind === 'mint' || e.kind === 'deck' || e.kind === 'retire' || e.kind === 'rules') foldEvent(noEngine, k, e, counts);
+  for (const e of events) {
+    if (e.kind === 'rules' && e.payload?.recovery) { const r=e.payload.recovery as import('./world.ts').RecoveryRecipe; const restored=replayKernel(r.baseline.kernel!,r.events); Object.assign(k,restored); k.tick=r.untilTick; sweep(k); continue; }
+    if (e.kind === 'birth' || e.kind === 'play' || e.kind === 'mint' || e.kind === 'deck' || e.kind === 'retire' || e.kind === 'rules') foldEvent(noEngine, k, e, counts);
+  }
   return k;
 }
 export { kernelHash };

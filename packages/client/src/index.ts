@@ -75,6 +75,7 @@ export class Replica {
 export type ConnState = 'connecting' | 'open' | 'closed';
 export type ConnStats = { state: ConnState; resyncs: number; reconnects: number; heartbeats: number; lastCheck: string; lastHash: string; myHash: string; bytesIn: number; msgsIn: number; rttMs: number; lastHeartbeatTick: number; snapshots: number };
 export type Handlers = {
+  onTakes?(stream: Extract<ServerMsg, {t: 'takes'}>): void;
   onChange?(): void; onLog?(e: LogEvent[]): void; onBrain?(c: BrainCall[]): void; onCamera?(l: CameraLine): void; onTicker?(l: TickerLine[]): void;
   onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onKernel?(v: KernelView): void; onError?(code: string, message: string): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
 };
@@ -185,6 +186,7 @@ export class Connection {
       case 'kernel': h.onKernel?.(m.view); break;
       case 'plays': h.onPlays?.(m.plays); break;
       case 'talk': h.onTalk?.(m.lines); break;
+      case 'takes': h.onTakes?.(m); break;
       case 'pong': this.stats.rttMs = this.now() - m.n; break;
       case 'error': console.warn('[sim] server error', m.code, m.message); h.onError?.(m.code, m.message); break;
     }

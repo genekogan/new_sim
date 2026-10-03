@@ -17,7 +17,7 @@ try {
   for (const [name, origin, path, needle] of [
     ['world-list', base, '/', 'Persistent worlds'],
     ['toy', base, '/w/toy', 'toy-1'],
-    ['mars', marsBase, '/w/mars', 'mars-1'],
+    ['mars', marsBase, '/w/mars', process.env.SIM_SMOKE_MARS_ID ?? 'mars-1'],
     ['lab', base, '/l/mars', 'Lab'],
     ['year-2020', base, '/w/mars/2020', '2020'],
     ['year-2026', base, '/w/mars/2026', '2026'],
@@ -30,15 +30,16 @@ try {
     if (name.startsWith('year')) await page.locator('body').filter({ hasText: needle }).waitFor({ timeout: 30_000 });
     else await page.getByText(needle, { exact: false }).first().waitFor({ timeout: 30_000 });
     if (name === 'mars') {
-      await page.getByText('Live · recorded on the server', { exact: false }).waitFor({ timeout: 30_000 });
-      await page.locator('canvas[aria-label="Live 3D world"]').waitFor();
+      await page.getByText('Live now', { exact: true }).waitFor({ timeout: 30_000 });
+      await page.locator('canvas[aria-label="Live 3D view of the world"]').waitFor();
       // Let templates and two successive take chunks render.
       await page.waitForTimeout(2500);
       for (const person of ['Alice', 'Bob', 'Carol', 'David']) await page.getByText(person, { exact: true }).first().waitFor();
     }
     if (name === 'lab' || name.startsWith('year')) {
       await page.locator('canvas').first().waitFor({ timeout: 45_000 });
-      await page.waitForTimeout(2500);
+      if (name.startsWith('year') && name !== 'year-2020') await page.waitForFunction(() => window.__marsStudio?.ready, {timeout:120000});
+      else await page.waitForTimeout(2500);
     }
     await page.screenshot({ path: `${output}/${name}.png`, fullPage: true });
     writeFileSync(`${output}/${name}.txt`, await page.locator('body').innerText());

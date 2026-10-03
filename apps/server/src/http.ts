@@ -46,6 +46,8 @@ export function buildApp(d: Deps) {
   app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
+  app.get('/v1/scene', c => c.json(d.host.engine.renderScene?.() ?? {scene: null}));
+  app.get('/v1/takes', c => c.json({serverTick: d.host.engine.world.tick, ...d.db.takes(d.host.worldId, intQ(c, 'from', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'to', d.host.engine.world.tick, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 120, 1, 120))}, 200, {'Cache-Control': 'no-store'}));
   app.get('/v1/take', c => c.json({ serverTick: d.host.engine.world.tick, chunks: d.host.engine.takeChunks?.(intQ(c, 'after', -1, -1, Number.MAX_SAFE_INTEGER)) ?? [] }, 200, { 'Cache-Control': 'no-store' }));
   app.get('/v1/kernel', (c) => c.json(d.host.kernelView()));
   app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-intQ(c, 'limit', 60, 1, 200)) }));

@@ -58,6 +58,9 @@ export class Runtime {
   /** Directed submissions waiting for pre-empted social holds to end (empty unless pre-emption happened). */
   private waiting = new Map<string, Waiting>();
   private nextId = 1;
+  private idPrefix = 'a';
+  /** A quiet renewal derives its generated-id namespace from durable world time. */
+  beginActionEpoch() { this.idPrefix = `a${this.world.tick}-`; this.nextId = 1; }
   observers: RuntimeObserver[] = [];
   /** Opt-in profiler (see `profile`); null when off. Measurement only, never read by the simulation. */
   prof: Profiler | null = null;
@@ -104,8 +107,8 @@ export class Runtime {
   submit(verb: string, params: unknown, opts: { id?: string; parent?: string; preempt?: boolean } = {}): ActionRecord {
     if (opts.id !== undefined && this.records.has(opts.id)) throw new ActionAdmissionError(opts.id);
     // Explicit ids can occupy the generated namespace; skip them without replacing history.
-    if (opts.id === undefined) while (this.records.has(`a${this.nextId}`)) this.nextId++;
-    const id = opts.id ?? `a${this.nextId++}`;
+    if (opts.id === undefined) while (this.records.has(`${this.idPrefix}${this.nextId}`)) this.nextId++;
+    const id = opts.id ?? `${this.idPrefix}${this.nextId++}`;
     const rec: ActionRecord = { id, verb, params, status: 'requested', history: [], requestedTick: this.tick, parent: opts.parent };
     this.records.set(id, rec);
     this.emit(rec, 'requested');
@@ -375,11 +378,14 @@ export class Runtime {
   }
 
   private internals(): RuntimeInternals {
+    const self = this;
     const getNextId = () => this.nextId;
     const setNextId = (n: number) => {
       this.nextId = n;
     };
     return {
+      get idPrefix() { return self.idPrefix; },
+      set idPrefix(v: string) { self.idPrefix = v; },
       live: this.live,
       waiting: this.waiting,
       owners: this.owners,

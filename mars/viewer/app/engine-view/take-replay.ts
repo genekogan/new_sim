@@ -169,7 +169,7 @@ export class TakePeople {
   private indexWalks() {
     this.walks.clear();
     for (const [id, s] of Object.entries(this.take.tracks)) {
-      if (recordOf(this.take, id)?.kind !== 'human') continue;
+      if (recordOf(this.take, id)?.kind !== 'human' || recordOf(this.take,id)?.body?.family === 'floater') continue;
       this.walks.set(id, { ticks: s.map((x) => x[0]), cum: walkCum(s), track: s });
     }
   }
@@ -254,15 +254,15 @@ export class TakePeople {
       const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; on?: string; proneYaw?: number; phaseK?: number; sleepPose?: NonNullable<Entity['human']>['sleepPose'] };
       if (src.kind === 'component') {
         // discrete state as of t (the final state's phase / support would put every item in its last place)
-        comps[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(e.phase ? { phase: e.phase as Entity['phase'] } : {}), ...('support' in st ? { support: st.support ?? undefined } : {}), ...('connections' in st ? { connections: st.connections ?? undefined } : {}), ...(st.contents ? { contents: st.contents } : {}) };
+        comps[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(e.phase ? { phase: e.phase as Entity['phase'] } : {}), ...('support' in st ? { support: st.support ?? undefined } : {}), ...('connections' in st ? { connections: st.connections ?? undefined } : {}), ...Object.fromEntries(['contents', 'gardenCare', 'planting', 'foodPreparation'].map(field => [field, e.state[field] ?? undefined])) };
         continue;
       }
       if (src.kind === 'fixture') {
         // piles / bundles, the cutting station, benches, campfires: pose + contents as of t (a pile shrinks)
-        fixtures[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(st.contents ? { contents: st.contents } : {}) };
+        fixtures[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...Object.fromEntries(['contents', 'gardenCare', 'planting', 'foodPreparation'].map(field => [field, e.state[field] ?? undefined])) };
         continue;
       }
-      if (src.kind !== 'human') continue;
+      if (src.kind !== 'human' || src.body?.family === 'floater') continue;
       const w = this.walks.get(id);
       const dist = (w ? this.walked(w, frame.tick) : 0) + (this.walkOffsets[id] ?? 0);
       const speed = w ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
@@ -281,6 +281,7 @@ export class TakePeople {
     this.fixtures.onTick({ entities: fixtures });
     this.fixtures.render(clock);
     this.humans.setFrame(people, clock, { ...comps, ...fixtures }); // seats / fires come from the fixtures
+    this.humans.setAttention(Object.fromEntries(Object.entries(frame.entities).filter(([,e]) => Array.isArray(e.state.attention)).map(([id,e]) => [id, e.state.attention as [number,number]])));
     this.humans.render(1, (id, from, out) => this.comps.nearestPoint(id, from, out));
     this.comps.attachHeld(this.humans);
     return frame;

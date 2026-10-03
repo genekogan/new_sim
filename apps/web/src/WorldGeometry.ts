@@ -16,7 +16,7 @@ export type RawChunk = { fromTick: number; toTick: number; take: unknown };
 /** What the server streams over the socket (useSim keeps the latest). `receivedAt` is performance.now(). */
 export type LiveTakes = { serverTick: number; chunks: RawChunk[]; receivedAt: number };
 export type BuildingPlacement = { file: string; p: [number, number, number]; yaw?: number };
-export type SceneInfo = { scene: SpatialScene | null; buildings: BuildingPlacement[]; kin: KinPlacement[] };
+export type SceneInfo = { scene: SpatialScene | null; buildings: BuildingPlacement[]; kin: KinPlacement[]; clock?: { origin: number; dayTicks: number } | null };
 
 const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -45,7 +45,8 @@ export function parseSceneInfo(x: unknown): SceneInfo {
     : null;
   const buildings = (Array.isArray(o.buildings) ? o.buildings : []).filter((b): b is BuildingPlacement => obj(b) && typeof b.file === 'string' && vec3(b.p) && (b.yaw === undefined || num(b.yaw)));
   const kin = (Array.isArray(o.kin) ? o.kin : []).filter((k): k is KinPlacement => obj(k) && typeof k.model === 'string' && vec3(k.p));
-  return { scene, buildings, kin };
+  const clock = obj(o.clock) && num(o.clock.origin) && num(o.clock.dayTicks) && o.clock.dayTicks > 0 ? { origin: o.clock.origin, dayTicks: o.clock.dayTicks } : null;
+  return { scene, buildings, kin, clock };
 }
 
 /** URL of a decorative building GLB, or null for a name that is not a plain file name. */

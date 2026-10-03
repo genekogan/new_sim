@@ -54,6 +54,7 @@ export type IntentPayload = { soulId: string; intent: WireIntent; source: 'web' 
 export type DecisionPayload = {
   soulId: string; entityId: string; option: string; label: string;
   steps: { verb: string; params: Record<string, unknown> }[];
+  continue?: boolean;
   mood?: string; reevalTicks: number; fallback: boolean; call?: number; trigger: string;
   /** Present when the choice is a card: its effects apply once `approachLen` depiction steps have run. */
   card?: string; target?: string | null; manner?: string; approachLen?: number;
@@ -69,6 +70,8 @@ export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive
 
 /** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
 export function publicEvent(e: LogEvent): LogEvent {
+  if (e.kind === 'rules' && e.payload?.recovery) { const r=e.payload.recovery; return {...e,payload:{recovery:{excluded:r.excluded,faults:r.faults,restored:true}}}; }
+  if (e.kind === 'rules' && e.payload?.reflection) return { ...e, payload: { soulId: e.payload.soulId, reflection: { day: e.payload.reflection.day, written: true } } };
   if (e.kind === 'intent' && (e.payload?.intent?.note || e.payload?.intent?.text)) return { ...e, payload: { ...e.payload, intent: publicIntent(e.payload.intent) } };
   // who owns a Soul is an account id: the public sees only whether it is the world's or a person's
   if (e.kind === 'birth' && e.payload?.owner && e.payload.owner !== 'system') return { ...e, payload: { ...e.payload, owner: 'someone' } };
@@ -83,7 +86,7 @@ export type PublicSoul = {
   intent: WireIntent | null; intentText: string; mood: string; energy: string; doing: string; native: boolean;
 };
 export type BrainCall = {
-  id: number; tick: number; at: number; tier: 'mid' | 'translate' | 'director' | 'narrator' | 'shot' | 'compile' | 'talk' | 'attune';
+  id: number; tick: number; at: number; tier: 'mid' | 'translate' | 'director' | 'narrator' | 'shot' | 'compile' | 'talk' | 'attune' | 'reflection';
   subject: string;
   /** Absent for world-level calls (narrator, director), which only admins see. */
   soulId?: string | null;
@@ -118,11 +121,15 @@ export type Batch = {
 };
 export type Heartbeat = { tick: number; seq: number; viewHash: string; keyframes: Record<string, PoseSample>; clients: number; clockRate: number; paused: boolean };
 
+export type TakeChunk = { fromTick: number; toTick: number; take: unknown };
+export type TakeStream = { serverTick: number; chunks: TakeChunk[] };
+
 export type ServerMsg =
   | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean }
   | ({ t: 'snapshot'; reason: string } & Snapshot)
   | ({ t: 'batch' } & Batch)
   | ({ t: 'heartbeat' } & Heartbeat)
+  | ({ t: 'takes' } & TakeStream)
   | { t: 'log'; events: LogEvent[] }
   | { t: 'brain'; calls: BrainCall[] }
   | { t: 'kernel'; view: KernelView }
@@ -156,7 +163,7 @@ export { samplePath };
 // ---------------------------------------------------------------- REST
 export const createSoulSchema = z.strictObject({
   name: z.string().trim().min(2).max(32).regex(/^[\p{L}\p{N} _'-]+$/u, 'letters, numbers, spaces, apostrophes and hyphens only'),
-  description: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(3).max(1200),
 });
 export const commandSchema = z.strictObject({ text: z.string().trim().min(1).max(280) });
 export const setIntentSchema = z.object({ intent: intentSchema });

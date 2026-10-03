@@ -53,6 +53,19 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
       db.exec('CREATE INDEX IF NOT EXISTS talks_pair ON talks (from_id, to_id, id)');
     },
   },
+  {
+    id: 4, name: 'durable model cost reservations',
+    up(db) {
+      db.exec('CREATE TABLE paid_costs (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, model TEXT NOT NULL, cost REAL NOT NULL, settled INTEGER NOT NULL DEFAULT 0)');
+      db.exec('CREATE INDEX paid_costs_at ON paid_costs(at)');
+      // Old hourly totals include pruned call rows. Date at hour end errs toward retaining spend.
+      db.exec("INSERT INTO paid_costs(at, model, cost, settled) SELECT (hour + 1) * 3600000, model, SUM(cost_usd), 1 FROM spend_hourly GROUP BY hour, model");
+    },
+  },
+  { id: 5, name: 'recorded rendering chunks', up(db) {
+    db.exec('CREATE TABLE take_chunks (world_id TEXT NOT NULL, from_tick INTEGER NOT NULL, to_tick INTEGER NOT NULL, body BLOB NOT NULL, PRIMARY KEY(world_id, to_tick))');
+    db.exec('CREATE INDEX take_chunks_from ON take_chunks(world_id, from_tick)');
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

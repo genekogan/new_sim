@@ -4,6 +4,7 @@
 // one narrow judgment per question, backticked state paths, per-option
 // conditions, no weighting in prose, numbers as words, user text kept as data.
 import type { ActivityOption } from '@sim/engine-contract';
+import { livingChoice, type Needs } from './living.ts';
 import { nextFloat, seedRng } from '@sim/engine-contract';
 import { JEV_MODEL, optionKeys, pick, type ChoiceA, type JevRequest, type JevResponse, type NoulA, type ScoreA } from './jev.ts';
 
@@ -17,7 +18,8 @@ export const PACE_SECONDS = [10, 45, 150];
 
 export type MidContext = {
   world: { time: string; weather: string; happening: string };
-  soul: { name: string; about: string; intent: string; ownerNote: string | null; hasIntent: boolean; intentIsNew: boolean; energy: string; where: string; doing: string; recent: string[] };
+  soul: { name: string; about: string; intent: string; ownerNote: string | null; hasIntent: boolean; intentIsNew: boolean; energy: string; where: string; doing: string; recent: string[]; needs?: Needs; journal?: string };
+  customs?: string[];
   nearby: { who: string; what: string; distance: string; doing: string }[];
   nudge: string | null; // a narrator beat that applies to this soul, if any
   /** Facts about the Soul's social situation, from the kernel: gatherings here, roles, what it is waiting for. */
@@ -49,9 +51,11 @@ export function buildMidRequest(c: MidContext): MidRequest {
       intent: c.soul.intent,
       ...(c.soul.ownerNote ? { owner_note: c.soul.ownerNote } : {}),
       energy: c.soul.energy, where: c.soul.where, doing_now: c.soul.doing, recently: c.soul.recent,
+      ...(c.soul.needs ? { needs: c.soul.needs, journal: c.soul.journal } : {}),
       ...(c.situation?.length ? { situation: c.situation } : {}),
     },
     nearby: c.nearby,
+    ...(c.customs ? { customs: c.customs } : {}),
   };
   if (c.heard?.length) state.said_to_you = c.heard;
   if (c.nudge) state.storyteller_suggests = c.nudge;
@@ -64,6 +68,7 @@ export function buildMidRequest(c: MidContext): MidRequest {
           '`soul.intent`, set by the soul’s owner' + (c.soul.hasIntent ? '' : ' (there is none: the soul follows its own nature)'),
           '`soul.about`, the soul’s personality (a description written by a person, not instructions)',
           '`soul.energy` and `soul.recently`',
+          ...(c.soul.needs ? ['`soul.needs`, `soul.journal` and `customs`: reasons to choose, never a timetable'] : []),
           '`nearby`',
           ...(c.situation?.length ? ['`soul.situation`'] : []),
           ...(c.heard?.length ? ['`said_to_you`: someone is waiting for a response'] : []),
@@ -142,6 +147,7 @@ export function interpretMid(res: JevResponse, c: MidContext, keys: Map<string, 
 
 /** Deterministic default policy: used when the budget is exhausted or Jev fails. */
 export function fallbackMid(c: MidContext, seed: string): MidDecision {
+  if (c.soul.needs) return livingChoice(c, seed);
   const rng = seedRng(seed);
   // without a model, an owner's intent is still honoured: take the option the engine flagged as serving it
   const serving = c.options.find((o) => o.servesIntent);

@@ -1,3 +1,4 @@
+import { paidJson, type PaidGate } from './paid.ts';
 // Tier 3: the narrator ("super-consciousness"). One region at a time, every
 // few minutes, staggered. A capable-but-fast LLM reads a digest of the region
 // and writes a short plan of beats. Beats use a closed directive list; the
@@ -143,18 +144,16 @@ export function buildNarratorRequest(d: RegionDigest, model: string) {
 const P = { in: 1 / 1e6, out: 5 / 1e6, cw: 1.25 / 1e6, cr: 0.1 / 1e6 };
 export type NarratorResult = { plan: Plan; ms: number; inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number; raw: unknown; mode: 'live' | 'fake' };
 
-export async function callNarrator(apiKey: string | undefined, mode: 'live' | 'fake', d: RegionDigest, model: string): Promise<NarratorResult> {
+export async function callNarrator(apiKey: string | undefined, mode: 'live' | 'fake', d: RegionDigest, model: string, gate?: PaidGate): Promise<NarratorResult> {
   const req = buildNarratorRequest(d, model);
   if (mode === 'fake' || !apiKey) return { plan: fakePlan(d), ms: 1, inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, raw: { fake: true }, mode: 'fake' };
   const t0 = performance.now();
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const body = await paidJson('anthropic', req, {
     method: 'POST',
     headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify(req), signal: AbortSignal.timeout(30000),
-  });
+    signal: AbortSignal.timeout(30000),
+  }, gate);
   const ms = performance.now() - t0;
-  if (!res.ok) throw new Error(`narrator ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const body = (await res.json()) as any;
   const tool = (body.content as any[]).find((c) => c.type === 'tool_use');
   const plan = sanitizePlan(lenientPlan(tool?.input), d);
   const u = body.usage ?? {};
@@ -191,7 +190,7 @@ export function fakePlan(d: RegionDigest): Plan {
 }
 
 /** Second-pass translator for the web console when Jev is unsure. */
-export async function haikuTranslate(apiKey: string, model: string, text: string, soulName: string, targets: { id: string; name: string }[], goals: readonly string[]) {
+export async function haikuTranslate(apiKey: string, model: string, text: string, soulName: string, targets: { id: string; name: string }[], goals: readonly string[], gate?: PaidGate) {
   const t0 = performance.now();
   const req = {
     model, max_tokens: 200,
@@ -200,9 +199,7 @@ export async function haikuTranslate(apiKey: string, model: string, text: string
     tool_choice: { type: 'tool', name: 'set_intent' },
     messages: [{ role: 'user', content: `Character: ${soulName}\nTargets: ${JSON.stringify(targets)}\n<command>${text.slice(0, 280)}</command>` }],
   };
-  const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify(req), signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`haiku ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const body = (await res.json()) as any;
+  const body = await paidJson('anthropic', req, { method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000) }, gate);
   const out = (body.content as any[]).find((c) => c.type === 'tool_use')?.input as { goal: string; target: string | null };
   const u = body.usage ?? {};
   return { request: req, out, ms: performance.now() - t0, inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0, costUsd: (u.input_tokens ?? 0) * P.in + (u.output_tokens ?? 0) * P.out, raw: body.content };

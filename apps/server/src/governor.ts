@@ -56,4 +56,4 @@ export class Governor {
     return (Object.keys(SHARES) as Tier[]).map((t) => ({ tier: t, share: SHARES[t], perDay: this.perDay(t), level: this.level[t], capacity: this.capacity(t), estCost: this.est[t], denied: this.denied[t] }));
   }
 }
-export const tierOf = (callTier: string): Tier => (callTier === 'mid' || callTier === 'attune' ? 'mid' : callTier === 'narrator' ? 'narrator' : callTier === 'director' ? 'director' : callTier === 'talk' ? 'talk' : 'user');
+export const tierOf = (callTier: string): Tier => (callTier === 'mid' || callTier === 'attune' ? 'mid' : callTier === 'narrator' || callTier === 'reflection' ? 'narrator' : callTier === 'director' ? 'director' : callTier === 'talk' ? 'talk' : 'user');

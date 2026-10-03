@@ -70,6 +70,8 @@ export type HumanState = {
    * when speed ≥ 0.08 (locomotion/walk.ts WALK_MIN), a blocked walker is 'wait' with speed 0.
    */
   speed?: number;
+  /** Server-computed head attention target, recorded rather than decided by a viewer. */
+  attention?: [number, number];
   /**
    * Prone receiver only (construction/handup.ts, HANDUP.md "Prone receiver"): progress 0–1 within the current hand-up
    * phase (lie-down, then each receiver phase), every tick from lie-down to the release; absent otherwise.
@@ -125,6 +127,8 @@ export type Entity = {
   contents?: { food: string; fraction: number };
   /** Partial preparation survives interruption; incomplete contents cannot be served. */
   foodPreparation?: FoodPreparation;
+  gardenCare?: import('../objects/garden.ts').GardenState;
+  planting?: import('../objects/planting.ts').PlantingState;
   /** Placed electrical equipment (construction/solar.ts place_equipment, spec §19): kind + configuration. */
   equipment?: { kind: string; config: Record<string, number | string | boolean> };
   /** Paint on a paintable face (engine/work/paint.ts): colour or texture, coverage 0..1 of the face, per reach band. */

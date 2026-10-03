@@ -82,7 +82,7 @@ export function check(s: KState, c: Change, by: string): void {
 /** Apply a change (already checked). Mutates `s`. */
 export function apply(s: KState, c: Change): void {
   switch (c.op) {
-    case 'appear': s.things[c.id] = { id: c.id, kind: c.kind, name: c.name, traits: c.traits ?? {}, states: c.states ?? {}, at: c.at, born: s.tick, by: '' }; break;
+    case 'appear': s.things[c.id] = { id: c.id, kind: c.kind, name: c.name, traits: structuredClone(c.traits ?? {}), states: structuredClone(c.states ?? {}), at: c.at, born: s.tick, by: '' }; break;
     case 'vanish': {
       // A thing takes with it whatever was made to exist only alongside it (traits.with), and so on down.
       const gone = [c.id];
@@ -92,7 +92,7 @@ export function apply(s: KState, c: Change): void {
       for (const t of Object.values(s.things)) if (t.at !== null && gone.includes(t.at)) t.at = null;
       break;
     }
-    case 'set': if (c.value === null) delete s.things[c.id].states[c.key]; else s.things[c.id].states[c.key] = c.value; break;
+    case 'set': if (c.value === null) delete s.things[c.id].states[c.key]; else s.things[c.id].states[c.key] = structuredClone(c.value); break;
     case 'move': s.things[c.id].at = c.to; break;
     case 'link': s.links[linkKey(c.kind, c.from, c.to)] = { kind: c.kind, from: c.from, to: c.to, since: s.tick, ...(c.value !== undefined ? { value: c.value } : {}), ...(c.data !== undefined ? { data: c.data } : {}), ...(c.until !== undefined ? { until: c.until } : {}) }; break;
     case 'unlink': delete s.links[linkKey(c.kind, c.from, c.to)]; break;

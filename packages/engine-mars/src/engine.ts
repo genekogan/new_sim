@@ -30,9 +30,10 @@ type Op = { verb: string; params: Record<string, unknown>; settle: 'done' | 'hel
 type Prog = {
   id: string; actor: string; label: string; steps: Program['steps'];
   index: number; started: boolean; since: number;
+  blockedSince?: number;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
 };
-export type MarsWorldConfig = { scene: 'proving-ground' | 'meal'; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp'; clock?: { origin: number; dayTicks: number }; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
 
 const secs = (v: unknown, d: number) => Math.round(Math.min(3600, Math.max(0.5, typeof v === 'number' ? v : d)) * TPS);
@@ -83,20 +84,21 @@ export class MarsEngine implements Engine {
   private leaving: string[] = [];                    // bodies to remove once nothing holds them
   private out: { paths: PathCommit[]; changes: ChangeEvent[]; programs: ProgramEvent[] } = { paths: [], changes: [], programs: [] };
   private recorder: any;
+  private quiet = false;
   private chunks: { fromTick: number; toTick: number; take: unknown }[] = [];
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }) {
-    this.m = m; this.rt = rt; this.cfg = cfg; this.registry = rt.registry;
+    this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;
     this.schema = rt.world.schema; this.rulesVersion = `sim-mars/1+${m.rulesVersion}`;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     this.cursor = rt.events.length;
     this.recorder = new m.TakeRecorder(rt, { rulesVersion: this.rulesVersion });
     const self = this;
     this.runtime = {
-      get tick() { return rt.tick as number; },
-      get records() { return rt.records as Map<string, ActionRecord>; },
-      get violations() { return rt.violations as { tick: number; code: string; message: string }[]; },
-      liveIds: () => [...(rt.records as Map<string, any>).values()].filter((r) => self.rt.isActive(r.id)).map((r) => r.id as string).sort(),
+      get tick() { return self.rt.tick as number; },
+      get records() { return self.rt.records as Map<string, ActionRecord>; },
+      get violations() { return self.rt.violations as { tick: number; code: string; message: string }[]; },
+      liveIds: () => [...(self.rt.records as Map<string, any>).values()].filter((r) => self.rt.isActive(r.id)).map((r) => r.id as string).sort(),
     };
   }
 
@@ -106,12 +108,15 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving }); }
+  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
   step() {
     this.rt.step();
+    this.updateClock();
+    if (this.rt.tick % 10 === 0) this.updateAttention();
+    if (this.quiet) this.advanceQuiet();
     const tick: number = this.rt.tick;
     for (const p of [...this.programs.values()]) this.advance(p);
     if (tick - this.recorder.startTick >= 20) {
@@ -180,6 +185,10 @@ export class MarsEngine implements Engine {
       if (p.action) {
         const rec = this.rt.records.get(p.action);
         if (rec) {
+          if (rec.status === 'blocked' && /deadlock\.|walk.goal-occupied/.test(rec.diagnostic?.code ?? '')) {
+            p.blockedSince ??= tick;
+            if (tick-p.blockedSince > 1200) { this.rt.cancel(rec.id,{code:'route.blocked',message:'the route has remained blocked for a minute'}); return this.end(p,'failed',{code:'route.blocked',message:'the route has remained blocked for a minute'}); }
+          } else p.blockedSince = undefined;
           if (rec.status === 'failed') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'failed' }); }
           else if (rec.status === 'cancelled') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.interrupted', message: rec.diagnostic?.message ?? 'interrupted' }); }
           else if (rec.status !== 'completed' && !(p.settle === 'held' && SETTLED.has(rec.phase))) return; // still under way
@@ -199,6 +208,13 @@ export class MarsEngine implements Engine {
       if (op.verb !== 'stand' && !op.raw && this.holders(p.actor).length) {
         if (op.verb === 'face') continue;                                        // not worth standing up for
         if (!this.release(p.actor, { code: 'program.next-step', message: 'moving on' })) { p.ops.unshift(op); return; }
+      }
+      if (op.verb === 'shared_food_break') {
+        for (const participant of (op.params.participants ?? []) as {actor:string}[]) {
+          if (participant.actor === p.actor) continue;
+          const invitation = this.byActor.get(participant.actor), host = invitation ? this.programs.get(invitation) : undefined;
+          if (host?.label.startsWith('host supper ') && this.holders(participant.actor).length === 0) this.stop(host.id);
+        }
       }
       const rec = this.rt.submit(op.verb, op.params);
       if (rec.status === 'failed') { if (op.soft) continue; return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'refused' }); }
@@ -252,6 +268,7 @@ export class MarsEngine implements Engine {
   /** One body-language step → the Mars actions and waits that depict it, decided when the step begins. */
   private lower(p: Prog, step: { verb: string; params: Record<string, unknown> }): Op[] | Diag {
     const me = p.actor, a = step.params ?? {};
+    if (step.verb === 'mars:take_item') { const it=this.ents[String(a.item)]; if (it?.support?.kind === 'in-hand' && it.support.by === me && (!a.hand || it.support.hand === a.hand)) return []; }
     if (step.verb.startsWith('mars:')) { const r = this.raw(me, step); return 'code' in r ? r : [{ ...r, settle: 'held', raw: true }]; }
     switch (step.verb) {
       case 'walk_to': {
@@ -310,16 +327,33 @@ export class MarsEngine implements Engine {
   canPerform(program: Program): Diag | null {
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
     const first = program.steps[0]; if (!first) return null;
+    if (!program.steps.some(s=>s.verb==='mars:serve')) for (const step of program.steps) if (step.verb==='mars:eat' && !(this.ents[String(step.params.bowl)]?.contents?.fraction > 0)) return {code:'eat.bowl-empty',message:'There is no food left in the bowl'};
+    const pots = program.steps.filter(s => ['mars:serve','mars:shared_food_break'].includes(s.verb)).map(s => s.params.pot);
+    if (this.cfg.scene === 'eden-camp' && pots.length && [...this.programs.values()].some(p => p.actor !== program.actor && p.steps.some(s => ['mars:serve','mars:shared_food_break'].includes(s.verb) && pots.includes(s.params.pot)))) return {code:'food.service-in-use',message:'Someone is already using this pot and its serving space'};
+    for (const step of program.steps) if (step.verb.startsWith('mars:')) {
+      const busy = this.jointIssue(step.params, program.actor); if (busy) return busy;
+      if (step.verb === 'mars:serve') {
+        const pot = this.ents[String(step.params.pot)];
+        if (!pot?.contents || pot.contents.fraction < 0.25 || pot.foodPreparation?.complete === false) return {code: 'food.unavailable', message: 'there is no completed serving left in the pot'};
+      }
+    }
+    if (first.verb === 'mars:take_item') { const it=this.ents[String(first.params.item)]; if (it?.support?.kind==='in-hand' && it.support.by===program.actor && (!first.params.hand || it.support.hand===first.params.hand)) return null; }
     if (first.verb.startsWith('mars:')) { const r = this.raw(program.actor, first); return 'code' in r ? r : this.plan(r.verb, r.params); }
     if (!BODY.has(first.verb)) return { code: 'action.unknown-verb', message: `no body verb "${first.verb}"` };
     if (first.verb === 'walk_to') { const g = this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0); return g !== 'here' && 'code' in g ? g : null; }
-    if (first.verb === 'sit') return this.plan('sit', { actor: program.actor, fixture: String(first.params.on ?? '') });
+    if (first.verb === 'sit') {
+      const fixture = String(first.params.on ?? '');
+      if (this.cfg.scene === 'eden-camp' && this.ents[fixture]?.def === 'bench-6ft') {
+        for (const r of this.rt.records.values()) if (this.rt.isActive(r.id) && r.params?.actor !== program.actor && (r.params?.fixture === fixture || String(r.params?.slot ?? '').startsWith(fixture+'#'))) return {code:'seat.approach-busy',message:'Someone is using the bench and its narrow entry; wait until they leave.'};
+      }
+      return this.plan('sit', { actor: program.actor, fixture });
+    }
     return null;
   }
   perform(program: Program) {
     const no = this.canPerform(program);
     const id = `p${this.nextProg++}`;
-    if (no) return { id, ok: false, diagnostic: no };
+    if (no) { const old = this.byActor.get(program.actor); if (old) this.stop(old); return { id, ok: false, diagnostic: no }; }
     const old = this.byActor.get(program.actor);
     if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
     const p: Prog = { id, actor: program.actor, label: program.label.slice(0, 200), steps: program.steps, index: 0, started: false, since: this.rt.tick, ops: [] };
@@ -393,11 +427,106 @@ export class MarsEngine implements Engine {
     return { nearby: items.slice(0, 8).map(({ id, who, what, doing, d }) => ({ id, who, what, distance: bucket(d), doing })), region: place ?? this.cfg.grounds.id, happening: 'nothing in particular' };
   }
 
+  private updateAttention() {
+    const people = (Object.values(this.ents) as any[]).filter(e => e.kind === 'human').sort((a,b) => a.id.localeCompare(b.id));
+    for (const e of people) {
+      delete e.human.attention;
+      if (!/talk|converse|listen|watch|warm/.test(e.human.activity)) continue;
+      const near = people.filter(o => o !== e).map(o => ({o, d: Math.hypot(o.pose.p[0]-e.pose.p[0], o.pose.p[2]-e.pose.p[2])})).filter(x => x.d < 7).sort((a,b) => a.d-b.d);
+      if (near[0]) e.human.attention = [near[0].o.pose.p[0], near[0].o.pose.p[2]];
+    }
+  }
+  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: this.cfg.clock ?? null}; }
+  actorBorrowed(actor: string) {
+    return !this.byActor.has(actor) && this.holders(actor).some(id => ['shared_food_break','converse','classroom_session','computer_music','campfire_circle','group_warmup'].includes(this.rt.records.get(id)?.verb));
+  }
+  private jointIssue(params: unknown, actor: string): Diag | null {
+    const ids = new Set<string>();
+    const visit = (v: unknown) => {
+      if (typeof v === 'string' && this.ents[v]?.kind === 'human') ids.add(v);
+      else if (Array.isArray(v)) v.forEach(visit);
+      else if (v && typeof v === 'object') Object.values(v).forEach(visit);
+    };
+    visit(params);
+    for (const id of ids) if (id !== actor && !this.free(id) && !(this.programs.get(this.byActor.get(id) ?? '')?.label.startsWith('host supper ') && this.holders(id).length === 0)) return {code: 'actor.busy', message: `${id} is doing something of their own`};
+    return null;
+  }
+  campAnchors(): Anchor[] {
+    const cfg: MarsWorldConfig = {...this.cfg, scene:'eden-camp',arrival:[-3,18],reference:[-1,17],arrivalPlace:'arrival'};
+    const w = this.m.edenCampWorld();
+    return new MarsEngine(this.m, new this.m.Runtime(w,this.registry,this.m.servicesFor(this.m.scenes)(w),this.m.invariants),cfg).anchors();
+  }
+  adoptCamp() {
+    if (this.rt.world.base.campus === 'eden-camp') return;
+    if (!this.isQuiet()) throw new Error('camp.adoption-not-quiet');
+    const camp = this.m.edenCampWorld();
+    // Add the camp without deleting the original bodies, fixtures, object progress or regions.
+    for (const [id, e] of Object.entries(camp.entities)) {
+      if (this.ents[id]) throw new Error(`camp.entity-collision:${id}`);
+      this.ents[id] = e;
+    }
+    for (const [id, r] of Object.entries(camp.regions)) if (!this.rt.world.regions[id]) this.rt.world.regions[id] = r;
+    this.rt.world.base = camp.base;
+    this.cfg = {...this.cfg, scene: 'eden-camp', arrival: [-3,18], reference: [-1,17], arrivalPlace: 'arrival'};
+    const actors = Object.keys(this.ents).filter(id => this.ents[id].kind === 'human').sort();
+    if (actors.length >= 2) this.m.bindCampChess(this.rt.world, actors[0], actors[1]);
+    this.rt = new this.m.Runtime(this.rt.world, this.registry, this.m.servicesFor(this.m.scenes)(this.rt.world), this.m.invariants);
+    this.rt.beginActionEpoch(); this.cursor = 0;
+    this.recorder = new this.m.TakeRecorder(this.rt, {rulesVersion: this.rulesVersion});
+  }
+  restockCamp() {
+    if (this.rt.world.base.campus !== 'eden-camp' || !this.isQuiet()) return;
+    // A logged practical supply edit; no trade/economy and no object progress reset.
+    const camp = this.m.edenCampWorld();
+    for (const id of ['stew-pot', 'beans-bowl', 'greens-bowl', 'water-bowl', 'seed-bowl']) {
+      const e = this.ents[id], initial = camp.entities[id];
+      if (e?.contents && initial?.contents && !e.foodPreparation) e.contents = structuredClone(initial.contents);
+    }
+  }
+
+  configureClock(clock: { origin: number; dayTicks: number }) { this.cfg.clock = { ...clock }; this.updateClock(); }
+  private updateClock() {
+    const c = this.cfg.clock; if (!c) return;
+    this.rt.world.env.datetime = new Date(Date.UTC(2026, 9, 3, 6) + Math.max(0, this.rt.tick - c.origin) / c.dayTicks * 86400_000).toISOString();
+    if (this.rt.tick % 10 === 0) this.out.changes.push([this.rt.tick, '$env', 'datetime', this.rt.world.env.datetime]);
+  }
+  beginQuiet() { this.quiet = true; }
+  private advanceQuiet() {
+    if (this.programs.size) return;
+    // Cancel only roots: their ordinary exits own and drain their child controllers.
+    for (const r of this.rt.records.values()) if (this.rt.isActive(r.id) && !r.parent && r.internalCause !== 'traffic.make-way' && !['put_item','hold_items','face'].includes(r.verb)) this.rt.cancel(r.id, {code:'world.quiet-point',message:'quiet checkpoint after the activity finished'});
+    const initial = this.cfg.scene === 'eden-camp' ? this.m.edenCampWorld().entities : {};
+    for (const e of Object.values(this.ents) as any[]) if (e.support?.kind === 'in-hand') {
+      const actor = e.support.by;
+      if (this.holders(actor).length || this.rt.holder(`entity:${e.id}`).length) continue;
+      const home = initial[e.id]?.support;
+      const slot = home?.kind === 'resting-on' && home.slot ? `${home.on}#${home.slot}` : 'ground';
+      const params = {actor,item:e.id,surfaceSlot:slot};
+      if (!this.plan('put_item',params)) this.rt.submit('put_item',params);
+      else if (!this.plan('put_item',{...params,surfaceSlot:'ground'})) this.rt.submit('put_item',{...params,surfaceSlot:'ground'});
+      else {
+        // A held item in front of a fixture needs a different facing before it can be set down.
+        const a = this.ents[actor], yaw = a.pose.yaw + Math.PI/2;
+        this.rt.submit('face',{actor,target:{point:[a.pose.p[0]+Math.cos(yaw)*2,a.pose.p[2]+Math.sin(yaw)*2]}});
+      }
+    }
+  }
+  isQuiet() { return this.programs.size === 0 && this.m.compactionIssue(this.rt) === null; }
+  compact() {
+    if (!this.isQuiet()) throw new Error('compaction.not-quiet');
+    if (this.rt.tick > this.recorder.startTick) {
+      const take = this.recorder.finish(); this.chunks.push({fromTick: take.startTick, toTick: this.rt.tick, take}); this.chunks = this.chunks.slice(-12);
+    }
+    this.rt = this.m.compactRuntime(this.rt, this.m.servicesFor(this.m.scenes));
+    this.registry = this.rt.registry; this.cursor = 0; this.quiet = false;
+    this.recorder = new this.m.TakeRecorder(this.rt, { rulesVersion: this.rulesVersion });
+  }
+
   // ------------------------------------------------------------------ checkpoints
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg });
+    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, quiet: this.quiet });
   }
   canSnapshot(): boolean {
     for (const r of this.rt.records.values()) if (this.rt.isActive(r.id) && this.m.nonResumableReason(this.registry.get(r.verb))) return false;
@@ -416,6 +545,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     rulesVersion: `sim-mars/1+${m.rulesVersion}`,
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
+      if (cfg.scene === 'eden-camp') return m.edenCampWorld(seed);
       if (cfg.scene === 'meal') { const w = m.mealWorld(); w.rng = m.seedRng(seed); return w as WorldState; }
       const w = m.provingGroundWorld();
       for (const id of Object.keys(w.entities)) if (w.entities[id].kind === 'human') delete w.entities[id];
@@ -424,12 +554,15 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     },
     create: (world) => new MarsEngine(m, new m.Runtime(world, registry, services(world), m.invariants), cfg),
     restore(snap: EngineSnapshot) {
-      const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig };
+      const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; quiet?: boolean };
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
       // Spatial services are rebuilt for the same base scene; the snapshot carries the rest.
-      const base = (s.cfg ?? cfg).scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
+      const scene = (s.cfg ?? cfg).scene;
+      const base = scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
       const rt = m.Runtime.restore(s.mars, registry, services(base), m.invariants);
-      return new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving });
+      const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving });
+      if (s.quiet) engine.beginQuiet();
+      return engine;
     },
   };
 }

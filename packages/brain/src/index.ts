@@ -6,3 +6,5 @@ export * from './narrator.ts';
 export * from './llm.ts';
 export * from './talk.ts';
 export * from './compile.ts';
+export * from './paid.ts';
+export * from './living.ts';

@@ -103,9 +103,16 @@ const smooth = (k: number) => k * k * (3 - 2 * k);
 /** Advance a sit-down / stand-up transition toward `to`; true when it has arrived. */
 function transition(rt: Runtime, ex: SlotExec, to: Vec2, dt: number): boolean {
   const a = rt.world.entities[ex.actor];
-  ex.t += dt;
-  const k = ex.dur > 0 ? Math.min(1, ex.t / ex.dur) : 1;
+  const nextT = ex.t + dt;
+  const k = ex.dur > 0 ? Math.min(1, nextT / ex.dur) : 1;
   const q = k >= 1 - 1e-9 ? to : lerp2(ex.from!, to, smooth(k));
+  // Standing up has no walk controller: check the next pose against moving neighbours too.
+  // The reservation remains held while waiting, so a new sitter cannot claim this slot.
+  if (ex.phase === 'stand-up') for (const other of Object.values(rt.world.entities)) {
+    if (other.id === a.id || !other.human || other.human.level !== a.human!.level || other.human.activity === 'sit') continue;
+    if (dist2(q,pos2(other)) < HUMAN_RADIUS * 2 + 0.02) return false;
+  }
+  ex.t = nextT;
   a.pose.p[0] = q[0];
   a.pose.p[2] = q[1];
   return k >= 1 - 1e-9;

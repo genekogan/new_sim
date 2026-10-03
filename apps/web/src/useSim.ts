@@ -6,6 +6,7 @@ import type { BrainCall, CameraLine, KernelView, LogEvent, Me, NarrativeView, Pl
 declare const __BUILD__: string;
 
 export type Sim = {
+  takes: { serverTick: number; chunks: {fromTick: number; toTick: number; take: unknown}[]; receivedAt: number };
   conn: Connection; me: Me | null; log: LogEvent[]; brain: BrainCall[]; camera: CameraLine | null; ticker: TickerLine[];
   narratives: Record<string, NarrativeView>; stats: ServerStats | null; bytesPerSec: number;
   /** The meaning layer: things, links, vocabulary, decks (public). */
@@ -16,12 +17,20 @@ export type Sim = {
 export function useSim(getToken: () => Promise<string | null>, authed: boolean): Sim {
   const tokenRef = useRef(getToken); tokenRef.current = getToken;
   const [, force] = useState(0);
-  const s = useRef<Omit<Sim, 'conn'> & { conn: Connection | null; lastBytes: number; lastAt: number }>({ conn: null, me: null, log: [], brain: [], camera: null, ticker: [], narratives: {}, stats: null, bytesPerSec: 0, kernel: null, plays: [], talk: [], lastBytes: 0, lastAt: Date.now() });
+  const s = useRef<Omit<Sim, 'conn'> & { conn: Connection | null; lastBytes: number; lastAt: number; takeEpoch?: string }>({ takes: {serverTick: 0, chunks: [], receivedAt: 0}, conn: null, me: null, log: [], brain: [], camera: null, ticker: [], narratives: {}, stats: null, bytesPerSec: 0, kernel: null, plays: [], talk: [], lastBytes: 0, lastAt: Date.now() });
   if (!s.current.conn) {
     const st = s.current;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     st.conn = new Connection(`${proto}://${location.host}${worldPath}/ws`, () => tokenRef.current(), {
+      onTakes: stream => {
+        const old = stream.serverTick < st.takes.serverTick ? [] : st.takes.chunks;
+        const merged = new Map(old.map(c => [c.toTick, c]));
+        for (const chunk of stream.chunks) merged.set(chunk.toTick, chunk);
+        st.takes = {serverTick: stream.serverTick, chunks: [...merged.values()].sort((a,b) => a.toTick-b.toTick).slice(-12), receivedAt: performance.now()};
+      },
       onWelcome: (me, w) => {
+        if (w.epoch !== st.takeEpoch) st.takes.chunks = [];
+        st.takeEpoch = w.epoch;
         st.me = me;
         // after a deploy, a page still running the old bundle reloads itself (once)
         if (w.build && w.build !== 'dev' && __BUILD__ !== 'dev' && w.build !== __BUILD__ && sessionStorage.getItem('sim.reloaded') !== w.build) { sessionStorage.setItem('sim.reloaded', w.build); location.reload(); }

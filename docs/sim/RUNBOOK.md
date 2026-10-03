@@ -7,6 +7,7 @@ a second admin, so every secret there is readable by both.
 | Thing | Where |
 |---|---|
 | Production | `sim.service` (`User=sim`), `127.0.0.1:4500`, https://sim.eden.art (also https://<eden2-sslip-host>) |
+| Mars | `sim-world@mars`, port 4502, `/srv/sim-data/mars/sim.db`; staging `sim-world-staging@mars`, port 4512, separate staging file |
 | Staging | `sim-staging.service`, `127.0.0.1:4501`, fake brain, own data in `/srv/sim-data-staging`, https://<staging-host> |
 | Code | `/srv/sim/releases/<build>`; `/srv/sim/current` → production, `/srv/sim/staging` → candidate, `/srv/sim/previous` → what production ran before the last deploy. Rsynced from a laptop; the box has no GitHub credentials. The 5 newest releases are kept |
 | Data | `/srv/sim-data/sim.db` (SQLite, WAL) + hourly `backup-YYYYMMDDHH.db` (6 hourly + 7 daily) |
@@ -16,10 +17,26 @@ a second admin, so every secret there is readable by both.
 | Caddy | `/etc/caddy/sites/sim.caddy`, pulled in by one `import sites/*.caddy` line at the end of `/etc/caddy/Caddyfile` |
 | DNS | `sim.eden.art` A record in Route53 (Gene edits DNS) |
 
+## Living-camp activation boundary
+
+`ENABLE_LIVING_WORLD` is currently off. The playback release understands camp
+checkpoints before activation, so it is the compatible code rollback for the subsequent
+living-camp milestone. Enable only in Mars's per-world env after the 48-day proof and
+stage qualification; never in the shared toy env. The day is 72,000 engine ticks, with
+quiet resumable checkpoints, fresh Runtime at first light, private journals and no
+activity timetable. Recovery receipts hold a private checkpoint/suffix recipe, exposed
+publicly only as card fault counts; three faults quarantine a card.
+
+Take chunks currently remain in compressed SQLite storage (measured camp ~13 KB/s).
+R2 take archival remains to be connected; do not prune chunks before archive/read-back
+proof. The model ledger is independent of trace pruning and budget changes. Unknown
+model prices refuse admission; uncertain transport failures retain the reservation.
+
 ## Operations
 
 ```bash
-infra/deploy.sh                # type check + tests + web build → new release → staging smoke test → production flip
+infra/deploy.sh --stage         # checks/build → staging + browser proof
+infra/deploy.sh --promote BUILD # promote that exact qualified staging release
 infra/rollback.sh [<build>]    # production back to /srv/sim/previous (or a named release); running it twice swaps back
 ssh root@eden2 'systemctl status sim sim-staging litestream sim-watch.timer --no-pager'
 ssh root@eden2 'journalctl -u sim -n 100 --no-pager'

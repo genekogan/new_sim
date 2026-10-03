@@ -59,6 +59,7 @@ export type RuntimeSnapshot = {
   data: unknown;
   spatialEpoch?: number;
   nextId: number;
+  idPrefix?: string;
   /** rt.events.length at the pause; the restored runtime's events start empty (continue the stream from here). */
   eventCursor: number;
   violations: Violation[];
@@ -76,6 +77,7 @@ export type RuntimeInternals = {
   live: Map<string, LiveEntry>;
   owners: Map<string, { action: string; mode: 'exclusive' | 'shared' }[]>;
   nextId: number;
+  idPrefix?: string;
   forceFinish(l: LiveEntry, status: 'cancelled', d: Diagnostic): void;
 };
 
@@ -191,6 +193,7 @@ export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotO
     data,
     spatialEpoch,
     nextId: int.nextId,
+    idPrefix: int.idPrefix,
     eventCursor: rt.events.length,
     violations: structuredClone(rt.violations),
     dropped: refused,
@@ -300,6 +303,7 @@ export function applySnapshot(rt: Runtime, int: RuntimeInternals, snap: RuntimeS
   }
   for (const [k, list] of g.owners) int.owners.set(k, list);
   int.nextId = snap.nextId;
+  int.idPrefix = snap.idPrefix ?? 'a';
   rt.violations.push(...structuredClone(snap.violations));
   for (const d of g.dropped) {
     const rec = rt.records.get(d.id)!;

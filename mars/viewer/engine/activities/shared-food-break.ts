@@ -366,6 +366,7 @@ function intervention(rt: Runtime, ex: Exec): Diagnostic | undefined {
       ) ||
       rec.id === ex.id ||
       rec.verb === 'hold_items' ||
+      (rec.verb === 'walk_to' && rec.internalCause === 'traffic.make-way') ||
       owned(rt, rec.id, ex.id)
     )
       continue;

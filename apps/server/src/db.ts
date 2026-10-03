@@ -2,6 +2,7 @@
 import { DatabaseSync, backup } from 'node:sqlite';
 import { statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { migrate } from './migrations.ts';
 import type { BrainCall, LogEvent, NarrativeView, TalkLine } from '@sim/protocol';
 
@@ -20,6 +21,29 @@ export class Db {
     this.migrated = migrate(this.db);
   }
   migrated: number[] = [];
+
+  paidCost(now = Date.now()): number {
+    return Number((this.db.prepare('SELECT COALESCE(SUM(cost),0) AS cost FROM paid_costs WHERE at >= ?').get(now - 86400_000) as { cost: number }).cost);
+  }
+  reserveCost(bound: number, model: string, budget: number, now = Date.now()) {
+    if (!Number.isFinite(bound) || bound < 0 || !Number.isFinite(budget) || this.paidCost(now) + bound > Math.min(1, budget)) throw new Error('world model budget cannot cover this request');
+    const id = Number(this.db.prepare('INSERT INTO paid_costs(at,model,cost) VALUES (?,?,?)').run(now, model, bound).lastInsertRowid);
+    return { settle: (cost: number) => {
+      if (!Number.isFinite(cost) || cost < 0) return;
+      this.db.prepare('UPDATE paid_costs SET cost = ?, settled = 1 WHERE id = ?').run(cost, id);
+      if (cost > bound) throw new Error('provider cost exceeded its admission bound');
+    } };
+  }
+
+  saveTake(worldId: string, chunk: {fromTick: number; toTick: number; take: unknown}) {
+    const body = gzipSync(JSON.stringify(chunk.take), {level: 1});
+    this.db.prepare('INSERT OR IGNORE INTO take_chunks VALUES (?,?,?,?)').run(worldId, chunk.fromTick, chunk.toTick, body);
+  }
+  takes(worldId: string, from: number, to: number, limit: number) {
+    const rows = this.db.prepare('SELECT from_tick, to_tick, body FROM take_chunks WHERE world_id = ? AND to_tick > ? AND from_tick < ? ORDER BY to_tick LIMIT ?').all(worldId, from, to, limit + 1) as {from_tick: number; to_tick: number; body: Uint8Array}[];
+    const selected = rows.slice(0, limit);
+    return { chunks: selected.map(r => ({fromTick: r.from_tick, toTick: r.to_tick, take: JSON.parse(gunzipSync(r.body).toString())})), next: rows.length > limit ? selected.at(-1)!.to_tick : null };
+  }
 
   // worlds
   world(id: string) { return this.db.prepare('SELECT * FROM worlds WHERE id = ?').get(id) as { id: string; schema: string; rules_version: string; dt: number; seed: string; clock_rate: number } | undefined; }
