@@ -19,7 +19,8 @@ a second admin, so every secret there is readable by both.
 
 ## Living-camp activation boundary
 
-`ENABLE_LIVING_WORLD` is currently off. The playback release understands camp
+`ENABLE_LIVING_WORLD` is a Mars-only activation flag; see MERGE-LOG for the
+current deployed setting. The playback release understands camp
 checkpoints before activation, so it is the compatible code rollback for the subsequent
 living-camp milestone. Enable only in Mars's per-world env after the 48-day proof and
 stage qualification; never in the shared toy env. The day is 72,000 engine ticks, with
