@@ -6,6 +6,7 @@ const budget = Number(env.BRAIN_BUDGET_USD_PER_DAY ?? 0.5);
 const worldKey = env.WORLD_KEY ?? 'toy';
 if (!['toy', 'mars', 'littlemartians', 'eden'].includes(worldKey)) throw new Error('invalid WORLD_KEY');
 export const config = {
+  archiveTakes: env.ARCHIVE_TAKES === '1',
   r2: {account:env.R2_ACCOUNT_ID,bucket:env.R2_BUCKET,endpoint:env.R2_ENDPOINT,access:env.R2_ACCESS_KEY_ID,secret:env.R2_SECRET_ACCESS_KEY,prefix:env.R2_PREFIX??'sim'},
   worldKey,
   livingWorld: env.ENABLE_LIVING_WORLD === '1',

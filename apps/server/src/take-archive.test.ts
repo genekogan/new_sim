@@ -30,3 +30,6 @@ test('absent R2 keeps all local history; checksum damage is rejected',async()=>{
 test('archives are world isolated and recent replay needs no network',async()=>{
  const f=fixture();try{f.fill(0);f.db.saveTake('other',{fromTick:0,toTick:20,take:{secret:'another world'}});await f.archive.archiveOne(6000);f.store.get=async()=>{throw Error('offline');};const p=await f.archive.read(0,6000,120);assert.equal(p.chunks.length,120);assert.ok(p.chunks.every(c=>(c.take as {frames:unknown}).frames));assert.equal(f.db.takes('other',0,20,1).chunks.length,1);}finally{f.db.close();}
 });
+test('staging and production archives cannot share object keys',async()=>{
+ const f=fixture();try{f.fill(0);await f.archive.archiveOne(6000);f.db.db.exec('DELETE FROM take_archives');const staged=new TakeArchive(f.db,'w',f.store,'test/staging');await staged.archiveOne(6000);assert.equal(f.objects.size,2);assert.ok(f.objects.has('test/w/0.json.gz'));assert.ok(f.objects.has('test/staging/w/0.json.gz'));}finally{f.db.close();}
+});

@@ -28,7 +28,9 @@ quiet resumable checkpoints, fresh Runtime at first light, private journals and 
 activity timetable. Recovery receipts hold a private checkpoint/suffix recipe, exposed
 publicly only as card fault counts; three faults quarantine a card.
 
-Take chunks keep a rolling 24-hour buffer in compressed SQLite storage (measured
+Take archival requires `ARCHIVE_TAKES=1` in the per-world env; local development
+is off by default. Staging must use `R2_PREFIX=sim/staging` with its own data,
+never production's take keys. Take chunks keep a rolling 24-hour buffer in compressed SQLite storage (measured
 camp ~13 KB/s). Completed five-minute segments are compressed in a worker and
 archived under `${R2_PREFIX}/takes/<world-id>/<segment>.json.gz`; manifests stay in
 the world database. Upload, metadata receipt and SHA-256 read-back must all pass
