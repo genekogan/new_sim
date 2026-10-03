@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { getRequestListener } from '@hono/node-server';
-import { toyFactory } from '@sim/engine-toy';
+import { recordedToyFactory } from './toy-takes.ts';
 import { Auth } from './auth.ts';
 import { Brain } from './brain.ts';
 import { config } from './config.ts';
@@ -31,7 +31,7 @@ const db = new Db(join(config.dataDir, 'sim.db'));
 const definition = worldDefinition(config.worldKey);
 if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(', ')}`);
 // Each process owns one world and imports its engine from this release.
-const factory = config.engine === 'mars' ? await (await import('@sim/engine-mars')).marsFactory() : toyFactory;
+const factory = config.engine === 'mars' ? await (await import('@sim/engine-mars')).marsFactory() : recordedToyFactory;
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId);
 const boot = host.boot();
 console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);

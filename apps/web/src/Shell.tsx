@@ -54,7 +54,7 @@ export function Shell({ cfg, auth }: { cfg: Cfg; auth: AuthCtx }) {
       <main>
         <div className="grid">
           {tab === 'watch' && <Intro authed={auth.authed} login={auth.login} go={() => setTab('my soul')} souls={r.souls.size} />}
-          {show('watch', 'world') && cfg.worldId !== 'toy-1' && <LiveWorld sim={sim} selected={selected} onSelect={setSelected} />}
+          {show('watch', 'world') && <LiveWorld sim={sim} selected={selected} onSelect={setSelected} />}
           {show('watch', 'world') && <WorldPanel sim={sim} mine={mine} selected={selected} onSelect={setSelected} />}
           {show('watch', 'world', 'story') && <BroadcastPanel sim={sim} />}
           {tab === 'watch' && <HeardPanel sim={sim} />}

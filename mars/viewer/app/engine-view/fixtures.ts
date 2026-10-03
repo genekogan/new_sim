@@ -279,7 +279,19 @@ export class FixtureViews {
     const color = d?.color ?? '#b08a5a';
     const v: Partial<View> = { key: e.def, prev: poseOf(e), cur: poseOf(e) };
     let obj: THREE.Object3D;
-    if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
+    if (e.def === 'bench') obj = this.bench(2.4, 0.45, 0.65, color);
+    else if (e.def === 'kiosk') {
+      const kiosk = new THREE.Group();
+      kiosk.add(this.box('#b08a5a', 0, 0, 0, 2.4, 1.0, 1.6));
+      kiosk.add(this.box('#657961', 0, 2.1, 0, 3.0, 0.12, 2.2));
+      for (const x of [-1.1, 1.1]) for (const z of [-0.7, 0.7]) kiosk.add(this.box('#927454', x, 1.0, z, 0.12, 1.1, 0.12));
+      obj = kiosk;
+    } else if (e.def === 'gate') {
+      const gate = new THREE.Group();
+      for (const x of [-1.5, 1.5]) gate.add(this.box('#927454', x, 0, 0, 0.2, 2.6, 0.2));
+      gate.add(this.box('#927454', 0, 2.4, 0, 3.2, 0.2, 0.2));
+      obj = gate;
+    } else if (e.def === 'bench-6ft') obj = this.bench(sx, sy, sz, color);
     else if (e.def === 'camp-chair') obj = this.chair(sx, sy, sz, color);
     else if (e.def === 'garden-planter' && (e as Entity & { planting?: { kind: string } }).planting?.kind === 'seedbed-v1') {
       v.seedbed = seedbedObject(this.box.bind(this), sx, sy, sz, color);

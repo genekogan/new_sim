@@ -75,8 +75,10 @@ export function quantize(e: Entity, t: number): PoseSample {
 const sameValues = (a: PoseSample, b: PoseSample) => a.length === b.length && a.every((v, i) => i === 0 || v === b[i]);
 const samePos = (a: PoseSample, b: PoseSample) => a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
 
+/** Recording needs state and events, not the engine scheduler or its services. */
+export type TakeSource = Pick<Runtime, 'world' | 'tick' | 'stateHash' | 'events' | 'observers'>;
 export class TakeRecorder implements RuntimeObserver {
-  readonly rt: Runtime;
+  readonly rt: TakeSource;
   readonly opts: Required<Pick<RecorderOptions, 'keyframeEvery'>> & RecorderOptions;
   private tol: { pos: number; ang: number };
   readonly startTick: number;
@@ -89,7 +91,7 @@ export class TakeRecorder implements RuntimeObserver {
   private cursor: number;
   private finished = false;
 
-  constructor(rt: Runtime, opts: RecorderOptions) {
+  constructor(rt: TakeSource, opts: RecorderOptions) {
     this.rt = rt;
     this.opts = { ...opts, keyframeEvery: opts.keyframeEvery ?? 20 };
     const tol = opts.tol ?? TRACK_TOL;
