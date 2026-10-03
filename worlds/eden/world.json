@@ -1,0 +1,19 @@
+{
+  "id": "eden",
+  "worldId": "eden-1",
+  "name": "Eden",
+  "engine": "mars",
+  "capabilities": [
+    "humanoid"
+  ],
+  "dayTicks": 72000,
+  "scene": "greenfield",
+  "customs": [],
+  "cast": [
+    {
+      "name": "Eden",
+      "description": "An idle humanoid in a literal green field, waiting for the owner\u2019s direction."
+    }
+  ],
+  "cardPack": "idle"
+}

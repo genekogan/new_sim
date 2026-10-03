@@ -277,7 +277,7 @@ export class HumanViews {
     ).map(e => String(e.equipment!.config.user)));
     let fx: Fixtures | undefined;
     for (const e of Object.values(world.entities)) {
-      if (e.kind !== 'human' || !e.human) continue;
+      if (e.kind !== 'human' || !e.human || e.body?.family==='floater') continue;
       const act = e.human.activity;
       const base = baseOf(act, e.human.baseActivity);
       let v = this.views.get(e.id);

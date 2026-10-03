@@ -1,7 +1,8 @@
 // Floater movement planning. A floater moves like a humanoid on the ground plane — the same Spatial
 // route planner, the same obstacles, the same grid and clearance rules, only its own radius — and is
-// drawn at a constant hover above the route. Nothing in spatial/ or locomotion/ changes: this module
-// builds its own Spatial over a *link-filtered copy* of the scene.
+// drawn at a constant hover above the route. The walk controller selects this derived Spatial and
+// body profile for floaters; humanoids retain the original planner and motion. This module builds
+// its own Spatial over a link-filtered copy of the scene.
 //
 // Level changes: a floater cannot use stairs, ladders, climbs or beams. It changes level only through
 // a link the scene author declared passable for floaters (an `opening`: a stairwell void, an atrium, a
@@ -30,7 +31,7 @@ export const floaterPassable = (link: Link, openings: ReadonlySet<string>) => op
 
 /** Links as a floater sees them: impassable kinds become unusable with a named reason. Input untouched. */
 export function floaterLinks(links: readonly Link[], openings: ReadonlySet<string>): Link[] {
-  return links.map((l) => (floaterPassable(l, openings) ? l : { ...l, usable: false, reason: linkReason(l.kind) }));
+  return links.map((l) => (openings.has(l.id)?{...l,usable:true}:floaterPassable(l, openings) ? l : { ...l, usable: false, reason: linkReason(l.kind) }));
 }
 
 /** A copy of the scene with floater link rules applied. */

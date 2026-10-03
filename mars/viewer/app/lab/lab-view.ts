@@ -1,3 +1,8 @@
+import {WorldGeometry} from '../../../../apps/web/src/WorldGeometry.ts';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+import {FloaterView,KinScenery} from '../engine-view/floaters.ts';
+import {LITTLE_MARTIANS_RENDER} from '../../engine/scenarios/littlemartians.ts';
 import { readReadingCircle } from '../../engine/activities/reading-circle.ts';
 import { readArtSharing } from '../../engine/activities/art-sharing.ts';
 import { groupWarmupAttention } from '../../engine/activities/group-warmup.ts';
@@ -53,6 +58,10 @@ export class LabView {
   private agents = new AgentOverlays();
   private groups: Record<OverlayName, THREE.Group>;
   private statics?: Backdrop;
+  private floaters=new FloaterView(this.scene,{baseUrl:'/world-assets/littlemartians/characters',dracoDecoderPath:'/mars-assets/draco/'});
+  private kin=new KinScenery(this.scene,{baseUrl:'/world-assets/littlemartians/characters',dracoDecoderPath:'/mars-assets/draco/'});
+  private buildingDecoder=new DRACOLoader().setDecoderPath('/mars-assets/draco/');
+  private buildingLoader=new GLTFLoader().setDRACOLoader(this.buildingDecoder);
   private resources = new ThreeResources();
   private abort = new AbortController();
   private raf = 0;
@@ -122,7 +131,15 @@ export class LabView {
     this.sleepMat.sync(rt.world, this.sim.scenario.name.startsWith('ground-sleep') || (this.sim.scenario.name.startsWith('prepared-day') || this.sim.scenario.name.startsWith('living-day')));
     this.statics?.dispose();
     if (this.statics) this.scene.remove(this.statics.group);
+    for(const id of this.floaters.ids())this.floaters.remove(id);this.kin.place([]);
+    for(const e of Object.values(rt.world.entities))if(e.body?.family==='floater')this.floaters.add(e.id,e.body);
     this.statics = yearBackdrop(rt, (m) => (this.error = m)) ?? new StaticScene(rt.services.spatial.base, this.sim.scenario.name === 'design-studio' ? { ground: '#d7d7d0', wall: '#f0eee5' } : undefined);
+    if(rt.world.base.campus==='littlemartians'){
+      this.statics.dispose();const geometry=new WorldGeometry(rt.services.spatial.base);this.statics=geometry;
+      this.kin.place(LITTLE_MARTIANS_RENDER.kin.map(k=>({...k,p:k.p as [number,number,number]})));void geometry.addBuildings(LITTLE_MARTIANS_RENDER.buildings as {file:string;p:[number,number,number];yaw?:number}[],this.buildingLoader).then(f=>{if(f.length)this.error=`Buildings could not load: ${f.join(', ')}`;});
+    }else if(rt.world.base.campus==='greenfield'){
+      this.statics.dispose();this.statics=new StaticScene(rt.services.spatial.base,{ground:'#76a454',wall:'#e3d6bd'});
+    }
     this.scene.add(this.statics.group);
     const fog = this.scene.fog as THREE.Fog;
     [fog.near, fog.far] = this.statics.fog ?? [70, 160];
@@ -330,6 +347,8 @@ export class LabView {
     this.components.render(alpha);
     this.fixtures.render(this.sim.rt.time, alpha);
     this.humans.render(alpha, this.reach);
+    for(const e of Object.values(this.sim.rt.world.entities))if(e.body?.family==='floater')this.floaters.setPose(e.id,{p:e.pose.p,yaw:e.pose.yaw,pitch:e.pose.pitch??0,roll:e.pose.roll??0,state:{},activity:e.human?.activity??'idle',speed:e.human?.speed??0},this.sim.rt.tick,0.05);
+    this.kin.update(this.sim.rt.tick,0.05);
     this.components.attachHeld(this.humans);
     this.syncOverlays();
     this.renderer.render(this.scene, this.camera);
@@ -360,6 +379,7 @@ export class LabView {
     this.agents.clear();
     this.sleepMat.dispose();
     this.statics?.dispose();
+    this.floaters.dispose();this.kin.dispose();this.buildingDecoder.dispose();
     this.components.dispose();
     this.fixtures.dispose();
     this.resources.dispose();

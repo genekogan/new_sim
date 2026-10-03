@@ -5,7 +5,7 @@ import sys
 
 release = pathlib.Path(sys.argv[1])
 if not (release / 'apps/server/src/mandate.ts').exists():
-    for filename in sys.argv[2:] or ['/srv/sim-data/sim.db', '/srv/sim-data/mars/sim.db']:
+    for filename in sys.argv[2:] or ['/srv/sim-data/sim.db', '/srv/sim-data/mars/sim.db','/srv/sim-data/littlemartians/sim.db','/srv/sim-data/eden/sim.db']:
         path = pathlib.Path(filename)
         if not path.exists():
             continue

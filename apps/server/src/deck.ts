@@ -13,6 +13,7 @@ export function engineRef(host: WorldHost, id: string): string | [number, number
   for (let t: Thing | undefined = k.things[id], n = 0; t && n < 6; t = t.at ? k.things[t.at] : undefined, n++) {
     if (typeof t.traits.body === 'string') return t.traits.body;
     if (typeof t.traits.entity === 'string') return t.traits.entity;
+    if(host.engine.world.regions[t.id])return t.id;
     if (Array.isArray(t.traits.point)) return t.traits.point as [number, number];
   }
   return null;

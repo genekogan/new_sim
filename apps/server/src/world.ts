@@ -407,8 +407,10 @@ export class WorldHost {
     for (const m of this.minds.values()) {
       if (!m.life) continue;
       const e = this.engine.world.entities[m.entityId]; if (!e?.human) continue;
-      const nearby = [...this.mindByEntity.values()].some(other => { const b = this.engine.world.entities[other.entityId]; return other !== m && b && Math.hypot(e.pose.p[0] - b.pose.p[0], e.pose.p[2] - b.pose.p[2]) < 4; });
-      advanceNeeds(m.life, tick, e.human.activity, nearby); m.energy = m.life.needs.energy;
+      const floater=(e as unknown as {body?:{family:string}}).body?.family==='floater';
+      const nearby = [...this.mindByEntity.values()].some(other => { const b = this.engine.world.entities[other.entityId]; return other !== m && b && (!floater || Math.abs(e.pose.p[1]-b.pose.p[1])<2) && Math.hypot(e.pose.p[0] - b.pose.p[0], e.pose.p[2] - b.pose.p[2]) < 4; });
+      const resting=floater&&!!this.engine.bodyResting?.(m.entityId),recharging=resting&&/bask|recharge/.test(m.doing);
+      advanceNeeds(m.life, tick, resting?'rest':e.human.activity, nearby, recharging, floater); m.energy = m.life.needs.energy;
     }
   }
 

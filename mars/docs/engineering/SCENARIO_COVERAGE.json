@@ -12,13 +12,13 @@
     "unique63": true
   },
   "summary": {
-    "totalSelectable": 65,
+    "totalSelectable": 68,
     "categories": {
       "manual-journey": 39,
       "scripted": 21,
       "diagnostic": 1,
       "continuous": 1,
-      "probe": 1,
+      "probe": 4,
       "conditional-construction": 2
     },
     "recordedCoverageGrades": {
@@ -27,7 +27,8 @@
       "recorded-exact-diagnostic": 1,
       "recorded-ui-play-bounded-liveness": 1,
       "recorded-still-probe": 1,
-      "recorded-actual-ui-play-supported-layout": 2
+      "recorded-actual-ui-play-supported-layout": 2,
+      "successor-focused-browser": 3
     },
     "exactCurrentSourceNativeFullGatePassed": false,
     "exactFunctionalInheritedFocusedUiJourneys": 3,
@@ -3579,6 +3580,27 @@
       "proofRefs": [
         "closingFocusedLibraryContact"
       ]
+    },
+    "eden-camp-snapshot": {
+      "file": "viewer/engine/test/world-snapshots.test.ts",
+      "name": "world snapshot: eden-camp-snapshot is browser-local, clock-free and has no Soul ownership",
+      "method": "node-fixture",
+      "outcome": "candidate",
+      "proofRefs": []
+    },
+    "littlemartians-snapshot": {
+      "file": "viewer/engine/test/world-snapshots.test.ts",
+      "name": "world snapshot: littlemartians-snapshot is browser-local, clock-free and has no Soul ownership",
+      "method": "node-fixture",
+      "outcome": "candidate",
+      "proofRefs": []
+    },
+    "greenfield-snapshot": {
+      "file": "viewer/engine/test/world-snapshots.test.ts",
+      "name": "world snapshot: greenfield-snapshot is browser-local, clock-free and has no Soul ownership",
+      "method": "node-fixture",
+      "outcome": "candidate",
+      "proofRefs": []
     }
   },
   "nodeFixtureCatalog": {
@@ -4714,6 +4736,24 @@
         "Actual UI Play: held-transfer Pause/End and Reset epoch cleanup"
       ],
       "limits": "One reader and two pre-authored grounded tables/chairs; a 24-second hypothetical book purpose relocates after seven seconds. No single-chair relocation, arbitrary rebind, generated text, active reload restoration or universal recovery if both release supports become unavailable."
+    },
+    "eden-camp-snapshot": {
+      "terminal": "Inspect the place or give an ordinary browser-local direction; Reset restores the authored snapshot.",
+      "retainedEffects": [],
+      "disruptionsWithRecordedChecks": [],
+      "limits": "No world clock, Soul minds, owners or persistent server mutations. This is a Lab snapshot, not autonomous life."
+    },
+    "littlemartians-snapshot": {
+      "terminal": "Inspect the place or give an ordinary browser-local direction; Reset restores the authored snapshot.",
+      "retainedEffects": [],
+      "disruptionsWithRecordedChecks": [],
+      "limits": "No world clock, Soul minds, owners or persistent server mutations. This is a Lab snapshot, not autonomous life."
+    },
+    "greenfield-snapshot": {
+      "terminal": "Inspect the place or give an ordinary browser-local direction; Reset restores the authored snapshot.",
+      "retainedEffects": [],
+      "disruptionsWithRecordedChecks": [],
+      "limits": "No world clock, Soul minds, owners or persistent server mutations. This is a Lab snapshot, not autonomous life."
     }
   },
   "scenarios": [
@@ -7670,6 +7710,105 @@
       "boundedNextTest": "Freeze combined source, run full gate, publish then verify three exact public library Play cases.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities"
+    },
+    {
+      "id": "eden-camp-snapshot",
+      "title": "Eden camp \u00b7 snapshot of the place",
+      "category": "probe",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/world-snapshots.ts"
+      ],
+      "startControls": [
+        "Select snapshot",
+        "Play or give direction"
+      ],
+      "setupNotes": [
+        "Paused authored place; no server state."
+      ],
+      "contractRef": "eden-camp-snapshot",
+      "coverageGrade": "successor-focused-browser",
+      "currentSourceProofRelationship": "Successor candidate: focused actual direction/Play/Pause/Reset/reload passed; node fixtures and inherited source evidence are separate.",
+      "testRefs": [
+        "eden-camp-snapshot"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "world-snapshots.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Broader activity journeys beyond directed movement."
+      ],
+      "boundedNextTest": "Broader activity journeys remain unqualified; focused direction/Play/Reset/reload passed in .merge-work/proof/worlds-browser-focus/receipt.json.",
+      "discoveryGroup": "snapshots"
+    },
+    {
+      "id": "littlemartians-snapshot",
+      "title": "Little Martians \u00b7 ceramic garden snapshot",
+      "category": "probe",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/world-snapshots.ts"
+      ],
+      "startControls": [
+        "Select snapshot",
+        "Play or give direction"
+      ],
+      "setupNotes": [
+        "Paused authored place; no server state."
+      ],
+      "contractRef": "littlemartians-snapshot",
+      "coverageGrade": "successor-focused-browser",
+      "currentSourceProofRelationship": "Successor candidate: focused actual direction/Play/Pause/Reset/reload passed; node fixtures and inherited source evidence are separate.",
+      "testRefs": [
+        "littlemartians-snapshot"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "world-snapshots.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Broader activity journeys beyond directed movement."
+      ],
+      "boundedNextTest": "Broader activity journeys remain unqualified; focused direction/Play/Reset/reload passed in .merge-work/proof/worlds-browser-focus/receipt.json.",
+      "discoveryGroup": "snapshots"
+    },
+    {
+      "id": "greenfield-snapshot",
+      "title": "Eden \u00b7 green field snapshot",
+      "category": "probe",
+      "engineContinuousFlag": false,
+      "sourceFiles": [
+        "viewer/app/lab/world-snapshots.ts"
+      ],
+      "startControls": [
+        "Select snapshot",
+        "Play or give direction"
+      ],
+      "setupNotes": [
+        "Paused authored place; no server state."
+      ],
+      "contractRef": "greenfield-snapshot",
+      "coverageGrade": "successor-focused-browser",
+      "currentSourceProofRelationship": "Successor candidate: focused actual direction/Play/Pause/Reset/reload passed; node fixtures and inherited source evidence are separate.",
+      "testRefs": [
+        "greenfield-snapshot"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "world-snapshots.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Broader activity journeys beyond directed movement."
+      ],
+      "boundedNextTest": "Broader activity journeys remain unqualified; focused direction/Play/Reset/reload passed in .merge-work/proof/worlds-browser-focus/receipt.json.",
+      "discoveryGroup": "snapshots"
     }
   ],
   "unprovedLegacyChecks": {
@@ -8049,6 +8188,10 @@
     {
       "id": "construction",
       "title": "Source-checked construction journeys"
+    },
+    {
+      "id": "snapshots",
+      "title": "Snapshots of persistent places"
     }
   ],
   "failureResolutions": [
@@ -8085,5 +8228,10 @@
     "candidateRegisteredTotal": 65,
     "status": "Reviewed registered core31PASS; all3 authored library actual Play cases executed PASS at a4d6582,8inspected captures plus3supplementalcloseups; final combined gate/public pending.",
     "focusedPlayProofRef": "closingFocusedLibraryContact"
+  },
+  "successorSnapshotProof": {
+    "path": "~/Eden/.merge-work/proof/worlds-browser-focus/receipt.json",
+    "sha256": "c55e08f76e98d88799e614a2bafab849dedc59f97dab93949daab86efa6e213a",
+    "scope": "Three actual ordinary directed moves, including tower level13; Play/Pause, Reset, reload exact tick/poses, zero server API requests or page errors. Live view assets/follow separately recorded. No broader snapshot activity claim."
   }
 }

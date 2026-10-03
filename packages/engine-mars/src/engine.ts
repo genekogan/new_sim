@@ -33,7 +33,9 @@ type Prog = {
   blockedSince?: number;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
 };
-export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp'; clock?: { origin: number; dayTicks: number }; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
+export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
 
 const secs = (v: unknown, d: number) => Math.round(Math.min(3600, Math.max(0.5, typeof v === 'number' ? v : d)) * TPS);
@@ -234,23 +236,27 @@ export class MarsEngine implements Engine {
   private plan(verb: string, params: unknown): Diag | null {
     const def = this.registry.get(verb); if (!def) return { code: 'action.unknown-verb', message: `no action verb "${verb}"` };
     const parsed = def.schema.safeParse(params); if (!parsed.success) return { code: 'action.invalid-params', message: parsed.error.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join('; ') };
+    const body=this.m.admitFloaters(verb,parsed.data,(id:string)=>this.ents[id]?.body);
+    if(body.status==='refuses')return {code:body.reason,message:body.note};
     const r = def.plan(this.rt, parsed.data);
     return r.ok ? null : { code: r.diagnostic.code, message: r.diagnostic.message };
   }
   /** A reachable standing point `standoff` metres from a target, on the side the actor comes from if possible. 'here' if already there. */
-  private goalNear(actor: string, to: unknown, standoff: number): { x: number; z: number } | 'here' | Diag {
+  private goalNear(actor: string, to: unknown, standoff: number): { x: number; z: number; level: number } | 'here' | Diag {
     const me = this.pos(actor)!, t = this.pointOf(to);
     if (!t) return { code: 'target.unknown', message: `nothing to walk to: ${JSON.stringify(to)}` };
+    const level = typeof to === 'string' ? (this.rt.world.regions[to]?.level ?? this.ents[to]?.human?.level ?? this.ents[actor].human.level) : this.ents[actor].human.level;
     const dx = me[0] - t[0], dz = me[1] - t[1], d = Math.hypot(dx, dz);
     const isBody = typeof to === 'string' && !!this.ents[to];
-    const off = Math.max(standoff, isBody ? 0.9 : 0);
-    if (d <= off + 0.4) return 'here';
+    const room=this.cfg.scene==='littlemartians'&&typeof to==='string'&&this.rt.world.regions[to]?.kind==='place';
+    const off = Math.max(standoff, isBody ? 0.9 : room?1.4:0);
+    if (d <= off + 0.4 && level === this.ents[actor].human.level) return 'here';
     const base = Math.atan2(dz, dx);
     let last: Diag = { code: 'route.unreachable', message: 'no reachable standing point near the target' };
     for (const turn of off === 0 ? [0] : [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
       const x = r3(t[0] + Math.cos(base + turn) * off), z = r3(t[1] + Math.sin(base + turn) * off);
-      const no = this.plan('walk_to', { actor, x, z });
-      if (!no) return { x, z };
+      const no = this.plan('walk_to', { actor, x, z, level });
+      if (!no) return { x, z, level };
       last = no;
     }
     return last;
@@ -275,7 +281,7 @@ export class MarsEngine implements Engine {
         const g = this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
-        const ops: Op[] = [{ verb: 'walk_to', params: { actor: me, x: g.x, z: g.z }, settle: 'done' }];
+        const ops: Op[] = [{ verb: 'walk_to', params: { actor: me, x: g.x, z: g.z, level:g.level }, settle: 'done' }];
         if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
@@ -300,7 +306,7 @@ export class MarsEngine implements Engine {
         // No place to take (a full bench, a spot with no layout): stand near it instead.
         const g = this.goalNear(me, a.at, 2);
         if (g !== 'here' && 'code' in g) return g;
-        return [...(g === 'here' ? [] : [{ verb: 'walk_to', params: { actor: me, x: g.x, z: g.z }, settle: 'done' } as Op]), { wait: n }];
+        return [...(g === 'here' ? [] : [{ verb: 'walk_to', params: { actor: me, x: g.x, z: g.z, level:g.level }, settle: 'done' } as Op]), { wait: n }];
       }
       case 'sit': return [{ verb: 'sit', params: { actor: me, fixture: String(a.on ?? '') }, settle: 'held' }, { wait: secs(a.seconds, 60) }];
       case 'stand': return this.holders(me).length ? [{ verb: 'stand', params: { actor: me }, settle: 'done', soft: true }] : [];
@@ -366,6 +372,7 @@ export class MarsEngine implements Engine {
     this.end(p, 'cancelled', { code: 'program.stopped', message: 'stopped' });
   }
   programOf(actor: string) { return this.byActor.get(actor) ?? null; }
+  bodyResting(actor:string) { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined; return !!p && p.until!==undefined && p.steps[p.index]?.verb==='rest' && !this.ents[actor]?.human?.task; }
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord { return this.rt.submit(verb, params, opts) as ActionRecord; }
   cancel(id: string, reason?: Diag): ActionRecord { return this.rt.cancel(id, reason) as ActionRecord; }
 
@@ -374,19 +381,20 @@ export class MarsEngine implements Engine {
   spawnHuman({ id, label, soul }: { id: string; label: string; soul: string }): string {
     if (this.ents[id]) return id;
     const [ax, az] = this.cfg.arrival;
+    const body=this.cfg.scene==='littlemartians'&&['Verdelis','Kalama','Kweku','Mycos','Ada','Shuijing','Nyx'].includes(label)?{family:'floater',model:label.toLowerCase(),radius:.35,hoverHeight:1.45}:undefined;
     const people = Object.values(this.ents).filter((e: any) => e.kind === 'human').map((e: any) => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     let spot: [number, number] | null = null;
     search: for (let ring = 0; ring < 6; ring++) for (let k = 0; k < Math.max(1, ring * 6); k++) {
       const ang = (k / Math.max(1, ring * 6)) * Math.PI * 2 + ring * 0.5, x = r3(ax + Math.cos(ang) * ring * 0.9), z = r3(az + Math.sin(ang) * ring * 0.9);
       if (people.some(([px, pz]) => Math.hypot(px - x, pz - z) < 0.8)) continue;
-      this.ents[id] = this.m.human(id, x, z, { label });
+      this.ents[id] = this.m.human(id, x, z, { label }); if(body)this.ents[id].body=body;
       const ok = !this.plan('walk_to', { actor: id, x: this.cfg.reference[0], z: this.cfg.reference[1] }) || !this.plan('walk_to', { actor: id, x: ax, z: az });
       delete this.ents[id];
       if (ok) { spot = [x, z]; break search; }
     }
     if (!spot) throw new Error('no free standing room at the arrival point');
     const e = this.m.human(id, spot[0], spot[1], { label, provenance: { origin: 'simulation', confidence: 'hypothetical' } });
-    e.human.soul = soul;
+    e.human.soul = soul; if(body)e.body=body;
     this.ents[id] = e; this.m.canonicalEntityOrder(this.rt.world);
     this.out.changes.push([this.rt.tick, id, 'present', e]);
     return id;
@@ -436,7 +444,7 @@ export class MarsEngine implements Engine {
       if (near[0]) e.human.attention = [near[0].o.pose.p[0], near[0].o.pose.p[2]];
     }
   }
-  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: this.cfg.clock ?? null}; }
+  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: this.cfg.clock ?? null,...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),ground:this.cfg.scene==='greenfield'?'grass':undefined}; }
   actorBorrowed(actor: string) {
     return !this.byActor.has(actor) && this.holders(actor).some(id => ['shared_food_break','converse','classroom_session','computer_music','campfire_circle','group_warmup'].includes(this.rt.records.get(id)?.verb));
   }
@@ -529,6 +537,8 @@ export class MarsEngine implements Engine {
     return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, quiet: this.quiet });
   }
   canSnapshot(): boolean {
+    // A legacy formation callback is not data and must wait for a quiet point.
+    for(const live of this.rt.live.values())if(typeof live.exec?.detour?.clearOf==='function')return false;
     for (const r of this.rt.records.values()) if (this.rt.isActive(r.id) && this.m.nonResumableReason(this.registry.get(r.verb))) return false;
     return true;
   }
@@ -544,9 +554,11 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
   return {
     rulesVersion: `sim-mars/1+${m.rulesVersion}`,
     // activities31 only adds new verbs; existing checkpoint codecs and body physics are unchanged.
-    canRestoreSnapshot: version => version === `sim-mars/1+${m.rulesVersion}` || version === `sim-mars/1+${m.rulesVersion}`.replace('activities/31', 'activities/29'),
+    canRestoreSnapshot: version => [m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===`sim-mars/1+${v}`),
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
+      if (cfg.scene === 'littlemartians') return m.littleMartiansWorld(seed);
+      if (cfg.scene === 'greenfield') return m.greenFieldWorld(seed);
       if (cfg.scene === 'eden-camp') return m.edenCampWorld(seed);
       if (cfg.scene === 'meal') { const w = m.mealWorld(); w.rng = m.seedRng(seed); return w as WorldState; }
       const w = m.provingGroundWorld();
@@ -560,7 +572,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
       // Spatial services are rebuilt for the same base scene; the snapshot carries the rest.
       const scene = (s.cfg ?? cfg).scene;
-      const base = scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
+      const base = scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
       const rt = m.Runtime.restore(s.mars, registry, services(base), m.invariants);
       const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving });
       if (s.quiet) engine.beginQuiet();

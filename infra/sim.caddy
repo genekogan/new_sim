@@ -10,6 +10,12 @@ https://sim.eden.art, https://<eden2-sslip-host> {
 	handle /w/mars* {
 		reverse_proxy 127.0.0.1:4502
 	}
+	handle /w/littlemartians* {
+		reverse_proxy 127.0.0.1:4503
+	}
+	handle /w/eden* {
+		reverse_proxy 127.0.0.1:4504
+	}
 	handle {
 		reverse_proxy 127.0.0.1:4500
 	}
@@ -24,6 +30,12 @@ https://<staging-host> {
 	}
 	handle /w/mars* {
 		reverse_proxy 127.0.0.1:4512
+	}
+	handle /w/littlemartians* {
+		reverse_proxy 127.0.0.1:4513
+	}
+	handle /w/eden* {
+		reverse_proxy 127.0.0.1:4514
 	}
 	handle {
 		reverse_proxy 127.0.0.1:4501

@@ -7,7 +7,7 @@ import {marsFactory} from '@sim/engine-mars';
 import {Db} from './db.ts';
 import {WorldHost} from './world.ts';
 test('additive Mars registry upgrade resumes the pinned checkpoint; unknown physics stays unqualified',async()=>{
- const factory=await marsFactory(); const old=factory.rulesVersion.replace('activities/31','activities/29');
+ const factory=await marsFactory(); const old=factory.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29');
  assert.equal(factory.canRestoreSnapshot?.(old),true);
  assert.equal(factory.canRestoreSnapshot?.(old.replace('mars-assembly/3','mars-assembly/2')),false);
  const db=new Db(join(mkdtempSync(join(tmpdir(),'sim-additive-')),'world.db'));

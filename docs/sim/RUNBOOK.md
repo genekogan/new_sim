@@ -19,11 +19,10 @@ a second admin, so every secret there is readable by both.
 
 ## Living-camp activation boundary
 
-`ENABLE_LIVING_WORLD` is a Mars-only activation flag; see MERGE-LOG for the
+`ENABLE_LIVING_WORLD` activates the non-Toy persistent world day; see MERGE-LOG for the
 current deployed setting. The playback release understands camp
 checkpoints before activation, so it is the compatible code rollback for the subsequent
-living-camp milestone. Enable only in Mars's per-world env after the 48-day proof and
-stage qualification; never in the shared toy env. The day is 72,000 engine ticks, with
+living-camp milestone. Enable in each non-Toy per-world env after qualification; never in the shared Toy env. The day is 72,000 engine ticks, with
 quiet resumable checkpoints, fresh Runtime at first light, private journals and no
 activity timetable. Recovery receipts hold a private checkpoint/suffix recipe, exposed
 publicly only as card fault counts; three faults quarantine a card.
@@ -186,3 +185,30 @@ TakeRecorder chunks render with TakePeople; no browser Runtime on live pages.
 
 The host accepts the qualified activities29 checkpoint under activities31. Unknown
 physics versions still replay from genesis. This additive upgrade keeps restarts brief.
+
+## Four persistent worlds
+
+Production ports: Toy 4500, Mars 4502, Little Martians 4503, Eden 4504.
+Staging ports: 4501, 4512, 4513, 4514. Each non-Toy world uses its own
+`sim-world@<key>` unit (or `sim-world-staging@<key>`), SQLite file under
+`/srv/sim-data/<key>` and root-owned 0640 env under `/home/sim/worlds`.
+The template inherits Sim's model, Privy and R2 settings, then overrides the
+world key/id, owner, data, port and public path. Staging is always fake and its
+archive prefix is `sim/staging`. New-world owner IDs are resolved from the
+existing single administrator in the Toy DB and never logged. Per-world model
+admission retains the existing stricter $0.50/rolling-24-hour budget.
+
+Deployment health and ten-route browser smoke cover all four processes and the
+static Lab/year mounts. The watchdog watches all four production clocks.
+Promotion takes consistent on-box backups for every existing world DB; Litestream
+adds distinct `sim/litestream/{mars,littlemartians,eden}.db` replicas. Take archives
+remain separated by world ID. No Eden3, Mars service, Worker or DNS change.
+
+Rollback is code-only. A release lacking the new world definitions stops the
+Little Martians/Eden units and preserves their DBs; its older Caddy route exposes
+only its supported worlds until the new release is restored. Private mandates
+require a mandate-capable rollback: `rollback-compatible.py` checks all four DBs
+before any symlink or service changes. Never reset or restore a production DB to
+make old code accept it. The world route/API prefix must match its process.
+
+New-world release proof (October 3): Little Martians completed the 48-day fake soak with zero physical recovery and bounded memory; paid proof $0.014983694, server stopped. Three paused Lab snapshots passed actual movement, Play/Pause, Reset and exact initial-state reload. Sim/46 server tests and 1542 Mars engine tests passed; 6 skips/11 TODOs remain upstream. Full Mars gate is reserved for tranche end.

@@ -26,7 +26,7 @@ if [ "$MODE" = --stage ]; then
   ssh "$HOST" "set -e; chown -R sim:sim $REL; sudo -u sim -H bash -lc 'set -euo pipefail; cd $REL; COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile --filter @sim/server... > /tmp/sim-deps-$BUILD.log 2>&1';
     install -m 644 $REL/infra/sim-world@.service /etc/systemd/system/sim-world@.service;
     install -m 644 $REL/infra/sim-world-staging@.service /etc/systemd/system/sim-world-staging@.service;
-    install -d -o sim -g sim -m 750 /srv/sim-data/mars /srv/sim-data-staging/mars;
+    install -d -o sim -g sim -m 750 /srv/sim-data/{mars,littlemartians,eden} /srv/sim-data-staging/{mars,littlemartians,eden};
     install -d -o root -g sim -m 750 /home/sim/worlds;
     systemctl daemon-reload"
   # Resolve the one existing admin owner from the toy DB without logging it.
@@ -36,17 +36,22 @@ conn=sqlite3.connect('file:/srv/sim-data/sim.db?mode=ro',uri=True)
 rows=conn.execute("SELECT id FROM users WHERE role='admin'").fetchall()
 assert len(rows)==1, 'one verified existing admin owner required'
 owner=rows[0][0]
-for stage, port, data, origin in [(False,4502,'/srv/sim-data/mars','https://sim.eden.art'),(True,4512,'/srv/sim-data-staging/mars','https://<staging-host>')]:
-    path=pathlib.Path('/home/sim/worlds')/('staging-mars.env' if stage else 'mars.env')
-    text=f'WORLD_KEY=mars\nWORLD_ID=mars-1\nENGINE=mars\nPORT={port}\nDATA_DIR={data}\nPUBLIC_URL={origin}/w/mars\nWORLD_OWNER_ID={owner}\nMAX_SOULS_PER_USER=8\n'
-    if stage: text+='BRAIN_MODE=fake\n'
+for key,liveport in [('mars',4502),('littlemartians',4503),('eden',4504)]:
+ for stage in [False,True]:
+    port=liveport+(10 if stage else 0)
+    data=f'/srv/sim-data{"-staging" if stage else ""}/{key}'
+    origin='https://<staging-host>' if stage else 'https://sim.eden.art'
+    path=pathlib.Path('/home/sim/worlds')/(('staging-' if stage else '')+key+'.env')
+    text=f'WORLD_KEY={key}\nWORLD_ID={key}-1\nENGINE=mars\nPORT={port}\nDATA_DIR={data}\nPUBLIC_URL={origin}/w/{key}\nWORLD_OWNER_ID={owner}\nMAX_SOULS_PER_USER=8\n'
+    if stage: text+='BRAIN_MODE=fake\nR2_PREFIX=sim/staging\n'
+    text+='ENABLE_LIVING_WORLD=1\nARCHIVE_TAKES=1\nSEED_NATIVES=1\n'
     # Existing configuration is preserved on later milestone deploys.
     if not path.exists():
         path.write_text(text);os.chmod(path,0o640);os.chown(path,0,grp.getgrnam('sim').gr_gid)
 PYREMOTE
   ssh "$HOST" "set -e; install -d -m 700 /srv/sim/ops/$BUILD; cp /etc/caddy/sites/sim.caddy /srv/sim/ops/$BUILD/caddy.before-stage;
     readlink /srv/sim/staging > /srv/sim/ops/$BUILD/staging.previous;
-    ln -sfn $REL /srv/sim/staging; systemctl restart sim-staging; systemctl enable --now sim-world-staging@mars; systemctl restart sim-world-staging@mars"
+    ln -sfn $REL /srv/sim/staging; systemctl restart sim-staging; systemctl enable --now sim-world-staging@{mars,littlemartians,eden}; systemctl restart sim-world-staging@{mars,littlemartians,eden}"
   # Stage routing only. Production's original proxy is kept until promotion.
   ssh "$HOST" "python3 - '$REL/infra/sim.caddy' <<'PYREMOTE'
 from pathlib import Path
@@ -59,23 +64,23 @@ Path('/etc/caddy/sites/sim.caddy').write_text(old.split(marker)[0]+marker+candid
 PYREMOTE
     caddy validate --config /etc/caddy/Caddyfile >/dev/null && systemctl reload caddy"
   for attempt in $(seq 1 30); do
-    if ssh "$HOST" "curl -fsS http://127.0.0.1:4501/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4512/healthz | grep -q '$BUILD'"; then break; fi
+    if ssh "$HOST" "curl -fsS http://127.0.0.1:4501/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4512/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4513/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4514/healthz | grep -q '$BUILD'"; then break; fi
     [ "$attempt" != 30 ] || { echo 'staging health failed; production unchanged'; exit 1; }
     sleep 1
   done
-  SIM_SMOKE_BASE="$STAGING" node infra/smoke.mjs
+  SIM_SMOKE_EXTRA_WORLDS=1 SIM_SMOKE_BASE="$STAGING" node infra/smoke.mjs
   ssh "$HOST" "echo '$BUILD browser smoke passed' > /srv/sim/ops/$BUILD/staging-qualified"
   echo "staging qualified: $BUILD"
   exit 0
 fi
 
 [ "$MODE" = --promote ] || { echo 'use --stage or --promote <build>'; exit 1; }
-ssh "$HOST" "test -f /srv/sim/ops/$BUILD/staging-qualified && test \"\$(readlink /srv/sim/staging)\" = '$REL' && curl -fsS http://127.0.0.1:4512/healthz | grep -q '$BUILD'"
+ssh "$HOST" "test -f /srv/sim/ops/$BUILD/staging-qualified && test \"\$(readlink /srv/sim/staging)\" = '$REL' && curl -fsS http://127.0.0.1:4512/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4513/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4514/healthz | grep -q '$BUILD'"
 # Online, consistent SQLite backup, no data reset or migration.
 ssh "$HOST" "python3 - '$BUILD' <<'PYREMOTE'
 import sqlite3,pathlib,sys
 folder=pathlib.Path('/srv/sim/ops')/sys.argv[1]
-for name,path in [('toy','/srv/sim-data/sim.db'),('mars','/srv/sim-data/mars/sim.db')]:
+for name,path in [('toy','/srv/sim-data/sim.db')]+[(key,f'/srv/sim-data/{key}/sim.db') for key in ['mars','littlemartians','eden']]:
     if pathlib.Path(path).exists():
         source=sqlite3.connect('file:'+path+'?mode=ro',uri=True)
         target=sqlite3.connect(folder/(name+'-before.db'));source.backup(target);target.close();source.close()
@@ -83,9 +88,9 @@ PYREMOTE
   cp /etc/caddy/sites/sim.caddy /srv/sim/ops/$BUILD/caddy.before-promote;
   prev=\$(readlink /srv/sim/current); echo \"\$prev\" > /srv/sim/ops/$BUILD/production.previous;
   [ \"\$prev\" = '$REL' ] || ln -sfn \"\$prev\" /srv/sim/previous;
-  ln -sfn $REL /srv/sim/current; systemctl restart sim; systemctl enable --now sim-world@mars; systemctl restart sim-world@mars"
+  ln -sfn $REL /srv/sim/current; systemctl restart sim; systemctl enable --now sim-world@{mars,littlemartians,eden}; systemctl restart sim-world@{mars,littlemartians,eden}"
 for attempt in $(seq 1 30); do
-  if ssh "$HOST" "curl -fsS http://127.0.0.1:4500/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4502/healthz | grep -q '$BUILD'"; then break; fi
+  if ssh "$HOST" "curl -fsS http://127.0.0.1:4500/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4502/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4503/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4504/healthz | grep -q '$BUILD'"; then break; fi
   if [ "$attempt" = 30 ]; then
     infra/rollback.sh
     echo 'production health failed; code rolled back for toy and Mars'; exit 1
@@ -98,12 +103,13 @@ ssh "$HOST" "set -e; cp $REL/infra/sim.caddy /etc/caddy/sites/sim.caddy;
   python3 - <<'PYREMOTE'
 from pathlib import Path
 p=Path('/etc/litestream.yml');s=p.read_text()
-if '/srv/sim-data/mars/sim.db' not in s:
-    s+='  - path: /srv/sim-data/mars/sim.db\n    replica:\n      url: s3://\${R2_BUCKET}/sim/litestream/mars.db?endpoint=\${R2_ACCOUNT_ID}.eu.r2.cloudflarestorage.com&region=auto\n      sync-interval: 10s\n      retention: 168h\n      snapshot-interval: 6h\n'
-    p.write_text(s)
+for key in ['mars','littlemartians','eden']:
+ if f'/srv/sim-data/{key}/sim.db' not in s:
+    s+=f'  - path: /srv/sim-data/{key}/sim.db\n    replica:\n      url: s3://\${{R2_BUCKET}}/sim/litestream/{key}.db?endpoint=\${{R2_ACCOUNT_ID}}.eu.r2.cloudflarestorage.com&region=auto\n      sync-interval: 10s\n      retention: 168h\n      snapshot-interval: 6h\n'
+p.write_text(s)
 PYREMOTE
-  systemctl restart litestream; systemctl is-active sim sim-world@mars caddy litestream"
-if ! SIM_SMOKE_BASE=https://sim.eden.art node infra/smoke.mjs; then
+  systemctl restart litestream; systemctl is-active sim sim-world@{mars,littlemartians,eden} caddy litestream"
+if ! SIM_SMOKE_EXTRA_WORLDS=1 SIM_SMOKE_BASE=https://sim.eden.art node infra/smoke.mjs; then
   infra/rollback.sh
   echo 'production browser smoke failed; code/services rolled back, databases preserved'; exit 1
 fi

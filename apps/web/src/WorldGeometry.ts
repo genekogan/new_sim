@@ -16,7 +16,7 @@ export type RawChunk = { fromTick: number; toTick: number; take: unknown };
 /** What the server streams over the socket (useSim keeps the latest). `receivedAt` is performance.now(). */
 export type LiveTakes = { serverTick: number; chunks: RawChunk[]; receivedAt: number };
 export type BuildingPlacement = { file: string; p: [number, number, number]; yaw?: number };
-export type SceneInfo = { scene: SpatialScene | null; buildings: BuildingPlacement[]; kin: KinPlacement[]; clock?: { origin: number; dayTicks: number } | null };
+export type SceneInfo = { scene: SpatialScene | null; buildings: BuildingPlacement[]; kin: KinPlacement[]; clock?: { origin: number; dayTicks: number } | null; ground?: 'grass' };
 
 const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -46,7 +46,7 @@ export function parseSceneInfo(x: unknown): SceneInfo {
   const buildings = (Array.isArray(o.buildings) ? o.buildings : []).filter((b): b is BuildingPlacement => obj(b) && typeof b.file === 'string' && vec3(b.p) && (b.yaw === undefined || num(b.yaw)));
   const kin = (Array.isArray(o.kin) ? o.kin : []).filter((k): k is KinPlacement => obj(k) && typeof k.model === 'string' && vec3(k.p));
   const clock = obj(o.clock) && num(o.clock.origin) && num(o.clock.dayTicks) && o.clock.dayTicks > 0 ? { origin: o.clock.origin, dayTicks: o.clock.dayTicks } : null;
-  return { scene, buildings, kin, clock };
+  return { scene, buildings, kin, clock,ground:o.ground==='grass'?'grass':undefined };
 }
 
 /** URL of a decorative building GLB, or null for a name that is not a plain file name. */
@@ -157,7 +157,8 @@ export class WorldGeometry {
   /** Ground rectangle [minX, minZ, maxX, maxZ] that the camera frames. */
   readonly bounds: [number, number, number, number];
 
-  constructor(scene: SpatialScene | null) {
+  constructor(scene: SpatialScene | null, ground?:'grass') {
+    if(ground==='grass'){this.materials.floor.color.set('#76a454');this.materials.outside.color.set('#639844');}
     this.group.name = 'camp';
     this.buildings.name = 'buildings';
     this.group.add(this.buildings);
@@ -177,7 +178,7 @@ export class WorldGeometry {
         floor.position.set(s.obb.c[0], s.y - 0.01, s.obb.c[1]);
         floor.receiveShadow = true;
         this.group.add(floor);
-      } else this.group.add(this.box(this.materials.deck, s.obb.c[0], s.y - 0.08, s.obb.c[1], w, 0.08, d, s.obb.yaw));
+      } else {const deck=this.box(this.materials.deck, s.obb.c[0], s.y - 0.08, s.obb.c[1], w, 0.08, d, s.obb.yaw);this.prisms.push(deck);this.group.add(deck);}
     }
     const linkBodies = new Set(scene.links.map((l) => `${l.id}-body`));
     for (const o of scene.obstacles) {

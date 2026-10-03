@@ -53,7 +53,7 @@ function WorldList() {
   return <main className="world-list"><h1>Sim</h1><p>Persistent worlds. Open one to watch, meet its Souls, or give yours direction.</p><div className="world-cards">
     <a href="/w/mars"><h2>Mars</h2><p>A camp of people, shared places and things to do.</p><span>enter world →</span></a>
     <a href="/w/toy"><h2>Toy</h2><p>The original world, still living.</p><span>enter world →</span></a>
-    <article><h2>Little Martians</h2><p>Floating ceramic characters and enterable glazed buildings.</p><a href="/buildings">see the first buildings →</a></article>
-    <article><h2>Eden</h2><p>A green field and one quiet Soul.</p><span>being built</span></article>
-  </div><p><a href="/l/mars">Mars Lab</a> · {[2020,2021,2022,2023,2024,2025,2026,2027].map(year=><a key={year} href={`/w/mars/${year}`} style={{marginRight:12}}>{year}</a>)}</p></main>;
+    <a href="/w/littlemartians"><h2>Little Martians</h2><p>Floating ceramic characters and enterable glazed buildings.</p><span>enter world →</span></a>
+    <a href="/w/eden"><h2>Eden</h2><p>A green field and one quiet Soul.</p><span>enter world →</span></a>
+  </div><p><a href="/l/mars">Mars Lab</a> · <a href="/l/littlemartians">Little Martians snapshot</a> · <a href="/l/eden">Eden snapshot</a> · {[2020,2021,2022,2023,2024,2025,2026,2027].map(year=><a key={year} href={`/w/mars/${year}`} style={{marginRight:12}}>{year}</a>)}</p></main>;
 }

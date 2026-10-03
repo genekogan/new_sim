@@ -10,6 +10,9 @@ ssh "$HOST" "set -e; cur=\$(readlink /srv/sim/current); target='$TARGET';
   systemctl restart sim;
   if [ -d \"\$target/mars/viewer/engine\" ]; then
     systemctl restart sim-world@mars;
+    for key in littlemartians eden; do
+      if [ -f \"\$target/worlds/\$key/world.json\" ]; then systemctl restart sim-world@\$key; else systemctl stop sim-world@\$key || true; fi;
+    done;
     cp \"\$target/infra/sim.caddy\" /etc/caddy/sites/sim.caddy;
   else
     systemctl stop sim-world@mars || true;

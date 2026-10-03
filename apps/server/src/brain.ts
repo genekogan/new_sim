@@ -145,7 +145,7 @@ export class Brain {
     // so a fixed iteration order can never let a few Souls take the whole mid-brain share.
     if (this.inflight.size < MAX_INFLIGHT) {
       const due: Mind[] = [];
-      for (const m of this.host.minds.values()) if (!this.host.quietBarrier && m.nextEvalTick <= tick && !this.inflight.has(m.soulId) && w.entities[m.entityId] && !(m.life && this.host.engine.actorBorrowed?.(m.entityId) && !URGENT.has(m.evalTrigger))) due.push(m);
+      for (const m of this.host.minds.values()) if ((this.cfg.worldKey!=='eden' || m.agendaPos<m.agenda.length || mandateOf(this.host.kernel,m.soulId).some(r=>r.status==='active')) && !this.host.quietBarrier && m.nextEvalTick <= tick && !this.inflight.has(m.soulId) && w.entities[m.entityId] && !(m.life && this.host.engine.actorBorrowed?.(m.entityId) && !URGENT.has(m.evalTrigger))) due.push(m);
       if (due.length) {
         due.sort((a, b) => prio(a.evalTrigger) - prio(b.evalTrigger) || (this.lastServed.get(a.soulId) ?? 0) - (this.lastServed.get(b.soulId) ?? 0) || (a.soulId < b.soulId ? -1 : 1));
         for (const m of due) { if (this.inflight.size >= MAX_INFLIGHT) break; void this.evaluate(m, m.evalTrigger || 'timer'); }

@@ -1,3 +1,4 @@
+import {bodyProfile,bodySpatial} from '../bodies/navigation.ts';
 // walk_to: global route (spatial/path.ts) → corridor following → contextual
 // stair traversal. Layers are separate as in Unity/Detour practice:
 //   planning  : route legs with guaranteed clearance (replanned only on topology change)
@@ -17,11 +18,11 @@ import { pointInObb, add2, angleDelta, clamp, cross2, dist2, dot2, heading, len2
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
-import { entityFootprint, type AroundPerson, type Spatial } from '../spatial/service.ts';
+import { entityFootprint, type AroundPerson } from '../spatial/service.ts';
 import { cellOf, clearanceAt, nearestBlocker, segmentClearance, type LevelGrid } from '../spatial/grid.ts';
 import { PLAN_MARGIN, type Leg, type LinkLeg, type Route, type WalkLeg } from '../spatial/path.ts';
 import { smoothPolyline, type PathSeg } from './spline.ts';
-import { HUMAN_PROFILE, type AgentProfile } from '../spatial/types.ts';
+import { type AgentProfile } from '../spatial/types.ts';
 import { gapToSleep, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 
 const ACCEL = 1.2; // m/s²
@@ -136,7 +137,7 @@ type Exec = {
    * `makeWay` with `clearOf`): walk to `spot`, wait there until `clearOf(goal)` holds (the formation no
    * longer needs the goal), then replan to the goal.
    */
-  detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf: (q: Vec2) => boolean; stage: 'pending' | 'going' | 'waiting' };
+  detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf?: (q: Vec2) => boolean; landing?: {y:number;radius:number}; stage: 'pending' | 'going' | 'waiting' };
 };
 
 export const walkSchema = z.strictObject({
@@ -148,7 +149,7 @@ export const walkSchema = z.strictObject({
   speed: z.number().min(0.3).max(WALK_SPEED_CAP).optional(),
 });
 
-const spatial = (rt: Runtime) => rt.services.spatial as Spatial;
+const spatial = bodySpatial;
 
 /**
  * What a `walk_to` step reads about everyone else, read once per step (PLANNING_BUDGET.md §6):
@@ -192,8 +193,8 @@ function actorOf(rt: Runtime, id: string): Entity | Diagnostic {
   return e;
 }
 
-export function planWalk(rt: Runtime, actor: Entity, goal: { level: number; p: Vec2 }, profile = HUMAN_PROFILE) {
-  return spatial(rt).route(rt.world, profile, { level: actor.human!.level, p: [actor.pose.p[0], actor.pose.p[2]] }, goal);
+export function planWalk(rt: Runtime, actor: Entity, goal: { level: number; p: Vec2 }, profile = bodyProfile(actor)) {
+  return spatial(rt,actor.id).route(rt.world, profile, { level: actor.human!.level, p: [actor.pose.p[0], actor.pose.p[2]] }, goal, actor.body?.family==='floater'?{planner:'corridor'}:undefined);
 }
 
 export const walkTo: ActionDef<WalkParams, Route, Exec> = {
@@ -207,7 +208,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     if ('code' in a) return { ok: false, diagnostic: a };
     if (a.human!.grip)
       return { ok: false, diagnostic: { code: 'actor.holding', message: `${p.actor} is holding ${a.human!.grip.entity} and cannot walk away until it is set down or stable`, subjects: [p.actor, a.human!.grip.entity] } };
-    const sleeper = occupant(rt, a, [p.x, p.z], HUMAN_PROFILE.radius, true, p.level ?? a.human!.level);
+    const sleeper = occupant(rt, a, [p.x, p.z], bodyProfile(a).radius, true, p.level ?? a.human!.level);
     if (sleeper) return { ok: false, diagnostic: { code: 'walk.goal-occupied', message: `${p.actor}'s destination overlaps ${sleeper}'s supported sleep space`, subjects: [p.actor, sleeper] } };
     const r = planWalk(rt, a, { level: p.level ?? a.human!.level, p: [p.x, p.z] });
     return r.ok ? { ok: true, program: r.route } : { ok: false, diagnostic: { ...r.diagnostic, subjects: [p.actor, ...(r.diagnostic.subjects ?? [])] } };
@@ -217,8 +218,8 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     a.human!.task = id;
     const ex: Exec = {
       id, actor: p.actor, goal: { level: p.level ?? a.human!.level, p: [p.x, p.z] }, face: p.face,
-      speed: p.speed ?? HUMAN_PROFILE.speed, profile: HUMAN_PROFILE, route, leg: 0, segs: [], total: 0, s: 0, v: 0,
-      offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {}, peopleReplans: 0, pushes: 0,
+      speed: p.speed ?? bodyProfile(a).speed, profile: bodyProfile(a), route, leg: 0, segs: [], total: 0, s: 0, v: 0,
+      offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt,p.actor).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {}, peopleReplans: 0, pushes: 0,
     };
     enterLeg(rt, ex);
     walkExecs(rt).set(id, ex);
@@ -239,6 +240,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
       walkExecs(rt).delete(ex.id);
       delete h.human!.speed;
     } else h.human!.speed = Math.round((dist2([x0, z0], [h.pose.p[0], h.pose.p[2]]) / dt) * 1000) / 1000;
+    if (h.body?.family==='floater' && (h.human!.speed??0)>=WALK_MIN && ['wait','idle'].includes(h.human!.activity)) h.human!.activity='walk';
     return r;
   },
   recoverWait(rt, ex, mover) {
@@ -255,7 +257,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     // the flight. Defer: walk on to whichever landing is nearer along the path, then finish as cancelled.
     const leg = ex.route.legs[ex.leg];
     if (leg?.kind === 'link' && ex.phase === 'climb' && ex.climbT > 1e-9) {
-      ex.cancelTo ??= ex.climbT >= linkGeometry(leg).total / 2 ? 'exit' : 'entry';
+      ex.cancelTo ??= rt.world.entities[ex.actor].body?.family==='floater'?'exit':ex.climbT >= linkGeometry(leg).total / 2 ? 'exit' : 'entry';
       return { ok: true, deferred: true };
     }
     releaseAll(rt, ex);
@@ -281,12 +283,12 @@ function enterLeg(rt: Runtime, ex: Exec) {
   ex.narrows = [];
   if (leg.kind === 'walk') {
     // smooth on the grid the route was planned on: with the people / loads it was routed around
-    const sp = spatial(rt);
+    const sp = spatial(rt,ex.actor);
     const lg = (ex.around?.length ? sp.gridsAround(rt.world, ex.around).grids.levels.get(leg.level) : undefined) ?? sp.level(leg.level)!;
     const sm = smoothPolyline(lg, leg.points, { clearance: ex.profile.radius + PLAN_MARGIN, speed: ex.speed, turnRate: ex.profile.turnRate });
     ex.segs = sm.segs;
     ex.total = sm.total;
-    ex.segEpoch = spatial(rt).epoch;
+    ex.segEpoch = spatial(rt,ex.actor).epoch;
     ex.narrows = findNarrows(rt, ex, leg);
     ex.phase = 'walk';
     // a new corridor (replan, next leg) that leaves at an angle to where the body faces: the walker
@@ -318,7 +320,7 @@ function routeHeadClear(route: Route, ok: (q: Vec2) => boolean, upTo: number): b
 
 /** Intervals of the leg that pass through single-file components. */
 function findNarrows(rt: Runtime, ex: Exec, leg: WalkLeg): Narrow[] {
-  const sp = spatial(rt);
+  const sp = spatial(rt,ex.actor);
   const g = sp.level(leg.level)!;
   const lab = sp.narrow(leg.level, ex.profile.radius);
   const out: Narrow[] = [];
@@ -418,7 +420,7 @@ function tryEnter(rt: Runtime, ex: Exec, n: Narrow): string | null {
 function retryPeople(rt: Runtime, ex: Exec, a: Entity): boolean {
   // Do not substitute a snapped safe endpoint for a destination inside a sleeper.
   if (!ex.cancelTo && occupant(rt, a, ex.goal.p, ex.profile.radius, true, ex.goal.level)) return false;
-  const sp = spatial(rt);
+  const sp = spatial(rt,ex.actor);
   ex.stuck = 0;
   ex.still = 0;
   ex.peopleReplans++;
@@ -461,7 +463,7 @@ function retryPeople(rt: Runtime, ex: Exec, a: Entity): boolean {
 
 function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   const a = rt.world.entities[ex.actor];
-  const sp = spatial(rt);
+  const sp = spatial(rt,ex.actor);
   // a holder never walks off, whichever path started the walk (walk_to plan, or a parent action
   // calling walkTo.start directly — review C2)
   if (a.human!.grip) {
@@ -523,9 +525,10 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   if (ex.detour?.stage === 'waiting') {
     // walk on once the goal and the first stretch of the way back to it are clear of the formation
     const d = ex.detour;
-    const r = d.clearOf(ex.goal.p) ? planWalk(rt, a, ex.goal, ex.profile) : null;
+    const clear=(q:Vec2)=>d.landing?(!rt.world.entities[d.by] || Math.abs(rt.world.entities[d.by].pose.p[1]-d.landing.y)>1 || dist2(q,[rt.world.entities[d.by].pose.p[0],rt.world.entities[d.by].pose.p[2]])>d.landing.radius):d.clearOf!(q);
+    const r = clear(ex.goal.p) ? planWalk(rt, a, ex.goal, ex.profile) : null;
     if (r && !r.ok) return { status: 'failed', diagnostic: { ...r.diagnostic, code: 'route.invalidated', message: `${ex.actor} cannot walk on after stepping aside: ${r.diagnostic.message}` } };
-    if (!r || !routeHeadClear(r.route, d.clearOf, 4)) {
+    if (!r || !routeHeadClear(r.route, clear, 4)) {
       a.human!.activity = 'wait';
       return blockedWait(rt, ex.id, ex.actor, d.blockers ?? [], { code: 'traffic.stepped-aside', message: `${ex.actor} stepped aside for ${d.by} and waits for it to pass before walking on`, subjects: [ex.actor, d.by] });
     }
@@ -934,8 +937,8 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
 /** Id of a person that moving from `from` to `to` would intrude on (closer than 2r and getting closer). */
 function intrusion(rt: Runtime, me: Entity, from: Vec2, to: Vec2, r: number): string | null {
   for (const o of entitiesOf(rt)) {
-    if (o.id === me.id || o.kind !== 'human' || o.human?.level !== me.human!.level) continue;
-    if (Math.abs(o.pose.p[1] - me.pose.p[1]) > 1.0) continue;
+    if (o.id === me.id || o.kind !== 'human' || !sameBodyPlane(me,o)) continue;
+    if (me.body?.family!=='floater' && Math.abs(o.pose.p[1] - me.pose.p[1]) > 1.0) continue;
     const sleepTo = gapToSleep(o, to);
     if (sleepTo !== null) {
       if (sleepTo <= r + SLEEP_BODY_MARGIN && sleepTo < gapToSleep(o, from)! - 1e-9) return o.id;
@@ -1027,7 +1030,7 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
   // is momentarily blocked is still a walker, handled by the encounter rules (give way, pass, follow)
   const cands: { id: string; kind: 'person' | 'load'; p: Vec2; need: number; now: number; near?: boolean; sleeper?: Entity }[] = [];
   for (const o of entitiesOf(rt)) {
-    if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level || Math.abs(o.pose.p[1] - a.pose.p[1]) > 1.0) continue;
+    if (o.id === a.id || o.kind !== 'human' || !sameBodyPlane(a,o) || Math.abs(o.pose.p[1] - a.pose.p[1]) > 1.0) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
     const sleepNow = gapToSleep(o, me), now = sleepNow ?? dist2(me, q);
     if (now > reach || isActiveWalker(rt, o)) continue;
@@ -1041,7 +1044,7 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
     const now = dist2(me, d.p);
     if (now <= reach + d.r) cands.push({ id: d.entity, kind: 'load', p: d.p, need: d.r + r - 0.02, now });
   }
-  const stale = ex.segEpoch !== spatial(rt).epoch;
+  const stale = ex.segEpoch !== spatial(rt,ex.actor).epoch;
   if (!cands.length && !stale) return null;
   const hereClear = Math.min(r, clearanceAt(g, me));
   // the lateral offset keeps moving (0.9 m/s) however slowly the walker advances, so a slow walker
@@ -1085,14 +1088,21 @@ function hazardAhead(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, targetOffse
   return null;
 }
 
+/** Floaters approaching a landing share its physical space before their level changes. */
+function sameBodyPlane(me:Entity,other:Entity):boolean {
+  return me.body?.family==='floater'?Math.abs(me.pose.p[1]-other.pose.p[1])<=1.1:other.human?.level===me.human!.level;
+}
+
 /** A person that moving from `from` to `to` on a flight would bring `me` within 2r of (and closer). Also used by the carry climb. */
 export function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number[], r: number): string | null {
   for (const o of entitiesOf(rt)) {
     if (o.id === me.id || o.kind !== 'human') continue;
-    const dTo = hypot(o.pose.p[0] - to[0], (o.pose.p[1] - to[1]) * 0.5, o.pose.p[2] - to[2]);
+    const floater=me.body?.family==='floater';
+    const dyTo=Math.abs(o.pose.p[1]-to[1]),dyFrom=Math.abs(o.pose.p[1]-from[1]);
+    const dTo = floater && dyTo<=1.1?hypot(o.pose.p[0]-to[0],o.pose.p[2]-to[2]):hypot(o.pose.p[0] - to[0], (o.pose.p[1] - to[1]) * 0.5, o.pose.p[2] - to[2]);
     if (dTo >= 2 * r - 0.02) continue;
-    const dFrom = hypot(o.pose.p[0] - from[0], (o.pose.p[1] - from[1]) * 0.5, o.pose.p[2] - from[2]);
-    if (dTo < dFrom - 1e-9) return o.id;
+    const dFrom = floater && dyFrom<=1.1?hypot(o.pose.p[0]-from[0],o.pose.p[2]-from[2]):hypot(o.pose.p[0] - from[0], (o.pose.p[1] - from[1]) * 0.5, o.pose.p[2] - from[2]);
+    if ((floater && dyTo<=1.1) || dTo < dFrom - 1e-9) return o.id;
   }
   return null;
 }
@@ -1106,7 +1116,7 @@ export function stairBlocker(rt: Runtime, me: Entity, from: number[], to: number
  * (true where the requester no longer needs the ground): it steps aside to a spot
  * `clearOf` accepts, waits there until its goal is clear, then walks on.
  */
-export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { by: string; subjects: string[]; test: (q: Vec2) => boolean }) {
+export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { by: string; subjects: string[]; test?: (q: Vec2) => boolean; landing?: {y:number;radius:number} }) {
   const o = rt.world.entities[who];
   if (!o?.human || o.human.grip) return;
   let ex: Exec | undefined;
@@ -1114,14 +1124,16 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
     if (!clearOf) return;
     const rec = rt.records.get(o.human.task);
     ex = walkExecs(rt).get(o.human.task);
-    if (!ex || rec?.verb !== 'walk_to' || rec.status !== 'blocked' || ex.detour || ex.cancelTo || ex.route.legs[ex.leg]?.kind !== 'walk') return;
-    // only a mutual wait: the walker is blocked by the requester itself (its load or one of its crew)
-    if (!rec.diagnostic?.subjects?.some((s) => s !== who && clearOf.subjects.includes(s))) return;
+    const settledFloater=o.body?.family==='floater' && !!clearOf.landing && (o.human.speed??0)<WALK_MIN && ex?.phase==='walk' && ex.s>=ex.total-1e-6;
+    if (!ex || rec?.verb !== 'walk_to' || (rec.status !== 'blocked' && !settledFloater) || ex.detour || ex.cancelTo || (ex.route.legs[ex.leg]?.kind !== 'walk' && !(o.body?.family==='floater' && ex.phase==='align'))) return;
+    // A settled floater at a landing may yield to the body that cannot step off there.
+    // Other walkers retain the original mutual-wait admission.
+    if (!settledFloater && !rec.diagnostic?.subjects?.some((s) => s !== who && clearOf.subjects.includes(s))) return;
   }
   // A coordinator may hold an idle actor between physical children. Respect
   // that claim instead of repeatedly submitting a conflicting ambient nudge.
   if (!ex && rt.holder(`actor:${who}`).length) return;
-  const sp = spatial(rt);
+  const sp = spatial(rt,o.id);
   const g = sp.level(o.human.level);
   if (!g) return;
   const from: Vec2 = [o.pose.p[0], o.pose.p[2]];
@@ -1134,14 +1146,14 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
       const q = add2(from, scale2(dir, d));
       if (dist2(q, keepClear) < 1.0) continue;
       const c = clearanceAt(g, q);
-      if (c < HUMAN_PROFILE.radius + 0.1 || occupant(rt, o, q, HUMAN_PROFILE.radius + 0.2)) continue;
-      if (ex && (!clearOf!.test(q) || !stepAwayClear(rt, o, from, q))) continue;
+      if (c < bodyProfile(o).radius + 0.1 || occupant(rt, o, q, bodyProfile(o).radius + 0.2)) continue;
+      if (ex && (!(clearOf!.landing?dist2(q,keepClear)>clearOf!.landing.radius:clearOf!.test!(q)) || !stepAwayClear(rt, o, from, q))) continue;
       const score = Math.min(c, 1.0) - 0.1 * d + 0.3 * (dir[0] * base[0] + dir[1] * base[1]);
       if (score > bestScore) { bestScore = score; best = q; }
     }
   }
   if (!best) return;
-  if (ex) ex.detour = { spot: best, level: o.human.level, by: clearOf!.by, blockers: [...clearOf!.subjects], clearOf: clearOf!.test, stage: 'pending' };
+  if (ex) ex.detour = { spot: best, level: o.human.level, by: clearOf!.by, blockers: [...clearOf!.subjects], ...(clearOf!.landing?{landing:clearOf!.landing}:{clearOf:clearOf!.test}), stage: 'pending' };
   else {
     const id = `${who}:make-way:${rt.tick}`;
     // Multiple blocked movers may nudge the same idle person in one tick, even after a refusal.
@@ -1151,11 +1163,11 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
 
 /** The straight way from `from` to `q` never brings `me` closer to a person or carried-load disc it is (or would be) touching. */
 function stepAwayClear(rt: Runtime, me: Entity, from: Vec2, q: Vec2): boolean {
-  const r = HUMAN_PROFILE.radius;
+  const r = bodyProfile(me).radius;
   const discs = [
     ...loadDiscsFor(rt, me).map((d) => ({ p: d.p, need: d.r + r + 0.05 })),
     ...entitiesOf(rt)
-      .filter((o) => o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level)
+      .filter((o) => o.id !== me.id && o.kind === 'human' && sameBodyPlane(me,o))
       .map((o) => ({ p: [o.pose.p[0], o.pose.p[2]] as Vec2, need: 2 * r + 0.05 })),
   ];
   const len = dist2(from, q);
@@ -1191,7 +1203,7 @@ function sidestepTarget(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, along: n
   const n: Vec2 = rot2(tangentAt(ex, s), -Math.PI / 2);
   const people: { p: Vec2; sleeper?: Entity }[] = [];
   for (const o of entitiesOf(rt)) {
-    if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level || isActiveWalker(rt, o)) continue;
+    if (o.id === a.id || o.kind !== 'human' || !sameBodyPlane(a,o) || isActiveWalker(rt, o)) continue;
     const q: Vec2 = [o.pose.p[0], o.pose.p[2]];
     const sleepGap = gapToSleep(o, base);
     if ((sleepGap ?? dist2(q, base)) < STATIC_OFFSET + 2 * r + 0.5) people.push({ p: q, ...(sleepGap !== null ? { sleeper: o } : {}) });
@@ -1214,7 +1226,7 @@ function sidestepTarget(rt: Runtime, ex: Exec, a: Entity, g: LevelGrid, along: n
 
 function standingPeople(rt: Runtime, me: Entity) {
   return entitiesOf(rt)
-    .filter((o) => o.id !== me.id && o.kind === 'human' && o.human?.level === me.human!.level && !isActiveWalker(rt, o))
+    .filter((o) => o.id !== me.id && o.kind === 'human' && sameBodyPlane(me,o) && !isActiveWalker(rt, o))
     .map((o) => ({ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }));
 }
 
@@ -1254,7 +1266,7 @@ function roomToPass(ex: Exec, g: LevelGrid, along: number, side: number): boolea
 /** A standing person we are stepping round is still level with or ahead of us, near our line. */
 function alongside(rt: Runtime, ex: Exec, a: Entity, tan: Vec2, id: string): boolean {
   const o = rt.world.entities[id];
-  if (!o || o.human?.level !== a.human!.level || isActiveWalker(rt, o)) return false;
+  if (!o || !sameBodyPlane(a,o) || isActiveWalker(rt, o)) return false;
   const pa = ex.plannedAround[o.id];
   if (pa && dist2(pa, [o.pose.p[0], o.pose.p[2]]) < 0.15) return false; // the route avoids them
   const d = sub2([o.pose.p[0], o.pose.p[2]], [a.pose.p[0], a.pose.p[2]]);
@@ -1266,8 +1278,8 @@ function alongside(rt: Runtime, ex: Exec, a: Entity, tan: Vec2, id: string): boo
 /** The pass partner is still an active walker ahead of us, near enough to our line to matter. */
 function stillPassing(rt: Runtime, a: Entity, track: () => Track, id: string): boolean {
   const o = rt.world.entities[id];
-  if (!o || o.human?.level !== a.human!.level || !isActiveWalker(rt, o)) return false;
-  const r = HUMAN_PROFILE.radius;
+  if (!o || !sameBodyPlane(a,o) || !isActiveWalker(rt, o)) return false;
+  const r = bodyProfile(a).radius;
   const pr = project(track(), [o.pose.p[0], o.pose.p[2]]);
   return pr.along > -r && pr.along < LOOK && pr.lateral < 2 * PASS_OFFSET + 2 * r;
 }
@@ -1342,7 +1354,7 @@ function encounter(rt: Runtime, ex: Exec, a: Entity, track: () => Track): Encoun
   const me: Vec2 = [a.pose.p[0], a.pose.p[2]];
   const band = 2 * ex.profile.radius + 0.12;
   for (const o of entitiesOf(rt)) {
-    if (o.id === a.id || o.kind !== 'human' || o.human?.level !== a.human!.level) continue;
+    if (o.id === a.id || o.kind !== 'human' || !sameBodyPlane(a,o)) continue;
     const op: Vec2 = [o.pose.p[0], o.pose.p[2]];
     const pa = ex.plannedAround[o.id];
     if (pa && dist2(pa, op) < 0.15) continue; // route already avoids them
@@ -1368,7 +1380,14 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     const gap = dist2([a.pose.p[0], a.pose.p[2]], en.p);
     if (gap > 1e-3) {
       const k = Math.min(1, (Math.min(ex.speed, WALK_SPEED_CAP) * dt) / gap);
-      a.pose.p = [a.pose.p[0] + (en.p[0] - a.pose.p[0]) * k, a.pose.p[1], a.pose.p[2] + (en.p[1] - a.pose.p[2]) * k];
+      const next: [number,number,number]=[a.pose.p[0] + (en.p[0] - a.pose.p[0]) * k, a.pose.p[1], a.pose.p[2] + (en.p[1] - a.pose.p[2]) * k];
+      const blocker=a.body?.family==='floater'?stairBlocker(rt,a,a.pose.p,next,ex.profile.radius):null;
+      if(blocker){
+        makeWay(rt,blocker,[next[0],next[2]],{by:a.id,subjects:[a.id],landing:{y:rt.world.entities[blocker].pose.p[1],radius:2*ex.profile.radius+.3}});
+        a.human!.activity='wait';ex.v=0;
+        return blockedWait(rt,ex.id,ex.actor,[blocker],{code:'traffic.person',message:`${ex.actor} waits at ${link.id} for ${blocker}`,subjects:[ex.actor,blocker,link.id]});
+      }
+      a.pose.p = next;
       a.pose.yaw = wrapAngle(a.pose.yaw + clamp(angleDelta(a.pose.yaw, face), -ex.profile.turnRate * dt, ex.profile.turnRate * dt));
       a.human!.activity = (gap * k) / dt >= WALK_MIN ? 'walk' : 'idle';
       return { status: 'running', phase: 'align' };
@@ -1383,9 +1402,9 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     // occupy the stair as a single-file resource
     const res = `link:${link.id}`;
     const t = traffic(rt).get(res);
-    if (t && t.actors.size && !t.actors.has(ex.actor) && (t.exclusive || dist2(t.entry, leg.ascending ? link.from.p : link.to.p) > 0.5)) {
+    if (t && t.actors.size && !t.actors.has(ex.actor) && (t.exclusive || dist2(t.entry, leg.ascending ? link.from.p : link.to.p) > 0.5 || (a.body?.family==='floater' && dot2(t.dir,rot2([1,0],face)) < -0.5))) {
       ex.phase = 'align';
-      return blockedWait(rt, ex.id, ex.actor, [...t.actors], { code: 'traffic.yield', message: `${ex.actor} waits for ${[...t.actors][0]} to finish using ${link.id}`, subjects: [ex.actor, link.id] });
+      return blockedWait(rt, ex.id, ex.actor, [...t.actors], { code: 'traffic.yield', message: `${ex.actor} waits for ${[...t.actors][0]} to finish using ${link.id}`, subjects: [ex.actor, ...(a.body?.family==='floater'?[...t.actors]:[]), link.id] });
     }
     if (!t) traffic(rt).set(res, { actors: new Set([ex.actor]), entry: leg.ascending ? link.from.p : link.to.p, dir: rot2([1, 0], face) });
     else t.actors.add(ex.actor);
@@ -1398,6 +1417,7 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
   // someone standing on / at the end of the stair: wait rather than pass through them
   const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);
   if (blocker) {
+    if(a.body?.family==='floater')makeWay(rt,blocker,[next[0],next[2]],{by:a.id,subjects:[a.id],landing:{y:rt.world.entities[blocker].pose.p[1],radius:2*ex.profile.radius+.3}});
     ex.climbT = Math.max(0, ex.climbT - CLIMB_SPEED * dt);
     a.human!.activity = 'climb-wait'; // still on the stair: stair geometry, not the floor grid, applies
     return blockedWait(rt, ex.id, ex.actor, [blocker], { code: 'traffic.person', message: `${ex.actor} waits on ${link.id} for ${blocker} to move`, subjects: [ex.actor, blocker, link.id] });
@@ -1450,7 +1470,7 @@ function stepLinkCancel(rt: Runtime, ex: Exec, a: Entity, leg: LinkLeg, dt: numb
   const geo = linkGeometry(leg);
   const forward = ex.cancelTo === 'exit';
   const landing = forward ? geo.exit : geo.entry;
-  const sp = spatial(rt), grid = sp.level(landing.level);
+  const sp = spatial(rt,ex.actor), grid = sp.level(landing.level);
   const supported = sp.scene.surfaces.some((s) => s.level === landing.level && Math.abs(s.y - landing.y) <= 1e-6 && pointInObb(landing.p, s.obb));
   if (!supported || !grid || clearanceAt(grid, landing.p) < ex.profile.radius) {
     a.human!.activity = 'climb-wait'; ex.v = 0;
@@ -1462,6 +1482,7 @@ function stepLinkCancel(rt: Runtime, ex: Exec, a: Entity, leg: LinkLeg, dt: numb
   const next = pointOnLink(geo, at);
   const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);
   if (blocker) {
+    if(a.body?.family==='floater')makeWay(rt,blocker,[next[0],next[2]],{by:a.id,subjects:[a.id],landing:{y:rt.world.entities[blocker].pose.p[1],radius:2*ex.profile.radius+.3}});
     a.human!.activity = 'climb-wait';
     return blockedWait(rt, ex.id, ex.actor, [blocker], { code: 'traffic.person', message: `${ex.actor} (cancelled) waits on ${leg.link.id} for ${blocker} to move before stepping off at the ${forward ? 'far' : 'near'} landing`, subjects: [ex.actor, blocker, leg.link.id] });
   }
@@ -1498,7 +1519,7 @@ export function takeReplan(rt: Runtime, forced: boolean): boolean {
 /** Whether the walker can keep following its old corridor while it waits: the next stretch it could
  *  cover in REPLAN_MAX_WAIT ticks (+0.5 m) is clear, or its current link is still usable. */
 function prefixValid(rt: Runtime, ex: Exec): boolean {
-  const sp = spatial(rt);
+  const sp = spatial(rt,ex.actor);
   const leg = ex.route.legs[ex.leg];
   if (leg.kind === 'link') return sp.scene.links.some((l) => l.id === leg.link.id && l.usable);
   const g = sp.level(leg.level);
@@ -1510,7 +1531,7 @@ function prefixValid(rt: Runtime, ex: Exec): boolean {
 }
 
 function remainingValid(rt: Runtime, ex: Exec): boolean {
-  const sp = spatial(rt);
+  const sp = spatial(rt,ex.actor);
   for (let k = ex.leg; k < ex.route.legs.length; k++) {
     const leg = ex.route.legs[k];
     if (leg.kind === 'link') {
