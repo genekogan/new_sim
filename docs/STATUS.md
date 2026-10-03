@@ -21,19 +21,19 @@ build is returned by `/healthz` and recorded in `<eden4>/MERGE-LOG.md`.
 The shared Mars view draws actual scene walls, openings, fixtures and server-recorded
 people. Selection, following, daylight and the last-hour rewind use TakePeople/sampleTake;
 there is no client Runtime. WebSocket chunks are compressed and retained in SQLite.
-Measured camp take storage is about 13 KB per simulated second; archival is the next
-storage task, rather than assuming the plan's unmeasured 1 KB/s estimate.
+Measured camp take storage is about 13 KB per simulated second. Verified R2
+archives retain historical rewind while SQLite keeps the recent 24-hour buffer.
 
 Replay regressions F1–F8 and the intentional F9 frontier behavior have focused tests.
-The next living-camp milestone is implemented behind `ENABLE_LIVING_WORLD=1` and remains
-**off** until its 48-day camp qualification passes. This playback release can already
+The living camp is activated per world with `ENABLE_LIVING_WORLD=1`. Its
+48-day qualification passed; exact production activation is recorded in MERGE-LOG. This playback release can already
 read the newer camp checkpoints, providing a compatible rollback for that activation.
 The camp has an additive place, individual needs/journals, logged choices, independently
 chosen supper hosting/joining, quiet checkpoints, daily fresh Runtime and durable fault
 recovery/quarantine. No routine or timetable controls a Soul. Reflection and owner words
 remain private. The local live mind proof spent $0.003215808 and its server was stopped.
 
-Current checks: workspace typecheck; 35 server tests passed; Mars engine 1,489 passed,
+Current checks: workspace typecheck; 35 server tests plus the staging archive isolation test passed; Mars engine 1,489 passed,
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
@@ -151,8 +151,8 @@ The Mars tests skip where there is no Mars checkout (CI).
 4. From the hardening sprint (`eden4/16`): protocol version negotiation, hot/cold database
    split, structured metrics, asset store on R2, load Privy only on sign-in.
 
-Waiting on Gene: the questions at the end of `eden4/18` and `eden4/19`. The earlier design
-discussion is in `frontier/`.
+Strategy questions in `eden4/18` and `eden4/19` remain background; the merge tranche
+is authorized by its kickoff. No credential or setup blocker currently needs Gene.
 
 ### Verified take archives
 
@@ -162,4 +162,7 @@ metadata and checksum read-back before local pruning. SQLite retains a rolling
 the world loop. Fake tests cover pagination, retention on upload failure, checksum
 rejection and world isolation; real R2 read-back passed on recorded camp frames.
 Use the exact release receipt in MERGE-LOG to determine production identity and
-Mars camp activation. The 48-day camp receipt is required before activation.
+Mars camp activation. The 48-day camp receipt passed: 3,456,000 ticks, zero invariant faults, exact
+mid-supper restart; early/late averages 0.889/0.841 ms per tick, heap 35.27/36.51 MB.
+All four Souls completed 12–22 distinct activities/day; 17 of 40 recorded shared
+moments had multiple participants. Activity-set similarity averaged 0.544–0.577.
