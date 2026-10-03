@@ -3356,3 +3356,23 @@ for reviewedmetadata integration, highconfidence absentnewconflict. No runtimech
 in finalreceiptcommits; exactvalidated/builtsource43 staysexplicit. UsefulMarsactivity
 queue resumesafterclosure undercurrentauthorization. Excludedworkshop3316a74/library
 319429c preserved; noEden/save-load/rigrewrite/cameraownershipexpansion.
+
+
+## 2026-10-03 04:35 UTC — alpha closure integrated; bounded workshop continues
+
+Canonical alpha42 coverage/docs/receipt review complete:131local links, JSON,
+registration contract parity and exact unchanged runtime/tests from043 PASS.
+Original proof/failure objects preserved; supper resolution recorded separately.
+Local tag `mars-world-v1-alpha` names the documentation/source checkpoint;
+functional gate/build/publication remains043 with no new runtime claim at receipts.
+All48other-owner paths remain protected. Stabilization remaining hours:0.
+
+Read-only Sol workshop review preserved3316a74 and all3untrackedfiles unchanged.
+MissingexistingClassroomDisplayService in factory caused original tick0 refusal;
+reuse servicesFor, retain required display/admission. New isolatedcore task owns
+onlytwoleafmodules, focusedtest andreport. Threeperson demonstration→independent
+12/18swork→learnerA review; no bothlearner rotation claim. Core exit includes
+independent pause/direction/resume,withdrawal/rejoin,3phaseEnd/history,resource
+refusal/cleanup/determinism. Root owns laterLab/registration/coverage/Play/gate.
+Savedlibrary proposal is docs-only anddeferred pending samebook physicalbookmark
+feasibility. No new scenario online yet; do not mistake this next candidate for42.

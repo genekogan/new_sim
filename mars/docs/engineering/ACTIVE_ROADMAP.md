@@ -9,19 +9,33 @@ clean nine-stage gate. Supported bounded alpha acceptance was verified at
 [scenario coverage](SCENARIO_COVERAGE.json) own exact receipts and exclusions.
 Campus `/` remains the homepage; Engine Lab is explicit `/lab`.
 
-## Small closing queue and next authorized work
+## Small active queue — after completed stabilization
 
-1. Finish canonical receipt/documentation integration (remaining close work estimate
-   0.5–1.5 working hours), then report stabilization complete. All 63 mapped/local-gate
-   coverage is not 63 fresh public journeys. Preserve the public41 supper race and
-   separate corrected repetitions; four dev-only source-import harness failures remain
-   excluded from public proof. Exact unchanged-runtime full year builds are inherited
-   evidence, not new release42 executions.
-2. Review preserved workshop draft against existing
-   computer/classroom mechanisms and library bookmark draft against existing reading.
-   Select one dependency-ready useful extension; neither draft is already verified.
-3. Preserve 48 protected main paths, all other-owner worktrees and camera/history
-   ownership. No Eden, GUI save/load, rig migration or arbitrary-input recovery scope.
+1. **Computer workshop core, in progress:** continue the preserved unverified draft
+   in a new alpha42 worktree. Supported hypothetical scope is three people:
+   facilitator demonstration, two distinct retained computer tasks, learner A review,
+   and ordinary departure. Existing display/workstation/classroom mechanisms own
+   physical execution; no generated images, typing simulation or new scheduling layer.
+   Exit: named admission failures, independent Pause/direction/Resume while a peer
+   continues, persistent Leave/explicit Join, honest waiting, safe repeated End in each
+   phase, retained task/session history, deterministic effects and no resource leaks.
+2. **Lab integration after core proof:** root owns registry/rules, family/HUD/hook/panel,
+   discovery/contracts and actual-Play tests in a separate candidate. Expose only the
+   supported three-person cast and interventions; review source before registration.
+   Exit: complete journey and representative disruptions under real Play, inspected
+   phase/terminal/Reset captures, clean combined gate, verified publication.
+3. **Next object/activity candidate, deferred:** library relocation is docs-only at
+   `319429c`. Inspect ordinary book take/walk/put and safe reading cleanup, then test
+   same-book bookmark continuation at a second supported seat before commissioning
+   a coordinator. Do not rebuild reading or call that proposal implemented.
+
+Alpha stabilization and canonical receipt integration are complete. All 63 mapped
+local-gate proofs are not 63 fresh public journeys; preserve original public41 supper
+failure, corrected repetitions and dev-only public harness failures. Same-runtime
+full construction proof is inherited, not a fresh release42 execution. All other-owner
+paths and drafts remain protected. No Eden, GUI save/load, rig migration or arbitrary
+recovery scope. No remaining stabilization hours; the new workshop estimate will be
+updated after core feasibility proof rather than treating a saved draft as completed.
 
 The earlier 20–36, 8–14 and 4–8 hour forecasts below are dated planning snapshots,
 not remaining-time estimates after the completed local gate/deployment. Expansion

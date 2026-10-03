@@ -3,7 +3,7 @@
 ## Current priority — accepted Mars World v1 alpha42 and useful expansion (2026-10-03)
 
 Supported bounded Mars World v1 alpha42 is published and verified. Stabilization
-exit criteria are satisfied; finish receipt/documentation integration, then continue
+exit criteria and receipt/documentation integration are complete; continue
 useful Mars activity expansion under Gene's current authorization. Preserve the
 unfinished workshop/library drafts; do not begin Eden.
 
