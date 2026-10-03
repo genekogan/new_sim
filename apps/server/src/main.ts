@@ -1,3 +1,4 @@
+import {TakeArchive,r2Store} from './take-archive.ts';
 import { createServer } from 'node:http';
 import { readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
@@ -68,7 +69,8 @@ const stripWorldPath = (url: string | undefined) => {
 server.on('upgrade', req => { req.url = stripWorldPath(req.url); });
 hub = new Hub(server, host, auth, db);
 hub.brain = brain; hub.build = config.build;
-const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls });
+const takes=new TakeArchive(db,host.worldId,r2Store(config),`${config.r2.prefix}/takes`); if(host.engine.takeChunks)takes.start(host);
+const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes });
 const listener = getRequestListener(app.fetch);
 server.on('request', (req, res) => {
   req.url = stripWorldPath(req.url);
@@ -94,7 +96,7 @@ let closing = false;
 const shutdown = (sig: string) => {
   if (closing) return; closing = true;
   console.log(`[world] ${sig}: saving snapshot at tick ${host.engine.world.tick}`);
-  host.stop();
+  host.stop(); takes.stop();
   try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
   server.close(); for (const c of hub.clients) c.ws.close(1001, 'server restarting');
   db.close(); process.exit(0);

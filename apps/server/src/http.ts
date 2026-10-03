@@ -13,9 +13,10 @@ import { cardGrammar } from '@sim/brain';
 import { skillMd } from './skill.ts';
 import { ApiError, type Souls } from './souls.ts';
 import { mountMarsStatic } from './mars-static.ts';
+import type {TakeArchive} from './take-archive.ts';
 import { type WorldHost } from './world.ts';
 
-type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls };
+type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive };
 
 export function buildApp(d: Deps) {
   const app = new Hono();
@@ -47,7 +48,7 @@ export function buildApp(d: Deps) {
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
   app.get('/v1/scene', c => c.json(d.host.engine.renderScene?.() ?? {scene: null}));
-  app.get('/v1/takes', c => c.json({serverTick: d.host.engine.world.tick, ...d.db.takes(d.host.worldId, intQ(c, 'from', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'to', d.host.engine.world.tick, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 120, 1, 120))}, 200, {'Cache-Control': 'no-store'}));
+  app.get('/v1/takes', async c => { const from=intQ(c,'from',0,0,Number.MAX_SAFE_INTEGER),to=intQ(c,'to',d.host.engine.world.tick,0,Number.MAX_SAFE_INTEGER),limit=intQ(c,'limit',120,1,120); const takes=d.takes?await d.takes.read(from,to,limit):d.db.takes(d.host.worldId,from,to,limit); return c.json({serverTick:d.host.engine.world.tick,...takes},200,{'Cache-Control':'no-store'}); });
   app.get('/v1/take', c => c.json({ serverTick: d.host.engine.world.tick, chunks: d.host.engine.takeChunks?.(intQ(c, 'after', -1, -1, Number.MAX_SAFE_INTEGER)) ?? [] }, 200, { 'Cache-Control': 'no-store' }));
   app.get('/v1/kernel', (c) => c.json(d.host.kernelView()));
   app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-intQ(c, 'limit', 60, 1, 200)) }));

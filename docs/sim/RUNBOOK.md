@@ -13,7 +13,7 @@ a second admin, so every secret there is readable by both.
 | Data | `/srv/sim-data/sim.db` (SQLite, WAL) + hourly `backup-YYYYMMDDHH.db` (6 hourly + 7 daily) |
 | Replication | `litestream.service` → R2 `s3://<bucket>/sim/litestream/sim.db`, 10 s sync, 7-day retention; config `/etc/litestream.yml`, credentials `/etc/litestream.env` (root 0600) |
 | Watchdog | `sim-watch.timer`, every minute: restarts `sim` if the tick has not advanced on two consecutive checks (unless paused); logs if Caddy is down |
-| Env file | `/home/sim/sim.env` (0600). Must set `PORT=4500`, `HOST=127.0.0.1`, `DATA_DIR=/srv/sim-data` (the only writable path for the unit) and `PUBLIC_URL`; plus `ADMIN_EMAILS`, `BRAIN_MODE`, `BRAIN_BUDGET_USD_PER_DAY`, optionally `COMPILER_MODEL` and `TALK_MODEL`, the Privy app id/secret, TypeSafe and Anthropic keys. It also holds `R2_*` variables that no server code reads yet (reserved for the asset store). Staging: `/home/sim/sim-staging.env` |
+| Env file | `/home/sim/sim.env` (0600). Must set `PORT=4500`, `HOST=127.0.0.1`, `DATA_DIR=/srv/sim-data` (the only writable path for the unit) and `PUBLIC_URL`; plus `ADMIN_EMAILS`, `BRAIN_MODE`, `BRAIN_BUDGET_USD_PER_DAY`, optionally `COMPILER_MODEL` and `TALK_MODEL`, the Privy app id/secret, TypeSafe and Anthropic keys. It also holds the `R2_*` credentials used for verified take archives (only under the existing Sim prefix). Staging: `/home/sim/sim-staging.env` |
 | Caddy | `/etc/caddy/sites/sim.caddy`, pulled in by one `import sites/*.caddy` line at the end of `/etc/caddy/Caddyfile` |
 | DNS | `sim.eden.art` A record in Route53 (Gene edits DNS) |
 
@@ -27,9 +27,16 @@ quiet resumable checkpoints, fresh Runtime at first light, private journals and 
 activity timetable. Recovery receipts hold a private checkpoint/suffix recipe, exposed
 publicly only as card fault counts; three faults quarantine a card.
 
-Take chunks currently remain in compressed SQLite storage (measured camp ~13 KB/s).
-R2 take archival remains to be connected; do not prune chunks before archive/read-back
-proof. The model ledger is independent of trace pruning and budget changes. Unknown
+Take chunks keep a rolling 24-hour buffer in compressed SQLite storage (measured
+camp ~13 KB/s). Completed five-minute segments are compressed in a worker and
+archived under `${R2_PREFIX}/takes/<world-id>/<segment>.json.gz`; manifests stay in
+the world database. Upload, metadata receipt and SHA-256 read-back must all pass
+before old local chunks are removed. An R2 outage retains local history; recent
+rewind needs no R2 request. Older pages verify the manifest checksum before decoding.
+The actual R2 proof uploaded/read back 299 camp chunks: 3.84 MB local gzip to
+2.78 MB archive. Preserve the take objects alongside the SQLite backup when restoring.
+Code rollback to the playback release remains state-compatible, with local rewind
+only; re-promoting the archive reader restores older rewind without a data restore. The model ledger is independent of trace pruning and budget changes. Unknown
 model prices refuse admission; uncertain transport failures retain the reservation.
 
 ## Operations

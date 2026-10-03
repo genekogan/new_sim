@@ -66,6 +66,7 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     db.exec('CREATE TABLE take_chunks (world_id TEXT NOT NULL, from_tick INTEGER NOT NULL, to_tick INTEGER NOT NULL, body BLOB NOT NULL, PRIMARY KEY(world_id, to_tick))');
     db.exec('CREATE INDEX take_chunks_from ON take_chunks(world_id, from_tick)');
   } },
+  {id:6,name:'verified take archives',up(db){db.exec('CREATE TABLE take_archives(world_id TEXT NOT NULL, segment INTEGER NOT NULL, from_tick INTEGER NOT NULL, to_tick INTEGER NOT NULL, key TEXT NOT NULL, sha TEXT NOT NULL, bytes INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(world_id,segment))');}},
 ];
 
 export function migrate(db: DatabaseSync): number[] {

@@ -33,7 +33,7 @@ chosen supper hosting/joining, quiet checkpoints, daily fresh Runtime and durabl
 recovery/quarantine. No routine or timetable controls a Soul. Reflection and owner words
 remain private. The local live mind proof spent $0.003215808 and its server was stopped.
 
-Current checks: workspace typecheck; 30 server tests passed; Mars engine 1,489 passed,
+Current checks: workspace typecheck; 31 server tests passed; Mars engine 1,489 passed,
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
@@ -153,3 +153,12 @@ The Mars tests skip where there is no Mars checkout (CI).
 
 Waiting on Gene: the questions at the end of `eden4/18` and `eden4/19`. The earlier design
 discussion is in `frontier/`.
+
+### Next persistence candidate: verified take archives
+
+Five-minute physical take archives use the existing Sim R2 prefix, with upload,
+metadata and checksum read-back before local pruning. SQLite retains a rolling
+24-hour buffer and the complete archive manifest. Worker compression stays off
+the world loop. Fake tests cover pagination, retention on upload failure, checksum
+rejection and world isolation; real R2 read-back passed on recorded camp frames.
+This change is not yet production until the next exact release receipt.
