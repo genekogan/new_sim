@@ -89,7 +89,8 @@
       "rootInspectedCaptures": 17,
       "generatedCaptures": 44,
       "public41PresetsWithoutExactMappedJourneyProof": 22,
-      "meaning": "Fresh42 covers both living-day castings, supper, incomplete-stairs and stress30. The 22 public41 gaps remain source-era distinctions; all 63 have separate clean local mapped contract proof."
+      "meaning": "Fresh42 covers both living-day castings, supper, incomplete-stairs and stress30. The 22 public41 gaps remain source-era distinctions; all 63 have separate clean local mapped contract proof.",
+      "reviewReport": "briefs/alpha-final-coverage.REPORT.md"
     }
   },
   "proofKinds": [
@@ -7754,15 +7755,7 @@
       "failedCase": "communal-supper: retained preparation and consumed meal continue to actual seven-vessel storage under Play",
       "cause": "Exact supported meal return occurred at tick2368; ordinary cleanup then picked up the original bowl before a separately scheduled Pause click captured tick2400. Zero invariant violations. Atomic pause at the unchanged original return predicate is reviewed but unverified; no assertion/support/identity/outcome change.",
       "repairCommit": "54fb8472ccbafcfe07ab9fec24d8b3b86ad28136",
-      "status": "retained native failure; focused repeats and combined repair gate pending",
-      "repairValidation": {
-        "proofRefs": [
-          "alphaSupperPublicRepeat043",
-          "alphaCombinedGate043"
-        ],
-        "status": "three public repaired journey repetitions PASS and clean 043 combined gate PASS; original failure retained",
-        "finalPublicAcceptance": "pending-release42"
-      }
+      "status": "retained native failure; focused repeats and combined repair gate pending"
     },
     {
       "source": "043957e8a061868836eacd811d2651e8589bad7d",
@@ -7836,6 +7829,23 @@
     {
       "id": "construction",
       "title": "Source-checked construction journeys"
+    }
+  ],
+  "failureResolutions": [
+    {
+      "originalSource": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+      "failedCase": "communal-supper: retained preparation and consumed meal continue to actual seven-vessel storage under Play",
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-public-supper-failure-diagnosis.json",
+      "receiptSha256": "5002c27c1c1b6dc7caae4d85c97a5cdba607402cde3e1b78ed446f312a9e7473",
+      "repairCommit": "54fb8472ccbafcfe07ab9fec24d8b3b86ad28136",
+      "testSource": "043957e8a061868836eacd811d2651e8589bad7d",
+      "proofRefs": [
+        "alphaSupperPublicRepeat043",
+        "alphaCombinedGate043",
+        "alphaPublic42Critical",
+        "alphaRelease42Verified"
+      ],
+      "status": "Reviewed atomic supported-return observation repair passed three serial public41 repetitions, clean043 combined gate and fresh public42 same whole supper journey; supported release42 accepted. Original native failure/cause/status remain unchanged at their historical checkpoint."
     }
   ]
 }
