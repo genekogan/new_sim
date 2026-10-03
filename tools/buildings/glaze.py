@@ -27,11 +27,11 @@ SOURCES = {
 # towards its sculpture as photographed: the temple reads a deeper blue.
 TINT = {
     'tower': (0.98, 1.02, 1.02),
-    'temple': (0.80, 0.86, 1.04),
+    'temple': (0.86, 0.89, 1.0),
 }
 
 # Contrast kept around the mean: the quilt is busier than glaze seen from afar.
-CONTRAST = {'tower': 0.62, 'temple': 0.72}
+CONTRAST = {'tower': 0.62, 'temple': 0.66}
 
 WORK = 2048     # atlas is downsampled to this before sampling
 PATCH = 96      # patch size at WORK resolution

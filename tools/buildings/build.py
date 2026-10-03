@@ -46,7 +46,7 @@ def build(b, materials, col, scratch):
                     for i, (hx, hy, r, z0, z1) in enumerate(shell.extra_voids)]
         cutters += _cutters(shell, scratch)
         geom.carve(solid, cutters, scratch)
-        geom.finish(solid, materials[shell.material])
+        geom.finish(solid, materials[shell.material], soften=True)
         parts.append(solid)
     for e in b.extras:
         for ob in e.build(col):

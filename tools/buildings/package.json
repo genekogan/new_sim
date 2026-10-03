@@ -6,6 +6,7 @@
     "generate": "blender -b --factory-startup --python generate.py --",
     "generate:quick": "blender -b --factory-startup --python generate.py -- --quick",
     "validate": "blender -b --factory-startup --python generate.py -- --no-render",
-    "selftest": "blender -b --factory-startup --python selftest.py"
+    "selftest": "blender -b --factory-startup --python selftest.py",
+    "check": "node check-glb.mjs"
   }
 }

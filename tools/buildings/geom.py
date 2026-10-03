@@ -193,8 +193,25 @@ def box_uv(ob, tile=TILE):
     bm.free()
 
 
-def finish(ob, material):
-    """Clean up a carved part: weld, drop loose bits, UVs, smooth-by-angle, material."""
+def bevel(ob, width=0.07, segments=2, angle=50):
+    """Soften sharp edges (arch reveals, slab edges) the way glaze rounds a fired edge."""
+    mod = ob.modifiers.new('bevel', 'BEVEL')
+    mod.width = width
+    mod.segments = segments
+    mod.limit_method = 'ANGLE'
+    mod.angle_limit = math.radians(angle)
+    mod.use_clamp_overlap = True
+    mod.harden_normals = True  # keeps big flat faces flat-shaded next to the rounded edge
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
+    old = ob.data
+    ob.modifiers.clear()
+    ob.data = me
+    bpy.data.meshes.remove(old)
+
+
+def finish(ob, material, soften=False):
+    """Clean up a carved part: weld, drop loose bits, (bevel), UVs, smooth-by-angle, material."""
     bm = bmesh.new()
     bm.from_mesh(ob.data)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
@@ -203,9 +220,11 @@ def finish(ob, material):
     bmesh.ops.delete(bm, geom=loose, context='VERTS')
     bm.to_mesh(ob.data)
     bm.free()
-    box_uv(ob)
     ob.data.shade_smooth()
     ob.data.set_sharp_from_angle(angle=math.radians(40))
+    if soften:
+        bevel(ob)
+    box_uv(ob)
     ob.data.materials.clear()
     ob.data.materials.append(material)
 

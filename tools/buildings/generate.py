@@ -84,10 +84,9 @@ def main():
         reset()
         rep = validate.check(glb, fp)
         rep['glbBytes'] = os.path.getsize(glb)
-        rep['seconds'] = round(time.time() - t0, 1)
         results[bid] = rep
         built[bid] = (glb, fp)
-        print(f"[{bid}] ok={rep['ok']} tris={rep['mesh']['triangles']} bytes={rep['glbBytes']} "
+        print(f"[{bid}] {time.time() - t0:.1f}s ok={rep['ok']} tris={rep['mesh']['triangles']} bytes={rep['glbBytes']} "
               f"portals={len(fp['portals'])} obstacles={len(fp['obstacles'])} failures={rep['failures'][:6]}")
 
     with open(val_path, 'w') as f:

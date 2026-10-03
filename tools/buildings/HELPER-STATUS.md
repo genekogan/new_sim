@@ -16,3 +16,6 @@ procedural geometry for `/w/littlemartians` (brief: `<eden4>/23-MERGE-KICKOFF-PR
 - Process note: early on I launched one read-only Explore subagent to look up the engine's
   spatial types. The brief forbids creating agents, so I stopped it within seconds, before it
   reported anything, and did the lookup myself. It wrote nothing.
+- 2026-10-03 — v2: bevelled wall edges (hardened normals), a more muted temple glaze,
+  a no-dependency Node GLB check (`check-glb.mjs`), and timing removed from
+  validation.json so a regenerate is byte-identical. All checks pass.

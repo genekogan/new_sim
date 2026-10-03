@@ -3,8 +3,8 @@
  "buildings": {
   "ceramic-tower": {
    "mesh": {
-    "vertices": 15063,
-    "triangles": 16336,
+    "vertices": 22714,
+    "triangles": 25148,
     "boundsEngine": {
      "min": [
       -9.502,
@@ -363,13 +363,12 @@
     "withoutGeometry": []
    },
    "ok": true,
-   "glbBytes": 795648,
-   "seconds": 1.2
+   "glbBytes": 1093356
   },
   "minaret-temple": {
    "mesh": {
-    "vertices": 9047,
-    "triangles": 10492,
+    "vertices": 15787,
+    "triangles": 17928,
     "boundsEngine": {
      "min": [
       -9.6,
@@ -612,8 +611,7 @@
     "withoutGeometry": []
    },
    "ok": true,
-   "glbBytes": 575112,
-   "seconds": 1.1
+   "glbBytes": 830800
   }
  }
 }

@@ -31,7 +31,7 @@ widths and y values by the same factor.
 Pale blue-green glaze. Four stepped tiers, round arches on all four sides of
 every tier, drip ribs down the walls, turrets at the four base corners,
 pinnacles on the upper tiers, a rounded crown, a ball and a finial spike.
-19.0 × 19.0 m footprint (with turrets), **38.3 m** tall. 16.3k triangles, 0.80 MB.
+19.0 × 19.0 m footprint (with turrets), **38.3 m** tall. 25.1k triangles, 1.09 MB.
 
 | level | room | floor y | clear height | room width | openings |
 |---|---|---|---|---|---|
@@ -52,7 +52,7 @@ vertically and then draws in, with pinched corner ridges. One side pair has a
 tall arched window, the other a twin pair of round windows, and the upper hall
 has a round window on each side. Then a lantern with four arches, two stepped
 drums with cornices, and a spike. 19.2 × 19.2 m plinth (body 16 m), **45.0 m** tall.
-10.5k triangles, 0.58 MB.
+17.9k triangles, 0.83 MB.
 
 | level | room | floor y | clear height | room width | openings |
 |---|---|---|---|---|---|
@@ -115,6 +115,11 @@ Every check runs against the **exported GLB, re-imported**:
 5. **Portal size.** Every clear rectangle and shaft is at least 2.2 m. Smallest:
    tower doors 2.5 m wide, temple round windows 2.24 m wide and lantern arches 2.26 m high.
 
+`node tools/buildings/check-glb.mjs` (no dependencies) checks the files for the web: GLB 2.0,
+no required extensions, embedded textures, normals and UVs on every primitive, and
+bounds that equal the footprint's. Regenerating is deterministic: the GLBs, footprints,
+textures and validation.json come out byte-identical with Blender 5.1.1.
+
 `tools/buildings/selftest.py` checks that the validator rejects a falsified footprint
 (a door slid into solid wall, an undersized door, a phantom wall).
 
@@ -136,6 +141,8 @@ merge, the same paths under the main checkout.)
 - These are interpretations, not replicas. The sculptures' hand-made irregularity
   (lumps, drips, leaning walls) is suggested by ribs, ridges and the glaze texture,
   not modelled.
+- Wall edges are bevelled (7 cm, two segments), about 50% more triangles than
+  hard edges. Set `soften=False` in `build.py` for a lighter mesh.
 - The glaze is one quilted texture per building, box-projected in world space at
   7 m per repeat. Seams can show where a face's dominant axis changes.
 - The temple's tapering body is footprinted in 1.5 m bands, each using the band's
