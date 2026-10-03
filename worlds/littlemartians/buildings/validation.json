@@ -1,0 +1,619 @@
+{
+ "blender": "5.1.1",
+ "buildings": {
+  "ceramic-tower": {
+   "mesh": {
+    "vertices": 15063,
+    "triangles": 16336,
+    "boundsEngine": {
+     "min": [
+      -9.502,
+      0.0,
+      -9.502
+     ],
+     "max": [
+      9.502,
+      38.3,
+      9.502
+     ]
+    }
+   },
+   "portals": [
+    {
+     "id": "tower-L0-my0",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-my1",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-my2",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-px0",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-px1",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-px2",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-py0",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-py1",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-py2",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-mx0",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-mx1",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L0-mx2",
+     "kind": "door",
+     "width": 3.1,
+     "height": 5.298,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-shaft-01",
+     "kind": "shaft",
+     "diameter": 3.4,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.695,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-my0",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-my1",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-px0",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-px1",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-py0",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-py1",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-mx0",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L1-mx1",
+     "kind": "door",
+     "width": 2.5,
+     "height": 4.03,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-shaft-12",
+     "kind": "shaft",
+     "diameter": 3.2,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.595,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L2-my",
+     "kind": "door",
+     "width": 2.7,
+     "height": 3.854,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L2-px",
+     "kind": "door",
+     "width": 2.7,
+     "height": 3.854,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L2-py",
+     "kind": "door",
+     "width": 2.7,
+     "height": 3.854,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L2-mx",
+     "kind": "door",
+     "width": 2.7,
+     "height": 3.854,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-shaft-23",
+     "kind": "shaft",
+     "diameter": 3.0,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.495,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L3-my",
+     "kind": "door",
+     "width": 2.5,
+     "height": 3.23,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L3-px",
+     "kind": "door",
+     "width": 2.5,
+     "height": 3.23,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L3-py",
+     "kind": "door",
+     "width": 2.5,
+     "height": 3.23,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "tower-L3-mx",
+     "kind": "door",
+     "width": 2.5,
+     "height": 3.23,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.4,
+     "obstaclesOverlapping": []
+    }
+   ],
+   "rooms": [
+    {
+     "id": "tower-L0",
+     "samples": 782,
+     "headFits": 782,
+     "minClearance": 1.0,
+     "clearHeight": 8.0
+    },
+    {
+     "id": "tower-L1",
+     "samples": 450,
+     "headFits": 450,
+     "minClearance": 1.0,
+     "clearHeight": 6.5
+    },
+    {
+     "id": "tower-L2",
+     "samples": 242,
+     "headFits": 242,
+     "minClearance": 1.0,
+     "clearHeight": 5.5
+    },
+    {
+     "id": "tower-L3",
+     "samples": 98,
+     "headFits": 98,
+     "minClearance": 1.0,
+     "clearHeight": 5.0
+    }
+   ],
+   "failures": [],
+   "obstacles": {
+    "count": 384,
+    "withoutGeometry": []
+   },
+   "ok": true,
+   "glbBytes": 795648,
+   "seconds": 1.2
+  },
+  "minaret-temple": {
+   "mesh": {
+    "vertices": 9047,
+    "triangles": 10492,
+    "boundsEngine": {
+     "min": [
+      -9.6,
+      0.0,
+      -9.6
+     ],
+     "max": [
+      9.6,
+      45.0,
+      9.6
+     ]
+    }
+   },
+   "portals": [
+    {
+     "id": "temple-L0-my",
+     "kind": "door",
+     "width": 8.7,
+     "height": 9.652,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 4.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L0-px",
+     "kind": "door",
+     "width": 8.7,
+     "height": 9.652,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 4.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L0-py",
+     "kind": "door",
+     "width": 8.7,
+     "height": 9.652,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 4.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L0-mx",
+     "kind": "door",
+     "width": 8.7,
+     "height": 9.652,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 4.5,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-shaft-01",
+     "kind": "shaft",
+     "diameter": 3.6,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.794,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L1-my",
+     "kind": "window",
+     "width": 3.1,
+     "height": 3.348,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L1-py",
+     "kind": "window",
+     "width": 3.1,
+     "height": 3.348,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.7,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L1-pxa",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L1-pxb",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L1-mxa",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L1-mxb",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L2-my",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L2-px",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L2-py",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-L2-mx",
+     "kind": "window",
+     "width": 2.24,
+     "height": 2.285,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.592,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-shaft-12",
+     "kind": "shaft",
+     "diameter": 3.4,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.695,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-lantern-my",
+     "kind": "window",
+     "width": 2.3,
+     "height": 2.306,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.3,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-lantern-px",
+     "kind": "window",
+     "width": 2.3,
+     "height": 2.306,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.3,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-lantern-py",
+     "kind": "window",
+     "width": 2.3,
+     "height": 2.306,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.3,
+     "obstaclesOverlapping": []
+    },
+    {
+     "id": "temple-lantern-mx",
+     "kind": "window",
+     "width": 2.3,
+     "height": 2.306,
+     "rays": 49,
+     "raysBlocked": 0,
+     "headClearance": 1.3,
+     "obstaclesOverlapping": []
+    }
+   ],
+   "rooms": [
+    {
+     "id": "temple-L0",
+     "samples": 529,
+     "headFits": 529,
+     "minClearance": 0.85,
+     "clearHeight": 13.2
+    },
+    {
+     "id": "temple-L1",
+     "samples": 578,
+     "headFits": 578,
+     "minClearance": 1.0,
+     "clearHeight": 7.7
+    },
+    {
+     "id": "temple-L2",
+     "samples": 455,
+     "headFits": 455,
+     "minClearance": 1.0,
+     "clearHeight": 13.0
+    }
+   ],
+   "failures": [],
+   "obstacles": {
+    "count": 662,
+    "withoutGeometry": []
+   },
+   "ok": true,
+   "glbBytes": 575112,
+   "seconds": 1.1
+  }
+ }
+}
