@@ -356,3 +356,25 @@ Compact record; Gene's decisions are in `06`, details in `14`–`17`.
   had the work reviewed independently and fixed what it found; ran live models and
   fixed what that showed; wrote a Mars adapter and ran the whole shell on the real
   Mars engine (the DJ story passes there from two plain wishes); and wrote `19`.
+- **Round 19 (2026-10-02 → 10-03).** Gene asked how to split the project into
+  the Mars version and a broader Eden that models a superset of it, with Mars
+  "nimble, free from the burden of Eden development" and "one among many
+  different worlds", then answered himself: "I guess it's really just one repo
+  still… Maybe worlds are just data", "capabilities are general purpose code and
+  they are data in worlds by being enabled or not… one latent codebase", and
+  code itself may be part of a world's spec, "like open frameworks". He asked
+  whether the engine is eventually a world model (yes, as depiction; never the
+  ledger), whether we are overbuilding and what is free in open source (keep
+  three.js; Blender offline; Quaternius, UniRig, glTF-Transform, Recast), and
+  proposed bodies with a morphology vector and separate skin, non-human Souls,
+  sculptable terrain and "a mini thingiverse". Separately he spitballed an
+  economy: anyone mints a world, one birth a day per world (a mini Nouns DAO),
+  Harberger on worlds, rent, owner-set fertility, death, and Souls bidding for
+  residency. Claude's analyses are in `20` and `21`. Gene then set the economy
+  and ontology aside ("premature") and asked for the build: Mars World had
+  reached its v1 alpha (release 42); stop its direct development, move it into
+  Sim, make Sim the real driver of the Mars world with an objective,
+  continuously evolving state, add Little Martians and a green-field Eden, and
+  re-check the stack. Claude surveyed both codebases and the Little Martians
+  assets, interviewed Gene in three rounds (hosting, domain, day length, idle
+  minds, cast, place, repo, cutover) and wrote the plan `22`.

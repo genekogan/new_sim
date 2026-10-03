@@ -1,3 +1,7 @@
+> **2026-10-03:** for the merge tranche (Mars engine into Sim; three worlds) use
+> [`23-MERGE-KICKOFF-PROMPT.md`](23-MERGE-KICKOFF-PROMPT.md) instead. The prompt
+> below predates it and describes the project before the merge.
+
 # 09 — Onboarding prompt
 
 Updated 2026-09-30 (after round 15). Two prompts exist:

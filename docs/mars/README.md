@@ -1,10 +1,12 @@
 # The Mars world simulator (documentation snapshot)
 
-The engine that eden4 will take over. Its code lives only in a local Git repo on
-Gene's laptop (`<mars-campus-repo>`, never pushed); this
-folder mirrors its documentation so the project can be understood from here.
-`SNAPSHOT.txt` records the Mars commit and the copy date. **These files are
-mirrors: do not edit them here.** Refresh with `infra/sync-docs.sh`.
+The engine is now hard-forked in this repository under `mars/`. The original
+`<mars-campus-repo>` and independent legacy Mars app remain
+protected references. This folder holds inherited engine docs and Sim-authored
+introductions. [SNAPSHOT.txt](SNAPSHOT.txt) records copy provenance, not deployment.
+Refresh selected inherited files from the in-repo fork with `infra/sync-docs.sh`;
+edit Sim-authored README/ENGINE-SNAPSHOT introductions here. Do not modify the
+original Mars checkout to refresh these references.
 
 The Mars project moves fast (hundreds of commits a day, releases daily), so
 anything here describing "current" work is current as of the snapshot date.
@@ -44,12 +46,19 @@ anything here describing "current" work is current as of the snapshot date.
 | [`HANDOFF.md`](HANDOFF.md) | The running session handoff (long; a log, not a summary) |
 | [`OWNER_DECISIONS.md`](OWNER_DECISIONS.md), [`AUDIT.md`](AUDIT.md) | Gene's recorded decisions; an audit of the codebase |
 
-Not mirrored (available only in the Mars repo): the progress log, backlog,
-release checklists, question files, per-feature briefs and evidence.
+The binding original-checkout integration boundary is retained as
+[INTEGRATION_BOUNDARY](INTEGRATION_BOUNDARY.md); its publication/ownership history
+is source evidence. It is byte-identical to the original and its internal relative
+links retain original-source context (deployment metadata, release checklist,
+coverage and backlog); consult `mars/docs/engineering/` for available fork copies.
+Other refreshed reference links resolve into actual fork files. Current authorized
+fork scope comes from the Eden kickoff
+and plan. Other source logs and feature briefs may exist under the vendored
+`mars/` tree or only in protected original sources; raw proof/media stay excluded.
 
 ## How Mars relates to Sim
 
 Sim's `packages/engine-contract` mirrors the Mars engine's types and method names
 so that adopting the engine is an adapter, not a rewrite: see
 [`../sim/ENGINE-CONTRACT.md`](../sim/ENGINE-CONTRACT.md) for the mapping and for
-what the transplant requires of Mars.
+the current adapter behavior. Historical transplant proposals are dated references.

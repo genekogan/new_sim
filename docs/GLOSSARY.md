@@ -7,11 +7,11 @@ is listed.
 |---|---|
 | **eden4** | The project: Eden as one persistent, shared, simulated world. Working name |
 | **Sim** | This repository and the running app shell (sim.eden.art) |
-| **Mars engine / Mars Studio / Mars world simulator** | The deterministic engine built as a simulation of Mars College, in a local-only repo on Gene's laptop. Sim runs on it through an adapter (`packages/engine-mars`, `ENGINE=mars`) wherever a checkout exists |
+| **Mars engine / Mars Studio / Mars world simulator** | The deterministic engine built as a simulation of Mars College, hard-forked under `mars/` with filtered history. Sim runs it through `packages/engine-mars`; the original Mars checkout/legacy app remain independent |
 | **Toy engine** | `packages/engine-toy`, the default engine: a small stand-in behind the same contract |
 | **Engine contract** | `packages/engine-contract`: what the shell needs from any engine. See `sim/ENGINE-CONTRACT.md` |
 | **Soul** | An inhabitant owned by a person. The strategy notes written before 2026-09-30 say **body**; "Sims" is avoided (EA's mark) |
-| **Native Soul** | One of six Souls owned by `system`, seeded so the world is never empty |
+| **Native Soul** | The preserved Toy world's original six `system`-owned Souls; new-world casts require a verified human owner |
 | **Mind** | A Soul's non-physical state in the server: standing intent, agenda and position, the card in progress, mood, energy, recent history, next-think time |
 | **Entity** | A thing in the engine's `WorldState` (`human`, `fixture`, …). A Soul's entity is its body in the world |
 | **Owner** | The signed-in person a Soul belongs to |
@@ -29,9 +29,9 @@ is listed.
 | **Manner** | How an action is done (`warmly`, `shyly`…). A Soul holds a few; one is chosen per decision and colours what is said |
 | **Play** | A card's changes being applied to the kernel, logged as a `play` event once the card's approach steps have run. A play can be refused |
 | **Mint** | Adding a new card (and any link kinds it needs) to the vocabulary, logged as a `mint` event. Cards are minted by the compiler or proposed by an agent, and validated first |
-| **Intent** | The standing direction an owner or agent gives a Soul: an agenda, or a goal from a closed list that the server turns into one. Replacing it is steering |
+| **Intent** | Toy's standing agenda/goal; living worlds use private mandate rules, with structured immediate intent becoming NOW |
 | **Agenda (plan)** | The ordered card steps of an intent: `{card, target?, of?}`. It says which options serve the owner; the Soul's mind still chooses every action |
-| **Wish (command)** | An owner's direction in plain words. The compiler turns it into an agenda |
+| **Wish (command)** | Owner words; Toy compiles an agenda, living worlds align a private mandate rule |
 | **Note / text** | The owner's own words on an intent (`note`, or the wish as `text`); seen only by the owner and the Soul's mind |
 | **Activity / option** | A thing a Soul could do now: a playable card on a target, with its verb steps bound (`ActivityOption`) |
 | **Verb** | An atomic engine action (`walk_to`, `sit`, …) |
@@ -56,7 +56,11 @@ is listed.
 | **Path (PathCommit)** | Timed waypoints broadcast when a body moves; clients compute positions from it. The toy engine sends a whole walk, the Mars adapter short keyframes |
 | **Talk line** | Words rendered for something that was said. Depiction only: the act is in the kernel |
 | **Rules version** | Identifier of the engine's rules; snapshots are bound to it. **Epochs** (rule changes with migrations) are designed, not built |
-| **Governor** | Splits the daily model budget into per-tier buckets |
+| **Governor** | Paces the budget across per-tier buckets; a separate durable rolling real-24-hour reservation ledger enforces the world cap |
 | **Pairing** | How an agent gets a Soul token: a code from the owner, or ask-and-approve |
 | **Release / staging** | A deployed build folder on the box / the instance that runs a new release before production does |
-| **manna, ritual, center/frontier, rooms** | eden4 design concepts (economy, daily event, geography, interiors); none is built |
+| **manna, ritual, center/frontier** | eden4 design concepts (economy, central daily event, geography); none is built |
+| **Mandate** | Private owner rules, aligned to objective cards with optional/time/gathering/NOW triggers; only NOW executes directly |
+| **Living day** | 72,000 ticks, one hour at rate one; quiet renewal creates a fresh released Runtime without a daily action schedule |
+| **Take archive** | Verified R2 physical recording segment; DB manifest persists, recent 24 hours remain local, unrelated to accepted-event replay head |
+| **Lab** | Paused independent browser Runtime for finite presets; no persistent-world ownership, minds or day |

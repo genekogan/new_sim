@@ -1,5 +1,11 @@
 # 19 — The Mars bridge: how the Eden runtime compiles down to the Mars engine
 
+> Implementation currency (2026-10-03): the authorized merge is delivered in
+> `<repo>`; [MERGE-LOG](../STATUS.md) records exact release/proof and the pending
+> elapsed 24-hour observation. Baseline facts, future tense and session-start
+> instructions below retain their original date/scope; do not repeat completed
+> import, preflight or qualification steps. Only Gene changes ledger decisions.
+
 > Status (2026-10-01): **proven on the proving ground, planned for the campus.**
 > Written the day before the Mars engine is taken over. Everything under
 > "Proven" was run today against the Mars checkout at commit `9638489`

@@ -1,5 +1,10 @@
 # Sequences, plans, takes, replay and rehearsal
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Code: `viewer/engine/{sequence,take,rehearsal}/`. Tests: `engine/test/{sequence,take,rehearsal,history}.test.ts`
 (fixtures in `test/sequence-fixtures.ts`). Spec: §14, §16, §21–24, §28.
 

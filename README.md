@@ -1,43 +1,45 @@
 # Sim
 
-The app shell of **eden4**: one persistent, shared, server-simulated world whose
-inhabitants, called **Souls**, belong to people who steer them and are kept alive
-by a three-tier brain. Live at https://sim.eden.art.
+The eden4 app at [sim.eden.art](https://sim.eden.art): four persistent worlds with
+owned Souls, recorded 3D watching, private owner steering, and independent clocks,
+logs, checkpoints and model budgets. The deterministic Mars engine is hard-forked
+in this repository with filtered history. Canonical checkout: `<repo>`.
 
-This is a two-headed project. **Sim** (this repo) is the larger head: canonical
-state and log, sync, accounts, the brain, the agent interface, deployment. The
-smaller head, inside it, is the **Mars world simulator**: a deterministic world
-and activity engine being built separately, which eden4 will take over as its
-engine. Until then Sim runs a **toy engine** (a 100 m plane, a campfire, benches)
-behind the same contract, and the UI is a text-only debug shell.
+Live worlds: `/w/toy`, `/w/mars`, `/w/littlemartians`, `/w/eden`. The original Toy
+rules and database are preserved. Three paused browser Labs and eight Mars year
+pages share the release. The independent legacy Mars app remains untouched.
 
-**Start with [`docs/README.md`](docs/README.md)**: the documentation map, reading
-paths by task, current status and glossary.
+Start with [the documentation map](docs/README.md), [current status](docs/STATUS.md)
+and [development](docs/sim/DEVELOPMENT.md). Before operating the server, read the
+[runbook](docs/sim/RUNBOOK.md). Design intent and implementation evidence have
+separate authorities; see the map before following an older plan.
 
 ## Layout
 
-| Path | What |
+| Path | Role |
 |---|---|
-| `packages/engine-contract` | The engine contract mirrored from the Mars engine (`WorldState`, `Runtime`, `ActionDef`, hashing, rng, timed-path kinematics) and a conformance suite any engine must pass |
-| `packages/engine-toy` | The stand-in engine |
-| `packages/protocol` | Everything that crosses a process boundary: log events, WebSocket messages, REST schemas |
-| `packages/brain` | Jev client and request builders (mid-brain, translator, director), narrator prompt |
-| `packages/client` | Client replica and reconnecting connection (browser and Node) |
-| `apps/server` | The sequencer: tick loop, event log, snapshots, WebSocket hub, REST, MCP, auth, brain scheduler, governor |
-| `apps/web` | React + Vite: watch view, Soul dashboard, debug panels |
-| `infra/` | systemd units, Caddy site, Litestream config, deploy / rollback / box setup, docs sync |
-| `docs/` | `sim/` technical docs · `mars/` the engine (snapshot) · `eden4/` strategy · `frontier/` open design discussion |
+| `mars/` | Vendored Mars engine, native viewer/Lab, tests and inherited docs |
+| `worlds/` | World definitions, public derivative assets and authored scenes |
+| `packages/engine-contract`, `engine-toy`, `engine-mars` | Shared contract, preserved Toy, native Mars adapter |
+| `packages/kernel` | Meaning, links, cards, vocabulary and coherence |
+| `packages/protocol`, `client`, `brain` | Wire schemas, replica, model request builders |
+| `apps/server` | World host, log/replay, auth, steering, REST/MCP, spend and archives |
+| `apps/web` | Shared recorded 3D shell and owner/debug panels |
+| `infra/` | Scoped Sim deployment, rollback, watchdog, qualification and docs tools |
+| `docs/` | Current technical docs, strategy mirrors and dated evidence |
 
-## Quick start
+## Local quick start
+
+Node ≥22.18 and pnpm 10.27:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 cp .env.example .env
-pnpm check                                   # type check + 26 tests (Node ≥ 22.18)
 pnpm --filter @sim/web build
-BRAIN_MODE=fake DEV_AUTH=1 node --env-file=.env apps/server/src/main.ts
+BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=./data-local node --env-file=.env apps/server/src/main.ts
 # http://localhost:4500/?dev=1
 ```
 
-Details: [`docs/sim/DEVELOPMENT.md`](docs/sim/DEVELOPMENT.md). Production:
-[`docs/sim/RUNBOOK.md`](docs/sim/RUNBOOK.md).
+`pnpm check` runs workspace typechecks, Sim tests and the vendored native engine
+suite. Local work uses fake minds and isolated data. See development for a Mars
+camp process, static Labs, asset builds and browser verification.

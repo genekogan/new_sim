@@ -1,5 +1,10 @@
 # Navigation and collision library evaluation (SPEC §8, §10, §11, §26, §28)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Date: 2026-09-27. Sandbox: `viewer/experiments/nav-eval/`. Raw numbers and rerun commands are in `RESULTS.md` there.
 Machine: M3 Max, Node 26. Versions: recast-navigation-js 0.43.1, Rapier 0.21.0 (compat and deterministic-compat),
 three-mesh-bvh 0.9.15.

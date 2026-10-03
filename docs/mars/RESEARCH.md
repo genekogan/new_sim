@@ -1,5 +1,10 @@
 # Engine-pattern research: decision notes
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Mature game-engine patterns mapped onto the Mars world engine (Three.js + TypeScript;
 pure-TS deterministic sim core running in Node tests, the browser and a Cloudflare Durable
 Object). Companion to `SPEC.md` (§8–18, 21–23, 26–29, 34) and `AUDIT.md`. Per topic:

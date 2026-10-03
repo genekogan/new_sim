@@ -1,5 +1,10 @@
 # Planning budget (2026-09-27)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 **Problem.** In lab `stress-30` one tick cost ~200 ms. At tick 5 all 30 wanderers submit `walk_to`,
 and each plans its full A\* route synchronously inside `submit()` (spec §13). A construction epoch
 can also replan every walker in one tick. Numbers: node 26, M3 Max, `node deploy/perf-stress.mjs`
@@ -484,3 +489,55 @@ The full/cropped campus and incremental-grid state pins intentionally move from 
 The frozen 2024/2025 JSON already records northAzimuthOffset0. Selecting the historical owner’s documented Kit-axis map in engine/env/sun.ts makes extraction coherent: the only discrepancy was that field and its contentHash; all2020–2025 extraction checks now pass without changing reviewed geometry. This is the owner-sourced local axis convention, not a surveyed bearing or a new historical inference.
 
 The same one-window take refresh covers flagship and campus build-bay-v3. Both recorder runs enforce completion and zero violations. V3 retains 17034ticks and exact recorded final entities; only base/regions differ, with final hash 0fe37f0174e52490a1cd726360c1b7fd32fe2c28303c2c7d3f0666f94e813e6a → 15d4e4ce80b4d191b5a2ec7db842888cf2d3a4c5d2e86c6475b0f3b9647fb33a. Their existing camera recipes remain unchanged; refreshed recordings still require full-gate replay/browser verification.
+
+## 2026-10-01 source reconciliation identity repin
+
+Engine owner authorized bounded canonical-source repin after independent physical checks. Final corrected 2026 campus content hash `256ac4954e7e2f00eef5146165933bb6bab52ef53305d35ac918cd5f542de25a`; full/crop flagship changes from intermediate `6e3b36c1c0cd44125e83a99917db541d1a0ab50d075d08f8cc0f6ce59e81e6e0` to `58dd8e0fb35b6a53ffa88d7847c990499b38e33f4f0527b7eced6fc068876f38`. Both complete43steps/11460ticks (573s), zero violations, identical entities/support/discrete states and human positions, visitor on deck, replay/execute identical and canonical unchanged. Prepin RED preserved `/tmp/mars-oct1-candidate-prepin-proof.log`; unchanged exact-pin assertion moved after physical assertions to expose evidence. Corrected photo-derived model changes world identity; no engine movement tolerances or physical assertions weakened. Independent determinism probe `b746b094…7f0c3` and unrelated historical pins must remain unchanged. Final post-repin focused tests/take regeneration pending at this record.
+
+Post-repin focused full/crop/grid tests:9/9 PASS, exact source-era hash above; original independent determinism assertion retained unchanged. Generated frame source count654 (was660): six kitchen internal diagonal receivers0263/0308/0399/0400/0444/0445 now have no collision prism after bounded photographic aisle clearance; all667 manifest rack IDs remain enumerated exactly once, six exact absent-prism provenance assertions added.
+
+
+## 2026-10-02 — expanded browser suite capacity
+
+Release38 clean gate executed264 passing browser checks plus7 excluded FIXMEs
+in3505.271seconds. The next eight room/supper/garden-circuit journeys actually
+passed under unchanged120second test /15second expectation /zero-retry limits:
+room57.9+4.3+16.4s, supper60.0+26.0+25.8s, garden58.0+10.8s =259.2s.
+Three required camera-entry checks add3.2+2.4+2.3=7.9s, plus three new selectable
+startup/reset/first-Step audits. The measured inherited+new lower bound3772.371s
+already exceeds3600s aggregate capacity. Whole-suite allowance becomes4200s
+(70min) so serial software-WebGL validation can execute all required checks.
+This changes no individual timeout, assertion, runtime/performance ceiling,
+tolerance, expected outcome, take or golden hash. Native failed results still fail
+the gate; seven legacy exclusions remain unproved. No pin is moved or re-recorded.
+Focused Play sourcec8331ec is preserved; rebase3316a74 changes only publication
+docs/deployment metadata, with byte-identical viewer runtime and test files.
+Full clean combined gate and publication remain pending.
+
+## 2026-10-02 — alpha browser cohort capacity, no pin change
+
+Verified release40's278 executed passes/7exclusions used3696.213s. Across exact
+retained native reports,37 distinct newly added alpha test cases actually passed
+in1254.995s: measured inherited+added cohort4951.208s already exceeds the4200s
+aggregate stage allowance. Solar, new whole garden/gallery and remaining quarantine
+cases add further required execution. Receipt: alphaWT viewer/.cloudflare/
+alpha-browser-capacity-evidence.json (per-case durations/source reports retained).
+
+Allow5700s (95min) for the expanded serialized software-WebGL cohort. This is
+whole-suite capacity, not relaxed performance acceptance: original120s/15s/zero
+retry and special construction per-test deadlines, peak/mean/work ceilings,
+assertions/tolerances and golden pins remain. No take or outcome is re-recorded.
+The expanded clean combined gate is pending; failures still fail admission/release.
+
+### 2026-10-03 — one reviewed visual baseline window, no simulation re-pin
+
+The alpha26case still-RED capture cohort at0fcc090 ran every original later
+assertion:34pixel errors, zero nonvisual errors. Root15/Sol6.1review19 old/candidate
+pairs were inspected; exact hashes and reasons are in
+[the root visual review](../../mars/docs/engineering/briefs/alpha-visual-root-review.REPORT.md) and
+[the complementary review](../../mars/briefs/alpha-coverage-review.REPORT.md).
+Only34images change for intended UI/already-released canvas differences; no
+physics/outcome/tolerance/performance-limit change. Rehearsal/hash/support/
+ownership/zero-invariant and renderer checks remain original. Engine/take pins
+unchanged; no new takes. Original RED reports retained in canonical coverage.
+A new clean full gate/public proof remains mandatory before integration/release.

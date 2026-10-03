@@ -331,7 +331,7 @@ the project is called **eden4** for now. Gene said he'll come back to:
 - what the daily ritual is for (Claude's lean: the manna fall);
 - where newcomers land, and the entry price.
 
-## Candidate first slice (superseded: the first slice was built as Sim, see `15`; building, manna and the ritual from this list are not built)
+## Candidate first slice (superseded: the first slice was built as Sim, see `15`; the broader manna/ritual slice remains unbuilt; finite camp construction is now delivered)
 
 The smallest version worth vibe-coding, reusing the Mars engine (`07`):
 - A 100 × 100 m flat ground; pallet racks + wood vocabulary.

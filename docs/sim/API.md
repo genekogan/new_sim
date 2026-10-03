@@ -1,5 +1,10 @@
 # HTTP API, agent API and MCP
 
+Reviewed against code on 2026-10-03. Routes below are process-relative. On the
+public site prepend `/w/toy`, `/w/mars`, `/w/littlemartians` or `/w/eden`; Caddy
+routes to the matching process; server `main.ts` strips that prefix. Root Toy aliases remain compatible. Pairing tokens belong to
+the selected world. Use its `/skill.md` and `/cards.md`.
+
 All routes are in `apps/server/src/http.ts`; MCP in `mcp.ts`. Errors are
 `{ ok: false, code, message }` with a matching status; rate limits return 429 with
 `retry_after` (seconds) and a `Retry-After` header. A `/v1/*` request body over
@@ -18,9 +23,12 @@ Auth, three kinds:
 
 | Route | Returns |
 |---|---|
-| `GET /healthz` | `{ ok, tick, clients, paused, build }` |
-| `GET /v1/config` | `privyAppId, publicUrl, worldId, authReady, devAuth, inviteRequired, build` |
+| `GET /healthz` | `{ ok, tick, clients, paused, build, worldId }` |
+| `GET /v1/config` | `privyAppId, publicUrl, worldId, worldKey, worldPath, authReady, devAuth, inviteRequired, build` |
 | `GET /v1/world` | `world, tick, time, rules_version, size_m, goals[], regions[], places[]`, `gatherings[]` (`id, name, at, states, host, taking_part`), and `souls[]` with `id` (the **entity** id, `h_…`), `name`, `about`, `doing`, `mood`, `region` |
+| `GET /v1/scene` | authored render scene/manifest for the selected engine |
+| `GET /v1/take?after=` | current bounded hot take chunks and server tick |
+| `GET /v1/takes?from=&to=&limit=` | paged recent/verified archive chunks and server tick; maximum 120 per page |
 | `GET /v1/kernel` | the kernel as anyone may see it: `tick, things, links, decks, vocab, hash, plays` |
 | `GET /v1/plays?limit=` | `{ plays }`: the most recent plays, applied or refused (default 60; the server keeps the last 200 in memory) |
 | `GET /v1/talk?limit=` | `{ lines }`: the most recent rendered speech (default 60, at most 200) |
@@ -55,7 +63,27 @@ Auth, three kinds:
 
 Only the owner (or an admin) may act on a Soul.
 
-## Steering: intents, commands, cards
+## Living-world mandate steering
+
+| Owner route | Behavior |
+|---|---|
+| `GET /v1/souls/:id/mandate` | private `{rules}` |
+| `POST /v1/souls/:id/mandate {words, strict?, id?}` | add or edit one aligned rule; words 1–2,000 chars, at most 24 rules per Soul |
+| `DELETE /v1/souls/:id/mandate/:rule` | remove an owned rule |
+
+Paired-agent routes use `/v1/agent/mandate` and `.../:rule`. MCP exposes
+`soul_steer`, `soul_mandate`, `soul_remove_rule`. Alignment failure leaves existing
+rules unchanged. NOW executes its objective agenda; optional/time/gathering rules
+wake thought and remain context for individual needs/journal choices. Strict
+rules report differing decisions once per world day. Rule internals, owner words,
+journals and recovery recipes stay out of public log/kernel projections.
+
+In living worlds, `/command` routes to this rule mechanism; structured `/intent`
+becomes an explicit NOW rule preserving supplied agenda steps. The Toy legacy
+API below retains its intent/translator behavior. Do not infer that ordinary
+living rules restrict choices to their agendas.
+
+## Toy steering: intents, commands, cards
 
 **Intent** (`POST …/intent`): `{ intent: { agenda: [{card, target?, of?}], note?,
 text? } }` or the older `{ intent: { goal, target?, note? } }`. Shapes and limits are
@@ -129,7 +157,7 @@ With the Soul token:
 | `GET /v1/agent/wait?seconds=` | long-poll (≤55 s, ≤4 concurrent): `reason` is `started: …`, `finished: …`, `could not complete: …`, `a new intent was accepted`, the kind of another logged event about the Soul (`play`, `deck`), or `timeout` |
 | `POST /v1/agent/release` | give the token back |
 
-A plan is direction, not control. Only the Soul's mind picks what to play, among
+For the Toy legacy plan API, a plan is direction, not control. Only the Soul's mind picks what to play, among
 the cards it can play now. While some option serves the plan, the mind chooses
 only among those. See `../eden4/17-AGENT-INTERFACE.md` and
 `../eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md` for the design.
@@ -141,7 +169,8 @@ bearer token, or `POST /mcp/<token>` for apps that only accept a URL. Tools:
 `world_query`, `soul_perceive`, `soul_status`, `soul_log {limit?}`, `soul_deck`,
 `soul_set_intent {goal?, target?, agenda?, note?}` (agenda steps take `card`,
 `target?`, `of?`), `soul_command {text}`, `soul_propose_cards {cards, links?, kinds?}`,
-`soul_wait {seconds?}`. Results are JSON text. An intent set over MCP has no `text`.
+`soul_wait {seconds?}`, `soul_steer {words, strict?, id?}`, `soul_mandate`,
+`soul_remove_rule {id}`. Results are JSON text. An intent set over MCP has no `text`.
 
 ## The agent skill
 

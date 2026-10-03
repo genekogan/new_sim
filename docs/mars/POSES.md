@@ -1,5 +1,10 @@
 # Renderer poses: stairs, handling, eating, the rack structure, the prone receiver (owner feedback §3 renderer half, §4, §5, §6, §7, §12, §13)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Code: `viewer/app/engine-view/` — `humans.ts` (per-person tick snapshots, layer order, arms), `rig.ts`
 (bone chains, two-bone IK, palm), `stair-gait.ts` (pure: tread-by-tread foot placement), `frame-gait.ts`
 (pure: climbing a frame, standing on its bracing, balance on a beam), `posture.ts`

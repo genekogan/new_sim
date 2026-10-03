@@ -1,5 +1,15 @@
 # Eden camp: the place for the live Mars world
 
+Integration currency (2026-10-03): the camp is live at `/w/mars`, with four
+Gene-owned Souls, a paused `/l/mars` snapshot preset, living resource renewal
+and four finite construction cards. The helper's source scenario inventory and
+12-test receipt below are retained as authored-scene evidence. Sections saying
+lead wiring is absent or supplies never renew describe the isolated scenario,
+not the integrated host. Current behavior: [STATUS](../../../docs/STATUS.md),
+[runbook](../../../docs/sim/RUNBOOK.md), `worlds/mars/world.json` and the adapter.
+The later workshop/library closing unit is published in the Lab; the persistent
+camp still does not run its composites as routines.
+
 Plan 22 §5 phase 3.2. This is a plain camp of about 42 × 42 m (scene bounds 44 × 44 m). It is built only
 from the Mars engine's existing fixtures, items, regions and construction components, and every activity
 example listed here is checked by the engine's own plan validation. Source:

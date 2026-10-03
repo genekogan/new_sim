@@ -1,5 +1,10 @@
 # Simulation vision
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Owner direction: Gene, 2026-09-29. This supersedes the requirement to close every
 LAST_MILE row or follow its former wave order before building playable activities.
 
@@ -128,10 +133,3 @@ After complete-suite critical review, acceptance, public website entry and recor
 release/evidence/limitations/handoff, **stop Mars feature expansion**. Do not begin
 Eden automatically. Historical reconstructions remain separately owned; illustrative
 participants and staging must be labeled hypothetical.
-## Future-facing reference
-
-[SIMULATION_FRONTIER.md](SIMULATION_FRONTIER.md) preserves the 2026-09-30 owner
-discussion of multi-day projects, relationships, shared intentions and persistent
-consequences. [SIMULATION_FRONTIER_APPLICATIONS.md](SIMULATION_FRONTIER_APPLICATIONS.md)
-distinguishes proposed Mars scenarios from reusable mechanisms and broader Eden
-world possibilities. These references do not expand the current active tranche.

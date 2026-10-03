@@ -1,0 +1,355 @@
+{
+  "files": {
+    "eden4/01-VISION.md": {
+      "mirror_sha256": "8910d5f223cf8fb33f22dc0a215cf0e09c4649eddfa3ab257d155a0bb01d4a3a",
+      "source": "01-VISION.md",
+      "source_sha256": "8910d5f223cf8fb33f22dc0a215cf0e09c4649eddfa3ab257d155a0bb01d4a3a"
+    },
+    "eden4/02-WORLD-AND-BODIES.md": {
+      "mirror_sha256": "f114346b8eafef6d3b00ca5306fdc6ecdb9c677917a1191a501e93d196aa4de4",
+      "source": "02-WORLD-AND-BODIES.md",
+      "source_sha256": "f114346b8eafef6d3b00ca5306fdc6ecdb9c677917a1191a501e93d196aa4de4"
+    },
+    "eden4/03-SIMULATOR-CHAIN-AND-NEUTRALITY.md": {
+      "mirror_sha256": "7320179ba2a1673e0271a48a564cf75051aba5a678f4c1bf14866fa75b130554",
+      "source": "03-SIMULATOR-CHAIN-AND-NEUTRALITY.md",
+      "source_sha256": "7320179ba2a1673e0271a48a564cf75051aba5a678f4c1bf14866fa75b130554"
+    },
+    "eden4/04-ECONOMY-AND-PROPERTY.md": {
+      "mirror_sha256": "bd015cff85914df1be67ce0c797c9a524a5779da46a25f29bc83e51cefccd2a5",
+      "source": "04-ECONOMY-AND-PROPERTY.md",
+      "source_sha256": "bd015cff85914df1be67ce0c797c9a524a5779da46a25f29bc83e51cefccd2a5"
+    },
+    "eden4/05-CREATION-AND-MODERATION.md": {
+      "mirror_sha256": "2925ce5cdf7c4da3b2f1e3bf1f8a987c9ccd0e73026546f8ee6df1e20ddbe26a",
+      "source": "05-CREATION-AND-MODERATION.md",
+      "source_sha256": "2925ce5cdf7c4da3b2f1e3bf1f8a987c9ccd0e73026546f8ee6df1e20ddbe26a"
+    },
+    "eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md": {
+      "mirror_sha256": "0c02f29d661de718556448b9d65a1236c3906da1c78a3b27495e3e92c2655881",
+      "source": "06-DECISIONS-AND-OPEN-QUESTIONS.md",
+      "source_sha256": "0c02f29d661de718556448b9d65a1236c3906da1c78a3b27495e3e92c2655881"
+    },
+    "eden4/07-TRIBUTARIES.md": {
+      "mirror_sha256": "797dec582c8eb12074cffb1bb38247dfdbae1a1f427e9aea62e8e5275bf9ac9c",
+      "source": "07-TRIBUTARIES.md",
+      "source_sha256": "797dec582c8eb12074cffb1bb38247dfdbae1a1f427e9aea62e8e5275bf9ac9c"
+    },
+    "eden4/08-CONVERSATION-LOG.md": {
+      "mirror_sha256": "3205c08d6d13a22c3cb11bafbb9810f5969670b463dc6c2f5214148525f22a92",
+      "source": "08-CONVERSATION-LOG.md",
+      "source_sha256": "3205c08d6d13a22c3cb11bafbb9810f5969670b463dc6c2f5214148525f22a92"
+    },
+    "eden4/09-ONBOARDING-PROMPT.md": {
+      "mirror_sha256": "b6b8cb5cf33079e057ba0aa9ddb80e197ca2d9f337d3ac6e4011717c63747551",
+      "source": "09-ONBOARDING-PROMPT.md",
+      "source_sha256": "b6b8cb5cf33079e057ba0aa9ddb80e197ca2d9f337d3ac6e4011717c63747551"
+    },
+    "eden4/10-FRONTIER-REPRESENTATION.md": {
+      "mirror_sha256": "bb6392f63b6bb4f1858cd394b2cc0fee7082233affc4d2475cb184e9b09bf53a",
+      "source": "10-FRONTIER-REPRESENTATION.md",
+      "source_sha256": "bb6392f63b6bb4f1858cd394b2cc0fee7082233affc4d2475cb184e9b09bf53a"
+    },
+    "eden4/11-STATE-AND-UPDATE-FORMALISM.md": {
+      "mirror_sha256": "8b8213a0d26361449bdd123b15ad682a8fda02779f0ed6868b4b4775476b9764",
+      "source": "11-STATE-AND-UPDATE-FORMALISM.md",
+      "source_sha256": "8b8213a0d26361449bdd123b15ad682a8fda02779f0ed6868b4b4775476b9764"
+    },
+    "eden4/12-ENGINE-FRONTIER.md": {
+      "mirror_sha256": "abc25571624a0f4bca65d1f7606eb00eae00ffedaf4288085ad45b064a65d9d0",
+      "source": "12-ENGINE-FRONTIER.md",
+      "source_sha256": "abc25571624a0f4bca65d1f7606eb00eae00ffedaf4288085ad45b064a65d9d0"
+    },
+    "eden4/13-PARAMETERS-AND-TRADEOFFS.md": {
+      "mirror_sha256": "f47ea69d6260a0a87e4f84b5dc0169d4878bd5ef12ebc3d7f1081e0982b47981",
+      "source": "13-PARAMETERS-AND-TRADEOFFS.md",
+      "source_sha256": "f47ea69d6260a0a87e4f84b5dc0169d4878bd5ef12ebc3d7f1081e0982b47981"
+    },
+    "eden4/14-MVP-TECHNICAL-SPEC-DRAFT.md": {
+      "mirror_sha256": "65d889733b84d4476d104e158c78e4bac42cc08acf70c1aab8c30718373a3883",
+      "source": "14-MVP-TECHNICAL-SPEC-DRAFT.md",
+      "source_sha256": "65d889733b84d4476d104e158c78e4bac42cc08acf70c1aab8c30718373a3883"
+    },
+    "eden4/15-SCAFFOLD-SPEC.md": {
+      "mirror_sha256": "0b2cd41679b05619cfee47e90a29b7950031be4c315624001727bb2f14dc8312",
+      "source": "15-SCAFFOLD-SPEC.md",
+      "source_sha256": "0b2cd41679b05619cfee47e90a29b7950031be4c315624001727bb2f14dc8312"
+    },
+    "eden4/16-HARDENING-SPRINT.md": {
+      "mirror_sha256": "c15f1580e2c05d022cf45860d4ecd0476135a9e36bb3346c122f989a187f195b",
+      "source": "16-HARDENING-SPRINT.md",
+      "source_sha256": "c15f1580e2c05d022cf45860d4ecd0476135a9e36bb3346c122f989a187f195b"
+    },
+    "eden4/17-AGENT-INTERFACE.md": {
+      "mirror_sha256": "e63a7f2404ca41b11cc021493b0a544620f50576b21ef07554de9104c780e351",
+      "source": "17-AGENT-INTERFACE.md",
+      "source_sha256": "e63a7f2404ca41b11cc021493b0a544620f50576b21ef07554de9104c780e351"
+    },
+    "eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md": {
+      "mirror_sha256": "e005b1d0e5ba7158fd33be8792802dd117bbc11331597e73c96867eb409b73ed",
+      "source": "18-KERNEL-CARDS-AND-SELF-CHANGE.md",
+      "source_sha256": "6b1ef1db75c07ae0739c8ef92bb90b7de87dc29ed885ddee5127f8d9c381a2ca"
+    },
+    "eden4/19-MARS-BRIDGE.md": {
+      "mirror_sha256": "4e5a3964cc653efa39aacfb03c77354c517b289704b47e4d69527e698d690a74",
+      "source": "19-MARS-BRIDGE.md",
+      "source_sha256": "bb1f19992b5c0f2940263c79c6b1a05324c149db34951be0a29d3e218996b299"
+    },
+    "eden4/20-WORLDS-BODIES-AND-LIBRARIES.md": {
+      "mirror_sha256": "da79b3434e42a6a9a9d11033f3a5d7fedd8ea5e1ef352f77fc56f36170f78c67",
+      "source": "20-WORLDS-BODIES-AND-LIBRARIES.md",
+      "source_sha256": "da79b3434e42a6a9a9d11033f3a5d7fedd8ea5e1ef352f77fc56f36170f78c67"
+    },
+    "eden4/21-WORLD-ECONOMY-OPEN-QUESTIONS.md": {
+      "mirror_sha256": "dbc1971abc771274762b6a490c7494180e7709edb82eaa254fa9dfa3a6d804fa",
+      "source": "21-WORLD-ECONOMY-OPEN-QUESTIONS.md",
+      "source_sha256": "dbc1971abc771274762b6a490c7494180e7709edb82eaa254fa9dfa3a6d804fa"
+    },
+    "eden4/22-MERGE-PLAN.md": {
+      "mirror_sha256": "21d50e16f01c3841b7e6e21aab94b12a996cab8e27fb9e37e966992b46a935a6",
+      "source": "22-MERGE-PLAN.md",
+      "source_sha256": "85bf87c9522f62d5e82759d6fc725d058291e87b7a287406d390787047ca1073"
+    },
+    "eden4/23-MERGE-KICKOFF-PROMPT.md": {
+      "mirror_sha256": "3f2f3a52cc527f815231cccf98f13e47f81ed791105e88803a1e1d7cc83f4c8d",
+      "source": "23-MERGE-KICKOFF-PROMPT.md",
+      "source_sha256": "62bbf90c63f7e661daa3a978a2d8df97f04ddd09bd7db17683e646dad55180ef"
+    },
+    "eden4/README.md": {
+      "mirror_sha256": "b28a03375db962cb720503e6c72992da97ea1c83a7063acdb217d0c546d8a863",
+      "source": "README.md",
+      "source_sha256": "c047c6867b52b49a3ee0c9a341a87e1b6eeede9e0f0c50fa9450a14f2990d9bd"
+    },
+    "eden4/report/eden4.html": {
+      "mirror_sha256": "8a0e529aefcde04caef7057ab1c3502c23cdcdea7e0d342b9df049c95b42bc37",
+      "source": "report/eden4.html",
+      "source_sha256": "8a0e529aefcde04caef7057ab1c3502c23cdcdea7e0d342b9df049c95b42bc37"
+    },
+    "eden4/research/EDEN4-BLUEPRINT-STE.html": {
+      "mirror_sha256": "35c9d2d29ae4e835dede71628dd4f6b35d891783a5725be7ba3c35ef84e41948",
+      "source": "research/EDEN4-BLUEPRINT-STE.html",
+      "source_sha256": "35c9d2d29ae4e835dede71628dd4f6b35d891783a5725be7ba3c35ef84e41948"
+    },
+    "eden4/research/EDEN4-COMPENDIUM.html": {
+      "mirror_sha256": "5e646b1c2d9294eb7067e4176295ba5450d1178c00c4373ebb7309cf151dcef0",
+      "source": "research/EDEN4-COMPENDIUM.html",
+      "source_sha256": "5e646b1c2d9294eb7067e4176295ba5450d1178c00c4373ebb7309cf151dcef0"
+    },
+    "eden4/research/R1-ONTOLOGY-PRIOR-ART.md": {
+      "mirror_sha256": "7cab860d694866da645354d404751f6562eaee95cc903d427fc80198088f07e1",
+      "source": "research/R1-ONTOLOGY-PRIOR-ART.md",
+      "source_sha256": "7cab860d694866da645354d404751f6562eaee95cc903d427fc80198088f07e1"
+    },
+    "eden4/research/R1-image-sources.md": {
+      "mirror_sha256": "395c6e8e0b37cde54a90c749915a9d6dd3441ad7f874bcb507d51dce70cca85b",
+      "source": "research/R1-image-sources.md",
+      "source_sha256": "395c6e8e0b37cde54a90c749915a9d6dd3441ad7f874bcb507d51dce70cca85b"
+    },
+    "eden4/research/R1-ontology-prior-art.html": {
+      "mirror_sha256": "7d625e7bb80d97b638ea48fe38622e8fdc67c24d1c428852bf4aa0c941d7f0b0",
+      "source": "research/R1-ontology-prior-art.html",
+      "source_sha256": "7d625e7bb80d97b638ea48fe38622e8fdc67c24d1c428852bf4aa0c941d7f0b0"
+    },
+    "eden4/research/R2-LANDSCAPE-AGENT-WORLDS.md": {
+      "mirror_sha256": "4c7f8546d0398d3f8b2a9ee0612cd988e1a1848e5f30692aa797db6df912eef5",
+      "source": "research/R2-LANDSCAPE-AGENT-WORLDS.md",
+      "source_sha256": "4c7f8546d0398d3f8b2a9ee0612cd988e1a1848e5f30692aa797db6df912eef5"
+    },
+    "eden4/research/R2-agent-worlds-landscape.html": {
+      "mirror_sha256": "1c02b8fdd41677e9262fd3ec5af3f4209397dc07dcb04c257d843e499d182c5c",
+      "source": "research/R2-agent-worlds-landscape.html",
+      "source_sha256": "1c02b8fdd41677e9262fd3ec5af3f4209397dc07dcb04c257d843e499d182c5c"
+    },
+    "eden4/research/R2-image-sources.md": {
+      "mirror_sha256": "377c51aacd5c130e60df53f8a59c95310e5033ca61efb45343f9663de0be8c53",
+      "source": "research/R2-image-sources.md",
+      "source_sha256": "377c51aacd5c130e60df53f8a59c95310e5033ca61efb45343f9663de0be8c53"
+    },
+    "eden4/research/R3-LEDGER-ON-CHAIN-OPTIONS.md": {
+      "mirror_sha256": "dd3529339d78210ecbe61f564f31a08d89b7f82b73393be22b5b9a1f49dd9c7c",
+      "source": "research/R3-LEDGER-ON-CHAIN-OPTIONS.md",
+      "source_sha256": "dd3529339d78210ecbe61f564f31a08d89b7f82b73393be22b5b9a1f49dd9c7c"
+    },
+    "eden4/research/R4-CHEAP-DIALOGUE.md": {
+      "mirror_sha256": "537ee186b2e5f8129bdbe069cf6e8782fc37a815d9a59383c7531c9d3bb9aa64",
+      "source": "research/R4-CHEAP-DIALOGUE.md",
+      "source_sha256": "537ee186b2e5f8129bdbe069cf6e8782fc37a815d9a59383c7531c9d3bb9aa64"
+    },
+    "eden4/research/R5-MARS-CAMPUS-PROBE.md": {
+      "mirror_sha256": "78019871fcea5afbccd65cf7fdda7edce4b0f4777786316cafa1e88ab5f1e61c",
+      "source": "research/R5-MARS-CAMPUS-PROBE.md",
+      "source_sha256": "78019871fcea5afbccd65cf7fdda7edce4b0f4777786316cafa1e88ab5f1e61c"
+    },
+    "eden4/research/R6-SPORE-GAMEPLAY.md": {
+      "mirror_sha256": "5a9f55642a9355f2e59baf975a5edc935216ba4b70244ede2c8cd30819307ede",
+      "source": "research/R6-SPORE-GAMEPLAY.md",
+      "source_sha256": "5a9f55642a9355f2e59baf975a5edc935216ba4b70244ede2c8cd30819307ede"
+    },
+    "eden4/research/R7-THE-SIMS-GAMEPLAY.md": {
+      "mirror_sha256": "c3b06e57b40d7d556cf6f510fcab2f87438198d04a65e370a0537af4fc722bc8",
+      "source": "research/R7-THE-SIMS-GAMEPLAY.md",
+      "source_sha256": "c3b06e57b40d7d556cf6f510fcab2f87438198d04a65e370a0537af4fc722bc8"
+    },
+    "eden4/research/R8-SECOND-LIFE.md": {
+      "mirror_sha256": "9a67a4d7a0ebd33dc0088c6c55b97bec152645bf72f5aa7d8aade0e53d3e0d73",
+      "source": "research/R8-SECOND-LIFE.md",
+      "source_sha256": "9a67a4d7a0ebd33dc0088c6c55b97bec152645bf72f5aa7d8aade0e53d3e0d73"
+    },
+    "eden4/research/R9-SPAWN.md": {
+      "mirror_sha256": "9046edd6a3cad3824a6267303bfc72dc0c17434df3d64fce721071de689b6b05",
+      "source": "research/R9-SPAWN.md",
+      "source_sha256": "9046edd6a3cad3824a6267303bfc72dc0c17434df3d64fce721071de689b6b05"
+    },
+    "eden4/research/RESUME.md": {
+      "mirror_sha256": "d434a471ea7ca0a740d3bc0da8bcf92fb44e74a3ee4dfdcfcabef74f5a31f284",
+      "source": "research/RESUME.md",
+      "source_sha256": "efea4b453ab801b3a8802d6bae643afc39ff1d82232513729d1a2669726364c9"
+    },
+    "mars/ACTIVE_ROADMAP.md": {
+      "mirror_sha256": "e27a1466050b68d1f3e489ffd8aa5dc5318a7d3de07530df4974ce12bf367ef3",
+      "source": "docs/engineering/ACTIVE_ROADMAP.md",
+      "source_sha256": "eec119f7ab2f4e142235fbb50fb29b1783786ba654614242a170f2ba1cd77dae"
+    },
+    "mars/AUDIT.md": {
+      "mirror_sha256": "fe51f84e2801e974e4bbc59540282ab1b2815691d2306dcfef1730a1b62ddf28",
+      "source": "docs/engineering/AUDIT.md",
+      "source_sha256": "3c13601f356947d7b7cefba9c3c111d8950bf18ae10a5a9eabd1f45e85029e40"
+    },
+    "mars/BODY_MODEL.md": {
+      "mirror_sha256": "a0bbb2da46549b645af078140ca7feb8776cb6efdfbdf8a347840554b83e28aa",
+      "source": "docs/engineering/BODY_MODEL.md",
+      "source_sha256": "e92fdf0145d65821e27362c9d4ef3377791b3a27e069185bcea239c6385d27b8"
+    },
+    "mars/CAMERA.md": {
+      "mirror_sha256": "4112d193723fd6625429032dba479d126562af55a5821ec20fedbc5a9f9ca386",
+      "source": "docs/engineering/CAMERA.md",
+      "source_sha256": "654891c914e2606016cfacc058b62c4b64f8da059c97afc8ddea4b58f75eee0c"
+    },
+    "mars/CARRY.md": {
+      "mirror_sha256": "e6b4b21fe9c73ff53096f85e7cca085d6aedab9e8d0899145e301723d1b00828",
+      "source": "docs/engineering/CARRY.md",
+      "source_sha256": "5957b1d3b481c108e6627ae85f8b945d54f27a025c07a05abf9b46142027e461"
+    },
+    "mars/ENGINEERING.md": {
+      "mirror_sha256": "aa490584c24159166c7345be3628624c3a4ad72be0fb89c63928d596d9eccbe9",
+      "source": "docs/engineering/ENGINEERING.md",
+      "source_sha256": "c63a7a3b50b73a460d79c367fd50deab3054ef302e2dd3a22a6c2294a70c35e4"
+    },
+    "mars/ENGINE_GUIDE.md": {
+      "mirror_sha256": "eaf326e6cd41b1e3b0330dba24ba519593c44b138470c4ab60218acfad8b60be",
+      "source": "docs/engineering/ENGINE_GUIDE.md",
+      "source_sha256": "b2e78d4e231bfc616fffbfd359438a82f175f89126ca9c2e2851b04db9fabae6"
+    },
+    "mars/HANDOFF.md": {
+      "mirror_sha256": "5b678bf0194070302c15f7b14194bd8bb016fbb0dcc634428fdc87101e7c9e52",
+      "source": "docs/engineering/HANDOFF.md",
+      "source_sha256": "fe9109c1f8b0a054a14f867170ce669b76be39218316ff51e288109cb683768e"
+    },
+    "mars/INTEGRATION_BOUNDARY.md": {
+      "mirror_sha256": "3c2782909891a207d2e13ba9ae894c767e054a57ed32bedacc5bf46fa1ba128e",
+      "source": "original published integration boundary, retained exact copy",
+      "source_sha256": "3c2782909891a207d2e13ba9ae894c767e054a57ed32bedacc5bf46fa1ba128e"
+    },
+    "mars/ITEMS.md": {
+      "mirror_sha256": "2210a60ea8a59a909cf6112c5ee3c1cb546df20b026e2cf3022e50423443976a",
+      "source": "docs/engineering/ITEMS.md",
+      "source_sha256": "47c5f9f6d71279689805e7e905a9788f94d39e71ded52f074625b4335a763c05"
+    },
+    "mars/LAB-README.md": {
+      "mirror_sha256": "2e8bf2c8ce191befe69fda81f779ab3583b0087962291376ec8554ffafe3a3f9",
+      "source": "viewer/app/lab/README.md",
+      "source_sha256": "6f0336b025986fd9f84cd1e28be386ced3e544cf1949c888eda8057607eeab4e"
+    },
+    "mars/LAB_GUIDE.md": {
+      "mirror_sha256": "d1641b5c2ab16a11714b76a5c71c0363696c541c90ab16295cefa8e2ea216995",
+      "source": "docs/engineering/LAB_GUIDE.md",
+      "source_sha256": "977aad7bc69b629be3cf34572670dd60c29dc5bc79e697d4d7ee5b14c3e39456"
+    },
+    "mars/LIB_EVAL.md": {
+      "mirror_sha256": "ee66412a09cc411b6575ea6d95e0d493067d84db06a0d3f922608038eebab486",
+      "source": "docs/engineering/LIB_EVAL.md",
+      "source_sha256": "af026907349b0a63f0e036b5ecf4003c5a8362a98871ddd42eda8be0d649f499"
+    },
+    "mars/MARS-README.md": {
+      "mirror_sha256": "32497c485c4faa9a4ea3df7319d6c569827c9c847b828177f8695a7263877622",
+      "source": "README.md",
+      "source_sha256": "484c7534bb981fd7d87c1e02a4ec57125b1b4aa0055f778adb172f2c163c4dbf"
+    },
+    "mars/MARS-ROADMAP.md": {
+      "mirror_sha256": "231cf688730ac0547d84ff1f43b9f5b2b9870136594b8865a148fa016f249652",
+      "source": "ROADMAP.md",
+      "source_sha256": "99d5d439676c70c6e4fb984188f70cac35b3e0c75ac21233a31bef50bcd7f940"
+    },
+    "mars/MOVEMENT.md": {
+      "mirror_sha256": "2bbda2e6772571a039aedd51b4239e79138ef6ee2054c38fc002a00b8a0af127",
+      "source": "docs/engineering/MOVEMENT.md",
+      "source_sha256": "e5ce1b3cca7413c9987cfcdacea5b2edc2baa04a4644e6465ef7495ae277a028"
+    },
+    "mars/OWNER_DECISIONS.md": {
+      "mirror_sha256": "30a889b40dd082010e650b21a68b03492b66e44861664de1eb801dde09186fbf",
+      "source": "docs/engineering/OWNER_DECISIONS.md",
+      "source_sha256": "dae720ca567f75bf83afb5d56af844c74fb62ea442d8fe480ef41c432f2a40de"
+    },
+    "mars/PLANNING_BUDGET.md": {
+      "mirror_sha256": "66c8d9ff75b6917651927ec462a104af1abe2f4a44348f2bd3165d3dbfb4ea36",
+      "source": "docs/engineering/PLANNING_BUDGET.md",
+      "source_sha256": "91d13634fcf6cb9d909f5423ff5125d78c4cb9cfd5ff7a806fe1ee4704b2e165"
+    },
+    "mars/POSES.md": {
+      "mirror_sha256": "dfdd280f174a437ba8836805fe46700348c4fb47040d6ed71385e83f8c746f25",
+      "source": "docs/engineering/POSES.md",
+      "source_sha256": "0e735c2fff792246c00dc48b9b053fc3ac5282739a85ad536c718f45d8971645"
+    },
+    "mars/RESEARCH.md": {
+      "mirror_sha256": "18fb8b217b83af8067dea8b8a13b090f082a1172c5c37c699a1313569eede5df",
+      "source": "docs/engineering/RESEARCH.md",
+      "source_sha256": "3e6d6cc196e31bf0e1f14e0a91acfe0e82c8b743870b8495a01d6855096c55d6"
+    },
+    "mars/SIMULATION-AGENT-GUIDE.md": {
+      "mirror_sha256": "65208b356c2a15783c06995809d2d1bd8c64d6c02506165c8a0db264eb4678e8",
+      "source": "viewer/public/simulation-agent-guide.md",
+      "source_sha256": "158623e01fe358cd9a650545c3233a12865f2265d2513e83f1301ecab37c71be"
+    },
+    "mars/SIMULATION-SERVER-README.md": {
+      "mirror_sha256": "bb75a6d077f0485d7c776aba3f732e34c4f273886e52ecd13f4de4addf8b847b",
+      "source": "viewer/simulation/README.md",
+      "source_sha256": "d85a7bf28196214dc0a8058529a3e5ec62efacd402d0b099702852760f823f60"
+    },
+    "mars/SIMULATION_FRONTIER.md": {
+      "mirror_sha256": "71cb3059856aed72155f0ba2ff28890a9f5a8ec7661c7877c050ac1a1f1b3c44",
+      "source": "original snapshot 4ddeea2, copied 2026-10-01",
+      "source_sha256": "71cb3059856aed72155f0ba2ff28890a9f5a8ec7661c7877c050ac1a1f1b3c44"
+    },
+    "mars/SIMULATION_FRONTIER_APPLICATIONS.md": {
+      "mirror_sha256": "31d716c326f2a8236749bbfe8c0cb01f08e16d0eec26396e3712730df79c7790",
+      "source": "original snapshot 4ddeea2, copied 2026-10-01",
+      "source_sha256": "31d716c326f2a8236749bbfe8c0cb01f08e16d0eec26396e3712730df79c7790"
+    },
+    "mars/SIMULATION_VISION.md": {
+      "mirror_sha256": "d90132467a77caf542ceaa5605df625c506c07703b8ae383b109d2d897b454dc",
+      "source": "docs/engineering/SIMULATION_VISION.md",
+      "source_sha256": "fde28652161155c25a26834e8938caa49ebb4b2b62d1e3976435a3963f996d56"
+    },
+    "mars/SOCIAL.md": {
+      "mirror_sha256": "5a0eb9f648c5a0cdbadc774d2e419a0675f71f012cc190d923013fc96cb4768d",
+      "source": "docs/engineering/SOCIAL.md",
+      "source_sha256": "0c7f31ce521d22c52d8ff2562c54ab3490bc4a26caea1fddd3fe1b884792be72"
+    },
+    "mars/SPEC.md": {
+      "mirror_sha256": "63ea66ba1b5390100878c7fdc5d6819f46431489ce574f6ab0bead17f0218182",
+      "source": "docs/engineering/SPEC.md",
+      "source_sha256": "27420fc3ccd83cbc38ac38c1b2a154e492f4d5711a5e68a6e6d0e18de0839ff9"
+    },
+    "mars/TAKES_AND_PLANS.md": {
+      "mirror_sha256": "1b1053d799a1574e2fd093016afd5cd421e7c1bc5ac78d6753a7d7c4561db001",
+      "source": "docs/engineering/TAKES_AND_PLANS.md",
+      "source_sha256": "fb603588498aa1c4037652507734de37fa718524c33dadc7938e94c72cc27036"
+    },
+    "mars/VEHICLES.md": {
+      "mirror_sha256": "2bab711930169e3771d2595e54f2ad37d44e63bee0d4ee1e48996346e0c8f7d3",
+      "source": "docs/engineering/VEHICLES.md",
+      "source_sha256": "66b1d54f7ed146e5fc21dfe71a13c1e1fb90478f71a61d2c10bbe1412c74ab28"
+    }
+  },
+  "schema": "sim-doc-mirrors/1"
+}

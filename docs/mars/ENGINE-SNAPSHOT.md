@@ -1,5 +1,12 @@
 # The Mars engine, as surveyed for Sim (snapshot)
 
+Current-use note (2026-10-03): this is a dated September 30/October 1 survey,
+not the current fork specification. The engine is now vendored under `mars/`,
+with world/day/recording integration delivered. For current contracts and
+phase-aware resumability, use [ENGINE-CONTRACT](../sim/ENGINE-CONTRACT.md) and
+[STATUS](../STATUS.md). Counts, release IDs and local-only claims below belong
+to the survey dates. The original source checkout remains read-only.
+
 Surveyed 2026-09-30 from `<mars-campus-repo>`
 (local-only Git, HEAD `5c8672d`, release 24 live). This is what the Sim shell
 is built to wrap. The engine keeps moving at hundreds of commits a day, so treat

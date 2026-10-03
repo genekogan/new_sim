@@ -1,10 +1,239 @@
-# Mars MVP contract — five-day target
+# Mars World v1 alpha — release42 accepted bounded checkpoint
+
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
+Release42 is published and verified at 100% from `043957e`, Worker
+`28055d72-9268-4e46-90c5-6066416304fc` (2026-10-03T04:15:14.687Z), after the
+clean nine-stage gate. Supported bounded alpha acceptance was verified at
+2026-10-03T04:25:20.197240+00:00. Rollback41 is
+`9596510b-336a-4519-8dca-5f862acde364`. [Deployment metadata](../../mars/viewer/deploy/deployment.json),
+[release checklist](../../mars/docs/engineering/RELEASE_CHECKLIST.md), [engineering status](../../mars/docs/engineering/INDEX.md) and
+[scenario coverage](../../mars/docs/engineering/SCENARIO_COVERAGE.json) own exact receipts and exclusions.
+Campus `/` remains the homepage; Engine Lab is explicit `/lab`.
+
+## Small active queue — after completed stabilization
+
+1. **Computer workshop core, in progress:** continue the preserved unverified draft
+   in a new alpha42 worktree. Supported hypothetical scope is three people:
+   facilitator demonstration, two distinct retained computer tasks, learner A review,
+   and ordinary departure. Existing display/workstation/classroom mechanisms own
+   physical execution; no generated images, typing simulation or new scheduling layer.
+   Exit: named admission failures, independent Pause/direction/Resume while a peer
+   continues, persistent Leave/explicit Join, honest waiting, safe repeated End in each
+   phase, retained task/session history, deterministic effects and no resource leaks.
+2. **Lab integration after core proof:** root owns registry/rules, family/HUD/hook/panel,
+   discovery/contracts and actual-Play tests in a separate candidate. Expose only the
+   supported three-person cast and interventions; review source before registration.
+   Exit: complete journey and representative disruptions under real Play, inspected
+   phase/terminal/Reset captures, clean combined gate, verified publication.
+3. **Next object/activity candidate, deferred:** library relocation is docs-only at
+   `319429c`. Inspect ordinary book take/walk/put and safe reading cleanup, then test
+   same-book bookmark continuation at a second supported seat before commissioning
+   a coordinator. Do not rebuild reading or call that proposal implemented.
+
+Alpha stabilization and canonical receipt integration are complete. All 63 mapped
+local-gate proofs are not 63 fresh public journeys; preserve original public41 supper
+failure, corrected repetitions and dev-only public harness failures. Same-runtime
+full construction proof is inherited, not a fresh release42 execution. All other-owner
+paths and drafts remain protected. No Eden, GUI save/load, rig migration or arbitrary
+recovery scope. No remaining stabilization hours; the new workshop estimate will be
+updated after core feasibility proof rather than treating a saved draft as completed.
+
+The earlier 20–36, 8–14 and 4–8 hour forecasts below are dated planning snapshots,
+not remaining-time estimates after the completed local gate/deployment. Expansion
+is now authorized following accepted alpha; this documentation task adds no runtime work.
+
+## Dated pre-release42 closing plan — superseded status/estimate provenance
+
+
+Stabilization remains the immediate priority. Gene's latest authorization lifts the
+quota pause and permits useful activity expansion after the verified alpha checkpoint.
+
+Published release/source/rollback and executed validation are canonical in
+[deployment metadata](../../mars/viewer/deploy/deployment.json) and the
+[release checklist](../../mars/docs/engineering/RELEASE_CHECKLIST.md). Keep `/` as the campus homepage and
+`/lab` as the simulation entry. Release41 is deployed; final alpha acceptance remains pending
+public verification and the reviewed test repair's combined gate; [scenario coverage](../../mars/docs/engineering/SCENARIO_COVERAGE.json)
+tracks exact-source proof and gaps, and the [performance audit](../../mars/docs/engineering/briefs/performance-alpha.REPORT.md)
+records bounded measurements/limits. Preserve camera/historical ownership and
+unverified workshop/library drafts.
+
+## Saved queue and exit criteria — owner-authorized resume after release40
+
+1. **Latest checkpoint:** retain deployed41, verified40 homepage repair and inherited39 proof; preserve main's48other-owner paths;
+   use this shipped checkpoint for stabilization. Expose
+   all shipped presets and longer runs honestly. Exclude unverified workshop/library
+   work; retain their branches/reports without claiming implementation.
+2. **World liveness and coverage:** declare every production preset's execution
+   contract/proof in one authoritative inventory; close full-Play/sustained/probe/
+   diagnostic and representative disruption gaps. A failed local purpose must not
+   freeze the clock/unrelated actors. Recover or explain/wait/clean up through ordinary
+   actions; serious invariant corruption stays visible and quarantined. Prove failure
+   isolation, effects/ownership/support/retained intentions and bounded retries.
+3. **Bounded performance + handoff:** measure cold/warm caching/versioning/readiness,
+   frame behavior/resource lifetime and server execution. Implement only material,
+   low-risk improvements. Update existing guides/indexes, authoring/extension contracts,
+   failure model/control precedence/determinism/persistence/validation/deployment
+   documentation; remove/date stale instructions and retain unfinished provenance.
+4. **Canonical publication:** critically review complete supported scenario suite and
+   architecture, clean combined full gate, inspected Play/disruptions, second deployment
+   and public verification. Mark UI/docs Mars World v1 alpha; record exact source/version,
+   rollback/evidence/limits/Eden handoff. Close this stabilization tranche, then resume
+   the approved activity-expansion queue under Gene's latest continuing authorization.
+   Do not begin Eden.
+
+Latest whole v1 alpha planning range **4–8 working hours**, medium confidence as of
+2026-10-03 02:25 UTC. Release41 (`00bd041`) is deployed after the clean nine-stage
+gate (319 browser PASS/7 SKIP; 1465 engine PASS/6 SKIP/11 TODO). Final alpha acceptance
+is pending: the public full-Play cohort found a supper observation race, retained as
+native failure. Ordinary cleanup correctly took the original bowl after meal return;
+the test's separate Pause click captured a later state. A bounded test repair freezes
+the exact original return predicate without changing expected ownership or outcomes.
+It needs repeated public proof and a clean combined gate before integration. No
+new functional engine repair has been justified by that failure.
+
+Small closing queue: root owns combined candidate, serialized validation and release;
+reviewed Sol6.1 test and documentation changes are isolated from the current public
+run. Performance audit, recovery contracts and focused coverage are complete within
+their documented limits. Remaining work is repeat proof, combined validation,
+current-source coverage/evidence receipts, final publication and public confirmation.
+The estimate assumes no further full-journey or integration failure. Serious defects
+must be explained and repaired rather than hidden to meet the estimate. No active
+save/load, character-rig migration, universal planning or arbitrary-input recovery
+promise. Useful bounded activity expansion follows accepted alpha publication.
+
+## Deferred expansion checkpoints
+
+- Room/supper/garden: bounded increment shipped39; local controls retain the explicit contracts below.
+- Computer workshop: codex/computer-workshop at3316a74, three untracked core/scenario/
+  brief files. UNVERIFIED; first submit refused missing classroom-display service.
+  No tests/TSc/lint/journey proof. Preserve draft; do not register as working.
+- Library reading: codex/library-reading docs-only319429c, clean report. No core/scenario/
+  tests; same-book physical relocation/bookmark continuation remains unverified.
+- All other-owner worktrees/48mainpending paths and legacy backlog remain preserved.
+
+| Preset | Initiate and intervene | Physical/continuation boundary |
+| --- | --- | --- |
+| `room-preparation` | Start room preparation then Play; Pause/Resume cleanup or setup, End, Join visitor, Ask and ordinary classroom floor/phase controls. | Same bowl/spoon stored; empty table and seat8 physically moved; visitor uses moved chair. Resume retries remaining actual setup without re-tidying. During session local Pause is named unsupported: use global Pause; ordinary session controls/End remain. |
+| `communal-supper` | Start supper then Play; Pause/Resume retained preparation/meal/cleanup, direct safely paused cook, End; retry End explicitly if an ordinary return was stopped. | Finite cold ingredients/preparation once; same two meal receipts continue only from safely cancelled checkpoint; consumed empty bowls never receive a fresh serving. Same seven empty vessels stored after completion; End returns held utensils but retains uneaten material, and blocked returns wait truthfully. |
+| `garden-circuit` | Start circuit then Play; Pause returns held bowl safely, direction and explicit Resume retain partial care; End drains real ownership. | Same supported pot/bowl and three grounded beds; .25 pot =1 bowl capacity unit, .5 pot initially=2 bowl units; six .25 care cycles deliver1.5 and leave .5 in same bowl, source0. Existing600tick due interval waits; no growth/refill. |
+
+Computer workshop remains an excluded UNVERIFIED draft at `3316a74` in
+`codex/computer-workshop`: three untracked activity/scenario/brief files; first
+submit refused `classroom.display-unavailable`, no journey/tests/TSc/lint proof.
+Library reading is excluded docs-only `319429c`, no core/scenario/tests or physical
+bookmark-continuation proof. Preserve these worktrees and all48 other-owner main
+paths; this publication does not merge all future branches or certify old inventory.
+
+## Previous expansion roadmap — superseded by alpha mandate and release39 notice
+
+# Mars activity vocabulary — active expansion after release38
+
+**Release38 is published and verified at https://sim.mars.college/**, Worker
+`7616e47a-9149-4b71-ba14-2ea8e5bc6660`, functional source
+`5f1dc2edc90888f8470fc50e14ca3db1cef4ae4d`; rollback37
+`8c57ad5b-9dfd-46b2-9d60-47fdb021510f`. All nine clean gate stages pass:
+294 deployment/1324 engine PASS (6 SKIP,11 TODO),264 browser PASS (7 FIXME).
+Fresh public92 PASS/0 FAIL/0 SKIP/0 flaky;60 selectable presets. Skipped/TODO/FIXME
+checks remain unproved. Original gateway browser/campus.glb HEAD length assertion
+still FAILS; modular HEAD/range and exact served bundle PASS. No DNS/gateway change.
+
+See [release record](../../mars/docs/engineering/RELEASE_CHECKLIST.md#production-deploy-38-2026-10-02-social-and-garden-vocabulary).
+Release38's eight new presets retain actual pads/books/bowls/seed purposes, physical
+support, finite materials, independent commitments and explicit intervention/Resume.
+All60 presets' fresh-load/Reset/first-Step checks pass; fulljourney cases are separate
+proof. Same paused-world camera entry is read-only; no natural camera-quality claim.
+
+## Current small queue
+
+1. **Connected room preparation:** separately saved/wired hypothetical classroom-4
+   derivative: ordinary same-item tidy, empty-table/chair moves and classroom session.
+   Next combined candidate, not online; actualPlay and combined/public acceptance remain required.
+2. **Communal supper:** separately saved finite preparation, retained same-meal
+   receipts and seven actual vessels returned to storage. Cancelled-only meal
+   continuation and safe End retry have focused proof; next combined candidate, not online.
+3. **Garden watering circuit:** separately saved supported pot resupply, same bowl
+   and three grounded beds; six finite care cycles preserve the600tick due interval.
+   Next combined candidate, not online; no growth/refill or universal garden planner.
+
+The clean separate `c8331ec` next combined candidate contains all three additions:
+63 presets, rules version `activities/29`, 185 focused Node checks and18 focused
+actual Play/camera-entry checks passed in5.0min on preservedc8331ec. Rebased3316a74
+retains byte-identical viewer runtime/tests except release metadata. Room3/supper3/
+garden2 journeys and camera entry10 pass with original deadlines/retries. Root
+inspected six key physical captures; independent review inspected all62PNG,
+64JSON and52a11y snapshots with no major visible support/continuity defect.
+Clean combined gate and fresh public proof remain required before release39.
+
+Owner-authorized expansion continues until explicitly stopped. Saved/wired drafts
+are not shipped; next batch publication depends on actual physical journeys, focused
+checks, inspected captures, clean combined gate and fresh public verification.
+Serialize expensive browser/performance lanes. Keep isolated ownership and at most
+three helpers. Preserve all48 other-owner main paths and failed-first receipts.
+
+All staging/participants/output remain hypothetical. Active save/load, rig migration,
+universal psychology/planning/terrain, growth/fluids and camera experiments remain
+deferred. Do not replace existing classroom/movers or reorganize legacy inventory.
+
+## Prior contracts and checkpoint provenance
+
+The dated entries below are retained history, not an active implementation queue.
+
+## Earlier five-day contract and checkpoint provenance
 
 Owner mandate 2026-09-30; target October 5. This section supersedes earlier
 open-ended milestones and allocation below. **50% playable experiences / 30%
 high-medium engineering / 20% polish, evidence and maintenance**; retain the
 50/30/20 product balance. The following is a proposed bounded acceptance contract,
 not a claim that unimplemented features work.
+
+## Immediate presentation checkpoint — 2026-10-01
+
+Owner asks for a minimal alumni entry at `/` using the existing Studio runtime,
+with photogrammetry retained at `/photo`, and editor/Lab at `/studio` and `/lab`.
+Only a collapsible year, aerial/WASD, reviewed room, Time (off initially), time-of-day
+and EUC panel is exposed. Automatic night campfire retains existing behavior.
+Combine reviewed historical source with live32 mechanics, then actual captures,
+clean full gate and production verification: complete in release33, functional7a2c826. Public12checks plus2full automatic builds pass; meal/sleep drafts excluded.
+Return immediately to the queue below after publication. This is presentation work,
+not a new activity/camera/animation subsystem or a change to the Mars/Eden boundary.
+
+## Historical active queue (release34, superseded by October2 tranche)
+
+Online: proposed2027 open-rack concept with explicit proposal labels and2026 default;
+physical cold two-ingredient preparation, retained deposits and two ordinary conserved
+servings; physical tabletop chess, reading/bookmarks, audible music/listeners,
+classroom/setup/shared walking and historical museum. Aerial releases EUC follow.
+Current rigs remain the MVP boundary; downhill feet retain anatomical left/right.
+
+1. **Playable:** supported lie/sleep/wake, then one connected prepared-day journey
+   retaining the same unfinished purpose across gathering/walk/food/rest and return.
+   Sleep uses a bounded current-rig adapter, physical clearance, ordinary approach
+   and coherent interruption. Both current rigs pass actual Play (2/2, 52.1s), 50 focused checks and
+   strict interruption/replay/reset assertions; all captures inspected. This
+   remains an unshipped candidate. Prepared-day core9805632 has12focusedPASS5.708s;
+   readonly depletion-label584ef5b is source-only. No combined/publicday claim.
+   Cold preparation and cross-experience serving conservation are verified in34
+   in both authored groundtable orientations; keep their physical contracts intact.
+2. **Engineering:** reuse structured exact-source engine test proof in the evidence
+   report to avoid rerunning the full engine suite after a clean gate. Existing
+   `--gate` imports only external checks; this release repeats the179.6-second engine
+   gate in `npm run evidence` (155.5seconds). Isolated `engine-evidence-reuse` starts
+   at5111019; structured native-CLI reporter/receipt candidate a47c02d passes
+   11 focused proof/parity checks. Combined gate and actual evidence reuse remain
+   required; no full-suite speedup measured. Keep source/test identity and
+   missing-map failures strict. This bounded improvement runs beside sleep→day;
+   it is not a legacy-row audit or a weakened release gate.
+
+WholeMVP remaining **40–70 working hours**, medium-low confidence: connected continuity/disruption and final acceptance proof remain uncertain;
+standalone supported sleep has passed actual Play on both current rigs;
+bounded preparation and two conserved servings are now verified online. October5
+requires bounded interactions; escalate if repeated anatomy or broader locomotion
+redesign becomes necessary. Proposed2027 and Aerial/EUC handoff are verified in release34; supported sleep and prepared-day drafts remain separate/excluded. Camera is independent and unchanged.
+Older dated entries below preserve provenance; this queue owns current priority.
 
 ## Required supported experiences and limits
 
@@ -53,9 +282,9 @@ a claim for plywood/roof phases or fine construction anatomy.
 2. **Continuity increment — complete in release28, source9b85793:** recovered and validated saved paired-walk core and optional paired
    lunch/unfinished-work integration in Mars4/8 and studio, including departure,
    pause/resume/player handoff and cleanup. Actual studio crossing recovers through the same ordinary walker; authored ground/free-handed pair scope only. Original drafts remain preserved.
-3. **Next breadth/engineering batch — reading active:** bounded reading/chess/music and food/sleep
+3. **Next breadth/engineering batch — reading integrated, music active:** bounded reading/chess/music and food/sleep
    interactions plus one cross-experience resource/recovery/persistence improvement,
-   chosen after verifying existing implementations. Reading now has focused state/persistence checks and one inspected actual Play proof; not shipped. Do not commission all at once.
+   chosen after verifying existing implementations. Reading candidate09da6a0 has passed the clean combined full gate and guarded main integration; release29 is published and verified with actual Reset/Step/Play/interruption/resumption. Music is a separate bounded draft; chess, meal preparation and supported sleep remain unstarted. Do not commission all at once.
 
 ## Publication and finish
 
@@ -72,7 +301,7 @@ Checkpoint repairs and new interaction breadth dominate uncertainty. If they exp
 larger prerequisites, surface an explicit recommended scope cut early; do not silently
 substitute prerecorded scenes. This estimate is not the next-release ETA.
 
-Latest whole-MVP forecast after release28: **40–70 working hours**, medium-low confidence. Shared-walk continuity is published; seated reading remains a tested draft. Assumes bounded chess/music/meal-preparation/sleep and existing rigs, not universal planning or new anatomy. October5 remains feasible only under that bounded scope; surface any new physical prerequisite before expanding it.
+Latest whole-MVP forecast after release29: **40–70 working hours**, medium-low confidence. Shared-walk continuity is published; seated reading is published with same-book interruption/resumption and inspected runtime captures. Assumes bounded chess/music/meal-preparation/sleep and existing rigs, not universal planning or new anatomy. October5 remains feasible only under that bounded scope; surface any new physical prerequisite before expanding it.
 
 ---
 
@@ -258,6 +487,6 @@ Exit criteria: worker retains exact notes through gathering/meal/rest/return, se
 Limits: authoredchoices/onefixedstudioarrangement/existingprimitiveappearance; no autonomousneeds/sleep or activeGUI restore. Cameraobserver unchanged; originalcurrenthouse unsupported3/9refusal and7browser skips stay explicit. Remaining1–3workinghours for combinedrelease assuming no new gate/deploy failure. Next boundedappearance2–4h requires actualtransformedGLB preview/supportenvelope/loadcleanup/attribution proof; broader needs and relationships require a separate small playable increment rather than a universal psychology/asset framework.
 
 
-## Current release blocker (2026-09-30)
+## Historical release25 blocker (2026-09-30; subsequently resolved)
 
 Continuing attendee purposes and independent hypothetical design studio are saved at73eda39 and passed the complete local gate. Production25verification failed with Cloudflare1102 resource exhaustion, exact operation and CPU/memory cause unknown; production rolled back to verified24. This is the immediate correctness/release task, not a camera prerequisite or lost implementation. Fresh isolated24all36MCP verification passes. Preserve failure evidence and establish the host cause before retrying25; do not raise limits or equate local green with production success. Optional selected computer appearance is separate candidate5e0c474, pending runtime inspection. Continue purposeful routines/reuse after resolving this bounded release block, without another planning tranche.

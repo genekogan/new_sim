@@ -1,5 +1,10 @@
 # Owner decisions (Gene, 2026-09-27 interview)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 - Production deploys of validated work are allowed ("pre-release, ok to break stuff"). Record previous Worker version for rollback before each deploy.
 - Git: local repo at campus-2026-reconstruction/, author genekogan <1335251+genekogan@users.noreply.github.com>. Remote (github.com/genekogan) to be set up by Gene later. Never push without him.
 - Any npm libs / Playwright+Chromium / CC0 assets allowed. No account sign-ups.

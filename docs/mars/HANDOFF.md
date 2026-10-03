@@ -1,15 +1,30 @@
 # Handoff: Mars Studio simulation engine, tranche of 2026-09-27
 
-> **Current product direction — Gene, 2026-09-29:** read
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
+> Current resume entry: [engineering navigation](../../mars/docs/engineering/INDEX.md), [active roadmap](ACTIVE_ROADMAP.md)
+> and newest [progress](../../mars/docs/engineering/PROGRESS.md)/[release receipt](../../mars/docs/engineering/RELEASE_CHECKLIST.md).
+> Publication status is authoritative in [deployment metadata](../../mars/viewer/deploy/deployment.json).
+> The restored campus homepage remains `/`; simulation entry is `/lab`.
+> Supported alpha42 is published and verified from `043957e` after the clean nine-stage gate and bounded public
+> acceptance. [INDEX](../../mars/docs/engineering/INDEX.md) owns current status and proof links.
+> Useful activity expansion is authorized after this accepted checkpoint; do not restart the old release35 queue
+> or begin Eden/save-load/rig migration.
+> Numbered checkpoints and branch lists below describe their dates, not current instructions.
+
+> **Dated product direction — Gene, 2026-09-29 (current queue superseded above):** read
 > [SIMULATION_VISION.md](SIMULATION_VISION.md), then
 > [ACTIVE_ROADMAP.md](ACTIVE_ROADMAP.md). Build the next playable classroom,
 > lightning-talk and conversation experience. The former requirement to close
 > LAST_MILE in wave order is superseded. Preserve all original rows and use
-> [RAINY_DAY_BACKLOG.md](RAINY_DAY_BACKLOG.md) for current dispositions.
+> [RAINY_DAY_BACKLOG.md](../../mars/docs/engineering/RAINY_DAY_BACKLOG.md) for current dispositions.
 > Older checkpoints and execution instructions below are retained as history.
 
 
-> **Latest technical checkpoint: release 12 (2026-09-29), gated/deployed source `7e5ff0a`.** History isolation/integrity, standalone seat return and resumable waiting directives are live as `f63d5e1a-556b-4379-b61c-2f7fa60a42e4`; rollback release11 `4de6d265-4292-4e20-88c2-e85dda7a5488`. Full clean-head gate: lint0, unit93/0, engine516/0 (6 skips/11 TODO documented), browser84 pass/7 skip, tsc, unchanged flagship/probe, all36 tools. Production checks passed and three captures personally inspected. Evidence17/17 rows and8/8 milestones PROVEN. LAST_MILE **35 fixed /36 reclassified /145 remaining**. See RELEASE_CHECKLIST deploy12. No pins or historical values changed.
+> **Historical technical checkpoint: release 12 (2026-09-29), gated/deployed source `7e5ff0a`.** History isolation/integrity, standalone seat return and resumable waiting directives are live as `f63d5e1a-556b-4379-b61c-2f7fa60a42e4`; rollback release11 `4de6d265-4292-4e20-88c2-e85dda7a5488`. Full clean-head gate: lint0, unit93/0, engine516/0 (6 skips/11 TODO documented), browser84 pass/7 skip, tsc, unchanged flagship/probe, all36 tools. Production checks passed and three captures personally inspected. Evidence17/17 rows and8/8 milestones PROVEN. LAST_MILE **35 fixed /36 reclassified /145 remaining**. See RELEASE_CHECKLIST deploy12. No pins or historical values changed.
 
 Pending isolated work, not deployed or counted fixed: conversation/ambient returns through `86283e5`; staged support `4abb117` and corrected sequential delivery `1f53b44`; camera physical corrections/cache through `d378943`; measured body/release and wrist IK through `f074a32` plus landmark harness; corridor back-out `cf02afc`; carry bystander guard `a887e80`; duplicate-id/live-link guards `641741f`/`6ec17de`; integer-power cleanup `35b76e9`. Pin-affecting changes await the single wave2 window. Camera calibrated admission has bounded fixture measurements but final full identity/worker proof is pending; late-horizon latency and cross-request navmesh caching remain incomplete. LM024/026/070 remain partial. Historical content remains parked. Older checkpoints below are history.
 

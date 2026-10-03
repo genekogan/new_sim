@@ -1,5 +1,11 @@
 # 18 — A small kernel, an open deck, and a world that can change itself
 
+> Implementation currency (2026-10-03): the authorized merge is delivered in
+> `<repo>`; [MERGE-LOG](../STATUS.md) records exact release/proof and the pending
+> elapsed 24-hour observation. Baseline facts, future tense and session-start
+> instructions below retain their original date/scope; do not repeat completed
+> import, preflight or qualification steps. Only Gene changes ledger decisions.
+
 Rounds 16–18, 2026-10-01. Status: **sections 3, 4 and 5 are built and running**
 (Sim repo, `packages/kernel`, tested on the toy engine and on the Mars engine);
 sections 6 and 8 are still proposals. Section 3 was rewritten after Gene's

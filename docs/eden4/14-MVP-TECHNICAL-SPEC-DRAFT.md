@@ -1,6 +1,6 @@
 # 14 — MVP technical spec (draft 1)
 
-> **Currency (2026-09-30):** a design draft written before anything was built. Its architecture, three-timescale mind and steering surfaces were carried out in Sim with changes; `15` records the plan and what was built, and the Sim repo's `docs/sim/` is authoritative for how things work now. Still useful here: the prior-art survey (§10), the reasoning, and the parts not built (building, economy, ritual, morphology).
+> **Currency (2026-09-30):** a design draft written before anything was built. Its architecture, three-timescale mind and steering surfaces were carried out in Sim with changes; `15` records the plan and what was built, and the Sim repo's `docs/sim/` is authoritative for how things work now. Current-use note (2026-10-03): finite physical construction, ceramic rooms and a floater body profile are now delivered; the broader economy, central ritual and general morphology system remain design work. The prior-art survey and reasoning retain their dates.
 
 Rounds 9–10, 2026-09-29. Status: **draft for discussion; the items marked
 (Gene, r10) are his answers, the rest is Claude's lean.** Design only; no

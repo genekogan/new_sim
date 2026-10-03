@@ -1,5 +1,10 @@
 # Engine Lab (`/lab`)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 The deterministic engine (`viewer/engine/`) running live in the browser over the
 proving ground (`engine/scenes/proving-ground.ts`). It renders with the studio's
 animated people (Quaternius CC0 `animated-{casual,punk,woman}.glb`, clips Idle/Walk).

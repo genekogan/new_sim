@@ -1,11 +1,16 @@
 # Mars College campus — reconstruction and modular design
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Private, local project. Source media is never modified. Generated datasets, intermediate models, and validation evidence live at `../../docs/media/reconstruction/2026-campus/`.
 
 ## Objective
 Reconstruct the built campus from actual overlapping drone images, preserve observation provenance, and evaluate against images withheld from reconstruction. Do not invent unobserved structures or call an unconstrained model survey accurate.
 
-The photogrammetric meshes are the reference layer, not the final design tool. An editable first-pass campus replica is now saved and available at `/studio`, with a nominal component library, source textures and interior evidence. Its dimensions and hidden interiors remain provisional. A separate 2027 workspace and verified inventory will follow. See [MODULAR_STATUS.md](MODULAR_STATUS.md). See [ROADMAP.md](ROADMAP.md) and [components/catalog.json](components/catalog.json).
+The photogrammetric meshes are the reference layer, not the final design tool. An editable first-pass campus replica is now saved and available at `/studio`, with a nominal component library, source textures and interior evidence. Its dimensions and hidden interiors remain provisional. A separate 2027 workspace and verified inventory will follow. See [MODULAR_STATUS.md](../../mars/MODULAR_STATUS.md). See [ROADMAP.md](../../mars/ROADMAP.md) and [components/catalog.json](../../mars/components/catalog.json).
 
 ## Working method
 1. Search the existing media catalog, probe candidates, and inspect temporal storyboards.

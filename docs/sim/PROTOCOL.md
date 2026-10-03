@@ -21,6 +21,14 @@ Everything that crosses a process boundary is defined in
 | `rules` | `admin` / `system` | `{ clockRate, why }`, `{ vocabulary: { kinds, links, manners, cards }, why }` or `{ kernelBootstrap: { at }, why }` | clock rate: recorded, no world effect. `vocabulary` sets the base vocabulary (kinds, link kinds, manners, base cards): logged once at a world's first tick so its history replays with its own words, and again whenever an admin adopts a newer set. `kernelBootstrap` (logged once for a world that predates the kernel) sets where each Soul's Thing is |
 | `admin` | `admin` | `{ action, … }` | recorded; no world effect |
 
+Living worlds additionally accept `mandate` events (add/update/remove/wake/status/
+report/condition) and `rules` payloads for day configuration, quiet renewal,
+reflection, accepted-baseline recovery, runtime policies and an unsnappable-head
+marker. These update replayable state, not just operator metadata. Exact shapes
+are defined in `packages/protocol/src/mandate.ts` and `apps/server/src/world.ts`.
+Public event projections retain identifiers/status while redacting owner words,
+reflection text and recovery recipes. Birth projections hide account IDs.
+
 A `play` is logged by the host when the engine reports that the pending card's
 program has reached step index `approachLen`, or has completed. Plays are in the
 log, so replay applies them without watching programs.
@@ -40,12 +48,14 @@ required.
 
 ## WebSocket (`/ws`, JSON, protocol 1)
 
+Public URLs use `/w/<key>/ws`; each connection belongs to one world process.
+
 Client → server (validated; max 20 messages per 10 s, beyond which the socket is
 closed with code 1008; 64 KB each):
 
 | message | meaning |
 |---|---|
-| `{t:'hello', proto, token?, since?}` | join; `token` = Privy access token (or none); `since` = last batch seq for resume |
+| `{t:'hello', proto, token?, since?, epoch?}` | join; `token` = Privy access token (or none); `since` = last batch seq for resume |
 | `{t:'resync', reason}` | ask for a fresh snapshot |
 | `{t:'ping', n}` | latency probe |
 
@@ -53,10 +63,11 @@ Server → client:
 
 | message | when | content |
 |---|---|---|
-| `welcome` | after hello | `build, proto, worldId, rulesVersion, schema, dt, clockRate, serverTick, serverTime, you` |
+| `welcome` | after hello | `build, proto, worldId, rulesVersion, schema, dt, clockRate, serverTick, serverTime, you, epoch?, paused?` |
 | `snapshot` | join, resync, or too far behind | `tick, seq, viewHash, entities, regions, env, paths[], souls[]` |
 | `batch` | every 10 ticks (500 ms) | `seq, fromTick, toTick, paths[], changes[], souls[], removedSouls[], log[]` |
 | `heartbeat` | every 100 ticks (5 s) | `tick, seq, viewHash, keyframes{id: PoseSample}, clients, clockRate, paused` |
+| `takes` | recorded chunk broadcast | `serverTick, chunks[]` (physical depiction only) |
 | `log` | on join | last 150 public events |
 | `kernel` | on join; after a batch when the kernel changed; at least every 200 ticks | `view: KernelView { tick, things, links, decks, vocab, hash, plays }` (unexpired links; `plays` counts successful plays per card) |
 | `plays` | on join (last 60), then one per play | `PlayView { seq, tick, soulId, soul, card, target, targetName, manner?, ok, reason?, changes[] }` |
@@ -75,7 +86,7 @@ two-waypoint keyframe (`speed` 0) sent every 5 ticks while a body moves.
 `$env.datetime`.
 
 `BrainCall.tier` is one of `mid, translate, director, narrator, shot, compile,
-talk, attune`. A reflex decision is recorded as tier `mid` with model `reflex`.
+talk, attune, reflection`. A reflex decision is recorded as tier `mid` with model `reflex`.
 
 `PlayView.changes` are kernel `Change` values. A refused play has `ok: false`, a
 `reason` and no changes. A `TalkLine` is depiction: the act it renders is already
@@ -94,3 +105,10 @@ replica or the view hash.
 
 Limits: 30 connections per IP, 2,000 total; a client more than 1 MB behind is
 skipped and resyncs at the next heartbeat.
+
+## Recorded 3D observer
+
+The live view uses `/v1/scene` and `/v1/take` hot chunks, plus `/v1/takes` paged
+local/verified archives for rewind. TakePeople/FloaterView sample quantized recorded
+poses about one second behind the server. They do not run a browser Runtime or
+replace the accepted event-log cursor. Labs execute a separate paused Runtime.

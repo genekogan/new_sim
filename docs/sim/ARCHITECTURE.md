@@ -43,10 +43,8 @@ verified in R2 before local pruning, and indexed forever; SQLite keeps 24 hours.
 New-world Labs start paused, run an isolated browser Runtime and expose explicit
 movement requests, Play and Reset. They have no server day, ownership or minds.
 
-The sections below retain the earlier shell component description. Native
-`system` ownership applies only to the preserved Toy world; all new-world Souls
-require the verified human owner. Historical text-only/local-Mars limitations
-are superseded by the deployed world architecture above.
+The sections below describe shared shell components. Toy-specific intent/agenda
+behavior is labeled; living worlds add mandate, life and daily renewal state.
 
 ## One process per world
 
@@ -153,7 +151,7 @@ The world is the fold of an append-only event log over the engine and the kernel
 (`fold.ts`; design in `../eden4/11-STATE-AND-UPDATE-FORMALISM.md`):
 
 1. Inputs (`birth`, `intent`, `decision`, `play`, `mint`, `deck`, `scene`, `rules`,
-   `admin`, `retire`) are queued with `WorldHost.enqueue`.
+   `admin`, `retire`, `mandate`) are queued with `WorldHost.enqueue`.
 2. At the next tick boundary each is assigned `seq` and the current `tick`,
    written to the `events` table, and applied: `foldEvent` moves the engine and the
    kernel, then `WorldHost.apply` updates the minds.
@@ -179,7 +177,7 @@ Model outputs never enter the engine or the kernel directly. A choice becomes a
    done, the host logs a `play` event. The fold checks the card's conditions
    again, turns it into changes and applies them under the coherence rule.
 4. If the play is refused, its program is stopped and that option is not offered
-   again for a minute. If it succeeds, the owner's plan may advance, a Soul that
+   again for a minute. If it succeeds, an active immediate agenda may advance, a Soul that
    was greeted, asked or answered re-thinks soon, and the words of anything said
    are rendered (`BRAIN.md`).
 
@@ -205,10 +203,12 @@ broadcast with a batch when the kernel changed, and at least every 200 ticks.
   state + the kernel + play counts per card, captured inside a tick; the database
   write is deferred past the tick for periodic snapshots. Also taken synchronously
   on SIGTERM.
-- **Boot** = the latest snapshot, if its rules version matches the engine's, then
+- **Boot** = the latest snapshot, if its rules version matches or is explicitly admitted by the factory, then
   fast-forward through later log events by stepping the engine to their ticks.
-  No snapshot, or a rules mismatch → genesis and a replay of the whole log under
-  the current rules (rule changes with migrations, "epochs", are not built).
+  No admitted snapshot → genesis and replay. The activities29→31 additive upgrade
+  is explicitly qualified; arbitrary physics epochs/migrations are not built.
+  Explicit shutdown at an unsnappable head logs a passive accepted tick marker;
+  periodic retries stay quiet. Hard crashes recover only durable accepted state.
 - **A snapshot from before the kernel existed** gets a kernel at boot: places from
   the engine, a Thing and a deck per Soul. Where each Soul stood is logged once as
   a `rules` event (`kernelBootstrap`), so a replay from genesis puts each Soul in
@@ -226,7 +226,9 @@ broadcast with a batch when the kernel changed, and at least every 200 ticks.
 
 ## Sync (server → clients)
 
-The server does not stream poses. On the toy engine, when a Soul commits to
+The replica protocol carries paths/keyframes and metadata. The 3D observer
+separately consumes server-recorded take chunks; it never steps a live Runtime.
+On the Toy engine, when a Soul commits to
 walking, the engine emits a timed path and clients compute positions locally with
 the shared kinematics (`samplePath`). The Mars adapter sends a two-point keyframe
 path for each moving body every 5 ticks instead. See `PROTOCOL.md`. Each heartbeat
@@ -246,9 +248,12 @@ The mind holds the standing intent, its agenda and position (`agenda`,
 `agendaPos`), the card whose effects are still to apply (`pending`), an option to
 avoid for a minute after it failed (`avoid`), since when the plan has been blocked
 (`planBlockedSince`), mood, energy, recent history and the next-think time. Minds
-are snapshotted but are not part of any hash and are not rebuilt by replay.
+are snapshotted outside the engine hash. Accepted decisions, intents, mandates
+and day/reflection events rebuild their replayable state; no model is called
+during replay. Living minds additionally carry needs, journal and active-rule
+state. Exact restart compares these alongside engine and kernel state.
 
-Six "native" Souls owned by `system` (Oda, Pim, Rowan, Tamsin, Juno, Basil) are
+In the preserved Toy world, six "native" Souls owned by `system` (Oda, Pim, Rowan, Tamsin, Juno, Basil) are
 seeded when the world has no live Souls.
 
 ## Web app
@@ -272,9 +277,10 @@ by it. `watch` includes overheard speech.
 | Mid-brain, narrator, director, compiler, speech, translator calling live models | real |
 | Spend tracking and governor | real |
 | Engine (default) | **toy**: 100 m plane, 7 fixtures, straight-line walking, 10 verbs |
-| Engine (`ENGINE=mars`) | the Mars engine through an adapter; needs a local Mars checkout, so it runs only where one exists |
+| Engine (`ENGINE=mars`) | vendored native engine, required in CI/deployment; camp, ceramic garden and green field |
 | Speech | the act (ask, agree, chat…) is kernel state; the words are rendered afterwards and change nothing |
 | Things made by cards | exist in the kernel only; no engine entity is created |
-| Rendering | none: the "map" is text; the broadcast shot is a Mars `ShotSpec` shown as data |
+| Rendering | shared recorded 3D observer for all four worlds; Lab is separate browser execution |
 | Scenes (several bodies staged as one), retiring or revising a card | not built |
-| Economy (manna), building, rooms, ritual, NFTs, chain | not built |
+| Physical building/rooms | finite lookout construction and seven ceramic rooms delivered |
+| Economy (manna), terrain, central ritual, NFTs, chain | deferred design |

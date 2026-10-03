@@ -1,12 +1,17 @@
 # Editable campus model and 2027 design workspace
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Updated 2026-09-05 following Gene's instructions. This project is private and local.
 
 ## Intended result
 
 A dimensioned, modular 3D model, with individually editable structural components, building sections and whole structures. Users must be able to move and rotate sections, duplicate bays, change layouts, and create new structures using the actual Mars building ingredients. A textured photogrammetric surface alone does not satisfy this objective.
 
-The viewer now includes an editable first-pass CAD/photo replica at `/studio`, eight reusable stock/template assets, interior cutaways, photo references, part/building selection, translation, rotation, duplication, JSON save/load and editable GLB export. Details and limitations are in [MODULAR_STATUS.md](MODULAR_STATUS.md).
+The viewer now includes an editable first-pass CAD/photo replica at `/studio`, eight reusable stock/template assets, interior cutaways, photo references, part/building selection, translation, rotation, duplication, JSON save/load and editable GLB export. Details and limitations are in [MODULAR_STATUS.md](../../mars/MODULAR_STATUS.md).
 
 The accuracy work is still incomplete: source CAD dimensions conflict with nominal rack sizes, the compute room and upstairs position are unresolved, and a stock-constrained as-built bay has not yet been validated. Connector snapping, undo/redo, semantic bay regrouping, verified inventory and dedicated 2027 scenarios remain future work. Do not mistake the saved CAD conversion for a fully measured replica.
 

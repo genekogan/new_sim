@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ontology Prior Art</title>
+<style>
+:root{
+  --bg:#fbfaf7; --fg:#1d1c1a; --muted:#6b6760; --rule:#d9d5cc; --panel:#f1eee7;
+  --accent:#9a3b1f; --accent2:#1f5f7a; --warn-bg:#fff1c9; --warn-fg:#5a4300;
+  --serif: "Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#16171a; --fg:#e7e4dd; --muted:#9a968d; --rule:#33353a; --panel:#1f2125;
+    --accent:#e08a66; --accent2:#7fbcd6; --warn-bg:#3d3210; --warn-fg:#f3dc8a; }
+}
+:root[data-theme="dark"]{ --bg:#16171a; --fg:#e7e4dd; --muted:#9a968d; --rule:#33353a; --panel:#1f2125;
+  --accent:#e08a66; --accent2:#7fbcd6; --warn-bg:#3d3210; --warn-fg:#f3dc8a; }
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--serif);font-size:18px;line-height:1.6}
+a{color:var(--accent2);text-underline-offset:2px}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:0;max-width:1180px;margin:0 auto;padding:0 20px}
+@media (min-width:1000px){ .wrap{grid-template-columns:230px minmax(0,1fr);gap:56px} }
+nav.toc{font-family:var(--sans);font-size:14px;line-height:1.45;padding:28px 0}
+@media (min-width:1000px){ nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto} }
+nav.toc h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:600}
+nav.toc ol{list-style:none;margin:0;padding:0}
+nav.toc li{margin:0 0 5px}
+nav.toc a{color:var(--fg);text-decoration:none}
+nav.toc a:hover{color:var(--accent2);text-decoration:underline}
+nav.toc .grp{margin-top:14px;color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+main{padding:36px 0 96px;min-width:0}
+main > header h1{font-size:2.1rem;line-height:1.15;margin:0 0 8px;font-weight:600}
+.kicker{font-family:var(--sans);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+p,li,dd{max-width:72ch}
+section{border-top:1px solid var(--rule);margin-top:64px;padding-top:28px}
+section h2{font-size:1.55rem;line-height:1.2;margin:0 0 4px;font-weight:600}
+section .when{font-family:var(--sans);font-size:14px;color:var(--muted);margin:0 0 20px}
+h3.lab{font-family:var(--sans);font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:26px 0 4px;font-weight:600}
+h3.lab + p{margin-top:0}
+figure{margin:28px 0;max-width:860px}
+figure img{display:block;max-width:100%;height:auto;border:1px solid var(--rule);background:var(--panel)}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font-family:var(--sans);font-size:13.5px;line-height:1.45;color:var(--muted);margin-top:8px;max-width:72ch}
+.imgfail{display:block;font-family:var(--sans);font-size:14px;padding:18px;border:1px dashed var(--rule);color:var(--muted)}
+.noimg{font-family:var(--sans);font-size:14.5px;color:var(--muted);border-left:3px solid var(--rule);padding:6px 12px;max-width:72ch}
+.src{font-family:var(--sans);font-size:15px}
+  .tablewrap{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;font-family:var(--sans);font-size:15px;line-height:1.45;margin:20px 0;width:100%;max-width:980px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px 9px 0;border-bottom:1px solid var(--rule)}
+th{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel);padding:1px 4px}
+/* diagrams: currentColor + variables so they read in both themes */
+svg.d{color:var(--fg)}
+svg.d text{font-family:var(--sans);font-size:15px;fill:currentColor}
+svg.d .t-s{font-size:13px;fill:var(--muted)}
+svg.d .t-h{font-size:13px;letter-spacing:.08em;text-transform:uppercase;fill:var(--muted);font-weight:600}
+svg.d .t-b{font-weight:600}
+svg.d .box{fill:var(--panel);stroke:currentColor;stroke-width:1.2}
+svg.d .frame{fill:none;stroke:var(--rule);stroke-width:1}
+svg.d .ln{stroke:currentColor;stroke-width:1.3;fill:none}
+svg.d .acc{stroke:var(--accent);stroke-width:1.8;fill:none}
+svg.d .acc2{stroke:var(--accent2);stroke-width:1.8;fill:none}
+svg.d .dash{stroke-dasharray:5 4}
+svg.d .f-acc{fill:var(--accent)} svg.d .f-acc2{fill:var(--accent2)} svg.d .f-fg{fill:currentColor}
+</style>
+<script>
+/* Replace a broken remote image with a plain link to its source page. */
+function imgFail(img){
+  var a=document.createElement('a');
+  a.className='imgfail';
+  a.href=img.getAttribute('data-source')||img.src;
+  a.textContent='image unavailable; see source';
+  img.replaceWith(a);
+}
+</script>
+</head>
+<body>
+
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#kernel">Our kernel, on one screen</a></li>
+    <li class="grp">Formal</li>
+    <li><a href="#strips">1 · STRIPS, PDDL, GOAP</a></li>
+    <li><a href="#sims">2 · The Sims</a></li>
+    <li><a href="#df">3 · Dwarf Fortress</a></li>
+    <li class="grp">Social</li>
+    <li><a href="#facade">4 · Façade and ABL</a></li>
+    <li><a href="#cif">5 · Comme il Faut, Prom Week, Ensemble</a></li>
+    <li><a href="#versu">6 · Versu</a></li>
+    <li><a href="#tott">7 · Talk of the Town, Kismet</a></li>
+    <li><a href="#speech">8 · Speech acts, FIPA, commitments</a></li>
+    <li class="grp">World models and stores</li>
+    <li><a href="#inform">9 · Inform 7 rulebooks</a></li>
+    <li><a href="#ecs">10 · ECS vs facts with time</a></li>
+    <li class="grp">LLM era</li>
+    <li><a href="#smallville">11 · Generative Agents, AI Town</a></li>
+    <li><a href="#voyager">12 · Voyager, Project Sid</a></li>
+    <li><a href="#concordia">13 · Concordia</a></li>
+    <li><a href="#craft">14 · Infinite Craft</a></li>
+    <li class="grp">Closing</li>
+    <li><a href="#ideas">Ranked ideas</a></li>
+    <li><a href="#scenes">Scenes and joint activities</a></li>
+    <li><a href="#reading">Reading list</a></li>
+  </ol>
+</nav>
+
+<main>
+<header>
+  <div class="kicker">Eden4 · Sim · research R1</div>
+  <h1>Ontology prior art: a guided tour</h1>
+  <p>Fourteen systems that already tried to describe a living world as structured state plus named operators, read against the Sim kernel (things, links, five changes, cards, one rule).</p>
+</header>
+
+<section id="kernel">
+  <h2>Our kernel, on one screen</h2>
+  <p class="when">The reference for every comparison below. Source: <code>eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md</code> §3–5.</p>
+
+  <figure>
+  <svg class="d" viewBox="0 0 960 580" role="img" aria-labelledby="k-t k-d">
+    <title id="k-t">The Sim kernel</title>
+    <desc id="k-d">State is Things and Links. Five changes alter state. A card is a named operator with conditions, changes and a depiction. Joint outcomes arise from four separate plays: host, ask, agree, act.</desc>
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="f-fg"/></marker>
+      <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="f-acc"/></marker>
+      <marker id="ah-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="f-acc2"/></marker>
+    </defs>
+
+    <!-- A. State -->
+    <rect class="frame" x="10" y="10" width="460" height="290"/>
+    <text class="t-h" x="24" y="34">State · Things and Links</text>
+    <rect class="box" x="40" y="60" width="150" height="54"/>
+    <text class="t-b" x="52" y="83">Rob</text><text class="t-s" x="52" y="102">soul · at: party</text>
+    <rect class="box" x="290" y="60" width="150" height="54"/>
+    <text class="t-b" x="302" y="83">Wren</text><text class="t-s" x="302" y="102">soul · at: party</text>
+    <rect class="box" x="230" y="200" width="210" height="54"/>
+    <text class="t-b" x="242" y="223">Rob's party</text><text class="t-s" x="242" y="242">gathering · music: playing</text>
+    <rect class="box" x="40" y="200" width="130" height="54"/>
+    <text class="t-b" x="52" y="223">campfire</text><text class="t-s" x="52" y="242">place</text>
+    <!-- at -->
+    <path class="ln" d="M230 227 L172 227" marker-end="url(#ah)"/>
+    <text class="t-s" x="190" y="219">at</text>
+    <!-- links -->
+    <path class="acc" d="M130 114 L290 198" marker-end="url(#ah-a)"/>
+    <text x="150" y="168" class="t-s">link: hosts</text>
+    <path class="acc" d="M380 114 L380 198" marker-end="url(#ah-a)"/>
+    <text x="388" y="162" class="t-s">link: dj of</text>
+    <path class="acc dash" d="M290 80 L192 80" marker-end="url(#ah-a)"/>
+    <text x="205" y="70" class="t-s">link: asked</text>
+    <text class="t-s" x="24" y="284">Thing = id, kind, name, traits, states, at · Link = kind, from, to, lifetime</text>
+
+    <!-- B. Five changes -->
+    <rect class="frame" x="490" y="10" width="460" height="290"/>
+    <text class="t-h" x="504" y="34">The five changes · the only ways state alters</text>
+    <g>
+      <text class="t-b" x="504" y="78">appear / vanish</text><text class="t-s" x="660" y="78">a thing begins, or ends</text>
+      <text class="t-b" x="504" y="122">set</text><text class="t-s" x="660" y="122">one state of one thing takes a value</text>
+      <text class="t-b" x="504" y="166">move</text><text class="t-s" x="660" y="166">a thing is now at another thing</text>
+      <text class="t-b" x="504" y="210">link / unlink</text><text class="t-s" x="660" y="210">a relation begins, or ends</text>
+      <text class="t-b" x="504" y="254">say</text><text class="t-s" x="660" y="254">an act, to someone, about something</text>
+      <path class="frame" d="M504 92 H936 M504 136 H936 M504 180 H936 M504 224 H936"/>
+    </g>
+    <text class="t-s" x="504" y="284">Kinds, link names, manners and cards are open vocabulary.</text>
+
+    <!-- C. A card -->
+    <rect class="frame" x="10" y="320" width="460" height="250"/>
+    <text class="t-h" x="24" y="344">A card · a named, minted operator</text>
+    <text class="t-b" x="24" y="372">“ask to be the dj”</text><text class="t-s" x="190" y="372">target: a gathering</text>
+    <rect class="box" x="24" y="388" width="130" height="92"/>
+    <text class="t-b" x="36" y="412">when</text>
+    <text class="t-s" x="36" y="434">actor at target</text>
+    <text class="t-s" x="36" y="452">no dj yet</text>
+    <text class="t-s" x="36" y="470">not asked yet</text>
+    <path class="ln" d="M154 434 L176 434" marker-end="url(#ah)"/>
+    <rect class="box" x="178" y="388" width="130" height="92"/>
+    <text class="t-b" x="190" y="412">then</text>
+    <text class="t-s" x="190" y="434">say: ask host</text>
+    <text class="t-s" x="190" y="452">(only the five</text>
+    <text class="t-s" x="190" y="470">changes)</text>
+    <path class="ln dash" d="M308 434 L330 434" marker-end="url(#ah)"/>
+    <rect class="box" x="332" y="388" width="126" height="92" stroke-dasharray="5 4"/>
+    <text class="t-b" x="344" y="412">depiction</text>
+    <text class="t-s" x="344" y="434">walk to host,</text>
+    <text class="t-s" x="344" y="452">wave; words</text>
+    <text class="t-s" x="344" y="470">written after</text>
+    <text class="t-s" x="24" y="508">A play = (card hash, who, on what, in what manner).</text>
+    <text class="t-s" x="24" y="528">Replay runs “then” with code and calls no model.</text>
+    <text class="t-s" x="24" y="548">New cards are written by an LLM compiler, then validated.</text>
+
+    <!-- D. ask -> agree -> act -->
+    <rect class="frame" x="490" y="320" width="460" height="250"/>
+    <text class="t-h" x="504" y="344">One rule · joint outcomes from separate plays</text>
+    <text class="t-b" x="504" y="402">Rob</text>
+    <text class="t-b" x="504" y="482">Wren</text>
+    <path class="frame" d="M548 398 H936 M548 478 H936"/>
+    <rect class="box" x="556" y="376" width="84" height="44"/>
+    <text x="566" y="394" class="t-s">1 · link</text><text x="566" y="412">hosts</text>
+    <rect class="box" x="652" y="456" width="84" height="44"/>
+    <text x="662" y="474" class="t-s">2 · say</text><text x="662" y="492">ask</text>
+    <rect class="box" x="748" y="376" width="84" height="44"/>
+    <text x="758" y="394" class="t-s">3 · say</text><text x="758" y="412">agree</text>
+    <rect class="box" x="844" y="456" width="92" height="44"/>
+    <text x="854" y="474" class="t-s">4 · link</text><text x="854" y="492">dj of</text>
+    <path class="acc2" d="M640 406 L662 454" marker-end="url(#ah-b)"/>
+    <path class="acc2" d="M736 470 L758 422" marker-end="url(#ah-b)"/>
+    <path class="acc2" d="M832 406 L856 454" marker-end="url(#ah-b)"/>
+    <text class="t-s" x="504" y="532">An actor changes only itself, what it controls, what it made.</text>
+    <text class="t-s" x="504" y="552">Step 4 is legal only because step 3 exists as state.</text>
+  </svg>
+  <figcaption>The Sim kernel: state, the five changes, a card, and the ask → agree → act pattern (the DJ example from doc 18). Drawn for this report.</figcaption>
+  </figure>
+
+  <h3 class="lab">Thesis</h3>
+  <p>Almost every part of the kernel has a tested ancestor. Cards are STRIPS operators with a depiction attached; decks are GOAP action sets and the card library is Voyager's skill library; “acts are state” is Singh's public semantics for speech acts; the one rule is Versu's design rule that practices only suggest and each character decides. The prior art is ahead of us in three places: agreements that carry content and a full life (Yolum and Singh), powers that are specific and revocable rather than all or nothing (institutional power), and a first-class way to hold several actors in one activity over time (Versu's practices). The tour runs from formal planning to social simulation to LLM worlds and ends with those three as the ranked ideas and a recommendation for scenes.</p>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="strips">
+  <h2>1 · STRIPS, PDDL and GOAP</h2>
+  <p class="when">1971 → 1998 → F.E.A.R., 2005</p>
+  <figure>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/0/0c/SRI_Shakey_with_callouts.jpg" alt="Shakey the robot with labelled components" loading="lazy" data-source="https://commons.wikimedia.org/wiki/File:SRI_Shakey_with_callouts.jpg" onerror="imgFail(this)" style="max-height:560px;width:auto">
+    <figcaption>Shakey, the SRI robot STRIPS was written to plan for · SRI International, CC BY-SA 3.0 · <a href="https://commons.wikimedia.org/wiki/File:SRI_Shakey_with_callouts.jpg">Wikimedia Commons</a></figcaption>
+  </figure>
+  <figure>
+    <img src="https://upload.wikimedia.org/wikipedia/en/1/18/F.E.A.R._gameplay_1.jpg" alt="F.E.A.R. gameplay screenshot" loading="lazy" data-source="https://en.wikipedia.org/wiki/File:F.E.A.R._gameplay_1.jpg" onerror="imgFail(this)">
+    <figcaption>F.E.A.R. (Monolith, 2005), whose enemies plan with GOAP · © Monolith Productions, low-resolution fair-use copy · <a href="https://en.wikipedia.org/wiki/File:F.E.A.R._gameplay_1.jpg">Wikipedia file page</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 330" role="img" aria-labelledby="s1-t s1-d">
+    <title id="s1-t">A STRIPS operator beside a Sim card</title>
+    <desc id="s1-d">Parameters map to target and derive, preconditions to when, add and delete lists to then. Below, a GOAP plan found by search, against our one-step lookahead.</desc>
+    <rect class="frame" x="10" y="10" width="340" height="210"/>
+    <text class="t-h" x="24" y="34">STRIPS operator</text>
+    <text class="t-b" x="24" y="62">pickup(x)</text>
+    <text class="t-s" x="24" y="94">pre</text><text x="80" y="94">clear(x), ontable(x), handempty</text>
+    <text class="t-s" x="24" y="132">delete</text><text x="80" y="132">ontable(x), clear(x), handempty</text>
+    <text class="t-s" x="24" y="170">add</text><text x="80" y="170">holding(x)</text>
+    <text class="t-s" x="24" y="204">anything not listed stays the same</text>
+    <rect class="frame" x="410" y="10" width="340" height="210"/>
+    <text class="t-h" x="424" y="34">Sim card</text>
+    <text class="t-b" x="424" y="62">ask to be the dj ($target)</text>
+    <text class="t-s" x="424" y="94">when</text><text x="480" y="94">at target, no dj, not asked</text>
+    <text class="t-s" x="424" y="132">then</text><text x="480" y="132">say ask to host</text>
+    <text class="t-s" x="424" y="170">+</text><text x="480" y="170">a depiction</text>
+    <text class="t-s" x="424" y="204">set and move replace; no delete list</text>
+    <path class="acc" d="M352 58 H408" marker-end="url(#ah-a)"/>
+    <path class="acc" d="M352 90 H408" marker-end="url(#ah-a)"/>
+    <path class="acc" d="M352 140 H408" marker-end="url(#ah-a)"/>
+    <text class="t-h" x="10" y="252">GOAP (F.E.A.R.)</text>
+    <rect class="box" x="10" y="264" width="120" height="40"/><text x="22" y="289">goal</text>
+    <rect class="box" x="170" y="264" width="140" height="40"/><text x="182" y="289">action B</text>
+    <rect class="box" x="350" y="264" width="140" height="40"/><text x="362" y="289">action A</text>
+    <path class="ln" d="M168 284 H132" marker-end="url(#ah)"/>
+    <path class="ln" d="M348 284 H312" marker-end="url(#ah)"/>
+    <text class="t-s" x="510" y="280">searched back from the goal;</text>
+    <text class="t-s" x="510" y="300">Sim today looks one step ahead</text>
+  </svg>
+  <figcaption>A card has the shape of a STRIPS operator: the arrows pair parameters, preconditions and effects. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>STRIPS (Fikes and Nilsson, 1971) describes an action as preconditions, an add list and a delete list, and assumes anything not listed stays the same; a planner searches for a sequence of actions that reaches a goal. PDDL standardised the notation for planners; version 2.1 added durative actions and numbers, and 2.2 added derived predicates (facts computed from other facts) and facts that switch on at a set time. Jeff Orkin's goal-oriented action planning (GOAP) brought this to games in F.E.A.R.: each character has a set of actions with preconditions and effects and plans a short sequence towards its current goal, so the character's state machine shrinks to three states. Hierarchical task network (HTN) planners such as SHOP2 instead store “methods” that decompose a task into subtasks until only primitive operators remain.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>A card is a STRIPS operator. <code>when</code> is the precondition list, <code>then</code> the effects, <code>target</code> and <code>derive</code> the typed parameters. <code>set</code> and <code>move</code> replace a single value, so they need no delete list; a link's lifetime is a timed fact. A Soul's deck is a GOAP action set, and doc 18's “looking one step ahead” is a search of depth one.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> because cards are already operators, standard planning applies cheaply: a reachability check at minting (“can this card ever be played?”) and lookahead of several steps without a model. An owner's agenda is an HTN decomposition done by the compiler; storing the decompositions as minted methods would let a cheap matcher reuse them. Derived predicates would remove duplicated state: base cards set <code>hosting: true</code> and also create a <code>hosts</code> link, and only one card clears the state. <strong>Beware:</strong> PDDL can say things our ten condition forms cannot (conditional or “for everyone” effects, numbers, conditions that must hold throughout). And F.E.A.R. kept one description of effects for the planner and another for the game; Evans and Short name that gap as why agents retry actions that cannot succeed. Sim is safe while the card that is evaluated is the card that is applied.</p>
+  <p class="src">Primary sources: <a href="https://pages.cs.wisc.edu/~dyer/cs540/handouts/gdc2006_orkin_jeff_fear.pdf">Orkin, “Three States and a Plan: The A.I. of F.E.A.R.” (GDC 2006)</a> · <a href="https://jair.org/index.php/jair/article/view/10352">Fox and Long, PDDL 2.1 (JAIR 2003)</a> · <a href="https://jair.org/index.php/jair/article/view/10362">Nau et al., SHOP2 (JAIR 2003)</a> · <a href="https://en.wikipedia.org/wiki/Stanford_Research_Institute_Problem_Solver">STRIPS overview</a></p>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="sims">
+  <h2>2 · The Sims: smart objects and advertisements</h2>
+  <p class="when">Maxis, 2000</p>
+  <figure>
+    <img src="https://upload.wikimedia.org/wikipedia/en/9/91/SimsSS.jpg" alt="The Sims (2000) gameplay screenshot" loading="lazy" data-source="https://en.wikipedia.org/wiki/File:SimsSS.jpg" onerror="imgFail(this)">
+    <figcaption>The Sims (2000) in play: a household lot seen from above · © Electronic Arts, low-resolution fair-use copy · <a href="https://en.wikipedia.org/wiki/File:SimsSS.jpg">Wikipedia file page</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 330" role="img" aria-labelledby="s2-t s2-d">
+    <title id="s2-t">Objects advertise; the Sim chooses; the object's procedure runs</title>
+    <desc id="s2-d">A fridge, a bed and a television each advertise an interaction and the need it satisfies. The Sim scores them against its needs, faded by distance, and runs the chosen object's procedure in its own thread. A social interaction creates an invisible object that both Sims' threads enter.</desc>
+    <rect class="box" x="20" y="40" width="230" height="170"/>
+    <text class="t-b" x="34" y="66">a Sim</text>
+    <text class="t-s" x="34" y="98">hunger</text><rect x="110" y="86" width="40" height="14" class="f-acc"/><rect class="frame" x="110" y="86" width="120" height="14"/>
+    <text class="t-s" x="34" y="128">energy</text><rect x="110" y="116" width="80" height="14" class="f-fg" opacity=".55"/><rect class="frame" x="110" y="116" width="120" height="14"/>
+    <text class="t-s" x="34" y="158">fun</text><rect x="110" y="146" width="105" height="14" class="f-fg" opacity=".55"/><rect class="frame" x="110" y="146" width="120" height="14"/>
+    <text class="t-s" x="34" y="194">low bar = urgent need</text>
+    <rect class="box" x="480" y="20" width="260" height="52"/><text class="t-b" x="494" y="42">fridge</text><text class="t-s" x="494" y="62">offers “have a snack” · hunger</text>
+    <rect class="box" x="480" y="98" width="260" height="52"/><text class="t-b" x="494" y="120">bed</text><text class="t-s" x="494" y="140">offers “sleep” · energy</text>
+    <rect class="box" x="480" y="176" width="260" height="52"/><text class="t-b" x="494" y="198">TV</text><text class="t-s" x="494" y="218">offers “watch” · fun</text>
+    <path class="acc" d="M478 46 L252 90" marker-end="url(#ah-a)"/>
+    <path class="acc2 dash" d="M478 124 L252 124" marker-end="url(#ah-b)"/>
+    <path class="acc2 dash" d="M478 202 L252 160" marker-end="url(#ah-b)"/>
+    <text class="t-s" x="290" y="58">chosen: best score</text>
+    <text class="t-s" x="292" y="226">score = need × promise,</text>
+    <text class="t-s" x="292" y="244">faded by distance</text>
+    <path class="frame" d="M10 262 H750"/>
+    <text class="t-h" x="20" y="288">Two Sims</text>
+    <text x="120" y="288">SimSam picks “kiss”, offered by SimMary → an invisible</text>
+    <text x="120" y="312">social-interaction object is created; both Sims' threads run inside it.</text>
+  </svg>
+  <figcaption>Knowledge of what can be done lives in objects, not in the Sim (after Forbus and Wright, 2001). Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>In The Sims the objects carry the behaviour. Each object's interaction has a procedure that does it, a check of whether it is possible, and advertisements saying which needs it satisfies (hunger, energy, fun, social and so on). A Sim not under the player's control picks, from all behaviours of all objects, the one that most raises its current happiness; advertisements fade with distance and can vary with personality. The chosen procedure then runs in the Sim's own thread. When two Sims interact, an invisible social-interaction object is created and both Sims' threads pass into it. New content is a new object: no Sim has to change. Free will was on by default and the player could override it, but some acts never happened autonomously: looking for a job, asking someone to move in, proposing, WooHoo (R7 §1).</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>An advertisement is a card offered by a Thing instead of held in a Soul's deck; needs are states on the Soul; the selection is a reflex-tier scorer. The invisible social-interaction object is the smallest possible scene Thing: something that exists only while two actors do one thing together.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> cards offered by things in reach as the default locality rule (doc 18 open problem 4): a Soul may play its own cards and those offered where it is. It also gives made things a purpose (open problem 3) and lets user-made objects extend everyone's action space. <strong>Beware:</strong> the object's procedure drives the Sim, which our one rule forbids; the Soul must remain the actor of every change. And a Sim judges an action by what it advertises, not what it does: Forbus and Wright suggest “skeptical Sims” that compare before and after, and Evans and Short cite the Sim that retries a blocked toilet for ever. Doc 18 met the same loop and patched it with a one-minute cooldown. The companion study R7 adds a lesson from play: a per-Soul autonomy dial with a short list of cards that never play without the owner.</p>
+  <p class="src">See also: <a href="R7-THE-SIMS-GAMEPLAY.md">R7 — The Sims: gameplay, players, and what a shared Sims taught</a> (how people played, The Sims Online, ten things to steal).</p>
+  <p class="src">Primary source: <a href="https://qrg.northwestern.edu/papers/Files/Programming_Objects_in_The_Sims.pdf">Forbus and Wright, “Some notes on programming objects in The Sims” (2001)</a> · later: <a href="https://gdcvault.com/play/1020190/Concurrent-Interactions-in-The-Sims">Ingebretson and Rebuschatis, “Concurrent Interactions in The Sims 4” (GDC 2014)</a></p>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="df">
+  <h2>3 · Dwarf Fortress</h2>
+  <p class="when">Bay 12 Games, 2006 →</p>
+  <figure>
+    <img src="https://bay12games.com/dwarves/imgs/classic_01.png" alt="Dwarf Fortress classic display: the fortress map beside one dwarf's Memories tab" loading="lazy" data-source="https://www.bay12games.com/dwarves/" onerror="imgFail(this)">
+    <figcaption>Dwarf Fortress, classic display: the fortress map beside a craftsdwarf's Memories tab, a dated list of feelings with their causes (receiving water, talking with a lover) · © Bay 12 Games · <a href="https://www.bay12games.com/dwarves/">bay12games.com/dwarves</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 300" role="img" aria-labelledby="s3-t s3-d">
+    <title id="s3-t">Dwarf Fortress builds a world, then a history, before play</title>
+    <desc id="s3-d">World generation runs from an elevation map through separate fields to biomes, rivers, populations and simulated civilisations; play starts in that history. Biomes are not placed; they follow from the interplay of fields.</desc>
+    <text class="t-h" x="10" y="24">World generation, in order</text>
+    <rect class="box" x="10" y="38" width="112" height="54"/><text x="20" y="62">elevation</text><text class="t-s" x="20" y="80">fractal</text>
+    <rect class="box" x="136" y="38" width="112" height="54"/><text x="146" y="62">fields</text><text class="t-s" x="146" y="80">rain, heat…</text>
+    <rect class="box" x="262" y="38" width="112" height="54"/><text x="272" y="62">biomes</text><text class="t-s" x="272" y="80">classified</text>
+    <rect class="box" x="388" y="38" width="112" height="54"/><text x="398" y="62">rivers</text><text class="t-s" x="398" y="80">erode, flow</text>
+    <rect class="box" x="514" y="38" width="112" height="54"/><text x="524" y="62">life</text><text class="t-s" x="524" y="80">plants, beasts</text>
+    <rect class="box" x="640" y="38" width="110" height="54"/><text x="650" y="62">history</text><text class="t-s" x="650" y="80">towns, wars</text>
+    <path class="ln" d="M122 65 H134 M248 65 H260 M374 65 H386 M500 65 H512 M626 65 H638"/>
+    <text class="t-s" x="640" y="114">→ play begins here</text>
+    <path class="frame" d="M10 134 H750"/>
+    <text class="t-h" x="10" y="162">Break the system into fields</text>
+    <rect class="box" x="10" y="176" width="130" height="34"/><text x="22" y="198">temperature</text>
+    <rect class="box" x="10" y="216" width="130" height="34"/><text x="22" y="238">rainfall</text>
+    <rect class="box" x="10" y="256" width="130" height="34"/><text x="22" y="278">drainage</text>
+    <path class="acc" d="M142 193 L246 228 M142 233 L246 233 M142 273 L246 238" />
+    <rect class="box" x="250" y="210" width="150" height="46"/><text class="t-b" x="262" y="238">forest or swamp</text>
+    <text class="t-s" x="420" y="214">not spawned directly: derived from</text>
+    <text class="t-s" x="420" y="234">the interplay of fields.</text>
+    <text class="t-s" x="420" y="262">For Sim: store the few underlying facts,</text>
+    <text class="t-s" x="420" y="282">derive the rest.</text>
+  </svg>
+  <figcaption>The generation order and the “fields, not biomes” example, both from Adams's chapter. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Dwarf Fortress generates a whole world and then simulates its civilisations (settlements, trade routes, wars) before the player arrives, so play starts inside a history. Tarn Adams's published principles are about method: do not overplan the model; break a system into its basic elements and let their interplay produce the result (biomes come from separate temperature, rainfall and drainage fields); “operate at the level of what the player sees or one layer below”; base the model on real-world analogues. Each dwarf carries dated memories with the feeling and its cause, as in the screenshot above. No author description of the social model was found; third-party reverse engineering (DFHack) shows joint activities stored as records, each a tree of events with a participant list.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Things with small traits and states, a log of events, and stories read off afterwards: the case for our approach. The ledger read as history is DF's Legends mode. A dwarf's memory list is what doc 18 open problem 5 lacks: a remembered event with a date, a feeling and a cause. A DF activity record is a scene Thing with member links and sub-events.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> “one layer below what the player sees” as the test for what belongs in the kernel; derive outcomes from a few underlying facts rather than storing them (the biome lesson, and the cure for duplicated state); a legends view over the ledger, which needs no kernel change. <strong>Beware:</strong> every DF kind, and every activity type, is hand-written code; it is the closed-vocabulary route, rich only where someone wrote the code. Emergent absurdity is charming in a single-player game and a support problem in a shared world with owners.</p>
+  <p class="src">Primary source: <a href="http://www.gameaipro.com/GameAIPro2/GameAIPro2_Chapter41_Simulation_Principles_from_Dwarf_Fortress.pdf">Adams, “Simulation Principles from Dwarf Fortress”, Game AI Pro 2, ch. 41 (2015)</a> · third-party: <a href="https://github.com/DFHack/df-structures/blob/master/df.activity.xml">DFHack activity structures</a></p>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="facade">
+  <h2>4 · Façade and ABL</h2>
+  <p class="when">Mateas &amp; Stern, 2005</p>
+  <figure>
+    <img src="https://web.archive.org/web/20060114000455im_/http://www.interactivestory.net:80/facadeimages/facade_1playergreets.jpg" alt="Façade: Trip at the door while the player types a greeting" loading="lazy" data-source="https://web.archive.org/web/20061231043053/http://www.interactivestory.net/" onerror="imgFail(this)">
+    <figcaption>Façade: Trip greets the player, who types “hi Trip! how are you!”; the text is mapped to a discourse act · official press screenshot, © Procedural Arts (Mateas and Stern) · <a href="https://web.archive.org/web/20061231043053/http://www.interactivestory.net/">interactivestory.net, archived 2006</a> (the live domain no longer belongs to the project)</figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 320" role="img" aria-labelledby="s4-t s4-d">
+    <title id="s4-t">An ABL joint behaviour inside a beat</title>
+    <desc id="s4-d">Trip proposes entering the joint behaviour OfferDrink; Grace answers enter or reject; when both are ready they enter together, each performing its own steps; exit is negotiated the same way. A player discourse act wakes a handler that interrupts the current beat goal.</desc>
+    <rect class="frame" x="10" y="10" width="740" height="300"/>
+    <text class="t-h" x="24" y="34">Beat · “offer the player a drink”</text>
+    <text class="t-b" x="24" y="88">Trip</text>
+    <text class="t-b" x="24" y="178">Grace</text>
+    <path class="frame" d="M84 84 H736 M84 174 H736"/>
+    <rect class="box" x="96" y="62" width="120" height="44"/><text class="t-s" x="106" y="80">1 · intends</text><text x="106" y="98">enter</text>
+    <rect class="box" x="236" y="152" width="120" height="44"/><text class="t-s" x="246" y="170">2 · replies</text><text x="246" y="188">enter / reject</text>
+    <rect class="box" x="376" y="62" width="76" height="44"/><text x="386" y="90">ready</text>
+    <rect class="box" x="376" y="152" width="76" height="44"/><text x="386" y="180">ready</text>
+    <path class="acc2" d="M216 100 L250 150" marker-end="url(#ah-b)"/>
+    <path class="acc2" d="M356 160 L376 106" marker-end="url(#ah-b)"/>
+    <rect class="box" x="474" y="62" width="160" height="44"/><text class="t-s" x="484" y="80">3 · own steps</text><text x="484" y="98">“A beer? Wine?”</text>
+    <rect class="box" x="474" y="152" width="160" height="44"/><text class="t-s" x="484" y="170">3 · own steps</text><text x="484" y="188">smile, joke</text>
+    <rect class="box" x="652" y="62" width="84" height="134"/><text x="662" y="120">exit</text><text x="662" y="140">together</text>
+    <text class="t-s" x="96" y="230">Entry and exit use a three-phase commit: intention → replies → ready from all.</text>
+    <path class="acc dash" d="M96 274 H460" marker-end="url(#ah-a)"/>
+    <text x="96" y="264">player types → discourse act</text>
+    <text class="t-s" x="470" y="270">a handler wakes, interrupts the</text>
+    <text class="t-s" x="470" y="290">beat goal, reacts, and resumes</text>
+  </svg>
+  <figcaption>The joint-behaviour protocol and beat handlers, after Mateas and Stern (2002). Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Façade is a one-act interactive drama with two characters, Trip and Grace, and a player who types freely. Content is organised in beats, the smallest unit of dramatic action; each beat has beat goals, and handlers that wake when the player does something, interrupt the current goal and respond. Typed text is interpreted as a discourse act (for example, a reference to Grace), and reactions are authored against acts, not words. The characters are written in ABL, a reactive planning language; its central addition is the <em>joint behaviour</em>: a behaviour shared by a team, entered and exited together through a three-phase commit (one member announces its intention, the others reply, all signal ready), with each member performing its own steps.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Discourse acts are our <code>say</code> acts: the same split between act and words, run in the opposite direction (they parse words into acts; we render acts into words). The joint-behaviour commit is ask → agree → act turned into a reusable protocol for entering and leaving a shared activity. A beat is a scene-sized operator with preconditions and effects on story state.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> the idea that entering a shared activity is itself negotiated, which is ask → agree. Exit needs less in Sim: a member who leaves removes its own role link, everyone can see that, and they re-plan, so no notice protocol is required. Take handlers too: reactions that interrupt, answer and return to what was under way. <strong>Beware:</strong> the authors say the assumption of strong autonomy “is problematic” for story characters, and design against it: one author writes both minds, and a joint behaviour holds both characters. Our one rule is strong autonomy. Evans and Short add that joining depends on having a matching behaviour, not on wanting to. And the cost: they count Façade's 27 beats against more than a thousand Versu actions.</p>
+  <p class="src">Primary source: <a href="https://www.qrg.northwestern.edu/Resources/aigames.org/papers2002/MMateas02.pdf">Mateas and Stern, “A Behavior Language for Story-Based Believable Agents” (2002)</a></p>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="cif">
+  <h2>5 · Comme il Faut, Prom Week and Ensemble</h2>
+  <p class="when">UC Santa Cruz, 2010–2015</p>
+  <figure>
+    <img src="https://promweek.soe.ucsc.edu/files/2012/10/newInterface.jpg" alt="Prom Week interface" loading="lazy" data-source="https://promweek.soe.ucsc.edu/" onerror="imgFail(this)">
+    <figcaption>Prom Week: the player picks a social exchange for one character toward Doug (Show Off, Insult, Bully, Woo) while thought bubbles preview how others would respond · Expressive Intelligence Studio, UC Santa Cruz · <a href="https://promweek.soe.ucsc.edu/">promweek.soe.ucsc.edu</a></figcaption>
+  </figure>
+  <figure>
+    <img src="https://raw.githubusercontent.com/ensemble-engine/ensemble/master/docs/toolscreenshot.png" alt="Ensemble authoring tool screenshot" loading="lazy" data-source="https://github.com/ensemble-engine/ensemble" onerror="imgFail(this)">
+    <figcaption>The Ensemble tool's Rules Editor: a volition rule, “when someone has more than 0 closeness for other”, raises that character's volition (+3) to increase closeness · Ensemble Engine project · <a href="https://github.com/ensemble-engine/ensemble">github.com/ensemble-engine/ensemble</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 300" role="img" aria-labelledby="s5-t s5-d">
+    <title id="s5-t">One round of Comme il Faut</title>
+    <desc id="s5-d">Volition rules score which exchange each initiator wants with whom; an exchange is chosen; the responder's own rules decide accept or reject; an instantiation is performed; trigger rules fire; the result is recorded in the social facts database, which the next round of volition reads.</desc>
+    <rect class="box" x="10" y="40" width="160" height="70"/><text class="t-b" x="22" y="66">1 · volition</text><text class="t-s" x="22" y="88">rules score (exchange,</text><text class="t-s" x="22" y="104">target) per character</text>
+    <rect class="box" x="200" y="40" width="160" height="70"/><text class="t-b" x="212" y="66">2 · initiator</text><text class="t-s" x="212" y="88">proposes, e.g.</text><text class="t-s" x="212" y="104">“Woo” toward Doug</text>
+    <rect class="box" x="390" y="40" width="160" height="70"/><text class="t-b" x="402" y="66">3 · responder</text><text class="t-s" x="402" y="88">its own rules decide</text><text class="t-s" x="402" y="104">accept or reject</text>
+    <rect class="box" x="580" y="40" width="170" height="70"/><text class="t-b" x="592" y="66">4 · instantiation</text><text class="t-s" x="592" y="88">effects + dialogue</text><text class="t-s" x="592" y="104">from NLG templates</text>
+    <path class="ln" d="M170 75 H198 M360 75 H388 M550 75 H578"/>
+    <rect class="box" x="580" y="160" width="170" height="70"/><text class="t-b" x="592" y="186">5 · trigger rules</text><text class="t-s" x="592" y="208">e.g. dating two people</text><text class="t-s" x="592" y="224">→ status “two-timer”</text>
+    <path class="ln" d="M665 110 V158" marker-end="url(#ah)"/>
+    <rect class="box" x="200" y="160" width="350" height="70"/><text class="t-b" x="212" y="186">social facts database</text><text class="t-s" x="212" y="208">who did what to whom, when; rules can</text><text class="t-s" x="212" y="224">ask “in the last n turns”, “ever”</text>
+    <path class="ln" d="M578 195 H552" marker-end="url(#ah)"/>
+    <path class="acc dash" d="M198 195 H90 V112" marker-end="url(#ah-a)"/>
+    <text class="t-s" x="20" y="260">next round reads the new state and history</text>
+    <text class="t-s" x="390" y="270">steps 2 and 3 are two separate decisions:</text>
+    <text class="t-s" x="390" y="290">ask, then agree or decline</text>
+  </svg>
+  <figcaption>The CiF cycle as described in McCoy et al. (2014), Fig. 1. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Comme il Faut (CiF) is a “social physics” engine built at UC Santa Cruz and used in Prom Week. Social state is traits, statuses, relationships and numeric networks between characters, plus a social facts database holding the history of what happened. A social exchange is one character's attempt to change the social state between itself and another (start dating, become allies). Weighted influence rules decide what each initiator wants and with whom (volition); the responder accepts or rejects by its own rules; an instantiation then performs the outcome with effects and templated dialogue; trigger rules fire afterwards to keep definitions true (dating two people makes a “two-timer”). Prom Week used more than 5,000 rules. Ensemble repackaged CiF as a general engine whose schema declares, for each kind of social fact, whether it is boolean or numeric, directed or reciprocal, its default and a duration after which it reverts.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Relationships, networks and statuses are Links (Ensemble's <code>duration</code> is our lifetime); the social facts database is our ledger; one exchange bundles our ask, answer and effect; volition rules are what our mid-brain does with a small model, written as data instead; Ensemble's schema is the link-kind table we keep in code and prose.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> declare direction, reciprocity, default and lifetime per link kind; allow conditions over history (“did X in the last n ticks”, “ever”), which the ledger already holds; consider derived consequences in the spirit of trigger rules, so cards need not repeat definitions. The responder deciding by its own rules is our one rule exactly. <strong>Beware:</strong> the rule count, and debugging thousands of weights. Evans and Short's criticism also applies to us: an exchange is an isolated act, with nothing to give a sequence of acts continuity. A third party can be referenced in conditions and effects, but CiF has no group activity. That is the scenes gap.</p>
+  <p class="src">Primary sources: <a href="https://cs.uky.edu/~sgware/reading/papers/mccoy2014cif.pdf">McCoy et al., “Social Story Worlds With Comme il Faut” (IEEE TCIAIG, 2014)</a> · <a href="https://github.com/ensemble-engine/ensemble/wiki/Schema">Ensemble schema</a> · <a href="https://promweek.soe.ucsc.edu/">Prom Week</a></p>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="versu">
+  <h2>6 · Versu: social practices and roles</h2>
+  <p class="when">Evans &amp; Short, 2013–2014</p>
+  <figure>
+    <img src="https://versu.com/wp-content/uploads/2014/05/linus_bergstrom_amused.png" alt="Versu character portrait, a man adjusting his glasses with an amused expression" loading="lazy" data-source="https://versu.com/" onerror="imgFail(this)" style="max-width:300px">
+    <figcaption>A Versu character portrait from the official site; the file name pairs the character with an expression (“amused”). No in-app screenshot of play could be found at a verifiable URL; the official site otherwise shows only splash art · © Versu · <a href="https://versu.com/">versu.com</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 320" role="img" aria-labelledby="s6-t s6-d">
+    <title id="s6-t">A Versu practice suggests; each agent decides</title>
+    <desc id="s6-d">A dinner practice has roles host and two guests and its own state. It suggests actions to whoever fills each role. Each agent picks among the suggestions of all the practices it is in, by trying each, scoring the result against its desires and undoing it. Below, exclusion logic: asserting brown.in!study replaces brown.in!dining_room.</desc>
+    <rect class="box" x="230" y="14" width="300" height="76" style="stroke:var(--accent2)"/>
+    <text class="t-b" x="244" y="40">practice: dinner</text>
+    <text class="t-s" x="244" y="62">roles: host, guest, guest</text>
+    <text class="t-s" x="244" y="80">state: serving · whose turn, what was said</text>
+    <rect class="box" x="20" y="150" width="200" height="80"/><text class="t-b" x="32" y="174">Ada · host</text><text class="t-s" x="32" y="196">offered: pass the dish,</text><text class="t-s" x="32" y="214">propose a toast</text>
+    <rect class="box" x="280" y="150" width="200" height="80"/><text class="t-b" x="292" y="174">Ben · guest</text><text class="t-s" x="292" y="196">offered: compliment,</text><text class="t-s" x="292" y="214">excuse yourself</text>
+    <rect class="box" x="540" y="150" width="200" height="80"/><text class="t-b" x="552" y="174">Cy · guest</text><text class="t-s" x="552" y="196">offered: compliment,</text><text class="t-s" x="552" y="214">leave mid-meal (a breach)</text>
+    <path class="acc2 dash" d="M300 90 L150 148 M380 90 L380 148 M460 90 L620 148"/>
+    <text class="t-s" x="400" y="126">suggests</text>
+    <text class="t-s" x="20" y="252">each agent chooses for itself: try an action, score the result against its desires, undo</text>
+    <path class="frame" d="M10 268 H750"/>
+    <text class="t-h" x="20" y="294">exclusion logic</text>
+    <text x="170" y="294"><tspan font-family="ui-monospace,Menlo,monospace">brown.in!dining_room</tspan>  →  assert <tspan font-family="ui-monospace,Menlo,monospace">brown.in!study</tspan></text>
+    <text class="t-s" x="170" y="314">“!” means the only value: the old one, and everything under it, is removed</text>
+  </svg>
+  <figcaption>Practices offer, agents choose, and breaches are allowed and remembered. Example roles and actions are illustrative; the mechanism and the exclusion-logic example are from Evans and Short (2014). Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Versu is an engine for text-based interactive stories (the official site lists genres from comedy to romance to thriller) in which every character is an autonomous agent. Coordination comes from <em>social practices</em>: descriptions of recurring situations (a greeting, a meal, a game of whist) with roles and a state of their own. In the authors' words, practices “never control the agents directly; they merely provide suggestions.” Several practices run at once, and a character's options are the union of what they offer; an agent judges an option by applying it, scoring the resulting state against its desires and undoing it. Norm violations are permitted, and recorded so that others can react. The world is a set of sentences in exclusion logic, where <code>a.b</code> says b is one of the ways a is and <code>a!b</code> that it is the only way.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>The closest ancestor overall. A practice instance is a Thing with role links; “an affordance exists only inside its practice” is a card whose <code>when</code> requires a link to that Thing (as <code>dance</code> requires <code>attends</code>). The <code>!</code> operator is the single-valuedness of <code>set</code> and <code>move</code>. And the authors' design rule is ours: “Relationship state changes should require active choice from both characters.”</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> scenes as practices (ranked idea 3); uniqueness declared once on a link kind and type-checked, where we repeat <code>noneLinkedTo</code> in each card; breaches as recorded facts others can respond to, where our kernel can only forbid; the inspector that answers “why did this precondition fail?”. <strong>Beware:</strong> the authors report more than 300 desires whose tuning was “a difficult and unrewarding problem”; their mechanism for letting one practice suppress the others was “too broad and crude”; all agents share one understanding of each practice's state; and a twenty-minute episode took one to two months to write until a higher-level authoring tool was built.</p>
+  <p class="src">Primary source: <a href="https://www.cs.uky.edu/~sgware/reading/papers/evans2014versu.pdf">Evans and Short, “Versu—A Simulationist Storytelling System” (IEEE TCIAIG, 2014)</a> · reconstruction: <a href="https://ojs.aaai.org/index.php/AIIDE/article/view/27537">Praxish (AIIDE 2023)</a></p>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="tott">
+  <h2>7 · Talk of the Town and Kismet</h2>
+  <p class="when">Ryan et al., 2015 · Summerville and Samuel, 2020–2021</p>
+  <p class="noimg">No real image: the Talk of the Town repository README and the papers' landing pages carry no linkable screenshot or figure, and Kismet's original 2020 paper was not located. The diagram below is ours, drawn from the 2015 paper's description of belief facets.</p>
+  <figure>
+  <svg class="d" viewBox="0 0 760 330" role="img" aria-labelledby="s7-t s7-d">
+    <title id="s7-t">A Talk of the Town belief facet and its evidence</title>
+    <desc id="s7-d">Ada's mental model of Rob holds a facet for his workplace: a value, whether it is accurate, the facet it replaced, and a list of evidence. Each piece of evidence has a type, source, location, time and a strength that decays; the facet's strength is the sum. Evidence types fall into four groups: origination, propagation, deterioration and termination.</desc>
+    <rect class="frame" x="10" y="10" width="360" height="210"/>
+    <text class="t-h" x="24" y="34">Ada's mental model of Rob</text>
+    <text class="t-b" x="24" y="64">facet: workplace = the bakery</text>
+    <text class="t-s" x="24" y="88">accurate? no (Rob moved to the mill)</text>
+    <text class="t-s" x="24" y="108">replaced: workplace = the farm</text>
+    <text class="t-s" x="24" y="128">strength = sum of evidence below</text>
+    <rect class="box" x="24" y="144" width="332" height="30"/><text class="t-s" x="34" y="164">observation · at the bakery · year 1 · fading</text>
+    <rect class="box" x="24" y="180" width="332" height="30"/><text class="t-s" x="34" y="200">statement from Wren · at the inn · year 3</text>
+    <text class="t-h" x="400" y="34">Nine evidence types, four groups</text>
+    <text class="t-b" x="400" y="66">origination</text><text class="t-s" x="400" y="86">reflection, observation, transference,</text><text class="t-s" x="400" y="104">confabulation, lie</text>
+    <text class="t-b" x="400" y="136">propagation</text><text class="t-s" x="400" y="156">statement, eavesdropping</text>
+    <text class="t-b" x="400" y="188">deterioration</text><text class="t-s" x="400" y="208">mutation</text>
+    <text class="t-b" x="590" y="188">termination</text><text class="t-s" x="590" y="208">forgetting</text>
+    <path class="frame" d="M10 246 H750"/>
+    <text class="t-h" x="10" y="272">In Sim</text>
+    <text x="10" y="298">a belief = a link Soul → Thing whose data holds the value, the evidence and its strength;</text>
+    <text x="10" y="320">a <tspan font-family="ui-monospace,Menlo,monospace">tell</tspan> act is a statement: it adds evidence in the hearer, not truth in the world.</text>
+  </svg>
+  <figcaption>Facet fields and evidence types from Ryan et al. (2015) as summarised in the companion analysis; the names and places are illustrative. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Talk of the Town simulates a small town over decades before play; its characters, in the authors' words, “observe and form knowledge about the world, propagate knowledge to other characters, misremember and forget knowledge, and lie.” Each character holds a mental model per person or place it knows, made of belief facets, one per attribute (workplace, hair colour, whereabouts). A facet records its value, whether it is accurate, the facet it replaced, and its evidence; its strength is the sum of that evidence, and each piece records source, location, time and a strength that decays. A lie is received as a statement. Kismet is a small social-simulation language with near-English rules (“if Drinker is drunk and Drinker and Target don't like each other”); its authors' follow-up reports that this phrasing “enhances readability, but it hurts writability”.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Doc 18 §6 (“Knowing”) and open problem 5 (memory): a belief is a link from a Soul to a Thing whose data holds value, evidence and strength, and our <code>said</code> is a statement event. City of Gangsters (section 10's sources) does the same for relationships: a relationship's value is the sum of dated, expiring, explained history entries.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> explained, dated evidence on social links (ranked idea 9): knowledge with provenance can be wrong, stale, second-hand or a lie, which answers doc 18's open question of saying something new (it becomes the hearer's belief, not world truth), and lets the interface say why. From Kismet: a near-natural vocabulary breeds synonyms (is “doesn't like” the same as “dislikes”?), so keep card JSON canonical and generate a plain-language rendering for Gene rather than a second syntax. <strong>Beware:</strong> per-character belief stores grow fast, and our bound is 400 links per Soul; decide what is forgotten before what is kept.</p>
+  <p class="src">Primary sources: <a href="https://ojs.aaai.org/index.php/AIIDE/article/view/12825">Ryan et al., “Toward Characters Who Observe, Tell, Misremember, and Lie” (AIIDE 2015)</a> · <a href="https://ceur-ws.org/Vol-3217/paper15.pdf">Summerville et al., “Casual Creator Cursed Problems” (2021)</a> · code: <a href="https://github.com/james-owen-ryan/talktown">github.com/james-owen-ryan/talktown</a></p>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="speech">
+  <h2>8 · Speech acts, FIPA-ACL and social commitments</h2>
+  <p class="when">Austin 1962 · Searle 1975 · KQML 1994 · FIPA 2002 · Singh 1998 · Yolum and Singh 2002</p>
+  <figure>
+    <img src="https://web.archive.org/web/20250813135423im_/http://www.fipa.org/specs/fipa00026/SC00026H_files/image001.gif" alt="UML sequence diagram of the FIPA Request Interaction Protocol" loading="lazy" data-source="https://web.archive.org/web/20250813135423/http://www.fipa.org/specs/fipa00026/SC00026H.html" onerror="imgFail(this)" style="max-width:347px">
+    <figcaption>The FIPA Request Interaction Protocol: the initiator requests; the participant refuses or agrees; after agreeing it reports failure, done, or a result · FIPA specification SC00026H (2002), its protocol figure · <a href="https://web.archive.org/web/20250813135423/http://www.fipa.org/specs/fipa00026/SC00026H.html">archived copy of the spec</a> (fipa.org refused direct requests when checked)</figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 360" role="img" aria-labelledby="s8-t s8-d">
+    <title id="s8-t">An act as state, and the life of a commitment</title>
+    <desc id="s8-d">Top: one utterance splits into the act and what it is about, which are state and are replayed, and the words, which are rendered afterwards and never replayed. Bottom: a conditional commitment becomes a commitment when its condition holds and ends when the debtor discharges it; the creditor can release it, the debtor can cancel it, the creditor can assign it to a new creditor and the debtor can delegate it to a new debtor. Sim's agreed link today has only create and expire.</desc>
+    <rect class="box" x="10" y="20" width="180" height="56" style="stroke:var(--accent)"/><text class="t-b" x="22" y="44">act: ask</text><text class="t-s" x="22" y="64">force · state · replayed</text>
+    <rect class="box" x="200" y="20" width="230" height="56" style="stroke:var(--accent)"/><text class="t-b" x="212" y="44">about: being the DJ</text><text class="t-s" x="212" y="64">content · state · replayed</text>
+    <rect class="box" x="440" y="20" width="310" height="56" stroke-dasharray="5 4"/><text x="452" y="44">“Rob, could I play tonight?”</text><text class="t-s" x="452" y="64">words · rendered after · never replayed</text>
+    <path class="frame" d="M10 100 H750"/>
+    <text class="t-h" x="10" y="126">A commitment: debtor owes creditor an outcome</text>
+    <rect class="box" x="10" y="146" width="190" height="60"/><text class="t-b" x="22" y="170">CC(x, y, p, q)</text><text class="t-s" x="22" y="192">if p, x will owe y q</text>
+    <rect class="box" x="270" y="146" width="170" height="60"/><text class="t-b" x="282" y="170">C(x, y, q)</text><text class="t-s" x="282" y="192">x owes y q</text>
+    <rect class="box" x="530" y="146" width="220" height="60" style="stroke:var(--accent2)"/><text class="t-b" x="542" y="170">discharged</text><text class="t-s" x="542" y="192">x did q (by the debtor)</text>
+    <path class="ln" d="M200 176 H268" marker-end="url(#ah)"/><text class="t-s" x="210" y="166">p holds</text>
+    <path class="ln" d="M440 176 H528" marker-end="url(#ah)"/><text class="t-s" x="452" y="166">discharge</text>
+    <path class="ln dash" d="M330 206 V250" marker-end="url(#ah)"/>
+    <path class="ln dash" d="M390 206 V250" marker-end="url(#ah)"/>
+    <text x="250" y="270">released</text><text class="t-s" x="250" y="288">by the creditor</text>
+    <text x="380" y="270">cancelled</text><text class="t-s" x="380" y="288">by the debtor, usually</text><text class="t-s" x="380" y="304">with a compensating one</text>
+    <text class="t-s" x="560" y="250">assign: creditor names</text><text class="t-s" x="560" y="268">a new creditor</text>
+    <text class="t-s" x="560" y="292">delegate: debtor is</text><text class="t-s" x="560" y="310">replaced</text>
+    <text class="t-b" x="10" y="344">Sim's <tspan font-family="ui-monospace,Menlo,monospace">agreed</tspan> today: create, then expire in 30 minutes.</text><text class="t-s" x="430" y="344">No content, discharge, release or cancel.</text>
+  </svg>
+  <figcaption>The commitment operations and who may perform each are from Yolum and Singh (2002); the last line is from the companion analysis's check of <code>kernel.ts</code>. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Saying is doing: Austin separated what is said from the act performed in saying it, and Searle's 1975 classification gives five kinds of act: assertives, directives, commissives, expressives, and declarations, which change reality by being said (naming, appointing). KQML and then FIPA-ACL turned this into message types (“performatives”) for software agents, with protocols such as the request protocol above. FIPA defined each act by the speaker's beliefs and intentions. Singh (1998) argued that private mental states cannot be checked among independent agents, that “communication is inherently public”, and that acts should be defined by the public commitments they create. Yolum and Singh then define a commitment as a public fact, a debtor owing a creditor an outcome, with operations and who may perform each; a protocol becomes any sequence of acts that resolves the commitments. Institutional-power work (Jones and Sergot) adds that an act can <em>count as</em> creating an institutional fact; electronic institutions build agent societies from role-based scenes with quotas and entry and exit states.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p><code>say</code> is (act, about), and “acts are state, words are depiction” is Singh's public semantics, already in place. An open <code>asked</code> link is a pending directive; an <code>agreed</code> link is a commitment from answerer to asker; <code>control: true</code> on a link kind is one hard-coded counts-as rule, and “take the role only if a controller agreed” is empowerment.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> give requests and agreements identity, content and the full lifecycle (ranked idea 1): consent should permit only what was asked, be used up when acted on, and be releasable by the asker and withdrawable by the answerer; and replace boolean control with specific, revocable powers (idea 2). Add the two act classes our base acts lack: declarations, and commissives with content (a promise to do X), which is doc 18's open question about saying something new. <strong>Beware:</strong> the companion analysis found this the weakest point in the kernel: <code>agreed</code> has no content, lets the asker take any control link on anything the answerer controls for thirty minutes, and cannot be withdrawn; and links keyed by kind, sender and receiver allow only one open question per pair. Never let a rule depend on what a Soul's model “believes”.</p>
+  <p class="src">Primary sources: <a href="https://www.csc2.ncsu.edu/faculty/mpsingh/papers/mas/computer-acl-98.pdf">Singh, “Agent Communication Languages: Rethinking the Principles” (1998)</a> · <a href="https://www.csc2.ncsu.edu/faculty/mpsingh/papers/mas/aamas-02-protocols.pdf">Yolum and Singh, “Flexible Protocol Specification and Execution” (2002)</a> · <a href="https://web.archive.org/web/20250813135423/http://www.fipa.org/specs/fipa00026/SC00026H.html">FIPA Request Interaction Protocol</a> · <a href="https://iiia.csic.es/media/filer_public/b8/a0/b8a0f2a8-6ab7-49af-a6b8-597b95af9c18/iiia-2004-896.pdf">Esteva et al., AMELI (2004)</a></p>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="inform">
+  <h2>9 · Inform 7 rulebooks</h2>
+  <p class="when">Graham Nelson, 2006 →</p>
+  <figure>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/1/1a/Inform_7_code_and_skein.png" alt="Inform 7 IDE showing source text and the skein" loading="lazy" data-source="https://commons.wikimedia.org/wiki/File:Inform_7_code_and_skein.png" onerror="imgFail(this)">
+    <figcaption>The Inform 7 IDE: natural-language source beside the skein of play-throughs · uploaded by Alan De Smet, GPL · <a href="https://commons.wikimedia.org/wiki/File:Inform_7_code_and_skein.png">Wikimedia Commons</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 296" role="img" aria-labelledby="s9-t s9-d">
+    <title id="s9-t">An Inform 7 action passing through its rulebooks</title>
+    <desc id="s9-d">An action such as taking the idol passes through six rulebooks in order: before, instead, check, carry out, after, report. Instead and check can stop it. Check, carry out and report belong to the action; before, instead and after can be written for any place or object. Below, the Sim equivalents: when, then, depiction.</desc>
+    <text class="t-b" x="10" y="26">taking the idol</text>
+    <rect class="box" x="10" y="44" width="110" height="50"/><text x="22" y="74">before</text>
+    <rect class="box" x="136" y="44" width="110" height="50"/><text x="148" y="74">instead</text>
+    <rect class="box" x="262" y="44" width="110" height="50" style="stroke:var(--accent)"/><text x="274" y="74">check</text>
+    <rect class="box" x="388" y="44" width="110" height="50" style="stroke:var(--accent);stroke-width:2.4"/><text class="t-b" x="400" y="74">carry out</text>
+    <rect class="box" x="514" y="44" width="110" height="50"/><text x="526" y="74">after</text>
+    <rect class="box" x="640" y="44" width="110" height="50" stroke-dasharray="5 4" style="stroke:var(--accent)"/><text x="652" y="74">report</text>
+    <path class="ln" d="M120 69 H134 M246 69 H260 M372 69 H386 M498 69 H512 M624 69 H638"/>
+    <path class="ln dash" d="M191 94 V128 M317 94 V128"/>
+    <text class="t-s" x="160" y="146">either can stop the action</text>
+    <text class="t-h" x="10" y="186">who writes the rules</text>
+    <path class="acc2" d="M10 200 H120 M136 200 H246 M514 200 H624"/>
+    <text class="t-s" x="10" y="222">before, instead, after: any place or object</text>
+    <path class="acc" d="M262 200 H498 M640 200 H750"/>
+    <text class="t-s" x="262" y="242">check, carry out, report: the action itself</text>
+    <text class="t-h" x="10" y="282">Sim</text>
+    <text x="262" y="282">when</text><text x="388" y="282">then</text><text x="640" y="282">depiction</text>
+    <text class="t-s" x="70" y="282">— (no slot)</text>
+  </svg>
+  <figcaption>Inform 7's action-processing order, after the Inform 7 Handbook. Sim has the three right-hand slots and nothing in the blue ones. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Inform 7 is Graham Nelson's language for interactive fiction, written in English-like sentences. The world is kinds (room, thing, container, person…) with properties, and relations whose shape is declared once (“Loving relates various people to one person”). Every command becomes an action that passes through rulebooks in a fixed order: before, instead, check, carry out, after, report. Check, carry out and report belong to the action; before, instead and after are shared rulebooks into which rules about any place or object can be written. Inform also has scenes: spans of time with cues to start and end.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Kinds, properties and relations are Things, states and Links; containment is <code>at</code>. Check is <code>when</code>, carry out is <code>then</code>, report is the depiction and the rendered words: the same separation of meaning from telling. What we lack is the left-hand half: no way for a place, host or object to modify how a general card works in its domain.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> declared relation shape (one-to-one, various-to-one) as a property of each link kind, replacing repeated <code>noneLinkedTo</code> conditions; house rules later: the controller of a place may attach rules that intercept plays there, which answers locality with local law. <strong>Beware:</strong> Inform is single-player and turn-based, with one actor at a time and no consent; an <code>instead</code> rule written by someone else is exactly acting on another, so only a thing's controller should attach rules to it. Interacting rulebooks also become hard to predict; Nelson himself calls the benefits of natural-language code “double-edged”.</p>
+  <p class="src">Primary sources: <a href="https://ganelson.github.io/inform-website/book/WI_13_5.html">Writing with Inform §13.5 (relations)</a> · <a href="https://ganelson.github.io/inform-website/book/WI_10_1.html">§10.1 (scenes)</a> · <a href="https://inform-7-handbook.readthedocs.io/en/v2.0/chapter_4_actions/action_processing/">Inform 7 Handbook: action processing</a></p>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="ecs">
+  <h2>10 · Entity-component-system vs facts with time</h2>
+  <p class="when">Game engines (Bilas, 2002) · RDF · Datomic, 2012 · Dedalus, 2009 · event sourcing</p>
+  <figure>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/2/23/ECS_Simple_Layout.svg" alt="Diagram of an entity-component-system layout: entities as columns, components as rows" loading="lazy" data-source="https://commons.wikimedia.org/wiki/File:ECS_Simple_Layout.svg" onerror="imgFail(this)" style="max-width:512px;width:100%">
+    <figcaption>A simple entity-component-system layout: each entity is an index into the component tables, and an empty cell means the entity lacks that component · Guypeter4, CC0 · <a href="https://commons.wikimedia.org/wiki/File:ECS_Simple_Layout.svg">Wikimedia Commons</a>. This is a diagram, not a screenshot; no figure of Datomic's data model was found (its documentation shows the model only as text).</figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 330" role="img" aria-labelledby="s10-t s10-d">
+    <title id="s10-t">The same small world as ECS tables and as a log of facts</title>
+    <desc id="s10-d">Left: entity-component tables hold only the current value, overwritten in place. Right: an append-only list of facts, entity, attribute, value, transaction and added flag; a change retracts the old fact and asserts a new one, and any past state can be read as of a transaction.</desc>
+    <text class="t-h" x="10" y="24">ECS: current state, overwritten</text>
+    <rect class="frame" x="10" y="38" width="330" height="150"/>
+    <text class="t-s" x="20" y="62">entity</text><text class="t-s" x="110" y="62">At</text><text class="t-s" x="210" y="62">Music</text>
+    <path class="frame" d="M10 72 H340"/>
+    <text x="20" y="98">Wren</text><text x="110" y="98">party</text><text x="210" y="98">—</text>
+    <text x="20" y="128">party</text><text x="110" y="128">campfire</text><text x="210" y="128">playing</text>
+    <text class="t-s" x="20" y="174">“music: off” is gone once written over</text>
+    <text class="t-h" x="380" y="24">Fact log (Datomic-style datoms)</text>
+    <rect class="frame" x="380" y="38" width="370" height="196"/>
+    <text class="t-s" x="390" y="62">entity · attribute · value · tx · added?</text>
+    <path class="frame" d="M380 72 H750"/>
+    <text x="390" y="98" font-family="ui-monospace,Menlo,monospace" font-size="14">party  music  off      40  +</text>
+    <text x="390" y="126" font-family="ui-monospace,Menlo,monospace" font-size="14" opacity=".6">party  music  off      41  −</text>
+    <text x="390" y="154" font-family="ui-monospace,Menlo,monospace" font-size="14">party  music  playing  41  +</text>
+    <text x="390" y="182" font-family="ui-monospace,Menlo,monospace" font-size="14">Wren   dj of  party    42  +</text>
+    <path class="acc2" d="M742 84 V134"/><text class="t-s" x="590" y="216">“as of tx 40”: music off</text>
+    <path class="frame" d="M10 258 H750"/>
+    <text class="t-h" x="10" y="284">Sim today</text>
+    <text x="110" y="284">kernel state = the current value; ledger = plays (commands), changes recomputed on replay</text>
+    <text class="t-s" x="110" y="310">Idea: log each play's resulting changes too, so the ledger becomes a fact log like the right-hand side.</text>
+  </svg>
+  <figcaption>Illustrative values in the shape of Datomic's datoms. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>In an entity-component system an entity is an id, components are plain data attached to it, and systems are code run over all entities with given components; it stores the current state, laid out for speed. City of Gangsters' authors relate their social model to this tradition (Bilas, 2002), which puts every game object behind a general query interface. Fact stores keep time instead. RDF stores subject–predicate–object triples. Datomic stores immutable facts <code>[entity, attribute, value, transaction, added?]</code>: a retraction is another fact and the database can be read as of any past transaction; its schema guidance is to grow and never break, never remove or reuse names, and annotate superseded ones. Dedalus adds an explicit time argument to Datalog, so persistence and change are rules. Event sourcing keeps an append-only log as the truth and separates a command (a request that may be refused) from an event (what happened).</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>A Thing is an entity with two open bags of data (traits and states); a Link is a triple plus value, data and lifetime. The ledger is a transaction log, but of plays, which are commands: their changes are recomputed on replay, so replay is correct only under the code that first ran them (doc 18 relies on the code hash), and lapsed links vanish without a logged event. <code>derive</code> and the link conditions are a small fixed-shape Datalog query.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> log each play's resulting changes as well (ranked idea 3), making replay depend only on the five-change applier and turning lapses into events; this also gives provenance (“why is Wren the DJ?”) and as-of views for memory and a legends view. From Datomic's schema rules, a library lifecycle: names are already never reused, but nothing records which card supersedes which (idea 7). Derived predicates as named rules (idea 8). When a relation needs identity, content or several instances, promote it to a node: requests and agreements have reached that point. <strong>Beware:</strong> history grows without bound and needs snapshots; ECS “systems” are global code that changes state with no actor, which our one rule rules out except for a few declared world rules such as expiry.</p>
+  <p class="src">Primary sources: <a href="https://docs.datomic.com/whatis/data-model.html">Datomic data model</a> · <a href="https://docs.datomic.com/reference/best.html">Datomic best practices</a> · <a href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/2009/EECS-2009-173.html">Alvaro et al., Dedalus (2009)</a> · <a href="https://ojs.aaai.org/index.php/AIIDE/article/view/18912">Zubek et al., City of Gangsters (2021)</a></p>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="smallville">
+  <h2>11 · Generative Agents (Smallville), then AI Town</h2>
+  <p class="when">Park et al., 2023 · a16z and Convex, 2023</p>
+  <figure>
+    <img src="https://arxiv.org/html/2304.03442v2/figures/figure_architecture2.png" alt="Generative agent architecture figure" loading="lazy" data-source="https://arxiv.org/abs/2304.03442" onerror="imgFail(this)">
+    <figcaption>Figure 5 of the paper: perceive → memory stream → retrieve → plan, reflect, act · Park et al., 2023 · <a href="https://arxiv.org/abs/2304.03442">arXiv:2304.03442</a></figcaption>
+  </figure>
+  <figure>
+    <img src="https://arxiv.org/html/2304.03442v2/figures/figure_valentine3.png" alt="Smallville Valentine's Day party figure" loading="lazy" data-source="https://arxiv.org/abs/2304.03442" onerror="imgFail(this)">
+    <figcaption>Figure 4 of the paper: the Valentine's Day party that spread from one agent's intent · Park et al., 2023 · <a href="https://arxiv.org/abs/2304.03442">arXiv:2304.03442</a></figcaption>
+  </figure>
+  <figure>
+    <img src="https://github.com/a16z-infra/ai-town/assets/3489963/a4c91f17-23ed-47ec-8c4e-9f9a8505057d" alt="AI Town: pixel-art town map with characters and a conversation log" loading="lazy" data-source="https://github.com/a16z-infra/ai-town" onerror="imgFail(this)">
+    <figcaption>AI Town: characters on a pixel-art map, with the log of a conversation two of them are in (“Lucky started the conversation”) · a16z-infra and Convex, from the project README (large file, about 2 MB) · <a href="https://github.com/a16z-infra/ai-town">github.com/a16z-infra/ai-town</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 350" role="img" aria-labelledby="s11-t s11-d">
+    <title id="s11-t">Where the model sits: Generative Agents versus AI Town</title>
+    <desc id="s11-d">In Generative Agents the language model decides what an action does to an object. In AI Town agents call models outside the engine and can only submit typed inputs, which the engine applies. AI Town's conversation membership moves from invited to walking over to participating, and ends by leaving or rejecting.</desc>
+    <text class="t-h" x="10" y="24">Generative Agents</text>
+    <rect class="box" x="10" y="38" width="170" height="50"/><text x="22" y="68">“make coffee”</text>
+    <rect class="box" x="230" y="38" width="200" height="50" style="stroke:var(--accent)"/><text x="242" y="60">language model</text><text class="t-s" x="242" y="78">decides the effect</text>
+    <rect class="box" x="480" y="38" width="270" height="50"/><text x="492" y="60">coffee machine:</text><text class="t-s" x="492" y="78">“off” → “brewing coffee” (free text)</text>
+    <path class="ln" d="M180 63 H228 M430 63 H478"/>
+    <text class="t-h" x="10" y="124">AI Town</text>
+    <rect class="box" x="10" y="138" width="170" height="50"/><text x="22" y="160">agent + model</text><text class="t-s" x="22" y="178">outside the engine</text>
+    <rect class="box" x="230" y="138" width="200" height="50"/><text x="242" y="160">typed input</text><text class="t-s" x="242" y="178">e.g. acceptInvite</text>
+    <rect class="box" x="480" y="138" width="270" height="50" style="stroke:var(--accent2)"/><text x="492" y="160">engine applies it</text><text class="t-s" x="492" y="178">only the engine writes game tables</text>
+    <path class="ln" d="M180 163 H228 M430 163 H478"/>
+    <path class="frame" d="M10 214 H750"/>
+    <text class="t-h" x="10" y="240">AI Town conversation membership</text>
+    <rect class="box" x="10" y="272" width="130" height="44"/><text x="22" y="299">invited</text>
+    <rect class="box" x="200" y="272" width="150" height="44"/><text x="212" y="299">walking over</text>
+    <rect class="box" x="410" y="272" width="150" height="44"/><text x="422" y="299">participating</text>
+    <rect class="box" x="620" y="272" width="130" height="44" stroke-dasharray="5 4"/><text x="632" y="299">left</text>
+    <path class="acc2" d="M140 294 H198" marker-end="url(#ah-b)"/><text class="t-s" x="146" y="266">accept</text>
+    <path class="acc2" d="M350 294 H408" marker-end="url(#ah-b)"/><text class="t-s" x="356" y="266">arrive</text>
+    <path class="acc2" d="M560 294 H618" marker-end="url(#ah-b)"/><text class="t-s" x="570" y="266">leave</text>
+    <text class="t-s" x="10" y="338">reject from “invited” ends it; “walking over” = agreed but not yet there</text>
+  </svg>
+  <figcaption>The coffee-machine example is the paper's; the membership states and inputs are from AI Town's ARCHITECTURE.md. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Generative Agents (Park et al., 2023) put 25 characters driven by a language model in a small sandbox town. Each keeps a memory stream of observations in natural language, retrieves memories by recency, importance and relevance, periodically reflects (writes higher-level conclusions back into the stream) and plans its day. The world's response is also decided by the model at run time: the authors prompt it to “ask what happens to the state of the object”. One agent was seeded with the intention to throw a Valentine's Day party; invitations spread and five agents came. AI Town is an open-source descendant on a real-time engine backed by a database: agents call models outside the engine and may change the world only by submitting typed inputs. Its one joint activity, the conversation, has members who are invited, walking over, or participating.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Generative Agents is the opposite allocation to ours: state is free text and the model decides each effect, so nothing can be validated, owned or replayed. AI Town draws the same line as doc 18: models propose, the engine disposes. Its conversation is a small scene with consent, and “walking over” is a state we lack: agreed, but not yet there.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> memory retrieval and reflection for open problem 5, applied over kernel facts and rendered words rather than replacing them; AI Town's membership states for scenes. <strong>Beware:</strong> the paper reports agents breaking norms that live only in prose, such as several entering a one-person bathroom or shops after closing; the lesson for us is to put a norm in state the kernel checks. And in AI Town the conversation is hand-coded: an engine of typed inputs still needs a general way to define joint activities.</p>
+  <p class="src">Primary sources: <a href="https://arxiv.org/abs/2304.03442">Park et al., “Generative Agents: Interactive Simulacra of Human Behavior” (UIST 2023)</a> · <a href="https://github.com/a16z-infra/ai-town/blob/main/ARCHITECTURE.md">AI Town ARCHITECTURE.md</a></p>
+</section>
+
+<!-- ============ 12 ============ -->
+<section id="voyager">
+  <h2>12 · Voyager's skill library, and Project Sid / PIANO</h2>
+  <p class="when">Wang et al., 2023 · Altera, 2024</p>
+  <figure>
+    <img src="https://arxiv.org/html/2305.16291v2/skill_library_fig.png" alt="Voyager skill library figure" loading="lazy" data-source="https://arxiv.org/abs/2305.16291" onerror="imgFail(this)">
+    <figcaption>Figure 4 of the paper: adding a verified skill to the library, and retrieving skills for a new task · Wang et al., 2023 · <a href="https://arxiv.org/abs/2305.16291">arXiv:2305.16291</a></figcaption>
+  </figure>
+  <figure>
+    <img src="https://arxiv.org/html/2411.00114v1/architecture.png" alt="PIANO architecture figure" loading="lazy" data-source="https://arxiv.org/abs/2411.00114" onerror="imgFail(this)">
+    <figcaption>Figure 3 of the paper: the PIANO architecture · Altera.AL, 2024 · <a href="https://arxiv.org/abs/2411.00114">arXiv:2411.00114</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 300" role="img" aria-labelledby="s12-t s12-d">
+    <title id="s12-t">Voyager's skill loop beside Sim's minting</title>
+    <desc id="s12-d">Voyager: a task, top-five retrieval of existing skills, the model writes code, the code runs in the game with feedback and retries, a critic model checks success, then the skill is stored under the embedding of its description. Sim: a wish, the compiler writes a card, static validation, mint. Sim has no retrieval step before writing and no test in the world before keeping.</desc>
+    <text class="t-h" x="10" y="24">Voyager</text>
+    <rect class="box" x="10" y="38" width="110" height="56"/><text x="20" y="62">task</text><text class="t-s" x="20" y="82">curriculum</text>
+    <rect class="box" x="134" y="38" width="120" height="56" style="stroke:var(--accent2)"/><text x="144" y="62">retrieve</text><text class="t-s" x="144" y="82">top 5 skills</text>
+    <rect class="box" x="268" y="38" width="110" height="56"/><text x="278" y="62">write</text><text class="t-s" x="278" y="82">code (GPT-4)</text>
+    <rect class="box" x="392" y="38" width="110" height="56" style="stroke:var(--accent2)"/><text x="402" y="62">run</text><text class="t-s" x="402" y="82">in the game</text>
+    <rect class="box" x="516" y="38" width="110" height="56" style="stroke:var(--accent2)"/><text x="526" y="62">critic</text><text class="t-s" x="526" y="82">succeeded?</text>
+    <rect class="box" x="640" y="38" width="110" height="56"/><text x="650" y="62">store</text><text class="t-s" x="650" y="82">by embedding</text>
+    <path class="ln" d="M120 66 H132 M254 66 H266 M378 66 H390 M502 66 H514 M626 66 H638"/>
+    <path class="acc2 dash" d="M447 96 V122 H323 V98" marker-end="url(#ah-b)"/>
+    <text class="t-s" x="334" y="140">errors and feedback: retry</text>
+    <path class="frame" d="M10 166 H750"/>
+    <text class="t-h" x="10" y="194">Sim today</text>
+    <rect class="box" x="10" y="208" width="110" height="56"/><text x="20" y="232">wish</text><text class="t-s" x="20" y="252">from owner</text>
+    <rect class="box" x="134" y="208" width="120" height="56" stroke-dasharray="5 4"/><text class="t-s" x="144" y="232">no retrieval</text><text class="t-s" x="144" y="252">step</text>
+    <rect class="box" x="268" y="208" width="110" height="56"/><text x="278" y="232">compile</text><text class="t-s" x="278" y="252">card (Haiku)</text>
+    <rect class="box" x="392" y="208" width="234" height="56" stroke-dasharray="5 4"/><text class="t-s" x="402" y="232">validated statically;</text><text class="t-s" x="402" y="252">not played before it is kept</text>
+    <rect class="box" x="640" y="208" width="110" height="56"/><text x="650" y="232">mint</text><text class="t-s" x="650" y="252">hash, library</text>
+    <path class="ln" d="M120 236 H132 M254 236 H266 M378 236 H390 M626 236 H638"/>
+    <text class="t-s" x="10" y="292">Blue boxes above are the steps Sim's minting does not have yet (dashed below).</text>
+  </svg>
+  <figcaption>Voyager's components as in its Fig. 2 and Fig. 4, set against doc 18's minting path. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Voyager (Wang et al., 2023) plays Minecraft with GPT-4. An automatic curriculum proposes the next task; the model writes JavaScript for it, runs it, reads the game's feedback and errors, and retries; a separate critic call judges whether the task succeeded. Only then is the program added to an ever-growing skill library, indexed by the embedding of its description, from which the five most relevant skills are retrieved for each new task. Project Sid (Altera, 2024) ran 10 to more than 1,000 agents in Minecraft with PIANO, an architecture of concurrent modules whose outputs pass through one “cognitive controller” so that speech and action agree; agents also voted on amendments to a tax constitution.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>The skill library is the card library and adding a verified skill is minting; a deck is per-agent retrieval. The difference is the language: Voyager's skills are arbitrary code, our cards a small language over five changes. Sid's controller exists because an agent may answer “Sure thing!” while its function call does something else; Sim renders words from the act, so that cannot happen.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> retrieve before minting (embed the wish, fetch the nearest cards, compile only if none fits: open problem 6); play a new card on a copy of the world before keeping it; back-translate a card into plain language and compare it with its summary. <strong>Beware:</strong> Voyager's authors report the critic missing successes, invented game facts and calls to functions that do not exist, and in its code a skill with an existing name silently replaces the old index entry. Later work (Berlot-Attwell et al., 2024) found that in two library-learning systems “function reuse is extremely infrequent”: expect most minted cards to be played once, and measure it. Sid's results come from one company's report; no independent replication was checked.</p>
+  <p class="src">Primary sources: <a href="https://arxiv.org/abs/2305.16291">Wang et al., “Voyager” (2023)</a> · <a href="https://arxiv.org/abs/2411.00114">Altera, “Project Sid” (2024)</a> · <a href="https://arxiv.org/abs/2410.20274">Berlot-Attwell et al., “Library Learning Doesn't” (2024)</a></p>
+</section>
+
+<!-- ============ 13 ============ -->
+<section id="concordia">
+  <h2>13 · Concordia: the game-master pattern</h2>
+  <p class="when">Google DeepMind, 2023 →</p>
+  <p class="noimg">No real image: the repository README carries only badges, the 2023 paper has no HTML version on arXiv with figures, and neither the 2025 follow-up's HTML nor DeepMind's publication page offers a figure that could be linked. The diagram below is ours.</p>
+  <figure>
+  <svg class="d" viewBox="0 0 760 290" role="img" aria-labelledby="s13-t s13-d">
+    <title id="s13-t">Concordia's Game Master beside Sim's kernel</title>
+    <desc id="s13-d">In Concordia, players state attempts in natural language; a Game Master model decides the outcome, tracks grounded variables such as money, resolves conflicts, and writes event statements back. In Sim the same place is held by deterministic code: the compiled card, the validator and the five changes.</desc>
+    <text class="t-h" x="10" y="24">Concordia, every step</text>
+    <rect class="box" x="10" y="40" width="170" height="70"/><text x="22" y="64">attempt</text><text class="t-s" x="22" y="84">Dorothy goes grocery</text><text class="t-s" x="22" y="100">shopping for dinner.</text>
+    <rect class="box" x="250" y="30" width="260" height="90" style="stroke:var(--accent)"/><text class="t-b" x="262" y="56">Game Master (a model)</text><text class="t-s" x="262" y="78">decides the outcome of the attempt;</text><text class="t-s" x="262" y="96">tracks grounded variables (money);</text><text class="t-s" x="262" y="114">resolves conflicting actions</text>
+    <rect class="box" x="580" y="40" width="170" height="70"/><text x="592" y="64">event</text><text class="t-s" x="592" y="84">… and overhears Charlie</text><text class="t-s" x="592" y="100">talking about Alice.</text>
+    <path class="ln" d="M180 75 H248 M510 75 H578"/>
+    <path class="frame" d="M10 150 H750"/>
+    <text class="t-h" x="10" y="176">Sim: judged once, at minting</text>
+    <rect class="box" x="10" y="192" width="170" height="70"/><text x="22" y="218">Soul plays</text><text class="t-s" x="22" y="240">a card on a target</text>
+    <rect class="box" x="250" y="192" width="260" height="70" style="stroke:var(--accent2)"/><text class="t-b" x="262" y="218">kernel (code)</text><text class="t-s" x="262" y="240">checks when, applies the five changes</text>
+    <rect class="box" x="580" y="192" width="170" height="70"/><text x="592" y="218">ledger entry</text><text class="t-s" x="592" y="240">replayable, no model</text>
+    <path class="ln" d="M180 227 H248 M510 227 H578"/>
+    <text class="t-s" x="10" y="284">The compiler is Sim's game master, but it runs once per new card, not once per action.</text>
+  </svg>
+  <figcaption>The Dorothy example is the one in the Concordia paper's own overview figure. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>Concordia is DeepMind's library for generative agent-based models, built on the tabletop role-playing pattern. Agents state what they want to do in natural language; a Game Master model “decides on the outcome of their attempt” and generates event statements. The paper lists its duties: keep a consistent, grounded world state, tell agents what they can observe, decide the effect of actions, and resolve what happens when actions submitted by several agents conflict. Chosen experimental quantities, such as the money an agent holds, are “grounded variables” that the Game Master records and checks; in physical settings it checks plausibility.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Grounded variables are their kernel; everything else is judged at run time. Concordia's “attempt in words, then a resolved event” is our wish, card and play, with the judgement compiled once into a card instead of made at every step.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> conflict resolution is someone's stated job; Sim should name where simultaneous plays on the same thing are ordered. A model in the Game Master role is useful at minting time, as a plausibility check on a new card. <strong>Beware:</strong> a model referee is not deterministic, cannot be replayed, costs a call per action, and can be steered by the text it reads. It must never be the ledger, and it must not judge joint outcomes in scenes at run time.</p>
+  <p class="src">Primary source: <a href="https://arxiv.org/abs/2312.03664">Vezhnevets et al., “Generative agent-based modeling with actions grounded in physical, social, or digital space using Concordia” (2023)</a> · code: <a href="https://github.com/google-deepmind/concordia">github.com/google-deepmind/concordia</a></p>
+</section>
+
+<!-- ============ 14 ============ -->
+<section id="craft">
+  <h2>14 · Infinite Craft</h2>
+  <p class="when">Neal Agarwal, 2024</p>
+  <figure>
+    <img src="https://upload.wikimedia.org/wikipedia/en/a/aa/Gameplay_screenshot_of_Infinite_Craft%2C_2024.png" alt="Infinite Craft: named elements scattered on a canvas, with a sidebar of discovered elements" loading="lazy" data-source="https://en.wikipedia.org/wiki/File:Gameplay_screenshot_of_Infinite_Craft,_2024.png" onerror="imgFail(this)">
+    <figcaption>Infinite Craft: elements on the canvas (two marked “First Discovery”) and the sidebar of everything the player has made · © Neal Agarwal, low-resolution fair-use copy · <a href="https://en.wikipedia.org/wiki/File:Gameplay_screenshot_of_Infinite_Craft,_2024.png">Wikipedia file page</a></figcaption>
+  </figure>
+  <figure>
+  <svg class="d" viewBox="0 0 760 250" role="img" aria-labelledby="s14-t s14-d">
+    <title id="s14-t">One fixed operation, memoised for everyone</title>
+    <desc id="s14-d">Two named elements go into one operation, combine. If the pair is in the shared database the stored result is returned; otherwise a language model names a new element, which is stored and credited as a first discovery. The same pair then gives the same result for every player.</desc>
+    <rect class="box" x="10" y="40" width="110" height="44"/><text x="22" y="68">Plant</text>
+    <rect class="box" x="10" y="110" width="110" height="44"/><text x="22" y="138">Smoke</text>
+    <rect class="box" x="170" y="70" width="130" height="54" style="stroke:var(--accent)"/><text class="t-b" x="182" y="102">combine</text>
+    <path class="ln" d="M120 62 L168 88 M120 132 L168 106"/>
+    <rect class="box" x="350" y="70" width="150" height="54"/><text x="362" y="94">pair stored?</text><text class="t-s" x="362" y="114">shared database</text>
+    <path class="ln" d="M300 97 H348" marker-end="url(#ah)"/>
+    <rect class="box" x="560" y="20" width="190" height="54" style="stroke:var(--accent2)"/><text x="572" y="44">yes: Incense</text><text class="t-s" x="572" y="64">same for every player</text>
+    <rect class="box" x="560" y="120" width="190" height="70"/><text x="572" y="144">no: a model names it</text><text class="t-s" x="572" y="164">stored, then returned;</text><text class="t-s" x="572" y="182">“First Discovery”</text>
+    <path class="acc2" d="M500 88 L558 52" marker-end="url(#ah-b)"/>
+    <path class="ln" d="M500 106 L558 150" marker-end="url(#ah)"/>
+    <text class="t-s" x="10" y="226">Sim's analogue: wish → card. Infinite Craft keys the cache by the question (the pair);</text>
+    <text class="t-s" x="10" y="244">Sim keys cards by their content, so one wish can mint several near-identical cards.</text>
+  </svg>
+  <figcaption>The Plant + Smoke → Incense example is Wikipedia's. Drawn for this report.</figcaption>
+  </figure>
+  <h3 class="lab">What it is</h3>
+  <p>A browser game that starts from four elements (water, fire, wind, earth) and has one operation: combine two named elements into a new one. According to press reports summarised on Wikipedia, the game first checks its database for the pair; if the pair is new, a Llama model names the result and picks an emoji, and the result is saved so that the same pair always gives the same answer for every player. The first player to make an element sees it labelled “First Discovery”. A content filter screens results, and some are still incoherent.</p>
+  <h3 class="lab">Maps to our kernel as</h3>
+  <p>Doc 18 §1 names it as the model for “unlimited named things, one fixed operation”. The stored recipe table is our card library: mint once, then replay for ever without a model. First Discovery is the author recorded at minting.</p>
+  <h3 class="lab">What to take / what to beware</h3>
+  <p><strong>Take:</strong> key the library by the question as well as the answer, so that a repeated wish finds its card instead of minting a near-duplicate (part of ranked idea 7); credit minters visibly; apply mint-once to more than cards (kinds, link kinds, depictions). <strong>Beware:</strong> a poor result is permanent once stored, so new cards need quarantine or a way to be superseded; and Infinite Craft's elements are names with no effects, so there is nothing to validate. It shows the open half of our design and none of the structured half.</p>
+  <p class="src">Source: <a href="https://neal.fun/infinite-craft/">the game</a> · <a href="https://en.wikipedia.org/wiki/Infinite_Craft">Wikipedia summary of press reports</a> (no primary statement by the author on the mechanism was found)</p>
+</section>
+
+<section id="ideas">
+  <h2>Ranked: the most actionable ideas</h2>
+  <p>Ranked by expected value for the kernel as it stands, from the companion analysis (<code>R1-ONTOLOGY-PRIOR-ART.md</code> §6), which checked the kernel code. Its code facts, cited in the table:</p>
+  <ul>
+    <li><strong>K1.</strong> Links are keyed by kind, sender and receiver, so one Soul can have only one open question to another.</li>
+    <li><strong>K2.</strong> <code>agreed</code> has no content and lasts 30 minutes; while it stands the asker may take any control link on anything the answerer controls; it is not used up and cannot be withdrawn.</li>
+    <li><strong>K3.</strong> Control is all or nothing, and a grantor cannot remove a grantee's control link.</li>
+    <li><strong>K4.</strong> <code>vanish</code> removes a thing's links, but states on other things stay: <code>hosting: true</code> outlives the gathering unless <code>end the gathering</code> was played.</li>
+    <li><strong>K5.</strong> Plays are logged as commands and recomputed on replay; names are never reused, but a revised card has no link to the old one; lapsed links leave no logged event.</li>
+  </ul>
+  <div class="tablewrap"><table>
+    <thead><tr><th>#</th><th>Idea</th><th>Source</th><th>What changes in kernel or cards</th><th>Cost</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td><strong>Requests and agreements with identity, content and a lifecycle</strong></td><td><a href="#speech">Yolum and Singh; FIPA request protocol</a></td><td><code>ask</code> creates a request (a Thing, or a link keyed by id) holding what was asked; <code>agree</code> attaches to it; consent permits only what was asked, is used up when acted on, and can be released by the asker or withdrawn by the answerer; several questions may be open at once. Fixes K1 and K2</td><td>Medium: speech handling, control check, base cards</td></tr>
+    <tr><td>2</td><td><strong>Specific, revocable powers in place of boolean control</strong></td><td><a href="#speech">Jones and Sergot; electronic institutions</a></td><td>A link kind lists what it permits on its target (which states, vanish, grant). A granted role holds only while the grant link stands, so the grantor revokes by removing its own link. Fixes K3 within the one rule</td><td>Medium: validator and apply check</td></tr>
+    <tr><td>3</td><td><strong>Log each play's resulting changes</strong></td><td><a href="#ecs">Event sourcing</a></td><td>Ledger entry gains its change list; replay applies changes; lapses become logged events</td><td>Low; larger ledger</td></tr>
+    <tr><td>4</td><td><strong>Schema on link kinds</strong></td><td><a href="#cif">Ensemble; Versu <code>!</code>; Inform relations</a></td><td>Declare per kind: cardinality (one per target, one per actor), default lifetime, reciprocity; the kernel enforces them, replacing repeated <code>noneLinkedTo</code> guards</td><td>Low</td></tr>
+    <tr><td>5</td><td><strong>Scenes as practices</strong></td><td><a href="#scenes">Versu; electronic institutions</a></td><td>Role link kinds with quotas, a phase state, cards per role and phase, one counting condition (see below)</td><td>Medium to high</td></tr>
+    <tr><td>6</td><td><strong>Test a card before minting</strong></td><td><a href="#voyager">Voyager; SkillWeaver; Guan et al.</a></td><td>Play it on a forked state; check it can ever be played; generate a plain-language gloss from its logic and compare it with its summary</td><td>Low to medium</td></tr>
+    <tr><td>7</td><td><strong>Library lifecycle</strong></td><td><a href="#craft">Datomic; Infinite Craft; TroVE</a></td><td>Mark a card superseded by another or retired (decks drop it, past plays keep their meaning by hash); near-duplicate check before minting; key repeated wishes to their card; count plays per card</td><td>Low</td></tr>
+    <tr><td>8</td><td><strong>Derived predicates</strong></td><td><a href="#strips">PDDL 2.2; Dedalus; CiF trigger rules</a></td><td>Named queries in the vocabulary (e.g. “hosting” = has a <code>hosts</code> link); remove duplicated state (K4)</td><td>Low to medium</td></tr>
+    <tr><td>9</td><td><strong>Explained, dated evidence on social links</strong></td><td><a href="#tott">City of Gangsters; Talk of the Town</a></td><td>A relationship or belief link carries entries (change, source event, time, expiry); its value is computed from them. Gives memory provenance and lets the interface say why</td><td>Medium</td></tr>
+    <tr><td>10</td><td><strong>Cards offered by Things in reach</strong></td><td><a href="#sims">The Sims; Versu</a></td><td>Default locality rule: a Soul may play its own cards and those offered by Things where it is</td><td>Medium</td></tr>
+    <tr><td>11</td><td><strong>Conditions that must keep holding</strong></td><td><a href="#strips">PDDL 2.1</a></td><td>A <code>while</code> list on long cards; the kernel ends the activity when it breaks</td><td>Medium</td></tr>
+    <tr><td>12</td><td><strong>Minted methods</strong></td><td><a href="#strips">HTN planning</a></td><td>Store wish → agenda templates; match before compiling</td><td>Low to medium</td></tr>
+    </tbody>
+  </table></div>
+  <p>Deferred: Inform-style house rules (a controller's rules intercepting plays in its domain) would be powerful but make outcomes hard to predict; revisit after ideas 2 and 5.</p>
+</section>
+
+<section id="scenes">
+  <h2>The open problem: scenes and joint activities</h2>
+  <p>Doc 18's first open problem: several bodies in one coordinated activity (a class, a meal, carrying a beam) when each actor may change only itself. Four systems in this tour each had an answer. Evans and Short compare them directly in the Versu paper; the panels below follow their comparison.</p>
+  <figure>
+  <svg class="d" viewBox="0 0 760 330" role="img" aria-labelledby="sc-t sc-d">
+    <title id="sc-t">Four ways to hold several characters in one activity</title>
+    <desc id="sc-d">Façade: a joint behaviour inside a beat drives both characters. Versu: a practice with role slots suggests actions; each agent chooses. The Sims: an invisible interaction object that both Sims' threads run inside. Comme il Faut: one initiator, one responder who accepts or rejects, and a third party only referenced in rules.</desc>
+    <rect class="frame" x="10" y="10" width="178" height="310"/><text class="t-h" x="22" y="34">Façade</text>
+    <rect class="box" x="24" y="52" width="150" height="70" style="stroke:var(--accent)"/><text x="34" y="76">joint behaviour</text><text class="t-s" x="34" y="96">inside a beat</text>
+    <rect class="box" x="24" y="170" width="66" height="40"/><text x="32" y="195">Trip</text>
+    <rect class="box" x="108" y="170" width="66" height="40"/><text x="114" y="195">Grace</text>
+    <path class="acc" d="M70 122 L57 168" marker-end="url(#ah-a)"/><path class="acc" d="M128 122 L141 168" marker-end="url(#ah-a)"/>
+    <text class="t-s" x="24" y="240">activity drives both;</text><text class="t-s" x="24" y="258">entry and exit</text><text class="t-s" x="24" y="276">negotiated</text>
+    <text class="t-b" x="24" y="306">one rule: no</text>
+
+    <rect class="frame" x="200" y="10" width="178" height="310"/><text class="t-h" x="212" y="34">Versu</text>
+    <rect class="box" x="214" y="52" width="150" height="70" style="stroke:var(--accent2)"/><text x="224" y="76">practice</text><text class="t-s" x="224" y="96">roles · own state</text>
+    <rect class="box" x="214" y="170" width="44" height="40"/><text class="t-s" x="221" y="195">host</text>
+    <rect class="box" x="267" y="170" width="44" height="40"/><text class="t-s" x="272" y="195">guest</text>
+    <rect class="box" x="320" y="170" width="44" height="40"/><text class="t-s" x="325" y="195">guest</text>
+    <path class="acc2 dash" d="M236 122 V168 M289 122 V168 M342 122 V168"/>
+    <text class="t-s" x="214" y="240">suggests to each role;</text><text class="t-s" x="214" y="258">each agent chooses;</text><text class="t-s" x="214" y="276">breaches are noticed</text>
+    <text class="t-b" x="214" y="306">one rule: yes</text>
+
+    <rect class="frame" x="390" y="10" width="178" height="310"/><text class="t-h" x="402" y="34">The Sims</text>
+    <rect class="box" x="404" y="52" width="150" height="70" style="stroke:var(--accent)"/><text x="414" y="76">interaction</text><text class="t-s" x="414" y="96">object (invisible)</text>
+    <rect class="box" x="404" y="170" width="66" height="40"/><text x="412" y="195">Sam</text>
+    <rect class="box" x="488" y="170" width="66" height="40"/><text x="494" y="195">Mary</text>
+    <path class="acc" d="M460 122 L437 168" marker-end="url(#ah-a)"/><path class="acc" d="M498 122 L521 168" marker-end="url(#ah-a)"/>
+    <text class="t-s" x="404" y="240">both threads run</text><text class="t-s" x="404" y="258">inside the object;</text><text class="t-s" x="404" y="276">lasts one act</text>
+    <text class="t-b" x="404" y="306">one rule: no</text>
+
+    <rect class="frame" x="580" y="10" width="170" height="310"/><text class="t-h" x="592" y="34">Comme il Faut</text>
+    <rect class="box" x="594" y="60" width="66" height="40"/><text class="t-s" x="600" y="85">initiator</text>
+    <rect class="box" x="664" y="170" width="80" height="40"/><text class="t-s" x="671" y="195">responder</text>
+    <rect class="box" x="594" y="170" width="66" height="40" stroke-dasharray="5 4"/><text class="t-s" x="604" y="195">third</text>
+    <path class="acc2" d="M660 90 L700 168" marker-end="url(#ah-b)"/>
+    <path class="ln dash" d="M627 100 V168"/>
+    <text class="t-s" x="594" y="240">ask, then accept or</text><text class="t-s" x="594" y="258">reject; third party</text><text class="t-s" x="594" y="276">only in the rules</text>
+    <text class="t-b" x="594" y="306">one rule: yes, for 2</text>
+  </svg>
+  <figcaption>Red arrows: the activity drives the characters. Blue: it only offers or asks. Drawn for this report from the sections above.</figcaption>
+  </figure>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>Façade</th><th>Versu</th><th>The Sims</th><th>Comme il Faut</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Holds the activity</strong></td><td>a joint behaviour within a beat</td><td>a practice instance with roles and its own state</td><td>an invisible social-interaction object</td><td>the exchange, for one turn</td></tr>
+    <tr><td><strong>How one gets in</strong></td><td>three-phase commit among team members</td><td>being bound to a role</td><td>chosen by the initiator; the other joins if not busy</td><td>chosen as responder</td></tr>
+    <tr><td><strong>Who picks each move</strong></td><td>the shared behaviour (one author)</td><td>each agent, among the practice's suggestions</td><td>the object's procedure, run in each Sim's thread</td><td>each side's own rules</td></tr>
+    <tr><td><strong>Continuity</strong></td><td>for the length of the beat</td><td>as long as the practice lasts</td><td>one act</td><td>none: isolated acts</td></tr>
+    <tr><td><strong>Group of three or more</strong></td><td>yes, a team</td><td>yes, many roles</td><td>pairs</td><td>a third party in rules only</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="lab">Recommendation, from the companion analysis</h3>
+  <p>Define the meaning of a scene as a Versu-style practice built from kernel parts, and keep doc 19's proposal (one coordinator stages a scene Thing and is re-staged from the kernel) as its depiction.</p>
+  <ul>
+    <li>A <strong>scene kind</strong> is vocabulary: its role link kinds with minimum and maximum counts (ranked idea 4), its phases, and which cards each role may play in each phase.</li>
+    <li><strong>Joining, readying and leaving</strong> are single-actor plays that write or remove the actor's own role link. A role that needs permission uses the request lifecycle (idea 1). Leaving needs no notice protocol: the removed link is visible to everyone, and they re-plan.</li>
+    <li><strong>Phase changes</strong> are cards played by a role with that power (idea 2), conditioned on the role links (“at least four carriers are ready”). This needs one new condition form that counts links to a Thing.</li>
+    <li>The scene Thing <strong>never changes a Soul</strong>. The coordinator runs while quotas are met. When the scene vanishes, its role links go with it; per-scene data should be stored on the scene so it dies too.</li>
+    <li>First test: carrying a beam (tight coupling, four roles, one phase change), then a class (asymmetric roles).</li>
+  </ul>
+  <p>Avoid scenes that take control of members (Façade's joint behaviours, drama managers), which break the one rule, and a model judging joint outcomes at run time (Concordia), which breaks replay. Other prior art worth a look for the protocol: electronic-institution scenes (role quotas, access and exit states per role), AI Town's membership states, and event-centric behaviour (Shoulson et al.), where one structure drives several bodies, as a Mars coordinator already does in depiction.</p>
+</section>
+
+<section id="reading">
+  <h2>Reading list, in order</h2>
+  <p>From the companion analysis (§9). Start with Versu: it is the closest ancestor and the best answer to scenes.</p>
+  <ol>
+    <li><a href="https://www.cs.uky.edu/~sgware/reading/papers/evans2014versu.pdf">Evans and Short, “Versu—A Simulationist Storytelling System” (2014)</a> — sections on practices, norms and limitations</li>
+    <li><a href="https://www.csc2.ncsu.edu/faculty/mpsingh/papers/mas/computer-acl-98.pdf">Singh, “Agent Communication Languages: Rethinking the Principles” (1998)</a> — eight pages</li>
+    <li><a href="https://www.csc2.ncsu.edu/faculty/mpsingh/papers/mas/aamas-02-protocols.pdf">Yolum and Singh, “Flexible Protocol Specification and Execution” (2002)</a> — sections 2–3</li>
+    <li><a href="https://iiia.csic.es/media/filer_public/b8/a0/b8a0f2a8-6ab7-49af-a6b8-597b95af9c18/iiia-2004-896.pdf">Esteva et al., “AMELI: An Agent-based Middleware for Electronic Institutions” (2004)</a> — section 2: scenes, quotas, norms</li>
+    <li><a href="https://ojs.aaai.org/index.php/AIIDE/article/view/18912">Zubek et al., “Social Modeling via Logic Programming in City of Gangsters” (2021)</a></li>
+    <li><a href="https://ojs.aaai.org/index.php/AIIDE/article/view/12825">Ryan et al., “Toward Characters Who Observe, Tell, Misremember, and Lie” (2015)</a></li>
+    <li><a href="https://cs.uky.edu/~sgware/reading/papers/mccoy2014cif.pdf">McCoy et al., “Social Story Worlds With Comme il Faut” (2014)</a> — with the Ensemble schema page</li>
+    <li><a href="https://arxiv.org/abs/2305.14909">Guan et al., “Leveraging Pre-trained LLMs to Construct and Utilize World Models” (2023)</a></li>
+    <li><a href="https://arxiv.org/abs/2305.16291">Wang et al., “Voyager” (2023), read with Berlot-Attwell et al., “Library Learning Doesn't” (2024)</a></li>
+    <li><a href="https://docs.datomic.com/reference/best.html">Datomic, “Best Practices”</a> — schema growth and names</li>
+  </ol>
+  <p class="src">Companion text with every source and what was not verified: <a href="R1-ONTOLOGY-PRIOR-ART.md">R1-ONTOLOGY-PRIOR-ART.md</a> · image list: <a href="R1-image-sources.md">R1-image-sources.md</a> · The Sims as played: <a href="R7-THE-SIMS-GAMEPLAY.md">R7-THE-SIMS-GAMEPLAY.md</a></p>
+</section>
+
+</main>
+</div>
+</body>
+</html>

@@ -1,5 +1,10 @@
 # Tables, hand-held items and eating (owner feedback §12, 80/20)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Code: `viewer/engine/world/catalog-items.ts` (defs), `viewer/engine/items/` (`body.ts` eat landmarks over the one
 body model `engine/body/model.ts` — BODY_MODEL.md; arm 0.62 m, was 0.75,
 `model.ts` support / surfaces / standing points, `actions.ts` verbs), `viewer/engine/scenarios/meal.ts`;

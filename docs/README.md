@@ -1,57 +1,54 @@
 # Documentation map
 
-Everything needed to understand what is being built is in this repository,
-including mirrors of material whose working home is elsewhere.
+Reviewed against the delivered merge code and receipts on **2026-10-03**.
+Sim runs four persistent worlds; the Mars engine is vendored under `mars/`.
+The canonical checkout is `<repo>`. Original `<old-sim-repo>`, `~/Mars` and
+`~/Dev/littlemartians` are read-only references for this tranche.
 
-## One project, two heads
+## Read by task
 
-- **eden4 / Sim (the larger head).** One persistent, shared, server-simulated world
-  that people and their agents inhabit through owned **Souls**. `sim` (this repo)
-  is its app shell: canonical state and log, sync, accounts, the three-tier brain,
-  the agent interface, deployment. It wraps an engine.
-- **The Mars world simulator (the smaller head, inside).** A deterministic world
-  and activity engine being built first as a simulation of life at Mars College.
-  When it reaches its milestones, eden4 takes the codebase over, generalizes it,
-  and Mars becomes one world inside the larger one. Production runs a toy engine
-  behind the same contract; `packages/engine-mars` runs the real one from a local
-  checkout. The Mars code is local to Gene's laptop; only its documentation is
-  mirrored here.
-
-## Folders
-
-| Folder | What | Home |
-|---|---|---|
-| [`STATUS.md`](STATUS.md) | What is built, live, measured, and not built, with dates | here |
-| [`GLOSSARY.md`](GLOSSARY.md) | Terms (Soul, mind, intent, activity, fold, governor, …) | here |
-| [`sim/`](sim/) | **How Sim works**: [architecture](sim/ARCHITECTURE.md), [engine contract](sim/ENGINE-CONTRACT.md), [protocol](sim/PROTOCOL.md), [API and MCP](sim/API.md), [brain](sim/BRAIN.md), [data](sim/DATA.md), [development](sim/DEVELOPMENT.md), [runbook](sim/RUNBOOK.md) | here |
-| [`mars/`](mars/README.md) | **The Mars engine**: Sim's survey ([ENGINE-SNAPSHOT](mars/ENGINE-SNAPSHOT.md)) plus mirrored engine docs (vision, roadmap, spec, subsystems, frontier) | mirror of `<mars-campus-repo>` |
-| [`eden4/`](eden4/README.md) | **Why and what**: the strategy notes `01`–`19` (vision, neutrality, economy, formalism, dials, specs, sprint, agent interface, the kernel and cards, the Mars bridge) and the decision ledger | mirror of `<eden4>` |
-| [`frontier/`](frontier/README.md) | The open design discussion on where the simulation goes next, and its decision log | here |
-| [`ONBOARDING-CLOUD.md`](ONBOARDING-CLOUD.md) | Prompt for an agent taking over the frontier discussion from this repo alone | here |
-
-## Reading paths
-
-| If you need to… | Read |
+| Task | Start here |
 |---|---|
-| Understand the project in ten minutes | this file → [`STATUS.md`](STATUS.md) → [`eden4/README.md`](eden4/README.md) |
-| Change or debug Sim | [`sim/ARCHITECTURE.md`](sim/ARCHITECTURE.md) → the specific `sim/` doc → [`sim/DEVELOPMENT.md`](sim/DEVELOPMENT.md) |
-| Deploy or operate | [`sim/RUNBOOK.md`](sim/RUNBOOK.md) |
-| Build an agent that steers a Soul | [`sim/API.md`](sim/API.md), and the live `/skill.md` |
-| Work on prompts or model cost | [`sim/BRAIN.md`](sim/BRAIN.md) |
-| Understand the world's ontology (things, links, cards, plans, speech) | [`eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md`](eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md) → [`sim/ARCHITECTURE.md`](sim/ARCHITECTURE.md), and the live `/cards.md` |
-| Understand or adopt the Mars engine | [`eden4/19-MARS-BRIDGE.md`](eden4/19-MARS-BRIDGE.md) → [`mars/ENGINE-SNAPSHOT.md`](mars/ENGINE-SNAPSHOT.md) → [`sim/ENGINE-CONTRACT.md`](sim/ENGINE-CONTRACT.md) → [`mars/README.md`](mars/README.md) |
-| Know what has been decided | [`eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md`](eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md), [`frontier/DECISIONS.md`](frontier/DECISIONS.md) |
-| Join the design discussion | [`frontier/README.md`](frontier/README.md), [`eden4/17-AGENT-INTERFACE.md`](eden4/17-AGENT-INTERFACE.md), the questions at the end of [`eden4/18`](eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md) and [`eden4/19`](eden4/19-MARS-BRIDGE.md), and the `notebook` tab of the running app |
+| Understand what is live and what remains | [STATUS](STATUS.md) → [qualification](MERGE-QUALIFICATION-20261003.md) |
+| Change the shell or engine adapter | [architecture](sim/ARCHITECTURE.md) → [development](sim/DEVELOPMENT.md) → [contract](sim/ENGINE-CONTRACT.md) |
+| Operate, release or roll back | [runbook](sim/RUNBOOK.md) |
+| Steer a Soul or integrate an agent | [API](sim/API.md), [protocol](sim/PROTOCOL.md), the selected world's `/skill.md` and `/cards.md` |
+| Work on choices, private rules or spend | [brain](sim/BRAIN.md), [data](sim/DATA.md) |
+| Resume the authorized merge | [kickoff](eden4/23-MERGE-KICKOFF-PROMPT.md) → [plan v3](eden4/22-MERGE-PLAN.md) → STATUS; local running log `<eden4>/MERGE-LOG.md` |
+| Understand design intent | [strategy index](eden4/README.md), [worlds/bodies](eden4/20-WORLDS-BODIES-AND-LIBRARIES.md), [decision ledger](eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md) |
+| Discuss later designs | [frontier](frontier/README.md), [cloud discussion onboarding](ONBOARDING-CLOUD.md) |
+| Read inherited native engine documentation | [Mars index](mars/README.md), then the actual fork source under `mars/` |
+| Interpret older status claims | [historical milestone notes](MERGE-MILESTONES-20261003.md) and the currency notes in each strategy document |
+| Look up terms | [glossary](GLOSSARY.md) |
+| Review this docs sprint and its limits | [review record](DOCS-REVIEW-20261003.md) |
 
-## Which document wins
+## Authority and currency
 
-For how Sim behaves: the code, then `sim/`. For current state: `STATUS.md`. For
-intent and decisions: `eden4/06`. The strategy notes `eden4/14`–`16` are specs and
-plans with a currency note at the top of each; where they differ from `sim/`, `sim/`
-is right. Mars docs describe Mars as of `mars/SNAPSHOT.txt`.
+For behavior, code wins; `docs/sim/` describes that code. For deployment identity,
+query the selected world's `/healthz` and use the release receipts in
+`/srv/sim/ops/<build>/` plus the local running log. STATUS summarizes delivered
+scope and open checkpoints without treating an old build number as current.
 
-## Keeping mirrors fresh
+For Gene's decisions, use `eden4/06` and the explicitly adopted kickoff/plan.
+Only Gene moves an item to Decided. Other documents can contain proposals,
+interviews or historical instructions; their presence is not new authorization.
+Broader economy, terrain and ontology proposals remain distinct from delivered
+construction, physical rooms and independent world processes.
 
-`infra/sync-docs.sh` (run on Gene's laptop) re-copies `eden4/` and `mars/` from
-their working homes. Edit the originals, then sync and commit. Everything else
-under `docs/` is edited here.
+`docs/eden4/` is a selected strategy mirror from `<eden4>`; its local source
+log is deliberately not copied. Its README's source-log links point to STATUS
+in this mirror. Research `_handoff` files, databases and raw proof stay local.
+`docs/mars/` contains dated inherited reference material, indexed separately from
+current fork behavior. SNAPSHOT records provenance; a refresh date does not mean
+that every historical claim has become a present-day fact.
+
+## Refreshing the mirrors
+
+Run `infra/sync-docs.sh` from this checkout, review the diff, scan for secrets and
+commit. It selects README and numbered strategy files, published top-level research
+reports/tours and the historical report. It excludes MERGE-LOG, raw proof, audit
+scripts/databases and media. Native docs refresh from the in-repo `mars/` fork;
+local Mars original paths are read-only and are not a runtime dependency.
+Sim-authored reference introductions and the research index are maintained here
+and are not overwritten. The retained exact integration boundary keeps its original
+source-relative links; use the native index for their source context.

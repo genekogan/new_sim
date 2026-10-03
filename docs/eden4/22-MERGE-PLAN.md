@@ -1,7 +1,13 @@
 # 22 — The merge: Sim drives the Mars world, then two more worlds
 
+> Implementation currency (2026-10-03): the authorized merge is delivered in
+> `<repo>`; [MERGE-LOG](../STATUS.md) records exact release/proof and the pending
+> elapsed 24-hour observation. Baseline facts, future tense and session-start
+> instructions below retain their original date/scope; do not repeat completed
+> import, preflight or qualification steps. Only Gene changes ledger decisions.
+
 > Status (2026-10-03, round 19, revised after a second interview): **plan v3 authorized by Gene and executing in `<repo>`.**
-> Current exact deployment/proofs/remaining work: [`MERGE-LOG`](MERGE-LOG.md). The paste-ready prompt for the
+> Current exact deployment/proofs/remaining work: [`MERGE-LOG`](../STATUS.md). The paste-ready prompt for the
 > agent is [`23`](23-MERGE-KICKOFF-PROMPT.md). **(plan v3: Gene's notes of 2026-10-03 applied)** It is written to be handed to a new agent working from `~/Eden`
 > with read access to `~/Mars`. Decisions marked **(Gene)** came from his
 > message and three interview rounds on 2026-10-03. Everything else is the

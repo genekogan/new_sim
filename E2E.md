@@ -15,3 +15,8 @@ Set PLAYWRIGHT_BROWSERS_PATH to an existing explicit workspace cache when
 needed. Screenshots, body text and a machine-readable summary are written
 under `.e2e/runs/`. Screenshot review accompanies assertions; this smoke is
 not a replacement for the full preserved Mars release gate.
+
+The deployed ten-route smoke sets `SIM_SMOKE_EXTRA_WORLDS=1` and covers the world
+list, four live worlds, three Labs and two representative year pages. All eight
+year pages have separate merge proof. Route smoke proves load/health, not every
+physical activity; use the qualification note for completion/restart evidence.

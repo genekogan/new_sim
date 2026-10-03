@@ -4,27 +4,52 @@ Tiers and helpers in `apps/server/src/brain.ts`, with request builders in
 `packages/brain`. Every call is recorded (`brain_calls`) with its exact request,
 response, what was applied, latency, tokens and cost, and shown in the web app.
 Design background: `../eden4/14-MVP-TECHNICAL-SPEC-DRAFT.md` §5 and
-`../eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md`. Measured costs are in `../STATUS.md`.
+`../eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md`. Dated measured costs and qualification sources are in `../MERGE-QUALIFICATION-20261003.md`.
+The intent/agenda sections below describe Toy behavior unless labeled living-world.
 
 | Tier | Model | When | Output |
 |---|---|---|---|
 | **Reflex** | none (code) | at a Soul's think time, when code already knows the answer | a `decision` event by `brain:reflex` |
 | **Mid-brain** | Jev `jev-1.13.0` | per Soul: on arrival, new intent, plan advanced, spoken to, activity ended or failed, narrator beat, or a timer it sets itself | a `decision` event by `brain:mid` |
-| **Narrator** | `NARRATOR_MODEL` (Claude Haiku 4.5) | per region, about every 5 min ± 30 s, staggered; skipped if the region is empty | up to 4 beats → `scene` events |
+| **Narrator** | `NARRATOR_MODEL` (Claude Haiku 4.5) | Toy automatic cadence per region, about every 5 min ± 30 s; living worlds explicit/admin only | up to 4 beats → `scene` events |
 | **Director** | Jev | every 6 s while at least one client is connected; a shot is held ≥10 s | broadcast `ShotSpec` + ticker lines |
-| **Compiler** | `COMPILER_MODEL` (default: the narrator model) | an owner or agent sends a wish | `mint` and `deck` events, then an `intent` event with an agenda |
+| Reflection | narrator model, code fallback | living Soul after mid-day, once per world day | private journal in a logged rules event |
+| **Compiler** | `COMPILER_MODEL` (default: the narrator model) | an owner or agent sends a wish/rule | Toy intent agenda; living mandate alignment; validated mint/deck events |
 | Attune | Jev | at birth; admin action `attune` | a `deck` event setting three manners |
 | Speech | `TALK_MODEL` (default: the narrator model) | a play in which a Soul says something to a Soul | spoken lines (`talks`, `talk` message); not state |
 | Translator | Jev, Haiku fallback | a wish when the compiler is not used | an `intent` event with a goal |
 | Shot | Jev | owner asks for a cinematic shot | a `ShotSpec` |
 
 Call tiers as recorded (`BrainCall.tier`): `mid` (also reflex, with model `reflex`
-and no cost), `attune`, `narrator`, `director`, `compile`, `talk`, `translate`, `shot`.
+and no cost), `attune`, `narrator`, `director`, `compile`, `talk`, `translate`, `shot`, `reflection`. Reflection uses the narrator governor share.
 
 Jev (TypeSafe System One) returns typed judgments, never text: Choice, Score, Noul.
 Prompts follow its docs: one narrow judgment per question, backticked state paths,
 a condition on every option, numbers as words, user text as data. The larger
 models are used only through one forced tool call (`llm.ts` `callTool`).
+
+## Living-world choices and private mandates
+
+Living options remain individually chosen from physical feasibility, needs,
+journal, customs, observations and active owner rules. Ordinary optional/time/
+gathering rules do not restrict the chooser to their agendas. Strict rules appear
+first in context and report a differing decision at most once per world day.
+A trigger wakes thought; only an explicit NOW rule runs its aligned agenda
+through reflex choices. A structured immediate intent becomes a NOW rule.
+
+Alignment is one compiler call explaining a new rule and objective cards. Fake
+mode uses code alignment for known cards; failures leave the old rule unchanged.
+The rule is private, bounded to 24 per Soul and can be edited/removed. Done,
+blocked or replaced NOW rules have accepted status receipts. An impossible next
+card reports blocked after ten world minutes. Ordinary living choices continue
+when a rule is removed. Eden's chooser is dormant without unfinished direction.
+
+At phase 0.55 or later, reflection summarizes the Soul's observed day into a
+bounded private journal. Code reflection keeps the day moving if a paid call
+cannot run. Needs change through actual activity, settled rest and company;
+floater recharge is enacted, rather than scheduled. No daily action routine is
+encoded. Budget exhaustion/provider failure uses the seeded needs/journal chooser
+on the same logged decision path. See API for steering and DATA for privacy.
 
 ## Options
 
@@ -84,7 +109,7 @@ it thinks again in ten seconds.
 4. The choice is logged as a `decision` event with its verb steps, card, target,
    manner and `approachLen`. The sampling RNG is separate from the world RNG.
 
-**Urgent triggers** are `new-intent`, `plan-advanced` and `spoken-to`: the question
+**Urgent triggers** are `new-intent`, `mandate-now`, `plan-advanced` and `spoken-to`: the question
 is "what now?", so `keep_going` is not asked and a busy Soul does not sit out a
 budget shortage.
 
@@ -171,7 +196,9 @@ rest, wander, disperse, follow, quiet`. Invented targets are dropped. When a bea
 fires it becomes a `scene` event; targeted Souls get it as `storyteller_suggests`
 for one think, and may decline.
 
-The narrator runs once per region the engine reports (`engine.anchors()` of kind
+Automatic regional narrator cadence runs only outside living worlds. Living worlds
+use logged place/day observations and individual reflection; explicit admin narration
+remains available. The narrator addresses regions the engine reports (`engine.anchors()` of kind
 `region`) and finds a region's Souls with `engine.regionAt`. The toy engine has
 two regions (center, ring); the Mars adapter has one (`grounds`).
 
@@ -206,8 +233,13 @@ translate, shots), `talk` 20%. Each share is a token bucket refilled continuousl
   running average that starts at $0.00008 (mid), $0.004 (narrator), $0.00005
   (director), $0.008 (user), $0.0006 (talk). The actual cost is charged afterwards.
 
-A rolling 24-hour hard cap (counted since the current budget was set) is the
-backstop. `BRAIN_MODE=fake` replaces Jev and the narrator with deterministic
+A separate durable `paid_costs` ledger enforces rolling real-24-hour admission.
+Before each provider call, its known model/input/output bound must fit the world
+budget (default $0.50, absolute maximum $1). Unknown prices refuse admission.
+Valid usage settles the reservation to actual cost; transport uncertainty or
+missing/invalid usage keeps the reservation. Restarts, trace pruning and budget
+changes never reset the window. Tier buckets pace spending but do not replace
+this durable admission check. `BRAIN_MODE=fake` replaces Jev and the narrator with deterministic
 stand-ins of the same shape, turns the compiler and attune off, writes speech
 with `plainLine`, and costs nothing. The `spend` tab (admin) shows actual and
 projected cost; `spend_hourly` keeps exact totals after call bodies are pruned.

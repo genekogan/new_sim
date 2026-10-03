@@ -4,7 +4,16 @@ Started 2026-09-30 by Gene, from a discussion with the agent working on the Mars
 world engine. **This folder is a discussion in progress, not a plan.** Take it
 over: read, argue, extend, and record decisions in `DECISIONS.md` here.
 
-## Latest
+## Currency — October 3, 2026
+
+The authorized merge is delivered: four persistent 3D worlds, private mandates,
+needs/journals, finite construction and three browser Labs. See [STATUS](../STATUS.md).
+The discussion below records September 30/October 1 framing, including former
+Toy-only/local-Mars facts; it does not reopen decided merge scope. Its research
+questions remain proposals where the ledger has not decided them. Only Gene
+moves a decision to Decided. The final live observation is still pending.
+
+## Historical discussion update
 
 2026-10-01: Gene answered the agent-interface questions (`../eden4/17-AGENT-INTERFACE.md`,
 last section) and Claude proposed a design that responds to them and to his
@@ -23,7 +32,7 @@ knowing, and levels of self-change). It awaits Gene's answers to its eight quest
 - `../mars/` holds the rest of the Mars engine's docs (indexed in its README) and
   `ENGINE-SNAPSHOT.md`, a survey of the engine's architecture and contracts as
   Sim wraps them.
-- `../eden4/`: the seventeen eden4 strategy documents (vision, bodies, neutrality
+- `../eden4/`: the numbered eden4 strategy documents (vision, bodies, neutrality
   and versioned rules, economy, formalism, engine frontier, dials, the MVP and
   scaffold specs, the hardening sprint, the agent interface).
 - `../sim/`: how Sim (this repo) actually works; `../STATUS.md`: what is built and what is not.
@@ -94,8 +103,9 @@ mechanisms from a working engagement"), and trace it through all three layers: h
 Mars would run it, what the reusable simulator needs, what the Sim shell must add
 (events, views, agent API), and what an owner and an agent would see. The
 collaborative workshop project followed by a gallery opening is the strongest
-candidate on both sides. Keep the toy engine in mind: any mechanism can be faked
-in Sim today to test the shell's part before the real engine arrives.
+candidate on both sides. Use the vendored engine and actual shell contracts when checking current feasibility.
+Toy remains a preserved explanatory world; its old behavior is not the template
+for future persistent worlds.
 
 Record outcomes as short decision records in `DECISIONS.md` (one per decision:
 question, options, choice, why, date). Keep this README as the map.

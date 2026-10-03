@@ -1,12 +1,17 @@
 # Mars simulation
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Cloudflare Worker endpoint `/mcp` uses the official MCP TypeScript server and its native Streamable HTTP handler. `MarsSimulation` is a SQLite Durable Object per room. Room state persists independently of any browser. The existing site and model downloads stay in the same deployment.
 
 Create a room in the studio and copy its connection configuration. The browser generates a random 256-bit control capability. `view = SHA256(control)` and `room = SHA256(view)` allow the worker to authenticate control and read-only access without storing plaintext credentials. Bearer format is `room.capability`; keys never go into API URLs. Shareable spectator links carry only the view capability in the fragment. Possession grants access to that room, not to Cloudflare or campus files. Leave/create makes a new independent room; it does not revoke old invitations. OAuth and per-person account revocation are not implemented.
 
 ## State and commands
 
-Twenty tools (plus the preview `engine_*` tools below) cover discovery, time/day length/simulation rate, weather, static cameras/orbits/spirals/keyframe paths, people/groups/activities, EUC missions, fire, seven gallery screens and atomic scene batches. The full external-agent contract is [public/simulation-agent-guide.md](../public/simulation-agent-guide.md), also published at `/simulation-agent-guide.md`. Schemas live in `commands.ts`; MCP `get_capabilities` returns their JSON Schema plus landmarks/IDs.
+Twenty tools (plus the preview `engine_*` tools below) cover discovery, time/day length/simulation rate, weather, static cameras/orbits/spirals/keyframe paths, people/groups/activities, EUC missions, fire, seven gallery screens and atomic scene batches. The full external-agent contract is [public/simulation-agent-guide.md](../../mars/viewer/public/simulation-agent-guide.md), also published at `/simulation-agent-guide.md`. Schemas live in `commands.ts`; MCP `get_capabilities` returns their JSON Schema plus landmarks/IDs.
 
 The server stores immutable motion paths and an anchored virtual clock `{real, virtual, rate}`. Pause freezes virtual time; rate changes re-anchor it without changing poses. `normalizeState` migrates old room state on read, preserving active and paused timelines. Commands clone before mutation and commit transactionally. `apply_scene` validates up to 12 children and commits one revision or none. The HTTP command endpoint has UUID idempotency keys (last 256 revisions). MCP creates a new command ID per invocation: retries are separate invocations.
 

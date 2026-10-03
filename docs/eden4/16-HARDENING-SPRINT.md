@@ -5,6 +5,8 @@
 > **Not done:** topics and region subscriptions (§3; Gene wants to design the world ontology himself first: keep as an idea), version negotiation, hot/cold database split, audience-aware cadence, token diet, per-Soul budgets, world registry, canonical minds, rules epochs, signed events, the asset store, bundle split, structured metrics, and the Mars adapter dry run.
 > The measurements in §0 predate the fixes (the database is now ~65 MB and snapshots ~50 KB).
 
+> **Current-use note (2026-10-03):** the earlier Done/Not done list is historical. The Mars adapter, four configured worlds, replayable life/mandate state and verified R2 take archives are delivered. Generic world registry, arbitrary rule epochs, hot/cold database split and other unimplemented items remain separate proposals. Use `<repo>/docs/STATUS.md` and MERGE-LOG for the current qualification and pending live observation.
+
 Round 14, 2026-09-30. Status: **proposal; nothing here is built.** Scope is
 the app shell only (`<old-sim-repo>`), not the engine. Target: ~25 simultaneous
 people, one Soul each, on the public internet, for about a week of work.

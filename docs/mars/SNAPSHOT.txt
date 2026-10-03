@@ -1,3 +1,6 @@
-Mars docs copied from <mars-campus-repo>
-Mars HEAD: 4ddeea2 2026-10-01 05:55:52 -0400
-Copied: 2026-10-01T10:24Z
+Native references copied from the in-repo fork unless MARS_DIR was explicitly overridden.
+Last native-tree commit: 91b75af3bacf17ce83e72f04e4b85aab447d4d93 2026-10-03T14:43:20-04:00
+Native Git tree: 4759482de114a69ce614c6902812f32910ba537d
+Selected source/mirror content digests: ../mirror-manifest.json
+Inherited links are resolved into the fork; unavailable source evidence is labeled.
+Dates and instructions inside inherited references remain historical.

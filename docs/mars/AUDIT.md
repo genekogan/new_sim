@@ -1,5 +1,10 @@
 # Architecture audit — campus-2026-reconstruction viewer (2026-09-27)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Scope: `viewer/app`, `viewer/lib`, `viewer/simulation`, `viewer/deploy`, plus the asset
 manifests they depend on. Written for the design of a deterministic Mars world engine
 (SPEC §3, 5, 6, 10–13, 21–24). No source was modified by this audit. Line numbers refer

@@ -1,5 +1,10 @@
 # Coordinated carrying (`carry`) — engine notes
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Spec: SPEC.md §11, §13, §28 (long load around corner, reservation conflict,
 graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.test.ts`.
 
@@ -180,4 +185,4 @@ budget admission. Unsupported phases explicitly refuse recovery. A parent is
 never certified quiescent while a gathering member is still approaching; early
 blocked results preserve live held support and cannot be committed by execute.
 The checked physical fixtures and conservative remaining cases are in
-[the recovery report](briefs/deadlock-recovery.REPORT.md).
+[the recovery report](../../mars/docs/engineering/briefs/deadlock-recovery.REPORT.md).

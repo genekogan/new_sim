@@ -1,5 +1,10 @@
 # One body model (owner decision 2026-09-28 "One body model"; feedback §5, §6)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 `viewer/engine/body/model.ts` — `BODY_MODEL` is the only place the engine says where a person's hands can be.
 A real ~1.75 m adult; heights above the feet (`pose.p`), horizontal distances from the body axis. Anything
 outside is refused by the engine with a diagnostic, never interpolated. The renderer (W9) scales the rig's arm

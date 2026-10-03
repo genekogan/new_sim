@@ -36,7 +36,7 @@ interface Engine {
   stateHash(): string; physicalHash(): string;
   step(): { paths: PathCommit[]; changes: ChangeEvent[]; events: RuntimeEvent[]; programs: ProgramEvent[] };
   perform(program): { id; ok; diagnostic? };        // start a program, replacing what the actor was doing
-  stop(programId): void;                            // the actor is left idle where it is
+  stop(programId): void;                            // request stop; committed physical work may drain safely
   canPerform(program): { code; message } | null;    // is the first step feasible now? null = yes; no side effects
   programOf(actor): string | null;
   submit(verb, params, opts?): ActionRecord; cancel(id, reason?): ActionRecord;
@@ -68,6 +68,15 @@ interface EngineFactory { rulesVersion; genesis(seed): WorldState; create(world)
 - `ActivityOption { id, template, label, goodWhen?, notFor?, servesIntent?, target?,
   steps, durationHint }` is the shape the mid-brain chooses among. The server now
   builds these from cards (`apps/server/src/deck.ts`), not from `enumerateActivities`.
+
+The interface excerpt above shows the core seam. Current optional hooks include
+`takeChunks`, `renderScene`, `canSnapshot`, `configureClock`,
+`configureRuntimePolicy`, `compact` and `actorBorrowed`; the exact declarations
+are in `packages/engine-contract/src/engine.ts`. Quiet renewal/fault recovery are
+host responsibilities using these hooks. Native geometry, body admission and
+controller reservations remain authoritative. Finite construction stop requests
+finish the committed safe phase before releasing crew; stop is not a teleport
+or guaranteed immediate idle pose.
 
 ## Body language
 
@@ -107,14 +116,14 @@ pass it (`packages/engine-toy/src/toy.test.ts`, `packages/engine-mars/src/mars.t
 
 ## The Mars adapter (`packages/engine-mars`)
 
-The Mars engine is never copied into this repository. `load.ts` imports it
-read-only from a local checkout: `MARS_ENGINE_DIR`, or by default
-`<mars-campus-repo>/viewer/engine`. `marsAvailable()` is true
-when that directory has `runtime/runtime.ts`. `marsFactory()` is async (it loads
-the engine); `main.ts` calls it only when `ENGINE=mars`.
+The Mars engine is hard-forked under `mars/viewer/engine`. `load.ts` imports that
+required in-repo tree and installs a Node SHA-256 provider with identical UTF-8
+digests. Browser/Worker hashing stays portable. `MARS_ENGINE_DIR` is obsolete.
+`marsFactory()` loads asynchronously; `main.ts` selects it for `ENGINE=mars`.
 
-- **World.** The default configuration is Mars's synthetic proving ground with its
-  test people removed; Souls arrive near a fixed arrival point. Rules version
+- **World.** The default adapter configuration retains the synthetic proving ground for
+  conformance. Production selects authored camp, ceramic garden or green field
+  by WORLD_KEY, with configured arrival points, scenes and bodies. Rules version
   `sim-mars/1+<Mars rules version>`; `schema` is the Mars world's own. A second
   configuration, `MEAL_WORLD`, loads one of Mars's authored scenarios and is used
   by a test only.
@@ -155,11 +164,13 @@ the engine); `main.ts` calls it only when `ENGINE=mars`.
   `currentPath` returns nothing. Activity and seat changes are sent as changes.
 - **Snapshot.** Format `sim-mars-snapshot/1`: Mars's own snapshot plus the programs,
   the program counter, bodies waiting to be removed, and the world configuration.
-  `stateHash` covers the Mars state hash and the adapter's programs. Body-language
-  steps lower only to Mars verbs that resume exactly (a test checks nothing is
-  dropped).
-- **Pruning.** Mars keeps every event and record. The adapter trims the event list
-  past 20,000 entries and forgets finished action records after 120 seconds.
+  `stateHash` covers the Mars state hash and the adapter's programs.
+  Resumability checks actual ActionDef codecs in the current phase. Active
+  non-resumable programs defer the checkpoint; accepted suffix replay continues
+  them without dropping work. Daily compaction requires released controllers.
+- **Bounded runtime.** Completed records/events are trimmed in the adapter; daily
+  quiet renewal creates a fresh native Runtime. Persistent accepted history and
+  verified take manifests remain in the DB/R2, separate from Runtime diagnostics.
 - **Regions.** `anchors()` returns one region, `grounds`, plus a place per Mars
   region (except `no-go`) and per fixture. `regionAt` returns `grounds` for every
   point. `enumerateActivities` returns nothing.

@@ -1,7 +1,8 @@
 # Eden4 merge qualification — October 3, 2026
 
 Canonical source is `<repo>`, private `genekogan/sim`. Production identity and
-rollback are in `eden4/MERGE-LOG.md` and `/healthz`. Gene authorized this tranche through
+rollback are in the local `<eden4>/MERGE-LOG.md` and `/healthz`. The repo
+mirror uses [STATUS](STATUS.md) for current scope. Gene authorized this tranche through
 plan 22 v3 and kickoff 23. Preflight passed, including the authenticated
 existing-owner/admin session. No setup remains.
 

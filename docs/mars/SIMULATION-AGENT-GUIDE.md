@@ -1,5 +1,10 @@
 # Mars campus simulation — external agent guide (v3)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Production studio: https://mars-campus-2026.<workers-subdomain>.workers.dev/studio
 
 MCP endpoint: https://mars-campus-2026.<workers-subdomain>.workers.dev/mcp

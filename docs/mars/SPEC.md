@@ -1,4 +1,9 @@
 # Mars College 3D World
+
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
 ## Research & Development Ideals, Architecture Targets, and Proof Obligations
 *Implementation handoff for an autonomous coding agent*
 > **Scope:** Historical reconstruction (2020–2026) + future-campus design + Mars-specific simulation/cinematic engine + agent-addressable controller + versioned/replayable world history.

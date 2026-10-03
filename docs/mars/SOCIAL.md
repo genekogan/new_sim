@@ -1,5 +1,10 @@
 # Social / inhabited-scene vocabulary (spec §17, milestone H)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 First pass at people *living* on campus, built on the same action runtime as walking and
 construction. Code: `viewer/engine/social/` (`slots.ts`, `actions.ts`, `ambient.ts`); tests:
 `viewer/engine/test/social.test.ts`; verbs are in the one registry (`api/registry.ts`).

@@ -1,5 +1,10 @@
 # Camera and cinematography layer (`viewer/engine/camera/`)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 This is pure, deterministic TypeScript with no three.js, DOM, wall-clock or randomness.
 Cameras **only read** the world and the spatial scene. A camera track is a separate
 object that points at a take by id, so re-shooting a take can never change it (SPEC §18, §21, §28; `RESEARCH.md` §9).

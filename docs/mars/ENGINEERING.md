@@ -1,4 +1,13 @@
-# Mars Studio world engine — engineering assessment & plan (living document)
+# Mars Studio world engine — historical engineering assessment (September27)
+
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
+> Historical starting assessment, retained for provenance. It is not the current
+> architecture or active queue. Use [engineering navigation](../../mars/docs/engineering/INDEX.md),
+> [engine guide](ENGINE_GUIDE.md) and [active roadmap](ACTIVE_ROADMAP.md).
 
 Status: 2026-09-27, overnight tranche in progress. Companion docs: `AUDIT.md`
 (observed architecture, file:line refs), `RESEARCH.md` (engine patterns, 12

@@ -1,5 +1,10 @@
 # Vehicles: EUC and bicycle riders (spec §10, §17)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Code: `viewer/engine/vehicles/` (`profiles.ts`, `curve.ts`, `actions.ts`, `invariants.ts`).
 Tests: `engine/test/vehicles.test.ts`. The verbs and invariants are registered in `api/registry.ts`.
 
@@ -209,7 +214,7 @@ and distance to the endpoint exceed 0.06 m (plus a conservative 1e-9 boundary
 guard). Endpoint/resume waits retain their independent retry/failure clock and
 prevent early termination. No vehicle pose or resource is forced free. See
 [MOVEMENT](MOVEMENT.md#persistent-waits-and-bounded-recovery-lm-024-staged).
-The [physical three-EUC proof](briefs/vehicle-deadlock.REPORT.md) covers a real
+The [physical three-EUC proof](../../mars/docs/engineering/briefs/vehicle-deadlock.REPORT.md) covers a real
 footprint/lane cycle, future cancel, external blocker movement, ownership and
 snapshot refusal. Forklift manipulation waits, mixed loaded-vehicle cycles and
 general deadlock freedom are not claimed.

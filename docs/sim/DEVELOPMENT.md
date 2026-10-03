@@ -13,12 +13,13 @@ BRAIN_MODE=fake DEV_AUTH=1 node --env-file=.env apps/server/src/main.ts
 ```
 
 For front-end work with hot reload, `pnpm dev` runs Vite on :5173 (proxying `/v1`,
-`/ws`, `/skill.md`, `/mcp`, `/healthz` to :4500; `/cards.md` is not proxied) and the
+`/ws`, `/skill.md`, `/cards.md`, `/mcp`, `/healthz` to :4500) and the
 server with `--watch`; the server's data then lands in `apps/server/data/`.
 
 Always run locally with `BRAIN_MODE=fake` unless you are testing the models: a live
 local server spends real money around the clock. In fake mode the compiler is
-off, so a typed wish goes to the translator; agendas and card proposals still work.
+off. Toy commands use the translator; living worlds use bounded code alignment
+for existing cards. Agendas and card proposals still work.
 
 ## Layout
 
@@ -80,30 +81,47 @@ explicit owner; Toy uses its independent original rules and data. See
 
 ## Tests
 
-34 run everywhere; 17 more run only where a Mars checkout exists (51 in all).
-Without one, the two Mars test files each report a single skipped test.
-
-| Where | What |
-|---|---|
-| `packages/engine-contract` (4) | hashing, rng |
-| `packages/kernel` (6) | the coherence rule, card validation, the DJ story as independent plays, determinism, one-step lookahead, forged speech and bounds |
-| `packages/engine-toy` (8) | the six conformance tests + two toy scenarios |
-| `packages/brain` (6) | request builders, selection policy, translator, narrator sanitizer |
-| `apps/server/src/replay.test.ts` (3) | replay from genesis equals live (engine and kernel, and the kernel alone); restart from snapshot + fast-forward; a world from before the kernel gets one and still replays |
-| `apps/server/src/sync.test.ts` (6) | real server + WebSocket clients: late joiners agree, dropped socket resumes from the ring, corrupted replica resyncs, invite gate, full Soul / pairing / agent / MCP / privacy flow, the DJ story through agent-proposed cards and two agendas |
-| `apps/server/src/brain.test.ts` (1) | fair mid-brain scheduling |
-| `packages/engine-mars` (13, Mars only) | the six conformance tests; programs step by step; refusal of an impossible first step; raw `mars:` verbs; borrowed joint staging; one of Mars's own scenarios as four programs; restore mid-program; keyframes and tick cost with twenty walkers |
-| `apps/server/src/mars.test.ts` (4, Mars only) | the shell on Mars: replay, restart from a snapshot, clients fed keyframes, the DJ story on a real server process |
+The in-repo engine is required; no Mars tests skip merely because the original
+laptop checkout is absent. Current dated counts and evidence are in
+[STATUS](../STATUS.md) and the qualification note, rather than frozen here.
 
 ```bash
-pnpm test                              # everything; Mars tests skip without a checkout
-pnpm --filter @sim/engine-mars test    # the adapter alone
-MARS_ENGINE_DIR=/path/to/viewer/engine pnpm --filter @sim/server test
+pnpm check                            # workspace types, Sim suites, native engine
+pnpm --filter @sim/server test        # server replay, persistence, auth, steering, budget, sync
+pnpm --filter @sim/engine-mars test    # adapter, worlds, phase-aware restart, construction
+pnpm test:mars                        # deterministic native engine suite
+pnpm test:mars:release                # long inherited full gate; requires isolated public fixtures
 ```
 
-CI (`.github/workflows/ci.yml`) runs type check, tests and the web build on pushes
-to `main` and on pull requests. It has no Mars checkout, so the Mars tests skip there.
-`infra/deploy.sh` runs the same gate before deploying.
+CI runs workspace typechecks, recursive package tests and the web build. The
+release script additionally runs `pnpm check`, including native engine cases.
+The original full native gate and focused repairs are distinct evidence; see
+[qualification](../MERGE-QUALIFICATION-20261003.md). Do not rerun passing long
+checks without a relevant change or unresolved finding.
+
+## Static app and assets
+
+The web quick start builds the shared shell only. For Lab/year-page work:
+
+```bash
+SIM_STATIC=1 pnpm --filter mars-campus-viewer build:static
+node infra/copy-decoders.mjs
+```
+
+Production Caddy routes `/w/<key>/` to the matching process. Server `main.ts`
+strips its own world prefix before HTTP/WS routing. Local Vite hot reload proxies the root Toy API;
+run a separately built camp server for camp work, or use a scoped local proxy
+for several processes. It does not reproduce the production world routing by itself.
+Use a separate data directory and port for each process. New worlds require
+`ENGINE=mars`, `ENABLE_LIVING_WORLD=1` and an explicit `WORLD_OWNER_ID` (local
+`dev:admin` only with DEV_AUTH). No credentials are needed for fake minds.
+
+`ARCHIVE_TAKES` defaults off locally; enable only for an authorized scoped R2
+proof. `WORLD_ID` defaults to `<WORLD_KEY>-1` (`toy-1` for Toy), `WORLD_PATH` to
+`/w/<WORLD_KEY>`, and `R2_PREFIX` to `sim`. Staging overrides the prefix to
+`sim/staging`. Configuration is defined in `apps/server/src/config.ts`.
+Never run native source-archive preparation against the protected source trees.
+For browser cache, proof bundles and the ten-route smoke, see [E2E](../../E2E.md).
 
 ## Conventions
 
@@ -117,5 +135,6 @@ to `main` and on pull requests. It has no Mars checkout, so the Mars tests skip 
 - Model output never touches the engine or the kernel except as a logged event.
 - Meaning changes only through logged events: a card's effects are a `play`, new
   vocabulary is a `mint`, a deck change is a `deck`.
-- Docs whose home is elsewhere (`docs/eden4`, `docs/mars`) are mirrors; edit the
-  originals and run `infra/sync-docs.sh`.
+- Strategy mirrors are edited at `<eden4>` then synced. Native mirrors
+  come from the authorized in-repo fork; do not edit protected original Mars.
+  Sim-authored introductions are edited here. See the documentation map.

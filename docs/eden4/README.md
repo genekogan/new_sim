@@ -2,7 +2,7 @@
 
 > Status (2026-10-03): **the merge is running at sim.eden.art; canonical code is `<repo>`.**
 > Current release, remaining work, verification and anything needing Gene are in
-> [`MERGE-LOG.md`](MERGE-LOG.md). Preflight passed; Gene owns all twelve Souls
+> [`MERGE-LOG.md`](../STATUS.md). Preflight passed; Gene owns all twelve Souls
 > in the three new worlds. Four persistent worlds share the 3D shell and private
 > owner mandate controls; browser-only Labs and all eight year pages are mounted.
 > Camp and Little Martians each passed 48 simulated days, exact restart and daily
@@ -26,14 +26,14 @@
 - **A separate project from eden1, eden2 and eden3.** eden3 (the live
   insider-alpha on dev/bp.eden.art) is its own lane, described in
   `~/Eden/AGENTS.md`. Don't touch it from here.
-- **One project, two heads.** The Mars world simulator
-  (`<mars-campus-repo>`) is the engine: it is finished first,
-  then eden4 takes over its development and generalizes it, and Mars becomes one
-  world inside eden4. Sim is the shell built to wrap it. Gene: the Mars world
+- **One project, two heads.** The Mars world simulator was hard-forked with filtered history into
+  `<repo>/mars`. Mars is now one world inside Sim; the original
+  `<mars-campus-repo>` remains a read-only reference.
+  Sim supplies the shared shell and persistent server. Gene: the Mars world
   "is eventually going to become a special case of the broader thing." 
 - Moved here from `~/Eden/vision/eden-world/` on 2026-09-29.
 
-## One paragraph
+## Long-term vision (not a delivered-feature inventory)
 
 Eden becomes a single persistent 3D world, simulated in one place. Anyone can
 buy a **body** and **drop into the world right away**; each body is an NFT, and
@@ -88,7 +88,7 @@ Currency: **vision** = still the design intent, open questions included · **led
 | [`21-WORLD-ECONOMY-OPEN-QUESTIONS.md`](21-WORLD-ECONOMY-OPEN-QUESTIONS.md) | Round 19 (*nothing decided*): anyone mints a world; one birth a day per world; rent; Harberger on worlds and on residency; birth rate and death as constants; who owns a world |
 | [`22-MERGE-PLAN.md`](22-MERGE-PLAN.md) | Round 19 (*plan v3, authorized and executing*): the implementation plan to merge the Mars engine into Sim, run it without stopping (a one-hour day from decisions, steering, quiet-point snapshots, nightly compaction), and add Little Martians and Eden. Decisions D1–D26, measured facts, phases, risks |
 | [`23-MERGE-KICKOFF-PROMPT.md`](23-MERGE-KICKOFF-PROMPT.md) | The long onboarding prompt for the lead agent that executes `22` (a fresh session in `~/Eden`) |
-| [`research/`](research/) | Reports R1–R8 (kernel prior art, agent worlds, ledger options, cheap dialogue, the Mars campus probe, Spore, The Sims, Second Life), two illustrated tours, `RESUME.md` (historical replay faults F1–F9; successor regressions cover F1–F8 and the intentional F9 frontier behavior), and the two books: `EDEN4-COMPENDIUM.html` (full) and `EDEN4-BLUEPRINT-STE.html` (short, plain English, with a worked example and a terms page) |
+| [`research/`](research/) | Reports R1–R9 (kernel prior art, agent worlds, ledger options, cheap dialogue, the Mars campus probe, Spore, The Sims, Second Life), two illustrated tours, `RESUME.md` (historical replay faults F1–F9; successor regressions cover F1–F8 and the intentional F9 frontier behavior), and the two books: `EDEN4-COMPENDIUM.html` (full) and `EDEN4-BLUEPRINT-STE.html` (short, plain English, with a worked example and a terms page) |
 | [`report/eden4.html`](report/eden4.html) | The articulation after round 8 as one HTML report (*historical*: predates Sim) |
 
 ## Handoff note for the next agent

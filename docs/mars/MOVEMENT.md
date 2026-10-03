@@ -1,5 +1,10 @@
 # Movement: splined turns and block reaction (2026-09-28)
 
+> Inherited native reference: source dates, release IDs and operating instructions
+> retain their original scope. For the current Eden fork use [the index](README.md),
+> [STATUS](../STATUS.md) and the Sim runbook; this file is not production authority.
+
+
 Owner feedback 2026-09-28 §2 (people turn on the spot, sometimes ~270°) and §3 (people walk into
 things for 4–5 strides before redirecting). Code: `viewer/engine/locomotion/spline.ts`,
 `viewer/engine/locomotion/walk.ts`, `viewer/engine/take/metrics.ts`. Tests:
@@ -375,13 +380,13 @@ external progress. A fixed-point proof follows mandatory `after` / `when: comple
 gates through pending tails; the tails remain pending, never skipped or cancelled.
 Independent future cues/cancels, started-only gates, invalid/unknown dependencies
 and dependency cycles prevent early stopping. See the
-[dependent-tail proof](briefs/deadlock-tails.REPORT.md).
+[dependent-tail proof](../../mars/docs/engineering/briefs/deadlock-tails.REPORT.md).
 
 Episode anchors, recovery requests/results and the stopped runner diagnostic are
 plain snapshot state. Older snapshots without those optional fields remain
 valid. Waiting snapshot blob hashes change; the ordinary opposing passage keeps
-its exact world/event hashes. See [stage 1](briefs/deadlock-detection.REPORT.md)
-and [stage 2](briefs/deadlock-recovery.REPORT.md) for proofs and inspected captures.
+its exact world/event hashes. See [stage 1](../../mars/docs/engineering/briefs/deadlock-detection.REPORT.md)
+and [stage 2](../../mars/docs/engineering/briefs/deadlock-recovery.REPORT.md) for proofs and inspected captures.
 
 LM-024 remains **partial**: genuine 0.1 m lateral oscillation in narrow ground
 corridors resets pose progress, full gather quiescence is conservative, and
