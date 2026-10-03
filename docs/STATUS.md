@@ -119,7 +119,8 @@ still reserved for tranche end.
 - `packages/engine-mars`: the real Mars engine behind Sim's engine contract, formerly imported
   read-only from a local checkout; the October 3 hard fork now lives under mars/. `ENGINE=mars` runs the
   whole shell on it, and one of Mars's own authored scenarios (the meal) runs through it
-  unchanged. Not deployed: the Mars code exists only on Gene's laptop.
+  unchanged. At that October 1 checkpoint it was laptop-only; the vendored engine
+  and live worlds are now deployed as described above.
 
 ## Earlier prototype limitations (historical October 1)
 
@@ -156,15 +157,17 @@ still reserved for tranche end.
 Replay check on production (2026-10-01): the kernel replayed from the live world's 11,939
 events in 35 ms and matched the running server's hash (`infra/verify-kernel.ts`).
 
-Tests: 52 (kernel 6, engine contract 4, toy engine 8, Mars adapter 13, brain 6, server 15).
-The Mars tests skip where there is no Mars checkout (CI).
+Historical October 1 tests: 52 (kernel 6, engine contract 4, toy engine 8, Mars
+adapter 13, brain 6, server 15). The former external adapter skipped without a
+local Mars checkout; the successor requires its vendored engine and runs in CI.
 
 ## Known limits and risks
 
 - The R2 key in use is eden3's media-bucket writer key (shared bucket, `sim/` prefix).
 - An eden3 deploy can drop the Caddy `import` line that serves Sim.
 - Secrets on eden2 are readable by both root users (Gene and a second admin).
-- Privy free tier ends at 499 monthly users.
+- The October 1 account note recorded a Privy free-tier ceiling of 499 monthly
+  users; current plan terms are not part of this merge qualification.
 - `node:sqlite` is still marked experimental in Node 22.
 - Budget and brain mode changed in the admin tab are lost on restart; pairing
   codes and pending approvals are in memory and are cancelled by a restart.
@@ -176,10 +179,11 @@ The Mars tests skip where there is no Mars checkout (CI).
   only by adopting a new base vocabulary (an admin action, logged).
 - The old goal `follow` now means "go and talk with"; nothing follows continuously.
 - On the Mars engine the director's shot list and the map still assume the toy world's layout.
-- On the Mars engine, only eight verbs resume exactly from a snapshot; the body language
-  uses only those (`eden4/19` §6).
+- Native controllers resume only in codec-supported phases. Persistent worlds
+  checkpoint at a safe point and replay the accepted suffix for other actions;
+  construction recovery and quiet renewal need ongoing operational observation.
 
-## Earlier shell roadmap
+## Earlier shell roadmap (historical)
 
 1. **Take over the Mars engine** (Gene, from 2026-10-02): decide where its code lives; run
    staging on `ENGINE=mars`; a furnished campus world; the first scene; a Mars vocabulary
@@ -188,6 +192,15 @@ The Mars tests skip where there is no Mars checkout (CI).
 3. Cost: a cheap matcher for wishes existing cards already cover; audience-aware cadence.
 4. From the hardening sprint (`eden4/16`): protocol version negotiation, hot/cold database
    split, structured metrics, asset store on R2, load Privy only on sign-in.
+
+## Deferred after this merge
+
+Terrain; the `sim.mars.college` redirect and retirement of its Worker; engine
+package restructuring; talking faces; other owners and their permissions; the
+2026 campus as a persistent world; economy; and a plugin platform remain deferred.
+The legacy Mars app stays on its existing codebase and DNS. Larger world ontology,
+terrain ownership and material economy questions remain strategy work, without
+new decisions being inferred from this implementation.
 
 Strategy questions in `eden4/18` and `eden4/19` remain background; the merge tranche
 is authorized by its kickoff. No credential or setup blocker currently needs Gene.
