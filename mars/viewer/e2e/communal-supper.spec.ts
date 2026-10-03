@@ -188,8 +188,8 @@ async function wait(p: Page, phase: Phase) {
           ['eating', 'releasing'].includes(a.meal?.phase ?? '') &&
           a.held.every((h) => h.items.length === 2)
         );
-      if (phase === 'meal-return')
-        return (
+      if (phase === 'meal-return') {
+        const returned = (
           a.mealComplete &&
           a.items
             .filter((e) =>
@@ -203,6 +203,11 @@ async function wait(p: Page, phase: Phase) {
                 e.support.on === 'meal-table',
             )
         );
+        // Freeze the observed supported return before ordinary cleanup can
+        // take its first vessel during a separate browser Pause click.
+        if (returned) window.__marsEngine.pause();
+        return returned;
+      }
       if (phase === 'meal-transfer')
         return (
           a.stage === 'storing-mealware' &&
