@@ -43,7 +43,8 @@ await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
 
 const living = config.worldKey !== 'toy' && config.livingWorld ? new LivingWorld(host) : null;
 if (living) { living.camp = config.worldKey === 'mars'; void living.install(definition.customs); }
-if (living && host.engine.configureRuntimePolicy && !host.extra.runtimePolicy?.quietSeatCourtesy) {
+const runtimePolicy = host.extra.runtimePolicy as { sleepBlockTicks: number; quietSeatCourtesy?: boolean } | undefined;
+if (living && host.engine.configureRuntimePolicy && !runtimePolicy?.quietSeatCourtesy) {
   void host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200,quietSeatCourtesy:true},why:'enable ordinary idle-bystander courtesy at quiet seat exits prospectively; retain historical replay before this event'});
 }
 const campCards = living?.camp ? new CampCards(host) : null;
