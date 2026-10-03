@@ -300,3 +300,8 @@ definitions, phases and standing angles; changed inputs or exceptions force a
 fresh proof. Failed diagnostics always use current locations. Every other physical
 invariant still runs normally. The WeakMap memo holds no historical controller
 state and is absent from checkpoints and hashes.
+
+A supported sleep step checks full clearance once through its safety function
+after publishing its sleep pose; the first-publication direct check and separate
+end-of-tick invariant still run. This removes an immediate duplicate read,
+without changing admission, ownership, lie/wake motion or obstacle checks.

@@ -161,7 +161,11 @@ export const sleepHold: ActionDef<SleepParams, Mat, Hold> = {
     const live = matOf(rt, ex.p.mat);
     const bad = 'code' in live ? live : dist2(live.anchor, ex.mat.anchor) > 1e-6 || Math.abs(angleDelta(live.yaw, ex.mat.yaw)) > 1e-6
       ? issue('mat-moved', `${ex.p.mat} changed after ${ex.p.actor} committed to its supported anchor`, [ex.p.actor, ex.p.mat])
-      : sleepSafetyIssue(rt, rt.world.entities[ex.p.actor]) ?? clearance(rt, ex.p, live);
+      // A published sleep pose's safety check already includes full clearance.
+      // Before its first publication the direct clearance check is still needed.
+      : rt.world.entities[ex.p.actor].human?.sleepPose
+        ? sleepSafetyIssue(rt, rt.world.entities[ex.p.actor])
+        : clearance(rt, ex.p, live);
     if (bad) { ex.error = bad; return { status: 'blocked', diagnostic: bad }; }
     ex.error = undefined;
     if (ex.phase === 'lying-down') { ex.standingFraction = Math.max(0, ex.standingFraction - dt / SLEEP_TRANSITION_SECONDS); if (ex.standingFraction < 1e-8) { ex.standingFraction = 0; ex.phase = 'sleeping'; } }

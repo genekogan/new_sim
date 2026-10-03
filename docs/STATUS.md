@@ -387,3 +387,13 @@ with identical world, kernel and recorded-take hashes and zero invariants. Three
 structural mutation/error regressions pass; full suites then fresh v6 are pending.
 This derived-check acceleration and the native hash provider are the only native
 engine source changes after the original full gate.
+
+## Duplicate supported-sleep clearance candidate
+
+V6 completed all 48 days physically with zero recovery/invariant/card faults and
+exact restart, but missed timing again: 0.580091→0.701777 ms, growth 20.977%.
+The published sleep pose's safety function already includes full clearance; the
+step no longer repeats it on success before any world change. Before first
+publication the direct clearance check remains, and the independent end-of-tick
+invariant remains active. All 50 existing sleep/visitor/take cases pass. Matched
+A/B, full suites and fresh v7 are pending. No performance limit was weakened.
