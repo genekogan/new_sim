@@ -1,5 +1,6 @@
 // The hard-forked engine lives inside this repository and is required in CI and deployment.
 import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -43,6 +44,9 @@ export async function loadMars(): Promise<Mars> {
   if (!marsAvailable()) throw new Error(`Mars engine not found at ${marsDir()} (vendored engine required)`);
   const at = (f: string) => import(pathToFileURL(join(marsDir(), f)).href);
   const [rt, reg, seeds, fac, rng, meal, recorder, snapshot, compact, camp, hashes, lm, field, bodies, walk] = await Promise.all([at('runtime/runtime.ts'), at('api/registry.ts'), at('api/seeds.ts'), at('world/factory.ts'), at('core/rng.ts'), at('scenarios/meal.ts'), at('take/recorder.ts'), at('runtime/snapshot.ts'), at('runtime/compact.ts'), at('scenarios/eden-camp.ts'), at('core/hash.ts'), at('scenarios/littlemartians.ts'), at('scenarios/greenfield.ts'),at('bodies/policy.ts'),at('locomotion/walk.ts')]);
+  // The server uses the identical UTF-8 SHA-256 digest in native code. The
+  // browser/Worker engine retains its portable default and the same addresses.
+  hashes.setSha256Provider((text: string) => createHash('sha256').update(text, 'utf8').digest('hex'));
   // Preserve the original proving-ground fixtures as a western annex during additive adoption.
   const campScene = structuredClone(camp.EDEN_CAMP_SCENE);
   campScene.bounds = [-30,-30,30,30]; campScene.surfaces[0].obb.half = [30,30];

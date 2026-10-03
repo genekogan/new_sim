@@ -287,3 +287,9 @@ Draco decoder at `public/mars-assets/draco`. Use an isolated ignored checkout
 and never deploy it. Missing JPEGs can draw black ground without failing an HTTP
 request because Vite's fallback returns HTML; validate image headers. Exact
 fixture receipts and focused original-baseline comparisons are in MERGE-LOG.
+
+The Sim Node adapter installs the native SHA-256 provider for content addressing.
+It produces identical UTF-8 hashes; the browser/Worker default stays portable.
+No rules version or checkpoint migration is required. Hash equivalence and a
+full engine suite with the native provider precede release. Keep soak timing
+thresholds intact; CPU measurements are evidence, not permission to weaken them.

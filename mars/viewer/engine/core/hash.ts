@@ -28,8 +28,16 @@ const K = new Uint32Array([
   0xc67178f2,
 ]);
 
+// Hosts may use an equivalent native digest. Browser/Worker defaults stay
+// dependency-free; the provider changes implementation, never hash semantics.
+let nativeSha256: ((text: string) => string) | undefined;
+export function setSha256Provider(provider?: (text: string) => string) {
+  nativeSha256 = provider;
+}
+
 /** SHA-256 of a UTF-8 string, hex encoded. */
 export function sha256(text: string): string {
+  if (nativeSha256) return nativeSha256(text);
   const bytes = new TextEncoder().encode(text);
   const len = bytes.length;
   const padded = new Uint8Array(((len + 9 + 63) >> 6) << 6);

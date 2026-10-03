@@ -359,3 +359,14 @@ Periodic pending retries emit no markers. The real mid-carry regression now uses
 this actual checkpoint path and proves exact engine/kernel restart and continued
 physical progress. A hard crash still resumes from the last durable checkpoint
 and accepted log; this change specifically preserves graceful restart heads.
+
+## Server hash acceleration candidate
+
+Node uses native SHA-256 for native engine content addresses. The portable
+browser/Worker implementation and stable serialization remain unchanged.
+Unicode, block boundaries and real state/program/take comparisons are identical.
+An isolated 20,000-tick late-camp comparison measured 1.180→0.976 ms/tick.
+Construction v4 completed all 48 days physically but failed the unchanged 20%
+timing limit narrowly (20.71%); fresh v5 qualification is pending. Full native
+gate retains its original report and focused repairs; this hash-only source
+change receives equivalence and full native-engine validation separately.
