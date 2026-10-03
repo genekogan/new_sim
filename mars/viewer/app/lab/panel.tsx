@@ -1,3 +1,4 @@
+import {WorldSnapshotHud} from './world-snapshot-hud.tsx';
 import { LibraryReadingHud } from './library-reading-hud.tsx';
 import { ComputerWorkshopHud } from './computer-workshop-hud.tsx';
 import { GardenCircuitHud } from './garden-circuit-hud.tsx';
@@ -87,6 +88,7 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
         </select>
       </label>
       <p className="lab-desc">{s.description}</p>
+      {s.name.endsWith('-snapshot') && <WorldSnapshotHud key={`${s.name}:${sim.scenarioEpoch}`} sim={sim} />}
       {contract && <details className="lab-meta" data-testid="scenario-contract">
         <summary>How to run this experience</summary>
         <p>{contract.start.join(' → ')}</p>

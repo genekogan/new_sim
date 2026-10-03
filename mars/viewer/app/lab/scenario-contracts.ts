@@ -28,6 +28,10 @@ export const LAB_SCENARIO_GROUPS = [
   {
     "id": "construction",
     "title": "Source-checked construction journeys"
+  },
+  {
+    "id": "snapshots",
+    "title": "Snapshots of persistent places"
   }
 ] as const;
 export const LAB_CONTRACTS = {
@@ -650,5 +654,32 @@ export const LAB_CONTRACTS = {
     ],
     "outcome": "The same original book is partially read at the source, physically transferred by ordinary handling to the second declared table, and the same task/bookmark is completed there; alternatively safe End drains children and retains unfinished reading and actual supported placement.",
     "scope": "One reader and two pre-authored grounded tables/chairs; a 24-second hypothetical book purpose relocates after seven seconds. No single-chair relocation, arbitrary rebind, generated text, active reload restoration or universal recovery if both release supports become unavailable."
+  },
+  "eden-camp-snapshot": {
+    "group": "snapshots",
+    "start": [
+      "Select snapshot",
+      "Play or give direction"
+    ],
+    "outcome": "Inspect the place or give an ordinary browser-local direction; Reset restores the authored snapshot.",
+    "scope": "No world clock, Soul minds, owners or persistent server mutations. This is a Lab snapshot, not autonomous life."
+  },
+  "littlemartians-snapshot": {
+    "group": "snapshots",
+    "start": [
+      "Select snapshot",
+      "Play or give direction"
+    ],
+    "outcome": "Inspect the place or give an ordinary browser-local direction; Reset restores the authored snapshot.",
+    "scope": "No world clock, Soul minds, owners or persistent server mutations. This is a Lab snapshot, not autonomous life."
+  },
+  "greenfield-snapshot": {
+    "group": "snapshots",
+    "start": [
+      "Select snapshot",
+      "Play or give direction"
+    ],
+    "outcome": "Inspect the place or give an ordinary browser-local direction; Reset restores the authored snapshot.",
+    "scope": "No world clock, Soul minds, owners or persistent server mutations. This is a Lab snapshot, not autonomous life."
   }
 } as const;

@@ -15,6 +15,7 @@ import { Souls } from './souls.ts';
 import { WorldHost } from './world.ts';
 import { LivingWorld } from './living.ts';
 import { CampCards } from './camp.ts';
+import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
@@ -31,7 +32,8 @@ const db = new Db(join(config.dataDir, 'sim.db'));
 const definition = worldDefinition(config.worldKey);
 if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(', ')}`);
 // Each process owns one world and imports its engine from this release.
-const factory = config.engine === 'mars' ? await (await import('@sim/engine-mars')).marsFactory() : toyFactory;
+const mars = config.engine==='mars'?await import('@sim/engine-mars'):null;
+const factory=mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'?mars.GREEN_FIELD_WORLD:undefined):toyFactory;
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId);
 const boot = host.boot();
 console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
@@ -39,9 +41,10 @@ console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engin
 const auth = new Auth(config, db);
 await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
 
-const living = config.worldKey === 'mars' && config.livingWorld ? new LivingWorld(host) : null;
-if (living) { living.camp = true; void living.install(definition.customs); }
-const campCards = living ? new CampCards(host) : null;
+const living = config.worldKey !== 'toy' && config.livingWorld ? new LivingWorld(host) : null;
+if (living) { living.camp = config.worldKey === 'mars'; void living.install(definition.customs); }
+const campCards = living?.camp ? new CampCards(host) : null;
+if(config.worldKey==='littlemartians')new FloaterCards(host);
 void campCards;
 const oldCharacters = ['A patient gardener who enjoys preparing food and welcoming people.', 'A curious builder who learns by making useful things from the yard’s materials.', 'A thoughtful reader and teacher who likes sharing ideas and quiet company.', 'A lively musician and storyteller who brings people together around the fire.'];
 if (living) for (const [i, n] of definition.cast.entries()) {

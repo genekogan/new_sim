@@ -3,7 +3,7 @@
 # Restarts sim if the tick has not advanced for two consecutive checks
 # (and the world is not paused), and reports Caddy if it is down.
 set -u
-for spec in toy:4500:sim mars:4502:sim-world@mars; do
+for spec in toy:4500:sim mars:4502:sim-world@mars littlemartians:4503:sim-world@littlemartians eden:4504:sim-world@eden; do
 IFS=: read -r world port unit <<< "$spec"
 systemctl is-active --quiet "$unit" || continue
 STATE="/run/sim-watch-$world.tick"

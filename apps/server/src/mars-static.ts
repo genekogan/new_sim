@@ -33,7 +33,7 @@ export function mountMarsStatic(app: Hono, root: string) {
       return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
     });
   }
-  for (const route of ['/l/mars', '/l/mars/', '/w/mars/:year']) {
+  for (const route of ['/l/mars', '/l/mars/', '/l/littlemartians', '/l/littlemartians/', '/l/eden', '/l/eden/', '/w/mars/:year']) {
     app.get(route, async (c) => {
       if (c.req.param('year') && !/^202[0-7]$/.test(c.req.param('year')!)) return c.notFound();
       return serveStatic({ root, path: 'index.html' })(c, async () => {});

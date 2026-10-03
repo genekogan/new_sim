@@ -68,6 +68,8 @@ export interface Engine {
   canPerform(program: Program): { code: string; message: string } | null;
   /** The program an actor is running, if any. */
   programOf(actor: string): string | null;
+  /** Actual settled body-language rest, distinct from travelling toward it. */
+  bodyResting?(actor:string): boolean;
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
   snapshot(): EngineSnapshot;

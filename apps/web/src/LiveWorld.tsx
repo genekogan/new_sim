@@ -160,7 +160,7 @@ export function LiveWorld({ sim, selected, onSelect }: { sim: Sim; selected: str
           if (abort.signal.aborted) return;
           base = info.scene; dayTicks = info.clock?.dayTicks ?? null;
           geometry.dispose();
-          geometry = new WorldGeometry(base);
+          geometry = new WorldGeometry(base,info.ground);
           scene.add(geometry.group);
           light.fit(geometry.bounds);
           if (base) overview(geometry.bounds); // else the first recorded moment frames the view
@@ -324,7 +324,7 @@ export function LiveWorld({ sim, selected, onSelect }: { sim: Sim; selected: str
           const text = `${soul.name}|${doing}|${card}|${soul.id === soulId}`;
           if (text !== l.text) {
             l.text = text; l.name.textContent = soul.name; l.line.textContent = clip(doing, 48); l.card.textContent = clip(card, 48);
-            l.line.style.display = doing ? '' : 'none'; l.card.style.display = card ? '' : 'none';
+            l.line.style.display = doing && soul.id===soulId ? '' : 'none'; l.card.style.display = card && soul.id===soulId ? '' : 'none';
             (l.obj.element as HTMLElement).style.outline = soul.id === soulId ? '2px solid #ffd34d' : 'none';
           }
         }

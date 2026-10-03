@@ -10,6 +10,7 @@ export const marsAvailable = () => existsSync(join(marsDir(), 'runtime/runtime.t
 /** The parts of the Mars engine the adapter uses. Typed loosely on purpose: the Mars types stay in Mars. */
 export type Mars = {
   Runtime: any;
+  admitFloaters: (verb:string,params:any,body:(id:string)=>any)=>any;
   TakeRecorder: any;
   compactRuntime: (rt: any, services: (world: any) => any) => any;
   compactionIssue: (rt: any) => string | null;
@@ -24,6 +25,9 @@ export type Mars = {
   provingGroundWorld: () => any;
   /** One of Mars's own authored scenarios (a table, a pot of stew, four people, four chairs round a fire) and its per-person steps. */
   edenCampWorld: (seed?: string) => any;
+  littleMartiansWorld: (seed?: string) => any;
+  greenFieldWorld: (seed?: string) => any;
+  littleMartiansRender: any;
   campActivities: () => any[];
   bindCampActivity: (activity: any, roles: Record<string,string>) => any;
   bindCampChess: (world: any, white: string, black: string) => void;
@@ -37,13 +41,14 @@ export type Mars = {
 export async function loadMars(): Promise<Mars> {
   if (!marsAvailable()) throw new Error(`Mars engine not found at ${marsDir()} (vendored engine required)`);
   const at = (f: string) => import(pathToFileURL(join(marsDir(), f)).href);
-  const [rt, reg, seeds, fac, rng, meal, recorder, snapshot, compact, camp, hashes] = await Promise.all([at('runtime/runtime.ts'), at('api/registry.ts'), at('api/seeds.ts'), at('world/factory.ts'), at('core/rng.ts'), at('scenarios/meal.ts'), at('take/recorder.ts'), at('runtime/snapshot.ts'), at('runtime/compact.ts'), at('scenarios/eden-camp.ts'), at('core/hash.ts')]);
+  const [rt, reg, seeds, fac, rng, meal, recorder, snapshot, compact, camp, hashes, lm, field, bodies] = await Promise.all([at('runtime/runtime.ts'), at('api/registry.ts'), at('api/seeds.ts'), at('world/factory.ts'), at('core/rng.ts'), at('scenarios/meal.ts'), at('take/recorder.ts'), at('runtime/snapshot.ts'), at('runtime/compact.ts'), at('scenarios/eden-camp.ts'), at('core/hash.ts'), at('scenarios/littlemartians.ts'), at('scenarios/greenfield.ts'),at('bodies/policy.ts')]);
   // Preserve the original proving-ground fixtures as a western annex during additive adoption.
   const campScene = structuredClone(camp.EDEN_CAMP_SCENE);
   campScene.bounds = [-30,-30,30,30]; campScene.surfaces[0].obb.half = [30,30];
   const campWorld = (seed?: string) => { const w = camp.edenCampWorld(seed); w.base.staticHash = hashes.hashOf(campScene); return w; };
   return {
-    Runtime: rt.Runtime, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: reg.createRegistry, servicesFor: reg.servicesFor,
-    invariants: reg.ENGINE_INVARIANTS, describeVerbs: reg.describeVerbs, scenes: {...seeds.ENGINE_SCENES, [camp.EDEN_CAMP_CAMPUS]: campScene}, edenCampWorld: campWorld, campActivities: camp.edenCampActivities, bindCampActivity: camp.bindCampActivity, bindCampChess: camp.bindCampChess, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom, mealWorld: meal.mealWorld, mealSteps: meal.mealSteps,
+    Runtime: rt.Runtime, admitFloaters:bodies.admitFloaters, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: reg.createRegistry, servicesFor: reg.servicesFor,
+    littleMartiansWorld: lm.littleMartiansWorld, greenFieldWorld:field.greenFieldWorld,littleMartiansRender:lm.LITTLE_MARTIANS_RENDER,
+    invariants: reg.ENGINE_INVARIANTS, describeVerbs: reg.describeVerbs, scenes: {...seeds.ENGINE_SCENES, [camp.EDEN_CAMP_CAMPUS]: campScene,littlemartians:lm.LITTLE_MARTIANS_SCENE,greenfield:field.GREEN_FIELD_SCENE}, edenCampWorld: campWorld, campActivities: camp.edenCampActivities, bindCampActivity: camp.bindCampActivity, bindCampChess: camp.bindCampChess, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom, mealWorld: meal.mealWorld, mealSteps: meal.mealSteps,
   };
 }

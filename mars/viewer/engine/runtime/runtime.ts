@@ -1,3 +1,4 @@
+import {admitFloaters} from '../bodies/policy.ts';
 // Fixed-step authoritative runtime. The same class runs rehearsals (in Node
 // tests or a forked room), official execution (Durable Object) and local
 // previews — there is no second "fast path" implementation (spec §16).
@@ -126,6 +127,8 @@ export class Runtime {
         code: 'action.invalid-params',
         message: `invalid parameters for ${verb}: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
       });
+    const body=admitFloaters(verb,parsed.data,id=>this.world.entities[id]?.body);
+    if(body.status==='refuses')return this.fail(rec,{code:body.reason,message:body.note,subjects:body.floaters});
     rec.params = parsed.data;
     // Any newer explicit instruction supersedes a queued voluntary return, even if
     // its own plan later refuses. Child work of the original directive does not supersede it.
@@ -378,14 +381,15 @@ export class Runtime {
   }
 
   private internals(): RuntimeInternals {
-    const self = this;
+    const getIdPrefix=()=>this.idPrefix;
+    const setIdPrefix=(v:string)=>{this.idPrefix=v;};
     const getNextId = () => this.nextId;
     const setNextId = (n: number) => {
       this.nextId = n;
     };
     return {
-      get idPrefix() { return self.idPrefix; },
-      set idPrefix(v: string) { self.idPrefix = v; },
+      get idPrefix() { return getIdPrefix(); },
+      set idPrefix(v: string) { setIdPrefix(v); },
       live: this.live,
       waiting: this.waiting,
       owners: this.owners,

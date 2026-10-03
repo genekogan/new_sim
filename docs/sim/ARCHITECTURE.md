@@ -3,7 +3,50 @@
 How the shell is put together, as built. For what each part should become, see
 `../eden4/`; for current state and gaps, `../STATUS.md`.
 
-## One process
+## October 3 world architecture
+
+Four independent processes serve `/w/toy`, `/w/mars`, `/w/littlemartians` and
+`/w/eden`, with separate SQLite files, clocks, logs, owner-bound new Souls and
+budget ledgers. Caddy routes each world; the common shell and browser-only
+Labs/year pages ship in the same immutable release. The Mars engine is a hard
+fork under `mars/`, imported through the engine contract inside this repository.
+
+Living Mars and Little Martians keep one-hour world days. Customs and first
+light/supper/dusk are observations. Logged decisions choose playable cards from
+mandate, context, needs and journal; a seeded fallback makes the same decision
+path when paid minds cannot run. There is no routine object or daily action
+schedule. Eden remains idle without owner direction. Owner mandate and journal
+text stay private; public physical takes contain no owner rules or reflection.
+
+At a daily quiet point the Mars adapter settles finite programs and releases
+ordinary controllers, then builds a fresh Runtime from WorldState. Checkpoints
+plus logged suffixes preserve engine, kernel and mind state across restarts.
+Resumability uses actual ActionDef capabilities. Fault recovery restores an
+accepted baseline, avoids the failed card and quarantines repeat faults. Long
+soak qualification rejects every physical recovery rather than reading only a
+cleared violation list. The 48-day camp proof remains separate from floater proof.
+
+Floater bodies retain the same action registry objects and physical world shape.
+Body admission rejects hand-dependent activities with named reasons. A derived
+per-Runtime navigation cache opens only the declared floater shafts at the same
+0.1 m grid. Continuous shaft motion, height-aware separation, traffic admission
+and serializable landing clearances live in ordinary locomotion. Humans retain
+the original profile and refuse these shafts. Ceramic recharge and quiet company
+are enacted during settled rest; they are not a scheduled replenishment.
+
+The observer records server takes in bounded chunks; the browser draws sampled
+poses through TakePeople and FloaterView, about one second behind. Selection,
+follow and rewind share this path. Five-minute archives are compressed off-loop,
+verified in R2 before local pruning, and indexed forever; SQLite keeps 24 hours.
+New-world Labs start paused, run an isolated browser Runtime and expose explicit
+movement requests, Play and Reset. They have no server day, ownership or minds.
+
+The sections below retain the earlier shell component description. Native
+`system` ownership applies only to the preserved Toy world; all new-world Souls
+require the verified human owner. Historical text-only/local-Mars limitations
+are superseded by the deployed world architecture above.
+
+## One process per world
 
 Everything server-side is one Node process (`apps/server/src/main.ts`), TypeScript
 run directly by Node's type stripping (no build step for the server).

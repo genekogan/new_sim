@@ -1,5 +1,6 @@
 // End-of-tick invariants (spec §31). They never correct anything — they
 // record violations so rehearsal reports and tests can fail loudly.
+import {isFloater,floaterBody} from '../bodies/body.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { entityFootprint, type Spatial } from '../spatial/service.ts';
@@ -30,10 +31,11 @@ export const humanStaticClearance: Invariant = (rt: Runtime) => {
     const g = sp.level(e.human.level);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);
-    if (c < HUMAN_RADIUS - TOL)
+    const radius=isFloater(e)?floaterBody(e.body).radius:HUMAN_RADIUS;
+    if (c < radius - TOL)
       out.push({
         code: 'collision.human-static',
-        message: `${e.id} body overlaps static geometry (clearance ${c.toFixed(2)} m < ${HUMAN_RADIUS} m) near ${nearestBlocker(g, [e.pose.p[0], e.pose.p[2]]) ?? 'the floor edge'} at (${e.pose.p[0].toFixed(2)}, ${e.pose.p[2].toFixed(2)}) level ${e.human.level} activity ${e.human.activity}`,
+        message: `${e.id} body overlaps static geometry (clearance ${c.toFixed(2)} m < ${radius} m) near ${nearestBlocker(g, [e.pose.p[0], e.pose.p[2]]) ?? 'the floor edge'} at (${e.pose.p[0].toFixed(2)}, ${e.pose.p[2].toFixed(2)}) level ${e.human.level} activity ${e.human.activity}`,
         subjects: [e.id],
         at: e.pose.p,
       });
@@ -50,7 +52,8 @@ export const humanHumanSeparation: Invariant = (rt: Runtime) => {
       if (a.human!.level !== b.human!.level) continue;
       if (Math.abs(a.pose.p[1] - b.pose.p[1]) > 1.0) continue;
       const d = hypot(a.pose.p[0] - b.pose.p[0], a.pose.p[2] - b.pose.p[2]);
-      if (d < 2 * HUMAN_RADIUS - 0.08)
+      const radius=(isFloater(a)?floaterBody(a.body).radius:HUMAN_RADIUS)+(isFloater(b)?floaterBody(b.body).radius:HUMAN_RADIUS);
+      if (d < radius - 0.08)
         out.push({ code: 'collision.human-human', message: `${a.id} and ${b.id} overlap (${d.toFixed(2)} m apart)`, subjects: [a.id, b.id], at: a.pose.p });
     }
   return out;

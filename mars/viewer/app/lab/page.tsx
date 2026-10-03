@@ -23,6 +23,7 @@ export default function Lab({ defaultScenario }: { defaultScenario?: string }) {
     let live = true;
     // scenarios with async data (year walkabouts) start on the default preset until it arrives
     v.sim.load(first.prepare ? SCENARIOS[0].name : first.name);
+    if(first.name.endsWith('-snapshot'))v.sim.paused=true;
     if (first.prepare)
       v.sim.loadAsync(first.name).then(
         () => live && refresh(),
@@ -91,7 +92,8 @@ export default function Lab({ defaultScenario }: { defaultScenario?: string }) {
           onScenario={(name) => {
             view.sim.loadAsync(name).then(
               () => {
-                history.replaceState(null, '', `/lab?scenario=${name}`);
+                if(name.endsWith('-snapshot'))view.sim.paused=true;
+                history.replaceState(null, '', `${location.pathname}?scenario=${name}`);
                 refresh();
               },
               (e) => ((view.error = `${name}: ${e.message}`), refresh()),

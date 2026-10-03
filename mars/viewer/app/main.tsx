@@ -28,7 +28,7 @@ class ErrorBoundary extends Component<
   }
 }
 const requestedRoute = location.pathname.replace(/\/$/, '') || '/';
-const route = requestedRoute === '/l/mars' ? '/lab' : requestedRoute.replace(/^\/w\/mars\/(202[0-7])$/, '/studio/$1');
+const route = /^\/l\/(mars|littlemartians|eden)$/.test(requestedRoute) ? '/lab' : requestedRoute.replace(/^\/w\/mars\/(202[0-7])$/, '/studio/$1');
 const requestedYear = new URLSearchParams(location.search).get('year');
 const presentationYear =
   requestedYear && /^202[0-7]$/.test(requestedYear)
@@ -48,7 +48,7 @@ createRoot(document.getElementById('root')!).render(
           year={route === '/studio' ? 2026 : Number(route.split('/')[2])}
         />
       ) : route === '/lab' ? (
-        <Lab />
+        <Lab defaultScenario={requestedRoute==='/l/littlemartians'?'littlemartians-snapshot':requestedRoute==='/l/eden'?'greenfield-snapshot':undefined} />
       ) : route === '/simulation-guide' ? (
         <Guide />
       ) : route === '/' ? (

@@ -9,14 +9,14 @@ export function newLife(tick: number): Life {
   return { needs: { energy: 80, hunger: 20, company: 35, restlessness: 20 }, journal: 'I am new here. I want to learn the place and find what suits me.', acts: [], lastTick: tick, reflectedDay: -1 };
 }
 /** Slow needs depend on enacted body state and elapsed world ticks, never wall time. */
-export function advanceNeeds(life: Life, tick: number, activity: string, companyNear: boolean): void {
+export function advanceNeeds(life: Life, tick: number, activity: string, companyNear: boolean, nourished=false, floater=false): void {
   const d = (tick - life.lastTick) / DAY_TICKS; life.lastTick = tick;
   const n = life.needs;
   const asleep = /sleep/.test(activity), resting = /rest|sit/.test(activity), eating = /eat/.test(activity);
-  const social = companyNear && /talk|converse|listen|warm|gather|watch/.test(activity);
+  const social = companyNear && (/talk|converse|listen|warm|gather|watch/.test(activity) || (floater && resting));
   const occupied = !/idle|stand|wait|rest|sleep/.test(activity);
-  n.energy = clamp(n.energy + d * (asleep ? 360 : resting ? 50 : occupied ? -105 : -65));
-  n.hunger = clamp(n.hunger + d * (eating ? -26000 : asleep ? 35 : 70));
+  n.energy = clamp(n.energy + d * (asleep ? 360 : resting ? (floater?360:50) : occupied ? -105 : -65));
+  n.hunger = clamp(n.hunger + d * (eating ? -26000 : nourished ? -4200 : asleep ? 35 : 70));
   n.company = clamp(n.company + d * (social ? -2200 : 75));
   n.restlessness = clamp(n.restlessness + d * (occupied ? -220 : asleep ? -50 : 95));
 }
@@ -36,10 +36,10 @@ export function livingChoice(c: MidContext, seed: string): MidDecision {
     let score = 1 + nextFloat(rng) * 3;
     for (const w of words(text)) if (nature.has(w)) score += 1.2;
     if (/sleep|rest/.test(text)) score += (100 - n.energy) / 10;
-    if (/eat|meal|supper|food|cook|finish the bowl/.test(text)) score += n.hunger / 10 + Math.max(0, n.hunger - 65) * 1.5;
+    if (/eat|meal|supper|food|cook|finish the bowl|bask|recharge/.test(text)) score += n.hunger / 10 + Math.max(0, n.hunger - 65) * 1.5;
     if (/join|talk|chat|host|music/.test(text)) score += n.company / 12;
     if (/join.*supper|share a meal/.test(text)) score += n.company / 5;
-    if (/walk|wander|draw|garden|build|work|chess|read/.test(text)) score += n.restlessness / 16;
+    if (/walk|glide|wander|draw|garden|build|work|chess|read/.test(text)) score += n.restlessness / 16;
     if (/sleep/.test(text) && n.energy > 60) score -= 8;
     if (/^return (bowl|spoon)/.test(text)) score += 10;
     if (n.energy < 15 && /sleep/.test(text)) score += 40;

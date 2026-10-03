@@ -40,7 +40,7 @@ export class LivingWorld {
     }
     const moments = [
       { phase: 0.25, id: 'midday', text: 'Midday. There is time to notice what is unfinished.' },
-      { phase: 0.48, id: 'supper-bell', text: 'The supper bell rings. People often share food around this time; anyone may host or join.' },
+      { phase: 0.48, id: 'supper-bell', text: this.camp?'The supper bell rings. People often share food around this time; anyone may host or join.':'The evening light changes. People sometimes meet to share stories or enjoy the view.' },
       { phase: 0.55, id: 'dusk', text: 'Dusk. Lamps and the fire are inviting; it is a chance to reflect on the day.' },
       { phase: 0.75, id: 'night', text: 'Night. Some people seek sleep and others enjoy the quiet hours.' },
     ];

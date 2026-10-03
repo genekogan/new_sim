@@ -17,6 +17,7 @@ const groups = new Set([
   'probes',
   'diagnostics',
   'construction',
+  'snapshots',
 ]);
 
 test('every production registration declares an exact execution contract and test mapping', () => {

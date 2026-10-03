@@ -10,7 +10,7 @@ build is returned by `/healthz` and recorded in `<eden4>/MERGE-LOG.md`.
 |---|---|
 | Production | https://sim.eden.art; staging first, immutable release directories and code-only rollback |
 | Staging | https://<staging-host>; independent data and fake minds |
-| Worlds | `/` list, `/w/toy` preserves `toy-1`, `/w/mars` independent four-Soul Mars process |
+| Worlds | `/` list, `/w/toy` preserves `toy-1`, `/w/mars`, `/w/littlemartians`, `/w/eden`: independent owner-bound processes |
 | Static | `/l/mars` original browser Lab; `/w/mars/2020`–`2027` Studio, public campus assets through an allowlisted same-origin proxy |
 | Ownership | All new-world Souls owned by Gene; existing Privy sign-in/admin; public watching |
 | Durability | Per-world SQLite, accepted event log, resumable checkpoints plus deterministic replay; Litestream/R2 and on-box backups |
@@ -33,11 +33,11 @@ chosen supper hosting/joining, quiet checkpoints, daily fresh Runtime and durabl
 recovery/quarantine. No routine or timetable controls a Soul. Reflection and owner words
 remain private. The local live mind proof spent $0.003215808 and its server was stopped.
 
-Current checks: workspace typecheck; 45 server tests qualified (44 broad-pass plus the corrected strict-report fixture in the nine-test focused pass); all other Sim suites passed. Mars engine 1,489 passed,
+Playback milestone checks (historical): workspace typecheck; 45 server tests; all other Sim suites passed. Mars engine 1,489 passed,
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
-The active Little Martians and Eden worlds, construction from the piles, remain ahead. All four bounded Opus helpers finished;
+Little Martians and Eden candidates are described below for the next world milestone. Construction from the piles and the Toy 3D view remain ahead. All four bounded Opus helpers finished;
 building pictures are available at `/buildings`.
 
 ## Mandate milestone
@@ -111,12 +111,12 @@ still reserved for tranche end.
 
 **A second engine** (2026-10-01; design in `eden4/19`)
 
-- `packages/engine-mars`: the real Mars engine behind Sim's engine contract, imported
-  read-only from a local checkout (never copied into this repo). `ENGINE=mars` runs the
+- `packages/engine-mars`: the real Mars engine behind Sim's engine contract, formerly imported
+  read-only from a local checkout; the October 3 hard fork now lives under mars/. `ENGINE=mars` runs the
   whole shell on it, and one of Mars's own authored scenarios (the meal) runs through it
   unchanged. Not deployed: the Mars code exists only on Gene's laptop.
 
-## Faked or absent
+## Earlier prototype limitations (historical October 1)
 
 - **Production runs the toy engine**: a 100 m plane, seven fixtures, straight-line walking.
 - **No rendering.** The map is text; camera shots are data.
@@ -203,3 +203,32 @@ moments had multiple participants. Activity-set similarity averaged 0.544–0.57
 Additive registry checkpoint upgrade: activities29→31 is explicitly qualified to
 resume the pinned checkpoint, without an unnecessary full replay. Other physics/
 assembly versions stay unqualified. Restart regression and all 46 server tests pass.
+
+## Ceramic garden and green field milestone
+
+The Little Martians scene has seven Gene-owned floating heads, six scenery kin,
+Ceramic Tower and Minaret Temple. The clean procedural GLBs use the authored
+1046-prism footprints, wide ground entries and five declared shafts. All seven
+rooms are reachable through ordinary continuous body movement; a humanoid can
+enter the ground room and refuses upper openings. Floaters use their own radius,
+height and link admission, with the same 0.1 m collision grid. A role-aware table
+covers all 95 verbs in `tools/floaters/POLICY.md`; hand-dependent work is refused.
+Humanoid activities and action object identity are preserved.
+
+The ordinary needs/journal chooser has room visiting and garden recharge cards;
+there is no timetable. Recharge is enacted only during settled rest, and quiet
+company can replenish a ceramic head. Landing alignment, opposite link traffic
+and ordinary step-aside clearance are collision checked and serializable. The
+soak rejects every physical recovery, including faults cleared by normal recovery.
+The 48-day qualification passed: 3,456,000 ticks, zero physical recovery or card faults, every quiet renewal released, exact mid-glide engine/kernel/needs/journal restart. Early/late averages 0.666/0.498 ms per tick, heap 30.34/31.79 MB. Each head completed 7–19 distinct activities per day; habits emerged without a daily sequence.
+
+Eden has a literal green field and one Gene-owned idle humanoid. Only an owner's
+unfinished direction wakes its chooser. `/l/mars` includes the camp snapshot;
+`/l/littlemartians` and `/l/eden` open paused browser-only place snapshots, without
+server state, Soul ownership or a world day. Explicit move, Play, Pause and Reset
+use ordinary Runtime actions; reset/reload retains the selected Lab route.
+
+Browser asset/follow proof loaded all seven heads, six kin and both buildings,
+with zero errors. The short isolated live model pass used one alignment and
+Jev/Speech decisions, cost **$0.014983694**, all reservations settled, server stopped.
+Directed snapshot proof passed for all three places: actual completed movement (including tower level 13), Play/Pause, Reset and reload to exact initial poses/tick, no server API calls, zero page errors. Full workspace release checks passed: Sim and 46 server tests; Mars 1542 passed, 6 inherited skips and 11 inherited TODOs, zero failures; typecheck and lint passed. Existing source proof grades remain separate.
