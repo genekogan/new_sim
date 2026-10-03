@@ -3270,3 +3270,27 @@ Release40/homepage remains online. Main77ee’s48pending paths unchanged/staged0
 all branches/worktrees preserved. Whole alpha remaining8–14workinghours, medium
 confidence; assumes no major functional defect after capture continuation. No quota
 pause or new priority interview; resume bounded vocabulary only after alpha closure.
+
+## 2026-10-03 00:12 UTC — bounded visual review/window; clean gate next
+
+Source0fcc090 focused26cases completed in270573.97ms:9PASS/17FAIL/0SKIP/0FLAKY.
+Exactly34pixel errors, zero nonvisual errors; soft comparisons preserved nativeRED
+and let all later original checks execute. Root15pairs+Sol6.1review19pairs inspected
+all34old/actual PNG pairs and recorded exact hashes. No unexplained major scene/
+support/material defect identified. Documentation links retained original failed
+full gate, focused native failures, scoped source inheritance and image limitations.
+
+Only34individually reviewed images replaced in one bounded golden window: alpha
+subtitle/contract/pause UI; released green palette/counted stock, mural mapping,
+installed support/equipment details, prior midpoint/social movement and museum
+furniture revisions. Alpha paint lease changes are explicit, not blanket renderer
+equality to40. Original paint/stock/support/flat-panel, rehearsal hash/tick/geometry,
+reach/sole, deterministic-fire/replay and console assertions execute without
+nonvisual errors. Pixel0.2/maxratio0.015, all assertions/time/performance limits
+unchanged; no engine/take pins moved or takes re-recorded. Full clean combined
+gate and exact public validation still required; no release/merge yet.
+
+Main48pending paths preserved; native artifacts and old snapshots remain in Git/
+ignored receipts. Whole alpha8–14workinghours, medium confidence with final gate/
+publication risks. Keep expansion deferred until alpha acceptance/publication,
+then resume preserved bounded workshop/library queue under owner authorization.

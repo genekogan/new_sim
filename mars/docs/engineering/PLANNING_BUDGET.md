@@ -523,3 +523,16 @@ whole-suite capacity, not relaxed performance acceptance: original120s/15s/zero
 retry and special construction per-test deadlines, peak/mean/work ceilings,
 assertions/tolerances and golden pins remain. No take or outcome is re-recorded.
 The expanded clean combined gate is pending; failures still fail admission/release.
+
+### 2026-10-03 — one reviewed visual baseline window, no simulation re-pin
+
+The alpha26case still-RED capture cohort at0fcc090 ran every original later
+assertion:34pixel errors, zero nonvisual errors. Root15/Sol6.1review19 old/candidate
+pairs were inspected; exact hashes and reasons are in
+[the root visual review](briefs/alpha-visual-root-review.REPORT.md) and
+[the complementary review](../../briefs/alpha-coverage-review.REPORT.md).
+Only34images change for intended UI/already-released canvas differences; no
+physics/outcome/tolerance/performance-limit change. Rehearsal/hash/support/
+ownership/zero-invariant and renderer checks remain original. Engine/take pins
+unchanged; no new takes. Original RED reports retained in canonical coverage.
+A new clean full gate/public proof remains mandatory before integration/release.

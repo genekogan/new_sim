@@ -49,6 +49,13 @@
       "browserFailed": 17,
       "browserSkipped": 7,
       "proof": "All63 fresh load/Reset/firstStep passed; full alpha journeys and original functional checks passed where native case completed. Visual-aborted cases and skipped checks remain unproved for their later assertions."
+    },
+    "reviewedVisualWindow": {
+      "capturedSource": "0fcc0904ba6c805880bab141e5160281fe7d3674",
+      "captureCount": 34,
+      "rootReview": "briefs/alpha-visual-root-review.REPORT.md",
+      "secondaryReview": "../../briefs/alpha-coverage-review.REPORT.md",
+      "meaning": "All34 old/candidate pairs inspected, exact hashes retained; replace only these images for intended UI and already-released visual/source changes. No assertion/tolerance/time/performance/engine pin change. New native full gate/public acceptance pending."
     }
   },
   "proofKinds": [
@@ -6660,6 +6667,57 @@
         "e2e/stairs.spec.ts:75:1 \u203a stair foot IK: capture mid-flight (up) (1.7s)"
       ],
       "preservedNativeTraces": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-f7-red-native"
+    },
+    {
+      "receipt": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-visual-review-results.json",
+      "sha256": "09b1412d22652de3dee7458621ac61822b7c82a08a3392747849e09a9074058d",
+      "source": "0fcc0904ba6c805880bab141e5160281fe7d3674",
+      "nativeResult": {
+        "startTime": "2026-10-02T23:54:52.912Z",
+        "duration": 270573.97,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 17,
+        "flaky": 0
+      },
+      "cause": "Still-RED softVisual cohort preserved:26completedcases,34pixelcomparisonerrors,zero nonvisual errors. All later original assertions could execute; not26nativePASS. Subsequent34 individually reviewed screenshot replacements retain hashes/provenance and unchanged assertions; fresh full gate/public proof still mandatory.",
+      "failedCases": [
+        "build-bay-held-oblique",
+        "build-bay-raise-oblique",
+        "build-bay-visitor-oblique",
+        "fire-dusk-close",
+        "fire-dusk-oblique",
+        "fire-top",
+        "fire-top-close",
+        "lab-narrow-passage-mid-top-debug",
+        "lab-social-t20-oblique",
+        "lab-social-t65-top-debug",
+        "lab-stairs-mid-oblique",
+        "lab-year-2021-top-prisms",
+        "lab-year-2022-top-prisms",
+        "lab-year-2024-top-prisms",
+        "meal-legs-crossed",
+        "meal-spoon-at-mouth",
+        "poses-beam-walk",
+        "poses-climb-frame",
+        "poses-handup",
+        "poses-handup-joist",
+        "poses-pickup-crouch",
+        "poses-raise-footer",
+        "poses-stairs-mid-flight",
+        "prone-push-up",
+        "prone-reach",
+        "prone-standing",
+        "render-polish-equipment",
+        "render-polish-flower-mural",
+        "render-polish-green-frame-supported-historical",
+        "render-polish-mounted-panel",
+        "render-polish-partial-paint",
+        "render-polish-tilt-legs",
+        "solar-paint-mid-paint",
+        "solar-paint-mounted-equipment"
+      ],
+      "interruptedCases": []
     }
   ],
   "topGaps": [
