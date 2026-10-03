@@ -16,6 +16,8 @@
 //     instruction pulls a person out of what they were doing.
 import { hashOf, physicalView, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
 import { loadMars, type Mars } from './load.ts';
+import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
+import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -32,6 +34,7 @@ type Prog = {
   index: number; started: boolean; since: number;
   blockedSince?: number;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
+  build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
 export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
@@ -44,6 +47,7 @@ const num = { type: 'number' }, str = { type: 'string' };
 const ref = { anyOf: [str, { type: 'array', items: num, minItems: 2, maxItems: 2 }] };
 /** The body language, as the card grammar and agents see it. The actor is always implied. */
 export const BODY_VERBS: VerbInfo[] = [
+  { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
   { verb: 'walk_to', description: 'Walk to a thing or a point, stopping `standoff` metres short of it.', inputSchema: { type: 'object', properties: { to: ref, standoff: num }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
   { verb: 'stand', description: 'Stand up, leaving a seat or a place in a gathering.', inputSchema: { type: 'object', properties: {} } },
@@ -157,6 +161,8 @@ export class MarsEngine implements Engine {
     this.out.programs.push({ tick: this.rt.tick, id: p.id, actor: p.actor, kind, step: kind === 'step' ? p.index : -1, ...(d ? { code: d.code, message: d.message } : {}) });
   }
   private end(p: Prog, kind: 'completed' | 'failed' | 'cancelled', d?: Diag) {
+    if (p.build && kind === 'failed' && unsafeConstruction(this.rt.world)) throw new Error(`construction.unsafe-failure: ${d?.code}: ${d?.message}; restore the accepted quiet baseline`);
+    if (p.build?.stopping && kind === 'completed') { kind = 'cancelled'; d = p.build.stopping; }
     this.programs.delete(p.id); if (this.byActor.get(p.actor) === p.id) this.byActor.delete(p.actor);
     this.emit(p, kind, d);
   }
@@ -261,7 +267,7 @@ export class MarsEngine implements Engine {
     }
     return last;
   }
-  private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id); }
+  private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
   /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */
   private raw(me: string, step: { verb: string; params: Record<string, unknown> }): { verb: string; params: Record<string, unknown> } | Diag {
@@ -332,7 +338,15 @@ export class MarsEngine implements Engine {
   // ------------------------------------------------------------------ programs
   canPerform(program: Program): Diag | null {
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
+    if ([...this.programs.values()].some(p=>p.build?.crew.includes(program.actor))) return {code:'construction.committed',message:'This builder is finishing a finite physical construction segment.'};
     const first = program.steps[0]; if (!first) return null;
+    if (first.verb === 'build_lookout') {
+      if (program.steps.length !== 1) return {code:'construction.one-job',message:'A construction card chooses one finite job.'};
+      const plan=this.buildPlan(program);
+      if ('code' in plan) return plan;
+      const raw=this.raw(program.actor,plan.steps[0]);
+      return 'code' in raw?raw:this.plan(raw.verb,raw.params);
+    }
     if (!program.steps.some(s=>s.verb==='mars:serve')) for (const step of program.steps) if (step.verb==='mars:eat' && !(this.ents[String(step.params.bowl)]?.contents?.fraction > 0)) return {code:'eat.bowl-empty',message:'There is no food left in the bowl'};
     const pots = program.steps.filter(s => ['mars:serve','mars:shared_food_break'].includes(s.verb)).map(s => s.params.pot);
     if (this.cfg.scene === 'eden-camp' && pots.length && [...this.programs.values()].some(p => p.actor !== program.actor && p.steps.some(s => ['mars:serve','mars:shared_food_break'].includes(s.verb) && pots.includes(s.params.pot)))) return {code:'food.service-in-use',message:'Someone is already using this pot and its serving space'};
@@ -362,12 +376,15 @@ export class MarsEngine implements Engine {
     if (no) { const old = this.byActor.get(program.actor); if (old) this.stop(old); return { id, ok: false, diagnostic: no }; }
     const old = this.byActor.get(program.actor);
     if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
-    const p: Prog = { id, actor: program.actor, label: program.label.slice(0, 200), steps: program.steps, index: 0, started: false, since: this.rt.tick, ops: [] };
+    const build=program.steps[0]?.verb==='build_lookout'?this.buildPlan(program):null;
+    if (build && 'code' in build) return {id,ok:false,diagnostic:build};
+    const p: Prog = { id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew}}:{}) };
     this.programs.set(id, p); this.byActor.set(p.actor, id);
     return { id, ok: true };
   }
   stop(programId: string) {
     const p = this.programs.get(programId); if (!p) return;
+    if (p.build) { p.build.stopping={code:'program.stopped',message:'Construction interruption requested; finishing the committed segment safely.'}; return; }
     if (p.action && this.rt.isActive(p.action)) this.rt.cancel(p.action, { code: 'program.stopped', message: 'stopped' });
     this.end(p, 'cancelled', { code: 'program.stopped', message: 'stopped' });
   }
@@ -446,7 +463,10 @@ export class MarsEngine implements Engine {
   }
   renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: this.cfg.clock ?? null,...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),ground:this.cfg.scene==='greenfield'?'grass':undefined}; }
   actorBorrowed(actor: string) {
-    return !this.byActor.has(actor) && this.holders(actor).some(id => ['shared_food_break','converse','classroom_session','computer_music','campfire_circle','group_warmup'].includes(this.rt.records.get(id)?.verb));
+    return !this.byActor.has(actor) && ([...this.programs.values()].some(p=>p.build?.crew.includes(actor)) || this.holders(actor).some(id => ['shared_food_break','converse','classroom_session','computer_music','campfire_circle','group_warmup'].includes(this.rt.records.get(id)?.verb)));
+  }
+  private buildPlan(program: Program) {
+    return constructionPlan(this.rt.world,program.actor,program.steps[0].params.phase,id=>id===program.actor?this.holders(id).length===0:this.free(id));
   }
   private jointIssue(params: unknown, actor: string): Diag | null {
     const ids = new Set<string>();
@@ -538,7 +558,15 @@ export class MarsEngine implements Engine {
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
-    for(const live of this.rt.live.values())if(typeof live.exec?.detour?.clearOf==='function')return false;
+    for (const live of this.rt.live.values()) {
+      if (typeof live.exec?.detour?.clearOf === 'function') return false;
+      // Some codecs admit only a safe execution phase (raise permits lowering).
+      // A serializer's presence alone does not establish resumability.
+      if (live.def.serializeExec) {
+        try { live.def.serializeExec(this.rt, live.exec); }
+        catch (error) { if (error instanceof CodecError) return false; throw error; }
+      }
+    }
     for (const r of this.rt.records.values()) if (this.rt.isActive(r.id) && this.m.nonResumableReason(this.registry.get(r.verb))) return false;
     return true;
   }

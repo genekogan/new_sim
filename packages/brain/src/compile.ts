@@ -12,6 +12,12 @@ export function cardGrammar(verbs: VerbDoc[]): string {
   const verbLines = verbs.filter((v) => v.scope !== 'world').map((v) => `- \`${v.verb}\`: ${v.description} Params: ${JSON.stringify(Object.fromEntries(Object.entries((v.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}).filter(([k]) => k !== 'actor')))}`).join('\n');
   const world = verbs.filter((v) => v.scope === 'world');
   const worldLines = world.length ? `\n\nThis world's engine also has verbs of its own, for cards that belong to this world. Their parameter schemas are at \`/v1/debug/verbs\`:\n\n${world.map((v) => `- \`${v.verb}\`: ${v.description.replace(/^\[[^\]]*\]\s*/, '').split(/(?<=\.)\s/)[0].slice(0, 140)}`).join('\n')}` : '';
+  const construction = verbs.some(v => v.verb === 'build_lookout') ? `
+
+Camp construction example (card names are lowercase words; the verb has an underscore):
+{"name":"stage lookout","summary":"Carry rack parts to the camp build site","good_when":"Wanting to build the camp lookout","target":null,"when":[],"then":[{"set":["$actor","doing","staging the lookout"]}],"approach":[],"during":[{"verb":"build_lookout","params":{"phase":"stage"}}],"takes":"minutes"}
+For this fixed camp project use the example shape exactly, with no target and no derive/source/destination slots: the engine already binds the original materials and build site. Change phase/name/doing text for frame, deck or stairs, one finite phase per card. Physical prerequisites and committed free crew are checked by the engine. Do not set a target state to claim that parts are built. Use this unprefixed verb exactly; mars:build_lookout does not exist.
+` : '';
   return `# How to write a card
 
 The world's state is made of **things** and **links**.
@@ -63,7 +69,7 @@ By convention a card that changes what the Soul is visibly doing sets \`["$actor
 
 \`approach\` and \`during\` are lists of engine verbs. **Use only these verbs**; if the motion you want does not exist, pick the nearest one and list the missing motion under \`wants\`.
 
-${verbLines}${worldLines}
+${verbLines}${worldLines}${construction}
 
 In depiction params, \`"$target"\`, \`"$host"\` and other references are replaced by whatever the engine needs to find that thing (a body, a fixture, a point). The actor is implied.
 

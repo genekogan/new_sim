@@ -37,7 +37,7 @@ Playback milestone checks (historical): workspace typecheck; 45 server tests; al
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
-Little Martians and Eden candidates are described below for the next world milestone. Construction from the piles remains ahead. Toy now uses the same recorded 3D view. All four bounded Opus helpers finished;
+Little Martians and Eden are live, with their qualification described below. The finite construction controller is qualified; autonomous construction cards are the next release. Toy now uses the same recorded 3D view. All four bounded Opus helpers finished;
 building pictures are available at `/buildings`.
 
 ## Mandate milestone
@@ -240,3 +240,19 @@ Toy now uses the shared recorded 3D shell, selection/follow and bounded rewind. 
 The browser proof renders loaded people and selected follow with zero page errors or HTTP failures. The first local capture used a server started before the static asset build; its fallback warning was caught by visual review, retained and corrected by restarting the owned harness after the build. Follow now frames a newly selected person from at most twelve metres, then preserves user zoom.
 
 Full runtime checks passed: 47 server tests and all Sim suites; Mars 1542 passes, 6 inherited skips, 11 inherited TODOs, zero failures. Web typecheck/build passed after the camera change. Production Toy archive capture uses its existing Sim R2 credentials under `sim/takes/toy-1`, separate from other worlds. Staging uses `sim/staging` and no paid models. Earlier Toy records and database remain untouched.
+
+## Finite construction controller milestone
+
+`build_lookout` chooses a finite stage/frame/deck/stairs job, lowered to the original
+Mars physical verbs. Progress derives from actual part geometry and support, not a
+parallel checklist. The crew is reserved at accepted choice; interruption finishes
+the committed phase safely. Unsafe execution failure restores the accepted baseline
+and records a card fault. Carrying/raising waits for resumable checkpoints.
+
+Qualified: all 24 original parts assembled, repeated-job refusal, daily compaction,
+fresh Runtime, exact real-host mid-carry checkpoint/log restart and genesis replay,
+held-frame snapshot refusal, safe stop and injected beam-failure recovery. Four bounded paid compiler/mind runs spent $0.069994242 total, all settled and
+stopped. Earlier refusals are retained; the clarified construction example produced
+a valid optional stage card/mandate on the final run. This release
+exposes the controller to the grammar/compiler; ordinary world cards follow as a
+separate milestone with this controller as their compatible rollback.

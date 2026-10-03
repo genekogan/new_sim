@@ -214,3 +214,17 @@ make old code accept it. The world route/API prefix must match its process.
 New-world release proof (October 3): Little Martians completed the 48-day fake soak with zero physical recovery and bounded memory; paid proof $0.014983694, server stopped. Three paused Lab snapshots passed actual movement, Play/Pause, Reset and exact initial-state reload. Sim/46 server tests and 1542 Mars engine tests passed; 6 skips/11 TODOs remain upstream. Full Mars gate is reserved for tranche end.
 
 Toy observer release: all four live worlds now have shared 3D playback. Toy retains its original rules/checkpoint format and database. Deploy ensures `ARCHIVE_TAKES=1` in the two Sim process envs, preserving other settings; staging prefix is `sim/staging`, production uses existing scoped R2. This starts recording from the release, without inventing earlier physical takes. 47 server tests, 1542 Mars tests and actual loaded-model selection/follow proof passed.
+
+## Finite camp construction
+
+`build_lookout` phases are finite physical jobs. The accepted leader reserves the
+required free ground crew; normal stop requests drain the committed phase before
+releasing it. Carrying/raising is not a resumable checkpoint; state resumes by
+checkpoint plus logged choices until an ordinary quiet point. A lowering-only
+raise codec must not be treated as admitting held or raising states. Unsafe job
+failure goes through the existing accepted-baseline fault recovery.
+
+Once any minted card or accepted decision uses `build_lookout`, code rollback must
+choose a release with `packages/engine-mars/src/construction.ts`. Never reset a
+world database to make an older reader work. The controller-only release precedes
+autonomous construction cards to retain that compatible rollback.
