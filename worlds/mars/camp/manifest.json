@@ -1,0 +1,3320 @@
+{
+  "schema": "eden-camp-affordances/1",
+  "campus": "eden-camp",
+  "bounds": [
+    -22,
+    -22,
+    22,
+    22
+  ],
+  "needs": [
+    "energy",
+    "hunger",
+    "company",
+    "restlessness"
+  ],
+  "arrivals": [
+    {
+      "id": "arrival-1",
+      "p": [
+        -3,
+        18
+      ],
+      "yaw": -1.359703
+    },
+    {
+      "id": "arrival-2",
+      "p": [
+        -1,
+        18
+      ],
+      "yaw": -1.499489
+    },
+    {
+      "id": "arrival-3",
+      "p": [
+        1,
+        18
+      ],
+      "yaw": -1.642104
+    },
+    {
+      "id": "arrival-4",
+      "p": [
+        3,
+        18
+      ],
+      "yaw": -1.78189
+    }
+  ],
+  "buildings": [
+    {
+      "id": "kitchen",
+      "label": "Kitchen",
+      "rect": [
+        -20,
+        -20,
+        -8,
+        -8
+      ],
+      "doors": [
+        {
+          "id": "kitchen-door",
+          "building": "kitchen",
+          "side": "s",
+          "at": -14,
+          "width": 1.4,
+          "inside": [
+            -14,
+            -9.2
+          ],
+          "outside": [
+            -14,
+            -6.8
+          ]
+        }
+      ]
+    },
+    {
+      "id": "living-room",
+      "label": "Living room and classroom corner",
+      "rect": [
+        -6,
+        -20,
+        10,
+        -8
+      ],
+      "doors": [
+        {
+          "id": "living-door",
+          "building": "living-room",
+          "side": "s",
+          "at": 2,
+          "width": 1.6,
+          "inside": [
+            2,
+            -9.2
+          ],
+          "outside": [
+            2,
+            -6.8
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bunkhouse",
+      "label": "Bunk house",
+      "rect": [
+        12,
+        -20,
+        21,
+        -8
+      ],
+      "doors": [
+        {
+          "id": "bunkhouse-door",
+          "building": "bunkhouse",
+          "side": "s",
+          "at": 16.5,
+          "width": 1.4,
+          "inside": [
+            16.5,
+            -9.2
+          ],
+          "outside": [
+            16.5,
+            -6.8
+          ]
+        }
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "kitchen",
+      "label": "Kitchen",
+      "kind": "place"
+    },
+    {
+      "id": "living-room",
+      "label": "Living room",
+      "kind": "place"
+    },
+    {
+      "id": "classroom-corner",
+      "label": "Classroom corner",
+      "kind": "place"
+    },
+    {
+      "id": "bunkhouse",
+      "label": "Bunk house",
+      "kind": "place"
+    },
+    {
+      "id": "fire-circle",
+      "label": "Fire circle",
+      "kind": "place"
+    },
+    {
+      "id": "garden",
+      "label": "Garden",
+      "kind": "place"
+    },
+    {
+      "id": "yard",
+      "label": "Open yard",
+      "kind": "walkable"
+    },
+    {
+      "id": "arrival",
+      "label": "South gate arrival",
+      "kind": "staging"
+    },
+    {
+      "id": "rack-pile",
+      "label": "Rack pile: uprights and beams",
+      "kind": "material-pile"
+    },
+    {
+      "id": "timber-pile",
+      "label": "Timber pile: 2x4 joists",
+      "kind": "material-pile"
+    },
+    {
+      "id": "plywood-pile",
+      "label": "Plywood pile",
+      "kind": "material-pile"
+    },
+    {
+      "id": "build-site",
+      "label": "Marked build site: lookout bay",
+      "kind": "work-area"
+    },
+    {
+      "id": "mat-1",
+      "label": "Sleeping mat 1",
+      "kind": "work-area"
+    },
+    {
+      "id": "mat-2",
+      "label": "Sleeping mat 2",
+      "kind": "work-area"
+    },
+    {
+      "id": "mat-3",
+      "label": "Sleeping mat 3",
+      "kind": "work-area"
+    },
+    {
+      "id": "mat-4",
+      "label": "Sleeping mat 4",
+      "kind": "work-area"
+    }
+  ],
+  "spots": [
+    {
+      "id": "arrival-1",
+      "label": "Arrival 1",
+      "region": "arrival",
+      "p": [
+        -3,
+        18
+      ]
+    },
+    {
+      "id": "arrival-2",
+      "label": "Arrival 2",
+      "region": "arrival",
+      "p": [
+        -1,
+        18
+      ]
+    },
+    {
+      "id": "arrival-3",
+      "label": "Arrival 3",
+      "region": "arrival",
+      "p": [
+        1,
+        18
+      ]
+    },
+    {
+      "id": "arrival-4",
+      "label": "Arrival 4",
+      "region": "arrival",
+      "p": [
+        3,
+        18
+      ]
+    },
+    {
+      "id": "kitchen-door-inside",
+      "label": "kitchen-door (inside)",
+      "region": "kitchen",
+      "p": [
+        -14,
+        -9.2
+      ]
+    },
+    {
+      "id": "kitchen-door-outside",
+      "label": "kitchen-door (outside)",
+      "region": "yard",
+      "p": [
+        -14,
+        -6.8
+      ]
+    },
+    {
+      "id": "living-door-inside",
+      "label": "living-door (inside)",
+      "region": "living-room",
+      "p": [
+        2,
+        -9.2
+      ]
+    },
+    {
+      "id": "living-door-outside",
+      "label": "living-door (outside)",
+      "region": "yard",
+      "p": [
+        2,
+        -6.8
+      ]
+    },
+    {
+      "id": "bunkhouse-door-inside",
+      "label": "bunkhouse-door (inside)",
+      "region": "bunkhouse",
+      "p": [
+        16.5,
+        -9.2
+      ]
+    },
+    {
+      "id": "bunkhouse-door-outside",
+      "label": "bunkhouse-door (outside)",
+      "region": "yard",
+      "p": [
+        16.5,
+        -6.8
+      ]
+    },
+    {
+      "id": "kitchen-middle",
+      "label": "Kitchen floor",
+      "region": "kitchen",
+      "p": [
+        -12.5,
+        -15
+      ]
+    },
+    {
+      "id": "kitchen-talk",
+      "label": "By the dining table",
+      "region": "kitchen",
+      "p": [
+        -12.5,
+        -9.6
+      ]
+    },
+    {
+      "id": "classroom-floor",
+      "label": "Classroom corner floor",
+      "region": "classroom-corner",
+      "p": [
+        -3,
+        -9.5
+      ]
+    },
+    {
+      "id": "living-middle",
+      "label": "Living-room floor",
+      "region": "living-room",
+      "p": [
+        2,
+        -12
+      ]
+    },
+    {
+      "id": "bunkhouse-aisle",
+      "label": "Bunk house aisle",
+      "region": "bunkhouse",
+      "p": [
+        16.5,
+        -15.6
+      ]
+    },
+    {
+      "id": "fire-side",
+      "label": "Beside the fire benches",
+      "region": "fire-circle",
+      "p": [
+        3.5,
+        4
+      ]
+    },
+    {
+      "id": "yard-talk",
+      "label": "Yard conversation spot",
+      "region": "yard",
+      "p": [
+        4,
+        12
+      ]
+    },
+    {
+      "id": "garden-path",
+      "label": "Garden path",
+      "region": "garden",
+      "p": [
+        14,
+        6.25
+      ]
+    },
+    {
+      "id": "build-site-edge",
+      "label": "Edge of the build site",
+      "region": "build-site",
+      "p": [
+        -9,
+        5.5
+      ]
+    },
+    {
+      "id": "rack-pile-edge",
+      "label": "Rack pile",
+      "region": "rack-pile",
+      "p": [
+        -14,
+        -5
+      ]
+    },
+    {
+      "id": "timber-pile-edge",
+      "label": "Timber pile",
+      "region": "timber-pile",
+      "p": [
+        -17,
+        15
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "prep-table",
+      "def": "table-6ft",
+      "label": "Kitchen preparation counter",
+      "region": "kitchen"
+    },
+    {
+      "id": "dining-table",
+      "def": "table-6ft",
+      "label": "Kitchen dining table",
+      "region": "kitchen"
+    },
+    {
+      "id": "dining-bench",
+      "def": "bench-6ft",
+      "label": "Dining bench",
+      "region": "kitchen"
+    },
+    {
+      "id": "class-display",
+      "def": "standing-display",
+      "label": "Classroom display",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "class-lectern",
+      "def": "speaker-lectern",
+      "label": "Classroom lectern",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "class-seat-1",
+      "def": "camp-chair",
+      "label": "Classroom seat 1",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "class-seat-2",
+      "def": "camp-chair",
+      "label": "Classroom seat 2",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "class-seat-3",
+      "def": "camp-chair",
+      "label": "Classroom seat 3",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "class-seat-4",
+      "def": "camp-chair",
+      "label": "Classroom seat 4",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "class-seat-5",
+      "def": "camp-chair",
+      "label": "Classroom seat 5",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "class-seat-6",
+      "def": "camp-chair",
+      "label": "Classroom seat 6",
+      "region": "classroom-corner"
+    },
+    {
+      "id": "computer-1",
+      "def": "computer-workstation",
+      "label": "Computer 1",
+      "region": "living-room"
+    },
+    {
+      "id": "computer-1-chair",
+      "def": "camp-chair",
+      "label": "Computer 1 chair",
+      "region": "living-room"
+    },
+    {
+      "id": "computer-2",
+      "def": "computer-workstation",
+      "label": "Computer 2",
+      "region": "living-room"
+    },
+    {
+      "id": "computer-2-chair",
+      "def": "camp-chair",
+      "label": "Computer 2 chair",
+      "region": "living-room"
+    },
+    {
+      "id": "chess-table",
+      "def": "table-6ft",
+      "label": "Chess table",
+      "region": "living-room"
+    },
+    {
+      "id": "reading-table",
+      "def": "table-6ft",
+      "label": "Reading table",
+      "region": "living-room"
+    },
+    {
+      "id": "reading-chair",
+      "def": "camp-chair",
+      "label": "Reading chair",
+      "region": "living-room"
+    },
+    {
+      "id": "drawing-table",
+      "def": "table-6ft",
+      "label": "Drawing table",
+      "region": "living-room"
+    },
+    {
+      "id": "living-bench",
+      "def": "bench-6ft",
+      "label": "Living-room sofa bench",
+      "region": "living-room"
+    },
+    {
+      "id": "listening-chair",
+      "def": "camp-chair",
+      "label": "Listening chair",
+      "region": "living-room"
+    },
+    {
+      "id": "campfire",
+      "def": "campfire",
+      "label": "Camp fire",
+      "region": "fire-circle"
+    },
+    {
+      "id": "fire-bench-north",
+      "def": "bench-6ft",
+      "label": "Fire bench (north)",
+      "region": "fire-circle"
+    },
+    {
+      "id": "fire-bench-south",
+      "def": "bench-6ft",
+      "label": "Fire bench (south)",
+      "region": "fire-circle"
+    },
+    {
+      "id": "garden-table",
+      "def": "table-6ft",
+      "label": "Garden table",
+      "region": "garden"
+    },
+    {
+      "id": "planter-1",
+      "def": "garden-planter",
+      "label": "Planter 1",
+      "region": "garden"
+    },
+    {
+      "id": "planter-2",
+      "def": "garden-planter",
+      "label": "Planter 2",
+      "region": "garden"
+    },
+    {
+      "id": "planter-3",
+      "def": "garden-planter",
+      "label": "Planter 3",
+      "region": "garden"
+    },
+    {
+      "id": "planter-4",
+      "def": "garden-planter",
+      "label": "Planter 4",
+      "region": "garden"
+    },
+    {
+      "id": "chess-board",
+      "def": "chess-board",
+      "region": "living-room",
+      "on": "chess-table#r1c2"
+    },
+    {
+      "id": "chess-tray",
+      "def": "chess-tray",
+      "region": "living-room",
+      "on": "chess-table#r1c4"
+    }
+  ],
+  "items": [
+    {
+      "id": "supper-pot",
+      "def": "pot",
+      "on": "prep-table#r0c2",
+      "contents": {
+        "food": "hypothetical cold shared dish",
+        "fraction": 0
+      }
+    },
+    {
+      "id": "beans-bowl",
+      "def": "bowl",
+      "on": "prep-table#r0c1",
+      "contents": {
+        "food": "beans",
+        "fraction": 1
+      }
+    },
+    {
+      "id": "greens-bowl",
+      "def": "bowl",
+      "on": "prep-table#r0c3",
+      "contents": {
+        "food": "greens",
+        "fraction": 1
+      }
+    },
+    {
+      "id": "prep-spoon",
+      "def": "spoon",
+      "on": "prep-table#r1c0"
+    },
+    {
+      "id": "stew-pot",
+      "def": "pot",
+      "on": "dining-table#r0c2",
+      "contents": {
+        "food": "stew",
+        "fraction": 1
+      }
+    },
+    {
+      "id": "bowl-1",
+      "def": "bowl",
+      "on": "dining-table#r0c0",
+      "contents": {
+        "food": "stew",
+        "fraction": 0
+      }
+    },
+    {
+      "id": "spoon-1",
+      "def": "spoon",
+      "on": "dining-table#r0c1"
+    },
+    {
+      "id": "bowl-2",
+      "def": "bowl",
+      "on": "dining-table#r0c4",
+      "contents": {
+        "food": "stew",
+        "fraction": 0
+      }
+    },
+    {
+      "id": "spoon-2",
+      "def": "spoon",
+      "on": "dining-table#r0c5"
+    },
+    {
+      "id": "bowl-3",
+      "def": "bowl",
+      "on": "dining-table#r2c0",
+      "contents": {
+        "food": "stew",
+        "fraction": 0
+      }
+    },
+    {
+      "id": "spoon-3",
+      "def": "spoon",
+      "on": "dining-table#r2c1"
+    },
+    {
+      "id": "bowl-4",
+      "def": "bowl",
+      "on": "dining-table#r2c4",
+      "contents": {
+        "food": "stew",
+        "fraction": 0
+      }
+    },
+    {
+      "id": "spoon-4",
+      "def": "spoon",
+      "on": "dining-table#r2c5"
+    },
+    {
+      "id": "camp-book",
+      "def": "reading-book",
+      "on": "reading-table#r0c2"
+    },
+    {
+      "id": "sketch-pad",
+      "def": "drawing-pad",
+      "on": "drawing-table#r0c2"
+    },
+    {
+      "id": "sketch-pencil",
+      "def": "drawing-pencil",
+      "on": "drawing-table#r0c3"
+    },
+    {
+      "id": "water-bowl",
+      "def": "bowl",
+      "on": "garden-table#r0c1",
+      "contents": {
+        "food": "water",
+        "fraction": 1
+      }
+    },
+    {
+      "id": "seed-bowl",
+      "def": "bowl",
+      "on": "garden-table#r0c4",
+      "contents": {
+        "food": "seeds",
+        "fraction": 0.5
+      }
+    }
+  ],
+  "construction": {
+    "site": {
+      "origin": [
+        -12,
+        8
+      ],
+      "yaw": 0
+    },
+    "blueprint": "lookout-bay: two 8 ft uprights 9 ft apart, beams at 0.5 m and 1.8 m on both columns, five 6 ft joists and two 4x6 sheets as a deck at ~2 m, a 10-tread stair on the east side",
+    "components": [
+      {
+        "id": "upright-a",
+        "def": "upright-8ft",
+        "phase": "stored",
+        "region": "rack-pile"
+      },
+      {
+        "id": "upright-b",
+        "def": "upright-8ft",
+        "phase": "stored",
+        "region": "rack-pile"
+      },
+      {
+        "id": "beam-1",
+        "def": "beam-9ft",
+        "phase": "stored",
+        "region": "rack-pile"
+      },
+      {
+        "id": "beam-2",
+        "def": "beam-9ft",
+        "phase": "stored",
+        "region": "rack-pile"
+      },
+      {
+        "id": "beam-3",
+        "def": "beam-9ft",
+        "phase": "stored",
+        "region": "rack-pile"
+      },
+      {
+        "id": "beam-4",
+        "def": "beam-9ft",
+        "phase": "stored",
+        "region": "rack-pile"
+      },
+      {
+        "id": "joist-1",
+        "def": "2x4-6ft",
+        "phase": "stored",
+        "region": "timber-pile"
+      },
+      {
+        "id": "joist-2",
+        "def": "2x4-6ft",
+        "phase": "stored",
+        "region": "timber-pile"
+      },
+      {
+        "id": "joist-3",
+        "def": "2x4-6ft",
+        "phase": "stored",
+        "region": "timber-pile"
+      },
+      {
+        "id": "joist-4",
+        "def": "2x4-6ft",
+        "phase": "stored",
+        "region": "timber-pile"
+      },
+      {
+        "id": "joist-5",
+        "def": "2x4-6ft",
+        "phase": "stored",
+        "region": "timber-pile"
+      },
+      {
+        "id": "sheet-1",
+        "def": "plywood-4x6",
+        "phase": "stored",
+        "region": "plywood-pile"
+      },
+      {
+        "id": "sheet-2",
+        "def": "plywood-4x6",
+        "phase": "stored",
+        "region": "plywood-pile"
+      },
+      {
+        "id": "lookout-stair",
+        "def": "stair-flight-10",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-1",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-2",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-3",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-4",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-5",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-6",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-7",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-8",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-9",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      },
+      {
+        "id": "tread-10",
+        "def": "stair-tread",
+        "phase": "staged",
+        "region": "build-site"
+      }
+    ],
+    "targets": {
+      "upright-a": "standing at the site origin, installed",
+      "upright-b": "standing 2.743 m along +z, installed",
+      "beam-1": "installed, column r, seat 0.5 m",
+      "beam-2": "installed, column l, seat 0.5 m",
+      "beam-3": "installed, column r, seat 1.8 m",
+      "beam-4": "installed, column l, seat 1.8 m",
+      "joist-1": "installed on the 1.8 m beams, 0.2 m along the bay",
+      "joist-2": "installed on the 1.8 m beams, 0.8 m along the bay",
+      "joist-3": "installed on the 1.8 m beams, 1.37 m along the bay",
+      "joist-4": "installed on the 1.8 m beams, 1.95 m along the bay",
+      "joist-5": "installed on the 1.8 m beams, 2.55 m along the bay",
+      "sheet-1": "installed deck sheet centred 0.760 m along the bay",
+      "sheet-2": "installed deck sheet centred 1.979 m along the bay",
+      "lookout-stair": "installed, foot east of the bay, ascending west",
+      "tread-1": "installed as tread 1",
+      "tread-2": "installed as tread 2",
+      "tread-3": "installed as tread 3",
+      "tread-4": "installed as tread 4",
+      "tread-5": "installed as tread 5",
+      "tread-6": "installed as tread 6",
+      "tread-7": "installed as tread 7",
+      "tread-8": "installed as tread 8",
+      "tread-9": "installed as tread 9",
+      "tread-10": "installed as tread 10"
+    }
+  },
+  "activities": [
+    {
+      "id": "camp.walk-to-fire",
+      "label": "Walk over to the fire",
+      "verb": "walk_to",
+      "region": "fire-circle",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "x": 3.5,
+        "z": 4
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "move",
+        "outdoors"
+      ]
+    },
+    {
+      "id": "camp.walk-to-kitchen",
+      "label": "Go into the kitchen",
+      "verb": "walk_to",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "x": -14,
+        "z": -11.2
+      },
+      "needs": {},
+      "tags": [
+        "move",
+        "indoors"
+      ]
+    },
+    {
+      "id": "camp.wander-yard",
+      "label": "Stroll around the yard",
+      "verb": "ambient_wander",
+      "region": "yard",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actors": [
+          "$actor"
+        ],
+        "region": "yard",
+        "duration": 120
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "move",
+        "outdoors",
+        "alone"
+      ]
+    },
+    {
+      "id": "camp.talk-yard",
+      "label": "Talk in the yard",
+      "verb": "converse",
+      "region": "yard",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "actors": [
+          "$actor",
+          "$partner"
+        ],
+        "at": [
+          4,
+          12
+        ],
+        "duration": 90
+      },
+      "needs": {
+        "company": 1
+      },
+      "tags": [
+        "talk",
+        "outdoors"
+      ]
+    },
+    {
+      "id": "camp.warmup",
+      "label": "Lead a standing warm-up in the yard",
+      "verb": "group_warmup",
+      "region": "yard",
+      "roles": [
+        "instructor",
+        "f1",
+        "f2",
+        "f3"
+      ],
+      "params": {
+        "instructor": {
+          "actor": "$instructor",
+          "at": [
+            3,
+            12
+          ],
+          "face": 3.141592653589793
+        },
+        "followers": [
+          {
+            "actor": "$f1",
+            "at": [
+              -1,
+              10.5
+            ],
+            "face": 0.358771,
+            "joinAfter": 0,
+            "lag": 0.2
+          },
+          {
+            "actor": "$f2",
+            "at": [
+              -1,
+              12
+            ],
+            "face": 0,
+            "joinAfter": 1.2,
+            "lag": 0.4
+          },
+          {
+            "actor": "$f3",
+            "at": [
+              -1,
+              13.5
+            ],
+            "face": -0.358771,
+            "joinAfter": 2.4,
+            "lag": 0.6000000000000001
+          }
+        ],
+        "phaseDuration": 2,
+        "cycles": 3
+      },
+      "needs": {
+        "energy": 1,
+        "company": 1
+      },
+      "tags": [
+        "exercise",
+        "outdoors",
+        "group",
+        "morning"
+      ]
+    },
+    {
+      "id": "fire.circle",
+      "label": "Gather around the fire",
+      "verb": "campfire_circle",
+      "region": "fire-circle",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "actors": [
+          "$actor",
+          "$partner"
+        ],
+        "fire": "campfire"
+      },
+      "needs": {
+        "company": 1
+      },
+      "tags": [
+        "fire",
+        "outdoors",
+        "group",
+        "evening"
+      ]
+    },
+    {
+      "id": "fire.sit-bench",
+      "label": "Sit on a fire bench",
+      "verb": "sit",
+      "region": "fire-circle",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "fixture": "fire-bench-south"
+      },
+      "needs": {
+        "energy": 1
+      },
+      "tags": [
+        "rest",
+        "fire",
+        "outdoors"
+      ]
+    },
+    {
+      "id": "kitchen.prepare-supper",
+      "label": "Prepare the supper pot from beans and greens",
+      "verb": "prepare_food",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "spoon": "prep-spoon",
+        "pot": "supper-pot",
+        "ingredients": [
+          "beans-bowl",
+          "greens-bowl"
+        ]
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "cook",
+        "indoors",
+        "evening"
+      ],
+      "effect": "beans-bowl and greens-bowl emptied into supper-pot (finite, once)"
+    },
+    {
+      "id": "kitchen.return-prep-spoon",
+      "label": "Put the cooking spoon back on the counter",
+      "verb": "put_item",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "item": "prep-spoon",
+        "surfaceSlot": "prep-table#r1c0"
+      },
+      "needs": {},
+      "tags": [
+        "tidy",
+        "cook",
+        "indoors"
+      ],
+      "requires": "actor holds prep-spoon (prepare_food keeps it in hand)",
+      "after": [
+        "kitchen.prepare-supper"
+      ]
+    },
+    {
+      "id": "kitchen.shared-meal",
+      "label": "Share a meal of stew at the dining table",
+      "verb": "shared_food_break",
+      "region": "kitchen",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "pot": "stew-pot",
+        "participants": [
+          {
+            "actor": "$actor",
+            "bowl": "bowl-2",
+            "spoon": "spoon-2",
+            "service": [
+              -12.05,
+              -13.35
+            ],
+            "returns": [
+              {
+                "item": "bowl-2",
+                "surfaceSlot": "dining-table#r0c4"
+              },
+              {
+                "item": "spoon-2",
+                "surfaceSlot": "dining-table#r0c5"
+              }
+            ]
+          },
+          {
+            "actor": "$partner",
+            "bowl": "bowl-1",
+            "spoon": "spoon-1",
+            "service": [
+              -12.95,
+              -13.35
+            ],
+            "returns": [
+              {
+                "item": "bowl-1",
+                "surfaceSlot": "dining-table#r0c0"
+              },
+              {
+                "item": "spoon-1",
+                "surfaceSlot": "dining-table#r0c1"
+              }
+            ]
+          }
+        ],
+        "at": [
+          -12.5,
+          -15.2
+        ]
+      },
+      "needs": {
+        "hunger": 1,
+        "company": 1
+      },
+      "tags": [
+        "eat",
+        "indoors",
+        "group",
+        "evening"
+      ],
+      "effect": "stew-pot drawn down by two servings of 0.25 (finite); utensils back in their own places"
+    },
+    {
+      "id": "kitchen.take-bowl",
+      "label": "Pick up a bowl",
+      "verb": "take_item",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "item": "bowl-3",
+        "hand": "left"
+      },
+      "needs": {},
+      "tags": [
+        "eat",
+        "indoors"
+      ]
+    },
+    {
+      "id": "kitchen.stand-at-pot",
+      "label": "Step up to the stew pot",
+      "verb": "walk_to",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "x": -12.5,
+        "z": -13.4,
+        "face": 1.5707963267948966
+      },
+      "needs": {},
+      "tags": [
+        "eat",
+        "indoors",
+        "move"
+      ]
+    },
+    {
+      "id": "kitchen.serve",
+      "label": "Serve stew into the held bowl",
+      "verb": "serve",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "pot": "stew-pot",
+        "bowl": "bowl-3"
+      },
+      "needs": {},
+      "tags": [
+        "eat",
+        "indoors"
+      ],
+      "requires": "actor holds an empty bowl-3 and stands within 1.1 m of stew-pot",
+      "after": [
+        "kitchen.take-bowl",
+        "kitchen.stand-at-pot"
+      ]
+    },
+    {
+      "id": "kitchen.take-spoon",
+      "label": "Pick up a spoon",
+      "verb": "take_item",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "item": "spoon-3",
+        "hand": "right"
+      },
+      "needs": {},
+      "tags": [
+        "eat",
+        "indoors"
+      ],
+      "requires": "right hand free",
+      "after": [
+        "kitchen.serve"
+      ]
+    },
+    {
+      "id": "kitchen.sit-bench",
+      "label": "Sit at the dining bench",
+      "verb": "sit",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "fixture": "dining-bench"
+      },
+      "needs": {
+        "energy": 1
+      },
+      "tags": [
+        "rest",
+        "indoors"
+      ]
+    },
+    {
+      "id": "kitchen.eat",
+      "label": "Eat the served stew",
+      "verb": "eat",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "bowl": "bowl-3",
+        "spoon": "spoon-3",
+        "cycles": 6
+      },
+      "needs": {
+        "hunger": 1
+      },
+      "tags": [
+        "eat",
+        "indoors"
+      ],
+      "requires": "actor holds a served bowl-3 and spoon-3",
+      "after": [
+        "kitchen.take-spoon"
+      ]
+    },
+    {
+      "id": "kitchen.return-bowl",
+      "label": "Put the bowl back on the table",
+      "verb": "put_item",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "item": "bowl-3",
+        "surfaceSlot": "dining-table#r2c0"
+      },
+      "needs": {},
+      "tags": [
+        "tidy",
+        "indoors"
+      ],
+      "requires": "actor holds bowl-3",
+      "after": [
+        "kitchen.eat"
+      ]
+    },
+    {
+      "id": "kitchen.return-spoon",
+      "label": "Put the spoon back on the table",
+      "verb": "put_item",
+      "region": "kitchen",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "item": "spoon-3",
+        "surfaceSlot": "dining-table#r2c1"
+      },
+      "needs": {},
+      "tags": [
+        "tidy",
+        "indoors"
+      ],
+      "requires": "actor holds spoon-3",
+      "after": [
+        "kitchen.eat"
+      ]
+    },
+    {
+      "id": "living.computer-work",
+      "label": "Work at computer 1",
+      "verb": "work_at",
+      "region": "living-room",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "station": "computer-1",
+        "seat": "computer-1-chair#seat",
+        "task": "Project notes",
+        "duration": 240
+      },
+      "needs": {
+        "restlessness": -1
+      },
+      "tags": [
+        "work",
+        "computer",
+        "indoors",
+        "alone"
+      ],
+      "effect": "task progress on computer-1 retained for the same person and task"
+    },
+    {
+      "id": "living.computer-music",
+      "label": "Make music at computer 2",
+      "verb": "computer_music",
+      "region": "living-room",
+      "roles": [
+        "actor",
+        "listener"
+      ],
+      "params": {
+        "performer": "$actor",
+        "station": "computer-2",
+        "seat": "computer-2-chair#seat",
+        "listeners": [
+          {
+            "actor": "$listener",
+            "seat": "listening-chair#seat"
+          }
+        ],
+        "score": "gentle",
+        "period": 0.5,
+        "duration": 120
+      },
+      "needs": {
+        "company": 1,
+        "restlessness": 1
+      },
+      "tags": [
+        "music",
+        "computer",
+        "indoors"
+      ]
+    },
+    {
+      "id": "living.read",
+      "label": "Read the camp book",
+      "verb": "read_book",
+      "region": "living-room",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "book": "camp-book",
+        "seat": "reading-chair#seat",
+        "task": "Quiet reading",
+        "duration": 240
+      },
+      "needs": {
+        "energy": 1,
+        "restlessness": -1
+      },
+      "tags": [
+        "read",
+        "indoors",
+        "alone",
+        "quiet"
+      ],
+      "effect": "bookmark retained for the same reader and task"
+    },
+    {
+      "id": "living.chess-opening",
+      "label": "Play the opening move at the chess table",
+      "verb": "chess_move",
+      "region": "living-room",
+      "roles": [
+        "white"
+      ],
+      "params": {
+        "actor": "$white",
+        "board": "chess-board",
+        "from": "e2",
+        "to": "e4",
+        "tray": "chess-tray"
+      },
+      "needs": {
+        "company": 1
+      },
+      "tags": [
+        "game",
+        "chess",
+        "indoors"
+      ],
+      "requires": "players bound with bindCampChess(world, white, black); it is white's turn",
+      "effect": "board position advances one ply"
+    },
+    {
+      "id": "living.draw",
+      "label": "Draw a shelter study",
+      "verb": "drawing_work",
+      "region": "living-room",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "pad": "sketch-pad",
+        "pencil": "sketch-pencil",
+        "returnSlot": "drawing-table#r0c3",
+        "task": "Shelter study"
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "draw",
+        "art",
+        "indoors",
+        "alone"
+      ],
+      "effect": "marks committed to sketch-pad"
+    },
+    {
+      "id": "living.sit-sofa",
+      "label": "Sit on the living-room bench",
+      "verb": "sit",
+      "region": "living-room",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "fixture": "living-bench"
+      },
+      "needs": {
+        "energy": 1
+      },
+      "tags": [
+        "rest",
+        "indoors"
+      ]
+    },
+    {
+      "id": "living.talk",
+      "label": "Talk in the living room",
+      "verb": "converse",
+      "region": "living-room",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "actors": [
+          "$actor",
+          "$partner"
+        ],
+        "at": [
+          2,
+          -11.399999999999999
+        ],
+        "duration": 90
+      },
+      "needs": {
+        "company": 1
+      },
+      "tags": [
+        "talk",
+        "indoors"
+      ]
+    },
+    {
+      "id": "class.session",
+      "label": "Give a class in the classroom corner",
+      "verb": "classroom_session",
+      "region": "classroom-corner",
+      "roles": [
+        "host",
+        "presenter",
+        "a1",
+        "a2"
+      ],
+      "params": {
+        "host": "$host",
+        "presenters": [
+          "$presenter"
+        ],
+        "audience": [
+          "$a1",
+          "$a2"
+        ],
+        "seats": [
+          "class-seat-1#seat",
+          "class-seat-2#seat",
+          "class-seat-3#seat",
+          "class-seat-4#seat",
+          "class-seat-5#seat",
+          "class-seat-6#seat"
+        ],
+        "presenterStation": "class-lectern#presenter",
+        "displayId": "class-display",
+        "requireDisplay": true,
+        "departure": {
+          "$host": [
+            -4.5,
+            -9.4
+          ],
+          "$presenter": [
+            -3,
+            -9.4
+          ],
+          "$a1": [
+            -1.5,
+            -9.4
+          ],
+          "$a2": [
+            0,
+            -9.4
+          ]
+        },
+        "conversationPoints": [
+          [
+            -3,
+            -9.6
+          ]
+        ],
+        "arrivalStaggerSeconds": 0.45,
+        "talkSeconds": 60,
+        "questionSeconds": 15,
+        "conversationSeconds": 30,
+        "maxPhaseSeconds": 180
+      },
+      "needs": {
+        "company": 1,
+        "restlessness": -1
+      },
+      "tags": [
+        "teach",
+        "learn",
+        "indoors",
+        "group"
+      ]
+    },
+    {
+      "id": "class.display",
+      "label": "Put a title on the classroom display",
+      "verb": "display_control",
+      "region": "classroom-corner",
+      "roles": [],
+      "params": {
+        "display": "class-display",
+        "mode": "on",
+        "content": "Tonight: how the lookout bay stands up"
+      },
+      "needs": {},
+      "tags": [
+        "teach",
+        "indoors"
+      ],
+      "effect": "display text and mode"
+    },
+    {
+      "id": "bunk.sleep-mat-1",
+      "label": "Sleep on mat-1",
+      "verb": "sleep",
+      "region": "bunkhouse",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "mat": "mat-1",
+        "duration": 600,
+        "returnTo": [
+          15.9,
+          -10
+        ]
+      },
+      "needs": {
+        "energy": 1
+      },
+      "tags": [
+        "sleep",
+        "indoors",
+        "night"
+      ]
+    },
+    {
+      "id": "bunk.sleep-mat-2",
+      "label": "Sleep on mat-2",
+      "verb": "sleep",
+      "region": "bunkhouse",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "mat": "mat-2",
+        "duration": 600,
+        "returnTo": [
+          17.1,
+          -10
+        ]
+      },
+      "needs": {
+        "energy": 1
+      },
+      "tags": [
+        "sleep",
+        "indoors",
+        "night"
+      ]
+    },
+    {
+      "id": "bunk.sleep-mat-3",
+      "label": "Sleep on mat-3",
+      "verb": "sleep",
+      "region": "bunkhouse",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "mat": "mat-3",
+        "duration": 600,
+        "returnTo": [
+          15.9,
+          -10
+        ]
+      },
+      "needs": {
+        "energy": 1
+      },
+      "tags": [
+        "sleep",
+        "indoors",
+        "night"
+      ]
+    },
+    {
+      "id": "bunk.sleep-mat-4",
+      "label": "Sleep on mat-4",
+      "verb": "sleep",
+      "region": "bunkhouse",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "mat": "mat-4",
+        "duration": 600,
+        "returnTo": [
+          17.1,
+          -10
+        ]
+      },
+      "needs": {
+        "energy": 1
+      },
+      "tags": [
+        "sleep",
+        "indoors",
+        "night"
+      ]
+    },
+    {
+      "id": "garden.water-1",
+      "label": "Water planter 1",
+      "verb": "garden_care",
+      "region": "garden",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "plant": "planter-1",
+        "water": "water-bowl",
+        "returnSlot": "garden-table#r0c1"
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "garden",
+        "outdoors",
+        "alone",
+        "morning"
+      ],
+      "effect": "planter-1 care cycle; water-bowl drawn down 0.25 (finite)"
+    },
+    {
+      "id": "garden.water-2",
+      "label": "Water planter 2",
+      "verb": "garden_care",
+      "region": "garden",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "plant": "planter-2",
+        "water": "water-bowl",
+        "returnSlot": "garden-table#r0c1"
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "garden",
+        "outdoors",
+        "alone"
+      ],
+      "effect": "planter-2 care cycle; water-bowl drawn down 0.25 (finite)"
+    },
+    {
+      "id": "garden.plant-3",
+      "label": "Sow seeds in planter 3",
+      "verb": "seed_planting",
+      "region": "garden",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "plant": "planter-3",
+        "seeds": "seed-bowl",
+        "returnSlot": "garden-table#r0c4"
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "garden",
+        "outdoors",
+        "alone"
+      ],
+      "effect": "planter-3 sown; seed-bowl drawn down (finite)"
+    },
+    {
+      "id": "garden.plant-4",
+      "label": "Sow seeds in planter 4",
+      "verb": "seed_planting",
+      "region": "garden",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "plant": "planter-4",
+        "seeds": "seed-bowl",
+        "returnSlot": "garden-table#r0c4"
+      },
+      "needs": {
+        "restlessness": 1
+      },
+      "tags": [
+        "garden",
+        "outdoors",
+        "alone"
+      ],
+      "effect": "planter-4 sown; seed-bowl drawn down (finite)"
+    },
+    {
+      "id": "build.carry-upright-a",
+      "label": "Carry upright A from the rack pile to its raise position",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "upright-a",
+        "to": {
+          "x": -12,
+          "z": 6.7808,
+          "yaw": -1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "effect": "upright-a lies at the build site"
+    },
+    {
+      "id": "build.carry-upright-b",
+      "label": "Carry upright B from the rack pile to its raise position",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "upright-b",
+        "to": {
+          "x": -12,
+          "z": 11.9624,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "effect": "upright-b lies at the build site",
+      "requires": "beams staged beside the bay first (B lies across their carry path)",
+      "after": [
+        "build.carry-beam-1",
+        "build.carry-beam-2",
+        "build.carry-beam-3",
+        "build.carry-beam-4"
+      ]
+    },
+    {
+      "id": "build.carry-beam-1",
+      "label": "Carry beam-1 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "beam-1",
+        "to": {
+          "x": -12.8096,
+          "z": 9.3716,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "effect": "beam-1 staged beside the bay"
+    },
+    {
+      "id": "build.carry-beam-2",
+      "label": "Carry beam-2 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "beam-2",
+        "to": {
+          "x": -11.1904,
+          "z": 9.3716,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "effect": "beam-2 staged beside the bay"
+    },
+    {
+      "id": "build.carry-beam-3",
+      "label": "Carry beam-3 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "beam-3",
+        "to": {
+          "x": -13.2096,
+          "z": 9.3716,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "effect": "beam-3 staged beside the bay"
+    },
+    {
+      "id": "build.carry-beam-4",
+      "label": "Carry beam-4 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "beam-4",
+        "to": {
+          "x": -10.7904,
+          "z": 9.3716,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "effect": "beam-4 staged beside the bay"
+    },
+    {
+      "id": "build.raise-upright-a",
+      "label": "Raise and hold upright A",
+      "verb": "raise_upright",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "upright-a",
+        "stand_at": {
+          "x": -12,
+          "z": 8
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "upright-a lying at its raise position, beams staged",
+      "after": [
+        "build.carry-upright-a",
+        "build.carry-beam-1",
+        "build.carry-beam-2",
+        "build.carry-beam-3",
+        "build.carry-beam-4"
+      ],
+      "effect": "upright-a standing, held by the actor until released"
+    },
+    {
+      "id": "build.raise-upright-b",
+      "label": "Raise and hold upright B",
+      "verb": "raise_upright",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "upright-b",
+        "stand_at": {
+          "x": -12,
+          "z": 10.7432
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "upright-b lying at its raise position",
+      "after": [
+        "build.carry-upright-b"
+      ],
+      "effect": "upright-b standing, held by the actor until released"
+    },
+    {
+      "id": "build.seat-beam-1",
+      "label": "Seat beam-1 at 0.5 m",
+      "verb": "connect_beam",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "beam": "beam-1",
+        "a": "upright-a",
+        "b": "upright-b",
+        "column": "r",
+        "height": 0.5
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "both uprights standing and held (or stable); beam staged",
+      "after": [
+        "build.raise-upright-a",
+        "build.raise-upright-b"
+      ],
+      "effect": "beam-1 installed"
+    },
+    {
+      "id": "build.seat-beam-2",
+      "label": "Seat beam-2 at 0.5 m",
+      "verb": "connect_beam",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "beam": "beam-2",
+        "a": "upright-a",
+        "b": "upright-b",
+        "column": "l",
+        "height": 0.5
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "both uprights standing and held (or stable); beam staged",
+      "after": [
+        "build.raise-upright-a",
+        "build.raise-upright-b",
+        "build.seat-beam-1"
+      ],
+      "effect": "beam-2 installed"
+    },
+    {
+      "id": "build.seat-beam-3",
+      "label": "Seat beam-3 at 1.8 m",
+      "verb": "connect_beam",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "beam": "beam-3",
+        "a": "upright-a",
+        "b": "upright-b",
+        "column": "r",
+        "height": 1.8
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "both uprights standing and held (or stable); beam staged",
+      "after": [
+        "build.raise-upright-a",
+        "build.raise-upright-b",
+        "build.seat-beam-1",
+        "build.seat-beam-2"
+      ],
+      "effect": "beam-3 installed"
+    },
+    {
+      "id": "build.seat-beam-4",
+      "label": "Seat beam-4 at 1.8 m",
+      "verb": "connect_beam",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "beam": "beam-4",
+        "a": "upright-a",
+        "b": "upright-b",
+        "column": "l",
+        "height": 1.8
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "both uprights standing and held (or stable); beam staged",
+      "after": [
+        "build.raise-upright-a",
+        "build.raise-upright-b",
+        "build.seat-beam-1",
+        "build.seat-beam-2",
+        "build.seat-beam-3"
+      ],
+      "effect": "beam-4 installed"
+    },
+    {
+      "id": "build.release-upright-a",
+      "label": "Let go of upright A",
+      "verb": "release_support",
+      "roles": [],
+      "params": {
+        "item": "upright-a"
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "all four beams seated (stability rule)",
+      "after": [
+        "build.seat-beam-1",
+        "build.seat-beam-2",
+        "build.seat-beam-3",
+        "build.seat-beam-4"
+      ],
+      "effect": "upright-a installed and self-supporting"
+    },
+    {
+      "id": "build.release-upright-b",
+      "label": "Let go of upright B",
+      "verb": "release_support",
+      "roles": [],
+      "params": {
+        "item": "upright-b"
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "all four beams seated (stability rule)",
+      "after": [
+        "build.seat-beam-1",
+        "build.seat-beam-2",
+        "build.seat-beam-3",
+        "build.seat-beam-4"
+      ],
+      "effect": "upright-b installed and self-supporting"
+    },
+    {
+      "id": "build.carry-joist-1",
+      "label": "Carry joist-1 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "joist-1",
+        "to": {
+          "x": -13.6,
+          "z": 9.37,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "frame released",
+      "after": [
+        "build.release-upright-a",
+        "build.release-upright-b"
+      ],
+      "effect": "joist-1 staged beside the bay"
+    },
+    {
+      "id": "build.carry-joist-2",
+      "label": "Carry joist-2 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "joist-2",
+        "to": {
+          "x": -13.72,
+          "z": 9.37,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "frame released",
+      "after": [
+        "build.release-upright-a",
+        "build.release-upright-b",
+        "build.carry-joist-1"
+      ],
+      "effect": "joist-2 staged beside the bay"
+    },
+    {
+      "id": "build.carry-joist-3",
+      "label": "Carry joist-3 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "joist-3",
+        "to": {
+          "x": -13.84,
+          "z": 9.37,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "frame released",
+      "after": [
+        "build.release-upright-a",
+        "build.release-upright-b",
+        "build.carry-joist-1",
+        "build.carry-joist-2"
+      ],
+      "effect": "joist-3 staged beside the bay"
+    },
+    {
+      "id": "build.carry-joist-4",
+      "label": "Carry joist-4 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "joist-4",
+        "to": {
+          "x": -13.96,
+          "z": 9.37,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "frame released",
+      "after": [
+        "build.release-upright-a",
+        "build.release-upright-b",
+        "build.carry-joist-1",
+        "build.carry-joist-2",
+        "build.carry-joist-3"
+      ],
+      "effect": "joist-4 staged beside the bay"
+    },
+    {
+      "id": "build.carry-joist-5",
+      "label": "Carry joist-5 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "item": "joist-5",
+        "to": {
+          "x": -14.08,
+          "z": 9.37,
+          "yaw": 1.570796
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "frame released",
+      "after": [
+        "build.release-upright-a",
+        "build.release-upright-b",
+        "build.carry-joist-1",
+        "build.carry-joist-2",
+        "build.carry-joist-3",
+        "build.carry-joist-4"
+      ],
+      "effect": "joist-5 staged beside the bay"
+    },
+    {
+      "id": "build.fix-joist-1",
+      "label": "Set joist-1 across the upper beams",
+      "verb": "install_joist",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "joist": "joist-1",
+        "bay": {
+          "a": "upright-a",
+          "b": "upright-b"
+        },
+        "height": 1.8,
+        "at": 0.2
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "joist staged; upper beams installed",
+      "after": [
+        "build.carry-joist-1",
+        "build.carry-joist-2",
+        "build.carry-joist-3",
+        "build.carry-joist-4",
+        "build.carry-joist-5",
+        "build.carry-sheet-1"
+      ],
+      "effect": "joist-1 installed"
+    },
+    {
+      "id": "build.fix-joist-2",
+      "label": "Set joist-2 across the upper beams",
+      "verb": "install_joist",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "joist": "joist-2",
+        "bay": {
+          "a": "upright-a",
+          "b": "upright-b"
+        },
+        "height": 1.8,
+        "at": 0.8
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "joist staged; upper beams installed",
+      "after": [
+        "build.carry-joist-1",
+        "build.carry-joist-2",
+        "build.carry-joist-3",
+        "build.carry-joist-4",
+        "build.carry-joist-5",
+        "build.carry-sheet-1",
+        "build.fix-joist-1"
+      ],
+      "effect": "joist-2 installed"
+    },
+    {
+      "id": "build.fix-joist-3",
+      "label": "Set joist-3 across the upper beams",
+      "verb": "install_joist",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "joist": "joist-3",
+        "bay": {
+          "a": "upright-a",
+          "b": "upright-b"
+        },
+        "height": 1.8,
+        "at": 1.37
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "joist staged; upper beams installed",
+      "after": [
+        "build.carry-joist-1",
+        "build.carry-joist-2",
+        "build.carry-joist-3",
+        "build.carry-joist-4",
+        "build.carry-joist-5",
+        "build.carry-sheet-1",
+        "build.fix-joist-1",
+        "build.fix-joist-2"
+      ],
+      "effect": "joist-3 installed"
+    },
+    {
+      "id": "build.fix-joist-4",
+      "label": "Set joist-4 across the upper beams",
+      "verb": "install_joist",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "joist": "joist-4",
+        "bay": {
+          "a": "upright-a",
+          "b": "upright-b"
+        },
+        "height": 1.8,
+        "at": 1.95
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "joist staged; upper beams installed",
+      "after": [
+        "build.carry-joist-1",
+        "build.carry-joist-2",
+        "build.carry-joist-3",
+        "build.carry-joist-4",
+        "build.carry-joist-5",
+        "build.carry-sheet-1",
+        "build.fix-joist-1",
+        "build.fix-joist-2",
+        "build.fix-joist-3"
+      ],
+      "effect": "joist-4 installed"
+    },
+    {
+      "id": "build.fix-joist-5",
+      "label": "Set joist-5 across the upper beams",
+      "verb": "install_joist",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "joist": "joist-5",
+        "bay": {
+          "a": "upright-a",
+          "b": "upright-b"
+        },
+        "height": 1.8,
+        "at": 2.55
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "joist staged; upper beams installed",
+      "after": [
+        "build.carry-joist-1",
+        "build.carry-joist-2",
+        "build.carry-joist-3",
+        "build.carry-joist-4",
+        "build.carry-joist-5",
+        "build.carry-sheet-1",
+        "build.fix-joist-1",
+        "build.fix-joist-2",
+        "build.fix-joist-3",
+        "build.fix-joist-4"
+      ],
+      "effect": "joist-5 installed"
+    },
+    {
+      "id": "build.carry-sheet-1",
+      "label": "Carry sheet-1 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "item": "sheet-1",
+        "to": {
+          "x": -9.4,
+          "z": 8.7596,
+          "yaw": 0
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "frame released",
+      "after": [
+        "build.release-upright-a",
+        "build.release-upright-b"
+      ],
+      "effect": "sheet-1 staged beside the bay"
+    },
+    {
+      "id": "build.carry-sheet-2",
+      "label": "Carry sheet-2 to the bay",
+      "verb": "carry",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "item": "sheet-2",
+        "to": {
+          "x": -14.6,
+          "z": 10,
+          "yaw": 0
+        }
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "joists installed (the sheet is staged where the joists lay)",
+      "after": [
+        "build.fix-joist-1",
+        "build.fix-joist-2",
+        "build.fix-joist-3",
+        "build.fix-joist-4",
+        "build.fix-joist-5"
+      ],
+      "effect": "sheet-2 staged beside the bay"
+    },
+    {
+      "id": "build.deck-sheet-1",
+      "label": "Lay sheet-1 on the joists",
+      "verb": "install_plywood",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "sheet": "sheet-1",
+        "x": -12,
+        "z": 8.7596,
+        "yaw": 0
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "sheet staged; joists installed",
+      "after": [
+        "build.carry-sheet-1",
+        "build.carry-sheet-2"
+      ],
+      "effect": "sheet-1 installed as deck"
+    },
+    {
+      "id": "build.deck-sheet-2",
+      "label": "Lay sheet-2 on the joists",
+      "verb": "install_plywood",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "sheet": "sheet-2",
+        "x": -12,
+        "z": 9.9788,
+        "yaw": 0
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "sheet staged; joists installed",
+      "after": [
+        "build.carry-sheet-1",
+        "build.carry-sheet-2",
+        "build.deck-sheet-1"
+      ],
+      "effect": "sheet-2 installed as deck"
+    },
+    {
+      "id": "build.set-stair",
+      "label": "Set the stair flight against the deck",
+      "verb": "install_stair_flight",
+      "roles": [
+        "actor",
+        "partner"
+      ],
+      "params": {
+        "crew": [
+          "$actor",
+          "$partner"
+        ],
+        "stair": "lookout-stair",
+        "x": -8.56,
+        "z": 8.75,
+        "heading": 3.141593
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "deck laid; nobody standing on the stair footprint",
+      "after": [
+        "build.deck-sheet-1",
+        "build.deck-sheet-2"
+      ],
+      "effect": "stair flight installed (treads still missing)"
+    },
+    {
+      "id": "build.tread-1",
+      "label": "Fit stair tread 1",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-1",
+        "index": 1
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "stair flight installed",
+      "after": [
+        "build.set-stair"
+      ],
+      "effect": "tread-1 installed"
+    },
+    {
+      "id": "build.tread-2",
+      "label": "Fit stair tread 2",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-2",
+        "index": 2
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 1 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1"
+      ],
+      "effect": "tread-2 installed"
+    },
+    {
+      "id": "build.tread-3",
+      "label": "Fit stair tread 3",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-3",
+        "index": 3
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 2 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2"
+      ],
+      "effect": "tread-3 installed"
+    },
+    {
+      "id": "build.tread-4",
+      "label": "Fit stair tread 4",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-4",
+        "index": 4
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 3 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3"
+      ],
+      "effect": "tread-4 installed"
+    },
+    {
+      "id": "build.tread-5",
+      "label": "Fit stair tread 5",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-5",
+        "index": 5
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 4 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3",
+        "build.tread-4"
+      ],
+      "effect": "tread-5 installed"
+    },
+    {
+      "id": "build.tread-6",
+      "label": "Fit stair tread 6",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-6",
+        "index": 6
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 5 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3",
+        "build.tread-4",
+        "build.tread-5"
+      ],
+      "effect": "tread-6 installed"
+    },
+    {
+      "id": "build.tread-7",
+      "label": "Fit stair tread 7",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-7",
+        "index": 7
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 6 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3",
+        "build.tread-4",
+        "build.tread-5",
+        "build.tread-6"
+      ],
+      "effect": "tread-7 installed"
+    },
+    {
+      "id": "build.tread-8",
+      "label": "Fit stair tread 8",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-8",
+        "index": 8
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 7 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3",
+        "build.tread-4",
+        "build.tread-5",
+        "build.tread-6",
+        "build.tread-7"
+      ],
+      "effect": "tread-8 installed"
+    },
+    {
+      "id": "build.tread-9",
+      "label": "Fit stair tread 9",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-9",
+        "index": 9
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 8 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3",
+        "build.tread-4",
+        "build.tread-5",
+        "build.tread-6",
+        "build.tread-7",
+        "build.tread-8"
+      ],
+      "effect": "tread-9 installed"
+    },
+    {
+      "id": "build.tread-10",
+      "label": "Fit stair tread 10",
+      "verb": "install_tread",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "crew": [
+          "$actor"
+        ],
+        "stair": "lookout-stair",
+        "tread": "tread-10",
+        "index": 10
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "physical"
+      ],
+      "needs": {
+        "restlessness": 1,
+        "energy": -1
+      },
+      "requires": "tread 9 fitted",
+      "after": [
+        "build.set-stair",
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3",
+        "build.tread-4",
+        "build.tread-5",
+        "build.tread-6",
+        "build.tread-7",
+        "build.tread-8",
+        "build.tread-9"
+      ],
+      "effect": "tread-10 installed"
+    },
+    {
+      "id": "build.climb-lookout",
+      "label": "Walk up onto the lookout deck",
+      "verb": "walk_to",
+      "roles": [
+        "actor"
+      ],
+      "params": {
+        "actor": "$actor",
+        "x": -12,
+        "z": 9.37,
+        "level": 4
+      },
+      "region": "build-site",
+      "tags": [
+        "build",
+        "outdoors",
+        "view"
+      ],
+      "needs": {
+        "restlessness": 1
+      },
+      "requires": "stair complete (all ten treads)",
+      "after": [
+        "build.tread-1",
+        "build.tread-2",
+        "build.tread-3",
+        "build.tread-4",
+        "build.tread-5",
+        "build.tread-6",
+        "build.tread-7",
+        "build.tread-8",
+        "build.tread-9",
+        "build.tread-10"
+      ]
+    }
+  ]
+}
