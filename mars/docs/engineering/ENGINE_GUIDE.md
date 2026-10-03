@@ -82,8 +82,10 @@ and honest source/proof status there. Generate only the UI contract text with
 `cd viewer && node deploy/scenario-contracts.mjs`; verify parity with
 `node deploy/scenario-contracts.mjs --check` and `engine/test/scenario-contracts.test.ts`.
 `app/lab/scenario-contracts.ts` is generated, not a second hand-maintained catalog.
-The inventory/gate acceptance is still alpha stabilization work; a catalog row or
-generated instruction is not proof that the preset completed on the current source.
+The clean combined gate passed at release41 functional source `00bd041`; final
+public alpha acceptance remains pending. See [current status](INDEX.md) and the
+inventory for exact-source scope; a catalog row/generated instruction is not proof
+that the preset completed on the current source.
 
 ### Existing example: prepare and use a room
 
@@ -210,21 +212,21 @@ effects. Compare deterministic boundary hashes with that receipt and verify decl
 effects separately; budget exhaustion is not journey completion. A later invariant
 or executor fault invalidates the receipt; Reset starts a new run.
 Recorded invariant violations produce `lab.invariant-halt`, retain diagnostics and
-halt further stepping until a fresh Reset. The alpha candidate's unexpected
+halt further stepping until a fresh Reset. The Lab's unexpected
 host/executor guard records `lab.executor-fault` with phase/tick/error details,
 clears any successful script receipt and quarantines the actual world, records and
 claims as uncertain partial execution. It does not cancel children, release claims
 or invent a rollback; those mutations cannot be certified safe after an unknown fault.
-The candidate panel disables execution/activity controls while halted, retaining
+The Lab panel disables execution/activity controls while halted, retaining
 Reset/scenario selection, inspection and camera controls. `hook.ts` applies
 `fenceLabControls` before invoking non-allowlisted methods, refusing with
 `lab.control-quarantined` without new world events/claims. New hook methods inherit
 that fence; add to `QUARANTINE_ALLOWED` only after proving the method returns detached
 observations or operates solely on presentation/a fresh world. Current-source
-combined UI certification remains pending. Synthetic renderer probes remain detached.
+final public certification remains pending. Synthetic renderer probes remain detached.
 These are bounded host safeguards, not recovery guarantees for arbitrary future
-inputs. The executor guard is an unreleased candidate change; source inspection
-and focused checks do not make it an online feature.
+inputs. These guards are included in deployed release41 source; their final public
+alpha acceptance remains pending. Source inspection alone is not execution proof.
 
 The legacy `Scenario.continuous` flag affects authored completion/budget for
 manually started finite presets; healthy world stepping continues independently
@@ -240,8 +242,8 @@ resume therefore retains an inspectable failed take while leaving the valid
 workspace head unchanged. An invalid private take is evidence, never a resumable
 checkpoint. Ordinary action failures retain their existing cleanup/onFail policies.
 Low-level Runtime stepping is an internal mechanism; hosts must enforce these
-boundaries. These guards have focused deterministic proof, but combined gate and
-actual Play certification remain pending on the alpha candidate.
+boundaries. These guards have focused deterministic proof and the release41 clean
+combined gate; [current status](INDEX.md) owns pending public acceptance and limits.
 
 
 ## Persistence and extension acceptance
@@ -274,5 +276,6 @@ all supported interactions for probes, or exact expected refusal plus surroundin
 usability for diagnostic demonstrations. Inspect captures of the physical effects.
 Record exact source, executed commands, original failures and limits in the inventory/
 evidence; deterministic Node checks, first-Step smoke, programmatic stepping and mixed
-completion remain distinct from actual Play. Required combined gates and current-source
-UI certification remain pending until the candidate is frozen, tested and accepted.
+completion remain distinct from actual Play. Each future extension still requires
+its clean combined gate and source-bound UI proof. Release41 passed its local gate;
+final public alpha acceptance is pending, as recorded in [current status](INDEX.md).

@@ -42,9 +42,12 @@ upload to resume. Do not clear the bucket during deployment.
 
 Routes include `/studio` and `/studio/2020`–`/studio/2027` (year models),
 `/photo` (photogrammetry comparison), `/lab` (playable engine), and `/simulation-guide`.
-Worker `/` preserves the museum presentation. On sim.mars.college only, `/`
-selects the existing Lab/connected living day; query scenario selection still works.
-This domain-specific entry is verified in release36, including full connected Play.
+Worker `/` and sim.mars.college `/` preserve the restored campus homepage.
+The engine entry is explicit `/lab`; select a preset at `/lab?scenario=<id>`.
+The earlier release36 root-to-Lab entry was superseded by release40 homepage repair.
+Release41 is deployed from `00bd041` after the clean nine-stage gate; final public
+alpha acceptance is pending. See [current engineering status](../../docs/engineering/INDEX.md)
+for executed proof/limits and the release checklist for final publication receipts.
 The existing gateway omits campus-model HEAD size metadata; exact fullGET/ranges
 and backend controls are verified. See the final handoff for this retained limitation.
 No mars.college/simulation page is provided. Browser layouts are downloaded JSON.

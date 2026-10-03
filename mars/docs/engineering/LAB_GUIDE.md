@@ -3,9 +3,10 @@
 Published checkpoint: [campus homepage](https://sim.mars.college/) at `/`,
 [Engine Lab](https://sim.mars.college/lab) at `/lab`. Exact current release/source,
 validation and rollback are authoritative in [deployment metadata](../../viewer/deploy/deployment.json)
-and the [latest release record](RELEASE_CHECKLIST.md). The alpha candidate is
-unreleased pending its combined gate/public verification; focused candidate proof
-is tracked in [scenario coverage](SCENARIO_COVERAGE.json), never inferred from smoke.
+and the [latest release record](RELEASE_CHECKLIST.md). Release41 is deployed from
+`00bd041` after a clean nine-stage gate; final public alpha acceptance is pending.
+[Current engineering status](INDEX.md) and [scenario coverage](SCENARIO_COVERAGE.json)
+keep source/proof distinctions explicit; no all63 full-Play claim follows from smoke.
 
 ## Published room preparation, supper and garden circuit
 
@@ -98,7 +99,7 @@ Choose a Scenario in `/lab`, or use its Quick tour. Play advances authoritative
 Speed changes playback rate, not timestep. Reset or loading another scenario
 replaces the current world, including all retained intentions and object states.
 Manually started activity presets require their own Start control. Scripted movement
-and construction presets start their sequence through Play. The alpha candidate
+and construction presets start their sequence through Play. The deployed alpha source
 separates authored terminal/refused/budget outcomes from the ongoing world clock;
 manual Pause still freezes intentionally. Its serious invariant/unknown-executor
 fault quarantine preserves inspection/camera and requires a fresh Reset; it does
@@ -151,8 +152,9 @@ Fine fingers/clothing and planted dance expression remain current-animation limi
 ## Camera and sound
 
 Live camera supports classroom, prepared/living days, garden care and music/dance.
-Release37's seven new presets still need the next candidate's allowlist/embedded-entry
-fix; do not interpret a fallback classroom review link as camera proof for them.
+Earlier release37 camera-entry gaps are dated provenance, superseded by later
+source-bound entry proof. Use [scenario coverage](SCENARIO_COVERAGE.json) for exact
+executed scope; entry proof alone does not certify natural camera quality.
 Choose Clear activity coverage or Restrained observation. It reads actual people,
 objects and phase facts; it never moves actors or owns their tasks. Follow activity
 person (Follow guest2 in classroom) takes operator precedence. Return camera to auto
@@ -205,7 +207,14 @@ Local: `cd viewer && npm run dev`, then `/lab`. Contributor rules:
 see `/simulation-agent-guide.md` and `viewer/deploy/README.md`. Never Git push/add a remote.
 
 
-## Shared reading candidate (not yet public)
+## Dated candidate authoring notes — superseded publication status
+
+The candidate/pending statements below describe their original checkpoints, not
+current release instructions. Published behavior is described above; current
+acceptance and exact-source proof belong to [INDEX](INDEX.md),
+[scenario coverage](SCENARIO_COVERAGE.json) and the [release record](RELEASE_CHECKLIST.md).
+
+### Shared reading candidate (original checkpoint)
 
 `reading-circle` and `reading-circle-rotated` use the same flat, supported book
 and reader. Start shared reading then Play: ordinary seated reading advances a
@@ -224,7 +233,7 @@ wired; focused engine/type checks pass. Actual Play, inspected captures, combine
 gate and publication remain required before a supported public claim.
 
 
-## Seed planting candidate (not yet public)
+### Seed planting candidate (original checkpoint)
 
 `seed-planting` and `seed-planting-rotated`: Start plant A, then Play. The same
 finite bowl travels to supported soil, deposits four conserved fractions and
@@ -243,7 +252,7 @@ renderer checks pass; two actual Play cases, inspected captures, combined gate a
 publication remain required.
 
 
-## Future connected garden candidate — not public
+### Connected garden candidate (original checkpoint)
 
 `garden-afternoon` and its90-degree rotated arrangement compose the same finite
 seed leaf, ordinary care and retained reading intentions. Start garden afternoon,
@@ -257,7 +266,7 @@ fresh combined Play/visual/gate/public proof remain mandatory, so this is a
 saved candidate, not an online release37 feature.
 
 
-## Guided gallery candidate (not yet public)
+### Guided gallery candidate (original checkpoint)
 
 `gallery-tour` and `gallery-tour-short`: Start gallery tour, then Play. The host
 and two viewers physically visit three or two supported, pre-marked hypothetical
@@ -270,7 +279,7 @@ places and generic drawings, no arbitrary gallery planning or generated dialogue
 Both actualPlay variations pass on cea39b5; inspected captures establish local
 continuity, not publication. Future combined fullgate/public verification required.
 
-## Room preparation candidate (not yet public)
+### Room preparation candidate (original checkpoint)
 
 `room-preparation`: Start room preparation, then Play. A worker carries the same
 bowl/spoon from the table into declared storage. Two guests then carry the empty
@@ -290,7 +299,7 @@ Focused Node and TypeScript checks pass; authored actual Play/camera-entry check
 and visual inspection remain pending. Saved controls are not a released experience.
 
 
-## Future communal supper (local candidate; not release37)
+### Communal supper candidate (original checkpoint)
 
 `communal-supper`: Start supper, then Play. Two anonymous people use the same pot,
 two ingredient bowls and their own bowls/spoons; cold preparation, conserved
@@ -307,7 +316,7 @@ Room preparation and supper together would add two presets after release38's60;
 these future capabilities must not be presented as already online.
 
 
-## Future finite garden circuit (local candidate; not yet public)
+### Finite garden circuit candidate (original checkpoint)
 
 `garden-circuit`: Start circuit, then Play. The same supported water pot fills the
 same bowl twice; one carer visits A,A,B,B,C,C. The second visit to each bed genuinely

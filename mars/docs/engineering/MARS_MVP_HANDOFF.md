@@ -4,14 +4,16 @@ Use [the campus homepage](https://sim.mars.college/) for the museum and
 [the Lab](https://sim.mars.college/lab) for activities/connected runs. Current
 source/release/rollback and exact published validation live in
 [deployment metadata](../../viewer/deploy/deployment.json) and the
-[release checklist](RELEASE_CHECKLIST.md). The alpha candidate remains pending
-combined gate/publication; [scenario coverage](SCENARIO_COVERAGE.json) distinguishes
+[release checklist](RELEASE_CHECKLIST.md). Release41 is deployed from `00bd041`
+after the clean nine-stage gate; final public alpha acceptance is pending.
+[Current engineering status](INDEX.md) and [scenario coverage](SCENARIO_COVERAGE.json) distinguish
 actual Play, mixed/programmatic execution, retained failures and exclusions.
 
 For another agent: [INDEX](INDEX.md) → [AGENTS](../../AGENTS.md) →
 [ENGINE_GUIDE](ENGINE_GUIDE.md) → [LAB_GUIDE](LAB_GUIDE.md) and the
 [active roadmap](ACTIVE_ROADMAP.md). Reusable mechanisms may be forked into Eden
-after the accepted checkpoint; do not start Eden here. Active GUI save/load and
+under separate future scope; do not start Eden here. After alpha acceptance, useful
+Mars activity expansion may continue under the current authorization. Active GUI save/load and
 rig migration remain deferred. Existing drafts/worktrees and other owners' paths
 must be preserved.
 

@@ -3,11 +3,14 @@
 > Current resume entry: [engineering navigation](INDEX.md), [active roadmap](ACTIVE_ROADMAP.md)
 > and newest [progress](PROGRESS.md)/[release receipt](RELEASE_CHECKLIST.md).
 > Publication status is authoritative in [deployment metadata](../../viewer/deploy/deployment.json).
-> Release40 restores the campus homepage at `/`; simulation entry is `/lab`.
-> Alpha stabilization is a later unpublished candidate, not the old release35 queue.
+> The restored campus homepage remains `/`; simulation entry is `/lab`.
+> Release41 is deployed from `00bd041` after the clean nine-stage gate; final public
+> alpha acceptance remains pending. [INDEX](INDEX.md) owns current status and proof links.
+> Useful activity expansion follows acceptance; do not restart the old release35 queue
+> or begin Eden/save-load/rig migration.
 > Numbered checkpoints and branch lists below describe their dates, not current instructions.
 
-> **Current product direction — Gene, 2026-09-29:** read
+> **Dated product direction — Gene, 2026-09-29 (current queue superseded above):** read
 > [SIMULATION_VISION.md](SIMULATION_VISION.md), then
 > [ACTIVE_ROADMAP.md](ACTIVE_ROADMAP.md). Build the next playable classroom,
 > lightning-talk and conversation experience. The former requirement to close

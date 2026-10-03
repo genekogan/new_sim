@@ -3,19 +3,30 @@
 Authoritative current status is deployment metadata and the latest verified release record.
 Earlier candidate/release sections below retain provenance and are superseded by this notice.
 
-## Current agent entry — 2026-10-02
+## Current agent entry — release41 deployment, acceptance pending (2026-10-03)
 
 Read [agent context](../../AGENTS.md) for ownership and the
 [active roadmap](ACTIVE_ROADMAP.md) for resumed alpha priorities after the verified
-release40 homepage repair. The alpha candidate is unreleased; coverage execution
-is ongoing and all63 selectable presets are not certified. Use
+release40 homepage repair. Release41 is deployed from functional source `00bd041`,
+Worker `9596510b-336a-4519-8dca-5f862acde364`, bundle `main-DYYxc5g6.js`.
+Final alpha acceptance remains pending; all63 full-Play/public completion is not
+claimed. The clean nine-stage gate passed at that source: 295 deployment, 1465 engine
+PASS (6 SKIP/11 TODO),319 browser PASS (7 SKIP), unchanged determinism hash.
+Gate report `viewer/.cloudflare/gate/2026-10-03T00-12-37-155Z/report.json` has SHA-256
+`4c69d0c3edba588c828371d7e06c959f31956db334ffe19153f7315e5ce0c4af`.
+Public entry 4 PASS/0 FAIL follows a retained 3 PASS/1 harness strict-locator failure;
+Worker 522 assets/24 routes and MCP 36/security pass. The 112-case public run including
+full year builds is ongoing at this documentation checkpoint. Use
 [deployment metadata](../../viewer/deploy/deployment.json) and the
 [latest verified release record](RELEASE_CHECKLIST.md) for publication status.
 The [bounded performance audit](briefs/performance-alpha.REPORT.md) owns actual
 cold/warm/frame/resource measurements and their limitations; do not infer CPU
 from Worker timers or hardware FPS from software WebGL.
 The release39/pause notice below records an earlier checkpoint; its pause is
-superseded by the current roadmap's owner-authorized resume.
+superseded by the current roadmap's owner-authorized resume. After final alpha
+acceptance, useful activity expansion may continue; Eden/save-load/rig migration
+remain deferred. Current planning is 8–14 working hours in the roadmap; earlier
+20–36 estimates below are historical.
 
 ## Dated release39 checkpoint and pause notice — 2026-10-02
 

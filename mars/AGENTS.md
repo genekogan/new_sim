@@ -10,7 +10,8 @@ The authoritative saved plan is [ACTIVE_ROADMAP](docs/engineering/ACTIVE_ROADMAP
 Order: latest verified deployment → comprehensive production-preset execution and
 failure-isolation coverage → bounded80/20 performance audit → documentation and
 extension-contract cleanup → second verified publication marked Mars World v1 alpha.
-Stop this stabilization tranche after publication/acceptance and report completion.
+Close this stabilization tranche after final acceptance and report completion; then
+continue useful activity expansion under the current authorization, without Eden.
 
 A local activity refusal/failure must not stop the simulation clock, UI or unrelated
 actors. Supported recovery uses relevant replanning/permitted alternatives, explained
@@ -25,20 +26,21 @@ actual Play to meaningful terminal effects for finite journeys, sustained livene
 for continuous worlds, complete supported probe interactions, and expected diagnostic
 plus surrounding-world usability for diagnostic demonstrations. First-Step smoke,
 Node fixtures, authored tests, skipped/FIXME cases and partial Play remain distinct.
-One authoritative coverage inventory is being prepared; do not manufacture proof.
+[SCENARIO_COVERAGE](docs/engineering/SCENARIO_COVERAGE.json) is authoritative; preserve its exact-source proof distinctions and remaining acceptance status.
 
 Keep at most three Sol6.1 helpers, isolated ownership and serialized expensive
 browser/performance validation. No tracked changes to a frozen candidate during its gate. Main's48other-owner paths remain protected. Camera remains
 separately owned and cannot block engine publication. No broad rewrite, rig migration,
-active save/load or new Eden systems. Initial whole-tranche estimate20–36workinghours,
-medium-low confidence; update from actual coverage/recovery findings, not a promise.
+active save/load or new Eden systems. The initial20–36workinghour estimate is dated
+provenance; [ACTIVE_ROADMAP](docs/engineering/ACTIVE_ROADMAP.md) owns the current
+8–14 working-hour planning range and assumptions, not a promise.
 
 Earlier expansion/stop instructions below are dated provenance and are superseded
 by this owner mandate for immediate work.
 
-## Latest published checkpoint40
+## Deployed checkpoint41 — final alpha acceptance pending
 
-The [campus homepage](https://sim.mars.college/) remains `/`; [Engine Lab](https://sim.mars.college/lab) is explicit `/lab`. Exact current release/source/rollback and executed publication proof belong in [deployment metadata](viewer/deploy/deployment.json) and the [latest release record](docs/engineering/RELEASE_CHECKLIST.md). The alpha candidate has focused source-bound proof in [SCENARIO_COVERAGE](docs/engineering/SCENARIO_COVERAGE.json), but no final gate/public acceptance yet. Legacy FIXMEs/TODOs and source-era construction reports remain unproved for their original guarantees.
+The [campus homepage](https://sim.mars.college/) remains `/`; [Engine Lab](https://sim.mars.college/lab) is explicit `/lab`. Exact current release/source/rollback and executed publication proof belong in [deployment metadata](viewer/deploy/deployment.json) and the [latest release record](docs/engineering/RELEASE_CHECKLIST.md). Release41 is deployed from `00bd041` after the clean nine-stage gate; final public alpha acceptance is pending. See [current engineering status](docs/engineering/INDEX.md) and [SCENARIO_COVERAGE](docs/engineering/SCENARIO_COVERAGE.json); do not infer all63 full-Play certification from gate or startup counts. Legacy FIXMEs/TODOs and source-era construction reports remain unproved for their original guarantees.
 
 Computer workshop remains an excluded UNVERIFIED draft at `3316a74` in
 `codex/computer-workshop`: three untracked activity/scenario/brief files; first
