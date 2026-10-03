@@ -28,7 +28,7 @@
       "recorded-still-probe": 1,
       "recorded-actual-ui-play-supported-layout": 2
     },
-    "exactCurrentSourceNativeFullGatePassed": true,
+    "exactCurrentSourceNativeFullGatePassed": false,
     "exactFunctionalInheritedFocusedUiJourneys": 3,
     "sustainedLivenessProven": 1,
     "current39Gate": "Historical release39 proof remains source-bound. Release41 passed its exact clean combined gate; final public acceptance and reviewed test-repair gate remain pending.",
@@ -57,7 +57,9 @@
       "secondaryReview": "../../briefs/alpha-coverage-review.REPORT.md",
       "meaning": "All 34 old/candidate pairs were inspected and only those baselines replaced for verified intended UI and already-released visual changes. Original limits and assertions remain unchanged; subsequent native release41 full gate passes. Original failed receipts remain retained."
     },
-    "nativeFullGateFunctionalSource": "00bd041a11c0fe1fe49fba8ca710913f519a24de"
+    "nativeFullGateFunctionalSource": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+    "verifiedGateSourceNativeFullGatePassed": true,
+    "currentRepairCandidateGate": "Pending: the reviewed supper test changed after the recorded clean 00bd041 gate. That source-bound gate remains valid; it does not certify the changed test candidate."
   },
   "proofKinds": [
     "actual-ui-play-journey",
