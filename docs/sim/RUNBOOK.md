@@ -183,3 +183,6 @@ has released. `eat` and `hold_items` in this alpha are resumable. Server
 TakeRecorder chunks render with TakePeople; no browser Runtime on live pages.
 
 ---
+
+The host accepts the qualified activities29 checkpoint under activities31. Unknown
+physics versions still replay from genesis. This additive upgrade keeps restarts brief.

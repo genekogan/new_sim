@@ -543,6 +543,8 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
   const registry = m.createRegistry(), services = m.servicesFor(m.scenes);
   return {
     rulesVersion: `sim-mars/1+${m.rulesVersion}`,
+    // activities31 only adds new verbs; existing checkpoint codecs and body physics are unchanged.
+    canRestoreSnapshot: version => version === `sim-mars/1+${m.rulesVersion}` || version === `sim-mars/1+${m.rulesVersion}`.replace('activities/31', 'activities/29'),
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
       if (cfg.scene === 'eden-camp') return m.edenCampWorld(seed);

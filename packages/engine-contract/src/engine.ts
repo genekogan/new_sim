@@ -102,6 +102,8 @@ export interface Engine {
 
 export interface EngineFactory {
   rulesVersion: string;
+  /** Explicit, qualified additive upgrades only; unknown versions replay from genesis. */
+  canRestoreSnapshot?: (rulesVersion: string) => boolean;
   genesis(seed: string): WorldState;
   create(world: WorldState): Engine;
   restore(snap: EngineSnapshot): Engine;

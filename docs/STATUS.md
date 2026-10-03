@@ -199,3 +199,7 @@ Mars camp activation. The 48-day camp receipt passed: 3,456,000 ticks, zero inva
 mid-supper restart; early/late averages 0.889/0.841 ms per tick, heap 35.27/36.51 MB.
 All four Souls completed 12–22 distinct activities/day; 17 of 40 recorded shared
 moments had multiple participants. Activity-set similarity averaged 0.544–0.577.
+
+Additive registry checkpoint upgrade: activities29→31 is explicitly qualified to
+resume the pinned checkpoint, without an unnecessary full replay. Other physics/
+assembly versions stay unqualified. Restart regression and all 46 server tests pass.

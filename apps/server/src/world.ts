@@ -103,7 +103,7 @@ export class WorldHost {
     this.clockRate = this.baseRate = w.clock_rate;
     const snap = this.db.latestSnapshot(this.worldId);
     let from: 'genesis' | 'snapshot' = 'genesis';
-    if (snap && snap.rulesVersion === this.factory.rulesVersion) {
+    if (snap && (snap.rulesVersion === this.factory.rulesVersion || this.factory.canRestoreSnapshot?.(snap.rulesVersion))) {
       const body = snap.body as SnapshotBody;
       this.engine = this.factory.restore(body.runtime);
       for (const m of body.minds) this.addMind({ ...m, agenda: m.agenda ?? [], agendaPos: m.agendaPos ?? 0, pending: m.pending ?? null });
