@@ -316,3 +316,21 @@ All 296 native deployment tests and the changed legacy photo-entry browser
 journey passed. The full native gate is running separately at its pinned source
 commit; any failed step and its focused repair remain recorded in MERGE-LOG.
 No geometry/performance assertion, baseline or native physical engine code changed.
+
+## Quiet seat courtesy reader
+
+The construction-enabled 48-day run exposed a blocked ordinary workstation
+exit after day 27: an idle bystander occupied the seat's stand-up corridor while
+quiet renewal held new choices. That run failed qualification and is retained.
+The adapter now understands the prospective logged policy
+`{sleepBlockTicks:1200, quietSeatCourtesy:true}`. During quiet renewal it releases
+finished social holds and asks free bystanders to use native `makeWay` walking;
+active programs and construction crews retain control. No poses, seat codecs,
+Lab behavior, or historical policy are rewritten.
+
+This reader release leaves courtesy inactive on startup. A subsequent activation
+release must log the flag only after qualification; keep this reader as its
+compatible rollback. Focused tests prove the legacy obstruction, ordinary walking
+without invariant faults, protection of active work, and policy persistence through
+checkpoint restore and genesis replay. A fresh 48-day construction run is in
+progress; it fails immediately if daily renewal stops releasing.

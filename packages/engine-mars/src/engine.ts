@@ -36,7 +36,7 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
@@ -520,9 +520,11 @@ export class MarsEngine implements Engine {
     }
   }
 
-  configureRuntimePolicy(policy: {sleepBlockTicks:number}) {
+  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}) {
     if (!Number.isInteger(policy.sleepBlockTicks) || policy.sleepBlockTicks < 20 || policy.sleepBlockTicks > 72000) throw new Error('runtime-policy.sleep-limit');
+    if(policy.quietSeatCourtesy !== undefined && typeof policy.quietSeatCourtesy !== "boolean") throw new Error("runtime-policy.quiet-seat-courtesy");
     this.cfg.sleepBlockTicks = policy.sleepBlockTicks;
+    this.cfg.quietSeatCourtesy = policy.quietSeatCourtesy;
   }
   configureClock(clock: { origin: number; dayTicks: number }) { this.cfg.clock = { ...clock }; this.updateClock(); }
   private updateClock() {
@@ -532,6 +534,7 @@ export class MarsEngine implements Engine {
   }
   beginQuiet() { this.quiet = true; }
   private advanceQuiet() {
+    if (this.cfg.quietSeatCourtesy) this.clearQuietSeatExits();
     if (this.programs.size) return;
     // Cancel only roots: their ordinary exits own and drain their child controllers.
     for (const r of this.rt.records.values()) if (this.rt.isActive(r.id) && !r.parent && r.internalCause !== 'traffic.make-way' && !['put_item','hold_items','face'].includes(r.verb)) this.rt.cancel(r.id, {code:'world.quiet-point',message:'quiet checkpoint after the activity finished'});
@@ -548,6 +551,28 @@ export class MarsEngine implements Engine {
         // A held item in front of a fixture needs a different facing before it can be set down.
         const a = this.ents[actor], yaw = a.pose.yaw + Math.PI/2;
         this.rt.submit('face',{actor,target:{point:[a.pose.p[0]+Math.cos(yaw)*2,a.pose.p[2]+Math.sin(yaw)*2]}});
+      }
+    }
+  }
+  private clearQuietSeatExits() {
+    // Completed social cards can retain physical holds while another card is
+    // still draining. Release only those idle holds, retaining every program's
+    // actor/crew, then let native makeWay find a legal courtesy step for a free
+    // bystander obstructing a seat's ordinary stand-up path.
+    for (const live of this.rt.live.values()) {
+      const r=live.rec;
+      if (r.parent || !['gather','converse','take_slot','sit'].includes(r.verb)) continue;
+      if ([...this.programs.values()].some(p=>p.action===r.id || [p.actor,...(p.build?.crew??[])].some(a=>this.holders(a).includes(r.id)))) continue;
+      this.rt.cancel(r.id,{code:'world.quiet-point',message:'release a completed social hold while remaining work drains'});
+    }
+    for (const live of this.rt.live.values()) {
+      if (!['sit','take_slot'].includes(live.rec.verb) || live.exec?.phase!=='stand-up' || !live.exec.approach) continue;
+      const actor=this.ents[live.exec.actor],from=live.exec.from ?? [actor.pose.p[0],actor.pose.p[2]],to=live.exec.approach;
+      const dx=to[0]-from[0],dz=to[1]-from[1],len=dx*dx+dz*dz;
+      for(const other of Object.values(this.ents) as any[]) {
+        if(other.id===actor.id || !other.human || other.human.level!==actor.human.level || this.byActor.has(other.id)||this.actorBorrowed(other.id)) continue;
+        const t=len ? Math.max(0,Math.min(1,((other.pose.p[0]-from[0])*dx+(other.pose.p[2]-from[1])*dz)/len)):0;
+        if(Math.hypot(other.pose.p[0]-from[0]-t*dx,other.pose.p[2]-from[1]-t*dz)<0.7) this.m.makeWay(this.rt,other.id,to);
       }
     }
   }

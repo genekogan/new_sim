@@ -121,7 +121,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       return {};
     }
     case 'rules': {
-      const rules = e.payload as { runtimePolicy?: {sleepBlockTicks:number}; dayConfig?: { origin: number; dayTicks: number }; quiet?: boolean; compact?: boolean; adoptCamp?: boolean; restockCamp?: boolean; anchors?: import('@sim/engine-contract').Anchor[]; soulId?: string; character?: string };
+      const rules = e.payload as { runtimePolicy?: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}; dayConfig?: { origin: number; dayTicks: number }; quiet?: boolean; compact?: boolean; adoptCamp?: boolean; restockCamp?: boolean; anchors?: import('@sim/engine-contract').Anchor[]; soulId?: string; character?: string };
       if (rules?.runtimePolicy) {
         if (!engine.configureRuntimePolicy) throw Error('runtime-policy.unsupported');
         engine.configureRuntimePolicy(rules.runtimePolicy);

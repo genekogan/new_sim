@@ -42,3 +42,22 @@ test('a directed-away native sleep purpose reports blockage and releases the dai
  for(let i=0;i<2000;i++){const out=e.step();if(out.programs.some(p=>p.id===r.id&&p.kind==='failed'&&p.code==='activity.blocked'))failed=true;if(e.isQuiet!())break;}
  assert.ok(failed);assert.equal(e.isQuiet!(),true);assert.deepEqual(e.runtime.violations,[]);
 });
+
+test('logged quiet courtesy lets a completed workstation exit past an idle bystander without stealing active work',async()=>{
+ const {e}=await setup(), rt=(e as any).rt;
+ const r=e.perform({actor:'h0',label:'computer work',steps:[{verb:'mars:work_at',params:{station:'computer-1',seat:'computer-1-chair#seat',task:'Exit proof',duration:120}}]});assert.equal(r.ok,true);
+ let seat:any;
+ for(let i=0;i<10000;i++){e.step();seat=[...rt.live.values()].find((x:any)=>x.rec.verb==='sit'&&x.exec.actor==='h0'&&x.exec.phase==='occupied');if(seat)break;}
+ assert.ok(seat?.exec.approach);const foot=seat.exec.approach;
+ const blocker=e.world.entities.h1;
+ const walk=e.submit('walk_to',{actor:'h1',x:foot[0],z:foot[1]});
+ for(let i=0;i<2000&&e.runtime.records.get(walk.id)?.status!=='completed';i++)e.step();
+ assert.equal(e.runtime.records.get(walk.id)?.status,'completed');
+ assert.ok(Math.hypot(blocker.pose.p[0]-foot[0],blocker.pose.p[2]-foot[1])<0.3);
+ for(let i=0;i<3000;i++)e.step();assert.ok([...e.runtime.records.values()].some(r=>r.verb==='work_at'&&r.phase==='stopping'));
+ e.beginQuiet!();for(let i=0;i<2000;i++)e.step();assert.equal(e.isQuiet!(),false,'old policy keeps the demonstrated blocked seat exit');
+ const own=e.perform({actor:'h1',label:'my pause',steps:[{verb:'rest',params:{seconds:10}}]});assert.equal(own.ok,true);
+ e.configureRuntimePolicy!({sleepBlockTicks:1200,quietSeatCourtesy:true});const before=[...blocker.pose.p];for(let i=0;i<100;i++)e.step();assert.deepEqual(blocker.pose.p,before,'courtesy does not seize an active program');
+ for(let i=0;i<3000&&!e.isQuiet!();i++)e.step();assert.equal(e.isQuiet!(),true);assert.deepEqual(e.runtime.violations,[]);
+ assert.ok([...rt.records.values()].some((r:any)=>r.internalCause==='traffic.make-way'),'ordinary native courtesy walk was used');
+});

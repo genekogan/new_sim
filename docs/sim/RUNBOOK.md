@@ -258,3 +258,12 @@ legacy photo/Blender links point to `sim.mars.college`; runtime GLBs remain
 local or available through the allowlisted Sim proxy. Native full-gate and
 focused repair receipts are kept separately in MERGE-LOG, without rerunning
 passing long browser scenarios after an unrelated packaging repair.
+
+For a quiet barrier blocked by a seat exit, inspect live `sit`/`take_slot`
+`stand-up` records and free bystanders before treating it as a card failure.
+`quietSeatCourtesy:true`, when explicitly logged with the sleep policy, lets
+completed social holds drain and uses native legal `makeWay` walks to clear
+the exit. Active programs and borrowed construction actors are protected.
+Deploy a courtesy-capable reader before logging the flag. The rollback guard
+refuses older readers once that event exists; never remove the policy event or
+rewrite production state to make an older rollback fit.

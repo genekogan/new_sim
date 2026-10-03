@@ -18,7 +18,7 @@ if (!dir) throw new Error('SOAK_DIR is required and must be an isolated proof di
 mkdirSync(dir,{recursive:true});
 const db = new Db(join(dir,'sim.db')), factory = await marsFactory(), def = worldDefinition('mars');
 const host = new WorldHost(db,factory,'camp-soak',6000,'mars-1'); host.boot();
-void host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200},why:'bounded live-card sleep blockage, applied prospectively'});
+void host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200,quietSeatCourtesy:true},why:'bounded sleep blockage and quiet seat courtesy, applied prospectively'});
 const living = new LivingWorld(host); living.camp = true; void living.install(def.customs);
 const pack = new CampCards(host); void pack;
 for (const n of def.cast) {
@@ -74,6 +74,7 @@ for (let day=1;day<=days;day++) {
   globalThis.gc?.();
   const row={day,tick:host.engine.world.tick,wallSec:(performance.now()-begin)/1000,msPerTick:samples.reduce((a,b)=>a+b,0)/samples.length,heap:process.memoryUsage().heapUsed,records:host.engine.runtime.records.size,quiet:host.quietBarrier,lastCompactedDay:host.living?.lastDay,faults:structuredClone(host.extra.cardFaults??{}),needs:structuredClone(Object.fromEntries([...host.minds.values()].map(m=>[m.name,m.life?.needs]))),journals:Object.fromEntries([...host.minds.values()].map(m=>[m.name,m.life?.journal])),activities:Object.fromEntries(def.cast.map(n=>[n.name,success[`${day-1}:${n.name}`]??{}]))};
   rows.push(row); console.log(JSON.stringify(row));
+  assert.ok((host.living?.lastDay??-1)>=day-2,'daily quiet barrier continues to release (fail immediately)');
   writeFileSync(join(dir,'report.json'),JSON.stringify({days:day,rows,restarted,failures,attendance:Object.fromEntries(Object.entries(attendance).map(([k,s])=>[k,[...s]])),spend:db.paidCost(),built:Object.fromEntries(Object.entries(host.engine.world.entities).filter(([id])=>/^(upright-|beam-|joist-|sheet-|lookout-stair|tread-)/.test(id)).map(([id,e])=>[id,{phase:(e as any).phase,support:(e as any).support}]))},null,2));
 }
 assert.equal(db.paidCost(),0);

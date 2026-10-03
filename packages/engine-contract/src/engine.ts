@@ -77,7 +77,7 @@ export interface Engine {
   takeChunks?(afterTick: number): { fromTick: number; toTick: number; take: unknown }[];
   renderScene?(): {scene: unknown; buildings?: {file: string; p: [number, number, number]; yaw?: number}[]; kin?: {model: string; p: [number,number,number]; yaw?: number; radius?: number}[]};
   canSnapshot?(): boolean;
-  configureRuntimePolicy?(policy: {sleepBlockTicks:number}): void;
+  configureRuntimePolicy?(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}): void;
   configureClock?(clock: { origin: number; dayTicks: number }): void;
   beginQuiet?(): void;
   isQuiet?(): boolean;

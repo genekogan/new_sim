@@ -60,10 +60,10 @@ test('logged runtime policy persists in both checkpoint readers and genesis repl
  try {
   assert.equal(h.extra.runtimePolicy,undefined);
   assert.equal((h.engine.snapshot() as any).cfg.sleepBlockTicks,undefined);
-  void h.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200},why:'bounded live-card blockage from this tick'});h.tickOnce();
-  assert.deepEqual(h.extra.runtimePolicy,{sleepBlockTicks:1200});assert.equal((h.engine.snapshot() as any).cfg.sleepBlockTicks,1200);h.saveSnapshot();
+  void h.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200,quietSeatCourtesy:true},why:'bounded live-card blockage and quiet courtesy from this tick'});h.tickOnce();
+  assert.deepEqual(h.extra.runtimePolicy,{sleepBlockTicks:1200,quietSeatCourtesy:true});assert.equal((h.engine.snapshot() as any).cfg.quietSeatCourtesy,true);assert.equal((h.engine.snapshot() as any).cfg.sleepBlockTicks,1200);h.saveSnapshot();
   const fresh=new WorldHost(db,factory,'physical-build',1e9,h.worldId);fresh.boot();
-  assert.equal(fresh.engine.stateHash(),h.engine.stateHash());assert.deepEqual(fresh.extra.runtimePolicy,h.extra.runtimePolicy);assert.equal((fresh.engine.snapshot() as any).cfg.sleepBlockTicks,1200);
-  const replay=replayFromGenesis(factory,'physical-build',db.events(h.worldId),h.engine.world.tick);assert.equal(replay.engine.stateHash(),h.engine.stateHash());assert.equal((replay.engine.snapshot() as any).cfg.sleepBlockTicks,1200);
+  assert.equal(fresh.engine.stateHash(),h.engine.stateHash());assert.deepEqual(fresh.extra.runtimePolicy,h.extra.runtimePolicy);assert.equal((fresh.engine.snapshot() as any).cfg.sleepBlockTicks,1200);assert.equal((fresh.engine.snapshot() as any).cfg.quietSeatCourtesy,true);
+  const replay=replayFromGenesis(factory,'physical-build',db.events(h.worldId),h.engine.world.tick);assert.equal(replay.engine.stateHash(),h.engine.stateHash());assert.equal((replay.engine.snapshot() as any).cfg.sleepBlockTicks,1200);assert.equal((replay.engine.snapshot() as any).cfg.quietSeatCourtesy,true);
  } finally {db.close();}
 });
