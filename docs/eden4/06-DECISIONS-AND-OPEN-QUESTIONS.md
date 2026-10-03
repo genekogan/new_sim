@@ -357,7 +357,15 @@ default beneath the authorized $1 maximum; derive finite construction progress
 from original physical parts; reserve a free crew for a finite phase and drain
 it safely on interruption; add a controller-compatible rollback before installing
 construction cards; retain published derivatives through a narrow asset proxy.
-These choices introduce no routine, property system, economy or world ontology.
+A prospective logged sleep limit and quiet seat courtesy preserve finite Lab
+semantics while letting live daily renewal complete. Graceful unsafe checkpoints
+record the actual replay head without forcing serialization. The full native gate
+report remains RED, with all failed steps cleared by focused fixture/packaging
+repair receipts and no golden or threshold change. Construction's fresh 48-day
+qualification passed with zero physical faults and unchanged limits; its receipt
+is in the running log. The separate live Little Martians 24-hour observation remains
+pending until October 4 13:27 UTC. These choices introduce no routine, property
+system, economy or world ontology.
 
 Deferred scope remains terrain, redirect, engine repackaging, talking faces, other
 owners/permissions, a persistent 2026 campus, economy and plugins. Questions in

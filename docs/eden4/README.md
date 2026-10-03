@@ -6,8 +6,12 @@
 > in the three new worlds. Four persistent worlds share the 3D shell and private
 > owner mandate controls; browser-only Labs and all eight year pages are mounted.
 > Camp and Little Martians each passed 48 simulated days, exact restart and daily
-> fresh-Runtime renewal. Construction/controller qualification is progressing;
-> the final native Mars gate remains pending.
+> fresh-Runtime renewal. Construction/controller qualification passed all 48 days;
+> the full native gate is completed, with its failed steps cleared by focused
+> repair receipts and its original report retained. Fresh construction 48-day
+> qualification passed with zero physical faults and unchanged timing/heap limits.
+> The live Little Martians 24-hour checkpoint remains pending until October 4
+> 13:27 UTC; autonomous observation continues. Use the running log for exact release.
 > The approved execution brief is [`23`](23-MERGE-KICKOFF-PROMPT.md), with plan
 > v3 in [`22`](22-MERGE-PLAN.md). Original `~/Mars`, `~/Dev/littlemartians` and
 > `<old-sim-repo>` are read-only references. The imported closing unit is exact

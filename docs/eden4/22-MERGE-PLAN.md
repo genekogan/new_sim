@@ -686,7 +686,37 @@ anything in this plan, list the rest).
 - F1–F8 have successor replay regressions; F9 is preserved as an intentional
   frontier refusal. No universal claim about all historical native cases is made.
 
-Full native Mars release-gate qualification and successor construction soak are
-still pending; use MERGE-LOG for their eventual receipts. Deferred scope remains
+The full native gate has completed: its original RED report is preserved, and
+every failed step has a passing bounded repair receipt. Missing licensed soil
+textures and local world/decoder mounts were test-fixture gaps; original goldens
+and thresholds remain unchanged. Use MERGE-LOG and its aggregate receipt.
+
+The construction-enabled v3 run failed beyond day 27 because an idle bystander
+blocked a normal workstation seat exit during quiet renewal. A prospective logged
+policy releases completed social holds and uses native `makeWay` walks; it protects
+active programs and crews and preserves earlier replay/Lab behavior. Fresh v4
+completed all 48 days physically but failed the timing criterion narrowly
+(20.71% vs 20%). The criterion remains intact. A native Node SHA-256 provider
+with identical Unicode/state/take addresses measured 17.3% faster on matched
+late-state copies and full suites passed. V5 was stopped unqualified after 11
+days: its quiet-machine baseline exposed completed-structure support cost. A
+bounded successful support-proof memo compares every structural input by value;
+mutation/exception regressions and matched world/kernel/take hashes pass at
+0.758→0.596 ms and full suites pass. V6 completed all 48 days physically but
+failed timing (20.98% vs 20%). Removing an immediate duplicate sleep-clearance
+check retains initial and end-of-tick safety checks; all 50 sleep cases and
+exact world/kernel/take comparisons pass at 0.775→0.698 ms. Fresh v7 qualification
+passed all 48 days; the timing criterion remains unchanged. Graceful unsnappable
+checkpoints also log their
+actual head tick, so restart replays to that point without forcing serialization.
+Periodic retries emit no markers. Deferred scope remains
 unchanged from `23`: terrain, redirect, engine packages, talking faces, other
 owners, persistent 2026 campus, economy and plugins.
+
+Final construction v7 receipt: 48 days / 3,456,000 ticks PASSED: 0.585745→0.673283 ms/tick,
+growth 14.94% (limit 20%); heap 36.82→41.50 MB; all 24 parts installed, every daily renewal
+progressing, exact actual mid-supper restart, zero physical recovery/invariant/card faults
+and zero paid spend. The complete runtime suites and native lint passed. The live Little
+Martians 24-hour checkpoint remains pending until October 4 13:27 UTC; accelerated
+qualification does not replace elapsed live time. Follow MERGE-LOG for its observation and
+exact release.

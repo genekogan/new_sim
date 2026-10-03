@@ -40,7 +40,7 @@ remain private. The local live mind proof spent $0.003215808 and its server was 
 
 Playback milestone checks (historical): workspace typecheck; 45 server tests; all other Sim suites passed. Mars engine 1,489 passed,
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
-has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
+has zero page errors or HTTP failures. The native full gate is completed; its original report and passing repairs are retained.
 
 Little Martians and Eden are live, with their qualification described below. The finite construction controller is qualified; ordinary stage/frame/deck/stairs construction cards are live. Toy now uses the same recorded 3D view. All four bounded Opus helpers finished;
 building pictures are available at `/buildings`.
@@ -76,8 +76,7 @@ Successor proof: full Sim suites passed (45 server tests); Mars engine 1,539 pas
 6 inherited skips, 11 inherited TODOs, zero failures. The six actual Play journeys
 passed: workshop completion, independent interruption/rejoin, safe End/Reset, same-book
 transfer completion, interrupted reading continuation, and held-transfer cleanup/Reset.
-Original publication evidence remains source-inherited; full successor Mars gate is
-still reserved for tranche end.
+Original publication evidence remains source-inherited; the full successor Mars gate is completed with its original RED report retained and all failed steps cleared by focused receipts.
 
 ## Retained shell capabilities
 
@@ -343,10 +342,9 @@ Lab behavior, or historical policy are rewritten.
 
 The reader release `9e78ee416a79` left courtesy inactive on startup. This
 activation candidate logs the flag once on each living non-Toy world; the reader
-is its compatible rollback. Promotion waits for fresh 48-day qualification. Focused tests prove the legacy obstruction, ordinary walking
+is its compatible rollback. Fresh 48-day qualification has passed. Focused tests prove the legacy obstruction, ordinary walking
 without invariant faults, protection of active work, and policy persistence through
-checkpoint restore and genesis replay. A fresh 48-day construction run is in
-progress; it fails immediately if daily renewal stops releasing.
+checkpoint restore and genesis replay. Fresh construction v7 passed all 48 days; its fail-fast renewal and safety criteria stayed intact.
 
 ## Graceful restart at an unsnappable head
 
@@ -397,7 +395,7 @@ step no longer repeats it on success before any world change. Before first
 publication the direct clearance check remains, and the independent end-of-tick
 invariant remains active. All 50 existing sleep/visitor/take cases pass. Matched
 A/B passed at 0.774711→0.697979 ms with 12,288 sleeping ticks and identical
-world/kernel/take hashes. Full suites and fresh v7 remain pending. No performance
+world/kernel/take hashes. Full suites and fresh v7 passed. No performance
 limit was weakened.
 
 ## Sync test resource repair
@@ -408,3 +406,19 @@ Its failed assertion then left a reconnect timer running. Test corruption now ad
 a phantom body that only a full snapshot removes, and every test closes its
 clients even on assertion failure. All six real-server sync journeys passed and
 exited cleanly. Production connection behavior and protocol assertions are unchanged.
+
+## Final construction qualification and live observation
+
+48 days / 3,456,000 ticks PASSED: 0.585745→0.673283 ms/tick, growth 14.94% (limit 20%); heap
+36.82→41.50 MB; all 24 parts installed, every daily renewal progressing, exact actual
+mid-supper restart, zero physical recovery/invariant/card faults and zero paid spend.
+
+Complete checks passed: all Sim suites, 50 server, 21 adapter, 1,545 native engine cases,
+zero failures, plus native lint. The original full-gate RED report and failed v3–v6 receipts
+are retained separately from passing repairs. A compact receipt is in
+`docs/qualification/merge-20261003.json`; context is in
+`docs/MERGE-QUALIFICATION-20261003.md`.
+
+The live Little Martians 24-hour checkpoint remains pending until October 4 13:27 UTC. The
+heartbeat continues that read-only observation; accelerated soaks do not establish elapsed
+production time. No setup or approval is needed from Gene.

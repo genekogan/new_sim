@@ -305,3 +305,19 @@ A supported sleep step checks full clearance once through its safety function
 after publishing its sleep pose; the first-publication direct check and separate
 end-of-tick invariant still run. This removes an immediate duplicate read,
 without changing admission, ownership, lie/wake motion or obstacle checks.
+
+## Qualified October 3 release
+
+Construction v7 passed 48 days with native hashing, bounded successful support proofs and
+the single sleep clearance. Required runtime checks and native lint passed; the original
+full native gate and focused repairs remain separate receipts. Courtesy logs once per
+existing living non-Toy world: two runtime-policy events total (earlier sleep limit and
+courtesy), one courtesy activation; Toy has none. The inactive reader `9e78ee416a79` is the
+compatible code rollback after activation. Preserve the databases and accepted policy
+history.
+
+The exact production build and backup path are in MERGE-LOG and `/healthz`. A staged
+graceful restart checks shutdown tick equals boot tick without duplicating policy events.
+Unexpected process loss resumes from durable checkpoints and accepted events. A read-only
+live observation remains due after October 4 13:27 UTC; do not repeat full suites or the
+accelerated soak merely to update that receipt.
