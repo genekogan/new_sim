@@ -58,7 +58,7 @@ export function check(s: KState, c: Change, by: string): void {
       if (!world && Object.values(s.things).filter((t) => t.by === by).length >= MAX_MADE) throw new Refused('limit.things', `a Soul may have at most ${MAX_MADE} things of its making at a time`);
       break;
     case 'vanish': mayAlter(exists(c.id)); if (s.things[c.id].kind === 'soul' && !world) throw new Refused('coherence.soul', 'a Soul cannot be removed by an action'); break;
-    case 'set': mayAlter(exists(c.id)); break;
+    case 'set': if(c.key==='privateMandate'&&!world)throw new Refused('coherence.mandate','owner mandate rules are changed through steering');mayAlter(exists(c.id)); break;
     case 'move': { const t = exists(c.id); if (c.to !== null) exists(c.to); if (!world && c.id !== by) { if (t.kind === 'soul') throw new Refused('coherence.other-soul', 'a Soul moves only itself'); mayAlter(t); } break; }
     case 'link': {
       exists(c.from); const target = exists(c.to);

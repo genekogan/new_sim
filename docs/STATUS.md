@@ -33,13 +33,31 @@ chosen supper hosting/joining, quiet checkpoints, daily fresh Runtime and durabl
 recovery/quarantine. No routine or timetable controls a Soul. Reflection and owner words
 remain private. The local live mind proof spent $0.003215808 and its server was stopped.
 
-Current checks: workspace typecheck; 35 server tests plus the staging archive isolation test passed; Mars engine 1,489 passed,
+Current checks: workspace typecheck; 45 server tests qualified (44 broad-pass plus the corrected strict-report fixture in the nine-test focused pass); all other Sim suites passed. Mars engine 1,489 passed,
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
-Mandates, the active Little Martians and Eden worlds, construction from the piles, and
+The active Little Martians and Eden worlds, construction from the piles, and
 the published Mars closing delta remain ahead. All four bounded Opus helpers finished;
 building pictures are available at `/buildings`.
+
+## Mandate milestone
+
+Living-world steering adds, edits or removes private owner rules. One Haiku alignment
+call explains a new rule and its objective cards; times and party conditions wake
+thought. Only explicit NOW uses a direct agenda, on the next tick. Completed NOW rules
+record done; impossible ones report blocked; a newer NOW records its predecessor
+replaced. Strict rules appear first in mind context and report a differing decision
+once per world day. No rule removal stops ordinary needs/journal decisions.
+
+Owner controls and paired-agent REST/MCP share the rule mechanism; legacy structured
+intent becomes a NOW rule in living worlds, preserving the supplied cards. Rules survive
+checkpoints/replay and stay out of public kernel/log and other Souls' compiler context.
+The isolated live proof used one Haiku compile, total world spend $0.01733385, all nine
+paid calls settled, server stopped. Browser add/strict/edit/reload/remove passed without
+page errors or HTTP failures. Focused tests also cover interruption, blocked reporting,
+structured steering, strict reporting, replay/restart and card tampering. Successful
+provider responses with missing/invalid usage retain their admission reservation.
 
 ## Retained shell capabilities
 

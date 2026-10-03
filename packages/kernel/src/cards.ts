@@ -137,6 +137,10 @@ export function validateCard(input: unknown, s: KState, engineVerbs: Set<string>
   if (!p.success) return { ok: false, problems: p.error.issues.map((i) => `${i.path.join('.') || 'card'}: ${i.message}`) };
   if (!s.vocab.cards[p.data.name] && Object.keys(s.vocab.cards).length >= MAX_CARDS) return { ok: false, problems: ['the library is full'] };
   const card = p.data, problems: string[] = [];
+  for(const st of card.then){
+    if('set' in st&&st.set[1]==='privateMandate')problems.push('owner mandate rules are changed through steering, never by a card');
+    if('appear' in st&&st.appear.states?.privateMandate!==undefined)problems.push('a card cannot create owner mandate state');
+  }
   const slots = new Set(['actor', 'region', ...(card.target ? ['target'] : []), ...Object.keys(card.derive ?? {}), 'new']);
   const okRef = (x: string) => !x.startsWith('$') || slots.has(x.slice(1).split('.')[0]);
   const refsOf = (o: unknown): string[] => (typeof o === 'string' ? [o] : Array.isArray(o) ? o.flatMap(refsOf) : []);

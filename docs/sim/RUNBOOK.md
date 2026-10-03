@@ -42,6 +42,27 @@ Code rollback to the playback release remains state-compatible, with local rewin
 only; re-promoting the archive reader restores older rewind without a data restore. The model ledger is independent of trace pruning and budget changes. Unknown
 model prices refuse admission; uncertain transport failures retain the reservation.
 
+## Owner mandate controls
+
+In a living world, POST `/v1/souls/<id>/mandate` with `{words, strict, id?}` adds
+or edits one private rule. GET lists it; DELETE `/v1/souls/<id>/mandate/<rule-id>`
+removes it. Ownership is enforced. Paired agents use the corresponding
+`/v1/agent/mandate` routes or MCP `soul_steer`, `soul_mandate`, `soul_remove_rule`.
+The same endpoints work under the world's API prefix. Existing command and
+structured-intent APIs become mandate changes in living worlds; toy keeps its old
+command/intent behavior. Rule count is bounded at 24 per Soul. Alignment failure
+leaves the rule unchanged. NOW has precedence; a ten-minute unplayable next card
+reports blocked, and a newer NOW reports its predecessor replaced. Other triggers
+only request thinking. Strict reports are bounded to one per world day.
+
+Owner words and rule internals live in accepted private events/checkpoints, never
+public kernel/log views. Preserve the database for rollback. The previous camp
+release cannot redact/fold new mandate events. The rollback compatibility guard
+refuses any older reader once mandate events exist; choose a mandate-capable
+release. Before any such events exist, the preceding camp release remains valid.
+Never restore data to erase steering. Successful model replies without a valid usage receipt retain the paid
+reservation; investigate the receipt rather than forgiving cost automatically.
+
 ## Operations
 
 ```bash
@@ -56,8 +77,7 @@ ssh root@eden2 'bash /srv/sim/current/infra/box-setup.sh'   # idempotent: units,
 
 Deploy never flips production if staging fails to start on the new release or
 reports a different build id; the rejected release is removed and staging is
-pointed back at production's release. Deploy ships the **working tree**:
-uncommitted changes are included and the build id gets a `-dirty` suffix. A restart reloads from the latest snapshot and
+pointed back at production's release. Deploy requires a clean committed release. A restart reloads from the latest snapshot and
 fast-forwards through later events; open pages reload themselves when the build
 id changes.
 

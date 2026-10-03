@@ -1,5 +1,6 @@
 // Wire protocol shared by server and clients: log events, WebSocket messages,
 // REST payloads. Everything that crosses a process boundary is defined here.
+export * from './mandate.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
@@ -46,7 +47,7 @@ export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => str
 export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire';
+export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
@@ -70,6 +71,7 @@ export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive
 
 /** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
 export function publicEvent(e: LogEvent): LogEvent {
+  if(e.kind==='mandate')return {...e,payload:{soulId:e.payload?.soulId,op:e.payload?.op,ruleId:e.payload?.ruleId??e.payload?.rule?.id,status:e.payload?.patch?.status??e.payload?.rule?.status}};
   if (e.kind === 'rules' && e.payload?.recovery) { const r=e.payload.recovery; return {...e,payload:{recovery:{excluded:r.excluded,faults:r.faults,restored:true}}}; }
   if (e.kind === 'rules' && e.payload?.reflection) return { ...e, payload: { soulId: e.payload.soulId, reflection: { day: e.payload.reflection.day, written: true } } };
   if (e.kind === 'intent' && (e.payload?.intent?.note || e.payload?.intent?.text)) return { ...e, payload: { ...e.payload, intent: publicIntent(e.payload.intent) } };

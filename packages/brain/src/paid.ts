@@ -25,7 +25,9 @@ export async function paidJson(provider: 'jev' | 'anthropic', request: any, init
     if ([400, 401, 403, 404, 429, 529].includes(response.status)) permit?.settle(0);
     throw new PaidHttpError(`${provider} ${response.status}: ${(await response.text()).slice(0, 200)}`, response.status, Number(response.headers.get('retry-after')) || 0);
   }
-  const body = await response.json() as any, u = body.usage ?? {};
+  const body = await response.json() as any, u = body.usage;
+  const valid=(x:unknown)=>typeof x==='number'&&Number.isFinite(x)&&Number.isInteger(x)&&x>=0;
+  if(!u||!valid(u.input_tokens)||(provider==='anthropic'&&!valid(u.output_tokens))||!valid(u.cache_creation_input_tokens??0)||!valid(u.cache_read_input_tokens??0))throw new Error(`${provider} response has no valid usage receipt; reservation retained`);
   const cost = provider === 'jev' ? (u.input_tokens ?? 0) * 0.042 / 1e6 :
     ((u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) * 1.25 + (u.cache_read_input_tokens ?? 0) * 0.1 + (u.output_tokens ?? 0) * 5) / 1e6;
   permit?.settle(cost);

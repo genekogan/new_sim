@@ -127,7 +127,7 @@ test('create a Soul, steer it from the page, pair an agent both ways, steer by R
   // --- MCP with the same token: header form and URL form
   const mcp = async (method: string, params: unknown, url = `${BASE}/mcp`, auth = true) => (await fetch(url, { method: 'POST', headers: { ...(auth ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).json() as Promise<any>;
   assert.equal((await mcp('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } })).result.serverInfo.name, 'sim');
-  assert.deepEqual((await mcp('tools/list', {})).result.tools.map((t: any) => t.name).sort(), ['soul_command', 'soul_deck', 'soul_log', 'soul_perceive', 'soul_propose_cards', 'soul_set_intent', 'soul_status', 'soul_wait', 'world_query']);
+  assert.deepEqual((await mcp('tools/list', {})).result.tools.map((t: any) => t.name).sort(), ['soul_command', 'soul_deck', 'soul_log', 'soul_mandate', 'soul_perceive', 'soul_propose_cards', 'soul_remove_rule', 'soul_set_intent', 'soul_status', 'soul_steer', 'soul_wait', 'world_query']);
   const call = await mcp('tools/call', { name: 'soul_set_intent', arguments: { goal: 'attend', target: 'campfire' } }, `${BASE}/mcp/${token}`, false);
   assert.equal(JSON.parse(call.result.content[0].text).ok, true);
   assert.equal((await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 401);

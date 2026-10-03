@@ -8,12 +8,13 @@ import {
   type CompileOut, type SpokenLine, type TalkInput, type PaidGate, clockAt, reflectInCode,
   type DirectorContext, type MidContext, type RegionDigest, type ShotCandidate, type Target, type Translation, type ChoiceA,
 } from '@sim/brain';
-import { GOALS, describeIntent, publicIntent, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
+import { GOALS, describeIntent, publicIntent, mandateTriggerSchema, type Alignment, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { energyWord, hash32, type Mind, type WorldHost } from './world.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
-import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, type CardOption } from './deck.ts';
+import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, matchesStep, type CardOption } from './deck.ts';
+import {mandateOf,triggerDue} from './mandate.ts';
 import { SPEECH_LINKS, cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
 
 const TPS = 20;
@@ -49,6 +50,7 @@ export class Brain {
   private narrating = new Set<string>();
   private directing = false;
   private reflecting = new Set<string>();
+  private ruleUpdates=new Set<string>();
   private tickerCandidates: { id: string; text: string; tick: number }[] = [];
   host: WorldHost; db: Db; cfg: Config; sink: BrainSink;
 
@@ -131,6 +133,14 @@ export class Brain {
   // ------------------------------------------------------------ per tick
   private afterTick(tick: number) {
     const w = this.host.engine.world;
+    const day=this.host.living;
+    if(day&&tick%20===0){const c=clockAt(tick,day.origin,day.dayTicks);for(const m of this.host.minds.values())for(const r of mandateOf(this.host.kernel,m.soulId)){
+      if(this.ruleUpdates.has(r.id))continue;
+      const matched=r.trigger.kind==='gathering'?Object.values(this.host.kernel.links).some(l=>l.kind==='hosts'&&l.from===(r.trigger as {host:string}).host&&this.host.kernel.things[l.to]?.kind==='gathering'):false;
+      if(triggerDue(r,this.host.kernel,c.day,c.hour+c.minute/60)){
+        this.ruleUpdates.add(r.id);void this.host.enqueue('mandate','world',{soulId:m.soulId,ruleId:r.id,op:'wake',patch:{lastFiredDay:c.day,...(r.trigger.kind==='gathering'?{conditionMatched:true}:{})}}).finally(()=>this.ruleUpdates.delete(r.id));
+      }else if(r.trigger.kind==='gathering'&&r.conditionMatched&&!matched){this.ruleUpdates.add(r.id);void this.host.enqueue('mandate','world',{soulId:m.soulId,ruleId:r.id,op:'condition',patch:{conditionMatched:false}}).finally(()=>this.ruleUpdates.delete(r.id));}
+    }}
     // Tier 2: mid-brain, per Soul, when due. Fair order: owner intents first, then whoever has waited longest,
     // so a fixed iteration order can never let a few Souls take the whole mid-brain share.
     if (this.inflight.size < MAX_INFLIGHT) {
@@ -176,21 +186,25 @@ export class Brain {
     const intentText = m.intent ? describeIntent({ ...m.intent, note: undefined, text: undefined } as WireIntent, nameOf) : 'none';
     const sit = situationOf(this.host, m);
     const deck = k.decks[m.soulId];
+    const rules=mandateOf(k,m.soulId).filter(r=>r.status==='active').sort((a,b)=>Number(b.strict)-Number(a.strict));
+    const options=optionsFor(this.host,m);
+    if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: this.host.living?.event ?? s.happening },
       ...(this.host.living ? { customs: this.host.living.customs } : {}),
       soul: {
-        name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.text ?? m.intent?.note ?? null, hasIntent: !!m.intent && m.agendaPos < Math.max(1, m.agenda.length),
+        name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.text ?? m.intent?.note ?? null, hasIntent: rules.length>0||!!m.intent && m.agendaPos < Math.max(1, m.agenda.length),
         intentIsNew: m.life ? ['new-intent','plan-advanced'].includes(trigger) : URGENT.has(trigger), energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
         doing: eng.programOf(m.entityId) ? m.doing : ent?.human?.activity ?? 'standing around', recent: m.recent.slice(-3),
         ...(m.life ? { needs: m.life.needs, journal: m.life.journal } : {}),
+        ...(rules.length?{mandate:rules.map(r=>({id:r.id,words:r.words,strict:r.strict,understanding:r.understanding}))}:{}),
       },
       nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
       nudge: m.nudge?.text ?? null,
       situation: sit.situation,
       heard: sit.heard.map((h) => ({ who: h.who, act: h.act, ...(h.about ? { about: h.about } : {}), ...(this.lastWords.get(`${h.from}>${m.soulId}`) ? { words: this.lastWords.get(`${h.from}>${m.soulId}`)! } : {}) })),
       manners: Object.fromEntries((deck?.manners ?? []).map((n) => [n, k.vocab.manners[n]?.summary ?? n])),
-      options: optionsFor(this.host, m),
+      options,
       running: !!eng.programOf(m.entityId),
       trigger,
     };
@@ -211,12 +225,15 @@ export class Brain {
     this.updateEnergy(m, ent, tick);
     const ctx = this.midContext(m, trigger);
     if (m.avoid && m.avoid.untilTick > tick) ctx.options = ctx.options.filter((o) => o.id !== m.avoid!.id); else m.avoid = undefined;
-    if (ctx.options.length === 0) { m.nextEvalTick = tick + TPS * 20; return; }
     // A plan that has been impossible for ten minutes is given up, so a Soul is never stuck waiting for ever.
     if (m.agendaPos < m.agenda.length) {
       if (!ctx.options.some((o) => o.servesIntent && o.card !== 'wait') && m.planBlockedSince === undefined) m.planBlockedSince = tick;
-      if (m.planBlockedSince !== undefined && tick - m.planBlockedSince > TPS * 600) { m.recent = [...m.recent.slice(-3), `gave up on the plan at "${m.agenda[m.agendaPos].card}" (not possible for a long while)`]; m.agendaPos = m.agenda.length; m.planBlockedSince = undefined; host.markDirty(m.soulId); }
+      if (m.planBlockedSince !== undefined && tick - m.planBlockedSince > TPS * 600) {
+        if(m.activeRule){void host.enqueue('mandate','world',{soulId:m.soulId,ruleId:m.activeRule,op:'status',patch:{status:'blocked',report:`The next card, ${m.agenda[m.agendaPos].card}, stayed impossible for ten minutes.`}});m.nextEvalTick=tick+20;return;}
+        m.recent = [...m.recent.slice(-3), `gave up on the plan at "${m.agenda[m.agendaPos].card}" (not possible for a long while)`]; m.agendaPos = m.agenda.length; m.planBlockedSince = undefined; host.markDirty(m.soulId);
+      }
     }
+    if (ctx.options.length === 0) { m.nextEvalTick = tick + TPS * 20; return; }
     const noBudgetNow = this.mode !== 'fake' && (this.overBudget || this.gov.waitSeconds('mid') > 0);
     // Tier 1, reflex: what code already knows needs no model.
     //  · Someone asked a question: the only options are to answer it (and if the owner's plan says to agree, agree).
@@ -225,7 +242,11 @@ export class Brain {
     const answers = ctx.options.filter((o) => o.card === 'say yes' || o.card === 'say no');
     const serving = ctx.options.filter((o) => o.servesIntent && o.card !== 'wait');
     let reflex: CardOption | undefined, why = '';
-    if (answers.length) {
+    if(m.activeRule){
+      if(m.agendaPos>=m.agenda.length){void host.enqueue('mandate','world',{soulId:m.soulId,op:'status',ruleId:m.activeRule,patch:{status:'done',report:'The cards played and their objective changes are logged.'}});m.nextEvalTick=tick+20;return;}
+      reflex=serving.sort((a,b)=>a.id.localeCompare(b.id))[0];why='the owner explicitly asked for this now';
+      if(!reflex){m.nextEvalTick=tick+20;return;}
+    }else if (answers.length) {
       ctx.options = answers; reflex = answers.find((o) => o.card === 'say yes' && o.servesIntent); why = 'someone asked, and the plan says to agree';
       // a question is never left hanging for want of budget: without a model, yes two times in three
       if (!reflex && noBudgetNow) { const yes = hash32(`${m.soulId}:${tick}:answer`) % 3 !== 0; reflex = answers.find((o) => o.card === (yes ? 'say yes' : 'say no')) ?? answers[0]; why = 'someone asked (no model budget just now)'; }
@@ -270,6 +291,10 @@ export class Brain {
     const now = host.engine.world.tick;
     const stale = m.intentVersion !== version || host.quietBarrier;
     const opt = ctx.options.find((o) => o.id === decision.option);
+    if(!stale&&host.living){const c=clockAt(now,host.living.origin,host.living.dayTicks);for(const r of mandateOf(host.kernel,m.soulId).filter(r=>r.strict&&r.status==='active'&&r.lastReportDay!==c.day)){
+      const chosen=opt?{card:opt.card,target:opt.cardTarget}:m.pending?{card:m.pending.card,target:m.pending.target}:null;
+      if(!chosen||!r.agenda.some(a=>matchesStep(host,a,chosen.card,chosen.target)))void host.enqueue('mandate','world',{soulId:m.soulId,ruleId:r.id,op:'report',patch:{lastReportDay:c.day,report:`This decision did not follow the strict rule: ${opt?.label??'continued the current activity'}. Needs, circumstances and the logged choice are available for review.`}});
+    }}
     const policy = { how: decision.how, pool: decision.pool, topP: decision.topP, keepGoing: decision.keepGoing, sociable: decision.sociable, optionKeys: Object.fromEntries(keys) };
     const applied = stale ? { dropped: 'intent changed during the call; re-evaluating' } : opt
       ? { option: opt.id, label: opt.label, card: opt.card, target: opt.cardTarget, manner: decision.manner, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, probabilities: decision.probabilities, ...policy, seed }
@@ -384,17 +409,17 @@ export class Brain {
   }
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
-  async compile(m: Mind, wish: string): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[] } | { ok: false; reason: string } | null> {
+  async compile(m: Mind, wish: string, align=false): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
     if (this.mode === 'fake' || !this.cfg.anthropicKey) return null;
     if (this.overBudget || !this.gov.allow('user')) return { ok: false, reason: 'the thinking budget is spent for now; try again in a few minutes' };
     const k = this.host.kernel, tick = this.host.engine.world.tick;
     const verbs = this.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity');
-    const system = COMPILER_PREAMBLE + cardGrammar(verbs);
+    const system = (align?`Align ONE new owner mandate rule in ONE call. Return alignment with a short understanding of the objective effects and one trigger. Time is the world's 24-hour clock: at 5pm every day means {kind:"time",hour:17,minute:0}. Every time Bill hosts a party means {kind:"gathering",host:Bill's known Soul id}. If you feel like it means {kind:"none"}. Only an explicit instruction to act now/immediately means {kind:"now"}. Otherwise use none: do not invent an immediate instruction. Triggers only wake the mind; the agenda describes possible objective steps, and non-now rules do not execute it automatically. The owner's words remain verbatim private context. Explain impossible or unclear rules by understood:false.\n`:'')+COMPILER_PREAMBLE + cardGrammar(verbs);
     const user = compileUser(k, m.soulId, wish, candidatesFor(this.host, m.soulId));
     const messages: { role: 'user' | 'assistant'; content: string }[] = [{ role: 'user', content: user }];
     let cost = 0, ms = 0, inTok = 0, outTok = 0, cached = 0; const attempts: unknown[] = [];
     try {
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < (align?1:2); attempt++) {
         const r = await callTool<CompileOut>({ gate: this.paidGate, apiKey: this.cfg.anthropicKey, model: this.cfg.compilerModel, system, cacheSystem: true, messages, tool: COMPILE_TOOL, maxTokens: 1800 });
         cost += r.costUsd; ms += r.ms; inTok += r.inputTokens; outTok += r.outputTokens; cached += r.cachedTokens;
         const out = r.out;
@@ -405,6 +430,7 @@ export class Brain {
         }
         // check everything before minting anything
         const problems: string[] = []; const verbSet = this.engineVerbs();
+        if(align){const trigger=mandateTriggerSchema.safeParse(out.alignment?.trigger);if(!trigger.success||!out.alignment?.understanding?.trim())problems.push('alignment must explain the effect and provide a valid trigger');else if(trigger.data.kind==='gathering'&&k.things[trigger.data.host]?.kind!=='soul')problems.push('the trigger host must be a known Soul');else if(trigger.data.kind==='now'&&(!/\b(?:now|immediately|right away)\b/i.test(wish)||/\bnot\s+(?:now|immediately)\b/i.test(wish)))problems.push('only an explicit immediate instruction may run directly');}
         const staged = structuredClone(k); for (const [n, d] of Object.entries(out.new_links ?? {})) staged.vocab.links[n] ??= d;
         const owners = Object.values(k.things).filter((x) => x.kind === 'soul' && x.id !== m.soulId && new RegExp(`\\b${x.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(’s|'s)`, 'i').test(wish));
         const validNew = new Map<string, Card>();
@@ -432,7 +458,7 @@ export class Brain {
             problems.push(`agenda step "${a.card}" targets ${t.name} (${t.id}), but the wish says ${owners.map((o) => `${o.name}’s`).join(' or ')} and that thing is not theirs. If ${owners[0].name} has no such thing yet, set "target" to null and "of" to "${owners[0].id}"`);
         }
         attempts.push({ out, problems });
-        if (problems.length && attempt === 0) { messages.push({ role: 'assistant', content: `I proposed: ${JSON.stringify(out)}` }, { role: 'user', content: `That cannot run. Problems:\n- ${problems.join('\n- ')}\nFix them and call compile again.` }); continue; }
+        if (problems.length && attempt === 0 && !align) { messages.push({ role: 'assistant', content: `I proposed: ${JSON.stringify(out)}` }, { role: 'user', content: `That cannot run. Problems:\n- ${problems.join('\n- ')}\nFix them and call compile again.` }); continue; }
         if (problems.length) {
           this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, rejected: problems, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: 'the compiled plan did not validate' });
           return { ok: false, reason: `could not turn that into something the world can run (${problems[0]})` };
@@ -441,7 +467,7 @@ export class Brain {
         const deal = [...new Set(out.agenda.map((a) => a.card))].filter((c) => this.host.kernel.vocab.cards[c] && !this.host.kernel.decks[m.soulId]?.cards.includes(c));
         if (deal.length) await this.host.enqueue('deck', `soul:${m.soulId}`, { soulId: m.soulId, add: deal, why: 'needed for the owner’s wish' });
         this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, agenda: out.agenda, minted, dealt: deal, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live' });
-        return { ok: true, agenda: out.agenda.map((a) => ({ card: a.card, target: a.target, ...(a.of ? { of: a.of } : {}) })), minted };
+        return { ok: true, agenda: out.agenda.map((a) => ({ card: a.card, target: a.target, ...(a.of ? { of: a.of } : {}) })), minted, ...(align?{alignment:out.alignment}:{}) };
       }
     } catch (e) {
       this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { messages }, response: null, applied: { wish, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: String((e as Error).message) });
@@ -620,8 +646,8 @@ export class Brain {
 /** Triggers after which the question is "what now?", not "should I keep going?". */
 /** The most kinds of link, and kinds of thing, a world's vocabulary may hold. */
 const MAX_VOCAB_WORDS = 400;
-const URGENT = new Set(['new-intent', 'plan-advanced', 'spoken-to']);
-const prio = (trigger: string) => ({ 'new-intent': 0, 'spoken-to': 0, 'plan-advanced': 0, 'activity-failed': 1, 'activity-ended': 1, birth: 1, 'narrator-beat': 2 } as Record<string, number>)[trigger] ?? 3;
+const URGENT = new Set(['new-intent', 'mandate-now', 'plan-advanced', 'spoken-to']);
+const prio = (trigger: string) => ({ 'new-intent': 0, 'mandate-now': 0, 'spoken-to': 0, 'plan-advanced': 0, 'activity-failed': 1, 'activity-ended': 1, birth: 1, 'narrator-beat': 2 } as Record<string, number>)[trigger] ?? 3;
 const durationFloor = (h: string) => (h === 'seconds' ? 8 : h === 'minute' ? 20 : 30);
 const score = (e: Entity) => ({ perform: 5, converse: 4, walk: 3, gather: 2, wave: 2 } as Record<string, number>)[e.human!.activity] ?? 0;
 const heldWord = (s: number) => (s < 8 ? 'just started' : s < 25 ? 'a little while' : s < 60 ? 'quite a while' : 'a long time');

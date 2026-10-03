@@ -30,7 +30,7 @@ const words = (s: string) => new Set(s.toLowerCase().match(/[a-z]{4,}/g) ?? []);
 export function livingChoice(c: MidContext, seed: string): MidDecision {
   const rng = seedRng(seed), n = c.soul.needs;
   if (!n) throw new Error('living chooser needs a living Soul');
-  const nature = words(`${c.soul.about} ${c.soul.journal ?? ''}`), recent = c.soul.recent;
+  const nature = words(`${c.soul.about} ${c.soul.journal ?? ''} ${(c.soul.mandate??[]).map(r=>r.words).join(' ')}`), recent = c.soul.recent;
   const scored = c.options.map(o => {
     const text = `${o.template} ${o.label} ${o.goodWhen ?? ''}`.toLowerCase();
     let score = 1 + nextFloat(rng) * 3;

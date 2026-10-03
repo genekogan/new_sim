@@ -4,6 +4,7 @@
 // owners' agents (as /cards.md) so they can propose cards themselves.
 import type { KState, MintedCard } from '@sim/kernel';
 import type { ToolDef } from './llm.ts';
+import type {Alignment} from '@sim/protocol';
 
 export type VerbDoc = { verb: string; description: string; inputSchema: Record<string, unknown>; scope?: 'world' };
 
@@ -134,6 +135,7 @@ export const COMPILE_TOOL: ToolDef = {
     type: 'object',
     properties: {
       understood: { type: 'boolean' }, reason: { type: 'string' },
+      alignment: {type:'object',properties:{understanding:{type:'string'},trigger:{type:'object',properties:{kind:{type:'string',enum:['none','now','time','gathering']},hour:{type:'integer',minimum:0,maximum:23},minute:{type:'integer',minimum:0,maximum:59},host:{type:'string'}},required:['kind']}},required:['understanding','trigger']},
       agenda: { type: 'array', maxItems: 8, items: { type: 'object', properties: { card: { type: 'string' }, target: { type: ['string', 'null'] }, of: { type: ['string', 'null'] } }, required: ['card', 'target'] } },
       new_cards: { type: 'array', maxItems: 4, items: { type: 'object' } },
       new_links: { type: 'object', additionalProperties: { type: 'object', properties: { summary: { type: 'string' }, control: { type: 'boolean' } }, required: ['summary'] } },
@@ -142,7 +144,7 @@ export const COMPILE_TOOL: ToolDef = {
     required: ['understood', 'agenda'],
   },
 };
-export type CompileOut = { understood: boolean; reason?: string; agenda: { card: string; target: string | null; of?: string | null }[]; new_cards?: unknown[]; new_links?: Record<string, { summary: string; control?: boolean }>; new_kinds?: Record<string, { summary: string }> };
+export type CompileOut = { understood: boolean; reason?: string; alignment?:Alignment; agenda: { card: string; target: string | null; of?: string | null }[]; new_cards?: unknown[]; new_links?: Record<string, { summary: string; control?: boolean }>; new_kinds?: Record<string, { summary: string }> };
 
 /** User-written text placed in a prompt: one line, and unable to open or close a tag. */
 const plain = (v: unknown, max = 200) => String(v ?? '').replace(/[<>\r\n]+/g, ' ').slice(0, max);
@@ -154,11 +156,12 @@ export function compileUser(k: KState, soulId: string, wish: string, known: stri
   const inDeck = deck.map((n) => k.vocab.cards[n]).filter(Boolean), library = Object.values(k.vocab.cards).filter((c) => !deck.includes(c.name));
   const things = known.map((id) => k.things[id]).filter(Boolean).map((t) => {
     const links = Object.values(k.links).filter((l) => l.to === t.id && (l.until === undefined || l.until >= k.tick) && l.kind !== 'said' && l.kind !== 'asked').map((l) => `${k.things[l.from]?.name ?? l.from} ${l.kind}`);
-    return `- ${t.id} | ${t.kind} | ${plain(t.name, 60)}${t.at ? ` | at ${plain(k.things[t.at]?.name ?? t.at, 60)}` : ''}${Object.keys(t.states).length ? ` | ${plain(JSON.stringify(t.states), 160)}` : ''}${links.length ? ` | ${plain(links.join('; '), 200)}` : ''}`;
+    const states=Object.fromEntries(Object.entries(t.states).filter(([key])=>key!=='privateMandate'));
+    return `- ${t.id} | ${t.kind} | ${plain(t.name, 60)}${t.at ? ` | at ${plain(k.things[t.at]?.name ?? t.at, 60)}` : ''}${Object.keys(states).length ? ` | ${plain(JSON.stringify(states), 160)}` : ''}${links.length ? ` | ${plain(links.join('; '), 200)}` : ''}`;
   });
   return `<soul>${plain(soul.name, 40)}: ${plain(soul.traits.about)} (currently at ${soul.at ? (k.things[soul.at]?.name ?? soul.at) : 'nowhere'})</soul>
 
-<wish>${plain(wish, 280)}</wish>
+<wish>${plain(wish, 2000)}</wish>
 
 Cards in this Soul's deck:
 ${inDeck.map(cardLine).join('\n')}

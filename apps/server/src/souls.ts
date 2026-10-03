@@ -1,6 +1,8 @@
 // Soul operations shared by the web API, the agent API and MCP.
 import { randomBytes } from 'node:crypto';
-import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
+import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, steerSchema, type MandateRule, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
+import {mandateOf,explicitTrigger} from './mandate.ts';
+import {clockAt} from '@sim/brain';
 import { deckView } from './deck.ts';
 import { hashToken, newId, newSoulToken, RateLimit } from './auth.ts';
 import type { Brain } from './brain.ts';
@@ -108,6 +110,7 @@ export class Souls {
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many intents; slow down', { retry_after: lim.retryAfter });
     const p = intentSchema.safeParse(input);
     if (!p.success) throw new ApiError(400, 'invalid-intent', p.error.issues.map((i) => `${i.path.join('.') || 'intent'}: ${i.message}`).join('; '));
+    if(this.host.living&&mandateOf(this.host.kernel,soul.id).length>=24)throw new ApiError(409,'mandate-full','at most 24 rules per Soul; edit or remove an existing rule');
     const k = this.host.kernel; const intent: WireIntent = { ...p.data };
     const need = (ref: string) => { const id = this.resolveThing(ref); if (!id) throw new ApiError(400, 'unknown-target', `no such target: ${ref}. Look at the world or perceive endpoints for valid names and ids.`); return id; };
     if (intent.target) intent.target = need(intent.target);
@@ -120,12 +123,22 @@ export class Souls {
       const deal = [...new Set(intent.agenda.map((a) => a.card))].filter((c) => !k.decks[soul.id]?.cards.includes(c));
       if (deal.length) await this.host.enqueue('deck', `soul:${soul.id}`, { soulId: soul.id, add: deal, why: 'on the agenda' } satisfies DeckPayload);
     } else intent.agenda = this.agendaFromGoal(intent.goal!, intent.target ?? null);
+    if(this.host.living){
+      const words=intent.text??intent.note??JSON.stringify(p.data);
+      const aligned=await this.brain.compile(this.host.minds.get(soul.id)!,`Perform this explicit agenda now: ${JSON.stringify(intent.agenda)}. Owner context: ${words}`,true);
+      if(aligned&&!aligned.ok)throw new ApiError(400,'rule-not-aligned',aligned.reason);
+      const rule:MandateRule={id:newId('r'),words,strict:false,understanding:aligned?.ok?aligned.alignment?.understanding??describeIntent(intent,id=>this.host.nameOf(id)):describeIntent(intent,id=>this.host.nameOf(id)),agenda:intent.agenda,trigger:{kind:'now'},status:'active',report:null};
+      await this.replaceNow(soul,rule);
+      const event=await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'upsert',rule,source});
+      return {event,intent,text:rule.understanding};
+    }
     const event = await this.host.enqueue('intent', `soul:${soul.id}`, { soulId: soul.id, intent, source } satisfies IntentPayload);
     return { event, intent, text: describeIntent(intent, (id) => this.host.nameOf(id)) };
   }
 
   /** A wish in plain words. The compiler turns it into an agenda (minting cards if needed); without a compiler, the small translator picks a goal. */
   async command(soul: SoulRow, text: string, source: IntentPayload['source'] = 'web') {
+    if(this.host.living)return this.steer(soul,{words:text},source);
     const lim = this.limits.allow(`cmd:${soul.owner}`, 20, 60_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many commands; slow down', { retry_after: lim.retryAfter });
     const mind = this.host.minds.get(soul.id);
@@ -144,6 +157,42 @@ export class Souls {
     const r = await this.setIntent(soul, tr.intent, source);
     return { ok: true as const, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq, via: tr.via, confidence: tr.confidence, minted: [] as string[] };
   }
+
+  async steer(soul:SoulRow,input:unknown,source:IntentPayload['source']='web'){
+    const parsed=steerSchema.safeParse(input);if(!parsed.success)throw new ApiError(400,'invalid-rule','a rule needs words (1–2000 characters), optional strict and an existing id to edit');
+    const p=parsed.data,m=this.host.minds.get(soul.id);if(!m)throw new ApiError(409,'not-in-world','this Soul is not in the world yet');
+    const limit=this.limits.allow(`steer:${soul.owner}`,20,60000);if(!limit.ok)throw new ApiError(429,'rate-limited','too many rule changes; slow down');
+    const existing=mandateOf(this.host.kernel,soul.id);
+    if(p.id&&!existing.some(r=>r.id===p.id))throw new ApiError(404,'unknown-rule','that rule is not in this Soul’s mandate');
+    if(!p.id&&existing.length>=24)throw new ApiError(409,'mandate-full','at most 24 rules per Soul; edit or remove an existing rule');
+    const compiled=await this.brain.compile(m,p.words,true);
+    if(compiled&&!compiled.ok)return {ok:false as const,reason:compiled.reason,via:'align'};
+    let agenda:AgendaStep[],understanding:string,trigger:MandateRule['trigger'],minted:string[]=[];
+    if(compiled?.ok){if(!compiled.alignment)throw new ApiError(400,'invalid-alignment','alignment did not return an understanding');agenda=compiled.agenda;({understanding,trigger}=compiled.alignment);minted=compiled.minted.filter(v=>v.ok).map(v=>v.name);}
+    else {
+      try{trigger=explicitTrigger(p.words,name=>Object.values(this.host.kernel.things).find(t=>t.kind==='soul'&&t.name.toLowerCase()===name.toLowerCase())?.id??null);}catch(e){return {ok:false as const,reason:(e as Error).message,via:'align'};}
+      const action=p.words.toLowerCase().replace(/\s+(?:at\s+\d[^]*?every day|every time\s+[^]*|if you feel like it|now|immediately|right away)\s*$/i,'').replace(/^please\s+/,'').trim();
+      const card=Object.values(this.host.kernel.vocab.cards).filter(c=>action===c.name||action.startsWith(c.name+' ')).sort((a,b)=>b.name.length-a.name.length)[0];
+      if(!card)return {ok:false as const,reason:'Without model alignment, name an existing card such as rest or join. No rule was added.',via:'align'};
+      const rest=action.slice(card.name.length).replace(/^(?:on|with|at|the)\s+/,'').trim(),target=rest?this.resolveThing(rest):null;
+      if(card.target&&rest&&!target)return {ok:false as const,reason:`No known target named ${rest}`,via:'align'};
+      agenda=[{card:card.name,target,...(trigger.kind==='gathering'&&card.target?.kind==='gathering'?{of:trigger.host}:{})}];
+      if(!this.host.kernel.decks[m.soulId]?.cards.includes(card.name))await this.host.enqueue('deck',`soul:${soul.id}`,{soulId:soul.id,add:[card.name],why:'needed for the owner rule'});
+      understanding=describeIntent({agenda},id=>this.host.nameOf(id));
+    }
+    const rule:MandateRule={id:p.id??newId('r'),words:p.words,strict:p.strict,understanding,agenda,trigger,status:'active',report:null};
+    const living=this.host.living,c=living?clockAt(this.host.engine.world.tick,living.origin,living.dayTicks):null;
+    if(c&&trigger.kind==='time'&&(c.hour+18)%24+c.minute/60>=(trigger.hour+18)%24+trigger.minute/60)rule.lastFiredDay=c.day;
+    await this.replaceNow(soul,rule);
+    const event=await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'upsert',rule,source});
+    return {ok:true as const,rule,text:understanding,tick:event.tick,seq:event.seq,via:'align',minted};
+  }
+  private async replaceNow(soul:SoulRow,rule:MandateRule){
+    const old=this.host.minds.get(soul.id)?.activeRule;
+    if(rule.trigger.kind==='now'&&old&&old!==rule.id)await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,ruleId:old,op:'status',patch:{status:'blocked',report:'Replaced by a newer NOW request from the owner.'}});
+  }
+  rules(soul:SoulRow){return mandateOf(this.host.kernel,soul.id);}
+  async removeRule(soul:SoulRow,id:string){if(!mandateOf(this.host.kernel,soul.id).some(r=>r.id===id))throw new ApiError(404,'unknown-rule','that rule is not in this Soul’s mandate');const event=await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'remove',ruleId:id});return {ok:true,tick:event.tick};}
 
   /** An owner's agent proposes cards for its Soul's deck. Validated like any other card; no model involved. */
   async proposeCards(soul: SoulRow, input: unknown) {
@@ -189,6 +238,7 @@ export class Souls {
       position: { x: ent.pose.p[0], z: ent.pose.p[2], region: s.region }, activity: ent.human!.activity, doing: e.programOf(m.entityId) ? m.doing : 'standing around',
       mood: m.mood, energy: energyWord(m.energy), wants_company: m.wantsCompany,
       ...(m.life ? { needs: m.life.needs, journal: m.life.journal, reflected_day: m.life.reflectedDay, customs: this.host.living?.customs } : {}),
+      mandate:mandateOf(this.host.kernel,soul.id),
       intent: m.intent, intent_text: describeIntent(m.intent, nameOf), agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ? this.host.nameOf(a.target) : null, done: i < m.agendaPos })), recent: m.recent, nearby: s.nearby, happening: s.happening,
       storyteller_suggests: m.nudge?.text ?? null,
       next_think_in_s: Math.max(0, Math.round((m.nextEvalTick - e.world.tick) / 20)),

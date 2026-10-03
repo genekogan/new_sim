@@ -17,6 +17,7 @@ for (let attempt = 0; attempt < 4; attempt++) {
   const events = rows.map((r) => ({ ...r, payload: JSON.parse(r.payload) }));
   const t0 = performance.now();
   const k = replayKernel(initKernel(toyFactory.create(toyFactory.genesis(world.seed)), pinnedVocabulary(events)), events); k.tick = live.tick;
+  for(const thing of Object.values(k.things))delete thing.states.privateMandate;
   const h = kernelHash(k).slice(0, 16);
   const kinds: Record<string, number> = {}; for (const e of events) kinds[e.kind] = (kinds[e.kind] ?? 0) + 1;
   console.log(`tick ${live.tick}: ${events.length} events ${JSON.stringify(kinds)} replayed in ${(performance.now() - t0).toFixed(0)} ms; live ${live.hash} replay ${h} → ${h === live.hash ? 'MATCH' : 'differ'}`);

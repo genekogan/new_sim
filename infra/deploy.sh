@@ -87,7 +87,7 @@ PYREMOTE
 for attempt in $(seq 1 30); do
   if ssh "$HOST" "curl -fsS http://127.0.0.1:4500/healthz | grep -q '$BUILD' && curl -fsS http://127.0.0.1:4502/healthz | grep -q '$BUILD'"; then break; fi
   if [ "$attempt" = 30 ]; then
-    ssh "$HOST" "prev=\$(cat /srv/sim/ops/$BUILD/production.previous); ln -sfn \"\$prev\" /srv/sim/current; systemctl restart sim; systemctl restart sim-world@mars"
+    infra/rollback.sh
     echo 'production health failed; code rolled back for toy and Mars'; exit 1
   fi
   sleep 1

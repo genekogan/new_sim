@@ -82,7 +82,7 @@ curl -s -X POST ${base}/v1/agent/command -H "Authorization: Bearer $TOKEN" -H 'c
   -d '{"text":"go to Rob\u2019s party and ask him if you can DJ"}'
 \`\`\`
 
-The reply shows the plan it understood (\`text\`, \`intent.agenda\`) and any cards it \`minted\`. If it
+In a living world this adds a private mandate rule: the reply returns \`rule\` with its understanding, trigger and status. Times and conditions wake thought; only explicit NOW starts directly. GET \`/v1/agent/mandate\` lists rules; POST with \`{words, strict, id?}\` adds/edits; DELETE \`/v1/agent/mandate/<rule-id>\` removes. With no rules, the Soul carries on. In the toy world the reply shows the plan it understood (\`text\`, \`intent.agenda\`) and any cards it \`minted\`. If it
 says \`ok: false\`, the \`reason\` tells you why: rephrase, or write the plan yourself.
 
 **The exact way: write the plan.** An agenda is a list of steps; each names a card from the deck
@@ -153,6 +153,6 @@ carries the current status. A natural loop:
 ## MCP (for apps that use connectors instead of HTTP)
 
 The same tools are available over MCP (Streamable HTTP):
-\`world_query\`, \`soul_perceive\`, \`soul_status\`, \`soul_log\`, \`soul_deck\`, \`soul_set_intent\`, \`soul_command\`, \`soul_propose_cards\`, \`soul_wait\`.
+\`world_query\`, \`soul_perceive\`, \`soul_status\`, \`soul_log\`, \`soul_deck\`, \`soul_set_intent\`, \`soul_command\`, \`soul_propose_cards\`, \`soul_wait\`, \`soul_mandate\`, \`soul_steer\`, \`soul_remove_rule\`.
 Use \`${base}/mcp\` with the bearer token, or \`${base}/mcp/<token>\` for apps that only accept a URL.
 `;

@@ -2,7 +2,7 @@
 // agent → watch its dashboard. One column of cards, in the order a newcomer needs them.
 import { DeckPanel, HeardPanel, SentencesPanel } from './Grammar.tsx';
 import { useEffect, useState } from 'react';
-import { GOALS, type BrainCall } from '@sim/protocol';
+import { GOALS, type BrainCall, type MandateRule } from '@sim/protocol';
 import type { AuthCtx } from './Shell.tsx';
 import type { Api, Sim } from './useSim.ts';
 import { Call } from './BrainPanels.tsx';
@@ -108,6 +108,7 @@ function PairApprove({ api, code, souls, done }: { api: Api; code: string; souls
 function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Sim; api: Api; soul: MySoul; isAdmin: boolean; base: string; refresh(): void; onGone(): void }) {
   const [d, setD] = useState<Dash | null>(null); const [tl, setTl] = useState<TL[]>([]);
   const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [replies, setReplies] = useState<{ text: string; reply: string; ok: boolean }[]>([]);
+  const [strict,setStrict]=useState(false),[editingRule,setEditingRule]=useState<string|null>(null);
   const [goal, setGoal] = useState<string>('wander'); const [target, setTarget] = useState(''); const [note, setNote] = useState('');
   const [pair, setPair] = useState<{ prompt: string; code: string } | null>(null); const [copied, setCopied] = useState(false); const [pairAt, setPairAt] = useState(0);
   const [shot, setShot] = useState<any>(null); const [openCall, setOpenCall] = useState<BrainCall | null>(null);
@@ -122,9 +123,10 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
   useEffect(() => { if (d?.agent.attached && d.agent.since && pair && d.agent.since > pairAt) setPair(null); }, [d?.agent.since]); // eslint-disable-line react-hooks/exhaustive-deps
   const send = async () => {
     if (!text.trim()) return; const t = text; setText(''); setBusy(true);
-    const r = await api(`/v1/souls/${soul.id}/command`, { text: t }); setBusy(false);
+    const r = s?.needs?await api(`/v1/souls/${soul.id}/mandate`,{words:t,strict,...(editingRule?{id:editingRule}:{})}):await api(`/v1/souls/${soul.id}/command`, { text: t }); setBusy(false);
+    if(r.status===200&&r.data.ok){setEditingRule(null);setStrict(false);}
     if (r.status !== 200) setText((cur) => cur || t);
-    const reply = r.status !== 200 ? (r.data.message ?? 'failed') : r.data.ok ? `the plan: ${r.data.text}${r.data.minted?.length ? ` · new card${r.data.minted.length > 1 ? 's' : ''} made for this: ${r.data.minted.join(', ')}` : ''}` : `could not: ${r.data.reason}`;
+    const reply = r.status !== 200 ? (r.data.message ?? 'failed') : r.data.ok ? `${s?.needs?'understood':'the plan'}: ${r.data.text}${r.data.minted?.length ? ` · new card${r.data.minted.length > 1 ? 's' : ''} made for this: ${r.data.minted.join(', ')}` : ''}` : `could not: ${r.data.reason}`;
     setReplies((h) => [...h, { text: t, reply, ok: r.status === 200 && r.data.ok }].slice(-6));
   };
   const setIntent = async () => {
@@ -144,7 +146,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
           <span>where</span><span>{sim.kernel?.things[sim.kernel.things[soul.id]?.at ?? '']?.name ?? sim.conn.replica.regions[s.position.region]?.label ?? s.position.region} <span className="dim">({s.position.x.toFixed(0)}, {s.position.z.toFixed(0)})</span></span>
           {s.agenda?.length > 0 && <><span>plan</span><span className="wrap">{s.agenda.map((a: any, i: number) => <span key={i} style={{ marginRight: 10 }} className={a.done ? 'dim' : ''}>{a.done ? '✓' : '·'} {a.card}{a.target ? ` (${a.target})` : ''}</span>)}</span></>}
           <span>mood · energy</span><span>{s.mood} · {s.energy}</span>
-          <span>your direction</span><span>{s.intent ? s.intent_text : <span className="dim">none yet: living by its own nature</span>}</span>
+          <span>your direction</span><span>{s.intent ? s.intent_text : s.mandate?.some((r:MandateRule)=>r.status==='active')?'standing rules below':<span className="dim">none yet: living by its own nature</span>}</span>
           {s.storyteller_suggests && <><span>storyteller</span><span className="dim">{s.storyteller_suggests}</span></>}
           <span>reconsiders in</span><span>{s.next_think_in_s} s <span className="dim">(or sooner, when what it is doing ends)</span></span>
           <span>around it</span><span>{s.nearby.slice(0, 6).map((n: any) => `${n.who} (${n.distance}, ${n.doing})`).join(' · ') || 'nothing close'}</span>
@@ -153,17 +155,19 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
       </section>
 
       <section>
-        <h2>Step 3 — give {soul.name} direction</h2>
+        <h2>{s?.needs?'Mandate':`Step 3 — give ${soul.name} direction`}</h2>
         {s?.needs && <div className="kv">{Object.entries(s.needs).map(([name, value]) => <div key={name}>{name}: {Math.round(Number(value))} / 100</div>)}</div>}
         {s?.journal && <details open><summary>Journal</summary><p>{s.journal}</p></details>}
-        <div className="row"><input placeholder={`tell ${soul.name} what to do, in plain words`} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void send(); }} maxLength={280} /><button className="primary" disabled={busy || !text.trim()} onClick={() => void send()}>send</button></div>
-        <details><summary className="dim">or pick exactly</summary>
+        {s?.needs&&<>{(s.mandate??[]).map((r:MandateRule)=><div className="card" key={r.id}><p><b>{r.strict?'Strict · ':''}{r.words}</b></p><p>{r.understanding}</p><p className="dim">{r.trigger.kind==='time'?`Think daily at ${String(r.trigger.hour).padStart(2,'0')}:${String(r.trigger.minute).padStart(2,'0')}`:r.trigger.kind==='gathering'?`Think when ${sim.kernel?.things[r.trigger.host]?.name??'the host'} starts a gathering`:r.trigger.kind==='now'?'Do now':'Weigh at each decision'} · {r.status}</p>{r.report&&<p>{r.report}</p>}<button onClick={()=>{setEditingRule(r.id);setText(r.words);setStrict(r.strict);}}>edit</button> <button onClick={async()=>{const result=await api(`/v1/souls/${soul.id}/mandate/${r.id}`,undefined,'DELETE');if(result.status!==200)setReplies(h=>[...h,{text:'remove rule',reply:result.data.message,ok:false}]);}}>remove</button></div>)}<p className="dim">Rules are private. Times and conditions wake thought. An explicit “do this now” takes precedence. With no rules, {soul.name} carries on.</p></>}
+        <div className="row"><input placeholder={`tell ${soul.name} what to do, in plain words`} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void send(); }} maxLength={s?.needs?2000:280} /><button className="primary" disabled={busy || !text.trim()} onClick={() => void send()}>{editingRule?'save rule':s?.needs?'add rule':'send'}</button>{editingRule&&<button onClick={()=>{setEditingRule(null);setText('');setStrict(false);}}>cancel edit</button>}</div>
+        {s?.needs&&<label><input type="checkbox" checked={strict} onChange={e=>setStrict(e.target.checked)}/> Strict: put first and report when not followed</label>}
+        {!s?.needs&&<details><summary className="dim">or pick exactly</summary>
           <div className="row"><select value={goal} onChange={(e) => setGoal(e.target.value)}>{GOALS.map((g) => <option key={g}>{g}</option>)}</select>
             <select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">(no target)</option>{targets.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
           <div className="row"><input placeholder="optional note: how, why, in what spirit (only you and the Soul see it)" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} /><button onClick={() => void setIntent()}>set</button></div>
-        </details>
+        </details>}
         {replies.slice().reverse().map((h, i) => <div key={i}><span className="dim">you:</span> {h.text} <span className={h.ok ? 'ok' : 'warn'}>→ {h.reply}</span></div>)}
-        <p className="note">Direction is not remote control. Your words become a plan: a few cards for {soul.name} to play in order. If the world has no card for what you ask, one is made. {soul.name} decides how and when, answers when spoken to, and cannot act for anyone else: to get something from another Soul, it asks.</p>
+        <p className="note">{s?.needs?`Your rules inform ${soul.name}’s decisions alongside character, needs and journal. The Soul tells you what it understood, and can report a rule blocked. An explicit NOW request runs first; other rules leave room for judgement.`:<>Direction is not remote control. Your words become a plan: a few cards for {soul.name} to play in order. If the world has no card for what you ask, one is made. {soul.name} decides how and when, answers when spoken to, and cannot act for anyone else: to get something from another Soul, it asks.</>}</p>
       </section>
 
       <DeckPanel api={api} soulId={soul.id} name={soul.name} sim={sim} />

@@ -12,6 +12,7 @@ import type { Db } from './db.ts';
 import { advanceNeeds, newLife, type Life } from '@sim/brain';
 import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pinnedVocabulary, soulThing, type Vocabulary } from './fold.ts';
 import { frontier, stepIndex } from './deck.ts';
+import {mandateOf,MANDATE_STATE} from './mandate.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 
@@ -20,6 +21,7 @@ export type Mind = {
   soulId: string; entityId: string; name: string; description: string; owner: string; native: boolean;
   life?: Life;
   intent: WireIntent | null; intentVersion: number;
+  activeRule?: string;
   mood: string; energy: number; wantsCompany: number;
   recent: string[]; doing: string;
   nextEvalTick: number; evalTrigger: string; lastEnergyTick: number; lastFingerprint: string;
@@ -290,6 +292,17 @@ export class WorldHost {
         this.acc.dirty.add(p.soulId); this.kernelDirty = true;
         break;
       }
+      case 'mandate': {
+        const p=e.payload,m=this.minds.get(p.soulId);if(!m)break;
+        const rule=mandateOf(this.kernel,m.soulId).find(r=>r.id===(p.ruleId??p.rule?.id));
+        if(p.op==='upsert'&&rule?.trigger.kind==='now'){
+          m.activeRule=rule.id;m.intent={agenda:rule.agenda,text:rule.words};m.agenda=rule.agenda;m.agendaPos=0;m.planBlockedSince=undefined;
+        }else if(m.activeRule===(p.ruleId??p.rule?.id)&&(p.op==='remove'||rule?.status!=='active'||p.op==='upsert')){
+          m.activeRule=undefined;m.intent=null;m.agenda=[];m.agendaPos=0;m.planBlockedSince=undefined;
+        }
+        m.intentVersion++;m.nextEvalTick=tick+1;m.evalTrigger=p.op==='upsert'&&rule?.trigger.kind==='now'?'mandate-now':p.op==='wake'?'mandate-trigger':'mandate-changed';m.lastFingerprint='';
+        this.acc.dirty.add(m.soulId);this.kernelDirty=true;break;
+      }
       case 'intent': {
         const p = e.payload as IntentPayload; const m = this.minds.get(p.soulId);
         if (m) { m.intent = p.intent; m.agenda = p.intent.agenda ?? []; m.agendaPos = 0; m.planBlockedSince = undefined; m.intentVersion++; m.nextEvalTick = tick + 1; m.evalTrigger = 'new-intent'; m.lastFingerprint = ''; this.acc.dirty.add(m.soulId); }
@@ -324,6 +337,7 @@ export class WorldHost {
             const idx = matchedStep;
             if (idx >= 0 && idx <= Math.max(reach, m.agendaPos)) {
               m.agendaPos = idx + 1; m.planBlockedSince = undefined;
+              if(m.activeRule&&m.agendaPos>=m.agenda.length&&!replay)void this.enqueue('mandate','world',{soulId:m.soulId,ruleId:m.activeRule,op:'status',patch:{status:'done',report:'The cards played and their objective changes are logged.'}});
               // the plan moved on: think again now, rather than sitting out the rest of this activity
               if (m.agendaPos < m.agenda.length) { m.nextEvalTick = Math.min(m.nextEvalTick, tick + 15); m.evalTrigger = 'plan-advanced'; m.lastFingerprint = ''; }
             }
@@ -469,7 +483,8 @@ export class WorldHost {
   kernelView(): KernelView {
     const k = this.kernel; k.tick = this.engine.world.tick;
     const links = Object.fromEntries(Object.entries(k.links).filter(([, l]) => l.until === undefined || l.until >= k.tick));
-    return { tick: k.tick, things: k.things, links, decks: k.decks, vocab: k.vocab, hash: kernelHash(k).slice(0, 16), plays: this.counts };
+    const things=Object.fromEntries(Object.entries(k.things).map(([id,t])=>[id,{...t,states:Object.fromEntries(Object.entries(t.states).filter(([key])=>key!==MANDATE_STATE))}]));
+    return { tick: k.tick, things, links, decks: k.decks, vocab: k.vocab, hash: kernelHash({...k,things}).slice(0, 16), plays: this.counts };
   }
   viewHash(): string {
     const w = this.engine.world;

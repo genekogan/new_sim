@@ -85,6 +85,9 @@ export function buildApp(d: Deps) {
     const p = commandSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'text is required (1–280 characters)');
     return c.json(await d.souls.command(s, p.data.text));
   });
+  app.get('/v1/souls/:id/mandate',async c=>{const u=await requireUser(c);return c.json({rules:d.souls.rules(ownSoul(u,c.req.param('id')))});});
+  app.post('/v1/souls/:id/mandate',async c=>{const u=await requireUser(c);d.souls.requireInvited(u);return c.json(await d.souls.steer(ownSoul(u,c.req.param('id')),await body(c)));});
+  app.delete('/v1/souls/:id/mandate/:rule',async c=>{const u=await requireUser(c);return c.json(await d.souls.removeRule(ownSoul(u,c.req.param('id')),c.req.param('rule')));});
   app.post('/v1/souls/:id/intent', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, c.req.param('id'));
     const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
@@ -155,6 +158,9 @@ export function buildApp(d: Deps) {
     const s = agentSoul(c); const p = commandSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'text is required (1–280 characters)');
     return c.json(await d.souls.command(s, p.data.text, 'api'));
   });
+  app.get('/v1/agent/mandate',c=>c.json({rules:d.souls.rules(agentSoul(c))}));
+  app.post('/v1/agent/mandate',async c=>c.json(await d.souls.steer(agentSoul(c),await body(c),'api')));
+  app.delete('/v1/agent/mandate/:rule',async c=>c.json(await d.souls.removeRule(agentSoul(c),c.req.param('rule'))));
   app.get('/v1/agent/deck', (c) => c.json(d.souls.deck(agentSoul(c))));
   app.post('/v1/agent/cards', async (c) => c.json(await d.souls.proposeCards(agentSoul(c), await body(c))));
   app.post('/v1/agent/release', (c) => { const s = agentSoul(c); d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });

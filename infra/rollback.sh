@@ -6,7 +6,7 @@ TARGET="${1:-}"
 [ -z "$TARGET" ] || [[ "$TARGET" =~ ^[a-f0-9]{7,40}$ ]] || { echo 'invalid build'; exit 1; }
 ssh "$HOST" "set -e; cur=\$(readlink /srv/sim/current); target='$TARGET';
   if [ -n \"\$target\" ]; then target=/srv/sim/releases/\$target; else target=\$(readlink /srv/sim/previous); fi;
-  test -d \"\$target\"; ln -sfn \"\$cur\" /srv/sim/previous; ln -sfn \"\$target\" /srv/sim/current;
+  test -d \"\$target\"; python3 \"\$cur/infra/rollback-compatible.py\" \"\$target\"; ln -sfn \"\$cur\" /srv/sim/previous; ln -sfn \"\$target\" /srv/sim/current;
   systemctl restart sim;
   if [ -d \"\$target/mars/viewer/engine\" ]; then
     systemctl restart sim-world@mars;
