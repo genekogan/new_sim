@@ -267,3 +267,8 @@ the exit. Active programs and borrowed construction actors are protected.
 Deploy a courtesy-capable reader before logging the flag. The rollback guard
 refuses older readers once that event exists; never remove the policy event or
 rewrite production state to make an older rollback fit.
+
+Courtesy activation logs one additional policy event per existing living world,
+with both `sleepBlockTicks:1200` and `quietSeatCourtesy:true`. Restart must not log
+another courtesy activation. Toy receives none. Reader `9e78ee416a79` is compatible
+with the new flag; the earlier sleep-only reader is not.

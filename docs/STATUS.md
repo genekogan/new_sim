@@ -328,9 +328,9 @@ finished social holds and asks free bystanders to use native `makeWay` walking;
 active programs and construction crews retain control. No poses, seat codecs,
 Lab behavior, or historical policy are rewritten.
 
-This reader release leaves courtesy inactive on startup. A subsequent activation
-release must log the flag only after qualification; keep this reader as its
-compatible rollback. Focused tests prove the legacy obstruction, ordinary walking
+The reader release `9e78ee416a79` left courtesy inactive on startup. This
+activation candidate logs the flag once on each living non-Toy world; the reader
+is its compatible rollback. Promotion waits for fresh 48-day qualification. Focused tests prove the legacy obstruction, ordinary walking
 without invariant faults, protection of active work, and policy persistence through
 checkpoint restore and genesis replay. A fresh 48-day construction run is in
 progress; it fails immediately if daily renewal stops releasing.
