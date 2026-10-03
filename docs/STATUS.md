@@ -4,6 +4,11 @@ As of **2026-10-03**, canonical checkout `<repo>`. Sources
 `<old-sim-repo>`, `~/Mars` and `~/Dev/littlemartians` stay read-only. The exact deployed
 build is returned by `/healthz` and recorded in `<eden4>/MERGE-LOG.md`.
 
+The four worlds, owner mandate, take archives and autonomous construction are live.
+The prospective sleep policy is activated through a logged event in each living
+non-Toy world; recent checkpoints and daily renewal are verified. Final native
+gate and successor construction-soak receipts are maintained in MERGE-LOG.
+
 ## Live deployment contract
 
 | Surface | State |
@@ -11,7 +16,7 @@ build is returned by `/healthz` and recorded in `<eden4>/MERGE-LOG.md`.
 | Production | https://sim.eden.art; staging first, immutable release directories and code-only rollback |
 | Staging | https://<staging-host>; independent data and fake minds |
 | Worlds | `/` list, `/w/toy` preserves `toy-1`, `/w/mars`, `/w/littlemartians`, `/w/eden`: independent owner-bound processes |
-| Static | `/l/mars` original browser Lab; `/w/mars/2020`–`2027` Studio, public campus assets through an allowlisted same-origin proxy |
+| Static | `/l/mars`, `/l/littlemartians`, `/l/eden` browser snapshot Labs, all 68 presets; `/w/mars/2020`–`2027` Studio, public campus assets through an allowlisted same-origin proxy |
 | Ownership | All new-world Souls owned by Gene; existing Privy sign-in/admin; public watching |
 | Durability | Per-world SQLite, accepted event log, resumable checkpoints plus deterministic replay; Litestream/R2 and on-box backups |
 | Budget | Durable admission reservations and rolling real-24-hour ledger; absolute maximum $1/world; existing $0.50 setting retained |
@@ -37,7 +42,7 @@ Playback milestone checks (historical): workspace typecheck; 45 server tests; al
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
-Little Martians and Eden are live, with their qualification described below. The finite construction controller is qualified; autonomous construction cards are the next release. Toy now uses the same recorded 3D view. All four bounded Opus helpers finished;
+Little Martians and Eden are live, with their qualification described below. The finite construction controller is qualified; ordinary stage/frame/deck/stairs construction cards are live. Toy now uses the same recorded 3D view. All four bounded Opus helpers finished;
 building pictures are available at `/buildings`.
 
 ## Mandate milestone
@@ -296,3 +301,18 @@ Three historical browser fixtures now resolve the filtered fork commit
 2022 JSON remains byte-identical: SHA-256
 `205d20234f72a5a05da8252262b9b57488080c70727c20a00b6daf08162d6d93`.
 No historical geometry/performance assertion or baseline was changed.
+
+## Fork packaging boundary repair
+
+The native legacy deployment tests now stage selected runtime derivatives,
+not Blender reconstruction projects or the source-photo archive. Existing
+Blender downloads, methodology and legacy photo references remain linked to
+the unchanged public Mars origin; the year-page attribution link is also
+reachable there. Displayed open-question images retain existence/packaging
+validation; answered entries render only their text, so unused old image
+paths no longer require local source copies. Generated questions HTML is unchanged.
+
+All 296 native deployment tests and the changed legacy photo-entry browser
+journey passed. The full native gate is running separately at its pinned source
+commit; any failed step and its focused repair remain recorded in MERGE-LOG.
+No geometry/performance assertion, baseline or native physical engine code changed.

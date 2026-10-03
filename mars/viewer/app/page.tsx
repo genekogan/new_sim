@@ -354,7 +354,7 @@ export default function Home() {
         />
         {compare && view && (
           <figure className="reference">
-            <img src={view.image} alt={`Drone reference: ${view.name}`} />
+            <img src={`https://sim.mars.college${view.image}`} alt={`Drone reference: ${view.name}`} />
             <figcaption>
               <Camera size={14} />
               {view.heldOut ? 'Held-out photograph' : 'Source photograph'}
@@ -496,10 +496,10 @@ export default function Home() {
             <a className="download" href={model.url} download>
               <Download size={16} /> Download mesh (.glb)
             </a>
-            <a href={`/data/${model.id}.blend`} download>
+            <a href={`https://sim.mars.college/data/${model.id}.blend`} download>
               Download Blender project (.blend)
             </a>
-            <a href="/data/report.html" target="_blank" rel="noreferrer">
+            <a href="https://sim.mars.college/data/report.html" target="_blank" rel="noreferrer">
               Read methodology and validation ↗
             </a>
           </aside>
@@ -524,7 +524,7 @@ export default function Home() {
                 key={v.name}
                 onClick={() => selectView(i)}
               >
-                <img src={v.image} alt={v.name} />
+                <img src={`https://sim.mars.college${v.image}`} alt={v.name} />
                 <span>{v.name}</span>
                 {v.heldOut && <em>CHECK VIEW</em>}
               </button>

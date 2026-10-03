@@ -250,3 +250,11 @@ The activation release logs this policy once on non-Toy living-world startup.
 Its compatible rollback is `4919298` (construction pack plus policy reader).
 Check recent checkpoints and `living.lastDay` after an interrupted sleep; a
 policy receipt should exist once per world, and no policy event exists in Toy.
+
+Native Mars gate fixtures may be hydrated from selected published derivative
+URLs in an isolated ignored test checkout. Never deploy that checkout or copy
+raw photos, Blender projects, SDK/vendor or the asset archive. The fork's
+legacy photo/Blender links point to `sim.mars.college`; runtime GLBs remain
+local or available through the allowlisted Sim proxy. Native full-gate and
+focused repair receipts are kept separately in MERGE-LOG, without rerunning
+passing long browser scenarios after an unrelated packaging repair.

@@ -38,27 +38,26 @@ GLOBS = [
 ]
 FILES = {
     'history': ['2025/c538-freeside-source.jpg', '2025/c509-roof-source.jpg',
-        '2023/review5-rear-c6656-t80.jpg'],
+        '2023/review5-rear-c6656-t80.jpg', '2024/review5-north-access-c42733.jpg'],
     '2020': ['evidence/site-march4.webp', 'evidence/forest-march9.webp',
         'evidence/portal-march17.webp', 'evidence/forest-march30.webp',
         'evidence/portal-depth-march9.webp', 'evidence/climbing-wall-2020.webp',
         'evidence/rv-ring-march9.webp', 'evidence/front-alignment-march17.webp',
         'evidence/side-stairs-march17.webp', 'evidence/portal-screens-2020.webp'],
-    'browser': ['campus.glb', 'campus.glb.br'],
+    'browser': ['campus.glb'],
     # Only the selected workstation and its attribution; never publish the model archive.
     'models': ['retro-computer-monitor.glb', 'retro-computer-monitor.credit.json'],
     'modular': ['README.html', 'components.json', 'references.json', 'rooms.json',
         'stock-library.json', 'appearance-credits.html', 'appearance-sources.json', 'silhouette-replacements.json', 'person_casual.glb', 'person_punk.glb', 'person_woman.glb', 'modeled-pieces.csv', 'camera-checks.json',
         'campus-components.glb', 'chiba-components.glb', 'chiba-photo-reference.glb',
-        'component-library.glb', 'mars-2026-modular.blend',
+        'component-library.glb',
         'upright_frame_8ft_4ft.glb', 'upright_frame_12ft_4ft.glb',
         'upright_frame_16ft_3ft.glb', 'upright_frame_19ft_3ft.glb',
         'horizontal_beam_12ft.glb', 'plywood_panel_template.glb',
         'timber_template.glb', 'acrylic_panel_template.glb',
         'modular-preview.png', 'interior-preview.png', 'camera-comparisons.jpg',
         'camera-check-00.png', 'camera-check-04.png', 'camera-check-08.png'],
-    'data': ['manifest.json', 'chiba.glb', 'campus.glb', 'chiba.blend', 'campus.blend',
-        'report.html', 'campus-comparison.jpg', 'detail-comparison.jpg', 'raw-comparison.jpg']
+    'data': ['manifest.json', 'chiba.glb', 'campus.glb']
 }
 
 def glob_regex(pattern):
@@ -78,8 +77,8 @@ def glob_regex(pattern):
 def resolve():
     """Every public/ path (relative, posix) the release stages, sorted."""
     paths = {f'{ns}/{name}' for ns, names in FILES.items() for name in names}
-    manifest = json.loads((ROOT / 'public/data/manifest.json').read_text())
-    paths |= {v['image'].removeprefix('/') for m in manifest['models'] for v in m['views']}
+    # The legacy photo page loads reference photographs from their original
+    # public origin. Never stage source photographs or reconstruction projects.
     for pattern in GLOBS:
         rule = glob_regex(pattern)
         # walk only the glob's literal directory prefix; os.walk follows the

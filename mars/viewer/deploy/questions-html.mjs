@@ -81,7 +81,9 @@ function parse(md) {
       const text = [].concat(f[k] ?? []).join(' ').toLowerCase();
       for (const w of BANNED) if (!defined.has(w) && new RegExp(`\\b${w}s?\\b`).test(text)) fail(`"${title}": engine word "${w}" in ${k}; rephrase or define it in terms`);
     }
-    const images = (f.images ?? []).map((t) => {
+    // Answered entries render only text in the record, so their unused old
+    // illustration paths are not part of the public page's asset contract.
+    const images = (answered ? [] : f.images ?? []).map((t) => {
       const [src, caption] = t.split(' | ');
       if (!src || !caption) fail(`"${title}": image "${t}" must be "path | caption"`);
       if (src === 'none') return { none: true, caption };

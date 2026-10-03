@@ -1627,7 +1627,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
                 {(exportReady.bytes / 1048576).toFixed(1)} MB
               </a>
             )}
-            {year === 2026 && <><a href="/modular/mars-2026-modular.blend?v=37351cc1b676" download>
+            {year === 2026 && <><a href="https://sim.mars.college/modular/mars-2026-modular.blend?v=37351cc1b676" download>
               Blender project ↓
             </a>
             <a href="/modular/campus-components.glb" download>
@@ -1641,7 +1641,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
               Component library ↓
             </a>
             <a
-              href="/modular/appearance-credits.html"
+              href="https://sim.mars.college/modular/appearance-credits.html"
               target="_blank"
               rel="noreferrer"
             >

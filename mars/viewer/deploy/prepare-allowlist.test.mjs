@@ -113,3 +113,15 @@ test('selected workstation model and attribution ship as explicit files only', (
   assert.deepEqual(release.files.filter((file) => file.startsWith('models/')), selected);
   assert.ok(!release.globs.some((glob) => glob.startsWith('models/')), 'selected models must not use a broad archive glob');
 });
+
+// Fork boundary: original source projects/photos stay at the legacy public
+// origin. Actual local runtime URLs above still require staged derivatives.
+test('fork staging excludes reconstruction projects and raw photo archives', () => {
+  assert.ok(release.files.every(f => !f.endsWith('.blend') && !f.startsWith('data/images/')));
+  const photo = readFileSync(path.join(ROOT,'app/page.tsx'),'utf8');
+  const studio = readFileSync(path.join(ROOT,'app/studio/page.tsx'),'utf8');
+  assert.ok(photo.includes('https://sim.mars.college/data/${model.id}.blend'));
+  assert.ok(photo.includes('https://sim.mars.college${view.image}'));
+  assert.ok(photo.includes('https://sim.mars.college${v.image}'));
+  assert.ok(studio.includes('https://sim.mars.college/modular/mars-2026-modular.blend'));
+});
