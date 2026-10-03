@@ -8,17 +8,17 @@ the §28 table are reported the same way in their own section.
 
 | | |
 | --- | --- |
-| Git HEAD | `05370e8` (engine tree clean) |
-| Generated | 2026-10-02T19:48:49.799Z · Node v22.20.0 |
-| Engine suite | 1441 tests in 146 files: 1424 pass, 0 fail, 6 skipped, 11 TODO · 182.6 s wall |
-| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-02T18-43-03-123Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
-| External gate | `.cloudflare/gate/2026-10-02T18-43-03-123Z/report.json` — current clean revision; statuses consumed per step |
+| Git HEAD | `043957e` (engine tree clean) |
+| Generated | 2026-10-03T04:13:27.416Z · Node v22.20.0 |
+| Engine suite | 1482 tests in 153 files: 1465 pass, 0 fail, 6 skipped, 11 TODO · 171.4 s wall |
+| Engine execution | reused exact-source gate proof `.cloudflare/gate/2026-10-03T02-44-23-325Z/engine-proof.json`; wall time above is the original execution, not evidence regeneration |
+| External gate | `.cloudflare/gate/2026-10-03T02-44-23-325Z/report.json` — current clean revision; statuses consumed per step |
 | §28 rows | 17 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 17) |
 | Capabilities beyond §28 | 25 PROVEN · 2 PARTIAL · 1 UNPROVEN (of 28) |
 | §30 milestones | 8 PROVEN · 0 PARTIAL · 0 UNPROVEN (of 8) |
-| Flagship, proving ground | 43 steps, 545 s simulated, 7168 ms compute (`build-bay.test.ts`) |
-| Flagship, 2026 campus | 43 steps, 573 s simulated, 10468 ms compute, take 321857 B (`campus-flagship.test.ts`) |
-| Flagship, full uncropped campus | 43 steps, 573 s simulated, 21992 ms compute (cropped 10449 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
+| Flagship, proving ground | 43 steps, 545 s simulated, 6124 ms compute (`build-bay.test.ts`) |
+| Flagship, 2026 campus | 43 steps, 573 s simulated, 9304 ms compute, take 321857 B (`campus-flagship.test.ts`) |
+| Flagship, full uncropped campus | 43 steps, 573 s simulated, 19856 ms compute (cropped 9292 ms in the same test) · final `58dd8e0f…` = cropped `58dd8e0f…` (`campus-full.test.ts`) |
 | Determinism probe | `build-bay/open-ground` completed, 10901 ticks · final state `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` · take `0977ce205b90f3890dd6afb0` · engine math `584b58ab6d111145` (`deploy/determinism-probe.mjs`) |
 
 **Status.** PROVEN = every mapped test and executable external proof passed. PARTIAL = some did. UNPROVEN = no proofs, or none passed. External proofs require a current clean gate; documentation references never count as passes.
@@ -270,7 +270,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/simulation-integration.log`) |
 
 *Approximate:* Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate.
 
@@ -293,7 +293,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/simulation-integration.log`) |
 
 *Approximate:* Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate.
 
@@ -309,7 +309,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/simulation-integration.log`) |
 
 *Approximate:* Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take.
 
@@ -448,7 +448,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
 *Approximate:* The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15.
@@ -478,7 +478,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/test.log`) |
+| pass | `viewer/deploy/history-ids.test.mjs` | `test` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/test.log`) |
 | reference | `docs/engineering/HISTORY_IDS.md` | supporting reference; not an executable proof |
 
 *Approximate:* The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly.
@@ -504,7 +504,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/simulation-integration.log`) |
+| pass | `viewer/deploy/simulation-integration.mjs` | `simulation-integration` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/simulation-integration.log`) |
 
 *Approximate:* UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit.
 
@@ -522,7 +522,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/determinism-probe.log`) |
+| pass | `viewer/deploy/determinism-probe.mjs` | `determinism-probe` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/determinism-probe.log`) |
 | reference | `docs/engineering/RELEASE_CHECKLIST.md` | supporting reference; not an executable proof |
 
 *Approximate:* This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified.
@@ -707,7 +707,7 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/poses.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
 | reference | `docs/engineering/BODY_MODEL.md` | supporting reference; not an executable proof |
 
 *Approximate:* The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact).
@@ -755,10 +755,10 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
-| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
-| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
-| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
+| pass | `viewer/e2e/studio-camera-vocab.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
+| pass | `viewer/e2e/camera-fixture.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
+| pass | `viewer/e2e/camera-worker.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 
 *Approximate:* Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups.
@@ -783,8 +783,8 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
-| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/e2e/camera-verify.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
+| pass | `viewer/e2e/studio-direct.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
 | reference | `docs/engineering/CAMERA_DIRECT.md` | supporting reference; not an executable proof |
 | reference | `docs/engineering/CAMERA_VERIFY.md` | supporting reference; not an executable proof |
 
@@ -803,9 +803,9 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 | External result | Source | Gate step / reason |
 | --- | --- | --- |
-| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/record-campus-take.log`) |
-| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
-| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-02T18-43-03-123Z/e2e.log`) |
+| pass | `viewer/deploy/record-campus-take.mjs` | `record-campus-take` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/record-campus-take.log`) |
+| unverified | `viewer/e2e/studio-build.spec.ts` | `e2e` — this spec includes skipped or failing cases (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
+| pass | `viewer/e2e/studio-take.spec.ts` | `e2e` — executed by the cited gate step (`.cloudflare/gate/2026-10-03T02-44-23-325Z/e2e.log`) |
 | reference | `docs/engineering/TAKES_AND_PLANS.md` | supporting reference; not an executable proof |
 
 *Approximate:* A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track.
@@ -1032,12 +1032,53 @@ PROVEN means only that the listed tests pass; the approximation notes say what t
 
 ## New regressions since the previous report
 
-Compared with the report at `b712825` (2026-10-02T15:24:27.314Z): 0 added, 0 removed.
+Compared with the report at `05370e8` (2026-10-02T19:48:49.799Z): 41 added, 0 removed.
 
+- added: alpha-invariant-containment.test.ts :: a valid pause can resume into quarantine without overwriting its valid head
+- added: alpha-invariant-containment.test.ts :: control-plane corruption cannot commit or continue a private run (0.05)
+- added: alpha-invariant-containment.test.ts :: control-plane corruption cannot commit or continue a private run (1)
+- added: alpha-invariant-containment.test.ts :: control-plane corruption cannot commit or continue a private run (unpaused)
+- added: component-view-lifetime.test.ts :: campfire Reset releases each old stone/log geometry without disposing shared fixture geometry
+- added: component-view-lifetime.test.ts :: cutting station blade geometry is released on Reset, removal and full view disposal
+- added: component-view-lifetime.test.ts :: paint image leases share aliases, survive band updates and release on clearing and repeated world Reset
+- added: component-view-lifetime.test.ts :: world Reset releases transient component geometry and rebuilds fresh geometry over repeated lifetimes
+- added: component-view-lifetime.test.ts :: year backdrop disposal releases shared mesh and line resources once across repeated lifetimes
+- added: lab-executor-fault.test.ts :: completion predicate throwing after a native tick cannot dispatch scenario or observation callbacks
+- added: lab-executor-fault.test.ts :: explicit sustained script guard still dispatches after its validation budget
+- added: lab-executor-fault.test.ts :: faulting completion predicate and expectation cannot be retried by UI readout callbacks
+- added: lab-executor-fault.test.ts :: non-Error synchronous throw remains explicit without fabricated stack or success
+- added: lab-executor-fault.test.ts :: observer throw on a violating tick preserves both original invariant and unexpected exception
+- added: lab-executor-fault.test.ts :: ordinary named action refusal does not become an executor quarantine or freeze another actor
+- added: lab-executor-fault.test.ts :: post-tick observer exception remains an unexpected fault with a retained completed runtime tick
+- added: lab-executor-fault.test.ts :: scenario tick throw is quarantined after real ordinary progress and never redispatched
+- added: lab-executor-fault.test.ts :: scenario.admission unexpected throw after valid Runtime construction is visible without rollback
+- added: lab-executor-fault.test.ts :: scenario.start unexpected throw after valid Runtime construction is visible without rollback
+- added: lab-executor-fault.test.ts :: throwing executor preserves partial tick, active records/claims and original exception without unsafe cleanup
+- added: lab-liveness.test.ts :: continued authoritative ticks replay deterministically after finite script completion
+- added: lab-liveness.test.ts :: custom sequence polls and dispatches each stage once before its own terminal boundary
+- added: lab-liveness.test.ts :: custom terminal journey cannot freeze another actor or redispatch after terminal
+- added: lab-liveness.test.ts :: empty and refused scripts leave ordinary world clock usable without retry dispatch
+- added: lab-liveness.test.ts :: fixed-DT accumulator and observation calls remain bounded across Pause and frame caps
+- added: lab-liveness.test.ts :: original finite walk, authored construction and expected-refusal preset outcomes remain intact
+- added: lab-liveness.test.ts :: pre-existing native invariant receipts prevent script start and remain detached from halt subjects
+- added: lab-liveness.test.ts :: real reading child failure drains posture while independent walk progresses
+- added: lab-liveness.test.ts :: script budget ends dispatch but ordinary actions continue; manual pause and Step remain distinct
+- added: lab-liveness.test.ts :: serious invariant violation visibly halts automatic and manual stepping until fresh reset
+- added: lab-liveness.test.ts :: terminal physical tick is observed once without further scripted dispatch
+- added: lab-sustained.test.ts :: declared sustained life keeps making ordinary commitments after its validation budget and replays
+- added: lab-terminal-result.test.ts :: a failed fresh-world builder preserves the prior scenario/runtime pair and ordinary commitments
+- added: lab-terminal-result.test.ts :: a later recorded invariant invalidates a prior boundary without certifying corrupt execution
+- added: lab-terminal-result.test.ts :: a later unexpected observer fault invalidates the receipt and quarantines actual state
+- added: lab-terminal-result.test.ts :: empty and admission-refused scripts retain their exact initial result without stopping the world
+- added: lab-terminal-result.test.ts :: exact terminal result matches deterministic reference while the same frame keeps ticking
+- added: lab-terminal-result.test.ts :: validation budget records its exact boundary; Pause and Reset retain their documented meanings
+- added: scenario-contracts.test.ts :: UI contract metadata is exactly generated from the authoritative coverage inventory
+- added: scenario-contracts.test.ts :: duplicate, undeclared, incomplete and unmapped registrations fail with named diagnostics
+- added: scenario-contracts.test.ts :: every production registration declares an exact execution contract and test mapping
 
 ## Tests not cited by any row or milestone
 
-1114 of 1441 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
+1155 of 1482 tests are not in the map (unit, perf, API, sun, campus-extraction and other supporting tests). They run and must pass, but no row or milestone claims them.
 
 <details><summary>List</summary>
 
@@ -1054,6 +1095,10 @@ Compared with the report at `b712825` (2026-10-02T15:24:27.314Z): 0 added, 0 rem
 - `activity-free-hands.test.ts` pass: unfinished computer work refuses held meal items, explicit puts permit same-user resume
 - `activity-free-hands.test.ts` pass: ordinary taking a second item and seated eating remain supported
 - `activity-free-hands.test.ts` pass: free-hand classroom entry still completes with the same physical actions
+- `alpha-invariant-containment.test.ts` pass: control-plane corruption cannot commit or continue a private run (unpaused)
+- `alpha-invariant-containment.test.ts` pass: control-plane corruption cannot commit or continue a private run (0.05)
+- `alpha-invariant-containment.test.ts` pass: control-plane corruption cannot commit or continue a private run (1)
+- `alpha-invariant-containment.test.ts` pass: a valid pause can resume into quarantine without overwriting its valid head
 - `ambient-return.test.ts` pass: directed ambient participant physically walks back into its region after successful work
 - `ambient-return.test.ts` pass: ambient return refuses failed/cancelled/newer directives, held items, groups and missing region
 - `ambient-return.test.ts` pass: ambient snapshots continue tick-exact before intervention, awaiting work and physically returning
@@ -1278,6 +1323,11 @@ Compared with the report at `b712825` (2026-10-02T15:24:27.314Z): 0 added, 0 rem
 - `communal-supper.test.ts` pass: cancelled return Retry End refuses occupied destination without child spam and requires explicit restored retry
 - `communal-supper.test.ts` pass: independent ordinary return physically satisfies cancelled history; End waits foreign withdrawal then completes honestly
 - `communal-supper.test.ts` pass: failed End return child retains its failed record and explicitly retries normal remaining stow
+- `component-view-lifetime.test.ts` pass: world Reset releases transient component geometry and rebuilds fresh geometry over repeated lifetimes
+- `component-view-lifetime.test.ts` pass: paint image leases share aliases, survive band updates and release on clearing and repeated world Reset
+- `component-view-lifetime.test.ts` pass: year backdrop disposal releases shared mesh and line resources once across repeated lifetimes
+- `component-view-lifetime.test.ts` pass: campfire Reset releases each old stone/log geometry without disposing shared fixture geometry
+- `component-view-lifetime.test.ts` pass: cutting station blade geometry is released on Reset, removal and full view disposal
 - `computer-music.test.ts` pass: ordinary computer execution and optional listening complete with coherent score at yaw 0
 - `computer-music.test.ts` pass: ordinary computer execution and optional listening complete with coherent score at yaw 1.5707963267948966
 - `computer-music.test.ts` pass: interruption safely releases children and quiescent JSON restore resumes the same recorded program
@@ -1592,6 +1642,35 @@ Compared with the report at `b712825` (2026-10-02T15:24:27.314Z): 0 added, 0 rem
 - `item-hand-drivers.test.ts` pass: two held items follow ordinary carry during put approach/turn; reservation-only parent=true, motion=approach
 - `item-hand-drivers.test.ts` pass: two held items follow ordinary carry during put approach/turn; reservation-only parent=true, motion=turn
 - `item-hand-drivers.test.ts` pass: unknown reserved-hand actions retain legacy driver ownership
+- `lab-executor-fault.test.ts` pass: throwing executor preserves partial tick, active records/claims and original exception without unsafe cleanup
+- `lab-executor-fault.test.ts` pass: scenario tick throw is quarantined after real ordinary progress and never redispatched
+- `lab-executor-fault.test.ts` pass: scenario.admission unexpected throw after valid Runtime construction is visible without rollback
+- `lab-executor-fault.test.ts` pass: scenario.start unexpected throw after valid Runtime construction is visible without rollback
+- `lab-executor-fault.test.ts` pass: faulting completion predicate and expectation cannot be retried by UI readout callbacks
+- `lab-executor-fault.test.ts` pass: post-tick observer exception remains an unexpected fault with a retained completed runtime tick
+- `lab-executor-fault.test.ts` pass: non-Error synchronous throw remains explicit without fabricated stack or success
+- `lab-executor-fault.test.ts` pass: ordinary named action refusal does not become an executor quarantine or freeze another actor
+- `lab-executor-fault.test.ts` pass: explicit sustained script guard still dispatches after its validation budget
+- `lab-executor-fault.test.ts` pass: observer throw on a violating tick preserves both original invariant and unexpected exception
+- `lab-executor-fault.test.ts` pass: completion predicate throwing after a native tick cannot dispatch scenario or observation callbacks
+- `lab-liveness.test.ts` pass: empty and refused scripts leave ordinary world clock usable without retry dispatch
+- `lab-liveness.test.ts` pass: custom terminal journey cannot freeze another actor or redispatch after terminal
+- `lab-liveness.test.ts` pass: real reading child failure drains posture while independent walk progresses
+- `lab-liveness.test.ts` pass: script budget ends dispatch but ordinary actions continue; manual pause and Step remain distinct
+- `lab-liveness.test.ts` pass: terminal physical tick is observed once without further scripted dispatch
+- `lab-liveness.test.ts` pass: serious invariant violation visibly halts automatic and manual stepping until fresh reset
+- `lab-liveness.test.ts` pass: continued authoritative ticks replay deterministically after finite script completion
+- `lab-liveness.test.ts` pass: custom sequence polls and dispatches each stage once before its own terminal boundary
+- `lab-liveness.test.ts` pass: fixed-DT accumulator and observation calls remain bounded across Pause and frame caps
+- `lab-liveness.test.ts` pass: pre-existing native invariant receipts prevent script start and remain detached from halt subjects
+- `lab-liveness.test.ts` pass: original finite walk, authored construction and expected-refusal preset outcomes remain intact
+- `lab-sustained.test.ts` pass: declared sustained life keeps making ordinary commitments after its validation budget and replays
+- `lab-terminal-result.test.ts` pass: exact terminal result matches deterministic reference while the same frame keeps ticking
+- `lab-terminal-result.test.ts` pass: empty and admission-refused scripts retain their exact initial result without stopping the world
+- `lab-terminal-result.test.ts` pass: validation budget records its exact boundary; Pause and Reset retain their documented meanings
+- `lab-terminal-result.test.ts` pass: a later unexpected observer fault invalidates the receipt and quarantines actual state
+- `lab-terminal-result.test.ts` pass: a later recorded invariant invalidates a prior boundary without certifying corrupt execution
+- `lab-terminal-result.test.ts` pass: a failed fresh-world builder preserves the prior scenario/runtime pair and ordinary commitments
 - `live-link.test.ts` pass: a replaced unusable link refuses before stair entry without following its stale plan
 - `live-link.test.ts` pass: closed or removed live stair blocks in place with ownership, including deferred cancel, then safely resumes
 - `live-link.test.ts` pass: an invalid future corridor cannot replan a climber onto its lower floor
@@ -1872,6 +1951,9 @@ Compared with the report at `b712825` (2026-10-02T15:24:27.314Z): 0 added, 0 rem
 - `room-setup.test.ts` pass: cancelled partial physical placement is visible without undo; later changed completed layout loses readiness
 - `room-setup.test.ts` pass: invalid setup schema cannot crash the read-only setup monitor
 - `room-storage.test.ts` pass: room workload: step and entity admission boundaries and malformed inputs preserve controller validation
+- `scenario-contracts.test.ts` pass: every production registration declares an exact execution contract and test mapping
+- `scenario-contracts.test.ts` pass: UI contract metadata is exactly generated from the authoritative coverage inventory
+- `scenario-contracts.test.ts` pass: duplicate, undeclared, incomplete and unmapped registrations fail with named diagnostics
 - `seed-planting.test.ts` pass: same bowl, supported right-hand reach and four conserved seed deposits at 0
 - `seed-planting.test.ts` pass: same bowl, supported right-hand reach and four conserved seed deposits at 1.5707963267948966
 - `seed-planting.test.ts` pass: cancel in taking returns same bowl and explicit continuation retains exact purpose

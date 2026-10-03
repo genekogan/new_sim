@@ -1867,3 +1867,82 @@ release40-root-garden-review.json, release40-upload-cache-receipt.json.
 Gene lifted the temporary quota pause after verified repair40; resume saved v1 alpha
 stabilization first (coverage/recovery/performance/docs), then useful activity expansion,
 with no Eden or automatic handoff. Excluded unfinished drafts remain preserved.
+
+
+## Production deploy42 — 2026-10-03 — Mars World v1 alpha
+
+Verified public checkpoint: https://sim.mars.college/ remains the campus homepage;
+https://sim.mars.college/lab exposes all63 presets, seven declared discovery groups,
+quick-tour longer experiences, scenario instructions, supported scope and existing
+live camera controls. Alpha label is visible. No mars.college/simulation page,
+DNS/site replacement or historical-content-value change.
+
+Functional tested/built source `043957e8a061868836eacd811d2651e8589bad7d`; Worker
+`28055d72-9268-4e46-90c5-6066416304fc`, deployed04:15:14.687UTC, verified04:25:20UTC.
+Normal Wrangler status confirms100%. Confirmed rollback41:
+`9596510b-336a-4519-8dca-5f862acde364`. Local fast-forward integration preserved all48
+other-owner paths byte/mode/mtime/status, staged0. Documentation/evidence receipt
+commits following this source have no new runtime acceptance claim.
+
+| Required check | Executed result |
+|---|---|
+| Zero-warning lint | PASS |
+| Deployment tests | 295 PASS,0FAIL/0SKIP/TODO |
+| Engine | 1465 PASS,0FAIL,6SKIP,11TODO |
+| App/camera TypeScript | bothPASS |
+| Browser | 319PASS,0FAIL,7SKIP; native84.53min |
+| Flagship take | PASS, no re-record |
+| Determinism | PASS, unchanged `b746b0947e651c054506ccdb6568d5216a84c2d0f0304fda1b8261ba62e7f0c3` |
+| Isolated MCP/security | PASS |
+
+Clean gate `viewer/.cloudflare/gate/2026-10-03T02-44-23-325Z/report.json` in
+`world-alpha-final-validation`, SHA256
+`09f736da2fae6847c63f9b28dc6de033e3fc9a1a02ea65dbfa41426abf69e245`, sourceclean,
+all9stagesPASS. Evidence reused the exact structured engine proof with the same
+recorded Node options:17rowsPROVEN,25capabilitiesPROVEN/2PARTIAL/1UNPROVEN,
+8milestonesPROVEN. First regeneration refused mismatched options; retained failure,
+then identical-options regenerationPASS. Original checks/pins/takes unchanged.
+
+Publication receipt:
+`<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/release42-network-receipt.json`,
+SHA256 `763f558eb0e5c6076cfac0e412ecaa285d80444351101c3c9b35a1613f06aac8`.
+Fresh entry4PASS/0FAIL/0SKIP/0flaky and real selectable refusal/stress2PASS.
+Critical native cohort3productionPASS(supper and two connected-day castings),
+4FAIL(dev-only fixture imports `/app/lab/scenarios.ts` unavailable on bundled
+production),0SKIP/0flaky. Retain those4native failures/traces; do not count them
+as public recovery proof. Same synthetic isolation/quarantine tests execute and
+PASS in the exact clean local gate.17representative PNGs root-inspected outof44
+fresh generated:5entry,8journey,4liveness. Body/sleep poses, cropped edges and denseHUD
+remain bounded visual limitations, not certified anatomical precision.
+
+Source inheritance: app/engine/simulation and all48 built JS/CSS hashes are
+byte-identical00bd041→043957e. Native public41 is111PASS/1FAIL, not relabeledgreen;
+the supper transient support was valid before ordinary cleanup pickup, while a
+separate Pause click captured later ownership. Exact original predicate now pauses
+atomically; unchanged same7vessel/material/consumption assertions PASS3serial public
+repeats and fresh42supper. Fresh41 current build fullautomaticPlay completed201steps/
+24parts and555steps/66parts, crewsgroundidle,0invariants; inherited unchangedruntime,
+not fresh42construction. All63local mappings retain methods, source-era exclusions,
+6engineSKIP/11TODO/7browserSKIP; no claim of63freshpublic journeys.
+
+HTTP522assets/24routes/696requests;48servedJS/CSS hashes and guide/replay bytes;
+36MCPtools/auth/security/read-only/replay/pause; publicdirector9steps(6579mswall)PASS.
+Worker CPU unavailable, printedzero is missingmetadata. Original identity-encoded
+campus.glb HEAD size remainsnull/FAIL; Brotli38494104bytes andmodular206/rangePASS
+separately. Eightlargeasset hashes reused:8cache skips,0R2writes;1newstaticcamera
+source receipt,567retained; Workerstartup131ms;9274.83KiB/gzip1635.68KiB. Current
+chunk-size warning retained. Performance audit measurements retain their actual
+release40 source and softwareGPU limitations; no arbitrary optimization claim.
+
+Supported alpha failure boundary: local terminal/refusal/failure retains usable
+clock/UI/unrelatedordinaryactions, reasoned waiting/cleanup and unfinishedeffects.
+Serious invariant/unknownexecutor corruption is visible/quarantined, no stepping or
+unsafe cleanup; explicit fresh Reset required. Deterministic replay/persistence
+limits and extension registration/testing contracts are in ENGINE_GUIDE andcoverage.
+No universal recovery, indefinite fairness/memoryplateau, activeGUI save/load, heat,
+plantgrowth, rig migration orEden. Excluded drafts:computerworkshop3316a74(unverified
+missingdisplay),library319429c(docs-only). Preserve all branches/pendingwork.
+
+Stabilization exit is satisfied for this supported checkpoint. Current owner
+instruction authorizes further useful bounded Mars activity expansion, after this
+receipt closes; it does not authorize automatically beginning Eden.

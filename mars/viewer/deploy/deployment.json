@@ -4,11 +4,11 @@
   "brahman_2020_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2020",
   "worker": "mars-campus-2026",
   "bucket": "mars-campus-2026-models",
-  "version": "bb946d3c-934d-4d2c-8d50-8ae74e087146",
-  "published": "2026-10-02",
-  "verification": "<mars-worktrees>/homepage-root-repair/viewer/.cloudflare/release40-network-receipt.json",
-  "updated": "2026-10-02",
-  "feature": "release40: restore campus presentation homepage; explicit Lab preserved",
+  "version": "28055d72-9268-4e46-90c5-6066416304fc",
+  "published": "2026-10-03",
+  "verification": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/release42-network-receipt.json",
+  "updated": "2026-10-03",
+  "feature": "Mars World v1 alpha42: declared production-preset contracts, isolated local failure, serious-fault quarantine, resource lifetime repair, verified connected experiences and current construction",
   "evidence": "../../research/2020/EVIDENCE.md",
   "mcp_url": "https://sim.mars.college/mcp",
   "guide_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/simulation-guide",
@@ -17,14 +17,14 @@
   "compression_verification": "../.cloudflare/compression-audit/live.json",
   "model_transfer_bytes": 38494104,
   "model_decoded_bytes": 70772556,
-  "rollback_version": "95a8f9a8-9d3c-4de4-8365-346fcf1df33d",
+  "rollback_version": "9596510b-336a-4519-8dca-5f862acde364",
   "lab_url": "https://sim.mars.college/lab?scenario=room-preparation",
-  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy40--2026-10-02--restore-campus-homepage",
+  "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy42--2026-10-03--mars-world-v1-alpha",
   "questions_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/questions/",
-  "source_commit": "05370e8c727d44e52e2db510f022dac53b748417",
-  "release": 40,
+  "source_commit": "043957e8a061868836eacd811d2651e8589bad7d",
+  "release": 42,
   "engine_evidence": "../../docs/engineering/EVIDENCE.md",
-  "gate_report": "<mars-worktrees>/homepage-root-repair/viewer/.cloudflare/gate/2026-10-02T18-43-03-123Z/report.json",
+  "gate_report": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/gate/2026-10-03T02-44-23-325Z/report.json",
   "last_rollback": {
     "failed_release": 25,
     "failed_version": "2edcf368-baeb-4dbf-aea7-da48ccccee62",
@@ -48,23 +48,44 @@
     "version": "ad241a52-e8d6-4c47-831e-557df9d5692a",
     "source_commit": "7648dbf plus isolated current historical working snapshot"
   },
-  "deployed_at": "2026-10-02T19:50:39.261Z",
-  "status": "verified bounded release40; owner lifted temporary pause; resume saved v1 alpha stabilization before activity expansion; no Eden",
+  "deployed_at": "2026-10-03T04:15:14.687Z",
+  "status": "verified Mars World v1 alpha supported checkpoint; stabilization complete; useful bounded Mars activity expansion authorized; no Eden",
   "production_verification": {
-    "verified_at": "2026-10-02T20:00:14.854075+00:00",
-    "browser_passed": 4,
-    "browser_failed": 0,
-    "browser_skipped": 0,
-    "browser_flaky": 0,
-    "browser_duration_ms": 36023.175,
-    "browser_scope": "root default2026/year2024/invalid fallback and explicit Lab actual Play/Pause/Reset/camera controls; inherited39 activity proof separate; not all63 full journeys",
-    "captures_inspected": 5,
-    "sim_home_exact_bundle": "main-CzMxBXeQ.js",
+    "verified_at": "2026-10-03T04:25:20.197240+00:00",
     "network_receipt": {
-      "path": "<mars-worktrees>/homepage-root-repair/viewer/.cloudflare/release40-network-receipt.json",
-      "sha256": "fd3935cee66d7b901b3a14bbdad3bdb2200b47d3c58a9e7cc6288f1c2ac08ebf"
+      "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/release42-network-receipt.json",
+      "sha256": "763f558eb0e5c6076cfac0e412ecaa285d80444351101c3c9b35a1613f06aac8"
     },
-    "gateway_limitation": "Original browser/campus.glb HEAD length FAIL retained",
+    "fresh_public_entry": {
+      "startTime": "2026-10-03T04:16:01.453Z",
+      "duration": 34944.687000000005,
+      "expected": 4,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "fresh_public_critical_native": {
+      "startTime": "2026-10-03T04:16:43.017Z",
+      "duration": 182695.998,
+      "expected": 3,
+      "skipped": 0,
+      "unexpected": 4,
+      "flaky": 0
+    },
+    "critical_scope": "3 production journeys PASS;4 dev-source-import fixture harness failures retained, not public recovery proof. Exact synthetic failure/isolation tests pass in clean local gate.",
+    "fresh_public_real_preset_liveness": {
+      "startTime": "2026-10-03T04:20:14.345Z",
+      "duration": 40034.675,
+      "expected": 2,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "captures_inspected": 17,
+    "generated_captures": 44,
+    "capture_scope": "5entry+8journey+4liveness representativeframes, notall44",
+    "sim_home_exact_bundle": "main-DYYxc5g6.js",
+    "exact_js_css_hashes": 48,
     "worker_http": {
       "status": "PASS",
       "assets": 522,
@@ -75,18 +96,87 @@
       "status": "PASS",
       "tools": 36,
       "security": "PASS",
-      "CPU": "unavailable; printed zero is missing-metadata fallback"
+      "CPU": "unavailable; printed zero missing metadata, not CPUmeasurement"
     },
     "director": {
       "status": "PASS",
       "steps": 9,
-      "wallMs": 7942,
-      "CPU": "unavailable"
+      "wallMs": 6579,
+      "CPU": "unavailable",
+      "command": "node deploy/director-demo.mjs --base https://sim.mars.college"
     },
-    "whole_current_build": "gate automatic Play throughs0021 then programmatic completion; full automatic current-house proof inherited release38 unchanged driver",
-    "active_browser_save_load": "owner-deferred, not implemented"
+    "source_inheritance": {
+      "fromPublic41": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+      "runtimePathsUnchanged": [
+        "viewer/app",
+        "viewer/engine",
+        "viewer/simulation"
+      ],
+      "identicalJsCssAssets": 48,
+      "largeAssetsUnchanged": 8,
+      "nativePublic41": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-public-results.json",
+        "sha256": "d28b98653d5233fcb5dfd714299ed7c7a80f30cc7880a32734b0e3d7f80d0617"
+      },
+      "nativePublic41Outcome": "111PASS1FAIL supper observation race; not relabeled green",
+      "repairedPublicSupperRepeat": {
+        "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-supper-repeat-results.json",
+        "sha256": "5b33225fbd0abb998048576a706e203f68797316a30ce56c7c0ead105a5f7749"
+      },
+      "repairedRepeatOutcome": "3PASS0FAIL0SKIP0flaky; exacttest043 againstunchangedpublic41runtime00bd",
+      "fullCurrentBuilds": {
+        "path": "<mars-worktrees>/world-alpha-stabilization/viewer/.cloudflare/alpha-public-current-builds-receipt.json",
+        "sha256": "c15ac89145290c6b29ae72fdd142fc23ba8280fc6c9175fac8dfbbceb1e3fbe0"
+      },
+      "fullCurrentBuildMeaning": "Fresh public41 automatic currentfirstbay201steps24parts and whole555steps66parts; unchangedruntime43 source inheritance, not repeatedfresh42builds."
+    },
+    "gateway_limitation": "Identity-encoded browser/campus.glb HEAD length assertion remains FAIL/null; Brotli38494104bytes/rangesPASS separate. No gateway/DNSchange.",
+    "active_browser_save_load": "owner-deferred, not implemented",
+    "coverage_scope": "All63 declared presets mapped to executed cleanlocal gate with explicit methods; not63freshpublicfullPlay. Native41111PASS1FAIL, corrected3PASS and fresh42cohorts separate.",
+    "limits": [
+      "6engineSKIP11TODO7browserSKIP unproved",
+      "All63declared registrations mapped passing cleanlocal tests; not63freshpublicfullPlay runs",
+      "Four synthetic dev-source import public harness failures retained; source-modules intentionally notserved, no public fixture proof",
+      "Identity-encoded browsermodel HEAD size remains null; Brotli38494104bytes andrangePASS",
+      "Finite supported arrangements/cold meal preparation; noheat,plantgrowth,save/load,rigmigration,universalrecovery orEden",
+      "Bounded stress witness; noindefinitelivenessfairness/memoryplateau orproductionCPU promise",
+      "Unverifiedcomputerworkshop3316a74 anddocs-onlylibrary319429c excluded"
+    ]
   },
   "previous_verified_release": {
+    "release": 41,
+    "version": "9596510b-336a-4519-8dca-5f862acde364",
+    "source_commit": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
+    "deployed_at": "2026-10-03T01:44:42.609Z",
+    "verification": "Clean nine-stage gate, entry4PASS/HTTP/MCP; nativepublic111PASS1FAIL supper observation race retained; corrected3serialPASS against unchanged runtime separate; alpha acceptance followed42."
+  },
+  "photo_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/photo",
+  "draft_2027_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2027",
+  "presentation_2027_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/?year=2027",
+  "website_entry_disposition": "owner requested added /simulation page and footer removal; do not recreate",
+  "simulation_url": "https://sim.mars.college/",
+  "publication_assets": {
+    "unchangedLargeHashKeys": 8,
+    "R2skipped": 8,
+    "R2writes": 0,
+    "newStatic": 1,
+    "retainedStatic": 567,
+    "startupMs": 131,
+    "dryKiB": 9274.83,
+    "gzipKiB": 1635.68
+  },
+  "selectable_presets": 63,
+  "new_presets": [
+    "room-preparation",
+    "communal-supper",
+    "garden-circuit"
+  ],
+  "rules_version": "activities/29",
+  "excluded_drafts": [
+    "computer-workshop UNVERIFIED classroom.display-unavailable; three untracked files",
+    "library-reading docs-only319429c"
+  ],
+  "earlier_verified_release39": {
     "release": 39,
     "version": "95a8f9a8-9d3c-4de4-8365-346fcf1df33d",
     "source_commit": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
@@ -146,26 +236,47 @@
       }
     }
   },
-  "photo_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/photo",
-  "draft_2027_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/studio/2027",
-  "presentation_2027_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/?year=2027",
-  "website_entry_disposition": "owner requested added /simulation page and footer removal; do not recreate",
-  "simulation_url": "https://sim.mars.college/",
-  "publication_assets": {
-    "unchangedLargeHashKeys": 8,
-    "R2skipped": 8,
-    "R2writes": 0,
-    "newStatic": 3,
-    "retainedStatic": 565,
-    "startupMs": 135,
-    "dryKiB": 9274.2,
-    "gzipKiB": 1635.54
-  },
-  "selectable_presets": 63,
-  "new_presets": ["room-preparation", "communal-supper", "garden-circuit"],
-  "rules_version": "activities/29",
-  "excluded_drafts": [
-    "computer-workshop UNVERIFIED classroom.display-unavailable; three untracked files",
-    "library-reading docs-only319429c"
-  ]
+  "earlier_verified_release40": {
+    "release": 40,
+    "version": "bb946d3c-934d-4d2c-8d50-8ae74e087146",
+    "source_commit": "05370e8c727d44e52e2db510f022dac53b748417",
+    "deployed_at": "2026-10-02T19:50:39.261Z",
+    "verification": "<mars-worktrees>/homepage-root-repair/viewer/.cloudflare/release40-network-receipt.json",
+    "production_verification": {
+      "verified_at": "2026-10-02T20:00:14.854075+00:00",
+      "browser_passed": 4,
+      "browser_failed": 0,
+      "browser_skipped": 0,
+      "browser_flaky": 0,
+      "browser_duration_ms": 36023.175,
+      "browser_scope": "root default2026/year2024/invalid fallback and explicit Lab actual Play/Pause/Reset/camera controls; inherited39 activity proof separate; not all63 full journeys",
+      "captures_inspected": 5,
+      "sim_home_exact_bundle": "main-CzMxBXeQ.js",
+      "network_receipt": {
+        "path": "<mars-worktrees>/homepage-root-repair/viewer/.cloudflare/release40-network-receipt.json",
+        "sha256": "fd3935cee66d7b901b3a14bbdad3bdb2200b47d3c58a9e7cc6288f1c2ac08ebf"
+      },
+      "gateway_limitation": "Original browser/campus.glb HEAD length FAIL retained",
+      "worker_http": {
+        "status": "PASS",
+        "assets": 522,
+        "routes": 24,
+        "requests": 696
+      },
+      "MCP": {
+        "status": "PASS",
+        "tools": 36,
+        "security": "PASS",
+        "CPU": "unavailable; printed zero is missing-metadata fallback"
+      },
+      "director": {
+        "status": "PASS",
+        "steps": 9,
+        "wallMs": 7942,
+        "CPU": "unavailable"
+      },
+      "whole_current_build": "gate automatic Play throughs0021 then programmatic completion; full automatic current-house proof inherited release38 unchanged driver",
+      "active_browser_save_load": "owner-deferred, not implemented"
+    }
+  }
 }

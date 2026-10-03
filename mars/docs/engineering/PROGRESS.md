@@ -3328,3 +3328,31 @@ Reviewed documentation updates and the small test repair are assembled in isolat
 Original native failures/skips, saved drafts and worktrees are preserved. Remaining
 whole alpha4–8workinghours, medium confidence, assumes no additional functional defect.
 Continue through accepted publication, then resume bounded Mars activities; no Eden.
+
+
+## 2026-10-03 04:25 UTC — verified Mars World v1 alpha42; stabilization closure
+
+Clean043957e all9gatePASS:295deploy,1465enginePASS/6SKIP/11TODO,319browserPASS/7SKIP,
+lint0,bothTSc,flagship,unchangedhash,MCP/security. Local mainff preserves48other-owner
+paths. Evidence17rowsPROVEN/25capabilitiesPROVEN2PARTIAL1UNPROVEN/8milestonesPROVEN;
+initialdifferentNodeoptionsrefusal retained, matching recordedoptionsPASS.
+
+Release42Worker28055d72-9268-4e46-90c5-6066416304fc100%,source043,rollback41
+9596510b-336a-4519-8dca-5f862acde364. Homepage remainsmuseum,explicitLab63presets.
+Freshentry4PASS,productionconnected-days2+supper1PASS,selectablerefusal/stress2PASS;
+17representativecapturesinspectedof44generated. Additionalcriticalnative4devsource
+importfixtureFAIL retained (source modulesnotserved), exactlocalfixturegatePASS;
+no publicfixtureproof orsuppression. Native41111PASS1supper observationFAIL remains;
+corrected samepredicate3serialPASS andfresh42same7vesseljourneyPASS separately.
+Current2022fullautomatic201/24and555/66 source41 proof inheritsunchangedruntime43.
+
+HTTP522assets24routes,48JS/CSSexacthashes+guide/replay,36MCP/security,9publicdirector
+stepsPASS6579mswall/CPUunavailable. IdentitymodelHEADsize originalFAIL retained;
+br/rangesPASS.8R2skips0writes,1new567retainedstatic,startup131ms. Boundedcache/frame/
+resource audit keeps measuredsource40 andsoftwareGPU/CPUlimits; nooptimizationcampaign.
+
+Canonical receipts/coverage/docs areclosing; remainingstabilization0.5–1.5workinghours
+for reviewedmetadata integration, highconfidence absentnewconflict. No runtimechanges
+in finalreceiptcommits; exactvalidated/builtsource43 staysexplicit. UsefulMarsactivity
+queue resumesafterclosure undercurrentauthorization. Excludedworkshop3316a74/library
+319429c preserved; noEden/save-load/rigrewrite/cameraownershipexpansion.

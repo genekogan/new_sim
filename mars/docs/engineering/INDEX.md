@@ -3,30 +3,39 @@
 Authoritative current status is deployment metadata and the latest verified release record.
 Earlier candidate/release sections below retain provenance and are superseded by this notice.
 
-## Current agent entry — release41 deployment, acceptance pending (2026-10-03)
+## Current agent entry — verified Mars World v1 alpha42 (2026-10-03)
 
-Read [agent context](../../AGENTS.md) for ownership and the
-[active roadmap](ACTIVE_ROADMAP.md) for resumed alpha priorities after the verified
-release40 homepage repair. Release41 is deployed from functional source `00bd041`,
-Worker `9596510b-336a-4519-8dca-5f862acde364`, bundle `main-DYYxc5g6.js`.
-Final alpha acceptance remains pending; all63 full-Play/public completion is not
-claimed. The clean nine-stage gate passed at that source: 295 deployment, 1465 engine
-PASS (6 SKIP/11 TODO),319 browser PASS (7 SKIP), unchanged determinism hash.
-Gate report `viewer/.cloudflare/gate/2026-10-03T00-12-37-155Z/report.json` has SHA-256
-`4c69d0c3edba588c828371d7e06c959f31956db334ffe19153f7315e5ce0c4af`.
-Public entry 4 PASS/0 FAIL follows a retained 3 PASS/1 harness strict-locator failure;
-Worker 522 assets/24 routes and MCP 36/security pass. The 112-case public run including
-full year builds is ongoing at this documentation checkpoint. Use
-[deployment metadata](../../viewer/deploy/deployment.json) and the
-[latest verified release record](RELEASE_CHECKLIST.md) for publication status.
-The [bounded performance audit](briefs/performance-alpha.REPORT.md) owns actual
-cold/warm/frame/resource measurements and their limitations; do not infer CPU
-from Worker timers or hardware FPS from software WebGL.
-The release39/pause notice below records an earlier checkpoint; its pause is
-superseded by the current roadmap's owner-authorized resume. After final alpha
-acceptance, useful activity expansion may continue; Eden/save-load/rig migration
-remain deferred. Current planning is 8–14 working hours in the roadmap; earlier
-20–36 estimates below are historical.
+The [campus homepage](https://sim.mars.college/) remains `/`; activities and longer
+connected experiences are at [Engine Lab](https://sim.mars.college/lab). Release42
+is verified from functional source `043957e8a061868836eacd811d2651e8589bad7d`.
+Exact Worker/version/rollback, source-bound receipts and limitations are canonical
+in [deployment metadata](../../viewer/deploy/deployment.json) and the
+[release record](RELEASE_CHECKLIST.md#production-deploy42--2026-10-03--mars-world-v1-alpha).
+Later documentation-only receipt commits are not separately gate-certified runtime.
+
+The clean nine-stage gate passed:295 deployment,1465 engine PASS(6 SKIP/11 TODO),
+319 browser PASS(7 SKIP), both TypeScript checks, lint, replay, unchanged determinism
+and MCP/security. All63 registered presets have named passing local mappings with
+explicit execution methods; this is not63 fresh public full-Play certification.
+[Scenario coverage](SCENARIO_COVERAGE.json) owns per-preset proof and exclusions.
+
+Fresh release42 entry4PASS, production supper+two independent connected days3PASS,
+and real refusal/stress presets2PASS;17 representative captures inspected. The critical
+native cohort also retains4failed dev-only source-import fixtures accidentally selected
+against production; their exact local gate proof remains distinct. Original public41
+111PASS/1supper observation failure and repaired3serialPASS remain separate. Full
+current2022 firstbay/wholehouse automatic Play proof is inherited from byte-identical
+release41 runtime; no fresh42 full construction rerun is claimed. HTTP522assets/24routes,
+48 exact JS/CSS hashes, guide/replay bytes,36MCPtools/security and9director steps PASS.
+
+Read [agent context](../../AGENTS.md), [active roadmap](ACTIVE_ROADMAP.md),
+[engine guide](ENGINE_GUIDE.md), [Lab guide](LAB_GUIDE.md) and recent progress.
+The [bounded performance audit](briefs/performance-alpha.REPORT.md) distinguishes
+cache/loading/resource findings from software WebGL and unavailable Worker CPU.
+Stabilization is complete within its supported failure model. Resume useful bounded
+Mars activity work under current owner authorization; preserve unverified workshop/
+library drafts,48other-owner paths and camera/historical ownership. No Eden,
+active browser save/load, rig migration or indefinite recovery/fairness promise.
 
 ## Dated release39 checkpoint and pause notice — 2026-10-02
 
@@ -77,7 +86,7 @@ paths; this publication does not merge all future branches or certify old invent
 - [Planning budgets](PLANNING_BUDGET.md): measured ceilings/pins, change rules.
 - [Release checklist](RELEASE_CHECKLIST.md): clean combined gate, deployment and rollback.
 - [Evidence](EVIDENCE.md): machine-linked checks, distinguish skipped/TODO from proof.
-- [Scenario coverage](SCENARIO_COVERAGE.json): authoritative per-preset execution contracts, discovery and source-bound proof; currently a stabilization draft, not full acceptance. Its [UI contract generator](../../viewer/deploy/scenario-contracts.mjs) derives instructions from this inventory; use the [active roadmap](ACTIVE_ROADMAP.md) for remaining acceptance work.
+- [Scenario coverage](SCENARIO_COVERAGE.json): authoritative per-preset execution contracts, discovery and source-bound supported alpha proof; exclusions and per-test modes remain explicit. Its [UI contract generator](../../viewer/deploy/scenario-contracts.mjs) derives instructions from this inventory; use the [active roadmap](ACTIVE_ROADMAP.md) for remaining acceptance work.
 - [Progress](PROGRESS.md): chronological work and failures, newest entries at the end.
 - [Live Lab repairs](LIVE_LAB_REPAIRS.md): Reach, stance and material continuity findings.
 
