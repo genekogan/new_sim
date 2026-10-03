@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "accepted-supported-model",
+  "status": "candidate-expansion",
   "inventorySource": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
   "selectorSource": "viewer/app/lab/scenarios.ts:SELECTABLE_SCENARIOS",
   "authoredAtUtc": "2026-10-02T14:37:04.420395+00:00",
@@ -12,9 +12,9 @@
     "unique63": true
   },
   "summary": {
-    "totalSelectable": 63,
+    "totalSelectable": 65,
     "categories": {
-      "manual-journey": 37,
+      "manual-journey": 39,
       "scripted": 21,
       "diagnostic": 1,
       "continuous": 1,
@@ -22,13 +22,14 @@
       "conditional-construction": 2
     },
     "recordedCoverageGrades": {
+      "recorded-actual-ui-play-local-candidate": 2,
       "recorded-actual-ui-play": 58,
       "recorded-exact-diagnostic": 1,
       "recorded-ui-play-bounded-liveness": 1,
       "recorded-still-probe": 1,
       "recorded-actual-ui-play-supported-layout": 2
     },
-    "exactCurrentSourceNativeFullGatePassed": true,
+    "exactCurrentSourceNativeFullGatePassed": false,
     "exactFunctionalInheritedFocusedUiJourneys": 3,
     "sustainedLivenessProven": 1,
     "current39Gate": "Historical release39/release41 proof remains source-bound. Exact clean 043 gate passed; release42 supported checkpoint published and verified, with legacy exclusions and public harness failures retained.",
@@ -62,7 +63,7 @@
     },
     "nativeFullGateFunctionalSource": "043957e8a061868836eacd811d2651e8589bad7d",
     "verifiedGateSourceNativeFullGatePassed": true,
-    "currentRepairCandidateGate": "GREEN at exact clean 043; reviewed supper observation repair included. Metadata follow-ups inherit source-bound gate, not a new execution at their commits.",
+    "currentRepairCandidateGate": "Workshop38 preparatory gate RED (322browserPASS/1FAIL/7SKIP); rendered-shoe measurement repair and library focused7PASS; combined65-preset full gate pending.",
     "completedPublic41": {
       "source": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
       "proofRef": "alphaPublic41Completed",
@@ -740,6 +741,53 @@
         "alpha-preset-incomplete-stairs",
         "alpha-preset-stress-30"
       ]
+    },
+    "workshopFocusedPlayFcd": {
+      "source": "fcd3f55",
+      "method": "actual UI Play; no programmatic completion or authority mutation",
+      "status": "PASS",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "nativeReceipt": "<mars-worktrees>/computer-workshop-lab/viewer/.cloudflare/workshop-play-fcd3f55-results.json",
+      "nativeReceiptSha256": "5bf3d941b21bd0ccc6f84599cb65067499264440e02a66ff58a28d641328f406",
+      "startedAt": "2026-10-03T05:16:02.833Z",
+      "durationMs": 101150.98300000001,
+      "capturesRootInspected": 9,
+      "captureDirectory": "<mars-worktrees>/computer-workshop-lab/viewer/e2e/artifacts/workshop-play-fcd3f55",
+      "limitations": "Local focused candidate proof only. Full clean combined gate and public publication pending. Original5639 firstPlay1PASS2authoringFAIL and traces retained."
+    },
+    "closingFocusedLibraryContact": {
+      "source": "a4d6582581d7addf702ae0cd28bbf2ec90022f9d",
+      "method": "actual UI Play for three library journeys and three existing room journeys; additional deterministic rendered-foot interval regression, distinguished from Play",
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "nativeReceipt": "<mars-worktrees>/library-reading-lab/viewer/.cloudflare/closing-focused-1-results.json",
+      "nativeReceiptSha256": "5835af5ea98d6b9779a2056bc62daec78009f7a0898dbe3e174542593ec843f1",
+      "startedAt": "2026-10-03T06:54:59.816Z",
+      "durationMs": 136242.579,
+      "capturesRootInspected": 12,
+      "captureDirectory": "<mars-worktrees>/library-reading-lab/viewer/e2e/artifacts/closing-focused-library-contact-1",
+      "limitations": "Focused candidate only; combined full gate and public publication pending. Subsequent HUD feedback wording removes stale Play instruction only; physical execution unchanged."
+    },
+    "workshopPreparatoryGate38": {
+      "source": "38a98d7c74bee4c6bc7ba515b309c075206c6907",
+      "status": "RED",
+      "nativeReceipt": "<mars-worktrees>/computer-workshop-lab/viewer/.cloudflare/gate/2026-10-03T05-21-23-676Z/report.json",
+      "browserPassed": 322,
+      "browserFailed": 1,
+      "browserSkipped": 7,
+      "firstFiveStages": "PASS",
+      "notExecuted": [
+        "record-campus-take",
+        "determinism-probe",
+        "simulation-integration"
+      ],
+      "cause": "Held-bowl Walk ankle-minus-rest-offset is not rotated shoe contact. Tick95 rendered minimum0.0035m vs proxy0.0458m; original3cm contact standard unchanged. Corrected focused whole room journey and36tick regression pass separately."
     }
   },
   "tests": {
@@ -3477,6 +3525,60 @@
         "alphaCombinedGate043"
       ],
       "proofScopeNotes": "Current exact named native gate PASS. Programmatic LabSim advance validates script boundary and continued valid world clock; this is not the old stop-at-budget semantics or an actual UI Play journey."
+    },
+    "workshop-play": {
+      "file": "viewer/e2e/computer-workshop.spec.ts",
+      "name": "computer-workshop: actual Play completes demonstration, independent tasks, review and departure",
+      "method": "actual-ui-play-to-terminal",
+      "outcome": "passed-at-local-fcd3f55",
+      "proofRefs": [
+        "workshopFocusedPlayFcd"
+      ]
+    },
+    "workshop-interruption": {
+      "file": "viewer/e2e/computer-workshop.spec.ts",
+      "name": "computer-workshop: individual Pause and ordinary direction retain same task while peer progresses; explicit Join and Resume complete",
+      "method": "actual-ui-play-to-terminal",
+      "outcome": "passed-at-local-fcd3f55",
+      "proofRefs": [
+        "workshopFocusedPlayFcd"
+      ]
+    },
+    "workshop-end": {
+      "file": "viewer/e2e/computer-workshop.spec.ts",
+      "name": "computer-workshop: local practice Pause retains both tasks; Resume then End drains children and Reset restores fresh supported world",
+      "method": "actual-ui-play-to-terminal",
+      "outcome": "passed-at-local-fcd3f55",
+      "proofRefs": [
+        "workshopFocusedPlayFcd"
+      ]
+    },
+    "library-play": {
+      "file": "viewer/e2e/library-reading.spec.ts",
+      "name": "library-reading: actual Play preserves the same book and bookmark through transfer to completion",
+      "method": "actual-ui-play-to-terminal",
+      "outcome": "passed-at-local-a4d6582",
+      "proofRefs": [
+        "closingFocusedLibraryContact"
+      ]
+    },
+    "library-interruption": {
+      "file": "viewer/e2e/library-reading.spec.ts",
+      "name": "library-reading: Pause and ordinary direction retain progress for explicit Resume",
+      "method": "actual-ui-play-to-terminal",
+      "outcome": "passed-at-local-a4d6582",
+      "proofRefs": [
+        "closingFocusedLibraryContact"
+      ]
+    },
+    "library-end": {
+      "file": "viewer/e2e/library-reading.spec.ts",
+      "name": "library-reading: held transfer Pause and End drain safely before Reset",
+      "method": "actual-ui-play-to-terminal",
+      "outcome": "passed-at-local-a4d6582",
+      "proofRefs": [
+        "closingFocusedLibraryContact"
+      ]
     }
   },
   "nodeFixtureCatalog": {
@@ -4578,9 +4680,81 @@
       "limits": "Actual progress/safety recorded through tick2017 only; no indefinite starvation-freedom certification.",
       "proofScopeNotes": "Bounded actual UI progress/safety now proven through2017ticks; historical perf metrics remain separate. No indefinite liveness certification.",
       "priorLimitsAtInventorySource": "Existing perf case reports metrics and only asserts console errors; sustained progress/safety assertions missing."
+    },
+    "computer-workshop": {
+      "terminal": "Demonstration, both original named learner tasks, learner A review/conversation and ordinary departure complete, with terminal child records and released claims; alternatively safe End retains partial work and drains children.",
+      "retainedEffects": [
+        "same two computer task receipts and elapsed progress",
+        "distinct 12/18-second learner commitments",
+        "actual demonstration/review history",
+        "explicit withdrawn participation until Join"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "individual Pause/ordinary direction/explicit Join/Resume while peer completes",
+        "local practice Pause/Resume",
+        "safe End retaining unfinished tasks",
+        "Reset",
+        "detached reads and camera non-authority"
+      ],
+      "limits": "Three declared anonymous people, fixed ground display/computers/chairs; learner A presents review. Local Pause supports practice only; global Pause for gatherings. Silent tasks, no generated images, typing simulation, arbitrary cast or active reload."
+    },
+    "library-reading": {
+      "terminal": "The same original book is partially read at the source, physically transferred by ordinary handling to the second declared table, and the same task/bookmark is completed there; alternatively safe End drains children and retains unfinished reading and actual supported placement.",
+      "retainedEffects": [
+        "original book identity and actual support",
+        "same actor/task/duration and exact partial bookmark",
+        "original fixture identity and terminal child history"
+      ],
+      "disruptionsWithRecordedChecks": [
+        "Node: Pause, ordinary direction and explicit Resume at both reading stages and held transfer",
+        "Node: End/direct cancel/repeated cancel and monotonic ending",
+        "Node: occupied destination, unavailable book, changed binding and stale receipt refusal",
+        "Node: threshold admission and observation purity",
+        "Actual UI Play: Pause, ordinary direction and explicit Resume to completion",
+        "Actual UI Play: held-transfer Pause/End and Reset epoch cleanup"
+      ],
+      "limits": "One reader and two pre-authored grounded tables/chairs; a 24-second hypothetical book purpose relocates after seven seconds. No single-chair relocation, arbitrary rebind, generated text, active reload restoration or universal recovery if both release supports become unavailable."
     }
   },
   "scenarios": [
+    {
+      "id": "computer-workshop",
+      "title": "Computer workshop \u00b7 demonstrate, practice and review (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts",
+        "viewer/engine/scenarios/computer-workshop.ts",
+        "viewer/engine/activities/computer-workshop.ts"
+      ],
+      "startControls": [
+        "Start workshop",
+        "Play"
+      ],
+      "setupNotes": [
+        "Three anonymous people; existing display service and ordinary work/classroom executors."
+      ],
+      "contractRef": "computer-workshop",
+      "coverageGrade": "recorded-actual-ui-play-local-candidate",
+      "currentSourceProofRelationship": "All3 focused local Play PASS at exact clean fcd3f55; no public/combined-gate certification yet.",
+      "testRefs": [
+        "workshop-play",
+        "workshop-interruption",
+        "workshop-end"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "computer-workshop.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Clean combined full gate and verified public publication."
+      ],
+      "boundedNextTest": "Run the established frozen combined gate; publish only after GREEN, then verify actual public workshop Play.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "connected"
+    },
     {
       "id": "living-day-4",
       "title": "Living day \u00b7 Mars classroom (hypothetical)",
@@ -7457,6 +7631,45 @@
         "alpha-preset-solar-paint"
       ],
       "acceptedPublicationProofRef": "alphaRelease42Verified"
+    },
+    {
+      "id": "library-reading",
+      "title": "Library reading \u00b7 carry the same book and continue (hypothetical)",
+      "category": "manual-journey",
+      "engineContinuousFlag": true,
+      "sourceFiles": [
+        "viewer/app/lab/living-object-scenarios.ts",
+        "viewer/engine/scenarios/library-reading.ts",
+        "viewer/engine/activities/library-reading.ts"
+      ],
+      "startControls": [
+        "Start library reading",
+        "Play"
+      ],
+      "setupNotes": [
+        "One anonymous reader, same original supported book, two existing grounded tables and prepared chairs."
+      ],
+      "contractRef": "library-reading",
+      "coverageGrade": "recorded-actual-ui-play-local-candidate",
+      "currentSourceProofRelationship": "All3 exact supported local Play cases PASS at clean a4d6582;8library PNG inspected plus supplemental3closeups. Combined gate/public pending.",
+      "testRefs": [
+        "library-play",
+        "library-interruption",
+        "library-end"
+      ],
+      "selectorProofRefs": [],
+      "nodeFixtureFiles": [
+        "library-reading.test.ts",
+        "library-relocation.test.ts"
+      ],
+      "nodeFixtureExecutionIsNotUiPlay": true,
+      "sustainedLiveness": null,
+      "missingProof": [
+        "Clean combined full gate and verified public publication."
+      ],
+      "boundedNextTest": "Freeze combined source, run full gate, publish then verify three exact public library Play cases.",
+      "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
+      "discoveryGroup": "activities"
     }
   ],
   "unprovedLegacyChecks": {
@@ -7782,6 +7995,13 @@
       },
       "cause": "Dev-only fixtures import unpublished /app/lab/scenarios.ts and /engine/*.ts before fixture creation; secondary undefined fixture.inspect. Production bundled runtime intentionally does not serve these source modules. Native 4 FAIL retained; exact clean local043 Vite fixture PASS remains separate.",
       "status": "retained native public harness failures; no public synthetic fixture proof; supported model accepted using separate real selectable native liveness proof"
+    },
+    {
+      "id": "workshop-preparatory38-room-contact",
+      "source": "38a98d7",
+      "proofRef": "workshopPreparatoryGate38",
+      "status": "Original RED retained; separate focused correction PASS; final full gate still pending.",
+      "boundary": "Validation-only existing room-preparation.spec.ts; no renderer, rig, authority, tolerance or golden change."
     }
   ],
   "topGaps": [
@@ -7847,5 +8067,23 @@
       ],
       "status": "Reviewed atomic supported-return observation repair passed three serial public41 repetitions, clean043 combined gate and fresh public42 same whole supper journey; supported release42 accepted. Original native failure/cause/status remain unchanged at their historical checkpoint."
     }
-  ]
+  ],
+  "pendingExpansion": {
+    "id": "computer-workshop",
+    "baseAcceptedRelease": 42,
+    "status": "Workshop3focused Play PASS; preparatory gate RED on preexisting ankle-proxy assertion, original receipt retained. Final combined gate/public pending.",
+    "registeredTotal": 64,
+    "acceptedCheckpointTotal": 63,
+    "meaning": "Existing alpha42 receipts remain historical source-bound proofs. A new registration is not accepted by their green gate.",
+    "summaryMeaning": "Summary registration total now64; mapped alpha gate and all accepted publication receipts remain at original63/source043. No candidate full gate proof yet.",
+    "focusedPlayProofRef": "workshopFocusedPlayFcd"
+  },
+  "pendingLibraryExpansion": {
+    "id": "library-reading",
+    "acceptedOnlineRelease": 42,
+    "acceptedOnlinePresetCount": 63,
+    "candidateRegisteredTotal": 65,
+    "status": "Reviewed registered core31PASS; all3 authored library actual Play cases executed PASS at a4d6582,8inspected captures plus3supplementalcloseups; final combined gate/public pending.",
+    "focusedPlayProofRef": "closingFocusedLibraryContact"
+  }
 }

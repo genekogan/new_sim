@@ -31,6 +31,15 @@ export const LAB_SCENARIO_GROUPS = [
   }
 ] as const;
 export const LAB_CONTRACTS = {
+  "computer-workshop": {
+    "group": "connected",
+    "start": [
+      "Start workshop",
+      "Play"
+    ],
+    "outcome": "Demonstration, both original named learner tasks, learner A review/conversation and ordinary departure complete, with terminal child records and released claims; alternatively safe End retains partial work and drains children.",
+    "scope": "Three declared anonymous people, fixed ground display/computers/chairs; learner A presents review. Local Pause supports practice only; global Pause for gatherings. Silent tasks, no generated images, typing simulation, arbitrary cast or active reload."
+  },
   "living-day-4": {
     "group": "connected",
     "start": [
@@ -632,5 +641,14 @@ export const LAB_CONTRACTS = {
     ],
     "outcome": "Finite paint bands match engine coverage, panel transported flat/installed and counted stock stays coherent.",
     "scope": "Scripted fixture; browser stepping is not UI Play completion."
+  },
+  "library-reading": {
+    "group": "activities",
+    "start": [
+      "Start library reading",
+      "Play"
+    ],
+    "outcome": "The same original book is partially read at the source, physically transferred by ordinary handling to the second declared table, and the same task/bookmark is completed there; alternatively safe End drains children and retains unfinished reading and actual supported placement.",
+    "scope": "One reader and two pre-authored grounded tables/chairs; a 24-second hypothetical book purpose relocates after seven seconds. No single-chair relocation, arbitrary rebind, generated text, active reload restoration or universal recovery if both release supports become unavailable."
   }
 } as const;

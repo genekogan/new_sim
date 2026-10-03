@@ -1,3 +1,5 @@
+import { libraryReadingRuntime } from '../../engine/scenarios/library-reading.ts';
+import { computerWorkshopRuntime, computerWorkshopScene } from '../../engine/scenarios/computer-workshop.ts';
 import { gardenCircuitRuntime, gardenCircuitScene } from '../../engine/scenarios/garden-circuit.ts';
 import { communalSupperRuntime, communalSupperScene } from '../../engine/scenarios/communal-supper.ts';
 import { roomPreparationRuntime, roomPreparationScene } from '../../engine/scenarios/room-preparation.ts';
@@ -31,6 +33,20 @@ const checks: Scenario['expect'] = (rt) => [
   },
 ];
 export const LIVING_OBJECT_SCENARIOS: Scenario[] = [
+  {
+    name: 'library-reading',
+    title: 'Library reading · carry the same book and continue (hypothetical)',
+    description: 'Start library reading, then Play. One anonymous reader studies the same supported book for seven seconds, gets up, physically carries it to a second prepared table and chair, and finishes the same 24-second purpose and bookmark. Pause safely stops reading or returns the held book; direct the released reader away and explicitly Resume. End drains ordinary children and retains unfinished reading and actual book placement. Two fixed ground tables and prepared chairs; no automatic furnishing, arbitrary relocation, generated text or active reload restoration.',
+    scene: () => READING_SCENE, humans: () => [], build: libraryReadingRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [2, 0, 11, 65], expect: checks,
+  },
+  {
+    name: 'computer-workshop',
+    title: 'Computer workshop · demonstrate, practice and review (hypothetical)',
+    description: 'Start workshop, then Play. Three anonymous people use a real display, two computers and supported seats: facilitator demonstration, two independent named tasks, learner A review, conversation and departure. Pause a learner, direct them away, explicitly Join and Resume retained work while the peer continues. Leave persists; all three must explicitly rejoin before shared review. End drains ordinary children and retains task/session history. Local workshop Pause only supports practice; use global Pause during gatherings. Fixed ground arrangement, silent presentation and task progress; no generated images, typing simulation or active reload restoration.',
+    scene: computerWorkshopScene, humans: () => [], build: computerWorkshopRuntime,
+    start: () => {}, continuous: true, maxTicks: 36000, focus: [0, -1, 15, 65], expect: checks,
+  },
   {
     name: 'garden-circuit',
     title: 'Finite garden circuit · resupply, care and due waits (hypothetical)',

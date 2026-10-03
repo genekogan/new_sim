@@ -30,6 +30,7 @@ const button = (page: Page, name: string) =>
 async function inspect(page: Page) {
   return page.evaluate(() => {
     const h = window.__marsEngine as RoomHook;
+    const feet = h.meshPoints('worker', 1).filter((p) => p.part === 'foot');
     return {
       state: h.state(),
       epoch: h.scenarioEpoch,
@@ -42,6 +43,12 @@ async function inspect(page: Page) {
       held: h.heldItems(),
       hands: h.humanFields(),
       bones: h.bones(),
+      // Rotated Walk shoes cannot be measured by ankle minus a rest-pose offset.
+      // Preserve that proxy above; measure the actual rendered ground contact.
+      workerFootContact: {
+        vertices: feet.length,
+        lowestY: Math.min(...feet.map((p) => p.p[1])),
+      },
       slots: h.slots(),
       claims: h.garden().claims,
       attention: h.activityAttentionTargets(),
@@ -216,9 +223,11 @@ async function waitMode(page: Page, mode: 'paused' | 'completed') {
 test.afterEach(async ({ page }, info) => {
   const name = info.title.startsWith('connected')
     ? 'room-preparation-connected'
-    : info.title.startsWith('active')
-      ? 'room-preparation-active-end'
-      : 'room-preparation-early-end';
+    : info.title.startsWith('ground Walk')
+      ? 'room-preparation-walk-contact'
+      : info.title.startsWith('active')
+        ? 'room-preparation-active-end'
+        : 'room-preparation-early-end';
   save(`${name}-result`, {
     status: info.status,
     errors: info.errors.map((e) => e.message),
@@ -271,9 +280,10 @@ test('connected actual Play: held bowl safe Pause, carried table safe retry, sam
   expect(heldBowl.held.find((e) => e.id === 'break-bowl')?.palm).not.toBeNull();
   expect(heldBowl.hands.worker.hands?.right).toHaveLength(3);
   expect(heldBowl.bones.worker).toBeDefined();
-  expect(
-    Math.abs(Math.min(...heldBowl.bones.worker.soles)),
-  ).toBeLessThanOrEqual(0.03);
+  expect(heldBowl.workerFootContact.vertices).toBeGreaterThan(0);
+  expect(Math.abs(heldBowl.workerFootContact.lowestY)).toBeLessThanOrEqual(
+    0.03,
+  );
   const tidy = room(heldBowl).tidy!.task;
   await button(page, 'Pause preparation').click();
   await expect(button(page, 'Resume preparation')).toBeDisabled();
@@ -692,4 +702,41 @@ test('active held-table End uses actual Play ground setdown and drains without s
     ended,
     retained,
   });
+});
+
+// Deterministic renderer regression supplements (never substitutes for) actual Play
+// above. Keep the full walking interval, including the original failed tick95.
+test('ground Walk held-bowl contact measures the rendered shoe through ticks80–115', async ({
+  page,
+}) => {
+  await open(page);
+  await button(page, 'Start room preparation').click();
+  const observations = [];
+  for (let tick = 80; tick <= 115; tick++) {
+    await page.evaluate((target) => {
+      const h = window.__marsEngine;
+      h.step(target - h.state().tick);
+    }, tick);
+    const s = await inspect(page);
+    expect(s.state.tick).toBe(tick);
+    expect(s.violations).toEqual([]);
+    expect(s.state.humans.find((h) => h.id === 'worker')?.activity).toBe(
+      'walk',
+    );
+    expect(s.held.find((e) => e.id === 'break-bowl')?.by).toBe('worker');
+    expect(s.workerFootContact.vertices).toBeGreaterThan(0);
+    expect(Math.abs(s.workerFootContact.lowestY)).toBeLessThanOrEqual(0.03);
+    observations.push({
+      tick,
+      proxy: s.bones.worker.soles,
+      contact: s.workerFootContact,
+    });
+  }
+  save('room-preparation-walk-contact-interval', observations);
+  await capture(page, 'room-preparation-walk-contact-last-tick');
+  await button(page, 'End preparation').click();
+  await play(page);
+  await waitMode(page, 'completed');
+  const ended = await capture(page, 'room-preparation-walk-contact-safe-end');
+  clean(ended);
 });

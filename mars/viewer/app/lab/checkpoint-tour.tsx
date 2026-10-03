@@ -6,6 +6,8 @@ type Props = {
 /** Discovery only: existing scenario loading and classroom controls own every action. */
 export function CheckpointTour({ scenario, onScenario }: Props) {
   const living =
+    scenario === 'library-reading' ||
+    scenario === 'computer-workshop' ||
     scenario.startsWith('living-day-') ||
     scenario === 'garden-circuit' ||
     scenario === 'communal-supper' ||
@@ -123,6 +125,8 @@ export function CheckpointTour({ scenario, onScenario }: Props) {
           Try the prepared day in an independent studio
         </button>
       </div>
+      {scenario === 'computer-workshop' && <p className="lab-desc">Start workshop, then Play. Watch the demonstration, independently interrupt the two learners, then review the same retained work. The controls below expose explicit Join/Resume and safe End. Global Pause freezes gatherings; local Pause stops practice safely.</p>}
+      {scenario === 'library-reading' && <p className="lab-desc">Start library reading, then Play. Watch the same book move between the two prepared reading places. Pause reading drains ordinary seating or book handling; keep Play running for cleanup, then direct the reader away or Resume the same bookmark. End retains actual unfinished effects. Reset clears this world.</p>}
       <p className="lab-meta">
         Loading a room resets the current world. These rooms and participants
         are hypothetical. Use Play and the activity controls below; Reset starts

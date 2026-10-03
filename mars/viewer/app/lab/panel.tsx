@@ -1,3 +1,5 @@
+import { LibraryReadingHud } from './library-reading-hud.tsx';
+import { ComputerWorkshopHud } from './computer-workshop-hud.tsx';
 import { GardenCircuitHud } from './garden-circuit-hud.tsx';
 import { CommunalSupperHud } from './communal-supper-hud.tsx';
 import { RoomPreparationHud } from './room-preparation-hud.tsx';
@@ -142,6 +144,8 @@ export function LabPanel({ view, checks, onScenario, onOverlay, onAll, onDrop, r
       <RestHud key={`quiet-rest:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <GardenCircuitHud key={`garden-circuit:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <CommunalSupperHud key={`communal-supper:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <ComputerWorkshopHud key={`computer-workshop:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
+      <LibraryReadingHud key={`library-reading:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <RoomPreparationHud key={`room-preparation:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <GardenAfternoonHud key={`garden-afternoon:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />
       <SeedPlantingHud key={`seed-planting:${sim.scenarioEpoch}`} sim={sim} refresh={refresh} />

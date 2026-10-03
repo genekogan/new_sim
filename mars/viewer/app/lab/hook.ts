@@ -1,3 +1,5 @@
+import { libraryReadingReadout } from '../../engine/activities/library-reading.ts';
+import { readComputerWorkshop } from '../../engine/activities/computer-workshop.ts';
 import { readGardenCircuit } from '../../engine/activities/garden-circuit.ts';
 import { readCommunalSupper } from '../../engine/activities/communal-supper.ts';
 import { readRoomPreparation } from '../../engine/activities/room-preparation.ts';
@@ -55,6 +57,8 @@ export type EngineHook = ReturnType<typeof installHook>;
 
 /** Explicit observers/reset/presentation controls; every other function is fenced by default. */
 const QUARANTINE_ALLOWED = new Set([
+  'libraryReading',
+  'computerWorkshop',
   'gardenCircuit',
   'communalSupper',
   'roomPreparation',
@@ -192,6 +196,8 @@ export function installHook(view: LabView, notify: () => void) {
   const hook = {
     gardenCircuit: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'garden_circuit').at(-1); return r ? readGardenCircuit(sim.rt, r.id) ?? null : null; },
     communalSupper: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'communal_supper').at(-1); return r ? readCommunalSupper(sim.rt, r.id) ?? null : null; },
+    libraryReading: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'library_reading').at(-1); return r ? libraryReadingReadout(sim.rt, r.id) ?? null : null; },
+    computerWorkshop: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'computer_workshop').at(-1); return r ? readComputerWorkshop(sim.rt, r.id) ?? null : null; },
     roomPreparation: () => { const r = [...sim.rt.records.values()].filter(r => r.verb === 'room_preparation').at(-1); return r ? readRoomPreparation(sim.rt, r.id) ?? null : null; },
     gardenAfternoon: () => readGardenAfternoon(sim.rt) ?? null,
     seedPlanting: () => {

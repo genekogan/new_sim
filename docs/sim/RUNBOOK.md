@@ -42,6 +42,15 @@ Code rollback to the playback release remains state-compatible, with local rewin
 only; re-promoting the archive reader restores older rewind without a data restore. The model ledger is independent of trace pruning and budget changes. Unknown
 model prices refuse admission; uncertain transport failures retain the reservation.
 
+## Published Mars registry delta
+
+The browser Lab includes computer workshop and library reading. The additive
+registry advances activities29→31. Existing runtime checkpoints retain their
+physical state; the successor restored and advanced an old rest checkpoint exactly.
+Previously exported bound plans should be rebound against the new registry stamp.
+The two composites remain non-resumable while active and are not automatically
+started in the persistent camp. They use its ordinary admission/release contracts.
+
 ## Owner mandate controls
 
 In a living world, POST `/v1/souls/<id>/mandate` with `{words, strict, id?}` adds

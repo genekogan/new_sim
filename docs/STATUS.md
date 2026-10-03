@@ -37,8 +37,7 @@ Current checks: workspace typecheck; 45 server tests qualified (44 broad-pass pl
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
-The active Little Martians and Eden worlds, construction from the piles, and
-the published Mars closing delta remain ahead. All four bounded Opus helpers finished;
+The active Little Martians and Eden worlds, construction from the piles, remain ahead. All four bounded Opus helpers finished;
 building pictures are available at `/buildings`.
 
 ## Mandate milestone
@@ -58,6 +57,22 @@ paid calls settled, server stopped. Browser add/strict/edit/reload/remove passed
 page errors or HTTP failures. Focused tests also cover interruption, blocked reporting,
 structured steering, strict reporting, replay/restart and card tampering. Successful
 provider responses with missing/invalid usage retain their admission reservation.
+
+## Mars closing unit
+
+The published computer workshop and physical same-book library continuation are
+imported together with all six shared wiring files from exact commits `4b89357`,
+`1b57a55`, `ab1f6be` and coverage metadata `fa0c9b6`. Original Mars stayed read-only.
+Registry activities29→31; old checkpoint restored and advanced without invariant faults.
+Both presets are browser Lab snapshots; this does not install composite routines in
+the persistent camp. Named floater admission covers all four new verbs.
+
+Successor proof: full Sim suites passed (45 server tests); Mars engine 1,539 passed,
+6 inherited skips, 11 inherited TODOs, zero failures. The six actual Play journeys
+passed: workshop completion, independent interruption/rejoin, safe End/Reset, same-book
+transfer completion, interrupted reading continuation, and held-transfer cleanup/Reset.
+Original publication evidence remains source-inherited; full successor Mars gate is
+still reserved for tranche end.
 
 ## Retained shell capabilities
 

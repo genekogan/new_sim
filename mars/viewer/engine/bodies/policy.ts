@@ -48,6 +48,10 @@ const CONTROL = (parent: string) => works(R.control, `steers an existing ${paren
 const listener = approx(R.hoverSeat, 'listens from a seat or place: hovers there facing the activity; no seated posture');
 
 export const FLOATER_POLICY: Readonly<Record<string, VerbPolicy>> = {
+  computer_workshop: HANDS('computer practice and workshop task execution'),
+  computer_workshop_control: CONTROL('computer_workshop'),
+  library_reading: HANDS('holding, carrying and reading the same book'),
+  library_reading_control: CONTROL('library_reading'),
   // locomotion and the social core
   walk_to: approx(R.glide, 'glides at constant hover over the ordinary ground route; level changes only through floater-passable openings (bodies/float.ts), stairs/ladders refused by name'),
   ambient_wander: approx(R.glide, 'background strolls become glides between standable points'),
