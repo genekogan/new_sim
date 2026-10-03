@@ -96,6 +96,12 @@ in the table above. Dated release38 proof does not certify those later additions
 
 Choose a Scenario in `/lab`, or use its Quick tour. Play advances authoritative
 20Hz simulation; Step advances one fixed tick; Pause freezes the whole world.
+Scripted presets show completion expectations before they are satisfied. Red
+“still running”, unfinished-step or not-yet-installed checks during execution are
+pending outcomes, not invariant violations. A supported completed journey must
+satisfy them. Named invariant/fault banners are separate: inspect their diagnostics
+and use fresh Reset after quarantine; do not treat those as expected progress.
+
 Speed changes playback rate, not timestep. Reset or loading another scenario
 replaces the current world, including all retained intentions and object states.
 Manually started activity presets require their own Start control. Scripted movement
