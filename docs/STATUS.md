@@ -370,3 +370,20 @@ Construction v4 completed all 48 days physically but failed the unchanged 20%
 timing limit narrowly (20.71%); fresh v5 qualification is pending. Full native
 gate retains its original report and focused repairs; this hash-only source
 change receives equivalence and full native-engine validation separately.
+
+## Repeated support proof candidate
+
+Fresh v5 was stopped unqualified after 11 days: physical construction, daily
+renewal and restart held, but native hashing alone left too much completed-
+structure cost. The progressive support invariant now reuses only a successful
+proof after every input it reads still matches by value. Connections and holder
+arrays mutated in place, definition/phase/standing-angle changes, new/deleted
+parts and exceptions invalidate it. Failed diagnostics and locations are never
+reused; every other invariant remains active. This memo is bounded by the current
+world and is not serialized or added to its rules/state.
+
+Matched unprofiled 20,000-tick late-state copies measured 0.758379→0.595700 ms,
+with identical world, kernel and recorded-take hashes and zero invariants. Three
+structural mutation/error regressions pass; full suites then fresh v6 are pending.
+This derived-check acceleration and the native hash provider are the only native
+engine source changes after the original full gate.

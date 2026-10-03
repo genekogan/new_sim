@@ -50,8 +50,50 @@ export const frameAccessContributor: Contributor = (world) => ({ links: frameLin
 
 const PROGRESSIVE = (e: Entity) => isJoist(e) || isPlywood(e) || isStairFlight(e) || e.def === 'stair-tread';
 
+// A completed deck has the same support chain for many ticks. Reuse only a
+// successful proof, after comparing every input read by supportProblems and
+// groupStability by value (connections/holder arrays mutate in place). Only
+// copied proof inputs are retained; no diagnostics, controllers or history.
+type SupportSnap = { key: string; id: string; def: string; category: string; phase: Entity['phase'];
+  pitch: number | undefined; roll: number | undefined; support: string; holders: number;
+  levels: number; crew: number; connections: string[] };
+const supported = new WeakMap<WorldState, SupportSnap[]>();
+
+function supportInputs(w: WorldState, previous?: SupportSnap[]): SupportSnap[] | undefined {
+  let i = 0, same = !!previous;
+  const oldLength = previous?.length;
+  const next: SupportSnap[] = previous ?? [];
+  for (const key in w.entities) {
+    if (!Object.hasOwn(w.entities, key)) continue;
+    const e = w.entities[key], d = def(e.def), s = previous?.[i];
+    const holders = e.support?.kind === 'held' ? e.support.by.length : 0;
+    const levels = d.size[1], crew = d.handling?.holdCrew ?? 1;
+    const cs = e.connections;
+    let match = !!s && s.key === key && s.id === e.id && s.def === e.def && s.category === d.category && s.phase === e.phase &&
+      s.pitch === e.pose.pitch && s.roll === e.pose.roll && s.support === (e.support?.kind ?? '') &&
+      s.holders === holders && s.levels === levels && s.crew === crew && s.connections.length === (cs?.length ?? 0) * 3;
+    if (match && cs) for (let j = 0; j < cs.length; j++) {
+      const c = cs[j];
+      if (s!.connections[j * 3] !== c.socket || s!.connections[j * 3 + 1] !== c.to || s!.connections[j * 3 + 2] !== c.toSocket) { match = false; break; }
+    }
+    same &&= match;
+    // Reuse copied scalar snapshots on hits; copy changed inputs only.
+    next[i++] = match ? s! : { key, id: e.id, def: e.def, category: d.category, phase: e.phase,
+      pitch: e.pose.pitch, roll: e.pose.roll, support: e.support?.kind ?? '', holders, levels, crew,
+      connections: (cs ?? []).flatMap(c => [c.socket, c.to, c.toSocket]) };
+  }
+  if (oldLength !== i) same = false;
+  next.length = i;
+  return same ? undefined : next;
+}
+
 /** Installed joists / sheets / stairs / treads must have a complete support chain. */
 export const progressiveSupported: Invariant = (rt) => {
+  let inputs: SupportSnap[] | undefined;
+  try { inputs = supportInputs(rt.world, supported.get(rt.world)); }
+  catch (error) { supported.delete(rt.world); throw error; }
+  if (!inputs) return [];
+  supported.delete(rt.world); // An exception must never leave a success proof for changed inputs.
   const out: Diagnostic[] = [];
   for (const e of sorted(rt.world)) {
     if (!PROGRESSIVE(e) || e.phase !== 'installed') continue;
@@ -59,5 +101,7 @@ export const progressiveSupported: Invariant = (rt) => {
     if (pr.length)
       out.push({ code: 'support.deck-unsupported', message: `${def(e.def).label} ${e.id} is installed but unsupported: ${pr.join('; ')}`, subjects: [e.id], at: e.pose.p });
   }
+  if (!out.length) supported.set(rt.world, inputs);
+  else supported.delete(rt.world);
   return out;
 };

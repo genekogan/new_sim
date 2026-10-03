@@ -293,3 +293,10 @@ It produces identical UTF-8 hashes; the browser/Worker default stays portable.
 No rules version or checkpoint migration is required. Hash equivalence and a
 full engine suite with the native provider precede release. Keep soak timing
 thresholds intact; CPU measurements are evidence, not permission to weaken them.
+
+Progressive support checks retain a successful proof only while all structural
+inputs still match by value. The memo compares in-place connection/holder arrays,
+definitions, phases and standing angles; changed inputs or exceptions force a
+fresh proof. Failed diagnostics always use current locations. Every other physical
+invariant still runs normally. The WeakMap memo holds no historical controller
+state and is absent from checkpoints and hashes.
