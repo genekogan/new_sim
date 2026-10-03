@@ -20,7 +20,6 @@ import build  # noqa: E402
 import footprint  # noqa: E402
 import geom  # noqa: E402
 import glaze  # noqa: E402
-import render  # noqa: E402
 import specs  # noqa: E402
 import validate  # noqa: E402
 

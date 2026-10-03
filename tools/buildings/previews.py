@@ -6,7 +6,6 @@ import bpy
 
 import render
 
-HEAD = (0.85, 0.42, 0.18)
 
 
 def _import(glb, dx=0.0):
@@ -60,7 +59,7 @@ def render_all(built, out, quick=False):
             paths.append(render.shot(os.path.join(out, f'{bid}-up-shaft.jpg'), (-0.9, -1.2, y + 0.9), (0.0, 0.0, y + 20), lens=12))
         # cutaway: the half nearest the camera removed
         for o in obs:
-            cut = render.cutaway(o, col)
+            render.cutaway(o, col)
             o.hide_render = True
         paths.append(render.shot(os.path.join(out, f'{bid}-section.jpg'), (0.95 * D, -0.25 * D, top * 0.45), (0, 0, mid), lens=40))
         write_plan(fp, os.path.join(out, f'{bid}-plan.svg'))
